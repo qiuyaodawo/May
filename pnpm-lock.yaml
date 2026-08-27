@@ -51,6 +51,12 @@ importers:
 
   packages/core: {}
 
+  packages/permissions:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/providers/anthropic:
     dependencies:
       '@may/core':

@@ -58,21 +58,26 @@ The session package composes Core into a long-lived identity. It owns a session
 id, metadata, serialized submission, context continuity, session events, and a
 storage seam. It may depend on `@may/core`; Core must not depend on it.
 
-### Permission runtime
+### `@may/permissions`
 
 Raw tools contain capabilities, not terminal interaction. Core exposes a
-general tool-executor seam. A permission package can implement that seam to
-allow, deny, or suspend execution for approval. Pending approvals and
-session-scoped grants belong to the headless session/runtime protocol. A TUI
-only renders a request and returns a decision.
+general tool-executor seam. The permissions package implements that seam to
+allow, deny, or suspend execution for approval. Its policy receives parsed tool
+input, and its approval events form a headless protocol: a TUI only renders a
+request and returns a decision.
+
+The first implementation supports one-time decisions. Session-scoped grants
+and durable approval decisions belong to later Session integration, not to the
+UI.
 
 ## Events and persistence
 
 `MayEvent` is a live observation of one run and may include streaming deltas.
-A future `SessionEvent` represents durable session facts such as submitted
-messages, finalized assistant messages, tool outcomes, run boundaries, and
-approval decisions. UI state is a projection of these events and is never the
-source of truth.
+`PermissionEvent` reports live approval requests and their resolution or
+cancellation. `SessionEvent` records durable session facts such as submitted
+messages, finalized assistant messages, tool outcomes, and run boundaries;
+approval decisions will join it when Session and permissions are integrated.
+UI state is a projection of these events and is never the source of truth.
 
 The first session implementation is in-memory, and its history model does not
 depend on a terminal UI or a specific storage backend.
