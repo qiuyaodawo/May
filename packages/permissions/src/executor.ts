@@ -26,6 +26,7 @@ export interface PermissionToolExecutorOptions {
 }
 
 interface PendingApproval {
+  request: ApprovalRequest;
   resolve(decision: ApprovalDecision): void;
   reject(error: Error): void;
   removeAbortListener(): void;
@@ -38,6 +39,7 @@ export class PermissionToolExecutor implements ToolExecutor {
   private readonly executor: ToolExecutor;
   private readonly eventQueue = new AsyncEventQueue<PermissionEvent>();
   private readonly pending = new Map<string, PendingApproval>();
+  private readonly sessionGrants = new Set<string>();
   private closed = false;
   private seq = 0;
 
@@ -62,21 +64,23 @@ export class PermissionToolExecutor implements ToolExecutor {
       input: execution.input,
       context: execution.context,
     };
-    const decision = await this.policy(check);
+    const outcome = normalizeDecision(await this.policy(check));
 
     this.throwIfClosed();
     throwIfAborted(execution.context.signal);
 
-    if (decision === "deny") {
+    if (outcome.decision === "deny") {
       throw new PermissionDeniedError(execution.tool.name);
     }
-    if (decision === "ask") {
-      const approval = await this.requestApproval(check);
-      if (approval === "deny") {
-        throw new PermissionDeniedError(execution.tool.name);
+    if (outcome.decision === "ask") {
+      const granted = outcome.grantKey !== undefined
+        && this.sessionGrants.has(outcome.grantKey);
+      if (!granted) {
+        const approval = await this.requestApproval(check, outcome.grantKey);
+        if (approval === "deny") {
+          throw new PermissionDeniedError(execution.tool.name);
+        }
       }
-    } else if (decision !== "allow") {
-      throw new TypeError(`Invalid permission decision: ${String(decision)}`);
     }
 
     this.throwIfClosed();
@@ -85,18 +89,37 @@ export class PermissionToolExecutor implements ToolExecutor {
   }
 
   resolve(requestId: string, decision: ApprovalDecision): boolean {
-    if (decision !== "allow" && decision !== "deny") {
+    if (
+      decision !== "allow"
+      && decision !== "allow-session"
+      && decision !== "deny"
+    ) {
       throw new TypeError(`Invalid approval decision: ${String(decision)}`);
     }
 
     const pending = this.pending.get(requestId);
     if (pending === undefined) return false;
+    const sessionGrantKey = decision === "allow-session"
+      ? pending.request.grantKey
+      : undefined;
+    if (decision === "allow-session" && sessionGrantKey === undefined) {
+      throw new TypeError(
+        `Approval request "${requestId}" does not define a session grant key`,
+      );
+    }
 
     this.pending.delete(requestId);
     pending.removeAbortListener();
+    if (sessionGrantKey !== undefined) {
+      this.sessionGrants.add(sessionGrantKey);
+    }
     this.emit({ type: "approval.resolved", requestId, decision });
     pending.resolve(decision);
     return true;
+  }
+
+  revokeSessionGrant(grantKey: string): boolean {
+    return this.sessionGrants.delete(grantKey);
   }
 
   close(reason?: string): void {
@@ -112,15 +135,26 @@ export class PermissionToolExecutor implements ToolExecutor {
       pending.reject(new PermissionExecutorClosedError(reason));
     }
 
+    this.sessionGrants.clear();
     this.eventQueue.close();
   }
 
-  private requestApproval(check: PermissionCheck): Promise<ApprovalDecision> {
-    const request: ApprovalRequest = {
-      ...check,
-      id: createApprovalId(),
-      createdAt: Date.now(),
-    };
+  private requestApproval(
+    check: PermissionCheck,
+    grantKey: string | undefined,
+  ): Promise<ApprovalDecision> {
+    const request: ApprovalRequest = grantKey === undefined
+      ? {
+          ...check,
+          id: createApprovalId(),
+          createdAt: Date.now(),
+        }
+      : {
+          ...check,
+          id: createApprovalId(),
+          createdAt: Date.now(),
+          grantKey,
+        };
 
     return new Promise<ApprovalDecision>((resolve, reject) => {
       const onAbort = () => {
@@ -134,6 +168,7 @@ export class PermissionToolExecutor implements ToolExecutor {
         reject(new RunCancelledError(reason));
       };
       const pending: PendingApproval = {
+        request,
         resolve,
         reject,
         removeAbortListener: () => {
@@ -158,6 +193,28 @@ export class PermissionToolExecutor implements ToolExecutor {
       timestamp: Date.now(),
     });
   }
+}
+
+interface NormalizedDecision {
+  decision: "allow" | "deny" | "ask";
+  grantKey?: string;
+}
+
+function normalizeDecision(value: PermissionDecision): NormalizedDecision {
+  if (value === "allow" || value === "deny" || value === "ask") {
+    return { decision: value };
+  }
+  if (
+    typeof value === "object"
+    && value !== null
+    && value.decision === "ask"
+  ) {
+    if (typeof value.grantKey !== "string" || value.grantKey.trim() === "") {
+      throw new TypeError("Invalid session grant key");
+    }
+    return { decision: "ask", grantKey: value.grantKey };
+  }
+  throw new TypeError(`Invalid permission decision: ${String(value)}`);
 }
 
 function throwIfAborted(signal: AbortSignal): void {

@@ -3,8 +3,17 @@ import type {
   ToolExecutionContext,
 } from "@may/core";
 
-export type PermissionDecision = "allow" | "deny" | "ask";
-export type ApprovalDecision = Exclude<PermissionDecision, "ask">;
+export interface ScopedPermissionAsk {
+  readonly decision: "ask";
+  readonly grantKey: string;
+}
+
+export type PermissionDecision =
+  | "allow"
+  | "deny"
+  | "ask"
+  | ScopedPermissionAsk;
+export type ApprovalDecision = "allow" | "allow-session" | "deny";
 
 export interface PermissionCheck {
   readonly tool: ToolDefinition;
@@ -19,6 +28,7 @@ export type PermissionPolicy = (
 export interface ApprovalRequest extends PermissionCheck {
   readonly id: string;
   readonly createdAt: number;
+  readonly grantKey?: string;
 }
 
 export type PermissionEventPayload =

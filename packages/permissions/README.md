@@ -11,9 +11,11 @@ import { May } from "@may/core";
 import { PermissionToolExecutor } from "@may/permissions";
 
 const permissions = new PermissionToolExecutor({
-  policy({ tool }) {
+  policy({ tool, input }) {
     if (tool.name === "read") return "allow";
-    if (tool.name === "write") return "ask";
+    if (tool.name === "write") {
+      return { decision: "ask", grantKey: `write:${JSON.stringify(input)}` };
+    }
     return "deny";
   },
 });
@@ -30,7 +32,15 @@ for await (const event of permissions.events) {
 
 Policies receive validated tool input and execution context. `allow` delegates
 to the wrapped executor, `deny` raises `PermissionDeniedError`, and `ask`
-suspends execution until `resolve()` receives `allow` or `deny`.
+suspends execution until `resolve()` receives `allow`, `allow-session`, or
+`deny`.
+
+`allow-session` is accepted only when the policy supplies an explicit
+`grantKey`. Reusing that key skips later prompts, but the policy is still
+evaluated first so a later `deny` wins. Use one executor per Session; sharing an
+executor would also share its in-memory grants.
+
+Use `revokeSessionGrant(grantKey)` to remove a grant before the executor closes.
 
 Pending requests are cancelled when their Run signal is aborted. Call
 `close()` when the owning application or session ends to reject remaining
@@ -38,7 +48,6 @@ requests and close the permission event stream.
 
 ## Current scope
 
-The package intentionally has no UI and no global permission registry. The
-initial implementation supports one-time decisions only. Persistent rules,
-session-scoped grants, and recording approval decisions in `SessionEvent` are
-future integration work.
+The package intentionally has no UI and no global permission registry. Grants
+live only for the lifetime of one executor. Persistent rules and recording
+approval decisions in `SessionEvent` are future integration work.

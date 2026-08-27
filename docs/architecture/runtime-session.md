@@ -66,9 +66,10 @@ allow, deny, or suspend execution for approval. Its policy receives parsed tool
 input, and its approval events form a headless protocol: a TUI only renders a
 request and returns a decision.
 
-The first implementation supports one-time decisions. Session-scoped grants
-and durable approval decisions belong to later Session integration, not to the
-UI.
+The permission executor supports one-time decisions and explicit scoped grants
+for its lifetime. Applications use one executor per Session so grants cannot
+leak between sessions. Durable grants and approval decisions belong to later
+Session storage integration, not to the UI.
 
 ## Events and persistence
 

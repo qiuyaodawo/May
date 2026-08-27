@@ -113,6 +113,80 @@ test("asks for approval and resumes after an allow response", async () => {
   permissions.close();
 });
 
+test("reuses an explicitly scoped session approval", async () => {
+  const permissions = new PermissionToolExecutor({
+    policy: () => ({ decision: "ask", grantKey: "bash:pwd" }),
+  });
+  const iterator = permissions.events[Symbol.asyncIterator]();
+  const firstResult = permissions.execute(createExecution());
+  const requested = (await iterator.next()).value;
+
+  assert.equal(requested.request.grantKey, "bash:pwd");
+  assert.equal(
+    permissions.resolve(requested.request.id, "allow-session"),
+    true,
+  );
+  assert.equal(await firstResult, "executed");
+  assert.equal((await iterator.next()).value.decision, "allow-session");
+
+  assert.equal(await permissions.execute(createExecution()), "executed");
+  permissions.close();
+  assert.equal((await iterator.next()).done, true);
+});
+
+test("requires an explicit grant key for allow-session", async () => {
+  const permissions = new PermissionToolExecutor({ policy: () => "ask" });
+  const iterator = permissions.events[Symbol.asyncIterator]();
+  const resultPromise = permissions.execute(createExecution());
+  const requested = (await iterator.next()).value;
+
+  assert.throws(
+    () => permissions.resolve(requested.request.id, "allow-session"),
+    /does not define a session grant key/,
+  );
+  assert.equal(permissions.resolve(requested.request.id, "allow"), true);
+  assert.equal(await resultPromise, "executed");
+  permissions.close();
+});
+
+test("does not let a session grant override a later denial", async () => {
+  let decision = { decision: "ask", grantKey: "bash:pwd" };
+  const permissions = new PermissionToolExecutor({ policy: () => decision });
+  const iterator = permissions.events[Symbol.asyncIterator]();
+  const firstResult = permissions.execute(createExecution());
+  const requested = (await iterator.next()).value;
+  permissions.resolve(requested.request.id, "allow-session");
+  await firstResult;
+
+  decision = "deny";
+  await assert.rejects(
+    permissions.execute(createExecution()),
+    PermissionDeniedError,
+  );
+  permissions.close();
+});
+
+test("can revoke a session grant", async () => {
+  const permissions = new PermissionToolExecutor({
+    policy: () => ({ decision: "ask", grantKey: "bash:pwd" }),
+  });
+  const iterator = permissions.events[Symbol.asyncIterator]();
+  const firstResult = permissions.execute(createExecution());
+  const firstRequest = (await iterator.next()).value.request;
+  permissions.resolve(firstRequest.id, "allow-session");
+  await firstResult;
+  await iterator.next();
+
+  assert.equal(permissions.revokeSessionGrant("bash:pwd"), true);
+  assert.equal(permissions.revokeSessionGrant("bash:pwd"), false);
+
+  const secondResult = permissions.execute(createExecution());
+  const secondRequest = (await iterator.next()).value.request;
+  permissions.resolve(secondRequest.id, "allow");
+  assert.equal(await secondResult, "executed");
+  permissions.close();
+});
+
 test("rejects an asked tool after a deny response", async () => {
   const permissions = new PermissionToolExecutor({ policy: () => "ask" });
   const iterator = permissions.events[Symbol.asyncIterator]();
@@ -241,6 +315,18 @@ test("rejects an invalid policy decision", async () => {
     /Invalid permission decision: later/,
   );
   permissions.close();
+  permissions.close();
+});
+
+test("rejects an empty session grant key", async () => {
+  const permissions = new PermissionToolExecutor({
+    policy: () => ({ decision: "ask", grantKey: " " }),
+  });
+
+  await assert.rejects(
+    permissions.execute(createExecution()),
+    /Invalid session grant key/,
+  );
   permissions.close();
 });
 
