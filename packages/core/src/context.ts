@@ -8,7 +8,7 @@ export interface ContextSnapshot {
 
 export interface AppendOptions {
   runId?: string;
-  turn?: number;
+  step?: number;
 }
 
 export interface Context {

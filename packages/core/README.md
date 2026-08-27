@@ -25,6 +25,28 @@ for await (const event of run.events) {
 const result = await run.result;
 ```
 
+## Tool execution
+
+May validates tool input and sends the parsed call through a `ToolExecutor`.
+The default `directToolExecutor` calls the tool directly. Applications can
+supply another executor to add cross-cutting behavior without changing tools:
+
+```ts
+import { directToolExecutor, May } from "@may/core";
+
+const toolExecutor = {
+  async execute(execution) {
+    console.log(`Executing ${execution.tool.name}`);
+    return directToolExecutor.execute(execution);
+  },
+};
+
+const may = new May({ model, tools, context, toolExecutor });
+```
+
+Permission checks, approvals, timeouts, and tracing can use this seam. Core
+does not impose any of those policies itself.
+
 Model adapters emit normalized `text.delta` and `response.completed` events.
 Tool failures are converted into tool messages so the model can recover.
 Model and Context failures terminate the run.

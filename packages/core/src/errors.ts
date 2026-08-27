@@ -14,9 +14,9 @@ export class ModelProtocolError extends MayError {
   }
 }
 
-export class MaxTurnsExceededError extends MayError {
-  constructor(maxTurns: number) {
-    super("MAX_TURNS_EXCEEDED", `Run exceeded the maximum of ${maxTurns} turns`);
+export class MaxStepsExceededError extends MayError {
+  constructor(maxSteps: number) {
+    super("MAX_STEPS_EXCEEDED", `Run exceeded the maximum of ${maxSteps} steps`);
   }
 }
 

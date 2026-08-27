@@ -239,7 +239,7 @@ test("round-trips reasoning_content through a May tool-call loop", async () => {
   const result = await run.result;
   const events = await eventPromise;
 
-  assert.equal(result.turns, 2);
+  assert.equal(result.steps, 2);
   assert.equal(
     result.message.content.find((part) => part.type === "text").text,
     "2 + 3 = 5",

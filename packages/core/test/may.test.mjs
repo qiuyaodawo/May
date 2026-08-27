@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { InMemoryContext, May, reasoningContent } from "../dist/index.js";
+import {
+  directToolExecutor,
+  InMemoryContext,
+  May,
+  reasoningContent,
+} from "../dist/index.js";
 
 function assistant(text, toolCalls) {
   const message = {
@@ -78,16 +83,16 @@ test("returns a direct model response and emits ordered events", async () => {
   const events = await eventPromise;
 
   assert.equal(result.message.content[0].text, "hello");
-  assert.equal(result.turns, 1);
+  assert.equal(result.steps, 1);
   assert.deepEqual(
     events.map((event) => event.type),
     [
       "run.started",
-      "turn.started",
+      "step.started",
       "model.started",
       "model.text.delta",
       "model.completed",
-      "turn.completed",
+      "step.completed",
       "run.completed",
     ],
   );
@@ -133,7 +138,7 @@ test("forwards reasoning deltas and preserves reasoning content", async () => {
   assert.deepEqual((await context.snapshot()).messages.at(-1), response);
 });
 
-test("rejects invalid maxTurns and duplicate tool names at construction", () => {
+test("rejects invalid maxSteps and duplicate tool names at construction", () => {
   const model = { async *stream() {} };
   const context = new InMemoryContext();
   const duplicate = {
@@ -144,8 +149,8 @@ test("rejects invalid maxTurns and duplicate tool names at construction", () => 
   };
 
   assert.throws(
-    () => new May({ model, context, maxTurns: 0 }),
-    /maxTurns must be a positive integer/,
+    () => new May({ model, context, maxSteps: 0 }),
+    /maxSteps must be a positive integer/,
   );
   assert.throws(
     () => new May({ model, context, tools: [duplicate, duplicate] }),
@@ -154,11 +159,11 @@ test("rejects invalid maxTurns and duplicate tool names at construction", () => 
 });
 
 test("executes a tool and feeds its result back to the model", async () => {
-  let modelTurn = 0;
+  let modelStep = 0;
   const model = {
     async *stream(request) {
-      modelTurn += 1;
-      if (modelTurn === 1) {
+      modelStep += 1;
+      if (modelStep === 1) {
         assert.equal(request.tools[0].name, "add");
         yield {
           type: "response.completed",
@@ -207,7 +212,7 @@ test("executes a tool and feeds its result back to the model", async () => {
   const result = await run.result;
   const events = await eventPromise;
 
-  assert.equal(result.turns, 2);
+  assert.equal(result.steps, 2);
   assert.equal(result.message.content[0].text, "2 + 3 = 5");
   assert.ok(events.some((event) => event.type === "tool.completed"));
 
@@ -220,7 +225,67 @@ test("executes a tool and feeds its result back to the model", async () => {
   ]);
 });
 
-test("preserves opaque model state across turns and runs", async () => {
+test("routes parsed tool calls through a custom executor", async () => {
+  let modelStep = 0;
+  let observedExecution;
+  const model = {
+    async *stream(request) {
+      modelStep += 1;
+      if (modelStep === 1) {
+        yield {
+          type: "response.completed",
+          message: assistant("", [
+            { id: "double_call", name: "double", input: { value: "4" } },
+          ]),
+        };
+        return;
+      }
+
+      assert.equal(request.messages.at(-1).content[0].value, 8);
+      yield {
+        type: "response.completed",
+        message: assistant("4 doubled is 8"),
+      };
+    },
+  };
+  const double = {
+    name: "double",
+    description: "Double a number",
+    inputSchema: { type: "object" },
+    parse(input) {
+      return { value: Number(input.value) };
+    },
+    async execute({ value }) {
+      return value * 2;
+    },
+  };
+  const toolExecutor = {
+    async execute(execution) {
+      observedExecution = execution;
+      return directToolExecutor.execute(execution);
+    },
+  };
+
+  const run = new May({
+    model,
+    tools: [double],
+    context: new InMemoryContext(),
+    toolExecutor,
+  }).run({ input: "double four" });
+  const result = await run.result;
+
+  assert.equal(result.steps, 2);
+  assert.equal(observedExecution.tool, double);
+  assert.deepEqual(observedExecution.input, { value: 4 });
+  assert.equal(observedExecution.context.runId, run.id);
+  assert.equal(observedExecution.context.step, 1);
+  assert.equal(
+    observedExecution.context.idempotencyKey,
+    `${run.id}:1:double_call`,
+  );
+});
+
+test("preserves opaque model state across steps and runs", async () => {
   const firstState = {
     type: "test.provider/response-v1",
     data: { responseId: "response_1", signature: "signed" },
@@ -306,13 +371,13 @@ test("preserves opaque model state across turns and runs", async () => {
   assert.equal(modelCall, 3);
 });
 
-test("executes multiple tool calls from one model turn in order", async () => {
-  let modelTurn = 0;
+test("executes multiple tool calls from one model step in order", async () => {
+  let modelStep = 0;
   const executionOrder = [];
   const model = {
     async *stream(request) {
-      modelTurn += 1;
-      if (modelTurn === 1) {
+      modelStep += 1;
+      if (modelStep === 1) {
         yield {
           type: "response.completed",
           message: assistant("", [
@@ -357,7 +422,7 @@ test("executes multiple tool calls from one model turn in order", async () => {
   const result = await run.result;
   const events = await eventPromise;
 
-  assert.equal(result.turns, 2);
+  assert.equal(result.steps, 2);
   assert.deepEqual(executionOrder, ["first", "second"]);
   assert.deepEqual(
     events
@@ -377,12 +442,12 @@ test("executes multiple tool calls from one model turn in order", async () => {
 });
 
 test("turns a tool parse failure into a tool message and continues", async () => {
-  let modelTurn = 0;
+  let modelStep = 0;
   let executeCalled = false;
   const model = {
     async *stream(request) {
-      modelTurn += 1;
-      if (modelTurn === 1) {
+      modelStep += 1;
+      if (modelStep === 1) {
         yield {
           type: "response.completed",
           message: assistant("", [
@@ -429,7 +494,7 @@ test("turns a tool parse failure into a tool message and continues", async () =>
   const result = await run.result;
   const events = await eventPromise;
 
-  assert.equal(result.turns, 2);
+  assert.equal(result.steps, 2);
   assert.equal(executeCalled, false);
   const failure = events.find((event) => event.type === "tool.failed");
   assert.equal(failure.error.name, "TypeError");
@@ -437,11 +502,11 @@ test("turns a tool parse failure into a tool message and continues", async () =>
 });
 
 test("turns a tool execution error into a tool message and continues", async () => {
-  let modelTurn = 0;
+  let modelStep = 0;
   const model = {
     async *stream(request) {
-      modelTurn += 1;
-      if (modelTurn === 1) {
+      modelStep += 1;
+      if (modelStep === 1) {
         yield {
           type: "response.completed",
           message: assistant("", [
@@ -480,18 +545,77 @@ test("turns a tool execution error into a tool message and continues", async () 
   const result = await run.result;
   const events = await eventPromise;
 
-  assert.equal(result.turns, 2);
+  assert.equal(result.steps, 2);
   const failure = events.find((event) => event.type === "tool.failed");
   assert.equal(failure.error.message, "tool exploded");
   assertSingleTerminalEvent(events, "run.completed");
 });
 
-test("turns an unknown tool into a tool error so the model can recover", async () => {
-  let turn = 0;
+test("turns a custom executor error into a tool message and continues", async () => {
+  let modelStep = 0;
   const model = {
     async *stream(request) {
-      turn += 1;
-      if (turn === 1) {
+      modelStep += 1;
+      if (modelStep === 1) {
+        yield {
+          type: "response.completed",
+          message: assistant("", [
+            { id: "blocked_call", name: "blocked", input: {} },
+          ]),
+        };
+        return;
+      }
+
+      const toolMessage = request.messages.at(-1);
+      assert.equal(toolMessage.isError, true);
+      assert.equal(
+        toolMessage.content[0].value.message,
+        "executor unavailable",
+      );
+      yield {
+        type: "response.completed",
+        message: assistant("executor failure recovered"),
+      };
+    },
+  };
+  const blocked = {
+    name: "blocked",
+    description: "Must be intercepted",
+    inputSchema: {},
+    async execute() {
+      assert.fail("the raw tool must not execute");
+    },
+  };
+  const toolExecutor = {
+    async execute() {
+      throw new Error("executor unavailable");
+    },
+  };
+
+  const run = new May({
+    model,
+    tools: [blocked],
+    context: new InMemoryContext(),
+    toolExecutor,
+  }).run({ input: "run blocked tool" });
+  const eventPromise = collect(run.events);
+  const result = await run.result;
+  const events = await eventPromise;
+
+  assert.equal(result.steps, 2);
+  assert.equal(
+    events.find((event) => event.type === "tool.failed").error.message,
+    "executor unavailable",
+  );
+  assertSingleTerminalEvent(events, "run.completed");
+});
+
+test("turns an unknown tool into a tool error so the model can recover", async () => {
+  let step = 0;
+  const model = {
+    async *stream(request) {
+      step += 1;
+      if (step === 1) {
         yield {
           type: "response.completed",
           message: assistant("", [
@@ -519,12 +643,12 @@ test("turns an unknown tool into a tool error so the model can recover", async (
   const result = await run.result;
   const events = await eventPromise;
 
-  assert.equal(result.turns, 2);
+  assert.equal(result.steps, 2);
   assert.ok(events.some((event) => event.type === "tool.failed"));
   assert.equal(events.at(-1).type, "run.completed");
 });
 
-test("fails when maxTurns is exceeded", async () => {
+test("fails when maxSteps is exceeded", async () => {
   const model = {
     async *stream() {
       yield {
@@ -549,14 +673,14 @@ test("fails when maxTurns is exceeded", async () => {
     model,
     tools: [noop],
     context: new InMemoryContext(),
-    maxTurns: 2,
+    maxSteps: 2,
   }).run({ input: "loop" });
   const eventPromise = collect(run.events);
 
-  await assert.rejects(run.result, { code: "MAX_TURNS_EXCEEDED" });
+  await assert.rejects(run.result, { code: "MAX_STEPS_EXCEEDED" });
   const events = await eventPromise;
   assert.equal(events.at(-1).type, "run.failed");
-  assert.equal(events.at(-1).error.code, "MAX_TURNS_EXCEEDED");
+  assert.equal(events.at(-1).error.code, "MAX_STEPS_EXCEEDED");
 });
 
 test("fails when the model stream ends without response.completed", async () => {
@@ -719,6 +843,55 @@ test("run.cancel aborts an active tool without turning it into a tool failure", 
 
   assert.equal(toolSignal.aborted, true);
   assert.equal(toolSignal.reason, "stop tool");
+  assert.equal(events.some((event) => event.type === "tool.failed"), false);
+  assertSingleTerminalEvent(events, "run.cancelled");
+});
+
+test("run.cancel aborts an active custom tool executor", async () => {
+  const started = deferred();
+  let executorSignal;
+  const model = {
+    async *stream() {
+      yield {
+        type: "response.completed",
+        message: assistant("", [
+          { id: "executor_call", name: "noop", input: {} },
+        ]),
+      };
+    },
+  };
+  const noop = {
+    name: "noop",
+    description: "Must be intercepted",
+    inputSchema: {},
+    async execute() {
+      assert.fail("the raw tool must not execute");
+    },
+  };
+  const toolExecutor = {
+    async execute({ context }) {
+      executorSignal = context.signal;
+      started.resolve();
+      await waitForAbort(context.signal);
+    },
+  };
+
+  const run = new May({
+    model,
+    tools: [noop],
+    context: new InMemoryContext(),
+    toolExecutor,
+  }).run({ input: "wait in executor" });
+  const eventPromise = collect(run.events);
+
+  await started.promise;
+  run.cancel("stop executor");
+
+  await assert.rejects(run.result, { code: "RUN_CANCELLED" });
+  const events = await eventPromise;
+
+  assert.equal(executorSignal.aborted, true);
+  assert.equal(executorSignal.reason, "stop executor");
   assert.equal(events.some((event) => event.type === "tool.failed"), false);
   assertSingleTerminalEvent(events, "run.cancelled");
 });

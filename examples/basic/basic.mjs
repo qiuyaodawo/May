@@ -1,12 +1,12 @@
 import { InMemoryContext, May } from "@may/core";
 
-let turn = 0;
+let step = 0;
 
 const model = {
   async *stream(request) {
-    turn += 1;
+    step += 1;
 
-    if (turn === 1) {
+    if (step === 1) {
       yield { type: "text.delta", delta: "让我计算一下……" };
       yield {
         type: "response.completed",

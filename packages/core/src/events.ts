@@ -8,34 +8,34 @@ export interface SerializedError {
 
 export interface RunResult {
   runId: string;
-  turns: number;
+  steps: number;
   message: AssistantMessage;
   usage?: Usage;
 }
 
 export type MayEventPayload =
   | { type: "run.started" }
-  | { type: "turn.started"; turn: number }
-  | { type: "turn.completed"; turn: number }
-  | { type: "model.started"; turn: number }
-  | { type: "model.text.delta"; turn: number; delta: string }
-  | { type: "model.reasoning.delta"; turn: number; delta: string }
+  | { type: "step.started"; step: number }
+  | { type: "step.completed"; step: number }
+  | { type: "model.started"; step: number }
+  | { type: "model.text.delta"; step: number; delta: string }
+  | { type: "model.reasoning.delta"; step: number; delta: string }
   | {
       type: "model.completed";
-      turn: number;
+      step: number;
       message: AssistantMessage;
       usage?: Usage;
     }
-  | { type: "tool.started"; turn: number; call: ToolCall }
+  | { type: "tool.started"; step: number; call: ToolCall }
   | {
       type: "tool.completed";
-      turn: number;
+      step: number;
       call: ToolCall;
       output: unknown;
     }
   | {
       type: "tool.failed";
-      turn: number;
+      step: number;
       call: ToolCall;
       error: SerializedError;
     }

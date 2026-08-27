@@ -1,6 +1,6 @@
 import type { Context, ContextSnapshot } from "./context.js";
 import {
-  MaxTurnsExceededError,
+  MaxStepsExceededError,
   ModelProtocolError,
   RunCancelledError,
   ToolNotFoundError,
@@ -13,7 +13,11 @@ import {
   type RunResult,
 } from "./events.js";
 import type { Model, ModelRequest, ToolDefinition } from "./model.js";
-import type { Tool } from "./tool.js";
+import {
+  directToolExecutor,
+  type Tool,
+  type ToolExecutor,
+} from "./tool.js";
 import {
   textContent,
   userMessage,
@@ -29,7 +33,8 @@ export interface MayOptions {
   model: Model;
   tools?: Tool[];
   context: Context;
-  maxTurns?: number;
+  maxSteps?: number;
+  toolExecutor?: ToolExecutor;
 }
 
 export interface RunOptions {
@@ -49,11 +54,13 @@ export class May {
   private readonly context: Context;
   private readonly tools: ReadonlyMap<string, Tool>;
   private readonly toolDefinitions: ToolDefinition[];
-  private readonly maxTurns: number;
+  private readonly maxSteps: number;
+  private readonly toolExecutor: ToolExecutor;
 
   constructor(options: MayOptions) {
-    if (!Number.isInteger(options.maxTurns ?? 16) || (options.maxTurns ?? 16) < 1) {
-      throw new RangeError("maxTurns must be a positive integer");
+    const maxSteps = options.maxSteps ?? 16;
+    if (!Number.isInteger(maxSteps) || maxSteps < 1) {
+      throw new RangeError("maxSteps must be a positive integer");
     }
 
     const tools = new Map<string, Tool>();
@@ -72,7 +79,8 @@ export class May {
       description: tool.description,
       inputSchema: tool.inputSchema,
     }));
-    this.maxTurns = options.maxTurns ?? 16;
+    this.maxSteps = maxSteps;
+    this.toolExecutor = options.toolExecutor ?? directToolExecutor;
   }
 
   run(options: RunOptions): RunHandle {
@@ -129,28 +137,28 @@ export class May {
       throwIfAborted(signal);
       await this.context.append([input], { runId });
 
-      for (let turn = 1; turn <= this.maxTurns; turn++) {
+      for (let step = 1; step <= this.maxSteps; step++) {
         throwIfAborted(signal);
-        emit({ type: "turn.started", turn });
+        emit({ type: "step.started", step });
 
         const snapshot = await this.context.snapshot();
         const request = this.createModelRequest(snapshot);
 
-        emit({ type: "model.started", turn });
+        emit({ type: "model.started", step });
         const { message, usage } = await this.consumeModel(
           request,
           signal,
-          turn,
+          step,
           emit,
         );
 
         throwIfAborted(signal);
-        await this.context.append([message], { runId, turn });
+        await this.context.append([message], { runId, step });
         emitOptionalUsage(
           emit,
           {
             type: "model.completed",
-            turn,
+            step,
             message,
           },
           usage,
@@ -158,9 +166,9 @@ export class May {
 
         const calls = message.toolCalls ?? [];
         if (calls.length === 0) {
-          emit({ type: "turn.completed", turn });
+          emit({ type: "step.completed", step });
 
-          const result = createRunResult(runId, turn, message, usage);
+          const result = createRunResult(runId, step, message, usage);
           emit({ type: "run.completed", result });
           return result;
         }
@@ -169,20 +177,20 @@ export class May {
           throwIfAborted(signal);
           const toolMessage = await this.executeTool(
             runId,
-            turn,
+            step,
             call,
             signal,
             emit,
           );
 
           throwIfAborted(signal);
-          await this.context.append([toolMessage], { runId, turn });
+          await this.context.append([toolMessage], { runId, step });
         }
 
-        emit({ type: "turn.completed", turn });
+        emit({ type: "step.completed", step });
       }
 
-      throw new MaxTurnsExceededError(this.maxTurns);
+      throw new MaxStepsExceededError(this.maxSteps);
     } catch (error) {
       if (signal.aborted || error instanceof RunCancelledError) {
         const cancelled = error instanceof RunCancelledError
@@ -228,7 +236,7 @@ export class May {
   private async consumeModel(
     request: ModelRequest,
     signal: AbortSignal,
-    turn: number,
+    step: number,
     emit: (event: MayEventPayload) => void,
   ): Promise<{ message: AssistantMessage; usage?: Usage }> {
     let completed: AssistantMessage | undefined;
@@ -238,12 +246,12 @@ export class May {
       throwIfAborted(signal);
 
       if (event.type === "text.delta") {
-        emit({ type: "model.text.delta", turn, delta: event.delta });
+        emit({ type: "model.text.delta", step, delta: event.delta });
         continue;
       }
 
       if (event.type === "reasoning.delta") {
-        emit({ type: "model.reasoning.delta", turn, delta: event.delta });
+        emit({ type: "model.reasoning.delta", step, delta: event.delta });
         continue;
       }
 
@@ -272,28 +280,32 @@ export class May {
 
   private async executeTool(
     runId: string,
-    turn: number,
+    step: number,
     call: ToolCall,
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
   ): Promise<ToolMessage> {
-    emit({ type: "tool.started", turn, call });
+    emit({ type: "tool.started", step, call });
 
     try {
       const tool = this.tools.get(call.name);
       if (!tool) throw new ToolNotFoundError(call.name);
 
       const input = tool.parse ? tool.parse(call.input) : call.input;
-      const output = await tool.execute(input, {
-        runId,
-        turn,
-        toolCallId: call.id,
-        idempotencyKey: `${runId}:${turn}:${call.id}`,
-        signal,
+      const output = await this.toolExecutor.execute({
+        tool,
+        input,
+        context: {
+          runId,
+          step,
+          toolCallId: call.id,
+          idempotencyKey: `${runId}:${step}:${call.id}`,
+          signal,
+        },
       });
 
       throwIfAborted(signal);
-      emit({ type: "tool.completed", turn, call, output });
+      emit({ type: "tool.completed", step, call, output });
 
       return {
         role: "tool",
@@ -305,7 +317,7 @@ export class May {
       if (signal.aborted || error instanceof RunCancelledError) throw error;
 
       const serialized = serializeError(error);
-      emit({ type: "tool.failed", turn, call, error: serialized });
+      emit({ type: "tool.failed", step, call, error: serialized });
 
       return {
         role: "tool",
@@ -336,11 +348,11 @@ function toReason(reason: unknown): string | undefined {
 
 function createRunResult(
   runId: string,
-  turns: number,
+  steps: number,
   message: AssistantMessage,
   usage: Usage | undefined,
 ): RunResult {
-  const result: RunResult = { runId, turns, message };
+  const result: RunResult = { runId, steps, message };
   if (usage !== undefined) result.usage = usage;
   return result;
 }

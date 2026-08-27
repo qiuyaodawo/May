@@ -16,7 +16,7 @@ test("completes a real reasoning and tool-call loop", { timeout: 120_000 }, asyn
   });
   const run = new May({
     model,
-    maxTurns: 4,
+    maxSteps: 4,
     context: new InMemoryContext({
       instructions: "You are testing May. Follow the user's tool-use instruction exactly.",
     }),
@@ -63,7 +63,7 @@ test("completes a real reasoning and tool-call loop", { timeout: 120_000 }, asyn
     events.some((event) => event.type === "tool.completed"),
     "Kimi did not call the add tool",
   );
-  assert.ok(result.turns >= 2, "the tool loop did not reach a continuation turn");
+  assert.ok(result.steps >= 2, "the tool loop did not reach a continuation step");
   assert.ok(
     result.message.content.some(
       (part) => part.type === "text" && part.text.trim() !== "",

@@ -324,7 +324,7 @@ test("round-trips signed and redacted thinking through a May tool loop", async (
   const result = await run.result;
   const events = await eventPromise;
 
-  assert.equal(result.turns, 2);
+  assert.equal(result.steps, 2);
   assert.equal(result.message.content[0].text, "2 + 3 = 5");
   assert.ok(events.some((event) => event.type === "model.reasoning.delta"));
   assert.ok(events.some((event) => event.type === "tool.completed"));

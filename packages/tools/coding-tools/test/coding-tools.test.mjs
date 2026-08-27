@@ -66,7 +66,7 @@ test("registers a created read tool in a May tool loop", async (t) => {
 
   const result = await run.result;
 
-  assert.equal(result.turns, 2);
+  assert.equal(result.steps, 2);
   assert.equal(result.message.content[0].text, "hello from the workspace");
   assert.deepEqual(requests[0].tools.map((tool) => tool.name), ["read"]);
 });

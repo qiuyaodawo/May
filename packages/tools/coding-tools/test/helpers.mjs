@@ -12,7 +12,7 @@ export async function executeTool(tool, input, signal) {
   const parsed = tool.parse ? tool.parse(input) : input;
   return tool.execute(parsed, {
     runId: "run_test",
-    turn: 1,
+    step: 1,
     toolCallId: "call_test",
     idempotencyKey: "run_test:1:call_test",
     signal: signal ?? new AbortController().signal,
