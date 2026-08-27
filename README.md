@@ -12,6 +12,7 @@ packages/
   provider-deepseek/  DeepSeek streaming model adapter
   provider-zhipu/     Zhipu GLM streaming model adapter
   provider-kimi/      Kimi streaming model adapter
+  provider-anthropic/ Anthropic Messages API streaming model adapter
 examples/
   basic/      Minimal Model → Tool → Model example
   deepseek/   Live DeepSeek tool-call example

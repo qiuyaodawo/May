@@ -10,6 +10,7 @@
     "test:integration:deepseek": "pnpm --filter @may/provider-deepseek run test:integration",
     "test:integration:zhipu": "pnpm --filter @may/provider-zhipu run test:integration",
     "test:integration:kimi": "pnpm --filter @may/provider-kimi run test:integration",
+    "test:integration:anthropic": "pnpm --filter @may/provider-anthropic run test:integration",
     "example": "pnpm run build && pnpm --filter @may/example-basic run start",
     "example:deepseek": "pnpm run build && pnpm --filter @may/example-deepseek run start"
   },

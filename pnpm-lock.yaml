@@ -29,6 +29,12 @@ importers:
 
   packages/core: {}
 
+  packages/provider-anthropic:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/provider-deepseek:
     dependencies:
       '@may/core':
