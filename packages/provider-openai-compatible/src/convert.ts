@@ -12,6 +12,7 @@ import type {
 
 export function toOpenAICompatibleMessages(
   messages: Message[],
+  options: { includeToolName?: boolean } = {},
 ): OpenAICompatibleMessage[] {
   return messages.map((message) => {
     if (message.role === "system" || message.role === "user") {
@@ -22,11 +23,16 @@ export function toOpenAICompatibleMessages(
     }
 
     if (message.role === "tool") {
-      return {
+      const converted: Extract<
+        OpenAICompatibleMessage,
+        { role: "tool" }
+      > = {
         role: "tool",
         tool_call_id: message.toolCallId,
         content: serializeVisibleContent(message.content),
       };
+      if (options.includeToolName) converted.name = message.name;
+      return converted;
     }
 
     const converted: Extract<

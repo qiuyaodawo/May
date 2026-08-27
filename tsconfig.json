@@ -4,6 +4,7 @@
     { "path": "./packages/core" },
     { "path": "./packages/provider-openai-compatible" },
     { "path": "./packages/provider-deepseek" },
-    { "path": "./packages/provider-zhipu" }
+    { "path": "./packages/provider-zhipu" },
+    { "path": "./packages/provider-kimi" }
   ]
 }

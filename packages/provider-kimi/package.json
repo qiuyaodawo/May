@@ -1,0 +1,32 @@
+{
+  "name": "@may/provider-kimi",
+  "version": "0.1.0",
+  "description": "Kimi model adapter for May.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs",
+    "test:integration": "pnpm run build && node --test test-integration/*.test.mjs"
+  },
+  "dependencies": {
+    "@may/core": "workspace:*",
+    "@may/provider-openai-compatible": "workspace:*"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

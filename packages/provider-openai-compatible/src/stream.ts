@@ -13,6 +13,7 @@ import { readSseData } from "./sse.js";
 export interface OpenAICompatibleStreamOptions {
   signal: AbortSignal;
   providerName: string;
+  requireDone?: boolean;
   protocolError(message: string, options?: ErrorOptions): Error;
   finishReasonError(finishReason: string): Error;
 }
@@ -32,6 +33,7 @@ export async function* streamOpenAICompatibleResponse(
   let hasReasoningContent = false;
   let usage: Usage | undefined;
   let finishReason: string | undefined;
+  let receivedDone = false;
   const pendingCalls = new Map<number, PendingToolCall>();
 
   for await (const data of readSseData(
@@ -40,7 +42,10 @@ export async function* streamOpenAICompatibleResponse(
     options.protocolError,
     options.providerName,
   )) {
-    if (data === "[DONE]") break;
+    if (data === "[DONE]") {
+      receivedDone = true;
+      break;
+    }
     const chunk = parseChunk(data, options);
 
     if (chunk.usage) usage = convertUsage(chunk.usage);
@@ -70,6 +75,12 @@ export async function* streamOpenAICompatibleResponse(
         finishReason = choice.finish_reason;
       }
     }
+  }
+
+  if (options.requireDone && !receivedDone) {
+    throw options.protocolError(
+      `${options.providerName} stream ended without [DONE]`,
+    );
   }
 
   if (finishReason === undefined) {

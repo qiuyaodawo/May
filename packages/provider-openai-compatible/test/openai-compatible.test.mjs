@@ -106,6 +106,18 @@ test("converts May messages and tools to the compatible wire format", () => {
       parameters: { type: "object" },
     },
   }]);
+
+  assert.deepEqual(toOpenAICompatibleMessages([{
+    role: "tool",
+    toolCallId: "call_1",
+    name: "lookup",
+    content: [{ type: "text", text: "found" }],
+  }], { includeToolName: true }), [{
+    role: "tool",
+    tool_call_id: "call_1",
+    name: "lookup",
+    content: "found",
+  }]);
 });
 
 test("assembles fragmented reasoning, text, tools, and usage", async () => {
@@ -211,6 +223,20 @@ test("uses provider error factories for malformed streams", async (t) => {
       (error) =>
         error instanceof TestProtocolError &&
         error.message === "TestProvider response has no body",
+    );
+  });
+
+  await t.test("required DONE marker", async () => {
+    await assert.rejects(
+      collect(streamOpenAICompatibleResponse(sseResponse([
+        { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
+      ]), {
+        ...streamOptions(),
+        requireDone: true,
+      })),
+      (error) =>
+        error instanceof TestProtocolError &&
+        error.message === "TestProvider stream ended without [DONE]",
     );
   });
 });
