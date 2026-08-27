@@ -19,6 +19,7 @@ export interface ModelRequest {
 
 export type ModelEvent =
   | { type: "text.delta"; delta: string }
+  | { type: "reasoning.delta"; delta: string }
   | {
       type: "response.completed";
       message: AssistantMessage;

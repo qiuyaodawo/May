@@ -19,6 +19,7 @@ export type MayEventPayload =
   | { type: "turn.completed"; turn: number }
   | { type: "model.started"; turn: number }
   | { type: "model.text.delta"; turn: number; delta: string }
+  | { type: "model.reasoning.delta"; turn: number; delta: string }
   | {
       type: "model.completed";
       turn: number;

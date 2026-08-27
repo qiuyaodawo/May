@@ -242,6 +242,11 @@ export class May {
         continue;
       }
 
+      if (event.type === "reasoning.delta") {
+        emit({ type: "model.reasoning.delta", turn, delta: event.delta });
+        continue;
+      }
+
       if (completed) {
         throw new ModelProtocolError(
           "Model emitted more than one response.completed event",

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { InMemoryContext, May } from "../dist/index.js";
+import { InMemoryContext, May, reasoningContent } from "../dist/index.js";
 
 function assistant(text, toolCalls) {
   const message = {
@@ -99,6 +99,38 @@ test("returns a direct model response and emits ordered events", async () => {
     "assistant",
   ]);
   assert.deepEqual(snapshot.metadata, { tenant: "test" });
+});
+
+test("forwards reasoning deltas and preserves reasoning content", async () => {
+  const response = {
+    role: "assistant",
+    content: [
+      ...reasoningContent("I should calculate first."),
+      { type: "text", text: "The answer is 42." },
+    ],
+  };
+  const model = {
+    async *stream() {
+      yield { type: "reasoning.delta", delta: "I should calculate first." };
+      yield { type: "text.delta", delta: "The answer is 42." };
+      yield { type: "response.completed", message: response };
+    },
+  };
+
+  const context = new InMemoryContext();
+  const run = new May({ model, context }).run({ input: "think" });
+  const eventPromise = collect(run.events);
+  const result = await run.result;
+  const events = await eventPromise;
+
+  assert.deepEqual(result.message, response);
+  assert.deepEqual(
+    events
+      .filter((event) => event.type === "model.reasoning.delta")
+      .map((event) => event.delta),
+    ["I should calculate first."],
+  );
+  assert.deepEqual((await context.snapshot()).messages.at(-1), response);
 });
 
 test("rejects invalid maxTurns and duplicate tool names at construction", () => {

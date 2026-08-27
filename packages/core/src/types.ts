@@ -2,6 +2,7 @@ export type JsonSchema = Readonly<Record<string, unknown>>;
 
 export type ContentPart =
   | { type: "text"; text: string }
+  | { type: "reasoning"; text: string }
   | { type: "json"; value: unknown };
 
 export interface SystemMessage {
@@ -48,6 +49,10 @@ export interface Usage {
 
 export function textContent(text: string): ContentPart[] {
   return [{ type: "text", text }];
+}
+
+export function reasoningContent(text: string): ContentPart[] {
+  return [{ type: "reasoning", text }];
 }
 
 export function userMessage(text: string): UserMessage {
