@@ -18,7 +18,22 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
+  examples/deepseek:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@may/provider-deepseek':
+        specifier: workspace:*
+        version: link:../../packages/provider-deepseek
+
   packages/core: {}
+
+  packages/provider-deepseek:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 

@@ -6,8 +6,9 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "test": "pnpm -r --if-present run test",
-    "test:coverage": "pnpm --filter @may/core run test:coverage",
-    "example": "pnpm run build && pnpm --filter @may/example-basic run start"
+    "test:coverage": "pnpm -r --if-present run test:coverage",
+    "example": "pnpm run build && pnpm --filter @may/example-basic run start",
+    "example:deepseek": "pnpm run build && pnpm --filter @may/example-deepseek run start"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

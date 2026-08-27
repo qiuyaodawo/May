@@ -1,0 +1,12 @@
+{
+  "name": "@may/example-deepseek",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node deepseek.mjs"
+  },
+  "dependencies": {
+    "@may/core": "workspace:*",
+    "@may/provider-deepseek": "workspace:*"
+  }
+}

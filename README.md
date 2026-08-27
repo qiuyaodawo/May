@@ -8,8 +8,10 @@ be used independently or combined into complete agents and applications.
 ```text
 packages/
   core/       Agent loop, contracts, events, and in-memory Context
+  provider-deepseek/  DeepSeek streaming model adapter
 examples/
   basic/      Minimal Model → Tool → Model example
+  deepseek/   Live DeepSeek tool-call example
 ```
 
 Future Provider, Tool, Context, and Agent packages will be added alongside
@@ -23,4 +25,10 @@ pnpm build
 pnpm test
 pnpm test:coverage
 pnpm example
+```
+
+The live DeepSeek example additionally requires `DEEPSEEK_API_KEY`:
+
+```bash
+pnpm example:deepseek
 ```

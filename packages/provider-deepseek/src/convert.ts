@@ -1,0 +1,82 @@
+import type {
+  ContentPart,
+  Message,
+  ToolCall,
+  ToolDefinition,
+} from "@may/core";
+import type {
+  DeepSeekMessage,
+  DeepSeekToolCall,
+  DeepSeekToolDefinition,
+} from "./protocol.js";
+
+export function convertMessages(messages: Message[]): DeepSeekMessage[] {
+  return messages.map((message) => {
+    if (message.role === "system" || message.role === "user") {
+      return {
+        role: message.role,
+        content: serializeVisibleContent(message.content),
+      };
+    }
+
+    if (message.role === "tool") {
+      return {
+        role: "tool",
+        tool_call_id: message.toolCallId,
+        content: serializeVisibleContent(message.content),
+      };
+    }
+
+    const converted: Extract<DeepSeekMessage, { role: "assistant" }> = {
+      role: "assistant",
+      content: serializeVisibleContent(message.content),
+    };
+    const reasoning = message.content
+      .filter((part) => part.type === "reasoning")
+      .map((part) => part.text)
+      .join("");
+
+    if (reasoning !== "") converted.reasoning_content = reasoning;
+    if (message.toolCalls !== undefined) {
+      converted.tool_calls = message.toolCalls.map(convertToolCall);
+    }
+
+    return converted;
+  });
+}
+
+export function convertTools(
+  tools: ToolDefinition[],
+): DeepSeekToolDefinition[] {
+  return tools.map((tool) => ({
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.inputSchema,
+    },
+  }));
+}
+
+function convertToolCall(call: ToolCall): DeepSeekToolCall {
+  return {
+    id: call.id,
+    type: "function",
+    function: {
+      name: call.name,
+      arguments: serializeJson(call.input),
+    },
+  };
+}
+
+function serializeVisibleContent(content: ContentPart[]): string {
+  return content
+    .filter((part) => part.type !== "reasoning")
+    .map((part) => part.type === "text" ? part.text : serializeJson(part.value))
+    .join("\n");
+}
+
+function serializeJson(value: unknown): string {
+  const serialized = JSON.stringify(value);
+  return serialized === undefined ? "null" : serialized;
+}
