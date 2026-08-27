@@ -39,7 +39,8 @@ export interface DeepSeekChatRequest {
   stream_options: { include_usage: true };
   tools?: DeepSeekToolDefinition[];
   thinking?: { type: "enabled" | "disabled" };
-  reasoning_effort?: "low" | "high" | "xhigh" | "max";
+  reasoning_effort?: "low" | "medium" | "high" | "xhigh" | "max";
+  max_tokens?: number;
 }
 
 export interface DeepSeekToolCallDelta {

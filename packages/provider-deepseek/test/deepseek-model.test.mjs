@@ -98,6 +98,7 @@ test("streams reasoning, text, usage, and sends DeepSeek configuration", async (
     baseURL: "https://example.test/",
     thinking: "enabled",
     reasoningEffort: "high",
+    maxTokens: 4096,
     fetch,
   });
   const controller = new AbortController();
@@ -118,6 +119,7 @@ test("streams reasoning, text, usage, and sends DeepSeek configuration", async (
   assert.deepEqual(body.stream_options, { include_usage: true });
   assert.deepEqual(body.thinking, { type: "enabled" });
   assert.equal(body.reasoning_effort, "high");
+  assert.equal(body.max_tokens, 4096);
   assert.equal("tools" in body, false);
 
   assert.deepEqual(events, [
@@ -313,6 +315,63 @@ test("assembles multiple interleaved tool calls in index order", async () => {
   ]);
 });
 
+test("preserves an explicitly empty reasoning_content for tool continuation", async () => {
+  const requests = [];
+  const responses = [
+    sseResponse([
+      {
+        choices: [{
+          index: 0,
+          delta: {
+            reasoning_content: "",
+            tool_calls: [{
+              index: 0,
+              id: "call_ping",
+              type: "function",
+              function: { name: "ping", arguments: "{}" },
+            }],
+          },
+          finish_reason: null,
+        }],
+      },
+      {
+        choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
+      },
+      "[DONE]",
+    ]),
+    sseResponse(completionChunks({ text: "pong" })),
+  ];
+  const model = new DeepSeekModel({
+    apiKey: "secret",
+    model: "model",
+    fetch: async (_url, init) => {
+      requests.push(JSON.parse(init.body));
+      return responses.shift();
+    },
+  });
+  const run = new May({
+    model,
+    tools: [{
+      name: "ping",
+      description: "Return pong",
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        return "pong";
+      },
+    }],
+    context: new InMemoryContext(),
+  }).run({ input: "ping" });
+
+  await run.result;
+
+  const assistant = requests[1].messages[1];
+  assert.equal(
+    Object.hasOwn(assistant, "reasoning_content"),
+    true,
+  );
+  assert.equal(assistant.reasoning_content, "");
+});
+
 test("surfaces structured DeepSeek HTTP errors", async () => {
   const fetch = async () => new Response(JSON.stringify({
     error: {
@@ -378,6 +437,35 @@ test("rejects malformed and incomplete DeepSeek streams", async (t) => {
       { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
       "[DONE]",
     ], DeepSeekProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+  await t.test("incomplete tool call", () =>
+    rejectStream([
+      {
+        choices: [{
+          index: 0,
+          delta: { tool_calls: [{ index: 0, id: "call_missing_name" }] },
+          finish_reason: null,
+        }],
+      },
+      { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
+      "[DONE]",
+    ], DeepSeekProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+});
+
+test("rejects a successful response without a streaming body", async () => {
+  const model = new DeepSeekModel({
+    apiKey: "secret",
+    model: "model",
+    fetch: async () => new Response(null, { status: 200 }),
+  });
+
+  await assert.rejects(
+    collect(model.stream(emptyRequest, {
+      signal: new AbortController().signal,
+    })),
+    (error) =>
+      error instanceof DeepSeekProtocolError &&
+      error.code === "DEEPSEEK_PROTOCOL_ERROR",
+  );
 });
 
 test("passes AbortSignal to fetch and propagates cancellation", async () => {
@@ -422,5 +510,13 @@ test("validates required constructor options", () => {
   assert.throws(
     () => new DeepSeekModel({ apiKey: "secret", model: "" }),
     /model must not be empty/,
+  );
+  assert.throws(
+    () => new DeepSeekModel({
+      apiKey: "secret",
+      model: "model",
+      maxTokens: 0,
+    }),
+    /maxTokens must be a positive safe integer/,
   );
 });

@@ -31,12 +31,15 @@ export function convertMessages(messages: Message[]): DeepSeekMessage[] {
       role: "assistant",
       content: serializeVisibleContent(message.content),
     };
-    const reasoning = message.content
-      .filter((part) => part.type === "reasoning")
-      .map((part) => part.text)
-      .join("");
+    const reasoningParts = message.content.filter(
+      (part) => part.type === "reasoning",
+    );
 
-    if (reasoning !== "") converted.reasoning_content = reasoning;
+    if (reasoningParts.length > 0) {
+      converted.reasoning_content = reasoningParts
+        .map((part) => part.text)
+        .join("");
+    }
     if (message.toolCalls !== undefined) {
       converted.tool_calls = message.toolCalls.map(convertToolCall);
     }

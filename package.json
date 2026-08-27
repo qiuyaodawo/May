@@ -7,6 +7,7 @@
     "clean": "tsc -b --clean",
     "test": "pnpm -r --if-present run test",
     "test:coverage": "pnpm -r --if-present run test:coverage",
+    "test:integration:deepseek": "pnpm --filter @may/provider-deepseek run test:integration",
     "example": "pnpm run build && pnpm --filter @may/example-basic run start",
     "example:deepseek": "pnpm run build && pnpm --filter @may/example-deepseek run start"
   },

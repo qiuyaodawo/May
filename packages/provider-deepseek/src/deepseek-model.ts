@@ -19,7 +19,12 @@ import type {
 } from "./protocol.js";
 import { readSseData } from "./sse.js";
 
-export type DeepSeekReasoningEffort = "low" | "high" | "xhigh" | "max";
+export type DeepSeekReasoningEffort =
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
 
 export interface DeepSeekModelOptions {
   apiKey: string;
@@ -27,6 +32,7 @@ export interface DeepSeekModelOptions {
   baseURL?: string;
   thinking?: "enabled" | "disabled";
   reasoningEffort?: DeepSeekReasoningEffort;
+  maxTokens?: number;
   fetch?: typeof globalThis.fetch;
 }
 
@@ -42,6 +48,7 @@ export class DeepSeekModel implements Model {
   private readonly baseURL: string;
   private readonly thinking: "enabled" | "disabled" | undefined;
   private readonly reasoningEffort: DeepSeekReasoningEffort | undefined;
+  private readonly maxTokens: number | undefined;
   private readonly fetchImplementation: typeof globalThis.fetch;
 
   constructor(options: DeepSeekModelOptions) {
@@ -51,6 +58,12 @@ export class DeepSeekModel implements Model {
     if (options.model.trim() === "") {
       throw new TypeError("model must not be empty");
     }
+    if (
+      options.maxTokens !== undefined &&
+      (!Number.isSafeInteger(options.maxTokens) || options.maxTokens < 1)
+    ) {
+      throw new RangeError("maxTokens must be a positive safe integer");
+    }
 
     this.apiKey = options.apiKey;
     this.model = options.model;
@@ -58,6 +71,7 @@ export class DeepSeekModel implements Model {
       .replace(/\/+$/, "");
     this.thinking = options.thinking;
     this.reasoningEffort = options.reasoningEffort;
+    this.maxTokens = options.maxTokens;
     this.fetchImplementation = options.fetch ?? globalThis.fetch;
   }
 
@@ -82,6 +96,7 @@ export class DeepSeekModel implements Model {
 
     let text = "";
     let reasoning = "";
+    let hasReasoningContent = false;
     let usage: Usage | undefined;
     let finishReason: string | undefined;
     const pendingCalls = new Map<number, PendingToolCall>();
@@ -96,9 +111,12 @@ export class DeepSeekModel implements Model {
         if (choice.index !== 0) continue;
         const delta = choice.delta;
 
-        if (delta?.reasoning_content) {
-          reasoning += delta.reasoning_content;
-          yield { type: "reasoning.delta", delta: delta.reasoning_content };
+        if (typeof delta?.reasoning_content === "string") {
+          hasReasoningContent = true;
+          if (delta.reasoning_content !== "") {
+            reasoning += delta.reasoning_content;
+            yield { type: "reasoning.delta", delta: delta.reasoning_content };
+          }
         }
 
         if (delta?.content) {
@@ -133,7 +151,7 @@ export class DeepSeekModel implements Model {
     }
 
     const message: AssistantMessage = { role: "assistant", content: [] };
-    if (reasoning !== "") {
+    if (hasReasoningContent) {
       message.content.push({ type: "reasoning", text: reasoning });
     }
     if (text !== "") message.content.push({ type: "text", text });
@@ -162,6 +180,7 @@ export class DeepSeekModel implements Model {
     if (this.reasoningEffort !== undefined) {
       body.reasoning_effort = this.reasoningEffort;
     }
+    if (this.maxTokens !== undefined) body.max_tokens = this.maxTokens;
 
     return body;
   }
