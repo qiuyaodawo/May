@@ -220,6 +220,92 @@ test("executes a tool and feeds its result back to the model", async () => {
   ]);
 });
 
+test("preserves opaque model state across turns and runs", async () => {
+  const firstState = {
+    type: "test.provider/response-v1",
+    data: { responseId: "response_1", signature: "signed" },
+  };
+  const secondState = {
+    type: "test.provider/response-v1",
+    data: { responseId: "response_2" },
+  };
+  let modelCall = 0;
+  const model = {
+    async *stream(request) {
+      modelCall += 1;
+
+      if (modelCall === 1) {
+        yield {
+          type: "response.completed",
+          message: {
+            ...assistant("", [
+              { id: "state_call", name: "noop", input: {} },
+            ]),
+            modelState: firstState,
+          },
+        };
+        return;
+      }
+
+      const previousAssistant = request.messages
+        .filter((message) => message.role === "assistant")
+        .at(-1);
+
+      if (modelCall === 2) {
+        assert.deepEqual(previousAssistant.modelState, firstState);
+        yield {
+          type: "response.completed",
+          message: {
+            ...assistant("first run complete"),
+            modelState: secondState,
+          },
+        };
+        return;
+      }
+
+      assert.deepEqual(previousAssistant.modelState, secondState);
+      yield {
+        type: "response.completed",
+        message: assistant("second run complete"),
+      };
+    },
+  };
+  const noop = {
+    name: "noop",
+    description: "No operation",
+    inputSchema: {},
+    async execute() {
+      return null;
+    },
+  };
+  const context = new InMemoryContext();
+  const may = new May({ model, tools: [noop], context });
+
+  const firstRun = may.run({ input: "first" });
+  const firstEventsPromise = collect(firstRun.events);
+  const firstResult = await firstRun.result;
+  const firstEvents = await firstEventsPromise;
+
+  assert.deepEqual(firstResult.message.modelState, secondState);
+  assert.deepEqual(
+    firstEvents
+      .filter((event) => event.type === "model.completed")
+      .map((event) => event.message.modelState),
+    [firstState, secondState],
+  );
+
+  const secondRun = may.run({ input: "second" });
+  const secondEventsPromise = collect(secondRun.events);
+  await secondRun.result;
+  await secondEventsPromise;
+
+  const assistantMessages = (await context.snapshot()).messages
+    .filter((message) => message.role === "assistant");
+  assert.deepEqual(assistantMessages[0].modelState, firstState);
+  assert.deepEqual(assistantMessages[1].modelState, secondState);
+  assert.equal(modelCall, 3);
+});
+
 test("executes multiple tool calls from one model turn in order", async () => {
   let modelTurn = 0;
   const executionOrder = [];

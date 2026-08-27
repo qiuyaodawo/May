@@ -28,3 +28,24 @@ const result = await run.result;
 Model adapters emit normalized `text.delta` and `response.completed` events.
 Tool failures are converted into tool messages so the model can recover.
 Model and Context failures terminate the run.
+
+## Model state
+
+An adapter can attach opaque continuation data to an assistant message:
+
+```ts
+const message = {
+  role: "assistant",
+  content: [],
+  modelState: {
+    type: "@may/provider-example/response-v1",
+    data: { responseId: "response_123" },
+  },
+};
+```
+
+`type` should be namespaced and versioned by the adapter. May persists the state
+with the message and passes it back in later `ModelRequest.messages`, but never
+interprets it. This lets adapters preserve provider-specific continuation data,
+such as response IDs or signed reasoning blocks, while normalized content
+remains available to other providers.

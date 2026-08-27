@@ -21,10 +21,19 @@ export interface ToolCall {
   input: unknown;
 }
 
+export interface ModelState<Data = unknown> {
+  /** Adapter-owned, namespaced, and versioned state identifier. */
+  type: string;
+  /** Opaque continuation data interpreted only by the owning adapter. */
+  data: Data;
+}
+
 export interface AssistantMessage {
   role: "assistant";
   content: ContentPart[];
   toolCalls?: ToolCall[];
+  /** Provider-specific continuation state that May persists but never reads. */
+  modelState?: ModelState;
 }
 
 export interface ToolMessage {

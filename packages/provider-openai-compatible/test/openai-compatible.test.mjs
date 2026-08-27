@@ -65,6 +65,10 @@ test("converts May messages and tools to the compatible wire format", () => {
         { type: "text", text: "Calling." },
       ],
       toolCalls: [{ id: "call_1", name: "lookup", input: { id: 1 } }],
+      modelState: {
+        type: "another.provider/response-v1",
+        data: { responseId: "response_1" },
+      },
     },
     {
       role: "tool",
