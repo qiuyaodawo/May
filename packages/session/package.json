@@ -1,0 +1,30 @@
+{
+  "name": "@may/session",
+  "version": "0.1.0",
+  "description": "Session lifecycle and durable history for May agents.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+  },
+  "dependencies": {
+    "@may/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

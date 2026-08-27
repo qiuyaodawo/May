@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/core" },
+    { "path": "./packages/session" },
     { "path": "./packages/config" },
     { "path": "./packages/providers/openai-compatible" },
     { "path": "./packages/providers/deepseek" },

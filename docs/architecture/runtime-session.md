@@ -54,9 +54,9 @@ one-shot run.
 
 ### `@may/session`
 
-The session package will compose Core into a long-lived identity. It will own a
-session id, metadata, serialized submission, context continuity, session events,
-and a storage seam. It may depend on `@may/core`; Core must not depend on it.
+The session package composes Core into a long-lived identity. It owns a session
+id, metadata, serialized submission, context continuity, session events, and a
+storage seam. It may depend on `@may/core`; Core must not depend on it.
 
 ### Permission runtime
 
@@ -74,5 +74,5 @@ messages, finalized assistant messages, tool outcomes, run boundaries, and
 approval decisions. UI state is a projection of these events and is never the
 source of truth.
 
-The first session implementation can be in-memory, but its history model must
-not depend on a terminal UI or a specific storage backend.
+The first session implementation is in-memory, and its history model does not
+depend on a terminal UI or a specific storage backend.

@@ -8,6 +8,7 @@ be used independently or combined into complete agents and applications.
 ```text
 packages/
   core/       Agent loop, contracts, events, and in-memory Context
+  session/    Serialized runs and durable session history
   config/     Optional application configuration loading and validation
   providers/
     openai-compatible/  Shared Chat Completions protocol helpers
