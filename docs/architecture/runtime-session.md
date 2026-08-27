@@ -81,5 +81,6 @@ messages, finalized assistant messages, approvals, tool outcomes, and run
 boundaries. UI state is a projection of these events and is never the source of
 truth.
 
-The first session implementation is in-memory, and its history model does not
-depend on a terminal UI or a specific storage backend.
+The session package includes in-memory storage and an optional Node.js JSONL
+file-store entry point. Sessions can rebuild Core context from durable history;
+the history model does not depend on a terminal UI or a specific backend.

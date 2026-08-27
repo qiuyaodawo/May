@@ -121,6 +121,9 @@ importers:
       '@may/permissions':
         specifier: workspace:*
         version: link:../permissions
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
 
   packages/tools/coding-tools:
     dependencies:

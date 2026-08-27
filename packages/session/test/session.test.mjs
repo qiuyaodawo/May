@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { appendFile, mkdtemp, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -7,6 +10,7 @@ import {
   RunCancelledError,
 } from "@may/core";
 import { PermissionToolExecutor } from "@may/permissions";
+import { FileSessionStore } from "@may/session/file-store";
 import {
   InMemorySessionStore,
   Session,
@@ -123,6 +127,7 @@ test("serializes submissions and preserves context between runs", async () => {
 });
 
 test("stores successful and failed tool outcomes", async () => {
+  const store = new InMemorySessionStore();
   let step = 0;
   const model = {
     async *stream() {
@@ -149,6 +154,7 @@ test("stores successful and failed tool outcomes", async () => {
     },
   };
   const session = await Session.create({
+    store,
     runtime: new May({
       model,
       context: new InMemoryContext(),
@@ -183,6 +189,26 @@ test("stores successful and failed tool outcomes", async () => {
   assert.deepEqual(toolEvents[0].output, { value: 1 });
   assert.equal(toolEvents[1].type, "tool.failed");
   assert.equal(toolEvents[1].error.message, "tool failed");
+
+  let replayed;
+  await Session.resume({
+    id: session.id,
+    store,
+    createRuntime(messages) {
+      replayed = messages;
+      return createRuntime();
+    },
+  });
+  assert.deepEqual(replayed.map((message) => message.role), [
+    "user",
+    "assistant",
+    "tool",
+    "tool",
+    "assistant",
+  ]);
+  assert.deepEqual(replayed[2].content[0].value, { value: 1 });
+  assert.equal(replayed[3].isError, true);
+  assert.equal(replayed[3].content[0].value.message, "tool failed");
 });
 
 test("records approval decisions before their tool outcomes", async () => {
@@ -400,6 +426,134 @@ test("rejects out-of-order events in the in-memory store", async () => {
   );
 });
 
+test("persists session events across file store instances", async (t) => {
+  const directory = await createTempDirectory(t);
+  const sessionId = "session/with:unsafe*characters";
+  const first = new FileSessionStore(directory);
+
+  await first.append({
+    type: "session.created",
+    sessionId,
+    seq: 1,
+    timestamp: 1,
+  });
+  await first.append({
+    type: "input.submitted",
+    sessionId,
+    seq: 2,
+    timestamp: 2,
+    message: { role: "user", content: [{ type: "text", text: "hello" }] },
+  });
+
+  const second = new FileSessionStore(directory);
+  const history = await second.read(sessionId);
+  assert.deepEqual(history.map((event) => event.seq), [1, 2]);
+  assert.equal(history[1].message.content[0].text, "hello");
+  const files = await readdir(directory);
+  assert.equal(files.length, 1);
+  assert.match(files[0], /^[A-Za-z0-9_-]+\.jsonl$/u);
+});
+
+test("resumes a file session and continues its context and sequence", async (t) => {
+  const directory = await createTempDirectory(t);
+  const firstStore = new FileSessionStore(directory);
+  const first = await Session.create({
+    id: "resume_me",
+    metadata: { workspace: "/repo" },
+    store: firstStore,
+    runtime: new May({
+      context: new InMemoryContext(),
+      model: {
+        async *stream() {
+          yield {
+            type: "response.completed",
+            message: {
+              ...assistantMessage("first answer"),
+              modelState: { type: "test/v1", data: { cursor: "abc" } },
+            },
+          };
+        },
+      },
+    }),
+  });
+  await (await first.submit({ input: "first question" })).result;
+
+  let restoredMessages;
+  let secondRequest;
+  const secondStore = new FileSessionStore(directory);
+  const resumed = await Session.resume({
+    id: "resume_me",
+    store: secondStore,
+    createRuntime(messages) {
+      restoredMessages = messages;
+      return new May({
+        context: new InMemoryContext({ messages }),
+        model: {
+          async *stream(request) {
+            secondRequest = request;
+            yield {
+              type: "response.completed",
+              message: assistantMessage("second answer"),
+            };
+          },
+        },
+      });
+    },
+  });
+
+  assert.deepEqual(resumed.metadata, { workspace: "/repo" });
+  assert.deepEqual(restoredMessages.map((message) => message.role), [
+    "user",
+    "assistant",
+  ]);
+  assert.deepEqual(restoredMessages[1].modelState, {
+    type: "test/v1",
+    data: { cursor: "abc" },
+  });
+
+  await (await resumed.submit({ input: "second question" })).result;
+  assert.deepEqual(secondRequest.messages.map((message) => message.role), [
+    "user",
+    "assistant",
+    "user",
+  ]);
+
+  const history = await resumed.history();
+  assert.deepEqual(
+    history.map((event) => event.seq),
+    history.map((_event, index) => index + 1),
+  );
+  assert.equal(
+    history.filter((event) => event.type === "session.created").length,
+    1,
+  );
+});
+
+test("reports missing sessions and corrupt session files", async (t) => {
+  const directory = await createTempDirectory(t);
+  const store = new FileSessionStore(directory);
+
+  await assert.rejects(
+    Session.resume({
+      id: "missing",
+      store,
+      createRuntime,
+    }),
+    /does not exist/,
+  );
+
+  await store.append({
+    type: "session.created",
+    sessionId: "corrupt",
+    seq: 1,
+    timestamp: 1,
+  });
+  const [file] = await readdir(directory);
+  await appendFile(join(directory, file), "not-json\n", "utf8");
+
+  await assert.rejects(store.read("corrupt"), /Invalid session event JSON/);
+});
+
 test("fails the session run when durable event storage fails", async () => {
   const backing = new InMemorySessionStore();
   const store = {
@@ -450,4 +604,10 @@ function deferred() {
     resolve = resolvePromise;
   });
   return { promise, resolve };
+}
+
+async function createTempDirectory(t) {
+  const directory = await mkdtemp(join(tmpdir(), "may-session-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  return directory;
 }

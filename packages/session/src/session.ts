@@ -2,6 +2,7 @@ import {
   AsyncEventQueue,
   type May,
   type MayEvent,
+  type Message,
   type RunHandle,
   type RunOptions,
   type UserMessage,
@@ -14,7 +15,11 @@ import type {
   SessionEvent,
   SessionEventPayload,
 } from "./events.js";
-import { InMemorySessionStore, type SessionStore } from "./store.js";
+import {
+  InMemorySessionStore,
+  type SessionStore,
+  validateSessionHistory,
+} from "./store.js";
 
 export interface SessionOptions {
   runtime: May;
@@ -23,13 +28,19 @@ export interface SessionOptions {
   metadata?: Record<string, unknown>;
 }
 
+export interface ResumeSessionOptions {
+  id: string;
+  store: SessionStore;
+  createRuntime(messages: Message[]): May;
+}
+
 export class Session {
   readonly id: string;
   readonly metadata: Readonly<Record<string, unknown>> | undefined;
 
   private readonly runtime: May;
   private readonly store: SessionStore;
-  private seq = 0;
+  private seq: number;
   private tail: Promise<void> = Promise.resolve();
 
   private constructor(
@@ -37,11 +48,13 @@ export class Session {
     runtime: May,
     store: SessionStore,
     metadata: Record<string, unknown> | undefined,
+    seq: number,
   ) {
     this.id = id;
     this.runtime = runtime;
     this.store = store;
     this.metadata = metadata === undefined ? undefined : { ...metadata };
+    this.seq = seq;
   }
 
   static async create(options: SessionOptions): Promise<Session> {
@@ -58,12 +71,38 @@ export class Session {
       options.runtime,
       store,
       options.metadata,
+      0,
     );
     const created: SessionEventPayload = session.metadata === undefined
       ? { type: "session.created" }
       : { type: "session.created", metadata: { ...session.metadata } };
     await session.record(created);
     return session;
+  }
+
+  static async resume(options: ResumeSessionOptions): Promise<Session> {
+    const events = await options.store.read(options.id);
+    if (events.length === 0) {
+      throw new Error(`Session "${options.id}" does not exist`);
+    }
+
+    validateSessionHistory(options.id, events);
+    const created = events[0]!;
+    if (created.type !== "session.created") {
+      throw new Error(`Session "${options.id}" has no creation event`);
+    }
+    if (events.slice(1).some((event) => event.type === "session.created")) {
+      throw new Error(`Session "${options.id}" has multiple creation events`);
+    }
+
+    const messages = replayMessages(events);
+    return new Session(
+      options.id,
+      options.createRuntime(messages),
+      options.store,
+      created.metadata,
+      events.length,
+    );
   }
 
   submit(options: RunOptions): Promise<RunHandle> {
@@ -143,6 +182,38 @@ export class Session {
     };
     await this.store.append(event);
   }
+}
+
+function replayMessages(events: readonly SessionEvent[]): Message[] {
+  const messages: Message[] = [];
+
+  for (const event of events) {
+    switch (event.type) {
+      case "input.submitted":
+      case "assistant.completed":
+        messages.push(event.message);
+        break;
+      case "tool.completed":
+        messages.push({
+          role: "tool",
+          toolCallId: event.call.id,
+          name: event.call.name,
+          content: [{ type: "json", value: event.output }],
+        });
+        break;
+      case "tool.failed":
+        messages.push({
+          role: "tool",
+          toolCallId: event.call.id,
+          name: event.call.name,
+          content: [{ type: "json", value: event.error }],
+          isError: true,
+        });
+        break;
+    }
+  }
+
+  return messages;
 }
 
 function toPermissionSessionEvent(
