@@ -8,11 +8,12 @@ be used independently or combined into complete agents and applications.
 ```text
 packages/
   core/       Agent loop, contracts, events, and in-memory Context
-  provider-openai-compatible/  Shared Chat Completions protocol helpers
-  provider-deepseek/  DeepSeek streaming model adapter
-  provider-zhipu/     Zhipu GLM streaming model adapter
-  provider-kimi/      Kimi streaming model adapter
-  provider-anthropic/ Anthropic Messages API streaming model adapter
+  providers/
+    openai-compatible/  Shared Chat Completions protocol helpers
+    deepseek/   DeepSeek streaming model adapter
+    zhipu/      Zhipu GLM streaming model adapter
+    kimi/       Kimi streaming model adapter
+    anthropic/  Anthropic Messages API streaming model adapter
 examples/
   basic/      Minimal Model → Tool → Model example
   deepseek/   Live DeepSeek tool-call example

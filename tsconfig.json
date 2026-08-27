@@ -2,10 +2,10 @@
   "files": [],
   "references": [
     { "path": "./packages/core" },
-    { "path": "./packages/provider-openai-compatible" },
-    { "path": "./packages/provider-deepseek" },
-    { "path": "./packages/provider-zhipu" },
-    { "path": "./packages/provider-kimi" },
-    { "path": "./packages/provider-anthropic" }
+    { "path": "./packages/providers/openai-compatible" },
+    { "path": "./packages/providers/deepseek" },
+    { "path": "./packages/providers/zhipu" },
+    { "path": "./packages/providers/kimi" },
+    { "path": "./packages/providers/anthropic" }
   ]
 }

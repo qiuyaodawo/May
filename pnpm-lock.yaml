@@ -25,48 +25,48 @@ importers:
         version: link:../../packages/core
       '@may/provider-deepseek':
         specifier: workspace:*
-        version: link:../../packages/provider-deepseek
+        version: link:../../packages/providers/deepseek
 
   packages/core: {}
 
-  packages/provider-anthropic:
+  packages/providers/anthropic:
     dependencies:
       '@may/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
 
-  packages/provider-deepseek:
+  packages/providers/deepseek:
     dependencies:
       '@may/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@may/provider-openai-compatible':
         specifier: workspace:*
-        version: link:../provider-openai-compatible
+        version: link:../openai-compatible
 
-  packages/provider-kimi:
+  packages/providers/kimi:
     dependencies:
       '@may/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@may/provider-openai-compatible':
         specifier: workspace:*
-        version: link:../provider-openai-compatible
+        version: link:../openai-compatible
 
-  packages/provider-openai-compatible:
+  packages/providers/openai-compatible:
     dependencies:
       '@may/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
 
-  packages/provider-zhipu:
+  packages/providers/zhipu:
     dependencies:
       '@may/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@may/provider-openai-compatible':
         specifier: workspace:*
-        version: link:../provider-openai-compatible
+        version: link:../openai-compatible
 
 packages:
 
