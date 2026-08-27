@@ -106,6 +106,16 @@ importers:
         specifier: workspace:*
         version: link:../../config
 
+  packages/tools/coding-tools:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+
 packages:
 
   '@types/node@22.20.1':

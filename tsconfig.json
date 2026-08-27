@@ -8,6 +8,7 @@
     { "path": "./packages/providers/zhipu" },
     { "path": "./packages/providers/kimi" },
     { "path": "./packages/providers/anthropic" },
+    { "path": "./packages/tools/coding-tools" },
     { "path": "./apps/cli" }
   ]
 }
