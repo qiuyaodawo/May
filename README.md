@@ -27,6 +27,9 @@ examples/
 Future Provider, Tool, Context, and Agent packages will be added alongside
 `@may/core` without introducing provider-specific dependencies into Core.
 
+See `docs/architecture/runtime-session.md` for the boundaries between agent
+definitions, sessions, runs, and steps.
+
 ## Development
 
 ```bash
