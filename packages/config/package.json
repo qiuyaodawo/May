@@ -1,7 +1,7 @@
 {
-  "name": "@may/provider-anthropic",
+  "name": "@may/config",
   "version": "0.1.0",
-  "description": "Anthropic model adapter for May.",
+  "description": "Configuration loading and validation for May applications.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,14 +18,10 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "test": "pnpm run build && node --test test/*.test.mjs",
-    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs",
-    "test:integration": "pnpm --filter @may/config run build && pnpm run build && node --test test-integration/*.test.mjs"
-  },
-  "dependencies": {
-    "@may/core": "workspace:*"
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "devDependencies": {
-    "@may/config": "workspace:*"
+    "@types/node": "^22.0.0"
   },
   "engines": {
     "node": ">=20"

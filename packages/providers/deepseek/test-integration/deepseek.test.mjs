@@ -1,13 +1,9 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import test from "node:test";
 
+import { loadMayConfig, resolveProviderConfig } from "@may/config";
 import { InMemoryContext, May } from "@may/core";
 import { DeepSeekModel } from "../dist/index.js";
-
-const configPath = join(homedir(), ".may", "config.json");
 
 test("completes a real reasoning and tool-call loop", { timeout: 120_000 }, async () => {
   const config = await readDeepSeekConfig();
@@ -78,19 +74,11 @@ test("completes a real reasoning and tool-call loop", { timeout: 120_000 }, asyn
 });
 
 async function readDeepSeekConfig() {
-  let parsed;
-  try {
-    parsed = JSON.parse(await readFile(configPath, "utf8"));
-  } catch (error) {
-    throw new Error(`Unable to read valid JSON from ${configPath}`, {
-      cause: error,
-    });
-  }
-
-  const config = parsed?.providers?.deepseek;
+  const loaded = await loadMayConfig();
+  const config = resolveProviderConfig(loaded, "deepseek");
   for (const key of ["apiKey", "baseURL", "model"]) {
     if (typeof config?.[key] !== "string" || config[key].trim() === "") {
-      throw new Error(`Set providers.deepseek.${key} in ${configPath}`);
+      throw new Error(`Set providers.deepseek.${key} in ${loaded.path}`);
     }
   }
 

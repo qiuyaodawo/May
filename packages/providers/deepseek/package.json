@@ -19,11 +19,14 @@
     "clean": "tsc -b --clean",
     "test": "pnpm run build && node --test test/*.test.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs",
-    "test:integration": "pnpm run build && node --test test-integration/*.test.mjs"
+    "test:integration": "pnpm --filter @may/config run build && pnpm run build && node --test test-integration/*.test.mjs"
   },
   "dependencies": {
     "@may/core": "workspace:*",
     "@may/provider-openai-compatible": "workspace:*"
+  },
+  "devDependencies": {
+    "@may/config": "workspace:*"
   },
   "engines": {
     "node": ">=20"

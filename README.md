@@ -8,6 +8,7 @@ be used independently or combined into complete agents and applications.
 ```text
 packages/
   core/       Agent loop, contracts, events, and in-memory Context
+  config/     Optional application configuration loading and validation
   providers/
     openai-compatible/  Shared Chat Completions protocol helpers
     deepseek/   DeepSeek streaming model adapter

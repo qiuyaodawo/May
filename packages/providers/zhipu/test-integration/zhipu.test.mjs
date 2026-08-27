@@ -1,13 +1,9 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import test from "node:test";
 
+import { loadMayConfig, resolveProviderConfig } from "@may/config";
 import { InMemoryContext, May } from "@may/core";
 import { ZhipuModel } from "../dist/index.js";
-
-const configPath = join(homedir(), ".may", "config.json");
 
 test("completes a real preserved-thinking tool loop", { timeout: 120_000 }, async () => {
   const config = await readZhipuConfig();
@@ -79,19 +75,11 @@ test("completes a real preserved-thinking tool loop", { timeout: 120_000 }, asyn
 });
 
 async function readZhipuConfig() {
-  let parsed;
-  try {
-    parsed = JSON.parse(await readFile(configPath, "utf8"));
-  } catch (error) {
-    throw new Error(`Unable to read valid JSON from ${configPath}`, {
-      cause: error,
-    });
-  }
-
-  const config = parsed?.providers?.zhipu;
+  const loaded = await loadMayConfig();
+  const config = resolveProviderConfig(loaded, "zhipu");
   for (const key of ["apiKey", "baseURL", "model"]) {
     if (typeof config?.[key] !== "string" || config[key].trim() === "") {
-      throw new Error(`Set providers.zhipu.${key} in ${configPath}`);
+      throw new Error(`Set providers.zhipu.${key} in ${loaded.path}`);
     }
   }
 

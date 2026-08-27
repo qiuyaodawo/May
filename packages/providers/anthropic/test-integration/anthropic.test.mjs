@@ -1,13 +1,9 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import test from "node:test";
 
+import { loadMayConfig, resolveProviderConfig } from "@may/config";
 import { InMemoryContext, May } from "@may/core";
 import { AnthropicModel } from "../dist/index.js";
-
-const configPath = join(homedir(), ".may", "config.json");
 
 test("completes a real Anthropic tool-call loop", { timeout: 120_000 }, async () => {
   const config = await readAnthropicConfig();
@@ -64,19 +60,11 @@ test("completes a real Anthropic tool-call loop", { timeout: 120_000 }, async ()
 });
 
 async function readAnthropicConfig() {
-  let parsed;
-  try {
-    parsed = JSON.parse(await readFile(configPath, "utf8"));
-  } catch (error) {
-    throw new Error(`Unable to read valid JSON from ${configPath}`, {
-      cause: error,
-    });
-  }
-
-  const config = parsed?.providers?.anthropic;
+  const loaded = await loadMayConfig();
+  const config = resolveProviderConfig(loaded, "anthropic");
   for (const key of ["apiKey", "baseURL", "model"]) {
     if (typeof config?.[key] !== "string" || config[key].trim() === "") {
-      throw new Error(`Set providers.anthropic.${key} in ${configPath}`);
+      throw new Error(`Set providers.anthropic.${key} in ${loaded.path}`);
     }
   }
 
