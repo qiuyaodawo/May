@@ -1,0 +1,86 @@
+import { realpath, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+
+import {
+  loadMayConfig,
+  type LoadMayConfigOptions,
+  type MayConfig,
+} from "@may/config";
+import type { Model } from "@may/core";
+import { FileSessionStore } from "@may/session/file-store";
+
+import { FileSessionCatalog } from "./catalog.js";
+import {
+  createMaybeCodeModel,
+  selectMaybeCodeModel,
+  type MaybeCodeModelSelector,
+  type SelectedMaybeCodeModel,
+} from "./model.js";
+import { MaybeCodeWorkspace } from "./workspace.js";
+
+export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
+  readonly workspace?: string;
+  readonly configPath?: string;
+  readonly dataDirectory?: string;
+  readonly sessionId?: string;
+  readonly autoResume?: boolean;
+  readonly instructions?: string;
+  readonly maxSteps?: number;
+}
+
+export interface ConfiguredMaybeCodeDependencies {
+  readonly loadConfig?: (
+    options?: LoadMayConfigOptions,
+  ) => Promise<MayConfig>;
+  readonly createModel?: (selection: SelectedMaybeCodeModel) => Model;
+}
+
+export function getDefaultMaybeCodeDataDirectory(): string {
+  return join(homedir(), ".may", "maybe-code");
+}
+
+export async function openConfiguredMaybeCode(
+  options: OpenConfiguredMaybeCodeOptions = {},
+  dependencies: ConfiguredMaybeCodeDependencies = {},
+): Promise<MaybeCodeWorkspace> {
+  const workspace = await resolveWorkspace(options.workspace ?? process.cwd());
+  const loadConfig = dependencies.loadConfig ?? loadMayConfig;
+  const config = await loadConfig(
+    options.configPath === undefined ? {} : { path: options.configPath },
+  );
+  const selection = selectMaybeCodeModel(config, {
+    ...(options.provider === undefined ? {} : { provider: options.provider }),
+    ...(options.model === undefined ? {} : { model: options.model }),
+  });
+  const model = (dependencies.createModel ?? createMaybeCodeModel)(selection);
+  const dataDirectory = resolve(
+    options.dataDirectory ?? getDefaultMaybeCodeDataDirectory(),
+  );
+
+  return MaybeCodeWorkspace.open({
+    workspace,
+    model,
+    store: new FileSessionStore(join(dataDirectory, "sessions")),
+    catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
+    ...(options.sessionId === undefined
+      ? {}
+      : { sessionId: options.sessionId }),
+    ...(options.autoResume === undefined
+      ? {}
+      : { autoResume: options.autoResume }),
+    ...(options.instructions === undefined
+      ? {}
+      : { instructions: options.instructions }),
+    ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
+  });
+}
+
+async function resolveWorkspace(workspace: string): Promise<string> {
+  const path = await realpath(resolve(workspace));
+  const information = await stat(path);
+  if (!information.isDirectory()) {
+    throw new Error(`Workspace is not a directory: ${workspace}`);
+  }
+  return path;
+}

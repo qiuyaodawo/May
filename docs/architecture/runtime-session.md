@@ -72,6 +72,13 @@ leak between sessions. Its awaited event sink lets Session persist approval
 requests and decisions before related tool outcomes. Durable grants remain
 future storage work and do not belong to the UI.
 
+### `apps/maybe-code`
+
+MaybeCode is an application composition layer, not another runtime. It creates
+Core runtimes from configuration, coding tools, permissions, and Session; owns
+their lifecycle; and exposes a terminal interface. No reusable package depends
+on MaybeCode.
+
 ## Events and persistence
 
 `MayEvent` is a live observation of one run and may include streaming deltas.

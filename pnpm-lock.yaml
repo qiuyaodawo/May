@@ -28,6 +28,31 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
+  apps/maybe-code:
+    dependencies:
+      '@may/coding-tools':
+        specifier: workspace:*
+        version: link:../../packages/tools/coding-tools
+      '@may/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@may/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@may/permissions':
+        specifier: workspace:*
+        version: link:../../packages/permissions
+      '@may/provider-deepseek':
+        specifier: workspace:*
+        version: link:../../packages/providers/deepseek
+      '@may/session':
+        specifier: workspace:*
+        version: link:../../packages/session
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+
   examples/basic:
     dependencies:
       '@may/core':

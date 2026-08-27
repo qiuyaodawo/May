@@ -11,7 +11,9 @@
     "test:integration:zhipu": "pnpm --filter @may/provider-zhipu run test:integration",
     "test:integration:kimi": "pnpm --filter @may/provider-kimi run test:integration",
     "test:integration:anthropic": "pnpm --filter @may/provider-anthropic run test:integration",
+    "test:integration:maybe-code": "pnpm --filter @may/maybe-code run test:integration",
     "may": "pnpm run build && node apps/cli/dist/bin.js",
+    "maybecode": "pnpm run build && node apps/maybe-code/dist/bin.js",
     "example": "pnpm run build && pnpm --filter @may/example-basic run start",
     "example:deepseek": "pnpm run build && pnpm --filter @may/example-deepseek run start"
   },
