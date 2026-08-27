@@ -12,6 +12,22 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  apps/cli:
+    dependencies:
+      '@may/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@may/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@may/provider-deepseek':
+        specifier: workspace:*
+        version: link:../../packages/providers/deepseek
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+
   examples/basic:
     dependencies:
       '@may/core':

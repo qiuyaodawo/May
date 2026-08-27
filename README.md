@@ -15,6 +15,8 @@ packages/
     zhipu/      Zhipu GLM streaming model adapter
     kimi/       Kimi streaming model adapter
     anthropic/  Anthropic Messages API streaming model adapter
+apps/
+  cli/        Minimal command-line interface
 examples/
   basic/      Minimal Model → Tool → Model example
   deepseek/   Live DeepSeek tool-call example
@@ -30,6 +32,7 @@ pnpm install
 pnpm build
 pnpm test
 pnpm test:coverage
+pnpm may --help
 pnpm example
 ```
 
