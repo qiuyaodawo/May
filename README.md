@@ -9,6 +9,7 @@ be used independently or combined into complete agents and applications.
 packages/
   core/       Agent loop, contracts, events, and in-memory Context
   provider-deepseek/  DeepSeek streaming model adapter
+  provider-zhipu/     Zhipu GLM streaming model adapter
 examples/
   basic/      Minimal Model → Tool → Model example
   deepseek/   Live DeepSeek tool-call example

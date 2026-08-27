@@ -35,6 +35,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/provider-zhipu:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@typescript/typescript-aix-ppc64@7.0.2':
