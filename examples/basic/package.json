@@ -1,0 +1,11 @@
+{
+  "name": "@may/example-basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node basic.mjs"
+  },
+  "dependencies": {
+    "@may/core": "workspace:*"
+  }
+}

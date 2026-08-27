@@ -1,0 +1,349 @@
+import type { Context, ContextSnapshot } from "./context.js";
+import {
+  MaxTurnsExceededError,
+  ModelProtocolError,
+  RunCancelledError,
+  ToolNotFoundError,
+} from "./errors.js";
+import {
+  AsyncEventQueue,
+  serializeError,
+  type MayEvent,
+  type MayEventPayload,
+  type RunResult,
+} from "./events.js";
+import type { Model, ModelRequest, ToolDefinition } from "./model.js";
+import type { Tool } from "./tool.js";
+import {
+  textContent,
+  userMessage,
+  type AssistantMessage,
+  type Message,
+  type ToolCall,
+  type ToolMessage,
+  type Usage,
+  type UserMessage,
+} from "./types.js";
+
+export interface MayOptions {
+  model: Model;
+  tools?: Tool[];
+  context: Context;
+  maxTurns?: number;
+}
+
+export interface RunOptions {
+  input: string | UserMessage;
+  signal?: AbortSignal;
+}
+
+export interface RunHandle {
+  readonly id: string;
+  readonly events: AsyncIterable<MayEvent>;
+  readonly result: Promise<RunResult>;
+  cancel(reason?: string): void;
+}
+
+export class May {
+  private readonly model: Model;
+  private readonly context: Context;
+  private readonly tools: ReadonlyMap<string, Tool>;
+  private readonly toolDefinitions: ToolDefinition[];
+  private readonly maxTurns: number;
+
+  constructor(options: MayOptions) {
+    if (!Number.isInteger(options.maxTurns ?? 16) || (options.maxTurns ?? 16) < 1) {
+      throw new RangeError("maxTurns must be a positive integer");
+    }
+
+    const tools = new Map<string, Tool>();
+    for (const tool of options.tools ?? []) {
+      if (tools.has(tool.name)) {
+        throw new Error(`Duplicate tool name: ${tool.name}`);
+      }
+      tools.set(tool.name, tool);
+    }
+
+    this.model = options.model;
+    this.context = options.context;
+    this.tools = tools;
+    this.toolDefinitions = [...tools.values()].map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+    }));
+    this.maxTurns = options.maxTurns ?? 16;
+  }
+
+  run(options: RunOptions): RunHandle {
+    const runId = createRunId();
+    const events = new AsyncEventQueue<MayEvent>();
+    const controller = new AbortController();
+    let seq = 0;
+
+    const onExternalAbort = () => controller.abort(options.signal?.reason);
+    if (options.signal?.aborted) {
+      onExternalAbort();
+    } else {
+      options.signal?.addEventListener("abort", onExternalAbort, { once: true });
+    }
+
+    const emit = (payload: MayEventPayload): void => {
+      events.push({
+        ...payload,
+        runId,
+        seq: ++seq,
+        timestamp: Date.now(),
+      });
+    };
+
+    const input = typeof options.input === "string"
+      ? userMessage(options.input)
+      : options.input;
+
+    const result = this.execute(runId, input, controller.signal, emit)
+      .finally(() => {
+        options.signal?.removeEventListener("abort", onExternalAbort);
+        events.close();
+      });
+
+    // Avoid an unhandled-rejection warning when a caller only consumes events.
+    void result.catch(() => undefined);
+
+    return {
+      id: runId,
+      events,
+      result,
+      cancel: (reason?: string) => controller.abort(reason),
+    };
+  }
+
+  private async execute(
+    runId: string,
+    input: UserMessage,
+    signal: AbortSignal,
+    emit: (event: MayEventPayload) => void,
+  ): Promise<RunResult> {
+    try {
+      emit({ type: "run.started" });
+      throwIfAborted(signal);
+      await this.context.append([input], { runId });
+
+      for (let turn = 1; turn <= this.maxTurns; turn++) {
+        throwIfAborted(signal);
+        emit({ type: "turn.started", turn });
+
+        const snapshot = await this.context.snapshot();
+        const request = this.createModelRequest(snapshot);
+
+        emit({ type: "model.started", turn });
+        const { message, usage } = await this.consumeModel(
+          request,
+          signal,
+          turn,
+          emit,
+        );
+
+        throwIfAborted(signal);
+        await this.context.append([message], { runId, turn });
+        emitOptionalUsage(
+          emit,
+          {
+            type: "model.completed",
+            turn,
+            message,
+          },
+          usage,
+        );
+
+        const calls = message.toolCalls ?? [];
+        if (calls.length === 0) {
+          emit({ type: "turn.completed", turn });
+
+          const result = createRunResult(runId, turn, message, usage);
+          emit({ type: "run.completed", result });
+          return result;
+        }
+
+        for (const call of calls) {
+          throwIfAborted(signal);
+          const toolMessage = await this.executeTool(
+            runId,
+            turn,
+            call,
+            signal,
+            emit,
+          );
+
+          throwIfAborted(signal);
+          await this.context.append([toolMessage], { runId, turn });
+        }
+
+        emit({ type: "turn.completed", turn });
+      }
+
+      throw new MaxTurnsExceededError(this.maxTurns);
+    } catch (error) {
+      if (signal.aborted || error instanceof RunCancelledError) {
+        const cancelled = error instanceof RunCancelledError
+          ? error
+          : new RunCancelledError(toReason(signal.reason));
+        const reason = toReason(signal.reason);
+
+        emit(reason === undefined
+          ? { type: "run.cancelled" }
+          : { type: "run.cancelled", reason });
+        throw cancelled;
+      }
+
+      emit({ type: "run.failed", error: serializeError(error) });
+      throw error;
+    }
+  }
+
+  private createModelRequest(snapshot: ContextSnapshot): ModelRequest {
+    const messages: Message[] = [];
+
+    if (snapshot.instructions) {
+      messages.push({
+        role: "system",
+        content: textContent(snapshot.instructions),
+      });
+    }
+
+    messages.push(...snapshot.messages);
+
+    const request: ModelRequest = {
+      messages,
+      tools: this.toolDefinitions,
+    };
+
+    if (snapshot.metadata !== undefined) {
+      request.metadata = snapshot.metadata;
+    }
+
+    return request;
+  }
+
+  private async consumeModel(
+    request: ModelRequest,
+    signal: AbortSignal,
+    turn: number,
+    emit: (event: MayEventPayload) => void,
+  ): Promise<{ message: AssistantMessage; usage?: Usage }> {
+    let completed: AssistantMessage | undefined;
+    let usage: Usage | undefined;
+
+    for await (const event of this.model.stream(request, { signal })) {
+      throwIfAborted(signal);
+
+      if (event.type === "text.delta") {
+        emit({ type: "model.text.delta", turn, delta: event.delta });
+        continue;
+      }
+
+      if (completed) {
+        throw new ModelProtocolError(
+          "Model emitted more than one response.completed event",
+        );
+      }
+
+      completed = event.message;
+      usage = event.usage;
+    }
+
+    if (!completed) {
+      throw new ModelProtocolError(
+        "Model stream ended without a response.completed event",
+      );
+    }
+
+    const result: { message: AssistantMessage; usage?: Usage } = {
+      message: completed,
+    };
+    if (usage !== undefined) result.usage = usage;
+    return result;
+  }
+
+  private async executeTool(
+    runId: string,
+    turn: number,
+    call: ToolCall,
+    signal: AbortSignal,
+    emit: (event: MayEventPayload) => void,
+  ): Promise<ToolMessage> {
+    emit({ type: "tool.started", turn, call });
+
+    try {
+      const tool = this.tools.get(call.name);
+      if (!tool) throw new ToolNotFoundError(call.name);
+
+      const input = tool.parse ? tool.parse(call.input) : call.input;
+      const output = await tool.execute(input, {
+        runId,
+        turn,
+        toolCallId: call.id,
+        idempotencyKey: `${runId}:${turn}:${call.id}`,
+        signal,
+      });
+
+      throwIfAborted(signal);
+      emit({ type: "tool.completed", turn, call, output });
+
+      return {
+        role: "tool",
+        toolCallId: call.id,
+        name: call.name,
+        content: [{ type: "json", value: output }],
+      };
+    } catch (error) {
+      if (signal.aborted || error instanceof RunCancelledError) throw error;
+
+      const serialized = serializeError(error);
+      emit({ type: "tool.failed", turn, call, error: serialized });
+
+      return {
+        role: "tool",
+        toolCallId: call.id,
+        name: call.name,
+        isError: true,
+        content: [{ type: "json", value: serialized }],
+      };
+    }
+  }
+}
+
+function createRunId(): string {
+  return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) {
+    throw new RunCancelledError(toReason(signal.reason));
+  }
+}
+
+function toReason(reason: unknown): string | undefined {
+  if (typeof reason === "string") return reason;
+  if (reason instanceof Error) return reason.message;
+  return undefined;
+}
+
+function createRunResult(
+  runId: string,
+  turns: number,
+  message: AssistantMessage,
+  usage: Usage | undefined,
+): RunResult {
+  const result: RunResult = { runId, turns, message };
+  if (usage !== undefined) result.usage = usage;
+  return result;
+}
+
+function emitOptionalUsage(
+  emit: (event: MayEventPayload) => void,
+  event: Extract<MayEventPayload, { type: "model.completed" }>,
+  usage: Usage | undefined,
+): void {
+  emit(usage === undefined ? event : { ...event, usage });
+}

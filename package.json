@@ -1,0 +1,15 @@
+{
+  "name": "may",
+  "private": true,
+  "packageManager": "pnpm@11.23.0",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "pnpm -r --if-present run test",
+    "test:coverage": "pnpm --filter @may/core run test:coverage",
+    "example": "pnpm run build && pnpm --filter @may/example-basic run start"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
