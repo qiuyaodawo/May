@@ -6,6 +6,7 @@ import {
   May,
   RunCancelledError,
 } from "@may/core";
+import { PermissionToolExecutor } from "@may/permissions";
 import {
   InMemorySessionStore,
   Session,
@@ -182,6 +183,141 @@ test("stores successful and failed tool outcomes", async () => {
   assert.deepEqual(toolEvents[0].output, { value: 1 });
   assert.equal(toolEvents[1].type, "tool.failed");
   assert.equal(toolEvents[1].error.message, "tool failed");
+});
+
+test("records approval decisions before their tool outcomes", async () => {
+  let modelCall = 0;
+  const model = {
+    async *stream() {
+      modelCall += 1;
+      if (modelCall === 1) {
+        yield {
+          type: "response.completed",
+          message: {
+            role: "assistant",
+            content: [],
+            toolCalls: [
+              { id: "call_write", name: "write", input: { path: "a.txt" } },
+            ],
+          },
+        };
+        return;
+      }
+      yield {
+        type: "response.completed",
+        message: assistantMessage("written"),
+      };
+    },
+  };
+  const permissions = new PermissionToolExecutor({
+    policy: () => ({ decision: "ask", grantKey: "write:a.txt" }),
+  });
+  const session = await Session.create({
+    runtime: new May({
+      model,
+      context: new InMemoryContext(),
+      toolExecutor: permissions,
+      tools: [
+        {
+          name: "write",
+          description: "Write a file",
+          inputSchema: { type: "object" },
+          async execute() {
+            return { bytes: 1 };
+          },
+        },
+      ],
+    }),
+  });
+  permissions.setEventSink((event) => session.recordPermissionEvent(event));
+
+  const run = await session.submit({ input: "write" });
+  const iterator = permissions.events[Symbol.asyncIterator]();
+  const requested = (await iterator.next()).value;
+  await permissions.resolve(requested.request.id, "allow-session");
+  await run.result;
+
+  const history = await session.history();
+  assert.deepEqual(
+    history.map((event) => event.type),
+    [
+      "session.created",
+      "input.submitted",
+      "run.started",
+      "assistant.completed",
+      "approval.requested",
+      "approval.resolved",
+      "tool.completed",
+      "assistant.completed",
+      "run.completed",
+    ],
+  );
+  const approval = history.find((event) => event.type === "approval.requested");
+  assert.equal(approval.request.runId, run.id);
+  assert.equal(approval.request.toolCallId, "call_write");
+  assert.equal(approval.request.grantKey, "write:a.txt");
+  assert.equal("signal" in approval.request, false);
+  assert.equal(
+    history.find((event) => event.type === "approval.resolved").decision,
+    "allow-session",
+  );
+  await permissions.close();
+});
+
+test("records approval cancellation before run cancellation", async () => {
+  const model = {
+    async *stream() {
+      yield {
+        type: "response.completed",
+        message: {
+          role: "assistant",
+          content: [],
+          toolCalls: [
+            { id: "call_bash", name: "bash", input: { command: "pwd" } },
+          ],
+        },
+      };
+    },
+  };
+  const permissions = new PermissionToolExecutor({ policy: () => "ask" });
+  const session = await Session.create({
+    runtime: new May({
+      model,
+      context: new InMemoryContext(),
+      toolExecutor: permissions,
+      tools: [
+        {
+          name: "bash",
+          description: "Run a command",
+          inputSchema: { type: "object" },
+          async execute() {
+            return "unreachable";
+          },
+        },
+      ],
+    }),
+  });
+  permissions.setEventSink((event) => session.recordPermissionEvent(event));
+
+  const run = await session.submit({ input: "run" });
+  const iterator = permissions.events[Symbol.asyncIterator]();
+  await iterator.next();
+  const rejected = assert.rejects(run.result, RunCancelledError);
+  run.cancel("user stopped");
+  await rejected;
+
+  const history = await session.history();
+  assert.deepEqual(
+    history.slice(-3).map((event) => event.type),
+    ["approval.requested", "approval.cancelled", "run.cancelled"],
+  );
+  const request = history.find((event) => event.type === "approval.requested");
+  assert.equal("grantKey" in request.request, false);
+  assert.equal(
+    history.find((event) => event.type === "approval.cancelled").reason,
+    "user stopped",
+  );
+  await permissions.close();
 });
 
 test("records failures and starts the next queued submission", async () => {

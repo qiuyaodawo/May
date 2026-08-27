@@ -23,6 +23,9 @@
   "dependencies": {
     "@may/core": "workspace:*"
   },
+  "devDependencies": {
+    "@may/permissions": "workspace:*"
+  },
   "engines": {
     "node": ">=20"
   },

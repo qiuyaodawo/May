@@ -68,17 +68,18 @@ request and returns a decision.
 
 The permission executor supports one-time decisions and explicit scoped grants
 for its lifetime. Applications use one executor per Session so grants cannot
-leak between sessions. Durable grants and approval decisions belong to later
-Session storage integration, not to the UI.
+leak between sessions. Its awaited event sink lets Session persist approval
+requests and decisions before related tool outcomes. Durable grants remain
+future storage work and do not belong to the UI.
 
 ## Events and persistence
 
 `MayEvent` is a live observation of one run and may include streaming deltas.
 `PermissionEvent` reports live approval requests and their resolution or
 cancellation. `SessionEvent` records durable session facts such as submitted
-messages, finalized assistant messages, tool outcomes, and run boundaries;
-approval decisions will join it when Session and permissions are integrated.
-UI state is a projection of these events and is never the source of truth.
+messages, finalized assistant messages, approvals, tool outcomes, and run
+boundaries. UI state is a projection of these events and is never the source of
+truth.
 
 The first session implementation is in-memory, and its history model does not
 depend on a terminal UI or a specific storage backend.

@@ -117,6 +117,10 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@may/permissions':
+        specifier: workspace:*
+        version: link:../permissions
 
   packages/tools/coding-tools:
     dependencies:

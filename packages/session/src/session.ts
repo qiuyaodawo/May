@@ -8,7 +8,12 @@ import {
   userMessage,
 } from "@may/core";
 
-import type { SessionEvent, SessionEventPayload } from "./events.js";
+import type {
+  RecordablePermissionEvent,
+  SessionApprovalRequest,
+  SessionEvent,
+  SessionEventPayload,
+} from "./events.js";
 import { InMemorySessionStore, type SessionStore } from "./store.js";
 
 export interface SessionOptions {
@@ -76,6 +81,10 @@ export class Session {
     return this.store.read(this.id);
   }
 
+  recordPermissionEvent(event: RecordablePermissionEvent): Promise<void> {
+    return this.record(toPermissionSessionEvent(event), event.timestamp);
+  }
+
   private async start(options: RunOptions): Promise<RunHandle> {
     const input: UserMessage = typeof options.input === "string"
       ? userMessage(options.input)
@@ -134,6 +143,50 @@ export class Session {
     };
     await this.store.append(event);
   }
+}
+
+function toPermissionSessionEvent(
+  event: RecordablePermissionEvent,
+): SessionEventPayload {
+  if (event.type === "approval.requested") {
+    const request: SessionApprovalRequest = event.request.grantKey === undefined
+      ? {
+          id: event.request.id,
+          createdAt: event.request.createdAt,
+          tool: event.request.tool,
+          input: event.request.input,
+          runId: event.request.context.runId,
+          step: event.request.context.step,
+          toolCallId: event.request.context.toolCallId,
+          idempotencyKey: event.request.context.idempotencyKey,
+        }
+      : {
+          id: event.request.id,
+          createdAt: event.request.createdAt,
+          tool: event.request.tool,
+          input: event.request.input,
+          runId: event.request.context.runId,
+          step: event.request.context.step,
+          toolCallId: event.request.context.toolCallId,
+          idempotencyKey: event.request.context.idempotencyKey,
+          grantKey: event.request.grantKey,
+        };
+    return { type: "approval.requested", request };
+  }
+  if (event.type === "approval.resolved") {
+    return {
+      type: "approval.resolved",
+      requestId: event.requestId,
+      decision: event.decision,
+    };
+  }
+  return event.reason === undefined
+    ? { type: "approval.cancelled", requestId: event.requestId }
+    : {
+        type: "approval.cancelled",
+        requestId: event.requestId,
+        reason: event.reason,
+      };
 }
 
 function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {

@@ -17,6 +17,7 @@ import type {
   PermissionDecision,
   PermissionEvent,
   PermissionEventPayload,
+  PermissionEventSink,
   PermissionPolicy,
 } from "./types.js";
 
@@ -28,7 +29,7 @@ export interface PermissionToolExecutorOptions {
 interface PendingApproval {
   request: ApprovalRequest;
   resolve(decision: ApprovalDecision): void;
-  reject(error: Error): void;
+  reject(error: unknown): void;
   removeAbortListener(): void;
 }
 
@@ -40,6 +41,7 @@ export class PermissionToolExecutor implements ToolExecutor {
   private readonly eventQueue = new AsyncEventQueue<PermissionEvent>();
   private readonly pending = new Map<string, PendingApproval>();
   private readonly sessionGrants = new Set<string>();
+  private eventSink: PermissionEventSink | undefined;
   private closed = false;
   private seq = 0;
 
@@ -88,7 +90,11 @@ export class PermissionToolExecutor implements ToolExecutor {
     return this.executor.execute(execution);
   }
 
-  resolve(requestId: string, decision: ApprovalDecision): boolean {
+  setEventSink(sink: PermissionEventSink | undefined): void {
+    this.eventSink = sink;
+  }
+
+  resolve(requestId: string, decision: ApprovalDecision): Promise<boolean> {
     if (
       decision !== "allow"
       && decision !== "allow-session"
@@ -98,7 +104,7 @@ export class PermissionToolExecutor implements ToolExecutor {
     }
 
     const pending = this.pending.get(requestId);
-    if (pending === undefined) return false;
+    if (pending === undefined) return Promise.resolve(false);
     const sessionGrantKey = decision === "allow-session"
       ? pending.request.grantKey
       : undefined;
@@ -110,36 +116,31 @@ export class PermissionToolExecutor implements ToolExecutor {
 
     this.pending.delete(requestId);
     pending.removeAbortListener();
-    if (sessionGrantKey !== undefined) {
-      this.sessionGrants.add(sessionGrantKey);
-    }
-    this.emit({ type: "approval.resolved", requestId, decision });
-    pending.resolve(decision);
-    return true;
+    return this.resolvePending(
+      requestId,
+      decision,
+      sessionGrantKey,
+      pending,
+    );
   }
 
   revokeSessionGrant(grantKey: string): boolean {
     return this.sessionGrants.delete(grantKey);
   }
 
-  close(reason?: string): void {
-    if (this.closed) return;
+  close(reason?: string): Promise<void> {
+    if (this.closed) return Promise.resolve();
     this.closed = true;
 
-    for (const [requestId, pending] of this.pending) {
-      this.pending.delete(requestId);
-      pending.removeAbortListener();
-      this.emit(reason === undefined
-        ? { type: "approval.cancelled", requestId }
-        : { type: "approval.cancelled", requestId, reason });
-      pending.reject(new PermissionExecutorClosedError(reason));
-    }
+    const pendingApprovals = [...this.pending.entries()];
+    this.pending.clear();
+    for (const [, pending] of pendingApprovals) pending.removeAbortListener();
 
     this.sessionGrants.clear();
-    this.eventQueue.close();
+    return this.closePending(pendingApprovals, reason);
   }
 
-  private requestApproval(
+  private async requestApproval(
     check: PermissionCheck,
     grantKey: string | undefined,
   ): Promise<ApprovalDecision> {
@@ -156,18 +157,22 @@ export class PermissionToolExecutor implements ToolExecutor {
           grantKey,
         };
 
-    return new Promise<ApprovalDecision>((resolve, reject) => {
+    let pending: PendingApproval | undefined;
+    const approval = new Promise<ApprovalDecision>((resolve, reject) => {
       const onAbort = () => {
         if (!this.pending.delete(request.id)) return;
 
         check.context.signal.removeEventListener("abort", onAbort);
         const reason = toReason(check.context.signal.reason);
-        this.emit(reason === undefined
+        const payload: PermissionEventPayload = reason === undefined
           ? { type: "approval.cancelled", requestId: request.id }
-          : { type: "approval.cancelled", requestId: request.id, reason });
-        reject(new RunCancelledError(reason));
+          : { type: "approval.cancelled", requestId: request.id, reason };
+        void this.emit(payload).then(
+          () => reject(new RunCancelledError(reason)),
+          reject,
+        );
       };
-      const pending: PendingApproval = {
+      pending = {
         request,
         resolve,
         reject,
@@ -178,20 +183,78 @@ export class PermissionToolExecutor implements ToolExecutor {
 
       this.pending.set(request.id, pending);
       check.context.signal.addEventListener("abort", onAbort, { once: true });
-      this.emit({ type: "approval.requested", request });
     });
+
+    try {
+      await this.emit({ type: "approval.requested", request });
+    } catch (error) {
+      if (this.pending.delete(request.id)) {
+        pending?.removeAbortListener();
+      }
+      throw error;
+    }
+    return approval;
+  }
+
+  private async resolvePending(
+    requestId: string,
+    decision: ApprovalDecision,
+    sessionGrantKey: string | undefined,
+    pending: PendingApproval,
+  ): Promise<boolean> {
+    try {
+      await this.emit({ type: "approval.resolved", requestId, decision });
+    } catch (error) {
+      pending.reject(error);
+      throw error;
+    }
+
+    if (sessionGrantKey !== undefined) {
+      this.sessionGrants.add(sessionGrantKey);
+    }
+    pending.resolve(decision);
+    return true;
+  }
+
+  private async closePending(
+    approvals: Array<[string, PendingApproval]>,
+    reason: string | undefined,
+  ): Promise<void> {
+    let failed = false;
+    let failure: unknown;
+
+    for (const [requestId, pending] of approvals) {
+      const payload: PermissionEventPayload = reason === undefined
+        ? { type: "approval.cancelled", requestId }
+        : { type: "approval.cancelled", requestId, reason };
+      try {
+        await this.emit(payload);
+        pending.reject(new PermissionExecutorClosedError(reason));
+      } catch (error) {
+        pending.reject(error);
+        if (!failed) {
+          failed = true;
+          failure = error;
+        }
+      }
+    }
+
+    this.eventQueue.close();
+    if (failed) throw failure;
   }
 
   private throwIfClosed(): void {
     if (this.closed) throw new PermissionExecutorClosedError();
   }
 
-  private emit(payload: PermissionEventPayload): void {
-    this.eventQueue.push({
+  private async emit(payload: PermissionEventPayload): Promise<void> {
+    const event: PermissionEvent = {
       ...payload,
       seq: ++this.seq,
       timestamp: Date.now(),
-    });
+    };
+    await this.eventSink?.(event);
+    this.eventQueue.push(event);
   }
 }
 

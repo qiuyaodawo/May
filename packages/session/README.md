@@ -24,13 +24,23 @@ const result = await run.result;
 const history = await session.history();
 ```
 
+When using `@may/permissions`, connect its durable event sink before submitting
+a run:
+
+```ts
+permissions.setEventSink((event) => session.recordPermissionEvent(event));
+```
+
+This records approval requests, decisions, and cancellations before related
+tool outcomes.
+
 `submit()` resolves when that run starts. If another run is active, the
 submission waits for it to finish. The returned handle retains Core's live
 event stream and cancellation behavior.
 
 Session history contains only durable facts: submitted input, complete
-assistant messages, tool outcomes, and run boundaries. Streaming deltas and
-other transient progress events remain on the live run stream.
+assistant messages, approvals, tool outcomes, and run boundaries. Streaming
+deltas and other transient progress events remain on the live run stream.
 
 ## Current scope
 

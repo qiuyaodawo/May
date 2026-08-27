@@ -44,3 +44,7 @@ export type PermissionEvent = PermissionEventPayload & {
   seq: number;
   timestamp: number;
 };
+
+export type PermissionEventSink = (
+  event: PermissionEvent,
+) => void | Promise<void>;

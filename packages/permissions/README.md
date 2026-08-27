@@ -25,7 +25,7 @@ const may = new May({ model, tools, context, toolExecutor: permissions });
 for await (const event of permissions.events) {
   if (event.type === "approval.requested") {
     const decision = await showApprovalPrompt(event.request);
-    permissions.resolve(event.request.id, decision);
+    await permissions.resolve(event.request.id, decision);
   }
 }
 ```
@@ -41,6 +41,14 @@ evaluated first so a later `deny` wins. Use one executor per Session; sharing an
 executor would also share its in-memory grants.
 
 Use `revokeSessionGrant(grantKey)` to remove a grant before the executor closes.
+The optional event sink is awaited before approval execution continues, which
+allows Session to preserve durable event order:
+
+```ts
+permissions.setEventSink((event) => session.recordPermissionEvent(event));
+```
+
+`resolve()` and `close()` therefore return Promises.
 
 Pending requests are cancelled when their Run signal is aborted. Call
 `close()` when the owning application or session ends to reject remaining
@@ -49,5 +57,4 @@ requests and close the permission event stream.
 ## Current scope
 
 The package intentionally has no UI and no global permission registry. Grants
-live only for the lifetime of one executor. Persistent rules and recording
-approval decisions in `SessionEvent` are future integration work.
+live only for the lifetime of one executor. Persistent rules are future work.
