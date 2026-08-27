@@ -1,71 +1,15 @@
-export interface DeepSeekFunctionCall {
-  name: string;
-  arguments: string;
-}
-
-export interface DeepSeekToolCall {
-  id: string;
-  type: "function";
-  function: DeepSeekFunctionCall;
-}
-
-export type DeepSeekMessage =
-  | { role: "system" | "user"; content: string }
-  | {
-      role: "assistant";
-      content: string;
-      reasoning_content?: string;
-      tool_calls?: DeepSeekToolCall[];
-    }
-  | {
-      role: "tool";
-      content: string;
-      tool_call_id: string;
-    };
-
-export interface DeepSeekToolDefinition {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: Readonly<Record<string, unknown>>;
-  };
-}
+import type {
+  OpenAICompatibleMessage,
+  OpenAICompatibleToolDefinition,
+} from "@may/provider-openai-compatible";
 
 export interface DeepSeekChatRequest {
   model: string;
-  messages: DeepSeekMessage[];
+  messages: OpenAICompatibleMessage[];
   stream: true;
   stream_options: { include_usage: true };
-  tools?: DeepSeekToolDefinition[];
+  tools?: OpenAICompatibleToolDefinition[];
   thinking?: { type: "enabled" | "disabled" };
   reasoning_effort?: "low" | "medium" | "high" | "xhigh" | "max";
   max_tokens?: number;
-}
-
-export interface DeepSeekToolCallDelta {
-  index: number;
-  id?: string;
-  type?: "function";
-  function?: {
-    name?: string;
-    arguments?: string;
-  };
-}
-
-export interface DeepSeekChunk {
-  choices?: Array<{
-    index: number;
-    delta?: {
-      content?: string | null;
-      reasoning_content?: string | null;
-      tool_calls?: DeepSeekToolCallDelta[];
-    };
-    finish_reason?: string | null;
-  }>;
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  } | null;
 }

@@ -1,40 +1,11 @@
-export interface ZhipuFunctionCall {
-  name: string;
-  arguments: string;
-}
-
-export interface ZhipuToolCall {
-  id: string;
-  type: "function";
-  function: ZhipuFunctionCall;
-}
-
-export type ZhipuMessage =
-  | { role: "system" | "user"; content: string }
-  | {
-      role: "assistant";
-      content: string;
-      reasoning_content?: string;
-      tool_calls?: ZhipuToolCall[];
-    }
-  | {
-      role: "tool";
-      content: string;
-      tool_call_id: string;
-    };
-
-export interface ZhipuToolDefinition {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: Readonly<Record<string, unknown>>;
-  };
-}
+import type {
+  OpenAICompatibleMessage,
+  OpenAICompatibleToolDefinition,
+} from "@may/provider-openai-compatible";
 
 export interface ZhipuChatRequest {
   model: string;
-  messages: ZhipuMessage[];
+  messages: OpenAICompatibleMessage[];
   stream: true;
   thinking: {
     type: "enabled" | "disabled";
@@ -49,33 +20,6 @@ export interface ZhipuChatRequest {
     | "xhigh"
     | "max";
   max_tokens?: number;
-  tools?: ZhipuToolDefinition[];
+  tools?: OpenAICompatibleToolDefinition[];
   tool_stream?: true;
-}
-
-export interface ZhipuToolCallDelta {
-  index: number;
-  id?: string;
-  type?: "function";
-  function?: {
-    name?: string;
-    arguments?: string;
-  };
-}
-
-export interface ZhipuChunk {
-  choices?: Array<{
-    index: number;
-    delta?: {
-      content?: string | null;
-      reasoning_content?: string | null;
-      tool_calls?: ZhipuToolCallDelta[];
-    };
-    finish_reason?: string | null;
-  }>;
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  } | null;
 }

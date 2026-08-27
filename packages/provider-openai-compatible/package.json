@@ -1,7 +1,7 @@
 {
-  "name": "@may/provider-zhipu",
+  "name": "@may/provider-openai-compatible",
   "version": "0.1.0",
-  "description": "Zhipu GLM model adapter for May.",
+  "description": "OpenAI-compatible Chat Completions protocol helpers for May providers.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,12 +18,10 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "test": "pnpm run build && node --test test/*.test.mjs",
-    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs",
-    "test:integration": "pnpm run build && node --test test-integration/*.test.mjs"
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*",
-    "@may/provider-openai-compatible": "workspace:*"
+    "@may/core": "workspace:*"
   },
   "engines": {
     "node": ">=20"

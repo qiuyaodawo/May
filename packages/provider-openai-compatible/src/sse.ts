@@ -1,11 +1,11 @@
-import { DeepSeekProtocolError } from "./errors.js";
-
 export async function* readSseData(
   response: Response,
   signal: AbortSignal,
+  protocolError: (message: string, options?: ErrorOptions) => Error,
+  providerName: string,
 ): AsyncGenerator<string> {
   if (!response.body) {
-    throw new DeepSeekProtocolError("DeepSeek response has no body");
+    throw protocolError(`${providerName} response has no body`);
   }
 
   const reader = response.body.getReader();

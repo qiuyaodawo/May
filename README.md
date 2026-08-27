@@ -8,6 +8,7 @@ be used independently or combined into complete agents and applications.
 ```text
 packages/
   core/       Agent loop, contracts, events, and in-memory Context
+  provider-openai-compatible/  Shared Chat Completions protocol helpers
   provider-deepseek/  DeepSeek streaming model adapter
   provider-zhipu/     Zhipu GLM streaming model adapter
 examples/

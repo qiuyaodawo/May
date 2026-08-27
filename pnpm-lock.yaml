@@ -34,12 +34,24 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../core
+      '@may/provider-openai-compatible':
+        specifier: workspace:*
+        version: link:../provider-openai-compatible
+
+  packages/provider-openai-compatible:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/provider-zhipu:
     dependencies:
       '@may/core':
         specifier: workspace:*
         version: link:../core
+      '@may/provider-openai-compatible':
+        specifier: workspace:*
+        version: link:../provider-openai-compatible
 
 packages:
 

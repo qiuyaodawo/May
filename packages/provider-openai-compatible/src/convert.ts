@@ -5,12 +5,14 @@ import type {
   ToolDefinition,
 } from "@may/core";
 import type {
-  DeepSeekMessage,
-  DeepSeekToolCall,
-  DeepSeekToolDefinition,
+  OpenAICompatibleMessage,
+  OpenAICompatibleToolCall,
+  OpenAICompatibleToolDefinition,
 } from "./protocol.js";
 
-export function convertMessages(messages: Message[]): DeepSeekMessage[] {
+export function toOpenAICompatibleMessages(
+  messages: Message[],
+): OpenAICompatibleMessage[] {
   return messages.map((message) => {
     if (message.role === "system" || message.role === "user") {
       return {
@@ -27,7 +29,10 @@ export function convertMessages(messages: Message[]): DeepSeekMessage[] {
       };
     }
 
-    const converted: Extract<DeepSeekMessage, { role: "assistant" }> = {
+    const converted: Extract<
+      OpenAICompatibleMessage,
+      { role: "assistant" }
+    > = {
       role: "assistant",
       content: serializeVisibleContent(message.content),
     };
@@ -48,9 +53,9 @@ export function convertMessages(messages: Message[]): DeepSeekMessage[] {
   });
 }
 
-export function convertTools(
+export function toOpenAICompatibleTools(
   tools: ToolDefinition[],
-): DeepSeekToolDefinition[] {
+): OpenAICompatibleToolDefinition[] {
   return tools.map((tool) => ({
     type: "function",
     function: {
@@ -61,7 +66,7 @@ export function convertTools(
   }));
 }
 
-function convertToolCall(call: ToolCall): DeepSeekToolCall {
+function convertToolCall(call: ToolCall): OpenAICompatibleToolCall {
   return {
     id: call.id,
     type: "function",

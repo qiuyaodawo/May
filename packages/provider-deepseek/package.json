@@ -22,7 +22,8 @@
     "test:integration": "pnpm run build && node --test test-integration/*.test.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*"
+    "@may/core": "workspace:*",
+    "@may/provider-openai-compatible": "workspace:*"
   },
   "engines": {
     "node": ">=20"

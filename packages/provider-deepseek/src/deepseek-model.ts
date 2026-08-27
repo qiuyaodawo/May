@@ -1,23 +1,15 @@
-import type {
-  AssistantMessage,
-  Model,
-  ModelEvent,
-  ModelRequest,
-  ToolCall,
-  Usage,
-} from "@may/core";
-import { convertMessages, convertTools } from "./convert.js";
+import type { Model, ModelEvent, ModelRequest } from "@may/core";
+import {
+  streamOpenAICompatibleResponse,
+  toOpenAICompatibleMessages,
+  toOpenAICompatibleTools,
+} from "@may/provider-openai-compatible";
 import {
   DeepSeekApiError,
   DeepSeekFinishReasonError,
   DeepSeekProtocolError,
 } from "./errors.js";
-import type {
-  DeepSeekChatRequest,
-  DeepSeekChunk,
-  DeepSeekToolCallDelta,
-} from "./protocol.js";
-import { readSseData } from "./sse.js";
+import type { DeepSeekChatRequest } from "./protocol.js";
 
 export type DeepSeekReasoningEffort =
   | "low"
@@ -34,12 +26,6 @@ export interface DeepSeekModelOptions {
   reasoningEffort?: DeepSeekReasoningEffort;
   maxTokens?: number;
   fetch?: typeof globalThis.fetch;
-}
-
-interface PendingToolCall {
-  id: string;
-  name: string;
-  arguments: string;
 }
 
 export class DeepSeekModel implements Model {
@@ -94,86 +80,27 @@ export class DeepSeekModel implements Model {
 
     if (!response.ok) throw await createApiError(response);
 
-    let text = "";
-    let reasoning = "";
-    let hasReasoningContent = false;
-    let usage: Usage | undefined;
-    let finishReason: string | undefined;
-    const pendingCalls = new Map<number, PendingToolCall>();
-
-    for await (const data of readSseData(response, options.signal)) {
-      if (data === "[DONE]") break;
-      const chunk = parseChunk(data);
-
-      if (chunk.usage) usage = convertUsage(chunk.usage);
-
-      for (const choice of chunk.choices ?? []) {
-        if (choice.index !== 0) continue;
-        const delta = choice.delta;
-
-        if (typeof delta?.reasoning_content === "string") {
-          hasReasoningContent = true;
-          if (delta.reasoning_content !== "") {
-            reasoning += delta.reasoning_content;
-            yield { type: "reasoning.delta", delta: delta.reasoning_content };
-          }
-        }
-
-        if (delta?.content) {
-          text += delta.content;
-          yield { type: "text.delta", delta: delta.content };
-        }
-
-        for (const toolDelta of delta?.tool_calls ?? []) {
-          mergeToolCall(pendingCalls, toolDelta);
-        }
-
-        if (choice.finish_reason !== null && choice.finish_reason !== undefined) {
-          finishReason = choice.finish_reason;
-        }
-      }
-    }
-
-    if (finishReason === undefined) {
-      throw new DeepSeekProtocolError(
-        "DeepSeek stream ended without a finish_reason",
-      );
-    }
-    if (finishReason !== "stop" && finishReason !== "tool_calls") {
-      throw new DeepSeekFinishReasonError(finishReason);
-    }
-
-    const toolCalls = completeToolCalls(pendingCalls);
-    if (finishReason === "tool_calls" && toolCalls.length === 0) {
-      throw new DeepSeekProtocolError(
-        "DeepSeek finished with tool_calls but emitted no tool calls",
-      );
-    }
-
-    const message: AssistantMessage = { role: "assistant", content: [] };
-    if (hasReasoningContent) {
-      message.content.push({ type: "reasoning", text: reasoning });
-    }
-    if (text !== "") message.content.push({ type: "text", text });
-    if (toolCalls.length > 0) message.toolCalls = toolCalls;
-
-    const completed: Extract<ModelEvent, { type: "response.completed" }> = {
-      type: "response.completed",
-      message,
-    };
-    if (usage !== undefined) completed.usage = usage;
-    yield completed;
+    yield* streamOpenAICompatibleResponse(response, {
+      signal: options.signal,
+      providerName: "DeepSeek",
+      protocolError: (message, errorOptions) =>
+        new DeepSeekProtocolError(message, errorOptions),
+      finishReasonError: (finishReason) =>
+        new DeepSeekFinishReasonError(finishReason),
+    });
   }
 
   private createRequest(request: ModelRequest): DeepSeekChatRequest {
     const body: DeepSeekChatRequest = {
       model: this.model,
-      messages: convertMessages(request.messages),
+      messages: toOpenAICompatibleMessages(request.messages),
       stream: true,
       stream_options: { include_usage: true },
     };
 
-    if (request.tools.length > 0) body.tools = convertTools(request.tools);
+    if (request.tools.length > 0) {
+      body.tools = toOpenAICompatibleTools(request.tools);
+    }
     if (this.thinking !== undefined) {
       body.thinking = { type: this.thinking };
     }
@@ -184,76 +111,6 @@ export class DeepSeekModel implements Model {
 
     return body;
   }
-}
-
-function parseChunk(data: string): DeepSeekChunk {
-  try {
-    const value: unknown = JSON.parse(data);
-    if (typeof value !== "object" || value === null) {
-      throw new TypeError("chunk is not an object");
-    }
-    return value as DeepSeekChunk;
-  } catch (error) {
-    throw new DeepSeekProtocolError("DeepSeek emitted invalid SSE JSON", {
-      cause: error,
-    });
-  }
-}
-
-function mergeToolCall(
-  calls: Map<number, PendingToolCall>,
-  delta: DeepSeekToolCallDelta,
-): void {
-  const call = calls.get(delta.index) ?? { id: "", name: "", arguments: "" };
-  if (delta.id !== undefined) call.id = delta.id;
-  if (delta.function?.name !== undefined) call.name += delta.function.name;
-  if (delta.function?.arguments !== undefined) {
-    call.arguments += delta.function.arguments;
-  }
-  calls.set(delta.index, call);
-}
-
-function completeToolCalls(calls: Map<number, PendingToolCall>): ToolCall[] {
-  return [...calls.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([index, call]) => {
-      if (call.id === "" || call.name === "") {
-        throw new DeepSeekProtocolError(
-          `DeepSeek emitted an incomplete tool call at index ${index}`,
-        );
-      }
-
-      return {
-        id: call.id,
-        name: call.name,
-        input: parseToolInput(call.arguments),
-      };
-    });
-}
-
-function parseToolInput(input: string): unknown {
-  if (input === "") return {};
-  try {
-    return JSON.parse(input);
-  } catch {
-    // Preserve malformed model output so the Tool's parse hook can reject it
-    // and May can return the validation error to the model.
-    return input;
-  }
-}
-
-function convertUsage(usage: NonNullable<DeepSeekChunk["usage"]>): Usage {
-  const converted: Usage = {};
-  if (usage.prompt_tokens !== undefined) {
-    converted.inputTokens = usage.prompt_tokens;
-  }
-  if (usage.completion_tokens !== undefined) {
-    converted.outputTokens = usage.completion_tokens;
-  }
-  if (usage.total_tokens !== undefined) {
-    converted.totalTokens = usage.total_tokens;
-  }
-  return converted;
 }
 
 async function createApiError(response: Response): Promise<DeepSeekApiError> {
@@ -279,11 +136,11 @@ async function createApiError(response: Response): Promise<DeepSeekApiError> {
     // Keep the response text as the error message when it is not JSON.
   }
 
-  const options: ConstructorParameters<typeof DeepSeekApiError>[0] = {
+  const errorOptions: ConstructorParameters<typeof DeepSeekApiError>[0] = {
     status: response.status,
     message,
   };
-  if (providerType !== undefined) options.providerType = providerType;
-  if (providerCode !== undefined) options.providerCode = providerCode;
-  return new DeepSeekApiError(options);
+  if (providerType !== undefined) errorOptions.providerType = providerType;
+  if (providerCode !== undefined) errorOptions.providerCode = providerCode;
+  return new DeepSeekApiError(errorOptions);
 }
