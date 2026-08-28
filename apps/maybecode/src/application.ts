@@ -4,6 +4,8 @@ import { createCodingTools } from "@may/coding-tools";
 import {
   InMemoryContextFactory,
   type ContextBudget,
+  type ContextCompactionResult,
+  type ContextCompactionStrategy,
   type ContextController,
   type ContextFactory,
   type ContextInspection,
@@ -50,6 +52,7 @@ export interface MaybeCodeApplicationOptions {
   readonly permissionPolicy?: PermissionPolicy;
   readonly contextFactory?: ContextFactory;
   readonly contextBudget?: ContextBudget;
+  readonly compactionStrategy?: ContextCompactionStrategy;
   readonly instructions?: string;
   readonly instructionsDirectory?: string;
   readonly maxSteps?: number;
@@ -143,6 +146,9 @@ export class MaybeCodeApplication {
         ...(runtimeInfo.latestModelMeasurement === undefined
           ? {}
           : { measurement: runtimeInfo.latestModelMeasurement }),
+        ...(options.compactionStrategy === undefined
+          ? {}
+          : { compactionStrategy: options.compactionStrategy }),
       });
       contextController = managedContext.controller;
       return new May({
@@ -239,6 +245,31 @@ export class MaybeCodeApplication {
   async inspectContext(): Promise<ContextInspection | undefined> {
     this.throwIfClosed();
     return this.contextController?.inspect();
+  }
+
+  async compactContext(
+    strategy?: ContextCompactionStrategy,
+  ): Promise<ContextCompactionResult> {
+    this.throwIfClosed();
+    if (this.isRunning) {
+      throw new Error("Cannot compact context while a run is active");
+    }
+    if (this.contextController?.compact === undefined) {
+      throw new Error("Context compaction is not supported by the active context");
+    }
+
+    const result = await this.contextController.compact(strategy);
+    if (result.changed) {
+      await this.session.recordContextCompaction({
+        strategy: result.strategy,
+        messages: result.messages,
+        beforeMessageCount: result.before.messageCount,
+        afterMessageCount: result.after.messageCount,
+        beforeEstimatedTokens: result.before.estimatedTokens,
+        afterEstimatedTokens: result.after.estimatedTokens,
+      });
+    }
+    return result;
   }
 
   async close(): Promise<void> {

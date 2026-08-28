@@ -1,5 +1,6 @@
 import type {
   AssistantMessage,
+  Message,
   RunResult,
   SerializedError,
   ToolCall,
@@ -21,6 +22,15 @@ export interface SessionApprovalRequest {
   toolCallId: string;
   idempotencyKey: string;
   grantKey?: string;
+}
+
+export interface SessionContextCompaction {
+  readonly strategy: string;
+  readonly messages: readonly Message[];
+  readonly beforeMessageCount: number;
+  readonly afterMessageCount: number;
+  readonly beforeEstimatedTokens: number;
+  readonly afterEstimatedTokens: number;
 }
 
 export type RecordablePermissionEvent = (
@@ -47,6 +57,15 @@ export type SessionEventPayload =
   | { type: "session.created"; metadata?: Record<string, unknown> }
   | { type: "input.submitted"; message: UserMessage }
   | { type: "run.started"; runId: string }
+  | {
+      type: "context.compacted";
+      strategy: string;
+      messages: Message[];
+      beforeMessageCount: number;
+      afterMessageCount: number;
+      beforeEstimatedTokens: number;
+      afterEstimatedTokens: number;
+    }
   | {
       type: "assistant.completed";
       runId: string;

@@ -20,7 +20,8 @@ const snapshot = await managed.context.snapshot();
 const inspection = await managed.controller?.inspect();
 ```
 
-`InMemoryContextFactory` creates the existing `@may/core` `InMemoryContext`.
+`InMemoryContextFactory` creates an in-memory implementation of the
+`@may/core` `Context` contract.
 Applications can accept the `ContextFactory` interface to let callers replace
 context storage and model-view selection without changing the Core agent loop.
 Factories return a `ManagedContext`: Core receives its `context`, while an
@@ -31,4 +32,33 @@ four. After a model reports `usage.inputTokens`,
 `SnapshotContextController` can retain that measured request prefix and
 estimate only messages appended afterward. `ContextBudget` carries model
 limits and future compaction reserves; it does not currently trigger or
-perform compaction.
+perform automatic compaction by itself.
+
+## Manual compaction
+
+`InMemoryContextFactory` also supplies a replaceable context controller with
+`compact()`. Its default `PruneOldToolResultsStrategy` keeps the four most
+recent tool results and replaces older results of at least 2 KiB with bounded
+placeholders. It preserves message order and tool-call identifiers.
+
+```ts
+import {
+  InMemoryContextFactory,
+  PruneOldToolResultsStrategy,
+} from "@may/context";
+
+const managed = await new InMemoryContextFactory().create({
+  messages,
+  compactionStrategy: new PruneOldToolResultsStrategy({
+    keepRecentToolResults: 2,
+    minimumResultBytes: 1024,
+  }),
+});
+
+const result = await managed.controller?.compact?.();
+```
+
+Compaction clears stale provider-token measurements and returns the before and
+after inspections plus the replacement messages. Applications remain
+responsible for persisting those replacement messages. Custom factories may
+omit `compact()` or provide a different strategy and storage mechanism.

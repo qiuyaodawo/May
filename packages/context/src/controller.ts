@@ -1,5 +1,10 @@
 import type { Context, ContextSnapshot, Message, Usage } from "@may/core";
 
+import type {
+  ContextCompactionResult,
+  ContextCompactionStrategy,
+} from "./compaction.js";
+
 export interface ContextBudget {
   readonly contextWindowTokens?: number;
   readonly outputReserveTokens?: number;
@@ -34,18 +39,31 @@ export interface ContextInspection {
 export interface ContextController {
   inspect(): Promise<ContextInspection>;
   recordModelUsage?(usage: Usage, contextMessageCount: number): void;
+  compact?(
+    strategy?: ContextCompactionStrategy,
+  ): Promise<ContextCompactionResult>;
+}
+
+export interface SnapshotContextControllerOptions {
+  readonly budget?: ContextBudget;
+  readonly measurement?: ContextMeasurement;
+  readonly compactionStrategy?: ContextCompactionStrategy;
+  readonly replaceMessages?: (
+    messages: readonly Message[],
+  ) => void | Promise<void>;
 }
 
 export class SnapshotContextController implements ContextController {
   private readonly budget: ContextBudget | undefined;
+  private readonly compactionStrategy: ContextCompactionStrategy | undefined;
+  private readonly replaceMessages: SnapshotContextControllerOptions[
+    "replaceMessages"
+  ];
   private measurement: ContextMeasurement | undefined;
 
   constructor(
     private readonly context: Context,
-    options: {
-      readonly budget?: ContextBudget;
-      readonly measurement?: ContextMeasurement;
-    } = {},
+    options: SnapshotContextControllerOptions = {},
   ) {
     this.budget = options.budget === undefined
       ? undefined
@@ -53,6 +71,8 @@ export class SnapshotContextController implements ContextController {
     this.measurement = options.measurement === undefined
       ? undefined
       : validateMeasurement(options.measurement);
+    this.compactionStrategy = options.compactionStrategy;
+    this.replaceMessages = options.replaceMessages;
   }
 
   async inspect(): Promise<ContextInspection> {
@@ -70,6 +90,63 @@ export class SnapshotContextController implements ContextController {
       inputTokens: usage.inputTokens,
       contextMessageCount,
     });
+  }
+
+  async compact(
+    strategy = this.compactionStrategy,
+  ): Promise<ContextCompactionResult> {
+    if (strategy === undefined) {
+      throw new Error("No context compaction strategy is configured");
+    }
+    if (strategy.name.trim() === "") {
+      throw new Error("Context compaction strategy name cannot be empty");
+    }
+    if (this.replaceMessages === undefined) {
+      throw new Error("The active context does not support compaction");
+    }
+
+    const snapshot = await this.context.snapshot();
+    const before = inspectContextSnapshot(snapshot, this.inspectionOptions());
+    const compacted = await strategy.compact({
+      ...snapshot,
+      messages: [...snapshot.messages],
+    });
+    if (!Array.isArray(compacted)) {
+      throw new TypeError("Context compaction strategy must return messages");
+    }
+
+    const messages = [...compacted];
+    const changed = JSON.stringify(messages) !== JSON.stringify(snapshot.messages);
+    if (!changed) {
+      return { strategy: strategy.name, changed, messages, before, after: before };
+    }
+
+    await this.replaceMessages(messages);
+    this.measurement = undefined;
+    const afterSnapshot = await this.context.snapshot();
+    const after = inspectContextSnapshot(
+      afterSnapshot,
+      this.inspectionOptions(),
+    );
+    return {
+      strategy: strategy.name,
+      changed,
+      messages: [...afterSnapshot.messages],
+      before,
+      after,
+    };
+  }
+
+  private inspectionOptions(): {
+    budget?: ContextBudget;
+    measurement?: ContextMeasurement;
+  } {
+    return {
+      ...(this.budget === undefined ? {} : { budget: this.budget }),
+      ...(this.measurement === undefined
+        ? {}
+        : { measurement: this.measurement }),
+    };
   }
 }
 

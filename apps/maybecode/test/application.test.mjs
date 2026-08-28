@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { InMemoryContext, RunCancelledError } from "@may/core";
+import { PruneOldToolResultsStrategy } from "@may/context";
 import { FileSessionStore } from "@may/session/file-store";
 import {
   InMemorySessionCatalog,
@@ -250,7 +251,83 @@ test("creates context through an injected factory for each session", async () =>
   assert.equal(inputs[0].instructions, inputs[2].instructions);
   assert.deepEqual(inputs[0].metadata, { workspace: process.cwd() });
   assert.equal(await app.inspectContext(), undefined);
+  await assert.rejects(
+    app.compactContext(),
+    /compaction is not supported/u,
+  );
   await app.close();
+});
+
+test("persists pruned tool results across session resume", async () => {
+  const store = new (await import("@may/session")).InMemorySessionStore();
+  const catalog = new InMemorySessionCatalog();
+  const requests = [];
+  let modelCall = 0;
+  const model = {
+    async *stream(request) {
+      requests.push(request);
+      modelCall += 1;
+      if (modelCall === 1) {
+        yield {
+          type: "response.completed",
+          message: {
+            role: "assistant",
+            content: [],
+            toolCalls: [
+              { id: "old", name: "large", input: { label: "old" } },
+              { id: "recent", name: "large", input: { label: "recent" } },
+            ],
+          },
+        };
+        return;
+      }
+      yield {
+        type: "response.completed",
+        message: assistantMessage(`answer ${modelCall}`),
+      };
+    },
+  };
+  const options = {
+    workspace: process.cwd(),
+    model,
+    store,
+    catalog,
+    tools: [{
+      name: "large",
+      description: "Returns a large result",
+      inputSchema: { type: "object" },
+      async execute(input) {
+        return { label: input.label, payload: "x".repeat(4000) };
+      },
+    }],
+    permissionPolicy: () => "allow",
+    compactionStrategy: new PruneOldToolResultsStrategy({
+      keepRecentToolResults: 1,
+      minimumResultBytes: 0,
+    }),
+  };
+
+  const first = await MaybeCodeWorkspace.open({ ...options, autoResume: false });
+  await (await first.submit({ input: "produce results" })).result;
+  const compacted = await first.compactContext();
+  assert.equal(compacted.changed, true);
+  assert.ok(compacted.after.estimatedTokens < compacted.before.estimatedTokens);
+  assert.equal(
+    (await first.history()).filter((event) =>
+      event.type === "context.compacted"
+    ).length,
+    1,
+  );
+  await first.close();
+
+  const resumed = await MaybeCodeWorkspace.open(options);
+  await (await resumed.submit({ input: "continue" })).result;
+  const toolMessages = requests.at(-1).messages.filter((message) =>
+    message.role === "tool"
+  );
+  assert.match(toolMessages[0].content[0].text, /tool result pruned/u);
+  assert.equal(toolMessages[1].content[0].value.label, "recent");
+  await resumed.close();
 });
 
 test("cancels an active model call", async () => {
@@ -280,6 +357,10 @@ test("cancels an active model call", async () => {
 
   const run = await app.submit({ input: "wait" });
   await modelStarted;
+  await assert.rejects(
+    app.compactContext(),
+    /while a run is active/u,
+  );
   assert.equal(app.cancel("stop"), true);
   await assert.rejects(run.result, RunCancelledError);
   await app.close();

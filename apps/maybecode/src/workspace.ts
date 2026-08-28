@@ -1,5 +1,9 @@
 import { AsyncEventQueue, type RunOptions } from "@may/core";
-import type { ContextInspection } from "@may/context";
+import type {
+  ContextCompactionResult,
+  ContextCompactionStrategy,
+  ContextInspection,
+} from "@may/context";
 import type { ApprovalDecision } from "@may/permissions";
 
 import {
@@ -143,6 +147,14 @@ export class MaybeCodeWorkspace {
   inspectContext(): Promise<ContextInspection | undefined> {
     this.throwIfClosed();
     return this.application.inspectContext();
+  }
+
+  async compactContext(
+    strategy?: ContextCompactionStrategy,
+  ): Promise<ContextCompactionResult> {
+    this.throwIfClosed();
+    this.assertIdle();
+    return this.application.compactContext(strategy);
   }
 
   async close(): Promise<void> {

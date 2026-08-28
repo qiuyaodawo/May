@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { InMemoryContextFactory } from "../dist/index.js";
+import {
+  InMemoryContextFactory,
+  PruneOldToolResultsStrategy,
+} from "../dist/index.js";
 
 test("creates independent in-memory contexts from factory input", async () => {
   const factory = new InMemoryContextFactory();
@@ -77,8 +80,43 @@ test("updates the measurement from model usage", async () => {
   );
 });
 
+test("prunes old tool results and resets stale measurements", async () => {
+  const oldTool = toolMessage("old", "x".repeat(4000));
+  const recentTool = toolMessage("recent", "y".repeat(4000));
+  const managed = new InMemoryContextFactory().create({
+    messages: [oldTool, message("between"), recentTool],
+    measurement: { inputTokens: 500, contextMessageCount: 2 },
+    compactionStrategy: new PruneOldToolResultsStrategy({
+      keepRecentToolResults: 1,
+      minimumResultBytes: 0,
+    }),
+  });
+
+  const result = await managed.controller.compact();
+  assert.equal(result.strategy, "prune-old-tool-results");
+  assert.equal(result.changed, true);
+  assert.equal(result.before.measurementMethod, "measured+estimated");
+  assert.equal(result.after.measurementMethod, "estimated");
+  assert.ok(result.after.estimatedTokens < result.before.estimatedTokens);
+  assert.match(result.messages[0].content[0].text, /tool result pruned/u);
+  assert.deepEqual(result.messages[2], recentTool);
+  assert.deepEqual((await managed.context.snapshot()).messages, result.messages);
+
+  const repeated = await managed.controller.compact();
+  assert.equal(repeated.changed, false);
+});
+
 function message(text) {
   return { role: "user", content: [{ type: "text", text }] };
+}
+
+function toolMessage(id, value) {
+  return {
+    role: "tool",
+    toolCallId: id,
+    name: "read",
+    content: [{ type: "json", value }],
+  };
 }
 
 function byteLength(value) {

@@ -5,6 +5,7 @@ import type {
   ContextController,
   ContextMeasurement,
 } from "./controller.js";
+import type { ContextCompactionStrategy } from "./compaction.js";
 
 export interface ContextFactoryOptions {
   readonly instructions?: string;
@@ -12,6 +13,7 @@ export interface ContextFactoryOptions {
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly budget?: ContextBudget;
   readonly measurement?: ContextMeasurement;
+  readonly compactionStrategy?: ContextCompactionStrategy;
 }
 
 export interface ContextFactory {

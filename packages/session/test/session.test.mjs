@@ -568,6 +568,71 @@ test("restores the latest model input measurement when resuming", async () => {
   });
 });
 
+test("replays the latest compacted context without deleting history", async () => {
+  const store = new InMemorySessionStore();
+  const session = await Session.create({
+    id: "compacted",
+    store,
+    runtime: new May({
+      context: new InMemoryContext(),
+      model: {
+        async *stream() {
+          yield {
+            type: "response.completed",
+            message: assistantMessage("original answer"),
+            usage: { inputTokens: 100 },
+          };
+        },
+      },
+    }),
+  });
+  await (await session.submit({ input: "original question" })).result;
+  const compactedMessages = [
+    { role: "user", content: [{ type: "text", text: "compact view" }] },
+  ];
+  await session.recordContextCompaction({
+    strategy: "test",
+    messages: compactedMessages,
+    beforeMessageCount: 2,
+    afterMessageCount: 1,
+    beforeEstimatedTokens: 100,
+    afterEstimatedTokens: 20,
+  });
+
+  let replayed;
+  let runtimeInfo;
+  await Session.resume({
+    id: session.id,
+    store,
+    createRuntime(messages, info) {
+      replayed = messages;
+      runtimeInfo = info;
+      return createRuntime();
+    },
+  });
+
+  assert.deepEqual(replayed, compactedMessages);
+  assert.deepEqual(runtimeInfo, {});
+  const history = await session.history();
+  assert.ok(history.some((event) => event.type === "input.submitted"));
+  assert.ok(history.some((event) => event.type === "assistant.completed"));
+  assert.deepEqual(
+    history.find((event) => event.type === "context.compacted"),
+    {
+      type: "context.compacted",
+      sessionId: "compacted",
+      seq: 6,
+      timestamp: history[5].timestamp,
+      strategy: "test",
+      messages: compactedMessages,
+      beforeMessageCount: 2,
+      afterMessageCount: 1,
+      beforeEstimatedTokens: 100,
+      afterEstimatedTokens: 20,
+    },
+  );
+});
+
 test("reports missing sessions and corrupt session files", async (t) => {
   const directory = await createTempDirectory(t);
   const store = new FileSessionStore(directory);

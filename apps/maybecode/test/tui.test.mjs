@@ -18,6 +18,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     "create a file",
     "/instructions",
     "/context",
+    "/compact",
     "/sessions",
     "/quit",
   ]);
@@ -80,6 +81,10 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   assert.match(terminal.output, /effective usage: ~[\d,]+ \/ 10,000 \([\d.]+%\)/u);
   assert.match(terminal.output, /measurement: 160 measured \+ ~\d+ estimated tail/u);
   assert.match(terminal.output, /remaining: [\d,]+ tokens/u);
+  assert.match(
+    terminal.output,
+    /No context changes were eligible for prune-old-tool-results/u,
+  );
   assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);
   assert.ok(terminal.prompts.some((prompt) => prompt.includes("allow [s]ession")));

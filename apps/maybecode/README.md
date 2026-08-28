@@ -77,6 +77,7 @@ and may also return a `ContextController` for application-level inspection.
 - `/resume <id>` switches sessions.
 - `/instructions` shows active instruction sources and content.
 - `/context` shows message counts, size, measured usage, and window remaining.
+- `/compact` prunes eligible old tool results and persists the active view.
 - `/help` shows commands.
 - `/quit` exits.
 - `Ctrl+C` cancels an active run and exits while idle.
@@ -87,6 +88,12 @@ that measured request prefix with an estimate for messages added afterward.
 This is intended for visibility, not exact billing or context-window
 enforcement, and does not yet trigger compaction. A custom context without a
 controller reports that inspection is unsupported.
+
+`/compact` currently uses `prune-old-tool-results`: it keeps the four newest
+tool results and replaces older results of at least 2 KiB with short
+placeholders. The original session events remain in JSONL, while subsequent
+model requests and resumed sessions use the compacted view. Automatic
+compaction and model-generated summaries are not implemented yet.
 
 The `read` tool runs without approval. `bash`, `edit`, and `write` require an
 allow-once, allow-for-session, or deny decision. Bash is not a sandbox.

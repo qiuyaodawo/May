@@ -12,6 +12,7 @@ import {
 import type {
   RecordablePermissionEvent,
   SessionApprovalRequest,
+  SessionContextCompaction,
   SessionEvent,
   SessionEventPayload,
 } from "./events.js";
@@ -137,6 +138,21 @@ export class Session {
     return this.record(toPermissionSessionEvent(event), event.timestamp);
   }
 
+  async recordContextCompaction(
+    compaction: SessionContextCompaction,
+  ): Promise<void> {
+    await this.tail;
+    await this.record({
+      type: "context.compacted",
+      strategy: compaction.strategy,
+      messages: [...compaction.messages],
+      beforeMessageCount: compaction.beforeMessageCount,
+      afterMessageCount: compaction.afterMessageCount,
+      beforeEstimatedTokens: compaction.beforeEstimatedTokens,
+      afterEstimatedTokens: compaction.afterEstimatedTokens,
+    });
+  }
+
   private async start(options: RunOptions): Promise<RunHandle> {
     const input: UserMessage = typeof options.input === "string"
       ? userMessage(options.input)
@@ -220,6 +236,10 @@ function replaySession(events: readonly SessionEvent[]): {
             contextMessageCount: event.contextMessageCount,
           };
         }
+        break;
+      case "context.compacted":
+        messages.splice(0, messages.length, ...event.messages);
+        latestModelMeasurement = undefined;
         break;
       case "tool.completed":
         messages.push({

@@ -15,6 +15,7 @@ const HELP = `Commands:
   /resume <id>     Switch to another session
   /instructions    Show active instruction sources and content
   /context         Show current context usage estimate
+  /compact         Prune eligible old tool results
   /help            Show commands
   /quit             Exit MaybeCode
   Ctrl+C            Cancel the active run, or exit while idle
@@ -189,6 +190,15 @@ async function handleCommand(
           ? "\nContext inspection is not supported by the active context.\n"
           : `\n${renderContextInspection(inspection)}`,
       );
+      return false;
+    }
+    case "/compact": {
+      if (arguments_.length > 0) {
+        terminal.write("\nUsage: /compact\n");
+        return false;
+      }
+      const result = await app.compactContext();
+      terminal.write(`\n${renderCompactionResult(result)}`);
       return false;
     }
     case "/new": {
@@ -491,6 +501,26 @@ function renderContextInspection(inspection: ContextInspection): string {
     output += `  remaining: ${formatNumber(inspection.remainingTokens)} tokens\n`;
   }
   return output;
+}
+
+function renderCompactionResult(
+  result: Awaited<ReturnType<MaybeCodeWorkspace["compactContext"]>>,
+): string {
+  if (!result.changed) {
+    return `No context changes were eligible for ${result.strategy}.\n`;
+  }
+  const saved = Math.max(
+    0,
+    result.before.estimatedTokens - result.after.estimatedTokens,
+  );
+  const ratio = result.before.estimatedTokens === 0
+    ? 0
+    : saved / result.before.estimatedTokens * 100;
+  return `Context compacted with ${result.strategy}:\n` +
+    `  messages: ${result.before.messageCount} -> ${result.after.messageCount}\n` +
+    `  estimated tokens: ~${formatNumber(result.before.estimatedTokens)} -> ` +
+    `~${formatNumber(result.after.estimatedTokens)}\n` +
+    `  saved: ~${formatNumber(saved)} tokens (${ratio.toFixed(1)}%)\n`;
 }
 
 function formatNumber(value: number): string {
