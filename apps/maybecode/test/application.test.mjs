@@ -243,7 +243,7 @@ async function collectEvents(app, target, approvalDecision) {
 }
 
 async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "maybe-code-"));
+  const directory = await mkdtemp(join(tmpdir(), "maybecode-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
 }

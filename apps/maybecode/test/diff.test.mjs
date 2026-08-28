@@ -108,7 +108,7 @@ test("bounds large diff output", async (t) => {
 });
 
 async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "maybe-code-diff-"));
+  const directory = await mkdtemp(join(tmpdir(), "maybecode-diff-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
 }

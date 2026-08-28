@@ -1,5 +1,6 @@
 import { MayConfigValidationError } from "./errors.js";
 import type {
+  ApplicationConfig,
   MayConfig,
   ModelProfile,
   ProviderConfig,
@@ -25,6 +26,16 @@ export function parseMayConfig(value: unknown, path = "<inline>"): MayConfig {
     }),
   );
 
+  const appsValue = root.apps === undefined
+    ? {}
+    : requireObject(root.apps, path, "apps");
+  const apps = Object.fromEntries(
+    Object.entries(appsValue).map(([name, app]) => {
+      requireName(name, path, "apps");
+      return [name, parseApplication(app, path, `apps.${name}`)];
+    }),
+  );
+
   for (const [name, model] of Object.entries(models)) {
     if (!Object.hasOwn(providers, model.provider)) {
       throw new MayConfigValidationError(
@@ -36,7 +47,7 @@ export function parseMayConfig(value: unknown, path = "<inline>"): MayConfig {
   }
 
   if (root.defaultModel === undefined) {
-    return { path, providers, models };
+    return { path, providers, models, apps };
   }
 
   const defaultModel = requireNonEmptyString(
@@ -51,7 +62,15 @@ export function parseMayConfig(value: unknown, path = "<inline>"): MayConfig {
       `references unknown model "${defaultModel}"`,
     );
   }
-  return { path, providers, models, defaultModel };
+  return { path, providers, models, apps, defaultModel };
+}
+
+function parseApplication(
+  value: unknown,
+  path: string,
+  field: string,
+): ApplicationConfig {
+  return { ...requireObject(value, path, field) };
 }
 
 function parseProvider(

@@ -12,6 +12,6 @@
     { "path": "./packages/providers/anthropic" },
     { "path": "./packages/tools/coding-tools" },
     { "path": "./apps/cli" },
-    { "path": "./apps/maybe-code" }
+    { "path": "./apps/maybecode" }
   ]
 }

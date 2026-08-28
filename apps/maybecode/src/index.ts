@@ -5,6 +5,7 @@ export * from "./configured.js";
 export * from "./diff.js";
 export * from "./errors.js";
 export * from "./events.js";
+export * from "./instructions.js";
 export * from "./model.js";
 export * from "./policy.js";
 export * from "./run.js";

@@ -47,7 +47,7 @@ test("rejects a corrupt session catalog", async (t) => {
 });
 
 async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "maybe-code-catalog-"));
+  const directory = await mkdtemp(join(tmpdir(), "maybecode-catalog-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
 }

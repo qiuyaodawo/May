@@ -28,7 +28,7 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
-  apps/maybe-code:
+  apps/maybecode:
     dependencies:
       '@may/coding-tools':
         specifier: workspace:*

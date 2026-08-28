@@ -14,7 +14,12 @@ import {
 
 test("terminal UI renders streams and drives tool approval", async (t) => {
   const workspace = await temporaryDirectory(t);
-  const terminal = new FakeTerminal(["create a file", "/sessions", "/quit"]);
+  const terminal = new FakeTerminal([
+    "create a file",
+    "/instructions",
+    "/sessions",
+    "/quit",
+  ]);
   let modelCall = 0;
   const model = {
     async *stream() {
@@ -60,7 +65,9 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   assert.match(terminal.output, /Approval required for write/);
   assert.match(terminal.output, /Permission: allow-session/);
   assert.match(terminal.output, /✓ write: hello\.txt \(created, \+1 -0\)/);
-  assert.match(terminal.output, /May: done/);
+  assert.match(terminal.output, /MaybeCode: done/);
+  assert.match(terminal.output, /Instructions:\n  system: built-in\n  project: none/);
+  assert.match(terminal.output, /Effective instructions:\n---\nYou are MaybeCode/u);
   assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);
   assert.ok(terminal.prompts.some((prompt) => prompt.includes("allow [s]ession")));
@@ -163,7 +170,7 @@ function assistantMessage(text) {
 }
 
 async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "maybe-code-tui-"));
+  const directory = await mkdtemp(join(tmpdir(), "maybecode-tui-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
 }

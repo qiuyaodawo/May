@@ -12,10 +12,13 @@ export interface ModelProfile {
   readonly options?: Readonly<Record<string, unknown>>;
 }
 
+export type ApplicationConfig = Readonly<Record<string, unknown>>;
+
 export interface MayConfig {
   readonly path: string;
   readonly providers: Readonly<Record<string, ProviderConfig>>;
   readonly models: Readonly<Record<string, ModelProfile>>;
+  readonly apps?: Readonly<Record<string, ApplicationConfig>>;
   readonly defaultModel?: string;
 }
 

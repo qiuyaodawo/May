@@ -17,6 +17,7 @@ import {
   type MaybeCodeModelSelector,
   type SelectedMaybeCodeModel,
 } from "./model.js";
+import { resolveMaybeCodeInstructionsDirectory } from "./instructions.js";
 import { MaybeCodeWorkspace } from "./workspace.js";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
@@ -37,7 +38,7 @@ export interface ConfiguredMaybeCodeDependencies {
 }
 
 export function getDefaultMaybeCodeDataDirectory(): string {
-  return join(homedir(), ".may", "maybe-code");
+  return join(homedir(), ".may", "maybecode");
 }
 
 export async function openConfiguredMaybeCode(
@@ -54,6 +55,9 @@ export async function openConfiguredMaybeCode(
     ...(options.model === undefined ? {} : { model: options.model }),
   });
   const model = (dependencies.createModel ?? createMaybeCodeModel)(selection);
+  const instructionsDirectory = options.instructions === undefined
+    ? resolveMaybeCodeInstructionsDirectory(config)
+    : undefined;
   const dataDirectory = resolve(
     options.dataDirectory ?? getDefaultMaybeCodeDataDirectory(),
   );
@@ -72,6 +76,9 @@ export async function openConfiguredMaybeCode(
     ...(options.instructions === undefined
       ? {}
       : { instructions: options.instructions }),
+    ...(instructionsDirectory === undefined
+      ? {}
+      : { instructionsDirectory }),
     ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
   });
 }

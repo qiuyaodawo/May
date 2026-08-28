@@ -19,6 +19,11 @@ Optional configuration loading and validation for May applications.
         "maxTokens": 8192
       }
     }
+  },
+  "apps": {
+    "maybecode": {
+      "instructionsDirectory": "instructions/maybecode"
+    }
   }
 }
 ```
@@ -38,6 +43,10 @@ const selectedModel = resolveModelProfile(config);
 By default, `loadMayConfig()` reads `~/.may/config.json`. Pass `{ path }` to
 load another file. Existing provider entries containing `apiKey`, `baseURL`, and
 `model` remain supported; `models` and `defaultModel` are optional.
+
+`apps` is an optional map of application-owned configuration. This package
+validates that each entry is an object but leaves fields such as
+`instructionsDirectory` for the application to interpret.
 
 `apiKeyEnv` is resolved only when `resolveProviderConfig()` or
 `resolveModelProfile()` selects that provider. The package does not instantiate

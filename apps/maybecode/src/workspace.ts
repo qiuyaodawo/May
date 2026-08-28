@@ -14,6 +14,7 @@ import type {
   MaybeCodeEvent,
   MaybeCodeRun,
 } from "./events.js";
+import type { MaybeCodeInstructions } from "./instructions.js";
 
 export interface MaybeCodeWorkspaceOptions extends Omit<
   MaybeCodeApplicationOptions,
@@ -85,6 +86,10 @@ export class MaybeCodeWorkspace {
 
   get isRunning(): boolean {
     return this.application.isRunning;
+  }
+
+  get instructions(): MaybeCodeInstructions {
+    return this.application.instructions;
   }
 
   async submit(options: RunOptions): Promise<MaybeCodeRun> {

@@ -21,7 +21,7 @@ packages/
     coding-tools/  Read, bash, edit, and write tools
 apps/
   cli/        Minimal command-line interface
-  maybe-code/ Terminal coding-agent application
+  maybecode/ Terminal coding-agent application
 examples/
   basic/      Minimal Model → Tool → Model example
   deepseek/   Live DeepSeek tool-call example

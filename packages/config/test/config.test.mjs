@@ -30,11 +30,29 @@ test("parses the existing provider-only config shape", () => {
 
   assert.equal(config.path, "memory.json");
   assert.deepEqual(config.models, {});
+  assert.deepEqual(config.apps, {});
   assert.deepEqual(config.providers.deepseek, {
     apiKey: "test-key",
     baseURL: "https://example.test",
     model: "deepseek-reasoner",
     maxTokens: 4096,
+  });
+});
+
+test("parses generic application configuration", () => {
+  const config = parseMayConfig({
+    providers: {},
+    apps: {
+      maybecode: {
+        instructionsDirectory: "~/.may/instructions/maybecode",
+      },
+    },
+  });
+
+  assert.deepEqual(config.apps, {
+    maybecode: {
+      instructionsDirectory: "~/.may/instructions/maybecode",
+    },
   });
 });
 
@@ -98,6 +116,7 @@ test("rejects invalid config shapes", async (t) => {
     ["non-object root", null, "config"],
     ["missing providers", {}, "providers"],
     ["non-object provider", { providers: { deepseek: [] } }, "providers.deepseek"],
+    ["non-object application", { providers: {}, apps: { maybecode: [] } }, "apps.maybecode"],
     ["empty known field", { providers: { deepseek: { apiKey: " " } } }, "providers.deepseek.apiKey"],
     [
       "two API key sources",

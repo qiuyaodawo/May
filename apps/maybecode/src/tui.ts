@@ -12,6 +12,7 @@ const HELP = `Commands:
   /new             Start a new session
   /sessions        List sessions for this workspace
   /resume <id>     Switch to another session
+  /instructions    Show active instruction sources and content
   /help            Show commands
   /quit             Exit MaybeCode
   Ctrl+C            Cancel the active run, or exit while idle
@@ -53,7 +54,8 @@ export async function runTerminalUI(
 
   const eventTask = consumeEvents(app, renderer, question);
   terminal.write(
-    `MaybeCode\nWorkspace: ${app.workspace}\nType /help for commands.\n`,
+    `MaybeCode\nWorkspace: ${app.workspace}\n` +
+      `${renderInstructionSources(app)}Type /help for commands.\n`,
   );
 
   try {
@@ -172,6 +174,12 @@ async function handleCommand(
     case "/help":
       terminal.write(`\n${HELP}`);
       return false;
+    case "/instructions":
+      terminal.write(
+        `\n${renderInstructionSources(app)}` +
+          `Effective instructions:\n---\n${app.instructions.effective}\n---\n`,
+      );
+      return false;
     case "/new": {
       const id = await app.newSession();
       terminal.write(`\nCreated session ${id}\n`);
@@ -231,7 +239,7 @@ class TerminalRenderer {
       case "model.text.delta":
         this.endReasoning();
         if (!this.textStarted) {
-          this.terminal.write("\nMay: ");
+          this.terminal.write("\nMaybeCode: ");
           this.textStarted = true;
         }
         this.terminal.write(event.delta);
@@ -240,7 +248,7 @@ class TerminalRenderer {
         this.endReasoning();
         const text = textFromContent(event.message.content);
         if (!this.textStarted && text !== "") {
-          this.terminal.write(`\nMay: ${text}`);
+          this.terminal.write(`\nMaybeCode: ${text}`);
           this.textStarted = true;
         }
         if (this.textStarted) this.terminal.write("\n");
@@ -387,7 +395,7 @@ function renderHistory(
       if (text !== "") terminal.write(`You: ${text}\n`);
     } else if (event.type === "assistant.completed") {
       const text = textFromContent(event.message.content);
-      if (text !== "") terminal.write(`May: ${text}\n`);
+      if (text !== "") terminal.write(`MaybeCode: ${text}\n`);
     } else if (event.type === "tool.completed") {
       terminal.write(`✓ ${event.call.name}${toolResultSummary(event.output)}\n`);
     } else if (event.type === "tool.failed") {
@@ -429,6 +437,21 @@ function toolInputSummary(toolName: string, input: unknown): string {
 
 function toolCallKey(runId: string, toolCallId: string): string {
   return `${runId}:${toolCallId}`;
+}
+
+function renderInstructionSources(app: MaybeCodeWorkspace): string {
+  const system = app.instructions.system.source;
+  const project = app.instructions.project?.source;
+  return `Instructions:\n  system: ${instructionSourceLabel(system)}\n` +
+    `  project: ${
+      project === undefined ? "none" : instructionSourceLabel(project)
+    }\n`;
+}
+
+function instructionSourceLabel(
+  source: MaybeCodeWorkspace["instructions"]["system"]["source"],
+): string {
+  return source.type === "file" ? source.path : source.type;
 }
 
 function changeKindLabel(kind: FileChangeKind): string {

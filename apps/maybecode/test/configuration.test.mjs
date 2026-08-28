@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -58,7 +58,13 @@ test("selects the default model profile", () => {
 
 test("opens configured MaybeCode with injected model creation", async (t) => {
   const directory = await temporaryDirectory(t);
+  const configDirectory = join(directory, "config");
+  const instructionsDirectory = join(configDirectory, "instructions", "maybecode");
+  await mkdir(instructionsDirectory, { recursive: true });
+  await writeFile(join(instructionsDirectory, "system.md"), "custom system");
+  await writeFile(join(directory, "AGENTS.md"), "project rules");
   let selected;
+  let request;
   const app = await openConfiguredMaybeCode(
     {
       workspace: directory,
@@ -68,17 +74,23 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
     {
       async loadConfig() {
         return {
-          path: "config.json",
+          path: join(configDirectory, "config.json"),
           providers: {
             deepseek: { apiKey: "test", model: "deepseek-chat" },
           },
           models: {},
+          apps: {
+            maybecode: {
+              instructionsDirectory: "instructions/maybecode",
+            },
+          },
         };
       },
       createModel(selection) {
         selected = selection;
         return {
-          async *stream() {
+          async *stream(value) {
+            request = value;
             yield {
               type: "response.completed",
               message: assistantMessage("ok"),
@@ -95,6 +107,12 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
       .text,
     "ok",
   );
+  assert.equal(
+    request.messages[0].content[0].text,
+    "custom system\n\n# Project instructions\n\nproject rules",
+  );
+  assert.equal(app.instructions.system.source.type, "file");
+  assert.equal(app.instructions.project.source.type, "file");
   await app.close();
 });
 
@@ -121,7 +139,7 @@ function assistantMessage(text) {
 }
 
 async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "maybe-code-config-"));
+  const directory = await mkdtemp(join(tmpdir(), "maybecode-config-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
 }

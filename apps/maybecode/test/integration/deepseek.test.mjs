@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
 test("runs and resumes a real DeepSeek coding session", async (t) => {
-  const dataDirectory = await mkdtemp(join(tmpdir(), "maybe-code-live-"));
+  const dataDirectory = await mkdtemp(join(tmpdir(), "maybecode-live-"));
   t.after(() => rm(dataDirectory, { recursive: true, force: true }));
   const workspace = fileURLToPath(new URL("../../../..", import.meta.url));
 

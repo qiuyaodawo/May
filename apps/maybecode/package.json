@@ -1,5 +1,5 @@
 {
-  "name": "@may/maybe-code",
+  "name": "@may/maybecode",
   "version": "0.1.0",
   "description": "Terminal coding agent built from May packages.",
   "private": true,

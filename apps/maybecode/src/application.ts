@@ -22,12 +22,13 @@ import type {
   MaybeCodeSessionEvent,
 } from "./events.js";
 import { createToolChangePreview } from "./diff.js";
+import {
+  loadMaybeCodeInstructions,
+  type MaybeCodeInstructions,
+} from "./instructions.js";
 import { createCodingPermissionPolicy } from "./policy.js";
 
-export const DEFAULT_MAYBE_CODE_INSTRUCTIONS = `You are MaybeCode, a coding agent working in a local workspace.
-Use tools to inspect the project before making claims about it.
-Keep changes focused, preserve existing conventions, and verify changes when practical.
-Workspace paths passed to file tools must be relative to the workspace.`;
+export { DEFAULT_MAYBE_CODE_INSTRUCTIONS } from "./instructions.js";
 
 export interface MaybeCodeApplicationOptions {
   readonly workspace: string;
@@ -38,6 +39,7 @@ export interface MaybeCodeApplicationOptions {
   readonly tools?: readonly Tool[];
   readonly permissionPolicy?: PermissionPolicy;
   readonly instructions?: string;
+  readonly instructionsDirectory?: string;
   readonly maxSteps?: number;
 }
 
@@ -45,6 +47,7 @@ export class MaybeCodeApplication {
   readonly events: AsyncIterable<MaybeCodeSessionEvent>;
   readonly sessionId: string;
   readonly workspace: string;
+  readonly instructions: MaybeCodeInstructions;
 
   private readonly session: Session;
   private readonly permissions: PermissionToolExecutor;
@@ -59,11 +62,13 @@ export class MaybeCodeApplication {
     workspace: string,
     session: Session,
     permissions: PermissionToolExecutor,
+    instructions: MaybeCodeInstructions,
   ) {
     this.workspace = workspace;
     this.session = session;
     this.sessionId = session.id;
     this.permissions = permissions;
+    this.instructions = instructions;
     this.events = this.eventQueue;
     this.permissionRelay = this.relayPermissionEvents();
   }
@@ -72,6 +77,15 @@ export class MaybeCodeApplication {
     options: MaybeCodeApplicationOptions,
   ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
+    const instructions = await loadMaybeCodeInstructions({
+      workspace,
+      ...(options.instructions === undefined
+        ? {}
+        : { instructions: options.instructions }),
+      ...(options.instructionsDirectory === undefined
+        ? {}
+        : { instructionsDirectory: options.instructionsDirectory }),
+    });
     const permissionPolicy = options.permissionPolicy ??
       createCodingPermissionPolicy();
     let application: MaybeCodeApplication | undefined;
@@ -100,7 +114,7 @@ export class MaybeCodeApplication {
         model: options.model,
         tools,
         context: new InMemoryContext({
-          instructions: options.instructions ?? DEFAULT_MAYBE_CODE_INSTRUCTIONS,
+          instructions: instructions.effective,
           messages,
           metadata: { workspace },
         }),
@@ -123,7 +137,12 @@ export class MaybeCodeApplication {
           });
       assertWorkspace(session, workspace);
       permissions.setEventSink((event) => session.recordPermissionEvent(event));
-      application = new MaybeCodeApplication(workspace, session, permissions);
+      application = new MaybeCodeApplication(
+        workspace,
+        session,
+        permissions,
+        instructions,
+      );
       return application;
     } catch (error) {
       await permissions.close();
