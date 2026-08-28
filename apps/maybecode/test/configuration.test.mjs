@@ -76,11 +76,12 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
       contextFactory: {
         create(options) {
           contextOptions = options;
-          return new InMemoryContext({
+          const context = new InMemoryContext({
             instructions: options.instructions,
             messages: [...(options.messages ?? [])],
             metadata: { ...options.metadata },
           });
+          return { context };
         },
       },
     },

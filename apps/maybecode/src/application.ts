@@ -3,7 +3,9 @@ import { resolve } from "node:path";
 import { createCodingTools } from "@may/coding-tools";
 import {
   InMemoryContextFactory,
+  type ContextController,
   type ContextFactory,
+  type ContextInspection,
 } from "@may/context";
 import {
   AsyncEventQueue,
@@ -55,6 +57,7 @@ export class MaybeCodeApplication {
 
   private readonly session: Session;
   private readonly permissions: PermissionToolExecutor;
+  private readonly contextController: ContextController | undefined;
   private readonly eventQueue = new AsyncEventQueue<MaybeCodeSessionEvent>();
   private readonly permissionRelay: Promise<void>;
   private readonly runRelays = new Set<Promise<void>>();
@@ -67,12 +70,14 @@ export class MaybeCodeApplication {
     session: Session,
     permissions: PermissionToolExecutor,
     instructions: MaybeCodeInstructions,
+    contextController: ContextController | undefined,
   ) {
     this.workspace = workspace;
     this.session = session;
     this.sessionId = session.id;
     this.permissions = permissions;
     this.instructions = instructions;
+    this.contextController = contextController;
     this.events = this.eventQueue;
     this.permissionRelay = this.relayPermissionEvents();
   }
@@ -114,16 +119,18 @@ export class MaybeCodeApplication {
     });
     const tools = [...(options.tools ?? createCodingTools({ cwd: workspace }))];
     const contextFactory = options.contextFactory ?? new InMemoryContextFactory();
+    let contextController: ContextController | undefined;
     const createRuntime = async (messages: Message[] = []) => {
-      const context = await contextFactory.create({
+      const managedContext = await contextFactory.create({
         instructions: instructions.effective,
         messages,
         metadata: { workspace },
       });
+      contextController = managedContext.controller;
       return new May({
         model: options.model,
         tools,
-        context,
+        context: managedContext.context,
         toolExecutor: permissions,
         ...(options.maxSteps === undefined
           ? {}
@@ -149,6 +156,7 @@ export class MaybeCodeApplication {
         session,
         permissions,
         instructions,
+        contextController,
       );
       return application;
     } catch (error) {
@@ -208,6 +216,11 @@ export class MaybeCodeApplication {
 
   history() {
     return this.session.history();
+  }
+
+  async inspectContext(): Promise<ContextInspection | undefined> {
+    this.throwIfClosed();
+    return this.contextController?.inspect();
   }
 
   async close(): Promise<void> {

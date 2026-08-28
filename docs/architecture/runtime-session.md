@@ -57,7 +57,9 @@ one-shot run.
 The context package provides factories and reusable implementations of Core's
 minimal `Context` contract. Applications can replace how model-visible history
 is stored or selected without changing the agent loop. It does not own session
-identity or durable history.
+identity or durable history. A factory may also expose a `ContextController`
+for application-level inspection and, later, explicit context operations;
+these controls do not expand Core's minimal execution contract.
 
 ### `@may/session`
 

@@ -208,7 +208,7 @@ test("creates context through an injected factory for each session", async () =>
         metadata: { ...options.metadata },
       });
       contexts.push(context);
-      return context;
+      return { context };
     },
   };
   const model = {
@@ -238,6 +238,7 @@ test("creates context through an injected factory for each session", async () =>
   assert.deepEqual(inputs.map((input) => input.messages?.length ?? 0), [0, 0, 2]);
   assert.equal(inputs[0].instructions, inputs[2].instructions);
   assert.deepEqual(inputs[0].metadata, { workspace: process.cwd() });
+  assert.equal(await app.inspectContext(), undefined);
   await app.close();
 });
 

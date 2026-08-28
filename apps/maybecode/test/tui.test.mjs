@@ -17,6 +17,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   const terminal = new FakeTerminal([
     "create a file",
     "/instructions",
+    "/context",
     "/sessions",
     "/quit",
   ]);
@@ -68,6 +69,11 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   assert.match(terminal.output, /MaybeCode: done/);
   assert.match(terminal.output, /Instructions:\n  system: built-in\n  project: none/);
   assert.match(terminal.output, /Effective instructions:\n---\nYou are MaybeCode/u);
+  assert.match(
+    terminal.output,
+    /Context:\n  messages: 4 \(system 0, user 1, assistant 2, tool 1\)/u,
+  );
+  assert.match(terminal.output, /estimated tokens: ~\d+ \(utf8-bytes\/4\)/u);
   assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);
   assert.ok(terminal.prompts.some((prompt) => prompt.includes("allow [s]ession")));

@@ -1,4 +1,5 @@
 import { AsyncEventQueue, type RunOptions } from "@may/core";
+import type { ContextInspection } from "@may/context";
 import type { ApprovalDecision } from "@may/permissions";
 
 import {
@@ -137,6 +138,11 @@ export class MaybeCodeWorkspace {
 
   history() {
     return this.application.history();
+  }
+
+  inspectContext(): Promise<ContextInspection | undefined> {
+    this.throwIfClosed();
+    return this.application.inspectContext();
   }
 
   async close(): Promise<void> {

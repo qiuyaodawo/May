@@ -52,7 +52,8 @@ Use `/instructions` to inspect the active sources and effective instructions.
 Programmatic callers can pass a `ContextFactory` to
 `openConfiguredMaybeCode`, `MaybeCodeWorkspace.open`, or
 `MaybeCodeApplication.open`. When omitted, MaybeCode uses
-`InMemoryContextFactory` from `@may/context`.
+`InMemoryContextFactory` from `@may/context`. Factories return the Core context
+and may also return a `ContextController` for application-level inspection.
 
 ## Commands
 
@@ -60,9 +61,15 @@ Programmatic callers can pass a `ContextFactory` to
 - `/sessions` lists sessions for the current workspace.
 - `/resume <id>` switches sessions.
 - `/instructions` shows active instruction sources and content.
+- `/context` shows message counts, UTF-8 size, and an approximate token count.
 - `/help` shows commands.
 - `/quit` exits.
 - `Ctrl+C` cancels an active run and exits while idle.
+
+The `/context` token count uses a provider-independent `UTF-8 bytes / 4`
+estimate. It is intended for visibility, not exact billing or context-window
+enforcement. A custom context without a controller reports that inspection is
+unsupported.
 
 The `read` tool runs without approval. `bash`, `edit`, and `write` require an
 allow-once, allow-for-session, or deny decision. Bash is not a sandbox.

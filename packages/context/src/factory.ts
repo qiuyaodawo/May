@@ -1,5 +1,7 @@
 import type { Context, Message } from "@may/core";
 
+import type { ContextController } from "./controller.js";
+
 export interface ContextFactoryOptions {
   readonly instructions?: string;
   readonly messages?: readonly Message[];
@@ -7,5 +9,10 @@ export interface ContextFactoryOptions {
 }
 
 export interface ContextFactory {
-  create(options: ContextFactoryOptions): Context | Promise<Context>;
+  create(options: ContextFactoryOptions): ManagedContext | Promise<ManagedContext>;
+}
+
+export interface ManagedContext {
+  readonly context: Context;
+  readonly controller?: ContextController;
 }

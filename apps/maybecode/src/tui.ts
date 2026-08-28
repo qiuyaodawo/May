@@ -1,4 +1,5 @@
 import type { ContentPart, MayEvent } from "@may/core";
+import type { ContextInspection } from "@may/context";
 import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
 
@@ -13,6 +14,7 @@ const HELP = `Commands:
   /sessions        List sessions for this workspace
   /resume <id>     Switch to another session
   /instructions    Show active instruction sources and content
+  /context         Show current context usage estimate
   /help            Show commands
   /quit             Exit MaybeCode
   Ctrl+C            Cancel the active run, or exit while idle
@@ -180,6 +182,15 @@ async function handleCommand(
           `Effective instructions:\n---\n${app.instructions.effective}\n---\n`,
       );
       return false;
+    case "/context": {
+      const inspection = await app.inspectContext();
+      terminal.write(
+        inspection === undefined
+          ? "\nContext inspection is not supported by the active context.\n"
+          : `\n${renderContextInspection(inspection)}`,
+      );
+      return false;
+    }
     case "/new": {
       const id = await app.newSession();
       terminal.write(`\nCreated session ${id}\n`);
@@ -446,6 +457,24 @@ function renderInstructionSources(app: MaybeCodeWorkspace): string {
     `  project: ${
       project === undefined ? "none" : instructionSourceLabel(project)
     }\n`;
+}
+
+function renderContextInspection(inspection: ContextInspection): string {
+  const roles = inspection.messagesByRole;
+  return `Context:\n` +
+    `  messages: ${inspection.messageCount} ` +
+    `(system ${roles.system}, user ${roles.user}, ` +
+    `assistant ${roles.assistant}, tool ${roles.tool})\n` +
+    `  instructions: ${formatBytes(inspection.instructionsBytes)}\n` +
+    `  message data: ${formatBytes(inspection.messageBytes)}\n` +
+    `  total: ${formatBytes(inspection.totalBytes)}\n` +
+    `  estimated tokens: ~${inspection.estimatedTokens} ` +
+    `(${inspection.tokenEstimateMethod})\n`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KiB`;
 }
 
 function instructionSourceLabel(
