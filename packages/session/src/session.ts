@@ -31,7 +31,7 @@ export interface SessionOptions {
 export interface ResumeSessionOptions {
   id: string;
   store: SessionStore;
-  createRuntime(messages: Message[]): May;
+  createRuntime(messages: Message[]): May | Promise<May>;
 }
 
 export class Session {
@@ -96,9 +96,10 @@ export class Session {
     }
 
     const messages = replayMessages(events);
+    const runtime = await options.createRuntime(messages);
     return new Session(
       options.id,
-      options.createRuntime(messages),
+      runtime,
       options.store,
       created.metadata,
       events.length,

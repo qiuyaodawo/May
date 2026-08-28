@@ -8,6 +8,7 @@ be used independently or combined into complete agents and applications.
 ```text
 packages/
   core/       Agent loop, contracts, events, and in-memory Context
+  context/    Replaceable Context factories and reusable implementations
   session/    Serialized runs and durable session history
   permissions/  Headless tool policies and approval requests
   config/     Optional application configuration loading and validation

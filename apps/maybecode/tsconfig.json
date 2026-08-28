@@ -11,6 +11,7 @@
   "references": [
     { "path": "../../packages/core" },
     { "path": "../../packages/config" },
+    { "path": "../../packages/context" },
     { "path": "../../packages/permissions" },
     { "path": "../../packages/session" },
     { "path": "../../packages/providers/deepseek" },

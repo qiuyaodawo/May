@@ -7,6 +7,7 @@ import {
   type LoadMayConfigOptions,
   type MayConfig,
 } from "@may/config";
+import type { ContextFactory } from "@may/context";
 import type { Model } from "@may/core";
 import { FileSessionStore } from "@may/session/file-store";
 
@@ -26,6 +27,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly dataDirectory?: string;
   readonly sessionId?: string;
   readonly autoResume?: boolean;
+  readonly contextFactory?: ContextFactory;
   readonly instructions?: string;
   readonly maxSteps?: number;
 }
@@ -73,6 +75,9 @@ export async function openConfiguredMaybeCode(
     ...(options.autoResume === undefined
       ? {}
       : { autoResume: options.autoResume }),
+    ...(options.contextFactory === undefined
+      ? {}
+      : { contextFactory: options.contextFactory }),
     ...(options.instructions === undefined
       ? {}
       : { instructions: options.instructions }),

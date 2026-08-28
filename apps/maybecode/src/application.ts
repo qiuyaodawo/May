@@ -2,8 +2,11 @@ import { resolve } from "node:path";
 
 import { createCodingTools } from "@may/coding-tools";
 import {
+  InMemoryContextFactory,
+  type ContextFactory,
+} from "@may/context";
+import {
   AsyncEventQueue,
-  InMemoryContext,
   May,
   type Message,
   type Model,
@@ -38,6 +41,7 @@ export interface MaybeCodeApplicationOptions {
   readonly resume?: boolean;
   readonly tools?: readonly Tool[];
   readonly permissionPolicy?: PermissionPolicy;
+  readonly contextFactory?: ContextFactory;
   readonly instructions?: string;
   readonly instructionsDirectory?: string;
   readonly maxSteps?: number;
@@ -109,26 +113,29 @@ export class MaybeCodeApplication {
       },
     });
     const tools = [...(options.tools ?? createCodingTools({ cwd: workspace }))];
-    const createRuntime = (messages: Message[] = []) =>
-      new May({
+    const contextFactory = options.contextFactory ?? new InMemoryContextFactory();
+    const createRuntime = async (messages: Message[] = []) => {
+      const context = await contextFactory.create({
+        instructions: instructions.effective,
+        messages,
+        metadata: { workspace },
+      });
+      return new May({
         model: options.model,
         tools,
-        context: new InMemoryContext({
-          instructions: instructions.effective,
-          messages,
-          metadata: { workspace },
-        }),
+        context,
         toolExecutor: permissions,
         ...(options.maxSteps === undefined
           ? {}
           : { maxSteps: options.maxSteps }),
       });
+    };
 
     try {
       const session = options.resume === true
         ? await resumeSession(options, createRuntime)
         : await Session.create({
-            runtime: createRuntime(),
+            runtime: await createRuntime(),
             store: options.store,
             metadata: { workspace },
             ...(options.sessionId === undefined
@@ -239,7 +246,7 @@ export class MaybeCodeApplication {
 
 async function resumeSession(
   options: MaybeCodeApplicationOptions,
-  createRuntime: (messages?: Message[]) => May,
+  createRuntime: (messages?: Message[]) => Promise<May>,
 ): Promise<Session> {
   if (options.sessionId === undefined) {
     throw new Error("sessionId is required when resuming a session");

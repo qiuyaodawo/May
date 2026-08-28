@@ -26,6 +26,7 @@
   "dependencies": {
     "@may/coding-tools": "workspace:*",
     "@may/config": "workspace:*",
+    "@may/context": "workspace:*",
     "@may/core": "workspace:*",
     "@may/permissions": "workspace:*",
     "@may/provider-deepseek": "workspace:*",

@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { InMemoryContext } from "@may/core";
+
 import {
   openConfiguredMaybeCode,
   parseMaybeCodeArgs,
@@ -65,11 +67,22 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   await writeFile(join(directory, "AGENTS.md"), "project rules");
   let selected;
   let request;
+  let contextOptions;
   const app = await openConfiguredMaybeCode(
     {
       workspace: directory,
       dataDirectory: join(directory, "data"),
       autoResume: false,
+      contextFactory: {
+        create(options) {
+          contextOptions = options;
+          return new InMemoryContext({
+            instructions: options.instructions,
+            messages: [...(options.messages ?? [])],
+            metadata: { ...options.metadata },
+          });
+        },
+      },
     },
     {
       async loadConfig() {
@@ -113,6 +126,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   );
   assert.equal(app.instructions.system.source.type, "file");
   assert.equal(app.instructions.project.source.type, "file");
+  assert.deepEqual(contextOptions.metadata, { workspace: directory });
   await app.close();
 });
 

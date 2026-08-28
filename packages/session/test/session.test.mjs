@@ -484,7 +484,8 @@ test("resumes a file session and continues its context and sequence", async (t) 
   const resumed = await Session.resume({
     id: "resume_me",
     store: secondStore,
-    createRuntime(messages) {
+    async createRuntime(messages) {
+      await new Promise((resolve) => setImmediate(resolve));
       restoredMessages = messages;
       return new May({
         context: new InMemoryContext({ messages }),

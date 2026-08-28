@@ -18,8 +18,8 @@ identity or active work by itself.
 
 A long-lived conversation and work identity. A session owns history and
 session-scoped state across multiple runs and may exist while no run is active.
-Persistence, resume, fork, compaction, and session-scoped permission grants
-belong here.
+Persistence, resume, fork, durable context checkpoints, and session-scoped
+permission grants belong here.
 
 A session may have at most one active run. Session storage is a separate
 capability so an in-memory session does not require filesystem dependencies.
@@ -51,6 +51,13 @@ Core owns active execution:
 Core does not own session discovery, persistence, resume, fork, user-interface
 state, or a specific permission policy. It must remain usable for an ephemeral
 one-shot run.
+
+### `@may/context`
+
+The context package provides factories and reusable implementations of Core's
+minimal `Context` contract. Applications can replace how model-visible history
+is stored or selected without changing the agent loop. It does not own session
+identity or durable history.
 
 ### `@may/session`
 

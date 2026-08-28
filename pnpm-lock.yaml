@@ -36,6 +36,9 @@ importers:
       '@may/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@may/context':
+        specifier: workspace:*
+        version: link:../../packages/context
       '@may/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -73,6 +76,12 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+
+  packages/context:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/core: {}
 

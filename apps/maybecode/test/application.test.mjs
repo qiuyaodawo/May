@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { RunCancelledError } from "@may/core";
+import { InMemoryContext, RunCancelledError } from "@may/core";
 import { FileSessionStore } from "@may/session/file-store";
 import {
   InMemorySessionCatalog,
@@ -192,6 +192,53 @@ test("auto-resumes, lists, creates, and switches workspace sessions", async () =
   await resumed.resumeSession(firstId);
   assert.equal(resumed.sessionId, firstId);
   await resumed.close();
+});
+
+test("creates context through an injected factory for each session", async () => {
+  const store = new (await import("@may/session")).InMemorySessionStore();
+  const catalog = new InMemorySessionCatalog();
+  const inputs = [];
+  const contexts = [];
+  const contextFactory = {
+    async create(options) {
+      inputs.push(options);
+      const context = new InMemoryContext({
+        instructions: options.instructions,
+        messages: [...(options.messages ?? [])],
+        metadata: { ...options.metadata },
+      });
+      contexts.push(context);
+      return context;
+    },
+  };
+  const model = {
+    async *stream() {
+      yield {
+        type: "response.completed",
+        message: assistantMessage("answer"),
+      };
+    },
+  };
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model,
+    store,
+    catalog,
+    contextFactory,
+    autoResume: false,
+  });
+
+  const firstId = app.sessionId;
+  await (await app.submit({ input: "first" })).result;
+  await app.newSession();
+  await app.resumeSession(firstId);
+
+  assert.equal(inputs.length, 3);
+  assert.equal(new Set(contexts).size, 3);
+  assert.deepEqual(inputs.map((input) => input.messages?.length ?? 0), [0, 0, 2]);
+  assert.equal(inputs[0].instructions, inputs[2].instructions);
+  assert.deepEqual(inputs[0].metadata, { workspace: process.cwd() });
+  await app.close();
 });
 
 test("cancels an active model call", async () => {

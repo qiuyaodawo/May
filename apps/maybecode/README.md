@@ -49,6 +49,11 @@ instructions. Each file has a 32 KiB limit.
 
 Use `/instructions` to inspect the active sources and effective instructions.
 
+Programmatic callers can pass a `ContextFactory` to
+`openConfiguredMaybeCode`, `MaybeCodeWorkspace.open`, or
+`MaybeCodeApplication.open`. When omitted, MaybeCode uses
+`InMemoryContextFactory` from `@may/context`.
+
 ## Commands
 
 - `/new` creates a session.
