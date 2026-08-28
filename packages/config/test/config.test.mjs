@@ -63,12 +63,15 @@ test("resolves the default model profile and provider environment key", () => {
       deepseek: {
         apiKeyEnv: "DEEPSEEK_API_KEY",
         baseURL: "https://example.test",
+        contextWindowTokens: 64000,
+        maxOutputTokens: 16000,
       },
     },
     models: {
       reasoner: {
         provider: "deepseek",
         model: "deepseek-reasoner",
+        maxOutputTokens: 8192,
         options: { maxTokens: 8192 },
       },
     },
@@ -82,11 +85,15 @@ test("resolves the default model profile and provider environment key", () => {
     name: "reasoner",
     provider: "deepseek",
     model: "deepseek-reasoner",
+    contextWindowTokens: 64000,
+    maxOutputTokens: 8192,
     options: { maxTokens: 8192 },
     providerConfig: {
       apiKeyEnv: "DEEPSEEK_API_KEY",
       apiKey: "env-key",
       baseURL: "https://example.test",
+      contextWindowTokens: 64000,
+      maxOutputTokens: 16000,
     },
   });
 });
@@ -130,6 +137,25 @@ test("rejects invalid config shapes", async (t) => {
         models: { reasoner: { provider: "deepseek", model: "model", options: [] } },
       },
       "models.reasoner.options",
+    ],
+    [
+      "invalid provider context window",
+      { providers: { deepseek: { contextWindowTokens: 0 } } },
+      "providers.deepseek.contextWindowTokens",
+    ],
+    [
+      "invalid model output limit",
+      {
+        providers: { deepseek: {} },
+        models: {
+          reasoner: {
+            provider: "deepseek",
+            model: "model",
+            maxOutputTokens: 1.5,
+          },
+        },
+      },
+      "models.reasoner.maxOutputTokens",
     ],
     [
       "unknown model provider",

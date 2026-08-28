@@ -46,11 +46,22 @@ export function resolveModelProfile(
     throw new MayConfigResolutionError(`Unknown model "${profileName}"`);
   }
   const profile = config.models[profileName]!;
+  const providerConfig = resolveProviderConfig(
+    config,
+    profile.provider,
+    options,
+  );
+  const contextWindowTokens = profile.contextWindowTokens ??
+    providerConfig.contextWindowTokens;
+  const maxOutputTokens = profile.maxOutputTokens ??
+    providerConfig.maxOutputTokens;
   return {
     name: profileName,
     provider: profile.provider,
     model: profile.model,
+    ...(contextWindowTokens === undefined ? {} : { contextWindowTokens }),
+    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
     options: { ...(profile.options ?? {}) },
-    providerConfig: resolveProviderConfig(config, profile.provider, options),
+    providerConfig,
   };
 }

@@ -36,7 +36,45 @@ test("creates independent in-memory contexts from factory input", async () => {
     toolResultCount: 0,
     estimatedTokens: Math.ceil((6 + messageBytes) / 4),
     tokenEstimateMethod: "utf8-bytes/4",
+    effectiveTokens: Math.ceil((6 + messageBytes) / 4),
+    measurementMethod: "estimated",
   });
+});
+
+test("combines measured input usage with an estimated context tail", async () => {
+  const initial = message("initial");
+  const tail = message("tail");
+  const managed = new InMemoryContextFactory().create({
+    messages: [initial, tail],
+    budget: { contextWindowTokens: 1000, outputReserveTokens: 100 },
+    measurement: { inputTokens: 120, contextMessageCount: 1 },
+  });
+
+  const inspection = await managed.controller.inspect();
+  const estimatedTailTokens = Math.ceil(byteLength(tail) / 4);
+  assert.equal(inspection.measurementMethod, "measured+estimated");
+  assert.equal(inspection.measuredInputTokens, 120);
+  assert.equal(inspection.estimatedTailTokens, estimatedTailTokens);
+  assert.equal(inspection.effectiveTokens, 120 + estimatedTailTokens);
+  assert.equal(inspection.contextWindowTokens, 1000);
+  assert.equal(inspection.remainingTokens, 1000 - inspection.effectiveTokens);
+  assert.equal(inspection.usageRatio, inspection.effectiveTokens / 1000);
+});
+
+test("updates the measurement from model usage", async () => {
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("input")],
+  });
+  managed.controller.recordModelUsage({ inputTokens: 80 }, 1);
+  await managed.context.append([message("new tail")]);
+
+  const inspection = await managed.controller.inspect();
+  assert.equal(inspection.measurementMethod, "measured+estimated");
+  assert.equal(inspection.measuredInputTokens, 80);
+  assert.equal(
+    inspection.effectiveTokens,
+    80 + Math.ceil(byteLength(message("new tail")) / 4),
+  );
 });
 
 function message(text) {

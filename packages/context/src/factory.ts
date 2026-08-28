@@ -1,11 +1,17 @@
 import type { Context, Message } from "@may/core";
 
-import type { ContextController } from "./controller.js";
+import type {
+  ContextBudget,
+  ContextController,
+  ContextMeasurement,
+} from "./controller.js";
 
 export interface ContextFactoryOptions {
   readonly instructions?: string;
   readonly messages?: readonly Message[];
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly budget?: ContextBudget;
+  readonly measurement?: ContextMeasurement;
 }
 
 export interface ContextFactory {

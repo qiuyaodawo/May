@@ -10,6 +10,10 @@ const managed = await factory.create({
   instructions: "You are a coding agent.",
   messages: [],
   metadata: { workspace: process.cwd() },
+  budget: {
+    contextWindowTokens: 64_000,
+    outputReserveTokens: 8_192,
+  },
 });
 
 const snapshot = await managed.context.snapshot();
@@ -23,4 +27,8 @@ Factories return a `ManagedContext`: Core receives its `context`, while an
 application can use the optional `controller` for management operations such
 as inspection. The default token estimate is explicitly approximate and uses
 the combined instruction and serialized-message UTF-8 byte count divided by
-four.
+four. After a model reports `usage.inputTokens`,
+`SnapshotContextController` can retain that measured request prefix and
+estimate only messages appended afterward. `ContextBudget` carries model
+limits and future compaction reserves; it does not currently trigger or
+perform compaction.

@@ -461,7 +461,7 @@ function renderInstructionSources(app: MaybeCodeWorkspace): string {
 
 function renderContextInspection(inspection: ContextInspection): string {
   const roles = inspection.messagesByRole;
-  return `Context:\n` +
+  let output = `Context:\n` +
     `  messages: ${inspection.messageCount} ` +
     `(system ${roles.system}, user ${roles.user}, ` +
     `assistant ${roles.assistant}, tool ${roles.tool})\n` +
@@ -470,6 +470,31 @@ function renderContextInspection(inspection: ContextInspection): string {
     `  total: ${formatBytes(inspection.totalBytes)}\n` +
     `  estimated tokens: ~${inspection.estimatedTokens} ` +
     `(${inspection.tokenEstimateMethod})\n`;
+  if (inspection.contextWindowTokens === undefined) {
+    output += `  effective usage: ~${formatNumber(inspection.effectiveTokens)} ` +
+      `(${inspection.measurementMethod})\n`;
+  } else {
+    output += `  effective usage: ~${formatNumber(inspection.effectiveTokens)} / ` +
+      `${formatNumber(inspection.contextWindowTokens)} ` +
+      `(${((inspection.usageRatio ?? 0) * 100).toFixed(1)}%)\n`;
+  }
+  if (inspection.measurementMethod === "measured+estimated") {
+    output += `  measurement: ${formatNumber(
+      inspection.measuredInputTokens ?? 0,
+    )} measured + ~${formatNumber(
+      inspection.estimatedTailTokens ?? 0,
+    )} estimated tail\n`;
+  } else {
+    output += "  measurement: estimated only\n";
+  }
+  if (inspection.remainingTokens !== undefined) {
+    output += `  remaining: ${formatNumber(inspection.remainingTokens)} tokens\n`;
+  }
+  return output;
+}
+
+function formatNumber(value: number): string {
+  return value.toLocaleString("en-US");
 }
 
 function formatBytes(bytes: number): string {

@@ -97,6 +97,11 @@ test("returns a direct model response and emits ordered events", async () => {
     ],
   );
   assert.deepEqual(events.map((event) => event.seq), [1, 2, 3, 4, 5, 6, 7]);
+  assert.equal(
+    events.find((event) => event.type === "model.completed")
+      .contextMessageCount,
+    1,
+  );
 
   const snapshot = await context.snapshot();
   assert.deepEqual(snapshot.messages.map((message) => message.role), [

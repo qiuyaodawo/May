@@ -23,6 +23,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   ]);
   let modelCall = 0;
   const model = {
+    limits: { contextWindowTokens: 10000, maxOutputTokens: 1000 },
     async *stream() {
       modelCall += 1;
       if (modelCall === 1) {
@@ -38,6 +39,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
               input: { path: "hello.txt", content: "hello" },
             }],
           },
+          usage: { inputTokens: 100, outputTokens: 10, totalTokens: 110 },
         };
         return;
       }
@@ -45,6 +47,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
       yield {
         type: "response.completed",
         message: assistantMessage("done"),
+        usage: { inputTokens: 160, outputTokens: 5, totalTokens: 165 },
       };
     },
   };
@@ -74,6 +77,9 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     /Context:\n  messages: 4 \(system 0, user 1, assistant 2, tool 1\)/u,
   );
   assert.match(terminal.output, /estimated tokens: ~\d+ \(utf8-bytes\/4\)/u);
+  assert.match(terminal.output, /effective usage: ~[\d,]+ \/ 10,000 \([\d.]+%\)/u);
+  assert.match(terminal.output, /measurement: 160 measured \+ ~\d+ estimated tail/u);
+  assert.match(terminal.output, /remaining: [\d,]+ tokens/u);
   assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);
   assert.ok(terminal.prompts.some((prompt) => prompt.includes("allow [s]ession")));

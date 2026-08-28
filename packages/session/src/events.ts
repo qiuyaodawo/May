@@ -53,6 +53,7 @@ export type SessionEventPayload =
       step: number;
       message: AssistantMessage;
       usage?: Usage;
+      contextMessageCount?: number;
     }
   | {
       type: "tool.completed";

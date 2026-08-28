@@ -31,7 +31,19 @@ export interface SessionOptions {
 export interface ResumeSessionOptions {
   id: string;
   store: SessionStore;
-  createRuntime(messages: Message[]): May | Promise<May>;
+  createRuntime(
+    messages: Message[],
+    info: SessionRuntimeInfo,
+  ): May | Promise<May>;
+}
+
+export interface SessionModelMeasurement {
+  readonly inputTokens: number;
+  readonly contextMessageCount: number;
+}
+
+export interface SessionRuntimeInfo {
+  readonly latestModelMeasurement?: SessionModelMeasurement;
 }
 
 export class Session {
@@ -95,8 +107,8 @@ export class Session {
       throw new Error(`Session "${options.id}" has multiple creation events`);
     }
 
-    const messages = replayMessages(events);
-    const runtime = await options.createRuntime(messages);
+    const replay = replaySession(events);
+    const runtime = await options.createRuntime(replay.messages, replay.info);
     return new Session(
       options.id,
       runtime,
@@ -185,14 +197,29 @@ export class Session {
   }
 }
 
-function replayMessages(events: readonly SessionEvent[]): Message[] {
+function replaySession(events: readonly SessionEvent[]): {
+  messages: Message[];
+  info: SessionRuntimeInfo;
+} {
   const messages: Message[] = [];
+  let latestModelMeasurement: SessionModelMeasurement | undefined;
 
   for (const event of events) {
     switch (event.type) {
       case "input.submitted":
+        messages.push(event.message);
+        break;
       case "assistant.completed":
         messages.push(event.message);
+        if (
+          event.usage?.inputTokens !== undefined &&
+          event.contextMessageCount !== undefined
+        ) {
+          latestModelMeasurement = {
+            inputTokens: event.usage.inputTokens,
+            contextMessageCount: event.contextMessageCount,
+          };
+        }
         break;
       case "tool.completed":
         messages.push({
@@ -214,7 +241,12 @@ function replayMessages(events: readonly SessionEvent[]): Message[] {
     }
   }
 
-  return messages;
+  return {
+    messages,
+    info: latestModelMeasurement === undefined
+      ? {}
+      : { latestModelMeasurement },
+  };
 }
 
 function toPermissionSessionEvent(
@@ -272,6 +304,7 @@ function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
             runId: event.runId,
             step: event.step,
             message: event.message,
+            contextMessageCount: event.contextMessageCount,
           }
         : {
             type: "assistant.completed",
@@ -279,6 +312,7 @@ function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
             step: event.step,
             message: event.message,
             usage: event.usage,
+            contextMessageCount: event.contextMessageCount,
           };
     case "tool.completed":
       return {

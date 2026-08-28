@@ -8,7 +8,9 @@ Optional configuration loading and validation for May applications.
   "providers": {
     "deepseek": {
       "apiKeyEnv": "DEEPSEEK_API_KEY",
-      "baseURL": "https://api.deepseek.com"
+      "baseURL": "https://api.deepseek.com",
+      "contextWindowTokens": 64000,
+      "maxOutputTokens": 8192
     }
   },
   "models": {
@@ -43,6 +45,8 @@ const selectedModel = resolveModelProfile(config);
 By default, `loadMayConfig()` reads `~/.may/config.json`. Pass `{ path }` to
 load another file. Existing provider entries containing `apiKey`, `baseURL`, and
 `model` remain supported; `models` and `defaultModel` are optional.
+`contextWindowTokens` and `maxOutputTokens` are optional positive integers.
+They can be set on a provider or overridden by a model profile.
 
 `apps` is an optional map of application-owned configuration. This package
 validates that each entry is an object but leaves fields such as

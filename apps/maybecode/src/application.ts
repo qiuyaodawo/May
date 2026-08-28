@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { createCodingTools } from "@may/coding-tools";
 import {
   InMemoryContextFactory,
+  type ContextBudget,
   type ContextController,
   type ContextFactory,
   type ContextInspection,
@@ -20,7 +21,11 @@ import {
   type ApprovalDecision,
   type PermissionPolicy,
 } from "@may/permissions";
-import { Session, type SessionStore } from "@may/session";
+import {
+  Session,
+  type SessionRuntimeInfo,
+  type SessionStore,
+} from "@may/session";
 
 import type {
   MaybeCodeRun,
@@ -44,6 +49,7 @@ export interface MaybeCodeApplicationOptions {
   readonly tools?: readonly Tool[];
   readonly permissionPolicy?: PermissionPolicy;
   readonly contextFactory?: ContextFactory;
+  readonly contextBudget?: ContextBudget;
   readonly instructions?: string;
   readonly instructionsDirectory?: string;
   readonly maxSteps?: number;
@@ -119,12 +125,24 @@ export class MaybeCodeApplication {
     });
     const tools = [...(options.tools ?? createCodingTools({ cwd: workspace }))];
     const contextFactory = options.contextFactory ?? new InMemoryContextFactory();
+    const contextBudget = options.contextBudget ?? contextBudgetFromModel(
+      options.model,
+    );
     let contextController: ContextController | undefined;
-    const createRuntime = async (messages: Message[] = []) => {
+    const createRuntime = async (
+      messages: Message[] = [],
+      runtimeInfo: SessionRuntimeInfo = {},
+    ) => {
       const managedContext = await contextFactory.create({
         instructions: instructions.effective,
         messages,
         metadata: { workspace },
+        ...(contextBudget === undefined
+          ? {}
+          : { budget: contextBudget }),
+        ...(runtimeInfo.latestModelMeasurement === undefined
+          ? {}
+          : { measurement: runtimeInfo.latestModelMeasurement }),
       });
       contextController = managedContext.controller;
       return new May({
@@ -238,6 +256,12 @@ export class MaybeCodeApplication {
 
   private async relayRunEvents(events: AsyncIterable<import("@may/core").MayEvent>) {
     for await (const event of events) {
+      if (event.type === "model.completed" && event.usage !== undefined) {
+        this.contextController?.recordModelUsage?.(
+          event.usage,
+          event.contextMessageCount,
+        );
+      }
       this.eventQueue.push({ type: "run.event", event });
     }
   }
@@ -259,7 +283,10 @@ export class MaybeCodeApplication {
 
 async function resumeSession(
   options: MaybeCodeApplicationOptions,
-  createRuntime: (messages?: Message[]) => Promise<May>,
+  createRuntime: (
+    messages?: Message[],
+    runtimeInfo?: SessionRuntimeInfo,
+  ) => Promise<May>,
 ): Promise<Session> {
   if (options.sessionId === undefined) {
     throw new Error("sessionId is required when resuming a session");
@@ -267,7 +294,7 @@ async function resumeSession(
   return Session.resume({
     id: options.sessionId,
     store: options.store,
-    createRuntime: (messages) => createRuntime(messages),
+    createRuntime: (messages, info) => createRuntime(messages, info),
   });
 }
 
@@ -286,4 +313,16 @@ function assertWorkspace(session: Session, workspace: string): void {
 function normalizePath(path: string): string {
   const normalized = resolve(path);
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+
+function contextBudgetFromModel(model: Model): ContextBudget | undefined {
+  if (model.limits === undefined) return undefined;
+  return {
+    ...(model.limits.contextWindowTokens === undefined
+      ? {}
+      : { contextWindowTokens: model.limits.contextWindowTokens }),
+    ...(model.limits.maxOutputTokens === undefined
+      ? {}
+      : { outputReserveTokens: model.limits.maxOutputTokens }),
+  };
 }

@@ -24,6 +24,7 @@ export type MayEventPayload =
       type: "model.completed";
       step: number;
       message: AssistantMessage;
+      contextMessageCount: number;
       usage?: Usage;
     }
   | { type: "tool.started"; step: number; call: ToolCall }

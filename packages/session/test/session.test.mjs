@@ -530,6 +530,44 @@ test("resumes a file session and continues its context and sequence", async (t) 
   );
 });
 
+test("restores the latest model input measurement when resuming", async () => {
+  const store = new InMemorySessionStore();
+  const session = await Session.create({
+    id: "measured",
+    store,
+    runtime: new May({
+      context: new InMemoryContext(),
+      model: {
+        async *stream() {
+          yield {
+            type: "response.completed",
+            message: assistantMessage("measured answer"),
+            usage: { inputTokens: 123, outputTokens: 4, totalTokens: 127 },
+          };
+        },
+      },
+    }),
+  });
+  await (await session.submit({ input: "measure me" })).result;
+
+  let runtimeInfo;
+  await Session.resume({
+    id: session.id,
+    store,
+    createRuntime(_messages, info) {
+      runtimeInfo = info;
+      return createRuntime();
+    },
+  });
+
+  assert.deepEqual(runtimeInfo, {
+    latestModelMeasurement: {
+      inputTokens: 123,
+      contextMessageCount: 1,
+    },
+  });
+});
+
 test("reports missing sessions and corrupt session files", async (t) => {
   const directory = await createTempDirectory(t);
   const store = new FileSessionStore(directory);

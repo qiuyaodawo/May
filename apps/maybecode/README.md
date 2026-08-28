@@ -26,6 +26,21 @@ pnpm maybecode 'E:\code\project'
 MaybeCode currently creates configured models for DeepSeek. The lower-level
 provider adapters remain independently usable.
 
+Optional model limits let MaybeCode report context-window usage:
+
+```json
+{
+  "providers": {
+    "deepseek": {
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "model": "deepseek-chat",
+      "contextWindowTokens": 64000,
+      "maxOutputTokens": 8192
+    }
+  }
+}
+```
+
 ## Instructions
 
 MaybeCode uses its built-in system prompt unless `apps.maybecode` configures an
@@ -61,15 +76,17 @@ and may also return a `ContextController` for application-level inspection.
 - `/sessions` lists sessions for the current workspace.
 - `/resume <id>` switches sessions.
 - `/instructions` shows active instruction sources and content.
-- `/context` shows message counts, UTF-8 size, and an approximate token count.
+- `/context` shows message counts, size, measured usage, and window remaining.
 - `/help` shows commands.
 - `/quit` exits.
 - `Ctrl+C` cancels an active run and exits while idle.
 
-The `/context` token count uses a provider-independent `UTF-8 bytes / 4`
-estimate. It is intended for visibility, not exact billing or context-window
-enforcement. A custom context without a controller reports that inspection is
-unsupported.
+Before the first model response, `/context` uses a provider-independent
+`UTF-8 bytes / 4` estimate. When the provider reports input usage, it combines
+that measured request prefix with an estimate for messages added afterward.
+This is intended for visibility, not exact billing or context-window
+enforcement, and does not yet trigger compaction. A custom context without a
+controller reports that inspection is unsupported.
 
 The `read` tool runs without approval. `bash`, `edit`, and `write` require an
 allow-once, allow-for-session, or deny decision. Bash is not a sandbox.

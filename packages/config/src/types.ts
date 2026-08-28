@@ -3,12 +3,16 @@ export interface ProviderConfig {
   readonly apiKeyEnv?: string;
   readonly baseURL?: string;
   readonly model?: string;
+  readonly contextWindowTokens?: number;
+  readonly maxOutputTokens?: number;
   readonly [key: string]: unknown;
 }
 
 export interface ModelProfile {
   readonly provider: string;
   readonly model: string;
+  readonly contextWindowTokens?: number;
+  readonly maxOutputTokens?: number;
   readonly options?: Readonly<Record<string, unknown>>;
 }
 
@@ -34,6 +38,8 @@ export interface ResolvedModelProfile {
   readonly name: string;
   readonly provider: string;
   readonly model: string;
+  readonly contextWindowTokens?: number;
+  readonly maxOutputTokens?: number;
   readonly options: Readonly<Record<string, unknown>>;
   readonly providerConfig: ProviderConfig;
 }

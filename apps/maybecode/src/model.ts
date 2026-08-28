@@ -4,7 +4,7 @@ import {
   type MayConfig,
   type ProviderConfig,
 } from "@may/config";
-import type { Model } from "@may/core";
+import type { Model, ModelLimits } from "@may/core";
 import {
   DeepSeekModel,
   type DeepSeekModelOptions,
@@ -31,6 +31,7 @@ export interface SelectedMaybeCodeModel {
   readonly model: string;
   readonly providerConfig: ProviderConfig;
   readonly options: Readonly<Record<string, unknown>>;
+  readonly limits?: ModelLimits;
 }
 
 export function selectMaybeCodeModel(
@@ -53,6 +54,7 @@ export function selectMaybeCodeModel(
       model: profile.model,
       providerConfig: profile.providerConfig,
       options: profile.options,
+      ...modelLimits(profile.contextWindowTokens, profile.maxOutputTokens),
     };
   }
 
@@ -64,7 +66,16 @@ export function selectMaybeCodeModel(
       `Set providers.${provider}.model in ${config.path}`,
     );
   }
-  return { provider, model, providerConfig, options: {} };
+  return {
+    provider,
+    model,
+    providerConfig,
+    options: {},
+    ...modelLimits(
+      providerConfig.contextWindowTokens,
+      providerConfig.maxOutputTokens,
+    ),
+  };
 }
 
 export function createMaybeCodeModel(
@@ -106,7 +117,31 @@ export function createMaybeCodeModel(
   if (thinking !== undefined) options.thinking = thinking;
   if (reasoningEffort !== undefined) options.reasoningEffort = reasoningEffort;
   if (maxTokens !== undefined) options.maxTokens = maxTokens;
-  return new DeepSeekModel(options);
+  const model = new DeepSeekModel(options);
+  const limits = modelLimits(
+    selection.limits?.contextWindowTokens,
+    maxTokens ?? selection.limits?.maxOutputTokens,
+  ).limits;
+  if (limits === undefined) return model;
+  return {
+    limits,
+    stream: (request, streamOptions) => model.stream(request, streamOptions),
+  };
+}
+
+function modelLimits(
+  contextWindowTokens: number | undefined,
+  maxOutputTokens: number | undefined,
+): { limits?: ModelLimits } {
+  if (contextWindowTokens === undefined && maxOutputTokens === undefined) {
+    return {};
+  }
+  return {
+    limits: {
+      ...(contextWindowTokens === undefined ? {} : { contextWindowTokens }),
+      ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+    },
+  };
 }
 
 function onlyProvider(config: MayConfig): string {

@@ -35,7 +35,7 @@ const store = new FileSessionStore(".may/sessions");
 const session = await Session.resume({
   id: "session_123",
   store,
-  createRuntime(messages: Message[]) {
+  createRuntime(messages: Message[], info) {
     return new May({
       model,
       tools,
@@ -46,7 +46,10 @@ const session = await Session.resume({
 ```
 
 `createRuntime` restores application-owned configuration while Session rebuilds
-conversation messages from durable events. The file store uses one JSONL file
+conversation messages from durable events. `info.latestModelMeasurement`
+contains the most recent provider-reported input-token count and the number of
+messages it measured when available. Old session logs without it remain
+compatible. The file store uses one JSONL file
 per session. Files are plaintext and require a single active writer per session;
 encryption and cross-process locking are outside the current scope.
 

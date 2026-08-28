@@ -91,6 +91,18 @@ function parseProvider(
     }
   }
 
+  for (
+    const key of ["contextWindowTokens", "maxOutputTokens"] as const
+  ) {
+    if (provider[key] !== undefined) {
+      result[key] = requirePositiveSafeInteger(
+        provider[key],
+        path,
+        `${field}.${key}`,
+      );
+    }
+  }
+
   if (result.apiKey !== undefined && result.apiKeyEnv !== undefined) {
     throw new MayConfigValidationError(
       path,
@@ -110,6 +122,24 @@ function parseModel(
   const result = {
     provider: requireNonEmptyString(model.provider, path, `${field}.provider`),
     model: requireNonEmptyString(model.model, path, `${field}.model`),
+    ...(model.contextWindowTokens === undefined
+      ? {}
+      : {
+          contextWindowTokens: requirePositiveSafeInteger(
+            model.contextWindowTokens,
+            path,
+            `${field}.contextWindowTokens`,
+          ),
+        }),
+    ...(model.maxOutputTokens === undefined
+      ? {}
+      : {
+          maxOutputTokens: requirePositiveSafeInteger(
+            model.maxOutputTokens,
+            path,
+            `${field}.maxOutputTokens`,
+          ),
+        }),
   };
   if (model.options === undefined) {
     return result;
@@ -144,6 +174,21 @@ function requireNonEmptyString(
     );
   }
   return value;
+}
+
+function requirePositiveSafeInteger(
+  value: unknown,
+  path: string,
+  field: string,
+): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 1) {
+    throw new MayConfigValidationError(
+      path,
+      field,
+      "must be a positive safe integer",
+    );
+  }
+  return value as number;
 }
 
 function requireName(name: string, path: string, field: string): void {

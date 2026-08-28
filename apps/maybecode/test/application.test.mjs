@@ -156,11 +156,17 @@ test("auto-resumes, lists, creates, and switches workspace sessions", async () =
   const catalog = new InMemorySessionCatalog();
   const requests = [];
   const model = {
+    limits: { contextWindowTokens: 10000, maxOutputTokens: 1000 },
     async *stream(request) {
       requests.push(request);
       yield {
         type: "response.completed",
         message: assistantMessage(`answer ${requests.length}`),
+        usage: {
+          inputTokens: 100 * requests.length,
+          outputTokens: 10,
+          totalTokens: 100 * requests.length + 10,
+        },
       };
     },
   };
@@ -178,6 +184,11 @@ test("auto-resumes, lists, creates, and switches workspace sessions", async () =
 
   const resumed = await MaybeCodeWorkspace.open(options);
   assert.equal(resumed.sessionId, firstId);
+  const inspection = await resumed.inspectContext();
+  assert.equal(inspection.measurementMethod, "measured+estimated");
+  assert.equal(inspection.measuredInputTokens, 100);
+  assert.ok(inspection.effectiveTokens > 100);
+  assert.equal(inspection.contextWindowTokens, 10000);
   await (await resumed.submit({ input: "second" })).result;
   assert.deepEqual(requests[1].messages.map((message) => message.role), [
     "system",

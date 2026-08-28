@@ -7,6 +7,7 @@ import test from "node:test";
 import { InMemoryContext } from "@may/core";
 
 import {
+  createMaybeCodeModel,
   openConfiguredMaybeCode,
   parseMaybeCodeArgs,
   selectMaybeCodeModel,
@@ -42,7 +43,13 @@ test("parses MaybeCode startup options", () => {
 test("selects the default model profile", () => {
   const selection = selectMaybeCodeModel({
     path: "config.json",
-    providers: { deepseek: { apiKey: "key" } },
+    providers: {
+      deepseek: {
+        apiKey: "key",
+        contextWindowTokens: 128000,
+        maxOutputTokens: 8192,
+      },
+    },
     models: {
       reasoner: {
         provider: "deepseek",
@@ -56,6 +63,25 @@ test("selects the default model profile", () => {
   assert.equal(selection.provider, "deepseek");
   assert.equal(selection.model, "deepseek-reasoner");
   assert.deepEqual(selection.options, { maxTokens: 100 });
+  assert.deepEqual(selection.limits, {
+    contextWindowTokens: 128000,
+    maxOutputTokens: 8192,
+  });
+});
+
+test("attaches configured context limits to the created model", () => {
+  const model = createMaybeCodeModel({
+    provider: "deepseek",
+    model: "deepseek-chat",
+    providerConfig: { apiKey: "test" },
+    options: { maxTokens: 2048 },
+    limits: { contextWindowTokens: 64000, maxOutputTokens: 8192 },
+  });
+
+  assert.deepEqual(model.limits, {
+    contextWindowTokens: 64000,
+    maxOutputTokens: 2048,
+  });
 });
 
 test("opens configured MaybeCode with injected model creation", async (t) => {
@@ -90,7 +116,12 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
         return {
           path: join(configDirectory, "config.json"),
           providers: {
-            deepseek: { apiKey: "test", model: "deepseek-chat" },
+            deepseek: {
+              apiKey: "test",
+              model: "deepseek-chat",
+              contextWindowTokens: 64000,
+              maxOutputTokens: 4096,
+            },
           },
           models: {},
           apps: {
@@ -128,6 +159,10 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   assert.equal(app.instructions.system.source.type, "file");
   assert.equal(app.instructions.project.source.type, "file");
   assert.deepEqual(contextOptions.metadata, { workspace: directory });
+  assert.deepEqual(contextOptions.budget, {
+    contextWindowTokens: 64000,
+    outputReserveTokens: 4096,
+  });
   await app.close();
 });
 

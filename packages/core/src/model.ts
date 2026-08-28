@@ -17,6 +17,11 @@ export interface ModelRequest {
   metadata?: Record<string, unknown>;
 }
 
+export interface ModelLimits {
+  readonly contextWindowTokens?: number;
+  readonly maxOutputTokens?: number;
+}
+
 export type ModelEvent =
   | { type: "text.delta"; delta: string }
   | { type: "reasoning.delta"; delta: string }
@@ -27,6 +32,7 @@ export type ModelEvent =
     };
 
 export interface Model {
+  readonly limits?: ModelLimits;
   stream(
     request: ModelRequest,
     options: { signal: AbortSignal },

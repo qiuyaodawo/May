@@ -160,6 +160,7 @@ export class May {
             type: "model.completed",
             step,
             message,
+            contextMessageCount: snapshot.messages.length,
           },
           usage,
         );

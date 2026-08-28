@@ -22,7 +22,12 @@ export class InMemoryContextFactory implements ContextFactory {
     });
     return {
       context,
-      controller: new SnapshotContextController(context),
+      controller: new SnapshotContextController(context, {
+        ...(options.budget === undefined ? {} : { budget: options.budget }),
+        ...(options.measurement === undefined
+          ? {}
+          : { measurement: options.measurement }),
+      }),
     };
   }
 }

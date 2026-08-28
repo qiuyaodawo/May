@@ -7,7 +7,7 @@ import {
   type LoadMayConfigOptions,
   type MayConfig,
 } from "@may/config";
-import type { ContextFactory } from "@may/context";
+import type { ContextBudget, ContextFactory } from "@may/context";
 import type { Model } from "@may/core";
 import { FileSessionStore } from "@may/session/file-store";
 
@@ -28,6 +28,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly sessionId?: string;
   readonly autoResume?: boolean;
   readonly contextFactory?: ContextFactory;
+  readonly contextBudget?: ContextBudget;
   readonly instructions?: string;
   readonly maxSteps?: number;
 }
@@ -57,6 +58,10 @@ export async function openConfiguredMaybeCode(
     ...(options.model === undefined ? {} : { model: options.model }),
   });
   const model = (dependencies.createModel ?? createMaybeCodeModel)(selection);
+  const contextBudget = options.contextBudget ?? createContextBudget(
+    model,
+    selection,
+  );
   const instructionsDirectory = options.instructions === undefined
     ? resolveMaybeCodeInstructionsDirectory(config)
     : undefined;
@@ -78,6 +83,7 @@ export async function openConfiguredMaybeCode(
     ...(options.contextFactory === undefined
       ? {}
       : { contextFactory: options.contextFactory }),
+    ...(contextBudget === undefined ? {} : { contextBudget }),
     ...(options.instructions === undefined
       ? {}
       : { instructions: options.instructions }),
@@ -86,6 +92,23 @@ export async function openConfiguredMaybeCode(
       : { instructionsDirectory }),
     ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
   });
+}
+
+function createContextBudget(
+  model: Model,
+  selection: SelectedMaybeCodeModel,
+): ContextBudget | undefined {
+  const contextWindowTokens = model.limits?.contextWindowTokens ??
+    selection.limits?.contextWindowTokens;
+  const outputReserveTokens = model.limits?.maxOutputTokens ??
+    selection.limits?.maxOutputTokens;
+  if (contextWindowTokens === undefined && outputReserveTokens === undefined) {
+    return undefined;
+  }
+  return {
+    ...(contextWindowTokens === undefined ? {} : { contextWindowTokens }),
+    ...(outputReserveTokens === undefined ? {} : { outputReserveTokens }),
+  };
 }
 
 async function resolveWorkspace(workspace: string): Promise<string> {
