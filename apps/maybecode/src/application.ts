@@ -6,9 +6,12 @@ import {
   type ContextBudget,
   type ContextCompactionResult,
   type ContextCompactionStrategy,
+  type ContextSummarizer,
   type ContextController,
   type ContextFactory,
   type ContextInspection,
+  PruneOldToolResultsStrategy,
+  SummaryTailStrategy,
 } from "@may/context";
 import {
   AsyncEventQueue,
@@ -39,6 +42,7 @@ import {
   type MaybeCodeInstructions,
 } from "./instructions.js";
 import { createCodingPermissionPolicy } from "./policy.js";
+import { createModelContextSummarizer } from "./summarizer.js";
 
 export { DEFAULT_MAYBE_CODE_INSTRUCTIONS } from "./instructions.js";
 
@@ -53,9 +57,23 @@ export interface MaybeCodeApplicationOptions {
   readonly contextFactory?: ContextFactory;
   readonly contextBudget?: ContextBudget;
   readonly compactionStrategy?: ContextCompactionStrategy;
+  readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly instructionsDirectory?: string;
   readonly maxSteps?: number;
+}
+
+export type MaybeCodeCompactionStrategyName =
+  | "prune-old-tool-results"
+  | "summary-tail";
+
+export type MaybeCodeCompactionSelection =
+  | MaybeCodeCompactionStrategyName
+  | ContextCompactionStrategy;
+
+interface ActiveCompaction {
+  readonly controller: AbortController;
+  readonly result: Promise<ContextCompactionResult>;
 }
 
 export class MaybeCodeApplication {
@@ -67,10 +85,12 @@ export class MaybeCodeApplication {
   private readonly session: Session;
   private readonly permissions: PermissionToolExecutor;
   private readonly contextController: ContextController | undefined;
+  private readonly summaryTailStrategy: ContextCompactionStrategy;
   private readonly eventQueue = new AsyncEventQueue<MaybeCodeSessionEvent>();
   private readonly permissionRelay: Promise<void>;
   private readonly runRelays = new Set<Promise<void>>();
   private currentRun: MaybeCodeRun | undefined;
+  private activeCompaction: ActiveCompaction | undefined;
   private starting = false;
   private closed = false;
 
@@ -80,6 +100,7 @@ export class MaybeCodeApplication {
     permissions: PermissionToolExecutor,
     instructions: MaybeCodeInstructions,
     contextController: ContextController | undefined,
+    summaryTailStrategy: ContextCompactionStrategy,
   ) {
     this.workspace = workspace;
     this.session = session;
@@ -87,6 +108,7 @@ export class MaybeCodeApplication {
     this.permissions = permissions;
     this.instructions = instructions;
     this.contextController = contextController;
+    this.summaryTailStrategy = summaryTailStrategy;
     this.events = this.eventQueue;
     this.permissionRelay = this.relayPermissionEvents();
   }
@@ -132,6 +154,10 @@ export class MaybeCodeApplication {
       options.model,
     );
     let contextController: ContextController | undefined;
+    const summaryTailStrategy = new SummaryTailStrategy({
+      summarizer: options.contextSummarizer ??
+        createModelContextSummarizer(options.model),
+    });
     const createRuntime = async (
       messages: Message[] = [],
       runtimeInfo: SessionRuntimeInfo = {},
@@ -181,6 +207,7 @@ export class MaybeCodeApplication {
         permissions,
         instructions,
         contextController,
+        summaryTailStrategy,
       );
       return application;
     } catch (error) {
@@ -190,13 +217,15 @@ export class MaybeCodeApplication {
   }
 
   get isRunning(): boolean {
-    return this.starting || this.currentRun !== undefined;
+    return this.starting ||
+      this.currentRun !== undefined ||
+      this.activeCompaction !== undefined;
   }
 
   async submit(options: RunOptions): Promise<MaybeCodeRun> {
     this.throwIfClosed();
     if (this.isRunning) {
-      throw new Error("A MaybeCode run is already active");
+      throw new Error("A MaybeCode operation is already active");
     }
 
     this.starting = true;
@@ -225,9 +254,15 @@ export class MaybeCodeApplication {
   }
 
   cancel(reason = "Cancelled by user"): boolean {
-    if (this.currentRun === undefined) return false;
-    this.currentRun.cancel(reason);
-    return true;
+    if (this.currentRun !== undefined) {
+      this.currentRun.cancel(reason);
+      return true;
+    }
+    if (this.activeCompaction !== undefined) {
+      this.activeCompaction.controller.abort(reason);
+      return true;
+    }
+    return false;
   }
 
   resolveApproval(
@@ -248,17 +283,33 @@ export class MaybeCodeApplication {
   }
 
   async compactContext(
-    strategy?: ContextCompactionStrategy,
+    selection?: MaybeCodeCompactionSelection,
   ): Promise<ContextCompactionResult> {
     this.throwIfClosed();
     if (this.isRunning) {
-      throw new Error("Cannot compact context while a run is active");
+      throw new Error("Cannot compact context while an operation is active");
     }
     if (this.contextController?.compact === undefined) {
       throw new Error("Context compaction is not supported by the active context");
     }
 
-    const result = await this.contextController.compact(strategy);
+    const strategy = this.resolveCompactionStrategy(selection);
+    const controller = new AbortController();
+    const operation = this.performCompaction(strategy, controller.signal);
+    const active: ActiveCompaction = { controller, result: operation };
+    this.activeCompaction = active;
+    try {
+      return await operation;
+    } finally {
+      if (this.activeCompaction === active) this.activeCompaction = undefined;
+    }
+  }
+
+  private async performCompaction(
+    strategy: ContextCompactionStrategy | undefined,
+    signal: AbortSignal,
+  ): Promise<ContextCompactionResult> {
+    const result = await this.contextController!.compact!(strategy, { signal });
     if (result.changed) {
       await this.session.recordContextCompaction({
         strategy: result.strategy,
@@ -279,6 +330,9 @@ export class MaybeCodeApplication {
     const active = this.currentRun;
     active?.cancel("MaybeCode is closing");
     await active?.result.catch(() => undefined);
+    const compaction = this.activeCompaction;
+    compaction?.controller.abort("MaybeCode is closing");
+    await compaction?.result.catch(() => undefined);
     await this.permissions.close("MaybeCode is closing");
     await Promise.all([...this.runRelays]);
     await this.permissionRelay;
@@ -305,6 +359,18 @@ export class MaybeCodeApplication {
 
   private clearCurrentRun(run: MaybeCodeRun): void {
     if (this.currentRun === run) this.currentRun = undefined;
+  }
+
+  private resolveCompactionStrategy(
+    selection: MaybeCodeCompactionSelection | undefined,
+  ): ContextCompactionStrategy | undefined {
+    if (selection === undefined) return undefined;
+    if (selection === "prune-old-tool-results") {
+      return new PruneOldToolResultsStrategy();
+    }
+    if (selection === "summary-tail") return this.summaryTailStrategy;
+    if (typeof selection === "object") return selection;
+    throw new Error(`Unknown context compaction strategy: ${String(selection)}`);
   }
 
   private throwIfClosed(): void {

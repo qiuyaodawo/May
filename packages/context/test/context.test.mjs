@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   InMemoryContextFactory,
   PruneOldToolResultsStrategy,
+  SummaryTailStrategy,
 } from "../dist/index.js";
 
 test("creates independent in-memory contexts from factory input", async () => {
@@ -106,6 +107,108 @@ test("prunes old tool results and resets stale measurements", async () => {
   assert.equal(repeated.changed, false);
 });
 
+test("summarizes complete old turns and retains the recent tail", async () => {
+  const captured = [];
+  const firstTool = toolMessage("first", "x".repeat(2000));
+  const messages = [
+    message("first request"),
+    assistantToolMessage("first"),
+    firstTool,
+    message("second request"),
+    assistantMessage("second answer"),
+    message("recent request"),
+    assistantMessage("recent answer"),
+  ];
+  const managed = new InMemoryContextFactory().create({
+    messages,
+    compactionStrategy: new SummaryTailStrategy({
+      keepRecentTurns: 1,
+      summarizer: {
+        summarize(request) {
+          captured.push(request.messages);
+          return "The first request used a tool; the second was answered.";
+        },
+      },
+    }),
+  });
+
+  const result = await managed.controller.compact();
+  assert.equal(result.changed, true);
+  assert.equal(result.strategy, "summary-tail");
+  assert.deepEqual(captured[0], messages.slice(0, 5));
+  assert.match(
+    result.messages[0].content[0].text,
+    /Earlier conversation summary/u,
+  );
+  assert.deepEqual(result.messages.slice(1), messages.slice(5));
+  assert.ok(result.after.estimatedTokens < result.before.estimatedTokens);
+});
+
+test("does not summarize when there are too few turns", async () => {
+  let called = false;
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("only turn"), assistantMessage("answer")],
+    compactionStrategy: new SummaryTailStrategy({
+      keepRecentTurns: 2,
+      summarizer: {
+        summarize() {
+          called = true;
+          return "unused";
+        },
+      },
+    }),
+  });
+
+  const result = await managed.controller.compact();
+  assert.equal(result.changed, false);
+  assert.equal(called, false);
+});
+
+test("does not apply a summary that would increase context size", async () => {
+  const messages = [
+    message("one"),
+    assistantMessage("one"),
+    message("two"),
+    assistantMessage("two"),
+  ];
+  const managed = new InMemoryContextFactory().create({
+    messages,
+    compactionStrategy: new SummaryTailStrategy({
+      keepRecentTurns: 1,
+      summarizer: {
+        summarize() {
+          return "larger ".repeat(1000);
+        },
+      },
+    }),
+  });
+
+  const result = await managed.controller.compact();
+  assert.equal(result.changed, false);
+  assert.deepEqual((await managed.context.snapshot()).messages, messages);
+});
+
+test("rejects an empty summary without changing context", async () => {
+  const messages = [
+    message("one"),
+    assistantMessage("answer"),
+    message("two"),
+  ];
+  const managed = new InMemoryContextFactory().create({
+    messages,
+    compactionStrategy: new SummaryTailStrategy({
+      keepRecentTurns: 1,
+      summarizer: { summarize: () => "  " },
+    }),
+  });
+
+  await assert.rejects(
+    managed.controller.compact(),
+    /empty summary/u,
+  );
+  assert.deepEqual((await managed.context.snapshot()).messages, messages);
+});
+
 function message(text) {
   return { role: "user", content: [{ type: "text", text }] };
 }
@@ -116,6 +219,18 @@ function toolMessage(id, value) {
     toolCallId: id,
     name: "read",
     content: [{ type: "json", value }],
+  };
+}
+
+function assistantMessage(text) {
+  return { role: "assistant", content: [{ type: "text", text }] };
+}
+
+function assistantToolMessage(id) {
+  return {
+    role: "assistant",
+    content: [],
+    toolCalls: [{ id, name: "read", input: { path: "file.txt" } }],
   };
 }
 

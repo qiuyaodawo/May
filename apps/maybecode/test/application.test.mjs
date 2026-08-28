@@ -330,6 +330,123 @@ test("persists pruned tool results across session resume", async () => {
   await resumed.close();
 });
 
+test("persists a summary-tail view across session resume", async () => {
+  const store = new (await import("@may/session")).InMemorySessionStore();
+  const catalog = new InMemorySessionCatalog();
+  const requests = [];
+  const summarized = [];
+  let modelCall = 0;
+  const model = {
+    async *stream(request) {
+      requests.push(request);
+      modelCall += 1;
+      yield {
+        type: "response.completed",
+        message: assistantMessage(
+          `answer ${modelCall} ${"x".repeat(1500)}`,
+        ),
+      };
+    },
+  };
+  const options = {
+    workspace: process.cwd(),
+    model,
+    store,
+    catalog,
+    contextSummarizer: {
+      summarize(request) {
+        summarized.push(request.messages);
+        return "The first request was completed successfully.";
+      },
+    },
+  };
+
+  const first = await MaybeCodeWorkspace.open({ ...options, autoResume: false });
+  await (await first.submit({ input: "first request" })).result;
+  await (await first.submit({ input: "second request" })).result;
+  await (await first.submit({ input: "third request" })).result;
+  const result = await first.compactContext("summary-tail");
+  assert.equal(result.changed, true);
+  assert.equal(result.strategy, "summary-tail");
+  assert.deepEqual(
+    summarized[0].map((message) => message.role),
+    ["user", "assistant"],
+  );
+  assert.equal(
+    (await first.history()).at(-1).type,
+    "context.compacted",
+  );
+  await first.close();
+
+  const resumed = await MaybeCodeWorkspace.open(options);
+  await (await resumed.submit({ input: "fourth request" })).result;
+  const resumedRequest = requests.at(-1);
+  assert.ok(
+    resumedRequest.messages.some((message) =>
+      message.role === "system" &&
+      message.content[0]?.type === "text" &&
+      message.content[0].text.includes("Earlier conversation summary")
+    ),
+  );
+  assert.equal(
+    resumedRequest.messages.some((message) =>
+      message.role === "user" &&
+      message.content[0]?.type === "text" &&
+      message.content[0].text === "first request"
+    ),
+    false,
+  );
+  await resumed.close();
+});
+
+test("cancels an active summary compaction without persisting it", async () => {
+  const store = new (await import("@may/session")).InMemorySessionStore();
+  let summaryStarted;
+  const started = new Promise((resolve) => {
+    summaryStarted = resolve;
+  });
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model: {
+      async *stream() {
+        yield {
+          type: "response.completed",
+          message: assistantMessage(`answer ${"x".repeat(1000)}`),
+        };
+      },
+    },
+    store,
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+    contextSummarizer: {
+      summarize({ signal }) {
+        summaryStarted();
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => reject(new RunCancelledError("summary stopped")),
+            { once: true },
+          );
+        });
+      },
+    },
+  });
+  for (const input of ["one", "two", "three"]) {
+    await (await app.submit({ input })).result;
+  }
+
+  const compaction = app.compactContext("summary-tail");
+  await started;
+  assert.equal(app.isRunning, true);
+  assert.equal(app.cancel("summary stopped"), true);
+  await assert.rejects(compaction, RunCancelledError);
+  assert.equal(
+    (await app.history()).some((event) => event.type === "context.compacted"),
+    false,
+  );
+  await app.close();
+});
+
 test("cancels an active model call", async () => {
   let started;
   const modelStarted = new Promise((resolve) => {
@@ -359,7 +476,7 @@ test("cancels an active model call", async () => {
   await modelStarted;
   await assert.rejects(
     app.compactContext(),
-    /while a run is active/u,
+    /while an operation is active/u,
   );
   assert.equal(app.cancel("stop"), true);
   await assert.rejects(run.result, RunCancelledError);

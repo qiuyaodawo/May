@@ -62,3 +62,23 @@ Compaction clears stale provider-token measurements and returns the before and
 after inspections plus the replacement messages. Applications remain
 responsible for persisting those replacement messages. Custom factories may
 omit `compact()` or provide a different strategy and storage mechanism.
+
+`SummaryTailStrategy` accepts a replaceable `ContextSummarizer`. It summarizes
+complete older user turns into one system message and preserves the configured
+number of recent user turns, so assistant tool calls are not separated from
+their tool results. The default is two recent turns. An empty summary is
+rejected, and a summary that would increase serialized context size is not
+applied.
+
+```ts
+import { SummaryTailStrategy } from "@may/context";
+
+const strategy = new SummaryTailStrategy({
+  keepRecentTurns: 2,
+  summarizer: {
+    async summarize({ messages, signal }) {
+      return summarizeWithYourModel(messages, signal);
+    },
+  },
+});
+```

@@ -7,7 +7,12 @@ import {
   type LoadMayConfigOptions,
   type MayConfig,
 } from "@may/config";
-import type { ContextBudget, ContextFactory } from "@may/context";
+import type {
+  ContextBudget,
+  ContextCompactionStrategy,
+  ContextFactory,
+  ContextSummarizer,
+} from "@may/context";
 import type { Model } from "@may/core";
 import { FileSessionStore } from "@may/session/file-store";
 
@@ -29,6 +34,8 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly autoResume?: boolean;
   readonly contextFactory?: ContextFactory;
   readonly contextBudget?: ContextBudget;
+  readonly compactionStrategy?: ContextCompactionStrategy;
+  readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly maxSteps?: number;
 }
@@ -84,6 +91,12 @@ export async function openConfiguredMaybeCode(
       ? {}
       : { contextFactory: options.contextFactory }),
     ...(contextBudget === undefined ? {} : { contextBudget }),
+    ...(options.compactionStrategy === undefined
+      ? {}
+      : { compactionStrategy: options.compactionStrategy }),
+    ...(options.contextSummarizer === undefined
+      ? {}
+      : { contextSummarizer: options.contextSummarizer }),
     ...(options.instructions === undefined
       ? {}
       : { instructions: options.instructions }),

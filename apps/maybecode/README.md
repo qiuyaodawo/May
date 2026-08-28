@@ -78,9 +78,10 @@ and may also return a `ContextController` for application-level inspection.
 - `/instructions` shows active instruction sources and content.
 - `/context` shows message counts, size, measured usage, and window remaining.
 - `/compact` prunes eligible old tool results and persists the active view.
+- `/compact summary-tail` summarizes older turns and retains the recent tail.
 - `/help` shows commands.
 - `/quit` exits.
-- `Ctrl+C` cancels an active run and exits while idle.
+- `Ctrl+C` cancels an active run or summary and exits while idle.
 
 Before the first model response, `/context` uses a provider-independent
 `UTF-8 bytes / 4` estimate. When the provider reports input usage, it combines
@@ -89,11 +90,17 @@ This is intended for visibility, not exact billing or context-window
 enforcement, and does not yet trigger compaction. A custom context without a
 controller reports that inspection is unsupported.
 
-`/compact` currently uses `prune-old-tool-results`: it keeps the four newest
+`/compact` uses `prune-old-tool-results`: it keeps the four newest
 tool results and replaces older results of at least 2 KiB with short
 placeholders. The original session events remain in JSONL, while subsequent
-model requests and resumed sessions use the compacted view. Automatic
-compaction and model-generated summaries are not implemented yet.
+model requests and resumed sessions use the compacted view.
+
+`/compact summary-tail` makes a separate, tool-free request to the active model
+to summarize all but the two most recent user turns. It only applies a
+non-empty summary that reduces serialized context size. The summary request can
+be cancelled with `Ctrl+C`; a cancelled or failed summary is not persisted.
+Programmatic callers can inject `contextSummarizer` or pass their own
+`ContextCompactionStrategy`. Automatic compaction is not implemented yet.
 
 The `read` tool runs without approval. `bash`, `edit`, and `write` require an
 allow-once, allow-for-session, or deny decision. Bash is not a sandbox.

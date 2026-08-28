@@ -1,13 +1,13 @@
 import { AsyncEventQueue, type RunOptions } from "@may/core";
 import type {
   ContextCompactionResult,
-  ContextCompactionStrategy,
   ContextInspection,
 } from "@may/context";
 import type { ApprovalDecision } from "@may/permissions";
 
 import {
   MaybeCodeApplication,
+  type MaybeCodeCompactionSelection,
   type MaybeCodeApplicationOptions,
 } from "./application.js";
 import {
@@ -150,7 +150,7 @@ export class MaybeCodeWorkspace {
   }
 
   async compactContext(
-    strategy?: ContextCompactionStrategy,
+    strategy?: MaybeCodeCompactionSelection,
   ): Promise<ContextCompactionResult> {
     this.throwIfClosed();
     this.assertIdle();
@@ -206,7 +206,7 @@ export class MaybeCodeWorkspace {
 
   private assertIdle(): void {
     if (this.isRunning) {
-      throw new Error("Cannot switch sessions while a run is active");
+      throw new Error("Cannot switch sessions while an operation is active");
     }
   }
 

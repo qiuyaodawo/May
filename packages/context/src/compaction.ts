@@ -6,7 +6,12 @@ export interface ContextCompactionStrategy {
   readonly name: string;
   compact(
     snapshot: Readonly<ContextSnapshot>,
+    options?: ContextCompactionOptions,
   ): readonly Message[] | Promise<readonly Message[]>;
+}
+
+export interface ContextCompactionOptions {
+  readonly signal?: AbortSignal;
 }
 
 export interface ContextCompactionResult {

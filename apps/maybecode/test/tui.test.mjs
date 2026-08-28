@@ -19,6 +19,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     "/instructions",
     "/context",
     "/compact",
+    "/compact summary-tail",
     "/sessions",
     "/quit",
   ]);
@@ -85,6 +86,11 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     terminal.output,
     /No context changes were eligible for prune-old-tool-results/u,
   );
+  assert.match(terminal.output, /Summarizing older context/u);
+  assert.match(
+    terminal.output,
+    /No context changes were eligible for summary-tail/u,
+  );
   assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);
   assert.ok(terminal.prompts.some((prompt) => prompt.includes("allow [s]ession")));
@@ -114,7 +120,7 @@ test("Ctrl+C cancels an active run and keeps the UI usable", async () => {
 
   await runTerminalUI(app, { terminal });
 
-  assert.match(terminal.output, /Cancelling current run/);
+  assert.match(terminal.output, /Cancelling current operation/);
   assert.match(terminal.output, /Run cancelled: Interrupted/);
 });
 

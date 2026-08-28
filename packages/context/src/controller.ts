@@ -2,6 +2,7 @@ import type { Context, ContextSnapshot, Message, Usage } from "@may/core";
 
 import type {
   ContextCompactionResult,
+  ContextCompactionOptions,
   ContextCompactionStrategy,
 } from "./compaction.js";
 
@@ -41,6 +42,7 @@ export interface ContextController {
   recordModelUsage?(usage: Usage, contextMessageCount: number): void;
   compact?(
     strategy?: ContextCompactionStrategy,
+    options?: ContextCompactionOptions,
   ): Promise<ContextCompactionResult>;
 }
 
@@ -94,7 +96,9 @@ export class SnapshotContextController implements ContextController {
 
   async compact(
     strategy = this.compactionStrategy,
+    options: ContextCompactionOptions = {},
   ): Promise<ContextCompactionResult> {
+    throwIfAborted(options.signal);
     if (strategy === undefined) {
       throw new Error("No context compaction strategy is configured");
     }
@@ -107,10 +111,14 @@ export class SnapshotContextController implements ContextController {
 
     const snapshot = await this.context.snapshot();
     const before = inspectContextSnapshot(snapshot, this.inspectionOptions());
-    const compacted = await strategy.compact({
-      ...snapshot,
-      messages: [...snapshot.messages],
-    });
+    const compacted = await strategy.compact(
+      {
+        ...snapshot,
+        messages: [...snapshot.messages],
+      },
+      options,
+    );
+    throwIfAborted(options.signal);
     if (!Array.isArray(compacted)) {
       throw new TypeError("Context compaction strategy must return messages");
     }
@@ -289,4 +297,13 @@ function validateInteger(value: number, name: string, minimum: number): void {
 
 function utf8Bytes(value: string): number {
   return new TextEncoder().encode(value).byteLength;
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted !== true) return;
+  const error = new Error(
+    typeof signal.reason === "string" ? signal.reason : "Context compaction cancelled",
+  );
+  error.name = "AbortError";
+  throw error;
 }

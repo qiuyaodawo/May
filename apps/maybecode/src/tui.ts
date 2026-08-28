@@ -15,10 +15,11 @@ const HELP = `Commands:
   /resume <id>     Switch to another session
   /instructions    Show active instruction sources and content
   /context         Show current context usage estimate
-  /compact         Prune eligible old tool results
+  /compact [strategy]
+                   Compact with prune-old-tool-results (default) or summary-tail
   /help            Show commands
   /quit             Exit MaybeCode
-  Ctrl+C            Cancel the active run, or exit while idle
+  Ctrl+C            Cancel the active operation, or exit while idle
 `;
 
 export interface RunTerminalUIOptions {
@@ -46,7 +47,7 @@ export async function runTerminalUI(
 
   const removeInterrupt = terminal.onInterrupt?.(() => {
     if (app.isRunning) {
-      terminal.write("\nCancelling current run...\n");
+      terminal.write("\nCancelling current operation...\n");
       app.cancel("Interrupted");
       activeQuestion?.abort();
     } else {
@@ -79,7 +80,9 @@ export async function runTerminalUI(
         try {
           exit = await handleCommand(input, app, terminal);
         } catch (error) {
-          terminal.write(`\nError: ${errorMessage(error)}\n`);
+          if (!isCancellation(error) && !isAbortError(error)) {
+            terminal.write(`\nError: ${errorMessage(error)}\n`);
+          }
         }
         continue;
       }
@@ -193,11 +196,22 @@ async function handleCommand(
       return false;
     }
     case "/compact": {
-      if (arguments_.length > 0) {
-        terminal.write("\nUsage: /compact\n");
+      const strategy = arguments_[0];
+      if (
+        arguments_.length > 1 ||
+        (strategy !== undefined &&
+          strategy !== "prune-old-tool-results" &&
+          strategy !== "summary-tail")
+      ) {
+        terminal.write(
+          "\nUsage: /compact [prune-old-tool-results|summary-tail]\n",
+        );
         return false;
       }
-      const result = await app.compactContext();
+      if (strategy === "summary-tail") {
+        terminal.write("\nSummarizing older context...\n");
+      }
+      const result = await app.compactContext(strategy);
       terminal.write(`\n${renderCompactionResult(result)}`);
       return false;
     }
