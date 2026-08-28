@@ -14,6 +14,7 @@ export interface ContextFactoryOptions {
   readonly budget?: ContextBudget;
   readonly measurement?: ContextMeasurement;
   readonly compactionStrategy?: ContextCompactionStrategy;
+  readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
 }
 
 export interface ContextFactory {

@@ -117,6 +117,8 @@ async function consumeEvents(
       await handlePermissionEvent(event.event, app, renderer, question);
     } else if (event.type === "change.preview") {
       renderer.changePreview(event);
+    } else if (event.type === "context.compacted") {
+      renderer.contextCompacted(event);
     } else {
       await renderer.sessionChanged(event, app);
     }
@@ -348,6 +350,20 @@ class TerminalRenderer {
     );
   }
 
+  contextCompacted(
+    event: Extract<MaybeCodeEvent, { type: "context.compacted" }>,
+  ): void {
+    const saved = Math.max(
+      0,
+      event.before.estimatedTokens - event.after.estimatedTokens,
+    );
+    this.terminal.write(
+      `\nContext automatically compacted with ${event.strategy}: ` +
+        `${event.before.messageCount} -> ${event.after.messageCount} messages, ` +
+        `~${formatNumber(saved)} tokens saved.\n`,
+    );
+  }
+
   permissionEvent(event: PermissionEvent): void {
     if (event.type === "approval.resolved") {
       this.terminal.write(`Permission: ${event.decision}\n`);
@@ -513,6 +529,18 @@ function renderContextInspection(inspection: ContextInspection): string {
   }
   if (inspection.remainingTokens !== undefined) {
     output += `  remaining: ${formatNumber(inspection.remainingTokens)} tokens\n`;
+  }
+  if (inspection.inputBudgetTokens !== undefined) {
+    output += `  input budget: ${formatNumber(inspection.inputBudgetTokens)} tokens`;
+    if ((inspection.reservedTokens ?? 0) > 0) {
+      output += ` (${formatNumber(inspection.reservedTokens ?? 0)} reserved)`;
+    }
+    output += "\n";
+  }
+  if (inspection.compactTriggerTokens !== undefined) {
+    output += `  compaction threshold: ${formatNumber(
+      inspection.compactTriggerTokens,
+    )} tokens (${inspection.shouldCompact === true ? "reached" : "not reached"})\n`;
   }
   return output;
 }

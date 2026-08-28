@@ -141,7 +141,11 @@ export class May {
         throwIfAborted(signal);
         emit({ type: "step.started", step });
 
-        const snapshot = await this.context.snapshot();
+        const snapshot = await this.context.snapshot({
+          runId,
+          step,
+          signal,
+        });
         const request = this.createModelRequest(snapshot);
 
         emit({ type: "model.started", step });

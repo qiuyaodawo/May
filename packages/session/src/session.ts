@@ -55,6 +55,10 @@ export class Session {
   private readonly store: SessionStore;
   private seq: number;
   private tail: Promise<void> = Promise.resolve();
+  private recordTail: Promise<void> = Promise.resolve();
+  private readonly completedModelSteps = new Set<string>();
+  private readonly modelCompletionWaiters = new Map<string, Deferred<void>>();
+  private readonly approvalRecords = new Map<string, Promise<void>>();
 
   private constructor(
     id: string,
@@ -131,17 +135,39 @@ export class Session {
   }
 
   async history(): Promise<readonly SessionEvent[]> {
+    await this.recordTail;
     return this.store.read(this.id);
   }
 
   recordPermissionEvent(event: RecordablePermissionEvent): Promise<void> {
-    return this.record(toPermissionSessionEvent(event), event.timestamp);
+    if (event.type === "approval.requested") {
+      const operation = this.waitForModelCompletion(
+        event.request.context.runId,
+        event.request.context.step,
+      ).then(() =>
+        this.record(toPermissionSessionEvent(event), event.timestamp)
+      );
+      this.approvalRecords.set(event.request.id, operation);
+      return operation;
+    }
+
+    const previous = this.approvalRecords.get(event.requestId) ??
+      Promise.resolve();
+    const operation = previous.then(() =>
+      this.record(toPermissionSessionEvent(event), event.timestamp)
+    );
+    this.approvalRecords.set(event.requestId, operation);
+    void operation.finally(() => {
+      if (this.approvalRecords.get(event.requestId) === operation) {
+        this.approvalRecords.delete(event.requestId);
+      }
+    }).catch(() => undefined);
+    return operation;
   }
 
   async recordContextCompaction(
     compaction: SessionContextCompaction,
   ): Promise<void> {
-    await this.tail;
     await this.record({
       type: "context.compacted",
       strategy: compaction.strategy,
@@ -192,16 +218,72 @@ export class Session {
         if (payload !== undefined) {
           await this.record(payload, event.timestamp);
         }
+        if (event.type === "model.completed") {
+          this.markModelCompleted(event.runId, event.step);
+        }
         events.push(event);
       }
+    } catch (error) {
+      this.rejectModelCompletionWaiters(run.id, error);
+      throw error;
     } finally {
+      this.clearModelCompletionState(run.id);
       events.close();
     }
   }
 
-  private async record(
+  private waitForModelCompletion(runId: string, step: number): Promise<void> {
+    const key = modelStepKey(runId, step);
+    if (this.completedModelSteps.has(key)) return Promise.resolve();
+
+    let waiter = this.modelCompletionWaiters.get(key);
+    if (waiter === undefined) {
+      waiter = createDeferred<void>();
+      this.modelCompletionWaiters.set(key, waiter);
+    }
+    return waiter.promise;
+  }
+
+  private markModelCompleted(runId: string, step: number): void {
+    const key = modelStepKey(runId, step);
+    this.completedModelSteps.add(key);
+    const waiter = this.modelCompletionWaiters.get(key);
+    if (waiter !== undefined) {
+      this.modelCompletionWaiters.delete(key);
+      waiter.resolve();
+    }
+  }
+
+  private rejectModelCompletionWaiters(runId: string, error: unknown): void {
+    const prefix = `${runId}:`;
+    for (const [key, waiter] of this.modelCompletionWaiters) {
+      if (!key.startsWith(prefix)) continue;
+      this.modelCompletionWaiters.delete(key);
+      waiter.reject(error);
+    }
+  }
+
+  private clearModelCompletionState(runId: string): void {
+    const prefix = `${runId}:`;
+    for (const key of this.completedModelSteps) {
+      if (key.startsWith(prefix)) this.completedModelSteps.delete(key);
+    }
+  }
+
+  private record(
     payload: SessionEventPayload,
     timestamp = Date.now(),
+  ): Promise<void> {
+    const operation = this.recordTail.then(() =>
+      this.recordNow(payload, timestamp)
+    );
+    this.recordTail = operation.catch(() => undefined);
+    return operation;
+  }
+
+  private async recordNow(
+    payload: SessionEventPayload,
+    timestamp: number,
   ): Promise<void> {
     const event: SessionEvent = {
       ...payload,
@@ -211,6 +293,26 @@ export class Session {
     };
     await this.store.append(event);
   }
+}
+
+interface Deferred<T> {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T | PromiseLike<T>) => void;
+  readonly reject: (reason?: unknown) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: Deferred<T>["resolve"];
+  let reject!: Deferred<T>["reject"];
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function modelStepKey(runId: string, step: number): string {
+  return `${runId}:${step}`;
 }
 
 function replaySession(events: readonly SessionEvent[]): {

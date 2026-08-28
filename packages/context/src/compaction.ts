@@ -21,3 +21,7 @@ export interface ContextCompactionResult {
   readonly before: ContextInspection;
   readonly after: ContextInspection;
 }
+
+export type ContextCompactionSink = (
+  result: ContextCompactionResult,
+) => void | Promise<void>;

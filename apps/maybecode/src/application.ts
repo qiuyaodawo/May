@@ -57,6 +57,7 @@ export interface MaybeCodeApplicationOptions {
   readonly contextFactory?: ContextFactory;
   readonly contextBudget?: ContextBudget;
   readonly compactionStrategy?: ContextCompactionStrategy;
+  readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly instructionsDirectory?: string;
@@ -150,14 +151,18 @@ export class MaybeCodeApplication {
     });
     const tools = [...(options.tools ?? createCodingTools({ cwd: workspace }))];
     const contextFactory = options.contextFactory ?? new InMemoryContextFactory();
-    const contextBudget = options.contextBudget ?? contextBudgetFromModel(
-      options.model,
+    const contextBudget = withDefaultCompactionThreshold(
+      options.contextBudget ?? contextBudgetFromModel(options.model),
     );
     let contextController: ContextController | undefined;
     const summaryTailStrategy = new SummaryTailStrategy({
       summarizer: options.contextSummarizer ??
         createModelContextSummarizer(options.model),
     });
+    const autoCompactionStrategies = options.autoCompactionStrategies ?? [
+      new PruneOldToolResultsStrategy(),
+      summaryTailStrategy,
+    ];
     const createRuntime = async (
       messages: Message[] = [],
       runtimeInfo: SessionRuntimeInfo = {},
@@ -175,6 +180,7 @@ export class MaybeCodeApplication {
         ...(options.compactionStrategy === undefined
           ? {}
           : { compactionStrategy: options.compactionStrategy }),
+        autoCompactionStrategies,
       });
       contextController = managedContext.controller;
       return new May({
@@ -208,6 +214,9 @@ export class MaybeCodeApplication {
         instructions,
         contextController,
         summaryTailStrategy,
+      );
+      contextController?.setAutoCompactionSink?.((result) =>
+        application!.recordAutomaticCompaction(result)
       );
       return application;
     } catch (error) {
@@ -311,16 +320,32 @@ export class MaybeCodeApplication {
   ): Promise<ContextCompactionResult> {
     const result = await this.contextController!.compact!(strategy, { signal });
     if (result.changed) {
-      await this.session.recordContextCompaction({
-        strategy: result.strategy,
-        messages: result.messages,
-        beforeMessageCount: result.before.messageCount,
-        afterMessageCount: result.after.messageCount,
-        beforeEstimatedTokens: result.before.estimatedTokens,
-        afterEstimatedTokens: result.after.estimatedTokens,
-      });
+      await this.persistCompaction(result);
     }
     return result;
+  }
+
+  private async recordAutomaticCompaction(
+    result: ContextCompactionResult,
+  ): Promise<void> {
+    await this.persistCompaction(result);
+    this.eventQueue.push({
+      type: "context.compacted",
+      strategy: result.strategy,
+      before: result.before,
+      after: result.after,
+    });
+  }
+
+  private persistCompaction(result: ContextCompactionResult): Promise<void> {
+    return this.session.recordContextCompaction({
+      strategy: result.strategy,
+      messages: result.messages,
+      beforeMessageCount: result.before.messageCount,
+      afterMessageCount: result.after.messageCount,
+      beforeEstimatedTokens: result.before.estimatedTokens,
+      afterEstimatedTokens: result.after.estimatedTokens,
+    });
   }
 
   async close(): Promise<void> {
@@ -336,6 +361,7 @@ export class MaybeCodeApplication {
     await this.permissions.close("MaybeCode is closing");
     await Promise.all([...this.runRelays]);
     await this.permissionRelay;
+    this.contextController?.setAutoCompactionSink?.(undefined);
     this.eventQueue.close();
   }
 
@@ -421,5 +447,16 @@ function contextBudgetFromModel(model: Model): ContextBudget | undefined {
     ...(model.limits.maxOutputTokens === undefined
       ? {}
       : { outputReserveTokens: model.limits.maxOutputTokens }),
+  };
+}
+
+function withDefaultCompactionThreshold(
+  budget: ContextBudget | undefined,
+): ContextBudget | undefined {
+  if (budget?.contextWindowTokens === undefined) return budget;
+  if (budget.compactTriggerRatio !== undefined) return budget;
+  return {
+    ...budget,
+    compactTriggerRatio: 0.9,
   };
 }

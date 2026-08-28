@@ -86,8 +86,8 @@ and may also return a `ContextController` for application-level inspection.
 Before the first model response, `/context` uses a provider-independent
 `UTF-8 bytes / 4` estimate. When the provider reports input usage, it combines
 that measured request prefix with an estimate for messages added afterward.
-This is intended for visibility, not exact billing or context-window
-enforcement, and does not yet trigger compaction. A custom context without a
+This is intended for context pressure management, not exact billing. It also
+shows the input budget and compaction threshold. A custom context without a
 controller reports that inspection is unsupported.
 
 `/compact` uses `prune-old-tool-results`: it keeps the four newest
@@ -100,7 +100,16 @@ to summarize all but the two most recent user turns. It only applies a
 non-empty summary that reduces serialized context size. The summary request can
 be cancelled with `Ctrl+C`; a cancelled or failed summary is not persisted.
 Programmatic callers can inject `contextSummarizer` or pass their own
-`ContextCompactionStrategy`. Automatic compaction is not implemented yet.
+`ContextCompactionStrategy`.
+
+Before each model request, MaybeCode automatically checks context pressure
+when the model has a configured context-window limit. By default, the trigger
+ratio is 90%, bounded by the window after the configured output reserve. It
+first tries `prune-old-tool-results`, then falls back to `summary-tail` if
+pressure remains. Each changed view is persisted as `context.compacted`
+before the model request and is restored on session resume. The terminal
+reports automatic compactions. Programmatic callers can replace the ordered
+chain with `autoCompactionStrategies`, or pass an empty array to disable it.
 
 The `read` tool runs without approval. `bash`, `edit`, and `write` require an
 allow-once, allow-for-session, or deny decision. Bash is not a sandbox.

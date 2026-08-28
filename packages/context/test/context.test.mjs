@@ -50,7 +50,13 @@ test("combines measured input usage with an estimated context tail", async () =>
   const tail = message("tail");
   const managed = new InMemoryContextFactory().create({
     messages: [initial, tail],
-    budget: { contextWindowTokens: 1000, outputReserveTokens: 100 },
+    budget: {
+      contextWindowTokens: 1000,
+      outputReserveTokens: 100,
+      toolReserveTokens: 50,
+      safetyMarginTokens: 25,
+      compactTriggerRatio: 0.9,
+    },
     measurement: { inputTokens: 120, contextMessageCount: 1 },
   });
 
@@ -63,6 +69,14 @@ test("combines measured input usage with an estimated context tail", async () =>
   assert.equal(inspection.contextWindowTokens, 1000);
   assert.equal(inspection.remainingTokens, 1000 - inspection.effectiveTokens);
   assert.equal(inspection.usageRatio, inspection.effectiveTokens / 1000);
+  assert.equal(inspection.reservedTokens, 175);
+  assert.equal(inspection.inputBudgetTokens, 825);
+  assert.equal(
+    inspection.remainingInputTokens,
+    825 - inspection.effectiveTokens,
+  );
+  assert.equal(inspection.compactTriggerTokens, 825);
+  assert.equal(inspection.shouldCompact, false);
 });
 
 test("updates the measurement from model usage", async () => {
@@ -207,6 +221,108 @@ test("rejects an empty summary without changing context", async () => {
     /empty summary/u,
   );
   assert.deepEqual((await managed.context.snapshot()).messages, messages);
+});
+
+test("runs automatic compaction strategies in order before model snapshots", async () => {
+  const calls = [];
+  const recorded = [];
+  const tail = message("tail");
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("x".repeat(1000)), tail],
+    budget: {
+      contextWindowTokens: 200,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [
+      {
+        name: "no-op",
+        compact(snapshot) {
+          calls.push("no-op");
+          return snapshot.messages;
+        },
+      },
+      {
+        name: "keep-tail",
+        compact() {
+          calls.push("keep-tail");
+          return [tail];
+        },
+      },
+    ],
+  });
+  managed.controller.setAutoCompactionSink((result) => recorded.push(result));
+
+  const snapshot = await managed.context.snapshot();
+
+  assert.deepEqual(calls, ["no-op", "keep-tail"]);
+  assert.deepEqual(snapshot.messages, [tail]);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].strategy, "keep-tail");
+  assert.equal(recorded[0].before.shouldCompact, true);
+  assert.equal(recorded[0].after.shouldCompact, false);
+
+  await managed.context.snapshot();
+  assert.deepEqual(calls, ["no-op", "keep-tail"]);
+});
+
+test("does not repeat exhausted automatic compaction until context changes", async () => {
+  let calls = 0;
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("x".repeat(1000))],
+    budget: {
+      contextWindowTokens: 100,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [{
+      name: "no-op",
+      compact(snapshot) {
+        calls += 1;
+        return snapshot.messages;
+      },
+    }],
+  });
+
+  await managed.context.snapshot();
+  await managed.context.snapshot();
+  assert.equal(calls, 1);
+
+  await managed.context.append([message("new")]);
+  await managed.context.snapshot();
+  assert.equal(calls, 2);
+});
+
+test("cancels automatic compaction without replacing context", async () => {
+  let started;
+  const compactionStarted = new Promise((resolve) => {
+    started = resolve;
+  });
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("x".repeat(1000))],
+    budget: {
+      contextWindowTokens: 100,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [{
+      name: "waiting",
+      compact(_snapshot, { signal }) {
+        started();
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () => {
+            const error = new Error("stopped");
+            error.name = "AbortError";
+            reject(error);
+          }, { once: true });
+        });
+      },
+    }],
+  });
+  const controller = new AbortController();
+  const snapshot = managed.context.snapshot({ signal: controller.signal });
+  await compactionStarted;
+  controller.abort("stopped");
+
+  await assert.rejects(snapshot, { name: "AbortError" });
+  assert.equal((await managed.controller.inspect()).messageCount, 1);
 });
 
 function message(text) {

@@ -13,6 +13,9 @@ const managed = await factory.create({
   budget: {
     contextWindowTokens: 64_000,
     outputReserveTokens: 8_192,
+    toolReserveTokens: 2_048,
+    safetyMarginTokens: 2_048,
+    compactTriggerRatio: 0.9,
   },
 });
 
@@ -30,9 +33,14 @@ as inspection. The default token estimate is explicitly approximate and uses
 the combined instruction and serialized-message UTF-8 byte count divided by
 four. After a model reports `usage.inputTokens`,
 `SnapshotContextController` can retain that measured request prefix and
-estimate only messages appended afterward. `ContextBudget` carries model
-limits and future compaction reserves; it does not currently trigger or
-perform automatic compaction by itself.
+estimate only messages appended afterward.
+
+`ContextBudget` separates the full model window from the input budget. The
+input budget is the context window minus output, tool, and safety reserves.
+When `compactTriggerRatio` is present, pressure begins at the smaller of that
+fraction of the full window and the input budget. `inspect()` exposes these
+values through `inputBudgetTokens`, `compactTriggerTokens`, and
+`shouldCompact`.
 
 ## Manual compaction
 
@@ -82,3 +90,34 @@ const strategy = new SummaryTailStrategy({
   },
 });
 ```
+
+## Automatic compaction
+
+`InMemoryContextFactory` can run an ordered strategy chain immediately before
+Core takes a model-facing snapshot:
+
+```ts
+const managed = await new InMemoryContextFactory().create({
+  messages,
+  budget: {
+    contextWindowTokens: 64_000,
+    outputReserveTokens: 8_192,
+    compactTriggerRatio: 0.9,
+  },
+  autoCompactionStrategies: [
+    new PruneOldToolResultsStrategy(),
+    strategy,
+  ],
+});
+
+managed.controller?.setAutoCompactionSink?.(async (result) => {
+  await persistReplacementView(result.messages);
+});
+```
+
+Strategies run in order until pressure falls below the threshold. Unchanged
+strategies fall through to the next strategy. If every strategy is exhausted,
+the same message snapshot is not retried until the context or model
+measurement changes. The run's cancellation signal is forwarded to each
+strategy. The sink is awaited so an application can durably record a changed
+view before the model request proceeds.

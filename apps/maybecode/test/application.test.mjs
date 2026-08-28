@@ -399,6 +399,72 @@ test("persists a summary-tail view across session resume", async () => {
   await resumed.close();
 });
 
+test("automatically compacts before a model call and persists the active view", async () => {
+  const store = new (await import("@may/session")).InMemorySessionStore();
+  const catalog = new InMemorySessionCatalog();
+  const requests = [];
+  let modelCall = 0;
+  const model = {
+    async *stream(request) {
+      requests.push(request);
+      modelCall += 1;
+      yield {
+        type: "response.completed",
+        message: assistantMessage(
+          modelCall === 1 ? `large ${"x".repeat(2500)}` : "done",
+        ),
+      };
+    },
+  };
+  const events = [];
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model,
+    store,
+    catalog,
+    autoResume: false,
+    contextBudget: {
+      contextWindowTokens: 1000,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [{
+      name: "keep-current-input",
+      compact(snapshot) {
+        return snapshot.messages.length < 3
+          ? snapshot.messages
+          : snapshot.messages.slice(-1);
+      },
+    }],
+  });
+  const eventReader = collectEvents(app, events, "allow");
+
+  await (await app.submit({ input: "first" })).result;
+  await (await app.submit({ input: "second" })).result;
+
+  assert.deepEqual(
+    requests[1].messages.map((message) => message.role),
+    ["system", "user"],
+  );
+  assert.equal(requests[1].messages[1].content[0].text, "second");
+  const history = await app.history();
+  const compacted = history.filter((event) =>
+    event.type === "context.compacted"
+  );
+  assert.equal(compacted.length, 1);
+  assert.equal(compacted[0].strategy, "keep-current-input");
+  assert.deepEqual(compacted[0].messages, [{
+    role: "user",
+    content: [{ type: "text", text: "second" }],
+  }]);
+
+  await app.close();
+  await eventReader;
+  assert.equal(
+    events.filter((event) => event.type === "context.compacted").length,
+    1,
+  );
+});
+
 test("cancels an active summary compaction without persisting it", async () => {
   const store = new (await import("@may/session")).InMemorySessionStore();
   let summaryStarted;

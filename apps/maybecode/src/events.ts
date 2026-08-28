@@ -1,4 +1,5 @@
 import type { MayEvent, RunResult } from "@may/core";
+import type { ContextInspection } from "@may/context";
 import type { PermissionEvent } from "@may/permissions";
 import type { ToolChangePreview } from "./diff.js";
 
@@ -11,6 +12,12 @@ export type MaybeCodeSessionEvent =
       step: number;
       toolCallId: string;
       preview: ToolChangePreview;
+    }
+  | {
+      type: "context.compacted";
+      strategy: string;
+      before: ContextInspection;
+      after: ContextInspection;
     };
 
 export type MaybeCodeEvent =

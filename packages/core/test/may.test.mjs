@@ -780,6 +780,71 @@ test("emits exactly one failed terminal event when the context throws", async ()
   assertSingleTerminalEvent(events, "run.failed");
 });
 
+test("passes run metadata and cancellation to context snapshots", async () => {
+  let snapshotOptions;
+  const context = {
+    messages: [],
+    async append(messages) {
+      this.messages.push(...messages);
+    },
+    async snapshot(options) {
+      snapshotOptions = options;
+      return { messages: [...this.messages] };
+    },
+  };
+  const model = {
+    async *stream() {
+      yield {
+        type: "response.completed",
+        message: assistant("done"),
+      };
+    },
+  };
+
+  const run = new May({ model, context }).run({ input: "hello" });
+  await run.result;
+
+  assert.equal(snapshotOptions.runId, run.id);
+  assert.equal(snapshotOptions.step, 1);
+  assert.ok(snapshotOptions.signal instanceof AbortSignal);
+});
+
+test("run.cancel aborts active context preparation before the model call", async () => {
+  const started = deferred();
+  let snapshotSignal;
+  let modelCalled = false;
+  const context = {
+    async append() {},
+    async snapshot({ signal }) {
+      snapshotSignal = signal;
+      started.resolve();
+      await waitForAbort(signal);
+      return { messages: [] };
+    },
+  };
+  const model = {
+    async *stream() {
+      modelCalled = true;
+      yield {
+        type: "response.completed",
+        message: assistant("unreachable"),
+      };
+    },
+  };
+  const run = new May({ model, context }).run({ input: "wait" });
+  const eventPromise = collect(run.events);
+
+  await started.promise;
+  run.cancel("stop context");
+
+  await assert.rejects(run.result, { code: "RUN_CANCELLED" });
+  const events = await eventPromise;
+  assert.equal(snapshotSignal.aborted, true);
+  assert.equal(snapshotSignal.reason, "stop context");
+  assert.equal(modelCalled, false);
+  assertSingleTerminalEvent(events, "run.cancelled");
+});
+
 test("run.cancel aborts an active model call", async () => {
   const started = deferred();
   let modelSignal;

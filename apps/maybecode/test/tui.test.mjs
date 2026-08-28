@@ -82,6 +82,8 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   assert.match(terminal.output, /effective usage: ~[\d,]+ \/ 10,000 \([\d.]+%\)/u);
   assert.match(terminal.output, /measurement: 160 measured \+ ~\d+ estimated tail/u);
   assert.match(terminal.output, /remaining: [\d,]+ tokens/u);
+  assert.match(terminal.output, /input budget: 9,000 tokens \(1,000 reserved\)/u);
+  assert.match(terminal.output, /compaction threshold: 9,000 tokens \(not reached\)/u);
   assert.match(
     terminal.output,
     /No context changes were eligible for prune-old-tool-results/u,

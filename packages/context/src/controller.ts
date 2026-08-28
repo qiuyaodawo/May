@@ -1,8 +1,9 @@
 import type { Context, ContextSnapshot, Message, Usage } from "@may/core";
 
 import type {
-  ContextCompactionResult,
   ContextCompactionOptions,
+  ContextCompactionResult,
+  ContextCompactionSink,
   ContextCompactionStrategy,
 } from "./compaction.js";
 
@@ -35,6 +36,11 @@ export interface ContextInspection {
   readonly contextWindowTokens?: number;
   readonly remainingTokens?: number;
   readonly usageRatio?: number;
+  readonly reservedTokens?: number;
+  readonly inputBudgetTokens?: number;
+  readonly remainingInputTokens?: number;
+  readonly compactTriggerTokens?: number;
+  readonly shouldCompact?: boolean;
 }
 
 export interface ContextController {
@@ -44,6 +50,10 @@ export interface ContextController {
     strategy?: ContextCompactionStrategy,
     options?: ContextCompactionOptions,
   ): Promise<ContextCompactionResult>;
+  prepareForModel?(
+    options?: ContextCompactionOptions,
+  ): Promise<readonly ContextCompactionResult[]>;
+  setAutoCompactionSink?(sink: ContextCompactionSink | undefined): void;
 }
 
 export interface SnapshotContextControllerOptions {
@@ -53,6 +63,7 @@ export interface SnapshotContextControllerOptions {
   readonly replaceMessages?: (
     messages: readonly Message[],
   ) => void | Promise<void>;
+  readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
 }
 
 export class SnapshotContextController implements ContextController {
@@ -61,6 +72,9 @@ export class SnapshotContextController implements ContextController {
   private readonly replaceMessages: SnapshotContextControllerOptions[
     "replaceMessages"
   ];
+  private readonly autoCompactionStrategies: readonly ContextCompactionStrategy[];
+  private autoCompactionSink: ContextCompactionSink | undefined;
+  private lastExhaustedFingerprint: string | undefined;
   private measurement: ContextMeasurement | undefined;
 
   constructor(
@@ -75,6 +89,9 @@ export class SnapshotContextController implements ContextController {
       : validateMeasurement(options.measurement);
     this.compactionStrategy = options.compactionStrategy;
     this.replaceMessages = options.replaceMessages;
+    this.autoCompactionStrategies = [
+      ...(options.autoCompactionStrategies ?? []),
+    ];
   }
 
   async inspect(): Promise<ContextInspection> {
@@ -92,6 +109,48 @@ export class SnapshotContextController implements ContextController {
       inputTokens: usage.inputTokens,
       contextMessageCount,
     });
+    this.lastExhaustedFingerprint = undefined;
+  }
+
+  setAutoCompactionSink(sink: ContextCompactionSink | undefined): void {
+    this.autoCompactionSink = sink;
+  }
+
+  async prepareForModel(
+    options: ContextCompactionOptions = {},
+  ): Promise<readonly ContextCompactionResult[]> {
+    if (this.autoCompactionStrategies.length === 0) return [];
+    throwIfAborted(options.signal);
+
+    const snapshot = await this.context.snapshot();
+    const inspection = inspectContextSnapshot(
+      snapshot,
+      this.inspectionOptions(),
+    );
+    if (inspection.shouldCompact !== true) {
+      this.lastExhaustedFingerprint = undefined;
+      return [];
+    }
+
+    const fingerprint = JSON.stringify(snapshot.messages);
+    if (fingerprint === this.lastExhaustedFingerprint) return [];
+
+    const results: ContextCompactionResult[] = [];
+    let currentInspection = inspection;
+    for (const strategy of this.autoCompactionStrategies) {
+      const result = await this.compact(strategy, options);
+      currentInspection = result.after;
+      if (result.changed) {
+        await this.autoCompactionSink?.(result);
+        results.push(result);
+      }
+      if (currentInspection.shouldCompact !== true) break;
+    }
+
+    this.lastExhaustedFingerprint = currentInspection.shouldCompact === true
+      ? JSON.stringify((await this.context.snapshot()).messages)
+      : undefined;
+    return results;
   }
 
   async compact(
@@ -131,6 +190,7 @@ export class SnapshotContextController implements ContextController {
 
     await this.replaceMessages(messages);
     this.measurement = undefined;
+    this.lastExhaustedFingerprint = undefined;
     const afterSnapshot = await this.context.snapshot();
     const after = inspectContextSnapshot(
       afterSnapshot,
@@ -211,17 +271,21 @@ export function inspectContextSnapshot(
   }
   const budgetDetails: Pick<
     ContextInspection,
-    "contextWindowTokens" | "remainingTokens" | "usageRatio"
+    | "contextWindowTokens"
+    | "remainingTokens"
+    | "usageRatio"
+    | "reservedTokens"
+    | "inputBudgetTokens"
+    | "remainingInputTokens"
+    | "compactTriggerTokens"
+    | "shouldCompact"
   > | Record<string, never> = budget?.contextWindowTokens === undefined
     ? {}
-    : {
-        contextWindowTokens: budget.contextWindowTokens,
-        remainingTokens: Math.max(
-          0,
-          budget.contextWindowTokens - effectiveTokens,
-        ),
-        usageRatio: effectiveTokens / budget.contextWindowTokens,
-      };
+    : createBudgetInspection(
+      budget,
+      budget.contextWindowTokens,
+      effectiveTokens,
+    );
   return {
     instructionsBytes,
     messageBytes,
@@ -234,6 +298,53 @@ export function inspectContextSnapshot(
     effectiveTokens,
     ...measurementDetails,
     ...budgetDetails,
+  };
+}
+
+function createBudgetInspection(
+  budget: ContextBudget,
+  contextWindowTokens: number,
+  effectiveTokens: number,
+): Pick<
+  ContextInspection,
+  | "contextWindowTokens"
+  | "remainingTokens"
+  | "usageRatio"
+  | "reservedTokens"
+  | "inputBudgetTokens"
+  | "remainingInputTokens"
+  | "compactTriggerTokens"
+  | "shouldCompact"
+> {
+  const reservedTokens = (budget.outputReserveTokens ?? 0) +
+    (budget.toolReserveTokens ?? 0) +
+    (budget.safetyMarginTokens ?? 0);
+  const inputBudgetTokens = Math.max(
+    0,
+    contextWindowTokens - reservedTokens,
+  );
+  const triggerTokens = budget.compactTriggerRatio === undefined
+    ? undefined
+    : Math.floor(Math.min(
+      contextWindowTokens * budget.compactTriggerRatio,
+      inputBudgetTokens,
+    ));
+  return {
+    contextWindowTokens,
+    remainingTokens: Math.max(
+      0,
+      contextWindowTokens - effectiveTokens,
+    ),
+    usageRatio: effectiveTokens / contextWindowTokens,
+    reservedTokens,
+    inputBudgetTokens,
+    remainingInputTokens: Math.max(0, inputBudgetTokens - effectiveTokens),
+    ...(triggerTokens === undefined
+      ? {}
+      : {
+          compactTriggerTokens: triggerTokens,
+          shouldCompact: effectiveTokens >= triggerTokens,
+        }),
   };
 }
 

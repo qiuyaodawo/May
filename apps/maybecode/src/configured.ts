@@ -35,6 +35,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly contextFactory?: ContextFactory;
   readonly contextBudget?: ContextBudget;
   readonly compactionStrategy?: ContextCompactionStrategy;
+  readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly maxSteps?: number;
@@ -94,6 +95,9 @@ export async function openConfiguredMaybeCode(
     ...(options.compactionStrategy === undefined
       ? {}
       : { compactionStrategy: options.compactionStrategy }),
+    ...(options.autoCompactionStrategies === undefined
+      ? {}
+      : { autoCompactionStrategies: options.autoCompactionStrategies }),
     ...(options.contextSummarizer === undefined
       ? {}
       : { contextSummarizer: options.contextSummarizer }),

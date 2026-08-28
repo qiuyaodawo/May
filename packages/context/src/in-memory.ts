@@ -1,4 +1,9 @@
-import type { Context, ContextSnapshot, Message } from "@may/core";
+import type {
+  Context,
+  ContextSnapshot,
+  Message,
+  SnapshotOptions,
+} from "@may/core";
 
 import { SnapshotContextController } from "./controller.js";
 import { PruneOldToolResultsStrategy } from "./prune-old-tool-results.js";
@@ -21,9 +26,7 @@ export class InMemoryContextFactory implements ContextFactory {
         ? {}
         : { metadata: { ...options.metadata } }),
     });
-    return {
-      context,
-      controller: new SnapshotContextController(context, {
+    const controller = new SnapshotContextController(context, {
         ...(options.budget === undefined ? {} : { budget: options.budget }),
         ...(options.measurement === undefined
           ? {}
@@ -31,8 +34,34 @@ export class InMemoryContextFactory implements ContextFactory {
         compactionStrategy: options.compactionStrategy ??
           new PruneOldToolResultsStrategy(),
         replaceMessages: (messages) => context.replaceMessages(messages),
-      }),
+        ...(options.autoCompactionStrategies === undefined
+          ? {}
+          : {
+              autoCompactionStrategies: options.autoCompactionStrategies,
+            }),
+      });
+    return {
+      context: new ModelViewContext(context, controller),
+      controller,
     };
+  }
+}
+
+class ModelViewContext implements Context {
+  constructor(
+    private readonly context: ReplaceableInMemoryContext,
+    private readonly controller: SnapshotContextController,
+  ) {}
+
+  async snapshot(options?: SnapshotOptions): Promise<ContextSnapshot> {
+    await this.controller.prepareForModel(
+      options?.signal === undefined ? {} : { signal: options.signal },
+    );
+    return this.context.snapshot();
+  }
+
+  append(messages: Message[]): Promise<void> {
+    return this.context.append(messages);
   }
 }
 

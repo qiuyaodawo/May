@@ -11,8 +11,12 @@ export interface AppendOptions {
   step?: number;
 }
 
+export interface SnapshotOptions extends AppendOptions {
+  signal?: AbortSignal;
+}
+
 export interface Context {
-  snapshot(): Promise<ContextSnapshot>;
+  snapshot(options?: SnapshotOptions): Promise<ContextSnapshot>;
   append(messages: Message[], options?: AppendOptions): Promise<void>;
 }
 

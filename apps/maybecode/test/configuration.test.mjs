@@ -162,7 +162,12 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   assert.deepEqual(contextOptions.budget, {
     contextWindowTokens: 64000,
     outputReserveTokens: 4096,
+    compactTriggerRatio: 0.9,
   });
+  assert.deepEqual(
+    contextOptions.autoCompactionStrategies.map((strategy) => strategy.name),
+    ["prune-old-tool-results", "summary-tail"],
+  );
   await app.close();
 });
 
