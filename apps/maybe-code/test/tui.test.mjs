@@ -54,8 +54,12 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
 
   assert.equal(await readFile(join(workspace, "hello.txt"), "utf8"), "hello");
   assert.match(terminal.output, /\[thinking\] checking/);
+  assert.match(terminal.output, /Change preview: hello\.txt \(created\)/);
+  assert.match(terminal.output, /--- \/dev\/null\n\+\+\+ b\/hello\.txt/);
+  assert.match(terminal.output, /\+hello/);
   assert.match(terminal.output, /Approval required for write/);
   assert.match(terminal.output, /Permission: allow-session/);
+  assert.match(terminal.output, /✓ write: hello\.txt \(created, \+1 -0\)/);
   assert.match(terminal.output, /May: done/);
   assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);

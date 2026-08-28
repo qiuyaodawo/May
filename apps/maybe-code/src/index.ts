@@ -2,6 +2,7 @@ export * from "./application.js";
 export * from "./args.js";
 export * from "./catalog.js";
 export * from "./configured.js";
+export * from "./diff.js";
 export * from "./errors.js";
 export * from "./events.js";
 export * from "./model.js";

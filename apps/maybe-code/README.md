@@ -40,6 +40,11 @@ allow-once, allow-for-session, or deny decision. Bash is not a sandbox.
 Allow-for-session grants currently last for the running MaybeCode process and
 are not restored after restart.
 
+Before `edit` and `write` execute, MaybeCode shows a bounded unified diff. After
+execution it reports the file, whether it was created or updated, and the
+numbers of added and deleted lines. A preview is still shown when a previous
+allow-for-session grant skips the approval prompt.
+
 Session event logs and the workspace catalog are stored under
 `~/.may/maybe-code`. They are plaintext and currently require a single active
 writer per session.

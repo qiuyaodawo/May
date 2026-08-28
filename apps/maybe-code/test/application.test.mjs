@@ -82,6 +82,11 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
     ).length,
     1,
   );
+  const previews = events.filter((event) => event.type === "change.preview");
+  assert.deepEqual(
+    previews.map((event) => event.preview.status === "ready" && event.preview.kind),
+    ["create", "update"],
+  );
 });
 
 test("executes read, write, edit, and bash through the application", async (t) => {

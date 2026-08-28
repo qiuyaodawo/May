@@ -2,6 +2,7 @@ import type { ContentPart, MayEvent } from "@may/core";
 import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
 
+import type { FileChangeKind, ToolChangePreview } from "./diff.js";
 import type { MaybeCodeEvent } from "./events.js";
 import type { MaybeCodeTerminal } from "./terminal.js";
 import { createNodeTerminal } from "./terminal.js";
@@ -106,6 +107,8 @@ async function consumeEvents(
       renderer.runEvent(event.event);
     } else if (event.type === "permission.event") {
       await handlePermissionEvent(event.event, app, renderer, question);
+    } else if (event.type === "change.preview") {
+      renderer.changePreview(event);
     } else {
       await renderer.sessionChanged(event, app);
     }
@@ -204,6 +207,7 @@ async function handleCommand(
 class TerminalRenderer {
   private textStarted = false;
   private reasoningStarted = false;
+  private readonly changePreviews = new Map<string, ToolChangePreview>();
 
   constructor(private readonly terminal: MaybeCodeTerminal) {}
 
@@ -244,28 +248,61 @@ class TerminalRenderer {
       }
       case "tool.started":
         this.terminal.write(
-          `\n→ ${event.call.name} ${truncate(stringify(event.call.input), 800)}\n`,
+          `\n→ ${event.call.name}${toolInputSummary(
+            event.call.name,
+            event.call.input,
+          )}\n`,
         );
         break;
       case "tool.completed":
-        this.terminal.write(
-          `✓ ${event.call.name}${toolResultSummary(event.output)}\n`,
-        );
+        this.renderToolCompleted(event);
         break;
       case "tool.failed":
+        this.changePreviews.delete(toolCallKey(event.runId, event.call.id));
         this.terminal.write(
           `✗ ${event.call.name}: ${event.error.message}\n`,
         );
         break;
+      case "run.completed":
+        this.clearRunPreviews(event.runId);
+        break;
       case "run.failed":
+        this.clearRunPreviews(event.runId);
         this.terminal.write(`\nRun failed: ${event.error.message}\n`);
         break;
       case "run.cancelled":
+        this.clearRunPreviews(event.runId);
         this.terminal.write(
           `\nRun cancelled${event.reason === undefined ? "" : `: ${event.reason}`}\n`,
         );
         break;
     }
+  }
+
+  changePreview(
+    event: Extract<MaybeCodeEvent, { type: "change.preview" }>,
+  ): void {
+    this.changePreviews.set(
+      toolCallKey(event.runId, event.toolCallId),
+      event.preview,
+    );
+    if (event.preview.status === "unavailable") {
+      this.terminal.write(
+        `\nDiff unavailable for ${event.preview.tool} ${event.preview.path}: ` +
+          `${event.preview.reason}\n`,
+      );
+      return;
+    }
+
+    this.terminal.write(
+      `\nChange preview: ${event.preview.path} ` +
+        `(${changeKindLabel(event.preview.kind)})\n`,
+    );
+    this.terminal.write(
+      event.preview.diff === ""
+        ? "(no content changes)\n"
+        : `${event.preview.diff}\n`,
+    );
   }
 
   permissionEvent(event: PermissionEvent): void {
@@ -277,6 +314,15 @@ class TerminalRenderer {
   }
 
   approvalRequest(request: ApprovalRequest): void {
+    const preview = this.changePreviews.get(
+      toolCallKey(request.context.runId, request.context.toolCallId),
+    );
+    if (preview !== undefined) {
+      this.terminal.write(
+        `\nApproval required for ${request.tool.name}: ${preview.path}\n`,
+      );
+      return;
+    }
     this.terminal.write(
       `\nApproval required for ${request.tool.name}:\n${truncate(stringify(request.input), 1200)}\n`,
     );
@@ -302,6 +348,32 @@ class TerminalRenderer {
 
   private dim(text: string): string {
     return this.terminal.colors ? `\x1b[2m${text}\x1b[0m` : text;
+  }
+
+  private renderToolCompleted(
+    event: Extract<MayEvent, { type: "tool.completed" }>,
+  ): void {
+    const key = toolCallKey(event.runId, event.call.id);
+    const preview = this.changePreviews.get(key);
+    this.changePreviews.delete(key);
+    if (preview?.status === "ready") {
+      this.terminal.write(
+        `✓ ${event.call.name}: ${preview.path} ` +
+          `(${changeKindLabel(preview.kind)}, ` +
+          `+${preview.additions} -${preview.deletions})\n`,
+      );
+      return;
+    }
+    this.terminal.write(
+      `✓ ${event.call.name}${toolResultSummary(event.output)}\n`,
+    );
+  }
+
+  private clearRunPreviews(runId: string): void {
+    const prefix = `${runId}:`;
+    for (const key of this.changePreviews.keys()) {
+      if (key.startsWith(prefix)) this.changePreviews.delete(key);
+    }
   }
 }
 
@@ -340,6 +412,34 @@ function toolResultSummary(output: unknown): string {
     return `: exit ${output.exitCode}`;
   }
   return "";
+}
+
+function toolInputSummary(toolName: string, input: unknown): string {
+  if (
+    (toolName === "edit" || toolName === "write") &&
+    typeof input === "object" &&
+    input !== null &&
+    "path" in input &&
+    typeof input.path === "string"
+  ) {
+    return `: ${input.path}`;
+  }
+  return ` ${truncate(stringify(input), 800)}`;
+}
+
+function toolCallKey(runId: string, toolCallId: string): string {
+  return `${runId}:${toolCallId}`;
+}
+
+function changeKindLabel(kind: FileChangeKind): string {
+  switch (kind) {
+    case "create":
+      return "created";
+    case "update":
+      return "updated";
+    case "no-change":
+      return "unchanged";
+  }
 }
 
 function stringify(value: unknown): string {

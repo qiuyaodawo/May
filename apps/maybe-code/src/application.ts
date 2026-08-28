@@ -21,6 +21,7 @@ import type {
   MaybeCodeRun,
   MaybeCodeSessionEvent,
 } from "./events.js";
+import { createToolChangePreview } from "./diff.js";
 import { createCodingPermissionPolicy } from "./policy.js";
 
 export const DEFAULT_MAYBE_CODE_INSTRUCTIONS = `You are MaybeCode, a coding agent working in a local workspace.
@@ -71,8 +72,27 @@ export class MaybeCodeApplication {
     options: MaybeCodeApplicationOptions,
   ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
+    const permissionPolicy = options.permissionPolicy ??
+      createCodingPermissionPolicy();
+    let application: MaybeCodeApplication | undefined;
     const permissions = new PermissionToolExecutor({
-      policy: options.permissionPolicy ?? createCodingPermissionPolicy(),
+      policy: async (check) => {
+        const preview = await createToolChangePreview(
+          workspace,
+          check.tool.name,
+          check.input,
+        );
+        if (preview !== undefined) {
+          application?.eventQueue.push({
+            type: "change.preview",
+            runId: check.context.runId,
+            step: check.context.step,
+            toolCallId: check.context.toolCallId,
+            preview,
+          });
+        }
+        return permissionPolicy(check);
+      },
     });
     const tools = [...(options.tools ?? createCodingTools({ cwd: workspace }))];
     const createRuntime = (messages: Message[] = []) =>
@@ -103,7 +123,8 @@ export class MaybeCodeApplication {
           });
       assertWorkspace(session, workspace);
       permissions.setEventSink((event) => session.recordPermissionEvent(event));
-      return new MaybeCodeApplication(workspace, session, permissions);
+      application = new MaybeCodeApplication(workspace, session, permissions);
+      return application;
     } catch (error) {
       await permissions.close();
       throw error;
