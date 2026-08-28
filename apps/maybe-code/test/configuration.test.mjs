@@ -98,6 +98,24 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   await app.close();
 });
 
+test(
+  "explains Windows drive-relative paths mangled by Git Bash",
+  { skip: process.platform !== "win32" },
+  async () => {
+    await assert.rejects(
+      openConfiguredMaybeCode(
+        { workspace: "E:codeept" },
+        {
+          async loadConfig() {
+            throw new Error("config should not be loaded");
+          },
+        },
+      ),
+      /Git Bash removes unquoted backslashes.*E:\/code\/project/u,
+    );
+  },
+);
+
 function assistantMessage(text) {
   return { role: "assistant", content: [{ type: "text", text }] };
 }

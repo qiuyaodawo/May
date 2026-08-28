@@ -14,6 +14,15 @@ pnpm maybecode --new /path/to/workspace
 pnpm maybecode --session <id> /path/to/workspace
 ```
 
+In Git Bash on Windows, use forward slashes or quote backslash paths. An
+unquoted `E:\code\project` is changed by Bash before MaybeCode receives it:
+
+```sh
+pnpm maybecode E:/code/project
+pnpm maybecode /e/code/project
+pnpm maybecode 'E:\code\project'
+```
+
 MaybeCode currently creates configured models for DeepSeek. The lower-level
 provider adapters remain independently usable.
 

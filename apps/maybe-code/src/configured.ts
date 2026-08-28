@@ -77,6 +77,13 @@ export async function openConfiguredMaybeCode(
 }
 
 async function resolveWorkspace(workspace: string): Promise<string> {
+  if (process.platform === "win32" && /^[A-Za-z]:[^\\/]/u.test(workspace)) {
+    throw new Error(
+      `Workspace path "${workspace}" is drive-relative. ` +
+        "Git Bash removes unquoted backslashes; use forward slashes " +
+        "(for example E:/code/project) or single-quote the path.",
+    );
+  }
   const path = await realpath(resolve(workspace));
   const information = await stat(path);
   if (!information.isDirectory()) {
