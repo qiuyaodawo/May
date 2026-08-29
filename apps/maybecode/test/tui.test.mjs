@@ -291,7 +291,7 @@ test("terminal UI retries the latest failed run without duplicating input", asyn
 test("CLI returns usage errors without opening an application", async () => {
   const terminal = new FakeTerminal([]);
   let opened = false;
-  const exitCode = await runMaybeCode(["--new", "--session", "one"], {
+  const exitCode = await runMaybeCode(["--continue", "--resume", "one"], {
     terminal,
     async open() {
       opened = true;

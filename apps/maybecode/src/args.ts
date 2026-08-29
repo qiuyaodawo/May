@@ -9,8 +9,8 @@ Options:
   --config <path>      Load another May config file
   --provider <name>    Use a configured provider
   --model <name>       Use a named model profile
-  --session <id>       Resume a specific session
-  --new                Start a new session instead of auto-resuming
+  -c, --continue       Continue the most recent session for this workspace
+  -r, --resume <id>    Resume a specific session
   -h, --help           Show this help
 `;
 
@@ -36,14 +36,16 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   let provider: string | undefined;
   let model: string | undefined;
   let sessionId: string | undefined;
-  let startNew = false;
+  let continueLatest = false;
 
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
     if (argument === "--help" || argument === "-h") return { type: "help" };
-    if (argument === "--new") {
-      if (startNew) throw new MaybeCodeUsageError("--new may only be specified once");
-      startNew = true;
+    if (argument === "--continue" || argument === "-c") {
+      if (continueLatest) {
+        throw new MaybeCodeUsageError("--continue may only be specified once");
+      }
+      continueLatest = true;
       continue;
     }
     if (argument === "--config") {
@@ -70,11 +72,15 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
       );
       continue;
     }
-    if (argument === "--session") {
+    if (
+      argument === "--resume" ||
+      argument === "-r" ||
+      argument === "--session"
+    ) {
       sessionId = setOption(
-        "--session",
+        "--resume",
         sessionId,
-        readValue(args, ++index, "--session"),
+        readValue(args, ++index, "--resume"),
       );
       continue;
     }
@@ -90,13 +96,15 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   if (provider !== undefined && model !== undefined) {
     throw new MaybeCodeUsageError("--provider and --model cannot be used together");
   }
-  if (startNew && sessionId !== undefined) {
-    throw new MaybeCodeUsageError("--new and --session cannot be used together");
+  if (continueLatest && sessionId !== undefined) {
+    throw new MaybeCodeUsageError(
+      "--continue and --resume cannot be used together",
+    );
   }
 
   return {
     type: "start",
-    autoResume: !startNew,
+    autoResume: continueLatest,
     ...(workspace === undefined ? {} : { workspace }),
     ...(configPath === undefined ? {} : { configPath }),
     ...(provider === undefined ? {} : { provider }),

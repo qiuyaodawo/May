@@ -209,6 +209,7 @@ test("retries a failed run after resuming its durable session", async (t) => {
     },
     store,
     catalog,
+    autoResume: true,
   });
   assert.equal(resumed.sessionId, sessionId);
   await (await resumed.retry()).result;
@@ -340,7 +341,7 @@ test("exposes bounded active-session history as an approval-free tool", async ()
   await app.close();
 });
 
-test("auto-resumes, lists, creates, and switches workspace sessions", async () => {
+test("starts fresh by default and explicitly resumes workspace sessions", async () => {
   const store = new (await import("@may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();
   const requests = [];
@@ -371,7 +372,7 @@ test("auto-resumes, lists, creates, and switches workspace sessions", async () =
   await (await first.submit({ input: "first" })).result;
   await first.close();
 
-  const resumed = await MaybeCodeWorkspace.open(options);
+  const resumed = await MaybeCodeWorkspace.open({ ...options, autoResume: true });
   assert.equal(resumed.sessionId, firstId);
   const inspection = await resumed.inspectContext();
   assert.equal(inspection.measurementMethod, "measured+estimated");
@@ -392,6 +393,10 @@ test("auto-resumes, lists, creates, and switches workspace sessions", async () =
   await resumed.resumeSession(firstId);
   assert.equal(resumed.sessionId, firstId);
   await resumed.close();
+
+  const fresh = await MaybeCodeWorkspace.open(options);
+  assert.notEqual(fresh.sessionId, firstId);
+  await fresh.close();
 });
 
 test("creates context through an injected factory for each session", async () => {
@@ -508,7 +513,7 @@ test("persists pruned tool results across session resume", async () => {
   );
   await first.close();
 
-  const resumed = await MaybeCodeWorkspace.open(options);
+  const resumed = await MaybeCodeWorkspace.open({ ...options, autoResume: true });
   await (await resumed.submit({ input: "continue" })).result;
   const toolMessages = requests.at(-1).messages.filter((message) =>
     message.role === "tool"
@@ -566,7 +571,7 @@ test("persists a summary-tail view across session resume", async () => {
   );
   await first.close();
 
-  const resumed = await MaybeCodeWorkspace.open(options);
+  const resumed = await MaybeCodeWorkspace.open({ ...options, autoResume: true });
   await (await resumed.submit({ input: "fourth request" })).result;
   const resumedRequest = requests.at(-1);
   assert.ok(

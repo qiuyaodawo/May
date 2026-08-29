@@ -116,7 +116,6 @@ const launched = await runPnpm([
   "maybecode",
   "--config",
   join(consumerDirectory, "config.json"),
-  "--new",
   workspaceDirectory,
 ], {
   cwd: consumerDirectory,

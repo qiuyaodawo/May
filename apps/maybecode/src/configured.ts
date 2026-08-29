@@ -39,6 +39,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly configPath?: string;
   readonly dataDirectory?: string;
   readonly sessionId?: string;
+  /** Resume the latest workspace session when no sessionId is given. Defaults to false. */
   readonly autoResume?: boolean;
   readonly contextFactory?: ContextFactory;
   readonly contextBudget?: ContextBudget;

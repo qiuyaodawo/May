@@ -49,9 +49,14 @@ Configure a built-in provider in `~/.may/config.json`, then run:
 ```sh
 pnpm maybecode
 pnpm maybecode /path/to/workspace
-pnpm maybecode --new /path/to/workspace
-pnpm maybecode --session <id> /path/to/workspace
+pnpm maybecode --continue /path/to/workspace
+pnpm maybecode --resume <id> /path/to/workspace
 ```
+
+A normal launch always starts a new session. Use `--continue` to resume the
+most recent session for the workspace, or `--resume <id>` to select a specific
+session. Starting a new session does not delete or overwrite older sessions;
+they remain available through `/sessions` and `/resume <id>`.
 
 The private package exposes a `maybecode` executable for local packaging. Its
 complete package graph can be packed, installed without registry access, and

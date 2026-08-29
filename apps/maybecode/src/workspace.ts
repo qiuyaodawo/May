@@ -35,6 +35,7 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
 > {
   readonly catalog: SessionCatalog;
   readonly sessionId?: string;
+  /** Resume the latest workspace session when no sessionId is given. Defaults to false. */
   readonly autoResume?: boolean;
 }
 
@@ -77,7 +78,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   ): Promise<MaybeCodeWorkspace> {
     const base = withoutSelection(options);
     let sessionId = options.sessionId;
-    if (sessionId === undefined && options.autoResume !== false) {
+    if (sessionId === undefined && options.autoResume === true) {
       sessionId = (await latestSession(options.catalog, options.workspace))?.id;
       if (
         sessionId !== undefined &&

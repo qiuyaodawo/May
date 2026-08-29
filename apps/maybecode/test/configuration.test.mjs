@@ -21,7 +21,7 @@ test("parses MaybeCode startup options", () => {
       "custom.json",
       "--model",
       "reasoner",
-      "--session",
+      "--resume",
       "abc",
       ".",
     ]),
@@ -31,12 +31,13 @@ test("parses MaybeCode startup options", () => {
       configPath: "custom.json",
       model: "reasoner",
       sessionId: "abc",
-      autoResume: true,
+      autoResume: false,
     },
   );
-  assert.equal(parseMaybeCodeArgs(["--new"]).autoResume, false);
+  assert.equal(parseMaybeCodeArgs([]).autoResume, false);
+  assert.equal(parseMaybeCodeArgs(["--continue"]).autoResume, true);
   assert.throws(
-    () => parseMaybeCodeArgs(["--new", "--session", "abc"]),
+    () => parseMaybeCodeArgs(["--continue", "--resume", "abc"]),
     /cannot be used together/,
   );
 });
