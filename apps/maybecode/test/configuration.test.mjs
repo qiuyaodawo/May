@@ -166,7 +166,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   });
   assert.deepEqual(
     contextOptions.autoCompactionStrategies.map((strategy) => strategy.name),
-    ["prune-old-tool-results", "summary-tail"],
+    ["prune-old-tool-results", "summary-tail", "history-reference"],
   );
   await app.close();
 });

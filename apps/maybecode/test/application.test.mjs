@@ -450,6 +450,43 @@ test("persists a summary-tail view across session resume", async () => {
   await resumed.close();
 });
 
+test("persists a history-reference view with the latest turn", async () => {
+  const requests = [];
+  const model = {
+    async *stream(request) {
+      requests.push(request);
+      yield {
+        type: "response.completed",
+        message: assistantMessage(`answer ${requests.length} ${"x".repeat(600)}`),
+      };
+    },
+  };
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model,
+    store: new (await import("@may/session")).InMemorySessionStore(),
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+  });
+  for (const input of ["first", "second", "current"]) {
+    await (await app.submit({ input })).result;
+  }
+
+  const result = await app.compactContext("history-reference");
+
+  assert.equal(result.changed, true);
+  assert.equal(result.strategy, "history-reference");
+  assert.deepEqual(result.messages.map((message) => message.role), [
+    "system",
+    "user",
+    "assistant",
+  ]);
+  assert.match(result.messages[0].content[0].text, /session_history/u);
+  assert.equal(result.messages[1].content[0].text, "current");
+  assert.equal((await app.history()).at(-1).type, "context.compacted");
+  await app.close();
+});
+
 test("automatically compacts before a model call and persists the active view", async () => {
   const store = new (await import("@may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();

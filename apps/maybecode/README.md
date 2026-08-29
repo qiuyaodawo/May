@@ -79,6 +79,8 @@ and may also return a `ContextController` for application-level inspection.
 - `/context` shows message counts, size, measured usage, and window remaining.
 - `/compact` prunes eligible old tool results and persists the active view.
 - `/compact summary-tail` summarizes older turns and retains the recent tail.
+- `/compact history-reference` keeps the current turn and points the model to
+  the bounded `session_history` tool for older details.
 - `/help` shows commands.
 - `/quit` exits.
 - `Ctrl+C` cancels an active run or summary and exits while idle.
@@ -106,7 +108,7 @@ Before each model request, MaybeCode automatically checks context pressure
 when the model has a configured context-window limit. By default, the trigger
 ratio is 90%, bounded by the window after the configured output reserve. It
 first tries `prune-old-tool-results`, then falls back to `summary-tail` if
-pressure remains. Each changed view is persisted as `context.compacted`
+pressure remains, and finally `history-reference`. Each changed view is persisted as `context.compacted`
 before the model request and is restored on session resume. The terminal
 reports automatic compactions. Programmatic callers can replace the ordered
 chain with `autoCompactionStrategies`, or pass an empty array to disable it.

@@ -20,6 +20,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     "/context",
     "/compact",
     "/compact summary-tail",
+    "/compact history-reference",
     "/sessions",
     "/quit",
   ]);
@@ -92,6 +93,10 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   assert.match(
     terminal.output,
     /No context changes were eligible for summary-tail/u,
+  );
+  assert.match(
+    terminal.output,
+    /No context changes were eligible for history-reference/u,
   );
   assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);

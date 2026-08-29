@@ -16,7 +16,8 @@ const HELP = `Commands:
   /instructions    Show active instruction sources and content
   /context         Show current context usage estimate
   /compact [strategy]
-                   Compact with prune-old-tool-results (default) or summary-tail
+                   Compact with prune-old-tool-results (default), summary-tail,
+                   or history-reference
   /help            Show commands
   /quit             Exit MaybeCode
   Ctrl+C            Cancel the active operation, or exit while idle
@@ -203,10 +204,11 @@ async function handleCommand(
         arguments_.length > 1 ||
         (strategy !== undefined &&
           strategy !== "prune-old-tool-results" &&
-          strategy !== "summary-tail")
+          strategy !== "summary-tail" &&
+          strategy !== "history-reference")
       ) {
         terminal.write(
-          "\nUsage: /compact [prune-old-tool-results|summary-tail]\n",
+          "\nUsage: /compact [prune-old-tool-results|summary-tail|history-reference]\n",
         );
         return false;
       }

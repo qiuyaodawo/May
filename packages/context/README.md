@@ -121,3 +121,9 @@ the same message snapshot is not retried until the context or model
 measurement changes. The run's cancellation signal is forwarded to each
 strategy. The sink is awaited so an application can durably record a changed
 view before the model request proceeds.
+
+`HistoryReferenceStrategy` is a final, provider-independent fallback. It
+replaces older turns with one system reference while retaining the configured
+number of recent user turns. Applications can point that reference at a
+bounded history tool, file, or another durable resource without coupling the
+context package to session storage.

@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 
 import { createCodingTools } from "@may/coding-tools";
 import {
+  HistoryReferenceStrategy,
   InMemoryContextFactory,
   type ContextBudget,
   type ContextCompactionResult,
@@ -67,7 +68,8 @@ export interface MaybeCodeApplicationOptions {
 
 export type MaybeCodeCompactionStrategyName =
   | "prune-old-tool-results"
-  | "summary-tail";
+  | "summary-tail"
+  | "history-reference";
 
 export type MaybeCodeCompactionSelection =
   | MaybeCodeCompactionStrategyName
@@ -88,6 +90,7 @@ export class MaybeCodeApplication {
   private readonly permissions: PermissionToolExecutor;
   private readonly contextController: ContextController | undefined;
   private readonly summaryTailStrategy: ContextCompactionStrategy;
+  private readonly historyReferenceStrategy: ContextCompactionStrategy;
   private readonly eventQueue = new AsyncEventQueue<MaybeCodeSessionEvent>();
   private readonly permissionRelay: Promise<void>;
   private readonly runRelays = new Set<Promise<void>>();
@@ -103,6 +106,7 @@ export class MaybeCodeApplication {
     instructions: MaybeCodeInstructions,
     contextController: ContextController | undefined,
     summaryTailStrategy: ContextCompactionStrategy,
+    historyReferenceStrategy: ContextCompactionStrategy,
   ) {
     this.workspace = workspace;
     this.session = session;
@@ -111,6 +115,7 @@ export class MaybeCodeApplication {
     this.instructions = instructions;
     this.contextController = contextController;
     this.summaryTailStrategy = summaryTailStrategy;
+    this.historyReferenceStrategy = historyReferenceStrategy;
     this.events = this.eventQueue;
     this.permissionRelay = this.relayPermissionEvents();
   }
@@ -173,9 +178,17 @@ export class MaybeCodeApplication {
       summarizer: options.contextSummarizer ??
         createModelContextSummarizer(options.model),
     });
+    const historyReferenceStrategy = new HistoryReferenceStrategy({
+      reference:
+        "Earlier model-visible context was removed to recover context capacity. " +
+        "The complete durable history remains available through the " +
+        "session_history tool. Inspect it when details from earlier work are " +
+        "needed, then continue the current request.",
+    });
     const autoCompactionStrategies = options.autoCompactionStrategies ?? [
       new PruneOldToolResultsStrategy(),
       summaryTailStrategy,
+      historyReferenceStrategy,
     ];
     const createRuntime = async (
       messages: Message[] = [],
@@ -229,6 +242,7 @@ export class MaybeCodeApplication {
         instructions,
         contextController,
         summaryTailStrategy,
+        historyReferenceStrategy,
       );
       contextController?.setAutoCompactionSink?.((result) =>
         application!.recordAutomaticCompaction(result)
@@ -410,6 +424,9 @@ export class MaybeCodeApplication {
       return new PruneOldToolResultsStrategy();
     }
     if (selection === "summary-tail") return this.summaryTailStrategy;
+    if (selection === "history-reference") {
+      return this.historyReferenceStrategy;
+    }
     if (typeof selection === "object") return selection;
     throw new Error(`Unknown context compaction strategy: ${String(selection)}`);
   }

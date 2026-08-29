@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  HistoryReferenceStrategy,
   InMemoryContextFactory,
   PruneOldToolResultsStrategy,
   SummaryTailStrategy,
@@ -221,6 +222,56 @@ test("rejects an empty summary without changing context", async () => {
     /empty summary/u,
   );
   assert.deepEqual((await managed.context.snapshot()).messages, messages);
+});
+
+test("replaces old turns with a durable history reference and keeps the current turn", async () => {
+  const messages = [
+    message("first"),
+    assistantMessage("x".repeat(1000)),
+    message("second"),
+    assistantMessage("y".repeat(1000)),
+    message("current request"),
+  ];
+  const managed = new InMemoryContextFactory().create({
+    messages,
+    compactionStrategy: new HistoryReferenceStrategy({
+      reference: "Use the session_history tool to inspect earlier work.",
+    }),
+  });
+
+  const result = await managed.controller.compact();
+
+  assert.equal(result.changed, true);
+  assert.equal(result.strategy, "history-reference");
+  assert.equal(result.messages[0].role, "system");
+  assert.match(result.messages[0].content[0].text, /session_history/u);
+  assert.deepEqual(result.messages.slice(1), [message("current request")]);
+  assert.ok(result.after.estimatedTokens < result.before.estimatedTokens);
+});
+
+test("supports dynamic history references and cancellation", async () => {
+  let called = false;
+  const strategy = new HistoryReferenceStrategy({
+    reference({ snapshot, signal }) {
+      called = true;
+      assert.equal(snapshot.messages.length, 3);
+      signal.throwIfAborted();
+      return "History resource: session://current";
+    },
+  });
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("old"), assistantMessage("old"), message("current")],
+    compactionStrategy: strategy,
+  });
+  const controller = new AbortController();
+  controller.abort("stop reference");
+
+  await assert.rejects(
+    managed.controller.compact(undefined, { signal: controller.signal }),
+    { name: "AbortError", message: "stop reference" },
+  );
+  assert.equal(called, false);
+  assert.equal((await managed.controller.inspect()).messageCount, 3);
 });
 
 test("runs automatic compaction strategies in order before model snapshots", async () => {
