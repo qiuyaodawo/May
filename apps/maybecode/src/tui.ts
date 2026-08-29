@@ -5,6 +5,13 @@ import type { SessionEvent } from "@may/session";
 
 import type { FileChangeKind, ToolChangePreview } from "./diff.js";
 import type { MaybeCodeEvent } from "./events.js";
+import {
+  createMaybeCodeSlashCommandSuggester,
+  executeMaybeCodeSlashCommand,
+  parseMaybeCodeSlashCommand,
+  type MaybeCodeSlashCommand,
+  type MaybeCodeSlashCommandResult,
+} from "./slash-commands.js";
 import type {
   MaybeCodeTerminal,
   TerminalQuestionOptions,
@@ -12,26 +19,9 @@ import type {
 import { createNodeTerminal } from "./terminal.js";
 import type { MaybeCodeController } from "./controller.js";
 
-const HELP = `Commands:
-  /new             Start a new session
-  /sessions        List sessions for this workspace
-  /resume <id>     Switch to another session
-  /retry           Continue the latest failed run without resubmitting input
-  /instructions    Show active instruction sources and content
-  /status          Show the active model, session, workspace, and context usage
-  /context         Show current context usage estimate
-  /compact [strategy]
-                   Compact with prune-old-tool-results (default), summary-tail,
-                   or history-reference
-  /help            Show commands
-  /quit             Exit MaybeCode
-  Ctrl+C            Cancel the active operation, or exit while idle
-  Multiline         End a line with \\ to continue on the next line
-`;
-
 type UIQuestion = (
   prompt: string,
-  options?: Pick<TerminalQuestionOptions, "history">,
+  options?: Omit<TerminalQuestionOptions, "signal">,
 ) => Promise<string>;
 
 export interface RunTerminalUIOptions {
@@ -44,6 +34,7 @@ export async function runTerminalUI(
 ): Promise<void> {
   const terminal = options.terminal ?? createNodeTerminal();
   const renderer = new TerminalRenderer(terminal);
+  const slashCommandSuggestions = createMaybeCodeSlashCommandSuggester(app);
   let activeQuestion: AbortController | undefined;
   let exit = false;
 
@@ -52,10 +43,8 @@ export async function runTerminalUI(
     activeQuestion = controller;
     try {
       return await terminal.question(prompt, {
+        ...questionOptions,
         signal: controller.signal,
-        ...(questionOptions.history === undefined
-          ? {}
-          : { history: questionOptions.history }),
       });
     } finally {
       if (activeQuestion === controller) activeQuestion = undefined;
@@ -85,7 +74,7 @@ export async function runTerminalUI(
     while (!exit) {
       let input: string;
       try {
-        input = await readInput(question);
+        input = await readInput(question, slashCommandSuggestions);
       } catch (error) {
         if (isAbortError(error)) {
           if (!app.isRunning) break;
@@ -198,102 +187,110 @@ async function handleCommand(
   app: MaybeCodeController,
   terminal: MaybeCodeTerminal,
 ): Promise<boolean> {
-  const [command, ...arguments_] = input.split(/\s+/u);
-  switch (command) {
-    case "/quit":
-    case "/exit":
+  const parsed = parseMaybeCodeSlashCommand(input);
+  if (
+    parsed.type === "command" &&
+    parsed.definition.name === "/retry" &&
+    parsed.arguments.length === 0
+  ) {
+    terminal.write("\nRetrying the latest failed run...\n");
+  }
+  if (
+    parsed.type === "command" &&
+    parsed.definition.name === "/compact" &&
+    parsed.arguments.length === 1 &&
+    parsed.arguments[0] === "summary-tail"
+  ) {
+    terminal.write("\nSummarizing older context...\n");
+  }
+
+  const result = await executeMaybeCodeSlashCommand(input, app);
+  return renderSlashCommandResult(result, app, terminal);
+}
+
+async function renderSlashCommandResult(
+  result: MaybeCodeSlashCommandResult,
+  app: MaybeCodeController,
+  terminal: MaybeCodeTerminal,
+): Promise<boolean> {
+  switch (result.type) {
+    case "exit":
       return true;
-    case "/help":
-      terminal.write(`\n${HELP}`);
-      return false;
-    case "/instructions":
+    case "help":
+      terminal.write(`\n${renderSlashCommandHelp(result.commands)}`);
+      break;
+    case "instructions":
       terminal.write(
         `\n${renderInstructionSources(app)}` +
-          `Effective instructions:\n---\n${app.instructions.effective}\n---\n`,
+          `Effective instructions:\n---\n${result.instructions.effective}\n---\n`,
       );
-      return false;
-    case "/retry": {
-      if (arguments_.length > 0) {
-        terminal.write("\nUsage: /retry\n");
-        return false;
-      }
-      terminal.write("\nRetrying the latest failed run...\n");
-      const run = await app.retry();
-      await run.result;
-      return false;
-    }
-    case "/status": {
-      const inspection = await app.inspectContext();
-      terminal.write(`\n${renderStatus(app, inspection)}`);
-      return false;
-    }
-    case "/context": {
-      const inspection = await app.inspectContext();
+      break;
+    case "retry.started":
+      await result.run.result;
+      break;
+    case "status":
+      terminal.write(`\n${renderStatus(app, result.inspection)}`);
+      break;
+    case "context":
       terminal.write(
-        inspection === undefined
+        result.inspection === undefined
           ? "\nContext inspection is not supported by the active context.\n"
-          : `\n${renderContextInspection(inspection)}`,
+          : `\n${renderContextInspection(result.inspection)}`,
       );
-      return false;
-    }
-    case "/compact": {
-      const strategy = arguments_[0];
-      if (
-        arguments_.length > 1 ||
-        (strategy !== undefined &&
-          strategy !== "prune-old-tool-results" &&
-          strategy !== "summary-tail" &&
-          strategy !== "history-reference")
-      ) {
-        terminal.write(
-          "\nUsage: /compact [prune-old-tool-results|summary-tail|history-reference]\n",
-        );
-        return false;
-      }
-      if (strategy === "summary-tail") {
-        terminal.write("\nSummarizing older context...\n");
-      }
-      const result = await app.compactContext(strategy);
-      terminal.write(`\n${renderCompactionResult(result)}`);
-      return false;
-    }
-    case "/new": {
-      const id = await app.newSession();
-      terminal.write(`\nCreated session ${id}\n`);
-      return false;
-    }
-    case "/sessions": {
-      const sessions = await app.listSessions();
+      break;
+    case "compacted":
+      terminal.write(`\n${renderCompactionResult(result.result)}`);
+      break;
+    case "session.created":
+      terminal.write(`\nCreated session ${result.sessionId}\n`);
+      break;
+    case "sessions":
       terminal.write("\nSessions:\n");
-      for (const session of sessions) {
+      for (const session of result.sessions) {
         const marker = session.id === app.sessionId ? "*" : " ";
         terminal.write(
           `${marker} ${session.id}  ${new Date(session.lastUsedAt).toISOString()}\n`,
         );
       }
-      return false;
-    }
-    case "/resume": {
-      const id = arguments_[0];
-      if (id === undefined) {
-        terminal.write("\nUsage: /resume <session-id>\n");
-        return false;
-      }
-      await app.resumeSession(id);
-      terminal.write(`\nResumed session ${id}\n`);
-      return false;
-    }
-    default:
-      terminal.write(`\nUnknown command: ${command}. Type /help.\n`);
-      return false;
+      break;
+    case "session.resumed":
+      terminal.write(`\nResumed session ${result.sessionId}\n`);
+      break;
+    case "usage":
+      terminal.write(`\nUsage: ${result.usage}\n`);
+      break;
+    case "unknown":
+      terminal.write(`\nUnknown command: ${result.command}. Type /help.\n`);
+      break;
   }
+  return false;
 }
 
-async function readInput(question: UIQuestion): Promise<string> {
+function renderSlashCommandHelp(
+  commands: readonly MaybeCodeSlashCommand[],
+): string {
+  const entries = commands.map((command) => {
+    const aliases = command.aliases === undefined
+      ? ""
+      : ` (alias ${command.aliases.join(", ")})`;
+    return `  ${command.usage}${aliases}\n      ${command.description}`;
+  }).join("\n");
+  return `Commands:\n${entries}\n` +
+    "  Ctrl+C\n      Cancel the active operation, or exit while idle\n" +
+    "  Multiline\n      End a line with \\ to continue on the next line\n";
+}
+
+async function readInput(
+  question: UIQuestion,
+  suggestions: TerminalQuestionOptions["suggestions"],
+): Promise<string> {
   const lines: string[] = [];
   while (true) {
     const line = await question(lines.length === 0 ? "\n> " : "... ", {
       history: false,
+      ...(lines.length === 0 && suggestions !== undefined
+        ? { suggestions }
+        : {}),
     });
     const continuation = removeLineContinuation(line);
     lines.push(continuation.text);

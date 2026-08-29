@@ -10,6 +10,7 @@ export * from "./instructions.js";
 export * from "./model.js";
 export * from "./policy.js";
 export * from "./run.js";
+export * from "./slash-commands.js";
 export * from "./summarizer.js";
 export * from "./terminal.js";
 export * from "./tui.js";

@@ -34,6 +34,14 @@ implementation. `MaybeCodeTerminal` is only the low-level input/output adapter
 for the bundled `runTerminalUI`; implementing it changes terminal mechanics but
 does not replace the bundled UI's command or rendering policy.
 
+Custom UIs can reuse the bundled command policy without reusing the terminal
+renderer. `MAYBECODE_SLASH_COMMANDS` exposes command metadata,
+`createMaybeCodeSlashCommandSuggester(controller)` provides command, compaction
+strategy, and session suggestions, and
+`executeMaybeCodeSlashCommand(input, controller)` returns a structured result
+for the UI to render. Alternatively, a UI can call `MaybeCodeController`
+directly and define a completely different command system.
+
 ## Run
 
 Configure a built-in provider in `~/.may/config.json`, then run:
@@ -169,6 +177,13 @@ Programmatic callers can pass a `ContextFactory` to
 and may also return a `ContextController` for application-level inspection.
 
 ## Commands
+
+In an interactive terminal, suggestions are shown as the first input line is
+edited. For example, `/re` shows `/resume` and `/retry`; `/compact ` filters
+compaction strategies; and `/resume ` filters known session IDs. Suggestions
+are display-only in this first version—finish typing the command and press
+Enter. Approval prompts and multiline continuation lines do not show command
+suggestions.
 
 - `/new` creates a session.
 - `/sessions` lists sessions for the current workspace.

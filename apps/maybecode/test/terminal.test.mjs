@@ -6,16 +6,28 @@ import { createNodeTerminal } from "../dist/index.js";
 
 test("redraws an active prompt around asynchronous output", async () => {
   const { terminal, input, output } = createTestTerminal();
-  const answer = terminal.question("> ", { history: false });
+  const suggestionInputs = [];
+  const answer = terminal.question("> ", {
+    history: false,
+    suggestions(line) {
+      suggestionInputs.push(line);
+      return line.startsWith("/")
+        ? [{ value: "/retry", label: "/retry", description: "Retry" }]
+        : [];
+    },
+  });
   await tick();
-  input.write("draft");
+  input.write("/re");
+  await tick();
   await tick();
 
   terminal.write("status update\n");
   input.write("\r");
 
-  assert.equal(await answer, "draft");
-  assert.match(output(), /status update\n> draft/u);
+  assert.equal(await answer, "/re");
+  assert.ok(suggestionInputs.includes("/re"));
+  assert.match(output(), /\/retry  Retry/u);
+  assert.match(output(), /status update\n> \/re/u);
   terminal.close();
 });
 

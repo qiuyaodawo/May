@@ -61,6 +61,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     catalog: new InMemorySessionCatalog(),
     autoResume: false,
   });
+  const initialSessionId = app.sessionId;
 
   await runTerminalUI(app, { terminal });
 
@@ -107,6 +108,23 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     ).history,
     false,
   );
+  assert.equal(
+    terminal.questions.find((question) =>
+      question.prompt.includes("allow [s]ession")
+    ).suggestions,
+    undefined,
+  );
+  assert.deepEqual(
+    terminal.suggestionSamples.commands.map((suggestion) => suggestion.label),
+    ["/resume", "/retry"],
+  );
+  assert.deepEqual(
+    terminal.suggestionSamples.compaction.map((suggestion) => suggestion.label),
+    ["summary-tail"],
+  );
+  assert.ok(terminal.suggestionSamples.sessions.some((suggestion) =>
+    suggestion.label === initialSessionId
+  ));
   assert.equal(terminal.history.includes("s"), false);
 });
 
@@ -293,6 +311,7 @@ class FakeTerminal {
   prompts = [];
   questions = [];
   history = [];
+  suggestionSamples;
   closed = false;
   #answers;
   #interrupt;
@@ -301,9 +320,16 @@ class FakeTerminal {
     this.#answers = [...answers];
   }
 
-  async question(prompt, { signal, history } = {}) {
+  async question(prompt, { signal, history, suggestions } = {}) {
     this.prompts.push(prompt);
-    this.questions.push({ prompt, history });
+    this.questions.push({ prompt, history, suggestions });
+    if (suggestions !== undefined && this.suggestionSamples === undefined) {
+      this.suggestionSamples = {
+        commands: await suggestions("/re"),
+        compaction: await suggestions("/compact s"),
+        sessions: await suggestions("/resume session_"),
+      };
+    }
     if (signal?.aborted) throw abortError();
     if (prompt.includes("[a]llow once")) return "s";
     const answer = this.#answers.shift();
