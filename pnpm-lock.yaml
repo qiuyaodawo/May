@@ -20,12 +20,9 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@may/provider-deepseek':
+      '@may/providers':
         specifier: workspace:*
-        version: link:../../packages/providers/deepseek
-      '@may/provider-openai':
-        specifier: workspace:*
-        version: link:../../packages/providers/openai
+        version: link:../../packages/providers
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -48,12 +45,9 @@ importers:
       '@may/permissions':
         specifier: workspace:*
         version: link:../../packages/permissions
-      '@may/provider-deepseek':
+      '@may/providers':
         specifier: workspace:*
-        version: link:../../packages/providers/deepseek
-      '@may/provider-openai':
-        specifier: workspace:*
-        version: link:../../packages/providers/openai
+        version: link:../../packages/providers
       '@may/session':
         specifier: workspace:*
         version: link:../../packages/session
@@ -99,6 +93,34 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/providers:
+    dependencies:
+      '@may/config':
+        specifier: workspace:*
+        version: link:../config
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
+      '@may/provider-anthropic':
+        specifier: workspace:*
+        version: link:anthropic
+      '@may/provider-deepseek':
+        specifier: workspace:*
+        version: link:deepseek
+      '@may/provider-kimi':
+        specifier: workspace:*
+        version: link:kimi
+      '@may/provider-openai':
+        specifier: workspace:*
+        version: link:openai
+      '@may/provider-zhipu':
+        specifier: workspace:*
+        version: link:zhipu
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
 
   packages/providers/anthropic:
     dependencies:

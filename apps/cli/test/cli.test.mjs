@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { parseMayConfig } from "@may/config";
-import { DeepSeekModel } from "@may/provider-deepseek";
-import { OpenAIResponsesModel } from "@may/provider-openai";
+import { DeepSeekModel, OpenAIResponsesModel } from "@may/providers";
 import {
   createConfiguredModel,
   parseCliArgs,
@@ -226,7 +225,7 @@ test("creates configured provider models and validates CLI-specific options", ()
   }) instanceof OpenAIResponsesModel);
   assert.throws(
     () => createConfiguredModel({ ...base, provider: "another" }),
-    /currently supports deepseek and openai/,
+    /available providers: deepseek, zhipu, glm, kimi, anthropic, openai/,
   );
   assert.throws(
     () => createConfiguredModel({

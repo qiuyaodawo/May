@@ -12,7 +12,7 @@ packages/
   session/    Serialized runs and durable session history
   permissions/  Headless tool policies and approval requests
   config/     Optional application configuration loading and validation
-  providers/
+  providers/  `@may/providers` selection, registry, and built-in composition
     openai-compatible/  Shared Chat Completions protocol helpers
     deepseek/   DeepSeek streaming model adapter
     zhipu/      Zhipu GLM streaming model adapter

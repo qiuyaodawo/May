@@ -1,8 +1,8 @@
 # May CLI
 
-The first May composition application. It loads `@may/config`, creates a
-DeepSeek or OpenAI Responses model, runs `@may/core`, and streams the result to
-the terminal.
+The first May composition application. It loads `@may/config`, creates a model
+through `@may/providers`, runs `@may/core`, and streams the result to the
+terminal.
 The default config path is `~/.may/config.json`.
 
 ```bash
@@ -21,5 +21,6 @@ Selection order:
 4. Otherwise, a single configured provider is selected automatically.
 
 Reasoning deltas are written to stderr and answer text is written to stdout.
-The MVP supports DeepSeek and OpenAI Responses, and does not yet include tools, interactive
-sessions, or persistence.
+The built-in provider registry supports DeepSeek, Zhipu GLM (`zhipu` or
+`glm`), Kimi, Anthropic, and OpenAI Responses. The CLI does not yet include
+tools, interactive sessions, or persistence.

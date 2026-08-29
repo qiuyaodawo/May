@@ -6,6 +6,7 @@
     { "path": "./packages/permissions" },
     { "path": "./packages/session" },
     { "path": "./packages/config" },
+    { "path": "./packages/providers" },
     { "path": "./packages/providers/openai-compatible" },
     { "path": "./packages/providers/deepseek" },
     { "path": "./packages/providers/zhipu" },

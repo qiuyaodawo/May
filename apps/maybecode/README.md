@@ -5,7 +5,7 @@ session, permission, provider, configuration, and coding-tool packages.
 
 ## Run
 
-Configure DeepSeek or OpenAI in `~/.may/config.json`, then run:
+Configure a built-in provider in `~/.may/config.json`, then run:
 
 ```sh
 pnpm maybecode
@@ -23,8 +23,9 @@ pnpm maybecode /e/code/project
 pnpm maybecode 'E:\code\project'
 ```
 
-MaybeCode currently creates configured models for DeepSeek Chat Completions
-and OpenAI Responses. The lower-level provider adapters remain independently
+MaybeCode creates configured models through `@may/providers`. Its built-in
+registry supports DeepSeek, Zhipu GLM (`zhipu` or `glm`), Kimi, Anthropic, and
+OpenAI Responses. The lower-level provider adapters remain independently
 usable.
 
 Optional model limits let MaybeCode report context-window usage:

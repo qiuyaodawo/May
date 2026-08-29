@@ -64,3 +64,5 @@ validates that each entry is an object but leaves fields such as
 `apiKeyEnv` is resolved only when `resolveProviderConfig()` or
 `resolveModelProfile()` selects that provider. The package does not instantiate
 models, log configuration, or become a dependency of `@may/core`.
+`@may/providers` can consume the resolved selection and interpret the
+provider-specific options; custom applications may use a different registry.
