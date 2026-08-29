@@ -51,6 +51,9 @@ importers:
       '@may/session':
         specifier: workspace:*
         version: link:../../packages/session
+      '@may/session-tools':
+        specifier: workspace:*
+        version: link:../../packages/tools/session-tools
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -164,6 +167,19 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+
+  packages/tools/session-tools:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@may/session':
+        specifier: workspace:*
+        version: link:../../session
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

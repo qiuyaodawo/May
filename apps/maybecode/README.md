@@ -113,6 +113,8 @@ chain with `autoCompactionStrategies`, or pass an empty array to disable it.
 
 The `read` tool runs without approval. `bash`, `edit`, and `write` require an
 allow-once, allow-for-session, or deny decision. Bash is not a sandbox.
+The read-only `session_history` tool also runs without approval and returns
+bounded pages of durable events from only the active session.
 Allow-for-session grants currently last for the running MaybeCode process and
 are not restored after restart.
 

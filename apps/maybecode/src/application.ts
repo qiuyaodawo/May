@@ -31,6 +31,7 @@ import {
   type SessionRuntimeInfo,
   type SessionStore,
 } from "@may/session";
+import { createSessionHistoryTool } from "@may/session-tools";
 
 import type {
   MaybeCodeRun,
@@ -149,7 +150,20 @@ export class MaybeCodeApplication {
         return permissionPolicy(check);
       },
     });
-    const tools = [...(options.tools ?? createCodingTools({ cwd: workspace }))];
+    let historySource: Session | undefined;
+    const sessionHistoryTool = createSessionHistoryTool({
+      source: () => {
+        if (historySource === undefined) {
+          throw new Error("Session history is not available before session creation");
+        }
+        return historySource;
+      },
+    });
+    const configuredTools = options.tools ?? createCodingTools({ cwd: workspace });
+    if (configuredTools.some((tool) => tool.name === sessionHistoryTool.name)) {
+      throw new Error(`Tool name "${sessionHistoryTool.name}" is reserved by MaybeCode`);
+    }
+    const tools = [...configuredTools, sessionHistoryTool];
     const contextFactory = options.contextFactory ?? new InMemoryContextFactory();
     const contextBudget = withDefaultCompactionThreshold(
       options.contextBudget ?? contextBudgetFromModel(options.model),
@@ -205,6 +219,7 @@ export class MaybeCodeApplication {
               ? {}
               : { id: options.sessionId }),
           });
+      historySource = session;
       assertWorkspace(session, workspace);
       permissions.setEventSink((event) => session.recordPermissionEvent(event));
       application = new MaybeCodeApplication(

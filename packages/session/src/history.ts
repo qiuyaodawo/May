@@ -115,7 +115,7 @@ export class SessionHistoryReader {
   }
 }
 
-const SESSION_EVENT_TYPES: ReadonlySet<string> = new Set<SessionEventType>([
+export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "session.created",
   "input.submitted",
   "run.started",
@@ -129,10 +129,14 @@ const SESSION_EVENT_TYPES: ReadonlySet<string> = new Set<SessionEventType>([
   "run.completed",
   "run.failed",
   "run.cancelled",
-]);
+] as const;
+
+const SESSION_EVENT_TYPE_SET: ReadonlySet<string> = new Set(
+  SESSION_EVENT_TYPES,
+);
 
 function validateEventType(type: SessionEventType): void {
-  if (typeof type !== "string" || !SESSION_EVENT_TYPES.has(type)) {
+  if (typeof type !== "string" || !SESSION_EVENT_TYPE_SET.has(type)) {
     throw new TypeError(`Unknown session event type: ${String(type)}`);
   }
 }

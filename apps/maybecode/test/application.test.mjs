@@ -152,6 +152,57 @@ test("executes read, write, edit, and bash through the application", async (t) =
   assert.equal(completed[3].output.stdout, "verified");
 });
 
+test("exposes bounded active-session history as an approval-free tool", async () => {
+  let modelCall = 0;
+  let historyOutput;
+  const model = {
+    async *stream(request) {
+      modelCall += 1;
+      if (modelCall === 1) {
+        yield {
+          type: "response.completed",
+          message: {
+            role: "assistant",
+            content: [],
+            toolCalls: [{
+              id: "history_1",
+              name: "session_history",
+              input: { order: "desc", limit: 5 },
+            }],
+          },
+        };
+        return;
+      }
+      historyOutput = request.messages.find((message) =>
+        message.role === "tool" && message.name === "session_history"
+      )?.content[0]?.value;
+      yield {
+        type: "response.completed",
+        message: assistantMessage("history inspected"),
+      };
+    },
+  };
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model,
+    store: new (await import("@may/session")).InMemorySessionStore(),
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+  });
+
+  await (await app.submit({ input: "inspect this session" })).result;
+
+  assert.ok(Array.isArray(historyOutput.events));
+  assert.ok(historyOutput.events.some((event) =>
+    event.type === "input.submitted"
+  ));
+  assert.equal(
+    (await app.history()).some((event) => event.type === "approval.requested"),
+    false,
+  );
+  await app.close();
+});
+
 test("auto-resumes, lists, creates, and switches workspace sessions", async () => {
   const store = new (await import("@may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();

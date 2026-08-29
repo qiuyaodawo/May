@@ -9,7 +9,9 @@ export function createCodingPermissionPolicy(): PermissionPolicy {
 }
 
 function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
-  if (check.tool.name === "read") return "allow";
+  if (check.tool.name === "read" || check.tool.name === "session_history") {
+    return "allow";
+  }
 
   if (check.tool.name === "bash") {
     const command = stringField(check.input, "command");

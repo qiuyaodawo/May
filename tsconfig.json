@@ -12,6 +12,7 @@
     { "path": "./packages/providers/kimi" },
     { "path": "./packages/providers/anthropic" },
     { "path": "./packages/tools/coding-tools" },
+    { "path": "./packages/tools/session-tools" },
     { "path": "./apps/cli" },
     { "path": "./apps/maybecode" }
   ]
