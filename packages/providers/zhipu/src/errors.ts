@@ -11,15 +11,18 @@ export class ZhipuError extends Error {
 export class ZhipuApiError extends ZhipuError {
   readonly status: number;
   readonly providerCode: string | number | undefined;
+  readonly retryAfterMs: number | undefined;
 
   constructor(options: {
     status: number;
     message: string;
     providerCode?: string | number;
+    retryAfterMs?: number;
   }) {
     super("ZHIPU_API_ERROR", options.message);
     this.status = options.status;
     this.providerCode = options.providerCode;
+    this.retryAfterMs = options.retryAfterMs;
   }
 }
 

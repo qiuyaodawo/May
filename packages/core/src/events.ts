@@ -14,12 +14,20 @@ export interface RunResult {
 }
 
 export type MayEventPayload =
-  | { type: "run.started" }
+  | { type: "run.started"; continuation?: boolean }
   | { type: "step.started"; step: number }
   | { type: "step.completed"; step: number }
   | { type: "model.started"; step: number }
   | { type: "model.text.delta"; step: number; delta: string }
   | { type: "model.reasoning.delta"; step: number; delta: string }
+  | {
+      type: "model.retrying";
+      step: number;
+      attempt: number;
+      maxAttempts: number;
+      delayMs: number;
+      error: SerializedError;
+    }
   | {
       type: "model.completed";
       step: number;

@@ -12,7 +12,9 @@ import {
   ProviderConfigurationError,
   ProviderRegistry,
   ProviderRegistryError,
+  RetryingModel,
   selectProviderModel,
+  withModelRetry,
   ZhipuModel,
 } from "../dist/index.js";
 
@@ -20,6 +22,120 @@ const request = {
   messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
   tools: [],
 };
+
+function apiError(status, message = `status ${status}`) {
+  return Object.assign(new Error(message), { status });
+}
+
+test("retries transient model errors and exposes attempt events", async () => {
+  let attempts = 0;
+  const delays = [];
+  const wrapped = new RetryingModel({
+    limits: { contextWindowTokens: 1000 },
+    contextCompactor: { name: "native", async compact() { return { messages: [] }; } },
+    async *stream() {
+      attempts += 1;
+      if (attempts < 3) throw apiError(429, "busy");
+      yield { type: "text.delta", delta: "ok" };
+      yield { type: "response.completed", message: completedMessage("ok") };
+    },
+  }, {
+    maxAttempts: 3,
+    baseDelayMs: 10,
+    maxDelayMs: 100,
+    jitterRatio: 0,
+    sleep: async (delay) => delays.push(delay),
+  });
+
+  const events = await collect(wrapped.stream(request, {
+    signal: new AbortController().signal,
+  }));
+
+  assert.equal(attempts, 3);
+  assert.deepEqual(delays, [10, 20]);
+  assert.deepEqual(events.map((event) => event.type), [
+    "retrying",
+    "retrying",
+    "text.delta",
+    "response.completed",
+  ]);
+  assert.deepEqual(events.slice(0, 2).map((event) => ({
+    attempt: event.attempt,
+    maxAttempts: event.maxAttempts,
+    delayMs: event.delayMs,
+    message: event.error.message,
+  })), [
+    { attempt: 2, maxAttempts: 3, delayMs: 10, message: "busy" },
+    { attempt: 3, maxAttempts: 3, delayMs: 20, message: "busy" },
+  ]);
+  assert.deepEqual(wrapped.limits, { contextWindowTokens: 1000 });
+  assert.equal(wrapped.contextCompactor.name, "native");
+});
+
+test("does not retry permanent failures or failures after completion", async () => {
+  let permanentAttempts = 0;
+  const permanent = withModelRetry({
+    async *stream() {
+      permanentAttempts += 1;
+      throw apiError(401, "invalid key");
+    },
+  }, { baseDelayMs: 0 });
+  await assert.rejects(
+    collect(permanent.stream(request, { signal: new AbortController().signal })),
+    /invalid key/,
+  );
+  assert.equal(permanentAttempts, 1);
+
+  let completedAttempts = 0;
+  const completedThenFailed = withModelRetry({
+    async *stream() {
+      completedAttempts += 1;
+      yield { type: "response.completed", message: completedMessage("done") };
+      throw apiError(500, "late failure");
+    },
+  }, { baseDelayMs: 0 });
+  await assert.rejects(
+    collect(completedThenFailed.stream(request, {
+      signal: new AbortController().signal,
+    })),
+    /late failure/,
+  );
+  assert.equal(completedAttempts, 1);
+});
+
+test("uses retryAfterMs and cancels an active backoff", async () => {
+  const delays = [];
+  const hinted = withModelRetry({
+    async *stream() {
+      const error = apiError(503);
+      error.retryAfterMs = 1234;
+      throw error;
+    },
+  }, {
+    maxAttempts: 2,
+    maxDelayMs: 2000,
+    sleep: async (delay) => delays.push(delay),
+  });
+  await assert.rejects(
+    collect(hinted.stream(request, { signal: new AbortController().signal })),
+    /status 503/,
+  );
+  assert.deepEqual(delays, [1234]);
+
+  const controller = new AbortController();
+  const cancelling = withModelRetry({
+    async *stream() {
+      throw apiError(500);
+    },
+  }, { baseDelayMs: 60_000, maxDelayMs: 60_000, jitterRatio: 0 });
+  const iterator = cancelling.stream(request, { signal: controller.signal })
+    [Symbol.asyncIterator]();
+  assert.equal((await iterator.next()).value.type, "retrying");
+  controller.abort("cancel retry");
+  await assert.rejects(iterator.next(), (error) =>
+    error.name === "AbortError" && error.message === "cancel retry"
+  );
+});
 
 test("registers custom providers without using global state", () => {
   const firstModel = completedModel("first");
@@ -296,5 +412,12 @@ function completedModel(text) {
         },
       };
     },
+  };
+}
+
+function completedMessage(text) {
+  return {
+    role: "assistant",
+    content: [{ type: "text", text }],
   };
 }

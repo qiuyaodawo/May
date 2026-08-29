@@ -14,6 +14,10 @@ import type {
   ContextSummarizer,
 } from "@may/context";
 import type { Model } from "@may/core";
+import {
+  withModelRetry,
+  type RetryingModelOptions,
+} from "@may/providers";
 import { FileSessionStore } from "@may/session/file-store";
 
 import { FileSessionCatalog } from "./catalog.js";
@@ -44,6 +48,8 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly maxSteps?: number;
+  /** Disable retries with false, or override the configured retry policy. */
+  readonly retry?: false | RetryingModelOptions;
 }
 
 export interface ConfiguredMaybeCodeDependencies {
@@ -70,7 +76,9 @@ export async function openConfiguredMaybeCode(
     ...(options.provider === undefined ? {} : { provider: options.provider }),
     ...(options.model === undefined ? {} : { model: options.model }),
   });
-  const model = (dependencies.createModel ?? createMaybeCodeModel)(selection);
+  const baseModel = (dependencies.createModel ?? createMaybeCodeModel)(selection);
+  const retry = options.retry ?? resolveMaybeCodeRetry(config);
+  const model = retry === false ? baseModel : withModelRetry(baseModel, retry);
   const contextBudget = options.contextBudget ?? createContextBudget(
     model,
     selection,
@@ -141,6 +149,48 @@ export function resolveProviderNativeAutoCompaction(
   return providerNative;
 }
 
+export function resolveMaybeCodeRetry(
+  config: MayConfig,
+): false | RetryingModelOptions {
+  const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.retry;
+  if (value === undefined) return {};
+  if (value === false) return false;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new MaybeCodeConfigError(
+      "apps.maybecode.retry must be false or an object",
+    );
+  }
+
+  const retry = value as Record<string, unknown>;
+  const maxAttempts = optionalPositiveInteger(
+    retry.maxAttempts,
+    "apps.maybecode.retry.maxAttempts",
+  );
+  const baseDelayMs = optionalNonNegativeNumber(
+    retry.baseDelayMs,
+    "apps.maybecode.retry.baseDelayMs",
+  );
+  const maxDelayMs = optionalNonNegativeNumber(
+    retry.maxDelayMs,
+    "apps.maybecode.retry.maxDelayMs",
+  );
+  const jitterRatio = optionalRatio(
+    retry.jitterRatio,
+    "apps.maybecode.retry.jitterRatio",
+  );
+  if ((baseDelayMs ?? 500) > (maxDelayMs ?? 8_000)) {
+    throw new MaybeCodeConfigError(
+      "apps.maybecode.retry.baseDelayMs cannot exceed maxDelayMs",
+    );
+  }
+  return {
+    ...(maxAttempts === undefined ? {} : { maxAttempts }),
+    ...(baseDelayMs === undefined ? {} : { baseDelayMs }),
+    ...(maxDelayMs === undefined ? {} : { maxDelayMs }),
+    ...(jitterRatio === undefined ? {} : { jitterRatio }),
+  };
+}
+
 function createContextBudget(
   model: Model,
   selection: SelectedMaybeCodeModel,
@@ -172,4 +222,34 @@ async function resolveWorkspace(workspace: string): Promise<string> {
     throw new Error(`Workspace is not a directory: ${workspace}`);
   }
   return path;
+}
+
+function optionalPositiveInteger(
+  value: unknown,
+  field: string,
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isSafeInteger(value) || (value as number) < 1) {
+    throw new MaybeCodeConfigError(`${field} must be a positive safe integer`);
+  }
+  return value as number;
+}
+
+function optionalNonNegativeNumber(
+  value: unknown,
+  field: string,
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new MaybeCodeConfigError(`${field} must be a non-negative number`);
+  }
+  return value;
+}
+
+function optionalRatio(value: unknown, field: string): number | undefined {
+  const number = optionalNonNegativeNumber(value, field);
+  if (number !== undefined && number > 1) {
+    throw new MaybeCodeConfigError(`${field} must be between 0 and 1`);
+  }
+  return number;
 }

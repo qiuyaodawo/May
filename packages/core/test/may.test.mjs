@@ -143,6 +143,74 @@ test("forwards reasoning deltas and preserves reasoning content", async () => {
   assert.deepEqual((await context.snapshot()).messages.at(-1), response);
 });
 
+test("forwards model retry events with run and step metadata", async () => {
+  const model = {
+    async *stream() {
+      yield {
+        type: "retrying",
+        attempt: 2,
+        maxAttempts: 3,
+        delayMs: 250,
+        error: { name: "Error", message: "temporarily unavailable" },
+      };
+      yield {
+        type: "response.completed",
+        message: assistant("recovered"),
+      };
+    },
+  };
+  const run = new May({ model, context: new InMemoryContext() }).run({
+    input: "retry",
+  });
+  const eventPromise = collect(run.events);
+  await run.result;
+  const retry = (await eventPromise).find((event) =>
+    event.type === "model.retrying"
+  );
+
+  assert.deepEqual(retry, {
+    type: "model.retrying",
+    runId: run.id,
+    seq: 4,
+    timestamp: retry.timestamp,
+    step: 1,
+    attempt: 2,
+    maxAttempts: 3,
+    delayMs: 250,
+    error: { name: "Error", message: "temporarily unavailable" },
+  });
+});
+
+test("continues existing context without appending a new user message", async () => {
+  let request;
+  const model = {
+    async *stream(value) {
+      request = value;
+      yield {
+        type: "response.completed",
+        message: assistant("continued"),
+      };
+    },
+  };
+  const original = {
+    role: "user",
+    content: [{ type: "text", text: "original" }],
+  };
+  const context = new InMemoryContext({ messages: [original] });
+  const run = new May({ model, context }).continue();
+  const eventPromise = collect(run.events);
+
+  await run.result;
+  const events = await eventPromise;
+
+  assert.deepEqual(request.messages, [original]);
+  assert.equal(events[0].type, "run.started");
+  assert.equal(events[0].continuation, true);
+  assert.deepEqual((await context.snapshot()).messages.map((message) =>
+    message.role
+  ), ["user", "assistant"]);
+});
+
 test("rejects invalid maxSteps and duplicate tool names at construction", () => {
   const model = { async *stream() {} };
   const context = new InMemoryContext();

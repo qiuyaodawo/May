@@ -204,11 +204,21 @@ async function createApiError(response: Response): Promise<OpenAIResponsesError>
   } catch {
     // Preserve the HTTP response text when the body is not structured JSON.
   }
+  const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
   return new OpenAIResponsesError(message, {
     status: response.status,
     ...(providerType === undefined ? {} : { providerType }),
     ...(requestId === undefined ? {} : { requestId }),
+    ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
   });
+}
+
+function parseRetryAfterMs(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - Date.now()) : undefined;
 }
 
 function requireRecord(value: unknown, field: string): Record<string, unknown> {

@@ -22,6 +22,7 @@ import {
   serializeError,
   type Message,
   type Model,
+  type RunHandle,
   type RunOptions,
   type Tool,
 } from "@may/core";
@@ -32,6 +33,7 @@ import {
 } from "@may/permissions";
 import {
   Session,
+  type SessionEvent,
   type SessionRuntimeInfo,
   type SessionStore,
 } from "@may/session";
@@ -287,6 +289,22 @@ export class MaybeCodeApplication {
   }
 
   async submit(options: RunOptions): Promise<MaybeCodeRun> {
+    return this.startRun(() => this.session.submit(options));
+  }
+
+  /** Retry the latest failed run without adding another user message. */
+  async retry(): Promise<MaybeCodeRun> {
+    return this.startRun(async () => {
+      if (!latestRunFailed(await this.session.history())) {
+        throw new Error("The latest run did not fail; there is nothing to retry");
+      }
+      return this.session.continue();
+    });
+  }
+
+  private async startRun(
+    start: () => Promise<RunHandle>,
+  ): Promise<MaybeCodeRun> {
     this.throwIfClosed();
     if (this.isRunning) {
       throw new Error("A MaybeCode operation is already active");
@@ -294,7 +312,7 @@ export class MaybeCodeApplication {
 
     this.starting = true;
     try {
-      const run = await this.session.submit(options);
+      const run = await start();
       const relay = this.relayRunEvents(run.events);
       this.runRelays.add(relay);
       void relay.finally(() => this.runRelays.delete(relay));
@@ -508,6 +526,17 @@ function assertWorkspace(session: Session, workspace: string): void {
 function normalizePath(path: string): string {
   const normalized = resolve(path);
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+
+function latestRunFailed(history: readonly SessionEvent[]): boolean {
+  for (let index = history.length - 1; index >= 0; index--) {
+    const event = history[index]!;
+    if (event.type === "run.failed") return true;
+    if (event.type === "run.completed" || event.type === "run.cancelled") {
+      return false;
+    }
+  }
+  return false;
 }
 
 function contextBudgetFromModel(model: Model): ContextBudget | undefined {

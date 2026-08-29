@@ -159,5 +159,15 @@ async function createApiError(response: Response): Promise<AnthropicApiError> {
   };
   if (providerType !== undefined) options.providerType = providerType;
   if (requestId !== undefined) options.requestId = requestId;
+  const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+  if (retryAfterMs !== undefined) options.retryAfterMs = retryAfterMs;
   return new AnthropicApiError(options);
+}
+
+function parseRetryAfterMs(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - Date.now()) : undefined;
 }

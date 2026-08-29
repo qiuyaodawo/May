@@ -3,6 +3,7 @@ import {
   type May,
   type MayEvent,
   type Message,
+  type ContinueOptions,
   type RunHandle,
   type RunOptions,
   type UserMessage,
@@ -134,6 +135,16 @@ export class Session {
 
   submit(options: RunOptions): Promise<RunHandle> {
     const started = this.tail.then(() => this.start(options));
+    return this.queue(started);
+  }
+
+  /** Continue the current context without recording a new user input. */
+  continue(options: ContinueOptions = {}): Promise<RunHandle> {
+    const started = this.tail.then(() => this.startContinuation(options));
+    return this.queue(started);
+  }
+
+  private queue(started: Promise<RunHandle>): Promise<RunHandle> {
     this.tail = started
       .then((run) => run.result)
       .then(
@@ -201,7 +212,14 @@ export class Session {
       : options.input;
     await this.record({ type: "input.submitted", message: input });
 
-    const run = this.runtime.run(options);
+    return this.wrapRun(this.runtime.run(options));
+  }
+
+  private startContinuation(options: ContinueOptions): RunHandle {
+    return this.wrapRun(this.runtime.continue(options));
+  }
+
+  private wrapRun(run: RunHandle): RunHandle {
     const events = new AsyncEventQueue<MayEvent>();
     const observation = this.observeRun(run, events);
     const result = (async () => {
@@ -434,7 +452,9 @@ function toPermissionSessionEvent(
 function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
   switch (event.type) {
     case "run.started":
-      return { type: "run.started", runId: event.runId };
+      return event.continuation === true
+        ? { type: "run.started", runId: event.runId, continuation: true }
+        : { type: "run.started", runId: event.runId };
     case "model.completed":
       return event.usage === undefined
         ? {

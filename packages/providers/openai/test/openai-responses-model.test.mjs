@@ -302,7 +302,7 @@ test("surfaces HTTP and malformed-stream failures", async () => {
       error: { message: "rate limited", type: "rate_limit_error" },
     }), {
       status: 429,
-      headers: { "x-request-id": "req_123" },
+      headers: { "x-request-id": "req_123", "retry-after": "2" },
     }),
   });
   await assert.rejects(
@@ -314,6 +314,7 @@ test("surfaces HTTP and malformed-stream failures", async () => {
       assert.equal(error.status, 429);
       assert.equal(error.providerType, "rate_limit_error");
       assert.equal(error.requestId, "req_123");
+      assert.equal(error.retryAfterMs, 2000);
       return true;
     },
   );

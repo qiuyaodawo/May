@@ -142,5 +142,15 @@ async function createApiError(response: Response): Promise<DeepSeekApiError> {
   };
   if (providerType !== undefined) errorOptions.providerType = providerType;
   if (providerCode !== undefined) errorOptions.providerCode = providerCode;
+  const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+  if (retryAfterMs !== undefined) errorOptions.retryAfterMs = retryAfterMs;
   return new DeepSeekApiError(errorOptions);
+}
+
+function parseRetryAfterMs(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - Date.now()) : undefined;
 }

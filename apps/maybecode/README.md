@@ -55,6 +55,31 @@ Optional model limits let MaybeCode report context-window usage:
 }
 ```
 
+MaybeCode retries transient model requests up to three total attempts by
+default. Retries apply to one model request rather than the whole agent run, so
+tools completed in earlier steps are not replayed. Configure the backoff under
+`apps.maybecode.retry`, or set it to `false` to disable automatic retries:
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "retry": {
+        "maxAttempts": 3,
+        "baseDelayMs": 500,
+        "maxDelayMs": 8000,
+        "jitterRatio": 0.2
+      }
+    }
+  }
+}
+```
+
+HTTP 408, 409, 429, server failures, common network failures, and provider
+overload events are retried. Authentication, request-validation, protocol, and
+cancellation failures are not. Provider `Retry-After` hints are respected up
+to `maxDelayMs`.
+
 OpenAI compaction is opt-in. `serverCompactThreshold` enables provider-side
 context management on normal Responses requests, while
 `apps.maybecode.autoCompaction.providerNative` lets MaybeCode call the model's
@@ -117,6 +142,8 @@ and may also return a `ContextController` for application-level inspection.
 - `/new` creates a session.
 - `/sessions` lists sessions for the current workspace.
 - `/resume <id>` switches sessions.
+- `/retry` continues the latest failed run without adding another user message
+  or replaying already completed tools.
 - `/instructions` shows active instruction sources and content.
 - `/status` shows the active provider/model, session, workspace, and compact
   context usage.

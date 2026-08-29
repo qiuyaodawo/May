@@ -42,6 +42,10 @@ export interface RunOptions {
   signal?: AbortSignal;
 }
 
+export interface ContinueOptions {
+  signal?: AbortSignal;
+}
+
 export interface RunHandle {
   readonly id: string;
   readonly events: AsyncIterable<MayEvent>;
@@ -84,16 +88,31 @@ export class May {
   }
 
   run(options: RunOptions): RunHandle {
+    const input = typeof options.input === "string"
+      ? userMessage(options.input)
+      : options.input;
+    return this.start(input, options.signal);
+  }
+
+  /** Continue from the existing context without appending a user message. */
+  continue(options: ContinueOptions = {}): RunHandle {
+    return this.start(undefined, options.signal);
+  }
+
+  private start(
+    input: UserMessage | undefined,
+    externalSignal: AbortSignal | undefined,
+  ): RunHandle {
     const runId = createRunId();
     const events = new AsyncEventQueue<MayEvent>();
     const controller = new AbortController();
     let seq = 0;
 
-    const onExternalAbort = () => controller.abort(options.signal?.reason);
-    if (options.signal?.aborted) {
+    const onExternalAbort = () => controller.abort(externalSignal?.reason);
+    if (externalSignal?.aborted) {
       onExternalAbort();
     } else {
-      options.signal?.addEventListener("abort", onExternalAbort, { once: true });
+      externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
     }
 
     const emit = (payload: MayEventPayload): void => {
@@ -105,13 +124,9 @@ export class May {
       });
     };
 
-    const input = typeof options.input === "string"
-      ? userMessage(options.input)
-      : options.input;
-
     const result = this.execute(runId, input, controller.signal, emit)
       .finally(() => {
-        options.signal?.removeEventListener("abort", onExternalAbort);
+        externalSignal?.removeEventListener("abort", onExternalAbort);
         events.close();
       });
 
@@ -128,14 +143,16 @@ export class May {
 
   private async execute(
     runId: string,
-    input: UserMessage,
+    input: UserMessage | undefined,
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
   ): Promise<RunResult> {
     try {
-      emit({ type: "run.started" });
+      emit(input === undefined
+        ? { type: "run.started", continuation: true }
+        : { type: "run.started" });
       throwIfAborted(signal);
-      await this.context.append([input], { runId });
+      if (input !== undefined) await this.context.append([input], { runId });
 
       for (let step = 1; step <= this.maxSteps; step++) {
         throwIfAborted(signal);
@@ -257,6 +274,18 @@ export class May {
 
       if (event.type === "reasoning.delta") {
         emit({ type: "model.reasoning.delta", step, delta: event.delta });
+        continue;
+      }
+
+      if (event.type === "retrying") {
+        emit({
+          type: "model.retrying",
+          step,
+          attempt: event.attempt,
+          maxAttempts: event.maxAttempts,
+          delayMs: event.delayMs,
+          error: event.error,
+        });
         continue;
       }
 

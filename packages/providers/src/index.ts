@@ -1,6 +1,7 @@
 export * from "./builtins.js";
 export * from "./errors.js";
 export * from "./registry.js";
+export * from "./retrying-model.js";
 export * from "./selection.js";
 export * from "./types.js";
 

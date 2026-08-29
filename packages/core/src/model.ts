@@ -5,6 +5,7 @@ import type {
   Usage,
 } from "./types.js";
 import type { ContextSnapshot } from "./context.js";
+import type { SerializedError } from "./events.js";
 
 export interface ToolDefinition {
   name: string;
@@ -40,6 +41,16 @@ export interface ModelContextCompactor {
 export type ModelEvent =
   | { type: "text.delta"; delta: string }
   | { type: "reasoning.delta"; delta: string }
+  | {
+      /** A model wrapper is waiting before another attempt of this request. */
+      type: "retrying";
+      /** The attempt that will start after the delay (one-based). */
+      attempt: number;
+      /** Total number of attempts allowed for this request. */
+      maxAttempts: number;
+      delayMs: number;
+      error: SerializedError;
+    }
   | {
       type: "response.completed";
       message: AssistantMessage;

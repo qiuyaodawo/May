@@ -12,17 +12,20 @@ export class DeepSeekApiError extends DeepSeekError {
   readonly status: number;
   readonly providerType: string | undefined;
   readonly providerCode: string | undefined;
+  readonly retryAfterMs: number | undefined;
 
   constructor(options: {
     status: number;
     message: string;
     providerType?: string;
     providerCode?: string;
+    retryAfterMs?: number;
   }) {
     super("DEEPSEEK_API_ERROR", options.message);
     this.status = options.status;
     this.providerType = options.providerType;
     this.providerCode = options.providerCode;
+    this.retryAfterMs = options.retryAfterMs;
   }
 }
 

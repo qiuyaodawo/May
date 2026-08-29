@@ -11,15 +11,18 @@ export class KimiError extends Error {
 export class KimiApiError extends KimiError {
   readonly status: number;
   readonly providerType: string | undefined;
+  readonly retryAfterMs: number | undefined;
 
   constructor(options: {
     status: number;
     message: string;
     providerType?: string;
+    retryAfterMs?: number;
   }) {
     super("KIMI_API_ERROR", options.message);
     this.status = options.status;
     this.providerType = options.providerType;
+    this.retryAfterMs = options.retryAfterMs;
   }
 }
 

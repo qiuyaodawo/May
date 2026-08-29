@@ -95,6 +95,138 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
   );
 });
 
+test("retries a failed run without resubmitting input or replaying tools", async () => {
+  let modelCalls = 0;
+  let toolExecutions = 0;
+  let retryRequest;
+  const model = {
+    async *stream(request) {
+      modelCalls += 1;
+      if (modelCalls === 1) {
+        yield {
+          type: "response.completed",
+          message: {
+            role: "assistant",
+            content: [],
+            toolCalls: [{ id: "effect_1", name: "side_effect", input: {} }],
+          },
+        };
+        return;
+      }
+      if (modelCalls === 2) throw new Error("model disconnected");
+      retryRequest = request;
+      yield {
+        type: "response.completed",
+        message: assistantMessage("recovered"),
+      };
+    },
+  };
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model,
+    tools: [{
+      name: "side_effect",
+      description: "Count one side effect",
+      inputSchema: { type: "object" },
+      async execute() {
+        toolExecutions += 1;
+        return { count: toolExecutions };
+      },
+    }],
+    permissionPolicy: () => "allow",
+    store: new (await import("@may/session")).InMemorySessionStore(),
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+  });
+
+  await assert.rejects(
+    (await app.submit({ input: "perform it once" })).result,
+    /model disconnected/,
+  );
+  assert.equal(toolExecutions, 1);
+
+  const retried = await app.retry();
+  assert.equal((await retried.result).message.content[0].text, "recovered");
+  assert.equal(modelCalls, 3);
+  assert.equal(toolExecutions, 1);
+  assert.equal(
+    retryRequest.messages.filter((message) => message.role === "user").length,
+    1,
+  );
+  assert.equal(
+    retryRequest.messages.filter((message) => message.role === "tool").length,
+    1,
+  );
+
+  const history = await app.history();
+  assert.equal(
+    history.filter((event) => event.type === "input.submitted").length,
+    1,
+  );
+  assert.deepEqual(
+    history.filter((event) => event.type === "run.started").map((event) =>
+      event.continuation === true
+    ),
+    [false, true],
+  );
+  await assert.rejects(app.retry(), /nothing to retry/);
+  await app.close();
+});
+
+test("retries a failed run after resuming its durable session", async (t) => {
+  const workspace = await temporaryDirectory(t);
+  const store = new FileSessionStore(join(workspace, ".sessions"));
+  const catalog = new InMemorySessionCatalog();
+  const first = await MaybeCodeWorkspace.open({
+    workspace,
+    model: {
+      async *stream() {
+        throw new Error("provider offline");
+      },
+    },
+    store,
+    catalog,
+    autoResume: false,
+  });
+  const sessionId = first.sessionId;
+  await assert.rejects(
+    (await first.submit({ input: "keep this request" })).result,
+    /provider offline/,
+  );
+  await first.close();
+
+  let request;
+  const resumed = await MaybeCodeWorkspace.open({
+    workspace,
+    model: {
+      async *stream(value) {
+        request = value;
+        yield {
+          type: "response.completed",
+          message: assistantMessage("resumed and recovered"),
+        };
+      },
+    },
+    store,
+    catalog,
+  });
+  assert.equal(resumed.sessionId, sessionId);
+  await (await resumed.retry()).result;
+  assert.equal(
+    request.messages.filter((message) => message.role === "user").length,
+    1,
+  );
+  assert.equal(request.messages.find((message) => message.role === "user")
+    .content[0].text, "keep this request");
+  assert.equal(
+    (await resumed.history()).filter((event) =>
+      event.type === "input.submitted"
+    ).length,
+    1,
+  );
+  await resumed.close();
+});
+
 test("executes read, write, edit, and bash through the application", async (t) => {
   const workspace = await temporaryDirectory(t);
   await writeFile(join(workspace, "source.txt"), "source", "utf8");

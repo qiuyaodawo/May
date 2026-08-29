@@ -12,17 +12,20 @@ export class AnthropicApiError extends AnthropicError {
   readonly status: number;
   readonly providerType: string | undefined;
   readonly requestId: string | undefined;
+  readonly retryAfterMs: number | undefined;
 
   constructor(options: {
     status: number;
     message: string;
     providerType?: string;
     requestId?: string;
+    retryAfterMs?: number;
   }) {
     super("ANTHROPIC_API_ERROR", options.message);
     this.status = options.status;
     this.providerType = options.providerType;
     this.requestId = options.requestId;
+    this.retryAfterMs = options.retryAfterMs;
   }
 }
 

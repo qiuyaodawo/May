@@ -383,6 +383,50 @@ test("records failures and starts the next queued submission", async () => {
   );
 });
 
+test("continues a failed run without recording another user input", async () => {
+  let modelCalls = 0;
+  let continuedRequest;
+  const runtime = new May({
+    context: new InMemoryContext(),
+    model: {
+      async *stream(request) {
+        modelCalls += 1;
+        if (modelCalls === 1) throw new Error("temporary failure");
+        continuedRequest = request;
+        yield {
+          type: "response.completed",
+          message: assistantMessage("recovered"),
+        };
+      },
+    },
+  });
+  const session = await Session.create({ runtime });
+
+  await assert.rejects(
+    (await session.submit({ input: "original input" })).result,
+    /temporary failure/,
+  );
+  const retried = await session.continue();
+  await retried.result;
+
+  assert.equal(modelCalls, 2);
+  assert.deepEqual(continuedRequest.messages.map((message) => message.role), [
+    "user",
+  ]);
+  const history = await session.history();
+  assert.equal(
+    history.filter((event) => event.type === "input.submitted").length,
+    1,
+  );
+  assert.deepEqual(
+    history.filter((event) => event.type === "run.started").map((event) =>
+      event.continuation === true
+    ),
+    [false, true],
+  );
+  assert.equal(history.at(-1).type, "run.completed");
+});
+
 test("preserves cancellation and records its reason", async () => {
   const modelStarted = deferred();
   const model = {

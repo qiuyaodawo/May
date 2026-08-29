@@ -108,6 +108,12 @@ export class MaybeCodeWorkspace {
     return this.application.submit(options);
   }
 
+  async retry(): Promise<MaybeCodeRun> {
+    this.throwIfClosed();
+    await this.recordCurrentSession();
+    return this.application.retry();
+  }
+
   cancel(reason?: string): boolean {
     return this.application.cancel(reason);
   }

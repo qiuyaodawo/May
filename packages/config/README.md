@@ -36,6 +36,12 @@ Optional configuration loading and validation for May applications.
       "instructionsDirectory": "instructions/maybecode",
       "autoCompaction": {
         "providerNative": false
+      },
+      "retry": {
+        "maxAttempts": 3,
+        "baseDelayMs": 500,
+        "maxDelayMs": 8000,
+        "jitterRatio": 0.2
       }
     }
   }
@@ -62,7 +68,8 @@ They can be set on a provider or overridden by a model profile.
 
 `apps` is an optional map of application-owned configuration. This package
 validates that each entry is an object but leaves fields such as
-`instructionsDirectory` and `autoCompaction` for the application to interpret.
+`instructionsDirectory`, `autoCompaction`, and `retry` for the application to
+interpret.
 
 `apiKeyEnv` is resolved only when `resolveProviderConfig()` or
 `resolveModelProfile()` selects that provider. The package does not instantiate

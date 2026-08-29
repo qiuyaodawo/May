@@ -381,7 +381,10 @@ test("surfaces structured DeepSeek HTTP errors", async () => {
     },
   }), {
     status: 401,
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "retry-after": "1.5",
+    },
   });
   const model = new DeepSeekModel({
     apiKey: "bad",
@@ -400,6 +403,7 @@ test("surfaces structured DeepSeek HTTP errors", async () => {
       assert.equal(error.message, "Authentication failed");
       assert.equal(error.providerType, "authentication_error");
       assert.equal(error.providerCode, "invalid_api_key");
+      assert.equal(error.retryAfterMs, 1500);
       return true;
     },
   );

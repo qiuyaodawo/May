@@ -10,6 +10,7 @@ import {
   createMaybeCodeModel,
   openConfiguredMaybeCode,
   parseMaybeCodeArgs,
+  resolveMaybeCodeRetry,
   selectMaybeCodeModel,
 } from "../dist/index.js";
 
@@ -243,6 +244,93 @@ test("validates provider-native automatic compaction configuration", async (t) =
     }),
     /apps\.maybecode\.autoCompaction must be an object/,
   );
+});
+
+test("resolves and validates MaybeCode model retry configuration", () => {
+  const base = { path: "config.json", providers: {}, models: {} };
+  assert.deepEqual(resolveMaybeCodeRetry(base), {});
+  assert.equal(resolveMaybeCodeRetry({
+    ...base,
+    apps: { maybecode: { retry: false } },
+  }), false);
+  assert.deepEqual(resolveMaybeCodeRetry({
+    ...base,
+    apps: {
+      maybecode: {
+        retry: {
+          maxAttempts: 4,
+          baseDelayMs: 100,
+          maxDelayMs: 2000,
+          jitterRatio: 0.1,
+        },
+      },
+    },
+  }), {
+    maxAttempts: 4,
+    baseDelayMs: 100,
+    maxDelayMs: 2000,
+    jitterRatio: 0.1,
+  });
+  assert.throws(() => resolveMaybeCodeRetry({
+    ...base,
+    apps: { maybecode: { retry: { maxAttempts: 0 } } },
+  }), /maxAttempts must be a positive safe integer/u);
+  assert.throws(() => resolveMaybeCodeRetry({
+    ...base,
+    apps: { maybecode: { retry: { baseDelayMs: 9000 } } },
+  }), /baseDelayMs cannot exceed maxDelayMs/u);
+});
+
+test("configured MaybeCode automatically retries transient model failures", async (t) => {
+  const directory = await temporaryDirectory(t);
+  let attempts = 0;
+  const app = await openConfiguredMaybeCode(
+    {
+      workspace: directory,
+      dataDirectory: join(directory, "data"),
+      autoResume: false,
+    },
+    {
+      async loadConfig() {
+        return {
+          path: join(directory, "config.json"),
+          providers: { deepseek: { apiKey: "test", model: "deepseek-chat" } },
+          models: {},
+          apps: {
+            maybecode: {
+              retry: {
+                maxAttempts: 2,
+                baseDelayMs: 0,
+                maxDelayMs: 0,
+                jitterRatio: 0,
+              },
+            },
+          },
+        };
+      },
+      createModel() {
+        return {
+          async *stream() {
+            attempts += 1;
+            if (attempts === 1) {
+              throw Object.assign(new Error("service unavailable"), {
+                status: 503,
+              });
+            }
+            yield {
+              type: "response.completed",
+              message: assistantMessage("recovered"),
+            };
+          },
+        };
+      },
+    },
+  );
+
+  const result = await (await app.submit({ input: "hello" })).result;
+  assert.equal(result.message.content[0].text, "recovered");
+  assert.equal(attempts, 2);
+  await app.close();
 });
 
 test(

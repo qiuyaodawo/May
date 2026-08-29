@@ -231,6 +231,45 @@ test("terminal UI accepts multiline input and renders status", async () => {
   assert.match(terminal.output, /Multiline\s+End a line with \\ to continue/u);
 });
 
+test("terminal UI retries the latest failed run without duplicating input", async () => {
+  let modelCalls = 0;
+  const terminal = new FakeTerminal(["do work", "/retry", "/quit"]);
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model: {
+      async *stream() {
+        modelCalls += 1;
+        if (modelCalls === 1) throw new Error("temporary outage");
+        yield {
+          type: "retrying",
+          attempt: 2,
+          maxAttempts: 3,
+          delayMs: 500,
+          error: { name: "Error", message: "rate limited" },
+        };
+        yield {
+          type: "response.completed",
+          message: assistantMessage("recovered"),
+        };
+      },
+    },
+    store: new InMemorySessionStore(),
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+  });
+
+  await runTerminalUI(app, { terminal });
+
+  assert.equal(modelCalls, 2);
+  assert.match(terminal.output, /Run failed: temporary outage/u);
+  assert.match(terminal.output, /Retrying the latest failed run/u);
+  assert.match(
+    terminal.output,
+    /Model request failed: rate limited\. Retrying in 500ms \(attempt 2\/3\)/u,
+  );
+  assert.match(terminal.output, /MaybeCode: recovered/u);
+});
+
 test("CLI returns usage errors without opening an application", async () => {
   const terminal = new FakeTerminal([]);
   let opened = false;

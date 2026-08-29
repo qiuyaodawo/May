@@ -56,7 +56,7 @@ export type RecordablePermissionEvent = (
 export type SessionEventPayload =
   | { type: "session.created"; metadata?: Record<string, unknown> }
   | { type: "input.submitted"; message: UserMessage }
-  | { type: "run.started"; runId: string }
+  | { type: "run.started"; runId: string; continuation?: boolean }
   | {
       type: "context.compacted";
       strategy: string;

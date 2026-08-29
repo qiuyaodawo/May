@@ -2,6 +2,7 @@ export class OpenAIResponsesError extends Error {
   readonly status: number | undefined;
   readonly providerType: string | undefined;
   readonly requestId: string | undefined;
+  readonly retryAfterMs: number | undefined;
 
   constructor(
     message: string,
@@ -9,6 +10,7 @@ export class OpenAIResponsesError extends Error {
       status?: number;
       providerType?: string;
       requestId?: string;
+      retryAfterMs?: number;
       cause?: unknown;
     } = {},
   ) {
@@ -17,6 +19,7 @@ export class OpenAIResponsesError extends Error {
     this.status = options.status;
     this.providerType = options.providerType;
     this.requestId = options.requestId;
+    this.retryAfterMs = options.retryAfterMs;
   }
 }
 

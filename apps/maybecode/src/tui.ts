@@ -16,6 +16,7 @@ const HELP = `Commands:
   /new             Start a new session
   /sessions        List sessions for this workspace
   /resume <id>     Switch to another session
+  /retry           Continue the latest failed run without resubmitting input
   /instructions    Show active instruction sources and content
   /status          Show the active model, session, workspace, and context usage
   /context         Show current context usage estimate
@@ -211,6 +212,16 @@ async function handleCommand(
           `Effective instructions:\n---\n${app.instructions.effective}\n---\n`,
       );
       return false;
+    case "/retry": {
+      if (arguments_.length > 0) {
+        terminal.write("\nUsage: /retry\n");
+        return false;
+      }
+      terminal.write("\nRetrying the latest failed run...\n");
+      const run = await app.retry();
+      await run.result;
+      return false;
+    }
     case "/status": {
       const inspection = await app.inspectContext();
       terminal.write(`\n${renderStatus(app, inspection)}`);
@@ -333,6 +344,17 @@ class TerminalRenderer {
           this.textStarted = true;
         }
         this.terminal.write(event.delta);
+        break;
+      case "model.retrying":
+        this.endReasoning();
+        if (this.textStarted) this.terminal.write("\n");
+        this.terminal.write(
+          `\nModel request failed: ${event.error.message}. ` +
+            `Retrying in ${formatDelay(event.delayMs)} ` +
+            `(attempt ${event.attempt}/${event.maxAttempts})...\n`,
+        );
+        this.textStarted = false;
+        this.reasoningStarted = false;
         break;
       case "model.completed": {
         this.endReasoning();
@@ -659,6 +681,12 @@ function renderCompactionResult(
 
 function formatNumber(value: number): string {
   return value.toLocaleString("en-US");
+}
+
+function formatDelay(milliseconds: number): string {
+  return milliseconds < 1000
+    ? `${milliseconds}ms`
+    : `${(milliseconds / 1000).toFixed(milliseconds % 1000 === 0 ? 0 : 1)}s`;
 }
 
 function formatBytes(bytes: number): string {
