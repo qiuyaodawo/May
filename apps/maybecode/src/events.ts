@@ -1,4 +1,4 @@
-import type { MayEvent, RunResult } from "@may/core";
+import type { MayEvent, RunResult, SerializedError } from "@may/core";
 import type { ContextInspection } from "@may/context";
 import type { PermissionEvent } from "@may/permissions";
 import type { ToolChangePreview } from "./diff.js";
@@ -18,6 +18,14 @@ export type MaybeCodeSessionEvent =
       strategy: string;
       before: ContextInspection;
       after: ContextInspection;
+    }
+  | {
+      type: "context.compaction.failed";
+      strategy: string;
+      automatic: true;
+      error: SerializedError;
+      continuing: boolean;
+      before: ContextInspection;
     };
 
 export type MaybeCodeEvent =

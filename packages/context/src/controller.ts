@@ -2,12 +2,15 @@ import type { Context, ContextSnapshot, Message, Usage } from "@may/core";
 
 import type {
   ContextCompactionDetails,
+  ContextCompactionFailure,
+  ContextCompactionFailureSink,
   ContextCompactionOptions,
   ContextCompactionOutput,
   ContextCompactionResult,
   ContextCompactionSink,
   ContextCompactionStrategy,
 } from "./compaction.js";
+import { ContextCompactionExhaustedError } from "./compaction.js";
 
 export interface ContextBudget {
   readonly contextWindowTokens?: number;
@@ -56,6 +59,9 @@ export interface ContextController {
     options?: ContextCompactionOptions,
   ): Promise<readonly ContextCompactionResult[]>;
   setAutoCompactionSink?(sink: ContextCompactionSink | undefined): void;
+  setAutoCompactionFailureSink?(
+    sink: ContextCompactionFailureSink | undefined,
+  ): void;
 }
 
 export interface SnapshotContextControllerOptions {
@@ -76,7 +82,7 @@ export class SnapshotContextController implements ContextController {
   ];
   private readonly autoCompactionStrategies: readonly ContextCompactionStrategy[];
   private autoCompactionSink: ContextCompactionSink | undefined;
-  private lastExhaustedFingerprint: string | undefined;
+  private autoCompactionFailureSink: ContextCompactionFailureSink | undefined;
   private measurement: ContextMeasurement | undefined;
 
   constructor(
@@ -111,11 +117,16 @@ export class SnapshotContextController implements ContextController {
       inputTokens: usage.inputTokens,
       contextMessageCount,
     });
-    this.lastExhaustedFingerprint = undefined;
   }
 
   setAutoCompactionSink(sink: ContextCompactionSink | undefined): void {
     this.autoCompactionSink = sink;
+  }
+
+  setAutoCompactionFailureSink(
+    sink: ContextCompactionFailureSink | undefined,
+  ): void {
+    this.autoCompactionFailureSink = sink;
   }
 
   async prepareForModel(
@@ -129,18 +140,28 @@ export class SnapshotContextController implements ContextController {
       snapshot,
       this.inspectionOptions(),
     );
-    if (inspection.shouldCompact !== true) {
-      this.lastExhaustedFingerprint = undefined;
-      return [];
-    }
-
-    const fingerprint = JSON.stringify(snapshot.messages);
-    if (fingerprint === this.lastExhaustedFingerprint) return [];
+    if (inspection.shouldCompact !== true) return [];
 
     const results: ContextCompactionResult[] = [];
+    const failures: ContextCompactionFailure[] = [];
     let currentInspection = inspection;
-    for (const strategy of this.autoCompactionStrategies) {
-      const result = await this.compact(strategy, options);
+    for (const [index, strategy] of this.autoCompactionStrategies.entries()) {
+      let result: ContextCompactionResult;
+      try {
+        result = await this.compact(strategy, options);
+      } catch (error) {
+        throwIfAborted(options.signal);
+        if (isAbortError(error)) throw error;
+        const failure: ContextCompactionFailure = {
+          strategy: strategy.name,
+          error: normalizeError(error),
+          before: currentInspection,
+          continuing: index < this.autoCompactionStrategies.length - 1,
+        };
+        failures.push(failure);
+        await this.autoCompactionFailureSink?.(failure);
+        continue;
+      }
       currentInspection = result.after;
       if (result.changed) {
         await this.autoCompactionSink?.(result);
@@ -151,9 +172,12 @@ export class SnapshotContextController implements ContextController {
       }
     }
 
-    this.lastExhaustedFingerprint = currentInspection.shouldCompact === true
-      ? JSON.stringify((await this.context.snapshot()).messages)
-      : undefined;
+    if (currentInspection.shouldCompact === true) {
+      currentInspection = await this.inspect();
+    }
+    if (currentInspection.shouldCompact === true) {
+      throw new ContextCompactionExhaustedError(currentInspection, failures);
+    }
     return results;
   }
 
@@ -206,7 +230,6 @@ export class SnapshotContextController implements ContextController {
 
     await this.replaceMessages(messages);
     if (output.effectiveTokens === undefined) this.measurement = undefined;
-    this.lastExhaustedFingerprint = undefined;
     const afterSnapshot = await this.context.snapshot();
     const after = inspectContextSnapshot(
       afterSnapshot,
@@ -464,4 +487,13 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   );
   error.name = "AbortError";
   throw error;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function normalizeError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  return new Error(String(error));
 }

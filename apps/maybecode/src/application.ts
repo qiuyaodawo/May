@@ -6,6 +6,7 @@ import {
   InMemoryContextFactory,
   ModelContextCompactionStrategy,
   type ContextBudget,
+  type ContextCompactionFailure,
   type ContextCompactionResult,
   type ContextCompactionStrategy,
   type ContextSummarizer,
@@ -18,6 +19,7 @@ import {
 import {
   AsyncEventQueue,
   May,
+  serializeError,
   type Message,
   type Model,
   type RunOptions,
@@ -258,6 +260,9 @@ export class MaybeCodeApplication {
       contextController?.setAutoCompactionSink?.((result) =>
         application!.recordAutomaticCompaction(result)
       );
+      contextController?.setAutoCompactionFailureSink?.((failure) =>
+        application!.recordAutomaticCompactionFailure(failure)
+      );
       return application;
     } catch (error) {
       await permissions.close();
@@ -377,6 +382,19 @@ export class MaybeCodeApplication {
     });
   }
 
+  private recordAutomaticCompactionFailure(
+    failure: ContextCompactionFailure,
+  ): void {
+    this.eventQueue.push({
+      type: "context.compaction.failed",
+      strategy: failure.strategy,
+      automatic: true,
+      error: serializeError(failure.error),
+      continuing: failure.continuing,
+      before: failure.before,
+    });
+  }
+
   private persistCompaction(result: ContextCompactionResult): Promise<void> {
     return this.session.recordContextCompaction({
       strategy: result.strategy,
@@ -402,6 +420,7 @@ export class MaybeCodeApplication {
     await Promise.all([...this.runRelays]);
     await this.permissionRelay;
     this.contextController?.setAutoCompactionSink?.(undefined);
+    this.contextController?.setAutoCompactionFailureSink?.(undefined);
     this.eventQueue.close();
   }
 

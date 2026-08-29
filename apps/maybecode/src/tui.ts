@@ -120,6 +120,8 @@ async function consumeEvents(
       renderer.changePreview(event);
     } else if (event.type === "context.compacted") {
       renderer.contextCompacted(event);
+    } else if (event.type === "context.compaction.failed") {
+      renderer.contextCompactionFailed(event);
     } else {
       await renderer.sessionChanged(event, app);
     }
@@ -363,6 +365,20 @@ class TerminalRenderer {
       `\nContext automatically compacted with ${event.strategy}: ` +
         `${event.before.messageCount} -> ${event.after.messageCount} messages, ` +
         `~${formatNumber(saved)} tokens saved.\n`,
+    );
+  }
+
+  contextCompactionFailed(
+    event: Extract<MaybeCodeEvent, { type: "context.compaction.failed" }>,
+  ): void {
+    const next = event.continuing
+      ? " Trying the next strategy."
+      : " No fallback strategies remain.";
+    const message = event.error.message.replace(/[.!?]+$/u, "");
+    this.terminal.write(
+      `\nAutomatic context compaction failed with ${event.strategy} at ` +
+        `~${formatNumber(event.before.effectiveTokens)} tokens: ` +
+        `${message}.${next}\n`,
     );
   }
 

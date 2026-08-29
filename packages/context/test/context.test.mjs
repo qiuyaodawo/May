@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  ContextCompactionExhaustedError,
   HistoryReferenceStrategy,
   InMemoryContextFactory,
   ModelContextCompactionStrategy,
@@ -317,7 +318,7 @@ test("runs automatic compaction strategies in order before model snapshots", asy
   assert.deepEqual(calls, ["no-op", "keep-tail"]);
 });
 
-test("does not repeat exhausted automatic compaction until context changes", async () => {
+test("throws an explicit error when automatic compaction cannot clear pressure", async () => {
   let calls = 0;
   const managed = new InMemoryContextFactory().create({
     messages: [message("x".repeat(1000))],
@@ -334,17 +335,85 @@ test("does not repeat exhausted automatic compaction until context changes", asy
     }],
   });
 
-  await managed.context.snapshot();
-  await managed.context.snapshot();
+  await assert.rejects(
+    managed.context.snapshot(),
+    (error) => {
+      assert.equal(error instanceof ContextCompactionExhaustedError, true);
+      assert.equal(error.inspection.shouldCompact, true);
+      assert.deepEqual(error.failures, []);
+      return true;
+    },
+  );
   assert.equal(calls, 1);
+});
 
-  await managed.context.append([message("new")]);
-  await managed.context.snapshot();
-  assert.equal(calls, 2);
+test("reports a failed automatic strategy and continues with fallback", async () => {
+  const calls = [];
+  const failures = [];
+  const compacted = message("small");
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("x".repeat(1000))],
+    budget: {
+      contextWindowTokens: 200,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [
+      {
+        name: "broken",
+        compact() {
+          calls.push("broken");
+          throw new Error("simulated failure");
+        },
+      },
+      {
+        name: "fallback",
+        compact() {
+          calls.push("fallback");
+          return [compacted];
+        },
+      },
+    ],
+  });
+  managed.controller.setAutoCompactionFailureSink((failure) => {
+    failures.push(failure);
+  });
+
+  const snapshot = await managed.context.snapshot();
+
+  assert.deepEqual(calls, ["broken", "fallback"]);
+  assert.deepEqual(snapshot.messages, [compacted]);
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].strategy, "broken");
+  assert.equal(failures[0].error.message, "simulated failure");
+  assert.equal(failures[0].before.shouldCompact, true);
+  assert.equal(failures[0].continuing, true);
+});
+
+test("does not convert manual compaction failures into automatic fallback events", async () => {
+  let failureEvents = 0;
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("current")],
+    compactionStrategy: {
+      name: "broken",
+      compact() {
+        throw new Error("manual failure");
+      },
+    },
+  });
+  managed.controller.setAutoCompactionFailureSink(() => {
+    failureEvents += 1;
+  });
+
+  await assert.rejects(managed.controller.compact(), {
+    message: "manual failure",
+  });
+  assert.equal(failureEvents, 0);
 });
 
 test("cancels automatic compaction without replacing context", async () => {
   let started;
+  let fallbackCalled = false;
+  let failureEvents = 0;
   const compactionStarted = new Promise((resolve) => {
     started = resolve;
   });
@@ -354,19 +423,31 @@ test("cancels automatic compaction without replacing context", async () => {
       contextWindowTokens: 100,
       compactTriggerRatio: 0.5,
     },
-    autoCompactionStrategies: [{
-      name: "waiting",
-      compact(_snapshot, { signal }) {
-        started();
-        return new Promise((_resolve, reject) => {
-          signal.addEventListener("abort", () => {
-            const error = new Error("stopped");
-            error.name = "AbortError";
-            reject(error);
-          }, { once: true });
-        });
+    autoCompactionStrategies: [
+      {
+        name: "waiting",
+        compact(_snapshot, { signal }) {
+          started();
+          return new Promise((_resolve, reject) => {
+            signal.addEventListener("abort", () => {
+              const error = new Error("stopped");
+              error.name = "AbortError";
+              reject(error);
+            }, { once: true });
+          });
+        },
       },
-    }],
+      {
+        name: "fallback",
+        compact(snapshot) {
+          fallbackCalled = true;
+          return snapshot.messages;
+        },
+      },
+    ],
+  });
+  managed.controller.setAutoCompactionFailureSink(() => {
+    failureEvents += 1;
   });
   const controller = new AbortController();
   const snapshot = managed.context.snapshot({ signal: controller.signal });
@@ -375,6 +456,8 @@ test("cancels automatic compaction without replacing context", async () => {
 
   await assert.rejects(snapshot, { name: "AbortError" });
   assert.equal((await managed.controller.inspect()).messageCount, 1);
+  assert.equal(fallbackCalled, false);
+  assert.equal(failureEvents, 0);
 });
 
 test("uses provider-native compaction as a terminal strategy with measured size", async () => {

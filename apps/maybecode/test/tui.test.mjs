@@ -131,6 +131,57 @@ test("Ctrl+C cancels an active run and keeps the UI usable", async () => {
   assert.match(terminal.output, /Run cancelled: Interrupted/);
 });
 
+test("terminal UI shows automatic compaction failure and fallback progress", async () => {
+  const terminal = new FakeTerminal(["x".repeat(2500), "/quit"]);
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model: {
+      async *stream() {
+        yield {
+          type: "response.completed",
+          message: assistantMessage("continued"),
+        };
+      },
+    },
+    store: new InMemorySessionStore(),
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+    contextBudget: {
+      contextWindowTokens: 1000,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [
+      {
+        name: "simulated-native",
+        compact() {
+          throw new Error("simulated outage");
+        },
+      },
+      {
+        name: "tui-fallback",
+        compact() {
+          return [{
+            role: "user",
+            content: [{ type: "text", text: "Continue." }],
+          }];
+        },
+      },
+    ],
+  });
+
+  await runTerminalUI(app, { terminal });
+
+  assert.match(
+    terminal.output,
+    /Automatic context compaction failed with simulated-native at ~[\d,]+ tokens: simulated outage\. Trying the next strategy\./u,
+  );
+  assert.match(
+    terminal.output,
+    /Context automatically compacted with tui-fallback/u,
+  );
+  assert.match(terminal.output, /MaybeCode: continued/u);
+});
+
 test("CLI returns usage errors without opening an application", async () => {
   const terminal = new FakeTerminal([]);
   let opened = false;

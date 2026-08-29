@@ -44,6 +44,38 @@ export type ContextCompactionSink = (
   result: ContextCompactionResult,
 ) => void | Promise<void>;
 
+export interface ContextCompactionFailure {
+  readonly strategy: string;
+  readonly error: Error;
+  readonly before: ContextInspection;
+  readonly continuing: boolean;
+}
+
+export type ContextCompactionFailureSink = (
+  failure: ContextCompactionFailure,
+) => void | Promise<void>;
+
+export class ContextCompactionExhaustedError extends Error {
+  readonly inspection: ContextInspection;
+  readonly failures: readonly ContextCompactionFailure[];
+
+  constructor(
+    inspection: ContextInspection,
+    failures: readonly ContextCompactionFailure[] = [],
+  ) {
+    const threshold = inspection.compactTriggerTokens === undefined
+      ? "the configured threshold"
+      : `the ~${inspection.compactTriggerTokens}-token threshold`;
+    super(
+      `Automatic context compaction exhausted all strategies; ` +
+        `context remains at ~${inspection.effectiveTokens} tokens at or above ${threshold}`,
+    );
+    this.name = "ContextCompactionExhaustedError";
+    this.inspection = inspection;
+    this.failures = [...failures];
+  }
+}
+
 export class ModelContextCompactionStrategy implements ContextCompactionStrategy {
   readonly name: string;
 

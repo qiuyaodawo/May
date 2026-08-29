@@ -5,7 +5,12 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { InMemoryContext, RunCancelledError } from "@may/core";
-import { PruneOldToolResultsStrategy } from "@may/context";
+import {
+  ContextCompactionExhaustedError,
+  ModelContextCompactionStrategy,
+  PruneOldToolResultsStrategy,
+} from "@may/context";
+import { OpenAIResponsesModel } from "@may/providers";
 import { FileSessionStore } from "@may/session/file-store";
 import {
   InMemorySessionCatalog,
@@ -553,6 +558,139 @@ test("automatically compacts before a model call and persists the active view", 
   );
 });
 
+test("falls back when OpenAI native compaction returns 503 and exposes the failure", async () => {
+  const urls = [];
+  const model = new OpenAIResponsesModel({
+    apiKey: "test-key",
+    model: "gpt-test",
+    baseURL: "https://example.test/v1",
+    fetch: async (url) => {
+      urls.push(String(url));
+      if (String(url).endsWith("/responses/compact")) {
+        return new Response(JSON.stringify({
+          error: { message: "compact service unavailable", type: "server_error" },
+        }), { status: 503 });
+      }
+      return openAIResponse("fallback worked");
+    },
+  });
+  const store = new (await import("@may/session")).InMemorySessionStore();
+  const events = [];
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model,
+    store,
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+    contextBudget: {
+      contextWindowTokens: 1000,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [
+      new ModelContextCompactionStrategy(model.contextCompactor),
+      {
+        name: "offline-fallback",
+        compact() {
+          return [{
+            role: "user",
+            content: [{ type: "text", text: "Continue after fallback." }],
+          }];
+        },
+      },
+    ],
+  });
+  const eventReader = collectEvents(app, events, "allow");
+
+  const result = await (await app.submit({ input: "x".repeat(2500) })).result;
+  assert.equal(result.message.content[0].text, "fallback worked");
+  assert.deepEqual(urls, [
+    "https://example.test/v1/responses/compact",
+    "https://example.test/v1/responses",
+  ]);
+
+  await app.close();
+  await eventReader;
+  const failed = events.find((event) =>
+    event.type === "context.compaction.failed"
+  );
+  assert.equal(failed.strategy, "openai-responses-compact");
+  assert.equal(failed.automatic, true);
+  assert.equal(failed.error.name, "OpenAIResponsesError");
+  assert.equal(failed.error.message, "compact service unavailable");
+  assert.equal(failed.continuing, true);
+  assert.equal(failed.before.shouldCompact, true);
+  assert.equal(
+    events.some((event) =>
+      event.type === "context.compacted" &&
+      event.strategy === "offline-fallback"
+    ),
+    true,
+  );
+  assert.equal(
+    (await app.history()).some((event) =>
+      event.type === "context.compaction.failed"
+    ),
+    false,
+  );
+});
+
+test("fails the run explicitly when automatic compaction is exhausted", async () => {
+  let modelCalled = false;
+  const events = [];
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model: {
+      async *stream() {
+        modelCalled = true;
+        yield { type: "response.completed", message: assistantMessage("no") };
+      },
+    },
+    store: new (await import("@may/session")).InMemorySessionStore(),
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+    contextBudget: {
+      contextWindowTokens: 1000,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [{
+      name: "always-broken",
+      compact() {
+        throw new Error("offline fault injection");
+      },
+    }],
+  });
+  const eventReader = collectEvents(app, events, "allow");
+
+  await assert.rejects(
+    (await app.submit({ input: "x".repeat(2500) })).result,
+    (error) => {
+      assert.equal(error instanceof ContextCompactionExhaustedError, true);
+      assert.equal(error.failures.length, 1);
+      return true;
+    },
+  );
+  assert.equal(modelCalled, false);
+  const history = await app.history();
+  assert.equal(history.at(-1).type, "run.failed");
+  assert.equal(history.at(-1).error.name, "ContextCompactionExhaustedError");
+
+  await app.close();
+  await eventReader;
+  const failure = events.find((event) =>
+    event.type === "context.compaction.failed"
+  );
+  assert.equal(failure.strategy, "always-broken");
+  assert.equal(failure.continuing, false);
+  assert.equal(
+    events.some((event) =>
+      event.type === "run.event" &&
+      event.event.type === "run.failed" &&
+      event.event.error.name === "ContextCompactionExhaustedError"
+    ),
+    true,
+  );
+});
+
 test("cancels an active summary compaction without persisting it", async () => {
   const store = new (await import("@may/session")).InMemorySessionStore();
   let summaryStarted;
@@ -639,6 +777,28 @@ test("cancels an active model call", async () => {
 
 function assistantMessage(text) {
   return { role: "assistant", content: [{ type: "text", text }] };
+}
+
+function openAIResponse(text) {
+  const event = {
+    type: "response.completed",
+    response: {
+      id: "resp_test",
+      object: "response",
+      status: "completed",
+      output: [{
+        type: "message",
+        role: "assistant",
+        status: "completed",
+        content: [{ type: "output_text", text, annotations: [] }],
+      }],
+      usage: { input_tokens: 12, output_tokens: 4, total_tokens: 16 },
+    },
+  };
+  return new Response(`data: ${JSON.stringify(event)}\n\ndata: [DONE]\n\n`, {
+    status: 200,
+    headers: { "content-type": "text/event-stream" },
+  });
 }
 
 async function collectEvents(app, target, approvalDecision) {
