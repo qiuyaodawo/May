@@ -5,7 +5,10 @@ import type { SessionEvent } from "@may/session";
 
 import type { FileChangeKind, ToolChangePreview } from "./diff.js";
 import type { MaybeCodeEvent } from "./events.js";
-import type { MaybeCodeTerminal } from "./terminal.js";
+import type {
+  MaybeCodeTerminal,
+  TerminalQuestionOptions,
+} from "./terminal.js";
 import { createNodeTerminal } from "./terminal.js";
 import type { MaybeCodeWorkspace } from "./workspace.js";
 
@@ -14,6 +17,7 @@ const HELP = `Commands:
   /sessions        List sessions for this workspace
   /resume <id>     Switch to another session
   /instructions    Show active instruction sources and content
+  /status          Show the active model, session, workspace, and context usage
   /context         Show current context usage estimate
   /compact [strategy]
                    Compact with prune-old-tool-results (default), summary-tail,
@@ -21,7 +25,13 @@ const HELP = `Commands:
   /help            Show commands
   /quit             Exit MaybeCode
   Ctrl+C            Cancel the active operation, or exit while idle
+  Multiline         End a line with \\ to continue on the next line
 `;
+
+type UIQuestion = (
+  prompt: string,
+  options?: Pick<TerminalQuestionOptions, "history">,
+) => Promise<string>;
 
 export interface RunTerminalUIOptions {
   readonly terminal?: MaybeCodeTerminal;
@@ -36,11 +46,16 @@ export async function runTerminalUI(
   let activeQuestion: AbortController | undefined;
   let exit = false;
 
-  const question = async (prompt: string): Promise<string> => {
+  const question: UIQuestion = async (prompt, questionOptions = {}) => {
     const controller = new AbortController();
     activeQuestion = controller;
     try {
-      return await terminal.question(prompt, { signal: controller.signal });
+      return await terminal.question(prompt, {
+        signal: controller.signal,
+        ...(questionOptions.history === undefined
+          ? {}
+          : { history: questionOptions.history }),
+      });
     } finally {
       if (activeQuestion === controller) activeQuestion = undefined;
     }
@@ -60,14 +75,16 @@ export async function runTerminalUI(
   const eventTask = consumeEvents(app, renderer, question);
   terminal.write(
     `MaybeCode\nWorkspace: ${app.workspace}\n` +
-      `${renderInstructionSources(app)}Type /help for commands.\n`,
+      `Model: ${modelLabel(app)}\n` +
+      `${renderInstructionSources(app)}` +
+      "Type /help for commands. End a line with \\ for multiline input.\n",
   );
 
   try {
     while (!exit) {
       let input: string;
       try {
-        input = (await question("\n> ")).trim();
+        input = await readInput(question);
       } catch (error) {
         if (isAbortError(error)) {
           if (!app.isRunning) break;
@@ -77,6 +94,7 @@ export async function runTerminalUI(
       }
 
       if (input === "") continue;
+      terminal.addHistory?.(input);
       if (input.startsWith("/")) {
         try {
           exit = await handleCommand(input, app, terminal);
@@ -109,7 +127,7 @@ export async function runTerminalUI(
 async function consumeEvents(
   app: MaybeCodeWorkspace,
   renderer: TerminalRenderer,
-  question: (prompt: string) => Promise<string>,
+  question: UIQuestion,
 ): Promise<void> {
   for await (const event of app.events) {
     if (event.type === "run.event") {
@@ -132,7 +150,7 @@ async function handlePermissionEvent(
   event: PermissionEvent,
   app: MaybeCodeWorkspace,
   renderer: TerminalRenderer,
-  question: (prompt: string) => Promise<string>,
+  question: UIQuestion,
 ): Promise<void> {
   if (event.type !== "approval.requested") {
     renderer.permissionEvent(event);
@@ -146,7 +164,9 @@ async function handlePermissionEvent(
       : "[a]llow once / allow [s]ession / [d]eny";
     let answer: string;
     try {
-      answer = (await question(`${choices}: `)).trim().toLowerCase();
+      answer = (await question(`${choices}: `, { history: false }))
+        .trim()
+        .toLowerCase();
     } catch (error) {
       if (isAbortError(error)) return;
       throw error;
@@ -191,6 +211,11 @@ async function handleCommand(
           `Effective instructions:\n---\n${app.instructions.effective}\n---\n`,
       );
       return false;
+    case "/status": {
+      const inspection = await app.inspectContext();
+      terminal.write(`\n${renderStatus(app, inspection)}`);
+      return false;
+    }
     case "/context": {
       const inspection = await app.inspectContext();
       terminal.write(
@@ -251,6 +276,30 @@ async function handleCommand(
       terminal.write(`\nUnknown command: ${command}. Type /help.\n`);
       return false;
   }
+}
+
+async function readInput(question: UIQuestion): Promise<string> {
+  const lines: string[] = [];
+  while (true) {
+    const line = await question(lines.length === 0 ? "\n> " : "... ", {
+      history: false,
+    });
+    const continuation = removeLineContinuation(line);
+    lines.push(continuation.text);
+    if (!continuation.continued) return lines.join("\n").trim();
+  }
+}
+
+function removeLineContinuation(line: string): {
+  readonly text: string;
+  readonly continued: boolean;
+} {
+  let backslashes = 0;
+  for (let index = line.length - 1; index >= 0 && line[index] === "\\"; index--) {
+    backslashes += 1;
+  }
+  if (backslashes % 2 === 0) return { text: line, continued: false };
+  return { text: line.slice(0, -1), continued: true };
 }
 
 class TerminalRenderer {
@@ -515,6 +564,31 @@ function renderInstructionSources(app: MaybeCodeWorkspace): string {
     `  project: ${
       project === undefined ? "none" : instructionSourceLabel(project)
     }\n`;
+}
+
+function renderStatus(
+  app: MaybeCodeWorkspace,
+  inspection: ContextInspection | undefined,
+): string {
+  let output = `Status:\n` +
+    `  model: ${modelLabel(app)}\n` +
+    `  session: ${app.sessionId}\n` +
+    `  workspace: ${app.workspace}\n`;
+  if (inspection === undefined) return `${output}  context: unavailable\n`;
+  output += `  context: ~${formatNumber(inspection.effectiveTokens)}`;
+  if (inspection.contextWindowTokens !== undefined) {
+    output += ` / ${formatNumber(inspection.contextWindowTokens)} tokens ` +
+      `(${((inspection.usageRatio ?? 0) * 100).toFixed(1)}%)`;
+  } else {
+    output += ` tokens (${inspection.measurementMethod})`;
+  }
+  return `${output}\n`;
+}
+
+function modelLabel(app: MaybeCodeWorkspace): string {
+  return app.modelInfo === undefined
+    ? "custom"
+    : `${app.modelInfo.provider}/${app.modelInfo.model}`;
 }
 
 function renderContextInspection(inspection: ContextInspection): string {

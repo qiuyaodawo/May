@@ -9,6 +9,7 @@ import {
   MaybeCodeApplication,
   type MaybeCodeCompactionSelection,
   type MaybeCodeApplicationOptions,
+  type MaybeCodeModelInfo,
 } from "./application.js";
 import {
   latestSession,
@@ -95,6 +96,10 @@ export class MaybeCodeWorkspace {
 
   get instructions(): MaybeCodeInstructions {
     return this.application.instructions;
+  }
+
+  get modelInfo(): MaybeCodeModelInfo | undefined {
+    return this.application.modelInfo;
   }
 
   async submit(options: RunOptions): Promise<MaybeCodeRun> {

@@ -56,9 +56,9 @@ assert.equal(
 const packages = await reachableWorkspacePackages("@may/maybecode");
 assert.equal(packages.length, packed.length, "the packed dependency graph is incomplete");
 assert.equal(
-  packages.some((pkg) => pkg.private === true),
-  false,
-  "the MaybeCode package graph contains a private package",
+  packages.filter((pkg) => pkg.private === true).map((pkg) => pkg.name).join(","),
+  "@may/maybecode",
+  "only the locally packed MaybeCode application may be private",
 );
 await mkdir(workspaceDirectory, { recursive: true });
 await mkdir(homeDirectory, { recursive: true });

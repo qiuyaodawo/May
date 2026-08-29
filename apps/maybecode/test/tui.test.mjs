@@ -101,6 +101,13 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);
   assert.ok(terminal.prompts.some((prompt) => prompt.includes("allow [s]ession")));
+  assert.equal(
+    terminal.questions.find((question) =>
+      question.prompt.includes("allow [s]ession")
+    ).history,
+    false,
+  );
+  assert.equal(terminal.history.includes("s"), false);
 });
 
 test("Ctrl+C cancels an active run and keeps the UI usable", async () => {
@@ -182,6 +189,48 @@ test("terminal UI shows automatic compaction failure and fallback progress", asy
   assert.match(terminal.output, /MaybeCode: continued/u);
 });
 
+test("terminal UI accepts multiline input and renders status", async () => {
+  let request;
+  const terminal = new FakeTerminal([
+    "first line\\",
+    "second line",
+    "/status",
+    "/help",
+    "/quit",
+  ]);
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model: {
+      limits: { contextWindowTokens: 10000, maxOutputTokens: 1000 },
+      async *stream(value) {
+        request = value;
+        yield {
+          type: "response.completed",
+          message: assistantMessage("received"),
+          usage: { inputTokens: 100, outputTokens: 5, totalTokens: 105 },
+        };
+      },
+    },
+    modelInfo: { provider: "deepseek", model: "deepseek-chat" },
+    store: new InMemorySessionStore(),
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+  });
+
+  await runTerminalUI(app, { terminal });
+
+  const user = request.messages.find((message) => message.role === "user");
+  assert.equal(user.content[0].text, "first line\nsecond line");
+  assert.ok(terminal.prompts.includes("... "));
+  assert.ok(terminal.history.includes("first line\nsecond line"));
+  assert.match(terminal.output, /Model: deepseek\/deepseek-chat/u);
+  assert.match(terminal.output, /Status:\n  model: deepseek\/deepseek-chat/u);
+  assert.match(terminal.output, /  session: session_/u);
+  assert.match(terminal.output, /  workspace: /u);
+  assert.match(terminal.output, /  context: ~[\d,]+ \/ 10,000 tokens/u);
+  assert.match(terminal.output, /Multiline\s+End a line with \\ to continue/u);
+});
+
 test("CLI returns usage errors without opening an application", async () => {
   const terminal = new FakeTerminal([]);
   let opened = false;
@@ -203,6 +252,8 @@ class FakeTerminal {
   colors = false;
   output = "";
   prompts = [];
+  questions = [];
+  history = [];
   closed = false;
   #answers;
   #interrupt;
@@ -211,13 +262,18 @@ class FakeTerminal {
     this.#answers = [...answers];
   }
 
-  async question(prompt, { signal } = {}) {
+  async question(prompt, { signal, history } = {}) {
     this.prompts.push(prompt);
+    this.questions.push({ prompt, history });
     if (signal?.aborted) throw abortError();
     if (prompt.includes("[a]llow once")) return "s";
     const answer = this.#answers.shift();
     if (answer === undefined) throw new Error(`No answer for prompt: ${prompt}`);
     return answer;
+  }
+
+  addHistory(value) {
+    this.history.unshift(value);
   }
 
   write(text) {

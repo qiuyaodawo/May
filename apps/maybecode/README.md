@@ -14,9 +14,9 @@ pnpm maybecode --new /path/to/workspace
 pnpm maybecode --session <id> /path/to/workspace
 ```
 
-The publishable package exposes a `maybecode` executable. Before a registry
-release, its complete package graph can be packed, installed without registry
-access, and launched outside this repository with:
+The private package exposes a `maybecode` executable for local packaging. Its
+complete package graph can be packed, installed without registry access, and
+launched outside this repository with:
 
 ```sh
 pnpm test:package:maybecode -- --directory /path/to/temporary-parent
@@ -118,6 +118,8 @@ and may also return a `ContextController` for application-level inspection.
 - `/sessions` lists sessions for the current workspace.
 - `/resume <id>` switches sessions.
 - `/instructions` shows active instruction sources and content.
+- `/status` shows the active provider/model, session, workspace, and compact
+  context usage.
 - `/context` shows message counts, size, measured usage, and window remaining.
 - `/compact` prunes eligible old tool results and persists the active view.
 - `/compact summary-tail` summarizes older turns and retains the recent tail.
@@ -126,6 +128,12 @@ and may also return a `ContextController` for application-level inspection.
 - `/help` shows commands.
 - `/quit` exits.
 - `Ctrl+C` cancels an active run or summary and exits while idle.
+
+End an input line with a single backslash to continue composing on the next
+line. Interactive input is kept in an in-process history, while approval
+answers are excluded. Asynchronous session, model, tool, and approval output
+temporarily clears and then redraws the active prompt so partially typed input
+is preserved. Input history is not persisted to disk.
 
 Before the first model response, `/context` uses a provider-independent
 `UTF-8 bytes / 4` estimate. When the provider reports input usage, it combines

@@ -51,9 +51,15 @@ import { createModelContextSummarizer } from "./summarizer.js";
 
 export { DEFAULT_MAYBE_CODE_INSTRUCTIONS } from "./instructions.js";
 
+export interface MaybeCodeModelInfo {
+  readonly provider: string;
+  readonly model: string;
+}
+
 export interface MaybeCodeApplicationOptions {
   readonly workspace: string;
   readonly model: Model;
+  readonly modelInfo?: MaybeCodeModelInfo;
   readonly store: SessionStore;
   readonly sessionId?: string;
   readonly resume?: boolean;
@@ -90,6 +96,7 @@ export class MaybeCodeApplication {
   readonly sessionId: string;
   readonly workspace: string;
   readonly instructions: MaybeCodeInstructions;
+  readonly modelInfo: MaybeCodeModelInfo | undefined;
 
   private readonly session: Session;
   private readonly permissions: PermissionToolExecutor;
@@ -112,6 +119,7 @@ export class MaybeCodeApplication {
     contextController: ContextController | undefined,
     summaryTailStrategy: ContextCompactionStrategy,
     historyReferenceStrategy: ContextCompactionStrategy,
+    modelInfo: MaybeCodeModelInfo | undefined,
   ) {
     this.workspace = workspace;
     this.session = session;
@@ -121,6 +129,7 @@ export class MaybeCodeApplication {
     this.contextController = contextController;
     this.summaryTailStrategy = summaryTailStrategy;
     this.historyReferenceStrategy = historyReferenceStrategy;
+    this.modelInfo = modelInfo === undefined ? undefined : { ...modelInfo };
     this.events = this.eventQueue;
     this.permissionRelay = this.relayPermissionEvents();
   }
@@ -256,6 +265,7 @@ export class MaybeCodeApplication {
         contextController,
         summaryTailStrategy,
         historyReferenceStrategy,
+        options.modelInfo,
       );
       contextController?.setAutoCompactionSink?.((result) =>
         application!.recordAutomaticCompaction(result)

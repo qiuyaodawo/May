@@ -88,6 +88,7 @@ export async function openConfiguredMaybeCode(
   return MaybeCodeWorkspace.open({
     workspace,
     model,
+    modelInfo: { provider: selection.provider, model: selection.model },
     store: new FileSessionStore(join(dataDirectory, "sessions")),
     catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
     ...(options.sessionId === undefined

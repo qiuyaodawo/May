@@ -177,6 +177,10 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   );
 
   assert.equal(selected.model, "deepseek-chat");
+  assert.deepEqual(app.modelInfo, {
+    provider: "deepseek",
+    model: "deepseek-chat",
+  });
   assert.equal(
     (await (await app.submit({ input: "hello" })).result).message.content[0]
       .text,
