@@ -122,6 +122,12 @@ measurement changes. The run's cancellation signal is forwarded to each
 strategy. The sink is awaited so an application can durably record a changed
 view before the model request proceeds.
 
+Models may expose a provider-native `contextCompactor`. Wrapping it with
+`ModelContextCompactionStrategy` preserves adapter-owned opaque state, accepts
+a provider-supplied effective token measurement, and terminates the current
+strategy chain after successful native compaction. Core does not inspect that
+state or contain provider-specific types.
+
 `HistoryReferenceStrategy` is a final, provider-independent fallback. It
 replaces older turns with one system reference while retaining the configured
 number of recent user turns. Applications can point that reference at a

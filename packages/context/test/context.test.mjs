@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   HistoryReferenceStrategy,
   InMemoryContextFactory,
+  ModelContextCompactionStrategy,
   PruneOldToolResultsStrategy,
   SummaryTailStrategy,
 } from "../dist/index.js";
@@ -374,6 +375,55 @@ test("cancels automatic compaction without replacing context", async () => {
 
   await assert.rejects(snapshot, { name: "AbortError" });
   assert.equal((await managed.controller.inspect()).messageCount, 1);
+});
+
+test("uses provider-native compaction as a terminal strategy with measured size", async () => {
+  let fallbackCalled = false;
+  let receivedOptions;
+  const compacted = {
+    role: "assistant",
+    content: [],
+    modelState: {
+      type: "provider.compaction.v1",
+      data: { opaque: "state" },
+    },
+  };
+  const native = new ModelContextCompactionStrategy({
+    name: "provider-native",
+    async compact(snapshot, options) {
+      assert.equal(snapshot.messages.length, 1);
+      receivedOptions = options;
+      return { messages: [compacted], effectiveTokens: 20 };
+    },
+  });
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("x".repeat(1000))],
+    budget: {
+      contextWindowTokens: 200,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [
+      native,
+      {
+        name: "fallback",
+        compact(snapshot) {
+          fallbackCalled = true;
+          return snapshot.messages;
+        },
+      },
+    ],
+  });
+
+  const snapshot = await managed.context.snapshot({ runId: "run", step: 2 });
+  const inspection = await managed.controller.inspect();
+
+  assert.deepEqual(snapshot.messages, [compacted]);
+  assert.equal(receivedOptions.runId, "run");
+  assert.equal(receivedOptions.step, 2);
+  assert.equal(fallbackCalled, false);
+  assert.equal(inspection.measurementMethod, "measured+estimated");
+  assert.equal(inspection.effectiveTokens, 20);
+  assert.equal(inspection.shouldCompact, false);
 });
 
 function message(text) {

@@ -54,9 +54,7 @@ class ModelViewContext implements Context {
   ) {}
 
   async snapshot(options?: SnapshotOptions): Promise<ContextSnapshot> {
-    await this.controller.prepareForModel(
-      options?.signal === undefined ? {} : { signal: options.signal },
-    );
+    await this.controller.prepareForModel(options);
     return this.context.snapshot();
   }
 

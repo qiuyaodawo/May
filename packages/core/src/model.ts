@@ -4,6 +4,7 @@ import type {
   Message,
   Usage,
 } from "./types.js";
+import type { ContextSnapshot } from "./context.js";
 
 export interface ToolDefinition {
   name: string;
@@ -22,6 +23,20 @@ export interface ModelLimits {
   readonly maxOutputTokens?: number;
 }
 
+export interface ModelContextCompactionResult {
+  readonly messages: readonly Message[];
+  /** Provider-supplied effective size of the compacted model input. */
+  readonly effectiveTokens?: number;
+}
+
+export interface ModelContextCompactor {
+  readonly name: string;
+  compact(
+    snapshot: Readonly<ContextSnapshot>,
+    options: { readonly signal?: AbortSignal; readonly runId?: string; readonly step?: number },
+  ): Promise<ModelContextCompactionResult>;
+}
+
 export type ModelEvent =
   | { type: "text.delta"; delta: string }
   | { type: "reasoning.delta"; delta: string }
@@ -33,6 +48,8 @@ export type ModelEvent =
 
 export interface Model {
   readonly limits?: ModelLimits;
+  /** Optional provider-native context compaction capability. */
+  readonly contextCompactor?: ModelContextCompactor;
   stream(
     request: ModelRequest,
     options: { signal: AbortSignal },

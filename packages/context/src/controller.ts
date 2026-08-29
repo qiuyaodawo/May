@@ -1,7 +1,9 @@
 import type { Context, ContextSnapshot, Message, Usage } from "@may/core";
 
 import type {
+  ContextCompactionDetails,
   ContextCompactionOptions,
+  ContextCompactionOutput,
   ContextCompactionResult,
   ContextCompactionSink,
   ContextCompactionStrategy,
@@ -144,7 +146,9 @@ export class SnapshotContextController implements ContextController {
         await this.autoCompactionSink?.(result);
         results.push(result);
       }
-      if (currentInspection.shouldCompact !== true) break;
+      if (result.terminal === true || currentInspection.shouldCompact !== true) {
+        break;
+      }
     }
 
     this.lastExhaustedFingerprint = currentInspection.shouldCompact === true
@@ -170,26 +174,38 @@ export class SnapshotContextController implements ContextController {
 
     const snapshot = await this.context.snapshot();
     const before = inspectContextSnapshot(snapshot, this.inspectionOptions());
-    const compacted = await strategy.compact(
+    const output = normalizeCompactionOutput(await strategy.compact(
       {
         ...snapshot,
         messages: [...snapshot.messages],
       },
       options,
-    );
+    ));
     throwIfAborted(options.signal);
-    if (!Array.isArray(compacted)) {
-      throw new TypeError("Context compaction strategy must return messages");
-    }
-
-    const messages = [...compacted];
+    const messages = [...output.messages];
     const changed = JSON.stringify(messages) !== JSON.stringify(snapshot.messages);
+    if (output.effectiveTokens !== undefined) {
+      this.measurement = validateMeasurement({
+        inputTokens: output.effectiveTokens,
+        contextMessageCount: messages.length,
+      });
+    }
     if (!changed) {
-      return { strategy: strategy.name, changed, messages, before, after: before };
+      const after = output.effectiveTokens === undefined
+        ? before
+        : inspectContextSnapshot(snapshot, this.inspectionOptions());
+      return {
+        strategy: strategy.name,
+        changed,
+        messages,
+        before,
+        after,
+        ...(output.terminal === true ? { terminal: true } : {}),
+      };
     }
 
     await this.replaceMessages(messages);
-    this.measurement = undefined;
+    if (output.effectiveTokens === undefined) this.measurement = undefined;
     this.lastExhaustedFingerprint = undefined;
     const afterSnapshot = await this.context.snapshot();
     const after = inspectContextSnapshot(
@@ -202,6 +218,7 @@ export class SnapshotContextController implements ContextController {
       messages: [...afterSnapshot.messages],
       before,
       after,
+      ...(output.terminal === true ? { terminal: true } : {}),
     };
   }
 
@@ -216,6 +233,36 @@ export class SnapshotContextController implements ContextController {
         : { measurement: this.measurement }),
     };
   }
+}
+
+function normalizeCompactionOutput(
+  output: ContextCompactionOutput,
+): ContextCompactionDetails {
+  if (Array.isArray(output)) return { messages: output };
+  if (
+    typeof output !== "object" ||
+    output === null ||
+    !("messages" in output) ||
+    !Array.isArray(output.messages)
+  ) {
+    throw new TypeError("Context compaction strategy must return messages");
+  }
+  if (
+    output.effectiveTokens !== undefined &&
+    (!Number.isSafeInteger(output.effectiveTokens) || output.effectiveTokens < 0)
+  ) {
+    throw new RangeError("effectiveTokens must be a non-negative safe integer");
+  }
+  if (output.terminal !== undefined && typeof output.terminal !== "boolean") {
+    throw new TypeError("terminal must be a boolean");
+  }
+  return {
+    messages: output.messages,
+    ...(output.effectiveTokens === undefined
+      ? {}
+      : { effectiveTokens: output.effectiveTokens }),
+    ...(output.terminal === undefined ? {} : { terminal: output.terminal }),
+  };
 }
 
 export function inspectContextSnapshot(

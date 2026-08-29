@@ -63,6 +63,11 @@ compaction. Core only forwards run metadata and cancellation when requesting a
 snapshot; strategy selection and durable replacement events remain outside
 Core's minimal execution contract.
 
+A model adapter may optionally expose a provider-native context compactor.
+Core defines only the opaque capability boundary. `@may/context` adapts it into
+the automatic strategy chain, while the owning provider serializes and
+restores native continuation state through `modelState`.
+
 ### `@may/session`
 
 The session package composes Core into a long-lived identity. It owns a session

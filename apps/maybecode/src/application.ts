@@ -4,6 +4,7 @@ import { createCodingTools } from "@may/coding-tools";
 import {
   HistoryReferenceStrategy,
   InMemoryContextFactory,
+  ModelContextCompactionStrategy,
   type ContextBudget,
   type ContextCompactionResult,
   type ContextCompactionStrategy,
@@ -185,8 +186,14 @@ export class MaybeCodeApplication {
         "session_history tool. Inspect it when details from earlier work are " +
         "needed, then continue the current request.",
     });
+    const nativeCompactionStrategy = options.model.contextCompactor === undefined
+      ? undefined
+      : new ModelContextCompactionStrategy(options.model.contextCompactor);
     const autoCompactionStrategies = options.autoCompactionStrategies ?? [
       new PruneOldToolResultsStrategy(),
+      ...(nativeCompactionStrategy === undefined
+        ? []
+        : [nativeCompactionStrategy]),
       summaryTailStrategy,
       historyReferenceStrategy,
     ];
