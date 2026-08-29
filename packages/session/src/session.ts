@@ -17,6 +17,11 @@ import type {
   SessionEventPayload,
 } from "./events.js";
 import {
+  SessionHistoryReader,
+  type SessionHistoryQuery,
+  type SessionHistoryPage,
+} from "./history.js";
+import {
   InMemorySessionStore,
   type SessionStore,
   validateSessionHistory,
@@ -53,6 +58,7 @@ export class Session {
 
   private readonly runtime: May;
   private readonly store: SessionStore;
+  private readonly historyReader: SessionHistoryReader;
   private seq: number;
   private tail: Promise<void> = Promise.resolve();
   private recordTail: Promise<void> = Promise.resolve();
@@ -70,6 +76,7 @@ export class Session {
     this.id = id;
     this.runtime = runtime;
     this.store = store;
+    this.historyReader = new SessionHistoryReader(store);
     this.metadata = metadata === undefined ? undefined : { ...metadata };
     this.seq = seq;
   }
@@ -98,7 +105,9 @@ export class Session {
   }
 
   static async resume(options: ResumeSessionOptions): Promise<Session> {
-    const events = await options.store.read(options.id);
+    const events = await new SessionHistoryReader(options.store).readAll(
+      options.id,
+    );
     if (events.length === 0) {
       throw new Error(`Session "${options.id}" does not exist`);
     }
@@ -136,7 +145,14 @@ export class Session {
 
   async history(): Promise<readonly SessionEvent[]> {
     await this.recordTail;
-    return this.store.read(this.id);
+    return this.historyReader.readAll(this.id);
+  }
+
+  async queryHistory(
+    query: SessionHistoryQuery = {},
+  ): Promise<SessionHistoryPage> {
+    await this.recordTail;
+    return this.historyReader.query(this.id, query);
   }
 
   recordPermissionEvent(event: RecordablePermissionEvent): Promise<void> {

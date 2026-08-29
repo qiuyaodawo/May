@@ -71,6 +71,12 @@ Session history contains only durable facts: submitted input, complete
 assistant messages, approvals, tool outcomes, and run boundaries. Streaming
 deltas and other transient progress events remain on the live run stream.
 
+`SessionHistoryReader` provides one validated history source for full replay
+and bounded queries. `Session.resume()` uses full history, while
+`Session.queryHistory()` supports stable sequence cursors, ascending or
+descending order, event-type filters, and bounded pages. This lets UIs and
+agent-facing tools inspect history without duplicating store-specific logic.
+
 Applications can persist a context controller's replacement view with
 `session.recordContextCompaction(...)`. This appends a `context.compacted`
 event containing the active replacement messages and before/after statistics.

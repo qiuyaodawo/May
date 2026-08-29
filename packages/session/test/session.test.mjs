@@ -77,6 +77,16 @@ test("relays live run events and stores only durable session facts", async () =>
     (event) => event.type === "assistant.completed",
   );
   assert.deepEqual(assistantEvent.usage, { totalTokens: 2 });
+  const page = await session.queryHistory({
+    order: "desc",
+    limit: 2,
+    types: ["input.submitted", "assistant.completed"],
+  });
+  assert.deepEqual(page.events.map((event) => event.type), [
+    "assistant.completed",
+    "input.submitted",
+  ]);
+  assert.equal(page.hasMore, false);
 });
 
 test("serializes submissions and preserves context between runs", async () => {
