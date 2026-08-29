@@ -14,6 +14,18 @@ pnpm maybecode --new /path/to/workspace
 pnpm maybecode --session <id> /path/to/workspace
 ```
 
+The publishable package exposes a `maybecode` executable. Before a registry
+release, its complete package graph can be packed, installed without registry
+access, and launched outside this repository with:
+
+```sh
+pnpm test:package:maybecode -- --directory /path/to/temporary-parent
+```
+
+The smoke test builds and packs MaybeCode plus all transitive May workspace
+packages, installs only those tarballs into an isolated consumer project, and
+verifies both `maybecode --help` and an interactive start/quit cycle.
+
 In Git Bash on Windows, use forward slashes or quote backslash paths. An
 unquoted `E:\code\project` is changed by Bash before MaybeCode receives it:
 

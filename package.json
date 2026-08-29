@@ -12,6 +12,7 @@
     "test:integration:kimi": "pnpm --filter @may/provider-kimi run test:integration",
     "test:integration:anthropic": "pnpm --filter @may/provider-anthropic run test:integration",
     "test:integration:maybecode": "pnpm --filter @may/maybecode run test:integration",
+    "test:package:maybecode": "node scripts/test-maybecode-package.mjs",
     "may": "pnpm run build && node apps/cli/dist/bin.js",
     "maybecode": "pnpm run build && node apps/maybecode/dist/bin.js",
     "example": "pnpm run build && pnpm --filter @may/example-basic run start",
