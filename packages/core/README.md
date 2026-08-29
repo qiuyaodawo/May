@@ -48,8 +48,50 @@ Permission checks, approvals, timeouts, and tracing can use this seam. Core
 does not impose any of those policies itself.
 
 Model adapters emit normalized `text.delta` and `response.completed` events.
-Tool failures are converted into tool messages so the model can recover.
-Model and Context failures terminate the run.
+Ordinary tool failures are converted into tool messages so the model can
+recover. Infrastructure that cannot safely continue can throw
+`FatalToolExecutionError` to terminate the run after the failed tool outcome is
+recorded.
+
+Tools can report live, non-durable output or progress through their execution
+context:
+
+```ts
+async execute(input, context) {
+  context.report({ type: "progress", message: "starting" });
+  context.report({ type: "output.delta", channel: "stdout", delta: "..." });
+  return result;
+}
+```
+
+Multiple calls in one model response run sequentially by default. Supply a
+custom `ToolScheduler`, or `parallelToolScheduler` when all selected tools are
+safe to run concurrently. Schedulers must return outcomes in call order; Core
+also ensures each operation executes at most once.
+
+## Runs and observability
+
+A `May` instance rejects overlapping runs by default because it owns one
+mutable `Context`. `concurrentRuns: "allow"` is an explicit escape hatch for a
+context implementation that provides its own isolation or serialization.
+
+Each model call receives `runId`, `step`, and a retry-stable `modelCallId` in
+`ModelStreamOptions`. A successful `RunResult` reports `modelCalls`,
+`toolCalls`, and token usage aggregated across all completed model calls.
+
+Live event queues retain at most `maxBufferedEvents` high-volume streaming
+events by default. When a consumer falls behind, text, reasoning, tool-output,
+and tool-progress deltas may be discarded before lifecycle events. Event
+sequence-number gaps make this observable; the result promise and durable
+context are unaffected.
+
+## Content
+
+`ContentPart` provides normalized text, reasoning, JSON, image, audio, file,
+and resource parts. Media may be supplied by URL, base64 data, or a
+provider-owned file id. Provider adapters convert only the forms their API
+supports and throw `UnsupportedContentError` for unsupported role/type pairs;
+Core does not silently stringify or discard rich input.
 
 ## Model state
 

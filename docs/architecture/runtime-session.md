@@ -46,7 +46,11 @@ Core owns active execution:
 - model, tool, and context contracts
 - the run and step loop
 - live run events and cancellation
-- tool dispatch through a replaceable executor
+- tool dispatch through replaceable executor and scheduler seams
+- normalized multimodal content and provider-owned conversion boundaries
+
+A Core runtime rejects overlapping runs by default because it owns one mutable
+Context. Session additionally serializes submissions as a lifecycle policy.
 
 Core does not own session discovery, persistence, resume, fork, user-interface
 state, or a specific permission policy. It must remain usable for an ephemeral
@@ -97,7 +101,10 @@ on MaybeCode.
 
 ## Events and persistence
 
-`MayEvent` is a live observation of one run and may include streaming deltas.
+`MayEvent` is a best-effort live observation of one run and may include
+streaming deltas. Slow consumers can observe sequence gaps when bounded relay
+queues discard high-volume deltas; finalized results and durable facts do not
+depend on retaining every delta.
 `PermissionEvent` reports live approval requests and their resolution or
 cancellation. `SessionEvent` records durable session facts such as submitted
 messages, finalized assistant messages, approvals, tool outcomes, and run

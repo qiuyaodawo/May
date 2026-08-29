@@ -1,9 +1,11 @@
 import type {
   ContentPart,
+  MediaSource,
   Message,
   ToolCall,
   ToolDefinition,
 } from "@may/core";
+import { UnsupportedContentError } from "@may/core";
 import type {
   OpenAICompatibleMessage,
   OpenAICompatibleToolCall,
@@ -15,11 +17,15 @@ export function toOpenAICompatibleMessages(
   options: { includeToolName?: boolean } = {},
 ): OpenAICompatibleMessage[] {
   return messages.map((message) => {
-    if (message.role === "system" || message.role === "user") {
+    if (message.role === "system") {
       return {
-        role: message.role,
-        content: serializeVisibleContent(message.content),
+        role: "system",
+        content: serializeVisibleContent(message.content, "system"),
       };
+    }
+
+    if (message.role === "user") {
+      return { role: "user", content: toUserContent(message.content) };
     }
 
     if (message.role === "tool") {
@@ -29,7 +35,7 @@ export function toOpenAICompatibleMessages(
       > = {
         role: "tool",
         tool_call_id: message.toolCallId,
-        content: serializeVisibleContent(message.content),
+        content: serializeVisibleContent(message.content, "tool"),
       };
       if (options.includeToolName) converted.name = message.name;
       return converted;
@@ -40,7 +46,7 @@ export function toOpenAICompatibleMessages(
       { role: "assistant" }
     > = {
       role: "assistant",
-      content: serializeVisibleContent(message.content),
+      content: serializeVisibleContent(message.content, "assistant"),
     };
     const reasoningParts = message.content.filter(
       (part) => part.type === "reasoning",
@@ -83,11 +89,67 @@ function convertToolCall(call: ToolCall): OpenAICompatibleToolCall {
   };
 }
 
-function serializeVisibleContent(content: ContentPart[]): string {
+function toUserContent(
+  content: ContentPart[],
+): Extract<OpenAICompatibleMessage, { role: "user" }>["content"] {
+  const hasImages = content.some((part) => part.type === "image");
+  if (!hasImages) return serializeVisibleContent(content, "user");
+
+  return content.flatMap<
+    | { type: "text"; text: string }
+    | { type: "image_url"; image_url: { url: string; detail?: string } }
+  >((part) => {
+    if (part.type === "reasoning") return [];
+    if (part.type === "text") return [{ type: "text" as const, text: part.text }];
+    if (part.type === "json") {
+      return [{ type: "text" as const, text: serializeJson(part.value) }];
+    }
+    if (part.type === "image") {
+      const imageUrl = imageSourceUrl(part.source);
+      return [{
+        type: "image_url" as const,
+        image_url: {
+          url: imageUrl,
+          ...(part.detail === undefined ? {} : { detail: part.detail }),
+        },
+      }];
+    }
+    throw new UnsupportedContentError(
+      "OpenAI-compatible chat adapter",
+      part.type,
+      "user",
+    );
+  });
+}
+
+function serializeVisibleContent(
+  content: ContentPart[],
+  role: Message["role"],
+): string {
   return content
     .filter((part) => part.type !== "reasoning")
-    .map((part) => part.type === "text" ? part.text : serializeJson(part.value))
+    .map((part) => {
+      if (part.type === "text") return part.text;
+      if (part.type === "json") return serializeJson(part.value);
+      throw new UnsupportedContentError(
+        "OpenAI-compatible chat adapter",
+        part.type,
+        role,
+      );
+    })
     .join("\n");
+}
+
+function imageSourceUrl(source: MediaSource): string {
+  if (source.type === "url") return source.url;
+  if (source.type === "base64") {
+    return `data:${source.mediaType};base64,${source.data}`;
+  }
+  throw new UnsupportedContentError(
+    "OpenAI-compatible chat adapter",
+    "image file-id source",
+    "user",
+  );
 }
 
 function serializeJson(value: unknown): string {

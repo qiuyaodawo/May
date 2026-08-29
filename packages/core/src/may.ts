@@ -1,22 +1,30 @@
 import type { Context, ContextSnapshot } from "./context.js";
 import {
+  ConcurrentRunError,
+  FatalToolExecutionError,
   MaxStepsExceededError,
   ModelProtocolError,
   RunCancelledError,
   ToolNotFoundError,
+  ToolSchedulerError,
 } from "./errors.js";
 import {
   AsyncEventQueue,
+  isStreamingMayEvent,
   serializeError,
   type MayEvent,
   type MayEventPayload,
   type RunResult,
+  type SerializedError,
 } from "./events.js";
 import type { Model, ModelRequest, ToolDefinition } from "./model.js";
 import {
   directToolExecutor,
+  sequentialToolScheduler,
   type Tool,
   type ToolExecutor,
+  type ToolProgressUpdate,
+  type ToolScheduler,
 } from "./tool.js";
 import {
   textContent,
@@ -35,6 +43,11 @@ export interface MayOptions {
   context: Context;
   maxSteps?: number;
   toolExecutor?: ToolExecutor;
+  toolScheduler?: ToolScheduler;
+  /** Defaults to reject because a May instance owns one mutable Context. */
+  concurrentRuns?: "reject" | "allow";
+  /** Streaming-event buffer target; lifecycle events are retained. */
+  maxBufferedEvents?: number;
 }
 
 export interface RunOptions {
@@ -60,6 +73,10 @@ export class May {
   private readonly toolDefinitions: ToolDefinition[];
   private readonly maxSteps: number;
   private readonly toolExecutor: ToolExecutor;
+  private readonly toolScheduler: ToolScheduler;
+  private readonly concurrentRuns: "reject" | "allow";
+  private readonly maxBufferedEvents: number;
+  private activeRuns = 0;
 
   constructor(options: MayOptions) {
     const maxSteps = options.maxSteps ?? 16;
@@ -85,6 +102,18 @@ export class May {
     }));
     this.maxSteps = maxSteps;
     this.toolExecutor = options.toolExecutor ?? directToolExecutor;
+    this.toolScheduler = options.toolScheduler ?? sequentialToolScheduler;
+    this.concurrentRuns = options.concurrentRuns ?? "reject";
+    if (
+      this.concurrentRuns !== "reject" &&
+      this.concurrentRuns !== "allow"
+    ) {
+      throw new TypeError("concurrentRuns must be \"reject\" or \"allow\"");
+    }
+    this.maxBufferedEvents = options.maxBufferedEvents ?? 1024;
+    if (!Number.isSafeInteger(this.maxBufferedEvents) || this.maxBufferedEvents < 1) {
+      throw new RangeError("maxBufferedEvents must be a positive safe integer");
+    }
   }
 
   run(options: RunOptions): RunHandle {
@@ -103,8 +132,15 @@ export class May {
     input: UserMessage | undefined,
     externalSignal: AbortSignal | undefined,
   ): RunHandle {
+    if (this.concurrentRuns === "reject" && this.activeRuns > 0) {
+      throw new ConcurrentRunError();
+    }
+    this.activeRuns += 1;
     const runId = createRunId();
-    const events = new AsyncEventQueue<MayEvent>();
+    const events = new AsyncEventQueue<MayEvent>({
+      maxBufferedValues: this.maxBufferedEvents,
+      isDroppable: isStreamingMayEvent,
+    });
     const controller = new AbortController();
     let seq = 0;
 
@@ -126,6 +162,7 @@ export class May {
 
     const result = this.execute(runId, input, controller.signal, emit)
       .finally(() => {
+        this.activeRuns -= 1;
         externalSignal?.removeEventListener("abort", onExternalAbort);
         events.close();
       });
@@ -147,6 +184,9 @@ export class May {
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
   ): Promise<RunResult> {
+    let aggregateUsage: Usage | undefined;
+    let modelCalls = 0;
+    let toolCalls = 0;
     try {
       emit(input === undefined
         ? { type: "run.started", continuation: true }
@@ -166,12 +206,15 @@ export class May {
         const request = this.createModelRequest(snapshot);
 
         emit({ type: "model.started", step });
+        modelCalls += 1;
         const { message, usage } = await this.consumeModel(
           request,
           signal,
+          runId,
           step,
           emit,
         );
+        aggregateUsage = addUsage(aggregateUsage, usage);
 
         throwIfAborted(signal);
         await this.context.append([message], { runId, step });
@@ -190,24 +233,49 @@ export class May {
         if (calls.length === 0) {
           emit({ type: "step.completed", step });
 
-          const result = createRunResult(runId, step, message, usage);
+          const result = createRunResult(
+            runId,
+            step,
+            modelCalls,
+            toolCalls,
+            message,
+            aggregateUsage,
+          );
           emit({ type: "run.completed", result });
           return result;
         }
 
-        for (const call of calls) {
-          throwIfAborted(signal);
-          const toolMessage = await this.executeTool(
-            runId,
-            step,
-            call,
-            signal,
-            emit,
-          );
+        toolCalls += calls.length;
+        const outcomes = await this.scheduleTools(
+          runId,
+          step,
+          calls,
+          signal,
+          emit,
+        );
+        let fatal: FatalToolExecutionError | undefined;
+        for (const outcome of outcomes) {
+          if (outcome.type === "completed") {
+            emit({
+              type: "tool.completed",
+              step,
+              call: outcome.call,
+              output: outcome.output,
+            });
+          } else {
+            emit({
+              type: "tool.failed",
+              step,
+              call: outcome.call,
+              error: outcome.error,
+            });
+            fatal ??= outcome.fatal;
+          }
 
           throwIfAborted(signal);
-          await this.context.append([toolMessage], { runId, step });
+          await this.context.append([outcome.message], { runId, step });
         }
+        if (fatal !== undefined) throw fatal;
 
         emit({ type: "step.completed", step });
       }
@@ -258,13 +326,19 @@ export class May {
   private async consumeModel(
     request: ModelRequest,
     signal: AbortSignal,
+    runId: string,
     step: number,
     emit: (event: MayEventPayload) => void,
   ): Promise<{ message: AssistantMessage; usage?: Usage }> {
     let completed: AssistantMessage | undefined;
     let usage: Usage | undefined;
 
-    for await (const event of this.model.stream(request, { signal })) {
+    for await (const event of this.model.stream(request, {
+      signal,
+      runId,
+      step,
+      modelCallId: `${runId}:model:${step}`,
+    })) {
       throwIfAborted(signal);
 
       if (event.type === "text.delta") {
@@ -312,14 +386,53 @@ export class May {
     return result;
   }
 
+  private async scheduleTools(
+    runId: string,
+    step: number,
+    calls: readonly ToolCall[],
+    signal: AbortSignal,
+    emit: (event: MayEventPayload) => void,
+  ): Promise<readonly ToolExecutionOutcome[]> {
+    const operations = calls.map((call) => {
+      let execution: Promise<ToolExecutionOutcome> | undefined;
+      return {
+        call,
+        tool: this.tools.get(call.name),
+        execute: () => {
+          execution ??= this.executeTool(runId, step, call, signal, emit);
+          return execution;
+        },
+      };
+    });
+    const outcomes = await this.toolScheduler.schedule(operations, {
+      runId,
+      step,
+      signal,
+    });
+    if (outcomes.length !== calls.length) {
+      throw new ToolSchedulerError(
+        `Tool scheduler returned ${outcomes.length} results for ${calls.length} calls`,
+      );
+    }
+    for (let index = 0; index < calls.length; index++) {
+      if (outcomes[index]?.call !== calls[index]) {
+        throw new ToolSchedulerError(
+          "Tool scheduler must return results in call order",
+        );
+      }
+    }
+    return outcomes;
+  }
+
   private async executeTool(
     runId: string,
     step: number,
     call: ToolCall,
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
-  ): Promise<ToolMessage> {
+  ): Promise<ToolExecutionOutcome> {
     emit({ type: "tool.started", step, call });
+    let active = true;
 
     try {
       const tool = this.tools.get(call.name);
@@ -335,34 +448,65 @@ export class May {
           toolCallId: call.id,
           idempotencyKey: `${runId}:${step}:${call.id}`,
           signal,
+          report: (update) => {
+            if (!active || signal.aborted) return;
+            emitToolProgress(step, call, update, emit);
+          },
         },
       });
 
       throwIfAborted(signal);
-      emit({ type: "tool.completed", step, call, output });
-
       return {
-        role: "tool",
-        toolCallId: call.id,
-        name: call.name,
-        content: [{ type: "json", value: output }],
+        type: "completed",
+        call,
+        output,
+        message: {
+          role: "tool",
+          toolCallId: call.id,
+          name: call.name,
+          content: [{ type: "json", value: output }],
+        },
       };
     } catch (error) {
       if (signal.aborted || error instanceof RunCancelledError) throw error;
 
       const serialized = serializeError(error);
-      emit({ type: "tool.failed", step, call, error: serialized });
-
-      return {
-        role: "tool",
-        toolCallId: call.id,
-        name: call.name,
-        isError: true,
-        content: [{ type: "json", value: serialized }],
+      const outcome: FailedToolExecution = {
+        type: "failed",
+        call,
+        error: serialized,
+        message: {
+          role: "tool",
+          toolCallId: call.id,
+          name: call.name,
+          isError: true,
+          content: [{ type: "json", value: serialized }],
+        },
       };
+      if (error instanceof FatalToolExecutionError) outcome.fatal = error;
+      return outcome;
+    } finally {
+      active = false;
     }
   }
 }
+
+interface CompletedToolExecution {
+  readonly type: "completed";
+  readonly call: ToolCall;
+  readonly output: unknown;
+  readonly message: ToolMessage;
+}
+
+interface FailedToolExecution {
+  readonly type: "failed";
+  readonly call: ToolCall;
+  readonly error: SerializedError;
+  readonly message: ToolMessage;
+  fatal?: FatalToolExecutionError;
+}
+
+type ToolExecutionOutcome = CompletedToolExecution | FailedToolExecution;
 
 function createRunId(): string {
   return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
@@ -383,12 +527,77 @@ function toReason(reason: unknown): string | undefined {
 function createRunResult(
   runId: string,
   steps: number,
+  modelCalls: number,
+  toolCalls: number,
   message: AssistantMessage,
   usage: Usage | undefined,
 ): RunResult {
-  const result: RunResult = { runId, steps, message };
+  const result: RunResult = {
+    runId,
+    steps,
+    modelCalls,
+    toolCalls,
+    message,
+  };
   if (usage !== undefined) result.usage = usage;
   return result;
+}
+
+function addUsage(
+  aggregate: Usage | undefined,
+  usage: Usage | undefined,
+): Usage | undefined {
+  if (usage === undefined) return aggregate;
+  const result: Usage = { ...(aggregate ?? {}) };
+  addTokenField(result, "inputTokens", usage.inputTokens);
+  addTokenField(result, "outputTokens", usage.outputTokens);
+  addTokenField(result, "totalTokens", usage.totalTokens);
+  return result;
+}
+
+function addTokenField(
+  target: Usage,
+  field: keyof Usage,
+  value: number | undefined,
+): void {
+  if (value !== undefined) target[field] = (target[field] ?? 0) + value;
+}
+
+function emitToolProgress(
+  step: number,
+  call: ToolCall,
+  update: ToolProgressUpdate,
+  emit: (event: MayEventPayload) => void,
+): void {
+  if (update.type === "output.delta") {
+    if (typeof update.delta !== "string") {
+      throw new TypeError("Tool output delta must be a string");
+    }
+    if (update.delta === "") return;
+    emit(update.channel === undefined
+      ? { type: "tool.output.delta", step, call, delta: update.delta }
+      : {
+          type: "tool.output.delta",
+          step,
+          call,
+          delta: update.delta,
+          channel: update.channel,
+        });
+    return;
+  }
+
+  if (update.type !== "progress" || typeof update.message !== "string") {
+    throw new TypeError("Tool progress update is invalid");
+  }
+  emit(update.data === undefined
+    ? { type: "tool.progress", step, call, message: update.message }
+    : {
+        type: "tool.progress",
+        step,
+        call,
+        message: update.message,
+        data: update.data,
+      });
 }
 
 function emitOptionalUsage(

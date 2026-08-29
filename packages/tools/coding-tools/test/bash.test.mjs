@@ -7,12 +7,13 @@ import { assertErrorCode, createWorkspace, executeTool } from "./helpers.mjs";
 test("bash captures stdout, stderr, and a non-zero exit code", async (t) => {
   const cwd = await createWorkspace(t);
   const tool = createBashTool({ cwd });
+  const progress = [];
 
   const result = await executeTool(tool, {
     command: nodeCommand(
       "process.stdout.write('out');process.stderr.write('err');process.exitCode=3",
     ),
-  });
+  }, undefined, (update) => progress.push(update));
 
   assert.deepEqual(result, {
     stdout: "out",
@@ -22,6 +23,10 @@ test("bash captures stdout, stderr, and a non-zero exit code", async (t) => {
     stdoutTruncated: false,
     stderrTruncated: false,
   });
+  assert.equal(progress.filter((update) => update.channel === "stdout")
+    .map((update) => update.delta).join(""), "out");
+  assert.equal(progress.filter((update) => update.channel === "stderr")
+    .map((update) => update.delta).join(""), "err");
 });
 
 test("bash truncates captured output without stopping the command", async (t) => {

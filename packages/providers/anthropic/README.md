@@ -24,6 +24,10 @@ The adapter uses `https://api.anthropic.com` and API version `2023-06-01` by
 default. It supports streaming text and thinking, client tool calls, usage,
 structured HTTP and stream errors, and cancellation.
 
+User and tool-result content supports images and documents backed by URL,
+base64 data, or an Anthropic file id. Audio and generic resource parts are
+rejected explicitly.
+
 Anthropic requires thinking and redacted-thinking blocks to be returned
 unchanged during continuation. The adapter stores the complete native assistant
 content in `AssistantMessage.modelState` under

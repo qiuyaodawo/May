@@ -18,6 +18,7 @@ import {
 } from "@may/context";
 import {
   AsyncEventQueue,
+  isStreamingMayEvent,
   May,
   serializeError,
   type Message,
@@ -105,7 +106,11 @@ export class MaybeCodeApplication {
   private readonly contextController: ContextController | undefined;
   private readonly summaryTailStrategy: ContextCompactionStrategy;
   private readonly historyReferenceStrategy: ContextCompactionStrategy;
-  private readonly eventQueue = new AsyncEventQueue<MaybeCodeSessionEvent>();
+  private readonly eventQueue = new AsyncEventQueue<MaybeCodeSessionEvent>({
+    maxBufferedValues: 1024,
+    isDroppable: (value) =>
+      value.type === "run.event" && isStreamingMayEvent(value.event),
+  });
   private readonly permissionRelay: Promise<void>;
   private readonly runRelays = new Set<Promise<void>>();
   private currentRun: MaybeCodeRun | undefined;

@@ -5,6 +5,7 @@ import {
   type ModelEvent,
   type ModelLimits,
   type ModelRequest,
+  type ModelStreamOptions,
 } from "@may/core";
 
 const RETRYABLE_STATUSES = new Set([408, 409, 429]);
@@ -94,7 +95,7 @@ export class RetryingModel implements Model {
 
   async *stream(
     request: ModelRequest,
-    options: { signal: AbortSignal },
+    options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       let completed = false;

@@ -1,4 +1,9 @@
-import type { Model, ModelEvent, ModelRequest } from "@may/core";
+import type {
+  Model,
+  ModelEvent,
+  ModelRequest,
+  ModelStreamOptions,
+} from "@may/core";
 import {
   toAnthropicRequestParts,
   toAnthropicThinking,
@@ -80,7 +85,7 @@ export class AnthropicModel implements Model {
 
   async *stream(
     request: ModelRequest,
-    options: { signal: AbortSignal },
+    options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
     const response = await this.fetchImplementation(
       `${this.baseURL}/v1/messages`,

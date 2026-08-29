@@ -468,6 +468,7 @@ function createExecution(options = {}) {
       toolCallId: "call_test",
       idempotencyKey: "run_test:1:call_test",
       signal: options.signal ?? controller.signal,
+      report() {},
     },
   };
 }

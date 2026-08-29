@@ -1,4 +1,9 @@
-import type { Model, ModelEvent, ModelRequest } from "@may/core";
+import type {
+  Model,
+  ModelEvent,
+  ModelRequest,
+  ModelStreamOptions,
+} from "@may/core";
 import {
   streamOpenAICompatibleResponse,
   toOpenAICompatibleMessages,
@@ -63,7 +68,7 @@ export class DeepSeekModel implements Model {
 
   async *stream(
     request: ModelRequest,
-    options: { signal: AbortSignal },
+    options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
     const response = await this.fetchImplementation(
       `${this.baseURL}/chat/completions`,

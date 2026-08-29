@@ -6,6 +6,7 @@ Completions APIs.
 The package provides:
 
 - May message and tool conversion;
+- text/JSON and URL/base64 image input conversion;
 - SSE parsing;
 - reasoning and text stream aggregation;
 - streamed function-call assembly;
@@ -14,3 +15,7 @@ The package provides:
 It does not send HTTP requests or define provider configuration. Authentication,
 request parameters, endpoint URLs, HTTP error parsing, and provider-specific
 behavior remain in each provider package.
+
+Audio, file, and generic resource parts are rejected rather than silently
+serialized. Accepting an image wire format does not imply that every model
+behind an OpenAI-compatible endpoint has vision capability.

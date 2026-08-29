@@ -1,4 +1,17 @@
-import type { JsonSchema } from "./types.js";
+import type { JsonSchema, ToolCall } from "./types.js";
+
+export type ToolProgressUpdate =
+  | {
+      type: "output.delta";
+      delta: string;
+      /** Optional output channel such as stdout or stderr. */
+      channel?: string;
+    }
+  | {
+      type: "progress";
+      message: string;
+      data?: unknown;
+    };
 
 export interface ToolExecutionContext {
   runId: string;
@@ -6,6 +19,8 @@ export interface ToolExecutionContext {
   toolCallId: string;
   idempotencyKey: string;
   signal: AbortSignal;
+  /** Emits live, non-durable progress while the tool is active. */
+  report(update: ToolProgressUpdate): void;
 }
 
 export interface Tool<TInput = unknown, TOutput = unknown> {
@@ -31,8 +46,42 @@ export interface ToolExecutor {
   ): Promise<TOutput>;
 }
 
+export interface ToolOperation<T> {
+  readonly call: ToolCall;
+  readonly tool: Tool | undefined;
+  execute(): Promise<T>;
+}
+
+export interface ToolSchedulingContext {
+  readonly runId: string;
+  readonly step: number;
+  readonly signal: AbortSignal;
+}
+
+export interface ToolScheduler {
+  schedule<T>(
+    operations: readonly ToolOperation<T>[],
+    context: ToolSchedulingContext,
+  ): Promise<readonly T[]>;
+}
+
 export const directToolExecutor: ToolExecutor = {
   execute({ tool, input, context }) {
     return tool.execute(input, context);
+  },
+};
+
+export const sequentialToolScheduler: ToolScheduler = {
+  async schedule<T>(operations: readonly ToolOperation<T>[]): Promise<T[]> {
+    const results: T[] = [];
+    for (const operation of operations) results.push(await operation.execute());
+    return results;
+  },
+};
+
+/** Use only when every selected tool is safe to run concurrently. */
+export const parallelToolScheduler: ToolScheduler = {
+  schedule<T>(operations: readonly ToolOperation<T>[]): Promise<T[]> {
+    return Promise.all(operations.map((operation) => operation.execute()));
   },
 };

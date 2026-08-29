@@ -109,6 +109,20 @@ test("maps Responses requests, streaming deltas, output, tools, and usage", asyn
         content: [
           { type: "text", text: "Find this" },
           { type: "json", value: { id: 1 } },
+          {
+            type: "image",
+            source: { type: "url", url: "https://example.test/image.png" },
+            detail: "high",
+          },
+          {
+            type: "file",
+            name: "notes.pdf",
+            source: {
+              type: "base64",
+              mediaType: "application/pdf",
+              data: "cGRm",
+            },
+          },
         ],
       },
     ],
@@ -134,7 +148,20 @@ test("maps Responses requests, streaming deltas, output, tools, and usage", asyn
   assert.equal(body.instructions, "Be concise.");
   assert.deepEqual(body.input, [{
     role: "user",
-    content: [{ type: "input_text", text: "Find this\n{\"id\":1}" }],
+    content: [
+      { type: "input_text", text: "Find this" },
+      { type: "input_text", text: "{\"id\":1}" },
+      {
+        type: "input_image",
+        image_url: "https://example.test/image.png",
+        detail: "high",
+      },
+      {
+        type: "input_file",
+        filename: "notes.pdf",
+        file_data: "data:application/pdf;base64,cGRm",
+      },
+    ],
   }]);
   assert.deepEqual(body.tools, [{
     type: "function",

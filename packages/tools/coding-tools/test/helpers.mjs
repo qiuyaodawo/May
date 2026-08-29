@@ -8,7 +8,7 @@ export async function createWorkspace(t) {
   return path;
 }
 
-export async function executeTool(tool, input, signal) {
+export async function executeTool(tool, input, signal, report = () => {}) {
   const parsed = tool.parse ? tool.parse(input) : input;
   return tool.execute(parsed, {
     runId: "run_test",
@@ -16,6 +16,7 @@ export async function executeTool(tool, input, signal) {
     toolCallId: "call_test",
     idempotencyKey: "run_test:1:call_test",
     signal: signal ?? new AbortController().signal,
+    report,
   });
 }
 

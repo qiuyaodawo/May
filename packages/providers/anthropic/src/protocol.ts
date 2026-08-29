@@ -27,6 +27,26 @@ export interface AnthropicTextBlock {
   text: string;
 }
 
+export type AnthropicMediaSource =
+  | { type: "url"; url: string }
+  | { type: "base64"; media_type: string; data: string }
+  | { type: "file"; file_id: string };
+
+export interface AnthropicImageBlock {
+  type: "image";
+  source: AnthropicMediaSource;
+}
+
+export interface AnthropicDocumentBlock {
+  type: "document";
+  source: AnthropicMediaSource;
+}
+
+export type AnthropicUserContentBlock =
+  | AnthropicTextBlock
+  | AnthropicImageBlock
+  | AnthropicDocumentBlock;
+
 export interface AnthropicThinkingBlock {
   type: "thinking";
   thinking: string;
@@ -54,14 +74,17 @@ export type AnthropicAssistantContentBlock =
 export interface AnthropicToolResultBlock {
   type: "tool_result";
   tool_use_id: string;
-  content: string;
+  content: string | AnthropicUserContentBlock[];
   is_error?: boolean;
 }
 
 export interface AnthropicRequestMessage {
   role: "user" | "assistant";
   content: Array<
-    AnthropicAssistantContentBlock | AnthropicToolResultBlock
+    | AnthropicAssistantContentBlock
+    | AnthropicToolResultBlock
+    | AnthropicImageBlock
+    | AnthropicDocumentBlock
   >;
 }
 

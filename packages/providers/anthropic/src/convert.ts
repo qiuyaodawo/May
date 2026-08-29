@@ -1,17 +1,21 @@
 import type {
   ContentPart,
+  MediaSource,
   Message,
   ModelState,
   ToolDefinition,
 } from "@may/core";
+import { UnsupportedContentError } from "@may/core";
 import { AnthropicProtocolError } from "./errors.js";
 import {
   ANTHROPIC_MODEL_STATE_TYPE,
   type AnthropicAssistantContentBlock,
   type AnthropicMessagesRequest,
+  type AnthropicMediaSource,
   type AnthropicModelStateData,
   type AnthropicRequestMessage,
   type AnthropicTextBlock,
+  type AnthropicUserContentBlock,
   type AnthropicThinkingConfig,
   type AnthropicToolDefinition,
   type AnthropicToolResultBlock,
@@ -38,7 +42,7 @@ export function toAnthropicRequestParts(
     if (message.role === "user") {
       converted.push({
         role: "user",
-        content: toTextBlocks(message.content),
+        content: toUserBlocks(message.content),
       });
       continue;
     }
@@ -47,7 +51,9 @@ export function toAnthropicRequestParts(
       const toolResult: AnthropicToolResultBlock = {
         type: "tool_result",
         tool_use_id: message.toolCallId,
-        content: serializeVisibleContent(message.content),
+        content: hasMedia(message.content)
+          ? toUserBlocks(message.content)
+          : serializeVisibleContent(message.content, "tool"),
       };
       if (message.isError !== undefined) {
         toolResult.is_error = message.isError;
@@ -63,7 +69,7 @@ export function toAnthropicRequestParts(
     }
 
     const content: AnthropicAssistantContentBlock[] = [
-      ...toTextBlocks(message.content),
+      ...toAssistantTextBlocks(message.content),
     ];
     for (const call of message.toolCalls ?? []) {
       if (!isRecord(call.input)) {
@@ -134,9 +140,12 @@ function getAnthropicStateContent(
   return (state.data as unknown as AnthropicModelStateData).content;
 }
 
-function toTextBlocks(content: ContentPart[]): AnthropicTextBlock[] {
+function toAssistantTextBlocks(content: ContentPart[]): AnthropicTextBlock[] {
   return content.flatMap((part) => {
     if (part.type === "reasoning") return [];
+    if (part.type !== "text" && part.type !== "json") {
+      throw new UnsupportedContentError("Anthropic adapter", part.type, "assistant");
+    }
     return [{
       type: "text" as const,
       text: part.type === "text" ? part.text : serializeJson(part.value),
@@ -144,11 +153,49 @@ function toTextBlocks(content: ContentPart[]): AnthropicTextBlock[] {
   });
 }
 
-function serializeVisibleContent(content: ContentPart[]): string {
+function toUserBlocks(content: ContentPart[]): AnthropicUserContentBlock[] {
+  return content.flatMap<AnthropicUserContentBlock>((part) => {
+    if (part.type === "reasoning") return [];
+    if (part.type === "text") return [{ type: "text", text: part.text }];
+    if (part.type === "json") {
+      return [{ type: "text", text: serializeJson(part.value) }];
+    }
+    if (part.type === "image") {
+      return [{ type: "image", source: toAnthropicSource(part.source) }];
+    }
+    if (part.type === "file") {
+      return [{ type: "document", source: toAnthropicSource(part.source) }];
+    }
+    throw new UnsupportedContentError("Anthropic adapter", part.type, "user");
+  });
+}
+
+function serializeVisibleContent(
+  content: ContentPart[],
+  role: Message["role"] = "system",
+): string {
   return content
     .filter((part) => part.type !== "reasoning")
-    .map((part) => part.type === "text" ? part.text : serializeJson(part.value))
+    .map((part) => {
+      if (part.type === "text") return part.text;
+      if (part.type === "json") return serializeJson(part.value);
+      throw new UnsupportedContentError("Anthropic adapter", part.type, role);
+    })
     .join("\n");
+}
+
+function hasMedia(content: readonly ContentPart[]): boolean {
+  return content.some((part) => part.type === "image" || part.type === "file");
+}
+
+function toAnthropicSource(source: MediaSource): AnthropicMediaSource {
+  if (source.type === "url") return { type: "url", url: source.url };
+  if (source.type === "file") return { type: "file", file_id: source.fileId };
+  return {
+    type: "base64",
+    media_type: source.mediaType,
+    data: source.data,
+  };
 }
 
 function serializeJson(value: unknown): string {

@@ -159,7 +159,25 @@ test("streams thinking, text, usage, and sends Anthropic configuration", async (
   const signal = new AbortController().signal;
   const events = await collect(model.stream(request([
     { role: "system", content: [{ type: "text", text: "Be concise." }] },
-    { role: "user", content: [{ type: "json", value: { question: 1 } }] },
+    {
+      role: "user",
+      content: [
+        { type: "json", value: { question: 1 } },
+        {
+          type: "image",
+          source: { type: "url", url: "https://example.test/image.png" },
+        },
+        {
+          type: "file",
+          name: "notes.pdf",
+          source: {
+            type: "base64",
+            mediaType: "application/pdf",
+            data: "cGRm",
+          },
+        },
+      ],
+    },
   ], [{
     name: "lookup",
     description: "Look up a value",
@@ -177,7 +195,21 @@ test("streams thinking, text, usage, and sends Anthropic configuration", async (
     max_tokens: 8192,
     messages: [{
       role: "user",
-      content: [{ type: "text", text: "{\"question\":1}" }],
+      content: [
+        { type: "text", text: "{\"question\":1}" },
+        {
+          type: "image",
+          source: { type: "url", url: "https://example.test/image.png" },
+        },
+        {
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: "cGRm",
+          },
+        },
+      ],
     }],
     stream: true,
     system: "Be concise.",

@@ -1,16 +1,57 @@
 export class MayError extends Error {
   readonly code: string;
 
-  constructor(code: string, message: string) {
-    super(message);
+  constructor(code: string, message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = new.target.name;
     this.code = code;
+  }
+}
+
+export class ConcurrentRunError extends MayError {
+  constructor() {
+    super(
+      "CONCURRENT_RUN",
+      "This May runtime already has an active run",
+    );
+  }
+}
+
+/** Marks a tool or ToolExecutor failure that must terminate the run. */
+export class FatalToolExecutionError extends MayError {
+  constructor(
+    message: string,
+    options?: ErrorOptions & { readonly code?: string },
+  ) {
+    super(options?.code ?? "FATAL_TOOL_EXECUTION", message, options);
+  }
+}
+
+export class ToolSchedulerError extends MayError {
+  constructor(message: string) {
+    super("TOOL_SCHEDULER_ERROR", message);
   }
 }
 
 export class ModelProtocolError extends MayError {
   constructor(message: string) {
     super("MODEL_PROTOCOL_ERROR", message);
+  }
+}
+
+export class UnsupportedContentError extends MayError {
+  readonly adapter: string;
+  readonly contentType: string;
+  readonly role: string;
+
+  constructor(adapter: string, contentType: string, role: string) {
+    super(
+      "UNSUPPORTED_CONTENT",
+      `${adapter} does not support ${contentType} content in ${role} messages`,
+    );
+    this.adapter = adapter;
+    this.contentType = contentType;
+    this.role = role;
   }
 }
 

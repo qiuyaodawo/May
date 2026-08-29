@@ -1,4 +1,8 @@
-import { AsyncEventQueue, type RunOptions } from "@may/core";
+import {
+  AsyncEventQueue,
+  isStreamingMayEvent,
+  type RunOptions,
+} from "@may/core";
 import type {
   ContextCompactionResult,
   ContextInspection,
@@ -39,7 +43,11 @@ export class MaybeCodeWorkspace {
     MaybeCodeWorkspaceOptions,
     "sessionId" | "autoResume"
   >;
-  private readonly eventQueue = new AsyncEventQueue<MaybeCodeEvent>();
+  private readonly eventQueue = new AsyncEventQueue<MaybeCodeEvent>({
+    maxBufferedValues: 1024,
+    isDroppable: (value) =>
+      value.type === "run.event" && isStreamingMayEvent(value.event),
+  });
   private application: MaybeCodeApplication;
   private eventRelay: Promise<void>;
   private closed = false;

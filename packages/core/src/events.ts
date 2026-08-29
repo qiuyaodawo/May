@@ -9,7 +9,10 @@ export interface SerializedError {
 export interface RunResult {
   runId: string;
   steps: number;
+  modelCalls: number;
+  toolCalls: number;
   message: AssistantMessage;
+  /** Aggregate usage across every completed model call in the run. */
   usage?: Usage;
 }
 
@@ -36,6 +39,20 @@ export type MayEventPayload =
       usage?: Usage;
     }
   | { type: "tool.started"; step: number; call: ToolCall }
+  | {
+      type: "tool.output.delta";
+      step: number;
+      call: ToolCall;
+      delta: string;
+      channel?: string;
+    }
+  | {
+      type: "tool.progress";
+      step: number;
+      call: ToolCall;
+      message: string;
+      data?: unknown;
+    }
   | {
       type: "tool.completed";
       step: number;
@@ -78,10 +95,38 @@ export function serializeError(error: unknown): SerializedError {
   };
 }
 
+export function isStreamingMayEvent(event: MayEvent): boolean {
+  return event.type === "model.text.delta" ||
+    event.type === "model.reasoning.delta" ||
+    event.type === "tool.output.delta" ||
+    event.type === "tool.progress";
+}
+
+export interface AsyncEventQueueOptions<T> {
+  /** Preferred maximum; non-droppable values may temporarily exceed it. */
+  readonly maxBufferedValues?: number;
+  /** Values that may be discarded under buffer pressure. */
+  readonly isDroppable?: (value: T) => boolean;
+}
+
 export class AsyncEventQueue<T> implements AsyncIterable<T> {
   private readonly values: T[] = [];
   private readonly waiters: Array<(result: IteratorResult<T>) => void> = [];
+  private readonly maxBufferedValues: number | undefined;
+  private readonly isDroppable: (value: T) => boolean;
   private closed = false;
+
+  constructor(options: AsyncEventQueueOptions<T> = {}) {
+    if (
+      options.maxBufferedValues !== undefined &&
+      (!Number.isSafeInteger(options.maxBufferedValues) ||
+        options.maxBufferedValues < 1)
+    ) {
+      throw new RangeError("maxBufferedValues must be a positive safe integer");
+    }
+    this.maxBufferedValues = options.maxBufferedValues;
+    this.isDroppable = options.isDroppable ?? (() => false);
+  }
 
   push(value: T): void {
     if (this.closed) return;
@@ -90,6 +135,17 @@ export class AsyncEventQueue<T> implements AsyncIterable<T> {
     if (waiter) {
       waiter({ value, done: false });
     } else {
+      if (
+        this.maxBufferedValues !== undefined &&
+        this.values.length >= this.maxBufferedValues
+      ) {
+        const droppableIndex = this.values.findIndex(this.isDroppable);
+        if (droppableIndex >= 0) {
+          this.values.splice(droppableIndex, 1);
+        } else if (this.isDroppable(value)) {
+          return;
+        }
+      }
       this.values.push(value);
     }
   }

@@ -57,12 +57,22 @@ export type ModelEvent =
       usage?: Usage;
     };
 
+export interface ModelStreamOptions {
+  readonly signal: AbortSignal;
+  /** Populated by May; optional for direct adapter use outside a run. */
+  readonly runId?: string;
+  /** Populated by May; optional for direct adapter use outside a run. */
+  readonly step?: number;
+  /** Stable across retries of the same model call. */
+  readonly modelCallId?: string;
+}
+
 export interface Model {
   readonly limits?: ModelLimits;
   /** Optional provider-native context compaction capability. */
   readonly contextCompactor?: ModelContextCompactor;
   stream(
     request: ModelRequest,
-    options: { signal: AbortSignal },
+    options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent>;
 }

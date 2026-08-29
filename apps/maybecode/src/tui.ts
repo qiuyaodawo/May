@@ -317,6 +317,10 @@ class TerminalRenderer {
   private textStarted = false;
   private reasoningStarted = false;
   private readonly changePreviews = new Map<string, ToolChangePreview>();
+  private readonly toolOutputState = new Map<
+    string,
+    { endsWithNewline: boolean; channel?: string }
+  >();
 
   constructor(private readonly terminal: MaybeCodeTerminal) {}
 
@@ -374,10 +378,39 @@ class TerminalRenderer {
           )}\n`,
         );
         break;
+      case "tool.output.delta": {
+        const key = toolCallKey(event.runId, event.call.id);
+        const previous = this.toolOutputState.get(key);
+        if (
+          previous !== undefined &&
+          !previous.endsWithNewline &&
+          previous.channel !== event.channel
+        ) {
+          this.terminal.write("\n");
+        }
+        if (previous === undefined || previous.endsWithNewline ||
+          previous.channel !== event.channel) {
+          this.terminal.write(
+            event.channel === undefined ? "" : `[${event.channel}] `,
+          );
+        }
+        this.terminal.write(event.delta);
+        this.toolOutputState.set(key, {
+          endsWithNewline: event.delta.endsWith("\n"),
+          ...(event.channel === undefined ? {} : { channel: event.channel }),
+        });
+        break;
+      }
+      case "tool.progress":
+        this.endToolOutput(event.runId, event.call.id);
+        this.terminal.write(`↳ ${event.call.name}: ${event.message}\n`);
+        break;
       case "tool.completed":
+        this.endToolOutput(event.runId, event.call.id);
         this.renderToolCompleted(event);
         break;
       case "tool.failed":
+        this.endToolOutput(event.runId, event.call.id);
         this.changePreviews.delete(toolCallKey(event.runId, event.call.id));
         this.terminal.write(
           `✗ ${event.call.name}: ${event.error.message}\n`,
@@ -522,6 +555,16 @@ class TerminalRenderer {
     for (const key of this.changePreviews.keys()) {
       if (key.startsWith(prefix)) this.changePreviews.delete(key);
     }
+    for (const key of this.toolOutputState.keys()) {
+      if (key.startsWith(prefix)) this.toolOutputState.delete(key);
+    }
+  }
+
+  private endToolOutput(runId: string, toolCallId: string): void {
+    const key = toolCallKey(runId, toolCallId);
+    const state = this.toolOutputState.get(key);
+    this.toolOutputState.delete(key);
+    if (state?.endsWithNewline === false) this.terminal.write("\n");
   }
 }
 

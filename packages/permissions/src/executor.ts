@@ -1,6 +1,7 @@
 import {
   AsyncEventQueue,
   directToolExecutor,
+  FatalToolExecutionError,
   RunCancelledError,
   type ToolExecution,
   type ToolExecutor,
@@ -54,39 +55,51 @@ export class PermissionToolExecutor implements ToolExecutor {
   async execute<TInput, TOutput>(
     execution: ToolExecution<TInput, TOutput>,
   ): Promise<TOutput> {
-    this.throwIfClosed();
-    throwIfAborted(execution.context.signal);
+    try {
+      this.throwIfClosed();
+      throwIfAborted(execution.context.signal);
 
-    const check: PermissionCheck = {
-      tool: {
-        name: execution.tool.name,
-        description: execution.tool.description,
-        inputSchema: execution.tool.inputSchema,
-      },
-      input: execution.input,
-      context: execution.context,
-    };
-    const outcome = normalizeDecision(await this.policy(check));
+      const check: PermissionCheck = {
+        tool: {
+          name: execution.tool.name,
+          description: execution.tool.description,
+          inputSchema: execution.tool.inputSchema,
+        },
+        input: execution.input,
+        context: execution.context,
+      };
+      const outcome = normalizeDecision(await this.policy(check));
 
-    this.throwIfClosed();
-    throwIfAborted(execution.context.signal);
+      this.throwIfClosed();
+      throwIfAborted(execution.context.signal);
 
-    if (outcome.decision === "deny") {
-      throw new PermissionDeniedError(execution.tool.name);
-    }
-    if (outcome.decision === "ask") {
-      const granted = outcome.grantKey !== undefined
-        && this.sessionGrants.has(outcome.grantKey);
-      if (!granted) {
-        const approval = await this.requestApproval(check, outcome.grantKey);
-        if (approval === "deny") {
-          throw new PermissionDeniedError(execution.tool.name);
+      if (outcome.decision === "deny") {
+        throw new PermissionDeniedError(execution.tool.name);
+      }
+      if (outcome.decision === "ask") {
+        const granted = outcome.grantKey !== undefined
+          && this.sessionGrants.has(outcome.grantKey);
+        if (!granted) {
+          const approval = await this.requestApproval(check, outcome.grantKey);
+          if (approval === "deny") {
+            throw new PermissionDeniedError(execution.tool.name);
+          }
         }
       }
+
+      this.throwIfClosed();
+      throwIfAborted(execution.context.signal);
+    } catch (error) {
+      if (
+        error instanceof PermissionDeniedError ||
+        error instanceof RunCancelledError ||
+        error instanceof FatalToolExecutionError
+      ) {
+        throw error;
+      }
+      throw fatalPermissionError(execution.tool.name, error);
     }
 
-    this.throwIfClosed();
-    throwIfAborted(execution.context.signal);
     return this.executor.execute(execution);
   }
 
@@ -253,7 +266,14 @@ export class PermissionToolExecutor implements ToolExecutor {
       seq: ++this.seq,
       timestamp: Date.now(),
     };
-    await this.eventSink?.(event);
+    try {
+      await this.eventSink?.(event);
+    } catch (error) {
+      throw new FatalToolExecutionError(
+        `Permission event persistence failed: ${errorMessage(error)}`,
+        error instanceof Error ? { cause: error } : undefined,
+      );
+    }
     this.eventQueue.push(event);
   }
 }
@@ -292,4 +312,16 @@ function toReason(reason: unknown): string | undefined {
 
 function createApprovalId(): string {
   return `approval_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function fatalPermissionError(toolName: string, error: unknown): Error {
+  return new FatalToolExecutionError(
+    `Permission evaluation failed for tool "${toolName}": ${errorMessage(error)}`,
+    error instanceof Error ? { cause: error } : undefined,
+  );
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return typeof error === "string" ? error : "Unknown permission error";
 }

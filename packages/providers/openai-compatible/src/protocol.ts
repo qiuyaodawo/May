@@ -9,8 +9,16 @@ export interface OpenAICompatibleToolCall {
   function: OpenAICompatibleFunctionCall;
 }
 
+export type OpenAICompatibleUserContent =
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string; detail?: string } }
+    >;
+
 export type OpenAICompatibleMessage =
-  | { role: "system" | "user"; content: string }
+  | { role: "system"; content: string }
+  | { role: "user"; content: OpenAICompatibleUserContent }
   | {
       role: "assistant";
       content: string;

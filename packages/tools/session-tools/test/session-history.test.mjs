@@ -121,5 +121,6 @@ function context(signal = new AbortController().signal) {
     toolCallId: "call",
     idempotencyKey: "run:call",
     signal,
+    report() {},
   };
 }

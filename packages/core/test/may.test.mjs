@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  ConcurrentRunError,
   directToolExecutor,
+  FatalToolExecutionError,
   InMemoryContext,
   May,
+  parallelToolScheduler,
   reasoningContent,
 } from "../dist/index.js";
 
@@ -233,9 +236,11 @@ test("rejects invalid maxSteps and duplicate tool names at construction", () => 
 
 test("executes a tool and feeds its result back to the model", async () => {
   let modelStep = 0;
+  const modelOptions = [];
   const model = {
-    async *stream(request) {
+    async *stream(request, options) {
       modelStep += 1;
+      modelOptions.push(options);
       if (modelStep === 1) {
         assert.equal(request.tools[0].name, "add");
         yield {
@@ -243,6 +248,7 @@ test("executes a tool and feeds its result back to the model", async () => {
           message: assistant("", [
             { id: "call_1", name: "add", input: { a: 2, b: 3 } },
           ]),
+          usage: { inputTokens: 10, outputTokens: 2, totalTokens: 12 },
         };
         return;
       }
@@ -253,6 +259,7 @@ test("executes a tool and feeds its result back to the model", async () => {
       yield {
         type: "response.completed",
         message: assistant("2 + 3 = 5"),
+        usage: { inputTokens: 20, outputTokens: 3, totalTokens: 23 },
       };
     },
   };
@@ -274,7 +281,9 @@ test("executes a tool and feeds its result back to the model", async () => {
       }
       return input;
     },
-    async execute({ a, b }) {
+    async execute({ a, b }, context) {
+      context.report({ type: "progress", message: "adding" });
+      context.report({ type: "output.delta", channel: "result", delta: "5" });
       return a + b;
     },
   };
@@ -286,8 +295,25 @@ test("executes a tool and feeds its result back to the model", async () => {
   const events = await eventPromise;
 
   assert.equal(result.steps, 2);
+  assert.equal(result.modelCalls, 2);
+  assert.equal(result.toolCalls, 1);
+  assert.deepEqual(result.usage, {
+    inputTokens: 30,
+    outputTokens: 5,
+    totalTokens: 35,
+  });
   assert.equal(result.message.content[0].text, "2 + 3 = 5");
   assert.ok(events.some((event) => event.type === "tool.completed"));
+  assert.equal(events.find((event) => event.type === "tool.progress").message, "adding");
+  assert.equal(events.find((event) => event.type === "tool.output.delta").delta, "5");
+  assert.deepEqual(modelOptions.map((options) => ({
+    runId: options.runId,
+    step: options.step,
+    modelCallId: options.modelCallId,
+  })), [
+    { runId: run.id, step: 1, modelCallId: `${run.id}:model:1` },
+    { runId: run.id, step: 2, modelCallId: `${run.id}:model:2` },
+  ]);
 
   const snapshot = await context.snapshot();
   assert.deepEqual(snapshot.messages.map((message) => message.role), [
@@ -444,9 +470,11 @@ test("preserves opaque model state across steps and runs", async () => {
   assert.equal(modelCall, 3);
 });
 
-test("executes multiple tool calls from one model step in order", async () => {
+test("can schedule tools in parallel while preserving result order", async () => {
   let modelStep = 0;
   const executionOrder = [];
+  const allStarted = deferred();
+  let started = 0;
   const model = {
     async *stream(request) {
       modelStep += 1;
@@ -481,6 +509,9 @@ test("executes multiple tool calls from one model step in order", async () => {
     inputSchema: { type: "object" },
     async execute(input) {
       executionOrder.push(name);
+      started += 1;
+      if (started === 2) allStarted.resolve();
+      await allStarted.promise;
       return `${name}:${input.value}`;
     },
   });
@@ -490,6 +521,7 @@ test("executes multiple tool calls from one model step in order", async () => {
     model,
     tools: [createTool("first"), createTool("second")],
     context,
+    toolScheduler: parallelToolScheduler,
   }).run({ input: "run both" });
   const eventPromise = collect(run.events);
   const result = await run.result;
@@ -681,6 +713,44 @@ test("turns a custom executor error into a tool message and continues", async ()
     "executor unavailable",
   );
   assertSingleTerminalEvent(events, "run.completed");
+});
+
+test("terminates the run for explicitly fatal tool infrastructure errors", async () => {
+  let modelCalls = 0;
+  const model = {
+    async *stream() {
+      modelCalls += 1;
+      yield {
+        type: "response.completed",
+        message: assistant("", [
+          { id: "fatal_call", name: "fatal", input: {} },
+        ]),
+      };
+    },
+  };
+  const context = new InMemoryContext();
+  const run = new May({
+    model,
+    context,
+    tools: [{
+      name: "fatal",
+      description: "fatal infrastructure failure",
+      inputSchema: {},
+      async execute() {
+        throw new FatalToolExecutionError("durability unavailable");
+      },
+    }],
+  }).run({ input: "fail" });
+  const eventPromise = collect(run.events);
+
+  await assert.rejects(run.result, FatalToolExecutionError);
+  const events = await eventPromise;
+
+  assert.equal(modelCalls, 1);
+  assert.equal(events.find((event) => event.type === "tool.failed").error.code,
+    "FATAL_TOOL_EXECUTION");
+  assert.equal((await context.snapshot()).messages.at(-1).isError, true);
+  assertSingleTerminalEvent(events, "run.failed");
 });
 
 test("turns an unknown tool into a tool error so the model can recover", async () => {
@@ -875,6 +945,60 @@ test("passes run metadata and cancellation to context snapshots", async () => {
   assert.equal(snapshotOptions.runId, run.id);
   assert.equal(snapshotOptions.step, 1);
   assert.ok(snapshotOptions.signal instanceof AbortSignal);
+});
+
+test("rejects concurrent runs against the same runtime context", async () => {
+  const started = deferred();
+  const model = {
+    async *stream(_request, { signal }) {
+      started.resolve();
+      await waitForAbort(signal);
+    },
+  };
+  const may = new May({ model, context: new InMemoryContext() });
+  const first = may.run({ input: "first" });
+  const eventPromise = collect(first.events);
+  await started.promise;
+
+  assert.throws(() => may.run({ input: "second" }), ConcurrentRunError);
+  first.cancel("done");
+  await assert.rejects(first.result, { code: "RUN_CANCELLED" });
+  await eventPromise;
+});
+
+test("bounds unconsumed streaming events without losing lifecycle events", async () => {
+  const model = {
+    async *stream() {
+      for (let index = 0; index < 20; index++) {
+        yield { type: "text.delta", delta: String(index) };
+      }
+      yield {
+        type: "response.completed",
+        message: assistant("complete"),
+      };
+    },
+  };
+  const run = new May({
+    model,
+    context: new InMemoryContext(),
+    maxBufferedEvents: 4,
+  }).run({ input: "stream" });
+
+  await run.result;
+  const events = await collect(run.events);
+
+  assert.equal(events.some((event) => event.type === "model.text.delta"), false);
+  assert.deepEqual(events.map((event) => event.type), [
+    "run.started",
+    "step.started",
+    "model.started",
+    "model.completed",
+    "step.completed",
+    "run.completed",
+  ]);
+  assert.ok(events.some((event, index) =>
+    index > 0 && event.seq > events[index - 1].seq + 1
+  ));
 });
 
 test("run.cancel aborts active context preparation before the model call", async () => {

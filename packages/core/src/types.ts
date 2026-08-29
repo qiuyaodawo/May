@@ -1,9 +1,28 @@
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
+export type MediaSource =
+  | { type: "url"; url: string }
+  | { type: "base64"; mediaType: string; data: string }
+  | { type: "file"; fileId: string };
+
 export type ContentPart =
   | { type: "text"; text: string }
   | { type: "reasoning"; text: string }
-  | { type: "json"; value: unknown };
+  | { type: "json"; value: unknown }
+  | {
+      type: "image";
+      source: MediaSource;
+      detail?: "auto" | "low" | "high";
+    }
+  | { type: "audio"; source: MediaSource }
+  | { type: "file"; source: MediaSource; name?: string }
+  | {
+      /** Provider-neutral reference for custom adapters and resource systems. */
+      type: "resource";
+      uri: string;
+      name?: string;
+      mediaType?: string;
+    };
 
 export interface SystemMessage {
   role: "system";

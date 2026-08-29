@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import type { Tool } from "@may/core";
+import type { Tool, ToolProgressUpdate } from "@may/core";
 import { CodingToolError } from "./errors.js";
 import {
   optionalPositiveInteger,
@@ -102,6 +102,7 @@ export function createBashTool(options: BashToolOptions): Tool<
         workspace.absolute,
         options,
         context.signal,
+        context.report,
       );
     },
   };
@@ -114,6 +115,7 @@ function executeCommand(
   cwd: string,
   options: BashToolOptions,
   abortSignal: AbortSignal,
+  report: (update: ToolProgressUpdate) => void,
 ): Promise<BashToolOutput> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, {
@@ -132,8 +134,16 @@ function executeCommand(
     let timedOut = false;
     let cancelled = false;
 
-    child.stdout.on("data", stdout.append);
-    child.stderr.on("data", stderr.append);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout.append(chunk);
+      report({ type: "output.delta", channel: "stdout", delta: chunk });
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr.append(chunk);
+      report({ type: "output.delta", channel: "stderr", delta: chunk });
+    });
 
     const timeout = setTimeout(() => {
       timedOut = true;
@@ -218,7 +228,7 @@ function terminateProcessTree(child: ChildProcess): void {
 }
 
 interface OutputCollector {
-  readonly append: (chunk: Buffer) => void;
+  readonly append: (chunk: Buffer | string) => void;
   readonly text: () => string;
   readonly truncated: () => boolean;
 }
@@ -229,13 +239,14 @@ function createOutputCollector(maxBytes: number): OutputCollector {
   let wasTruncated = false;
   return {
     append(chunk) {
+      const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
       const remaining = maxBytes - bytes;
       if (remaining > 0) {
-        const kept = chunk.subarray(0, remaining);
+        const kept = buffer.subarray(0, remaining);
         chunks.push(kept);
         bytes += kept.byteLength;
       }
-      if (chunk.byteLength > remaining) wasTruncated = true;
+      if (buffer.byteLength > remaining) wasTruncated = true;
     },
     text: () => Buffer.concat(chunks).toString("utf8"),
     truncated: () => wasTruncated,

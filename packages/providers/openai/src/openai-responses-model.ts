@@ -4,6 +4,7 @@ import type {
   ModelContextCompactor,
   ModelEvent,
   ModelRequest,
+  ModelStreamOptions,
 } from "@may/core";
 
 import {
@@ -72,7 +73,7 @@ export class OpenAIResponsesModel implements Model {
 
   async *stream(
     request: ModelRequest,
-    options: { signal: AbortSignal },
+    options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
     const parts = toOpenAIResponsesRequestParts(request.messages);
     const body: Record<string, unknown> = {

@@ -57,7 +57,17 @@ class TestFinishReasonError extends Error {
 test("converts May messages and tools to the compatible wire format", () => {
   const messages = toOpenAICompatibleMessages([
     { role: "system", content: [{ type: "text", text: "System" }] },
-    { role: "user", content: [{ type: "json", value: { question: 1 } }] },
+    {
+      role: "user",
+      content: [
+        { type: "json", value: { question: 1 } },
+        {
+          type: "image",
+          source: { type: "url", url: "https://example.test/image.png" },
+          detail: "low",
+        },
+      ],
+    },
     {
       role: "assistant",
       content: [
@@ -80,7 +90,19 @@ test("converts May messages and tools to the compatible wire format", () => {
 
   assert.deepEqual(messages, [
     { role: "system", content: "System" },
-    { role: "user", content: "{\"question\":1}" },
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "{\"question\":1}" },
+        {
+          type: "image_url",
+          image_url: {
+            url: "https://example.test/image.png",
+            detail: "low",
+          },
+        },
+      ],
+    },
     {
       role: "assistant",
       content: "Calling.",
@@ -122,6 +144,14 @@ test("converts May messages and tools to the compatible wire format", () => {
     name: "lookup",
     content: "found",
   }]);
+
+  assert.throws(() => toOpenAICompatibleMessages([{
+    role: "user",
+    content: [{
+      type: "audio",
+      source: { type: "url", url: "https://example.test/audio.mp3" },
+    }],
+  }]), /does not support audio content/);
 });
 
 test("assembles fragmented reasoning, text, tools, and usage", async () => {

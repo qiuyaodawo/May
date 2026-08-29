@@ -1,5 +1,6 @@
 import {
   AsyncEventQueue,
+  isStreamingMayEvent,
   type May,
   type MayEvent,
   type Message,
@@ -220,7 +221,10 @@ export class Session {
   }
 
   private wrapRun(run: RunHandle): RunHandle {
-    const events = new AsyncEventQueue<MayEvent>();
+    const events = new AsyncEventQueue<MayEvent>({
+      maxBufferedValues: 1024,
+      isDroppable: isStreamingMayEvent,
+    });
     const observation = this.observeRun(run, events);
     const result = (async () => {
       try {

@@ -1,4 +1,4 @@
-import { MayError } from "@may/core";
+import { FatalToolExecutionError, MayError } from "@may/core";
 
 export class PermissionDeniedError extends MayError {
   readonly toolName: string;
@@ -9,11 +9,12 @@ export class PermissionDeniedError extends MayError {
   }
 }
 
-export class PermissionExecutorClosedError extends MayError {
+export class PermissionExecutorClosedError extends FatalToolExecutionError {
   constructor(reason?: string) {
     super(
-      "PERMISSION_EXECUTOR_CLOSED",
       reason ?? "Permission executor is closed",
+      { code: "PERMISSION_EXECUTOR_CLOSED" },
     );
+    this.name = "PermissionExecutorClosedError";
   }
 }
