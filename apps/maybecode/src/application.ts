@@ -61,6 +61,8 @@ export interface MaybeCodeApplicationOptions {
   readonly contextBudget?: ContextBudget;
   readonly compactionStrategy?: ContextCompactionStrategy;
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
+  /** Include the model's native compactor in the default automatic chain. */
+  readonly providerNativeAutoCompaction?: boolean;
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly instructionsDirectory?: string;
@@ -186,9 +188,11 @@ export class MaybeCodeApplication {
         "session_history tool. Inspect it when details from earlier work are " +
         "needed, then continue the current request.",
     });
-    const nativeCompactionStrategy = options.model.contextCompactor === undefined
-      ? undefined
-      : new ModelContextCompactionStrategy(options.model.contextCompactor);
+    const nativeCompactionStrategy =
+      options.providerNativeAutoCompaction === true &&
+        options.model.contextCompactor !== undefined
+        ? new ModelContextCompactionStrategy(options.model.contextCompactor)
+        : undefined;
     const autoCompactionStrategies = options.autoCompactionStrategies ?? [
       new PruneOldToolResultsStrategy(),
       ...(nativeCompactionStrategy === undefined

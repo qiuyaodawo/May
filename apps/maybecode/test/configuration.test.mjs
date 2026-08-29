@@ -201,7 +201,75 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   await app.close();
 });
 
-test("adds provider-native compaction to the automatic fallback chain", async (t) => {
+test("does not enable provider-native automatic compaction by default", async (t) => {
+  const opened = await openWithCapturedOpenAIContext(t, {});
+
+  assert.deepEqual(opened.strategyNames, [
+    "prune-old-tool-results",
+    "summary-tail",
+    "history-reference",
+  ]);
+  await opened.app.close();
+});
+
+test("adds explicitly enabled provider-native compaction after prune", async (t) => {
+  const opened = await openWithCapturedOpenAIContext(t, {
+    maybecode: { autoCompaction: { providerNative: true } },
+  });
+
+  assert.deepEqual(opened.strategyNames, [
+    "prune-old-tool-results",
+    "openai-responses-compact",
+    "summary-tail",
+    "history-reference",
+  ]);
+  await opened.app.close();
+});
+
+test("validates provider-native automatic compaction configuration", async (t) => {
+  await assert.rejects(
+    openWithCapturedOpenAIContext(t, {
+      maybecode: { autoCompaction: { providerNative: "yes" } },
+    }),
+    /apps\.maybecode\.autoCompaction\.providerNative must be a boolean/,
+  );
+  await assert.rejects(
+    openWithCapturedOpenAIContext(t, {
+      maybecode: { autoCompaction: true },
+    }),
+    /apps\.maybecode\.autoCompaction must be an object/,
+  );
+});
+
+test(
+  "explains Windows drive-relative paths mangled by Git Bash",
+  { skip: process.platform !== "win32" },
+  async () => {
+    await assert.rejects(
+      openConfiguredMaybeCode(
+        { workspace: "E:codeept" },
+        {
+          async loadConfig() {
+            throw new Error("config should not be loaded");
+          },
+        },
+      ),
+      /Git Bash removes unquoted backslashes.*E:\/code\/project/u,
+    );
+  },
+);
+
+function assistantMessage(text) {
+  return { role: "assistant", content: [{ type: "text", text }] };
+}
+
+async function temporaryDirectory(t) {
+  const directory = await mkdtemp(join(tmpdir(), "maybecode-config-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  return directory;
+}
+
+async function openWithCapturedOpenAIContext(t, apps) {
   const directory = await temporaryDirectory(t);
   let contextOptions;
   const app = await openConfiguredMaybeCode(
@@ -235,48 +303,15 @@ test("adds provider-native compaction to the automatic fallback chain", async (t
             },
           },
           models: {},
-          apps: {},
+          apps,
         };
       },
     },
   );
-
-  assert.deepEqual(
-    contextOptions.autoCompactionStrategies.map((strategy) => strategy.name),
-    [
-      "prune-old-tool-results",
-      "openai-responses-compact",
-      "summary-tail",
-      "history-reference",
-    ],
-  );
-  await app.close();
-});
-
-test(
-  "explains Windows drive-relative paths mangled by Git Bash",
-  { skip: process.platform !== "win32" },
-  async () => {
-    await assert.rejects(
-      openConfiguredMaybeCode(
-        { workspace: "E:codeept" },
-        {
-          async loadConfig() {
-            throw new Error("config should not be loaded");
-          },
-        },
-      ),
-      /Git Bash removes unquoted backslashes.*E:\/code\/project/u,
-    );
-  },
-);
-
-function assistantMessage(text) {
-  return { role: "assistant", content: [{ type: "text", text }] };
-}
-
-async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "maybecode-config-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return directory;
+  return {
+    app,
+    strategyNames: contextOptions.autoCompactionStrategies.map(
+      (strategy) => strategy.name,
+    ),
+  };
 }

@@ -43,8 +43,10 @@ Optional model limits let MaybeCode report context-window usage:
 }
 ```
 
-An OpenAI Responses configuration can enable both provider-side automatic
-context management and May's explicit provider-native fallback:
+OpenAI compaction is opt-in. `serverCompactThreshold` enables provider-side
+context management on normal Responses requests, while
+`apps.maybecode.autoCompaction.providerNative` lets MaybeCode call the model's
+native compactor as an automatic fallback:
 
 ```json
 {
@@ -57,6 +59,13 @@ context management and May's explicit provider-native fallback:
       "reasoningEffort": "high",
       "reasoningSummary": "auto",
       "serverCompactThreshold": 100000
+    }
+  },
+  "apps": {
+    "maybecode": {
+      "autoCompaction": {
+        "providerNative": true
+      }
     }
   }
 }
@@ -128,12 +137,15 @@ Programmatic callers can inject `contextSummarizer` or pass their own
 Before each model request, MaybeCode automatically checks context pressure
 when the model has a configured context-window limit. By default, the trigger
 ratio is 90%, bounded by the window after the configured output reserve. It
-first tries `prune-old-tool-results`. When the selected provider exposes native
-compaction, that runs next; otherwise the chain proceeds directly to
-`summary-tail`, then `history-reference`. Each changed view is persisted as `context.compacted`
+first tries `prune-old-tool-results`, then `summary-tail`, and finally
+`history-reference`. Provider-native automatic compaction is disabled by
+default. When `apps.maybecode.autoCompaction.providerNative` is `true` and the
+model exposes that capability, it is inserted after prune and before
+`summary-tail`; it is never the first strategy. Each changed view is persisted as `context.compacted`
 before the model request and is restored on session resume. The terminal
 reports automatic compactions. Programmatic callers can replace the ordered
-chain with `autoCompactionStrategies`, or pass an empty array to disable it.
+chain with `autoCompactionStrategies`, pass `providerNativeAutoCompaction`, or
+pass an empty strategy array to disable automatic compaction.
 
 The `read` tool runs without approval. `bash`, `edit`, and `write` require an
 allow-once, allow-for-session, or deny decision. Bash is not a sandbox.

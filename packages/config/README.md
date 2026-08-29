@@ -33,7 +33,10 @@ Optional configuration loading and validation for May applications.
   },
   "apps": {
     "maybecode": {
-      "instructionsDirectory": "instructions/maybecode"
+      "instructionsDirectory": "instructions/maybecode",
+      "autoCompaction": {
+        "providerNative": false
+      }
     }
   }
 }
@@ -59,7 +62,7 @@ They can be set on a provider or overridden by a model profile.
 
 `apps` is an optional map of application-owned configuration. This package
 validates that each entry is an object but leaves fields such as
-`instructionsDirectory` for the application to interpret.
+`instructionsDirectory` and `autoCompaction` for the application to interpret.
 
 `apiKeyEnv` is resolved only when `resolveProviderConfig()` or
 `resolveModelProfile()` selects that provider. The package does not instantiate

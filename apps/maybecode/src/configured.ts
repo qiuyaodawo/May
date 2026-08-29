@@ -17,13 +17,17 @@ import type { Model } from "@may/core";
 import { FileSessionStore } from "@may/session/file-store";
 
 import { FileSessionCatalog } from "./catalog.js";
+import { MaybeCodeConfigError } from "./errors.js";
 import {
   createMaybeCodeModel,
   selectMaybeCodeModel,
   type MaybeCodeModelSelector,
   type SelectedMaybeCodeModel,
 } from "./model.js";
-import { resolveMaybeCodeInstructionsDirectory } from "./instructions.js";
+import {
+  MAYBECODE_APPLICATION_ID,
+  resolveMaybeCodeInstructionsDirectory,
+} from "./instructions.js";
 import { MaybeCodeWorkspace } from "./workspace.js";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
@@ -36,6 +40,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly contextBudget?: ContextBudget;
   readonly compactionStrategy?: ContextCompactionStrategy;
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
+  readonly providerNativeAutoCompaction?: boolean;
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly maxSteps?: number;
@@ -73,6 +78,9 @@ export async function openConfiguredMaybeCode(
   const instructionsDirectory = options.instructions === undefined
     ? resolveMaybeCodeInstructionsDirectory(config)
     : undefined;
+  const providerNativeAutoCompaction =
+    options.providerNativeAutoCompaction ??
+      resolveProviderNativeAutoCompaction(config);
   const dataDirectory = resolve(
     options.dataDirectory ?? getDefaultMaybeCodeDataDirectory(),
   );
@@ -98,6 +106,7 @@ export async function openConfiguredMaybeCode(
     ...(options.autoCompactionStrategies === undefined
       ? {}
       : { autoCompactionStrategies: options.autoCompactionStrategies }),
+    providerNativeAutoCompaction,
     ...(options.contextSummarizer === undefined
       ? {}
       : { contextSummarizer: options.contextSummarizer }),
@@ -109,6 +118,26 @@ export async function openConfiguredMaybeCode(
       : { instructionsDirectory }),
     ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
   });
+}
+
+export function resolveProviderNativeAutoCompaction(
+  config: MayConfig,
+): boolean {
+  const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.autoCompaction;
+  if (value === undefined) return false;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new MaybeCodeConfigError(
+      "apps.maybecode.autoCompaction must be an object",
+    );
+  }
+  const providerNative = (value as Record<string, unknown>).providerNative;
+  if (providerNative === undefined) return false;
+  if (typeof providerNative !== "boolean") {
+    throw new MaybeCodeConfigError(
+      "apps.maybecode.autoCompaction.providerNative must be a boolean",
+    );
+  }
+  return providerNative;
 }
 
 function createContextBudget(
