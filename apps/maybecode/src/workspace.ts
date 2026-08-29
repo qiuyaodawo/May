@@ -11,9 +11,7 @@ import type { ApprovalDecision } from "@may/permissions";
 
 import {
   MaybeCodeApplication,
-  type MaybeCodeCompactionSelection,
   type MaybeCodeApplicationOptions,
-  type MaybeCodeModelInfo,
 } from "./application.js";
 import {
   latestSession,
@@ -25,6 +23,11 @@ import type {
   MaybeCodeRun,
 } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
+import type {
+  MaybeCodeCompactionSelection,
+  MaybeCodeController,
+  MaybeCodeModelInfo,
+} from "./controller.js";
 
 export interface MaybeCodeWorkspaceOptions extends Omit<
   MaybeCodeApplicationOptions,
@@ -35,7 +38,7 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
   readonly autoResume?: boolean;
 }
 
-export class MaybeCodeWorkspace {
+export class MaybeCodeWorkspace implements MaybeCodeController {
   readonly events: AsyncIterable<MaybeCodeEvent>;
   readonly workspace: string;
 

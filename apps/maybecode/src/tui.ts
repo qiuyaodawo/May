@@ -10,7 +10,7 @@ import type {
   TerminalQuestionOptions,
 } from "./terminal.js";
 import { createNodeTerminal } from "./terminal.js";
-import type { MaybeCodeWorkspace } from "./workspace.js";
+import type { MaybeCodeController } from "./controller.js";
 
 const HELP = `Commands:
   /new             Start a new session
@@ -39,7 +39,7 @@ export interface RunTerminalUIOptions {
 }
 
 export async function runTerminalUI(
-  app: MaybeCodeWorkspace,
+  app: MaybeCodeController,
   options: RunTerminalUIOptions = {},
 ): Promise<void> {
   const terminal = options.terminal ?? createNodeTerminal();
@@ -126,7 +126,7 @@ export async function runTerminalUI(
 }
 
 async function consumeEvents(
-  app: MaybeCodeWorkspace,
+  app: MaybeCodeController,
   renderer: TerminalRenderer,
   question: UIQuestion,
 ): Promise<void> {
@@ -149,7 +149,7 @@ async function consumeEvents(
 
 async function handlePermissionEvent(
   event: PermissionEvent,
-  app: MaybeCodeWorkspace,
+  app: MaybeCodeController,
   renderer: TerminalRenderer,
   question: UIQuestion,
 ): Promise<void> {
@@ -195,7 +195,7 @@ async function handlePermissionEvent(
 
 async function handleCommand(
   input: string,
-  app: MaybeCodeWorkspace,
+  app: MaybeCodeController,
   terminal: MaybeCodeTerminal,
 ): Promise<boolean> {
   const [command, ...arguments_] = input.split(/\s+/u);
@@ -511,7 +511,7 @@ class TerminalRenderer {
 
   async sessionChanged(
     event: Extract<MaybeCodeEvent, { type: "session.changed" }>,
-    app: MaybeCodeWorkspace,
+    app: MaybeCodeController,
   ): Promise<void> {
     this.terminal.write(
       `\nSession ${event.resumed ? "resumed" : "started"}: ${event.sessionId}\n`,
@@ -622,7 +622,7 @@ function toolCallKey(runId: string, toolCallId: string): string {
   return `${runId}:${toolCallId}`;
 }
 
-function renderInstructionSources(app: MaybeCodeWorkspace): string {
+function renderInstructionSources(app: MaybeCodeController): string {
   const system = app.instructions.system.source;
   const project = app.instructions.project?.source;
   return `Instructions:\n  system: ${instructionSourceLabel(system)}\n` +
@@ -632,7 +632,7 @@ function renderInstructionSources(app: MaybeCodeWorkspace): string {
 }
 
 function renderStatus(
-  app: MaybeCodeWorkspace,
+  app: MaybeCodeController,
   inspection: ContextInspection | undefined,
 ): string {
   let output = `Status:\n` +
@@ -650,7 +650,7 @@ function renderStatus(
   return `${output}\n`;
 }
 
-function modelLabel(app: MaybeCodeWorkspace): string {
+function modelLabel(app: MaybeCodeController): string {
   return app.modelInfo === undefined
     ? "custom"
     : `${app.modelInfo.provider}/${app.modelInfo.model}`;
@@ -703,7 +703,7 @@ function renderContextInspection(inspection: ContextInspection): string {
 }
 
 function renderCompactionResult(
-  result: Awaited<ReturnType<MaybeCodeWorkspace["compactContext"]>>,
+  result: Awaited<ReturnType<MaybeCodeController["compactContext"]>>,
 ): string {
   if (!result.changed) {
     return `No context changes were eligible for ${result.strategy}.\n`;
@@ -738,7 +738,7 @@ function formatBytes(bytes: number): string {
 }
 
 function instructionSourceLabel(
-  source: MaybeCodeWorkspace["instructions"]["system"]["source"],
+  source: MaybeCodeController["instructions"]["system"]["source"],
 ): string {
   return source.type === "file" ? source.path : source.type;
 }

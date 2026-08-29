@@ -51,13 +51,12 @@ import {
 } from "./instructions.js";
 import { createCodingPermissionPolicy } from "./policy.js";
 import { createModelContextSummarizer } from "./summarizer.js";
+import type {
+  MaybeCodeCompactionSelection,
+  MaybeCodeModelInfo,
+} from "./controller.js";
 
 export { DEFAULT_MAYBE_CODE_INSTRUCTIONS } from "./instructions.js";
-
-export interface MaybeCodeModelInfo {
-  readonly provider: string;
-  readonly model: string;
-}
 
 export interface MaybeCodeApplicationOptions {
   readonly workspace: string;
@@ -79,15 +78,6 @@ export interface MaybeCodeApplicationOptions {
   readonly instructionsDirectory?: string;
   readonly maxSteps?: number;
 }
-
-export type MaybeCodeCompactionStrategyName =
-  | "prune-old-tool-results"
-  | "summary-tail"
-  | "history-reference";
-
-export type MaybeCodeCompactionSelection =
-  | MaybeCodeCompactionStrategyName
-  | ContextCompactionStrategy;
 
 interface ActiveCompaction {
   readonly controller: AbortController;

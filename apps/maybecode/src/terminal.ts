@@ -7,6 +7,7 @@ export interface TerminalQuestionOptions {
   readonly history?: boolean;
 }
 
+/** Low-level I/O adapter used by the bundled TUI, not the custom-UI contract. */
 export interface MaybeCodeTerminal {
   readonly colors?: boolean;
   question(prompt: string, options?: TerminalQuestionOptions): Promise<string>;

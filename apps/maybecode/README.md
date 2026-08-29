@@ -3,6 +3,37 @@
 MaybeCode is the terminal coding-agent application assembled from May's Core,
 session, permission, provider, configuration, and coding-tool packages.
 
+## Custom UIs
+
+`MaybeCodeController` is the headless UI boundary. A custom terminal, desktop,
+or remote UI sends user actions through its methods and renders its
+`AsyncIterable<MaybeCodeEvent>` stream:
+
+```ts
+import {
+  openConfiguredMaybeCode,
+  type MaybeCodeController,
+} from "@may/maybecode";
+
+const controller: MaybeCodeController = await openConfiguredMaybeCode();
+
+const observation = (async () => {
+  for await (const event of controller.events) {
+    render(event);
+  }
+})();
+
+await (await controller.submit({ input: "Inspect this workspace." })).result;
+await controller.close();
+await observation;
+```
+
+The controller covers submission, cancellation, approvals, sessions, history,
+and context inspection/compaction. `MaybeCodeWorkspace` is the default concrete
+implementation. `MaybeCodeTerminal` is only the low-level input/output adapter
+for the bundled `runTerminalUI`; implementing it changes terminal mechanics but
+does not replace the bundled UI's command or rendering policy.
+
 ## Run
 
 Configure a built-in provider in `~/.may/config.json`, then run:

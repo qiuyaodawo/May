@@ -9,13 +9,13 @@ import {
 import { MaybeCodeUsageError } from "./errors.js";
 import { createNodeTerminal, type MaybeCodeTerminal } from "./terminal.js";
 import { runTerminalUI } from "./tui.js";
-import type { MaybeCodeWorkspace } from "./workspace.js";
+import type { MaybeCodeController } from "./controller.js";
 
 export interface RunMaybeCodeDependencies {
   readonly terminal?: MaybeCodeTerminal;
   readonly open?: (
     options: OpenConfiguredMaybeCodeOptions,
-  ) => Promise<MaybeCodeWorkspace>;
+  ) => Promise<MaybeCodeController>;
 }
 
 export async function runMaybeCode(

@@ -99,6 +99,14 @@ Core runtimes from configuration, coding tools, permissions, and Session; owns
 their lifecycle; and exposes a terminal interface. No reusable package depends
 on MaybeCode.
 
+Its explicit UI boundary is `MaybeCodeController`: user intents are methods,
+while asynchronous model, tool, permission, context, and session changes are a
+`MaybeCodeEvent` stream. `MaybeCodeWorkspace` implements this headless contract.
+The bundled TUI depends only on the contract, so another TUI can consume the
+same controller without implementing readline or inheriting the default
+rendering and command policy. `MaybeCodeTerminal` is a narrower I/O adapter for
+reusing the bundled TUI rather than the custom-UI boundary.
+
 ## Events and persistence
 
 `MayEvent` is a best-effort live observation of one run and may include
