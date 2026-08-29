@@ -10,7 +10,8 @@
   "references": [
     { "path": "../../packages/config" },
     { "path": "../../packages/core" },
-    { "path": "../../packages/providers/deepseek" }
+    { "path": "../../packages/providers/deepseek" },
+    { "path": "../../packages/providers/openai" }
   ],
   "include": ["src/**/*.ts"]
 }

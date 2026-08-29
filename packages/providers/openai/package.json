@@ -1,8 +1,7 @@
 {
-  "name": "@may/cli",
+  "name": "@may/provider-openai",
   "version": "0.1.0",
-  "description": "Minimal command-line interface for May.",
-  "private": true,
+  "description": "OpenAI Responses API model adapter for May.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,27 +11,19 @@
       "import": "./dist/index.js"
     }
   },
-  "bin": {
-    "may": "./dist/bin.js"
-  },
+  "files": ["dist"],
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "start": "pnpm run build && node dist/bin.js",
     "test": "pnpm run build && node --test test/*.test.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/config": "workspace:*",
-    "@may/core": "workspace:*",
-    "@may/provider-deepseek": "workspace:*",
-    "@may/provider-openai": "workspace:*"
+    "@may/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"
   },
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": { "node": ">=20" },
   "license": "MIT"
 }

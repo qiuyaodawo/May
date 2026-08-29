@@ -23,6 +23,9 @@ importers:
       '@may/provider-deepseek':
         specifier: workspace:*
         version: link:../../packages/providers/deepseek
+      '@may/provider-openai':
+        specifier: workspace:*
+        version: link:../../packages/providers/openai
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -48,6 +51,9 @@ importers:
       '@may/provider-deepseek':
         specifier: workspace:*
         version: link:../../packages/providers/deepseek
+      '@may/provider-openai':
+        specifier: workspace:*
+        version: link:../../packages/providers/openai
       '@may/session':
         specifier: workspace:*
         version: link:../../packages/session
@@ -129,6 +135,16 @@ importers:
       '@may/config':
         specifier: workspace:*
         version: link:../../config
+
+  packages/providers/openai:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
 
   packages/providers/openai-compatible:
     dependencies:

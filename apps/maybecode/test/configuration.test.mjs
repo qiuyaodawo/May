@@ -84,6 +84,36 @@ test("attaches configured context limits to the created model", () => {
   });
 });
 
+test("creates an OpenAI Responses model and preserves native compaction", () => {
+  const model = createMaybeCodeModel({
+    provider: "openai",
+    model: "gpt-5.4",
+    providerConfig: { apiKey: "test" },
+    options: {
+      reasoningEffort: "high",
+      reasoningSummary: "auto",
+      serverCompactThreshold: 50_000,
+      store: false,
+    },
+    limits: { contextWindowTokens: 128_000, maxOutputTokens: 8192 },
+  });
+
+  assert.deepEqual(model.limits, {
+    contextWindowTokens: 128_000,
+    maxOutputTokens: 8192,
+  });
+  assert.equal(model.contextCompactor.name, "openai-responses-compact");
+  assert.throws(
+    () => createMaybeCodeModel({
+      provider: "openai",
+      model: "gpt-5.4",
+      providerConfig: { apiKey: "test" },
+      options: { store: "yes" },
+    }),
+    /providers\.openai\.store must be a boolean/,
+  );
+});
+
 test("opens configured MaybeCode with injected model creation", async (t) => {
   const directory = await temporaryDirectory(t);
   const configDirectory = join(directory, "config");
@@ -167,6 +197,58 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   assert.deepEqual(
     contextOptions.autoCompactionStrategies.map((strategy) => strategy.name),
     ["prune-old-tool-results", "summary-tail", "history-reference"],
+  );
+  await app.close();
+});
+
+test("adds provider-native compaction to the automatic fallback chain", async (t) => {
+  const directory = await temporaryDirectory(t);
+  let contextOptions;
+  const app = await openConfiguredMaybeCode(
+    {
+      workspace: directory,
+      dataDirectory: join(directory, "data"),
+      autoResume: false,
+      contextFactory: {
+        create(options) {
+          contextOptions = options;
+          return {
+            context: new InMemoryContext({
+              instructions: options.instructions,
+              messages: [...(options.messages ?? [])],
+              metadata: { ...options.metadata },
+            }),
+          };
+        },
+      },
+    },
+    {
+      async loadConfig() {
+        return {
+          path: join(directory, "config.json"),
+          providers: {
+            openai: {
+              apiKey: "test",
+              model: "gpt-5.4",
+              contextWindowTokens: 128_000,
+              maxOutputTokens: 8192,
+            },
+          },
+          models: {},
+          apps: {},
+        };
+      },
+    },
+  );
+
+  assert.deepEqual(
+    contextOptions.autoCompactionStrategies.map((strategy) => strategy.name),
+    [
+      "prune-old-tool-results",
+      "openai-responses-compact",
+      "summary-tail",
+      "history-reference",
+    ],
   );
   await app.close();
 });

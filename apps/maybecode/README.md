@@ -5,7 +5,7 @@ session, permission, provider, configuration, and coding-tool packages.
 
 ## Run
 
-Configure DeepSeek in `~/.may/config.json`, then run:
+Configure DeepSeek or OpenAI in `~/.may/config.json`, then run:
 
 ```sh
 pnpm maybecode
@@ -23,8 +23,9 @@ pnpm maybecode /e/code/project
 pnpm maybecode 'E:\code\project'
 ```
 
-MaybeCode currently creates configured models for DeepSeek. The lower-level
-provider adapters remain independently usable.
+MaybeCode currently creates configured models for DeepSeek Chat Completions
+and OpenAI Responses. The lower-level provider adapters remain independently
+usable.
 
 Optional model limits let MaybeCode report context-window usage:
 
@@ -36,6 +37,25 @@ Optional model limits let MaybeCode report context-window usage:
       "model": "deepseek-chat",
       "contextWindowTokens": 64000,
       "maxOutputTokens": 8192
+    }
+  }
+}
+```
+
+An OpenAI Responses configuration can enable both provider-side automatic
+context management and May's explicit provider-native fallback:
+
+```json
+{
+  "providers": {
+    "openai": {
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "model": "gpt-5.4",
+      "contextWindowTokens": 128000,
+      "maxOutputTokens": 8192,
+      "reasoningEffort": "high",
+      "reasoningSummary": "auto",
+      "serverCompactThreshold": 100000
     }
   }
 }
@@ -107,8 +127,9 @@ Programmatic callers can inject `contextSummarizer` or pass their own
 Before each model request, MaybeCode automatically checks context pressure
 when the model has a configured context-window limit. By default, the trigger
 ratio is 90%, bounded by the window after the configured output reserve. It
-first tries `prune-old-tool-results`, then falls back to `summary-tail` if
-pressure remains, and finally `history-reference`. Each changed view is persisted as `context.compacted`
+first tries `prune-old-tool-results`. When the selected provider exposes native
+compaction, that runs next; otherwise the chain proceeds directly to
+`summary-tail`, then `history-reference`. Each changed view is persisted as `context.compacted`
 before the model request and is restored on session resume. The terminal
 reports automatic compactions. Programmatic callers can replace the ordered
 chain with `autoCompactionStrategies`, or pass an empty array to disable it.

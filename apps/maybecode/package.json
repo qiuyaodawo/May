@@ -30,6 +30,7 @@
     "@may/core": "workspace:*",
     "@may/permissions": "workspace:*",
     "@may/provider-deepseek": "workspace:*",
+    "@may/provider-openai": "workspace:*",
     "@may/session": "workspace:*",
     "@may/session-tools": "workspace:*"
   },

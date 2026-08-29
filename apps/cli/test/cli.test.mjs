@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { parseMayConfig } from "@may/config";
 import { DeepSeekModel } from "@may/provider-deepseek";
+import { OpenAIResponsesModel } from "@may/provider-openai";
 import {
   createConfiguredModel,
   parseCliArgs,
@@ -204,7 +205,7 @@ test("reports an ambiguous provider selection", async () => {
   assert.match(stderr.value, /Select a provider with --provider/);
 });
 
-test("creates DeepSeek models and validates CLI-specific options", () => {
+test("creates configured provider models and validates CLI-specific options", () => {
   const base = {
     provider: "deepseek",
     model: "deepseek-reasoner",
@@ -213,9 +214,19 @@ test("creates DeepSeek models and validates CLI-specific options", () => {
   };
 
   assert.ok(createConfiguredModel(base) instanceof DeepSeekModel);
+  assert.ok(createConfiguredModel({
+    provider: "openai",
+    model: "gpt-5.4",
+    providerConfig: { apiKey: "test-key" },
+    options: {
+      reasoningEffort: "high",
+      reasoningSummary: "auto",
+      serverCompactThreshold: 50_000,
+    },
+  }) instanceof OpenAIResponsesModel);
   assert.throws(
     () => createConfiguredModel({ ...base, provider: "another" }),
-    /currently supports deepseek/,
+    /currently supports deepseek and openai/,
   );
   assert.throws(
     () => createConfiguredModel({

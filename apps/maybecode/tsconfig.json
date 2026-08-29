@@ -15,6 +15,7 @@
     { "path": "../../packages/permissions" },
     { "path": "../../packages/session" },
     { "path": "../../packages/providers/deepseek" },
+    { "path": "../../packages/providers/openai" },
     { "path": "../../packages/tools/coding-tools" },
     { "path": "../../packages/tools/session-tools" }
   ]

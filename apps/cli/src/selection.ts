@@ -5,6 +5,7 @@ import {
   type ProviderConfig,
   type ResolveProviderOptions,
 } from "@may/config";
+import type { ModelLimits } from "@may/core";
 import { CliConfigError } from "./errors.js";
 
 export interface ModelSelector {
@@ -17,6 +18,7 @@ export interface SelectedModelConfig {
   readonly model: string;
   readonly providerConfig: ProviderConfig;
   readonly options: Readonly<Record<string, unknown>>;
+  readonly limits?: ModelLimits;
 }
 
 export function selectModelConfig(
@@ -40,6 +42,7 @@ export function selectModelConfig(
       model: profile.model,
       providerConfig: profile.providerConfig,
       options: profile.options,
+      ...modelLimits(profile.contextWindowTokens, profile.maxOutputTokens),
     };
   }
 
@@ -51,7 +54,31 @@ export function selectModelConfig(
       `Set providers.${provider}.model in ${config.path}`,
     );
   }
-  return { provider, model, providerConfig, options: {} };
+  return {
+    provider,
+    model,
+    providerConfig,
+    options: {},
+    ...modelLimits(
+      providerConfig.contextWindowTokens,
+      providerConfig.maxOutputTokens,
+    ),
+  };
+}
+
+function modelLimits(
+  contextWindowTokens: number | undefined,
+  maxOutputTokens: number | undefined,
+): { limits?: ModelLimits } {
+  if (contextWindowTokens === undefined && maxOutputTokens === undefined) {
+    return {};
+  }
+  return {
+    limits: {
+      ...(contextWindowTokens === undefined ? {} : { contextWindowTokens }),
+      ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+    },
+  };
 }
 
 function selectOnlyProvider(config: MayConfig): string {

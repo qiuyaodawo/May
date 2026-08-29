@@ -11,6 +11,15 @@ Optional configuration loading and validation for May applications.
       "baseURL": "https://api.deepseek.com",
       "contextWindowTokens": 64000,
       "maxOutputTokens": 8192
+    },
+    "openai": {
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "model": "gpt-5.4",
+      "contextWindowTokens": 128000,
+      "maxOutputTokens": 8192,
+      "reasoningEffort": "high",
+      "reasoningSummary": "auto",
+      "serverCompactThreshold": 100000
     }
   },
   "models": {

@@ -18,6 +18,7 @@ packages/
     zhipu/      Zhipu GLM streaming model adapter
     kimi/       Kimi streaming model adapter
     anthropic/  Anthropic Messages API streaming model adapter
+    openai/     OpenAI Responses API adapter and native compaction
   tools/
     coding-tools/  Read, bash, edit, and write tools
 apps/

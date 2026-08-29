@@ -10,15 +10,35 @@ import {
   type DeepSeekModelOptions,
   type DeepSeekReasoningEffort,
 } from "@may/provider-deepseek";
+import {
+  OpenAIResponsesModel,
+  type OpenAIReasoningEffort,
+  type OpenAIReasoningSummary,
+  type OpenAIResponsesModelOptions,
+} from "@may/provider-openai";
 
 import { MaybeCodeConfigError } from "./errors.js";
 
-const REASONING_EFFORTS = new Set<DeepSeekReasoningEffort>([
+const DEEPSEEK_REASONING_EFFORTS = new Set<DeepSeekReasoningEffort>([
   "low",
   "medium",
   "high",
   "xhigh",
   "max",
+]);
+const OPENAI_REASONING_EFFORTS = new Set<OpenAIReasoningEffort>([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+]);
+const OPENAI_REASONING_SUMMARIES = new Set<OpenAIReasoningSummary>([
+  "auto",
+  "concise",
+  "detailed",
 ]);
 
 export interface MaybeCodeModelSelector {
@@ -81,12 +101,14 @@ export function selectMaybeCodeModel(
 export function createMaybeCodeModel(
   selection: SelectedMaybeCodeModel,
 ): Model {
-  if (selection.provider !== "deepseek") {
-    throw new MaybeCodeConfigError(
-      `Unsupported provider "${selection.provider}"; MaybeCode currently supports deepseek`,
-    );
-  }
+  if (selection.provider === "deepseek") return createDeepSeekModel(selection);
+  if (selection.provider === "openai") return createOpenAIModel(selection);
+  throw new MaybeCodeConfigError(
+    `Unsupported provider "${selection.provider}"; MaybeCode currently supports deepseek and openai`,
+  );
+}
 
+function createDeepSeekModel(selection: SelectedMaybeCodeModel): Model {
   const options: DeepSeekModelOptions = {
     apiKey: requiredString(
       selection.providerConfig.apiKey,
@@ -106,7 +128,7 @@ export function createMaybeCodeModel(
   const reasoningEffort = optionalEnum(
     tuningOption(selection, "reasoningEffort"),
     "providers.deepseek.reasoningEffort",
-    REASONING_EFFORTS,
+    DEEPSEEK_REASONING_EFFORTS,
   );
   const maxTokens = optionalPositiveInteger(
     tuningOption(selection, "maxTokens"),
@@ -122,9 +144,67 @@ export function createMaybeCodeModel(
     selection.limits?.contextWindowTokens,
     maxTokens ?? selection.limits?.maxOutputTokens,
   ).limits;
+  return attachLimits(model, limits);
+}
+
+function createOpenAIModel(selection: SelectedMaybeCodeModel): Model {
+  const baseURL = optionalString(
+    selection.providerConfig.baseURL,
+    "providers.openai.baseURL",
+  );
+  const maxOutputTokens = optionalPositiveInteger(
+    modelOption(selection, "maxOutputTokens"),
+    "providers.openai.maxOutputTokens",
+  ) ?? selection.limits?.maxOutputTokens;
+  const reasoningEffort = optionalEnum(
+    tuningOption(selection, "reasoningEffort"),
+    "providers.openai.reasoningEffort",
+    OPENAI_REASONING_EFFORTS,
+  );
+  const reasoningSummary = optionalEnum(
+    tuningOption(selection, "reasoningSummary"),
+    "providers.openai.reasoningSummary",
+    OPENAI_REASONING_SUMMARIES,
+  );
+  const serverCompactThreshold = optionalPositiveInteger(
+    tuningOption(selection, "serverCompactThreshold"),
+    "providers.openai.serverCompactThreshold",
+  );
+  const store = optionalBoolean(
+    tuningOption(selection, "store"),
+    "providers.openai.store",
+  );
+  const options: OpenAIResponsesModelOptions = {
+    apiKey: requiredString(
+      selection.providerConfig.apiKey,
+      "providers.openai.apiKey",
+    ),
+    model: selection.model,
+    ...(baseURL === undefined ? {} : { baseURL }),
+    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+    ...(reasoningSummary === undefined ? {} : { reasoningSummary }),
+    ...(serverCompactThreshold === undefined
+      ? {}
+      : { serverCompactThreshold }),
+    ...(store === undefined ? {} : { store }),
+  };
+
+  const model = new OpenAIResponsesModel(options);
+  const limits = modelLimits(
+    selection.limits?.contextWindowTokens,
+    maxOutputTokens,
+  ).limits;
+  return attachLimits(model, limits);
+}
+
+function attachLimits(model: Model, limits: ModelLimits | undefined): Model {
   if (limits === undefined) return model;
   return {
     limits,
+    ...(model.contextCompactor === undefined
+      ? {}
+      : { contextCompactor: model.contextCompactor }),
     stream: (request, streamOptions) => model.stream(request, streamOptions),
   };
 }
@@ -166,6 +246,15 @@ function tuningOption(
     : selection.providerConfig[name];
 }
 
+function modelOption(
+  selection: SelectedMaybeCodeModel,
+  name: string,
+): unknown {
+  return Object.hasOwn(selection.options, name)
+    ? selection.options[name]
+    : undefined;
+}
+
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim() === "") {
     throw new MaybeCodeConfigError(`${field} must be a non-empty string`);
@@ -201,4 +290,12 @@ function optionalPositiveInteger(
     throw new MaybeCodeConfigError(`${field} must be a positive safe integer`);
   }
   return value as number;
+}
+
+function optionalBoolean(value: unknown, field: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") {
+    throw new MaybeCodeConfigError(`${field} must be a boolean`);
+  }
+  return value;
 }

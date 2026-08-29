@@ -11,6 +11,7 @@
     { "path": "./packages/providers/zhipu" },
     { "path": "./packages/providers/kimi" },
     { "path": "./packages/providers/anthropic" },
+    { "path": "./packages/providers/openai" },
     { "path": "./packages/tools/coding-tools" },
     { "path": "./packages/tools/session-tools" },
     { "path": "./apps/cli" },
