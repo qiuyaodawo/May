@@ -43,7 +43,10 @@ export interface MaybeCodePrototypeViewOptions {
   readonly suggestions?: (
     input: string,
   ) => Promise<readonly MaybeCodeSlashCommandSuggestion[]>;
-  readonly onSubmit: (value: string) => void | Promise<void>;
+  readonly onSubmit: (
+    value: string,
+    accepted?: () => void,
+  ) => void | Promise<void>;
   readonly onCancel?: () => void;
   readonly onInvalidate?: () => void;
 }
@@ -71,6 +74,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
   private suggestions: readonly MaybeCodeSlashCommandSuggestion[] = [];
   private suggestionsVisible = false;
   private suggestionVersion = 0;
+  private submissionInFlight = false;
   private status = "Ready";
   private model: string;
   private readonly unsubscribe: () => void;
@@ -280,12 +284,12 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
   }
 
   setStatus(status: string): void {
-    this.status = status;
+    this.status = sanitizeTerminalText(status);
     this.options.onInvalidate?.();
   }
 
   setModel(model: string): void {
-    this.model = model;
+    this.model = sanitizeTerminalText(model);
     this.options.onInvalidate?.();
   }
 
@@ -414,16 +418,23 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
 
   private submit(value: string, completeCommand = true): void {
     if (value.trim() === "") return;
+    if (this.submissionInFlight) {
+      this.setStatus("An operation is already active");
+      return;
+    }
+    this.submissionInFlight = true;
     this.inputHistory.record(value);
     this.editor.setValue("");
     this.hideSuggestions();
     this.setStatus("Running");
-    void this.resolveSubmission(value, completeCommand).then(
-      (status) => this.setStatus(status ?? "Ready"),
-      (error: unknown) => this.setStatus(
-        `Error: ${error instanceof Error ? error.message : String(error)}`,
-      ),
-    );
+    void this.resolveSubmission(value, completeCommand)
+      .then(
+        (status) => this.setStatus(status ?? "Ready"),
+        (error: unknown) => this.setStatus(
+          `Error: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      )
+      .finally(() => this.submissionInFlight = false);
   }
 
   private async resolveSubmission(
@@ -438,10 +449,16 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     const uiResult = this.uiActions.executeCommand(submission);
     if (uiResult.matched) return uiResult.status;
     this.transcript.scrollToEnd();
-    if (this.options.recordInput?.(submission) ?? true) {
-      this.options.store.appendUser(submission);
-    }
-    await this.options.onSubmit(submission);
+    let recorded = false;
+    const recordAcceptedInput = (): void => {
+      if (recorded) return;
+      recorded = true;
+      if (this.options.recordInput?.(submission) ?? true) {
+        this.options.store.appendUser(submission);
+      }
+    };
+    await this.options.onSubmit(submission, recordAcceptedInput);
+    recordAcceptedInput();
     return undefined;
   }
 
@@ -511,7 +528,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     });
     this.dialog = new Dialog(this.baseView, prompt, {
       open: true,
-      title: `Approval: ${pending.request.tool.name}`,
+      title: `Approval: ${sanitizeTerminalText(pending.request.tool.name)}`,
       width: 72,
       height: pending.request.grantKey === undefined ? 10 : 11,
       dismissOnEscape: false,
@@ -703,7 +720,12 @@ class ApprovalPrompt implements InteractiveComponent {
   render(size: RenderSize): RenderResult {
     const input = truncate(sanitizeTerminalText(stringify(this.request.input)), 1_200);
     return new Column([
-      { height: 1, component: new Text(`Tool: ${this.request.tool.name}`) },
+      {
+        height: 1,
+        component: new Text(
+          `Tool: ${sanitizeTerminalText(this.request.tool.name)}`,
+        ),
+      },
       { flex: 1, minHeight: 1, component: new Text(input) },
       {
         height: this.request.grantKey === undefined ? 2 : 3,
@@ -869,7 +891,7 @@ class SessionPrompt implements InteractiveComponent {
       return true;
     }
     this.mode = "delete";
-    this.status = `Delete ${session.title ?? session.id}?`;
+    this.status = `Delete ${sanitizeTerminalText(session.title ?? session.id)}?`;
     return true;
   }
 

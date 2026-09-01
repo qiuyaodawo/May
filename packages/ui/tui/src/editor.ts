@@ -363,7 +363,7 @@ function fitPrefix(value: string, width: number): string {
 
 function displayGrapheme(value: string): string {
   if (value === "\t") return "  ";
-  if (/^[\u0000-\u001f\u007f]$/u.test(value)) return "�";
+  if (/^[\u0000-\u001f\u007f-\u009f]$/u.test(value)) return "�";
   return value;
 }
 

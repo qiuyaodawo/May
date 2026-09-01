@@ -2,6 +2,7 @@ import type { ContentPart, MayEvent } from "@may/core";
 import type { ContextInspection } from "@may/context";
 import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
+import { sanitizeTerminalText } from "@may/tui";
 
 import type { FileChangeKind, ToolChangePreview } from "./diff.js";
 import type { MaybeCodeEvent } from "./events.js";
@@ -38,10 +39,24 @@ export async function runTerminalUI(
   options: RunTerminalUIOptions = {},
 ): Promise<void> {
   const terminal = options.terminal ?? createNodeTerminal();
+  let terminalClosed = false;
+  const closeTerminal = (): void => {
+    if (terminalClosed) return;
+    terminalClosed = true;
+    terminal.close();
+  };
   const renderer = new TerminalRenderer(terminal);
   const slashCommandSuggestions = createMaybeCodeSlashCommandSuggester(app);
   let activeQuestion: AbortController | undefined;
   let exit = false;
+  const handleProcessSignal = (): void => {
+    exit = true;
+    if (app.isRunning) app.cancel("Interrupted by process signal");
+    activeQuestion?.abort();
+    closeTerminal();
+  };
+  process.on("SIGINT", handleProcessSignal);
+  process.on("SIGTERM", handleProcessSignal);
 
   const question: UIQuestion = async (prompt, questionOptions = {}) => {
     const controller = new AbortController();
@@ -68,12 +83,12 @@ export async function runTerminalUI(
   });
 
   const eventTask = consumeEvents(app, renderer, question);
-  terminal.write(
+  terminal.write(sanitizeTerminalText(
     `MaybeCode\nWorkspace: ${app.workspace}\n` +
       `Model: ${modelLabel(app)}\n` +
       `${renderInstructionSources(app)}` +
       "Type /help for commands. End a line with \\ for multiline input.\n",
-  );
+  ));
 
   try {
     while (!exit) {
@@ -95,7 +110,9 @@ export async function runTerminalUI(
           exit = await handleCommand(input, app, terminal, question);
         } catch (error) {
           if (!isCancellation(error) && !isAbortError(error)) {
-            terminal.write(`\nError: ${errorMessage(error)}\n`);
+            terminal.write(
+              `\nError: ${sanitizeTerminalText(errorMessage(error))}\n`,
+            );
           }
         }
         continue;
@@ -106,16 +123,22 @@ export async function runTerminalUI(
         await run.result;
       } catch (error) {
         if (!isCancellation(error)) {
-          terminal.write(`\nError: ${errorMessage(error)}\n`);
+          terminal.write(
+            `\nError: ${sanitizeTerminalText(errorMessage(error))}\n`,
+          );
         }
       }
     }
   } finally {
+    process.removeListener("SIGINT", handleProcessSignal);
+    process.removeListener("SIGTERM", handleProcessSignal);
     activeQuestion?.abort();
     removeInterrupt?.();
+    // Restore readline/raw terminal state before potentially slow application
+    // cancellation and event-drain work.
+    closeTerminal();
     await app.close();
     await eventTask;
-    terminal.close();
   }
 }
 
@@ -230,10 +253,10 @@ async function renderSlashCommandResult(
       terminal.write(`\n${renderSlashCommandHelp(result.commands)}`);
       break;
     case "instructions":
-      terminal.write(
+      terminal.write(sanitizeTerminalText(
         `\n${renderInstructionSources(app)}` +
           `Effective instructions:\n---\n${result.instructions.effective}\n---\n`,
-      );
+      ));
       break;
     case "retry.started":
       await result.run.result;
@@ -440,7 +463,7 @@ class TerminalRenderer {
           this.terminal.write(`\n${this.dim("[thinking] ")}`);
           this.reasoningStarted = true;
         }
-        this.terminal.write(this.dim(event.delta));
+        this.terminal.write(this.dim(sanitizeTerminalText(event.delta)));
         break;
       case "model.text.delta":
         this.endReasoning();
@@ -448,13 +471,13 @@ class TerminalRenderer {
           this.terminal.write("\nMaybeCode: ");
           this.textStarted = true;
         }
-        this.terminal.write(event.delta);
+        this.terminal.write(sanitizeTerminalText(event.delta));
         break;
       case "model.retrying":
         this.endReasoning();
         if (this.textStarted) this.terminal.write("\n");
         this.terminal.write(
-          `\nModel request failed: ${event.error.message}. ` +
+          `\nModel request failed: ${sanitizeTerminalText(event.error.message)}. ` +
             `Retrying in ${formatDelay(event.delayMs)} ` +
             `(attempt ${event.attempt}/${event.maxAttempts})...\n`,
         );
@@ -465,7 +488,7 @@ class TerminalRenderer {
         this.endReasoning();
         const text = textFromContent(event.message.content);
         if (!this.textStarted && text !== "") {
-          this.terminal.write(`\nMaybeCode: ${text}`);
+          this.terminal.write(`\nMaybeCode: ${sanitizeTerminalText(text)}`);
           this.textStarted = true;
         }
         if (this.textStarted) this.terminal.write("\n");
@@ -473,7 +496,7 @@ class TerminalRenderer {
       }
       case "tool.started":
         this.terminal.write(
-          `\n→ ${event.call.name}${toolInputSummary(
+          `\n→ ${sanitizeTerminalText(event.call.name)}${toolInputSummary(
             event.call.name,
             event.call.input,
           )}\n`,
@@ -492,10 +515,12 @@ class TerminalRenderer {
         if (previous === undefined || previous.endsWithNewline ||
           previous.channel !== event.channel) {
           this.terminal.write(
-            event.channel === undefined ? "" : `[${event.channel}] `,
+            event.channel === undefined
+              ? ""
+              : `[${sanitizeTerminalText(event.channel)}] `,
           );
         }
-        this.terminal.write(event.delta);
+        this.terminal.write(sanitizeTerminalText(event.delta));
         this.toolOutputState.set(key, {
           endsWithNewline: event.delta.endsWith("\n"),
           ...(event.channel === undefined ? {} : { channel: event.channel }),
@@ -504,7 +529,10 @@ class TerminalRenderer {
       }
       case "tool.progress":
         this.endToolOutput(event.runId, event.call.id);
-        this.terminal.write(`↳ ${event.call.name}: ${event.message}\n`);
+        this.terminal.write(
+          `↳ ${sanitizeTerminalText(event.call.name)}: ` +
+            `${sanitizeTerminalText(event.message)}\n`,
+        );
         break;
       case "tool.completed":
         this.endToolOutput(event.runId, event.call.id);
@@ -514,7 +542,8 @@ class TerminalRenderer {
         this.endToolOutput(event.runId, event.call.id);
         this.changePreviews.delete(toolCallKey(event.runId, event.call.id));
         this.terminal.write(
-          `✗ ${event.call.name}: ${event.error.message}\n`,
+          `✗ ${sanitizeTerminalText(event.call.name)}: ` +
+            `${sanitizeTerminalText(event.error.message)}\n`,
         );
         break;
       case "run.completed":
@@ -522,12 +551,18 @@ class TerminalRenderer {
         break;
       case "run.failed":
         this.clearRunPreviews(event.runId);
-        this.terminal.write(`\nRun failed: ${event.error.message}\n`);
+        this.terminal.write(
+          `\nRun failed: ${sanitizeTerminalText(event.error.message)}\n`,
+        );
         break;
       case "run.cancelled":
         this.clearRunPreviews(event.runId);
         this.terminal.write(
-          `\nRun cancelled${event.reason === undefined ? "" : `: ${event.reason}`}\n`,
+          `\nRun cancelled${
+            event.reason === undefined
+              ? ""
+              : `: ${sanitizeTerminalText(event.reason)}`
+          }\n`,
         );
         break;
     }
@@ -542,20 +577,21 @@ class TerminalRenderer {
     );
     if (event.preview.status === "unavailable") {
       this.terminal.write(
-        `\nDiff unavailable for ${event.preview.tool} ${event.preview.path}: ` +
-          `${event.preview.reason}\n`,
+        `\nDiff unavailable for ${event.preview.tool} ` +
+          `${sanitizeTerminalText(event.preview.path)}: ` +
+          `${sanitizeTerminalText(event.preview.reason)}\n`,
       );
       return;
     }
 
     this.terminal.write(
-      `\nChange preview: ${event.preview.path} ` +
+      `\nChange preview: ${sanitizeTerminalText(event.preview.path)} ` +
         `(${changeKindLabel(event.preview.kind)})\n`,
     );
     this.terminal.write(
       event.preview.diff === ""
         ? "(no content changes)\n"
-        : `${event.preview.diff}\n`,
+        : `${sanitizeTerminalText(event.preview.diff)}\n`,
     );
   }
 
@@ -579,7 +615,8 @@ class TerminalRenderer {
     const next = event.continuing
       ? " Trying the next strategy."
       : " No fallback strategies remain.";
-    const message = event.error.message.replace(/[.!?]+$/u, "");
+    const message = sanitizeTerminalText(event.error.message)
+      .replace(/[.!?]+$/u, "");
     this.terminal.write(
       `\nAutomatic context compaction failed with ${event.strategy} at ` +
         `~${formatNumber(event.before.effectiveTokens)} tokens: ` +
@@ -601,12 +638,14 @@ class TerminalRenderer {
     );
     if (preview !== undefined) {
       this.terminal.write(
-        `\nApproval required for ${request.tool.name}: ${preview.path}\n`,
+        `\nApproval required for ${sanitizeTerminalText(request.tool.name)}: ` +
+          `${sanitizeTerminalText(preview.path)}\n`,
       );
       return;
     }
     this.terminal.write(
-      `\nApproval required for ${request.tool.name}:\n${truncate(stringify(request.input), 1200)}\n`,
+      `\nApproval required for ${sanitizeTerminalText(request.tool.name)}:\n` +
+        `${sanitizeTerminalText(truncate(stringify(request.input), 1200))}\n`,
     );
   }
 
@@ -651,14 +690,15 @@ class TerminalRenderer {
     this.changePreviews.delete(key);
     if (preview?.status === "ready") {
       this.terminal.write(
-        `✓ ${event.call.name}: ${preview.path} ` +
+        `✓ ${sanitizeTerminalText(event.call.name)}: ` +
+          `${sanitizeTerminalText(preview.path)} ` +
           `(${changeKindLabel(preview.kind)}, ` +
           `+${preview.additions} -${preview.deletions})\n`,
       );
       return;
     }
     this.terminal.write(
-      `${toolResultMarker(event.output)} ${event.call.name}${
+      `${toolResultMarker(event.output)} ${sanitizeTerminalText(event.call.name)}${
         toolResultSummary(event.output)
       }\n`,
     );
@@ -689,18 +729,23 @@ function renderHistory(
   for (const event of history) {
     if (event.type === "input.submitted") {
       const text = textFromContent(event.message.content);
-      if (text !== "") terminal.write(`You: ${text}\n`);
+      if (text !== "") terminal.write(`You: ${sanitizeTerminalText(text)}\n`);
     } else if (event.type === "assistant.completed") {
       const text = textFromContent(event.message.content);
-      if (text !== "") terminal.write(`MaybeCode: ${text}\n`);
+      if (text !== "") {
+        terminal.write(`MaybeCode: ${sanitizeTerminalText(text)}\n`);
+      }
     } else if (event.type === "tool.completed") {
       terminal.write(
-        `${toolResultMarker(event.output)} ${event.call.name}${
+        `${toolResultMarker(event.output)} ${sanitizeTerminalText(event.call.name)}${
           toolResultSummary(event.output)
         }\n`,
       );
     } else if (event.type === "tool.failed") {
-      terminal.write(`✗ ${event.call.name}: ${event.error.message}\n`);
+      terminal.write(
+        `✗ ${sanitizeTerminalText(event.call.name)}: ` +
+          `${sanitizeTerminalText(event.error.message)}\n`,
+      );
     }
   }
 }
@@ -715,7 +760,7 @@ function textFromContent(content: readonly ContentPart[]): string {
 function toolResultSummary(output: unknown): string {
   if (typeof output !== "object" || output === null) return "";
   if ("path" in output && typeof output.path === "string") {
-    return `: ${output.path}`;
+    return `: ${sanitizeTerminalText(output.path)}`;
   }
   if ("exitCode" in output && typeof output.exitCode === "number") {
     return `: exit ${output.exitCode}`;
@@ -753,9 +798,9 @@ function toolInputSummary(toolName: string, input: unknown): string {
     "path" in input &&
     typeof input.path === "string"
   ) {
-    return `: ${input.path}`;
+    return `: ${sanitizeTerminalText(input.path)}`;
   }
-  return ` ${truncate(stringify(input), 800)}`;
+  return ` ${sanitizeTerminalText(truncate(stringify(input), 800))}`;
 }
 
 function toolCallKey(runId: string, toolCallId: string): string {

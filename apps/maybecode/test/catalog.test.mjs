@@ -46,6 +46,38 @@ test("rejects a corrupt session catalog", async (t) => {
   );
 });
 
+test("does not lose concurrent updates from separate catalog instances", async (t) => {
+  const directory = await temporaryDirectory(t);
+  const path = join(directory, "catalog.json");
+  const first = new FileSessionCatalog(path);
+  const second = new FileSessionCatalog(path);
+  const originalNow = Date.now;
+  Date.now = () => 1_900_000_000_000;
+  try {
+    await Promise.all(Array.from({ length: 40 }, (_, index) =>
+      (index % 2 === 0 ? first : second).record({
+        id: `session-${index}`,
+        workspace: directory,
+        createdAt: index,
+        lastUsedAt: index,
+      })
+    ));
+    await first.record({
+      id: "rename-me",
+      workspace: directory,
+      createdAt: 100,
+      lastUsedAt: 100,
+    });
+    assert.equal(await second.rename("rename-me", directory, "renamed"), true);
+  } finally {
+    Date.now = originalNow;
+  }
+
+  const sessions = await new FileSessionCatalog(path).list(directory);
+  assert.equal(sessions.length, 41);
+  assert.equal(sessions.find((item) => item.id === "rename-me")?.title, "renamed");
+});
+
 async function temporaryDirectory(t) {
   const directory = await mkdtemp(join(tmpdir(), "maybecode-catalog-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

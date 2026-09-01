@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { link, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -56,7 +56,10 @@ test("previews an exact edit and detects unchanged content", async (t) => {
   });
   assert.equal(edited.status, "ready");
   assert.equal(edited.kind, "update");
-  assert.match(edited.diff, /-before value after\n\+before updated after/u);
+  assert.match(
+    edited.diff,
+    /-before value after\n\\ No newline at end of file\n\+before updated after/u,
+  );
 
   const unchanged = await createToolChangePreview(workspace, "write", {
     path: "file.txt",
@@ -103,8 +106,63 @@ test("bounds large diff output", async (t) => {
   });
 
   assert.equal(preview.status, "ready");
-  assert.match(preview.diff, /182 diff lines omitted/u);
+  assert.match(preview.diff, /184 diff lines omitted/u);
   assert.ok(preview.diff.split("\n").length < 230);
+});
+
+test("reports separated edits without replacing unchanged middle lines", async (t) => {
+  const workspace = await temporaryDirectory(t);
+  await writeFile(join(workspace, "separated.txt"), "a\nb\nc\nd\ne\n", "utf8");
+  const preview = await createToolChangePreview(workspace, "write", {
+    path: "separated.txt",
+    content: "A\nb\nc\nd\nE\n",
+  });
+
+  assert.equal(preview.status, "ready");
+  assert.equal(preview.additions, 2);
+  assert.equal(preview.deletions, 2);
+  assert.match(preview.diff, / b\n c\n d/u);
+});
+
+test("shows EOF newline changes and rejects hard-linked previews", async (t) => {
+  const workspace = await temporaryDirectory(t);
+  await writeFile(join(workspace, "eof.txt"), "a", "utf8");
+  const eof = await createToolChangePreview(workspace, "write", {
+    path: "eof.txt",
+    content: "a\n",
+  });
+  assert.equal(eof.status, "ready");
+  assert.equal(eof.additions, 1);
+  assert.equal(eof.deletions, 1);
+  assert.match(eof.diff, /No newline at end of file/u);
+
+  await writeFile(join(workspace, "endings.txt"), "a\r\n", "utf8");
+  const endings = await createToolChangePreview(workspace, "write", {
+    path: "endings.txt",
+    content: "a\n",
+  });
+  assert.equal(endings.status, "ready");
+  assert.match(endings.diff, /Line ending: CRLF/u);
+  assert.notEqual(endings.diff, "");
+
+  await writeFile(join(workspace, "bom.txt"), "\uFEFFvalue", "utf8");
+  const bom = await createToolChangePreview(workspace, "write", {
+    path: "bom.txt",
+    content: "value",
+  });
+  assert.equal(bom.status, "ready");
+  assert.match(bom.diff, /UTF-8 BOM/u);
+  assert.notEqual(bom.diff, "");
+
+  const external = join(await temporaryDirectory(t), "external.txt");
+  await writeFile(external, "secret", "utf8");
+  await link(external, join(workspace, "linked.txt"));
+  const linked = await createToolChangePreview(workspace, "write", {
+    path: "linked.txt",
+    content: "replacement",
+  });
+  assert.equal(linked.status, "unavailable");
+  assert.match(linked.reason, /hard-linked files cannot be previewed/u);
 });
 
 async function temporaryDirectory(t) {

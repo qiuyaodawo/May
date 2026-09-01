@@ -85,7 +85,9 @@ function readOptionValue(
   option: string,
 ): string {
   const value = args[index];
-  if (value === undefined || value.trim() === "") {
+  if (
+    value === undefined || value.trim() === "" || value.startsWith("-")
+  ) {
     throw new CliUsageError(`${option} requires a value`);
   }
   return value;

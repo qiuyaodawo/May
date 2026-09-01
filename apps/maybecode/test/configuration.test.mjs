@@ -45,6 +45,10 @@ test("parses MaybeCode startup options", () => {
     () => parseMaybeCodeArgs(["--continue", "--resume", "abc"]),
     /cannot be used together/,
   );
+  assert.throws(
+    () => parseMaybeCodeArgs(["--config", "--model", "chat"]),
+    /--config requires a value/,
+  );
 });
 
 test("selects the default model profile", () => {
@@ -519,17 +523,19 @@ test(
   "explains Windows drive-relative paths mangled by Git Bash",
   { skip: process.platform !== "win32" },
   async () => {
-    await assert.rejects(
-      openConfiguredMaybeCode(
-        { workspace: "E:codeept" },
-        {
-          async loadConfig() {
-            throw new Error("config should not be loaded");
+    for (const workspace of ["E:codeept", "E:"]) {
+      await assert.rejects(
+        openConfiguredMaybeCode(
+          { workspace },
+          {
+            async loadConfig() {
+              throw new Error("config should not be loaded");
+            },
           },
-        },
-      ),
-      /Git Bash removes unquoted backslashes.*E:\/code\/project/u,
-    );
+        ),
+        /Git Bash removes unquoted backslashes.*E:\/code\/project/u,
+      );
+    }
   },
 );
 

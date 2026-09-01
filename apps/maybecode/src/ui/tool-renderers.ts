@@ -127,7 +127,10 @@ const fileChangeRenderer: ToolTranscriptRenderer = {
         lines.push(styleText(`  └─ ${preview.kind}${hint}`, options.theme.muted));
       }
     } else if (preview?.status === "unavailable") {
-      lines.push(styleText(`  Diff unavailable: ${preview.reason}`, options.theme.warning));
+      lines.push(styleText(
+        `  Diff unavailable: ${sanitizeTerminalText(preview.reason)}`,
+        options.theme.warning,
+      ));
     }
     if (item.status === "completed" && preview === undefined) {
       appendOutput(lines, stringify(item.output), options);

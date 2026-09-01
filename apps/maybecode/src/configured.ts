@@ -281,7 +281,9 @@ function createContextBudget(
 }
 
 async function resolveWorkspace(workspace: string): Promise<string> {
-  if (process.platform === "win32" && /^[A-Za-z]:[^\\/]/u.test(workspace)) {
+  if (
+    process.platform === "win32" && /^[A-Za-z]:(?:$|[^\\/])/u.test(workspace)
+  ) {
     throw new Error(
       `Workspace path "${workspace}" is drive-relative. ` +
         "Git Bash removes unquoted backslashes; use forward slashes " +

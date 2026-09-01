@@ -1,4 +1,5 @@
 import type { KeyStroke } from "@may/keybindings";
+import { sanitizeTerminalText } from "@may/tui";
 
 import type { SessionSummary } from "./catalog.js";
 import type { MaybeCodeController } from "./controller.js";
@@ -46,7 +47,7 @@ export async function runSessionPicker(
       const visible = filterSessions(sessions, query);
       selectedIndex = clampIndex(selectedIndex, visible.length);
       const selected = visible[selectedIndex];
-      options.terminal.renderView(renderSessionPicker({
+      options.terminal.renderView(sanitizeTerminalText(renderSessionPicker({
         sessions: visible,
         selectedIndex,
         currentSessionId: options.controller.sessionId,
@@ -55,7 +56,7 @@ export async function runSessionPicker(
         renameText,
         preview,
         ...(notice === undefined ? {} : { notice }),
-      }));
+      })));
       notice = undefined;
 
       const stroke = await options.terminal.readKey();
@@ -182,10 +183,10 @@ export async function runSessionPicker(
 async function runLineSessionPicker(
   options: SessionPickerOptions,
 ): Promise<SessionPickerResult> {
-  options.terminal.write(`\n${renderLineSessionList(
+  options.terminal.write(sanitizeTerminalText(`\n${renderLineSessionList(
     options.sessions,
     options.controller.sessionId,
-  )}`);
+  )}`));
   const answer = (await options.question(
     "Select a session number or ID (Enter to cancel): ",
   )).trim();

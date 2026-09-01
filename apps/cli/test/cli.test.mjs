@@ -32,6 +32,10 @@ test("parses the run command and options", () => {
     type: "run",
     prompt: "--explain",
   });
+  assert.throws(
+    () => parseCliArgs(["run", "--config", "--model", "chat", "hello"]),
+    /--config requires a value/,
+  );
 });
 
 test("rejects invalid command arguments before loading config", async () => {

@@ -1,6 +1,6 @@
-import { readFile, stat } from "node:fs/promises";
+import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type { MayConfig } from "@may/config";
 
@@ -111,9 +111,24 @@ function explicitInstructions(content: string): InstructionDocument {
 async function optionalProjectInstructions(
   workspace: string,
 ): Promise<InstructionDocument | undefined> {
-  const path = join(resolve(workspace), PROJECT_INSTRUCTIONS_FILENAME);
+  const root = await realpath(resolve(workspace));
+  const path = join(root, PROJECT_INSTRUCTIONS_FILENAME);
+  let target: string;
   try {
-    const information = await stat(path);
+    const linkInformation = await lstat(path);
+    if (linkInformation.isSymbolicLink()) {
+      throw new MaybeCodeConfigError(
+        `Project instructions path must not be a symbolic link or reparse point: ${path}`,
+      );
+    }
+    if (linkInformation.isFile() && linkInformation.nlink > 1) {
+      throw new MaybeCodeConfigError(
+        `Project instructions path must not be a hard link: ${path}`,
+      );
+    }
+    target = await realpath(path);
+    assertInside(root, target, path);
+    const information = await stat(target);
     if (!information.isFile()) {
       throw new MaybeCodeConfigError(
         `Project instructions path is not a file: ${path}`,
@@ -129,8 +144,20 @@ async function optionalProjectInstructions(
     );
   }
 
-  const document = await fileInstructions(path, "project instructions");
+  const document = await fileInstructions(target, "project instructions");
   return document.content.trim() === "" ? undefined : document;
+}
+
+function assertInside(root: string, target: string, displayPath: string): void {
+  const pathFromRoot = relative(root, target);
+  if (
+    pathFromRoot === ".." || pathFromRoot.startsWith(`..${sep}`) ||
+    isAbsolute(pathFromRoot)
+  ) {
+    throw new MaybeCodeConfigError(
+      `Project instructions path resolves outside the workspace: ${displayPath}`,
+    );
+  }
 }
 
 async function fileInstructions(

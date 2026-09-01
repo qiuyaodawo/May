@@ -1,4 +1,5 @@
 import type { KeyStroke } from "@may/keybindings";
+import { sanitizeTerminalText } from "@may/tui";
 
 import type {
   MaybeCodeController,
@@ -42,11 +43,11 @@ export async function runModelPicker(
   );
   try {
     while (true) {
-      options.terminal.renderView(renderModelPicker(
+      options.terminal.renderView(sanitizeTerminalText(renderModelPicker(
         options.models,
         selectedIndex,
         options.controller.modelInfo?.profile,
-      ));
+      )));
       const action = resolvePickerAction(
         keymap,
         await options.terminal.readKey(),
@@ -73,10 +74,10 @@ export async function runModelPicker(
 async function runLineModelPicker(
   options: ModelPickerOptions,
 ): Promise<ModelPickerResult> {
-  options.terminal.write(`\n${renderLineModelList(
+  options.terminal.write(sanitizeTerminalText(`\n${renderLineModelList(
     options.models,
     options.controller.modelInfo?.profile,
-  )}`);
+  )}`));
   const answer = (await options.question(
     "Select a model number/name, or d <selection> to set default (Enter to cancel): ",
   )).trim();

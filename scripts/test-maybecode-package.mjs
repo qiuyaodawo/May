@@ -10,7 +10,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repository = await realpath(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
@@ -23,6 +23,9 @@ const consumerDirectory = join(directory, "consumer");
 const workspaceDirectory = join(consumerDirectory, "workspace");
 const homeDirectory = join(consumerDirectory, "home");
 const pnpm = resolvePnpmCommand();
+const repositoryStore = (await runPnpm(["store", "path"], {
+  cwd: repository,
+})).stdout.trim();
 
 await resetSmokeDirectory(directory);
 await mkdir(packsDirectory, { recursive: true });
@@ -86,15 +89,28 @@ await writeFile(
   "utf8",
 );
 await writeFile(join(consumerDirectory, "config.json"), JSON.stringify({
+  defaultModel: "deepseek",
   providers: {
     deepseek: {
+      adapter: "deepseek-chat",
       apiKey: "package-smoke-key",
+    },
+  },
+  models: {
+    deepseek: {
+      provider: "deepseek",
       model: "deepseek-chat",
     },
   },
 }, null, 2) + "\n", "utf8");
 
-await runPnpm(["install", "--offline", "--ignore-scripts"], {
+await runPnpm([
+  "install",
+  "--offline",
+  "--ignore-scripts",
+  "--store-dir",
+  repositoryStore,
+], {
   cwd: consumerDirectory,
   inherit: true,
 });
@@ -114,6 +130,8 @@ assert.match(help.stdout, /Usage:\s+maybecode/u);
 const launched = await runPnpm([
   "exec",
   "maybecode",
+  "--ui",
+  "classic",
   "--config",
   join(consumerDirectory, "config.json"),
   workspaceDirectory,
@@ -159,7 +177,8 @@ async function resetSmokeDirectory(target) {
     basename(target) !== "may-maybecode-package-smoke" ||
     target === parent ||
     target === repository ||
-    isInside(target, repository)
+    isInside(target, repository) ||
+    isInside(repository, target)
   ) {
     throw new Error(`Refusing to clear unsafe smoke directory: ${target}`);
   }
@@ -170,7 +189,8 @@ async function resetSmokeDirectory(target) {
 
 function isInside(candidate, parent) {
   const path = relative(parent, candidate);
-  return path !== "" && path !== ".." && !path.startsWith(`..${sep}`);
+  return path !== "" && path !== ".." && !path.startsWith(`..${sep}`) &&
+    !isAbsolute(path);
 }
 
 async function reachableWorkspacePackages(rootName) {

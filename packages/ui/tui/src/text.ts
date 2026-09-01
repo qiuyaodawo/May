@@ -35,5 +35,8 @@ export function sanitizeTerminalText(value: string): string {
   return value
     .replace(/\r\n?/gu, "\n")
     .replace(/\u001b/gu, "␛")
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f]/gu, "�");
+    .replace(
+      /[\u0000-\u0008\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f-\u009f]/gu,
+      "�",
+    );
 }

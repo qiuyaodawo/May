@@ -1,5 +1,6 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 
 export interface SessionSummary {
   readonly id: string;
@@ -60,9 +61,12 @@ export class FileSessionCatalog implements SessionCatalog {
   readonly path: string;
 
   private tail: Promise<void> = Promise.resolve();
+  private readonly operationsDirectory: string;
+  private operationClock = 0;
 
   constructor(path: string) {
     this.path = resolve(path);
+    this.operationsDirectory = `${this.path}.operations`;
   }
 
   async list(workspace: string): Promise<readonly SessionSummary[]> {
@@ -75,21 +79,9 @@ export class FileSessionCatalog implements SessionCatalog {
   }
 
   record(summary: SessionSummary): Promise<void> {
-    const operation = this.tail.then(async () => {
-      const sessions = await this.readNow();
-      const index = sessions.findIndex((item) => item.id === summary.id);
-      if (index === -1) {
-        sessions.push({ ...summary });
-      } else {
-        sessions[index] = mergeSummary(sessions[index], summary);
-      }
-      await this.write(sessions);
+    return this.enqueue(async () => {
+      await this.appendOperation({ type: "record", summary: { ...summary } });
     });
-    this.tail = operation.then(
-      () => undefined,
-      () => undefined,
-    );
-    return operation;
   }
 
   rename(
@@ -97,44 +89,65 @@ export class FileSessionCatalog implements SessionCatalog {
     workspace: string,
     title: string,
   ): Promise<boolean> {
-    return this.update(async (sessions) => {
-      const index = sessions.findIndex((item) =>
+    return this.enqueue(async () => {
+      const exists = (await this.readNow()).some((item) =>
         item.id === sessionId && sameWorkspace(item.workspace, workspace)
       );
-      if (index === -1) return false;
-      sessions[index] = { ...sessions[index]!, title };
+      if (!exists) return false;
+      await this.appendOperation({ type: "rename", sessionId, workspace, title });
       return true;
     });
   }
 
   remove(sessionId: string, workspace: string): Promise<boolean> {
-    return this.update(async (sessions) => {
-      const index = sessions.findIndex((item) =>
+    return this.enqueue(async () => {
+      const exists = (await this.readNow()).some((item) =>
         item.id === sessionId && sameWorkspace(item.workspace, workspace)
       );
-      if (index === -1) return false;
-      sessions.splice(index, 1);
+      if (!exists) return false;
+      await this.appendOperation({ type: "remove", sessionId, workspace });
       return true;
     });
   }
 
-  private update<T>(
-    mutate: (sessions: SessionSummary[]) => Promise<T> | T,
-  ): Promise<T> {
-    const operation = this.tail.then(async () => {
-      const sessions = await this.readNow();
-      const result = await mutate(sessions);
-      await this.write(sessions);
-      return result;
-    });
-    this.tail = operation.then(
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.tail.then(operation);
+    this.tail = result.then(
       () => undefined,
       () => undefined,
     );
-    return operation;
+    return result;
   }
 
   private async readNow(): Promise<SessionSummary[]> {
+    const sessions = new Map(
+      (await this.readLegacyCatalog()).map((summary) => [summary.id, summary]),
+    );
+    for (const operation of await this.readOperations()) {
+      if (operation.type === "record") {
+        sessions.set(
+          operation.summary.id,
+          mergeSummary(sessions.get(operation.summary.id), operation.summary),
+        );
+        continue;
+      }
+      const current = sessions.get(operation.sessionId);
+      if (
+        current === undefined ||
+        !sameWorkspace(current.workspace, operation.workspace)
+      ) {
+        continue;
+      }
+      if (operation.type === "rename") {
+        sessions.set(operation.sessionId, { ...current, title: operation.title });
+      } else {
+        sessions.delete(operation.sessionId);
+      }
+    }
+    return [...sessions.values()];
+  }
+
+  private async readLegacyCatalog(): Promise<SessionSummary[]> {
     let source: string;
     try {
       source = await readFile(this.path, "utf8");
@@ -150,12 +163,9 @@ export class FileSessionCatalog implements SessionCatalog {
       throw new Error(`Invalid MaybeCode session catalog JSON: ${this.path}`);
     }
     if (
-      typeof value !== "object" ||
-      value === null ||
-      !("version" in value) ||
-      value.version !== 1 ||
-      !("sessions" in value) ||
-      !Array.isArray(value.sessions) ||
+      typeof value !== "object" || value === null ||
+      !("version" in value) || value.version !== 1 ||
+      !("sessions" in value) || !Array.isArray(value.sessions) ||
       !value.sessions.every(isSessionSummary)
     ) {
       throw new Error(`Invalid MaybeCode session catalog: ${this.path}`);
@@ -163,20 +173,100 @@ export class FileSessionCatalog implements SessionCatalog {
     return value.sessions.map((item) => ({ ...item }));
   }
 
-  private async write(sessions: readonly SessionSummary[]): Promise<void> {
-    await mkdir(dirname(this.path), { recursive: true });
-    const temporary = `${this.path}.${process.pid}.${Date.now()}.tmp`;
+  private async readOperations(): Promise<CatalogOperation[]> {
+    let names: string[];
     try {
-      await writeFile(
+      names = (await readdir(this.operationsDirectory))
+        .filter((name) => name.endsWith(".json"))
+        .sort();
+    } catch (error) {
+      if (isNodeError(error, "ENOENT")) return [];
+      throw error;
+    }
+    const operations: CatalogOperation[] = [];
+    for (const name of names) {
+      const path = join(this.operationsDirectory, name);
+      let value: unknown;
+      try {
+        value = JSON.parse(await readFile(path, "utf8"));
+      } catch (error) {
+        throw new Error(`Invalid MaybeCode session catalog operation: ${path}`, {
+          cause: error,
+        });
+      }
+      if (!isCatalogOperation(value)) {
+        throw new Error(`Invalid MaybeCode session catalog operation: ${path}`);
+      }
+      operations.push(value);
+    }
+    return operations;
+  }
+
+  private async appendOperation(operation: CatalogOperation): Promise<void> {
+    await mkdir(this.operationsDirectory, { recursive: true });
+    const token = randomUUID();
+    const temporary = join(
+      this.operationsDirectory,
+      `.${process.pid}-${token}.tmp`,
+    );
+    try {
+      await writeFile(temporary, `${JSON.stringify(operation)}\n`, "utf8");
+      const timestamp = await this.nextOperationTimestamp();
+      await rename(
         temporary,
-        `${JSON.stringify({ version: 1, sessions }, undefined, 2)}\n`,
-        "utf8",
+        join(
+          this.operationsDirectory,
+          `${String(timestamp).padStart(16, "0")}-${process.pid}-${token}.json`,
+        ),
       );
-      await rename(temporary, this.path);
     } finally {
       await rm(temporary, { force: true });
     }
   }
+
+  private async nextOperationTimestamp(): Promise<number> {
+    const names = await readdir(this.operationsDirectory);
+    const latest = names.reduce((maximum, name) => {
+      const value = Number(name.slice(0, 16));
+      return Number.isSafeInteger(value) ? Math.max(maximum, value) : maximum;
+    }, 0);
+    const timestamp = Math.max(Date.now(), this.operationClock + 1, latest + 1);
+    this.operationClock = timestamp;
+    return timestamp;
+  }
+}
+
+type CatalogOperation =
+  | { readonly type: "record"; readonly summary: SessionSummary }
+  | {
+      readonly type: "rename";
+      readonly sessionId: string;
+      readonly workspace: string;
+      readonly title: string;
+    }
+  | {
+      readonly type: "remove";
+      readonly sessionId: string;
+      readonly workspace: string;
+    };
+
+function isCatalogOperation(value: unknown): value is CatalogOperation {
+  if (typeof value !== "object" || value === null || !("type" in value)) {
+    return false;
+  }
+  if (value.type === "record") {
+    return "summary" in value && isSessionSummary(value.summary);
+  }
+  if (value.type !== "rename" && value.type !== "remove") return false;
+  if (
+    !("sessionId" in value) || typeof value.sessionId !== "string" ||
+    value.sessionId === "" || !("workspace" in value) ||
+    typeof value.workspace !== "string" || value.workspace === ""
+  ) {
+    return false;
+  }
+  return value.type === "remove" ||
+    ("title" in value && typeof value.title === "string" && value.title !== "");
 }
 
 export async function latestSession(

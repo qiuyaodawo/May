@@ -51,6 +51,12 @@ export async function runRetainedTerminalUI(
     runtime?.stop();
     resolveExit();
   };
+  const handleProcessSignal = (): void => {
+    if (app.isRunning) app.cancel("Interrupted by process signal");
+    finish();
+  };
+  process.on("SIGINT", handleProcessSignal);
+  process.on("SIGTERM", handleProcessSignal);
 
   const view = new MaybeCodePrototypeView({
     store,
@@ -67,13 +73,14 @@ export async function runRetainedTerminalUI(
         finish();
       }
     },
-    onSubmit: async (value) => {
+    onSubmit: async (value, accepted) => {
       if (value.trimStart().startsWith("/")) {
         await handleCommand(value, app, store, view, finish);
         return;
       }
       try {
         const run = await app.submit({ input: value });
+        accepted?.();
         await run.result;
       } catch (error) {
         if (!isCancellation(error)) throw error;
@@ -94,6 +101,8 @@ export async function runRetainedTerminalUI(
     await exited;
   } finally {
     closing = true;
+    process.removeListener("SIGINT", handleProcessSignal);
+    process.removeListener("SIGTERM", handleProcessSignal);
     runtime.stop();
     view.dispose();
     await app.close();

@@ -8,6 +8,7 @@ import type {
   RenderSize,
 } from "./component.js";
 import { styleText, type TextStyle } from "./theme.js";
+import { sanitizeTerminalText } from "./text.js";
 
 export interface SelectItem<T = string> {
   readonly value: T;
@@ -92,7 +93,13 @@ export class SelectList<T = string>
 
   render(size: RenderSize): RenderResult {
     if (this.items.length === 0) {
-      return { lines: [sliceAnsi(this.options.emptyLabel ?? "No items", 0, size.width)] };
+      return {
+        lines: [sliceAnsi(
+          sanitizeTerminalText(this.options.emptyLabel ?? "No items"),
+          0,
+          size.width,
+        )],
+      };
     }
     this.pageSize = size.height;
     if (this.index >= 0) {
@@ -184,7 +191,7 @@ function nextEnabled<T>(
 }
 
 function singleLine(value: string): string {
-  return value.replace(/\s+/gu, " ").trim();
+  return sanitizeTerminalText(value).replace(/\s+/gu, " ").trim();
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

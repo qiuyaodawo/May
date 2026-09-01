@@ -15,12 +15,18 @@ import {
   SelectList,
   Stack,
   Text,
+  sanitizeTerminalText,
 } from "../dist/index.js";
 import { keyStroke } from "@may/keybindings";
 
 test("wraps CJK text by terminal display width", () => {
   const result = new Text("中文abc").render({ width: 4, height: 3 });
   assert.deepEqual(result.lines, ["中文", "abc"]);
+});
+
+test("neutralizes 7-bit and 8-bit terminal control sequences", () => {
+  const safe = sanitizeTerminalText("a\x1b[2Jb\u009b2Jc\u009d0;title\u0007d");
+  assert.equal(safe, "a␛[2Jb�2Jc�0;title�d");
 });
 
 test("clips rendered lines and cursors to the screen", () => {

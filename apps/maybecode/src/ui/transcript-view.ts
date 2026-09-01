@@ -110,11 +110,21 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   }
 
   render(size: RenderSize): RenderResult {
+    return this.renderItems(size, false);
+  }
+
+  /** ScrollView hook: retain the latest rows when the bounded buffer overflows. */
+  renderTail(size: RenderSize): RenderResult {
+    return this.renderItems(size, true);
+  }
+
+  private renderItems(size: RenderSize, retainTail: boolean): RenderResult {
     if (this.store.items.length === 0) {
       return new Text("No messages yet.", { style: this.theme.dim }).render(size);
     }
     this.ensureSelectedTool();
     this.toolAnchors.clear();
+    if (retainTail) return this.renderTailItems(size);
     const lines: string[] = [];
     for (const item of this.store.items) {
       if (lines.length >= size.height) break;
@@ -140,6 +150,62 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     return { lines };
   }
 
+  private renderTailItems(size: RenderSize): RenderResult {
+    const chunks: Array<{
+      readonly item: TranscriptItem;
+      readonly lines: readonly string[];
+    }> = [];
+    let remaining = size.height;
+    for (let index = this.store.items.length - 1; index >= 0; index--) {
+      const item = this.store.items[index]!;
+      const separator = chunks.length === 0 ? 0 : 1;
+      const available = remaining - separator;
+      if (available <= 0) break;
+      const rendered = this.renderItem(
+        tailBoundItem(item, size.width, size.height),
+        size.width,
+        Number.MAX_SAFE_INTEGER,
+      ).lines;
+      const visible = rendered.length <= available
+        ? rendered
+        : rendered.slice(-available);
+      chunks.unshift({ item, lines: visible });
+      remaining -= visible.length + separator;
+      if (visible.length < rendered.length) break;
+    }
+
+    const lines: string[] = [];
+    for (const chunk of chunks) {
+      if (lines.length > 0) lines.push("");
+      const start = lines.length;
+      lines.push(...chunk.lines);
+      if (chunk.item.kind === "tool") {
+        this.toolAnchors.set(chunk.item.id, { start, end: start });
+      }
+    }
+    return { lines };
+  }
+
+  private renderItem(
+    item: TranscriptItem,
+    width: number,
+    height: number,
+  ): RenderResult {
+    const selected = item.kind === "tool" && this.focused &&
+      item.id === this.selectedToolId;
+    return new TranscriptItemView(item, {
+      showReasoning: this.reasoningVisible,
+      showToolDetails: item.kind === "tool"
+        ? this.isToolExpanded(item.id)
+        : this.toolDetailsVisible,
+      selected,
+      maximumToolOutputCharacters: this.options.maximumToolOutputCharacters ??
+        8_000,
+      theme: this.theme,
+      toolRenderers: this.toolRenderers,
+    }).render({ width, height });
+  }
+
   private isToolExpanded(id: string): boolean {
     return this.toolDetailOverrides.get(id) ?? this.toolDetailsVisible;
   }
@@ -163,6 +229,39 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     this.selectedToolId = tools[next]!.id;
     return true;
   }
+}
+
+function tailBoundItem(
+  item: TranscriptItem,
+  width: number,
+  maximumLines: number,
+): TranscriptItem {
+  const maximumCharacters = Math.max(1, width) * maximumLines;
+  if (item.kind === "user" || item.kind === "notice") {
+    return { ...item, text: tailText(item.text, maximumCharacters, maximumLines) };
+  }
+  if (item.kind === "assistant") {
+    return {
+      ...item,
+      text: tailText(item.text, maximumCharacters, maximumLines),
+      reasoning: tailText(item.reasoning, maximumCharacters, maximumLines),
+    };
+  }
+  return item;
+}
+
+function tailText(
+  value: string,
+  maximumCharacters: number,
+  maximumLines: number,
+): string {
+  const lines = value.replace(/\r\n?/gu, "\n").split("\n");
+  let tail = lines.slice(-maximumLines).join("\n");
+  if (tail.length <= maximumCharacters) return tail;
+  let start = tail.length - maximumCharacters;
+  if (/^[\uDC00-\uDFFF]$/u.test(tail[start] ?? "")) start += 1;
+  tail = tail.slice(start);
+  return tail;
 }
 
 interface TranscriptItemViewOptions {
@@ -246,7 +345,7 @@ function renderUser(item: UserTranscriptItem, theme: TuiTheme): string {
 function renderApproval(item: ApprovalTranscriptItem, theme: TuiTheme): string {
   if (item.status === "pending") {
     return `${styleText("?", theme.warning)} Approval required for ` +
-      styleText(item.toolName, theme.toolTitle);
+      styleText(sanitizeTerminalText(item.toolName), theme.toolTitle);
   }
   if (item.status === "resolved") {
     return `${styleText("✓", theme.success)} Permission: ${item.decision ?? "resolved"}`;

@@ -132,10 +132,13 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
   }
 
   render(size: RenderSize): RenderResult {
-    const content = this.child.render({
+    const renderSize = {
       width: size.width,
       height: this.maxContentLines,
-    });
+    };
+    const content = isTailRenderable(this.child)
+      ? this.child.renderTail(renderSize)
+      : this.child.render(renderSize);
     this.lastPageSize = size.height;
     this.lastMaximumOffset = Math.max(0, content.lines.length - size.height);
     const pendingAnchor = this.pendingAnchor;
@@ -163,6 +166,15 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
         : {}),
     };
   }
+}
+
+interface TailRenderableComponent extends Component {
+  /** Render the newest bounded content instead of truncating appended rows. */
+  renderTail(size: RenderSize): RenderResult;
+}
+
+function isTailRenderable(component: Component): component is TailRenderableComponent {
+  return "renderTail" in component && typeof component.renderTail === "function";
 }
 
 interface PendingScrollAnchor {

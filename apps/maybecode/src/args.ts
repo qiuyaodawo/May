@@ -123,7 +123,9 @@ function readValue(
   option: string,
 ): string {
   const value = args[index];
-  if (value === undefined || value.trim() === "") {
+  if (
+    value === undefined || value.trim() === "" || value.startsWith("-")
+  ) {
     throw new MaybeCodeUsageError(`${option} requires a value`);
   }
   return value;

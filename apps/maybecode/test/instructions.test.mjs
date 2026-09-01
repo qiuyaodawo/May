@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -152,6 +152,18 @@ test("ignores an empty AGENTS.md and validates project instructions", async (t) 
   await assert.rejects(
     loadMaybeCodeInstructions({ workspace }),
     /Project instructions.*must be valid UTF-8/u,
+  );
+});
+
+test("rejects project instructions hard-linked to another file", async (t) => {
+  const workspace = await temporaryDirectory(t);
+  const external = join(await temporaryDirectory(t), "outside.md");
+  await writeFile(external, "external secret", "utf8");
+  await link(external, join(workspace, "AGENTS.md"));
+
+  await assert.rejects(
+    loadMaybeCodeInstructions({ workspace }),
+    /must not be a hard link/u,
   );
 });
 
