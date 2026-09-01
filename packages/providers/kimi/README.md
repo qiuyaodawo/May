@@ -42,7 +42,7 @@ available but remains opt-in and unverified until credentials are configured:
 pnpm test:integration:kimi
 ```
 
-It expects `providers.kimi.apiKey`, `baseURL`, and `model` in
+It finds a model profile using the `kimi-chat` adapter in
 `~/.may/config.json`. Do not commit that file or print its contents in logs.
 
 See the [Kimi thinking model documentation](https://platform.kimi.ai/docs/guide/use-thinking-models).

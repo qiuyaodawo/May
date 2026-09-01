@@ -16,7 +16,8 @@ import {
 } from "./errors.js";
 import type { KimiChatRequest, KimiThinkingConfig } from "./protocol.js";
 
-export type KimiReasoningEffort = "low" | "high" | "max";
+/** Provider/model metadata determines concrete supported values. */
+export type KimiReasoningEffort = string;
 
 export interface KimiModelOptions {
   apiKey: string;

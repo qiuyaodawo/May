@@ -2,6 +2,7 @@ import { MayConfigValidationError } from "./errors.js";
 import type {
   ApplicationConfig,
   MayConfig,
+  ModelCapabilitiesOverride,
   ModelProfile,
   ProviderConfig,
 } from "./types.js";
@@ -79,9 +80,21 @@ function parseProvider(
   field: string,
 ): ProviderConfig {
   const provider = requireObject(value, path, field);
-  const result: Record<string, unknown> = { ...provider };
+  rejectUnknownKeys(
+    provider,
+    new Set(["adapter", "apiKey", "apiKeyEnv", "baseURL", "options"]),
+    path,
+    field,
+  );
+  const result: Record<string, unknown> = {
+    adapter: requireNonEmptyString(
+      provider.adapter,
+      path,
+      `${field}.adapter`,
+    ),
+  };
 
-  for (const key of ["apiKey", "apiKeyEnv", "baseURL", "model"] as const) {
+  for (const key of ["apiKey", "apiKeyEnv", "baseURL"] as const) {
     if (provider[key] !== undefined) {
       result[key] = requireNonEmptyString(
         provider[key],
@@ -91,16 +104,10 @@ function parseProvider(
     }
   }
 
-  for (
-    const key of ["contextWindowTokens", "maxOutputTokens"] as const
-  ) {
-    if (provider[key] !== undefined) {
-      result[key] = requirePositiveSafeInteger(
-        provider[key],
-        path,
-        `${field}.${key}`,
-      );
-    }
+  if (provider.options !== undefined) {
+    result.options = {
+      ...requireObject(provider.options, path, `${field}.options`),
+    };
   }
 
   if (result.apiKey !== undefined && result.apiKeyEnv !== undefined) {
@@ -110,7 +117,7 @@ function parseProvider(
       "must not define both apiKey and apiKeyEnv",
     );
   }
-  return result as ProviderConfig;
+  return result as unknown as ProviderConfig;
 }
 
 function parseModel(
@@ -119,8 +126,31 @@ function parseModel(
   field: string,
 ): ModelProfile {
   const model = requireObject(value, path, field);
+  rejectUnknownKeys(
+    model,
+    new Set([
+      "provider",
+      "adapter",
+      "model",
+      "contextWindowTokens",
+      "maxOutputTokens",
+      "options",
+      "capabilities",
+    ]),
+    path,
+    field,
+  );
   const result = {
     provider: requireNonEmptyString(model.provider, path, `${field}.provider`),
+    ...(model.adapter === undefined
+      ? {}
+      : {
+          adapter: requireNonEmptyString(
+            model.adapter,
+            path,
+            `${field}.adapter`,
+          ),
+        }),
     model: requireNonEmptyString(model.model, path, `${field}.model`),
     ...(model.contextWindowTokens === undefined
       ? {}
@@ -140,6 +170,15 @@ function parseModel(
             `${field}.maxOutputTokens`,
           ),
         }),
+    ...(model.capabilities === undefined
+      ? {}
+      : {
+          capabilities: parseModelCapabilities(
+            model.capabilities,
+            path,
+            `${field}.capabilities`,
+          ),
+        }),
   };
   if (model.options === undefined) {
     return result;
@@ -148,6 +187,93 @@ function parseModel(
     ...result,
     options: { ...requireObject(model.options, path, `${field}.options`) },
   };
+}
+
+function parseModelCapabilities(
+  value: unknown,
+  path: string,
+  field: string,
+): ModelCapabilitiesOverride {
+  const capabilities = requireObject(value, path, field);
+  rejectUnknownKeys(capabilities, new Set(["reasoning"]), path, field);
+  if (capabilities.reasoning === undefined) return {};
+  if (capabilities.reasoning === false) return { reasoning: false };
+
+  const reasoning = requireObject(
+    capabilities.reasoning,
+    path,
+    `${field}.reasoning`,
+  );
+  rejectUnknownKeys(
+    reasoning,
+    new Set(["efforts", "defaultEffort"]),
+    path,
+    `${field}.reasoning`,
+  );
+  if (!Array.isArray(reasoning.efforts)) {
+    throw new MayConfigValidationError(
+      path,
+      `${field}.reasoning.efforts`,
+      "must be an array",
+    );
+  }
+  if (reasoning.efforts.length === 0) {
+    throw new MayConfigValidationError(
+      path,
+      `${field}.reasoning.efforts`,
+      "must contain at least one effort; use reasoning: false for unsupported models",
+    );
+  }
+  const efforts = reasoning.efforts.map((effort, index) =>
+    requireNonEmptyString(
+      effort,
+      path,
+      `${field}.reasoning.efforts.${index}`,
+    )
+  );
+  if (new Set(efforts).size !== efforts.length) {
+    throw new MayConfigValidationError(
+      path,
+      `${field}.reasoning.efforts`,
+      "must not contain duplicates",
+    );
+  }
+  const defaultEffort = reasoning.defaultEffort === undefined
+    ? undefined
+    : requireNonEmptyString(
+      reasoning.defaultEffort,
+      path,
+      `${field}.reasoning.defaultEffort`,
+    );
+  if (defaultEffort !== undefined && !efforts.includes(defaultEffort)) {
+    throw new MayConfigValidationError(
+      path,
+      `${field}.reasoning.defaultEffort`,
+      "must be listed in efforts",
+    );
+  }
+  return {
+    reasoning: {
+      efforts,
+      ...(defaultEffort === undefined ? {} : { defaultEffort }),
+    },
+  };
+}
+
+function rejectUnknownKeys(
+  value: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+  path: string,
+  field: string,
+): void {
+  const unknown = Object.keys(value).find((key) => !allowed.has(key));
+  if (unknown !== undefined) {
+    throw new MayConfigValidationError(
+      path,
+      `${field}.${unknown}`,
+      "is not supported",
+    );
+  }
 }
 
 function requireObject(

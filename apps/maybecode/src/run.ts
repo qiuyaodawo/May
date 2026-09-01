@@ -52,9 +52,6 @@ export async function runMaybeCode(
       ...(command.configPath === undefined
         ? {}
         : { configPath: command.configPath }),
-      ...(command.provider === undefined
-        ? {}
-        : { provider: command.provider }),
       ...(command.model === undefined ? {} : { model: command.model }),
       ...(command.sessionId === undefined
         ? {}

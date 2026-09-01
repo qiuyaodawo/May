@@ -6,6 +6,9 @@ import type { SessionSummary } from "./catalog.js";
 import type {
   MaybeCodeCompactionStrategyName,
   MaybeCodeController,
+  MaybeCodeModelInfo,
+  MaybeCodeModelProfile,
+  MaybeCodeReasoningEffortState,
 } from "./controller.js";
 import type { MaybeCodeRun } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
@@ -14,6 +17,8 @@ export type MaybeCodeSlashCommandName =
   | "/new"
   | "/sessions"
   | "/resume"
+  | "/model"
+  | "/effort"
   | "/retry"
   | "/instructions"
   | "/status"
@@ -48,8 +53,18 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   },
   {
     name: "/resume",
-    usage: "/resume <session-id>",
-    description: "Switch to another session",
+    usage: "/resume [session-id]",
+    description: "Browse sessions or switch directly by ID",
+  },
+  {
+    name: "/model",
+    usage: "/model [profile-prefix [--default]]",
+    description: "Browse, switch, or choose the default model profile",
+  },
+  {
+    name: "/effort",
+    usage: "/effort [default|level-prefix]",
+    description: "Browse or change reasoning effort for the active model",
   },
   {
     name: "/retry",
@@ -130,7 +145,30 @@ export type MaybeCodeSlashCommandResult =
       readonly type: "sessions";
       readonly sessions: readonly SessionSummary[];
     }
+  | {
+      readonly type: "session.selection.requested";
+      readonly sessions: readonly SessionSummary[];
+    }
   | { readonly type: "session.resumed"; readonly sessionId: string }
+  | {
+      readonly type: "model.selection.requested";
+      readonly models: readonly MaybeCodeModelProfile[];
+    }
+  | {
+      readonly type: "model.switched";
+      readonly profile: string;
+      readonly model: MaybeCodeModelInfo;
+    }
+  | { readonly type: "model.not-found"; readonly query: string }
+  | {
+      readonly type: "effort.selection.requested";
+      readonly state: MaybeCodeReasoningEffortState;
+    }
+  | {
+      readonly type: "effort.changed";
+      readonly state: MaybeCodeReasoningEffortState;
+    }
+  | { readonly type: "effort.not-found"; readonly query: string }
   | { readonly type: "usage"; readonly usage: string }
   | { readonly type: "unknown"; readonly command: string };
 
@@ -231,6 +269,47 @@ export function createMaybeCodeSlashCommandSuggester(
         }));
     }
 
+    if (definition?.name === "/model") {
+      const optionInput = /^(\S+)\s+(\S*)$/u.exec(
+        argumentInput.argumentPrefix,
+      );
+      if (optionInput !== null) {
+        const optionPrefix = optionInput[2]!;
+        return "--default".startsWith(optionPrefix)
+          ? [{
+              value: `${argumentInput.command} ${optionInput[1]} --default`,
+              label: "--default",
+              description: "Switch to this profile and make it the default",
+            }]
+          : [];
+      }
+      if (/\s/u.test(argumentInput.argumentPrefix)) return [];
+      const normalized = argumentInput.argumentPrefix.toLowerCase();
+      return (await controller.listModels())
+        .filter((model) => model.name.toLowerCase().startsWith(normalized))
+        .map((model) => ({
+          value: `${argumentInput.command} ${model.name}`,
+          label: model.name,
+          description: model.name === controller.modelInfo?.profile
+            ? `Current · ${model.provider}/${model.model}`
+            : `${model.provider}/${model.model} · ${model.adapter}`,
+        }));
+    }
+
+    if (definition?.name === "/effort") {
+      if (/\s/u.test(argumentInput.argumentPrefix)) return [];
+      const state = await controller.getReasoningEffort();
+      if (state.status !== "known") return [];
+      const normalized = argumentInput.argumentPrefix.toLowerCase();
+      return reasoningEffortChoices(state)
+        .filter((effort) => effort.toLowerCase().startsWith(normalized))
+        .map((effort) => ({
+          value: `${argumentInput.command} ${effort}`,
+          label: effort,
+          description: reasoningEffortDescription(effort, state),
+        }));
+    }
+
     return [];
   };
 }
@@ -300,13 +379,90 @@ export async function executeMaybeCodeSlashCommand(
     }
     case "/resume": {
       const sessionId = arguments_[0];
+      if (arguments_.length === 0) {
+        return {
+          type: "session.selection.requested",
+          sessions: await controller.listSessions(),
+        };
+      }
       if (arguments_.length !== 1 || sessionId === undefined) {
         return usage(definition);
       }
       await controller.resumeSession(sessionId);
       return { type: "session.resumed", sessionId };
     }
+    case "/model": {
+      if (arguments_.length === 0) {
+        return {
+          type: "model.selection.requested",
+          models: await controller.listModels(),
+        };
+      }
+      const query = arguments_[0];
+      const setDefault = arguments_[1] === "--default";
+      if (
+        query === undefined ||
+        arguments_.length > 2 ||
+        (arguments_.length === 2 && !setDefault)
+      ) {
+        return usage(definition);
+      }
+      const normalized = query.toLowerCase();
+      const selected = (await controller.listModels()).find((model) =>
+        model.name.toLowerCase().startsWith(normalized)
+      );
+      if (selected === undefined) return { type: "model.not-found", query };
+      const model = await controller.switchModel(selected.name);
+      if (setDefault) await controller.setDefaultModel(selected.name);
+      return {
+        type: "model.switched",
+        profile: selected.name,
+        model,
+      };
+    }
+    case "/effort": {
+      const state = await controller.getReasoningEffort();
+      if (arguments_.length === 0) {
+        return { type: "effort.selection.requested", state };
+      }
+      const query = arguments_[0];
+      if (arguments_.length !== 1 || query === undefined) {
+        return usage(definition);
+      }
+      if (state.status !== "known") {
+        return { type: "effort.selection.requested", state };
+      }
+      const normalized = query.toLowerCase();
+      const selected = reasoningEffortChoices(state).find((effort) =>
+        effort.toLowerCase().startsWith(normalized)
+      );
+      if (selected === undefined) return { type: "effort.not-found", query };
+      return {
+        type: "effort.changed",
+        state: await controller.setReasoningEffort(
+          selected === "default" ? undefined : selected,
+        ),
+      };
+    }
   }
+}
+
+function reasoningEffortChoices(
+  state: MaybeCodeReasoningEffortState,
+): readonly string[] {
+  return ["default", ...state.efforts];
+}
+
+function reasoningEffortDescription(
+  effort: string,
+  state: MaybeCodeReasoningEffortState,
+): string {
+  if (effort === "default") {
+    const value = state.defaultEffort ?? "provider/model default";
+    return `Clear runtime override · ${value}`;
+  }
+  const current = effort === state.effectiveEffort ? "Current · " : "";
+  return `${current}capability source: ${state.source}`;
 }
 
 function commandNames(): Array<{

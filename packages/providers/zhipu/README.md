@@ -28,7 +28,7 @@ available but remains opt-in and unverified until credentials are configured:
 pnpm test:integration:zhipu
 ```
 
-It expects `providers.zhipu.apiKey`, `baseURL`, and `model` in
+It finds a model profile using the `zhipu-chat` adapter in
 `~/.may/config.json`. Do not commit that file or print its contents in logs.
 
 See the [Zhipu API documentation](https://docs.bigmodel.cn/cn/guide/capabilities/thinking-mode).

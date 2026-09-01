@@ -1,17 +1,19 @@
 import type { MayConfig } from "@may/config";
 import type { Model } from "@may/core";
 import {
+  createBuiltinProviderAdapterRegistry,
   createBuiltinProviderModel,
+  type ProviderAdapterRegistry,
   ProviderConfigurationError,
-  ProviderRegistryError,
+  ProviderAdapterRegistryError,
   selectProviderModel,
   type ProviderModelSelection,
-  type ProviderModelSelector,
+  type ModelProfileSelector,
 } from "@may/providers";
 
 import { MaybeCodeConfigError } from "./errors.js";
 
-export type MaybeCodeModelSelector = ProviderModelSelector;
+export type MaybeCodeModelSelector = ModelProfileSelector;
 export type SelectedMaybeCodeModel = ProviderModelSelection;
 
 export function selectMaybeCodeModel(
@@ -30,13 +32,20 @@ export function selectMaybeCodeModel(
 
 export function createMaybeCodeModel(
   selection: SelectedMaybeCodeModel,
+  registry?: ProviderAdapterRegistry,
 ): Model {
   try {
-    return createBuiltinProviderModel(selection);
+    return registry === undefined
+      ? createBuiltinProviderModel(selection)
+      : registry.create(selection);
   } catch (error) {
-    if (error instanceof ProviderRegistryError) {
+    if (error instanceof ProviderAdapterRegistryError) {
       throw new MaybeCodeConfigError(error.message, { cause: error });
     }
     throw error;
   }
+}
+
+export function createMaybeCodeAdapterRegistry(): ProviderAdapterRegistry {
+  return createBuiltinProviderAdapterRegistry();
 }

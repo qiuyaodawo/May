@@ -6,11 +6,16 @@ export interface SessionSummary {
   readonly workspace: string;
   readonly createdAt: number;
   readonly lastUsedAt: number;
+  readonly title?: string;
+  readonly preview?: string;
+  readonly turnCount?: number;
 }
 
 export interface SessionCatalog {
   list(workspace: string): Promise<readonly SessionSummary[]>;
   record(summary: SessionSummary): Promise<void>;
+  rename?(sessionId: string, workspace: string, title: string): Promise<boolean>;
+  remove?(sessionId: string, workspace: string): Promise<boolean>;
 }
 
 export class InMemorySessionCatalog implements SessionCatalog {
@@ -28,6 +33,27 @@ export class InMemorySessionCatalog implements SessionCatalog {
     const current = this.sessions.get(summary.id);
     this.sessions.set(summary.id, mergeSummary(current, summary));
   }
+
+  async rename(
+    sessionId: string,
+    workspace: string,
+    title: string,
+  ): Promise<boolean> {
+    const current = this.sessions.get(sessionId);
+    if (current === undefined || !sameWorkspace(current.workspace, workspace)) {
+      return false;
+    }
+    this.sessions.set(sessionId, { ...current, title });
+    return true;
+  }
+
+  async remove(sessionId: string, workspace: string): Promise<boolean> {
+    const current = this.sessions.get(sessionId);
+    if (current === undefined || !sameWorkspace(current.workspace, workspace)) {
+      return false;
+    }
+    return this.sessions.delete(sessionId);
+  }
 }
 
 export class FileSessionCatalog implements SessionCatalog {
@@ -42,7 +68,7 @@ export class FileSessionCatalog implements SessionCatalog {
   async list(workspace: string): Promise<readonly SessionSummary[]> {
     await this.tail;
     return sortSessions(
-      (await this.read()).filter((item) =>
+      (await this.readNow()).filter((item) =>
         sameWorkspace(item.workspace, workspace)
       ),
     );
@@ -50,7 +76,7 @@ export class FileSessionCatalog implements SessionCatalog {
 
   record(summary: SessionSummary): Promise<void> {
     const operation = this.tail.then(async () => {
-      const sessions = await this.read();
+      const sessions = await this.readNow();
       const index = sessions.findIndex((item) => item.id === summary.id);
       if (index === -1) {
         sessions.push({ ...summary });
@@ -66,7 +92,49 @@ export class FileSessionCatalog implements SessionCatalog {
     return operation;
   }
 
-  private async read(): Promise<SessionSummary[]> {
+  rename(
+    sessionId: string,
+    workspace: string,
+    title: string,
+  ): Promise<boolean> {
+    return this.update(async (sessions) => {
+      const index = sessions.findIndex((item) =>
+        item.id === sessionId && sameWorkspace(item.workspace, workspace)
+      );
+      if (index === -1) return false;
+      sessions[index] = { ...sessions[index]!, title };
+      return true;
+    });
+  }
+
+  remove(sessionId: string, workspace: string): Promise<boolean> {
+    return this.update(async (sessions) => {
+      const index = sessions.findIndex((item) =>
+        item.id === sessionId && sameWorkspace(item.workspace, workspace)
+      );
+      if (index === -1) return false;
+      sessions.splice(index, 1);
+      return true;
+    });
+  }
+
+  private update<T>(
+    mutate: (sessions: SessionSummary[]) => Promise<T> | T,
+  ): Promise<T> {
+    const operation = this.tail.then(async () => {
+      const sessions = await this.readNow();
+      const result = await mutate(sessions);
+      await this.write(sessions);
+      return result;
+    });
+    this.tail = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return operation;
+  }
+
+  private async readNow(): Promise<SessionSummary[]> {
     let source: string;
     try {
       source = await readFile(this.path, "utf8");
@@ -122,9 +190,15 @@ function mergeSummary(
   current: SessionSummary | undefined,
   update: SessionSummary,
 ): SessionSummary {
+  const title = current?.title ?? update.title;
+  const preview = update.preview ?? current?.preview;
+  const turnCount = update.turnCount ?? current?.turnCount;
   return {
     ...update,
     createdAt: current?.createdAt ?? update.createdAt,
+    ...(title === undefined ? {} : { title }),
+    ...(preview === undefined ? {} : { preview }),
+    ...(turnCount === undefined ? {} : { turnCount }),
   };
 }
 
@@ -155,7 +229,13 @@ function isSessionSummary(value: unknown): value is SessionSummary {
     Number.isFinite(value.createdAt) &&
     "lastUsedAt" in value &&
     typeof value.lastUsedAt === "number" &&
-    Number.isFinite(value.lastUsedAt);
+    Number.isFinite(value.lastUsedAt) &&
+    (!("title" in value) ||
+      (typeof value.title === "string" && value.title.trim() !== "")) &&
+    (!("preview" in value) || typeof value.preview === "string") &&
+    (!("turnCount" in value) ||
+      (Number.isSafeInteger(value.turnCount) &&
+        typeof value.turnCount === "number" && value.turnCount >= 0));
 }
 
 function isNodeError(error: unknown, code: string): boolean {

@@ -5,13 +5,15 @@ import { parseMayConfig } from "@may/config";
 import {
   AnthropicModel,
   createBuiltinProviderModel,
-  createBuiltinProviderRegistry,
+  createBuiltinProviderAdapterRegistry,
+  createModelCapabilityResolver,
   DeepSeekModel,
   KimiModel,
+  OpenAIChatCompletionsModel,
   OpenAIResponsesModel,
+  ProviderAdapterRegistry,
+  ProviderAdapterRegistryError,
   ProviderConfigurationError,
-  ProviderRegistry,
-  ProviderRegistryError,
   RetryingModel,
   selectProviderModel,
   withModelRetry,
@@ -137,16 +139,16 @@ test("uses retryAfterMs and cancels an active backoff", async () => {
   );
 });
 
-test("registers custom providers without using global state", () => {
+test("registers custom adapters without using global state", () => {
   const firstModel = completedModel("first");
   const secondModel = completedModel("second");
-  const first = new ProviderRegistry().register("custom", {
+  const first = new ProviderAdapterRegistry().register("custom", {
     create(selection) {
       assert.equal(selection.model, "custom-model");
       return firstModel;
     },
   });
-  const second = new ProviderRegistry().register("custom", {
+  const second = new ProviderAdapterRegistry().register("custom", {
     create: () => secondModel,
   });
   const selection = modelSelection("custom", "custom-model");
@@ -161,12 +163,12 @@ test("registers custom providers without using global state", () => {
     /already registered/,
   );
   assert.throws(
-    () => first.create({ ...selection, provider: "missing" }),
-    /available providers: custom/,
+    () => first.create({ ...selection, adapter: "missing" }),
+    /available adapters: custom/,
   );
-  assert.throws(() => new ProviderRegistry().register("", {
+  assert.throws(() => new ProviderAdapterRegistry().register("", {
     create: () => firstModel,
-  }), /provider name must be a non-empty string/);
+  }), /adapter name must be a non-empty string/);
 });
 
 test("selects provider models once for all consuming applications", () => {
@@ -174,15 +176,15 @@ test("selects provider models once for all consuming applications", () => {
     defaultModel: "reasoner",
     providers: {
       openai: {
+        adapter: "openai-responses",
         apiKeyEnv: "OPENAI_API_KEY",
-        contextWindowTokens: 128_000,
-        maxOutputTokens: 8192,
       },
     },
     models: {
       reasoner: {
         provider: "openai",
         model: "gpt-test",
+        contextWindowTokens: 128_000,
         maxOutputTokens: 4096,
         options: { reasoningEffort: "high" },
       },
@@ -194,6 +196,8 @@ test("selects provider models once for all consuming applications", () => {
   });
 
   assert.equal(selected.provider, "openai");
+  assert.equal(selected.adapter, "openai-responses");
+  assert.equal(selected.profile, "reasoner");
   assert.equal(selected.model, "gpt-test");
   assert.equal(selected.providerConfig.apiKey, "secret");
   assert.deepEqual(selected.options, { reasoningEffort: "high" });
@@ -201,46 +205,102 @@ test("selects provider models once for all consuming applications", () => {
     contextWindowTokens: 128_000,
     maxOutputTokens: 4096,
   });
-  assert.throws(
-    () => selectProviderModel(config, { provider: "openai", model: "reasoner" }),
-    ProviderConfigurationError,
-  );
 });
 
-test("provides every built-in adapter and a GLM alias", () => {
+test("resolves model capabilities by explicit, provider, builtin, then unknown priority", async () => {
+  let requests = 0;
+  const resolver = createModelCapabilityResolver({
+    async fetch(url, init) {
+      requests += 1;
+      assert.equal(url, "https://cpa.test/v1/models?client_version=may");
+      assert.equal(init.headers.Authorization, "Bearer test-key");
+      return Response.json({
+        models: [{
+          slug: "gpt-5.6-luna",
+          default_reasoning_level: "medium",
+          supported_reasoning_levels: [
+            { effort: "low" },
+            { effort: "medium" },
+            { effort: "high" },
+            { effort: "max" },
+          ],
+        }],
+      });
+    },
+  });
+  const cpa = modelSelection(
+    "openai-responses",
+    "gpt-5.6-luna",
+    { baseURL: "https://cpa.test/v1" },
+  );
+
+  assert.deepEqual((await resolver.resolve(cpa)).reasoningEffort, {
+    status: "known",
+    source: "provider",
+    efforts: ["low", "medium", "high", "max"],
+    defaultEffort: "medium",
+  });
+  assert.deepEqual((await resolver.resolve({
+    ...cpa,
+    capabilities: {
+      reasoning: { efforts: ["high"], defaultEffort: "high" },
+    },
+  })).reasoningEffort, {
+    status: "known",
+    source: "user",
+    efforts: ["high"],
+    defaultEffort: "high",
+  });
+  assert.equal(requests, 1);
+
+  const offline = createModelCapabilityResolver({ discoveries: [] });
+  assert.deepEqual((await offline.resolve(
+    modelSelection("deepseek-chat", "deepseek-v4-pro"),
+  )).reasoningEffort, {
+    status: "known",
+    source: "builtin",
+    efforts: ["low", "high", "max"],
+    defaultEffort: "high",
+  });
+  assert.deepEqual((await offline.resolve(
+    modelSelection("deepseek-chat", "unlisted-model"),
+  )).reasoningEffort, { status: "unknown", source: "unknown" });
+});
+
+test("provides every built-in adapter", () => {
   assert.ok(createBuiltinProviderModel(
-    modelSelection("deepseek", "deepseek-chat"),
+    modelSelection("deepseek-chat", "deepseek-chat"),
   ) instanceof DeepSeekModel);
   assert.ok(createBuiltinProviderModel(
-    modelSelection("zhipu", "glm-5"),
+    modelSelection("zhipu-chat", "glm-5"),
   ) instanceof ZhipuModel);
   assert.ok(createBuiltinProviderModel(
-    modelSelection("glm", "glm-5"),
-  ) instanceof ZhipuModel);
-  assert.ok(createBuiltinProviderModel(
-    modelSelection("kimi", "kimi-k3"),
+    modelSelection("kimi-chat", "kimi-k3"),
   ) instanceof KimiModel);
   assert.ok(createBuiltinProviderModel(
-    modelSelection("anthropic", "claude-test"),
+    modelSelection("anthropic-messages", "claude-test"),
   ) instanceof AnthropicModel);
   assert.ok(createBuiltinProviderModel(
-    modelSelection("openai", "gpt-test"),
+    modelSelection("openai-responses", "gpt-test"),
   ) instanceof OpenAIResponsesModel);
+  assert.ok(createBuiltinProviderModel(
+    modelSelection("openai-chat-completions", "gpt-test"),
+  ) instanceof OpenAIChatCompletionsModel);
 
-  const names = createBuiltinProviderRegistry().names();
+  const names = createBuiltinProviderAdapterRegistry().names();
   assert.deepEqual(names, [
-    "deepseek",
-    "zhipu",
-    "glm",
-    "kimi",
-    "anthropic",
-    "openai",
+    "deepseek-chat",
+    "zhipu-chat",
+    "kimi-chat",
+    "anthropic-messages",
+    "openai-responses",
+    "openai-chat-completions",
   ]);
 });
 
 test("maps provider-specific configuration into each adapter request", async () => {
   const requests = [];
-  const registry = createBuiltinProviderRegistry({
+  const registry = createBuiltinProviderAdapterRegistry({
     async fetch(url, init) {
       requests.push({ url, init, body: JSON.parse(init.body) });
       return new Response("expected test failure", { status: 500 });
@@ -248,10 +308,10 @@ test("maps provider-specific configuration into each adapter request", async () 
   });
 
   await sendAndReject(registry.create(modelSelection(
-    "deepseek",
+    "deepseek-chat",
     "deepseek-test",
-    { baseURL: "https://deepseek.test", thinking: "disabled" },
-    { reasoningEffort: "high", maxTokens: 2000 },
+    { baseURL: "https://deepseek.test" },
+    { thinking: "disabled", reasoningEffort: "high", maxTokens: 2000 },
   )));
   assert.equal(requests[0].url, "https://deepseek.test/chat/completions");
   assert.deepEqual(requests[0].body.thinking, { type: "disabled" });
@@ -259,10 +319,15 @@ test("maps provider-specific configuration into each adapter request", async () 
   assert.equal(requests[0].body.max_tokens, 2000);
 
   await sendAndReject(registry.create(modelSelection(
-    "glm",
+    "zhipu-chat",
     "glm-test",
-    { baseURL: "https://glm.test", clearThinking: true },
-    { thinking: "enabled", reasoningEffort: "max", maxTokens: 3000 },
+    { baseURL: "https://glm.test" },
+    {
+      thinking: "enabled",
+      clearThinking: true,
+      reasoningEffort: "max",
+      maxTokens: 3000,
+    },
   )));
   assert.equal(requests[1].url, "https://glm.test/chat/completions");
   assert.deepEqual(requests[1].body.thinking, {
@@ -272,7 +337,7 @@ test("maps provider-specific configuration into each adapter request", async () 
   assert.equal(requests[1].body.reasoning_effort, "max");
 
   await sendAndReject(registry.create(modelSelection(
-    "kimi",
+    "kimi-chat",
     "kimi-test",
     { baseURL: "https://kimi.test" },
     {
@@ -289,10 +354,11 @@ test("maps provider-specific configuration into each adapter request", async () 
   assert.equal(requests[2].body.max_completion_tokens, 4000);
 
   await sendAndReject(registry.create(modelSelection(
-    "anthropic",
+    "anthropic-messages",
     "claude-test",
-    { baseURL: "https://anthropic.test", apiVersion: "test-version" },
+    { baseURL: "https://anthropic.test" },
     {
+      apiVersion: "test-version",
       thinking: { type: "enabled", budgetTokens: 1024 },
       reasoningEffort: "high",
       maxTokens: 4096,
@@ -307,15 +373,18 @@ test("maps provider-specific configuration into each adapter request", async () 
   assert.deepEqual(requests[3].body.output_config, { effort: "high" });
 
   await sendAndReject(registry.create(modelSelection(
-    "openai",
+    "openai-responses",
     "gpt-test",
     {
       baseURL: "https://openai.test/v1",
+    },
+    {
       reasoningSummary: "auto",
       serverCompactThreshold: 50_000,
       store: false,
+      reasoningEffort: "high",
+      maxOutputTokens: 5000,
     },
-    { reasoningEffort: "high", maxOutputTokens: 5000 },
   )));
   assert.equal(requests[4].url, "https://openai.test/v1/responses");
   assert.deepEqual(requests[4].body.reasoning, {
@@ -327,11 +396,23 @@ test("maps provider-specific configuration into each adapter request", async () 
     type: "compaction",
     compact_threshold: 50_000,
   }]);
+
+  await sendAndReject(registry.create(modelSelection(
+    "openai-chat-completions",
+    "proxy-model",
+    { baseURL: "https://proxy.test/v1" },
+    { reasoningEffort: "ultra", maxOutputTokens: 6000, store: false },
+  )));
+  assert.equal(requests[5].url, "https://proxy.test/v1/chat/completions");
+  assert.equal(requests[5].body.model, "proxy-model");
+  assert.equal(requests[5].body.reasoning_effort, "ultra");
+  assert.equal(requests[5].body.max_completion_tokens, 6000);
+  assert.equal(requests[5].body.store, false);
 });
 
 test("preserves model limits and provider-native capabilities", () => {
   const model = createBuiltinProviderModel({
-    ...modelSelection("openai", "gpt-test"),
+    ...modelSelection("openai-responses", "gpt-test"),
     limits: { contextWindowTokens: 100_000, maxOutputTokens: 8000 },
   });
 
@@ -345,20 +426,20 @@ test("preserves model limits and provider-native capabilities", () => {
 test("reports registry and provider configuration errors", () => {
   assert.throws(
     () => createBuiltinProviderModel(modelSelection("missing", "model")),
-    ProviderRegistryError,
+    ProviderAdapterRegistryError,
   );
   assert.throws(
     () => createBuiltinProviderModel(modelSelection(
-      "kimi",
+      "kimi-chat",
       "kimi-test",
       {},
       { thinking: { type: "sometimes" } },
     )),
-    /providers\.kimi\.thinking\.type must be one of/,
+    /models\.test-profile\.options\.thinking\.type must be one of/,
   );
   assert.throws(
     () => createBuiltinProviderModel(modelSelection(
-      "anthropic",
+      "anthropic-messages",
       "claude-test",
       {},
       { thinking: { type: "enabled" } },
@@ -367,23 +448,25 @@ test("reports registry and provider configuration errors", () => {
   );
   assert.throws(
     () => createBuiltinProviderModel({
-      ...modelSelection("openai", "gpt-test"),
-      providerConfig: {},
+      ...modelSelection("openai-responses", "gpt-test"),
+      providerConfig: { adapter: "openai-responses" },
     }),
-    /providers\.openai\.apiKey must be a non-empty string/,
+    /providers\.test-provider\.apiKey must be a non-empty string/,
   );
 });
 
 function modelSelection(
-  provider,
+  adapter,
   model,
   providerConfig = {},
   options = {},
 ) {
   return {
-    provider,
+    profile: "test-profile",
+    provider: "test-provider",
+    adapter,
     model,
-    providerConfig: { apiKey: "test-key", ...providerConfig },
+    providerConfig: { adapter, apiKey: "test-key", ...providerConfig },
     options,
   };
 }

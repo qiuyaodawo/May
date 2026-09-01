@@ -1,30 +1,29 @@
 import {
   AnthropicModel,
   type AnthropicModelOptions,
-  type AnthropicReasoningEffort,
   type AnthropicThinkingConfig,
 } from "@may/provider-anthropic";
 import {
   DeepSeekModel,
   type DeepSeekModelOptions,
-  type DeepSeekReasoningEffort,
 } from "@may/provider-deepseek";
 import {
   KimiModel,
   type KimiModelOptions,
-  type KimiReasoningEffort,
   type KimiThinkingConfig,
 } from "@may/provider-kimi";
 import {
   OpenAIResponsesModel,
-  type OpenAIReasoningEffort,
   type OpenAIReasoningSummary,
   type OpenAIResponsesModelOptions,
 } from "@may/provider-openai";
 import {
+  OpenAIChatCompletionsModel,
+  type OpenAIChatCompletionsModelOptions,
+} from "@may/provider-openai-compatible";
+import {
   ZhipuModel,
   type ZhipuModelOptions,
-  type ZhipuReasoningEffort,
 } from "@may/provider-zhipu";
 import type { Model } from "@may/core";
 
@@ -32,6 +31,7 @@ import { ProviderConfigurationError } from "./errors.js";
 import {
   attachModelLimits,
   modelOption,
+  optionField,
   optionalBoolean,
   optionalEnum,
   optionalPositiveInteger,
@@ -41,46 +41,12 @@ import {
   requireRecord,
   tuningOption,
 } from "./options.js";
-import { ProviderRegistry } from "./registry.js";
-import type { ProviderFactory, ProviderModelSelection } from "./types.js";
+import { ProviderAdapterRegistry } from "./registry.js";
+import type {
+  ProviderAdapterFactory,
+  ProviderModelSelection,
+} from "./types.js";
 
-const DEEPSEEK_REASONING_EFFORTS = new Set<DeepSeekReasoningEffort>([
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-]);
-const ZHIPU_REASONING_EFFORTS = new Set<ZhipuReasoningEffort>([
-  "none",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-]);
-const KIMI_REASONING_EFFORTS = new Set<KimiReasoningEffort>([
-  "low",
-  "high",
-  "max",
-]);
-const ANTHROPIC_REASONING_EFFORTS = new Set<AnthropicReasoningEffort>([
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-]);
-const OPENAI_REASONING_EFFORTS = new Set<OpenAIReasoningEffort>([
-  "none",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-]);
 const OPENAI_REASONING_SUMMARIES = new Set<OpenAIReasoningSummary>([
   "auto",
   "concise",
@@ -94,55 +60,58 @@ const ANTHROPIC_THINKING_TYPES = new Set([
 ] as const);
 const THINKING_DISPLAYS = new Set(["summarized", "omitted"] as const);
 
-export interface BuiltinProviderRegistryOptions {
+export interface BuiltinProviderAdapterRegistryOptions {
   readonly fetch?: typeof globalThis.fetch;
 }
 
-export function createBuiltinProviderRegistry(
-  options: BuiltinProviderRegistryOptions = {},
-): ProviderRegistry {
-  const registry = new ProviderRegistry();
+export function createBuiltinProviderAdapterRegistry(
+  options: BuiltinProviderAdapterRegistryOptions = {},
+): ProviderAdapterRegistry {
+  const registry = new ProviderAdapterRegistry();
   const zhipu = factory((selection) => createZhipuModel(selection, options));
   registry
-    .register("deepseek", factory((selection) =>
+    .register("deepseek-chat", factory((selection) =>
       createDeepSeekModel(selection, options)
     ))
-    .register("zhipu", zhipu)
-    .register("glm", zhipu)
-    .register("kimi", factory((selection) => createKimiModel(selection, options)))
-    .register("anthropic", factory((selection) =>
+    .register("zhipu-chat", zhipu)
+    .register("kimi-chat", factory((selection) =>
+      createKimiModel(selection, options)
+    ))
+    .register("anthropic-messages", factory((selection) =>
       createAnthropicModel(selection, options)
     ))
-    .register("openai", factory((selection) =>
+    .register("openai-responses", factory((selection) =>
       createOpenAIModel(selection, options)
+    ))
+    .register("openai-chat-completions", factory((selection) =>
+      createOpenAIChatCompletionsModel(selection, options)
     ));
   return registry;
 }
 
 export function createBuiltinProviderModel(
   selection: ProviderModelSelection,
-  options: BuiltinProviderRegistryOptions = {},
+  options: BuiltinProviderAdapterRegistryOptions = {},
 ): Model {
-  return createBuiltinProviderRegistry(options).create(selection);
+  return createBuiltinProviderAdapterRegistry(options).create(selection);
 }
 
 function createDeepSeekModel(
   selection: ProviderModelSelection,
-  dependencies: BuiltinProviderRegistryOptions,
+  dependencies: BuiltinProviderAdapterRegistryOptions,
 ): Model {
   const thinking = optionalEnum(
     tuningOption(selection, "thinking"),
-    providerField(selection, "thinking"),
+    optionField(selection, "thinking"),
     THINKING_TYPES,
   );
-  const reasoningEffort = optionalEnum(
+  const reasoningEffort = optionalString(
     tuningOption(selection, "reasoningEffort"),
-    providerField(selection, "reasoningEffort"),
-    DEEPSEEK_REASONING_EFFORTS,
+    optionField(selection, "reasoningEffort"),
   );
   const maxTokens = optionalPositiveInteger(
     tuningOption(selection, "maxTokens"),
-    providerField(selection, "maxTokens"),
+    optionField(selection, "maxTokens"),
   ) ?? selection.limits?.maxOutputTokens;
   const baseURL = providerBaseURL(selection);
   const options: DeepSeekModelOptions = {
@@ -162,25 +131,24 @@ function createDeepSeekModel(
 
 function createZhipuModel(
   selection: ProviderModelSelection,
-  dependencies: BuiltinProviderRegistryOptions,
+  dependencies: BuiltinProviderAdapterRegistryOptions,
 ): Model {
   const thinking = optionalEnum(
     tuningOption(selection, "thinking"),
-    providerField(selection, "thinking"),
+    optionField(selection, "thinking"),
     THINKING_TYPES,
   );
   const clearThinking = optionalBoolean(
     tuningOption(selection, "clearThinking"),
-    providerField(selection, "clearThinking"),
+    optionField(selection, "clearThinking"),
   );
-  const reasoningEffort = optionalEnum(
+  const reasoningEffort = optionalString(
     tuningOption(selection, "reasoningEffort"),
-    providerField(selection, "reasoningEffort"),
-    ZHIPU_REASONING_EFFORTS,
+    optionField(selection, "reasoningEffort"),
   );
   const maxTokens = optionalPositiveInteger(
     tuningOption(selection, "maxTokens"),
-    providerField(selection, "maxTokens"),
+    optionField(selection, "maxTokens"),
   ) ?? selection.limits?.maxOutputTokens;
   const baseURL = providerBaseURL(selection);
   const options: ZhipuModelOptions = {
@@ -197,20 +165,19 @@ function createZhipuModel(
 
 function createKimiModel(
   selection: ProviderModelSelection,
-  dependencies: BuiltinProviderRegistryOptions,
+  dependencies: BuiltinProviderAdapterRegistryOptions,
 ): Model {
   const thinking = optionalKimiThinking(
     tuningOption(selection, "thinking"),
-    providerField(selection, "thinking"),
+    optionField(selection, "thinking"),
   );
-  const reasoningEffort = optionalEnum(
+  const reasoningEffort = optionalString(
     tuningOption(selection, "reasoningEffort"),
-    providerField(selection, "reasoningEffort"),
-    KIMI_REASONING_EFFORTS,
+    optionField(selection, "reasoningEffort"),
   );
   const maxTokens = optionalPositiveInteger(
     tuningOption(selection, "maxTokens"),
-    providerField(selection, "maxTokens"),
+    optionField(selection, "maxTokens"),
   ) ?? selection.limits?.maxOutputTokens;
   const baseURL = providerBaseURL(selection);
   const options: KimiModelOptions = {
@@ -226,25 +193,24 @@ function createKimiModel(
 
 function createAnthropicModel(
   selection: ProviderModelSelection,
-  dependencies: BuiltinProviderRegistryOptions,
+  dependencies: BuiltinProviderAdapterRegistryOptions,
 ): Model {
   const thinking = optionalAnthropicThinking(
     tuningOption(selection, "thinking"),
-    providerField(selection, "thinking"),
+    optionField(selection, "thinking"),
   );
-  const reasoningEffort = optionalEnum(
+  const reasoningEffort = optionalString(
     tuningOption(selection, "reasoningEffort"),
-    providerField(selection, "reasoningEffort"),
-    ANTHROPIC_REASONING_EFFORTS,
+    optionField(selection, "reasoningEffort"),
   );
   const maxTokens = optionalPositiveInteger(
     tuningOption(selection, "maxTokens"),
-    providerField(selection, "maxTokens"),
+    optionField(selection, "maxTokens"),
   ) ?? selection.limits?.maxOutputTokens;
   const baseURL = providerBaseURL(selection);
   const apiVersion = optionalString(
     tuningOption(selection, "apiVersion"),
-    providerField(selection, "apiVersion"),
+    optionField(selection, "apiVersion"),
   );
   const options: AnthropicModelOptions = {
     ...credentials(selection),
@@ -264,32 +230,28 @@ function createAnthropicModel(
 
 function createOpenAIModel(
   selection: ProviderModelSelection,
-  dependencies: BuiltinProviderRegistryOptions,
+  dependencies: BuiltinProviderAdapterRegistryOptions,
 ): Model {
   const maxOutputTokens = optionalPositiveInteger(
     modelOption(selection, "maxOutputTokens"),
-    providerField(selection, "maxOutputTokens"),
-  ) ?? selection.limits?.maxOutputTokens ?? optionalPositiveInteger(
-    selection.providerConfig.maxOutputTokens,
-    providerField(selection, "maxOutputTokens"),
-  );
-  const reasoningEffort = optionalEnum(
+    optionField(selection, "maxOutputTokens"),
+  ) ?? selection.limits?.maxOutputTokens;
+  const reasoningEffort = optionalString(
     tuningOption(selection, "reasoningEffort"),
-    providerField(selection, "reasoningEffort"),
-    OPENAI_REASONING_EFFORTS,
+    optionField(selection, "reasoningEffort"),
   );
   const reasoningSummary = optionalEnum(
     tuningOption(selection, "reasoningSummary"),
-    providerField(selection, "reasoningSummary"),
+    optionField(selection, "reasoningSummary"),
     OPENAI_REASONING_SUMMARIES,
   );
   const serverCompactThreshold = optionalPositiveInteger(
     tuningOption(selection, "serverCompactThreshold"),
-    providerField(selection, "serverCompactThreshold"),
+    optionField(selection, "serverCompactThreshold"),
   );
   const store = optionalBoolean(
     tuningOption(selection, "store"),
-    providerField(selection, "store"),
+    optionField(selection, "store"),
   );
   const baseURL = providerBaseURL(selection);
   const options: OpenAIResponsesModelOptions = {
@@ -306,6 +268,38 @@ function createOpenAIModel(
   };
   return attachModelLimits(
     new OpenAIResponsesModel(options),
+    selection.limits,
+    maxOutputTokens,
+  );
+}
+
+function createOpenAIChatCompletionsModel(
+  selection: ProviderModelSelection,
+  dependencies: BuiltinProviderAdapterRegistryOptions,
+): Model {
+  const maxOutputTokens = optionalPositiveInteger(
+    modelOption(selection, "maxOutputTokens"),
+    optionField(selection, "maxOutputTokens"),
+  ) ?? selection.limits?.maxOutputTokens;
+  const reasoningEffort = optionalString(
+    tuningOption(selection, "reasoningEffort"),
+    optionField(selection, "reasoningEffort"),
+  );
+  const store = optionalBoolean(
+    tuningOption(selection, "store"),
+    optionField(selection, "store"),
+  );
+  const baseURL = providerBaseURL(selection);
+  const options: OpenAIChatCompletionsModelOptions = {
+    ...credentials(selection),
+    ...(baseURL === undefined ? {} : { baseURL }),
+    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+    ...(store === undefined ? {} : { store }),
+    ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
+  };
+  return attachModelLimits(
+    new OpenAIChatCompletionsModel(options),
     selection.limits,
     maxOutputTokens,
   );
@@ -398,6 +392,6 @@ function optionalAnthropicThinking(
 
 function factory(
   create: (selection: ProviderModelSelection) => Model,
-): ProviderFactory {
+): ProviderAdapterFactory {
   return { create };
 }

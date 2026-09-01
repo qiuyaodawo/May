@@ -1,11 +1,11 @@
-export class ProviderRegistryError extends Error {
+export class ProviderAdapterRegistryError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "ProviderRegistryError";
+    this.name = "ProviderAdapterRegistryError";
   }
 }
 
-export class ProviderConfigurationError extends ProviderRegistryError {
+export class ProviderConfigurationError extends ProviderAdapterRegistryError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "ProviderConfigurationError";

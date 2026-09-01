@@ -16,14 +16,8 @@ import {
 } from "./errors.js";
 import type { ZhipuChatRequest } from "./protocol.js";
 
-export type ZhipuReasoningEffort =
-  | "none"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max";
+/** Provider/model metadata determines concrete supported values. */
+export type ZhipuReasoningEffort = string;
 
 export interface ZhipuModelOptions {
   apiKey: string;

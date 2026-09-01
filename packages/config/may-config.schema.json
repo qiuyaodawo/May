@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "May configuration",
+  "description": "Configuration for May applications, model profiles, and provider adapters.",
+  "type": "object",
+  "required": ["providers"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional editor hint pointing to this schema."
+    },
+    "defaultModel": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Default model profile name."
+    },
+    "providers": {
+      "type": "object",
+      "description": "Named provider connections.",
+      "additionalProperties": { "$ref": "#/$defs/provider" }
+    },
+    "models": {
+      "type": "object",
+      "description": "Named, user-selectable model profiles.",
+      "default": {},
+      "additionalProperties": { "$ref": "#/$defs/model" }
+    },
+    "apps": {
+      "type": "object",
+      "description": "Application-owned settings.",
+      "default": {},
+      "properties": {
+        "maybecode": { "$ref": "#/$defs/maybecode" }
+      },
+      "additionalProperties": { "type": "object" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reasoningEffort": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Model-specific value. Use model capabilities or MaybeCode /effort to discover supported levels."
+    },
+    "provider": {
+      "type": "object",
+      "required": ["adapter"],
+      "properties": {
+        "adapter": { "$ref": "#/$defs/nonEmptyString" },
+        "apiKey": { "$ref": "#/$defs/nonEmptyString" },
+        "apiKeyEnv": { "$ref": "#/$defs/nonEmptyString" },
+        "baseURL": { "$ref": "#/$defs/nonEmptyString" },
+        "options": {
+          "type": "object",
+          "description": "Adapter-specific shared options. A model profile may override them."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "adapter": { "const": "openai-responses" } } },
+          "then": { "properties": { "options": { "$ref": "#/$defs/openaiResponsesOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "openai-chat-completions" } } },
+          "then": { "properties": { "options": { "$ref": "#/$defs/openaiChatOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "deepseek-chat" } } },
+          "then": { "properties": { "options": { "$ref": "#/$defs/deepseekOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "zhipu-chat" } } },
+          "then": { "properties": { "options": { "$ref": "#/$defs/zhipuOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "kimi-chat" } } },
+          "then": { "properties": { "options": { "$ref": "#/$defs/kimiOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "anthropic-messages" } } },
+          "then": { "properties": { "options": { "$ref": "#/$defs/anthropicOptions" } } }
+        }
+      ],
+      "not": { "required": ["apiKey", "apiKeyEnv"] },
+      "additionalProperties": false
+    },
+    "model": {
+      "type": "object",
+      "required": ["provider", "model"],
+      "properties": {
+        "provider": { "$ref": "#/$defs/nonEmptyString" },
+        "adapter": { "$ref": "#/$defs/nonEmptyString" },
+        "model": { "$ref": "#/$defs/nonEmptyString" },
+        "contextWindowTokens": { "$ref": "#/$defs/positiveInteger" },
+        "maxOutputTokens": { "$ref": "#/$defs/positiveInteger" },
+        "options": { "$ref": "#/$defs/knownModelOptions" },
+        "capabilities": { "$ref": "#/$defs/modelCapabilities" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "adapter": { "const": "openai-responses" } }, "required": ["adapter"] },
+          "then": { "properties": { "options": { "$ref": "#/$defs/openaiResponsesOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "openai-chat-completions" } }, "required": ["adapter"] },
+          "then": { "properties": { "options": { "$ref": "#/$defs/openaiChatOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "deepseek-chat" } }, "required": ["adapter"] },
+          "then": { "properties": { "options": { "$ref": "#/$defs/deepseekOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "zhipu-chat" } }, "required": ["adapter"] },
+          "then": { "properties": { "options": { "$ref": "#/$defs/zhipuOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "kimi-chat" } }, "required": ["adapter"] },
+          "then": { "properties": { "options": { "$ref": "#/$defs/kimiOptions" } } }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "anthropic-messages" } }, "required": ["adapter"] },
+          "then": { "properties": { "options": { "$ref": "#/$defs/anthropicOptions" } } }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "modelCapabilities": {
+      "type": "object",
+      "description": "Explicit model capability overrides. These take precedence over provider discovery and May's built-in catalog.",
+      "properties": {
+        "reasoning": {
+          "oneOf": [
+            { "const": false },
+            { "$ref": "#/$defs/reasoningCapabilities" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "reasoningCapabilities": {
+      "type": "object",
+      "required": ["efforts"],
+      "properties": {
+          "efforts": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "defaultEffort": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "knownModelOptions": {
+      "type": "object",
+      "description": "Options are interpreted by the effective adapter. Unknown keys remain allowed for custom adapters.",
+      "properties": {
+        "thinking": {
+          "oneOf": [
+            { "type": "string", "enum": ["enabled", "disabled"] },
+            { "$ref": "#/$defs/kimiThinking" },
+            { "$ref": "#/$defs/anthropicThinking" }
+          ]
+        },
+        "clearThinking": { "type": "boolean" },
+        "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
+        "reasoningSummary": { "type": "string", "enum": ["auto", "concise", "detailed"] },
+        "maxTokens": { "$ref": "#/$defs/positiveInteger" },
+        "maxOutputTokens": { "$ref": "#/$defs/positiveInteger" },
+        "serverCompactThreshold": { "$ref": "#/$defs/positiveInteger" },
+        "store": { "type": "boolean" },
+        "apiVersion": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "openaiResponsesOptions": {
+      "type": "object",
+      "properties": {
+        "maxOutputTokens": { "$ref": "#/$defs/positiveInteger" },
+        "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
+        "reasoningSummary": { "type": "string", "enum": ["auto", "concise", "detailed"] },
+        "serverCompactThreshold": { "$ref": "#/$defs/positiveInteger" },
+        "store": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": false
+    },
+    "openaiChatOptions": {
+      "type": "object",
+      "properties": {
+        "maxOutputTokens": { "$ref": "#/$defs/positiveInteger" },
+        "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
+        "store": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "deepseekOptions": {
+      "type": "object",
+      "properties": {
+        "thinking": { "type": "string", "enum": ["enabled", "disabled"] },
+        "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
+        "maxTokens": { "$ref": "#/$defs/positiveInteger" }
+      },
+      "additionalProperties": false
+    },
+    "zhipuOptions": {
+      "type": "object",
+      "properties": {
+        "thinking": { "type": "string", "enum": ["enabled", "disabled"] },
+        "clearThinking": { "type": "boolean" },
+        "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
+        "maxTokens": { "$ref": "#/$defs/positiveInteger" }
+      },
+      "additionalProperties": false
+    },
+    "kimiThinking": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["enabled", "disabled"] },
+        "keep": { "enum": ["all", null] }
+      },
+      "additionalProperties": false
+    },
+    "kimiOptions": {
+      "type": "object",
+      "properties": {
+        "thinking": { "$ref": "#/$defs/kimiThinking" },
+        "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
+        "maxTokens": { "$ref": "#/$defs/positiveInteger" }
+      },
+      "additionalProperties": false
+    },
+    "anthropicThinking": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "budgetTokens"],
+          "properties": {
+            "type": { "const": "enabled" },
+            "budgetTokens": { "$ref": "#/$defs/positiveInteger" },
+            "display": { "type": "string", "enum": ["summarized", "omitted"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "adaptive" },
+            "display": { "type": "string", "enum": ["summarized", "omitted"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": { "type": { "const": "disabled" } },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "anthropicOptions": {
+      "type": "object",
+      "properties": {
+        "thinking": { "$ref": "#/$defs/anthropicThinking" },
+        "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
+        "maxTokens": { "$ref": "#/$defs/positiveInteger" },
+        "apiVersion": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "maybecode": {
+      "type": "object",
+      "properties": {
+        "instructionsDirectory": { "$ref": "#/$defs/nonEmptyString" },
+        "autoCompaction": {
+          "type": "object",
+          "properties": {
+            "providerNative": { "type": "boolean", "default": false }
+          },
+          "additionalProperties": false
+        },
+        "retry": {
+          "oneOf": [
+            { "const": false },
+            {
+              "type": "object",
+              "properties": {
+                "maxAttempts": { "$ref": "#/$defs/positiveInteger" },
+                "baseDelayMs": { "type": "number", "minimum": 0 },
+                "maxDelayMs": { "type": "number", "minimum": 0 },
+                "jitterRatio": { "type": "number", "minimum": 0, "maximum": 1 }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

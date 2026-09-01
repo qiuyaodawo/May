@@ -1,6 +1,7 @@
 import type { MayEvent, RunResult, SerializedError } from "@may/core";
 import type { ContextInspection } from "@may/context";
 import type { PermissionEvent } from "@may/permissions";
+import type { MaybeCodeModelInfo } from "./controller.js";
 import type { ToolChangePreview } from "./diff.js";
 
 export type MaybeCodeSessionEvent =
@@ -34,6 +35,14 @@ export type MaybeCodeEvent =
       type: "session.changed";
       sessionId: string;
       resumed: boolean;
+    }
+  | {
+      type: "model.changed";
+      model: MaybeCodeModelInfo;
+    }
+  | {
+      type: "model.default.changed";
+      profile: string;
     };
 
 export interface MaybeCodeRun {

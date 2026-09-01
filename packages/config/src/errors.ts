@@ -21,6 +21,21 @@ export class MayConfigFileError extends MayConfigError {
   }
 }
 
+export class MayConfigWriteError extends MayConfigError {
+  readonly path: string;
+
+  constructor(path: string, problem?: string, options?: ErrorOptions) {
+    super(
+      "MAY_CONFIG_WRITE_ERROR",
+      `Unable to update May config at ${path}${
+        problem === undefined ? "" : `: ${problem}`
+      }`,
+      options,
+    );
+    this.path = path;
+  }
+}
+
 export class MayConfigParseError extends MayConfigError {
   readonly path: string;
 

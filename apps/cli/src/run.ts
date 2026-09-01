@@ -4,6 +4,7 @@ import {
   type MayConfig,
 } from "@may/config";
 import { InMemoryContext, May, type Model } from "@may/core";
+import type { ProviderAdapterRegistry } from "@may/providers";
 import { CLI_USAGE, parseCliArgs } from "./args.js";
 import { CliUsageError } from "./errors.js";
 import { createConfiguredModel } from "./model.js";
@@ -25,6 +26,7 @@ export interface RunCliDependencies {
     options?: LoadMayConfigOptions,
   ) => Promise<MayConfig>;
   readonly createModel?: (selection: SelectedModelConfig) => Model;
+  readonly adapterRegistry?: ProviderAdapterRegistry;
 }
 
 export async function runCli(
@@ -57,12 +59,12 @@ export async function runCli(
       : { path: command.configPath };
     const config = await loadConfig(loadOptions);
     const selector: ModelSelector = {
-      ...(command.provider === undefined ? {} : { provider: command.provider }),
       ...(command.model === undefined ? {} : { model: command.model }),
     };
     const selection = selectModelConfig(config, selector);
-    const createModel = dependencies.createModel ?? createConfiguredModel;
-    const model = createModel(selection);
+    const model = dependencies.createModel === undefined
+      ? createConfiguredModel(selection, dependencies.adapterRegistry)
+      : dependencies.createModel(selection);
 
     return await executeRun(
       model,

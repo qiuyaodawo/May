@@ -7,7 +7,6 @@ Usage:
 
 Options:
   --config <path>      Load another config file
-  --provider <name>    Use a provider and its configured model
   --model <name>       Use a named model profile
   -h, --help           Show this help
 `;
@@ -20,7 +19,6 @@ export interface RunCommand {
   readonly type: "run";
   readonly prompt: string;
   readonly configPath?: string;
-  readonly provider?: string;
   readonly model?: string;
 }
 
@@ -38,7 +36,6 @@ export function parseCliArgs(args: readonly string[]): CliCommand {
   }
 
   let configPath: string | undefined;
-  let provider: string | undefined;
   let model: string | undefined;
   let parseOptions = true;
   const prompt: string[] = [];
@@ -60,14 +57,6 @@ export function parseCliArgs(args: readonly string[]): CliCommand {
       );
       continue;
     }
-    if (parseOptions && argument === "--provider") {
-      provider = setOption(
-        "--provider",
-        provider,
-        readOptionValue(args, ++index, "--provider"),
-      );
-      continue;
-    }
     if (parseOptions && argument === "--model") {
       model = setOption(
         "--model",
@@ -82,16 +71,12 @@ export function parseCliArgs(args: readonly string[]): CliCommand {
     prompt.push(argument);
   }
 
-  if (provider !== undefined && model !== undefined) {
-    throw new CliUsageError("--provider and --model cannot be used together");
-  }
-
   const input = prompt.join(" ").trim();
   if (input === "") {
     throw new CliUsageError("A prompt is required");
   }
 
-  return createRunCommand(input, configPath, provider, model);
+  return createRunCommand(input, configPath, model);
 }
 
 function readOptionValue(
@@ -120,14 +105,12 @@ function setOption(
 function createRunCommand(
   prompt: string,
   configPath: string | undefined,
-  provider: string | undefined,
   model: string | undefined,
 ): RunCommand {
   return {
     type: "run",
     prompt,
     ...(configPath === undefined ? {} : { configPath }),
-    ...(provider === undefined ? {} : { provider }),
     ...(model === undefined ? {} : { model }),
   };
 }

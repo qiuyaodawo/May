@@ -3,12 +3,8 @@ import type { JsonSchema } from "@may/core";
 export const ANTHROPIC_MODEL_STATE_TYPE =
   "@may/provider-anthropic/message-v1";
 
-export type AnthropicReasoningEffort =
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max";
+/** Provider/model metadata determines concrete supported values. */
+export type AnthropicReasoningEffort = string;
 
 export type AnthropicThinkingConfig =
   | {

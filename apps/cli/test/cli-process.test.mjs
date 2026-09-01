@@ -55,14 +55,20 @@ test("runs the built CLI through config, DeepSeek, and May", {
   const configPath = await writeConfig(t, {
     providers: {
       deepseek: {
+        adapter: "deepseek-chat",
         apiKeyEnv: "MAY_CLI_TEST_API_KEY",
         baseURL,
-        model: "deepseek-test-model",
-        thinking: "enabled",
-        reasoningEffort: "high",
-        maxTokens: 1234,
+        options: {
+          thinking: "enabled",
+          reasoningEffort: "high",
+          maxTokens: 1234,
+        },
       },
     },
+    models: {
+      deepseek: { provider: "deepseek", model: "deepseek-test-model" },
+    },
+    defaultModel: "deepseek",
   });
 
   const result = await runProcess([
@@ -113,11 +119,15 @@ test("returns a clean process error for DeepSeek HTTP failures", {
   const configPath = await writeConfig(t, {
     providers: {
       deepseek: {
+        adapter: "deepseek-chat",
         apiKey: "test-key",
         baseURL,
-        model: "deepseek-test-model",
       },
     },
+    models: {
+      deepseek: { provider: "deepseek", model: "deepseek-test-model" },
+    },
+    defaultModel: "deepseek",
   });
 
   const result = await runProcess([

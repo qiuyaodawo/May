@@ -15,6 +15,6 @@ export interface KimiChatRequest {
   stream_options: { include_usage: true };
   tools?: OpenAICompatibleToolDefinition[];
   thinking?: KimiThinkingConfig;
-  reasoning_effort?: "low" | "high" | "max";
+  reasoning_effort?: string;
   max_completion_tokens?: number;
 }

@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 
 import {
   loadMayConfig,
+  updateDefaultMayModel,
   type LoadMayConfigOptions,
   type MayConfig,
 } from "@may/config";
@@ -15,6 +16,9 @@ import type {
 } from "@may/context";
 import type { Model } from "@may/core";
 import {
+  createModelCapabilityResolver,
+  type ModelCapabilityResolver,
+  type ProviderAdapterRegistry,
   withModelRetry,
   type RetryingModelOptions,
 } from "@may/providers";
@@ -33,6 +37,7 @@ import {
   resolveMaybeCodeInstructionsDirectory,
 } from "./instructions.js";
 import { MaybeCodeWorkspace } from "./workspace.js";
+import type { MaybeCodeModelConfiguration } from "./workspace.js";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly workspace?: string;
@@ -58,6 +63,9 @@ export interface ConfiguredMaybeCodeDependencies {
     options?: LoadMayConfigOptions,
   ) => Promise<MayConfig>;
   readonly createModel?: (selection: SelectedMaybeCodeModel) => Model;
+  readonly adapterRegistry?: ProviderAdapterRegistry;
+  readonly capabilityResolver?: ModelCapabilityResolver;
+  readonly persistDefaultModel?: (profile: string) => Promise<void>;
 }
 
 export function getDefaultMaybeCodeDataDirectory(): string {
@@ -73,17 +81,57 @@ export async function openConfiguredMaybeCode(
   const config = await loadConfig(
     options.configPath === undefined ? {} : { path: options.configPath },
   );
-  const selection = selectMaybeCodeModel(config, {
-    ...(options.provider === undefined ? {} : { provider: options.provider }),
-    ...(options.model === undefined ? {} : { model: options.model }),
-  });
-  const baseModel = (dependencies.createModel ?? createMaybeCodeModel)(selection);
   const retry = options.retry ?? resolveMaybeCodeRetry(config);
-  const model = retry === false ? baseModel : withModelRetry(baseModel, retry);
-  const contextBudget = options.contextBudget ?? createContextBudget(
-    model,
-    selection,
-  );
+  const capabilityResolver = dependencies.capabilityResolver ??
+    createModelCapabilityResolver();
+  const selectionFor = (profile?: string): SelectedMaybeCodeModel =>
+    selectMaybeCodeModel(config, {
+      ...(profile === undefined ? {} : { model: profile }),
+    });
+  const configureModel = (
+    profile?: string,
+    runtimeOptions: Readonly<Record<string, unknown>> = {},
+  ): MaybeCodeModelConfiguration => {
+    const selected = selectionFor(profile);
+    const selection: SelectedMaybeCodeModel = {
+      ...selected,
+      options: { ...selected.options, ...runtimeOptions },
+    };
+    const baseModel = dependencies.createModel === undefined
+      ? createMaybeCodeModel(selection, dependencies.adapterRegistry)
+      : dependencies.createModel(selection);
+    const model = retry === false ? baseModel : withModelRetry(baseModel, retry);
+    const contextBudget = options.contextBudget ?? createContextBudget(
+      model,
+      selection,
+    );
+    return {
+      model,
+      modelInfo: {
+        profile: selection.profile,
+        provider: selection.provider,
+        adapter: selection.adapter,
+        model: selection.model,
+      },
+      ...(contextBudget === undefined ? {} : { contextBudget }),
+    };
+  };
+  const initialModel = configureModel(options.model);
+  const modelProfiles = Object.entries(config.models).map(([name, profile]) => {
+    const provider = config.providers[profile.provider]!;
+    const reasoningEffort = {
+      ...(provider.options ?? {}),
+      ...(profile.options ?? {}),
+    }.reasoningEffort;
+    return {
+      name,
+      provider: profile.provider,
+      adapter: profile.adapter ?? provider.adapter,
+      model: profile.model,
+      isDefault: config.defaultModel === name,
+      ...(typeof reasoningEffort === "string" ? { reasoningEffort } : {}),
+    };
+  });
   const instructionsDirectory = options.instructions === undefined
     ? resolveMaybeCodeInstructionsDirectory(config)
     : undefined;
@@ -96,8 +144,14 @@ export async function openConfiguredMaybeCode(
 
   return MaybeCodeWorkspace.open({
     workspace,
-    model,
-    modelInfo: { provider: selection.provider, model: selection.model },
+    model: initialModel.model,
+    modelInfo: initialModel.modelInfo,
+    modelProfiles,
+    createModelConfiguration: (profile, runtimeOptions) =>
+      configureModel(profile, runtimeOptions),
+    resolveModelCapabilities: async (profile) =>
+      capabilityResolver.resolve(selectionFor(profile)),
+    ...resolveDefaultModelPersistence(config, dependencies),
     store: new FileSessionStore(join(dataDirectory, "sessions")),
     catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
     ...(options.sessionId === undefined
@@ -109,7 +163,9 @@ export async function openConfiguredMaybeCode(
     ...(options.contextFactory === undefined
       ? {}
       : { contextFactory: options.contextFactory }),
-    ...(contextBudget === undefined ? {} : { contextBudget }),
+    ...(initialModel.contextBudget === undefined
+      ? {}
+      : { contextBudget: initialModel.contextBudget }),
     ...(options.compactionStrategy === undefined
       ? {}
       : { compactionStrategy: options.compactionStrategy }),
@@ -128,6 +184,21 @@ export async function openConfiguredMaybeCode(
       : { instructionsDirectory }),
     ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
   });
+}
+
+function resolveDefaultModelPersistence(
+  config: MayConfig,
+  dependencies: ConfiguredMaybeCodeDependencies,
+): { persistDefaultModel?: (profile: string) => Promise<void> } {
+  if (dependencies.persistDefaultModel !== undefined) {
+    return { persistDefaultModel: dependencies.persistDefaultModel };
+  }
+  if (dependencies.loadConfig !== undefined) return {};
+  return {
+    persistDefaultModel: async (profile) => {
+      await updateDefaultMayModel(config.path, profile);
+    },
+  };
 }
 
 export function resolveProviderNativeAutoCompaction(

@@ -34,11 +34,18 @@ Expected configuration:
 {
   "providers": {
     "deepseek": {
+      "adapter": "deepseek-chat",
       "apiKey": "",
-      "baseURL": "https://api.deepseek.com",
+      "baseURL": "https://api.deepseek.com"
+    }
+  },
+  "models": {
+    "deepseek": {
+      "provider": "deepseek",
       "model": "deepseek-v4-flash"
     }
-  }
+  },
+  "defaultModel": "deepseek"
 }
 ```
 

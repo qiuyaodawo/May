@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -14,28 +14,58 @@ import {
   parseMayConfig,
   resolveModelProfile,
   resolveProviderConfig,
+  updateDefaultMayModel,
 } from "../dist/index.js";
 
-test("parses the existing provider-only config shape", () => {
+test("parses provider connections and model profiles", () => {
   const config = parseMayConfig({
     providers: {
-      deepseek: {
+      gateway: {
+        adapter: "openai-responses",
         apiKey: "test-key",
         baseURL: "https://example.test",
-        model: "deepseek-reasoner",
-        maxTokens: 4096,
+        options: { store: false },
+      },
+    },
+    models: {
+      chat: {
+        provider: "gateway",
+        adapter: "openai-chat-completions",
+        model: "test-model",
+        capabilities: {
+          reasoning: {
+            efforts: ["low", "high"],
+            defaultEffort: "high",
+          },
+        },
       },
     },
   }, "memory.json");
 
   assert.equal(config.path, "memory.json");
-  assert.deepEqual(config.models, {});
+  assert.deepEqual(config.models.chat, {
+    provider: "gateway",
+    adapter: "openai-chat-completions",
+    model: "test-model",
+    capabilities: {
+      reasoning: {
+        efforts: ["low", "high"],
+        defaultEffort: "high",
+      },
+    },
+  });
   assert.deepEqual(config.apps, {});
-  assert.deepEqual(config.providers.deepseek, {
+  assert.deepEqual(config.providers.gateway, {
+    adapter: "openai-responses",
     apiKey: "test-key",
     baseURL: "https://example.test",
-    model: "deepseek-reasoner",
-    maxTokens: 4096,
+    options: { store: false },
+  });
+  const resolved = resolveModelProfile(config, "chat");
+  assert.equal(resolved.adapter, "openai-chat-completions");
+  assert.deepEqual(resolved.options, { store: false });
+  assert.deepEqual(resolved.capabilities, {
+    reasoning: { efforts: ["low", "high"], defaultEffort: "high" },
   });
 });
 
@@ -61,18 +91,19 @@ test("resolves the default model profile and provider environment key", () => {
     defaultModel: "reasoner",
     providers: {
       deepseek: {
+        adapter: "deepseek-chat",
         apiKeyEnv: "DEEPSEEK_API_KEY",
         baseURL: "https://example.test",
-        contextWindowTokens: 64000,
-        maxOutputTokens: 16000,
+        options: { thinking: "enabled", maxTokens: 16000 },
       },
     },
     models: {
       reasoner: {
         provider: "deepseek",
         model: "deepseek-reasoner",
+        contextWindowTokens: 64000,
         maxOutputTokens: 8192,
-        options: { maxTokens: 8192 },
+        options: { maxTokens: 8192, reasoningEffort: "high" },
       },
     },
   });
@@ -84,16 +115,21 @@ test("resolves the default model profile and provider environment key", () => {
   assert.deepEqual(resolved, {
     name: "reasoner",
     provider: "deepseek",
+    adapter: "deepseek-chat",
     model: "deepseek-reasoner",
     contextWindowTokens: 64000,
     maxOutputTokens: 8192,
-    options: { maxTokens: 8192 },
+    options: {
+      thinking: "enabled",
+      maxTokens: 8192,
+      reasoningEffort: "high",
+    },
     providerConfig: {
+      adapter: "deepseek-chat",
       apiKeyEnv: "DEEPSEEK_API_KEY",
       apiKey: "env-key",
       baseURL: "https://example.test",
-      contextWindowTokens: 64000,
-      maxOutputTokens: 16000,
+      options: { thinking: "enabled", maxTokens: 16000 },
     },
   });
 });
@@ -101,8 +137,11 @@ test("resolves the default model profile and provider environment key", () => {
 test("resolves apiKeyEnv lazily", () => {
   const config = parseMayConfig({
     providers: {
-      deepseek: { apiKeyEnv: "MISSING_DEEPSEEK_KEY" },
-      local: { apiKey: "direct-key" },
+      deepseek: {
+        adapter: "deepseek-chat",
+        apiKeyEnv: "MISSING_DEEPSEEK_KEY",
+      },
+      local: { adapter: "openai-chat-completions", apiKey: "direct-key" },
     },
   });
 
@@ -124,29 +163,30 @@ test("rejects invalid config shapes", async (t) => {
     ["missing providers", {}, "providers"],
     ["non-object provider", { providers: { deepseek: [] } }, "providers.deepseek"],
     ["non-object application", { providers: {}, apps: { maybecode: [] } }, "apps.maybecode"],
-    ["empty known field", { providers: { deepseek: { apiKey: " " } } }, "providers.deepseek.apiKey"],
+    ["missing adapter", { providers: { deepseek: {} } }, "providers.deepseek.adapter"],
+    ["empty known field", { providers: { deepseek: { adapter: "deepseek-chat", apiKey: " " } } }, "providers.deepseek.apiKey"],
     [
       "two API key sources",
-      { providers: { deepseek: { apiKey: "key", apiKeyEnv: "KEY" } } },
+      { providers: { deepseek: { adapter: "deepseek-chat", apiKey: "key", apiKeyEnv: "KEY" } } },
       "providers.deepseek",
     ],
     [
       "non-object model options",
       {
-        providers: { deepseek: {} },
+        providers: { deepseek: { adapter: "deepseek-chat" } },
         models: { reasoner: { provider: "deepseek", model: "model", options: [] } },
       },
       "models.reasoner.options",
     ],
     [
-      "invalid provider context window",
-      { providers: { deepseek: { contextWindowTokens: 0 } } },
-      "providers.deepseek.contextWindowTokens",
+      "legacy provider model",
+      { providers: { deepseek: { adapter: "deepseek-chat", model: "old" } } },
+      "providers.deepseek.model",
     ],
     [
       "invalid model output limit",
       {
-        providers: { deepseek: {} },
+        providers: { deepseek: { adapter: "deepseek-chat" } },
         models: {
           reasoner: {
             provider: "deepseek",
@@ -210,13 +250,40 @@ test("loads a config from a custom path", async (t) => {
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, "config.json");
   await writeFile(path, JSON.stringify({
-    providers: { deepseek: { apiKey: "test-key" } },
+    providers: {
+      deepseek: { adapter: "deepseek-chat", apiKey: "test-key" },
+    },
   }));
 
   const config = await loadMayConfig({ path });
 
   assert.equal(config.path, path);
   assert.equal(config.providers.deepseek.apiKey, "test-key");
+});
+
+test("atomically updates only the default model with existing formatting", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "may-config-update-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, "config.json");
+  const source = JSON.stringify({
+    providers: {
+      local: { adapter: "openai-responses", apiKey: "test" },
+    },
+    models: {
+      first: { provider: "local", model: "first-model" },
+      second: { provider: "local", model: "second-model" },
+    },
+    defaultModel: "first",
+  }, null, 4).replace(/\n/gu, "\r\n") + "\r\n";
+  await writeFile(path, source);
+
+  const updated = await updateDefaultMayModel(path, "second");
+  const written = await readFile(path, "utf8");
+
+  assert.equal(updated.defaultModel, "second");
+  assert.equal(JSON.parse(written).defaultModel, "second");
+  assert.match(written, /\r\n    "providers"/u);
+  assert.equal(written.endsWith("\r\n"), true);
 });
 
 test("distinguishes file and JSON parsing failures", async (t) => {

@@ -27,7 +27,7 @@ export function resolveProviderConfig(
     }
     resolved.apiKey = apiKey;
   }
-  return resolved as ProviderConfig;
+  return resolved as unknown as ProviderConfig;
 }
 
 export function resolveModelProfile(
@@ -51,17 +51,22 @@ export function resolveModelProfile(
     profile.provider,
     options,
   );
-  const contextWindowTokens = profile.contextWindowTokens ??
-    providerConfig.contextWindowTokens;
-  const maxOutputTokens = profile.maxOutputTokens ??
-    providerConfig.maxOutputTokens;
+  const contextWindowTokens = profile.contextWindowTokens;
+  const maxOutputTokens = profile.maxOutputTokens;
   return {
     name: profileName,
     provider: profile.provider,
+    adapter: profile.adapter ?? providerConfig.adapter,
     model: profile.model,
     ...(contextWindowTokens === undefined ? {} : { contextWindowTokens }),
     ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
-    options: { ...(profile.options ?? {}) },
+    options: {
+      ...(providerConfig.options ?? {}),
+      ...(profile.options ?? {}),
+    },
+    ...(profile.capabilities === undefined
+      ? {}
+      : { capabilities: profile.capabilities }),
     providerConfig,
   };
 }

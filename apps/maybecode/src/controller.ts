@@ -12,8 +12,29 @@ import type { MaybeCodeEvent, MaybeCodeRun } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 
 export interface MaybeCodeModelInfo {
+  readonly profile?: string;
   readonly provider: string;
+  readonly adapter?: string;
   readonly model: string;
+}
+
+export interface MaybeCodeModelProfile {
+  readonly name: string;
+  readonly provider: string;
+  readonly adapter: string;
+  readonly model: string;
+  readonly isDefault: boolean;
+  /** Effort configured by provider/model options before runtime overrides. */
+  readonly reasoningEffort?: string;
+}
+
+export interface MaybeCodeReasoningEffortState {
+  readonly status: "known" | "unsupported" | "unknown";
+  readonly source: "user" | "provider" | "builtin" | "unknown";
+  readonly efforts: readonly string[];
+  readonly defaultEffort?: string;
+  readonly effectiveEffort?: string;
+  readonly overridden: boolean;
 }
 
 export type MaybeCodeCompactionStrategyName =
@@ -52,6 +73,18 @@ export interface MaybeCodeController {
   listSessions(): Promise<readonly SessionSummary[]>;
   newSession(): Promise<string>;
   resumeSession(sessionId: string): Promise<void>;
+  renameSession(sessionId: string, title: string): Promise<void>;
+  deleteSession(sessionId: string): Promise<boolean>;
+
+  listModels(): Promise<readonly MaybeCodeModelProfile[]>;
+  switchModel(profile: string): Promise<MaybeCodeModelInfo>;
+  /** Persist the profile used by future launches without switching models. */
+  setDefaultModel(profile: string): Promise<void>;
+  getReasoningEffort(): Promise<MaybeCodeReasoningEffortState>;
+  /** Set an active-profile override, or clear it with undefined. */
+  setReasoningEffort(
+    effort?: string,
+  ): Promise<MaybeCodeReasoningEffortState>;
 
   history(): Promise<readonly SessionEvent[]>;
   inspectContext(): Promise<ContextInspection | undefined>;

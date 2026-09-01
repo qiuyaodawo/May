@@ -14,9 +14,7 @@ export function tuningOption(
   selection: ProviderModelSelection,
   name: string,
 ): unknown {
-  return Object.hasOwn(selection.options, name)
-    ? selection.options[name]
-    : selection.providerConfig[name];
+  return selection.options[name];
 }
 
 export function modelOption(
@@ -26,6 +24,13 @@ export function modelOption(
   return Object.hasOwn(selection.options, name)
     ? selection.options[name]
     : undefined;
+}
+
+export function optionField(
+  selection: ProviderModelSelection,
+  name: string,
+): string {
+  return `models.${selection.profile}.options.${name}`;
 }
 
 export function requiredString(value: unknown, field: string): string {

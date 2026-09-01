@@ -17,7 +17,12 @@ import type {
   TerminalQuestionOptions,
 } from "./terminal.js";
 import { createNodeTerminal } from "./terminal.js";
-import type { MaybeCodeController } from "./controller.js";
+import type {
+  MaybeCodeController,
+  MaybeCodeReasoningEffortState,
+} from "./controller.js";
+import { runModelPicker } from "./model-picker.js";
+import { runSessionPicker } from "./session-picker.js";
 
 type UIQuestion = (
   prompt: string,
@@ -87,7 +92,7 @@ export async function runTerminalUI(
       terminal.addHistory?.(input);
       if (input.startsWith("/")) {
         try {
-          exit = await handleCommand(input, app, terminal);
+          exit = await handleCommand(input, app, terminal, question);
         } catch (error) {
           if (!isCancellation(error) && !isAbortError(error)) {
             terminal.write(`\nError: ${errorMessage(error)}\n`);
@@ -130,6 +135,10 @@ async function consumeEvents(
       renderer.contextCompacted(event);
     } else if (event.type === "context.compaction.failed") {
       renderer.contextCompactionFailed(event);
+    } else if (event.type === "model.changed") {
+      renderer.modelChanged(event.model);
+    } else if (event.type === "model.default.changed") {
+      renderer.defaultModelChanged(event.profile);
     } else {
       await renderer.sessionChanged(event, app);
     }
@@ -151,7 +160,7 @@ async function handlePermissionEvent(
   while (true) {
     const choices = event.request.grantKey === undefined
       ? "[a]llow once / [d]eny"
-      : "[a]llow once / allow [s]ession / [d]eny";
+      : permissionChoices(event.request.tool.name);
     let answer: string;
     try {
       answer = (await question(`${choices}: `, { history: false }))
@@ -186,6 +195,7 @@ async function handleCommand(
   input: string,
   app: MaybeCodeController,
   terminal: MaybeCodeTerminal,
+  question: UIQuestion,
 ): Promise<boolean> {
   const parsed = parseMaybeCodeSlashCommand(input);
   if (
@@ -205,13 +215,14 @@ async function handleCommand(
   }
 
   const result = await executeMaybeCodeSlashCommand(input, app);
-  return renderSlashCommandResult(result, app, terminal);
+  return renderSlashCommandResult(result, app, terminal, question);
 }
 
 async function renderSlashCommandResult(
   result: MaybeCodeSlashCommandResult,
   app: MaybeCodeController,
   terminal: MaybeCodeTerminal,
+  question: UIQuestion,
 ): Promise<boolean> {
   switch (result.type) {
     case "exit":
@@ -248,13 +259,94 @@ async function renderSlashCommandResult(
       terminal.write("\nSessions:\n");
       for (const session of result.sessions) {
         const marker = session.id === app.sessionId ? "*" : " ";
+        const title = session.title === undefined ? "" : `  ${session.title}`;
         terminal.write(
-          `${marker} ${session.id}  ${new Date(session.lastUsedAt).toISOString()}\n`,
+          `${marker} ${session.id}${title}  ` +
+            `${new Date(session.lastUsedAt).toISOString()}\n`,
         );
       }
       break;
+    case "session.selection.requested": {
+      const selection = await runSessionPicker({
+        controller: app,
+        terminal,
+        sessions: result.sessions,
+        question: (prompt) => question(prompt, { history: false }),
+      });
+      if (selection.type === "empty") {
+        terminal.write("\nNo sessions found for this workspace.\n");
+      } else if (selection.type === "resume") {
+        await app.resumeSession(selection.sessionId);
+        terminal.write(`\nResumed session ${selection.sessionId}\n`);
+      }
+      break;
+    }
     case "session.resumed":
       terminal.write(`\nResumed session ${result.sessionId}\n`);
+      break;
+    case "model.selection.requested": {
+      let models = result.models;
+      while (true) {
+        const selection = await runModelPicker({
+          controller: app,
+          terminal,
+          models,
+          question: (prompt) => question(prompt, { history: false }),
+        });
+        if (selection.type === "empty") {
+          terminal.write("\nNo model profiles are configured.\n");
+          break;
+        }
+        if (selection.type === "cancelled") break;
+        if (selection.type === "select") {
+          await app.switchModel(selection.profile);
+          break;
+        }
+        await app.setDefaultModel(selection.profile);
+        models = await app.listModels();
+      }
+      break;
+    }
+    case "model.switched":
+      break;
+    case "model.not-found":
+      terminal.write(`\nNo model profile starts with: ${result.query}\n`);
+      break;
+    case "effort.selection.requested": {
+      if (result.state.status !== "known") {
+        terminal.write(`\n${renderReasoningEffortState(result.state)}\n`);
+        break;
+      }
+      const choices = ["default", ...result.state.efforts];
+      terminal.write(`\n${renderReasoningEffortState(result.state)}`);
+      for (const [index, effort] of choices.entries()) {
+        terminal.write(`  ${index + 1}. ${effort}\n`);
+      }
+      const answer = (await question(
+        "Select an effort number or name (Enter to cancel): ",
+        { history: false },
+      )).trim().toLowerCase();
+      if (answer !== "") {
+        const numeric = Number(answer);
+        const selected = Number.isSafeInteger(numeric) && numeric > 0
+          ? choices[numeric - 1]
+          : choices.find((choice) => choice.startsWith(answer));
+        if (selected === undefined) {
+          terminal.write(`\nNo reasoning effort starts with: ${answer}\n`);
+        } else {
+          const state = await app.setReasoningEffort(
+            selected === "default" ? undefined : selected,
+          );
+          terminal.write(`\n${renderReasoningEffortChanged(state)}\n`);
+        }
+      }
+      break;
+    }
+    case "effort.changed":
+      terminal.write(`\n${renderReasoningEffortChanged(result.state)}\n`);
+      break;
+    case "effort.not-found":
+      terminal.write(`\nNo reasoning effort starts with: ${result.query}\n`);
       break;
     case "usage":
       terminal.write(`\nUsage: ${result.usage}\n`);
@@ -264,6 +356,26 @@ async function renderSlashCommandResult(
       break;
   }
   return false;
+}
+
+function renderReasoningEffortState(
+  state: MaybeCodeReasoningEffortState,
+): string {
+  if (state.status === "unknown") {
+    return "Reasoning effort capability is unknown for the active model.";
+  }
+  if (state.status === "unsupported") {
+    return "The active model does not support effort-based reasoning.";
+  }
+  const current = state.effectiveEffort ?? "provider/model default";
+  return `Reasoning effort (source: ${state.source}, current: ${current})\n`;
+}
+
+function renderReasoningEffortChanged(
+  state: MaybeCodeReasoningEffortState,
+): string {
+  const effort = state.effectiveEffort ?? "provider/model default";
+  return `Reasoning effort: ${effort}${state.overridden ? " (runtime override)" : ""}`;
 }
 
 function renderSlashCommandHelp(
@@ -286,12 +398,16 @@ async function readInput(
 ): Promise<string> {
   const lines: string[] = [];
   while (true) {
-    const line = await question(lines.length === 0 ? "\n> " : "... ", {
+    let line = await question(lines.length === 0 ? "\n> " : "... ", {
       history: false,
       ...(lines.length === 0 && suggestions !== undefined
         ? { suggestions }
         : {}),
     });
+    if (lines.length === 0 && suggestions !== undefined) {
+      const candidates = await suggestions(line);
+      line = candidates[0]?.value ?? line;
+    }
     const continuation = removeLineContinuation(line);
     lines.push(continuation.text);
     if (!continuation.continued) return lines.join("\n").trim();
@@ -518,6 +634,17 @@ class TerminalRenderer {
     renderHistory(await app.history(), this.terminal);
   }
 
+  modelChanged(model: NonNullable<MaybeCodeController["modelInfo"]>): void {
+    const profile = model.profile === undefined ? "" : ` ${model.profile}`;
+    this.terminal.write(
+      `\nModel switched to${profile}: ${model.provider}/${model.model}\n`,
+    );
+  }
+
+  defaultModelChanged(profile: string): void {
+    this.terminal.write(`\nDefault model set to ${profile}\n`);
+  }
+
   private endReasoning(): void {
     if (!this.reasoningStarted) return;
     this.terminal.write(this.terminal.colors ? "\x1b[0m\n" : "\n");
@@ -543,7 +670,9 @@ class TerminalRenderer {
       return;
     }
     this.terminal.write(
-      `✓ ${event.call.name}${toolResultSummary(event.output)}\n`,
+      `${toolResultMarker(event.output)} ${event.call.name}${
+        toolResultSummary(event.output)
+      }\n`,
     );
   }
 
@@ -577,7 +706,11 @@ function renderHistory(
       const text = textFromContent(event.message.content);
       if (text !== "") terminal.write(`MaybeCode: ${text}\n`);
     } else if (event.type === "tool.completed") {
-      terminal.write(`✓ ${event.call.name}${toolResultSummary(event.output)}\n`);
+      terminal.write(
+        `${toolResultMarker(event.output)} ${event.call.name}${
+          toolResultSummary(event.output)
+        }\n`,
+      );
     } else if (event.type === "tool.failed") {
       terminal.write(`✗ ${event.call.name}: ${event.error.message}\n`);
     }
@@ -602,6 +735,28 @@ function toolResultSummary(output: unknown): string {
   return "";
 }
 
+function toolResultMarker(output: unknown): "✓" | "✗" {
+  if (
+    typeof output === "object" &&
+    output !== null &&
+    "exitCode" in output &&
+    typeof output.exitCode === "number" &&
+    output.exitCode !== 0
+  ) {
+    return "✗";
+  }
+  return "✓";
+}
+
+function permissionChoices(toolName: string): string {
+  const scope = toolName === "shell" || toolName === "bash"
+    ? "same command"
+    : toolName === "edit" || toolName === "write"
+    ? "same path"
+    : "same operation";
+  return `[a]llow once / allow ${scope} for [s]ession / [d]eny`;
+}
+
 function toolInputSummary(toolName: string, input: unknown): string {
   if (
     (toolName === "edit" || toolName === "write") &&
@@ -621,8 +776,12 @@ function toolCallKey(runId: string, toolCallId: string): string {
 
 function renderInstructionSources(app: MaybeCodeController): string {
   const system = app.instructions.system.source;
+  const runtime = app.instructions.runtime?.source;
   const project = app.instructions.project?.source;
   return `Instructions:\n  system: ${instructionSourceLabel(system)}\n` +
+    `  runtime: ${
+      runtime === undefined ? "none" : instructionSourceLabel(runtime)
+    }\n` +
     `  project: ${
       project === undefined ? "none" : instructionSourceLabel(project)
     }\n`;
@@ -648,9 +807,11 @@ function renderStatus(
 }
 
 function modelLabel(app: MaybeCodeController): string {
-  return app.modelInfo === undefined
-    ? "custom"
-    : `${app.modelInfo.provider}/${app.modelInfo.model}`;
+  if (app.modelInfo === undefined) return "custom";
+  const endpoint = `${app.modelInfo.provider}/${app.modelInfo.model}`;
+  return app.modelInfo.profile === undefined
+    ? endpoint
+    : `${app.modelInfo.profile} (${endpoint})`;
 }
 
 function renderContextInspection(inspection: ContextInspection): string {

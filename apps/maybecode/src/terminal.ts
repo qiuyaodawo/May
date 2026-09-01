@@ -1,5 +1,6 @@
 import { clearLine, cursorTo, moveCursor } from "node:readline";
 import { createInterface } from "node:readline/promises";
+import { keyStroke, type KeyStroke } from "@may/keybindings";
 
 export interface TerminalSuggestion {
   /** Full input value represented by the suggestion. */
@@ -25,7 +26,14 @@ export interface TerminalQuestionOptions {
 /** Low-level I/O adapter used by the bundled TUI, not the custom-UI contract. */
 export interface MaybeCodeTerminal {
   readonly colors?: boolean;
+  readonly interactive?: boolean;
   question(prompt: string, options?: TerminalQuestionOptions): Promise<string>;
+  /** Read one normalized key while no line question is active. */
+  readKey?(options?: { readonly signal?: AbortSignal }): Promise<KeyStroke>;
+  /** Render a temporary full-screen view. */
+  renderView?(text: string): void;
+  /** Close the temporary view and restore the previous terminal contents. */
+  closeView?(): void;
   addHistory?(value: string): void;
   write(text: string): void;
   onInterrupt?(listener: () => void): () => void;
@@ -54,6 +62,7 @@ export function createNodeTerminal(
     terminal: interactive,
     historySize,
     removeHistoryDuplicates: true,
+    escapeCodeTimeout: 100,
   });
   const history = (readline as unknown as { readonly history: string[] }).history;
   let activePrompt: string | undefined;
@@ -61,6 +70,11 @@ export function createNodeTerminal(
   let activeSuggestions: readonly TerminalSuggestion[] = [];
   let renderedSuggestionCount = 0;
   let suggestionVersion = 0;
+  let activeSuggestionInput: string | undefined;
+  let activeKeyRead: KeyRead | undefined;
+  let viewActive = false;
+  let suppressInterrupt = false;
+  let closed = false;
 
   const inputColumn = (): number => {
     const prompt = activePrompt?.replace(/^\r?\n/u, "") ?? "";
@@ -94,9 +108,11 @@ export function createNodeTerminal(
 
   const replaceSuggestions = (
     suggestions: readonly TerminalSuggestion[],
+    inputValue: string,
   ): void => {
     eraseSuggestionRows();
     activeSuggestions = suggestions;
+    activeSuggestionInput = inputValue;
     drawSuggestionRows();
   };
 
@@ -121,14 +137,63 @@ export function createNodeTerminal(
     ) {
       return;
     }
-    replaceSuggestions(suggestions);
+    replaceSuggestions(suggestions, line);
+  };
+
+  const completeActiveSuggestion = (line: string): boolean => {
+    if (activeSuggestionInput !== line) return false;
+    const completion = commonSuggestionPrefix(line, activeSuggestions);
+    if (completion === undefined || completion === line) return false;
+    suggestionVersion += 1;
+    eraseSuggestionRows();
+    activeSuggestions = [];
+    activeSuggestionInput = undefined;
+    readline.write(undefined, { ctrl: true, name: "u" });
+    readline.write(completion);
+    return true;
   };
 
   const onKeypress = (
-    _value: string | undefined,
-    key: { readonly name?: string; readonly ctrl?: boolean } = {},
+    value: string | undefined,
+    key: NodeKey = {},
   ): void => {
+    if (activeKeyRead !== undefined) {
+      const read = activeKeyRead;
+      activeKeyRead = undefined;
+      read.cleanup();
+      if (key.ctrl === true && key.name === "c") {
+        suppressInterrupt = true;
+        setImmediate(() => suppressInterrupt = false);
+      }
+      read.resolve(toKeyStroke(value, key));
+      queueMicrotask(() => {
+        if (!closed && activePrompt === undefined) {
+          readline.write(undefined, { ctrl: true, name: "u" });
+        }
+      });
+      return;
+    }
     if (activePrompt === undefined) return;
+    if (key.name === "tab" && activeSuggestionProvider !== undefined) {
+      const line = readline.line;
+      const completed = completeActiveSuggestion(line);
+      const expected = readline.line;
+      queueMicrotask(() => {
+        if (readline.line === `${expected}\t`) {
+          readline.write(undefined, { ctrl: true, name: "u" });
+          readline.write(expected);
+        }
+        void refreshSuggestions().then(() => {
+          if (
+            !completed && activePrompt !== undefined &&
+            readline.line === line
+          ) {
+            completeActiveSuggestion(line);
+          }
+        });
+      });
+      return;
+    }
     if (
       key.name === "return" ||
       key.name === "enter" ||
@@ -145,9 +210,13 @@ export function createNodeTerminal(
 
   return {
     colors: options.colors ?? interactive,
+    interactive,
     async question(prompt, questionOptions = {}) {
       if (activePrompt !== undefined) {
         throw new Error("The terminal already has an active question");
+      }
+      if (activeKeyRead !== undefined) {
+        throw new Error("The terminal is currently reading a key");
       }
       const previousHistory = questionOptions.history === false
         ? [...history]
@@ -155,6 +224,7 @@ export function createNodeTerminal(
       activePrompt = prompt;
       activeSuggestionProvider = questionOptions.suggestions;
       activeSuggestions = [];
+      activeSuggestionInput = undefined;
       renderedSuggestionCount = 0;
       suggestionVersion += 1;
       try {
@@ -166,11 +236,54 @@ export function createNodeTerminal(
         eraseSuggestionRows();
         activeSuggestionProvider = undefined;
         activeSuggestions = [];
+        activeSuggestionInput = undefined;
         activePrompt = undefined;
         if (previousHistory !== undefined) {
           history.splice(0, history.length, ...previousHistory);
         }
       }
+    },
+    readKey({ signal } = {}) {
+      if (!interactive) {
+        return Promise.reject(
+          new Error("Key input requires an interactive terminal"),
+        );
+      }
+      if (activePrompt !== undefined || activeKeyRead !== undefined) {
+        return Promise.reject(new Error("The terminal input is already active"));
+      }
+      if (signal?.aborted) return Promise.reject(abortError(signal.reason));
+      return new Promise<KeyStroke>((resolve, reject) => {
+        const onAbort = () => {
+          if (activeKeyRead !== read) return;
+          activeKeyRead = undefined;
+          read.cleanup();
+          reject(abortError(signal?.reason));
+        };
+        const read: KeyRead = {
+          resolve,
+          reject,
+          cleanup: () => signal?.removeEventListener("abort", onAbort),
+        };
+        activeKeyRead = read;
+        signal?.addEventListener("abort", onAbort, { once: true });
+      });
+    },
+    renderView(text) {
+      if (!interactive) {
+        output.write(text);
+        return;
+      }
+      if (!viewActive) {
+        output.write("\x1b[?1049h");
+        viewActive = true;
+      }
+      output.write(`\x1b[2J\x1b[H${text}`);
+    },
+    closeView() {
+      if (!viewActive) return;
+      output.write("\x1b[?1049l");
+      viewActive = false;
     },
     addHistory(value) {
       if (!interactive) return;
@@ -203,14 +316,79 @@ export function createNodeTerminal(
       drawSuggestionRows();
     },
     onInterrupt(listener) {
-      readline.on("SIGINT", listener);
-      return () => readline.off("SIGINT", listener);
+      const wrapped = () => {
+        if (suppressInterrupt) {
+          suppressInterrupt = false;
+          return;
+        }
+        listener();
+      };
+      readline.on("SIGINT", wrapped);
+      return () => readline.off("SIGINT", wrapped);
     },
     close() {
+      closed = true;
+      activeKeyRead?.reject(new Error("Terminal closed"));
+      activeKeyRead?.cleanup();
+      activeKeyRead = undefined;
+      if (viewActive) output.write("\x1b[?1049l");
       if (interactive) input.removeListener("keypress", onKeypress);
       readline.close();
     },
   };
+}
+
+interface NodeKey {
+  readonly name?: string;
+  readonly ctrl?: boolean;
+  readonly meta?: boolean;
+  readonly shift?: boolean;
+}
+
+interface KeyRead {
+  readonly resolve: (stroke: KeyStroke) => void;
+  readonly reject: (error: Error) => void;
+  readonly cleanup: () => void;
+}
+
+function toKeyStroke(value: string | undefined, key: NodeKey): KeyStroke {
+  const name = key.name ?? value ?? "unknown";
+  const standaloneEscape = name === "escape";
+  const printable = value !== undefined && value.length > 0 &&
+    key.ctrl !== true && key.meta !== true;
+  return keyStroke(name, {
+    ctrl: key.ctrl === true,
+    alt: key.meta === true && !standaloneEscape,
+    shift: key.shift === true,
+    ...(printable ? { text: value } : {}),
+  });
+}
+
+function commonSuggestionPrefix(
+  input: string,
+  suggestions: readonly TerminalSuggestion[],
+): string | undefined {
+  const values = suggestions
+    .map((suggestion) => suggestion.value)
+    .filter((value) => value.startsWith(input));
+  const first = values[0];
+  if (first === undefined) return undefined;
+  let length = first.length;
+  for (const value of values.slice(1)) {
+    length = Math.min(length, value.length);
+    let index = input.length;
+    while (index < length && first[index] === value[index]) index += 1;
+    length = index;
+  }
+  return first.slice(0, length);
+}
+
+function abortError(reason: unknown): Error {
+  const error = new Error(
+    typeof reason === "string" ? reason : "The operation was aborted",
+  );
+  error.name = "AbortError";
+  return error;
 }
 
 function formatSuggestion(

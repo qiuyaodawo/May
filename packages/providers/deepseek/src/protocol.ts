@@ -10,6 +10,6 @@ export interface DeepSeekChatRequest {
   stream_options: { include_usage: true };
   tools?: OpenAICompatibleToolDefinition[];
   thinking?: { type: "enabled" | "disabled" };
-  reasoning_effort?: "low" | "medium" | "high" | "xhigh" | "max";
+  reasoning_effort?: string;
   max_tokens?: number;
 }

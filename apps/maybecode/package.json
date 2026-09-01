@@ -32,6 +32,7 @@
     "@may/config": "workspace:*",
     "@may/context": "workspace:*",
     "@may/core": "workspace:*",
+    "@may/keybindings": "workspace:*",
     "@may/permissions": "workspace:*",
     "@may/providers": "workspace:*",
     "@may/session": "workspace:*",

@@ -9,10 +9,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./schema": "./may-config.schema.json"
   },
   "files": [
     "dist",
+    "may-config.schema.json",
     "!dist/.tsbuildinfo"
   ],
   "scripts": {

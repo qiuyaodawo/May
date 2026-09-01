@@ -6,12 +6,12 @@ import {
   ProviderConfigurationError,
   selectProviderModel,
   type ProviderModelSelection,
-  type ProviderModelSelector,
+  type ModelProfileSelector,
 } from "@may/providers";
 
 import { CliConfigError } from "./errors.js";
 
-export type ModelSelector = ProviderModelSelector;
+export type ModelSelector = ModelProfileSelector;
 export type SelectedModelConfig = ProviderModelSelection;
 
 export function selectModelConfig(

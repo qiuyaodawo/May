@@ -7,7 +7,6 @@ Usage:
 
 Options:
   --config <path>      Load another May config file
-  --provider <name>    Use a configured provider
   --model <name>       Use a named model profile
   -c, --continue       Continue the most recent session for this workspace
   -r, --resume <id>    Resume a specific session
@@ -22,7 +21,6 @@ export interface MaybeCodeStartCommand {
   readonly type: "start";
   readonly workspace?: string;
   readonly configPath?: string;
-  readonly provider?: string;
   readonly model?: string;
   readonly sessionId?: string;
   readonly autoResume: boolean;
@@ -33,7 +31,6 @@ export type MaybeCodeCommand = MaybeCodeHelpCommand | MaybeCodeStartCommand;
 export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   let workspace: string | undefined;
   let configPath: string | undefined;
-  let provider: string | undefined;
   let model: string | undefined;
   let sessionId: string | undefined;
   let continueLatest = false;
@@ -53,14 +50,6 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
         "--config",
         configPath,
         readValue(args, ++index, "--config"),
-      );
-      continue;
-    }
-    if (argument === "--provider") {
-      provider = setOption(
-        "--provider",
-        provider,
-        readValue(args, ++index, "--provider"),
       );
       continue;
     }
@@ -93,9 +82,6 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
     workspace = argument;
   }
 
-  if (provider !== undefined && model !== undefined) {
-    throw new MaybeCodeUsageError("--provider and --model cannot be used together");
-  }
   if (continueLatest && sessionId !== undefined) {
     throw new MaybeCodeUsageError(
       "--continue and --resume cannot be used together",
@@ -107,7 +93,6 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
     autoResume: continueLatest,
     ...(workspace === undefined ? {} : { workspace }),
     ...(configPath === undefined ? {} : { configPath }),
-    ...(provider === undefined ? {} : { provider }),
     ...(model === undefined ? {} : { model }),
     ...(sessionId === undefined ? {} : { sessionId }),
   };

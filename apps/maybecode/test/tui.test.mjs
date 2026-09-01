@@ -74,7 +74,10 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   assert.match(terminal.output, /Permission: allow-session/);
   assert.match(terminal.output, /✓ write: hello\.txt \(created, \+1 -0\)/);
   assert.match(terminal.output, /MaybeCode: done/);
-  assert.match(terminal.output, /Instructions:\n  system: built-in\n  project: none/);
+  assert.match(
+    terminal.output,
+    /Instructions:\n  system: built-in\n  runtime: runtime\n  project: none/u,
+  );
   assert.match(terminal.output, /Effective instructions:\n---\nYou are MaybeCode/u);
   assert.match(
     terminal.output,
@@ -101,16 +104,16 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   );
   assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);
-  assert.ok(terminal.prompts.some((prompt) => prompt.includes("allow [s]ession")));
+  assert.ok(terminal.prompts.some((prompt) => prompt.includes("for [s]ession")));
   assert.equal(
     terminal.questions.find((question) =>
-      question.prompt.includes("allow [s]ession")
+      question.prompt.includes("for [s]ession")
     ).history,
     false,
   );
   assert.equal(
     terminal.questions.find((question) =>
-      question.prompt.includes("allow [s]ession")
+      question.prompt.includes("for [s]ession")
     ).suggestions,
     undefined,
   );
@@ -213,7 +216,7 @@ test("terminal UI accepts multiline input and renders status", async () => {
     "first line\\",
     "second line",
     "/status",
-    "/help",
+    "/hel",
     "/quit",
   ]);
   const app = await MaybeCodeWorkspace.open({
@@ -288,6 +291,60 @@ test("terminal UI retries the latest failed run without duplicating input", asyn
   assert.match(terminal.output, /MaybeCode: recovered/u);
 });
 
+test("resume picker uses contextual keys to rename, delete, and resume", async () => {
+  const store = new InMemorySessionStore();
+  const catalog = new InMemorySessionCatalog();
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model: {
+      async *stream() {
+        yield { type: "response.completed", message: assistantMessage("done") };
+      },
+    },
+    store,
+    catalog,
+    autoResume: false,
+  });
+  const firstId = app.sessionId;
+  await (await app.submit({ input: "first task" })).result;
+  const secondId = await app.newSession();
+  await (await app.submit({ input: "second task" })).result;
+  await app.newSession();
+  const initialSessions = await app.listSessions();
+  const secondIndex = initialSessions.findIndex((session) =>
+    session.id === secondId
+  );
+  const afterDelete = initialSessions.filter((session) => session.id !== secondId);
+  const firstIndexAfterDelete = afterDelete.findIndex((session) =>
+    session.id === firstId
+  );
+
+  const keys = [
+    key("home"),
+    ...Array.from({ length: secondIndex }, () => key("down")),
+    key("r", { text: "r" }),
+    key("u", { ctrl: true }),
+    ...textKeys("Renamed session"),
+    key("enter"),
+    key("d", { text: "d" }),
+    key("y", { text: "y" }),
+    key("home"),
+    ...Array.from({ length: firstIndexAfterDelete }, () => key("down")),
+    key("enter"),
+  ];
+  const terminal = new FakeTerminal(["/resume", "/quit"], keys);
+
+  await runTerminalUI(app, { terminal });
+
+  assert.equal(app.sessionId, firstId);
+  assert.equal((await store.read(secondId)).length, 0);
+  assert.ok(terminal.frames.some((frame) =>
+    frame.includes("Renamed session to Renamed session")
+  ));
+  assert.ok(terminal.frames.some((frame) => frame.includes("Deleted Renamed session")));
+  assert.match(terminal.output, new RegExp(`Resumed session ${firstId}`));
+});
+
 test("CLI returns usage errors without opening an application", async () => {
   const terminal = new FakeTerminal([]);
   let opened = false;
@@ -307,17 +364,22 @@ test("CLI returns usage errors without opening an application", async () => {
 
 class FakeTerminal {
   colors = false;
+  interactive = false;
   output = "";
   prompts = [];
   questions = [];
   history = [];
   suggestionSamples;
   closed = false;
+  frames = [];
   #answers;
+  #keys;
   #interrupt;
 
-  constructor(answers) {
+  constructor(answers, keys = []) {
     this.#answers = [...answers];
+    this.#keys = [...keys];
+    this.interactive = keys.length > 0;
   }
 
   async question(prompt, { signal, history, suggestions } = {}) {
@@ -341,6 +403,18 @@ class FakeTerminal {
     this.history.unshift(value);
   }
 
+  async readKey() {
+    const stroke = this.#keys.shift();
+    if (stroke === undefined) throw new Error("No key available");
+    return stroke;
+  }
+
+  renderView(text) {
+    this.frames.push(text);
+  }
+
+  closeView() {}
+
   write(text) {
     this.output += text;
   }
@@ -359,6 +433,26 @@ class FakeTerminal {
   close() {
     this.closed = true;
   }
+}
+
+function key(name, options = {}) {
+  return {
+    key: name,
+    ctrl: options.ctrl ?? false,
+    alt: options.alt ?? false,
+    shift: options.shift ?? false,
+    meta: options.meta ?? false,
+    ...(options.text === undefined ? {} : { text: options.text }),
+  };
+}
+
+function textKeys(value) {
+  return [...value].map((text) =>
+    key(text === " " ? "space" : text.toLowerCase(), {
+      text,
+      shift: text.toLowerCase() !== text,
+    })
+  );
 }
 
 function abortError() {

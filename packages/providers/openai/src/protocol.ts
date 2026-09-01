@@ -1,13 +1,7 @@
 export const OPENAI_RESPONSES_MODEL_STATE_TYPE = "openai.responses.output.v1";
 
-export type OpenAIReasoningEffort =
-  | "none"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max";
+/** Provider/model metadata determines concrete supported values. */
+export type OpenAIReasoningEffort = string;
 
 export type OpenAIReasoningSummary = "auto" | "concise" | "detailed";
 

@@ -21,13 +21,63 @@ test("redraws an active prompt around asynchronous output", async () => {
   await tick();
   await tick();
 
+  input.write("\t");
+  await tick();
+  await tick();
+
   terminal.write("status update\n");
   input.write("\r");
 
-  assert.equal(await answer, "/re");
+  assert.equal(await answer, "/retry");
   assert.ok(suggestionInputs.includes("/re"));
   assert.match(output(), /\/retry  Retry/u);
-  assert.match(output(), /status update\n> \/re/u);
+  assert.match(output(), /status update\n> \/retry/u);
+
+  const common = terminal.question("> ", {
+    history: false,
+    suggestions(line) {
+      return line.startsWith("/comm")
+        ? [{ value: "/commanda" }, { value: "/commandb" }]
+        : [];
+    },
+  });
+  await tick();
+  input.write("/comm\t");
+  await tick();
+  await tick();
+  input.write("\r");
+  assert.equal(await common, "/command");
+
+  const stroke = terminal.readKey();
+  await tick();
+  input.write("d");
+  assert.deepEqual(await stroke, {
+    key: "d",
+    ctrl: false,
+    alt: false,
+    shift: false,
+    meta: false,
+    text: "d",
+  });
+  const nextStroke = terminal.readKey();
+  await tick();
+  input.write("r");
+  assert.equal((await nextStroke).key, "r");
+  const escape = terminal.readKey();
+  await tick();
+  input.write("\x1b");
+  assert.deepEqual(await escape, {
+    key: "escape",
+    ctrl: false,
+    alt: false,
+    shift: false,
+    meta: false,
+  });
+  await tick();
+  const afterKeys = terminal.question("> ");
+  await tick();
+  input.write("/quit\r");
+  assert.equal(await afterKeys, "/quit");
   terminal.close();
 });
 

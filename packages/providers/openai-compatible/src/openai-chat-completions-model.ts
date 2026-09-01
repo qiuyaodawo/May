@@ -4,41 +4,58 @@ import type {
   ModelRequest,
   ModelStreamOptions,
 } from "@may/core";
+
 import {
-  streamOpenAICompatibleResponse,
   toOpenAICompatibleMessages,
   toOpenAICompatibleTools,
-} from "@may/provider-openai-compatible";
+} from "./convert.js";
 import {
-  DeepSeekApiError,
-  DeepSeekFinishReasonError,
-  DeepSeekProtocolError,
+  OpenAIChatCompletionsApiError,
+  OpenAIChatCompletionsFinishReasonError,
+  OpenAIChatCompletionsProtocolError,
 } from "./errors.js";
-import type { DeepSeekChatRequest } from "./protocol.js";
+import type {
+  OpenAICompatibleMessage,
+  OpenAICompatibleToolDefinition,
+} from "./protocol.js";
+import { streamOpenAICompatibleResponse } from "./stream.js";
 
 /** Provider/model metadata determines concrete supported values. */
-export type DeepSeekReasoningEffort = string;
+export type OpenAIChatCompletionsReasoningEffort = string;
 
-export interface DeepSeekModelOptions {
+export interface OpenAIChatCompletionsModelOptions {
   apiKey: string;
   model: string;
   baseURL?: string;
-  thinking?: "enabled" | "disabled";
-  reasoningEffort?: DeepSeekReasoningEffort;
-  maxTokens?: number;
+  maxOutputTokens?: number;
+  reasoningEffort?: OpenAIChatCompletionsReasoningEffort;
+  store?: boolean;
   fetch?: typeof globalThis.fetch;
 }
 
-export class DeepSeekModel implements Model {
+interface OpenAIChatCompletionsRequest {
+  model: string;
+  messages: OpenAICompatibleMessage[];
+  stream: true;
+  stream_options: { include_usage: true };
+  tools?: OpenAICompatibleToolDefinition[];
+  max_completion_tokens?: number;
+  reasoning_effort?: OpenAIChatCompletionsReasoningEffort;
+  store?: boolean;
+}
+
+export class OpenAIChatCompletionsModel implements Model {
   private readonly apiKey: string;
   private readonly model: string;
   private readonly baseURL: string;
-  private readonly thinking: "enabled" | "disabled" | undefined;
-  private readonly reasoningEffort: DeepSeekReasoningEffort | undefined;
-  private readonly maxTokens: number | undefined;
+  private readonly maxOutputTokens: number | undefined;
+  private readonly reasoningEffort:
+    | OpenAIChatCompletionsReasoningEffort
+    | undefined;
+  private readonly store: boolean | undefined;
   private readonly fetchImplementation: typeof globalThis.fetch;
 
-  constructor(options: DeepSeekModelOptions) {
+  constructor(options: OpenAIChatCompletionsModelOptions) {
     if (options.apiKey.trim() === "") {
       throw new TypeError("apiKey must not be empty");
     }
@@ -46,19 +63,20 @@ export class DeepSeekModel implements Model {
       throw new TypeError("model must not be empty");
     }
     if (
-      options.maxTokens !== undefined &&
-      (!Number.isSafeInteger(options.maxTokens) || options.maxTokens < 1)
+      options.maxOutputTokens !== undefined &&
+      (!Number.isSafeInteger(options.maxOutputTokens) ||
+        options.maxOutputTokens < 1)
     ) {
-      throw new RangeError("maxTokens must be a positive safe integer");
+      throw new RangeError("maxOutputTokens must be a positive safe integer");
     }
 
     this.apiKey = options.apiKey;
     this.model = options.model;
-    this.baseURL = (options.baseURL ?? "https://api.deepseek.com")
+    this.baseURL = (options.baseURL ?? "https://api.openai.com/v1")
       .replace(/\/+$/, "");
-    this.thinking = options.thinking;
+    this.maxOutputTokens = options.maxOutputTokens;
     this.reasoningEffort = options.reasoningEffort;
-    this.maxTokens = options.maxTokens;
+    this.store = options.store;
     this.fetchImplementation = options.fetch ?? globalThis.fetch;
   }
 
@@ -83,40 +101,42 @@ export class DeepSeekModel implements Model {
 
     yield* streamOpenAICompatibleResponse(response, {
       signal: options.signal,
-      providerName: "DeepSeek",
+      providerName: "OpenAI-compatible chat",
+      requireDone: true,
       protocolError: (message, errorOptions) =>
-        new DeepSeekProtocolError(message, errorOptions),
+        new OpenAIChatCompletionsProtocolError(message, errorOptions),
       finishReasonError: (finishReason) =>
-        new DeepSeekFinishReasonError(finishReason),
+        new OpenAIChatCompletionsFinishReasonError(finishReason),
     });
   }
 
-  private createRequest(request: ModelRequest): DeepSeekChatRequest {
-    const body: DeepSeekChatRequest = {
+  private createRequest(request: ModelRequest): OpenAIChatCompletionsRequest {
+    const body: OpenAIChatCompletionsRequest = {
       model: this.model,
       messages: toOpenAICompatibleMessages(request.messages),
       stream: true,
       stream_options: { include_usage: true },
     };
-
     if (request.tools.length > 0) {
       body.tools = toOpenAICompatibleTools(request.tools);
     }
-    if (this.thinking !== undefined) {
-      body.thinking = { type: this.thinking };
+    if (this.maxOutputTokens !== undefined) {
+      body.max_completion_tokens = this.maxOutputTokens;
     }
     if (this.reasoningEffort !== undefined) {
       body.reasoning_effort = this.reasoningEffort;
     }
-    if (this.maxTokens !== undefined) body.max_tokens = this.maxTokens;
-
+    if (this.store !== undefined) body.store = this.store;
     return body;
   }
 }
 
-async function createApiError(response: Response): Promise<DeepSeekApiError> {
+async function createApiError(
+  response: Response,
+): Promise<OpenAIChatCompletionsApiError> {
   const text = await response.text();
-  let message = text || `DeepSeek request failed with status ${response.status}`;
+  let message = text ||
+    `OpenAI-compatible chat request failed with status ${response.status}`;
   let providerType: string | undefined;
   let providerCode: string | undefined;
 
@@ -134,24 +154,27 @@ async function createApiError(response: Response): Promise<DeepSeekApiError> {
       providerCode = parsed.error.code;
     }
   } catch {
-    // Keep the response text as the error message when it is not JSON.
+    // Keep the response text when the endpoint did not return JSON.
   }
 
-  const errorOptions: ConstructorParameters<typeof DeepSeekApiError>[0] = {
-    status: response.status,
-    message,
-  };
-  if (providerType !== undefined) errorOptions.providerType = providerType;
-  if (providerCode !== undefined) errorOptions.providerCode = providerCode;
+  const options: ConstructorParameters<
+    typeof OpenAIChatCompletionsApiError
+  >[0] = { status: response.status, message };
+  if (providerType !== undefined) options.providerType = providerType;
+  if (providerCode !== undefined) options.providerCode = providerCode;
   const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
-  if (retryAfterMs !== undefined) errorOptions.retryAfterMs = retryAfterMs;
-  return new DeepSeekApiError(errorOptions);
+  if (retryAfterMs !== undefined) options.retryAfterMs = retryAfterMs;
+  return new OpenAIChatCompletionsApiError(options);
 }
 
 function parseRetryAfterMs(value: string | null): number | undefined {
   if (value === null) return undefined;
   const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1000);
+  }
   const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? Math.max(0, timestamp - Date.now()) : undefined;
+  return Number.isFinite(timestamp)
+    ? Math.max(0, timestamp - Date.now())
+    : undefined;
 }

@@ -7,7 +7,9 @@ import test from "node:test";
 import { InMemoryContext } from "@may/core";
 
 import {
+  createMaybeCodeSlashCommandSuggester,
   createMaybeCodeModel,
+  executeMaybeCodeSlashCommand,
   openConfiguredMaybeCode,
   parseMaybeCodeArgs,
   resolveMaybeCodeRetry,
@@ -47,15 +49,16 @@ test("selects the default model profile", () => {
     path: "config.json",
     providers: {
       deepseek: {
+        adapter: "deepseek-chat",
         apiKey: "key",
-        contextWindowTokens: 128000,
-        maxOutputTokens: 8192,
       },
     },
     models: {
       reasoner: {
         provider: "deepseek",
         model: "deepseek-reasoner",
+        contextWindowTokens: 128000,
+        maxOutputTokens: 8192,
         options: { maxTokens: 100 },
       },
     },
@@ -63,6 +66,7 @@ test("selects the default model profile", () => {
   });
 
   assert.equal(selection.provider, "deepseek");
+  assert.equal(selection.adapter, "deepseek-chat");
   assert.equal(selection.model, "deepseek-reasoner");
   assert.deepEqual(selection.options, { maxTokens: 100 });
   assert.deepEqual(selection.limits, {
@@ -73,9 +77,11 @@ test("selects the default model profile", () => {
 
 test("attaches configured context limits to the created model", () => {
   const model = createMaybeCodeModel({
+    profile: "chat",
     provider: "deepseek",
+    adapter: "deepseek-chat",
     model: "deepseek-chat",
-    providerConfig: { apiKey: "test" },
+    providerConfig: { adapter: "deepseek-chat", apiKey: "test" },
     options: { maxTokens: 2048 },
     limits: { contextWindowTokens: 64000, maxOutputTokens: 8192 },
   });
@@ -88,9 +94,11 @@ test("attaches configured context limits to the created model", () => {
 
 test("creates an OpenAI Responses model and preserves native compaction", () => {
   const model = createMaybeCodeModel({
+    profile: "gpt",
     provider: "openai",
+    adapter: "openai-responses",
     model: "gpt-5.4",
-    providerConfig: { apiKey: "test" },
+    providerConfig: { adapter: "openai-responses", apiKey: "test" },
     options: {
       reasoningEffort: "high",
       reasoningSummary: "auto",
@@ -107,12 +115,14 @@ test("creates an OpenAI Responses model and preserves native compaction", () => 
   assert.equal(model.contextCompactor.name, "openai-responses-compact");
   assert.throws(
     () => createMaybeCodeModel({
+      profile: "gpt",
       provider: "openai",
+      adapter: "openai-responses",
       model: "gpt-5.4",
-      providerConfig: { apiKey: "test" },
+      providerConfig: { adapter: "openai-responses", apiKey: "test" },
       options: { store: "yes" },
     }),
-    /providers\.openai\.store must be a boolean/,
+    /models\.gpt\.options\.store must be a boolean/,
   );
 });
 
@@ -149,13 +159,19 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
           path: join(configDirectory, "config.json"),
           providers: {
             deepseek: {
+              adapter: "deepseek-chat",
               apiKey: "test",
+            },
+          },
+          models: {
+            chat: {
+              provider: "deepseek",
               model: "deepseek-chat",
               contextWindowTokens: 64000,
               maxOutputTokens: 4096,
             },
           },
-          models: {},
+          defaultModel: "chat",
           apps: {
             maybecode: {
               instructionsDirectory: "instructions/maybecode",
@@ -180,7 +196,9 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
 
   assert.equal(selected.model, "deepseek-chat");
   assert.deepEqual(app.modelInfo, {
+    profile: "chat",
     provider: "deepseek",
+    adapter: "deepseek-chat",
     model: "deepseek-chat",
   });
   assert.equal(
@@ -209,6 +227,156 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
     contextOptions.autoCompactionStrategies.map((strategy) => strategy.name),
     ["prune-old-tool-results", "summary-tail", "history-reference"],
   );
+  await app.close();
+});
+
+test("switches configured model profiles by prefix without changing sessions", async (t) => {
+  const directory = await temporaryDirectory(t);
+  const created = [];
+  const persistedDefaults = [];
+  const app = await openConfiguredMaybeCode(
+    {
+      workspace: directory,
+      dataDirectory: join(directory, "data"),
+      autoResume: false,
+    },
+    {
+      async loadConfig() {
+        return {
+          path: join(directory, "config.json"),
+          providers: {
+            cliproxy: {
+              adapter: "openai-responses",
+              apiKey: "test",
+            },
+          },
+          models: {
+            "cliproxy-low": {
+              provider: "cliproxy",
+              model: "gpt-model",
+              options: { reasoningEffort: "low" },
+            },
+            "cliproxy-high": {
+              provider: "cliproxy",
+              model: "gpt-model",
+              options: { reasoningEffort: "high" },
+            },
+          },
+          defaultModel: "cliproxy-high",
+          apps: { maybecode: { retry: false } },
+        };
+      },
+      createModel(selection) {
+        created.push(selection.profile);
+        return {
+          async *stream() {
+            yield {
+              type: "response.completed",
+              message: assistantMessage(selection.profile),
+            };
+          },
+        };
+      },
+      async persistDefaultModel(profile) {
+        persistedDefaults.push(profile);
+      },
+    },
+  );
+
+  const sessionId = app.sessionId;
+  await (await app.submit({ input: "before" })).result;
+  const suggest = createMaybeCodeSlashCommandSuggester(app);
+  assert.deepEqual(
+    (await suggest("/model cliproxy-")).map((item) => item.label),
+    ["cliproxy-low", "cliproxy-high"],
+  );
+
+  assert.deepEqual(
+    (await suggest("/model clip ")).map((item) => item.label),
+    ["--default"],
+  );
+  const switched = await executeMaybeCodeSlashCommand(
+    "/model clip --default",
+    app,
+  );
+  assert.equal(switched.type, "model.switched");
+  assert.equal(switched.profile, "cliproxy-low");
+  assert.equal(app.sessionId, sessionId);
+  assert.equal(app.modelInfo.profile, "cliproxy-low");
+  assert.deepEqual(created, ["cliproxy-high", "cliproxy-low"]);
+  assert.deepEqual(persistedDefaults, ["cliproxy-low"]);
+  assert.deepEqual(
+    (await app.listModels()).filter((model) => model.isDefault)
+      .map((model) => model.name),
+    ["cliproxy-low"],
+  );
+  assert.equal(
+    (await (await app.submit({ input: "after" })).result).message.content[0].text,
+    "cliproxy-low",
+  );
+  assert.equal(
+    (await executeMaybeCodeSlashCommand("/model", app)).type,
+    "model.selection.requested",
+  );
+  await app.close();
+});
+
+test("switches supported reasoning effort without duplicating model profiles", async (t) => {
+  const directory = await temporaryDirectory(t);
+  const createdEfforts = [];
+  const app = await openConfiguredMaybeCode(
+    {
+      workspace: directory,
+      dataDirectory: join(directory, "data"),
+      autoResume: false,
+    },
+    {
+      async loadConfig() {
+        return {
+          path: join(directory, "config.json"),
+          providers: {
+            deepseek: { adapter: "deepseek-chat", apiKey: "test" },
+          },
+          models: {
+            reasoner: {
+              provider: "deepseek",
+              model: "deepseek-v4-pro",
+            },
+          },
+          defaultModel: "reasoner",
+          apps: { maybecode: { retry: false } },
+        };
+      },
+      createModel(selection) {
+        createdEfforts.push(selection.options.reasoningEffort);
+        return {
+          async *stream() {
+            yield {
+              type: "response.completed",
+              message: assistantMessage("ok"),
+            };
+          },
+        };
+      },
+    },
+  );
+
+  const sessionId = app.sessionId;
+  const suggest = createMaybeCodeSlashCommandSuggester(app);
+  assert.deepEqual(
+    (await suggest("/effort ")).map((item) => item.label),
+    ["default", "low", "high", "max"],
+  );
+  const changed = await executeMaybeCodeSlashCommand("/effort m", app);
+  assert.equal(changed.type, "effort.changed");
+  assert.equal(changed.state.effectiveEffort, "max");
+  assert.equal(changed.state.source, "builtin");
+  assert.equal(app.sessionId, sessionId);
+
+  const restored = await executeMaybeCodeSlashCommand("/effort default", app);
+  assert.equal(restored.type, "effort.changed");
+  assert.equal(restored.state.effectiveEffort, "high");
+  assert.deepEqual(createdEfforts, [undefined, "max", undefined]);
   await app.close();
 });
 
@@ -300,8 +468,13 @@ test("configured MaybeCode automatically retries transient model failures", asyn
       async loadConfig() {
         return {
           path: join(directory, "config.json"),
-          providers: { deepseek: { apiKey: "test", model: "deepseek-chat" } },
-          models: {},
+          providers: {
+            deepseek: { adapter: "deepseek-chat", apiKey: "test" },
+          },
+          models: {
+            chat: { provider: "deepseek", model: "deepseek-chat" },
+          },
+          defaultModel: "chat",
           apps: {
             maybecode: {
               retry: {
@@ -394,13 +567,19 @@ async function openWithCapturedOpenAIContext(t, apps) {
           path: join(directory, "config.json"),
           providers: {
             openai: {
+              adapter: "openai-responses",
               apiKey: "test",
+            },
+          },
+          models: {
+            gpt: {
+              provider: "openai",
               model: "gpt-5.4",
               contextWindowTokens: 128_000,
               maxOutputTokens: 8192,
             },
           },
-          models: {},
+          defaultModel: "gpt",
           apps,
         };
       },

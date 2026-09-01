@@ -1,9 +1,8 @@
 # `@may/provider-openai-compatible`
 
-Low-level helpers for building May providers on OpenAI-compatible Chat
-Completions APIs.
+An OpenAI-compatible Chat Completions model adapter and shared protocol helpers.
 
-The package provides:
+The package provides `OpenAIChatCompletionsModel` plus:
 
 - May message and tool conversion;
 - text/JSON and URL/base64 image input conversion;
@@ -12,9 +11,8 @@ The package provides:
 - streamed function-call assembly;
 - usage conversion and completion validation.
 
-It does not send HTTP requests or define provider configuration. Authentication,
-request parameters, endpoint URLs, HTTP error parsing, and provider-specific
-behavior remain in each provider package.
+Provider-specific packages reuse the conversion and streaming helpers while
+retaining their own request extensions and error handling.
 
 Audio, file, and generic resource parts are rejected rather than silently
 serialized. Accepting an image wire format does not imply that every model

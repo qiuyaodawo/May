@@ -20,7 +20,7 @@ test("runs and resumes a real DeepSeek coding session", async (t) => {
   });
   const firstEvents = collectAndApprove(first);
   const firstRun = await first.submit({
-    input: "Use the read tool to read README.md, then answer with only its first Markdown heading. Do not use bash.",
+    input: "Use the read tool to read README.md, then answer with only its first Markdown heading. Do not use shell.",
   });
   const firstResult = await firstRun.result;
   const sessionId = first.sessionId;

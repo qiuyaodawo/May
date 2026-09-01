@@ -25,6 +25,7 @@
     "@may/provider-deepseek": "workspace:*",
     "@may/provider-kimi": "workspace:*",
     "@may/provider-openai": "workspace:*",
+    "@may/provider-openai-compatible": "workspace:*",
     "@may/provider-zhipu": "workspace:*"
   },
   "devDependencies": {

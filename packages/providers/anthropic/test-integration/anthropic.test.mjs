@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { loadMayConfig, resolveProviderConfig } from "@may/config";
+import { loadMayConfig, resolveModelProfile } from "@may/config";
 import { InMemoryContext, May } from "@may/core";
 import { AnthropicModel } from "../dist/index.js";
 
@@ -61,12 +61,24 @@ test("completes a real Anthropic tool-call loop", { timeout: 120_000 }, async ()
 
 async function readAnthropicConfig() {
   const loaded = await loadMayConfig();
-  const config = resolveProviderConfig(loaded, "anthropic");
-  for (const key of ["apiKey", "baseURL", "model"]) {
+  const name = findModelProfile(loaded, "anthropic-messages");
+  const resolved = resolveModelProfile(loaded, name);
+  const config = { ...resolved.providerConfig, model: resolved.model };
+  for (const key of ["apiKey", "model"]) {
     if (typeof config?.[key] !== "string" || config[key].trim() === "") {
-      throw new Error(`Set providers.anthropic.${key} in ${loaded.path}`);
+      throw new Error(`Configure ${key} for models.${name} in ${loaded.path}`);
     }
   }
 
   return config;
+}
+
+function findModelProfile(config, adapter) {
+  const entry = Object.entries(config.models).find(([, profile]) =>
+    (profile.adapter ?? config.providers[profile.provider]?.adapter) === adapter
+  );
+  if (entry === undefined) {
+    throw new Error(`Configure a model using adapter ${adapter} in ${config.path}`);
+  }
+  return entry[0];
 }

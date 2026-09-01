@@ -7,8 +7,6 @@ The default config path is `~/.may/config.json`.
 
 ```bash
 pnpm may run "你好"
-pnpm may run --provider deepseek "解释 agent loop"
-pnpm may run --provider openai "解释 agent loop"
 pnpm may run --model reasoner "解释 agent loop"
 pnpm may run --config ./config.json "你好"
 ```
@@ -16,11 +14,11 @@ pnpm may run --config ./config.json "你好"
 Selection order:
 
 1. `--model` selects a named entry from `models`.
-2. `--provider` uses `providers.<name>.model`.
-3. Without either option, `defaultModel` is used when configured.
-4. Otherwise, a single configured provider is selected automatically.
+2. Without it, `defaultModel` is used when configured.
+3. Otherwise, a single configured model profile is selected automatically.
 
 Reasoning deltas are written to stderr and answer text is written to stdout.
-The built-in provider registry supports DeepSeek, Zhipu GLM (`zhipu` or
-`glm`), Kimi, Anthropic, and OpenAI Responses. The CLI does not yet include
-tools, interactive sessions, or persistence.
+The built-in registry supports `deepseek-chat`, `zhipu-chat`, `kimi-chat`,
+`anthropic-messages`, `openai-responses`, and
+`openai-chat-completions`. The CLI does not yet include tools, interactive
+sessions, or persistence.

@@ -16,8 +16,8 @@ test("parses the run command and options", () => {
       "run",
       "--config",
       "custom.json",
-      "--provider",
-      "deepseek",
+      "--model",
+      "reasoner",
       "hello",
       "May",
     ]),
@@ -25,7 +25,7 @@ test("parses the run command and options", () => {
       type: "run",
       prompt: "hello May",
       configPath: "custom.json",
-      provider: "deepseek",
+      model: "reasoner",
     },
   );
   assert.deepEqual(parseCliArgs(["run", "--", "--explain"]), {
@@ -41,10 +41,10 @@ test("rejects invalid command arguments before loading config", async () => {
 
   const code = await runCli([
     "run",
-    "--provider",
-    "deepseek",
     "--model",
     "reasoner",
+    "--model",
+    "other",
     "hello",
   ], {
     stdout,
@@ -58,18 +58,21 @@ test("rejects invalid command arguments before loading config", async () => {
   assert.equal(code, 2);
   assert.equal(loaded, false);
   assert.equal(stdout.value, "");
-  assert.match(stderr.value, /--provider and --model cannot be used together/);
+  assert.match(stderr.value, /--model may only be specified once/);
   assert.match(stderr.value, /Usage:/);
 });
 
-test("runs with the only configured provider and streams output", async () => {
+test("runs with the only configured model profile and streams output", async () => {
   const config = parseMayConfig({
     providers: {
       deepseek: {
+        adapter: "deepseek-chat",
         apiKey: "test-key",
         baseURL: "https://example.test",
-        model: "deepseek-reasoner",
       },
+    },
+    models: {
+      reasoner: { provider: "deepseek", model: "deepseek-reasoner" },
     },
   }, "memory.json");
   const stdout = captureOutput();
@@ -114,12 +117,14 @@ test("runs with the only configured provider and streams output", async () => {
   assert.equal(code, 0);
   assert.deepEqual(loadedWith, { path: "custom.json" });
   assert.deepEqual(selected, {
+    profile: "reasoner",
     provider: "deepseek",
+    adapter: "deepseek-chat",
     model: "deepseek-reasoner",
     providerConfig: {
+      adapter: "deepseek-chat",
       apiKey: "test-key",
       baseURL: "https://example.test",
-      model: "deepseek-reasoner",
     },
     options: {},
   });
@@ -131,7 +136,7 @@ test("runs with the only configured provider and streams output", async () => {
 test("selects a named model profile and prints a non-streamed final message", async () => {
   const config = parseMayConfig({
     providers: {
-      deepseek: { apiKey: "test-key" },
+      deepseek: { adapter: "deepseek-chat", apiKey: "test-key" },
     },
     models: {
       reasoner: {
@@ -168,8 +173,11 @@ test("uses defaultModel when no selector is passed", () => {
   const config = parseMayConfig({
     defaultModel: "reasoner",
     providers: {
-      deepseek: { apiKeyEnv: "DEEPSEEK_API_KEY" },
-      another: { apiKey: "unused", model: "unused" },
+      deepseek: {
+        adapter: "deepseek-chat",
+        apiKeyEnv: "DEEPSEEK_API_KEY",
+      },
+      another: { adapter: "openai-responses", apiKey: "unused" },
     },
     models: {
       reasoner: { provider: "deepseek", model: "deepseek-reasoner" },
@@ -185,11 +193,14 @@ test("uses defaultModel when no selector is passed", () => {
   assert.equal(selected.providerConfig.apiKey, "env-key");
 });
 
-test("reports an ambiguous provider selection", async () => {
+test("reports an ambiguous model selection", async () => {
   const config = parseMayConfig({
     providers: {
-      deepseek: { apiKey: "key", model: "model" },
-      another: { apiKey: "key", model: "model" },
+      deepseek: { adapter: "deepseek-chat", apiKey: "key" },
+    },
+    models: {
+      first: { provider: "deepseek", model: "first" },
+      second: { provider: "deepseek", model: "second" },
     },
   }, "memory.json");
   const stderr = captureOutput();
@@ -201,22 +212,26 @@ test("reports an ambiguous provider selection", async () => {
   });
 
   assert.equal(code, 1);
-  assert.match(stderr.value, /Select a provider with --provider/);
+  assert.match(stderr.value, /Select a model with --model/);
 });
 
 test("creates configured provider models and validates CLI-specific options", () => {
   const base = {
+    profile: "reasoner",
     provider: "deepseek",
+    adapter: "deepseek-chat",
     model: "deepseek-reasoner",
-    providerConfig: { apiKey: "test-key" },
+    providerConfig: { adapter: "deepseek-chat", apiKey: "test-key" },
     options: {},
   };
 
   assert.ok(createConfiguredModel(base) instanceof DeepSeekModel);
   assert.ok(createConfiguredModel({
+    profile: "gpt",
     provider: "openai",
+    adapter: "openai-responses",
     model: "gpt-5.4",
-    providerConfig: { apiKey: "test-key" },
+    providerConfig: { adapter: "openai-responses", apiKey: "test-key" },
     options: {
       reasoningEffort: "high",
       reasoningSummary: "auto",
@@ -224,15 +239,8 @@ test("creates configured provider models and validates CLI-specific options", ()
     },
   }) instanceof OpenAIResponsesModel);
   assert.throws(
-    () => createConfiguredModel({ ...base, provider: "another" }),
-    /available providers: deepseek, zhipu, glm, kimi, anthropic, openai/,
-  );
-  assert.throws(
-    () => createConfiguredModel({
-      ...base,
-      options: { reasoningEffort: "extreme" },
-    }),
-    /reasoningEffort must be one of/,
+    () => createConfiguredModel({ ...base, adapter: "another" }),
+    /available adapters: deepseek-chat, zhipu-chat, kimi-chat, anthropic-messages, openai-responses, openai-chat-completions/,
   );
   assert.throws(
     () => createConfiguredModel({
@@ -246,8 +254,9 @@ test("creates configured provider models and validates CLI-specific options", ()
 test("returns a failure code when the model fails", async () => {
   const config = parseMayConfig({
     providers: {
-      deepseek: { apiKey: "test-key", model: "model" },
+      deepseek: { adapter: "deepseek-chat", apiKey: "test-key" },
     },
+    models: { chat: { provider: "deepseek", model: "model" } },
   });
   const stderr = captureOutput();
 
@@ -271,8 +280,9 @@ test("returns a failure code when the model fails", async () => {
 test("returns exit code 130 when cancelled", async () => {
   const config = parseMayConfig({
     providers: {
-      deepseek: { apiKey: "test-key", model: "model" },
+      deepseek: { adapter: "deepseek-chat", apiKey: "test-key" },
     },
+    models: { chat: { provider: "deepseek", model: "model" } },
   });
   const controller = new AbortController();
   controller.abort("Interrupted");

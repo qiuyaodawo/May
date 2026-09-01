@@ -1,21 +1,26 @@
 import type { Model } from "@may/core";
 
-import { ProviderRegistryError } from "./errors.js";
-import type { ProviderFactory, ProviderModelSelection } from "./types.js";
+import { ProviderAdapterRegistryError } from "./errors.js";
+import type {
+  ProviderAdapterFactory,
+  ProviderModelSelection,
+} from "./types.js";
 
-export class ProviderRegistry {
-  private readonly factories = new Map<string, ProviderFactory>();
+export class ProviderAdapterRegistry {
+  private readonly factories = new Map<string, ProviderAdapterFactory>();
 
-  register(name: string, factory: ProviderFactory): this {
-    validateProviderName(name);
+  register(name: string, factory: ProviderAdapterFactory): this {
+    validateAdapterName(name);
     if (typeof factory !== "object" || factory === null) {
-      throw new TypeError("provider factory must be an object");
+      throw new TypeError("adapter factory must be an object");
     }
     if (typeof factory.create !== "function") {
-      throw new TypeError("provider factory must define create(selection)");
+      throw new TypeError("adapter factory must define create(selection)");
     }
     if (this.factories.has(name)) {
-      throw new ProviderRegistryError(`Provider "${name}" is already registered`);
+      throw new ProviderAdapterRegistryError(
+        `Adapter "${name}" is already registered`,
+      );
     }
     this.factories.set(name, factory);
     return this;
@@ -30,25 +35,25 @@ export class ProviderRegistry {
   }
 
   create(selection: ProviderModelSelection): Model {
-    const factory = this.factories.get(selection.provider);
+    const factory = this.factories.get(selection.adapter);
     if (factory === undefined) {
       const available = this.names();
-      throw new ProviderRegistryError(
-        `Unsupported provider "${selection.provider}"` +
+      throw new ProviderAdapterRegistryError(
+        `Unsupported adapter "${selection.adapter}"` +
           (available.length === 0
-            ? "; no providers are registered"
-            : `; available providers: ${available.join(", ")}`),
+            ? "; no adapters are registered"
+            : `; available adapters: ${available.join(", ")}`),
       );
     }
     return factory.create(selection);
   }
 }
 
-function validateProviderName(name: string): void {
+function validateAdapterName(name: string): void {
   if (typeof name !== "string" || name.trim() === "") {
-    throw new TypeError("provider name must be a non-empty string");
+    throw new TypeError("adapter name must be a non-empty string");
   }
   if (name !== name.trim()) {
-    throw new TypeError("provider name must not have surrounding whitespace");
+    throw new TypeError("adapter name must not have surrounding whitespace");
   }
 }

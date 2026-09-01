@@ -11,14 +11,7 @@ export interface ZhipuChatRequest {
     type: "enabled" | "disabled";
     clear_thinking?: boolean;
   };
-  reasoning_effort?:
-    | "none"
-    | "minimal"
-    | "low"
-    | "medium"
-    | "high"
-    | "xhigh"
-    | "max";
+  reasoning_effort?: string;
   max_tokens?: number;
   tools?: OpenAICompatibleToolDefinition[];
   tool_stream?: true;
