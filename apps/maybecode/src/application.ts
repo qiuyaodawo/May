@@ -1,6 +1,10 @@
 import { resolve } from "node:path";
 
-import { createCodingTools } from "@may/coding-tools";
+import {
+  createCodingTools,
+  getShellToolInfo,
+  shellRuntimeInstructions,
+} from "@may/coding-tools";
 import {
   HistoryReferenceStrategy,
   InMemoryContextFactory,
@@ -135,6 +139,10 @@ export class MaybeCodeApplication {
     options: MaybeCodeApplicationOptions,
   ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
+    const configuredTools = options.tools ?? createCodingTools({ cwd: workspace });
+    const shellInfo = configuredTools
+      .map((tool) => getShellToolInfo(tool))
+      .find((info) => info !== undefined);
     const instructions = await loadMaybeCodeInstructions({
       workspace,
       ...(options.instructions === undefined
@@ -143,6 +151,9 @@ export class MaybeCodeApplication {
       ...(options.instructionsDirectory === undefined
         ? {}
         : { instructionsDirectory: options.instructionsDirectory }),
+      ...(shellInfo === undefined
+        ? {}
+        : { runtimeInstructions: shellRuntimeInstructions(shellInfo) }),
     });
     const permissionPolicy = options.permissionPolicy ??
       createCodingPermissionPolicy();
@@ -175,7 +186,6 @@ export class MaybeCodeApplication {
         return historySource;
       },
     });
-    const configuredTools = options.tools ?? createCodingTools({ cwd: workspace });
     if (configuredTools.some((tool) => tool.name === sessionHistoryTool.name)) {
       throw new Error(`Tool name "${sessionHistoryTool.name}" is reserved by MaybeCode`);
     }

@@ -13,11 +13,11 @@ function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
     return "allow";
   }
 
-  if (check.tool.name === "bash") {
+  if (check.tool.name === "shell" || check.tool.name === "bash") {
     const command = stringField(check.input, "command");
     return command === undefined
       ? "ask"
-      : { decision: "ask", grantKey: `bash:${command}` };
+      : { decision: "ask", grantKey: `${check.tool.name}:${command}` };
   }
 
   if (check.tool.name === "edit" || check.tool.name === "write") {

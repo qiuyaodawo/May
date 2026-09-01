@@ -19,6 +19,7 @@ Workspace paths passed to file tools must be relative to the workspace.`;
 export type InstructionSource =
   | { readonly type: "built-in" }
   | { readonly type: "explicit" }
+  | { readonly type: "runtime" }
   | { readonly type: "file"; readonly path: string };
 
 export interface InstructionDocument {
@@ -28,6 +29,7 @@ export interface InstructionDocument {
 
 export interface MaybeCodeInstructions {
   readonly system: InstructionDocument;
+  readonly runtime?: InstructionDocument;
   readonly project?: InstructionDocument;
   readonly effective: string;
 }
@@ -36,6 +38,7 @@ export interface LoadMaybeCodeInstructionsOptions {
   readonly workspace: string;
   readonly instructions?: string;
   readonly instructionsDirectory?: string;
+  readonly runtimeInstructions?: string;
 }
 
 export function resolveMaybeCodeInstructionsDirectory(
@@ -69,14 +72,32 @@ export async function loadMaybeCodeInstructions(
         content: DEFAULT_MAYBE_CODE_INSTRUCTIONS,
       };
   const project = await optionalProjectInstructions(options.workspace);
+  const runtime = options.runtimeInstructions === undefined
+    ? undefined
+    : runtimeInstructions(options.runtimeInstructions);
+
+  const sections = [system.content];
+  if (runtime !== undefined) {
+    sections.push(`# Runtime environment\n\n${runtime.content}`);
+  }
+  if (project !== undefined) {
+    sections.push(`# Project instructions\n\n${project.content}`);
+  }
 
   return {
     system,
+    ...(runtime === undefined ? {} : { runtime }),
     ...(project === undefined ? {} : { project }),
-    effective: project === undefined
-      ? system.content
-      : `${system.content}\n\n# Project instructions\n\n${project.content}`,
+    effective: sections.join("\n\n"),
   };
+}
+
+function runtimeInstructions(content: string): InstructionDocument {
+  if (content.trim() === "") {
+    throw new MaybeCodeConfigError("Runtime instructions must not be empty");
+  }
+  assertSize(Buffer.byteLength(content, "utf8"), "Runtime instructions");
+  return { source: { type: "runtime" }, content };
 }
 
 function explicitInstructions(content: string): InstructionDocument {

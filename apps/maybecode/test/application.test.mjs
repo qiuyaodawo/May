@@ -228,7 +228,7 @@ test("retries a failed run after resuming its durable session", async (t) => {
   await resumed.close();
 });
 
-test("executes read, write, edit, and bash through the application", async (t) => {
+test("executes read, write, edit, and shell through the application", async (t) => {
   const workspace = await temporaryDirectory(t);
   await writeFile(join(workspace, "source.txt"), "source", "utf8");
   const calls = [
@@ -244,14 +244,16 @@ test("executes read, write, edit, and bash through the application", async (t) =
       input: { path: "target.txt", oldText: "old", newText: "new" },
     },
     {
-      id: "bash",
-      name: "bash",
+      id: "shell",
+      name: "shell",
       input: { command: "node -e \"process.stdout.write('verified')\"" },
     },
   ];
   let modelCall = 0;
+  let firstRequest;
   const model = {
-    async *stream() {
+    async *stream(request) {
+      firstRequest ??= request;
       const call = calls[modelCall++];
       yield {
         type: "response.completed",
@@ -285,9 +287,20 @@ test("executes read, write, edit, and bash through the application", async (t) =
     "read",
     "write",
     "edit",
-    "bash",
+    "shell",
   ]);
   assert.equal(completed[3].output.stdout, "verified");
+  const shellDefinition = firstRequest.tools.find((tool) => tool.name === "shell");
+  assert.match(
+    shellDefinition.description,
+    process.platform === "win32" ? /PowerShell/u : /Bash/u,
+  );
+  assert.match(
+    firstRequest.messages[0].content[0].text,
+    process.platform === "win32"
+      ? /shell tool runs (?:Windows PowerShell|PowerShell 7)/u
+      : /shell tool runs Bash/u,
+  );
 });
 
 test("exposes bounded active-session history as an approval-free tool", async () => {

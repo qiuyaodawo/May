@@ -188,11 +188,16 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
       .text,
     "ok",
   );
-  assert.equal(
+  assert.match(
     request.messages[0].content[0].text,
-    "custom system\n\n# Project instructions\n\nproject rules",
+    /^custom system\n\n# Runtime environment\n\n/u,
+  );
+  assert.match(
+    request.messages[0].content[0].text,
+    /\n\n# Project instructions\n\nproject rules$/u,
   );
   assert.equal(app.instructions.system.source.type, "file");
+  assert.equal(app.instructions.runtime.source.type, "runtime");
   assert.equal(app.instructions.project.source.type, "file");
   assert.deepEqual(contextOptions.metadata, { workspace: directory });
   assert.deepEqual(contextOptions.budget, {

@@ -3,7 +3,7 @@
 Basic filesystem and shell tools for May coding agents:
 
 - `read`: read a range from a UTF-8 text file
-- `bash`: run a shell command and capture its output
+- `shell`: run a platform-appropriate shell command and capture its output
 - `edit`: replace one exact, unique text occurrence
 - `write`: create or overwrite a UTF-8 text file
 
@@ -31,9 +31,9 @@ Individual factories are also available:
 
 ```ts
 import {
-  createBashTool,
   createEditTool,
   createReadTool,
+  createShellTool,
   createWriteTool,
 } from "@may/coding-tools";
 
@@ -46,6 +46,16 @@ File sizes, returned line counts, command timeouts, and captured command output
 are bounded and configurable. Runtime cancellation is forwarded to filesystem
 operations and terminates the spawned command tree.
 
-`bash` is **not a sandbox**. It executes with the permissions of the May
+`shell` uses Windows PowerShell on Windows and Bash on other supported
+platforms. Its dynamic tool description and MaybeCode's generated runtime
+instructions tell the model which syntax to use. PowerShell is launched
+directly with UTF-8 stdout/stderr rather than through `cmd.exe`.
+
+Pass a `ShellProfile` to select another executable. `createPowerShellProfile`
+and `createBashShellProfile` provide the built-in launch conventions.
+`createBashTool` remains as a deprecated compatibility factory and now means a
+real Bash executable rather than the platform's implicit default shell.
+
+`shell` is **not a sandbox**. It executes with the permissions of the May
 process and inherits its environment by default. An application that runs
 untrusted commands must add its own sandbox and approval policy.

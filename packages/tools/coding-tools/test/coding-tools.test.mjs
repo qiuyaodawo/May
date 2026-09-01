@@ -17,7 +17,7 @@ test("creates individual, coding, and read-only tool sets", async (t) => {
   assert.equal(createCodingTool("edit", { cwd }).name, "edit");
   assert.deepEqual(
     createCodingTools({ cwd }).map((tool) => tool.name),
-    ["read", "bash", "edit", "write"],
+    ["read", "shell", "edit", "write"],
   );
   assert.deepEqual(
     createReadOnlyTools({ cwd }).map((tool) => tool.name),
