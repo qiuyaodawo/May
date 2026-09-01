@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./model-summarizer": {
+      "types": "./dist/model-summarizer.d.ts",
+      "import": "./dist/model-summarizer.js"
     }
   },
   "files": [
