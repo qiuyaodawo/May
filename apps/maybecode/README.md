@@ -29,7 +29,8 @@ await observation;
 ```
 
 The controller covers submission, cancellation, approvals, sessions, history,
-and context inspection/compaction. `MaybeCodeWorkspace` is the default concrete
+session rename/deletion, and context inspection/compaction.
+`MaybeCodeWorkspace` is the default concrete
 implementation. `MaybeCodeTerminal` is only the low-level input/output adapter
 for the bundled `runTerminalUI`; implementing it changes terminal mechanics but
 does not replace the bundled UI's command or rendering policy.
@@ -41,6 +42,31 @@ strategy, and session suggestions, and
 `executeMaybeCodeSlashCommand(input, controller)` returns a structured result
 for the UI to render. Alternatively, a UI can call `MaybeCodeController`
 directly and define a completely different command system.
+
+The bundled SessionPicker uses the optional `@may/keybindings` package to map
+context-specific key sequences to semantic actions. Custom UIs may reuse that
+resolver or provide their own keyboard and interaction system.
+
+The retained-screen frontend is the default. The previous line-oriented
+frontend remains available with `maybecode --ui classic [workspace]`. The
+retained frontend supports Slash-command completion and a `/resume` dialog with search (`/`),
+rename (`r`), delete (`d`), and resume (`Enter`) actions. It also renders safe
+terminal Markdown and uses specialized, collapsible renderers for `read`,
+`shell`, `edit`, and `write`.
+
+Retained-view display shortcuts use the existing leader key (`Ctrl+X`):
+
+- `Ctrl+X`, then `D` toggles tool output and unified diff details.
+- `Ctrl+X`, then `T` toggles reasoning-block visibility.
+
+The same display actions are available as TUI-local `/details` and `/thinking`
+commands. They are handled by the retained frontend and do not enter the agent
+controller or session history.
+
+Press `Tab` to focus the transcript. In transcript focus, `J`/`K` selects the
+next/previous tool, `Enter` or `Space` toggles only that tool, and arrow or page
+keys scroll. Expanding a historical tool detaches from end-following so its
+header stays in view; submitting a new prompt resumes following the live run.
 
 ## Run
 
@@ -56,7 +82,7 @@ pnpm maybecode --resume <id> /path/to/workspace
 A normal launch always starts a new session. Use `--continue` to resume the
 most recent session for the workspace, or `--resume <id>` to select a specific
 session. Starting a new session does not delete or overwrite older sessions;
-they remain available through `/sessions` and `/resume <id>`.
+they remain available through `/sessions` and `/resume`.
 
 The private package exposes a `maybecode` executable for local packaging. Its
 complete package graph can be packed, installed without registry access, and
@@ -79,10 +105,10 @@ pnpm maybecode /e/code/project
 pnpm maybecode 'E:\code\project'
 ```
 
-MaybeCode creates configured models through `@may/providers`. Its built-in
-registry supports DeepSeek, Zhipu GLM (`zhipu` or `glm`), Kimi, Anthropic, and
-OpenAI Responses. The lower-level provider adapters remain independently
-usable.
+MaybeCode creates configured models through `@may/providers`. Provider names
+identify configured connections; adapters identify protocols. Its built-in
+adapter registry supports `deepseek-chat`, `zhipu-chat`, `kimi-chat`,
+`anthropic-messages`, `openai-responses`, and `openai-chat-completions`.
 
 Optional model limits let MaybeCode report context-window usage:
 
@@ -90,12 +116,20 @@ Optional model limits let MaybeCode report context-window usage:
 {
   "providers": {
     "deepseek": {
+      "adapter": "deepseek-chat",
       "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "baseURL": "https://api.deepseek.com"
+    }
+  },
+  "models": {
+    "deepseek-chat": {
+      "provider": "deepseek",
       "model": "deepseek-chat",
       "contextWindowTokens": 64000,
       "maxOutputTokens": 8192
     }
-  }
+  },
+  "defaultModel": "deepseek-chat"
 }
 ```
 
@@ -133,15 +167,24 @@ native compactor as an automatic fallback:
 {
   "providers": {
     "openai": {
+      "adapter": "openai-responses",
       "apiKeyEnv": "OPENAI_API_KEY",
-      "model": "gpt-5.4",
-      "contextWindowTokens": 128000,
-      "maxOutputTokens": 8192,
-      "reasoningEffort": "high",
-      "reasoningSummary": "auto",
-      "serverCompactThreshold": 100000
+      "options": {
+        "reasoningEffort": "high",
+        "reasoningSummary": "auto",
+        "serverCompactThreshold": 100000
+      }
     }
   },
+  "models": {
+    "gpt": {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "contextWindowTokens": 128000,
+      "maxOutputTokens": 8192
+    }
+  },
+  "defaultModel": "gpt",
   "apps": {
     "maybecode": {
       "autoCompaction": {
@@ -173,6 +216,11 @@ non-empty UTF-8 `system.md`. It completely replaces the built-in system prompt.
 An optional `AGENTS.md` at the workspace root is then appended as project
 instructions. Each file has a 32 KiB limit.
 
+MaybeCode also appends a short generated runtime section describing the actual
+shell used by the `shell` tool. This operational metadata is independent of
+`system.md`, so a custom system prompt cannot accidentally tell the model to use
+Bash syntax when the tool is running PowerShell, or vice versa.
+
 Use `/instructions` to inspect the active sources and effective instructions.
 
 Programmatic callers can pass a `ContextFactory` to
@@ -185,14 +233,29 @@ and may also return a `ContextController` for application-level inspection.
 
 In an interactive terminal, suggestions are shown as the first input line is
 edited. For example, `/re` shows `/resume` and `/retry`; `/compact ` filters
-compaction strategies; and `/resume ` filters known session IDs. Suggestions
-are display-only in this first version—finish typing the command and press
-Enter. Approval prompts and multiline continuation lines do not show command
-suggestions.
+compaction strategies; `/resume ` filters known session IDs; and `/model `
+filters configured model-profile names. `/effort ` filters the active model's
+discovered reasoning levels. Suggestions also participate in input:
+`Enter` executes the first displayed candidate,
+while `Tab` completes the longest unambiguous prefix without executing it. A
+single candidate is completed in full. For example, candidates `/commanda` and
+`/commandb` complete `/comm` to `/command`. Approval prompts and multiline
+continuation lines do not show command suggestions.
 
 - `/new` creates a session.
 - `/sessions` lists sessions for the current workspace.
-- `/resume <id>` switches sessions.
+- `/resume` opens the interactive session picker; `/resume <id>` switches
+  directly without opening it.
+- `/model` opens the configured model-profile picker. `/model <prefix>` switches
+  to the first profile whose name starts with the prefix, in configuration
+  order. Switching rebuilds the model runtime while preserving the active
+  session and its durable context. `/model <prefix> --default` also persists
+  the selected profile as the configuration's `defaultModel`.
+- `/effort` opens the active model's reasoning-effort picker. `/effort <prefix>`
+  selects the first matching supported level, while `/effort default` clears
+  the runtime override. Changing effort rebuilds the model runtime but keeps the
+  active session and durable context. When reliable capability metadata is not
+  available, MaybeCode reports the capability as unknown instead of guessing.
 - `/retry` continues the latest failed run without adding another user message
   or replaying already completed tools.
 - `/instructions` shows active instruction sources and content.
@@ -206,6 +269,48 @@ suggestions.
 - `/help` shows commands.
 - `/quit` exits.
 - `Ctrl+C` cancels an active run or summary and exits while idle.
+
+The `/resume` picker has its own shortcut context:
+
+- `Up`/`Down`, `PageUp`/`PageDown`, and `Home`/`End` move the selection.
+- `Enter` resumes the selected session without automatically prompting the
+  model.
+- `/` enters search mode. It matches the current workspace's session ID,
+  title, and latest message preview with a case-insensitive substring search;
+  it does not scan the complete JSONL history. `Enter` finishes and `Esc`
+  closes search mode and clears the filter.
+- `Space` toggles metadata and message preview.
+- `R` renames the selected session.
+- `D` opens a deletion confirmation; `Y` deletes and `N` or `Esc` cancels.
+- `Esc` closes the picker and `Ctrl+C` is an emergency close.
+
+The active session cannot be deleted. Deleting another session removes both
+its workspace-catalog entry and its durable JSONL history.
+
+The `/model` and retained `/effort` pickers use the same list navigation keys (`Up`/`Down`,
+`PageUp`/`PageDown`, `Home`/`End`, `Enter`, and `Esc`). At the command line,
+`Tab` only completes: one candidate completes fully, multiple candidates
+complete their longest common prefix, and no additional common prefix leaves
+the input unchanged.
+
+The `/model` picker marks the active and default profiles separately. Press
+`D` to make the selected profile the default without switching the active
+model; the picker remains open with the updated marker. In the non-screen
+fallback picker, enter `d <number-or-name>`. The change is atomically written
+to the configuration file that was actually loaded, including a custom
+`--config` path, and applies to future launches that omit `--model`.
+
+The retained editor keeps submitted prompts and commands in bounded in-process
+history. At the first or last logical line, `Up`/`Down` navigates that history;
+inside multiline input it moves between lines. `Ctrl+W`, `Ctrl+Backspace`, or
+`Alt+Backspace` deletes the previous word, and modified Left/Right moves by
+word. `Shift+Enter` inserts a newline when the terminal reports that modifier.
+Bracketed multiline paste is inserted as text and cannot accidentally execute
+embedded lines one at a time.
+
+The retained header displays the effective effort beside the active model name
+and refreshes it after `/model` or `/effort`. Unknown capability metadata is
+shown explicitly as `effort: unknown`.
 
 End an input line with a single backslash to continue composing on the next
 line. Interactive input is kept in an in-process history, while approval
@@ -245,8 +350,8 @@ reports automatic compactions. Programmatic callers can replace the ordered
 chain with `autoCompactionStrategies`, pass `providerNativeAutoCompaction`, or
 pass an empty strategy array to disable automatic compaction.
 
-The `read` tool runs without approval. `bash`, `edit`, and `write` require an
-allow-once, allow-for-session, or deny decision. Bash is not a sandbox.
+The `read` tool runs without approval. `shell`, `edit`, and `write` require an
+allow-once, allow-for-session, or deny decision. The shell tool is not a sandbox.
 The read-only `session_history` tool also runs without approval and returns
 bounded pages of durable events from only the active session.
 Allow-for-session grants currently last for the running MaybeCode process and
@@ -255,7 +360,9 @@ are not restored after restart.
 Before `edit` and `write` execute, MaybeCode shows a bounded unified diff. After
 execution it reports the file, whether it was created or updated, and the
 numbers of added and deleted lines. A preview is still shown when a previous
-allow-for-session grant skips the approval prompt.
+allow-for-session grant skips the approval prompt. Preview metadata is stored
+as a versioned Session presentation event, so the same diff remains available
+after `/resume`; older histories without this event continue to load normally.
 
 Session event logs and the workspace catalog are stored under
 `~/.may/maybecode`. They are plaintext and currently require a single active

@@ -52,6 +52,9 @@ messages it measured when available. Old session logs without it remain
 compatible. The file store uses one JSONL file
 per session. Files are plaintext and require a single active writer per session;
 encryption and cross-process locking are outside the current scope.
+Both built-in stores implement optional history deletion through
+`SessionStore.delete(sessionId)`; applications decide which sessions users may
+delete.
 
 When using `@may/permissions`, connect its durable event sink before submitting
 a run:
@@ -71,6 +74,12 @@ Session history contains only durable facts: submitted input, complete
 assistant messages, approvals, tool outcomes, and run boundaries. Streaming
 deltas and other transient progress events remain on the live run stream.
 
+Applications may attach versioned display metadata to a tool call with
+`session.recordToolPresentation(...)`. Session persists and exposes these
+`tool.presentation` events, but deliberately ignores them when rebuilding the
+model-visible conversation. The `kind`, `version`, and `data` schema remain
+owned by the application, keeping Session independent of any particular UI.
+
 `SessionHistoryReader` provides one validated history source for full replay
 and bounded queries. `Session.resume()` uses full history, while
 `Session.queryHistory()` supports stable sequence cursors, ascending or
@@ -85,7 +94,7 @@ older JSONL events are retained as an auditable full history.
 
 ## Current scope
 
-The package supports new and resumed sessions with in-memory or local JSONL
+The package supports new, resumed, and deleted histories with in-memory or local JSONL
 storage and durable context-replacement events. It does not choose or execute
 compaction strategies. Forking, metadata updates, and cross-process
 coordination are not implemented yet.

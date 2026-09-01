@@ -20,7 +20,10 @@ packages/
     anthropic/  Anthropic Messages API streaming model adapter
     openai/     OpenAI Responses API adapter and native compaction
   tools/
-    coding-tools/  Read, bash, edit, and write tools
+    coding-tools/  Read, cross-platform shell, edit, and write tools
+  ui/
+    keybindings/  Context-aware semantic keyboard mappings
+    tui/          May-owned terminal renderer and reusable UI primitives
 apps/
   cli/        Minimal command-line interface
   maybecode/ Terminal coding-agent application
@@ -34,6 +37,10 @@ Future Provider, Tool, Context, and Agent packages will be added alongside
 
 See `docs/architecture/runtime-session.md` for the boundaries between agent
 definitions, sessions, runs, and steps.
+
+See `docs/configuration.md` for the configuration reference and built-in
+provider option matrix. The editor schema lives at
+`packages/config/may-config.schema.json`.
 
 ## Development
 

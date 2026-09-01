@@ -116,8 +116,10 @@ depend on retaining every delta.
 `PermissionEvent` reports live approval requests and their resolution or
 cancellation. `SessionEvent` records durable session facts such as submitted
 messages, finalized assistant messages, approvals, tool outcomes, and run
-boundaries. UI state is a projection of these events and is never the source of
-truth.
+boundaries. Applications may also record namespaced, versioned
+`tool.presentation` metadata. Session exposes but does not replay this metadata
+into model context. UI state is a projection of these events and is never the
+source of truth.
 
 The session package includes in-memory storage and an optional Node.js JSONL
 file-store entry point. Sessions can rebuild Core context from durable history;
