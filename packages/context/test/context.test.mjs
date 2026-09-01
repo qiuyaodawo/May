@@ -410,6 +410,42 @@ test("does not convert manual compaction failures into automatic fallback events
   assert.equal(failureEvents, 0);
 });
 
+test("preserves messages appended while an asynchronous compaction is running", async () => {
+  let startCompaction;
+  let finishCompaction;
+  const compactionStarted = new Promise((resolve) => {
+    startCompaction = resolve;
+  });
+  const allowCompaction = new Promise((resolve) => {
+    finishCompaction = resolve;
+  });
+  const compacted = message("compacted history");
+  const appended = message("concurrent append");
+  const managed = new InMemoryContextFactory().create({
+    messages: [message("old history")],
+    compactionStrategy: {
+      name: "delayed",
+      async compact() {
+        startCompaction();
+        await allowCompaction;
+        return [compacted];
+      },
+    },
+  });
+
+  const compaction = managed.controller.compact();
+  await compactionStarted;
+  await managed.context.append([appended]);
+  finishCompaction();
+
+  const result = await compaction;
+  assert.deepEqual(result.messages, [compacted, appended]);
+  assert.deepEqual((await managed.context.snapshot()).messages, [
+    compacted,
+    appended,
+  ]);
+});
+
 test("cancels automatic compaction without replacing context", async () => {
   let started;
   let fallbackCalled = false;

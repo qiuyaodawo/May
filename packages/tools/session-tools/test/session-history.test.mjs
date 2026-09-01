@@ -77,7 +77,42 @@ test("bounds individual events and total tool output", async () => {
   assert.equal(output.outputTruncated, true);
   assert.equal(output.hasMore, true);
   assert.equal(output.nextSeq, output.events.at(-1).seq);
-  assert.ok(new TextEncoder().encode(JSON.stringify(output)).byteLength < 500);
+  assert.ok(new TextEncoder().encode(JSON.stringify(output)).byteLength <= 350);
+});
+
+test("strictly includes envelope and cursor fields in the output byte limit", async () => {
+  assert.throws(
+    () =>
+      createSessionHistoryTool({
+        source: { queryHistory: async () => ({ events: [], hasMore: false }) },
+        maxEventBytes: 60,
+        maxOutputBytes: 60,
+      }),
+    /maxOutputBytes must be at least/u,
+  );
+  const tool = createSessionHistoryTool({
+    source: {
+      async queryHistory() {
+        return {
+          events: [event(123456, {
+            type: "input.submitted",
+            message: user("large"),
+          })],
+          hasMore: true,
+          nextSeq: 123456,
+        };
+      },
+    },
+    maxEvents: 1,
+    maxEventBytes: 78,
+    maxOutputBytes: 78,
+  });
+
+  const output = await tool.execute(tool.parse({}), context());
+  assert.ok(new TextEncoder().encode(JSON.stringify(output)).byteLength <= 78);
+  assert.equal(output.outputTruncated, true);
+  assert.equal(output.hasMore, true);
+  assert.equal(output.nextSeq, 123456);
 });
 
 test("validates tool input and cancellation", async () => {

@@ -50,6 +50,8 @@ export interface ToolOperation<T> {
   readonly call: ToolCall;
   readonly tool: Tool | undefined;
   execute(): Promise<T>;
+  /** Stop a sequential batch after this result without starting later tools. */
+  isTerminal?(result: T): boolean;
 }
 
 export interface ToolSchedulingContext {
@@ -72,9 +74,17 @@ export const directToolExecutor: ToolExecutor = {
 };
 
 export const sequentialToolScheduler: ToolScheduler = {
-  async schedule<T>(operations: readonly ToolOperation<T>[]): Promise<T[]> {
+  async schedule<T>(
+    operations: readonly ToolOperation<T>[],
+    context: ToolSchedulingContext,
+  ): Promise<T[]> {
     const results: T[] = [];
-    for (const operation of operations) results.push(await operation.execute());
+    for (const operation of operations) {
+      context.signal.throwIfAborted();
+      const result = await operation.execute();
+      results.push(result);
+      if (operation.isTerminal?.(result) === true) break;
+    }
     return results;
   },
 };

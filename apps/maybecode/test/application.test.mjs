@@ -766,6 +766,114 @@ test("automatically compacts before a model call and persists the active view", 
   );
 });
 
+test("persists automatic compaction after the run events it contains", async () => {
+  const { InMemorySessionStore, Session } = await import("@may/session");
+  const backing = new InMemorySessionStore();
+  let releaseAssistant;
+  const assistantGate = new Promise((resolve) => {
+    releaseAssistant = resolve;
+  });
+  let assistantAppendStarted;
+  const assistantStarted = new Promise((resolve) => {
+    assistantAppendStarted = resolve;
+  });
+  let delayedAssistant = false;
+  const store = {
+    read: (sessionId) => backing.read(sessionId),
+    async append(event) {
+      if (event.type === "assistant.completed" && !delayedAssistant) {
+        delayedAssistant = true;
+        assistantAppendStarted();
+        await assistantGate;
+      }
+      await backing.append(event);
+    },
+  };
+  let compactionDidStart;
+  const compactionStarted = new Promise((resolve) => {
+    compactionDidStart = resolve;
+  });
+  let modelCall = 0;
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model: {
+      async *stream() {
+        modelCall += 1;
+        yield modelCall === 1
+          ? {
+              type: "response.completed",
+              message: {
+                role: "assistant",
+                content: [],
+                toolCalls: [{ id: "large_1", name: "large", input: {} }],
+              },
+            }
+          : {
+              type: "response.completed",
+              message: assistantMessage("done"),
+            };
+      },
+    },
+    tools: [{
+      name: "large",
+      description: "Returns enough data to trigger compaction",
+      inputSchema: { type: "object" },
+      async execute() {
+        return { payload: "x".repeat(5000) };
+      },
+    }],
+    permissionPolicy: () => "allow",
+    store,
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+    contextBudget: {
+      contextWindowTokens: 2000,
+      compactTriggerRatio: 0.5,
+    },
+    autoCompactionStrategies: [{
+      name: "drop-input",
+      compact(snapshot) {
+        compactionDidStart();
+        return snapshot.messages.slice(1).map((message) =>
+          message.role === "tool"
+            ? { ...message, content: [{ type: "json", value: { pruned: true } }] }
+            : message
+        );
+      },
+    }],
+  });
+
+  const run = await app.submit({ input: "use the large tool" });
+  await Promise.all([assistantStarted, compactionStarted]);
+  releaseAssistant();
+  await run.result;
+
+  const history = await app.history();
+  const toolIndex = history.findIndex((event) => event.type === "tool.completed");
+  const compactionIndex = history.findIndex((event) =>
+    event.type === "context.compacted"
+  );
+  assert.ok(toolIndex >= 0);
+  assert.ok(compactionIndex > toolIndex);
+
+  let replayed;
+  await Session.resume({
+    id: app.sessionId,
+    store,
+    createRuntime(messages) {
+      replayed = messages;
+      return {};
+    },
+  });
+  assert.equal(
+    replayed.filter((message) =>
+      message.role === "tool" && message.toolCallId === "large_1"
+    ).length,
+    1,
+  );
+  await app.close();
+});
+
 test("falls back when OpenAI native compaction returns 503 and exposes the failure", async () => {
   const urls = [];
   const model = new OpenAIResponsesModel({

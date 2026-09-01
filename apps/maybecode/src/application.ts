@@ -287,8 +287,8 @@ export class MaybeCodeApplication {
         historyReferenceStrategy,
         options.modelInfo,
       );
-      contextController?.setAutoCompactionSink?.((result) =>
-        application!.recordAutomaticCompaction(result)
+      contextController?.setAutoCompactionSink?.((result, compactionOptions) =>
+        application!.recordAutomaticCompaction(result, compactionOptions)
       );
       contextController?.setAutoCompactionFailureSink?.((failure) =>
         application!.recordAutomaticCompactionFailure(failure)
@@ -418,8 +418,9 @@ export class MaybeCodeApplication {
 
   private async recordAutomaticCompaction(
     result: ContextCompactionResult,
+    options: ContextCompactionOptions,
   ): Promise<void> {
-    await this.persistCompaction(result);
+    await this.persistCompaction(result, options);
     this.eventQueue.push({
       type: "context.compacted",
       strategy: result.strategy,
@@ -441,15 +442,25 @@ export class MaybeCodeApplication {
     });
   }
 
-  private persistCompaction(result: ContextCompactionResult): Promise<void> {
-    return this.session.recordContextCompaction({
-      strategy: result.strategy,
-      messages: result.messages,
-      beforeMessageCount: result.before.messageCount,
-      afterMessageCount: result.after.messageCount,
-      beforeEstimatedTokens: result.before.estimatedTokens,
-      afterEstimatedTokens: result.after.estimatedTokens,
-    });
+  private persistCompaction(
+    result: ContextCompactionResult,
+    ordering?: Pick<ContextCompactionOptions, "runId" | "step">,
+  ): Promise<void> {
+    const afterRunStep = ordering?.runId === undefined ||
+        ordering.step === undefined
+      ? undefined
+      : { runId: ordering.runId, step: ordering.step };
+    return this.session.recordContextCompaction(
+      {
+        strategy: result.strategy,
+        messages: result.messages,
+        beforeMessageCount: result.before.messageCount,
+        afterMessageCount: result.after.messageCount,
+        beforeEstimatedTokens: result.before.estimatedTokens,
+        afterEstimatedTokens: result.after.estimatedTokens,
+      },
+      afterRunStep,
+    );
   }
 
   private async recordToolChangePreview(

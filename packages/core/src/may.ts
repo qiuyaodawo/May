@@ -191,6 +191,8 @@ export class May {
     let pendingTools: {
       readonly step: number;
       readonly calls: readonly ToolCall[];
+      readonly outcomes: Array<ToolExecutionOutcome | undefined>;
+      readonly executions: Array<Promise<ToolExecutionOutcome> | undefined>;
     } | undefined;
     try {
       emit(input === undefined
@@ -251,36 +253,23 @@ export class May {
         }
 
         toolCalls += calls.length;
-        pendingTools = { step, calls };
+        pendingTools = { step, calls, outcomes: [], executions: [] };
         const outcomes = await this.scheduleTools(
           runId,
           step,
           calls,
           signal,
           emit,
+          pendingTools,
         );
         let fatal: FatalToolExecutionError | undefined;
         await this.context.append(
           outcomes.map((outcome) => outcome.message),
           { runId, step },
         );
+        emitToolOutcomes(step, outcomes, emit);
         for (const outcome of outcomes) {
-          if (outcome.type === "completed") {
-            emit({
-              type: "tool.completed",
-              step,
-              call: outcome.call,
-              output: outcome.output,
-            });
-          } else {
-            emit({
-              type: "tool.failed",
-              step,
-              call: outcome.call,
-              error: outcome.error,
-            });
-            fatal ??= outcome.fatal;
-          }
+          if (outcome.type === "failed") fatal ??= outcome.fatal;
         }
         pendingTools = undefined;
         throwIfAborted(signal);
@@ -298,12 +287,31 @@ export class May {
         const reason = toReason(signal.reason);
 
         if (pendingTools !== undefined) {
-          await this.context.append(
-            pendingTools.calls.map((call) =>
-              toolCancellationMessage(call, cancelled.message)
+          await Promise.allSettled(
+            pendingTools.executions.filter(
+              (execution): execution is Promise<ToolExecutionOutcome> =>
+                execution !== undefined,
             ),
-            { runId, step: pendingTools.step },
           );
+          const settledOutcomes = pendingTools.outcomes.filter(
+            (outcome): outcome is ToolExecutionOutcome => outcome !== undefined,
+          );
+          const cancellationOutcomes = pendingTools.calls.map((call, index) =>
+            pendingTools?.outcomes[index] ??
+              createCancelledToolOutcome(call, cancelled)
+          );
+          try {
+            await this.context.append(
+              cancellationOutcomes.map((outcome) => outcome.message),
+              { runId, step: pendingTools.step },
+            );
+          } catch (contextError) {
+            emitToolOutcomes(pendingTools.step, cancellationOutcomes, emit);
+            pendingTools = undefined;
+            emit({ type: "run.failed", error: serializeError(contextError) });
+            throw contextError;
+          }
+          emitToolOutcomes(pendingTools.step, settledOutcomes, emit);
           pendingTools = undefined;
         }
 
@@ -411,16 +419,27 @@ export class May {
     calls: readonly ToolCall[],
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
+    pending: {
+      readonly outcomes: Array<ToolExecutionOutcome | undefined>;
+      readonly executions: Array<Promise<ToolExecutionOutcome> | undefined>;
+    },
   ): Promise<readonly ToolExecutionOutcome[]> {
-    const operations = calls.map((call) => {
+    const operations = calls.map((call, index) => {
       let execution: Promise<ToolExecutionOutcome> | undefined;
       return {
         call,
         tool: this.tools.get(call.name),
         execute: () => {
-          execution ??= this.executeTool(runId, step, call, signal, emit);
+          execution ??= this.executeTool(runId, step, call, signal, emit)
+            .then((outcome) => {
+              pending.outcomes[index] = outcome;
+              return outcome;
+            });
+          pending.executions[index] = execution;
           return execution;
         },
+        isTerminal: (outcome: ToolExecutionOutcome) =>
+          outcome.type === "failed" && outcome.fatal !== undefined,
       };
     });
     const outcomes = await this.toolScheduler.schedule(operations, {
@@ -428,19 +447,37 @@ export class May {
       step,
       signal,
     });
-    if (outcomes.length !== calls.length) {
+    if (outcomes.length > calls.length) {
       throw new ToolSchedulerError(
         `Tool scheduler returned ${outcomes.length} results for ${calls.length} calls`,
       );
     }
-    for (let index = 0; index < calls.length; index++) {
+    for (let index = 0; index < outcomes.length; index++) {
       if (outcomes[index]?.call !== calls[index]) {
         throw new ToolSchedulerError(
           "Tool scheduler must return results in call order",
         );
       }
     }
-    return outcomes;
+    if (outcomes.length === calls.length) return outcomes;
+
+    const terminal = outcomes.at(-1);
+    if (
+      terminal?.type !== "failed" ||
+      terminal.fatal === undefined
+    ) {
+      throw new ToolSchedulerError(
+        `Tool scheduler returned ${outcomes.length} results for ${calls.length} calls`,
+      );
+    }
+
+    const fatal = terminal.fatal;
+    return [
+      ...outcomes,
+      ...calls.slice(outcomes.length).map((call) =>
+        createSkippedToolOutcome(call, fatal)
+      ),
+    ];
   }
 
   private async executeTool(
@@ -474,7 +511,6 @@ export class May {
         },
       });
 
-      throwIfAborted(signal);
       return {
         type: "completed",
         call,
@@ -526,6 +562,65 @@ interface FailedToolExecution {
 }
 
 type ToolExecutionOutcome = CompletedToolExecution | FailedToolExecution;
+
+function createCancelledToolOutcome(
+  call: ToolCall,
+  error: RunCancelledError,
+): FailedToolExecution {
+  return {
+    type: "failed",
+    call,
+    error: serializeError(error),
+    message: toolCancellationMessage(call, error.message),
+  };
+}
+
+function createSkippedToolOutcome(
+  call: ToolCall,
+  fatal: FatalToolExecutionError,
+): FailedToolExecution {
+  const error: SerializedError = {
+    name: "ToolSkippedError",
+    message: `Tool \"${call.name}\" was not executed because a previous tool failed fatally: ${fatal.message}`,
+    code: "TOOL_SKIPPED",
+  };
+  return {
+    type: "failed",
+    call,
+    error,
+    message: {
+      role: "tool",
+      toolCallId: call.id,
+      name: call.name,
+      isError: true,
+      content: [{ type: "json", value: error }],
+    },
+  };
+}
+
+function emitToolOutcomes(
+  step: number,
+  outcomes: readonly ToolExecutionOutcome[],
+  emit: (event: MayEventPayload) => void,
+): void {
+  for (const outcome of outcomes) {
+    if (outcome.type === "completed") {
+      emit({
+        type: "tool.completed",
+        step,
+        call: outcome.call,
+        output: outcome.output,
+      });
+    } else {
+      emit({
+        type: "tool.failed",
+        step,
+        call: outcome.call,
+        error: outcome.error,
+      });
+    }
+  }
+}
 
 function createRunId(): string {
   return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;

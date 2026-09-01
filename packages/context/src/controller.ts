@@ -68,9 +68,11 @@ export interface SnapshotContextControllerOptions {
   readonly budget?: ContextBudget;
   readonly measurement?: ContextMeasurement;
   readonly compactionStrategy?: ContextCompactionStrategy;
+  /** Return false when expectedMessages no longer matches atomically. */
   readonly replaceMessages?: (
     messages: readonly Message[],
-  ) => void | Promise<void>;
+    expectedMessages: readonly Message[],
+  ) => boolean | void | Promise<boolean | void>;
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
 }
 
@@ -84,6 +86,7 @@ export class SnapshotContextController implements ContextController {
   private autoCompactionSink: ContextCompactionSink | undefined;
   private autoCompactionFailureSink: ContextCompactionFailureSink | undefined;
   private measurement: ContextMeasurement | undefined;
+  private compactionQueue: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly context: Context,
@@ -164,7 +167,7 @@ export class SnapshotContextController implements ContextController {
       }
       currentInspection = result.after;
       if (result.changed) {
-        await this.autoCompactionSink?.(result);
+        await this.autoCompactionSink?.(result, options);
         results.push(result);
       }
       if (result.terminal === true || currentInspection.shouldCompact !== true) {
@@ -181,9 +184,23 @@ export class SnapshotContextController implements ContextController {
     return results;
   }
 
-  async compact(
+  compact(
     strategy = this.compactionStrategy,
     options: ContextCompactionOptions = {},
+  ): Promise<ContextCompactionResult> {
+    const result = this.compactionQueue.then(() =>
+      this.compactExclusive(strategy, options)
+    );
+    this.compactionQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private async compactExclusive(
+    strategy: ContextCompactionStrategy | undefined,
+    options: ContextCompactionOptions,
   ): Promise<ContextCompactionResult> {
     throwIfAborted(options.signal);
     if (strategy === undefined) {
@@ -196,53 +213,98 @@ export class SnapshotContextController implements ContextController {
       throw new Error("The active context does not support compaction");
     }
 
-    const snapshot = await this.context.snapshot();
-    const before = inspectContextSnapshot(snapshot, this.inspectionOptions());
-    const output = normalizeCompactionOutput(await strategy.compact(
-      {
-        ...snapshot,
-        messages: [...snapshot.messages],
-      },
-      options,
-    ));
-    throwIfAborted(options.signal);
-    const messages = [...output.messages];
-    const changed = JSON.stringify(messages) !== JSON.stringify(snapshot.messages);
-    if (output.effectiveTokens !== undefined) {
-      this.measurement = validateMeasurement({
-        inputTokens: output.effectiveTokens,
-        contextMessageCount: messages.length,
-      });
-    }
-    if (!changed) {
-      const after = output.effectiveTokens === undefined
-        ? before
-        : inspectContextSnapshot(snapshot, this.inspectionOptions());
-      return {
-        strategy: strategy.name,
-        changed,
-        messages,
-        before,
-        after,
-        ...(output.terminal === true ? { terminal: true } : {}),
-      };
-    }
-
-    await this.replaceMessages(messages);
-    if (output.effectiveTokens === undefined) this.measurement = undefined;
-    const afterSnapshot = await this.context.snapshot();
-    const after = inspectContextSnapshot(
-      afterSnapshot,
+    let sourceSnapshot = await this.context.snapshot();
+    let before = inspectContextSnapshot(
+      sourceSnapshot,
       this.inspectionOptions(),
     );
-    return {
-      strategy: strategy.name,
-      changed,
-      messages: [...afterSnapshot.messages],
-      before,
-      after,
-      ...(output.terminal === true ? { terminal: true } : {}),
-    };
+
+    while (true) {
+      const output = normalizeCompactionOutput(await strategy.compact(
+        {
+          ...sourceSnapshot,
+          messages: [...sourceSnapshot.messages],
+        },
+        options,
+      ));
+      throwIfAborted(options.signal);
+
+      while (true) {
+        const latestSnapshot = await this.context.snapshot();
+        throwIfAborted(options.signal);
+        const tail = appendedTail(sourceSnapshot.messages, latestSnapshot.messages);
+        if (tail === undefined) {
+          // Another replacement won the race. Re-run the strategy against that
+          // history instead of overwriting it with a stale result.
+          sourceSnapshot = latestSnapshot;
+          before = inspectContextSnapshot(
+            sourceSnapshot,
+            this.inspectionOptions(),
+          );
+          break;
+        }
+
+        const compactedMessages = [...output.messages];
+        const messages = [...compactedMessages, ...tail];
+        const changed = !messagesEqual(messages, latestSnapshot.messages);
+        if (!changed) {
+          if (output.effectiveTokens !== undefined) {
+            this.applyCompactionMeasurement(
+              output.effectiveTokens,
+              compactedMessages.length,
+            );
+          }
+          const after = inspectContextSnapshot(
+            latestSnapshot,
+            this.inspectionOptions(),
+          );
+          return {
+            strategy: strategy.name,
+            changed,
+            messages,
+            before,
+            after,
+            ...(output.terminal === true ? { terminal: true } : {}),
+          };
+        }
+
+        const replaced = await this.replaceMessages(
+          messages,
+          latestSnapshot.messages,
+        );
+        if (replaced === false) continue;
+
+        this.applyCompactionMeasurement(
+          output.effectiveTokens,
+          compactedMessages.length,
+        );
+        const afterSnapshot = await this.context.snapshot();
+        const after = inspectContextSnapshot(
+          afterSnapshot,
+          this.inspectionOptions(),
+        );
+        return {
+          strategy: strategy.name,
+          changed,
+          messages: [...afterSnapshot.messages],
+          before,
+          after,
+          ...(output.terminal === true ? { terminal: true } : {}),
+        };
+      }
+    }
+  }
+
+  private applyCompactionMeasurement(
+    effectiveTokens: number | undefined,
+    compactedMessageCount: number,
+  ): void {
+    this.measurement = effectiveTokens === undefined
+      ? undefined
+      : validateMeasurement({
+          inputTokens: effectiveTokens,
+          contextMessageCount: compactedMessageCount,
+        });
   }
 
   private inspectionOptions(): {
@@ -256,6 +318,24 @@ export class SnapshotContextController implements ContextController {
         : { measurement: this.measurement }),
     };
   }
+}
+
+function appendedTail(
+  source: readonly Message[],
+  latest: readonly Message[],
+): readonly Message[] | undefined {
+  if (latest.length < source.length) return undefined;
+  for (let index = 0; index < source.length; index++) {
+    if (!messagesEqual([source[index]!], [latest[index]!])) return undefined;
+  }
+  return latest.slice(source.length);
+}
+
+function messagesEqual(
+  left: readonly Message[],
+  right: readonly Message[],
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function normalizeCompactionOutput(

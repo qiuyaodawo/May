@@ -42,6 +42,7 @@ export interface ContextCompactionResult {
 
 export type ContextCompactionSink = (
   result: ContextCompactionResult,
+  options: ContextCompactionOptions,
 ) => void | Promise<void>;
 
 export interface ContextCompactionFailure {

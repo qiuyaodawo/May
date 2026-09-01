@@ -717,6 +717,7 @@ test("turns a custom executor error into a tool message and continues", async ()
 
 test("terminates the run for explicitly fatal tool infrastructure errors", async () => {
   let modelCalls = 0;
+  let laterToolExecuted = false;
   const model = {
     async *stream() {
       modelCalls += 1;
@@ -724,6 +725,7 @@ test("terminates the run for explicitly fatal tool infrastructure errors", async
         type: "response.completed",
         message: assistant("", [
           { id: "fatal_call", name: "fatal", input: {} },
+          { id: "later_call", name: "later", input: {} },
         ]),
       };
     },
@@ -739,6 +741,14 @@ test("terminates the run for explicitly fatal tool infrastructure errors", async
       async execute() {
         throw new FatalToolExecutionError("durability unavailable");
       },
+    }, {
+      name: "later",
+      description: "must not run after a fatal failure",
+      inputSchema: {},
+      async execute() {
+        laterToolExecuted = true;
+        return "unexpected";
+      },
     }],
   }).run({ input: "fail" });
   const eventPromise = collect(run.events);
@@ -749,7 +759,16 @@ test("terminates the run for explicitly fatal tool infrastructure errors", async
   assert.equal(modelCalls, 1);
   assert.equal(events.find((event) => event.type === "tool.failed").error.code,
     "FATAL_TOOL_EXECUTION");
-  assert.equal((await context.snapshot()).messages.at(-1).isError, true);
+  assert.equal(laterToolExecuted, false);
+  assert.deepEqual(
+    events.filter((event) => event.type === "tool.started")
+      .map((event) => event.call.id),
+    ["fatal_call"],
+  );
+  const toolMessages = (await context.snapshot()).messages.slice(-2);
+  assert.equal(toolMessages[0].isError, true);
+  assert.equal(toolMessages[1].toolCallId, "later_call");
+  assert.equal(toolMessages[1].content[0].value.code, "TOOL_SKIPPED");
   assertSingleTerminalEvent(events, "run.failed");
 });
 
@@ -1134,6 +1153,179 @@ test("run.cancel aborts an active tool without turning it into a tool failure", 
     (await may.run({ input: "continue" }).result).message.content[0].text,
     "recovered",
   );
+});
+
+test("emits a failed terminal event when cancellation context persistence fails", async () => {
+  const started = deferred();
+  const inner = new InMemoryContext();
+  const context = {
+    snapshot: (options) => inner.snapshot(options),
+    append(messages, options) {
+      if (
+        messages.some((message) =>
+          message.role === "tool" &&
+          message.content[0]?.value?.code === "RUN_CANCELLED"
+        )
+      ) {
+        return Promise.reject(new Error("context write failed"));
+      }
+      return inner.append(messages, options);
+    },
+  };
+  const run = new May({
+    context,
+    model: {
+      async *stream() {
+        yield {
+          type: "response.completed",
+          message: assistant("", [{ id: "slow_call", name: "slow", input: {} }]),
+        };
+      },
+    },
+    tools: [{
+      name: "slow",
+      description: "Wait until cancelled",
+      inputSchema: {},
+      async execute(_input, { signal }) {
+        started.resolve();
+        await waitForAbort(signal);
+      },
+    }],
+  }).run({ input: "start" });
+  const eventPromise = collect(run.events);
+
+  await started.promise;
+  run.cancel("stop");
+
+  await assert.rejects(run.result, /context write failed/u);
+  const events = await eventPromise;
+  assert.equal(
+    events.find((event) => event.type === "tool.failed").error.code,
+    "RUN_CANCELLED",
+  );
+  assertSingleTerminalEvent(events, "run.failed");
+});
+
+test("cancelling a sequential tool batch preserves completed outcomes", async () => {
+  const secondStarted = deferred();
+  const model = {
+    async *stream() {
+      yield {
+        type: "response.completed",
+        message: assistant("", [
+          { id: "completed_call", name: "complete", input: {} },
+          { id: "cancelled_call", name: "slow", input: {} },
+        ]),
+      };
+    },
+  };
+  const context = new InMemoryContext();
+  const run = new May({
+    model,
+    context,
+    tools: [{
+      name: "complete",
+      description: "complete before cancellation",
+      inputSchema: {},
+      async execute() {
+        return { sideEffectCommitted: true };
+      },
+    }, {
+      name: "slow",
+      description: "wait for cancellation",
+      inputSchema: {},
+      async execute(_input, { signal }) {
+        secondStarted.resolve();
+        await waitForAbort(signal);
+      },
+    }],
+  }).run({ input: "run both" });
+  const eventPromise = collect(run.events);
+
+  await secondStarted.promise;
+  run.cancel("stop batch");
+
+  await assert.rejects(run.result, { code: "RUN_CANCELLED" });
+  const events = await eventPromise;
+  const toolMessages = (await context.snapshot()).messages.slice(-2);
+
+  assert.deepEqual(toolMessages[0].content[0].value, {
+    sideEffectCommitted: true,
+  });
+  assert.equal(toolMessages[0].isError, undefined);
+  assert.equal(toolMessages[1].content[0].value.code, "RUN_CANCELLED");
+  assert.deepEqual(
+    events.filter((event) => event.type === "tool.completed")
+      .map((event) => event.call.id),
+    ["completed_call"],
+  );
+  assertSingleTerminalEvent(events, "run.cancelled");
+});
+
+test("cancelling parallel tools waits for started side effects to settle", async () => {
+  const sideEffectStarted = deferred();
+  const releaseSideEffect = deferred();
+  let sideEffects = 0;
+  const context = new InMemoryContext();
+  const run = new May({
+    context,
+    toolScheduler: parallelToolScheduler,
+    model: {
+      async *stream() {
+        yield {
+          type: "response.completed",
+          message: assistant("", [
+            { id: "abort_call", name: "abort", input: {} },
+            { id: "effect_call", name: "effect", input: {} },
+          ]),
+        };
+      },
+    },
+    tools: [{
+      name: "abort",
+      description: "Reject on cancellation",
+      inputSchema: {},
+      async execute(_input, { signal }) {
+        await waitForAbort(signal);
+      },
+    }, {
+      name: "effect",
+      description: "Commit a side effect despite late cancellation",
+      inputSchema: {},
+      async execute() {
+        sideEffectStarted.resolve();
+        await releaseSideEffect.promise;
+        sideEffects += 1;
+        return { sideEffectCommitted: true };
+      },
+    }],
+  }).run({ input: "run in parallel" });
+  const eventPromise = collect(run.events);
+  let resultSettled = false;
+  void run.result.finally(() => {
+    resultSettled = true;
+  }).catch(() => undefined);
+
+  await sideEffectStarted.promise;
+  run.cancel("stop parallel batch");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(resultSettled, false);
+  releaseSideEffect.resolve();
+
+  await assert.rejects(run.result, { code: "RUN_CANCELLED" });
+  const events = await eventPromise;
+  assert.equal(sideEffects, 1);
+  assert.deepEqual(
+    events.filter((event) => event.type === "tool.completed")
+      .map((event) => event.call.id),
+    ["effect_call"],
+  );
+  const toolMessages = (await context.snapshot()).messages.slice(-2);
+  assert.equal(toolMessages[0].content[0].value.code, "RUN_CANCELLED");
+  assert.deepEqual(toolMessages[1].content[0].value, {
+    sideEffectCommitted: true,
+  });
+  assertSingleTerminalEvent(events, "run.cancelled");
 });
 
 test("run.cancel aborts an active custom tool executor", async () => {

@@ -33,7 +33,8 @@ export class InMemoryContextFactory implements ContextFactory {
           : { measurement: options.measurement }),
         compactionStrategy: options.compactionStrategy ??
           new PruneOldToolResultsStrategy(),
-        replaceMessages: (messages) => context.replaceMessages(messages),
+        replaceMessages: (messages, expectedMessages) =>
+          context.replaceMessages(messages, expectedMessages),
         ...(options.autoCompactionStrategies === undefined
           ? {}
           : {
@@ -94,7 +95,14 @@ class ReplaceableInMemoryContext implements Context {
     this.messages.push(...messages);
   }
 
-  replaceMessages(messages: readonly Message[]): void {
+  replaceMessages(
+    messages: readonly Message[],
+    expectedMessages: readonly Message[],
+  ): boolean {
+    if (JSON.stringify(this.messages) !== JSON.stringify(expectedMessages)) {
+      return false;
+    }
     this.messages.splice(0, this.messages.length, ...messages);
+    return true;
   }
 }

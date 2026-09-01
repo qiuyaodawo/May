@@ -489,6 +489,35 @@ test("preserves cancellation and records its reason", async () => {
   assert.equal(cancelled.reason, "user stopped");
 });
 
+test("does not persist input from a submission that was already cancelled", async () => {
+  const store = new InMemorySessionStore();
+  const session = await Session.create({
+    id: "pre_cancelled",
+    runtime: createRuntime(),
+    store,
+  });
+  const controller = new AbortController();
+  controller.abort("never submit");
+
+  const run = await session.submit({ input: "ghost", signal: controller.signal });
+  await assert.rejects(run.result, RunCancelledError);
+  assert.equal(
+    (await session.history()).some((event) => event.type === "input.submitted"),
+    false,
+  );
+
+  let replayed;
+  await Session.resume({
+    id: session.id,
+    store,
+    createRuntime(messages) {
+      replayed = messages;
+      return createRuntime();
+    },
+  });
+  assert.deepEqual(replayed, []);
+});
+
 test("rejects a duplicate session id in the same store", async () => {
   const store = new InMemorySessionStore();
   await Session.create({ id: "same", runtime: createRuntime(), store });
@@ -539,6 +568,33 @@ test("persists session events across file store instances", async (t) => {
   const files = await readdir(directory);
   assert.equal(files.length, 1);
   assert.match(files[0], /^[A-Za-z0-9_-]+\.jsonl$/u);
+});
+
+test("queues file-session deletion with appends for the same session", async (t) => {
+  const directory = await createTempDirectory(t);
+  const store = new FileSessionStore(directory);
+  const sessionId = "delete_queue";
+  await store.append({
+    type: "session.created",
+    sessionId,
+    seq: 1,
+    timestamp: 1,
+  });
+
+  const append = store.append({
+    type: "run.started",
+    sessionId,
+    seq: 2,
+    timestamp: 2,
+    runId: "run",
+  });
+  const appendTail = store.tails.get(sessionId);
+  const deletion = store.delete(sessionId);
+  assert.notEqual(store.tails.get(sessionId), appendTail);
+
+  await append;
+  assert.equal(await deletion, true);
+  assert.deepEqual(await store.read(sessionId), []);
 });
 
 test("resumes a file session and continues its context and sequence", async (t) => {
@@ -745,12 +801,14 @@ test("reports missing sessions and corrupt session files", async (t) => {
   await assert.rejects(store.read("corrupt"), /Invalid session event JSON/);
 });
 
-test("fails the session run when durable event storage fails", async () => {
+test("recovers the session sequence after a durable append fails", async () => {
   const backing = new InMemorySessionStore();
+  let failed = false;
   const store = {
     read: (sessionId) => backing.read(sessionId),
     append(event) {
-      if (event.type === "run.started") {
+      if (event.type === "run.started" && !failed) {
+        failed = true;
         return Promise.reject(new Error("store unavailable"));
       }
       return backing.append(event);
@@ -761,6 +819,12 @@ test("fails the session run when durable event storage fails", async () => {
   const run = await session.submit({ input: "hello" });
 
   await assert.rejects(run.result, /store unavailable/);
+  await (await session.submit({ input: "retry" })).result;
+  const history = await session.history();
+  assert.deepEqual(
+    history.map((event) => event.seq),
+    history.map((_event, index) => index + 1),
+  );
 });
 
 function createRuntime() {

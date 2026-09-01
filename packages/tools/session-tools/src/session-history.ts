@@ -10,6 +10,14 @@ import {
 export const DEFAULT_SESSION_HISTORY_MAX_EVENTS = 50;
 export const DEFAULT_SESSION_HISTORY_MAX_OUTPUT_BYTES = 32 * 1024;
 export const DEFAULT_SESSION_HISTORY_MAX_EVENT_BYTES = 8 * 1024;
+const MINIMUM_SESSION_HISTORY_OUTPUT_BYTES = utf8Bytes(
+  JSON.stringify({
+    events: [],
+    hasMore: true,
+    nextSeq: Number.MAX_SAFE_INTEGER,
+    outputTruncated: true,
+  }),
+);
 
 export interface SessionHistorySource {
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage>;
@@ -51,6 +59,11 @@ export function createSessionHistoryTool(
     options.maxOutputBytes ?? DEFAULT_SESSION_HISTORY_MAX_OUTPUT_BYTES,
     "maxOutputBytes",
   );
+  if (maxOutputBytes < MINIMUM_SESSION_HISTORY_OUTPUT_BYTES) {
+    throw new RangeError(
+      `maxOutputBytes must be at least ${MINIMUM_SESSION_HISTORY_OUTPUT_BYTES}`,
+    );
+  }
   const maxEventBytes = positiveInteger(
     options.maxEventBytes ?? DEFAULT_SESSION_HISTORY_MAX_EVENT_BYTES,
     "maxEventBytes",
@@ -167,39 +180,74 @@ function boundPage(
   maxEventBytes: number,
 ): SessionHistoryToolOutput {
   const entries: SessionHistoryEntry[] = [];
-  let bytes = utf8Bytes('{"events":[],"hasMore":false,"outputTruncated":false}');
   let outputTruncated = false;
+  let cursorSeq: number | undefined;
 
-  for (const event of page.events) {
+  for (const [index, event] of page.events.entries()) {
     const entry = projectEvent(event, maxEventBytes);
-    const entryBytes = utf8Bytes(JSON.stringify(entry)) + 1;
-    if (bytes + entryBytes > maxOutputBytes) {
+    const candidate = createOutput(page, [...entries, entry], index + 1, false);
+    if (utf8Bytes(JSON.stringify(candidate)) > maxOutputBytes) {
       const minimal: SessionHistoryEntry = {
         seq: event.seq,
         timestamp: event.timestamp,
         type: event.type,
         truncated: true,
       };
-      if (bytes + utf8Bytes(JSON.stringify(minimal)) + 1 <= maxOutputBytes) {
+      const minimalOutput = createOutput(
+        page,
+        [...entries, minimal],
+        index + 1,
+        true,
+      );
+      if (utf8Bytes(JSON.stringify(minimalOutput)) <= maxOutputBytes) {
         entries.push(minimal);
+      } else if (entries.length === 0) {
+        const skippedOutput = createOutput(
+          page,
+          entries,
+          entries.length,
+          true,
+          event.seq,
+        );
+        if (utf8Bytes(JSON.stringify(skippedOutput)) <= maxOutputBytes) {
+          cursorSeq = event.seq;
+        }
       }
       outputTruncated = true;
       break;
     }
     entries.push(entry);
-    bytes += entryBytes;
   }
 
-  const hasMore = page.hasMore || entries.length < page.events.length;
+  const output = createOutput(
+    page,
+    entries,
+    entries.length,
+    outputTruncated,
+    cursorSeq,
+  );
+  if (utf8Bytes(JSON.stringify(output)) > maxOutputBytes) {
+    throw new Error("session_history output exceeded its configured byte limit");
+  }
+  return output;
+}
+
+function createOutput(
+  page: SessionHistoryPage,
+  entries: readonly SessionHistoryEntry[],
+  consumedEvents: number,
+  outputTruncated: boolean,
+  cursorSeq?: number,
+): SessionHistoryToolOutput {
+  const hasMore = page.hasMore || consumedEvents < page.events.length;
   const last = entries[entries.length - 1];
+  const nextSeq = cursorSeq ?? last?.seq ?? page.nextSeq;
   return {
     events: entries,
     hasMore,
-    ...(hasMore && last !== undefined
-      ? { nextSeq: last.seq }
-      : page.nextSeq === undefined
-      ? {}
-      : { nextSeq: page.nextSeq }),
+    ...(hasMore && nextSeq !== undefined
+      ? { nextSeq }
+      : {}),
     outputTruncated,
   };
 }
@@ -234,18 +282,20 @@ function projectEvent(event: SessionEvent, maxEventBytes: number): SessionHistor
 function truncateUtf8(value: string, maxBytes: number): string {
   const suffix = "…[truncated]";
   const suffixBytes = utf8Bytes(suffix);
-  if (suffixBytes >= maxBytes) return suffix.slice(0, Math.max(1, maxBytes));
-  let low = 0;
-  let high = value.length;
-  while (low < high) {
-    const middle = Math.ceil((low + high) / 2);
-    if (utf8Bytes(value.slice(0, middle)) + suffixBytes <= maxBytes) {
-      low = middle;
-    } else {
-      high = middle - 1;
-    }
+  if (suffixBytes >= maxBytes) return utf8Prefix(suffix, maxBytes);
+  return `${utf8Prefix(value, maxBytes - suffixBytes)}${suffix}`;
+}
+
+function utf8Prefix(value: string, maxBytes: number): string {
+  let bytes = 0;
+  let end = 0;
+  for (const character of value) {
+    const characterBytes = utf8Bytes(character);
+    if (bytes + characterBytes > maxBytes) break;
+    bytes += characterBytes;
+    end += character.length;
   }
-  return `${value.slice(0, low)}${suffix}`;
+  return value.slice(0, end);
 }
 
 function optionalPositiveInteger(value: unknown, name: string): number | undefined {

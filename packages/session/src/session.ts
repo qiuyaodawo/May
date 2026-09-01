@@ -69,6 +69,10 @@ export class Session {
   private recordTail: Promise<void> = Promise.resolve();
   private readonly completedModelSteps = new Set<string>();
   private readonly modelCompletionWaiters = new Map<string, Deferred<void>>();
+  private readonly observedStepStarts = new Set<string>();
+  private readonly stepStartWaiters = new Map<string, Deferred<void>>();
+  private readonly activeRunObservations = new Set<string>();
+  private readonly finishedRunObservationErrors = new Map<string, unknown>();
   private readonly approvalRecords = new Map<string, Promise<void>>();
 
   private constructor(
@@ -198,7 +202,11 @@ export class Session {
 
   async recordContextCompaction(
     compaction: SessionContextCompaction,
+    afterRunStep?: { readonly runId: string; readonly step: number },
   ): Promise<void> {
+    if (afterRunStep !== undefined) {
+      await this.waitForStepStart(afterRunStep.runId, afterRunStep.step);
+    }
     await this.record({
       type: "context.compacted",
       strategy: compaction.strategy,
@@ -221,7 +229,9 @@ export class Session {
     const input: UserMessage = typeof options.input === "string"
       ? userMessage(options.input)
       : options.input;
-    await this.record({ type: "input.submitted", message: input });
+    if (options.signal?.aborted !== true) {
+      await this.record({ type: "input.submitted", message: input });
+    }
 
     return this.wrapRun(this.runtime.run(options));
   }
@@ -235,6 +245,8 @@ export class Session {
       maxBufferedValues: 1024,
       isDroppable: isStreamingMayEvent,
     });
+    this.finishedRunObservationErrors.clear();
+    this.activeRunObservations.add(run.id);
     const observation = this.observeRun(run, events);
     const result = (async () => {
       try {
@@ -260,6 +272,7 @@ export class Session {
     run: RunHandle,
     events: AsyncEventQueue<MayEvent>,
   ): Promise<void> {
+    let observationError: unknown;
     try {
       for await (const event of run.events) {
         const payload = toSessionEvent(event);
@@ -269,12 +282,21 @@ export class Session {
         if (event.type === "model.completed") {
           this.markModelCompleted(event.runId, event.step);
         }
+        if (event.type === "step.started") {
+          this.markStepStarted(event.runId, event.step);
+        }
         events.push(event);
       }
     } catch (error) {
-      this.rejectModelCompletionWaiters(run.id, error);
+      observationError = error;
       throw error;
     } finally {
+      const terminalError = observationError ?? new Error(
+        `Run "${run.id}" ended before the requested event was observed`,
+      );
+      this.activeRunObservations.delete(run.id);
+      this.finishedRunObservationErrors.set(run.id, terminalError);
+      this.rejectModelCompletionWaiters(run.id, terminalError);
       this.clearModelCompletionState(run.id);
       events.close();
     }
@@ -283,6 +305,11 @@ export class Session {
   private waitForModelCompletion(runId: string, step: number): Promise<void> {
     const key = modelStepKey(runId, step);
     if (this.completedModelSteps.has(key)) return Promise.resolve();
+    const finishedError = this.finishedRunObservationErrors.get(runId);
+    if (finishedError !== undefined) return Promise.reject(finishedError);
+    if (!this.activeRunObservations.has(runId)) {
+      return Promise.reject(new Error(`Run "${runId}" is not active`));
+    }
 
     let waiter = this.modelCompletionWaiters.get(key);
     if (waiter === undefined) {
@@ -290,6 +317,33 @@ export class Session {
       this.modelCompletionWaiters.set(key, waiter);
     }
     return waiter.promise;
+  }
+
+  private waitForStepStart(runId: string, step: number): Promise<void> {
+    const key = modelStepKey(runId, step);
+    if (this.observedStepStarts.has(key)) return Promise.resolve();
+    const finishedError = this.finishedRunObservationErrors.get(runId);
+    if (finishedError !== undefined) return Promise.reject(finishedError);
+    if (!this.activeRunObservations.has(runId)) {
+      return Promise.reject(new Error(`Run "${runId}" is not active`));
+    }
+
+    let waiter = this.stepStartWaiters.get(key);
+    if (waiter === undefined) {
+      waiter = createDeferred<void>();
+      this.stepStartWaiters.set(key, waiter);
+    }
+    return waiter.promise;
+  }
+
+  private markStepStarted(runId: string, step: number): void {
+    const key = modelStepKey(runId, step);
+    this.observedStepStarts.add(key);
+    const waiter = this.stepStartWaiters.get(key);
+    if (waiter !== undefined) {
+      this.stepStartWaiters.delete(key);
+      waiter.resolve();
+    }
   }
 
   private markModelCompleted(runId: string, step: number): void {
@@ -309,12 +363,20 @@ export class Session {
       this.modelCompletionWaiters.delete(key);
       waiter.reject(error);
     }
+    for (const [key, waiter] of this.stepStartWaiters) {
+      if (!key.startsWith(prefix)) continue;
+      this.stepStartWaiters.delete(key);
+      waiter.reject(error);
+    }
   }
 
   private clearModelCompletionState(runId: string): void {
     const prefix = `${runId}:`;
     for (const key of this.completedModelSteps) {
       if (key.startsWith(prefix)) this.completedModelSteps.delete(key);
+    }
+    for (const key of this.observedStepStarts) {
+      if (key.startsWith(prefix)) this.observedStepStarts.delete(key);
     }
   }
 
@@ -333,13 +395,15 @@ export class Session {
     payload: SessionEventPayload,
     timestamp: number,
   ): Promise<void> {
+    const seq = this.seq + 1;
     const event: SessionEvent = {
       ...payload,
       sessionId: this.id,
-      seq: ++this.seq,
+      seq,
       timestamp,
     };
     await this.store.append(event);
+    this.seq = seq;
   }
 }
 

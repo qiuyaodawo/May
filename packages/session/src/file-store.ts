@@ -17,16 +17,20 @@ export class FileSessionStore implements SessionStore {
   }
 
   append(event: SessionEvent): Promise<void> {
-    const previous = this.tails.get(event.sessionId) ?? Promise.resolve();
-    const operation = previous.then(() => this.appendNow(event));
+    return this.enqueue(event.sessionId, () => this.appendNow(event));
+  }
+
+  private enqueue<T>(sessionId: string, action: () => Promise<T>): Promise<T> {
+    const previous = this.tails.get(sessionId) ?? Promise.resolve();
+    const operation = previous.then(action);
     const tail = operation.then(
       () => undefined,
       () => undefined,
     );
-    this.tails.set(event.sessionId, tail);
+    this.tails.set(sessionId, tail);
     void tail.finally(() => {
-      if (this.tails.get(event.sessionId) === tail) {
-        this.tails.delete(event.sessionId);
+      if (this.tails.get(sessionId) === tail) {
+        this.tails.delete(sessionId);
       }
     });
     return operation;
@@ -37,15 +41,16 @@ export class FileSessionStore implements SessionStore {
     return this.readNow(sessionId);
   }
 
-  async delete(sessionId: string): Promise<boolean> {
-    await this.tails.get(sessionId);
-    try {
-      await rm(this.filePath(sessionId));
-      return true;
-    } catch (error) {
-      if (isNodeError(error, "ENOENT")) return false;
-      throw error;
-    }
+  delete(sessionId: string): Promise<boolean> {
+    return this.enqueue(sessionId, async () => {
+      try {
+        await rm(this.filePath(sessionId));
+        return true;
+      } catch (error) {
+        if (isNodeError(error, "ENOENT")) return false;
+        throw error;
+      }
+    });
   }
 
   private async appendNow(event: SessionEvent): Promise<void> {
