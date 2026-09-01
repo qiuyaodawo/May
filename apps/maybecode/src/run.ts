@@ -10,36 +10,42 @@ import { MaybeCodeUsageError } from "./errors.js";
 import { createNodeTerminal, type MaybeCodeTerminal } from "./terminal.js";
 import { runTerminalUI } from "./tui.js";
 import type { MaybeCodeController } from "./controller.js";
+import { runRetainedTerminalUI } from "./ui/retained-tui.js";
 
 export interface RunMaybeCodeDependencies {
   readonly terminal?: MaybeCodeTerminal;
   readonly open?: (
     options: OpenConfiguredMaybeCodeOptions,
   ) => Promise<MaybeCodeController>;
+  readonly runRetainedUI?: (app: MaybeCodeController) => Promise<void>;
 }
 
 export async function runMaybeCode(
   args: readonly string[],
   dependencies: RunMaybeCodeDependencies = {},
 ): Promise<number> {
-  const terminal = dependencies.terminal ?? createNodeTerminal();
+  let terminal = dependencies.terminal;
+  const outputTerminal = (): MaybeCodeTerminal => {
+    terminal ??= createNodeTerminal();
+    return terminal;
+  };
   let command;
 
   try {
     command = parseMaybeCodeArgs(args);
   } catch (error) {
     if (error instanceof MaybeCodeUsageError) {
-      terminal.write(`Error: ${error.message}\n\n${MAYBE_CODE_USAGE}`);
-      terminal.close();
+      outputTerminal().write(`Error: ${error.message}\n\n${MAYBE_CODE_USAGE}`);
+      outputTerminal().close();
       return 2;
     }
-    terminal.close();
+    terminal?.close();
     throw error;
   }
 
   if (command.type === "help") {
-    terminal.write(MAYBE_CODE_USAGE);
-    terminal.close();
+    outputTerminal().write(MAYBE_CODE_USAGE);
+    outputTerminal().close();
     return 0;
   }
 
@@ -58,11 +64,16 @@ export async function runMaybeCode(
         : { sessionId: command.sessionId }),
       autoResume: command.autoResume,
     });
-    await runTerminalUI(app, { terminal });
+    if (command.ui === "retained") {
+      terminal?.close();
+      await (dependencies.runRetainedUI ?? runRetainedTerminalUI)(app);
+    } else {
+      await runTerminalUI(app, { terminal: outputTerminal() });
+    }
     return 0;
   } catch (error) {
-    terminal.write(`\nError: ${errorMessage(error)}\n`);
-    terminal.close();
+    outputTerminal().write(`\nError: ${errorMessage(error)}\n`);
+    outputTerminal().close();
     return 1;
   }
 }

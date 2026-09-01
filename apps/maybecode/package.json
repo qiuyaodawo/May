@@ -36,7 +36,8 @@
     "@may/permissions": "workspace:*",
     "@may/providers": "workspace:*",
     "@may/session": "workspace:*",
-    "@may/session-tools": "workspace:*"
+    "@may/session-tools": "workspace:*",
+    "@may/tui": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

@@ -8,6 +8,7 @@ Usage:
 Options:
   --config <path>      Load another May config file
   --model <name>       Use a named model profile
+  --ui <name>          UI implementation: classic (default) or retained
   -c, --continue       Continue the most recent session for this workspace
   -r, --resume <id>    Resume a specific session
   -h, --help           Show this help
@@ -24,7 +25,10 @@ export interface MaybeCodeStartCommand {
   readonly model?: string;
   readonly sessionId?: string;
   readonly autoResume: boolean;
+  readonly ui: MaybeCodeUI;
 }
+
+export type MaybeCodeUI = "classic" | "retained";
 
 export type MaybeCodeCommand = MaybeCodeHelpCommand | MaybeCodeStartCommand;
 
@@ -33,6 +37,7 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   let configPath: string | undefined;
   let model: string | undefined;
   let sessionId: string | undefined;
+  let ui: MaybeCodeUI | undefined;
   let continueLatest = false;
 
   for (let index = 0; index < args.length; index++) {
@@ -59,6 +64,19 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
         model,
         readValue(args, ++index, "--model"),
       );
+      continue;
+    }
+    if (argument === "--ui") {
+      const value = readValue(args, ++index, "--ui");
+      if (value !== "classic" && value !== "retained") {
+        throw new MaybeCodeUsageError(
+          '--ui must be either "classic" or "retained"',
+        );
+      }
+      if (ui !== undefined) {
+        throw new MaybeCodeUsageError("--ui may only be specified once");
+      }
+      ui = value;
       continue;
     }
     if (
@@ -91,6 +109,7 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   return {
     type: "start",
     autoResume: continueLatest,
+    ui: ui ?? "classic",
     ...(workspace === undefined ? {} : { workspace }),
     ...(configPath === undefined ? {} : { configPath }),
     ...(model === undefined ? {} : { model }),

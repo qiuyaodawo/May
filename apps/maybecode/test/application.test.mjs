@@ -15,6 +15,7 @@ import { FileSessionStore } from "@may/session/file-store";
 import {
   InMemorySessionCatalog,
   MaybeCodeWorkspace,
+  TranscriptStore,
 } from "../dist/index.js";
 
 test("runs coding tools and reuses an approved session grant", async (t) => {
@@ -48,13 +49,16 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
       };
     },
   };
+  const sessionDirectory = join(workspace, ".sessions");
+  const catalog = new InMemorySessionCatalog();
   const app = await MaybeCodeWorkspace.open({
     workspace,
     model,
-    store: new FileSessionStore(join(workspace, ".sessions")),
-    catalog: new InMemorySessionCatalog(),
+    store: new FileSessionStore(sessionDirectory),
+    catalog,
     autoResume: false,
   });
+  const sessionId = app.sessionId;
   const eventReader = collectEvents(app, events, "allow-session");
 
   assert.equal(
@@ -103,6 +107,23 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
     previews.map((event) => event.preview.status === "ready" && event.preview.kind),
     ["create", "update"],
   );
+
+  const resumed = await MaybeCodeWorkspace.open({
+    workspace,
+    model,
+    store: new FileSessionStore(sessionDirectory),
+    catalog,
+    sessionId,
+  });
+  const restoredTranscript = new TranscriptStore();
+  restoredTranscript.loadHistory(await resumed.history());
+  assert.deepEqual(
+    restoredTranscript.items
+      .filter((item) => item.kind === "tool")
+      .map((item) => item.preview?.kind),
+    ["create", "update"],
+  );
+  await resumed.close();
 });
 
 test("retries a failed run without resubmitting input or replaying tools", async () => {
