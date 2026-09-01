@@ -56,6 +56,35 @@ Both built-in stores implement optional history deletion through
 `SessionStore.delete(sessionId)`; applications decide which sessions users may
 delete.
 
+## Session catalogs
+
+Session history stores the complete durable event stream. A `SessionCatalog`
+is the separate, lightweight index an application can use to list, resume,
+rename, and remove sessions without replaying every history file:
+
+```ts
+import { FileSessionCatalog } from "@may/session/catalog";
+
+const catalog = new FileSessionCatalog(".may/catalog.json");
+await catalog.record({
+  id: session.id,
+  workspace: process.cwd(),
+  createdAt: Date.now(),
+  lastUsedAt: Date.now(),
+  title: "Repository review",
+});
+
+const recent = await catalog.list(process.cwd());
+```
+
+`InMemorySessionCatalog` is available for ephemeral applications and tests.
+The file implementation reads a legacy JSON snapshot and commits each later
+record, rename, or remove operation through an atomically renamed file in
+`<catalog-path>.operations`. This prevents separate catalog instances from
+overwriting each other's updates. Applications with long-lived catalogs should
+plan periodic snapshotting or use a database-backed implementation, because
+the built-in operation directory is not compacted automatically.
+
 When using `@may/permissions`, connect its durable event sink before submitting
 a run:
 
@@ -94,7 +123,8 @@ older JSONL events are retained as an auditable full history.
 
 ## Current scope
 
-The package supports new, resumed, and deleted histories with in-memory or local JSONL
-storage and durable context-replacement events. It does not choose or execute
-compaction strategies. Forking, metadata updates, and cross-process
-coordination are not implemented yet.
+The package supports new, resumed, and deleted histories with in-memory or
+local JSONL storage, reusable session catalogs, and durable context-replacement
+events. It does not choose or execute compaction strategies. Forking and
+cross-process coordination for simultaneous writers to the same session
+history are not implemented yet.

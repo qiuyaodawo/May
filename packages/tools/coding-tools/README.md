@@ -43,6 +43,26 @@ import {
 const read = createReadTool({ cwd: process.cwd(), maxBytes: 2_000_000 });
 ```
 
+## Change previews
+
+Approval UIs can preview an `edit` or `write` call without performing it:
+
+```ts
+import { createToolChangePreview } from "@may/coding-tools/change-preview";
+
+const preview = await createToolChangePreview(process.cwd(), "edit", {
+  path: "src/index.ts",
+  oldText: "before",
+  newText: "after",
+});
+```
+
+The preview validates the workspace boundary and file shape, rejects unsafe
+linked files, and returns a bounded unified diff with addition/deletion counts.
+`decodeToolChangePreviewPresentation` validates previews restored from durable
+session presentation events. The persisted presentation identifier remains
+compatible with MaybeCode sessions created before this component was extracted.
+
 ## Safety boundaries
 
 File sizes, returned line counts, command timeouts, and captured command output

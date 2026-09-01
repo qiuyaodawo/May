@@ -91,6 +91,21 @@ const strategy = new SummaryTailStrategy({
 });
 ```
 
+For a tool-free summarizer backed by any May `Model`, use the reusable adapter
+and keep prompt policy in the application:
+
+```ts
+import { createModelContextSummarizer } from "@may/context/model-summarizer";
+
+const summarizer = createModelContextSummarizer(model, {
+  instructions: "Return a concise continuation summary.",
+  requestText: "Summarize the preceding conversation now.",
+});
+```
+
+The adapter forwards cancellation and validates that the model emits exactly
+one completed, non-empty text response without attempting to call tools.
+
 ## Automatic compaction
 
 `InMemoryContextFactory` can run an ordered strategy chain immediately before

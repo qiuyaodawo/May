@@ -8,8 +8,8 @@ be used independently or combined into complete agents and applications.
 ```text
 packages/
   core/       Agent loop, contracts, events, and in-memory Context
-  context/    Replaceable Context factories and reusable implementations
-  session/    Serialized runs and durable session history
+  context/    Context factories, compaction, and model-backed summarization
+  session/    Serialized runs, durable history, and session catalogs
   permissions/  Headless tool policies and approval requests
   config/     Optional application configuration loading and validation
   providers/  `@may/providers` selection, registry, and built-in composition
@@ -20,10 +20,10 @@ packages/
     anthropic/  Anthropic Messages API streaming model adapter
     openai/     OpenAI Responses API adapter and native compaction
   tools/
-    coding-tools/  Read, cross-platform shell, edit, and write tools
+    coding-tools/  Read, shell, edit, write, and safe change previews
   ui/
     keybindings/  Context-aware semantic keyboard mappings
-    tui/          May-owned terminal renderer and reusable UI primitives
+    tui/          Terminal adapters, renderer, and reusable UI primitives
 apps/
   cli/        Minimal command-line interface
   maybecode/ Terminal coding-agent application
