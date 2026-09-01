@@ -321,7 +321,10 @@ async function renderSlashCommandResult(
     case "model.switched":
       break;
     case "model.not-found":
-      terminal.write(`\nNo model profile starts with: ${result.query}\n`);
+      terminal.write(
+        `\nNo model profile starts with: ` +
+          `${sanitizeTerminalText(result.query)}\n`,
+      );
       break;
     case "effort.selection.requested": {
       if (result.state.status !== "known") {
@@ -331,7 +334,9 @@ async function renderSlashCommandResult(
       const choices = ["default", ...result.state.efforts];
       terminal.write(`\n${renderReasoningEffortState(result.state)}`);
       for (const [index, effort] of choices.entries()) {
-        terminal.write(`  ${index + 1}. ${effort}\n`);
+        terminal.write(
+          `  ${index + 1}. ${sanitizeTerminalText(effort)}\n`,
+        );
       }
       const answer = (await question(
         "Select an effort number or name (Enter to cancel): ",
@@ -343,7 +348,10 @@ async function renderSlashCommandResult(
           ? choices[numeric - 1]
           : choices.find((choice) => choice.startsWith(answer));
         if (selected === undefined) {
-          terminal.write(`\nNo reasoning effort starts with: ${answer}\n`);
+          terminal.write(
+            `\nNo reasoning effort starts with: ` +
+              `${sanitizeTerminalText(answer)}\n`,
+          );
         } else {
           const state = await app.setReasoningEffort(
             selected === "default" ? undefined : selected,
@@ -357,13 +365,19 @@ async function renderSlashCommandResult(
       terminal.write(`\n${renderReasoningEffortChanged(result.state)}\n`);
       break;
     case "effort.not-found":
-      terminal.write(`\nNo reasoning effort starts with: ${result.query}\n`);
+      terminal.write(
+        `\nNo reasoning effort starts with: ` +
+          `${sanitizeTerminalText(result.query)}\n`,
+      );
       break;
     case "usage":
-      terminal.write(`\nUsage: ${result.usage}\n`);
+      terminal.write(`\nUsage: ${sanitizeTerminalText(result.usage)}\n`);
       break;
     case "unknown":
-      terminal.write(`\nUnknown command: ${result.command}. Type /help.\n`);
+      terminal.write(
+        `\nUnknown command: ${sanitizeTerminalText(result.command)}. ` +
+          "Type /help.\n",
+      );
       break;
   }
   return false;
@@ -378,14 +392,19 @@ function renderReasoningEffortState(
   if (state.status === "unsupported") {
     return "The active model does not support effort-based reasoning.";
   }
-  const current = state.effectiveEffort ?? "provider/model default";
-  return `Reasoning effort (source: ${state.source}, current: ${current})\n`;
+  const current = sanitizeTerminalText(
+    state.effectiveEffort ?? "provider/model default",
+  );
+  return `Reasoning effort (source: ${sanitizeTerminalText(state.source)}, ` +
+    `current: ${current})\n`;
 }
 
 function renderReasoningEffortChanged(
   state: MaybeCodeReasoningEffortState,
 ): string {
-  const effort = state.effectiveEffort ?? "provider/model default";
+  const effort = sanitizeTerminalText(
+    state.effectiveEffort ?? "provider/model default",
+  );
   return `Reasoning effort: ${effort}${state.overridden ? " (runtime override)" : ""}`;
 }
 
@@ -662,14 +681,20 @@ class TerminalRenderer {
   }
 
   modelChanged(model: NonNullable<MaybeCodeController["modelInfo"]>): void {
-    const profile = model.profile === undefined ? "" : ` ${model.profile}`;
+    const profile = model.profile === undefined
+      ? ""
+      : ` ${sanitizeTerminalText(model.profile)}`;
     this.terminal.write(
-      `\nModel switched to${profile}: ${model.provider}/${model.model}\n`,
+      `\nModel switched to${profile}: ` +
+        `${sanitizeTerminalText(model.provider)}/` +
+        `${sanitizeTerminalText(model.model)}\n`,
     );
   }
 
   defaultModelChanged(profile: string): void {
-    this.terminal.write(`\nDefault model set to ${profile}\n`);
+    this.terminal.write(
+      `\nDefault model set to ${sanitizeTerminalText(profile)}\n`,
+    );
   }
 
   private endReasoning(): void {
@@ -826,8 +851,8 @@ function renderStatus(
 ): string {
   let output = `Status:\n` +
     `  model: ${modelLabel(app)}\n` +
-    `  session: ${app.sessionId}\n` +
-    `  workspace: ${app.workspace}\n`;
+    `  session: ${sanitizeTerminalText(app.sessionId)}\n` +
+    `  workspace: ${sanitizeTerminalText(app.workspace)}\n`;
   if (inspection === undefined) return `${output}  context: unavailable\n`;
   output += `  context: ~${formatNumber(inspection.effectiveTokens)}`;
   if (inspection.contextWindowTokens !== undefined) {
@@ -841,10 +866,11 @@ function renderStatus(
 
 function modelLabel(app: MaybeCodeController): string {
   if (app.modelInfo === undefined) return "custom";
-  const endpoint = `${app.modelInfo.provider}/${app.modelInfo.model}`;
+  const endpoint = `${sanitizeTerminalText(app.modelInfo.provider)}/` +
+    sanitizeTerminalText(app.modelInfo.model);
   return app.modelInfo.profile === undefined
     ? endpoint
-    : `${app.modelInfo.profile} (${endpoint})`;
+    : `${sanitizeTerminalText(app.modelInfo.profile)} (${endpoint})`;
 }
 
 function renderContextInspection(inspection: ContextInspection): string {

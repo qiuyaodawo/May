@@ -248,6 +248,49 @@ test("terminal UI accepts multiline input and renders status", async () => {
   assert.match(terminal.output, /Multiline\s+End a line with \\ to continue/u);
 });
 
+test("terminal UI neutralizes provider-controlled reasoning efforts", async () => {
+  const terminal = new FakeTerminal(["/effort", "", "/quit"]);
+  const app = await MaybeCodeWorkspace.open({
+    workspace: process.cwd(),
+    model: {
+      async *stream() {
+        yield {
+          type: "response.completed",
+          message: assistantMessage("unused"),
+        };
+      },
+    },
+    modelInfo: {
+      profile: "chat",
+      provider: "provider",
+      model: "model",
+    },
+    modelProfiles: [{
+      name: "chat",
+      provider: "provider",
+      adapter: "adapter",
+      model: "model",
+      isDefault: true,
+    }],
+    resolveModelCapabilities: async () => ({
+      reasoningEffort: {
+        status: "known",
+        source: "provider",
+        efforts: ["low", "\x1b[2J"],
+        defaultEffort: "\x1b[2J",
+      },
+    }),
+    store: new InMemorySessionStore(),
+    catalog: new InMemorySessionCatalog(),
+    autoResume: false,
+  });
+
+  await runTerminalUI(app, { terminal });
+
+  assert.doesNotMatch(terminal.output, /\x1b/u);
+  assert.match(terminal.output, /\u241b\[2J/u);
+});
+
 test("terminal UI retries the latest failed run without duplicating input", async () => {
   let modelCalls = 0;
   const terminal = new FakeTerminal(["do work", "/retry", "/quit"]);
