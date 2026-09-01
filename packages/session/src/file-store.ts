@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import type { SessionEvent } from "./events.js";
@@ -35,6 +35,17 @@ export class FileSessionStore implements SessionStore {
   async read(sessionId: string): Promise<readonly SessionEvent[]> {
     await this.tails.get(sessionId);
     return this.readNow(sessionId);
+  }
+
+  async delete(sessionId: string): Promise<boolean> {
+    await this.tails.get(sessionId);
+    try {
+      await rm(this.filePath(sessionId));
+      return true;
+    } catch (error) {
+      if (isNodeError(error, "ENOENT")) return false;
+      throw error;
+    }
   }
 
   private async appendNow(event: SessionEvent): Promise<void> {
