@@ -82,7 +82,7 @@ pnpm maybecode --resume <id> /path/to/workspace
 A normal launch always starts a new session. Use `--continue` to resume the
 most recent session for the workspace, or `--resume <id>` to select a specific
 session. Starting a new session does not delete or overwrite older sessions;
-they remain available through `/sessions` and `/resume`.
+they remain available through `/resume`.
 
 The private package exposes a `maybecode` executable for local packaging. Its
 complete package graph can be packed, installed without registry access, and
@@ -243,7 +243,6 @@ single candidate is completed in full. For example, candidates `/commanda` and
 continuation lines do not show command suggestions.
 
 - `/new` creates a session.
-- `/sessions` lists sessions for the current workspace.
 - `/resume` opens the interactive session picker; `/resume <id>` switches
   directly without opening it.
 - `/model` opens the configured model-profile picker. `/model <prefix>` switches

@@ -21,7 +21,6 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     "/compact",
     "/compact summary-tail",
     "/compact history-reference",
-    "/sessions",
     "/quit",
   ]);
   let modelCall = 0;
@@ -102,7 +101,6 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     terminal.output,
     /No context changes were eligible for history-reference/u,
   );
-  assert.match(terminal.output, /Sessions:/);
   assert.ok(terminal.closed);
   assert.ok(terminal.prompts.some((prompt) => prompt.includes("for [s]ession")));
   assert.equal(

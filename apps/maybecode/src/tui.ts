@@ -255,17 +255,6 @@ async function renderSlashCommandResult(
     case "session.created":
       terminal.write(`\nCreated session ${result.sessionId}\n`);
       break;
-    case "sessions":
-      terminal.write("\nSessions:\n");
-      for (const session of result.sessions) {
-        const marker = session.id === app.sessionId ? "*" : " ";
-        const title = session.title === undefined ? "" : `  ${session.title}`;
-        terminal.write(
-          `${marker} ${session.id}${title}  ` +
-            `${new Date(session.lastUsedAt).toISOString()}\n`,
-        );
-      }
-      break;
     case "session.selection.requested": {
       const selection = await runSessionPicker({
         controller: app,

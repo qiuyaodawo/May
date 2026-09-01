@@ -213,9 +213,6 @@ async function presentCommandResult(
     case "session.created":
       store.appendNotice("info", `Created session ${result.sessionId}`);
       break;
-    case "sessions":
-      store.appendNotice("info", sessionsText(result.sessions, app.sessionId));
-      break;
     case "session.selection.requested":
       await runSessionDialog(view, app, store, result.sessions);
       break;
@@ -352,18 +349,6 @@ function inspectionText(
     : ` / ${inspection.contextWindowTokens}`;
   return `\nContext: ~${inspection.effectiveTokens}${window} tokens, ` +
     `${inspection.messageCount} messages`;
-}
-
-function sessionsText(
-  sessions: readonly SessionSummary[],
-  activeId: string,
-): string {
-  if (sessions.length === 0) return "No sessions found";
-  return sessions.map((session) => {
-    const marker = session.id === activeId ? "*" : " ";
-    const title = session.title === undefined ? "" : ` — ${session.title}`;
-    return `${marker} ${session.id}${title}`;
-  }).join("\n");
 }
 
 function modelLabel(

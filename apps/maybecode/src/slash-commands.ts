@@ -15,7 +15,6 @@ import type { MaybeCodeInstructions } from "./instructions.js";
 
 export type MaybeCodeSlashCommandName =
   | "/new"
-  | "/sessions"
   | "/resume"
   | "/model"
   | "/effort"
@@ -45,11 +44,6 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
     name: "/new",
     usage: "/new",
     description: "Start a new session",
-  },
-  {
-    name: "/sessions",
-    usage: "/sessions",
-    description: "List sessions for this workspace",
   },
   {
     name: "/resume",
@@ -141,10 +135,6 @@ export type MaybeCodeSlashCommandResult =
       readonly result: ContextCompactionResult;
     }
   | { readonly type: "session.created"; readonly sessionId: string }
-  | {
-      readonly type: "sessions";
-      readonly sessions: readonly SessionSummary[];
-    }
   | {
       readonly type: "session.selection.requested";
       readonly sessions: readonly SessionSummary[];
@@ -371,11 +361,6 @@ export async function executeMaybeCodeSlashCommand(
       const invalid = noArguments(arguments_, definition);
       if (invalid !== undefined) return invalid;
       return { type: "session.created", sessionId: await controller.newSession() };
-    }
-    case "/sessions": {
-      const invalid = noArguments(arguments_, definition);
-      if (invalid !== undefined) return invalid;
-      return { type: "sessions", sessions: await controller.listSessions() };
     }
     case "/resume": {
       const sessionId = arguments_[0];
