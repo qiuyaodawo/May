@@ -1,3 +1,4 @@
+export * from "./catalog.js";
 export * from "./events.js";
 export * from "./history.js";
 export * from "./session.js";
