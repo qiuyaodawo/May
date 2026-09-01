@@ -189,6 +189,7 @@ test("streams thinking, text, usage, and sends Anthropic configuration", async (
   const headers = new Headers(capturedInit.headers);
   assert.equal(headers.get("x-api-key"), "test-key");
   assert.equal(headers.get("anthropic-version"), "2023-06-01");
+  assert.equal(headers.get("anthropic-beta"), null);
   assert.equal(headers.get("authorization"), null);
   assert.deepEqual(JSON.parse(capturedInit.body), {
     model: "test-model",
@@ -244,6 +245,38 @@ test("streams thinking, text, usage, and sends Anthropic configuration", async (
       ],
     },
   });
+});
+
+test("enables the Files API beta only for file-id references", async () => {
+  let headers;
+  let body;
+  const model = new AnthropicModel({
+    apiKey: "test-key",
+    model: "test-model",
+    async fetch(_url, init) {
+      headers = new Headers(init.headers);
+      body = JSON.parse(init.body);
+      return simpleResponse();
+    },
+  });
+
+  await collect(model.stream(request([{
+    role: "user",
+    content: [{
+      type: "file",
+      name: "notes.pdf",
+      source: { type: "file", fileId: "file_123" },
+    }],
+  }]), { signal: new AbortController().signal }));
+
+  assert.equal(headers.get("anthropic-beta"), "files-api-2025-04-14");
+  assert.deepEqual(body.messages, [{
+    role: "user",
+    content: [{
+      type: "document",
+      source: { type: "file", file_id: "file_123" },
+    }],
+  }]);
 });
 
 test("round-trips signed and redacted thinking through a May tool loop", async () => {

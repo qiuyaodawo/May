@@ -261,6 +261,69 @@ test("round-trips native Responses output through a tool-result request", async 
   ]);
 });
 
+test("streams refusal text and preserves its native continuation state", async () => {
+  const requests = [];
+  const refusalOutput = [{
+    id: "msg_refusal",
+    type: "message",
+    role: "assistant",
+    status: "completed",
+    content: [{ type: "refusal", refusal: "I cannot help with that." }],
+  }];
+  const responses = [
+    sseResponse([
+      { type: "response.refusal.delta", delta: "I cannot help with that." },
+      {
+        type: "response.completed",
+        response: completedResponse(refusalOutput),
+      },
+    ]),
+    sseResponse([{
+      type: "response.completed",
+      response: completedResponse([{
+        type: "message",
+        role: "assistant",
+        status: "completed",
+        content: [{ type: "output_text", text: "Okay.", annotations: [] }],
+      }]),
+    }]),
+  ];
+  const model = new OpenAIResponsesModel({
+    apiKey: "secret",
+    model: "gpt-5.4",
+    fetch: async (_url, init) => {
+      requests.push(JSON.parse(init.body));
+      return responses.shift();
+    },
+  });
+  const signal = new AbortController().signal;
+  const events = await collect(model.stream(emptyRequest, { signal }));
+  const assistant = events.at(-1).message;
+
+  assert.deepEqual(events[0], {
+    type: "text.delta",
+    delta: "I cannot help with that.",
+  });
+  assert.deepEqual(assistant.content, [{
+    type: "text",
+    text: "I cannot help with that.",
+  }]);
+
+  await collect(model.stream({
+    messages: [
+      ...emptyRequest.messages,
+      assistant,
+      { role: "user", content: [{ type: "text", text: "Understood." }] },
+    ],
+    tools: [],
+  }, { signal }));
+  assert.deepEqual(requests[1].input, [
+    requests[0].input[0],
+    refusalOutput[0],
+    { role: "user", content: [{ type: "input_text", text: "Understood." }] },
+  ]);
+});
+
 test("compacts context natively and reuses the opaque compacted output", async () => {
   const requests = [];
   const compactedOutput = [
@@ -359,6 +422,24 @@ test("surfaces HTTP and malformed-stream failures", async () => {
       signal: new AbortController().signal,
     })),
     OpenAIResponsesProtocolError,
+  );
+
+  const streamFailure = new OpenAIResponsesModel({
+    apiKey: "secret",
+    model: "gpt-5.4",
+    fetch: async () => sseResponse([{
+      type: "error",
+      code: "server_error",
+      message: "retryable failure",
+    }]),
+  });
+  await assert.rejects(
+    collect(streamFailure.stream(emptyRequest, {
+      signal: new AbortController().signal,
+    })),
+    (error) =>
+      error instanceof OpenAIResponsesError &&
+      error.providerType === "server_error",
   );
 });
 

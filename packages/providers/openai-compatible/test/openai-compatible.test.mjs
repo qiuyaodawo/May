@@ -224,6 +224,34 @@ test("assembles fragmented reasoning, text, tools, and usage", async () => {
   ]);
 });
 
+test("exposes refusal text and serializes it into the next turn", async () => {
+  const events = await collect(streamOpenAICompatibleResponse(sseResponse([
+    {
+      choices: [{
+        index: 0,
+        delta: { refusal: "I cannot help with that." },
+        finish_reason: "stop",
+      }],
+    },
+    "[DONE]",
+  ]), streamOptions()));
+
+  assert.deepEqual(events, [
+    { type: "text.delta", delta: "I cannot help with that." },
+    {
+      type: "response.completed",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "I cannot help with that." }],
+      },
+    },
+  ]);
+  assert.deepEqual(toOpenAICompatibleMessages([events[1].message]), [{
+    role: "assistant",
+    content: "I cannot help with that.",
+  }]);
+});
+
 test("uses provider error factories for malformed streams", async (t) => {
   await t.test("invalid JSON", async () => {
     await assert.rejects(

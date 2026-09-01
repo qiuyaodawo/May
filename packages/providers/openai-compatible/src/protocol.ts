@@ -56,6 +56,7 @@ export interface OpenAICompatibleChunk {
     index: number;
     delta?: {
       content?: string | null;
+      refusal?: string | null;
       reasoning_content?: string | null;
       tool_calls?: OpenAICompatibleToolCallDelta[];
     };

@@ -163,7 +163,15 @@ class CpaCodexCapabilityDiscovery implements ModelCapabilityDiscovery {
       catalog = this.fetchCatalog(selection, baseURL);
       this.catalogs.set(cacheKey, catalog);
     }
-    const entry = (await catalog)?.get(selection.model);
+    const resolvedCatalog = await catalog;
+    if (
+      resolvedCatalog === undefined &&
+      this.catalogs.get(cacheKey) === catalog
+    ) {
+      // A failed discovery must not make this resolver permanently offline.
+      this.catalogs.delete(cacheKey);
+    }
+    const entry = resolvedCatalog?.get(selection.model);
     if (entry === undefined) return undefined;
     return {
       status: "known",

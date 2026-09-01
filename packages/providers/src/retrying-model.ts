@@ -61,6 +61,8 @@ export interface RetryingModelOptions {
 /**
  * Retries one model request at a time. It never wraps an entire agent run, so
  * completed tool calls are not replayed when a later model request fails.
+ * Once a content delta has reached the consumer, the attempt is never retried
+ * because the model stream has no reset or retraction event.
  */
 export class RetryingModel implements Model {
   readonly limits?: ModelLimits;
@@ -99,9 +101,13 @@ export class RetryingModel implements Model {
   ): AsyncIterable<ModelEvent> {
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       let completed = false;
+      let emittedContent = false;
       try {
         for await (const event of this.model.stream(request, options)) {
           if (options.signal.aborted) throw abortReason(options.signal);
+          if (event.type === "text.delta" || event.type === "reasoning.delta") {
+            emittedContent = true;
+          }
           yield event;
           if (event.type === "response.completed") completed = true;
         }
@@ -115,6 +121,7 @@ export class RetryingModel implements Model {
         if (
           options.signal.aborted ||
           completed ||
+          emittedContent ||
           attempt >= this.maxAttempts ||
           !this.shouldRetry(error, context)
         ) {

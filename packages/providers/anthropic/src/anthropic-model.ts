@@ -1,4 +1,5 @@
 import type {
+  Message,
   Model,
   ModelEvent,
   ModelRequest,
@@ -27,6 +28,8 @@ export interface AnthropicModelOptions {
   reasoningEffort?: AnthropicReasoningEffort;
   fetch?: typeof globalThis.fetch;
 }
+
+const FILES_API_BETA = "files-api-2025-04-14";
 
 export class AnthropicModel implements Model {
   private readonly apiKey: string;
@@ -87,16 +90,21 @@ export class AnthropicModel implements Model {
     request: ModelRequest,
     options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
+    const body = this.createRequest(request);
+    const headers: Record<string, string> = {
+      "anthropic-version": this.apiVersion,
+      "content-type": "application/json",
+      "x-api-key": this.apiKey,
+    };
+    if (usesFileId(request.messages)) {
+      headers["anthropic-beta"] = FILES_API_BETA;
+    }
     const response = await this.fetchImplementation(
       `${this.baseURL}/v1/messages`,
       {
         method: "POST",
-        headers: {
-          "anthropic-version": this.apiVersion,
-          "content-type": "application/json",
-          "x-api-key": this.apiKey,
-        },
-        body: JSON.stringify(this.createRequest(request)),
+        headers,
+        body: JSON.stringify(body),
         signal: options.signal,
       },
     );
@@ -126,6 +134,13 @@ export class AnthropicModel implements Model {
     }
     return body;
   }
+}
+
+function usesFileId(messages: readonly Message[]): boolean {
+  return messages.some((message) => message.content.some((part) =>
+    (part.type === "image" || part.type === "file") &&
+    part.source.type === "file"
+  ));
 }
 
 function cloneThinking(

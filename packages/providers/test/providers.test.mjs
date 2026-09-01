@@ -74,7 +74,7 @@ test("retries transient model errors and exposes attempt events", async () => {
   assert.equal(wrapped.contextCompactor.name, "native");
 });
 
-test("does not retry permanent failures or failures after completion", async () => {
+test("does not retry permanent, completed, or partially emitted failures", async () => {
   let permanentAttempts = 0;
   const permanent = withModelRetry({
     async *stream() {
@@ -103,6 +103,25 @@ test("does not retry permanent failures or failures after completion", async () 
     /late failure/,
   );
   assert.equal(completedAttempts, 1);
+
+  let partialAttempts = 0;
+  const partialThenFailed = withModelRetry({
+    async *stream() {
+      partialAttempts += 1;
+      yield { type: "text.delta", delta: "partial" };
+      throw apiError(500, "failed after output");
+    },
+  }, { baseDelayMs: 0 });
+  const partialEvents = [];
+  await assert.rejects(async () => {
+    for await (const event of partialThenFailed.stream(request, {
+      signal: new AbortController().signal,
+    })) {
+      partialEvents.push(event);
+    }
+  }, /failed after output/);
+  assert.equal(partialAttempts, 1);
+  assert.deepEqual(partialEvents, [{ type: "text.delta", delta: "partial" }]);
 });
 
 test("uses retryAfterMs and cancels an active backoff", async () => {
@@ -265,6 +284,35 @@ test("resolves model capabilities by explicit, provider, builtin, then unknown p
   assert.deepEqual((await offline.resolve(
     modelSelection("deepseek-chat", "unlisted-model"),
   )).reasoningEffort, { status: "unknown", source: "unknown" });
+
+  let flakyRequests = 0;
+  const flaky = createModelCapabilityResolver({
+    async fetch() {
+      flakyRequests += 1;
+      if (flakyRequests === 1) throw new TypeError("temporary network failure");
+      return Response.json({
+        models: [{
+          slug: "provider-only",
+          supported_reasoning_levels: ["low", "high"],
+        }],
+      });
+    },
+  });
+  const providerOnly = modelSelection(
+    "openai-responses",
+    "provider-only",
+    { baseURL: "https://flaky.test/v1" },
+  );
+  assert.deepEqual((await flaky.resolve(providerOnly)).reasoningEffort, {
+    status: "unknown",
+    source: "unknown",
+  });
+  assert.deepEqual((await flaky.resolve(providerOnly)).reasoningEffort, {
+    status: "known",
+    source: "provider",
+    efforts: ["low", "high"],
+  });
+  assert.equal(flakyRequests, 2);
 });
 
 test("provides every built-in adapter", () => {

@@ -67,6 +67,11 @@ export async function* streamOpenAICompatibleResponse(
         yield { type: "text.delta", delta: delta.content };
       }
 
+      if (delta?.refusal) {
+        text += delta.refusal;
+        yield { type: "text.delta", delta: delta.refusal };
+      }
+
       for (const toolDelta of delta?.tool_calls ?? []) {
         mergeToolCall(pendingCalls, toolDelta);
       }

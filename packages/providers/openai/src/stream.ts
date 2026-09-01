@@ -30,6 +30,11 @@ export async function* streamOpenAIResponse(
       if (delta !== "") yield { type: "text.delta", delta };
       continue;
     }
+    if (type === "response.refusal.delta") {
+      const delta = requireString(event.delta, `${type}.delta`);
+      if (delta !== "") yield { type: "text.delta", delta };
+      continue;
+    }
     if (type === "response.reasoning_summary_text.delta") {
       const delta = requireString(event.delta, `${type}.delta`);
       if (delta !== "") yield { type: "reasoning.delta", delta };
@@ -89,6 +94,10 @@ export function parseCompletedOpenAIResponse(value: unknown): {
         if (part.type === "output_text") {
           const text = requireString(part.text, "output_text.text");
           if (text !== "") content.push({ type: "text", text });
+        }
+        if (part.type === "refusal") {
+          const refusal = requireString(part.refusal, "refusal.refusal");
+          if (refusal !== "") content.push({ type: "text", text: refusal });
         }
       }
       continue;
@@ -163,7 +172,11 @@ function streamError(event: Record<string, unknown>): Error {
   return new OpenAIResponsesError(
     typeof error.message === "string" ? error.message : "OpenAI Responses stream error",
     {
-      ...(typeof error.type === "string" ? { providerType: error.type } : {}),
+      ...(typeof error.code === "string"
+        ? { providerType: error.code }
+        : typeof error.type === "string"
+        ? { providerType: error.type }
+        : {}),
       ...(typeof event.request_id === "string" ? { requestId: event.request_id } : {}),
     },
   );
