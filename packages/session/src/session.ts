@@ -7,6 +7,8 @@ import {
   type ContinueOptions,
   type RunHandle,
   type RunOptions,
+  toolCancellationMessage,
+  type ToolCall,
   type UserMessage,
   userMessage,
 } from "@may/core";
@@ -386,6 +388,7 @@ function replaySession(events: readonly SessionEvent[]): {
   info: SessionRuntimeInfo;
 } {
   const messages: Message[] = [];
+  const pendingTools = new Map<string, Map<string, ToolCall>>();
   let latestModelMeasurement: SessionModelMeasurement | undefined;
 
   for (const event of events) {
@@ -395,6 +398,15 @@ function replaySession(events: readonly SessionEvent[]): {
         break;
       case "assistant.completed":
         messages.push(event.message);
+        if (
+          event.message.toolCalls !== undefined &&
+          event.message.toolCalls.length > 0
+        ) {
+          pendingTools.set(
+            modelStepKey(event.runId, event.step),
+            new Map(event.message.toolCalls.map((call) => [call.id, call])),
+          );
+        }
         if (
           event.usage?.inputTokens !== undefined &&
           event.contextMessageCount !== undefined
@@ -407,6 +419,7 @@ function replaySession(events: readonly SessionEvent[]): {
         break;
       case "context.compacted":
         messages.splice(0, messages.length, ...event.messages);
+        pendingTools.clear();
         latestModelMeasurement = undefined;
         break;
       case "tool.completed":
@@ -416,6 +429,7 @@ function replaySession(events: readonly SessionEvent[]): {
           name: event.call.name,
           content: [{ type: "json", value: event.output }],
         });
+        resolvePendingTool(pendingTools, event.runId, event.step, event.call.id);
         break;
       case "tool.failed":
         messages.push({
@@ -425,6 +439,18 @@ function replaySession(events: readonly SessionEvent[]): {
           content: [{ type: "json", value: event.error }],
           isError: true,
         });
+        resolvePendingTool(pendingTools, event.runId, event.step, event.call.id);
+        break;
+      case "run.cancelled":
+        for (const [key, calls] of pendingTools) {
+          if (!key.startsWith(`${event.runId}:`)) continue;
+          messages.push(
+            ...[...calls.values()].map((call) =>
+              toolCancellationMessage(call, event.reason)
+            ),
+          );
+          pendingTools.delete(key);
+        }
         break;
     }
   }
@@ -435,6 +461,19 @@ function replaySession(events: readonly SessionEvent[]): {
       ? {}
       : { latestModelMeasurement },
   };
+}
+
+function resolvePendingTool(
+  pending: Map<string, Map<string, ToolCall>>,
+  runId: string,
+  step: number,
+  toolCallId: string,
+): void {
+  const key = modelStepKey(runId, step);
+  const calls = pending.get(key);
+  if (calls === undefined) return;
+  calls.delete(toolCallId);
+  if (calls.size === 0) pending.delete(key);
 }
 
 function toPermissionSessionEvent(

@@ -28,6 +28,7 @@ import {
 } from "./tool.js";
 import {
   textContent,
+  toolCancellationMessage,
   userMessage,
   type AssistantMessage,
   type Message,
@@ -187,6 +188,10 @@ export class May {
     let aggregateUsage: Usage | undefined;
     let modelCalls = 0;
     let toolCalls = 0;
+    let pendingTools: {
+      readonly step: number;
+      readonly calls: readonly ToolCall[];
+    } | undefined;
     try {
       emit(input === undefined
         ? { type: "run.started", continuation: true }
@@ -246,6 +251,7 @@ export class May {
         }
 
         toolCalls += calls.length;
+        pendingTools = { step, calls };
         const outcomes = await this.scheduleTools(
           runId,
           step,
@@ -254,6 +260,10 @@ export class May {
           emit,
         );
         let fatal: FatalToolExecutionError | undefined;
+        await this.context.append(
+          outcomes.map((outcome) => outcome.message),
+          { runId, step },
+        );
         for (const outcome of outcomes) {
           if (outcome.type === "completed") {
             emit({
@@ -271,10 +281,9 @@ export class May {
             });
             fatal ??= outcome.fatal;
           }
-
-          throwIfAborted(signal);
-          await this.context.append([outcome.message], { runId, step });
         }
+        pendingTools = undefined;
+        throwIfAborted(signal);
         if (fatal !== undefined) throw fatal;
 
         emit({ type: "step.completed", step });
@@ -287,6 +296,16 @@ export class May {
           ? error
           : new RunCancelledError(toReason(signal.reason));
         const reason = toReason(signal.reason);
+
+        if (pendingTools !== undefined) {
+          await this.context.append(
+            pendingTools.calls.map((call) =>
+              toolCancellationMessage(call, cancelled.message)
+            ),
+            { runId, step: pendingTools.step },
+          );
+          pendingTools = undefined;
+        }
 
         emit(reason === undefined
           ? { type: "run.cancelled" }

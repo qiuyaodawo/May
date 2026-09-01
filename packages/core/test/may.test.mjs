@@ -1068,9 +1068,27 @@ test("run.cancel aborts an active model call", async () => {
 
 test("run.cancel aborts an active tool without turning it into a tool failure", async () => {
   const started = deferred();
+  let modelCall = 0;
   let toolSignal;
   const model = {
-    async *stream() {
+    async *stream(request) {
+      modelCall += 1;
+      if (modelCall > 1) {
+        const callIndex = request.messages.findIndex((message) =>
+          message.role === "assistant" &&
+          message.toolCalls?.some((call) => call.id === "slow_call")
+        );
+        const cancellation = request.messages[callIndex + 1];
+        assert.equal(cancellation.role, "tool");
+        assert.equal(cancellation.toolCallId, "slow_call");
+        assert.equal(cancellation.isError, true);
+        assert.equal(cancellation.content[0].value.code, "RUN_CANCELLED");
+        yield {
+          type: "response.completed",
+          message: assistant("recovered"),
+        };
+        return;
+      }
       yield {
         type: "response.completed",
         message: assistant("", [
@@ -1090,11 +1108,13 @@ test("run.cancel aborts an active tool without turning it into a tool failure", 
     },
   };
 
-  const run = new May({
+  const context = new InMemoryContext();
+  const may = new May({
     model,
     tools: [slow],
-    context: new InMemoryContext(),
-  }).run({ input: "start slow tool" });
+    context,
+  });
+  const run = may.run({ input: "start slow tool" });
   const eventPromise = collect(run.events);
 
   await started.promise;
@@ -1107,6 +1127,13 @@ test("run.cancel aborts an active tool without turning it into a tool failure", 
   assert.equal(toolSignal.reason, "stop tool");
   assert.equal(events.some((event) => event.type === "tool.failed"), false);
   assertSingleTerminalEvent(events, "run.cancelled");
+  assert.deepEqual((await context.snapshot()).messages.map((message) =>
+    message.role
+  ), ["user", "assistant", "tool"]);
+  assert.equal(
+    (await may.run({ input: "continue" }).result).message.content[0].text,
+    "recovered",
+  );
 });
 
 test("run.cancel aborts an active custom tool executor", async () => {

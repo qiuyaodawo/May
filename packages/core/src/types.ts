@@ -86,3 +86,24 @@ export function reasoningContent(text: string): ContentPart[] {
 export function userMessage(text: string): UserMessage {
   return { role: "user", content: textContent(text) };
 }
+
+/** Close a provider tool call when its run is cancelled before execution ends. */
+export function toolCancellationMessage(
+  call: Readonly<ToolCall>,
+  reason?: string,
+): ToolMessage {
+  return {
+    role: "tool",
+    toolCallId: call.id,
+    name: call.name,
+    isError: true,
+    content: [{
+      type: "json",
+      value: {
+        name: "RunCancelledError",
+        message: reason ?? "Run was cancelled",
+        code: "RUN_CANCELLED",
+      },
+    }],
+  };
+}

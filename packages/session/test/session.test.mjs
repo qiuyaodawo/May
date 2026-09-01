@@ -314,6 +314,7 @@ test("records approval decisions before their tool outcomes", async () => {
 });
 
 test("records approval cancellation before run cancellation", async () => {
+  const store = new InMemorySessionStore();
   const model = {
     async *stream() {
       yield {
@@ -330,6 +331,7 @@ test("records approval cancellation before run cancellation", async () => {
   };
   const permissions = new PermissionToolExecutor({ policy: () => "ask" });
   const session = await Session.create({
+    store,
     runtime: new May({
       model,
       context: new InMemoryContext(),
@@ -366,6 +368,24 @@ test("records approval cancellation before run cancellation", async () => {
     history.find((event) => event.type === "approval.cancelled").reason,
     "user stopped",
   );
+  let replayed;
+  await Session.resume({
+    id: session.id,
+    store,
+    createRuntime(messages) {
+      replayed = messages;
+      return createRuntime();
+    },
+  });
+  assert.deepEqual(replayed.map((message) => message.role), [
+    "user",
+    "assistant",
+    "tool",
+  ]);
+  assert.equal(replayed[2].toolCallId, "call_bash");
+  assert.equal(replayed[2].isError, true);
+  assert.equal(replayed[2].content[0].value.code, "RUN_CANCELLED");
+  assert.equal(replayed[2].content[0].value.message, "user stopped");
   await permissions.close();
 });
 
