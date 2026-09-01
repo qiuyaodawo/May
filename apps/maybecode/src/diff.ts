@@ -25,6 +25,25 @@ export type ToolChangePreview =
       readonly reason: string;
     };
 
+export const MAYBECODE_CHANGE_PREVIEW_PRESENTATION_KIND =
+  "maybecode.change-preview";
+export const MAYBECODE_CHANGE_PREVIEW_PRESENTATION_VERSION = 1;
+
+export function decodeToolChangePreviewPresentation(
+  kind: string,
+  version: number,
+  data: unknown,
+): ToolChangePreview | undefined {
+  if (
+    kind !== MAYBECODE_CHANGE_PREVIEW_PRESENTATION_KIND ||
+    version !== MAYBECODE_CHANGE_PREVIEW_PRESENTATION_VERSION ||
+    !isToolChangePreview(data)
+  ) {
+    return undefined;
+  }
+  return data;
+}
+
 export async function createToolChangePreview(
   workspace: string,
   toolName: string,
@@ -268,6 +287,31 @@ function stringField(value: unknown, name: string): string | undefined {
   }
   const field = (value as Record<string, unknown>)[name];
   return typeof field === "string" ? field : undefined;
+}
+
+function isToolChangePreview(value: unknown): value is ToolChangePreview {
+  if (typeof value !== "object" || value === null) return false;
+  const preview = value as Record<string, unknown>;
+  if (
+    (preview.tool !== "edit" && preview.tool !== "write") ||
+    typeof preview.path !== "string"
+  ) {
+    return false;
+  }
+  if (preview.status === "unavailable") {
+    return typeof preview.reason === "string";
+  }
+  return preview.status === "ready" &&
+    (preview.kind === "create" ||
+      preview.kind === "update" ||
+      preview.kind === "no-change") &&
+    isNonNegativeInteger(preview.additions) &&
+    isNonNegativeInteger(preview.deletions) &&
+    typeof preview.diff === "string";
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
 }
 
 function assertInside(root: string, target: string, inputPath: string): void {

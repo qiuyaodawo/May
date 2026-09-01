@@ -17,6 +17,7 @@ import type {
   SessionContextCompaction,
   SessionEvent,
   SessionEventPayload,
+  SessionToolPresentation,
 } from "./events.js";
 import {
   SessionHistoryReader,
@@ -207,6 +208,13 @@ export class Session {
     });
   }
 
+  async recordToolPresentation(
+    presentation: SessionToolPresentation,
+  ): Promise<void> {
+    validateToolPresentation(presentation);
+    await this.record({ type: "tool.presentation", ...presentation });
+  }
+
   private async start(options: RunOptions): Promise<RunHandle> {
     const input: UserMessage = typeof options.input === "string"
       ? userMessage(options.input)
@@ -351,6 +359,26 @@ function createDeferred<T>(): Deferred<T> {
 
 function modelStepKey(runId: string, step: number): string {
   return `${runId}:${step}`;
+}
+
+function validateToolPresentation(
+  presentation: SessionToolPresentation,
+): void {
+  requireNonEmpty(presentation.runId, "runId");
+  requireNonEmpty(presentation.toolCallId, "toolCallId");
+  requireNonEmpty(presentation.kind, "kind");
+  requirePositiveSafeInteger(presentation.step, "step");
+  requirePositiveSafeInteger(presentation.version, "version");
+}
+
+function requireNonEmpty(value: string, name: string): void {
+  if (value.trim() === "") throw new TypeError(`${name} cannot be empty`);
+}
+
+function requirePositiveSafeInteger(value: number, name: string): void {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new RangeError(`${name} must be a positive safe integer`);
+  }
 }
 
 function replaySession(events: readonly SessionEvent[]): {

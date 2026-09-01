@@ -33,6 +33,19 @@ export interface SessionContextCompaction {
   readonly afterEstimatedTokens: number;
 }
 
+/**
+ * Durable, application-owned display metadata associated with a tool call.
+ * Session stores and exposes this event, but does not replay it into model context.
+ */
+export interface SessionToolPresentation {
+  readonly runId: string;
+  readonly step: number;
+  readonly toolCallId: string;
+  readonly kind: string;
+  readonly version: number;
+  readonly data: unknown;
+}
+
 export type RecordablePermissionEvent = (
   | {
       type: "approval.requested";
@@ -88,6 +101,7 @@ export type SessionEventPayload =
       call: ToolCall;
       error: SerializedError;
     }
+  | ({ type: "tool.presentation" } & SessionToolPresentation)
   | { type: "approval.requested"; request: SessionApprovalRequest }
   | {
       type: "approval.resolved";

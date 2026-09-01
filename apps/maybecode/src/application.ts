@@ -48,7 +48,12 @@ import type {
   MaybeCodeRun,
   MaybeCodeSessionEvent,
 } from "./events.js";
-import { createToolChangePreview } from "./diff.js";
+import {
+  createToolChangePreview,
+  MAYBECODE_CHANGE_PREVIEW_PRESENTATION_KIND,
+  MAYBECODE_CHANGE_PREVIEW_PRESENTATION_VERSION,
+  type ToolChangePreview,
+} from "./diff.js";
 import {
   loadMaybeCodeInstructions,
   type MaybeCodeInstructions,
@@ -165,14 +170,13 @@ export class MaybeCodeApplication {
           check.tool.name,
           check.input,
         );
-        if (preview !== undefined) {
-          application?.eventQueue.push({
-            type: "change.preview",
-            runId: check.context.runId,
-            step: check.context.step,
-            toolCallId: check.context.toolCallId,
+        if (preview !== undefined && application !== undefined) {
+          await application.recordToolChangePreview(
+            check.context.runId,
+            check.context.step,
+            check.context.toolCallId,
             preview,
-          });
+          );
         }
         return permissionPolicy(check);
       },
@@ -436,6 +440,29 @@ export class MaybeCodeApplication {
       afterMessageCount: result.after.messageCount,
       beforeEstimatedTokens: result.before.estimatedTokens,
       afterEstimatedTokens: result.after.estimatedTokens,
+    });
+  }
+
+  private async recordToolChangePreview(
+    runId: string,
+    step: number,
+    toolCallId: string,
+    preview: ToolChangePreview,
+  ): Promise<void> {
+    await this.session.recordToolPresentation({
+      runId,
+      step,
+      toolCallId,
+      kind: MAYBECODE_CHANGE_PREVIEW_PRESENTATION_KIND,
+      version: MAYBECODE_CHANGE_PREVIEW_PRESENTATION_VERSION,
+      data: preview,
+    });
+    this.eventQueue.push({
+      type: "change.preview",
+      runId,
+      step,
+      toolCallId,
+      preview,
     });
   }
 

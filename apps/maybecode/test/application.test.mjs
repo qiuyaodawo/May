@@ -78,6 +78,16 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
     history.findIndex((event) => event.type === "approval.resolved") <
       history.findIndex((event) => event.type === "tool.completed"),
   );
+  const persistedPreviews = history.filter(
+    (event) => event.type === "tool.presentation",
+  );
+  assert.deepEqual(
+    persistedPreviews.map((event) => [event.kind, event.version, event.data.kind]),
+    [
+      ["maybecode.change-preview", 1, "create"],
+      ["maybecode.change-preview", 1, "update"],
+    ],
+  );
 
   await app.close();
   await eventReader;

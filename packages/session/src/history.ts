@@ -123,6 +123,7 @@ export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "assistant.completed",
   "tool.completed",
   "tool.failed",
+  "tool.presentation",
   "approval.requested",
   "approval.resolved",
   "approval.cancelled",

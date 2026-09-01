@@ -191,7 +191,16 @@ test("stores successful and failed tool outcomes", async () => {
 
   const run = await session.submit({ input: "use tools" });
   await run.result;
-  const toolEvents = (await session.history()).filter(
+  await session.recordToolPresentation({
+    runId: run.id,
+    step: 1,
+    toolCallId: "call_ok",
+    kind: "test.preview",
+    version: 1,
+    data: { label: "preview" },
+  });
+  const history = await session.history();
+  const toolEvents = history.filter(
     (event) => event.type === "tool.completed" || event.type === "tool.failed",
   );
 
@@ -199,6 +208,10 @@ test("stores successful and failed tool outcomes", async () => {
   assert.deepEqual(toolEvents[0].output, { value: 1 });
   assert.equal(toolEvents[1].type, "tool.failed");
   assert.equal(toolEvents[1].error.message, "tool failed");
+  assert.deepEqual(
+    history.find((event) => event.type === "tool.presentation").data,
+    { label: "preview" },
+  );
 
   let replayed;
   await Session.resume({
