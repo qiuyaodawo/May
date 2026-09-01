@@ -232,8 +232,8 @@ and may also return a `ContextController` for application-level inspection.
 ## Commands
 
 In an interactive terminal, suggestions are shown as the first input line is
-edited. For example, `/re` shows `/resume` and `/retry`; `/compact ` filters
-compaction strategies; `/resume ` filters known session IDs; and `/model `
+edited. For example, `/re` shows `/resume` and `/retry`; `/compact ` offers
+`history-reference`; `/resume ` filters known session IDs; and `/model `
 filters configured model-profile names. `/effort ` filters the active model's
 discovered reasoning levels. Suggestions also participate in input:
 `Enter` executes the first displayed candidate,
@@ -261,8 +261,8 @@ continuation lines do not show command suggestions.
 - `/status` shows the active provider/model, session, workspace, and compact
   context usage.
 - `/context` shows message counts, size, measured usage, and window remaining.
-- `/compact` prunes eligible old tool results and persists the active view.
-- `/compact summary-tail` summarizes older turns and retains the recent tail.
+- `/compact` prunes eligible old tool results, summarizes older turns, and
+  retains the recent tail.
 - `/compact history-reference` keeps the current turn and points the model to
   the bounded `session_history` tool for older details.
 - `/help` shows commands.
@@ -324,17 +324,18 @@ This is intended for context pressure management, not exact billing. It also
 shows the input budget and compaction threshold. A custom context without a
 controller reports that inspection is unsupported.
 
-`/compact` uses `prune-old-tool-results`: it keeps the four newest
-tool results and replaces older results of at least 2 KiB with short
-placeholders. The original session events remain in JSONL, while subsequent
-model requests and resumed sessions use the compacted view.
+`/compact` first keeps the four newest tool results and replaces older results
+of at least 2 KiB with short placeholders. It then makes a separate, tool-free
+request to the active model to summarize all but the two most recent user
+turns. Both phases are applied atomically as `prune+summary-tail`; a cancelled
+or failed summary is not persisted. The original session events remain in
+JSONL, while subsequent model requests and resumed sessions use the compacted
+view. Programmatic callers can inject `contextSummarizer` or replace the
+default with their own `ContextCompactionStrategy`.
 
-`/compact summary-tail` makes a separate, tool-free request to the active model
-to summarize all but the two most recent user turns. It only applies a
-non-empty summary that reduces serialized context size. The summary request can
-be cancelled with `Ctrl+C`; a cancelled or failed summary is not persisted.
-Programmatic callers can inject `contextSummarizer` or pass their own
-`ContextCompactionStrategy`.
+`/compact history-reference` is the explicit stronger alternative: it retains
+the current turn and replaces older model-visible context with a reference to
+the durable `session_history` tool.
 
 Before each model request, MaybeCode automatically checks context pressure
 when the model has a configured context-window limit. By default, the trigger

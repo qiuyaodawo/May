@@ -567,7 +567,7 @@ test("persists pruned tool results across session resume", async () => {
   await resumed.close();
 });
 
-test("persists a summary-tail view across session resume", async () => {
+test("persists the default prune-and-summary view across resume", async () => {
   const store = new (await import("@may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();
   const requests = [];
@@ -577,6 +577,21 @@ test("persists a summary-tail view across session resume", async () => {
     async *stream(request) {
       requests.push(request);
       modelCall += 1;
+      if (modelCall === 1) {
+        yield {
+          type: "response.completed",
+          message: {
+            role: "assistant",
+            content: [],
+            toolCalls: Array.from({ length: 5 }, (_, index) => ({
+              id: `large_${index}`,
+              name: "large",
+              input: { index },
+            })),
+          },
+        };
+        return;
+      }
       yield {
         type: "response.completed",
         message: assistantMessage(
@@ -590,6 +605,15 @@ test("persists a summary-tail view across session resume", async () => {
     model,
     store,
     catalog,
+    tools: [{
+      name: "large",
+      description: "Returns a large result",
+      inputSchema: { type: "object" },
+      async execute(input) {
+        return { index: input.index, payload: "x".repeat(4000) };
+      },
+    }],
+    permissionPolicy: () => "allow",
     contextSummarizer: {
       summarize(request) {
         summarized.push(request.messages);
@@ -602,16 +626,19 @@ test("persists a summary-tail view across session resume", async () => {
   await (await first.submit({ input: "first request" })).result;
   await (await first.submit({ input: "second request" })).result;
   await (await first.submit({ input: "third request" })).result;
-  const result = await first.compactContext("summary-tail");
+  const result = await first.compactContext();
   assert.equal(result.changed, true);
-  assert.equal(result.strategy, "summary-tail");
-  assert.deepEqual(
-    summarized[0].map((message) => message.role),
-    ["user", "assistant"],
+  assert.equal(result.strategy, "prune+summary-tail");
+  const summarizedTools = summarized[0].filter((message) =>
+    message.role === "tool"
   );
+  assert.equal(summarizedTools.length, 5);
+  assert.match(summarizedTools[0].content[0].text, /tool result pruned/u);
+  assert.equal(summarizedTools[4].content[0].value.index, 4);
   assert.equal(
-    (await first.history()).at(-1).type,
-    "context.compacted",
+    (await first.history()).filter((event) => event.type === "context.compacted")
+      .length,
+    1,
   );
   await first.close();
 
@@ -908,7 +935,7 @@ test("cancels an active summary compaction without persisting it", async () => {
     await (await app.submit({ input })).result;
   }
 
-  const compaction = app.compactContext("summary-tail");
+  const compaction = app.compactContext();
   await started;
   assert.equal(app.isRunning, true);
   assert.equal(app.cancel("summary stopped"), true);

@@ -34,8 +34,6 @@ export interface MaybeCodeSlashCommand {
 }
 
 export const MAYBECODE_COMPACTION_STRATEGIES = [
-  "prune-old-tool-results",
-  "summary-tail",
   "history-reference",
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
@@ -82,9 +80,8 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   },
   {
     name: "/compact",
-    usage:
-      "/compact [prune-old-tool-results|summary-tail|history-reference]",
-    description: "Compact the active model context",
+    usage: "/compact [history-reference]",
+    description: "Summarize context or replace older history with a reference",
   },
   {
     name: "/help",
@@ -242,7 +239,7 @@ export function createMaybeCodeSlashCommandSuggester(
         .map((strategy) => ({
           value: `${argumentInput.command} ${strategy}`,
           label: strategy,
-          description: "Context compaction strategy",
+          description: "Keep the current turn and reference durable history",
         }));
     }
 

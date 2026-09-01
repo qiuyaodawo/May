@@ -208,10 +208,9 @@ async function handleCommand(
   if (
     parsed.type === "command" &&
     parsed.definition.name === "/compact" &&
-    parsed.arguments.length === 1 &&
-    parsed.arguments[0] === "summary-tail"
+    parsed.arguments.length === 0
   ) {
-    terminal.write("\nSummarizing older context...\n");
+    terminal.write("\nPruning old tool results and summarizing context...\n");
   }
 
   const result = await executeMaybeCodeSlashCommand(input, app);

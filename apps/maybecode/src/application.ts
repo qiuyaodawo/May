@@ -11,6 +11,8 @@ import {
   ModelContextCompactionStrategy,
   type ContextBudget,
   type ContextCompactionFailure,
+  type ContextCompactionOptions,
+  type ContextCompactionOutput,
   type ContextCompactionResult,
   type ContextCompactionStrategy,
   type ContextSummarizer,
@@ -25,6 +27,7 @@ import {
   isStreamingMayEvent,
   May,
   serializeError,
+  type ContextSnapshot,
   type Message,
   type Model,
   type RunHandle,
@@ -103,6 +106,7 @@ export class MaybeCodeApplication {
   private readonly session: Session;
   private readonly permissions: PermissionToolExecutor;
   private readonly contextController: ContextController | undefined;
+  private readonly manualCompactionStrategy: ContextCompactionStrategy;
   private readonly summaryTailStrategy: ContextCompactionStrategy;
   private readonly historyReferenceStrategy: ContextCompactionStrategy;
   private readonly eventQueue = new AsyncEventQueue<MaybeCodeSessionEvent>({
@@ -123,6 +127,7 @@ export class MaybeCodeApplication {
     permissions: PermissionToolExecutor,
     instructions: MaybeCodeInstructions,
     contextController: ContextController | undefined,
+    manualCompactionStrategy: ContextCompactionStrategy,
     summaryTailStrategy: ContextCompactionStrategy,
     historyReferenceStrategy: ContextCompactionStrategy,
     modelInfo: MaybeCodeModelInfo | undefined,
@@ -133,6 +138,7 @@ export class MaybeCodeApplication {
     this.permissions = permissions;
     this.instructions = instructions;
     this.contextController = contextController;
+    this.manualCompactionStrategy = manualCompactionStrategy;
     this.summaryTailStrategy = summaryTailStrategy;
     this.historyReferenceStrategy = historyReferenceStrategy;
     this.modelInfo = modelInfo === undefined ? undefined : { ...modelInfo };
@@ -203,6 +209,8 @@ export class MaybeCodeApplication {
       summarizer: options.contextSummarizer ??
         createModelContextSummarizer(options.model),
     });
+    const manualCompactionStrategy = options.compactionStrategy ??
+      new PruneAndSummaryTailStrategy(summaryTailStrategy);
     const historyReferenceStrategy = new HistoryReferenceStrategy({
       reference:
         "Earlier model-visible context was removed to recover context capacity. " +
@@ -274,6 +282,7 @@ export class MaybeCodeApplication {
         permissions,
         instructions,
         contextController,
+        manualCompactionStrategy,
         summaryTailStrategy,
         historyReferenceStrategy,
         options.modelInfo,
@@ -508,8 +517,8 @@ export class MaybeCodeApplication {
 
   private resolveCompactionStrategy(
     selection: MaybeCodeCompactionSelection | undefined,
-  ): ContextCompactionStrategy | undefined {
-    if (selection === undefined) return undefined;
+  ): ContextCompactionStrategy {
+    if (selection === undefined) return this.manualCompactionStrategy;
     if (selection === "prune-old-tool-results") {
       return new PruneOldToolResultsStrategy();
     }
@@ -523,6 +532,25 @@ export class MaybeCodeApplication {
 
   private throwIfClosed(): void {
     if (this.closed) throw new Error("MaybeCode application is closed");
+  }
+}
+
+class PruneAndSummaryTailStrategy implements ContextCompactionStrategy {
+  readonly name = "prune+summary-tail";
+
+  private readonly prune = new PruneOldToolResultsStrategy();
+
+  constructor(private readonly summaryTail: ContextCompactionStrategy) {}
+
+  async compact(
+    snapshot: Readonly<ContextSnapshot>,
+    options: ContextCompactionOptions = {},
+  ): Promise<ContextCompactionOutput> {
+    const messages = this.prune.compact(snapshot);
+    return this.summaryTail.compact(
+      { ...snapshot, messages: [...messages] },
+      options,
+    );
   }
 }
 

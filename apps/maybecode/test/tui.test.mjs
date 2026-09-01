@@ -19,7 +19,6 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     "/instructions",
     "/context",
     "/compact",
-    "/compact summary-tail",
     "/compact history-reference",
     "/quit",
   ]);
@@ -90,12 +89,11 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   assert.match(terminal.output, /compaction threshold: 9,000 tokens \(not reached\)/u);
   assert.match(
     terminal.output,
-    /No context changes were eligible for prune-old-tool-results/u,
+    /No context changes were eligible for prune\+summary-tail/u,
   );
-  assert.match(terminal.output, /Summarizing older context/u);
   assert.match(
     terminal.output,
-    /No context changes were eligible for summary-tail/u,
+    /Pruning old tool results and summarizing context/u,
   );
   assert.match(
     terminal.output,
@@ -121,7 +119,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   );
   assert.deepEqual(
     terminal.suggestionSamples.compaction.map((suggestion) => suggestion.label),
-    ["summary-tail"],
+    ["history-reference"],
   );
   assert.ok(terminal.suggestionSamples.sessions.some((suggestion) =>
     suggestion.label === initialSessionId
@@ -386,7 +384,7 @@ class FakeTerminal {
     if (suggestions !== undefined && this.suggestionSamples === undefined) {
       this.suggestionSamples = {
         commands: await suggestions("/re"),
-        compaction: await suggestions("/compact s"),
+        compaction: await suggestions("/compact h"),
         sessions: await suggestions("/resume session_"),
       };
     }

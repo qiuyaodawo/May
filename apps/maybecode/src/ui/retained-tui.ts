@@ -14,6 +14,7 @@ import type {
 import {
   createMaybeCodeSlashCommandSuggester,
   executeMaybeCodeSlashCommand,
+  parseMaybeCodeSlashCommand,
   type MaybeCodeSlashCommandResult,
 } from "../slash-commands.js";
 import { MaybeCodePrototypeView } from "./prototype-view.js";
@@ -151,6 +152,17 @@ async function handleCommand(
   view: MaybeCodePrototypeView,
   finish: () => void,
 ): Promise<void> {
+  const parsed = parseMaybeCodeSlashCommand(input);
+  if (
+    parsed.type === "command" &&
+    parsed.definition.name === "/compact" &&
+    parsed.arguments.length === 0
+  ) {
+    store.appendNotice(
+      "info",
+      "Pruning old tool results and summarizing context",
+    );
+  }
   const result = await executeMaybeCodeSlashCommand(input, app);
   await presentCommandResult(result, app, store, view, finish);
 }
