@@ -14,6 +14,7 @@ export const DEFAULT_EDIT_MAX_BYTES = 1024 * 1024;
 export interface EditToolOptions {
   readonly cwd: string;
   readonly maxBytes?: number;
+  readonly allowHardLinks?: boolean;
 }
 
 export interface EditToolInput {
@@ -61,7 +62,9 @@ export function createEditTool(options: EditToolOptions): Tool<
       };
     },
     async execute(input, context) {
-      const file = await resolveExistingWorkspacePath(options.cwd, input.path);
+      const file = await resolveExistingWorkspacePath(options.cwd, input.path, {
+        allowHardLinks: options.allowHardLinks === true,
+      });
       const original = await readTextFile(
         file.absolute,
         file.relative,

@@ -13,24 +13,35 @@ export interface WorkspacePath {
   readonly relative: string;
 }
 
+export interface WorkspacePathOptions {
+  /**
+   * Hard links cannot be proven to belong exclusively to the workspace.
+   * Keep this disabled unless the workspace itself is fully trusted.
+   */
+  readonly allowHardLinks?: boolean;
+}
+
 export async function resolveExistingWorkspacePath(
   cwd: string,
   inputPath: string,
+  options: WorkspacePathOptions = {},
 ): Promise<WorkspacePath> {
-  return resolveWorkspacePath(cwd, inputPath, true);
+  return resolveWorkspacePath(cwd, inputPath, true, options);
 }
 
 export async function resolveWritableWorkspacePath(
   cwd: string,
   inputPath: string,
+  options: WorkspacePathOptions = {},
 ): Promise<WorkspacePath> {
-  return resolveWorkspacePath(cwd, inputPath, false);
+  return resolveWorkspacePath(cwd, inputPath, false, options);
 }
 
 async function resolveWorkspacePath(
   cwd: string,
   inputPath: string,
   mustExist: boolean,
+  options: WorkspacePathOptions,
 ): Promise<WorkspacePath> {
   const root = await resolveWorkspaceRoot(cwd);
   const candidate = resolve(root, inputPath);
@@ -46,6 +57,7 @@ async function resolveWorkspacePath(
 
   if (target !== undefined) {
     assertInside(root, target, inputPath);
+    await assertSafeLinkCount(target, inputPath, options.allowHardLinks === true);
     return { absolute: target, relative: displayPath };
   }
   if (mustExist) {
@@ -58,6 +70,20 @@ async function resolveWorkspacePath(
   await assertNotUnresolvedSymbolicLink(candidate, inputPath);
   await assertExistingParentInside(root, dirname(candidate), inputPath);
   return { absolute: candidate, relative: displayPath };
+}
+
+async function assertSafeLinkCount(
+  target: string,
+  inputPath: string,
+  allowHardLinks: boolean,
+): Promise<void> {
+  if (allowHardLinks) return;
+  const information = await stat(target);
+  if (!information.isFile() || information.nlink <= 1) return;
+  throw new CodingToolError(
+    "CODING_TOOL_UNSAFE_HARD_LINK",
+    `Cannot verify workspace containment for hard-linked file: ${inputPath}`,
+  );
 }
 
 async function assertNotUnresolvedSymbolicLink(

@@ -8,7 +8,10 @@ Basic filesystem and shell tools for May coding agents:
 - `write`: create or overwrite a UTF-8 text file
 
 Each tool is created for one workspace. Filesystem tools reject paths and
-symbolic links that escape that workspace.
+symbolic links that escape that workspace. Existing hard-linked files are also
+rejected by default because a path-only check cannot prove that every link is
+inside the workspace. Trusted applications may opt in per tool with
+`allowHardLinks: true`.
 
 ```ts
 import { InMemoryContext, May } from "@may/core";

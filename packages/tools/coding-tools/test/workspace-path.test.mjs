@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, mkdir, symlink, writeFile } from "node:fs/promises";
+import { access, link, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -105,4 +105,34 @@ test("write rejects a dangling symlink before creating its outside target", asyn
   await assert.rejects(access(outside), {
     code: "ENOENT",
   });
+});
+
+test("file tools reject hard links with unverifiable workspace ownership", async (t) => {
+  const root = await createWorkspace(t);
+  const cwd = join(root, "workspace");
+  const outside = join(root, "outside.txt");
+  await mkdir(cwd);
+  await writeFile(outside, "secret");
+  await link(outside, join(cwd, "linked.txt"));
+
+  await assert.rejects(
+    executeTool(createReadTool({ cwd }), { path: "linked.txt" }),
+    assertErrorCode("CODING_TOOL_UNSAFE_HARD_LINK"),
+  );
+  await assert.rejects(
+    executeTool(createEditTool({ cwd }), {
+      path: "linked.txt",
+      oldText: "secret",
+      newText: "changed",
+    }),
+    assertErrorCode("CODING_TOOL_UNSAFE_HARD_LINK"),
+  );
+  await assert.rejects(
+    executeTool(createWriteTool({ cwd }), {
+      path: "linked.txt",
+      content: "changed",
+    }),
+    assertErrorCode("CODING_TOOL_UNSAFE_HARD_LINK"),
+  );
+  assert.equal(await readFile(outside, "utf8"), "secret");
 });

@@ -161,6 +161,11 @@ test("rejects invalid config shapes", async (t) => {
   const cases = [
     ["non-object root", null, "config"],
     ["missing providers", {}, "providers"],
+    [
+      "unknown root field",
+      { providers: {}, defaultModal: "typo" },
+      "config.defaultModal",
+    ],
     ["non-object provider", { providers: { deepseek: [] } }, "providers.deepseek"],
     ["non-object application", { providers: {}, apps: { maybecode: [] } }, "apps.maybecode"],
     ["missing adapter", { providers: { deepseek: {} } }, "providers.deepseek.adapter"],

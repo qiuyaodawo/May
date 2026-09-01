@@ -1,7 +1,11 @@
 import { readFile, stat } from "node:fs/promises";
 import { CodingToolError } from "./errors.js";
 
-const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
+// Keep a leading BOM so edit can round-trip bytes outside the replacement.
+const UTF8_DECODER = new TextDecoder("utf-8", {
+  fatal: true,
+  ignoreBOM: true,
+});
 
 export async function readTextFile(
   path: string,

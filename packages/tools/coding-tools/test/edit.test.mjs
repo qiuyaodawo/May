@@ -23,6 +23,20 @@ test("edit replaces one exact occurrence", async (t) => {
   );
 });
 
+test("edit preserves a UTF-8 byte order mark", async (t) => {
+  const cwd = await createWorkspace(t);
+  const path = join(cwd, "bom.txt");
+  await writeFile(path, Buffer.from([0xef, 0xbb, 0xbf, 0x61]));
+
+  await executeTool(createEditTool({ cwd }), {
+    path: "bom.txt",
+    oldText: "a",
+    newText: "b",
+  });
+
+  assert.deepEqual(await readFile(path), Buffer.from([0xef, 0xbb, 0xbf, 0x62]));
+});
+
 test("edit allows deleting the matched text", async (t) => {
   const cwd = await createWorkspace(t);
   await writeFile(join(cwd, "file.txt"), "remove me");

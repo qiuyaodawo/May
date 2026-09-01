@@ -9,6 +9,12 @@ import type {
 
 export function parseMayConfig(value: unknown, path = "<inline>"): MayConfig {
   const root = requireObject(value, path, "config");
+  rejectUnknownKeys(
+    root,
+    new Set(["$schema", "defaultModel", "providers", "models", "apps"]),
+    path,
+    "config",
+  );
   const providersValue = requireObject(root.providers, path, "providers");
   const providers = Object.fromEntries(
     Object.entries(providersValue).map(([name, provider]) => {

@@ -16,6 +16,7 @@ export interface ReadToolOptions {
   readonly cwd: string;
   readonly maxBytes?: number;
   readonly maxLines?: number;
+  readonly allowHardLinks?: boolean;
 }
 
 export interface ReadToolInput {
@@ -80,7 +81,9 @@ export function createReadTool(options: ReadToolOptions): Tool<
       };
     },
     async execute(input, context) {
-      const file = await resolveExistingWorkspacePath(options.cwd, input.path);
+      const file = await resolveExistingWorkspacePath(options.cwd, input.path, {
+        allowHardLinks: options.allowHardLinks === true,
+      });
       const text = await readTextFile(
         file.absolute,
         file.relative,

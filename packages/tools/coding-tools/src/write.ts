@@ -14,6 +14,7 @@ export const DEFAULT_WRITE_MAX_BYTES = 1024 * 1024;
 export interface WriteToolOptions {
   readonly cwd: string;
   readonly maxBytes?: number;
+  readonly allowHardLinks?: boolean;
 }
 
 export interface WriteToolInput {
@@ -58,7 +59,9 @@ export function createWriteTool(options: WriteToolOptions): Tool<
       };
     },
     async execute(input, context) {
-      const file = await resolveWritableWorkspacePath(options.cwd, input.path);
+      const file = await resolveWritableWorkspacePath(options.cwd, input.path, {
+        allowHardLinks: options.allowHardLinks === true,
+      });
       const bytesWritten = assertTextWithinLimit(
         input.content,
         file.relative,
