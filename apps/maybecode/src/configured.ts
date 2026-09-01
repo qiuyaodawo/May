@@ -24,7 +24,7 @@ import {
 } from "@may/providers";
 import { FileSessionStore } from "@may/session/file-store";
 
-import { FileSessionCatalog } from "./catalog.js";
+import { FileSessionCatalog } from "@may/session/catalog";
 import { MaybeCodeConfigError } from "./errors.js";
 import {
   createMaybeCodeModel,

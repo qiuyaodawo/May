@@ -1,10 +1,10 @@
 import type { KeyStroke } from "@may/keybindings";
 import { sanitizeTerminalText } from "@may/tui";
 
-import type { SessionSummary } from "./catalog.js";
+import type { SessionSummary } from "@may/session/catalog";
 import type { MaybeCodeController } from "./controller.js";
 import { createMaybeCodeKeymap, type MaybeCodeKeyAction } from "./keymap.js";
-import type { MaybeCodeTerminal } from "./terminal.js";
+import type { TerminalIO } from "@may/tui/node-terminal";
 
 type PickerMode = "browse" | "search" | "rename" | "delete";
 
@@ -15,7 +15,7 @@ export type SessionPickerResult =
 
 export interface SessionPickerOptions {
   readonly controller: MaybeCodeController;
-  readonly terminal: MaybeCodeTerminal;
+  readonly terminal: TerminalIO;
   readonly sessions: readonly SessionSummary[];
   readonly question: (prompt: string) => Promise<string>;
 }

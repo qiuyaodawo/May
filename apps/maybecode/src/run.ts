@@ -7,13 +7,13 @@ import {
   type OpenConfiguredMaybeCodeOptions,
 } from "./configured.js";
 import { MaybeCodeUsageError } from "./errors.js";
-import { createNodeTerminal, type MaybeCodeTerminal } from "./terminal.js";
+import { createNodeTerminal, type TerminalIO } from "@may/tui/node-terminal";
 import { runTerminalUI } from "./tui.js";
 import type { MaybeCodeController } from "./controller.js";
 import { runRetainedTerminalUI } from "./ui/retained-tui.js";
 
 export interface RunMaybeCodeDependencies {
-  readonly terminal?: MaybeCodeTerminal;
+  readonly terminal?: TerminalIO;
   readonly open?: (
     options: OpenConfiguredMaybeCodeOptions,
   ) => Promise<MaybeCodeController>;
@@ -25,7 +25,7 @@ export async function runMaybeCode(
   dependencies: RunMaybeCodeDependencies = {},
 ): Promise<number> {
   let terminal = dependencies.terminal;
-  const outputTerminal = (): MaybeCodeTerminal => {
+  const outputTerminal = (): TerminalIO => {
     terminal ??= createNodeTerminal();
     return terminal;
   };

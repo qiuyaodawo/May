@@ -14,7 +14,7 @@ import type { SessionEvent } from "@may/session";
 import {
   decodeToolChangePreviewPresentation,
   type ToolChangePreview,
-} from "../diff.js";
+} from "@may/coding-tools/change-preview";
 import type { MaybeCodeEvent } from "../events.js";
 
 export type TranscriptItem =

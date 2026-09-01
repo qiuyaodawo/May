@@ -6,7 +6,7 @@ import type {
   MaybeCodeModelProfile,
 } from "./controller.js";
 import { createMaybeCodeKeymap, type MaybeCodeKeyAction } from "./keymap.js";
-import type { MaybeCodeTerminal } from "./terminal.js";
+import type { TerminalIO } from "@may/tui/node-terminal";
 
 export type ModelPickerResult =
   | { readonly type: "cancelled" }
@@ -16,7 +16,7 @@ export type ModelPickerResult =
 
 export interface ModelPickerOptions {
   readonly controller: MaybeCodeController;
-  readonly terminal: MaybeCodeTerminal;
+  readonly terminal: TerminalIO;
   readonly models: readonly MaybeCodeModelProfile[];
   readonly question: (prompt: string) => Promise<string>;
 }

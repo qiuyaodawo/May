@@ -53,10 +53,10 @@ import type {
 } from "./events.js";
 import {
   createToolChangePreview,
-  MAYBECODE_CHANGE_PREVIEW_PRESENTATION_KIND,
-  MAYBECODE_CHANGE_PREVIEW_PRESENTATION_VERSION,
+  TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
+  TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
   type ToolChangePreview,
-} from "./diff.js";
+} from "@may/coding-tools/change-preview";
 import {
   loadMaybeCodeInstructions,
   type MaybeCodeInstructions,
@@ -473,8 +473,8 @@ export class MaybeCodeApplication {
       runId,
       step,
       toolCallId,
-      kind: MAYBECODE_CHANGE_PREVIEW_PRESENTATION_KIND,
-      version: MAYBECODE_CHANGE_PREVIEW_PRESENTATION_VERSION,
+      kind: TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
+      version: TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
       data: preview,
     });
     this.eventQueue.push({

@@ -21,7 +21,7 @@ import {
 import { TranscriptStore } from "./transcript-store.js";
 import { TranscriptView } from "./transcript-view.js";
 import type { MaybeCodeSlashCommandSuggestion } from "../slash-commands.js";
-import type { SessionSummary } from "../catalog.js";
+import type { SessionSummary } from "@may/session/catalog";
 import type {
   MaybeCodeModelProfile,
   MaybeCodeReasoningEffortState,

@@ -4,7 +4,7 @@ import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
 import { sanitizeTerminalText } from "@may/tui";
 
-import type { FileChangeKind, ToolChangePreview } from "./diff.js";
+import type { FileChangeKind, ToolChangePreview } from "@may/coding-tools/change-preview";
 import type { MaybeCodeEvent } from "./events.js";
 import {
   createMaybeCodeSlashCommandSuggester,
@@ -14,10 +14,10 @@ import {
   type MaybeCodeSlashCommandResult,
 } from "./slash-commands.js";
 import type {
-  MaybeCodeTerminal,
+  TerminalIO,
   TerminalQuestionOptions,
-} from "./terminal.js";
-import { createNodeTerminal } from "./terminal.js";
+} from "@may/tui/node-terminal";
+import { createNodeTerminal } from "@may/tui/node-terminal";
 import type {
   MaybeCodeController,
   MaybeCodeReasoningEffortState,
@@ -31,7 +31,7 @@ type UIQuestion = (
 ) => Promise<string>;
 
 export interface RunTerminalUIOptions {
-  readonly terminal?: MaybeCodeTerminal;
+  readonly terminal?: TerminalIO;
 }
 
 export async function runTerminalUI(
@@ -217,7 +217,7 @@ async function handlePermissionEvent(
 async function handleCommand(
   input: string,
   app: MaybeCodeController,
-  terminal: MaybeCodeTerminal,
+  terminal: TerminalIO,
   question: UIQuestion,
 ): Promise<boolean> {
   const parsed = parseMaybeCodeSlashCommand(input);
@@ -243,7 +243,7 @@ async function handleCommand(
 async function renderSlashCommandResult(
   result: MaybeCodeSlashCommandResult,
   app: MaybeCodeController,
-  terminal: MaybeCodeTerminal,
+  terminal: TerminalIO,
   question: UIQuestion,
 ): Promise<boolean> {
   switch (result.type) {
@@ -465,7 +465,7 @@ class TerminalRenderer {
     { endsWithNewline: boolean; channel?: string }
   >();
 
-  constructor(private readonly terminal: MaybeCodeTerminal) {}
+  constructor(private readonly terminal: TerminalIO) {}
 
   write(text: string): void {
     this.terminal.write(text);
@@ -749,7 +749,7 @@ class TerminalRenderer {
 
 function renderHistory(
   history: readonly SessionEvent[],
-  terminal: MaybeCodeTerminal,
+  terminal: TerminalIO,
 ): void {
   for (const event of history) {
     if (event.type === "input.submitted") {

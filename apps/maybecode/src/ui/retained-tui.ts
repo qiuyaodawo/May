@@ -5,7 +5,7 @@ import {
   type RuntimeRenderer,
   type RuntimeTerminal,
 } from "@may/tui";
-import type { SessionSummary } from "../catalog.js";
+import type { SessionSummary } from "@may/session/catalog";
 import type {
   MaybeCodeController,
   MaybeCodeModelProfile,

@@ -2,7 +2,7 @@ import type { MayEvent, RunResult, SerializedError } from "@may/core";
 import type { ContextInspection } from "@may/context";
 import type { PermissionEvent } from "@may/permissions";
 import type { MaybeCodeModelInfo } from "./controller.js";
-import type { ToolChangePreview } from "./diff.js";
+import type { ToolChangePreview } from "@may/coding-tools/change-preview";
 
 export type MaybeCodeSessionEvent =
   | { type: "run.event"; event: MayEvent }

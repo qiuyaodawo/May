@@ -7,7 +7,7 @@ import type {
 import type { ApprovalDecision } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
 
-import type { SessionSummary } from "./catalog.js";
+import type { SessionSummary } from "@may/session/catalog";
 import type { MaybeCodeEvent, MaybeCodeRun } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 

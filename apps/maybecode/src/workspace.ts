@@ -20,7 +20,7 @@ import {
   latestSession,
   type SessionCatalog,
   type SessionSummary,
-} from "./catalog.js";
+} from "@may/session/catalog";
 import type {
   MaybeCodeEvent,
   MaybeCodeRun,
