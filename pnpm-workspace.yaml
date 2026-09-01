@@ -2,5 +2,6 @@ packages:
   - "packages/*"
   - "packages/providers/*"
   - "packages/tools/*"
+  - "packages/ui/*"
   - "apps/*"
   - "examples/*"

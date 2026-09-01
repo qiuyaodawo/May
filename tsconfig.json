@@ -15,6 +15,7 @@
     { "path": "./packages/providers/openai" },
     { "path": "./packages/tools/coding-tools" },
     { "path": "./packages/tools/session-tools" },
+    { "path": "./packages/ui/keybindings" },
     { "path": "./apps/cli" },
     { "path": "./apps/maybecode" }
   ]
