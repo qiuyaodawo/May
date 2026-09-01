@@ -518,6 +518,59 @@ test("does not persist input from a submission that was already cancelled", asyn
   assert.deepEqual(replayed, []);
 });
 
+test("keeps durable and live input aligned when cancellation races storage", async () => {
+  const backing = new InMemorySessionStore();
+  const inputStarted = deferred();
+  const releaseInput = deferred();
+  const store = {
+    read: (sessionId) => backing.read(sessionId),
+    async append(event) {
+      if (event.type === "input.submitted") {
+        inputStarted.resolve();
+        await releaseInput.promise;
+      }
+      await backing.append(event);
+    },
+  };
+  const context = new InMemoryContext();
+  const session = await Session.create({
+    runtime: new May({
+      context,
+      model: {
+        async *stream() {
+          yield {
+            type: "response.completed",
+            message: assistantMessage("unreachable"),
+          };
+        },
+      },
+    }),
+    store,
+  });
+  const controller = new AbortController();
+  const submission = session.submit({
+    input: "committed before cancellation",
+    signal: controller.signal,
+  });
+
+  await inputStarted.promise;
+  controller.abort("cancel during storage");
+  releaseInput.resolve();
+  const run = await submission;
+  await assert.rejects(run.result, RunCancelledError);
+
+  assert.equal(
+    (await session.history()).filter((event) =>
+      event.type === "input.submitted"
+    ).length,
+    1,
+  );
+  assert.deepEqual((await context.snapshot()).messages, [{
+    role: "user",
+    content: [{ type: "text", text: "committed before cancellation" }],
+  }]);
+});
+
 test("rejects a duplicate session id in the same store", async () => {
   const store = new InMemorySessionStore();
   await Session.create({ id: "same", runtime: createRuntime(), store });

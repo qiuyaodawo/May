@@ -229,11 +229,33 @@ export class Session {
     const input: UserMessage = typeof options.input === "string"
       ? userMessage(options.input)
       : options.input;
-    if (options.signal?.aborted !== true) {
-      await this.record({ type: "input.submitted", message: input });
+    if (options.signal?.aborted === true) {
+      return this.wrapRun(this.runtime.run(options));
     }
+    await this.record({ type: "input.submitted", message: input });
 
-    return this.wrapRun(this.runtime.run(options));
+    return this.wrapRun(this.runAfterInputCommit(options));
+  }
+
+  private runAfterInputCommit(options: RunOptions): RunHandle {
+    const externalSignal = options.signal;
+    if (externalSignal === undefined) return this.runtime.run(options);
+
+    // Once input.submitted is durable, let Core start its non-cancellable
+    // context append before forwarding an abort that arrived during storage.
+    // This keeps the live context and replay on the same side of the commit.
+    const controller = new AbortController();
+    const run = this.runtime.run({ ...options, signal: controller.signal });
+    const forwardAbort = () => controller.abort(externalSignal.reason);
+    if (externalSignal.aborted) {
+      forwardAbort();
+    } else {
+      externalSignal.addEventListener("abort", forwardAbort, { once: true });
+      const removeListener = () =>
+        externalSignal.removeEventListener("abort", forwardAbort);
+      void run.result.then(removeListener, removeListener);
+    }
+    return run;
   }
 
   private startContinuation(options: ContinueOptions): RunHandle {
