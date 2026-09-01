@@ -1,0 +1,83 @@
+import assert from "node:assert/strict";
+import { PassThrough } from "node:stream";
+import test from "node:test";
+
+import { createNodeTerminal } from "@may/tui/node-terminal";
+
+test("completes suggestions and redraws an active prompt around output", async () => {
+  const { terminal, input, output } = createTestTerminal();
+  const suggestionInputs = [];
+  const answer = terminal.question("> ", {
+    history: false,
+    suggestions(line) {
+      suggestionInputs.push(line);
+      return line.startsWith("/")
+        ? [{ value: "/retry", label: "/retry", description: "Retry" }]
+        : [];
+    },
+  });
+  await tick();
+  input.write("/re");
+  await tick();
+  await tick();
+
+  input.write("\t");
+  await tick();
+  await tick();
+
+  terminal.write("status update\n");
+  input.write("\r");
+
+  assert.equal(await answer, "/retry");
+  assert.ok(suggestionInputs.includes("/re"));
+  assert.match(output(), /\/retry  Retry/u);
+  assert.match(output(), /status update\n> \/retry/u);
+  terminal.close();
+});
+
+test("keeps temporary answers out of history and normalizes standalone keys", async () => {
+  const { terminal, input } = createTestTerminal();
+  const approval = terminal.question("approve: ", { history: false });
+  await tick();
+  input.write("s\r");
+  assert.equal(await approval, "s");
+
+  terminal.addHistory("first line\nsecond line");
+  const recalled = terminal.question("> ", { history: false });
+  await tick();
+  input.write("\x1b[A\r");
+  assert.equal(await recalled, "first line second line");
+
+  const stroke = terminal.readKey();
+  await tick();
+  input.write("d");
+  assert.deepEqual(await stroke, {
+    key: "d",
+    ctrl: false,
+    alt: false,
+    shift: false,
+    meta: false,
+    text: "d",
+  });
+  terminal.close();
+});
+
+function createTestTerminal() {
+  const input = new PassThrough();
+  input.isTTY = true;
+  input.setRawMode = () => {};
+  const stream = new PassThrough();
+  stream.isTTY = true;
+  stream.columns = 80;
+  let output = "";
+  stream.on("data", (chunk) => output += chunk.toString());
+  return {
+    input,
+    terminal: createNodeTerminal({ input, output: stream, colors: false }),
+    output: () => output,
+  };
+}
+
+function tick() {
+  return new Promise((resolve) => setImmediate(resolve));
+}

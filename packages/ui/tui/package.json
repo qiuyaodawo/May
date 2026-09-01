@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./node-terminal": {
+      "types": "./dist/node-terminal.d.ts",
+      "import": "./dist/node-terminal.js"
     }
   },
   "files": [

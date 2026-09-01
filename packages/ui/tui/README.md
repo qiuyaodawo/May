@@ -13,7 +13,15 @@ The first milestone provides:
 - explicit focus management and a batched TUI runtime;
 - a retained screen buffer and differential full-screen renderer;
 - a Node terminal driver that emits `@may/keybindings` key strokes and treats
-  bracketed paste as one safe multiline input operation.
+  bracketed paste as one safe multiline input operation;
+- a readline-backed `TerminalIO` adapter for prompt-driven applications, with
+  history, live suggestions, prompt-safe asynchronous output, and normalized
+  one-key reads.
+
+Use `NodeTerminalDriver` when an application owns a retained, raw-mode screen.
+Use `createNodeTerminal` when it needs line-oriented questions and occasional
+temporary full-screen views. The latter is also available through the
+`@may/tui/node-terminal` subpath.
 
 `Editor` supports grapheme-aware editing, optional in-process `EditorHistory`,
 history navigation at the first/last logical line, `Ctrl+W` or modified

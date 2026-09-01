@@ -3,6 +3,7 @@ export * from "./column.js";
 export * from "./editor.js";
 export * from "./focus.js";
 export * from "./markdown.js";
+export * from "./node-terminal.js";
 export * from "./overlay.js";
 export * from "./renderer.js";
 export * from "./runtime.js";
