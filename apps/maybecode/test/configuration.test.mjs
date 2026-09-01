@@ -34,7 +34,7 @@ test("parses MaybeCode startup options", () => {
       model: "reasoner",
       sessionId: "abc",
       autoResume: false,
-      ui: "classic",
+      ui: "retained",
     },
   );
   assert.equal(parseMaybeCodeArgs(["--ui", "retained"]).ui, "retained");

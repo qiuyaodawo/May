@@ -8,7 +8,7 @@ Usage:
 Options:
   --config <path>      Load another May config file
   --model <name>       Use a named model profile
-  --ui <name>          UI implementation: classic (default) or retained
+  --ui <name>          UI implementation: retained (default) or classic
   -c, --continue       Continue the most recent session for this workspace
   -r, --resume <id>    Resume a specific session
   -h, --help           Show this help
@@ -109,7 +109,7 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   return {
     type: "start",
     autoResume: continueLatest,
-    ui: ui ?? "classic",
+    ui: ui ?? "retained",
     ...(workspace === undefined ? {} : { workspace }),
     ...(configPath === undefined ? {} : { configPath }),
     ...(model === undefined ? {} : { model }),
