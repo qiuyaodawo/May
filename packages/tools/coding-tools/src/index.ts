@@ -1,4 +1,5 @@
 export * from "./bash.js";
+export * from "./change-preview.js";
 export * from "./coding-tools.js";
 export * from "./edit.js";
 export * from "./errors.js";

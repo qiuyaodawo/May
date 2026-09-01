@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./change-preview": {
+      "types": "./dist/change-preview.d.ts",
+      "import": "./dist/change-preview.js"
     }
   },
   "files": [
