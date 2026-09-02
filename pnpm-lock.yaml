@@ -57,9 +57,6 @@ importers:
       '@may/session':
         specifier: workspace:*
         version: link:../../packages/session
-      '@may/session-tools':
-        specifier: workspace:*
-        version: link:../../packages/tools/session-tools
       '@may/tui':
         specifier: workspace:*
         version: link:../../packages/ui/tui

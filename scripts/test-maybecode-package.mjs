@@ -30,6 +30,13 @@ const repositoryStore = (await runPnpm(["store", "path"], {
 await resetSmokeDirectory(directory);
 await mkdir(packsDirectory, { recursive: true });
 
+// TypeScript incremental builds do not remove outputs for deleted source files.
+// Pack from a fresh application dist so retired implementation modules cannot
+// leak into the tarball after a refactor.
+await rm(join(repository, "apps", "maybecode", "dist"), {
+  recursive: true,
+  force: true,
+});
 await runPnpm(["run", "build"], { cwd: repository, inherit: true });
 const packedOutput = await runPnpm([
   "--filter",
@@ -50,6 +57,18 @@ assert.ok(application, "@may/maybecode was not packed");
 const applicationPaths = application.files.map((file) => file.path);
 assert.ok(applicationPaths.includes("dist/bin.js"), "packed bin is missing");
 assert.ok(applicationPaths.includes("dist/index.js"), "packed entry point is missing");
+const retiredModules = [
+  "dist/ui/tool-renderers",
+  "dist/ui/transcript-store",
+  "dist/ui/transcript-view",
+];
+assert.equal(
+  applicationPaths.some((path) => retiredModules.some((module) =>
+    path === module || path.startsWith(`${module}.`)
+  )),
+  false,
+  "retired MaybeCode TUI implementations leaked into the package",
+);
 assert.equal(
   applicationPaths.some((path) => path.startsWith("src/") || path.startsWith("test/")),
   false,

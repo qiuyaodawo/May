@@ -18,7 +18,6 @@
     { "path": "../../packages/permissions" },
     { "path": "../../packages/session" },
     { "path": "../../packages/providers" },
-    { "path": "../../packages/tools/coding-tools" },
-    { "path": "../../packages/tools/session-tools" }
+    { "path": "../../packages/tools/coding-tools" }
   ]
 }
