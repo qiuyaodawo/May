@@ -9,8 +9,10 @@ A May tool is one named capability exposed to a model. The `Tool` contract from
 - optional `parse()` validates and converts untrusted model output;
 - `execute()` performs the operation.
 
-There is currently no process-global tool registry. Each `May` or
-`AgentApplication` receives its own tool array.
+`ToolRegistry` provides instance-scoped composition and lookup. There is no
+process-global tool registry: each definition, application, or Core runtime
+receives an `Iterable<Tool>` and snapshots its membership at the appropriate
+construction boundary.
 
 ## A complete tool
 
@@ -58,20 +60,87 @@ export const addTool: Tool<AddInput, AddOutput> = {
 };
 ```
 
-Register it when opening an application:
+Compose it with other capabilities, then capture the composition in an Agent
+definition:
 
 ```ts
-const application = await AgentApplication.open({
+import { defineAgent } from "@may/application";
+import { ToolRegistry } from "@may/core";
+
+const tools = new ToolRegistry([addTool]);
+tools.registerAll(productTools);
+
+const agent = defineAgent({
   model,
-  store,
-  tools: [addTool],
+  tools,
   permissionPolicy,
 });
+
+const application = await agent.open({ store });
 ```
 
 `inputSchema` is sent to the model; it is not a runtime validator. Always
 validate in `parse()` (or inside `execute()` if no separate parser is useful).
 The permission policy receives the parsed value.
+
+## Registry composition and lookup
+
+`ToolRegistry` implements `Iterable<Tool>` and retains insertion order. Its
+complete collection API is:
+
+```ts
+const registry = new ToolRegistry(baseTools);
+
+registry.register(tool);
+registry.registerAll(featureTools);
+
+registry.size;
+registry.has("add");
+registry.get("add");       // Tool | undefined
+registry.require("add");   // Tool, or ToolNotFoundError
+registry.names();          // insertion-ordered string snapshot
+registry.values();         // insertion-ordered Tool snapshot
+registry.definitions();    // model-facing definitions, no execute/parse
+
+const independent = registry.clone();
+const composed = ToolRegistry.compose(baseTools, featureTools);
+for (const registeredTool of composed) {
+  console.log(registeredTool.name);
+}
+```
+
+The constructor and registration methods validate the Tool shape. Duplicate
+names throw `DuplicateToolNameError`. `registerAll()` is atomic: if any member
+is invalid, repeats another incoming name, or conflicts with an existing name,
+none of that group is registered. `register()` delegates to the same rule.
+`clone()` and `compose()` create independent registries; they do not mutate a
+source registry.
+
+Collection snapshots preserve the original Tool object identity rather than
+cloning executable objects. This allows product metadata keyed by Tool identity
+(for example, a `WeakMap<Tool, Metadata>`) to keep working across composition.
+The Tool's `name`, `description`, and `inputSchema` fields are readonly in
+TypeScript; those fields plus `parse` and `execute` must remain stable after
+registration. When returning tools or model definitions, a registry checks the
+registered `name`, `description`, `inputSchema` reference, `parse`, and
+`execute`; changing one causes `TypeError`. The check is shallow—the schema
+object is not deep-frozen—so treat its contents as immutable too. Create new
+Tool objects when an application needs different per-Session descriptors or
+state.
+
+`May` consumes any tool iterable and snapshots it in the constructor.
+`defineAgent()` consumes and snapshots its iterable when the definition is
+created, before any application is opened. Direct `AgentApplication.open()`
+accepts an iterable and snapshots it while opening. Consequently, registering
+a tool later affects none of those existing owners:
+
+```ts
+const tools = new ToolRegistry([addTool]);
+const agent = defineAgent({ model, tools, permissionPolicy });
+
+tools.register(subtractTool); // available in tools, not in agent
+const application = await agent.open({ store });
+```
 
 ## Execution context
 

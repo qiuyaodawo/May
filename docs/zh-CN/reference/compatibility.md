@@ -25,6 +25,32 @@ import type { ContextFactory } from "@may/context";
 当前 API 在 `1.0.0` 前可能变化。重命名 API 时，May 会在可行情况下提供文档化的
 deprecated alias 或 adapter，但预览版用户仍应阅读每次发布说明并重新编译。
 
+### 组合对象
+
+`ToolRegistry`、`DuplicateToolNameError`、`AgentDefinition` 和 `defineAgent()` 都通过
+各自 package 的根入口导出，但仍服从同一套 `0.1.0` 开发预览兼容策略。
+
+`@may/core` 的 `ToolRegistry` 是调用方创建的实例，不是进程全局 registry。它实现
+`Iterable<Tool>`；`May` 在构造时消费 iterable 并保存当时的成员，因此之后注册到源
+registry 的工具不会出现在已有 runtime 中。重名由 `DuplicateToolNameError` 明确拒绝，
+不会以后注册者覆盖前者。
+
+Registry 保留原始 `Tool` 对象身份，但会在注册时保存其 readonly descriptor：名称、
+描述、schema 引用、parser 和 executor。若这些字段随后被替换，需要返回/迭代工具或
+生成模型定义的 registry 操作会抛出 `TypeError`。Schema 只按引用检查且不会深度冻结；
+调用方必须让 descriptor 保持稳定，并自行管理 Tool 的其他内部状态。
+
+`@may/application` 的 `AgentDefinition`/`defineAgent()` 在 definition 创建时同样消费并
+快照工具 iterable。每次 `definition.open({ store, ... })` 都创建独立的 application 与
+Session 生命周期；Session id、恢复选项和 metadata 不属于 definition。直接调用
+`AgentApplication.open()` 时，则在打开期间快照 iterable。
+
+这些快照是**集合和部分 option 容器的浅快照**，并非任意协作者的序列化或深克隆。
+`Model`、`ContextFactory`、`ToolExecutor`、`ToolScheduler`、policy closure 和 `Tool`
+对象仍由调用方拥有；同一 definition 多次打开时会有意共享它们。不要依赖 May 自动
+隔离有状态 adapter，也不要把 `AgentDefinition` 当作可持久化 wire format。需要跨进程
+保存 definition 的产品应定义自己的带版本配置格式，并在恢复时重新构造这些对象。
+
 ## 事件
 
 Run 和 permission stream 是实时观察通道。消费者过慢时，有界队列可能丢弃高频

@@ -1,7 +1,7 @@
 {
   "name": "@may/application",
   "version": "0.1.0",
-  "description": "Headless application and workspace lifecycle for May agents.",
+  "description": "Reusable Agent definitions and headless application/workspace lifecycle for May agents.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

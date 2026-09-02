@@ -7,8 +7,8 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 
 ## 从这里开始
 
-1. [快速开始](getting-started.md) —— 运行一个最小 Agent，并将其扩展为可持久化、
-   可恢复的 `AgentApplication`。
+1. [快速开始](getting-started.md) —— 定义可复用 Agent、组合工具，并打开可持久化的
+   `AgentApplication`。
 2. [构建 Agent](guides/building-an-agent.md) —— 选择模型、工具、指令、Context、
    权限、Session 存储和 UI。
 3. [Package 参考](reference/packages.md) —— 为应用选择最小且合适的 May 层级。

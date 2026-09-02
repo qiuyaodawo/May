@@ -66,7 +66,8 @@ Session、权限、历史或 UI-independent 生命周期的产品应从这里开
 创建 `examples/quickstart-agent/agent.mjs`：
 
 ```js
-import { AgentApplication } from "@may/application";
+import { defineAgent } from "@may/application";
+import { ToolRegistry } from "@may/core";
 import { InMemorySessionStore } from "@may/session";
 
 /** @type {import("@may/core").Model} */
@@ -129,17 +130,17 @@ const add = {
 };
 
 const store = new InMemorySessionStore();
-const applicationOptions = {
+const tools = new ToolRegistry().register(add);
+const agent = defineAgent({
   model,
-  store,
-  tools: [add],
+  tools,
   instructions: "Use the add tool and answer concisely.",
   // 仅因该确定性示例中的每个工具都可信，才可这样设置。
   permissionPolicy: () => "allow",
   sessionHistory: false,
-};
+});
 
-const application = await AgentApplication.open(applicationOptions);
+const application = await agent.open({ store });
 const sessionId = application.sessionId;
 
 try {
@@ -159,8 +160,8 @@ try {
 }
 
 // 只要进程和同一个 store 对象仍存在，内存 store 就能恢复。
-const resumed = await AgentApplication.open({
-  ...applicationOptions,
+const resumed = await agent.open({
+  store,
   sessionId,
   resume: true,
 });
@@ -205,18 +206,31 @@ DeepSeek 接线，需要 `@may/provider-deepseek`、`DEEPSEEK_API_KEY` 和受支
 代码提供了通用生命周期本身无法替产品选择的行为与策略：
 
 ```text
-AgentApplication
+AgentDefinition
   + Model                 模型请求如何得到回答
-  + Tool[]                模型可用的 capability
+  + ToolRegistry          模型可用的 capability
   + instructions          产品行为
   + PermissionPolicy      每个已校验工具调用是否可以执行
-  + SessionStore          一个 Session 身份的持久化事实
   + ContextFactory        此处省略，因此使用默认内存实现
+       |
+       `- open({ store }) -> AgentApplication -> Session
+                              + SessionStore    持久化事实
 ```
 
-`AgentApplication.open()` 创建新 Session，除非同时提供 `resume: true` 和 `sessionId`。
-它会安装 permission executor、创建 Core runtime、转发事件，并连接 history 与 Context
-管理。
+`defineAgent()` 保存可复用的行为和策略，并在创建时快照传入的工具 iterable。即使之后
+向 `tools` registry 注册新工具，已有 definition 也不会改变。`agent.open()` 每次创建
+独立的 `AgentApplication`；它创建新 Session，除非同时提供 `resume: true` 和
+`sessionId`。打开过程会安装 permission executor、创建 Core runtime、转发事件，并
+连接 history 与 Context 管理。
+
+`ToolRegistry` 是实例级组合对象，不是进程全局表。当多个 feature 提供工具时，它能
+集中检测重名，但并非必需。简单 Agent 可以直接向 `defineAgent({ tools: [...] })` 传
+数组；Set、generator 或任何其他 `Iterable<Tool>` 也可用。
+
+Definition 会复用同一批 Tool、Model 和其他协作者对象，而不会深克隆它们。应保持
+Tool descriptor 稳定；若 Model、Context factory、自定义 executor 或 scheduler 有内部
+状态，调用方必须保证它可以在多个已打开 application 之间安全共享，或为每个
+ownership 边界创建单独的 definition。
 
 示例显式禁用可选 `session_history` 工具。需要模型查询持久化 Session history 的有界
 分页时，改为传入 `sessionHistory: {}`。

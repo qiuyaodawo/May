@@ -1,9 +1,10 @@
 import { resolve } from "node:path";
 
 import {
-  AgentApplication,
   contextBudgetFromModel,
+  defineAgent,
   withDefaultCompactionThreshold,
+  type AgentApplication,
   type AgentApplicationEvent,
 } from "@may/application";
 import {
@@ -32,6 +33,7 @@ import {
 import {
   AsyncEventQueue,
   isStreamingMayEvent,
+  ToolRegistry,
   type ContextSnapshot,
   type Model,
   type RunOptions,
@@ -65,7 +67,7 @@ export interface MaybeCodeApplicationOptions {
   readonly store: SessionStore;
   readonly sessionId?: string;
   readonly resume?: boolean;
-  readonly tools?: readonly Tool[];
+  readonly tools?: Iterable<Tool>;
   readonly permissionPolicy?: PermissionPolicy;
   readonly contextFactory?: ContextFactory;
   readonly contextBudget?: ContextBudget;
@@ -130,8 +132,10 @@ export class MaybeCodeApplication {
     options: MaybeCodeApplicationOptions,
   ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
-    const configuredTools = options.tools ?? createCodingTools({ cwd: workspace });
-    const shellInfo = configuredTools
+    const configuredTools = new ToolRegistry(
+      options.tools ?? createCodingTools({ cwd: workspace }),
+    );
+    const shellInfo = configuredTools.values()
       .map((tool) => getShellToolInfo(tool))
       .find((info) => info !== undefined);
     const instructions = await loadMaybeCodeInstructions({
@@ -177,18 +181,11 @@ export class MaybeCodeApplication {
       options.contextBudget ?? contextBudgetFromModel(options.model),
     );
 
-    const application = await AgentApplication.open({
+    const definition = defineAgent({
       model: options.model,
-      store: options.store,
       permissionPolicy: options.permissionPolicy ?? createCodingPermissionPolicy(),
       tools: configuredTools,
       instructions: instructions.effective,
-      metadata: { workspace },
-      contextMetadata: { workspace },
-      ...(options.sessionId === undefined
-        ? {}
-        : { sessionId: options.sessionId }),
-      ...(options.resume === undefined ? {} : { resume: options.resume }),
       ...(options.contextFactory === undefined
         ? {}
         : { contextFactory: options.contextFactory }),
@@ -215,6 +212,15 @@ export class MaybeCodeApplication {
       },
       validateSession: (metadata) => assertWorkspace(metadata, workspace),
       closeReason: "MaybeCode is closing",
+    });
+    const application = await definition.open({
+      store: options.store,
+      metadata: { workspace },
+      contextMetadata: { workspace },
+      ...(options.sessionId === undefined
+        ? {}
+        : { sessionId: options.sessionId }),
+      ...(options.resume === undefined ? {} : { resume: options.resume }),
     });
 
     return new MaybeCodeApplication(

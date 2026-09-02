@@ -7,8 +7,8 @@ be used independently or combined into complete agents and applications.
 
 ```text
 packages/
-  core/       Agent loop, contracts, events, and in-memory Context
-  application/  Headless single-session and workspace application lifecycle
+  core/       Agent loop, ToolRegistry, contracts, events, and in-memory Context
+  application/  Agent definitions plus single-session/workspace lifecycle
   context/    Context factories, compaction, and model-backed summarization
   session/    Serialized runs, durable history, and session catalogs
   permissions/  Headless tool policies and approval requests

@@ -15,7 +15,8 @@ surface or persistence format as stable.
 | Goal | Start with | Usually add |
 | --- | --- | --- |
 | Run one model/tool loop in memory | `@may/core` | A provider adapter |
-| Build a headless, durable single-session Agent | `@may/application` | `@may/session`, `@may/context`, permissions and tools |
+| Define reusable Agent behavior and policy | `defineAgent()` from `@may/application` | A `ToolRegistry` from `@may/core` |
+| Build a headless, durable single-session Agent | `AgentDefinition.open()` or `AgentApplication.open()` | `@may/session`, `@may/context`, permissions and tools |
 | Manage multiple sessions in one workspace | `@may/application` | A `SessionCatalog` from `@may/session/catalog` |
 | Build a terminal Agent | Headless application controller | `@may/tui`, optionally `@may/keybindings` |
 | Build a coding Agent | Headless application controller | `@may/coding-tools` and an execution isolation policy |
@@ -33,6 +34,8 @@ that needs sessions, approvals, context management and orderly shutdown.
 The provider-neutral execution kernel:
 
 - `May`, `Model`, `Tool`, `Context` and `ToolExecutor` contracts;
+- instance-scoped `ToolRegistry` composition, lookup and model-definition
+  projection;
 - Run and Step execution, streaming events and cancellation;
 - tool scheduling and normalized messages;
 - `InMemoryContext` for small or ephemeral integrations.
@@ -41,19 +44,34 @@ Core deliberately does not own durable sessions, provider selection, product
 configuration, permission policy or UI. See the
 [Core package README](../../../packages/core/README.md).
 
+`ToolRegistry` implements `Iterable<Tool>` and provides `register()`, atomic
+`registerAll()`, `has()`, `get()`, `require()`, `size`, `names()`, `values()`,
+`definitions()`, `clone()`, iteration and static `compose()`. Ambiguous names
+throw `DuplicateToolNameError`. `May` accepts any tool iterable and snapshots
+its membership when constructed. Registry snapshots preserve original Tool
+identity while guarding the registered descriptor values/references against
+later replacement; they do not deep-clone tools or schemas.
+
 ### `@may/application`
 
 Headless orchestration above Core:
 
+- `AgentDefinition` and `defineAgent()` capture reusable behavior and policy;
 - `AgentApplication` owns one active durable Session;
 - `AgentWorkspace` owns active-session selection and Catalog updates;
 - `AgentController` and `AgentWorkspaceController` define UI-independent
   control surfaces;
 - `AsyncStateSerializer` serializes product and session transitions;
 - context inspection and compaction results are persisted through Session;
+- optional custom `ToolExecutor` and `ToolScheduler` injection;
 - optional `session_history` and tool-presentation support.
 
-Models, tools, prompts, policies and storage remain injected product choices.
+Definition-time Models, tools, prompts and policies remain injected product
+choices. Storage, Session identity and Session/Context metadata are supplied
+to `AgentDefinition.open()`. Every call opens an independent application, but
+stateful collaborators captured by the definition—including a custom tool
+scheduler—remain caller-owned and shared. Tool iterable membership is
+snapshotted when the definition is created.
 See [Agent and Application](../concepts/agent-application.md) and the
 [package README](../../../packages/application/README.md).
 

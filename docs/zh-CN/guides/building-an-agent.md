@@ -8,15 +8,20 @@ May 是一组可组合 package，而不是单一的预配置 assistant。应用�
 尚未运行 Agent 时先阅读[快速开始](../getting-started.md)。Agent definition、Session、
 Run 和 Step 见 [Runtime 与 Session 边界](../architecture/runtime-session.md)。
 
-> **当前 API：** 在 May `0.1.0` 中，“Agent definition”是设计概念，而不是
-> `defineAgent()` 函数。工具通过数组传入，也没有全局 `ToolRegistry`。应像下文一样
-> 用普通 factory 组合产品，不要依赖尚不存在的 API。
+> **当前 API：** `@may/application` 提供 `AgentDefinition` 和 `defineAgent()`，用于把
+> 可复用行为与 Session 生命周期输入分开。`@may/core` 提供实例级 `ToolRegistry`；它
+> 不是进程全局状态。两者都接受 `Iterable<Tool>`，因此数组仍然是有效的简单输入。
 
 ## 组合模型
 
 ```text
 Product-owned decisions
   model + instructions + tools + permission policy + Context policy
+                              |
+                              v
+                     AgentDefinition
+                              |
+                    open(Session inputs)
                               |
                               v
                     AgentApplication
@@ -42,23 +47,29 @@ MaybeCode 是参考组合，不是必需 superclass 或 runtime。
 | --- | --- | --- |
 | `@may/core` 的 `May` | 一次性、临时或深度嵌入式执行 | Run 上层的 Context 连续性、持久化、权限与关闭 |
 | `@may/session` 的 `Session` | 需要持久化对话身份，但希望手工组装生命周期 | Runtime 重建、permission event 持久化、发现和 UI relay |
+| `@may/application` 的 `AgentDefinition` | 多个 Session 要复用同一套行为与策略 | 每次打开时提供存储、身份与 metadata |
 | `@may/application` 的 `AgentApplication` | Headless 产品需要一个活动、可恢复 Session | 产品模型、工具、指令、策略、存储和 event handling |
 | `@may/application` 的 `AgentWorkspace` | 用户需要创建、列出、恢复、重命名或删除 Session | Application factory、`SessionCatalog` 和产品配置迁移 |
 
-多数交互产品应从 `AgentApplication` 开始。只有 Core 故意保持的小边界恰好是所需能力时，
-才直接使用 Core。不要在 `AgentApplication` 外再包一层 `Session`，它已经拥有一个。
+多数交互产品应先用 `defineAgent()` 定义行为，再从中打开 application。只有不需要复用
+definition/open 分界时，才直接调用 `AgentApplication.open()`；只有 Core 故意保持的
+小边界恰好是所需能力时，才直接使用 Core。不要在 `AgentApplication` 外再包一层
+`Session`，它已经拥有一个。
 
 ## 必需与可选输入
 
-`AgentApplication.open()` 必须提供：
+推荐把输入分成两个阶段。`defineAgent()` 必须提供：
 
 - 一个 `Model`；
-- 一个 `SessionStore`；
 - 一个 `PermissionPolicy`。
 
-其余均是明确的可选选择：
+`definition.open()` 必须提供一个 `SessionStore`，并可为本次 Session 提供 `sessionId`、
+`resume`、`metadata` 和 `contextMetadata`。Definition option 会明确拒绝这五项
+Session-bound 输入，避免一个可复用 definition 意外捕获单个对话身份。其余行为均是
+definition 阶段的明确可选选择：
 
 - `tools` 默认不包含产品工具；
+- `toolScheduler` 默认使用 Core 的串行 scheduler；
 - `instructions` 默认没有 system instruction；
 - `contextFactory` 默认为 `InMemoryContextFactory`；
 - 未配置时禁用 Context budget 与 compaction；
@@ -66,9 +77,12 @@ MaybeCode 是参考组合，不是必需 superclass 或 runtime。
 - 只有 `sessionHistory` 是 option object 时才安装有界 `session_history` 工具；
 - 只有产品提供 `createToolPresentation` 才生成工具呈现 metadata。
 
-## 把组合集中在一个 Factory
+直接调用 `AgentApplication.open()` 仍受支持；此时以上两组输入放在同一个 option 对象
+中。一次性或高度动态的组合可使用该入口，复用行为时则优先使用 definition。
 
-下面是完整的 provider-neutral TypeScript application factory。调用方可传入任何实现
+## 把组合集中在一个 Agent Definition
+
+下面是完整的 provider-neutral TypeScript definition factory。调用方可传入任何实现
 Core `Model` 契约的对象。
 
 该文件需要的 workspace dependency：
@@ -85,18 +99,9 @@ Core `Model` 契约的对象。
 ```
 
 ```ts
-import { AgentApplication, type AgentApplicationOptions } from "@may/application";
+import { defineAgent, type AgentDefinition } from "@may/application";
 import { InMemoryContextFactory, PruneOldToolResultsStrategy } from "@may/context";
-import type { Model, Tool } from "@may/core";
-import type { SessionStore } from "@may/session";
-
-export interface OpenExampleAgentOptions {
-  readonly model: Model;
-  readonly store: SessionStore;
-  readonly workspace: string;
-  readonly sessionId?: string;
-  readonly resume?: boolean;
-}
+import { ToolRegistry, type Model, type Tool } from "@may/core";
 
 const lookup: Tool<{ key: string }, { value: string | null }> = {
   name: "lookup",
@@ -122,25 +127,22 @@ const lookup: Tool<{ key: string }, { value: string | null }> = {
   },
 };
 
-export function openExampleAgent(
-  options: OpenExampleAgentOptions,
-): Promise<AgentApplication> {
+export function createExampleAgent(model: Model): AgentDefinition {
   const prune = new PruneOldToolResultsStrategy({
     keepRecentToolResults: 4,
     minimumResultBytes: 2_048,
   });
 
-  const applicationOptions: AgentApplicationOptions = {
-    model: options.model,
-    store: options.store,
-    tools: [lookup],
+  const tools = new ToolRegistry([lookup]);
+
+  return defineAgent({
+    model,
+    tools,
     instructions: [
       "You are Example Agent.",
       "Use lookup when a requested value may exist in the data source.",
       "Do not invent missing values.",
     ].join("\n"),
-    metadata: { workspace: options.workspace, agent: "example" },
-    contextMetadata: { workspace: options.workspace },
     permissionPolicy: ({ tool }) =>
       tool.name === "lookup" ? "allow" : "deny",
     contextFactory: new InMemoryContextFactory(),
@@ -159,19 +161,31 @@ export function openExampleAgent(
       maxEventBytes: 8 * 1_024,
     },
     maxSteps: 16,
-    ...(options.sessionId === undefined
-      ? {}
-      : { sessionId: options.sessionId }),
-    ...(options.resume === true ? { resume: true } : {}),
-  };
-
-  return AgentApplication.open(applicationOptions);
+  });
 }
 ```
 
-这个 factory 就是产品实际的 Agent definition。它容易测试，也让所有会改变行为的选择
-集中在一处接受 review。64,000 token budget 只是示例值，**不代表所有模型**；应使用
-所选 provider/model 的文档限制，并为输出和预期工具 payload 保留足够空间。
+创建 definition 后，用 Session 级输入打开 application：
+
+```ts
+const agent = createExampleAgent(model);
+const application = await agent.open({
+  store,
+  metadata: { workspace, agent: "example" },
+  contextMetadata: { workspace },
+});
+```
+
+这个 factory 返回产品实际的 Agent definition。它容易测试，也让所有会改变行为的选择
+集中在一处接受 review。工具 iterable 在 `defineAgent()` 返回前就被快照；随后修改
+`tools` 数组或 registry 不会悄悄改变已有 definition。64,000 token budget 只是示例值，
+**不代表所有模型**；应使用所选 provider/model 的文档限制，并为输出和预期工具
+payload 保留足够空间。
+
+每次 `agent.open(...)` 都创建独立的 `AgentApplication` 和 Session 生命周期。Definition
+不会深拷贝 model、Context factory、tool scheduler 或其他有状态协作者；这些对象仍由
+调用方拥有，并会在多次打开之间共享。若 adapter 不能安全共享，应为它创建独立
+definition 或包装工厂。
 
 ## 显式作出每个组合决策
 
@@ -214,9 +228,29 @@ Tool 拥有一个 capability、JSON Schema、可选 parser、execution 与 cance
 即使已提供 schema，也应实现严格 `parse()`：parser 将 provider 输出转换为已校验、
 typed value，并在 runtime 拒绝 malformed input。
 
-Runtime 内工具名必须唯一；`May` 拒绝重复。启用可选 history tool 时，
-`AgentApplication` 保留 `session_history`。当前 API 通过数组组合工具；工具分组 function
-应放在本地 tool package 或产品中，不要假设存在全局 registry。
+Runtime 内工具名必须唯一；`May` 和 `ToolRegistry` 用 `DuplicateToolNameError` 拒绝重复。
+启用可选 history tool 时，`AgentApplication` 保留 `session_history`。
+
+数组适合固定的小集合；多个 feature 提供工具时，可用实例级 registry 明确组合：
+
+```ts
+const tools = ToolRegistry.compose(filesystemTools, searchTools);
+tools.register(reviewTool);
+
+if (tools.has("review")) {
+  console.log(tools.names());
+}
+```
+
+`registerAll()` 会先校验整个输入；若任意工具无效，或名字与现有/同批工具重复，registry
+保持不变。`values()`、`definitions()` 返回按注册顺序排列的快照，`clone()` 创建可独立
+继续注册的 registry，registry 自身也可直接迭代。详细 API 见[自定义工具](custom-tool.md)。
+Registry 是组合对象而不是 service locator；不要建立隐藏的进程级全局实例。
+
+`May` 接受任意 `Iterable<Tool>` 并在构造时快照它，之后修改源 registry 不会改变正在
+运行的 runtime。`AgentDefinition` 同样在定义时快照工具；直接
+`AgentApplication.open()` 则在打开期间快照。源 registry 的后续修改只影响之后重新
+接收该 registry 的 consumer。
 
 工具接收 `AbortSignal`，并可通过 `context.report(...)` 报告实时进度。I/O 和 subprocess
 应尊重取消。普通工具 failure 变成模型可见 error result，fatal error 只用于无法安全
@@ -224,7 +258,9 @@ Runtime 内工具名必须唯一；`May` 拒绝重复。启用可选 history too
 
 横切执行行为属于 Core `ToolExecutor` seam。`AgentApplication` 接受 `toolExecutor`，
 再用 permission executor 包装它，因此 logging、sandbox dispatch 或 timeout 可以注入，
-无需修改每个 Tool。
+无需修改每个 Tool。独立的 `toolScheduler` 决定同一 Step 中调用的调度方式；application
+会把它转发给 Core，definition 则会捕获并复用该 scheduler。默认保持串行，只有工具和
+协作者都能安全并发时才选择并行 scheduler。
 
 ### Permission 不是 Sandbox
 
@@ -366,6 +402,7 @@ import { join } from "node:path";
 const stateDirectory = join(process.cwd(), ".may");
 const store = new FileSessionStore(join(stateDirectory, "sessions"));
 const catalog = new FileSessionCatalog(join(stateDirectory, "catalog.json"));
+const agent = createExampleAgent(model);
 
 const workspace = await AgentWorkspace.open({
   workspace: process.cwd(),
@@ -373,10 +410,10 @@ const workspace = await AgentWorkspace.open({
   catalog,
   autoResume: true,
   openApplication: ({ sessionId, resume }) =>
-    openExampleAgent({
-      model,
+    agent.open({
       store,
-      workspace: process.cwd(),
+      metadata: { workspace: process.cwd(), agent: "example" },
+      contextMetadata: { workspace: process.cwd() },
       ...(sessionId === undefined ? {} : { sessionId }),
       ...(resume ? { resume: true } : {}),
     }),
@@ -420,6 +457,8 @@ Session 上打开替换 application。Profile 选择等产品状态应留在通�
 
 拥有低层对象的 owner 负责关闭它们：
 
+- `AgentDefinition` 没有活动资源或 `close()`；从中打开的每个 application 都有自己的
+  生命周期；
 - Core `RunHandle` 可取消，但 `May` 本身没有 close method；
 - `AgentApplication` 关闭活动 Run/压缩、permission executor 和 event relay；
 - `AgentWorkspace` 关闭活动 application、串行状态队列、Catalog recording tail 和
@@ -433,8 +472,11 @@ Session 上打开替换 application。Profile 选择等产品状态应留在通�
 在把 Agent 产品视为完成前，确认它明确回答：
 
 - **行为：** 哪些 instruction 是默认、runtime addition 或 workspace-controlled addition？
+- **Definition：** 哪些配置跨 Session 复用，哪些输入只在 `open()` 时提供？Model、
+  Context factory、executor、scheduler 和 policy closure 能否安全共享？
 - **Provider：** Credential 从哪里加载，支持哪些模型限制和 content form？
-- **Capability：** 工具名是否唯一，输入是否解析，输出是否有限，取消是否转发？
+- **Capability：** 工具 registry 是否为实例级、没有重名，并在预期边界完成快照？输入
+  是否解析，输出是否有限，取消是否转发？
 - **安全：** 哪些调用 allow/deny/ask？审批之外有什么机制限制已允许工具？
 - **Context：** 实际 model budget 是多少，何时压缩，Agent 能否找回被省略历史？
 - **持久化：** 使用内存、本地单 writer，还是满足并发/加密要求的自定义后端？

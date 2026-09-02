@@ -13,7 +13,8 @@ May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行�
 | 目标 | 从这里开始 | 通常还需加入 |
 | --- | --- | --- |
 | 在内存中运行一次模型/工具循环 | `@may/core` | 一个 provider adapter |
-| 构建 headless、可持久化的单 Session Agent | `@may/application` | `@may/session`、`@may/context`、权限和工具 |
+| 定义可复用的 Agent 行为与策略 | `@may/application` 的 `defineAgent()` | `@may/core` 的 `ToolRegistry` |
+| 构建 headless、可持久化的单 Session Agent | `AgentDefinition.open()` 或 `AgentApplication.open()` | `@may/session`、`@may/context`、权限和工具 |
 | 在一个 workspace 中管理多个 Session | `@may/application` | `@may/session/catalog` 的 `SessionCatalog` |
 | 构建终端 Agent | Headless application controller | `@may/tui`，可选 `@may/keybindings` |
 | 构建编码 Agent | Headless application controller | `@may/coding-tools` 和执行隔离策略 |
@@ -29,10 +30,18 @@ May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行�
 
 与 provider 无关的执行内核：
 
-- `May`、`Model`、`Tool`、`Context` 和 `ToolExecutor` 契约；
+- `May`、`Model`、`Tool`、`Context`、`ToolExecutor` 和 `ToolScheduler` 契约；
+- 实例级 `ToolRegistry` 与 `DuplicateToolNameError`；
 - Run 与 Step 执行、流式事件和取消；
 - 工具调度与标准化消息；
 - 适合小型或临时集成的 `InMemoryContext`。
+
+`ToolRegistry` 实现 `Iterable<Tool>`，并提供 `register()`、原子 `registerAll()`、
+`has()`、`get()`、`require()`、`size`、`names()`、`values()`、`definitions()`、
+`clone()`、迭代和静态 `compose()`。有歧义的名字会抛出 `DuplicateToolNameError`。
+`May` 接受任何 `Iterable<Tool>` 并在构造时快照集合；registry 不是进程级全局状态。
+Registry 保留原始 Tool 身份，同时检查注册后的 readonly descriptor 是否仍与登记时
+一致；schema 只进行引用检查，不会被深度冻结。
 
 Core 不负责持久化 Session、provider 选择、产品配置、权限策略或 UI。参阅
 [Core package README](../../../packages/core/README.md)。
@@ -41,6 +50,8 @@ Core 不负责持久化 Session、provider 选择、产品配置、权限策略�
 
 位于 Core 之上的 headless 编排层：
 
+- `AgentDefinition` 和 `defineAgent()` 将可复用行为/策略（包括可选 tool executor 与
+  scheduler）与 Session 输入分开；
 - `AgentApplication` 拥有一个活动且可持久化的 Session；
 - `AgentWorkspace` 管理活动 Session 选择与 Catalog 更新；
 - `AgentController` 和 `AgentWorkspaceController` 定义与 UI 无关的控制面；
@@ -48,7 +59,10 @@ Core 不负责持久化 Session、provider 选择、产品配置、权限策略�
 - Context 检查与压缩结果通过 Session 持久化；
 - 可选安装 `session_history` 和工具呈现支持。
 
-模型、工具、prompt、策略与存储仍由产品注入。参阅
+Definition 创建时会快照工具 iterable；每次 `open({ store, ... })` 创建独立的
+application/Session 生命周期。Model、Context factory、executor、scheduler 等有状态
+协作者仍由调用方拥有，不会因多次打开而自动克隆。模型、工具、prompt、策略与存储仍
+由产品注入。参阅
 [Agent 与 Application](../concepts/agent-application.md)和
 [package README](../../../packages/application/README.md)。
 

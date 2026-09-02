@@ -6,31 +6,72 @@ May separates reusable Agent configuration from conversation identity and from
 the process that currently owns that conversation. For the complete package
 boundary, see [Runtime and session boundaries](../architecture/runtime-session.md).
 The shorter lifecycle vocabulary is described in
-[Session, run, and step](./session-run-step.md).
+[Session, run, and step](./session-run-step.md). The composition-object choice
+is recorded in
+[ADR 0004](../architecture/decisions/0004-agent-definitions-and-tool-registries.md).
 
-## Agent definition is currently a concept
+## `AgentDefinition`: reusable behavior and policy
 
 An **Agent definition** is the reusable product configuration that determines
 how an Agent behaves. It normally includes:
 
 - a `Model`;
 - instructions;
-- tools and, optionally, a custom `ToolExecutor`;
+- tools and, optionally, a custom `ToolExecutor` and `ToolScheduler`;
 - a `PermissionPolicy`;
 - a `ContextFactory`, context budget, and compaction strategies;
 - application choices such as maximum steps and whether to expose session
   history as a tool.
 
-There is currently no exported `AgentDefinition` class or `defineAgent()`
-function. A product expresses this concept by constructing
-`AgentApplicationOptions`, usually behind its own factory. The definition has
-no session id, conversation history, active run, or lifecycle of its own.
+`@may/application` exports both the `AgentDefinition` class and the
+`defineAgent()` convenience function. A definition deliberately excludes the
+Session-bound `store`, `sessionId`, `resume`, `metadata`, and
+`contextMetadata` options. Supply those when opening an application:
 
-This distinction matters during resume: `@may/session` restores durable
+```ts
+import { defineAgent } from "@may/application";
+
+const agent = defineAgent({
+  model,
+  tools,
+  instructions,
+  permissionPolicy,
+});
+
+const application = await agent.open({
+  store,
+  metadata: { workspace: process.cwd() },
+  contextMetadata: { workspace: process.cwd() },
+});
+```
+
+`new AgentDefinition(options)` is equivalent when a class constructor is more
+convenient. The definition has no Session id, conversation history, active
+Run, event stream, or close lifecycle of its own. Each `open()` call creates
+an independent `AgentApplication` and Session lifecycle; use `sessionId` with
+`resume: true` to reconstruct an existing Session instead.
+
+Lifecycle independence does not make the Session store multi-writer safe.
+Opening the same `sessionId` in two applications concurrently creates two
+owners that can race; neither `AgentDefinition` nor `AgentApplication`
+coordinates them. Keep one active writer for each durable Session identity.
+
+Definition construction consumes and snapshots the tools iterable. Later
+adding to the source array or `ToolRegistry` does not change the definition,
+and applications opened from it do not share a mutable tool collection.
+Individual Tool objects and other collaborators are not cloned, however.
+Original Tool identity is preserved, while registered descriptor values and
+references must remain stable. A stateful Model, Context factory, Tool
+executor, Tool scheduler, policy closure, or compaction strategy remains
+caller-owned and is intentionally shared when captured by one definition. The
+caller must provide any concurrency safety or per-open factory behavior those
+collaborators require.
+
+The definition/application distinction matters during resume: `@may/session` restores durable
 conversation facts, but it does not recreate the model, tools, prompt, or
-permission policy. The application must supply those parts again. Session
-metadata can identify or validate product configuration, but May does not yet
-version or migrate arbitrary Agent definitions.
+permission policy. Calling `definition.open()` supplies those parts again.
+Session metadata can identify or validate product configuration, but May does
+not serialize, version, discover, or migrate Agent definitions.
 
 ## `AgentApplication`: one active session
 
@@ -48,9 +89,12 @@ AgentApplication
 `- application event relay
 ```
 
-Its required inputs are a model, a `SessionStore`, and a permission policy.
-Tools, instructions, context configuration, session identity, and the other
-policies are optional. The important ownership rules are:
+Direct `AgentApplication.open()` requires a model, a `SessionStore`, and a
+permission policy. `AgentDefinition.open()` has already captured the model and
+policy, so it requires only the store. Tools, instructions, context
+configuration, session identity, and the other policies are optional. Both
+paths snapshot the supplied tool iterable before constructing the Core
+runtime. The important ownership rules are:
 
 - `metadata` is copied into a newly created Session and is available for
   validation after create or resume.
@@ -98,10 +142,21 @@ It still owns only **one active `AgentApplication` at a time**. It requires:
 - a separate `SessionCatalog` containing listable summaries; and
 - an `openApplication({ sessionId, resume })` factory supplied by the product.
 
-The factory is the current composition seam for an Agent definition. A
-workspace uses it for the initial application and every new or resumed
-session. The workspace itself does not choose a provider, tools, prompt,
-permission policy, or model profile.
+The factory is the workspace's application-opening seam. It can call one
+reusable definition's `open()` method for the initial application and every
+new or resumed Session:
+
+```ts
+openApplication: ({ sessionId, resume }) => agent.open({
+  store,
+  metadata: { workspace },
+  ...(sessionId === undefined ? {} : { sessionId }),
+  ...(resume ? { resume: true } : {}),
+})
+```
+
+The workspace itself does not choose a provider, tools, prompt, permission
+policy, model profile, or Agent definition.
 
 At open time an explicit `sessionId` wins. Otherwise, when `autoResume` is
 enabled, the workspace asks the Catalog for the most recently used entry in
@@ -126,7 +181,7 @@ Session switching, deletion, renaming, compaction, and application replacement
 require an idle active application. `cancel()` and approval resolution are
 direct operations rather than queued state transitions.
 
-### Product transitions are not Agent definition storage
+### Product transitions and definitions are not definition storage
 
 A model-profile switch is a typical use of `transitionApplication()`. The
 product creates the replacement first; if creation fails, the old application
@@ -134,10 +189,12 @@ remains active. By default the replacement must expose the same `sessionId`.
 The old application is then closed and its relay drained before the workspace
 starts relaying the replacement.
 
-This mechanism does not persist a model profile or other product state by
-itself. The product owns that state and may emit a typed extension event after
-the transition. Likewise, `AgentWorkspace` is generic over application events,
-extension events, and a product-defined compaction-selection type.
+This mechanism does not persist an Agent definition, model profile, or other
+product state by itself. The product owns that state and may emit a typed
+extension event after the transition. A definition is an in-process
+composition object, not a serialized manifest or registry entry. Likewise,
+`AgentWorkspace` is generic over application events, extension events, and a
+product-defined compaction-selection type.
 
 ## Catalog operations are projections, not transactions
 
@@ -179,7 +236,7 @@ lifecycle.
 
 ## Current limits
 
-`@may/application` is a developer-preview API. It currently does not provide a
-first-class Agent-definition registry, multiple simultaneously active
-Sessions in one workspace object, multi-Agent delegation, distributed locking,
-or transactional coordination between history and Catalog storage.
+`@may/application` is a developer-preview API. It currently does not provide
+an Agent-definition discovery/persistence registry, multiple simultaneously
+active Sessions in one workspace object, multi-Agent delegation, distributed
+locking, or transactional coordination between history and Catalog storage.

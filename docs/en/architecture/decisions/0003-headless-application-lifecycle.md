@@ -35,6 +35,16 @@ registry, default prompt, UI or coding policy.
 - Core remains usable for ephemeral and fully custom runtimes.
 - Products still need a small composition wrapper when they map generic events
   or expose named product strategies.
-- Declarative Agent definitions, tool registries and distributed execution
-  remain possible future layers rather than responsibilities silently added to
-  Core.
+- At the time of this decision, declarative Agent definitions, tool registries
+  and distributed execution remained possible future layers rather than
+  responsibilities silently added to Core. See the addendum below.
+
+## Addendum: reusable composition objects
+
+[ADR 0004](0004-agent-definitions-and-tool-registries.md) subsequently added
+`AgentDefinition`/`defineAgent()` and Core's instance-scoped `ToolRegistry`.
+That decision supersedes this record only where the original text described
+Agent definitions and tool registries as future work. The lifecycle boundary
+remains unchanged: `AgentApplication` still owns one active Session, the
+definition is not persisted, tool registration is not global, and products
+still select concrete prompts, providers, policies, and UI.

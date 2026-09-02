@@ -4,22 +4,57 @@
 
 May 将可复用 Agent 配置、对话身份以及当前拥有该对话的进程区分开来。完整 package
 边界见 [Runtime 与 Session 边界](../architecture/runtime-session.md)，更精简的生命周期
-术语见 [Session、Run 与 Step](session-run-step.md)。
+术语见 [Session、Run 与 Step](session-run-step.md)。这两个组合对象的架构取舍记录在
+[ADR 0004](../architecture/decisions/0004-agent-definitions-and-tool-registries.md)。
 
-## Agent definition 当前是一个概念
+## `AgentDefinition`：可复用行为与策略
 
 **Agent definition** 是决定 Agent 如何工作的可复用产品配置，通常包括：
 
 - 一个 `Model`；
 - 指令；
-- 工具，以及可选的自定义 `ToolExecutor`；
+- 工具，以及可选的自定义 `ToolExecutor` 和 `ToolScheduler`；
 - `PermissionPolicy`；
 - `ContextFactory`、Context budget 和压缩策略；
 - 最大 Step 数、是否暴露 Session history tool 等应用选择。
 
-当前没有导出的 `AgentDefinition` class 或 `defineAgent()` 函数。产品通过构造
-`AgentApplicationOptions` 来表达这个概念，通常把它封装在自己的 factory 中。
-Definition 本身没有 Session id、对话历史、活动 Run 或独立生命周期。
+`@may/application` 导出 `AgentDefinition` class 和便捷函数 `defineAgent()`。Definition
+明确排除 Session-bound 的 `store`、`sessionId`、`resume`、`metadata` 和
+`contextMetadata`；调用 `definition.open(...)` 时必须提供 store，并按需提供其余输入：
+
+```ts
+import { defineAgent } from "@may/application";
+
+const agent = defineAgent({
+  model,
+  tools,
+  instructions,
+  permissionPolicy,
+});
+
+const application = await agent.open({
+  store,
+  metadata: { workspace: process.cwd() },
+  contextMetadata: { workspace: process.cwd() },
+});
+```
+
+当 class constructor 更方便时，`new AgentDefinition(options)` 与 `defineAgent(options)`
+等价。Definition 本身没有 Session id、对话历史、活动 Run、event stream 或需要关闭的
+独立生命周期。同一个 definition 可以多次 `open()`；每次调用都会创建互相独立的
+`AgentApplication` 和 Session 生命周期。用 `sessionId` 与 `resume: true` 可以重建已有
+Session。
+
+独立的是进程内 lifecycle object，不是同一 durable Session 的 writer lease。Definition、
+Application 和内置 store 都不会协调两个以相同 `sessionId` 打开的 application；同一
+durable Session 不应被并发打开，应由一个 application 或 workspace owner 独占写入。
+
+创建 definition 时，工具 `Iterable<Tool>` 会立即被消费并按当时内容保存。因此，之后
+修改原数组或 `ToolRegistry` 不会改变该 definition。Context budget、自动压缩策略数组和
+Session-history option 也会被浅复制并冻结。单个 `Tool` 对象、`Model`、
+`ContextFactory`、`ToolExecutor`、`ToolScheduler`、policy closure 和 compaction
+strategy 等协作者不会被复制；它们仍由调用方拥有，并会被同一 definition 打开的
+多个 application 共享。需要隔离这些对象时，应为每个 definition 构造独立实例。
 
 这一区分在恢复时很重要：`@may/session` 恢复持久化的对话事实，但不会重建模型、
 工具、prompt 或权限策略。应用必须再次提供这些组件。Session metadata 可以标识或
@@ -28,7 +63,8 @@ Definition 本身没有 Session id、对话历史、活动 Run 或独立生命�
 ## `AgentApplication`：一个活动 Session
 
 `AgentApplication` 是恰好一个持久化 `Session` 的可复用 headless 生命周期 owner。
-`AgentApplication.open()` 将注入的产品配置组合为：
+通常由 `AgentDefinition.open()` 创建；需要动态、一次性的全部配置时，也可以直接调用
+`AgentApplication.open()`。两条路径最终都把产品配置组合为：
 
 ```text
 AgentApplication
@@ -36,12 +72,14 @@ AgentApplication
 |  `- May runtime
 |     |- Model
 |     |- Context
-|     `- Tools -> PermissionToolExecutor -> optional ToolExecutor
+|     `- Tools -> ToolScheduler -> PermissionToolExecutor -> optional ToolExecutor
 `- application event relay
 ```
 
-必需输入为 model、`SessionStore` 和 permission policy。工具、指令、Context 配置、
-Session 身份和其他策略均可选。重要的 ownership 规则包括：
+直接调用时，必需输入为 model、`SessionStore` 和 permission policy。使用 definition
+时，model 和 permission policy 在定义阶段提供，`SessionStore` 在 `open()` 阶段提供。
+工具、指令、Context 配置、Session 身份和其他策略均可选。两条路径都会在构造 Core
+runtime 前快照工具 iterable。重要的 ownership 规则包括：
 
 - `metadata` 会复制到新 Session，创建或恢复后可用于校验。
 - `contextMetadata` 经 Context 发送给模型请求；未指定时回退为 Session metadata。
@@ -81,9 +119,18 @@ Session 身份和其他策略均可选。重要的 ownership 规则包括：
 - 保存可列出摘要的独立 `SessionCatalog`；
 - 产品提供的 `openApplication({ sessionId, resume })` factory。
 
-该 factory 是目前 Agent definition 的组合 seam。Workspace 用它打开初始 application
-以及每个新建或恢复的 Session。Workspace 本身不选择 provider、工具、prompt、
-permission policy 或 model profile。
+该 factory 可以直接调用一个共享的 `AgentDefinition.open()`，也可以为每次打开执行
+额外的产品逻辑。Workspace 用它打开初始 application，以及每个新建或恢复的 Session。
+Workspace 本身不选择 provider、工具、prompt、permission policy 或 model profile。
+
+```ts
+openApplication: ({ sessionId, resume }) => agent.open({
+  store,
+  metadata: { workspace },
+  ...(sessionId === undefined ? {} : { sessionId }),
+  ...(resume ? { resume: true } : {}),
+})
+```
 
 打开时显式 `sessionId` 优先。否则，启用 `autoResume` 时，workspace 从 Catalog 查询
 该 workspace 最近使用的记录，并且只在 SessionStore 历史非空时恢复。若两者都未
@@ -102,15 +149,16 @@ Workspace 提供：
 Session 切换、删除、重命名、压缩和 application 替换都要求活动 application 处于空闲。
 `cancel()` 与审批处理是直接操作，不进入状态迁移队列。
 
-### 产品迁移不是 Agent definition 存储
+### 产品迁移和 definition 都不是 definition 存储
 
 切换 model profile 是 `transitionApplication()` 的典型用途。产品先创建替换实例；
 创建失败时旧 application 仍保持活动。替换实例默认必须暴露相同 `sessionId`。随后旧
 application 被关闭，relay 排空后，workspace 才开始转发新实例事件。
 
-这个机制不会自行持久化 model profile 或其他产品状态。产品拥有该状态，并可在迁移
-后发出 typed extension event。同理，`AgentWorkspace` 对 application event、extension
-event 和产品定义的 compaction selection type 都使用泛型。
+这个机制不会自行持久化 Agent definition、model profile 或其他产品状态。产品拥有该
+状态，并可在迁移后发出 typed extension event。Definition 是进程内组合对象，不是
+序列化 manifest 或 registry entry。同理，`AgentWorkspace` 对 application event、
+extension event 和产品定义的 compaction selection type 都使用泛型。
 
 ## Catalog 操作是投影，不是事务
 
@@ -145,6 +193,7 @@ Close 是幂等的，但调用方仍应 `await`。正确顺序防止终结事件
 
 ## 当前限制
 
-`@may/application` 仍是开发预览 API。目前没有一等 Agent-definition registry、在同一
-workspace 对象中同时活动的多个 Session、多 Agent 委派、分布式锁，也没有 history
-与 Catalog 存储之间的事务协调。
+`@may/application` 仍是开发预览 API。目前有一等 `AgentDefinition` 组合对象，但没有
+进程级 Agent-definition registry、definition 序列化或迁移、在同一 workspace 对象中
+同时活动的多个 Session、多 Agent 委派、分布式锁，也没有 history 与 Catalog 存储
+之间的事务协调。

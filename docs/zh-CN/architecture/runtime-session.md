@@ -17,7 +17,12 @@ Agent definition -> Session -> Run -> Step
 ### Agent definition
 
 决定 Agent 行为的可复用配置，包括模型、工具、指令和默认执行策略。它本身没有
-对话身份，也不表示正在执行的工作。
+对话身份，也不表示正在执行的工作。`@may/application` 的 `AgentDefinition`（通常由
+`defineAgent()` 创建）把这些选择保存为可复用组合；`open()` 再接收 Session store、
+身份和 metadata，并创建独立的 `AgentApplication`。
+
+这里的“独立”只表示每次打开都会得到独立的进程内 lifecycle object，并不表示框架会为
+相同 `sessionId` 提供 multi-writer 锁或协调。
 
 ### Session
 
@@ -27,6 +32,10 @@ grant 都属于这一层。
 
 一个 Session 最多只能有一个活动 Run。Session 存储是独立能力，因此内存 Session
 无需引入文件系统依赖。
+
+当前 Session/Application 契约假定每个 durable Session 只有一个活动 writer。不得用同一
+`sessionId` 并发打开多个 application；应复用同一个 application/workspace owner，或在
+框架之外由自定义后端提供协调后再设计相应的单 writer ownership。
 
 ### Run
 
@@ -60,13 +69,15 @@ package 不导入应用，特别是没有 package 导入 `apps/maybecode`。
 Core 负责活动执行：
 
 - model、tool 和 context 契约；
+- 实例级、可迭代的 `ToolRegistry`，用于按名称进行无歧义组合与查询；
 - Run/Step 循环；
 - 实时 Run 事件与取消；
-- 通过可替换 executor 和 scheduler seam 分派工具；
+- 通过可替换 `ToolExecutor` 和 `ToolScheduler` seam 分派工具；
 - 标准化多模态内容，以及 provider 自有转换边界。
 
 Core runtime 默认拒绝重叠 Run，因为它只拥有一个可变 Context。Session 还会把提交
-串行化为生命周期策略。
+串行化为生命周期策略。`May` 接受任意 `Iterable<Tool>`，并在构造时快照工具集合，
+所以之后修改源数组或 registry 不会改变该 runtime。
 
 Core 不负责 Session 发现、持久化、恢复、fork、UI 状态或某种具体权限策略。它必须
 继续支持临时的一次性 Run。
@@ -105,6 +116,9 @@ Session 使用一个 executor，避免 grant 跨 Session 泄露。它的 awaited
 ### `@may/application`
 
 Application package 提供位于 Session 与 Core 之上的 headless 编排。
+`AgentDefinition` 保存可跨 Session 复用的模型、工具、指令、权限、Context、工具执行
+和调度策略；`defineAgent()` 是创建它的便捷函数。Definition 的 `open()` 把这些策略与
+本次 Session 的 store、id 和 metadata 组合起来。
 `AgentApplication` 拥有一个持久化 Session，并集中负责：
 
 - 从注入的模型、工具、Context factory、权限策略、指令和存储创建或恢复 Session；
@@ -117,9 +131,13 @@ Application package 提供位于 Session 与 Core 之上的 headless 编排。
 摘要和 FIFO 状态迁移队列。产品可以通过 `transitionApplication` 在同一 Session 上
 重建活动 application，或用 `runStateTransition` 串行化产品自有配置操作。
 
-这些 class 提供排序和依赖注入 seam，不定义 provider registry、system prompt、编码
-权限策略、model profile、UI 命令或终端渲染。当前 JSONL Session store 和 append-only
-文件 Catalog 是轻量本地后端，并不声称具备 crash-proof、多主机生产存储能力。
+这些 class 提供排序和依赖注入 seam，不定义进程级 Agent-definition registry、provider
+registry、definition 序列化、system prompt、编码权限策略、model profile、UI 命令或终端渲染。
+Definition 会快照工具 iterable，但不会克隆调用方拥有的 model、Context factory、
+executor 或 scheduler 等有状态协作者；同一 definition 多次打开时，每个 application
+都有独立的进程内 Session 对象，但这些有状态协作者仍会共享。当前 JSONL Session store
+和 append-only 文件 Catalog 是轻量本地后端，并不声称具备 crash-proof、多主机生产
+存储能力。
 
 ### `@may/tui`
 
@@ -137,9 +155,10 @@ headless controller。
 
 ### `apps/maybecode`
 
-MaybeCode 是应用组合层，不是另一个 runtime。它选择和配置可复用 package，把通用
-单 Session 和 workspace 生命周期交给 `@may/application`，使用 `@may/tui` 的 Agent
-transcript，并形成终端编码 Agent 产品。任何可复用 package 都不依赖 MaybeCode。
+MaybeCode 是应用组合层，不是另一个 runtime。它选择和配置可复用 package，使用
+`ToolRegistry` 组合编码工具，通过 `defineAgent()` 捕获通用行为，把单 Session 和
+workspace 生命周期交给 `@may/application`，使用 `@may/tui` 的 Agent transcript，并
+形成终端编码 Agent 产品。任何可复用 package 都不依赖 MaybeCode。
 
 应用只保留产品策略和兼容适配：
 

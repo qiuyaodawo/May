@@ -8,8 +8,9 @@ May's execution vocabulary has four levels:
 Agent definition -> Session -> Run -> Step
 ```
 
-The Agent definition is reusable configuration rather than a current runtime
-object. `AgentApplication` and `AgentWorkspace` orchestrate the other levels;
+An `AgentDefinition` is a reusable composition object rather than an active
+execution or conversation. `AgentApplication` and `AgentWorkspace` orchestrate
+the other levels;
 see [Agent definition, application, and workspace](./agent-application.md).
 For the package ownership view, see
 [Runtime and session boundaries](../architecture/runtime-session.md).

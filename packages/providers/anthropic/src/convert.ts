@@ -27,7 +27,7 @@ export interface AnthropicRequestParts {
 }
 
 export function toAnthropicRequestParts(
-  messages: Message[],
+  messages: readonly Message[],
 ): AnthropicRequestParts {
   const system: string[] = [];
   const converted: AnthropicRequestMessage[] = [];
@@ -93,7 +93,7 @@ export function toAnthropicRequestParts(
 }
 
 export function toAnthropicTools(
-  tools: ToolDefinition[],
+  tools: readonly ToolDefinition[],
 ): AnthropicToolDefinition[] {
   return tools.map((tool) => ({
     name: tool.name,

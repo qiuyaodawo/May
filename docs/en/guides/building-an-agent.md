@@ -11,20 +11,22 @@ Start with [Getting started](../getting-started.md) if you have not run an
 Agent yet. The terms Agent definition, Session, Run, and Step are defined in
 [Runtime and session boundaries](../architecture/runtime-session.md).
 
-> **Current API:** “Agent definition” is a design concept in May `0.1.0`, not a
-> `defineAgent()` function. Tools are passed as an array; there is no global
-> `ToolRegistry`. Keep product composition in an ordinary factory function as
-> shown below instead of depending on APIs that do not exist yet.
+May provides two reusable, instance-scoped composition objects:
+
+- `AgentDefinition`/`defineAgent()` captures behavior and policy independently
+  from a Session; and
+- `ToolRegistry` composes named tools without global mutable state.
 
 ## The composition model
 
 ```text
 Product-owned decisions
-  model + instructions + tools + permission policy + Context policy
+  defineAgent(model + instructions + tools + execution/permission/Context policy)
+                              |
+                 open(Session store + identity/metadata)
                               |
                               v
                     AgentApplication
-                              |
                Session + permission executor
                               |
                               v
@@ -47,39 +49,48 @@ MaybeCode is a reference composition, not a required superclass or runtime.
 | --- | --- | --- |
 | `May` from `@may/core` | One-shot, ephemeral, or deeply embedded execution | Context continuity, persistence, permissions, and shutdown above the run |
 | `Session` from `@may/session` | You need a durable conversation identity but want to assemble lifecycle pieces manually | Runtime reconstruction, permission event persistence, discovery, and UI relays |
-| `AgentApplication` from `@may/application` | A headless product needs one active resumable Session | Product model, tools, instructions, policies, storage, and event handling |
+| `AgentDefinition` from `@may/application` | Reusable behavior should open one or more independent resumable Sessions | Collaborator lifecycle/concurrency, Session storage, metadata, and event handling |
+| `AgentApplication` from `@may/application` | A headless product needs one active resumable Session without a reusable definition | Product model, tools, instructions, policies, storage, and event handling |
 | `AgentWorkspace` from `@may/application` | A product lets users create, list, resume, rename, or delete Sessions | An application factory, a `SessionCatalog`, and product-specific configuration transitions |
 
-Most interactive products should begin with `AgentApplication`. Use Core
-directly only when its deliberately small boundary is the feature you need.
-Do not layer a second `Session` around `AgentApplication`: the application
-already owns one.
+Most interactive products should define behavior with `defineAgent()` and open
+applications from it. Call `AgentApplication.open()` directly when there is no
+benefit to reusing the definition/open split. Use Core directly only when its
+deliberately small boundary is the feature you need. Do not layer a second
+`Session` around `AgentApplication`: the application already owns one.
 
 ## Required and optional inputs
 
-`AgentApplication.open()` requires:
+`defineAgent()` requires the behavior-level inputs that
+`AgentApplication.open()` would otherwise receive directly:
 
 - a `Model`;
-- a `SessionStore`;
 - a `PermissionPolicy`.
+
+`AgentDefinition.open()` then requires a `SessionStore`. It also accepts the
+Session-bound `sessionId`, `resume`, `metadata`, and `contextMetadata` options.
+Those five values are intentionally rejected as definition options so one
+definition cannot accidentally capture one conversation's identity.
 
 Everything else is a deliberate optional choice:
 
 - `tools` defaults to no product tools;
+- `toolExecutor` defaults to direct execution beneath the permission wrapper;
+- `toolScheduler` defaults to Core's sequential scheduler;
 - `instructions` defaults to no system instructions;
 - `contextFactory` defaults to `InMemoryContextFactory`;
 - Context budgets and compaction are disabled unless configured;
-- a Session is new unless both `sessionId` and `resume: true` are supplied;
+- an opened Session is new unless both `sessionId` and `resume: true` are supplied;
 - the bounded `session_history` tool is installed only when
   `sessionHistory` is an options object;
 - tool-presentation metadata is produced only when the product supplies
   `createToolPresentation`.
 
-## Keep composition in one factory
+## Define behavior once, then open Sessions
 
-The following TypeScript factory is a complete, provider-neutral application
-composition. Its caller supplies any object implementing Core's `Model`
-contract.
+The following TypeScript factory creates a complete, provider-neutral Agent
+definition. Its caller supplies any object implementing Core's `Model`
+contract. Session storage and identity remain inputs to `open()`.
 
 Required workspace dependencies for this file are:
 
@@ -95,18 +106,9 @@ Required workspace dependencies for this file are:
 ```
 
 ```ts
-import { AgentApplication, type AgentApplicationOptions } from "@may/application";
+import { defineAgent, type AgentDefinition } from "@may/application";
 import { InMemoryContextFactory, PruneOldToolResultsStrategy } from "@may/context";
-import type { Model, Tool } from "@may/core";
-import type { SessionStore } from "@may/session";
-
-export interface OpenExampleAgentOptions {
-  readonly model: Model;
-  readonly store: SessionStore;
-  readonly workspace: string;
-  readonly sessionId?: string;
-  readonly resume?: boolean;
-}
+import { ToolRegistry, type Model, type Tool } from "@may/core";
 
 const lookup: Tool<{ key: string }, { value: string | null }> = {
   name: "lookup",
@@ -132,25 +134,21 @@ const lookup: Tool<{ key: string }, { value: string | null }> = {
   },
 };
 
-export function openExampleAgent(
-  options: OpenExampleAgentOptions,
-): Promise<AgentApplication> {
+export function createExampleAgent(model: Model): AgentDefinition {
   const prune = new PruneOldToolResultsStrategy({
     keepRecentToolResults: 4,
     minimumResultBytes: 2_048,
   });
+  const tools = new ToolRegistry([lookup]);
 
-  const applicationOptions: AgentApplicationOptions = {
-    model: options.model,
-    store: options.store,
-    tools: [lookup],
+  return defineAgent({
+    model,
+    tools,
     instructions: [
       "You are Example Agent.",
       "Use lookup when a requested value may exist in the data source.",
       "Do not invent missing values.",
     ].join("\n"),
-    metadata: { workspace: options.workspace, agent: "example" },
-    contextMetadata: { workspace: options.workspace },
     permissionPolicy: ({ tool }) =>
       tool.name === "lookup" ? "allow" : "deny",
     contextFactory: new InMemoryContextFactory(),
@@ -169,18 +167,28 @@ export function openExampleAgent(
       maxEventBytes: 8 * 1_024,
     },
     maxSteps: 16,
-    ...(options.sessionId === undefined
-      ? {}
-      : { sessionId: options.sessionId }),
-    ...(options.resume === true ? { resume: true } : {}),
-  };
-
-  return AgentApplication.open(applicationOptions);
+  });
 }
 ```
 
-The factory is the product's effective Agent definition. It is easy to test,
-and it makes every behavior-changing choice reviewable in one place. The
+Open an independent application by supplying only Session-bound state:
+
+```ts
+const agent = createExampleAgent(model);
+const application = await agent.open({
+  store,
+  metadata: { workspace, agent: "example" },
+  contextMetadata: { workspace },
+});
+```
+
+The returned `AgentDefinition` is easy to test, and it makes every
+behavior-changing choice reviewable in one place. Its tool iterable is
+snapshotted by `defineAgent()`; changing `tools` later would not affect it.
+Every call to `open()` gets an independent application and Session, but
+captured collaborators such as `model` and `InMemoryContextFactory` remain
+caller-owned and shared. Do not concurrently open applications from a
+definition unless those stateful collaborators support that use. The
 64,000-token budget above is an example value, **not** a statement about every
 model. Use limits documented by the selected provider/model; reserve enough
 space for output and expected tool payloads.
@@ -237,8 +245,21 @@ typed value and rejects malformed provider output at runtime.
 
 Tool names must be unique within a runtime. `May` rejects duplicate names, and
 `AgentApplication` reserves `session_history` when that optional tool is
-enabled. The current API composes tools as an array; keep grouping functions
-local to a tool package or product rather than assuming a global registry.
+enabled. Use the instance-scoped `ToolRegistry` when composing feature groups:
+its constructor, `register()`, atomic `registerAll()`, `clone()`, and static
+`compose()` reject ambiguity with `DuplicateToolNameError`. It is itself an
+`Iterable<Tool>`, so definitions, applications, and Core accept it directly.
+There is deliberately no process-global registry.
+
+Both `May` and `AgentDefinition` snapshot iterable membership at construction;
+direct `AgentApplication.open()` snapshots tools while opening. A later
+registry mutation therefore affects only future consumers that receive that
+registry, not an existing definition or runtime. Registries preserve original
+Tool identity, but descriptor fields must remain stable after registration;
+they detect replacement of a name, description, schema reference, parser, or
+executor rather than deep-cloning the Tool. See
+[Custom tools](custom-tool.md#registry-composition-and-lookup) for the lookup
+and snapshot API.
 
 Tool execution receives an `AbortSignal` and can report live progress through
 `context.report(...)`. Respect cancellation in I/O and subprocesses. Ordinary
@@ -249,6 +270,12 @@ Cross-cutting execution behavior belongs at Core's `ToolExecutor` seam.
 `AgentApplication` accepts a `toolExecutor` and wraps it with its permission
 executor, so logging, sandbox dispatch, or timeouts can be injected without
 changing every Tool.
+
+Scheduling is a separate Core seam. `AgentApplication` also accepts an optional
+`toolScheduler` and forwards it to `May`; `AgentDefinition` captures both
+execution collaborators. The default is sequential. Use a parallel or custom
+scheduler only when its tools and executor are concurrency-safe and it
+preserves Core's outcome-ordering and at-most-once contracts.
 
 ### Permissions are not a sandbox
 
@@ -413,6 +440,7 @@ import { join } from "node:path";
 const stateDirectory = join(process.cwd(), ".may");
 const store = new FileSessionStore(join(stateDirectory, "sessions"));
 const catalog = new FileSessionCatalog(join(stateDirectory, "catalog.json"));
+const agent = createExampleAgent(model);
 
 const workspace = await AgentWorkspace.open({
   workspace: process.cwd(),
@@ -420,10 +448,10 @@ const workspace = await AgentWorkspace.open({
   catalog,
   autoResume: true,
   openApplication: ({ sessionId, resume }) =>
-    openExampleAgent({
-      model,
+    agent.open({
       store,
-      workspace: process.cwd(),
+      metadata: { workspace: process.cwd(), agent: "example" },
+      contextMetadata: { workspace: process.cwd() },
       ...(sessionId === undefined ? {} : { sessionId }),
       ...(resume ? { resume: true } : {}),
     }),
@@ -471,6 +499,8 @@ projection; rebuild it from durable history and then apply live events.
 
 The object that owns lower layers must close them:
 
+- an `AgentDefinition` has no active resources or `close()` method; every
+  application opened from it has its own lifecycle;
 - a direct Core `RunHandle` can be cancelled, but `May` itself has no close
   method;
 - an `AgentApplication` closes its active run/compaction, permission executor,
@@ -491,8 +521,9 @@ for the following:
   workspace-controlled additions?
 - **Provider:** Where are credentials loaded, and which model limits/content
   forms are supported?
-- **Capabilities:** Are tool names unique, inputs parsed, outputs bounded, and
-  cancellation forwarded?
+- **Capabilities:** Are tool registries instance-scoped, duplicate-free and
+  snapshotted at the intended boundary? Are inputs parsed, outputs bounded,
+  and cancellations forwarded?
 - **Safety:** Which calls allow, deny, or ask? What constrains an allowed tool
   beyond the approval prompt?
 - **Context:** What is the actual model budget, what triggers compaction, and
@@ -505,6 +536,9 @@ for the following:
   resumes rejected?
 - **Lifecycle:** Who owns cancellation and `close()`, including on startup or
   rendering failure?
+- **Definition ownership:** Can captured Models, Context factories, executors,
+  schedulers, and policy closures safely be shared by every application opened
+  from the definition?
 - **Product boundary:** Could another UI or provider reuse the headless
   composition without importing application-specific rendering code?
 

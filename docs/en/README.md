@@ -8,8 +8,8 @@ interfaces are intended for extension.
 
 ## Start here
 
-1. [Getting started](getting-started.md) — run a minimal Agent and then add a
-   durable `AgentApplication`.
+1. [Getting started](getting-started.md) — define a reusable Agent, compose its
+   tools, and open a durable `AgentApplication`.
 2. [Building an Agent](guides/building-an-agent.md) — choose models, tools,
    instructions, Context, permissions, Session storage and UI.
 3. [Package reference](reference/packages.md) — select the smallest May layer

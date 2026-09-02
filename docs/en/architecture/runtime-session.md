@@ -17,9 +17,17 @@ when a product creates, resumes, or reconfigures a session.
 
 ### Agent definition
 
-The reusable configuration that determines how an agent behaves: its model,
-tools, instructions, and default execution policy. It has no conversation
-identity or active work by itself.
+An `AgentDefinition` is the reusable composition object that determines how an
+agent behaves: its model, tools, instructions, and default execution policy.
+Create it with `defineAgent()`, then call `open()` with a Session store and
+optional identity/metadata for each independent `AgentApplication`. It has no
+conversation identity or active work by itself.
+
+“Independent” describes the in-process lifecycle objects, not coordination for
+the same durable identity. `AgentDefinition.open()` does not lock or serialize
+multiple applications that use the same `sessionId`. Do not concurrently open
+the same durable Session; the current Session/storage contracts assume one
+active writer per Session identity.
 
 ### Session
 
@@ -30,6 +38,8 @@ permission grants belong here.
 
 A session may have at most one active run. Session storage is a separate
 capability so an in-memory session does not require filesystem dependencies.
+That per-object run rule is not a distributed or cross-application lock for
+another Session object opened against the same id.
 
 ### Run
 
@@ -67,6 +77,7 @@ import an application. In particular, no package imports `apps/maybecode`.
 Core owns active execution:
 
 - model, tool, and context contracts
+- the instance-scoped `ToolRegistry` composition and lookup utility
 - the run and step loop
 - live run events and cancellation
 - tool dispatch through replaceable executor and scheduler seams
@@ -74,6 +85,8 @@ Core owns active execution:
 
 A Core runtime rejects overlapping runs by default because it owns one mutable
 Context. Session additionally serializes submissions as a lifecycle policy.
+`May` accepts any `Iterable<Tool>` and snapshots its membership when the
+runtime is constructed; it does not read later registry mutations.
 
 Core does not own session discovery, persistence, resume, fork, user-interface
 state, or a specific permission policy. It must remain usable for an ephemeral
@@ -120,10 +133,12 @@ future storage work and do not belong to the UI.
 ### `@may/application`
 
 The application package provides headless orchestration above Session and
-Core. `AgentApplication` owns one durable Session and centralizes:
+Core. `AgentDefinition` captures reusable behavior and policy without Session
+identity or storage. Each call to `AgentDefinition.open()` creates an
+independent `AgentApplication`, which owns one durable Session and centralizes:
 
 - creating or resuming a Session from injected model, tools, Context factory,
-  permission policy, instructions, and storage;
+  permission policy, tool executor/scheduler, instructions, and storage;
 - submission, retry, cancellation, approval resolution, and safe shutdown;
 - relaying normalized run and permission events;
 - context inspection, compaction cancellation, and persistence of changed
@@ -139,9 +154,12 @@ queue. A product can rebuild the active application on the same Session through
 
 These classes provide ordering and dependency-injection seams; they do not
 define a provider registry, a system prompt, a coding permission policy, model
-profiles, UI commands, or terminal rendering. The current JSONL Session store
-and append-only file Catalog remain lightweight local backends rather than a
-claim of crash-proof, multi-host production storage.
+profiles, UI commands, or terminal rendering. Definition collaborators remain
+caller-owned: separate applications do not share the same in-process Session
+object, but they do share a captured stateful Model, Context factory, executor,
+or scheduler unless the caller provides an isolation layer. The current JSONL
+Session store and append-only file Catalog remain lightweight local backends
+rather than a claim of crash-proof, multi-host production storage.
 
 ### `@may/tui`
 
@@ -163,9 +181,11 @@ UI can ignore `@may/tui` and consume a headless controller directly.
 ### `apps/maybecode`
 
 MaybeCode is an application composition layer, not another runtime. It selects
-and configures reusable packages, delegates generic one-session and workspace
-lifecycle to `@may/application`, uses `@may/tui`'s Agent transcript, and exposes
-a terminal coding-agent product. No reusable package depends on MaybeCode.
+and configures reusable packages, composes coding tools with `ToolRegistry`,
+captures generic behavior with `defineAgent()`, delegates one-session and
+workspace lifecycle to `@may/application`, uses `@may/tui`'s Agent transcript,
+and exposes a terminal coding-agent product. No reusable package depends on
+MaybeCode.
 
 The application keeps only product policy and compatibility adapters:
 

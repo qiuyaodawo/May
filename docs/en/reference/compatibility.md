@@ -31,6 +31,38 @@ prefer a documented deprecated alias or an adapter when doing so is practical,
 but preview consumers must still review release notes and compile their code
 against each upgrade.
 
+### Composition objects
+
+`ToolRegistry`, `DuplicateToolNameError`, `AgentDefinition`, and
+`defineAgent()` are public through their package root exports, but remain
+developer-preview APIs under the same `0.1.0` policy.
+
+Their current ownership contract is explicit:
+
+- registries are ordinary instances, never process-global state;
+- `May` consumes and snapshots an `Iterable<Tool>` in its constructor;
+- `AgentDefinition` consumes and snapshots its tool iterable when the
+  definition is created;
+- direct `AgentApplication.open()` snapshots its iterable while opening; and
+- collection snapshots preserve original Tool identity rather than cloning
+  executable code or stateful collaborators.
+
+`Tool.name`, `Tool.description`, and `Tool.inputSchema` are readonly in
+TypeScript. A `ToolRegistry` records those values/references plus the parser
+and executor, and throws `TypeError` from operations that expose tools or
+definitions if one later changes. This is intentionally a shallow guard, not
+a deep clone or freeze of the schema object.
+
+Each `AgentDefinition.open()` creates an independent application and Session
+lifecycle. It does not clone a captured Model, Context factory, Tool executor,
+Tool scheduler, policy closure, or Tool object. Callers must therefore treat
+those objects as shared and provide isolation when opening applications
+concurrently.
+
+The framework does not currently persist or discover Agent definitions.
+Session history and metadata are not a serialized definition, and resume still
+applies the behavior and policy supplied by the current process.
+
 ## Events
 
 Run and permission streams are live observation channels. High-volume

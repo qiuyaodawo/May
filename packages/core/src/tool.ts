@@ -24,9 +24,9 @@ export interface ToolExecutionContext {
 }
 
 export interface Tool<TInput = unknown, TOutput = unknown> {
-  name: string;
-  description: string;
-  inputSchema: JsonSchema;
+  readonly name: string;
+  readonly description: string;
+  readonly inputSchema: JsonSchema;
 
   /** Optional runtime validation/coercion hook. Throw to reject the input. */
   parse?(input: unknown): TInput;

@@ -13,7 +13,7 @@ import type {
 } from "./protocol.js";
 
 export function toOpenAICompatibleMessages(
-  messages: Message[],
+  messages: readonly Message[],
   options: { includeToolName?: boolean } = {},
 ): OpenAICompatibleMessage[] {
   return messages.map((message) => {
@@ -66,7 +66,7 @@ export function toOpenAICompatibleMessages(
 }
 
 export function toOpenAICompatibleTools(
-  tools: ToolDefinition[],
+  tools: readonly ToolDefinition[],
 ): OpenAICompatibleToolDefinition[] {
   return tools.map((tool) => ({
     type: "function",

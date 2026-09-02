@@ -8,15 +8,15 @@ import type { ContextSnapshot } from "./context.js";
 import type { SerializedError } from "./events.js";
 
 export interface ToolDefinition {
-  name: string;
-  description: string;
-  inputSchema: JsonSchema;
+  readonly name: string;
+  readonly description: string;
+  readonly inputSchema: JsonSchema;
 }
 
 export interface ModelRequest {
-  messages: Message[];
-  tools: ToolDefinition[];
-  metadata?: Record<string, unknown>;
+  readonly messages: readonly Message[];
+  readonly tools: readonly ToolDefinition[];
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface ModelLimits {

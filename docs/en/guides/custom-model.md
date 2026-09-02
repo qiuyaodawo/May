@@ -117,6 +117,13 @@ be exercised directly.
 - provider-neutral tool definitions (`name`, `description`, `inputSchema`);
 - optional application metadata.
 
+Treat the `ModelRequest` and its `messages` and `tools` collections as readonly
+adapter input. `ToolDefinition` fields are readonly as well. An adapter should
+map these normalized values into a new provider-owned request object; it must
+not sort, splice, annotate, or otherwise rewrite May's request, messages, or
+tool definitions in place. This keeps retries, other adapters, Context, and
+durable history isolated from provider-specific conversion.
+
 A real adapter is responsible for validating what its provider supports. If a
 content part cannot be represented, fail explicitly (the built-in adapters use
 `UnsupportedContentError`) rather than silently dropping it. Provider tool

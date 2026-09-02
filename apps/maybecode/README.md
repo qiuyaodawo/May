@@ -9,9 +9,11 @@ packages.
 MaybeCode is a product composition layer. Generic lifecycle does not live in
 the app:
 
-- `@may/application` owns run/retry/cancel, approval relaying, Session history,
-  Context compaction persistence, closing, session switching, and Catalog
-  summaries;
+- `@may/core`'s instance-scoped `ToolRegistry` composes the coding tools;
+- `@may/application`'s `defineAgent()` captures reusable behavior, while its
+  application/workspace layer owns run/retry/cancel, approval relaying,
+  Session history, Context compaction persistence, closing, session switching,
+  and Catalog summaries;
 - `@may/tui/transcript` projects live and restored Agent events, and
   `@may/tui/tool-renderers` supplies an instance-scoped renderer registry;
 - `@may/coding-tools/instructions` loads bounded, path-safe instruction files;

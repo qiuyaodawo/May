@@ -19,6 +19,7 @@ not accidentally undo it.
 | [0001](0001-apps-compose-packages.md) | Accepted | Applications compose reusable packages through one-way dependencies |
 | [0002](0002-agent-ui-stays-in-may-tui.md) | Accepted | Agent-aware terminal components remain in `@may/tui` |
 | [0003](0003-headless-application-lifecycle.md) | Accepted | Shared Session orchestration belongs in `@may/application` |
+| [0004](0004-agent-definitions-and-tool-registries.md) | Accepted | Agent definitions and tool registries are reusable, instance-scoped composition objects |
 
 ## Adding a record
 

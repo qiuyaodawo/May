@@ -109,6 +109,12 @@ Run 失败。Streaming delta 是实时呈现数据；`response.completed` 的完
 - provider-neutral 工具定义（`name`、`description`、`inputSchema`）；
 - 可选 application metadata。
 
+`ModelRequest`、它的 `messages`/`tools` collection 以及每个 `ToolDefinition` 都是
+readonly adapter 输入。Adapter 应把它们映射为新的、由 provider 层拥有的请求对象；
+不得原地修改、排序或 `splice()` May 的数组，也不得直接给 message/tool definition
+添加 provider 字段。这样同一 Context snapshot 才能被重试、记录或交给其他 wrapper，
+而不会受到 adapter 的隐藏副作用。
+
 真实 adapter 负责校验 provider 支持的内容。无法表示某种 content part 时应明确失败
 （内置 adapter 使用 `UnsupportedContentError`），而不是静默丢弃。Provider tool call
 必须在最终 assistant message 中以标准化 `toolCalls` 返回；May 执行后在下一 Step

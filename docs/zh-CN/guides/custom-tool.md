@@ -8,12 +8,14 @@ May tool 是暴露给模型的一个命名 capability。`@may/core` 的 `Tool` �
 - 可选 `parse()` 校验并转换不可信的模型输出；
 - `execute()` 执行操作。
 
-当前没有进程级全局 tool registry。每个 `May` 或 `AgentApplication` 接收自己的工具数组。
+`@may/core` 提供实例级 `ToolRegistry`，用于显式组合与查询工具；它不是进程级全局
+service locator。`May`、`AgentApplication` 和 `AgentDefinition` 都接受
+`Iterable<Tool>`，所以可以传 registry、数组或其他 iterable。
 
 ## 完整工具示例
 
 ```ts
-import type { Tool } from "@may/core";
+import { ToolRegistry, type Tool } from "@may/core";
 
 interface AddInput {
   readonly left: number;
@@ -56,19 +58,96 @@ export const addTool: Tool<AddInput, AddOutput> = {
 };
 ```
 
-打开 application 时注册：
+与其他 capability 组合，再把集合捕获到 Agent definition 中：
 
 ```ts
-const application = await AgentApplication.open({
+import { defineAgent } from "@may/application";
+import { ToolRegistry } from "@may/core";
+
+const tools = new ToolRegistry([addTool]);
+tools.registerAll(productTools);
+
+const agent = defineAgent({
   model,
-  store,
-  tools: [addTool],
+  tools,
   permissionPolicy,
 });
+
+const application = await agent.open({ store });
 ```
 
 `inputSchema` 会发给模型，但它不是 runtime validator。始终在 `parse()` 中校验；若单独
 parser 不合适，也必须在 `execute()` 中校验。Permission policy 接收解析后的值。
+
+## 使用 `ToolRegistry` 组合工具
+
+Registry 保留注册顺序，并在实例内保证名字唯一：
+
+```ts
+import {
+  DuplicateToolNameError,
+  ToolRegistry,
+} from "@may/core";
+
+const tools = new ToolRegistry([addTool]);
+tools.register(subtractTool);
+tools.registerAll([multiplyTool, divideTool]);
+
+console.log(tools.size);
+console.log(tools.has("add"));
+console.log(tools.get("missing"));       // undefined
+console.log(tools.require("add").name); // "add"
+
+for (const tool of tools) {
+  console.log(tool.name);
+}
+
+const names = tools.names();
+const executableTools = tools.values();
+const modelTools = tools.definitions();
+const extended = tools.clone().register(powerTool);
+const combined = ToolRegistry.compose(coreTools, productTools);
+```
+
+API 语义如下：
+
+| API | 行为 |
+| --- | --- |
+| `new ToolRegistry(tools?)` | 从一个 iterable 注册初始工具 |
+| `register(tool)` | 原子注册单个工具并返回同一 registry |
+| `registerAll(tools)` | 原子注册整批工具并返回同一 registry |
+| `size`、`has(name)` | 查询数量或名字是否存在 |
+| `get(name)` | 返回工具或 `undefined` |
+| `require(name)` | 返回工具；缺失时抛出 `ToolNotFoundError` |
+| `names()`、`values()` | 返回注册顺序的数组快照 |
+| `definitions()` | 返回不含 parser/executor callback 的模型侧定义快照 |
+| `clone()` | 创建可独立继续注册的新 registry |
+| `[Symbol.iterator]()` | 按注册顺序迭代工具 |
+| `ToolRegistry.compose(...sources)` | 按 source 顺序组合多个 iterable |
+
+`registerAll()` 会先完整消费并校验输入。若工具无效、与现有名字重复，或同一批输入中
+出现重名，它会抛出 `TypeError` 或 `DuplicateToolNameError`，且**不注册该批中的任何
+工具**。`register()` 具有相同的单项原子性。`compose()` 遇到重复名字也会失败，而不是
+静默覆盖。`DuplicateToolNameError` 是带 `code: "DUPLICATE_TOOL_NAME"` 的 `MayError`，
+其 `toolName` 属性保存冲突名称。
+
+`names()`、`values()` 和 `definitions()` 返回新数组；`clone()` 不共享可变 registry
+映射。Registry 仍返回注册时的原始 `Tool` 对象身份，以便调用方继续使用基于
+`WeakMap<Tool, ...>` 的 metadata；它不会用 wrapper 替换工具。
+
+注册时，registry 会保存 descriptor 的值或引用：`name`、`description`、
+`inputSchema` 引用、`parse` 和 `execute`。TypeScript 的 `Tool` 契约将这些字段声明为
+`readonly`。若 JavaScript 或 type assertion 在注册后替换其中任意字段，之后通过
+`get()`/`require()`/`values()` 取出工具、迭代、clone/compose 或生成 definition 时会
+抛出 `TypeError`，而不是在旧名称/新实现之间产生不一致。
+`inputSchema` 只比较对象引用，并不会被深度冻结；因此调用方仍必须把 schema 及已注册
+Tool 的 descriptor 视为稳定值。工具的其他内部运行状态可以按产品 ownership 模型
+变化。
+
+`May` 在构造时快照传入 iterable 的成员，之后向源 registry 注册工具不会改变该
+runtime。`defineAgent()` 也在创建 definition 时快照工具成员，之后每次 `open()` 都使用
+同一组工具。直接 `AgentApplication.open()` 会在打开期间快照工具。若产品需要不同
+capability 集合，应显式创建新的 runtime 或 definition。
 
 ## Execution Context
 
@@ -105,8 +184,9 @@ Step 观察并恢复。只有继续 Run 会不安全时（例如授权或持久�
 Core 会为完成前被取消的调用记录终结结果，避免恢复后的 history 出现无匹配结果的
 tool call。
 
-工具名在 runtime 内必须唯一；`May` 拒绝重复。若 `AgentApplication` 启用可选
-`session_history`，该名字由 application 保留。
+工具名在 runtime 内必须唯一；`May` 构造内部 registry，因此重名会抛出
+`DuplicateToolNameError`。若 `AgentApplication` 启用可选 `session_history`，该名字由
+application 保留。
 
 Core 默认串行调度。只有同一模型响应选择的每个工具都可安全并发、且结果按调用顺序
 仍有意义时，才使用 `parallelToolScheduler`。

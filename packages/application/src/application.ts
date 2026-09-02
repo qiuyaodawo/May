@@ -15,12 +15,14 @@ import {
   isStreamingMayEvent,
   May,
   serializeError,
+  ToolRegistry,
   type Message,
   type Model,
   type RunHandle,
   type RunOptions,
   type Tool,
   type ToolExecutor,
+  type ToolScheduler,
 } from "@may/core";
 import {
   PermissionToolExecutor,
@@ -55,8 +57,9 @@ export interface AgentApplicationOptions {
   readonly model: Model;
   readonly store: SessionStore;
   readonly permissionPolicy: PermissionPolicy;
-  readonly tools?: readonly Tool[];
+  readonly tools?: Iterable<Tool>;
   readonly toolExecutor?: ToolExecutor;
+  readonly toolScheduler?: ToolScheduler;
   readonly instructions?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly contextMetadata?: Readonly<Record<string, unknown>>;
@@ -141,7 +144,7 @@ export class AgentApplication implements AgentController {
   static async open(options: AgentApplicationOptions): Promise<AgentApplication> {
     let application: AgentApplication | undefined;
     let historySource: Session | undefined;
-    const configuredTools = [...(options.tools ?? [])];
+    const configuredTools = new ToolRegistry(options.tools);
     if (options.sessionHistory !== false && options.sessionHistory !== undefined) {
       const historyTool = createSessionHistoryTool({
         ...options.sessionHistory,
@@ -152,10 +155,10 @@ export class AgentApplication implements AgentController {
           return historySource;
         },
       });
-      if (configuredTools.some((tool) => tool.name === historyTool.name)) {
+      if (configuredTools.has(historyTool.name)) {
         throw new Error(`Tool name "${historyTool.name}" is reserved by AgentApplication`);
       }
-      configuredTools.push(historyTool);
+      configuredTools.register(historyTool);
     }
 
     const permissions = new PermissionToolExecutor({
@@ -213,6 +216,9 @@ export class AgentApplication implements AgentController {
         tools: configuredTools,
         context: managedContext.context,
         toolExecutor: permissions,
+        ...(options.toolScheduler === undefined
+          ? {}
+          : { toolScheduler: options.toolScheduler }),
         ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
       });
     };

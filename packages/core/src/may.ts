@@ -17,7 +17,7 @@ import {
   type RunResult,
   type SerializedError,
 } from "./events.js";
-import type { Model, ModelRequest, ToolDefinition } from "./model.js";
+import type { Model, ModelRequest } from "./model.js";
 import {
   directToolExecutor,
   sequentialToolScheduler,
@@ -26,6 +26,7 @@ import {
   type ToolProgressUpdate,
   type ToolScheduler,
 } from "./tool.js";
+import { ToolRegistry } from "./tool-registry.js";
 import {
   textContent,
   toolCancellationMessage,
@@ -40,7 +41,7 @@ import {
 
 export interface MayOptions {
   model: Model;
-  tools?: Tool[];
+  tools?: Iterable<Tool>;
   context: Context;
   maxSteps?: number;
   toolExecutor?: ToolExecutor;
@@ -70,8 +71,7 @@ export interface RunHandle {
 export class May {
   private readonly model: Model;
   private readonly context: Context;
-  private readonly tools: ReadonlyMap<string, Tool>;
-  private readonly toolDefinitions: ToolDefinition[];
+  private readonly tools: ToolRegistry;
   private readonly maxSteps: number;
   private readonly toolExecutor: ToolExecutor;
   private readonly toolScheduler: ToolScheduler;
@@ -85,22 +85,11 @@ export class May {
       throw new RangeError("maxSteps must be a positive integer");
     }
 
-    const tools = new Map<string, Tool>();
-    for (const tool of options.tools ?? []) {
-      if (tools.has(tool.name)) {
-        throw new Error(`Duplicate tool name: ${tool.name}`);
-      }
-      tools.set(tool.name, tool);
-    }
+    const tools = new ToolRegistry(options.tools);
 
     this.model = options.model;
     this.context = options.context;
     this.tools = tools;
-    this.toolDefinitions = [...tools.values()].map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-    }));
     this.maxSteps = maxSteps;
     this.toolExecutor = options.toolExecutor ?? directToolExecutor;
     this.toolScheduler = options.toolScheduler ?? sequentialToolScheduler;
@@ -338,16 +327,13 @@ export class May {
 
     messages.push(...snapshot.messages);
 
-    const request: ModelRequest = {
+    return {
       messages,
-      tools: this.toolDefinitions,
+      tools: this.tools.definitions(),
+      ...(snapshot.metadata === undefined
+        ? {}
+        : { metadata: snapshot.metadata }),
     };
-
-    if (snapshot.metadata !== undefined) {
-      request.metadata = snapshot.metadata;
-    }
-
-    return request;
   }
 
   private async consumeModel(

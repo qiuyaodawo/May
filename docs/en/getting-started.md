@@ -76,7 +76,8 @@ workspace links.
 Create `examples/quickstart-agent/agent.mjs`:
 
 ```js
-import { AgentApplication } from "@may/application";
+import { defineAgent } from "@may/application";
+import { ToolRegistry } from "@may/core";
 import { InMemorySessionStore } from "@may/session";
 
 /** @type {import("@may/core").Model} */
@@ -139,17 +140,17 @@ const add = {
 };
 
 const store = new InMemorySessionStore();
-const applicationOptions = {
+const tools = new ToolRegistry([add]);
+const agent = defineAgent({
   model,
-  store,
-  tools: [add],
+  tools,
   instructions: "Use the add tool and answer concisely.",
   // Safe only because every tool in this deterministic example is trusted.
   permissionPolicy: () => "allow",
   sessionHistory: false,
-};
+});
 
-const application = await AgentApplication.open(applicationOptions);
+const application = await agent.open({ store });
 const sessionId = application.sessionId;
 
 try {
@@ -169,8 +170,8 @@ try {
 }
 
 // An in-memory store can resume while this process and store object remain alive.
-const resumed = await AgentApplication.open({
-  ...applicationOptions,
+const resumed = await agent.open({
+  store,
   sessionId,
   resume: true,
 });
@@ -218,18 +219,33 @@ The code supplies the behavior and policy that a reusable lifecycle cannot
 choose on its own:
 
 ```text
-AgentApplication
+AgentDefinition
   + Model                 how model requests are answered
-  + Tool[]                capabilities available to the model
+  + Iterable<Tool>        capabilities available to the model
   + instructions          product behavior
   + PermissionPolicy      whether each validated tool call may execute
-  + SessionStore          durable facts for one Session identity
   + ContextFactory        omitted here, so the in-memory default is used
+       |
+       `- open({ SessionStore }) -> AgentApplication for one Session
 ```
 
-`AgentApplication.open()` creates a new Session unless `resume: true` and a
-`sessionId` are supplied. It installs the permission executor, creates the
-Core runtime, relays events, and connects history and Context management.
+`defineAgent()` separates reusable behavior and policy from Session-bound
+infrastructure. It consumes and snapshots the tools iterable immediately, so
+later additions to `tools` would not change this definition. Each
+`agent.open()` call creates an independent `AgentApplication` and a new Session
+unless `resume: true` and a `sessionId` are supplied. It installs the
+permission executor, creates the Core runtime, relays events, and connects
+history and Context management.
+
+`ToolRegistry` is useful when several features contribute tools and duplicate
+names must fail early. It is an ordinary instance, not global state. An array,
+set, generator, or any other `Iterable<Tool>` is also accepted.
+
+The definition reuses the same Tool, Model, and other collaborator objects; it
+does not clone them. Keep Tool descriptors stable after registration. If a
+Model, Context factory, custom executor/scheduler, or other collaborator is
+stateful, the caller must make it safe to share across opened applications or
+create a separate definition for each ownership boundary.
 
 The example explicitly disables the optional `session_history` tool. Pass
 `sessionHistory: {}` instead when the model should be able to query bounded

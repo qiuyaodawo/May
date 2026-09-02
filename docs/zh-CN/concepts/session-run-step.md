@@ -8,7 +8,7 @@ May 的执行术语分为四层：
 Agent definition -> Session -> Run -> Step
 ```
 
-Agent definition 是可复用配置，不是当前运行时对象。`AgentApplication` 与
+`AgentDefinition` 是可复用组合对象，不是一次活动执行或对话。`AgentApplication` 与
 `AgentWorkspace` 编排其他层级；参阅
 [Agent definition、Application 与 Workspace](agent-application.md)。Package ownership
 视角见 [Runtime 与 Session 边界](../architecture/runtime-session.md)。

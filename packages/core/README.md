@@ -2,7 +2,7 @@
 
 The model- and tool-agnostic runtime at the heart of May agents.
 
-It accepts a `Model`, a set of `Tool`s, and a `Context`, executes an agent
+It accepts a `Model`, an iterable of `Tool`s, and a `Context`, executes an agent
 loop, and exposes the run as an async event stream.
 
 ```ts
@@ -24,6 +24,55 @@ for await (const event of run.events) {
 
 const result = await run.result;
 ```
+
+`May` consumes and snapshots the tool iterable in its constructor. Later
+changes to the source iterable do not change an existing runtime.
+
+## Tool registry
+
+`ToolRegistry` is an instance-scoped, insertion-ordered composition helper. It
+implements `Iterable<Tool>`, so it can be passed anywhere May accepts tools;
+there is no process-global registry.
+
+```ts
+import { ToolRegistry } from "@may/core";
+
+const tools = new ToolRegistry([readTool])
+  .register(writeTool)
+  .registerAll([searchTool, fetchTool]);
+
+const may = new May({ model, tools, context });
+```
+
+The constructor, `register()`, and `registerAll()` validate tools and reject
+duplicate names with `DuplicateToolNameError`. `registerAll()` is atomic: if
+any incoming tool is invalid or conflicts with the registry or its incoming
+group, none of that group is added.
+
+Registry operations are:
+
+- `has(name)`, `get(name)`, and `require(name)` for lookup; `require()` throws
+  `ToolNotFoundError` when the name is absent;
+- `size`, `names()`, and `values()` for insertion-ordered snapshots;
+- `definitions()` for model-facing definitions without executable callbacks;
+- `clone()` for an independent registry with the same tools;
+- iteration for direct use as `Iterable<Tool>`; and
+- `ToolRegistry.compose(...sources)` for duplicate-safe composition of tool
+  iterables into a new registry.
+
+Registries snapshot collection membership and descriptor values/references,
+but intentionally return each original Tool object. Preserving identity lets
+products associate metadata with a Tool through a `WeakMap` or other
+identity-based mechanism. The `name`, `description`, and `inputSchema` fields
+are readonly in TypeScript; those fields plus `parse` and `execute` must remain
+stable after registration.
+
+Operations that return a Tool or model definition verify that its `name`,
+`description`, `inputSchema` reference, `parse`, and `execute` still match the
+registered descriptor and throw `TypeError` if not. This is a shallow
+integrity check, not a clone or deep freeze: mutating properties inside the
+same schema object is not detected, so schemas should also be treated as
+immutable.
 
 ## Tool execution
 

@@ -18,6 +18,7 @@
 | [0001](0001-apps-compose-packages.md) | 已接受 | 应用通过单向依赖组合可复用 package |
 | [0002](0002-agent-ui-stays-in-may-tui.md) | 已接受 | Agent 感知的终端组件保留在 `@may/tui` |
 | [0003](0003-headless-application-lifecycle.md) | 已接受 | 共享 Session 编排属于 `@may/application` |
+| [0004](0004-agent-definitions-and-tool-registries.md) | 已接受 | Agent definition 与工具 registry 是实例级可复用组合对象 |
 
 ## 添加记录
 
