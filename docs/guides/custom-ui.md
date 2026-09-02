@@ -1,0 +1,174 @@
+# Custom UI
+
+May's application layer is headless. A terminal, desktop, web, or remote UI
+should depend on `AgentController` (one active Session) or
+`AgentWorkspaceController` (multiple Sessions), invoke user-intent methods, and
+project the asynchronous event stream into view state.
+
+Do not make UI state the source of truth. Complete Session events are durable;
+streaming deltas and progress are live observations.
+
+## Headless controller boundary
+
+The primary UI operations are:
+
+```ts
+const run = await controller.submit({ input: "Explain this repository" });
+run.cancel("Cancelled in UI");       // cancel this handle
+controller.cancel("Cancelled in UI"); // cancel the active run or compaction
+
+await controller.resolveApproval(requestId, "allow");
+await controller.compactContext();
+const history = await controller.history();
+```
+
+`submit()` resolves when a run has started, not when it has finished. Observe
+`run.result` for completion or failure. Disable conflicting controls while
+`controller.isRunning` is true; application and workspace methods also enforce
+their idle-only transitions.
+
+Always call `close()`. Closing cancels active work, rejects pending approvals,
+waits for event relays, and then closes the event stream.
+
+## Projecting application events
+
+This bridge fills `@may/tui`'s reusable transcript without coupling the
+controller to terminal input:
+
+```ts
+import type {
+  AgentApplicationEvent,
+  AgentController,
+} from "@may/application";
+import type {
+  ApprovalDecision,
+  ApprovalRequest,
+} from "@may/permissions";
+import { TranscriptStore } from "@may/tui/transcript";
+
+type AskApproval = (
+  request: ApprovalRequest,
+) => Promise<ApprovalDecision>;
+
+export async function projectApplication(
+  controller: AgentController<AgentApplicationEvent>,
+  store: TranscriptStore,
+  askApproval: AskApproval,
+): Promise<void> {
+  store.loadHistory(await controller.history());
+
+  for await (const event of controller.events) {
+    switch (event.type) {
+      case "run.event":
+        store.applyMayEvent(event.event);
+        break;
+      case "permission.event":
+        store.applyPermissionEvent(event.event);
+        if (event.event.type === "approval.requested") {
+          let decision: ApprovalDecision = "deny";
+          try {
+            decision = await askApproval(event.event.request);
+          } finally {
+            await controller.resolveApproval(event.event.request.id, decision);
+          }
+        }
+        break;
+      case "context.compacted":
+        store.appendNotice("info", `Context compacted by ${event.strategy}`);
+        break;
+      case "context.compaction.failed":
+        store.appendNotice("warning", event.error.message);
+        break;
+      case "tool.presentation":
+        // The application owns this namespaced/versioned display schema.
+        // Decode recognized kinds here and update the corresponding tool item.
+        break;
+    }
+  }
+}
+```
+
+If an approval dialog fails, this example denies the call rather than leaving
+the run suspended. `resolveApproval()` returns `false` when the request is
+already gone, for example after cancellation.
+
+For an `AgentWorkspaceController`, also handle `session.changed`: reset or load
+the new `controller.history()` before applying later live events. Product
+extension events are likewise translated in the product UI bridge.
+
+## Retained terminal rendering
+
+`@may/tui` provides terminal primitives, but it is not required by a graphical
+UI. A minimal retained transcript is:
+
+```ts
+import {
+  FullscreenRenderer,
+  NodeTerminalDriver,
+  TuiRuntime,
+} from "@may/tui";
+import { TranscriptStore, TranscriptView } from "@may/tui/transcript";
+
+const store = new TranscriptStore();
+const view = new TranscriptView(store, { assistantLabel: "My Agent" });
+view.setFocused(true);
+
+const terminal = new NodeTerminalDriver();
+const renderer = new FullscreenRenderer(terminal);
+const runtime = new TuiRuntime({ terminal, renderer, root: view });
+const unsubscribe = store.subscribe(() => runtime.requestRender());
+
+runtime.start();
+try {
+  await projectApplication(application, store, showApprovalDialog);
+} finally {
+  unsubscribe();
+  runtime.stop();
+}
+```
+
+The application must close for `projectApplication()` to finish normally. In a
+real product, an editor or command component initiates `submit()` and the exit
+path calls `application.close()` before awaiting the projection task.
+
+`TranscriptView` renders standard coding tools with its default registry and
+unknown tools with a generic renderer. Register product renderers on a
+`ToolRendererRegistry` instance and pass it in the view options; there is no
+global UI registry.
+
+Use `NodeTerminalDriver` for a raw-mode retained screen. Use
+`createNodeTerminal()` from `@may/tui/node-terminal` for a line-oriented prompt
+UI. They own different input modes and should not control the same terminal at
+the same time.
+
+## Event consistency
+
+Application queues may discard high-volume streaming deltas under buffer
+pressure while retaining lifecycle events. A UI must therefore:
+
+- replace streamed assistant text with the complete `model.completed` message;
+- treat tool progress as transient;
+- reload `history()` after resume or when recovering from a disconnected UI;
+- key run events by `runId` and tool calls by their call IDs, not arrival text;
+- render serialized errors without assuming their concrete JavaScript class.
+
+`TranscriptStore` implements those live/final projection rules. Its
+`loadHistory()` method reconstructs only durable facts, so a restored screen
+may intentionally omit transient progress seen before shutdown.
+
+## Security and shutdown
+
+- Sanitize any terminal text rendered outside May's `Text`, Markdown, or
+  transcript components; untrusted control sequences can alter the terminal.
+- Do not render approval as granted until its resolution event is observed.
+- Never infer authorization from a disabled button; the permission policy is
+  the enforcement boundary.
+- Bound tool details, diffs, and history pages before sending them over a UI
+  transport.
+- Restore terminal raw mode and the alternate screen in `finally` by calling
+  `runtime.stop()`.
+- Remove subscriptions and close the controller when the UI exits.
+
+See [Permission policies](./permission-policy.md),
+[Custom tools](./custom-tool.md), and
+[Runtime and session boundaries](../architecture/runtime-session.md).
