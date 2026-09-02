@@ -3,6 +3,14 @@ import type {
   ContextInspection,
 } from "@may/context";
 import type { SessionSummary } from "@may/session/catalog";
+import {
+  SlashCommandRegistry,
+  type SlashCommandDefinition,
+  type SlashCommandInvocation,
+  type SlashCommandParseResult,
+  type SlashCommandSuggester,
+  type SlashCommandSuggestion,
+} from "@may/tui/slash-commands";
 import type {
   MaybeCodeCompactionStrategyName,
   MaybeCodeController,
@@ -26,12 +34,8 @@ export type MaybeCodeSlashCommandName =
   | "/help"
   | "/quit";
 
-export interface MaybeCodeSlashCommand {
-  readonly name: MaybeCodeSlashCommandName;
-  readonly aliases?: readonly string[];
-  readonly usage: string;
-  readonly description: string;
-}
+export type MaybeCodeSlashCommand =
+  SlashCommandDefinition<MaybeCodeSlashCommandName>;
 
 export const MAYBECODE_COMPACTION_STRATEGIES = [
   "history-reference",
@@ -96,17 +100,11 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   },
 ];
 
-export interface MaybeCodeSlashCommandInvocation {
-  readonly type: "command";
-  readonly definition: MaybeCodeSlashCommand;
-  readonly invokedAs: string;
-  readonly arguments: readonly string[];
-}
+export type MaybeCodeSlashCommandInvocation =
+  SlashCommandInvocation<MaybeCodeSlashCommand>;
 
 export type MaybeCodeSlashCommandParseResult =
-  | MaybeCodeSlashCommandInvocation
-  | { readonly type: "not-command" }
-  | { readonly type: "unknown"; readonly command: string };
+  SlashCommandParseResult<MaybeCodeSlashCommand>;
 
 export type MaybeCodeSlashCommandResult =
   | { readonly type: "exit" }
@@ -159,46 +157,22 @@ export type MaybeCodeSlashCommandResult =
   | { readonly type: "usage"; readonly usage: string }
   | { readonly type: "unknown"; readonly command: string };
 
-export interface MaybeCodeSlashCommandSuggestion {
-  /** Full input value represented by this suggestion. */
-  readonly value: string;
-  readonly label: string;
-  readonly description?: string;
-}
+export type MaybeCodeSlashCommandSuggestion = SlashCommandSuggestion;
 
-export type MaybeCodeSlashCommandSuggester = (
-  input: string,
-) => Promise<readonly MaybeCodeSlashCommandSuggestion[]>;
+export type MaybeCodeSlashCommandSuggester = SlashCommandSuggester;
+
+const maybeCodeSlashCommands = new SlashCommandRegistry(MAYBECODE_SLASH_COMMANDS);
 
 export function parseMaybeCodeSlashCommand(
   input: string,
 ): MaybeCodeSlashCommandParseResult {
-  const trimmed = input.trim();
-  if (!trimmed.startsWith("/")) return { type: "not-command" };
-  const [invokedAs = "", ...arguments_] = trimmed.split(/\s+/u);
-  const definition = findCommand(invokedAs);
-  return definition === undefined
-    ? { type: "unknown", command: invokedAs }
-    : {
-        type: "command",
-        definition,
-        invokedAs,
-        arguments: arguments_,
-      };
+  return maybeCodeSlashCommands.parse(input);
 }
 
 export function matchMaybeCodeSlashCommands(
   prefix: string,
 ): readonly MaybeCodeSlashCommandSuggestion[] {
-  if (!prefix.startsWith("/") || /\s/u.test(prefix)) return [];
-  const normalized = prefix.toLowerCase();
-  return commandNames()
-    .filter(({ value }) => value.startsWith(normalized))
-    .map(({ value, definition }) => ({
-      value,
-      label: value,
-      description: definition.description,
-    }));
+  return maybeCodeSlashCommands.match(prefix);
 }
 
 export function createMaybeCodeSlashCommandSuggester(
@@ -224,31 +198,25 @@ export function createMaybeCodeSlashCommandSuggester(
     return cachedSessions;
   };
 
-  return async (input) => {
-    if (!input.startsWith("/")) return [];
-    const argumentInput = splitArgumentInput(input);
-    if (argumentInput === undefined) {
-      return matchMaybeCodeSlashCommands(input);
-    }
-
-    const definition = findCommand(argumentInput.command);
+  return maybeCodeSlashCommands.createSuggester(async (argumentInput) => {
+    const { definition, invokedAs: command, argumentPrefix } = argumentInput;
     if (definition?.name === "/compact") {
-      if (/\s/u.test(argumentInput.argumentPrefix)) return [];
+      if (/\s/u.test(argumentPrefix)) return [];
       return MAYBECODE_COMPACTION_STRATEGIES
-        .filter((strategy) => strategy.startsWith(argumentInput.argumentPrefix))
+        .filter((strategy) => strategy.startsWith(argumentPrefix))
         .map((strategy) => ({
-          value: `${argumentInput.command} ${strategy}`,
+          value: `${command} ${strategy}`,
           label: strategy,
           description: "Keep the current turn and reference durable history",
         }));
     }
 
     if (definition?.name === "/resume") {
-      if (/\s/u.test(argumentInput.argumentPrefix)) return [];
+      if (/\s/u.test(argumentPrefix)) return [];
       return (await sessions())
-        .filter((session) => session.id.startsWith(argumentInput.argumentPrefix))
+        .filter((session) => session.id.startsWith(argumentPrefix))
         .map((session) => ({
-          value: `${argumentInput.command} ${session.id}`,
+          value: `${command} ${session.id}`,
           label: session.id,
           description: session.id === controller.sessionId
             ? "Current session"
@@ -258,24 +226,24 @@ export function createMaybeCodeSlashCommandSuggester(
 
     if (definition?.name === "/model") {
       const optionInput = /^(\S+)\s+(\S*)$/u.exec(
-        argumentInput.argumentPrefix,
+        argumentPrefix,
       );
       if (optionInput !== null) {
         const optionPrefix = optionInput[2]!;
         return "--default".startsWith(optionPrefix)
           ? [{
-              value: `${argumentInput.command} ${optionInput[1]} --default`,
+              value: `${command} ${optionInput[1]} --default`,
               label: "--default",
               description: "Switch to this profile and make it the default",
             }]
           : [];
       }
-      if (/\s/u.test(argumentInput.argumentPrefix)) return [];
-      const normalized = argumentInput.argumentPrefix.toLowerCase();
+      if (/\s/u.test(argumentPrefix)) return [];
+      const normalized = argumentPrefix.toLowerCase();
       return (await controller.listModels())
         .filter((model) => model.name.toLowerCase().startsWith(normalized))
         .map((model) => ({
-          value: `${argumentInput.command} ${model.name}`,
+          value: `${command} ${model.name}`,
           label: model.name,
           description: model.name === controller.modelInfo?.profile
             ? `Current · ${model.provider}/${model.model}`
@@ -284,21 +252,21 @@ export function createMaybeCodeSlashCommandSuggester(
     }
 
     if (definition?.name === "/effort") {
-      if (/\s/u.test(argumentInput.argumentPrefix)) return [];
+      if (/\s/u.test(argumentPrefix)) return [];
       const state = await controller.getReasoningEffort();
       if (state.status !== "known") return [];
-      const normalized = argumentInput.argumentPrefix.toLowerCase();
+      const normalized = argumentPrefix.toLowerCase();
       return reasoningEffortChoices(state)
         .filter((effort) => effort.toLowerCase().startsWith(normalized))
         .map((effort) => ({
-          value: `${argumentInput.command} ${effort}`,
+          value: `${command} ${effort}`,
           label: effort,
           description: reasoningEffortDescription(effort, state),
         }));
     }
 
     return [];
-  };
+  });
 }
 
 export async function executeMaybeCodeSlashCommand(
@@ -445,33 +413,6 @@ function reasoningEffortDescription(
   }
   const current = effort === state.effectiveEffort ? "Current · " : "";
   return `${current}capability source: ${state.source}`;
-}
-
-function commandNames(): Array<{
-  value: string;
-  definition: MaybeCodeSlashCommand;
-}> {
-  return MAYBECODE_SLASH_COMMANDS.flatMap((definition) => [
-    { value: definition.name, definition },
-    ...(definition.aliases ?? []).map((value) => ({ value, definition })),
-  ]);
-}
-
-function findCommand(name: string): MaybeCodeSlashCommand | undefined {
-  const normalized = name.toLowerCase();
-  return MAYBECODE_SLASH_COMMANDS.find((definition) =>
-    definition.name === normalized ||
-    definition.aliases?.includes(normalized) === true
-  );
-}
-
-function splitArgumentInput(input: string): {
-  command: string;
-  argumentPrefix: string;
-} | undefined {
-  const match = /^(\/\S+)\s+(.*)$/u.exec(input);
-  if (match === null) return undefined;
-  return { command: match[1]!, argumentPrefix: match[2]! };
 }
 
 function noArguments(

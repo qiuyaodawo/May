@@ -1,5 +1,10 @@
 import type { KeyStroke } from "@may/keybindings";
 import { sanitizeTerminalText } from "@may/tui";
+import {
+  ListSelectionModel,
+  resolveListInput,
+  type ListNavigationAction,
+} from "@may/tui/list-selection";
 
 import type {
   MaybeCodeController,
@@ -35,17 +40,20 @@ export async function runModelPicker(
   }
 
   const keymap = createMaybeCodeKeymap();
-  let selectedIndex = Math.max(
-    0,
-    options.models.findIndex((model) =>
-      model.name === options.controller.modelInfo?.profile
+  const selection = new ListSelectionModel(options.models, {
+    initialIndex: Math.max(
+      0,
+      options.models.findIndex((model) =>
+        model.name === options.controller.modelInfo?.profile
+      ),
     ),
-  );
+    pageSize: 10,
+  });
   try {
     while (true) {
       options.terminal.renderView(sanitizeTerminalText(renderModelPicker(
         options.models,
-        selectedIndex,
+        selection.selectedIndex,
         options.controller.modelInfo?.profile,
       )));
       const action = resolvePickerAction(
@@ -56,15 +64,16 @@ export async function runModelPicker(
         return { type: "cancelled" };
       }
       if (action === "list.accept") {
-        return { type: "select", profile: options.models[selectedIndex]!.name };
+        return { type: "select", profile: selection.selected!.name };
       }
       if (action === "model.default.set") {
         return {
           type: "set-default",
-          profile: options.models[selectedIndex]!.name,
+          profile: selection.selected!.name,
         };
       }
-      selectedIndex = moveSelection(action, selectedIndex, options.models.length);
+      const navigation = navigationAction(action);
+      if (navigation !== undefined) selection.move(navigation);
     }
   } finally {
     options.terminal.closeView();
@@ -84,10 +93,7 @@ async function runLineModelPicker(
   if (answer === "") return { type: "cancelled" };
   const defaultMatch = /^d\s+(.+)$/iu.exec(answer);
   const selection = defaultMatch?.[1] ?? answer;
-  const numeric = Number(selection);
-  const selected = Number.isSafeInteger(numeric) && numeric > 0
-    ? options.models[numeric - 1]
-    : options.models.find((model) => model.name === selection);
+  const selected = resolveListInput(options.models, selection, (model) => model.name);
   if (selected === undefined) {
     throw new Error(`Unknown model selection: ${selection}`);
   }
@@ -107,26 +113,24 @@ function resolvePickerAction(
     : undefined;
 }
 
-function moveSelection(
+function navigationAction(
   action: MaybeCodeKeyAction | undefined,
-  current: number,
-  count: number,
-): number {
+): ListNavigationAction | undefined {
   switch (action) {
     case "list.up":
-      return current === 0 ? count - 1 : current - 1;
+      return "up";
     case "list.down":
-      return current === count - 1 ? 0 : current + 1;
+      return "down";
     case "list.pageUp":
-      return Math.max(0, current - 10);
+      return "page-up";
     case "list.pageDown":
-      return Math.min(count - 1, current + 10);
+      return "page-down";
     case "list.home":
-      return 0;
+      return "home";
     case "list.end":
-      return count - 1;
+      return "end";
     default:
-      return current;
+      return undefined;
   }
 }
 
