@@ -1,31 +1,24 @@
-import {
-  AsyncEventQueue,
-  isStreamingMayEvent,
-  type RunOptions,
-} from "@may/core";
+import { resolve } from "node:path";
+
+import { AgentWorkspace } from "@may/application";
 import type {
-  ContextCompactionResult,
   ContextBudget,
+  ContextCompactionResult,
   ContextInspection,
 } from "@may/context";
-import type { Model } from "@may/core";
+import type { Model, RunOptions } from "@may/core";
 import type { ApprovalDecision } from "@may/permissions";
 import type { ModelCapabilities } from "@may/providers";
+import type {
+  SessionHistoryPage,
+  SessionHistoryQuery,
+} from "@may/session";
+import type { SessionCatalog, SessionSummary } from "@may/session/catalog";
 
 import {
   MaybeCodeApplication,
   type MaybeCodeApplicationOptions,
 } from "./application.js";
-import {
-  latestSession,
-  type SessionCatalog,
-  type SessionSummary,
-} from "@may/session/catalog";
-import type {
-  MaybeCodeEvent,
-  MaybeCodeRun,
-} from "./events.js";
-import type { MaybeCodeInstructions } from "./instructions.js";
 import type {
   MaybeCodeCompactionSelection,
   MaybeCodeController,
@@ -33,6 +26,12 @@ import type {
   MaybeCodeModelProfile,
   MaybeCodeReasoningEffortState,
 } from "./controller.js";
+import type {
+  MaybeCodeEvent,
+  MaybeCodeRun,
+  MaybeCodeSessionEvent,
+} from "./events.js";
+import type { MaybeCodeInstructions } from "./instructions.js";
 
 export interface MaybeCodeModelConfiguration {
   readonly model: Model;
@@ -59,213 +58,170 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
   readonly persistDefaultModel?: (profile: string) => Promise<void>;
 }
 
+type MaybeCodeProductEvent = Exclude<MaybeCodeEvent, MaybeCodeSessionEvent | {
+  type: "session.changed";
+  sessionId: string;
+  resumed: boolean;
+}>;
+
+type ActiveWorkspaceOptions = Omit<
+  MaybeCodeWorkspaceOptions,
+  "sessionId" | "autoResume"
+>;
+
+interface WorkspaceState {
+  options: ActiveWorkspaceOptions;
+}
+
+type BaseWorkspace = AgentWorkspace<
+  MaybeCodeSessionEvent,
+  MaybeCodeProductEvent,
+  MaybeCodeCompactionSelection,
+  MaybeCodeApplication
+>;
+
+/** MaybeCode model policy around the reusable multi-session workspace. */
 export class MaybeCodeWorkspace implements MaybeCodeController {
   readonly events: AsyncIterable<MaybeCodeEvent>;
   readonly workspace: string;
 
-  private options: Omit<
-    MaybeCodeWorkspaceOptions,
-    "sessionId" | "autoResume"
-  >;
-  private readonly eventQueue = new AsyncEventQueue<MaybeCodeEvent>({
-    maxBufferedValues: 1024,
-    isDroppable: (value) =>
-      value.type === "run.event" && isStreamingMayEvent(value.event),
-  });
-  private application: MaybeCodeApplication;
-  private eventRelay: Promise<void>;
-  private sessionRecordTail: Promise<void> = Promise.resolve();
-  private stateMutationTail: Promise<void> = Promise.resolve();
+  private readonly manager: BaseWorkspace;
+  private readonly state: WorkspaceState;
   private readonly modelOptionOverrides = new Map<
     string,
     Readonly<Record<string, unknown>>
   >();
   private closed = false;
 
-  private constructor(
-    options: Omit<MaybeCodeWorkspaceOptions, "sessionId" | "autoResume">,
-    application: MaybeCodeApplication,
-    resumed: boolean,
-  ) {
-    this.options = options;
-    this.application = application;
-    this.workspace = application.workspace;
-    this.events = this.eventQueue;
-    this.eventRelay = this.relayEvents(application);
-    this.eventQueue.push({
-      type: "session.changed",
-      sessionId: application.sessionId,
-      resumed,
-    });
+  private constructor(state: WorkspaceState, manager: BaseWorkspace) {
+    this.state = state;
+    this.manager = manager;
+    this.workspace = manager.workspace;
+    this.events = manager.events;
   }
 
   static async open(
     options: MaybeCodeWorkspaceOptions,
   ): Promise<MaybeCodeWorkspace> {
-    const base = withoutSelection(options);
-    let sessionId = options.sessionId;
-    if (sessionId === undefined && options.autoResume === true) {
-      sessionId = (await latestSession(options.catalog, options.workspace))?.id;
-      if (
-        sessionId !== undefined &&
-        (await options.store.read(sessionId)).length === 0
-      ) {
-        sessionId = undefined;
-      }
-    }
-
-    const resumed = sessionId !== undefined;
-    const application = await MaybeCodeApplication.open({
-      ...applicationOptions(base),
-      ...(sessionId === undefined ? {} : { sessionId, resume: true }),
+    const state: WorkspaceState = {
+      options: withoutSelection({
+        ...options,
+        workspace: resolve(options.workspace),
+      }),
+    };
+    const manager = await AgentWorkspace.open<
+      MaybeCodeSessionEvent,
+      MaybeCodeProductEvent,
+      MaybeCodeCompactionSelection,
+      MaybeCodeApplication
+    >({
+      workspace: state.options.workspace,
+      store: state.options.store,
+      catalog: state.options.catalog,
+      openApplication: (selection) => MaybeCodeApplication.open({
+        ...applicationOptions(state.options),
+        ...(selection.sessionId === undefined
+          ? {}
+          : { sessionId: selection.sessionId }),
+        resume: selection.resume,
+      }),
+      ...(options.sessionId === undefined
+        ? {}
+        : { sessionId: options.sessionId }),
+      ...(options.autoResume === undefined
+        ? {}
+        : { autoResume: options.autoResume }),
     });
-    const manager = new MaybeCodeWorkspace(base, application, resumed);
-    await manager.recordCurrentSession().catch(() => undefined);
-    return manager;
+    return new MaybeCodeWorkspace(state, manager);
   }
 
   get sessionId(): string {
-    return this.application.sessionId;
+    return this.manager.sessionId;
   }
 
   get isRunning(): boolean {
-    return this.application.isRunning;
+    return this.manager.isRunning;
   }
 
   get instructions(): MaybeCodeInstructions {
-    return this.application.instructions;
+    return this.manager.activeApplication.instructions;
   }
 
   get modelInfo(): MaybeCodeModelInfo | undefined {
-    return this.application.modelInfo;
+    return this.manager.activeApplication.modelInfo;
   }
 
-  async submit(options: RunOptions): Promise<MaybeCodeRun> {
-    return this.withStateMutation(async () => {
-      const run = await this.application.submit(options);
-      void this.recordCurrentSession().catch(() => undefined);
-      return this.withSessionRecord(run);
-    });
+  submit(options: RunOptions): Promise<MaybeCodeRun> {
+    return this.manager.submit(options);
   }
 
-  async retry(): Promise<MaybeCodeRun> {
-    return this.withStateMutation(async () => {
-      void this.recordCurrentSession().catch(() => undefined);
-      return this.withSessionRecord(await this.application.retry());
-    });
+  retry(): Promise<MaybeCodeRun> {
+    return this.manager.retry();
   }
 
   cancel(reason?: string): boolean {
-    return this.application.cancel(reason);
+    return this.manager.cancel(reason);
   }
 
   resolveApproval(
     requestId: string,
     decision: ApprovalDecision,
   ): Promise<boolean> {
-    this.throwIfClosed();
-    return this.application.resolveApproval(requestId, decision);
+    return this.manager.resolveApproval(requestId, decision);
   }
 
   listSessions(): Promise<readonly SessionSummary[]> {
-    this.throwIfClosed();
-    return this.options.catalog.list(this.workspace);
+    return this.manager.listSessions();
   }
 
-  async newSession(): Promise<string> {
-    return this.withStateMutation(async () => {
-      this.assertIdle();
-      const next = await MaybeCodeApplication.open(applicationOptions(this.options));
-      await this.replaceApplication(next, false);
-      return next.sessionId;
-    });
+  newSession(): Promise<string> {
+    return this.manager.newSession();
   }
 
-  async resumeSession(sessionId: string): Promise<void> {
-    return this.withStateMutation(async () => {
-      this.assertIdle();
-      if (sessionId === this.sessionId) return;
-      const next = await MaybeCodeApplication.open({
-        ...applicationOptions(this.options),
-        sessionId,
-        resume: true,
-      });
-      await this.replaceApplication(next, true);
-    });
+  resumeSession(sessionId: string): Promise<void> {
+    return this.manager.resumeSession(sessionId);
   }
 
-  async renameSession(sessionId: string, title: string): Promise<void> {
-    return this.withStateMutation(async () => {
-      this.assertIdle();
-      const normalized = title.replace(/\s+/gu, " ").trim();
-      if (normalized === "") throw new Error("Session title cannot be empty");
-      const rename = this.options.catalog.rename;
-      if (rename === undefined) {
-        throw new Error("The active session catalog does not support renaming");
-      }
-      if (!await rename.call(
-        this.options.catalog,
-        sessionId,
-        this.workspace,
-        normalized,
-      )) {
-        throw new Error(`Session "${sessionId}" does not exist`);
-      }
-    });
+  renameSession(sessionId: string, title: string): Promise<void> {
+    return this.manager.renameSession(sessionId, title);
   }
 
-  async deleteSession(sessionId: string): Promise<boolean> {
-    return this.withStateMutation(async () => {
-      this.assertIdle();
-      if (sessionId === this.sessionId) {
-        throw new Error("Cannot delete the active session");
-      }
-      const removeHistory = this.options.store.delete;
-      const removeCatalog = this.options.catalog.remove;
-      if (removeHistory === undefined) {
-        throw new Error("The active session store does not support deletion");
-      }
-      if (removeCatalog === undefined) {
-        throw new Error("The active session catalog does not support deletion");
-      }
-      const known = (await this.options.catalog.list(this.workspace)).some(
-        (session) => session.id === sessionId,
-      );
-      if (!known) return false;
-      const historyRemoved = await removeHistory.call(this.options.store, sessionId);
-      const catalogRemoved = await removeCatalog.call(
-        this.options.catalog,
-        sessionId,
-        this.workspace,
-      );
-      return historyRemoved || catalogRemoved;
-    });
+  deleteSession(sessionId: string): Promise<boolean> {
+    return this.manager.deleteSession(sessionId);
   }
 
   async listModels(): Promise<readonly MaybeCodeModelProfile[]> {
     this.throwIfClosed();
-    return [...(this.options.modelProfiles ?? [])];
+    return [...(this.state.options.modelProfiles ?? [])];
   }
 
   async switchModel(profile: string): Promise<MaybeCodeModelInfo> {
-    return this.withStateMutation(async () => {
-      this.assertIdle();
-      const selected = (this.options.modelProfiles ?? []).find((candidate) =>
-        candidate.name === profile
-      );
-      if (selected === undefined) {
-        throw new Error(`Unknown model profile "${profile}"`);
-      }
-      if (this.modelInfo?.profile === profile) {
-        this.eventQueue.push({ type: "model.changed", model: this.modelInfo });
-        return this.modelInfo;
-      }
-      const create = this.options.createModelConfiguration;
+    this.throwIfClosed();
+    const selected = (this.state.options.modelProfiles ?? []).find((candidate) =>
+      candidate.name === profile
+    );
+    if (selected === undefined) throw new Error(`Unknown model profile "${profile}"`);
+
+    if (this.modelInfo?.profile === profile) {
+      return this.manager.runStateTransition((application) => {
+        const model = application.modelInfo;
+        if (model === undefined) {
+          throw new Error("The active application does not expose model information");
+        }
+        this.manager.emit({ type: "model.changed", model });
+        return model;
+      }, {
+        activeOperationMessage:
+          "Cannot switch sessions while an operation is active",
+      });
+    }
+
+    let result: MaybeCodeModelInfo | undefined;
+    await this.manager.transitionApplication(async (current) => {
+      const create = this.state.options.createModelConfiguration;
       if (create === undefined) {
         throw new Error("The active MaybeCode workspace cannot switch models");
       }
-
-      await this.recordCurrentSession().catch(() => undefined);
       const configuration = await create(
         profile,
         this.modelOptionOverrides.get(profile),
@@ -276,52 +232,61 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
             `"${configuration.modelInfo.profile ?? "unknown"}"`,
         );
       }
-      const nextOptions = withModelConfiguration(this.options, configuration);
+      const nextOptions = withModelConfiguration(
+        this.state.options,
+        configuration,
+      );
       const next = await MaybeCodeApplication.open({
         ...applicationOptions(nextOptions),
-        sessionId: this.sessionId,
+        sessionId: current.sessionId,
         resume: true,
       });
-      this.options = nextOptions;
-      await this.replaceApplication(next);
-      this.eventQueue.push({ type: "model.changed", model: configuration.modelInfo });
-      return configuration.modelInfo;
+      this.state.options = nextOptions;
+      result = configuration.modelInfo;
+      return next;
+    }, {
+      createEvent: (application) => ({
+        type: "model.changed",
+        model: application.modelInfo!,
+      }),
     });
+    return result!;
   }
 
-  async setDefaultModel(profile: string): Promise<void> {
-    return this.withStateMutation(async () => {
-      const profiles = this.options.modelProfiles ?? [];
+  setDefaultModel(profile: string): Promise<void> {
+    this.throwIfClosed();
+    return this.manager.runStateTransition(async () => {
+      const profiles = this.state.options.modelProfiles ?? [];
       if (!profiles.some((candidate) => candidate.name === profile)) {
         throw new Error(`Unknown model profile "${profile}"`);
       }
-      const persist = this.options.persistDefaultModel;
+      const persist = this.state.options.persistDefaultModel;
       if (persist === undefined) {
         throw new Error("The active MaybeCode configuration is not writable");
       }
 
       await persist(profile);
-      this.options = {
-        ...this.options,
+      this.state.options = {
+        ...this.state.options,
         modelProfiles: profiles.map((candidate) => ({
           ...candidate,
           isDefault: candidate.name === profile,
         })),
       };
-      this.eventQueue.push({ type: "model.default.changed", profile });
-    });
+      this.manager.emit({ type: "model.default.changed", profile });
+    }, { requireIdle: false });
   }
 
   async getReasoningEffort(): Promise<MaybeCodeReasoningEffortState> {
     this.throwIfClosed();
     const profile = this.modelInfo?.profile;
     if (profile === undefined) return unknownReasoningEffort();
-    const resolveCapabilities = this.options.resolveModelCapabilities;
+    const resolveCapabilities = this.state.options.resolveModelCapabilities;
     if (resolveCapabilities === undefined) return unknownReasoningEffort();
 
     const capabilities = (await resolveCapabilities(profile)).reasoningEffort;
-    const configured = (this.options.modelProfiles ?? []).find((candidate) =>
-      candidate.name === profile
+    const configured = (this.state.options.modelProfiles ?? []).find(
+      (candidate) => candidate.name === profile,
     )?.reasoningEffort;
     const override = this.modelOptionOverrides.get(profile)?.reasoningEffort;
     const overridden = typeof override === "string";
@@ -350,161 +315,80 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   async setReasoningEffort(
     effort?: string,
   ): Promise<MaybeCodeReasoningEffortState> {
-    return this.withStateMutation(async () => {
-    this.assertIdle();
-    const profile = this.modelInfo?.profile;
-    if (profile === undefined) {
-      throw new Error("The active model has no configurable profile");
-    }
-    const state = await this.getReasoningEffort();
-    if (effort !== undefined) {
-      if (state.status === "unknown") {
-        throw new Error(
-          `Reasoning effort capabilities are unknown for model profile "${profile}"`,
-        );
+    this.throwIfClosed();
+    await this.manager.transitionApplication(async (current) => {
+      const profile = current.modelInfo?.profile;
+      if (profile === undefined) {
+        throw new Error("The active model has no configurable profile");
       }
-      if (state.status === "unsupported") {
-        throw new Error(
-          `Model profile "${profile}" does not support effort-based reasoning`,
-        );
+      const state = await this.getReasoningEffort();
+      if (effort !== undefined) {
+        if (state.status === "unknown") {
+          throw new Error(
+            `Reasoning effort capabilities are unknown for model profile "${profile}"`,
+          );
+        }
+        if (state.status === "unsupported") {
+          throw new Error(
+            `Model profile "${profile}" does not support effort-based reasoning`,
+          );
+        }
+        if (!state.efforts.includes(effort)) {
+          throw new Error(
+            `Reasoning effort "${effort}" is unsupported by model profile ` +
+              `"${profile}"; supported values: ${state.efforts.join(", ")}`,
+          );
+        }
+        this.modelOptionOverrides.set(profile, { reasoningEffort: effort });
+      } else {
+        this.modelOptionOverrides.delete(profile);
       }
-      if (!state.efforts.includes(effort)) {
-        throw new Error(
-          `Reasoning effort "${effort}" is unsupported by model profile ` +
-            `"${profile}"; supported values: ${state.efforts.join(", ")}`,
-        );
-      }
-      this.modelOptionOverrides.set(profile, { reasoningEffort: effort });
-    } else {
-      this.modelOptionOverrides.delete(profile);
-    }
 
-    const create = this.options.createModelConfiguration;
-    if (create === undefined) {
-      throw new Error("The active MaybeCode workspace cannot tune models");
-    }
-    await this.recordCurrentSession().catch(() => undefined);
-    const configuration = await create(
-      profile,
-      this.modelOptionOverrides.get(profile),
-    );
-    const nextOptions = withModelConfiguration(this.options, configuration);
-    const next = await MaybeCodeApplication.open({
-      ...applicationOptions(nextOptions),
-      sessionId: this.sessionId,
-      resume: true,
+      const create = this.state.options.createModelConfiguration;
+      if (create === undefined) {
+        throw new Error("The active MaybeCode workspace cannot tune models");
+      }
+      const configuration = await create(
+        profile,
+        this.modelOptionOverrides.get(profile),
+      );
+      const nextOptions = withModelConfiguration(
+        this.state.options,
+        configuration,
+      );
+      const next = await MaybeCodeApplication.open({
+        ...applicationOptions(nextOptions),
+        sessionId: current.sessionId,
+        resume: true,
+      });
+      this.state.options = nextOptions;
+      return next;
     });
-    this.options = nextOptions;
-    await this.replaceApplication(next);
     return this.getReasoningEffort();
-    });
   }
 
   history() {
-    return this.application.history();
+    return this.manager.history();
+  }
+
+  queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage> {
+    return this.manager.queryHistory(query);
   }
 
   inspectContext(): Promise<ContextInspection | undefined> {
-    this.throwIfClosed();
-    return this.application.inspectContext();
+    return this.manager.inspectContext();
   }
 
-  async compactContext(
+  compactContext(
     strategy?: MaybeCodeCompactionSelection,
   ): Promise<ContextCompactionResult> {
-    return this.withStateMutation(async () => {
-      this.assertIdle();
-      return this.application.compactContext(strategy);
-    });
+    return this.manager.compactContext(strategy);
   }
 
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    await this.stateMutationTail;
-    await this.application.close();
-    await this.eventRelay;
-    await this.sessionRecordTail;
-    this.eventQueue.close();
-  }
-
-  private async replaceApplication(
-    next: MaybeCodeApplication,
-    resumed?: boolean,
-  ): Promise<void> {
-    try {
-      await this.application.close();
-      await this.eventRelay;
-    } catch (error) {
-      await next.close();
-      throw error;
-    }
-
-    this.application = next;
-    this.eventRelay = this.relayEvents(next);
-    await this.recordCurrentSession().catch(() => undefined);
-    if (resumed !== undefined) {
-      this.eventQueue.push({
-        type: "session.changed",
-        sessionId: next.sessionId,
-        resumed,
-      });
-    }
-  }
-
-  private async recordCurrentSession(): Promise<void> {
-    const application = this.application;
-    const operation = this.sessionRecordTail.then(async () => {
-      const history = await application.history();
-      const createdAt = history[0]?.timestamp ?? Date.now();
-      const details = summarizeSession(history);
-      await this.options.catalog.record({
-        id: application.sessionId,
-        workspace: this.workspace,
-        createdAt,
-        lastUsedAt: Date.now(),
-        ...details,
-      });
-    });
-    this.sessionRecordTail = operation.catch(() => undefined);
-    return operation;
-  }
-
-  private withSessionRecord(run: MaybeCodeRun): MaybeCodeRun {
-    const result = run.result.then(
-      async (value) => {
-        await this.recordCurrentSession().catch(() => undefined);
-        return value;
-      },
-      async (error: unknown) => {
-        await this.recordCurrentSession().catch(() => undefined);
-        throw error;
-      },
-    );
-    void result.catch(() => undefined);
-    return { id: run.id, result, cancel: run.cancel };
-  }
-
-  private async relayEvents(application: MaybeCodeApplication): Promise<void> {
-    for await (const event of application.events) {
-      this.eventQueue.push(event);
-    }
-  }
-
-  private assertIdle(): void {
-    if (this.isRunning) {
-      throw new Error("Cannot switch sessions while an operation is active");
-    }
-  }
-
-  private withStateMutation<T>(operation: () => Promise<T>): Promise<T> {
-    this.throwIfClosed();
-    const result = this.stateMutationTail.then(operation);
-    this.stateMutationTail = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
+    await this.manager.close();
   }
 
   private throwIfClosed(): void {
@@ -512,54 +396,15 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 }
 
-function summarizeSession(
-  history: readonly import("@may/session").SessionEvent[],
-): Pick<SessionSummary, "title" | "preview" | "turnCount"> {
-  const messages = history.flatMap((event) => {
-    if (event.type === "input.submitted" || event.type === "assistant.completed") {
-      const text = event.message.content
-        .filter((part) => part.type === "text")
-        .map((part) => part.text)
-        .join("")
-        .replace(/\s+/gu, " ")
-        .trim();
-      return text === "" ? [] : [text];
-    }
-    return [];
-  });
-  const firstInput = history.find((event) => event.type === "input.submitted");
-  const title = firstInput?.type === "input.submitted"
-    ? firstInput.message.content
-      .filter((part) => part.type === "text")
-      .map((part) => part.text)
-      .join("")
-      .replace(/\s+/gu, " ")
-      .trim()
-    : "";
-  const preview = messages.at(-1);
-  const turnCount = history.filter((event) =>
-    event.type === "input.submitted"
-  ).length;
-  return {
-    ...(title === "" ? {} : { title: truncate(title, 80) }),
-    ...(preview === undefined ? {} : { preview: truncate(preview, 180) }),
-    turnCount,
-  };
-}
-
-function truncate(value: string, limit: number): string {
-  return value.length <= limit ? value : `${value.slice(0, limit - 1)}…`;
-}
-
 function withoutSelection(
   options: MaybeCodeWorkspaceOptions,
-): Omit<MaybeCodeWorkspaceOptions, "sessionId" | "autoResume"> {
+): ActiveWorkspaceOptions {
   const { sessionId: _sessionId, autoResume: _autoResume, ...base } = options;
   return base;
 }
 
 function applicationOptions(
-  options: Omit<MaybeCodeWorkspaceOptions, "sessionId" | "autoResume">,
+  options: ActiveWorkspaceOptions,
 ): MaybeCodeApplicationOptions {
   const {
     catalog: _catalog,
@@ -582,9 +427,9 @@ function unknownReasoningEffort(): MaybeCodeReasoningEffortState {
 }
 
 function withModelConfiguration(
-  options: Omit<MaybeCodeWorkspaceOptions, "sessionId" | "autoResume">,
+  options: ActiveWorkspaceOptions,
   configuration: MaybeCodeModelConfiguration,
-): Omit<MaybeCodeWorkspaceOptions, "sessionId" | "autoResume"> {
+): ActiveWorkspaceOptions {
   const {
     model: _model,
     modelInfo: _modelInfo,

@@ -1,22 +1,29 @@
 import { resolve } from "node:path";
 
 import {
+  AgentApplication,
+  contextBudgetFromModel,
+  withDefaultCompactionThreshold,
+  type AgentApplicationEvent,
+} from "@may/application";
+import {
   createCodingTools,
+  createToolChangePreview,
+  decodeToolChangePreviewPresentation,
   getShellToolInfo,
   shellRuntimeInstructions,
+  TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
+  TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
 } from "@may/coding-tools";
 import {
   HistoryReferenceStrategy,
-  InMemoryContextFactory,
   ModelContextCompactionStrategy,
   type ContextBudget,
-  type ContextCompactionFailure,
   type ContextCompactionOptions,
   type ContextCompactionOutput,
   type ContextCompactionResult,
   type ContextCompactionStrategy,
   type ContextSummarizer,
-  type ContextController,
   type ContextFactory,
   type ContextInspection,
   PruneOldToolResultsStrategy,
@@ -25,48 +32,29 @@ import {
 import {
   AsyncEventQueue,
   isStreamingMayEvent,
-  May,
-  serializeError,
   type ContextSnapshot,
-  type Message,
   type Model,
-  type RunHandle,
   type RunOptions,
   type Tool,
 } from "@may/core";
-import {
-  PermissionToolExecutor,
-  type ApprovalDecision,
-  type PermissionPolicy,
-} from "@may/permissions";
-import {
-  Session,
-  type SessionEvent,
-  type SessionRuntimeInfo,
-  type SessionStore,
+import type { ApprovalDecision, PermissionPolicy } from "@may/permissions";
+import type {
+  SessionHistoryPage,
+  SessionHistoryQuery,
+  SessionStore,
 } from "@may/session";
-import { createSessionHistoryTool } from "@may/session-tools";
 
 import type {
-  MaybeCodeRun,
-  MaybeCodeSessionEvent,
-} from "./events.js";
-import {
-  createToolChangePreview,
-  TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
-  TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
-  type ToolChangePreview,
-} from "@may/coding-tools/change-preview";
+  MaybeCodeCompactionSelection,
+  MaybeCodeModelInfo,
+} from "./controller.js";
+import type { MaybeCodeRun, MaybeCodeSessionEvent } from "./events.js";
 import {
   loadMaybeCodeInstructions,
   type MaybeCodeInstructions,
 } from "./instructions.js";
 import { createCodingPermissionPolicy } from "./policy.js";
 import { createModelContextSummarizer } from "./summarizer.js";
-import type {
-  MaybeCodeCompactionSelection,
-  MaybeCodeModelInfo,
-} from "./controller.js";
 
 export { DEFAULT_MAYBE_CODE_INSTRUCTIONS } from "./instructions.js";
 
@@ -91,11 +79,13 @@ export interface MaybeCodeApplicationOptions {
   readonly maxSteps?: number;
 }
 
-interface ActiveCompaction {
-  readonly controller: AbortController;
-  readonly result: Promise<ContextCompactionResult>;
-}
-
+/**
+ * MaybeCode product composition around the reusable headless agent lifecycle.
+ *
+ * Coding tools, prompts, permission defaults, preview presentation and named
+ * compaction choices remain product policy. Session/run/approval persistence and
+ * cancellation are delegated to `@may/application`.
+ */
 export class MaybeCodeApplication {
   readonly events: AsyncIterable<MaybeCodeSessionEvent>;
   readonly sessionId: string;
@@ -103,9 +93,7 @@ export class MaybeCodeApplication {
   readonly instructions: MaybeCodeInstructions;
   readonly modelInfo: MaybeCodeModelInfo | undefined;
 
-  private readonly session: Session;
-  private readonly permissions: PermissionToolExecutor;
-  private readonly contextController: ContextController | undefined;
+  private readonly application: AgentApplication;
   private readonly manualCompactionStrategy: ContextCompactionStrategy;
   private readonly summaryTailStrategy: ContextCompactionStrategy;
   private readonly historyReferenceStrategy: ContextCompactionStrategy;
@@ -114,36 +102,28 @@ export class MaybeCodeApplication {
     isDroppable: (value) =>
       value.type === "run.event" && isStreamingMayEvent(value.event),
   });
-  private readonly permissionRelay: Promise<void>;
-  private readonly runRelays = new Set<Promise<void>>();
-  private currentRun: MaybeCodeRun | undefined;
-  private activeCompaction: ActiveCompaction | undefined;
-  private starting = false;
+  private readonly eventRelay: Promise<void>;
   private closed = false;
 
   private constructor(
     workspace: string,
-    session: Session,
-    permissions: PermissionToolExecutor,
+    application: AgentApplication,
     instructions: MaybeCodeInstructions,
-    contextController: ContextController | undefined,
     manualCompactionStrategy: ContextCompactionStrategy,
     summaryTailStrategy: ContextCompactionStrategy,
     historyReferenceStrategy: ContextCompactionStrategy,
     modelInfo: MaybeCodeModelInfo | undefined,
   ) {
     this.workspace = workspace;
-    this.session = session;
-    this.sessionId = session.id;
-    this.permissions = permissions;
+    this.application = application;
+    this.sessionId = application.sessionId;
     this.instructions = instructions;
-    this.contextController = contextController;
     this.manualCompactionStrategy = manualCompactionStrategy;
     this.summaryTailStrategy = summaryTailStrategy;
     this.historyReferenceStrategy = historyReferenceStrategy;
     this.modelInfo = modelInfo === undefined ? undefined : { ...modelInfo };
     this.events = this.eventQueue;
-    this.permissionRelay = this.relayPermissionEvents();
+    this.eventRelay = this.relayEvents(application.events);
   }
 
   static async open(
@@ -166,45 +146,7 @@ export class MaybeCodeApplication {
         ? {}
         : { runtimeInstructions: shellRuntimeInstructions(shellInfo) }),
     });
-    const permissionPolicy = options.permissionPolicy ??
-      createCodingPermissionPolicy();
-    let application: MaybeCodeApplication | undefined;
-    const permissions = new PermissionToolExecutor({
-      policy: async (check) => {
-        const preview = await createToolChangePreview(
-          workspace,
-          check.tool.name,
-          check.input,
-        );
-        if (preview !== undefined && application !== undefined) {
-          await application.recordToolChangePreview(
-            check.context.runId,
-            check.context.step,
-            check.context.toolCallId,
-            preview,
-          );
-        }
-        return permissionPolicy(check);
-      },
-    });
-    let historySource: Session | undefined;
-    const sessionHistoryTool = createSessionHistoryTool({
-      source: () => {
-        if (historySource === undefined) {
-          throw new Error("Session history is not available before session creation");
-        }
-        return historySource;
-      },
-    });
-    if (configuredTools.some((tool) => tool.name === sessionHistoryTool.name)) {
-      throw new Error(`Tool name "${sessionHistoryTool.name}" is reserved by MaybeCode`);
-    }
-    const tools = [...configuredTools, sessionHistoryTool];
-    const contextFactory = options.contextFactory ?? new InMemoryContextFactory();
-    const contextBudget = withDefaultCompactionThreshold(
-      options.contextBudget ?? contextBudgetFromModel(options.model),
-    );
-    let contextController: ContextController | undefined;
+
     const summaryTailStrategy = new SummaryTailStrategy({
       summarizer: options.contextSummarizer ??
         createModelContextSummarizer(options.model),
@@ -231,299 +173,135 @@ export class MaybeCodeApplication {
       summaryTailStrategy,
       historyReferenceStrategy,
     ];
-    const createRuntime = async (
-      messages: Message[] = [],
-      runtimeInfo: SessionRuntimeInfo = {},
-    ) => {
-      const managedContext = await contextFactory.create({
-        instructions: instructions.effective,
-        messages,
-        metadata: { workspace },
-        ...(contextBudget === undefined
-          ? {}
-          : { budget: contextBudget }),
-        ...(runtimeInfo.latestModelMeasurement === undefined
-          ? {}
-          : { measurement: runtimeInfo.latestModelMeasurement }),
-        ...(options.compactionStrategy === undefined
-          ? {}
-          : { compactionStrategy: options.compactionStrategy }),
-        autoCompactionStrategies,
-      });
-      contextController = managedContext.controller;
-      return new May({
-        model: options.model,
-        tools,
-        context: managedContext.context,
-        toolExecutor: permissions,
-        ...(options.maxSteps === undefined
-          ? {}
-          : { maxSteps: options.maxSteps }),
-      });
-    };
+    const contextBudget = withDefaultCompactionThreshold(
+      options.contextBudget ?? contextBudgetFromModel(options.model),
+    );
 
-    try {
-      const session = options.resume === true
-        ? await resumeSession(options, createRuntime)
-        : await Session.create({
-            runtime: await createRuntime(),
-            store: options.store,
-            metadata: { workspace },
-            ...(options.sessionId === undefined
-              ? {}
-              : { id: options.sessionId }),
-          });
-      historySource = session;
-      assertWorkspace(session, workspace);
-      permissions.setEventSink((event) => session.recordPermissionEvent(event));
-      application = new MaybeCodeApplication(
-        workspace,
-        session,
-        permissions,
-        instructions,
-        contextController,
-        manualCompactionStrategy,
-        summaryTailStrategy,
-        historyReferenceStrategy,
-        options.modelInfo,
-      );
-      contextController?.setAutoCompactionSink?.((result, compactionOptions) =>
-        application!.recordAutomaticCompaction(result, compactionOptions)
-      );
-      contextController?.setAutoCompactionFailureSink?.((failure) =>
-        application!.recordAutomaticCompactionFailure(failure)
-      );
-      return application;
-    } catch (error) {
-      await permissions.close();
-      throw error;
-    }
+    const application = await AgentApplication.open({
+      model: options.model,
+      store: options.store,
+      permissionPolicy: options.permissionPolicy ?? createCodingPermissionPolicy(),
+      tools: configuredTools,
+      instructions: instructions.effective,
+      metadata: { workspace },
+      contextMetadata: { workspace },
+      ...(options.sessionId === undefined
+        ? {}
+        : { sessionId: options.sessionId }),
+      ...(options.resume === undefined ? {} : { resume: options.resume }),
+      ...(options.contextFactory === undefined
+        ? {}
+        : { contextFactory: options.contextFactory }),
+      ...(contextBudget === undefined ? {} : { contextBudget }),
+      ...(options.compactionStrategy === undefined
+        ? {}
+        : { compactionStrategy: options.compactionStrategy }),
+      autoCompactionStrategies,
+      ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
+      sessionHistory: {},
+      createToolPresentation: async (check) => {
+        const preview = await createToolChangePreview(
+          workspace,
+          check.tool.name,
+          check.input,
+        );
+        return preview === undefined
+          ? undefined
+          : {
+              kind: TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
+              version: TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
+              data: preview,
+            };
+      },
+      validateSession: (metadata) => assertWorkspace(metadata, workspace),
+      closeReason: "MaybeCode is closing",
+    });
+
+    return new MaybeCodeApplication(
+      workspace,
+      application,
+      instructions,
+      manualCompactionStrategy,
+      summaryTailStrategy,
+      historyReferenceStrategy,
+      options.modelInfo,
+    );
   }
 
   get isRunning(): boolean {
-    return this.starting ||
-      this.currentRun !== undefined ||
-      this.activeCompaction !== undefined;
+    return this.application.isRunning;
   }
 
-  async submit(options: RunOptions): Promise<MaybeCodeRun> {
-    return this.startRun(() => this.session.submit(options));
+  submit(options: RunOptions): Promise<MaybeCodeRun> {
+    return this.application.submit(options);
   }
 
-  /** Retry the latest failed run without adding another user message. */
-  async retry(): Promise<MaybeCodeRun> {
-    return this.startRun(async () => {
-      if (!latestRunFailed(await this.session.history())) {
-        throw new Error("The latest run did not fail; there is nothing to retry");
-      }
-      return this.session.continue();
-    });
+  retry(): Promise<MaybeCodeRun> {
+    return this.application.retry();
   }
 
-  private async startRun(
-    start: () => Promise<RunHandle>,
-  ): Promise<MaybeCodeRun> {
-    this.throwIfClosed();
-    if (this.isRunning) {
-      throw new Error("A MaybeCode operation is already active");
-    }
-
-    this.starting = true;
-    try {
-      const run = await start();
-      const relay = this.relayRunEvents(run.events);
-      this.runRelays.add(relay);
-      void relay.finally(() => this.runRelays.delete(relay));
-
-      const result = relay.then(() => run.result);
-      const wrapped: MaybeCodeRun = {
-        id: run.id,
-        result,
-        cancel: (reason?: string) => run.cancel(reason),
-      };
-      this.currentRun = wrapped;
-      void result.then(
-        () => this.clearCurrentRun(wrapped),
-        () => this.clearCurrentRun(wrapped),
-      );
-      void result.catch(() => undefined);
-      return wrapped;
-    } finally {
-      this.starting = false;
-    }
-  }
-
-  cancel(reason = "Cancelled by user"): boolean {
-    if (this.currentRun !== undefined) {
-      this.currentRun.cancel(reason);
-      return true;
-    }
-    if (this.activeCompaction !== undefined) {
-      this.activeCompaction.controller.abort(reason);
-      return true;
-    }
-    return false;
+  cancel(reason?: string): boolean {
+    return this.application.cancel(reason);
   }
 
   resolveApproval(
     requestId: string,
     decision: ApprovalDecision,
   ): Promise<boolean> {
-    this.throwIfClosed();
-    return this.permissions.resolve(requestId, decision);
+    return this.application.resolveApproval(requestId, decision);
   }
 
   history() {
-    return this.session.history();
+    return this.application.history();
   }
 
-  async inspectContext(): Promise<ContextInspection | undefined> {
-    this.throwIfClosed();
-    return this.contextController?.inspect();
+  queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage> {
+    return this.application.queryHistory(query);
   }
 
-  async compactContext(
+  inspectContext(): Promise<ContextInspection | undefined> {
+    return this.application.inspectContext();
+  }
+
+  compactContext(
     selection?: MaybeCodeCompactionSelection,
   ): Promise<ContextCompactionResult> {
-    this.throwIfClosed();
-    if (this.isRunning) {
-      throw new Error("Cannot compact context while an operation is active");
-    }
-    if (this.contextController?.compact === undefined) {
-      throw new Error("Context compaction is not supported by the active context");
-    }
-
-    const strategy = this.resolveCompactionStrategy(selection);
-    const controller = new AbortController();
-    const operation = this.performCompaction(strategy, controller.signal);
-    const active: ActiveCompaction = { controller, result: operation };
-    this.activeCompaction = active;
-    try {
-      return await operation;
-    } finally {
-      if (this.activeCompaction === active) this.activeCompaction = undefined;
-    }
-  }
-
-  private async performCompaction(
-    strategy: ContextCompactionStrategy | undefined,
-    signal: AbortSignal,
-  ): Promise<ContextCompactionResult> {
-    const result = await this.contextController!.compact!(strategy, { signal });
-    if (result.changed) {
-      await this.persistCompaction(result);
-    }
-    return result;
-  }
-
-  private async recordAutomaticCompaction(
-    result: ContextCompactionResult,
-    options: ContextCompactionOptions,
-  ): Promise<void> {
-    await this.persistCompaction(result, options);
-    this.eventQueue.push({
-      type: "context.compacted",
-      strategy: result.strategy,
-      before: result.before,
-      after: result.after,
-    });
-  }
-
-  private recordAutomaticCompactionFailure(
-    failure: ContextCompactionFailure,
-  ): void {
-    this.eventQueue.push({
-      type: "context.compaction.failed",
-      strategy: failure.strategy,
-      automatic: true,
-      error: serializeError(failure.error),
-      continuing: failure.continuing,
-      before: failure.before,
-    });
-  }
-
-  private persistCompaction(
-    result: ContextCompactionResult,
-    ordering?: Pick<ContextCompactionOptions, "runId" | "step">,
-  ): Promise<void> {
-    const afterRunStep = ordering?.runId === undefined ||
-        ordering.step === undefined
-      ? undefined
-      : { runId: ordering.runId, step: ordering.step };
-    return this.session.recordContextCompaction(
-      {
-        strategy: result.strategy,
-        messages: result.messages,
-        beforeMessageCount: result.before.messageCount,
-        afterMessageCount: result.after.messageCount,
-        beforeEstimatedTokens: result.before.estimatedTokens,
-        afterEstimatedTokens: result.after.estimatedTokens,
-      },
-      afterRunStep,
+    return this.application.compactContext(
+      this.resolveCompactionStrategy(selection),
     );
-  }
-
-  private async recordToolChangePreview(
-    runId: string,
-    step: number,
-    toolCallId: string,
-    preview: ToolChangePreview,
-  ): Promise<void> {
-    await this.session.recordToolPresentation({
-      runId,
-      step,
-      toolCallId,
-      kind: TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
-      version: TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
-      data: preview,
-    });
-    this.eventQueue.push({
-      type: "change.preview",
-      runId,
-      step,
-      toolCallId,
-      preview,
-    });
   }
 
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-
-    const active = this.currentRun;
-    active?.cancel("MaybeCode is closing");
-    await active?.result.catch(() => undefined);
-    const compaction = this.activeCompaction;
-    compaction?.controller.abort("MaybeCode is closing");
-    await compaction?.result.catch(() => undefined);
-    await this.permissions.close("MaybeCode is closing");
-    await Promise.all([...this.runRelays]);
-    await this.permissionRelay;
-    this.contextController?.setAutoCompactionSink?.(undefined);
-    this.contextController?.setAutoCompactionFailureSink?.(undefined);
+    await this.application.close();
+    await this.eventRelay;
     this.eventQueue.close();
   }
 
-  private async relayRunEvents(events: AsyncIterable<import("@may/core").MayEvent>) {
+  private async relayEvents(
+    events: AsyncIterable<AgentApplicationEvent>,
+  ): Promise<void> {
     for await (const event of events) {
-      if (event.type === "model.completed" && event.usage !== undefined) {
-        this.contextController?.recordModelUsage?.(
-          event.usage,
-          event.contextMessageCount,
-        );
+      if (event.type !== "tool.presentation") {
+        this.eventQueue.push(event);
+        continue;
       }
-      this.eventQueue.push({ type: "run.event", event });
+      const value = event.presentation;
+      const preview = decodeToolChangePreviewPresentation(
+        value.kind,
+        value.version,
+        value.data,
+      );
+      if (preview === undefined) continue;
+      this.eventQueue.push({
+        type: "change.preview",
+        runId: value.runId,
+        step: value.step,
+        toolCallId: value.toolCallId,
+        preview,
+      });
     }
-  }
-
-  private async relayPermissionEvents(): Promise<void> {
-    for await (const event of this.permissions.events) {
-      this.eventQueue.push({ type: "permission.event", event });
-    }
-  }
-
-  private clearCurrentRun(run: MaybeCodeRun): void {
-    if (this.currentRun === run) this.currentRun = undefined;
   }
 
   private resolveCompactionStrategy(
@@ -534,21 +312,14 @@ export class MaybeCodeApplication {
       return new PruneOldToolResultsStrategy();
     }
     if (selection === "summary-tail") return this.summaryTailStrategy;
-    if (selection === "history-reference") {
-      return this.historyReferenceStrategy;
-    }
+    if (selection === "history-reference") return this.historyReferenceStrategy;
     if (typeof selection === "object") return selection;
     throw new Error(`Unknown context compaction strategy: ${String(selection)}`);
-  }
-
-  private throwIfClosed(): void {
-    if (this.closed) throw new Error("MaybeCode application is closed");
   }
 }
 
 class PruneAndSummaryTailStrategy implements ContextCompactionStrategy {
   readonly name = "prune+summary-tail";
-
   private readonly prune = new PruneOldToolResultsStrategy();
 
   constructor(private readonly summaryTail: ContextCompactionStrategy) {}
@@ -565,70 +336,20 @@ class PruneAndSummaryTailStrategy implements ContextCompactionStrategy {
   }
 }
 
-async function resumeSession(
-  options: MaybeCodeApplicationOptions,
-  createRuntime: (
-    messages?: Message[],
-    runtimeInfo?: SessionRuntimeInfo,
-  ) => Promise<May>,
-): Promise<Session> {
-  if (options.sessionId === undefined) {
-    throw new Error("sessionId is required when resuming a session");
-  }
-  return Session.resume({
-    id: options.sessionId,
-    store: options.store,
-    createRuntime: (messages, info) => createRuntime(messages, info),
-  });
-}
-
-function assertWorkspace(session: Session, workspace: string): void {
-  const stored = session.metadata?.workspace;
+function assertWorkspace(
+  metadata: Readonly<Record<string, unknown>> | undefined,
+  workspace: string,
+): void {
+  const stored = metadata?.workspace;
   if (
     typeof stored === "string" &&
     normalizePath(stored) !== normalizePath(workspace)
   ) {
-    throw new Error(
-      `Session "${session.id}" belongs to another workspace: ${stored}`,
-    );
+    throw new Error(`Session belongs to another workspace: ${stored}`);
   }
 }
 
 function normalizePath(path: string): string {
   const normalized = resolve(path);
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;
-}
-
-function latestRunFailed(history: readonly SessionEvent[]): boolean {
-  for (let index = history.length - 1; index >= 0; index--) {
-    const event = history[index]!;
-    if (event.type === "run.failed") return true;
-    if (event.type === "run.completed" || event.type === "run.cancelled") {
-      return false;
-    }
-  }
-  return false;
-}
-
-function contextBudgetFromModel(model: Model): ContextBudget | undefined {
-  if (model.limits === undefined) return undefined;
-  return {
-    ...(model.limits.contextWindowTokens === undefined
-      ? {}
-      : { contextWindowTokens: model.limits.contextWindowTokens }),
-    ...(model.limits.maxOutputTokens === undefined
-      ? {}
-      : { outputReserveTokens: model.limits.maxOutputTokens }),
-  };
-}
-
-function withDefaultCompactionThreshold(
-  budget: ContextBudget | undefined,
-): ContextBudget | undefined {
-  if (budget?.contextWindowTokens === undefined) return budget;
-  if (budget.compactTriggerRatio !== undefined) return budget;
-  return {
-    ...budget,
-    compactTriggerRatio: 0.9,
-  };
 }

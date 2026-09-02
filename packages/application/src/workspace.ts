@@ -313,12 +313,10 @@ export class AgentWorkspace<
   }
 
   history(): Promise<readonly SessionEvent[]> {
-    this.throwIfClosed();
     return this.application.history();
   }
 
   queryHistory(query: SessionHistoryQuery = {}): Promise<SessionHistoryPage> {
-    this.throwIfClosed();
     return this.application.queryHistory(query);
   }
 

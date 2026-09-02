@@ -323,12 +323,10 @@ export class AgentApplication implements AgentController {
   }
 
   history(): Promise<readonly SessionEvent[]> {
-    this.throwIfClosed();
     return this.session.history();
   }
 
   queryHistory(query: SessionHistoryQuery = {}): Promise<SessionHistoryPage> {
-    this.throwIfClosed();
     return this.session.queryHistory(query);
   }
 

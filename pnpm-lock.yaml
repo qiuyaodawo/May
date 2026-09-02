@@ -30,6 +30,9 @@ importers:
 
   apps/maybecode:
     dependencies:
+      '@may/application':
+        specifier: workspace:*
+        version: link:../../packages/application
       '@may/coding-tools':
         specifier: workspace:*
         version: link:../../packages/tools/coding-tools
