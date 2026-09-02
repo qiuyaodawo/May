@@ -1,32 +1,15 @@
-import type { MayEvent, RunResult, SerializedError } from "@may/core";
-import type { ContextInspection } from "@may/context";
-import type { PermissionEvent } from "@may/permissions";
+import type { AgentApplicationEvent, AgentRun } from "@may/application";
 import type { MaybeCodeModelInfo } from "./controller.js";
 import type { ToolChangePreview } from "@may/coding-tools/change-preview";
 
 export type MaybeCodeSessionEvent =
-  | { type: "run.event"; event: MayEvent }
-  | { type: "permission.event"; event: PermissionEvent }
+  | Exclude<AgentApplicationEvent, { type: "tool.presentation" }>
   | {
       type: "change.preview";
       runId: string;
       step: number;
       toolCallId: string;
       preview: ToolChangePreview;
-    }
-  | {
-      type: "context.compacted";
-      strategy: string;
-      before: ContextInspection;
-      after: ContextInspection;
-    }
-  | {
-      type: "context.compaction.failed";
-      strategy: string;
-      automatic: true;
-      error: SerializedError;
-      continuing: boolean;
-      before: ContextInspection;
     };
 
 export type MaybeCodeEvent =
@@ -45,8 +28,4 @@ export type MaybeCodeEvent =
       profile: string;
     };
 
-export interface MaybeCodeRun {
-  readonly id: string;
-  readonly result: Promise<RunResult>;
-  cancel(reason?: string): void;
-}
+export type MaybeCodeRun = AgentRun;
