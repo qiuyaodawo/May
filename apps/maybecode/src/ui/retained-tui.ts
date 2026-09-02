@@ -5,6 +5,7 @@ import {
   type RuntimeRenderer,
   type RuntimeTerminal,
 } from "@may/tui";
+import { TranscriptStore } from "@may/tui/transcript";
 import type { SessionSummary } from "@may/session/catalog";
 import type {
   MaybeCodeController,
@@ -18,7 +19,7 @@ import {
   type MaybeCodeSlashCommandResult,
 } from "../slash-commands.js";
 import { MaybeCodePrototypeView } from "./prototype-view.js";
-import { TranscriptStore } from "./transcript-store.js";
+import type { MaybeCodeEvent } from "../events.js";
 
 export interface RunRetainedTerminalUIOptions {
   readonly terminal?: RuntimeTerminal;
@@ -119,7 +120,7 @@ async function consumeEvents(
 ): Promise<void> {
   const approvals = new Set<Promise<void>>();
   for await (const event of app.events) {
-    store.apply(event);
+    applyMaybeCodeEvent(store, event);
     if (event.type === "model.changed") {
       void refreshModelLabel(view, app);
     }
@@ -152,6 +153,61 @@ async function consumeEvents(
     }
   }
   await Promise.all(approvals);
+}
+
+function applyMaybeCodeEvent(
+  store: TranscriptStore,
+  event: MaybeCodeEvent,
+): void {
+  switch (event.type) {
+    case "run.event":
+      store.applyMayEvent(event.event);
+      break;
+    case "permission.event":
+      store.applyPermissionEvent(event.event);
+      break;
+    case "change.preview":
+      store.appendChangePreview(
+        event.runId,
+        event.step,
+        event.toolCallId,
+        event.preview,
+      );
+      break;
+    case "session.changed":
+      store.reset(event.sessionId);
+      store.appendNotice(
+        "info",
+        `Session ${event.resumed ? "resumed" : "started"}: ${event.sessionId}`,
+      );
+      break;
+    case "model.changed": {
+      const profile = event.model.profile === undefined
+        ? ""
+        : ` profile ${event.model.profile}`;
+      store.appendNotice(
+        "info",
+        `Model switched to${profile}: ${event.model.provider}/${event.model.model}`,
+      );
+      break;
+    }
+    case "model.default.changed":
+      store.appendNotice("info", `Default model set to ${event.profile}`);
+      break;
+    case "context.compacted":
+      store.appendNotice(
+        "info",
+        `Context compacted with ${event.strategy}: ` +
+          `${event.before.messageCount} → ${event.after.messageCount} messages`,
+      );
+      break;
+    case "context.compaction.failed":
+      store.appendNotice(
+        "warning",
+        `Context compaction failed with ${event.strategy}: ${event.error.message}`,
+      );
+      break;
+  }
 }
 
 async function handleCommand(

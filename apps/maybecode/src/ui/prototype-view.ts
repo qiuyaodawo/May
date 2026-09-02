@@ -18,8 +18,11 @@ import {
   type RenderSize,
   type TuiTheme,
 } from "@may/tui";
-import { TranscriptStore } from "./transcript-store.js";
-import { TranscriptView } from "./transcript-view.js";
+import {
+  TranscriptStore,
+  TranscriptView,
+} from "@may/tui/transcript";
+import type { ToolRendererRegistry } from "@may/tui/tool-renderers";
 import type { MaybeCodeSlashCommandSuggestion } from "../slash-commands.js";
 import type { SessionSummary } from "@may/session/catalog";
 import type {
@@ -28,7 +31,6 @@ import type {
 } from "../controller.js";
 import { createMaybeCodeKeymap } from "../keymap.js";
 import { MAYBECODE_DARK_THEME } from "./theme.js";
-import type { ToolRendererRegistry } from "./tool-renderers.js";
 import { MaybeCodeUiActionRegistry } from "./actions.js";
 
 export interface MaybeCodePrototypeViewOptions {
@@ -94,6 +96,9 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     this.model = options.model ?? "model: unknown";
     this.transcriptView = new TranscriptView(options.store, {
       theme: this.theme,
+      assistantLabel: "MaybeCode",
+      selectedToolDetailsHint: "Enter details",
+      toolDetailsHint: "Ctrl+X D all",
       ...(options.toolRenderers === undefined ? {} : { toolRenderers: options.toolRenderers }),
     });
     this.transcript = new ScrollView(this.transcriptView, {

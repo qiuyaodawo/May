@@ -10,32 +10,30 @@ import { ScrollView } from "@may/tui";
 test("projects streaming events into stable, terminal-safe transcript items", () => {
   const store = new TranscriptStore();
   const base = { runId: "run-1", step: 1, timestamp: 1 };
-  store.apply({
-    type: "run.event",
-    event: { ...base, type: "model.started", seq: 1 },
+  store.applyMayEvent({ ...base, type: "model.started", seq: 1 });
+  store.applyMayEvent({
+    ...base,
+    type: "model.reasoning.delta",
+    delta: "think",
+    seq: 2,
   });
-  store.apply({
-    type: "run.event",
-    event: { ...base, type: "model.reasoning.delta", delta: "think", seq: 2 },
+  store.applyMayEvent({
+    ...base,
+    type: "model.text.delta",
+    delta: "\x1b[2Jhello",
+    seq: 3,
   });
-  store.apply({
-    type: "run.event",
-    event: { ...base, type: "model.text.delta", delta: "\x1b[2Jhello", seq: 3 },
-  });
-  store.apply({
-    type: "run.event",
-    event: {
-      ...base,
-      type: "model.completed",
-      seq: 4,
-      contextMessageCount: 2,
-      message: {
-        role: "assistant",
-        content: [
-          { type: "reasoning", text: "think" },
-          { type: "text", text: "\x1b[2Jhello" },
-        ],
-      },
+  store.applyMayEvent({
+    ...base,
+    type: "model.completed",
+    seq: 4,
+    contextMessageCount: 2,
+    message: {
+      role: "assistant",
+      content: [
+        { type: "reasoning", text: "think" },
+        { type: "text", text: "\x1b[2Jhello" },
+      ],
     },
   });
 
@@ -104,23 +102,19 @@ test("does not display input that the controller rejected", async () => {
 
 test("collapses file diffs and reveals them through the details toggle", () => {
   const store = new TranscriptStore();
-  store.apply({
-    type: "run.event",
-    event: {
-      type: "tool.started",
-      runId: "run-1",
-      step: 1,
-      seq: 1,
-      timestamp: 1,
-      call: { id: "edit-1", name: "edit", input: { path: "a.ts" } },
-    },
-  });
-  store.apply({
-    type: "change.preview",
+  store.applyMayEvent({
+    type: "tool.started",
     runId: "run-1",
     step: 1,
-    toolCallId: "edit-1",
-    preview: {
+    seq: 1,
+    timestamp: 1,
+    call: { id: "edit-1", name: "edit", input: { path: "a.ts" } },
+  });
+  store.appendChangePreview(
+    "run-1",
+    1,
+    "edit-1",
+    {
       status: "ready",
       tool: "edit",
       path: "a.ts",
@@ -129,7 +123,7 @@ test("collapses file diffs and reveals them through the details toggle", () => {
       deletions: 1,
       diff: "--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-old\n+new",
     },
-  });
+  );
 
   const view = new TranscriptView(store);
   assert.doesNotMatch(

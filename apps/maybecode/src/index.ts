@@ -21,8 +21,10 @@ export * from "./tui.js";
 export * from "./ui/prototype-view.js";
 export * from "./ui/actions.js";
 export * from "./ui/retained-tui.js";
-export * from "./ui/transcript-store.js";
-export * from "./ui/transcript-view.js";
+export * from "@may/tui/transcript";
 export * from "./ui/theme.js";
-export * from "./ui/tool-renderers.js";
+export * from "@may/tui/tool-renderers";
+export {
+  createCodingToolRendererRegistry as createMaybeCodeToolRendererRegistry,
+} from "@may/tui/tool-renderers";
 export * from "./workspace.js";
