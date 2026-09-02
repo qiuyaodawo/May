@@ -8,6 +8,7 @@ import {
   DEFAULT_MAYBE_CODE_INSTRUCTIONS,
   loadMaybeCodeInstructions,
   MAX_INSTRUCTIONS_BYTES,
+  MaybeCodeConfigError,
   resolveMaybeCodeInstructionsDirectory,
 } from "../dist/index.js";
 
@@ -102,7 +103,11 @@ test("rejects invalid or missing system instructions", async (t) => {
 
   await assert.rejects(
     loadMaybeCodeInstructions({ workspace, instructionsDirectory: directory }),
-    /Unable to read system instructions/u,
+    (error) => {
+      assert.ok(error instanceof MaybeCodeConfigError);
+      assert.match(error.message, /Unable to read system instructions/u);
+      return true;
+    },
   );
 
   await writeFile(join(directory, "system.md"), "   ", "utf8");
