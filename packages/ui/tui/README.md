@@ -3,6 +3,8 @@
 Terminal UI components for May agents. The low-level primitives remain usable
 without a provider or product application, while the agent transcript layer
 projects May runtime, permission, and session events into a retained view.
+Both layers intentionally remain in `@may/tui`; May does not introduce a
+separate `@may/agent-tui` package for the Agent-aware components.
 
 The first milestone provides:
 

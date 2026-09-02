@@ -6,6 +6,11 @@ May uses four lifecycle levels:
 Agent definition -> Session -> Run -> Step
 ```
 
+Application orchestration sits around these lifecycle levels rather than
+adding another model-execution level. An `AgentApplication` owns one active
+Session, while an `AgentWorkspace` selects and replaces the active application
+when a product creates, resumes, or reconfigures a session.
+
 ## Vocabulary
 
 ### Agent definition
@@ -38,6 +43,22 @@ model/tool iterations, not the number of tools: one step may contain multiple
 tool calls.
 
 ## Package responsibilities
+
+Reusable code lives under `packages`; executable product composition lives
+under `apps`. The dependency rule is:
+
+```text
+apps/*
+  |-> @may/application -> context / session / permissions / core /
+  |                      session-tools
+  |-> @may/tui         -> coding-tools / keybindings / session /
+  |                      permissions / core
+  `-> provider / tool / config packages
+```
+
+This is a layering sketch, not a requirement that every package depend on
+every package to its right. The invariant is that reusable packages do not
+import an application. In particular, no package imports `apps/maybecode`.
 
 ### `@may/core`
 
@@ -76,7 +97,9 @@ restores native continuation state through `modelState`.
 
 The session package composes Core into a long-lived identity. It owns a session
 id, metadata, serialized submission, context continuity, session events, and a
-storage seam. It may depend on `@may/core`; Core must not depend on it.
+storage seam. It also provides reusable in-memory and file-backed session
+Catalog implementations. It may depend on `@may/core`; Core must not depend on
+it.
 
 ### `@may/permissions`
 
@@ -92,20 +115,81 @@ leak between sessions. Its awaited event sink lets Session persist approval
 requests and decisions before related tool outcomes. Durable grants remain
 future storage work and do not belong to the UI.
 
+### `@may/application`
+
+The application package provides headless orchestration above Session and
+Core. `AgentApplication` owns one durable Session and centralizes:
+
+- creating or resuming a Session from injected model, tools, Context factory,
+  permission policy, instructions, and storage;
+- submission, retry, cancellation, approval resolution, and safe shutdown;
+- relaying normalized run and permission events;
+- context inspection, compaction cancellation, and persistence of changed
+  model-visible context;
+- optional bounded `session_history` installation and durable, model-invisible
+  tool-presentation metadata.
+
+`AgentWorkspace` adds the active-session catalog, auto-resume, session
+creation/resume/rename/delete, catalog summaries, and a FIFO state-transition
+queue. A product can rebuild the active application on the same Session through
+`transitionApplication`, or serialize product-only configuration work through
+`runStateTransition`.
+
+These classes provide ordering and dependency-injection seams; they do not
+define a provider registry, a system prompt, a coding permission policy, model
+profiles, UI commands, or terminal rendering. The current JSONL Session store
+and append-only file Catalog remain lightweight local backends rather than a
+claim of crash-proof, multi-host production storage.
+
+### `@may/tui`
+
+The TUI package is May's terminal component package and is intentionally
+Agent-aware. It contains two internal levels without splitting them into
+another package:
+
+- terminal primitives such as text, editor, selection, scrolling, overlay,
+  focus, screen buffer, renderer, and Node terminal adapters;
+- Agent projections such as `TranscriptStore`, `TranscriptView`, and the
+  instance-scoped `ToolRendererRegistry`.
+
+The Agent layer consumes Core, permission, and Session events and builds a
+retained transcript. It is exposed through `@may/tui/transcript` and
+`@may/tui/tool-renderers`. Product labels, notices, layouts, commands, and
+controller calls are still supplied by the application. A graphical or remote
+UI can ignore `@may/tui` and consume a headless controller directly.
+
 ### `apps/maybecode`
 
-MaybeCode is an application composition layer, not another runtime. It creates
-Core runtimes from configuration, coding tools, permissions, and Session; owns
-their lifecycle; and exposes a terminal interface. No reusable package depends
-on MaybeCode.
+MaybeCode is an application composition layer, not another runtime. It selects
+and configures reusable packages, delegates generic one-session and workspace
+lifecycle to `@may/application`, uses `@may/tui`'s Agent transcript, and exposes
+a terminal coding-agent product. No reusable package depends on MaybeCode.
 
-Its explicit UI boundary is `MaybeCodeController`: user intents are methods,
-while asynchronous model, tool, permission, context, and session changes are a
-`MaybeCodeEvent` stream. `MaybeCodeWorkspace` implements this headless contract.
-The bundled TUI depends only on the contract, so another TUI can consume the
-same controller without implementing readline or inheriting the default
-rendering and command policy. `MaybeCodeTerminal` is a narrower I/O adapter for
-reusing the bundled TUI rather than the custom-UI boundary.
+The application keeps only product policy and compatibility adapters:
+
+- the MaybeCode prompt, instruction-source policy, and shell runtime guidance;
+- the default coding tools, change-preview generation, and coding permission
+  policy;
+- named manual compaction choices and the ordered automatic compaction chain;
+- provider/model profiles, reasoning-effort overrides, and default-model
+  persistence;
+- slash-command definitions, product events, theme, page layout, model/session
+  picker flows, and classic-versus-retained terminal behavior.
+
+`MaybeCodeApplication` is now a product composition wrapper around
+`AgentApplication`. It maps generic tool-presentation events to the existing
+change-preview event while delegating run, approval, history, Context, and close
+operations. `MaybeCodeWorkspace` similarly wraps `AgentWorkspace` and retains
+primarily model-profile and effort policy.
+
+Its explicit product UI boundary is `MaybeCodeController`: user intents are
+methods, while asynchronous model, tool, permission, context, and session
+changes are a `MaybeCodeEvent` stream. `MaybeCodeWorkspace` implements this
+headless contract.
+The bundled frontends consume this contract. Another UI can consume the same
+controller without inheriting MaybeCode's rendering or command policy.
+`MaybeCodeTerminal` is a narrower line-oriented I/O adapter for reusing the
+classic frontend rather than the custom-UI boundary.
 
 ## Events and persistence
 

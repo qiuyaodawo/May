@@ -8,6 +8,7 @@ be used independently or combined into complete agents and applications.
 ```text
 packages/
   core/       Agent loop, contracts, events, and in-memory Context
+  application/  Headless single-session and workspace application lifecycle
   context/    Context factories, compaction, and model-backed summarization
   session/    Serialized runs, durable history, and session catalogs
   permissions/  Headless tool policies and approval requests
@@ -20,10 +21,11 @@ packages/
     anthropic/  Anthropic Messages API streaming model adapter
     openai/     OpenAI Responses API adapter and native compaction
   tools/
-    coding-tools/  Read, shell, edit, write, and safe change previews
+    coding-tools/  Read, shell, edit, write, instructions, and change previews
+    session-tools/ Read-only access to bounded durable session history
   ui/
     keybindings/  Context-aware semantic keyboard mappings
-    tui/          Terminal adapters, renderer, and reusable UI primitives
+    tui/          Terminal primitives plus reusable Agent transcript components
 apps/
   cli/        Minimal command-line interface
   maybecode/ Terminal coding-agent application
@@ -32,8 +34,24 @@ examples/
   deepseek/   Live DeepSeek tool-call example
 ```
 
-Future Provider, Tool, Context, and Agent packages will be added alongside
-`@may/core` without introducing provider-specific dependencies into Core.
+`packages` contains the contracts and reusable components used to construct an
+Agent; `apps` contains executable products that select and configure those
+components. Dependencies point from applications into packages, never from a
+reusable package into `apps/maybecode` or another product. Packages may depend
+on lower-level packages: for example, `@may/application` composes Core,
+Context, Session, permissions, and the optional session-history tool, while
+`@may/tui` projects Core, permission, and Session events for terminal display.
+
+MaybeCode is the main reference product. It delegates generic run, approval,
+compaction-persistence, and multi-session lifecycle to `@may/application` and
+uses the Agent transcript from `@may/tui`. It retains coding-product policy:
+the prompt and instruction sources, coding tools and permission defaults,
+model profiles and reasoning effort, compaction strategy order, commands,
+theme, layout, and terminal interaction flow.
+
+The packages are currently versioned `0.1.0`; their public APIs and the
+file-backed persistence formats should be treated as developer-preview APIs,
+not as a promise of production or compatibility stability.
 
 See `docs/architecture/runtime-session.md` for the boundaries between agent
 definitions, sessions, runs, and steps.

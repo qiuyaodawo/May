@@ -1,7 +1,29 @@
 # MaybeCode
 
 MaybeCode is the terminal coding-agent application assembled from May's Core,
-session, permission, provider, configuration, and coding-tool packages.
+application, session, permission, provider, configuration, coding-tool, and TUI
+packages.
+
+## Component boundary
+
+MaybeCode is a product composition layer. Generic lifecycle does not live in
+the app:
+
+- `@may/application` owns run/retry/cancel, approval relaying, Session history,
+  Context compaction persistence, closing, session switching, and Catalog
+  summaries;
+- `@may/tui/transcript` projects live and restored Agent events, and
+  `@may/tui/tool-renderers` supplies an instance-scoped renderer registry;
+- `@may/coding-tools/instructions` loads bounded, path-safe instruction files;
+- the generic list-selection and Slash-command state models also live in
+  `@may/tui`.
+
+The app retains the decisions that define the MaybeCode product: its prompt and
+instruction composition, default coding tools and permission policy, coding
+change previews, model profiles and reasoning effort, compaction strategy
+order, concrete commands, product event compatibility, terminal layout, theme,
+and picker workflows. This separation makes the extracted components reusable;
+it does not make MaybeCode or the `0.1.0` APIs production-stable.
 
 ## Custom UIs
 

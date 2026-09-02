@@ -10,7 +10,13 @@ and optional tool-presentation metadata are injected by the product.
 `AgentWorkspace` adds a session catalog, auto-resume, session switching and a
 serialized application-transition primitive. Products retain their own model
 profiles and can use `transitionApplication` to rebuild the same session after a
-model/configuration change.
+model/configuration change. Product-only mutations that do not rebuild the
+runtime can use `runStateTransition` so they share the same FIFO queue as
+session operations.
+
+This package owns orchestration, not product policy. Callers still choose the
+prompt, tools, permissions, Context strategies, model/provider configuration,
+and UI. Its current `0.1.0` surface is a developer-preview API.
 
 ```ts
 import { AgentApplication, AgentWorkspace } from "@may/application";
