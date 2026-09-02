@@ -205,9 +205,7 @@ export class AgentApplication implements AgentController {
         ...(options.compactionStrategy === undefined
           ? {}
           : { compactionStrategy: options.compactionStrategy }),
-        ...(autoCompactionStrategies.length === 0
-          ? {}
-          : { autoCompactionStrategies }),
+        autoCompactionStrategies,
       });
       contextController = managedContext.controller;
       return new May({
