@@ -53,11 +53,12 @@ The packages are currently versioned `0.1.0`; their public APIs and the
 file-backed persistence formats should be treated as developer-preview APIs,
 not as a promise of production or compatibility stability.
 
-See `docs/architecture/runtime-session.md` for the boundaries between agent
-definitions, sessions, runs, and steps.
-
-See `docs/configuration.md` for the configuration reference and built-in
-provider option matrix. The editor schema lives at
+Start with the [documentation index](docs/README.md) and
+[Getting started](docs/getting-started.md). The
+[runtime architecture](docs/architecture/runtime-session.md) describes the
+boundaries between Agent definitions, applications, sessions, runs, and steps.
+The [configuration reference](docs/reference/configuration.md) documents the
+built-in provider option matrix; its editor schema lives at
 `packages/config/may-config.schema.json`.
 
 ## Development

@@ -208,7 +208,7 @@ const model = new DeepSeekModel({ apiKey, model: modelName });
 
 This snippet additionally requires
 `"@may/provider-deepseek": "workspace:*"`. Other built-in provider packages
-are listed in the [configuration reference](../configuration.md). Provider
+are listed in the [configuration reference](../reference/configuration.md). Provider
 adapters normalize output into Core events but retain responsibility for
 provider request formats, supported content, retries, and native continuation
 state.

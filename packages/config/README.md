@@ -3,7 +3,7 @@
 Optional configuration loading and validation for May applications.
 
 The complete user-facing reference is in
-[`docs/configuration.md`](../../docs/configuration.md). A JSON Schema for editor
+[`docs/reference/configuration.md`](../../docs/reference/configuration.md). A JSON Schema for editor
 completion and validation is available at
 [`may-config.schema.json`](./may-config.schema.json) and is exported as
 `@may/config/schema`.
