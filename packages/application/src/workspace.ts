@@ -75,6 +75,12 @@ export interface AgentApplicationTransitionOptions<
   readonly createEvent?: (application: Application) => ExtensionEvent;
 }
 
+export interface AgentStateTransitionOptions {
+  /** Defaults to true. Set false for state that cannot affect an active run. */
+  readonly requireIdle?: boolean;
+  readonly activeOperationMessage?: string;
+}
+
 /**
  * Multi-session lifecycle shared by headless Agent applications.
  *
@@ -331,6 +337,26 @@ export class AgentWorkspace<
   }
 
   /**
+   * Run product-owned state work on the same queue as session operations.
+   * The callback must not call another serialized AgentWorkspace method.
+   */
+  runStateTransition<T>(
+    operation: (application: Application) => T | Promise<T>,
+    options: AgentStateTransitionOptions = {},
+  ): Promise<T> {
+    this.throwIfClosed();
+    return this.state.run(async () => {
+      if (options.requireIdle !== false) {
+        this.assertIdle(
+          options.activeOperationMessage ??
+            "Cannot change application state while an operation is active",
+        );
+      }
+      return operation(this.application);
+    });
+  }
+
+  /**
    * Atomically replace the active application for a product-owned transition,
    * such as switching a model profile. Creation happens before the old instance
    * is closed; failure leaves the old application active.
@@ -339,6 +365,7 @@ export class AgentWorkspace<
     create: (current: Application) => Application | Promise<Application>,
     options: AgentApplicationTransitionOptions<Application, ExtensionEvent> = {},
   ): Promise<Application> {
+    this.throwIfClosed();
     return this.state.run(async () => {
       this.assertIdle("Cannot replace the application while an operation is active");
       await this.recordCurrentSession().catch(() => undefined);
