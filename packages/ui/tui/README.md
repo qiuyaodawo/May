@@ -1,7 +1,8 @@
 # `@may/tui`
 
-May-owned terminal UI primitives. This package is intentionally independent of
-May's agent core, providers, sessions, and MaybeCode.
+Terminal UI components for May agents. The low-level primitives remain usable
+without a provider or product application, while the agent transcript layer
+projects May runtime, permission, and session events into a retained view.
 
 The first milestone provides:
 
@@ -16,7 +17,11 @@ The first milestone provides:
   bracketed paste as one safe multiline input operation;
 - a readline-backed `TerminalIO` adapter for prompt-driven applications, with
   history, live suggestions, prompt-safe asynchronous output, and normalized
-  one-key reads.
+  one-key reads;
+- a reusable `TranscriptStore` and `TranscriptView` for live and restored agent
+  runs, exposed through `@may/tui/transcript`;
+- an instance-scoped tool-renderer registry and standard coding-tool renderers,
+  exposed through `@may/tui/tool-renderers`.
 
 Use `NodeTerminalDriver` when an application owns a retained, raw-mode screen.
 Use `createNodeTerminal` when it needs line-oriented questions and occasional
@@ -41,6 +46,7 @@ exercise reflow, and press `Ctrl+C` to exit.
 not the custom-UI boundary. Alternative UIs should consume the application's
 headless controller and events directly.
 
-`TuiTheme` deliberately contains presentation tokens rather than agent-domain
-types. Applications own their concrete palette and may pass it into components;
-tool-specific presentation belongs to the application rather than this package.
+`TuiTheme` deliberately contains presentation tokens rather than product-domain
+types. Applications own their concrete palette and may pass it into components.
+Product events and labels stay outside the transcript projection: applications
+use `reset`, `appendNotice`, and `appendChangePreview` to bridge that state.

@@ -14,3 +14,5 @@ export * from "./stack.js";
 export * from "./terminal-driver.js";
 export * from "./text.js";
 export * from "./theme.js";
+export * from "./agent/transcript.js";
+export * from "./agent/tool-renderers.js";

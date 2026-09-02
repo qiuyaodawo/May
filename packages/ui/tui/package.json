@@ -13,6 +13,14 @@
     "./node-terminal": {
       "types": "./dist/node-terminal.d.ts",
       "import": "./dist/node-terminal.js"
+    },
+    "./transcript": {
+      "types": "./dist/agent/transcript.d.ts",
+      "import": "./dist/agent/transcript.js"
+    },
+    "./tool-renderers": {
+      "types": "./dist/agent/tool-renderers.d.ts",
+      "import": "./dist/agent/tool-renderers.js"
     }
   },
   "files": [
@@ -27,7 +35,11 @@
     "test": "pnpm run build && node --test test/*.test.mjs"
   },
   "dependencies": {
+    "@may/coding-tools": "workspace:*",
+    "@may/core": "workspace:*",
     "@may/keybindings": "workspace:*",
+    "@may/permissions": "workspace:*",
+    "@may/session": "workspace:*",
     "marked": "18.0.11",
     "slice-ansi": "^7.1.2",
     "string-width": "^7.2.0",
