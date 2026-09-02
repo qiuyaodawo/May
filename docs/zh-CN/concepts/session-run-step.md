@@ -1,6 +1,6 @@
 # Session、Run 与 Step
 
-[English](../../concepts/session-run-step.md) | **简体中文**
+[English](../../en/concepts/session-run-step.md) | **简体中文**
 
 May 的执行术语分为四层：
 

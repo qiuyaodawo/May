@@ -1,6 +1,6 @@
 # Events and durability
 
-**English** | [简体中文](../zh-CN/concepts/events.md)
+**English** | [简体中文](../../zh-CN/concepts/events.md)
 
 May has several event layers because model streaming, live application state,
 and durable Session replay have different requirements. They are related but

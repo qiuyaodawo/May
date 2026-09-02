@@ -1,6 +1,6 @@
 # ADR 0002：Agent 终端 UI 保留在 `@may/tui`
 
-[English](../../../architecture/decisions/0002-agent-ui-stays-in-may-tui.md) | **简体中文**
+[English](../../../en/architecture/decisions/0002-agent-ui-stays-in-may-tui.md) | **简体中文**
 
 - **状态：** 已接受
 - **日期：** 2026-09-02

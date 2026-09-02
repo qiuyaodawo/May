@@ -1,6 +1,6 @@
 # Runtime 与 Session 边界
 
-[English](../../architecture/runtime-session.md) | **简体中文**
+[English](../../en/architecture/runtime-session.md) | **简体中文**
 
 May 使用四个生命周期层级：
 

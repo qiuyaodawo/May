@@ -1,6 +1,6 @@
 # 架构决策记录
 
-[English](../../../architecture/decisions/README.md) | **简体中文**
+[English](../../../en/architecture/decisions/README.md) | **简体中文**
 
 本目录记录会约束多个 May package 或应用的架构决策。ADR 解释某个边界为何存在，
 避免后续重构在无意中破坏它。

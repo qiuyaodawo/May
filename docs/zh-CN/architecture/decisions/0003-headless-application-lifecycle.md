@@ -1,6 +1,6 @@
 # ADR 0003：共享生命周期属于 `@may/application`
 
-[English](../../../architecture/decisions/0003-headless-application-lifecycle.md) | **简体中文**
+[English](../../../en/architecture/decisions/0003-headless-application-lifecycle.md) | **简体中文**
 
 - **状态：** 已接受
 - **日期：** 2026-09-02

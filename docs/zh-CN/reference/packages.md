@@ -1,6 +1,6 @@
 # Package 参考
 
-[English](../../reference/packages.md) | **简体中文**
+[English](../../en/reference/packages.md) | **简体中文**
 
 May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行产品位于
 `apps/`。应用可以依赖 package，但 package 不得导入应用。

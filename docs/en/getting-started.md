@@ -1,6 +1,6 @@
 # Getting started
 
-**English** | [简体中文](zh-CN/getting-started.md)
+**English** | [简体中文](../zh-CN/getting-started.md)
 
 This guide runs a May Agent locally, then turns the same model-and-tool loop
 into a resumable headless application. It targets the current `0.1.0`
@@ -30,7 +30,7 @@ The existing deterministic example needs no API key and demonstrates one
 pnpm example
 ```
 
-Its source is [`examples/basic/basic.mjs`](../examples/basic/basic.mjs). That
+Its source is [`examples/basic/basic.mjs`](../../examples/basic/basic.mjs). That
 example uses `@may/core` directly, which is the right level for a one-shot or
 embedded loop. The rest of this guide uses `@may/application`, the recommended
 starting point for a product that needs a Session, permissions, history, or a
@@ -208,7 +208,7 @@ pnpm --filter @may/example-quickstart-agent start
 The deterministic `model` makes this example reproducible without network
 access. In a real Agent, replace it with one of May's provider adapters and add
 that adapter as a direct dependency. For example, the live DeepSeek wiring is
-shown in [`examples/deepseek/deepseek.mjs`](../examples/deepseek/deepseek.mjs)
+shown in [`examples/deepseek/deepseek.mjs`](../../examples/deepseek/deepseek.mjs)
 and requires `@may/provider-deepseek`, `DEEPSEEK_API_KEY`, and a supported model
 name.
 
@@ -296,9 +296,9 @@ it closes its application and waits for catalog recording and event relays.
 
 - Read [Building an Agent](guides/building-an-agent.md) before selecting
   persistence, permissions, Context policies, or a UI.
-- Read the [`@may/core` README](../packages/core/README.md) for the low-level
+- Read the [`@may/core` README](../../packages/core/README.md) for the low-level
   run loop and tool-executor seam.
-- Read the [`@may/application` README](../packages/application/README.md) for
+- Read the [`@may/application` README](../../packages/application/README.md) for
   the single- and multi-Session lifecycle.
-- Read the [`@may/session` README](../packages/session/README.md) before relying
+- Read the [`@may/session` README](../../packages/session/README.md) before relying
   on file persistence or catalogs.

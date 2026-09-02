@@ -1,6 +1,6 @@
 # 配置参考已迁移
 
-[English](../configuration.md) | **简体中文**
+[English](../en/configuration.md) | **简体中文**
 
 May 的规范中文配置参考位于
 [reference/configuration.md](reference/configuration.md)。

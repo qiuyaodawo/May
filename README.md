@@ -53,12 +53,12 @@ The packages are currently versioned `0.1.0`; their public APIs and the
 file-backed persistence formats should be treated as developer-preview APIs,
 not as a promise of production or compatibility stability.
 
-Start with the [English documentation](docs/README.md) or the
+Start with the [English documentation](docs/en/README.md) or the
 [简体中文文档](docs/zh-CN/README.md), then follow
-[Getting started](docs/getting-started.md). The
-[runtime architecture](docs/architecture/runtime-session.md) describes the
+[Getting started](docs/en/getting-started.md). The
+[runtime architecture](docs/en/architecture/runtime-session.md) describes the
 boundaries between Agent definitions, applications, sessions, runs, and steps.
-The [configuration reference](docs/reference/configuration.md) documents the
+The [configuration reference](docs/en/reference/configuration.md) documents the
 built-in provider option matrix; its editor schema lives at
 `packages/config/may-config.schema.json`.
 

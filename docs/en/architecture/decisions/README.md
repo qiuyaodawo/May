@@ -1,6 +1,6 @@
 # Architecture decision records
 
-**English** | [简体中文](../../zh-CN/architecture/decisions/README.md)
+**English** | [简体中文](../../../zh-CN/architecture/decisions/README.md)
 
 This directory records decisions that constrain more than one May package or
 application. An ADR explains why a boundary exists so a later refactor does

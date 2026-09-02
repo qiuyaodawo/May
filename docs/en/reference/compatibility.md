@@ -1,6 +1,6 @@
 # Compatibility and stability
 
-**English** | [简体中文](../zh-CN/reference/compatibility.md)
+**English** | [简体中文](../../zh-CN/reference/compatibility.md)
 
 May is currently a developer-preview framework. All workspace packages are at
 `0.1.0`; the repository does not yet promise long-term source, binary, wire or

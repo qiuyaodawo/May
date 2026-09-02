@@ -1,6 +1,6 @@
 # 快速开始
 
-[English](../getting-started.md) | **简体中文**
+[English](../en/getting-started.md) | **简体中文**
 
 本指南先在本地运行一个 May Agent，再把同一套模型/工具循环变为可恢复的 headless
 application，面向仓库当前 `0.1.0` 开发预览 API。

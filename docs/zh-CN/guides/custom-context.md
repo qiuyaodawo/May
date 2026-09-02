@@ -1,6 +1,6 @@
 # 自定义 Context
 
-[English](../../guides/custom-context.md) | **简体中文**
+[English](../../en/guides/custom-context.md) | **简体中文**
 
 Core 的 `Context` 是一个 runtime 的模型可见工作集，不是持久化 Session log。Context
 决定下一次模型请求看到哪些指令、消息和 metadata；Session 记录日后重建状态所需事实。

@@ -1,6 +1,6 @@
 # Package reference
 
-**English** | [简体中文](../zh-CN/reference/packages.md)
+**English** | [简体中文](../../zh-CN/reference/packages.md)
 
 May is a pnpm workspace. Reusable framework code is defined under
 `packages/`; executable products live in `apps/`. Applications may depend on
@@ -39,7 +39,7 @@ The provider-neutral execution kernel:
 
 Core deliberately does not own durable sessions, provider selection, product
 configuration, permission policy or UI. See the
-[Core package README](../../packages/core/README.md).
+[Core package README](../../../packages/core/README.md).
 
 ### `@may/application`
 
@@ -55,7 +55,7 @@ Headless orchestration above Core:
 
 Models, tools, prompts, policies and storage remain injected product choices.
 See [Agent and Application](../concepts/agent-application.md) and the
-[package README](../../packages/application/README.md).
+[package README](../../../packages/application/README.md).
 
 ## State and policy
 

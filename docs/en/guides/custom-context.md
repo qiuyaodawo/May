@@ -1,6 +1,6 @@
 # Custom Context
 
-**English** | [简体中文](../zh-CN/guides/custom-context.md)
+**English** | [简体中文](../../zh-CN/guides/custom-context.md)
 
 Core's `Context` is the model-visible working set for one runtime. It is not
 the durable Session log. A Context decides which instructions, messages, and

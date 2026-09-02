@@ -1,6 +1,6 @@
 # 事件与持久化
 
-[English](../../concepts/events.md) | **简体中文**
+[English](../../en/concepts/events.md) | **简体中文**
 
 May 具有多个事件层，因为模型 streaming、实时 application 状态和持久化 Session
 回放的要求不同。它们相关，但不能互换。

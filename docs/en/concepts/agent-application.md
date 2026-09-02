@@ -1,6 +1,6 @@
 # Agent definition, application, and workspace
 
-**English** | [简体中文](../zh-CN/concepts/agent-application.md)
+**English** | [简体中文](../../zh-CN/concepts/agent-application.md)
 
 May separates reusable Agent configuration from conversation identity and from
 the process that currently owns that conversation. For the complete package

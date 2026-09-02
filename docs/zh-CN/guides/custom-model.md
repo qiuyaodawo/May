@@ -1,6 +1,6 @@
 # 自定义模型 Adapter
 
-[English](../../guides/custom-model.md) | **简体中文**
+[English](../../en/guides/custom-model.md) | **简体中文**
 
 May model adapter 把某个 provider 协议转换为 `@may/core` 的 provider-neutral `Model`
 契约。它不应管理 Session、权限提示、UI 状态或产品指令。

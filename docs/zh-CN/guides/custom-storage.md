@@ -1,6 +1,6 @@
 # 自定义 Session 存储
 
-[English](../../guides/custom-storage.md) | **简体中文**
+[English](../../en/guides/custom-storage.md) | **简体中文**
 
 May 将持久化对话历史与 Session 发现分开：
 

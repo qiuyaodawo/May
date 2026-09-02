@@ -1,6 +1,6 @@
 # Context 与持久化历史
 
-[English](../../concepts/context-and-history.md) | **简体中文**
+[English](../../en/concepts/context-and-history.md) | **简体中文**
 
 May 有意区分下一次模型调用可见的消息与 Session 保存的持久化事实。这样可以替换或
 压缩 Context，同时不破坏审计历史。

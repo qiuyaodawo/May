@@ -1,6 +1,6 @@
 # Context and durable history
 
-**English** | [简体中文](../zh-CN/concepts/context-and-history.md)
+**English** | [简体中文](../../zh-CN/concepts/context-and-history.md)
 
 May deliberately separates the messages visible to the next model call from
 the durable facts kept for a Session. This makes Context replaceable and

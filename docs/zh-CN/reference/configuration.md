@@ -1,6 +1,6 @@
 # May 配置参考
 
-[English](../../reference/configuration.md) | **简体中文**
+[English](../../en/reference/configuration.md) | **简体中文**
 
 May 默认读取 `~/.may/config.json`。配置把命名 provider 连接、可选 model profile
 和应用设置分开保存。

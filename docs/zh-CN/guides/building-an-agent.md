@@ -1,6 +1,6 @@
 # 构建 Agent
 
-[English](../../guides/building-an-agent.md) | **简体中文**
+[English](../../en/guides/building-an-agent.md) | **简体中文**
 
 May 是一组可组合 package，而不是单一的预配置 assistant。应用选择行为与策略，框架
 提供执行和生命周期机制。本文基于仓库当前已实现的 API 说明这些选择。

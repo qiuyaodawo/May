@@ -4,21 +4,24 @@ import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const docsRoot = resolve(repositoryRoot, "docs");
+const englishRoot = resolve(docsRoot, "en");
 const chineseRoot = resolve(docsRoot, "zh-CN");
 
-const markdownFiles = await walkMarkdown(docsRoot);
-const englishFiles = markdownFiles.filter(
-  (file) => file !== chineseRoot && !file.startsWith(`${chineseRoot}${sep}`),
-);
-const chineseFiles = markdownFiles.filter(
-  (file) => file.startsWith(`${chineseRoot}${sep}`),
-);
-
 const errors = [];
+const topLevelEntries = await readdir(docsRoot, { withFileTypes: true });
+for (const entry of topLevelEntries) {
+  if (!entry.isDirectory() || !["en", "zh-CN"].includes(entry.name)) {
+    errors.push(`docs/${entry.name}: documentation must live under docs/en or docs/zh-CN`);
+  }
+}
+
+const englishFiles = await walkMarkdown(englishRoot);
+const chineseFiles = await walkMarkdown(chineseRoot);
+const markdownFiles = [...englishFiles, ...chineseFiles];
 const expectedChineseFiles = new Set();
 
 for (const englishFile of englishFiles) {
-  const documentPath = relative(docsRoot, englishFile);
+  const documentPath = relative(englishRoot, englishFile);
   const chineseFile = resolve(chineseRoot, documentPath);
   expectedChineseFiles.add(chineseFile);
 

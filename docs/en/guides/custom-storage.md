@@ -1,6 +1,6 @@
 # Custom Session storage
 
-**English** | [简体中文](../zh-CN/guides/custom-storage.md)
+**English** | [简体中文](../../zh-CN/guides/custom-storage.md)
 
 May separates durable conversation history from session discovery:
 

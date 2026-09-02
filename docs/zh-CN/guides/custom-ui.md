@@ -1,6 +1,6 @@
 # 自定义 UI
 
-[English](../../guides/custom-ui.md) | **简体中文**
+[English](../../en/guides/custom-ui.md) | **简体中文**
 
 May 的 application 层是 headless 的。终端、桌面、Web 或远程 UI 应依赖
 `AgentController`（一个活动 Session）或 `AgentWorkspaceController`（多个 Session），

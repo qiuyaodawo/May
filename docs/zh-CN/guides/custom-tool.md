@@ -1,6 +1,6 @@
 # 自定义工具
 
-[English](../../guides/custom-tool.md) | **简体中文**
+[English](../../en/guides/custom-tool.md) | **简体中文**
 
 May tool 是暴露给模型的一个命名 capability。`@may/core` 的 `Tool` 契约分离三个关注点：
 

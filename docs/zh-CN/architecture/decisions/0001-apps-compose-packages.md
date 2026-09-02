@@ -1,6 +1,6 @@
 # ADR 0001：应用组合可复用 package
 
-[English](../../../architecture/decisions/0001-apps-compose-packages.md) | **简体中文**
+[English](../../../en/architecture/decisions/0001-apps-compose-packages.md) | **简体中文**
 
 - **状态：** 已接受
 - **日期：** 2026-09-02

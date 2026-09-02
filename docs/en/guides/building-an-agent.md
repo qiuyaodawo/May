@@ -1,6 +1,6 @@
 # Building an Agent
 
-**English** | [简体中文](../zh-CN/guides/building-an-agent.md)
+**English** | [简体中文](../../zh-CN/guides/building-an-agent.md)
 
 May is a set of composable packages, not a single preconfigured assistant.
 An application chooses behavior and policy, while the framework supplies the
@@ -510,15 +510,15 @@ for the following:
 
 ## Related package documentation
 
-- [`@may/core`](../../packages/core/README.md): execution loop, Tool and Model
+- [`@may/core`](../../../packages/core/README.md): execution loop, Tool and Model
   contracts, live events, and executor/scheduler seams
-- [`@may/application`](../../packages/application/README.md): headless
+- [`@may/application`](../../../packages/application/README.md): headless
   single-Session and workspace lifecycle
-- [`@may/context`](../../packages/context/README.md): inspection, budgets, and
+- [`@may/context`](../../../packages/context/README.md): inspection, budgets, and
   compaction strategies
-- [`@may/session`](../../packages/session/README.md): durable history, resume,
+- [`@may/session`](../../../packages/session/README.md): durable history, resume,
   local file store, and catalogs
-- [`@may/permissions`](../../packages/permissions/README.md): headless policy
+- [`@may/permissions`](../../../packages/permissions/README.md): headless policy
   and approval protocol
-- [`@may/coding-tools`](../../packages/tools/coding-tools/README.md): bounded
+- [`@may/coding-tools`](../../../packages/tools/coding-tools/README.md): bounded
   coding capabilities, instructions, previews, and shell safety boundary

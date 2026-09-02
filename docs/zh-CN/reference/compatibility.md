@@ -1,6 +1,6 @@
 # 兼容性与稳定性
 
-[English](../../reference/compatibility.md) | **简体中文**
+[English](../../en/reference/compatibility.md) | **简体中文**
 
 May 当前是开发预览框架。所有 workspace package 版本均为 `0.1.0`；项目尚不承诺
 长期的源码、二进制、wire format 或持久化兼容性。

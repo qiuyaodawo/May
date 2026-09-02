@@ -1,6 +1,6 @@
 # ADR 0002: Agent-aware terminal UI stays in `@may/tui`
 
-**English** | [简体中文](../../zh-CN/architecture/decisions/0002-agent-ui-stays-in-may-tui.md)
+**English** | [简体中文](../../../zh-CN/architecture/decisions/0002-agent-ui-stays-in-may-tui.md)
 
 - **Status:** Accepted
 - **Date:** 2026-09-02

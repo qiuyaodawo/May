@@ -1,6 +1,6 @@
 # Permission policies
 
-**English** | [简体中文](../zh-CN/guides/permission-policy.md)
+**English** | [简体中文](../../zh-CN/guides/permission-policy.md)
 
 `@may/permissions` is a headless authorization and approval layer around tool
 execution. A `PermissionPolicy` receives the tool definition, its parsed input,

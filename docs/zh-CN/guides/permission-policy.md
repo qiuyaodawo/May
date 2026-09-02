@@ -1,6 +1,6 @@
 # 权限策略
 
-[English](../../guides/permission-policy.md) | **简体中文**
+[English](../../en/guides/permission-policy.md) | **简体中文**
 
 `@may/permissions` 是包围工具执行的 headless 授权与审批层。`PermissionPolicy` 接收
 工具定义、已解析输入和 execution correlation data，然后返回：

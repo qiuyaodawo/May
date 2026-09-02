@@ -1,6 +1,6 @@
 # Agent definition、Application 与 Workspace
 
-[English](../../concepts/agent-application.md) | **简体中文**
+[English](../../en/concepts/agent-application.md) | **简体中文**
 
 May 将可复用 Agent 配置、对话身份以及当前拥有该对话的进程区分开来。完整 package
 边界见 [Runtime 与 Session 边界](../architecture/runtime-session.md)，更精简的生命周期
