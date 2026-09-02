@@ -14,6 +14,14 @@
       "types": "./dist/node-terminal.d.ts",
       "import": "./dist/node-terminal.js"
     },
+    "./list-selection": {
+      "types": "./dist/list-selection.d.ts",
+      "import": "./dist/list-selection.js"
+    },
+    "./slash-commands": {
+      "types": "./dist/slash-commands.d.ts",
+      "import": "./dist/slash-commands.js"
+    },
     "./transcript": {
       "types": "./dist/agent/transcript.d.ts",
       "import": "./dist/agent/transcript.js"
