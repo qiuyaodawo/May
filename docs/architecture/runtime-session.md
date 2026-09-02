@@ -1,5 +1,7 @@
 # Runtime and session boundaries
 
+**English** | [简体中文](../zh-CN/architecture/runtime-session.md)
+
 May uses four lifecycle levels:
 
 ```text

@@ -1,5 +1,7 @@
 # Custom tools
 
+**English** | [简体中文](../zh-CN/guides/custom-tool.md)
+
 A May tool is one named capability exposed to a model. The `Tool` contract from
 `@may/core` separates three concerns:
 

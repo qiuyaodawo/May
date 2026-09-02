@@ -1,5 +1,7 @@
 # Custom UI
 
+**English** | [简体中文](../zh-CN/guides/custom-ui.md)
+
 May's application layer is headless. A terminal, desktop, web, or remote UI
 should depend on `AgentController` (one active Session) or
 `AgentWorkspaceController` (multiple Sessions), invoke user-intent methods, and

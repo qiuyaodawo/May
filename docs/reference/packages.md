@@ -1,5 +1,7 @@
 # Package reference
 
+**English** | [简体中文](../zh-CN/reference/packages.md)
+
 May is a pnpm workspace. Reusable framework code is defined under
 `packages/`; executable products live in `apps/`. Applications may depend on
 packages, but packages must not import an application.

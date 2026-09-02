@@ -1,5 +1,7 @@
 # Building an Agent
 
+**English** | [简体中文](../zh-CN/guides/building-an-agent.md)
+
 May is a set of composable packages, not a single preconfigured assistant.
 An application chooses behavior and policy, while the framework supplies the
 execution and lifecycle mechanisms. This guide explains those choices using

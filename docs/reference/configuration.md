@@ -1,5 +1,7 @@
 # May configuration reference
 
+**English** | [简体中文](../zh-CN/reference/configuration.md)
+
 May reads `~/.may/config.json` by default. The configuration separates named
 provider connections, selectable model profiles, and application settings.
 

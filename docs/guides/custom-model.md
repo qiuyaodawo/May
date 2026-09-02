@@ -1,5 +1,7 @@
 # Custom model adapters
 
+**English** | [简体中文](../zh-CN/guides/custom-model.md)
+
 A May model adapter translates one provider protocol into the provider-neutral
 `Model` contract from `@may/core`. It should not own sessions, permission
 prompts, UI state, or product instructions.

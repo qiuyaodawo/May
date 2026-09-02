@@ -1,5 +1,7 @@
 # May documentation
 
+**English** | [简体中文](zh-CN/README.md)
+
 May is a composable Agent framework. These documents explain how to assemble
 its packages into an application, how runtime state is divided, and which
 interfaces are intended for extension.
@@ -47,3 +49,10 @@ Package-level READMEs remain the closest reference for individual exports.
 Only package entry points declared in `exports` are public; see
 [Compatibility and stability](reference/compatibility.md) for the current
 developer-preview guarantees.
+
+## Languages and maintenance
+
+English documents keep their stable paths under `docs/`. Complete Simplified
+Chinese mirrors live under `docs/zh-CN/` with the same relative paths. Update
+both files in a pair whenever behavior changes, and run `pnpm docs:check`
+before committing documentation changes.

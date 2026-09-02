@@ -5,6 +5,7 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
+    "docs:check": "node scripts/check-docs.mjs",
     "test": "pnpm -r --if-present run test",
     "test:coverage": "pnpm -r --if-present run test:coverage",
     "test:integration:deepseek": "pnpm --filter @may/provider-deepseek run test:integration",

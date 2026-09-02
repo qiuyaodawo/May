@@ -1,5 +1,7 @@
 # ADR 0001: Applications compose reusable packages
 
+**English** | [简体中文](../../zh-CN/architecture/decisions/0001-apps-compose-packages.md)
+
 - **Status:** Accepted
 - **Date:** 2026-09-02
 

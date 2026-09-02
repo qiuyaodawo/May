@@ -1,5 +1,7 @@
 # Custom Session storage
 
+**English** | [简体中文](../zh-CN/guides/custom-storage.md)
+
 May separates durable conversation history from session discovery:
 
 - `SessionStore` stores the ordered `SessionEvent` stream and is the source of

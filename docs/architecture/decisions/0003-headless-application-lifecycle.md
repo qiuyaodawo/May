@@ -1,5 +1,7 @@
 # ADR 0003: Shared lifecycle belongs in `@may/application`
 
+**English** | [简体中文](../../zh-CN/architecture/decisions/0003-headless-application-lifecycle.md)
+
 - **Status:** Accepted
 - **Date:** 2026-09-02
 

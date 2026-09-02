@@ -1,5 +1,7 @@
 # Getting started
 
+**English** | [简体中文](zh-CN/getting-started.md)
+
 This guide runs a May Agent locally, then turns the same model-and-tool loop
 into a resumable headless application. It targets the current `0.1.0`
 developer-preview API in this repository.
