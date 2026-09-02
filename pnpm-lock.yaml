@@ -80,6 +80,28 @@ importers:
         specifier: workspace:*
         version: link:../../packages/providers/deepseek
 
+  packages/application:
+    dependencies:
+      '@may/context':
+        specifier: workspace:*
+        version: link:../context
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
+      '@may/permissions':
+        specifier: workspace:*
+        version: link:../permissions
+      '@may/session':
+        specifier: workspace:*
+        version: link:../session
+      '@may/session-tools':
+        specifier: workspace:*
+        version: link:../tools/session-tools
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+
   packages/config:
     devDependencies:
       '@types/node':
@@ -236,9 +258,21 @@ importers:
 
   packages/ui/tui:
     dependencies:
+      '@may/coding-tools':
+        specifier: workspace:*
+        version: link:../../tools/coding-tools
+      '@may/core':
+        specifier: workspace:*
+        version: link:../../core
       '@may/keybindings':
         specifier: workspace:*
         version: link:../keybindings
+      '@may/permissions':
+        specifier: workspace:*
+        version: link:../../permissions
+      '@may/session':
+        specifier: workspace:*
+        version: link:../../session
       marked:
         specifier: 18.0.11
         version: 18.0.11
