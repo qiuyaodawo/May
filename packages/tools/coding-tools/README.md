@@ -63,6 +63,34 @@ linked files, and returns a bounded unified diff with addition/deletion counts.
 session presentation events. The persisted presentation identifier remains
 compatible with MaybeCode sessions created before this component was extracted.
 
+## Coding instructions
+
+Applications can compose bounded, strict UTF-8 system, runtime, and
+workspace-root instruction documents without coupling prompt policy to a
+specific agent product:
+
+```ts
+import { loadCodingInstructions } from "@may/coding-tools/instructions";
+
+const instructions = await loadCodingInstructions({
+  workspace: process.cwd(),
+  defaultSystemInstructions: "You are a coding agent.",
+  projectInstructionsFilename: "AGENTS.md",
+  sectionLabels: {
+    runtime: "Runtime environment",
+    project: "Project instructions",
+  },
+  maxBytes: 32 * 1024,
+});
+```
+
+An explicit `systemInstructions` value takes precedence over a `system.md`
+loaded from `instructionsDirectory`; otherwise the application-provided default
+is used. Project instruction discovery can be disabled with
+`projectInstructionsFilename: false`. Instruction files reject symbolic links,
+reparse points, and hard links rather than risk reading outside their declared
+root.
+
 ## Safety boundaries
 
 File sizes, returned line counts, command timeouts, and captured command output

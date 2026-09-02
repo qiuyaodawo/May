@@ -13,6 +13,10 @@
     "./change-preview": {
       "types": "./dist/change-preview.d.ts",
       "import": "./dist/change-preview.js"
+    },
+    "./instructions": {
+      "types": "./dist/instructions.d.ts",
+      "import": "./dist/instructions.js"
     }
   },
   "files": [
