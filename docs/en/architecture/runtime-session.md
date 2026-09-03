@@ -212,6 +212,7 @@ The application keeps only product policy and compatibility adapters:
 - named manual compaction choices and the ordered automatic compaction chain;
 - provider/model profiles, reasoning-effort overrides, and default-model
   persistence;
+- optional local tracing configuration plus ownership of its shared processor;
 - slash-command definitions, product events, theme, page layout, model/session
   picker flows, and classic-versus-retained terminal behavior.
 

@@ -16,6 +16,12 @@ import type {
 } from "@may/context";
 import type { Model } from "@may/core";
 import {
+  BasicTracer,
+  BatchSpanProcessor,
+  JsonlFileSpanExporter,
+  ratioSampler,
+} from "@may/observability";
+import {
   createModelCapabilityResolver,
   type ModelCapabilityResolver,
   type ProviderAdapterRegistry,
@@ -56,6 +62,17 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly maxSteps?: number;
   /** Disable retries with false, or override the configured retry policy. */
   readonly retry?: false | RetryingModelOptions;
+  /** Disable tracing or override apps.maybecode.observability. */
+  readonly observability?: false | MaybeCodeObservabilityOptions;
+}
+
+export interface MaybeCodeObservabilityOptions {
+  /** Absolute path, or a path relative to MaybeCode's data directory. */
+  readonly file?: string;
+  readonly samplingRatio?: number;
+  readonly maxQueueSize?: number;
+  readonly maxExportBatchSize?: number;
+  readonly scheduledDelayMs?: number;
 }
 
 export interface ConfiguredMaybeCodeDependencies {
@@ -141,49 +158,166 @@ export async function openConfiguredMaybeCode(
   const dataDirectory = resolve(
     options.dataDirectory ?? getDefaultMaybeCodeDataDirectory(),
   );
+  const observabilityOptions = options.observability ??
+    resolveMaybeCodeObservability(config);
+  const observability = observabilityOptions === false
+    ? undefined
+    : createMaybeCodeObservability(observabilityOptions, dataDirectory);
 
-  return MaybeCodeWorkspace.open({
-    workspace,
-    model: initialModel.model,
-    modelInfo: initialModel.modelInfo,
-    modelProfiles,
-    createModelConfiguration: (profile, runtimeOptions) =>
-      configureModel(profile, runtimeOptions),
-    resolveModelCapabilities: async (profile) =>
-      capabilityResolver.resolve(selectionFor(profile)),
-    ...resolveDefaultModelPersistence(config, dependencies),
-    store: new FileSessionStore(join(dataDirectory, "sessions")),
-    catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
-    ...(options.sessionId === undefined
-      ? {}
-      : { sessionId: options.sessionId }),
-    ...(options.autoResume === undefined
-      ? {}
-      : { autoResume: options.autoResume }),
-    ...(options.contextFactory === undefined
-      ? {}
-      : { contextFactory: options.contextFactory }),
-    ...(initialModel.contextBudget === undefined
-      ? {}
-      : { contextBudget: initialModel.contextBudget }),
-    ...(options.compactionStrategy === undefined
-      ? {}
-      : { compactionStrategy: options.compactionStrategy }),
-    ...(options.autoCompactionStrategies === undefined
-      ? {}
-      : { autoCompactionStrategies: options.autoCompactionStrategies }),
-    providerNativeAutoCompaction,
-    ...(options.contextSummarizer === undefined
-      ? {}
-      : { contextSummarizer: options.contextSummarizer }),
-    ...(options.instructions === undefined
-      ? {}
-      : { instructions: options.instructions }),
-    ...(instructionsDirectory === undefined
-      ? {}
-      : { instructionsDirectory }),
-    ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
+  try {
+    return await MaybeCodeWorkspace.open({
+      workspace,
+      model: initialModel.model,
+      modelInfo: initialModel.modelInfo,
+      modelProfiles,
+      createModelConfiguration: (profile, runtimeOptions) =>
+        configureModel(profile, runtimeOptions),
+      resolveModelCapabilities: async (profile) =>
+        capabilityResolver.resolve(selectionFor(profile)),
+      ...resolveDefaultModelPersistence(config, dependencies),
+      store: new FileSessionStore(join(dataDirectory, "sessions")),
+      catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
+      ...(observability === undefined
+        ? {}
+        : {
+            tracer: observability.tracer,
+            closeOwnedResources: () => observability.processor.shutdown(),
+          }),
+      ...(options.sessionId === undefined
+        ? {}
+        : { sessionId: options.sessionId }),
+      ...(options.autoResume === undefined
+        ? {}
+        : { autoResume: options.autoResume }),
+      ...(options.contextFactory === undefined
+        ? {}
+        : { contextFactory: options.contextFactory }),
+      ...(initialModel.contextBudget === undefined
+        ? {}
+        : { contextBudget: initialModel.contextBudget }),
+      ...(options.compactionStrategy === undefined
+        ? {}
+        : { compactionStrategy: options.compactionStrategy }),
+      ...(options.autoCompactionStrategies === undefined
+        ? {}
+        : { autoCompactionStrategies: options.autoCompactionStrategies }),
+      providerNativeAutoCompaction,
+      ...(options.contextSummarizer === undefined
+        ? {}
+        : { contextSummarizer: options.contextSummarizer }),
+      ...(options.instructions === undefined
+        ? {}
+        : { instructions: options.instructions }),
+      ...(instructionsDirectory === undefined
+        ? {}
+        : { instructionsDirectory }),
+      ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
+    });
+  } catch (error) {
+    await observability?.processor.shutdown();
+    throw error;
+  }
+}
+
+export function resolveMaybeCodeObservability(
+  config: MayConfig,
+): false | MaybeCodeObservabilityOptions {
+  const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.observability;
+  if (value === undefined || value === false) return false;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new MaybeCodeConfigError(
+      "apps.maybecode.observability must be false or an object",
+    );
+  }
+
+  const candidate = value as Record<string, unknown>;
+  rejectUnknownOptions(
+    candidate,
+    ["enabled", "exporter", "file", "samplingRatio", "batch"],
+    "apps.maybecode.observability",
+  );
+  const enabled = candidate.enabled;
+  if (enabled !== undefined && typeof enabled !== "boolean") {
+    throw new MaybeCodeConfigError(
+      "apps.maybecode.observability.enabled must be a boolean",
+    );
+  }
+  if (candidate.exporter !== undefined && candidate.exporter !== "file") {
+    throw new MaybeCodeConfigError(
+      'apps.maybecode.observability.exporter must be "file"',
+    );
+  }
+  const file = candidate.file === undefined
+    ? undefined
+    : nonEmptyString(
+        candidate.file,
+        "apps.maybecode.observability.file",
+      );
+  const samplingRatio = optionalRatio(
+    candidate.samplingRatio,
+    "apps.maybecode.observability.samplingRatio",
+  );
+  const batch = candidate.batch === undefined
+    ? {}
+    : objectValue(candidate.batch, "apps.maybecode.observability.batch");
+  rejectUnknownOptions(
+    batch,
+    ["maxQueueSize", "maxExportBatchSize", "scheduledDelayMs"],
+    "apps.maybecode.observability.batch",
+  );
+  const maxQueueSize = optionalPositiveInteger(
+    batch.maxQueueSize,
+    "apps.maybecode.observability.batch.maxQueueSize",
+  );
+  const maxExportBatchSize = optionalPositiveInteger(
+    batch.maxExportBatchSize,
+    "apps.maybecode.observability.batch.maxExportBatchSize",
+  );
+  const scheduledDelayMs = optionalNonNegativeNumber(
+    batch.scheduledDelayMs,
+    "apps.maybecode.observability.batch.scheduledDelayMs",
+  );
+  if ((maxExportBatchSize ?? 512) > (maxQueueSize ?? 2_048)) {
+    throw new MaybeCodeConfigError(
+      "apps.maybecode.observability.batch.maxExportBatchSize cannot exceed maxQueueSize",
+    );
+  }
+  if (enabled === false) return false;
+  return {
+    ...(file === undefined ? {} : { file }),
+    ...(samplingRatio === undefined ? {} : { samplingRatio }),
+    ...(maxQueueSize === undefined ? {} : { maxQueueSize }),
+    ...(maxExportBatchSize === undefined ? {} : { maxExportBatchSize }),
+    ...(scheduledDelayMs === undefined ? {} : { scheduledDelayMs }),
+  };
+}
+
+function createMaybeCodeObservability(
+  options: MaybeCodeObservabilityOptions,
+  dataDirectory: string,
+) {
+  const exporter = new JsonlFileSpanExporter({
+    path: resolve(dataDirectory, options.file ?? "traces.jsonl"),
   });
+  const processor = new BatchSpanProcessor(exporter, {
+    ...(options.maxQueueSize === undefined
+      ? {}
+      : { maxQueueSize: options.maxQueueSize }),
+    ...(options.maxExportBatchSize === undefined
+      ? {}
+      : { maxExportBatchSize: options.maxExportBatchSize }),
+    ...(options.scheduledDelayMs === undefined
+      ? {}
+      : { scheduledDelayMs: options.scheduledDelayMs }),
+  });
+  return {
+    processor,
+    tracer: new BasicTracer({
+      processor,
+      sampler: ratioSampler(options.samplingRatio ?? 1),
+      resourceAttributes: { "service.name": "maybecode" },
+    }),
+  };
 }
 
 function resolveDefaultModelPersistence(
@@ -326,4 +460,30 @@ function optionalRatio(value: unknown, field: string): number | undefined {
     throw new MaybeCodeConfigError(`${field} must be between 0 and 1`);
   }
   return number;
+}
+
+function nonEmptyString(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new MaybeCodeConfigError(`${field} must be a non-empty string`);
+  }
+  return value;
+}
+
+function objectValue(value: unknown, field: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new MaybeCodeConfigError(`${field} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function rejectUnknownOptions(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  field: string,
+): void {
+  const names = new Set(allowed);
+  const unknown = Object.keys(value).find((name) => !names.has(name));
+  if (unknown !== undefined) {
+    throw new MaybeCodeConfigError(`${field}.${unknown} is not supported`);
+  }
 }

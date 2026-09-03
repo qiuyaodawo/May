@@ -81,7 +81,7 @@ See [Agent and Application](../concepts/agent-application.md) and the
 Optional fail-open tracing implementation for Core's `Tracer` port. It
 provides `BasicTracer`, deterministic sampling, immutable completed spans,
 in-memory and serialized/bounded processors, and in-memory/JSON-console
-exporters. Core, Application, Session, model, and tool contexts propagate
+plus local JSONL exporters. Core, Application, Session, model, and tool contexts propagate
 trace identity without a process-global tracer. Processor lifetime remains
 caller-owned. See [Observability and tracing](../guides/observability.md).
 

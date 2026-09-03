@@ -182,6 +182,36 @@ overload events are retried. Authentication, request-validation, protocol, and
 cancellation failures are not. Provider `Retry-After` hints are respected up
 to `maxDelayMs`.
 
+MaybeCode tracing is disabled when `apps.maybecode.observability` is absent or
+`false`. Configure an object to write content-free completed spans to JSONL:
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "observability": {
+        "enabled": true,
+        "exporter": "file",
+        "file": "traces.jsonl",
+        "samplingRatio": 1,
+        "batch": {
+          "maxQueueSize": 2048,
+          "maxExportBatchSize": 512,
+          "scheduledDelayMs": 5000
+        }
+      }
+    }
+  }
+}
+```
+
+Relative trace paths use the MaybeCode data directory, so the default output
+is `~/.may/maybecode/traces.jsonl`. MaybeCode flushes and shuts down the batch
+processor after its workspace closes. The append-only file is not rotated and
+its preview span schema is not an audit contract. It contains operational ids,
+tool/model names, counts, timings, statuses, usage, and decisions, but no
+prompts, reasoning, or tool input/output from built-in instrumentation.
+
 OpenAI compaction is opt-in. `serverCompactThreshold` enables provider-side
 context management on normal Responses requests, while
 `apps.maybecode.autoCompaction.providerNative` lets MaybeCode call the model's

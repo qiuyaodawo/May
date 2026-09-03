@@ -15,6 +15,7 @@
     { "path": "../../packages/ui/tui" },
     { "path": "../../packages/config" },
     { "path": "../../packages/context" },
+    { "path": "../../packages/observability" },
     { "path": "../../packages/permissions" },
     { "path": "../../packages/session" },
     { "path": "../../packages/providers" },

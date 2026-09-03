@@ -38,6 +38,8 @@ import {
   type Model,
   type RunOptions,
   type Tool,
+  type TraceAttributes,
+  type Tracer,
 } from "@may/core";
 import type { ApprovalDecision, PermissionPolicy } from "@may/permissions";
 import type {
@@ -69,6 +71,8 @@ export interface MaybeCodeApplicationOptions {
   readonly resume?: boolean;
   readonly tools?: Iterable<Tool>;
   readonly permissionPolicy?: PermissionPolicy;
+  readonly tracer?: Tracer;
+  readonly traceAttributes?: TraceAttributes;
   readonly contextFactory?: ContextFactory;
   readonly contextBudget?: ContextBudget;
   readonly compactionStrategy?: ContextCompactionStrategy;
@@ -186,6 +190,23 @@ export class MaybeCodeApplication {
       permissionPolicy: options.permissionPolicy ?? createCodingPermissionPolicy(),
       tools: configuredTools,
       instructions: instructions.effective,
+      ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
+      traceAttributes: {
+        ...(options.traceAttributes ?? {}),
+        "may.agent.name": "maybecode",
+        ...(options.modelInfo?.profile === undefined
+          ? {}
+          : { "may.model.profile": options.modelInfo.profile }),
+        ...(options.modelInfo?.provider === undefined
+          ? {}
+          : { "may.model.provider": options.modelInfo.provider }),
+        ...(options.modelInfo?.adapter === undefined
+          ? {}
+          : { "may.model.adapter": options.modelInfo.adapter }),
+        ...(options.modelInfo?.model === undefined
+          ? {}
+          : { "may.model.name": options.modelInfo.model }),
+      },
       ...(options.contextFactory === undefined
         ? {}
         : { contextFactory: options.contextFactory }),

@@ -56,6 +56,8 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
     profile: string,
   ) => Promise<ModelCapabilities>;
   readonly persistDefaultModel?: (profile: string) => Promise<void>;
+  /** Product-owned resources, such as tracing processors, closed after the workspace. */
+  readonly closeOwnedResources?: () => void | Promise<void>;
 }
 
 type MaybeCodeProductEvent = Exclude<MaybeCodeEvent, MaybeCodeSessionEvent | {
@@ -388,7 +390,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    await this.manager.close();
+    try {
+      await this.manager.close();
+    } finally {
+      await this.state.options.closeOwnedResources?.();
+    }
   }
 
   private throwIfClosed(): void {
@@ -412,6 +418,7 @@ function applicationOptions(
     createModelConfiguration: _createModelConfiguration,
     resolveModelCapabilities: _resolveModelCapabilities,
     persistDefaultModel: _persistDefaultModel,
+    closeOwnedResources: _closeOwnedResources,
     ...application
   } = options;
   return application;

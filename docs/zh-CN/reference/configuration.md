@@ -171,6 +171,17 @@ Anthropic 接受禁用、自适应或显式 token budget：
         "baseDelayMs": 500,
         "maxDelayMs": 8000,
         "jitterRatio": 0.2
+      },
+      "observability": {
+        "enabled": true,
+        "exporter": "file",
+        "file": "traces.jsonl",
+        "samplingRatio": 1,
+        "batch": {
+          "maxQueueSize": 2048,
+          "maxExportBatchSize": 512,
+          "scheduledDelayMs": 5000
+        }
       }
     }
   }
@@ -179,6 +190,16 @@ Anthropic 接受禁用、自适应或显式 token budget：
 
 将 `retry` 设为 `false` 可禁用自动重试。相对 instruction 目录以
 `config.json` 所在目录为基准解析。
+
+`observability` 缺失、为 `false` 或包含 `enabled: false` 时禁用可观测性。配置 object
+会启用文件 exporter；`enabled` 默认为 `true`，`exporter` 目前只接受 `file`，
+`samplingRatio` 默认为 `1`。相对 `file` 路径基于 MaybeCode data directory 解析，默认
+位置为 `~/.may/maybecode/traces.jsonl`。Batch 默认值如上，且
+`maxExportBatchSize` 不能超过 `maxQueueSize`。
+
+MaybeCode 会在 workspace 关闭时 flush processor。JSONL 文件只追加且不会自动轮转；
+它是 fail-open 的运行遥测，不是 Session 或 audit 事实来源。参阅
+[可观测性与 Tracing](../guides/observability.md)。
 
 ## 维护时的事实来源
 

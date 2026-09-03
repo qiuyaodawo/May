@@ -57,10 +57,10 @@ Core 的 `Tracer`、`TraceSpan`、`TraceContext`、attribute 与传播字段是�
 `@may/observability` 的 processor、exporter、采样函数、完成 span 结构、span name 和
 attribute name 同样属于预览 API，在 `1.0.0` 前可能演进。
 
-Tracing 有意采用 fail-open、非持久化语义。它允许采样或丢弃，因此调用方不能把 span
-当成 Session、权限、计费或安全审计的事实来源。内置 instrumentation 不记录 prompt、
-message、reasoning 和工具输入输出；调用方提供的 attribute 不会自动脱敏，必须保持
-有界且不含敏感数据。
+Tracing 有意采用 fail-open、非权威语义。即使 exporter 会持久化 span，它仍允许采样或
+丢弃，因此调用方不能把它当成 Session、权限、计费或安全审计的事实来源。内置
+instrumentation 不记录 prompt、message、reasoning 和工具输入输出；调用方提供的
+attribute 不会自动脱敏，必须保持有界且不含敏感数据。
 
 Tracer 与 processor 生命周期由调用方拥有。关闭 `AgentApplication` 不会 flush 或
 shutdown 共享 processor；产品必须在真正的 ownership 边界只执行一次。
@@ -93,6 +93,10 @@ streaming delta；终结生命周期事件、返回的 Run 结果和持久化 Se
 不要手工编辑这些文件。需要稳定外部 schema 的应用应在公共接口后实现自己的
 `SessionStore` 与 `SessionCatalog`，并自行管理迁移策略。参阅
 [自定义存储](../guides/custom-storage.md)。
+
+MaybeCode 的可选 `traces.jsonl` 同样是不会自动轮转的 append-only 本地数据。完成 span
+的 JSON 结构和 attribute name 属于预览遥测契约，不是 Session storage 或稳定 audit
+schema。
 
 ## Provider 自有状态
 

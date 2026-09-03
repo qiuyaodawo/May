@@ -70,7 +70,7 @@ application/Session 生命周期。Model、Context factory、executor、schedule
 ### `@may/observability`
 
 这是 Core `Tracer` port 的可选 fail-open tracing 实现，提供 `BasicTracer`、确定性采样、
-不可变完成 span、内存与串行/有界 processor，以及内存/JSON console exporter。Core、
+不可变完成 span、内存与串行/有界 processor，以及内存/JSON console/本地 JSONL exporter。Core、
 Application、Session、模型和工具 context 会显式传播 trace identity，不使用进程全局
 tracer。Processor 生命周期仍由调用方拥有。参阅
 [可观测性与 Tracing](../guides/observability.md)。

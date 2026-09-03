@@ -48,6 +48,9 @@ importers:
       '@may/keybindings':
         specifier: workspace:*
         version: link:../../packages/ui/keybindings
+      '@may/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@may/permissions':
         specifier: workspace:*
         version: link:../../packages/permissions
@@ -121,6 +124,10 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
 
   packages/permissions:
     dependencies:

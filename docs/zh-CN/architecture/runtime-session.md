@@ -179,6 +179,7 @@ workspace 生命周期交给 `@may/application`，使用 `@may/tui` 的 Agent tr
 - 默认编码工具、变更预览生成和编码权限策略；
 - 命名手动压缩选项和有序自动压缩链；
 - provider/model profile、reasoning effort 覆盖和默认模型持久化；
+- 可选的本地 tracing 配置，以及共享 processor 的生命周期 ownership；
 - slash command、产品事件、主题、页面布局、模型/Session picker flow，以及 classic
   与 retained 两种终端行为。
 

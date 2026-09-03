@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,6 +12,7 @@ import {
   executeMaybeCodeSlashCommand,
   openConfiguredMaybeCode,
   parseMaybeCodeArgs,
+  resolveMaybeCodeObservability,
   resolveMaybeCodeRetry,
   selectMaybeCodeModel,
 } from "../dist/index.js";
@@ -235,6 +236,105 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
     ["prune-old-tool-results", "summary-tail", "history-reference"],
   );
   await app.close();
+});
+
+test("writes configured content-free traces and flushes them on close", async (t) => {
+  const directory = await temporaryDirectory(t);
+  const dataDirectory = join(directory, "data");
+  const tracePath = join(dataDirectory, "telemetry", "traces.jsonl");
+  const app = await openConfiguredMaybeCode(
+    { workspace: directory, dataDirectory, autoResume: false },
+    {
+      async loadConfig() {
+        return {
+          path: join(directory, "config.json"),
+          providers: {
+            local: { adapter: "test", apiKey: "do-not-capture" },
+          },
+          models: {
+            chat: { provider: "local", model: "test-model" },
+          },
+          defaultModel: "chat",
+          apps: {
+            maybecode: {
+              retry: false,
+              observability: {
+                enabled: true,
+                exporter: "file",
+                file: "telemetry/traces.jsonl",
+                samplingRatio: 1,
+                batch: { scheduledDelayMs: 60_000 },
+              },
+            },
+          },
+        };
+      },
+      createModel() {
+        return {
+          async *stream() {
+            yield {
+              type: "response.completed",
+              message: assistantMessage("private answer"),
+            };
+          },
+        };
+      },
+    },
+  );
+
+  await (await app.submit({ input: "private prompt" })).result;
+  const sessionId = app.sessionId;
+  await app.close();
+
+  const content = await readFile(tracePath, "utf8");
+  const spans = content.trim().split("\n").map((line) => JSON.parse(line));
+  const run = spans.find((span) => span.name === "may.run");
+  assert.ok(run);
+  assert.equal(run.attributes["service.name"], "maybecode");
+  assert.equal(run.attributes["may.agent.name"], "maybecode");
+  assert.equal(run.attributes["may.model.profile"], "chat");
+  assert.equal(run.attributes["may.session.id"], sessionId);
+  assert.doesNotMatch(content, /private prompt|private answer|do-not-capture/u);
+});
+
+test("resolves and validates MaybeCode observability configuration", () => {
+  const base = { path: "config.json", providers: {}, models: {} };
+  assert.equal(resolveMaybeCodeObservability(base), false);
+  assert.equal(resolveMaybeCodeObservability({
+    ...base,
+    apps: { maybecode: { observability: { enabled: false } } },
+  }), false);
+  assert.deepEqual(resolveMaybeCodeObservability({
+    ...base,
+    apps: {
+      maybecode: {
+        observability: {
+          file: "trace/output.jsonl",
+          samplingRatio: 0.25,
+          batch: { maxQueueSize: 32, maxExportBatchSize: 8 },
+        },
+      },
+    },
+  }), {
+    file: "trace/output.jsonl",
+    samplingRatio: 0.25,
+    maxQueueSize: 32,
+    maxExportBatchSize: 8,
+  });
+  assert.throws(() => resolveMaybeCodeObservability({
+    ...base,
+    apps: {
+      maybecode: {
+        observability: {
+          batch: { maxQueueSize: 8, maxExportBatchSize: 9 },
+        },
+      },
+    },
+  }), /maxExportBatchSize cannot exceed maxQueueSize/u);
+  assert.throws(() => resolveMaybeCodeObservability({
+    ...base,
+    apps: { maybecode: { observability: { destination: "somewhere" } } },
+  }), /observability\.destination is not supported/u);
 });
 
 test("switches configured model profiles by prefix without changing sessions", async (t) => {

@@ -100,6 +100,7 @@ may.tool.call                    9.72s
 - `BatchSpanProcessor` 使用有界队列并暴露 `droppedSpans`，不会把 exporter backpressure
   施加给 Run；
 - 内置 `InMemorySpanExporter` 和 `ConsoleSpanExporter`；
+- `JsonlFileSpanExporter` 会把 append 串行写入本地 JSONL 文件；
 - `alwaysOnSampler`、`alwaysOffSampler` 和 `ratioSampler()` 决定根 Trace 是否采样，
   子 span 继承父节点决定。
 
@@ -109,6 +110,32 @@ owner 结束时调用一次 `shutdown()`。关闭一个 application 不得关闭
 
 外部 tracing 系统应通过自定义 `SpanExporter` 或 `SpanProcessor` 集成，provider SDK
 类型不能进入 Core。
+
+## 在 MaybeCode 中启用 Tracing
+
+MaybeCode 提供了可直接使用的本地文件组合。在 May config 中加入：
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "observability": {
+        "enabled": true,
+        "exporter": "file",
+        "file": "traces.jsonl",
+        "samplingRatio": 1
+      }
+    }
+  }
+}
+```
+
+启用后，workspace 打开或重建的所有 application 会共享一个 tracer 和 batch processor；
+MaybeCode 只在整个 workspace 关闭后 flush。相对路径基于 MaybeCode data directory，
+所以默认位置是 `~/.may/maybecode/traces.jsonl`。文件只追加且不会自动轮转。
+
+没有 `observability` 配置，或配置为 `false`/`enabled: false` 时，MaybeCode 行为不变，
+也不会创建 trace 文件。Batch 设置见[配置参考](../reference/configuration.md)。
 
 ## 隐私与失败行为
 

@@ -70,11 +70,11 @@ fields are public preview contracts. `@may/observability` processors,
 exporters, sampling functions, completed-span shape, span names, and attribute
 names are also preview APIs and may evolve before `1.0.0`.
 
-Tracing is deliberately fail-open and non-durable. It may be sampled or
-dropped, so callers must not use spans as Session, permission, billing, or
-security audit truth. Built-in instrumentation excludes prompts, messages,
-reasoning, and tool input/output; caller-supplied attributes have no automatic
-redaction and must be bounded and non-sensitive.
+Tracing is deliberately fail-open and non-authoritative. It may be sampled or
+dropped—even when an exporter persists spans—so callers must not use it as
+Session, permission, billing, or security audit truth. Built-in instrumentation
+excludes prompts, messages, reasoning, and tool input/output; caller-supplied
+attributes have no automatic redaction and must be bounded and non-sensitive.
 
 Tracer and processor lifetime is caller-owned. Closing an `AgentApplication`
 does not flush or shut down a shared processor; the product must do that once
@@ -115,6 +115,10 @@ Do not edit the files manually. Applications that require a stable external
 schema should implement a `SessionStore` and `SessionCatalog` behind the public
 interfaces and own their migration policy. See
 [Custom storage](../guides/custom-storage.md).
+
+MaybeCode's optional `traces.jsonl` is also append-only local data without
+automatic rotation. Its completed-span JSON shape and attribute names are
+preview telemetry contracts, not Session storage or a stable audit schema.
 
 ## Provider-owned state
 

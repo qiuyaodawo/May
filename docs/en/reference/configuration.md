@@ -176,6 +176,17 @@ Anthropic accepts disabled, adaptive, or explicitly budgeted thinking:
         "baseDelayMs": 500,
         "maxDelayMs": 8000,
         "jitterRatio": 0.2
+      },
+      "observability": {
+        "enabled": true,
+        "exporter": "file",
+        "file": "traces.jsonl",
+        "samplingRatio": 1,
+        "batch": {
+          "maxQueueSize": 2048,
+          "maxExportBatchSize": 512,
+          "scheduledDelayMs": 5000
+        }
       }
     }
   }
@@ -184,6 +195,18 @@ Anthropic accepts disabled, adaptive, or explicitly budgeted thinking:
 
 Set `retry` to `false` to disable automatic retries. Relative instruction
 directories are resolved from the directory containing `config.json`.
+
+Observability is disabled when `observability` is absent, `false`, or has
+`enabled: false`. An object enables the file exporter; `enabled` defaults to
+`true`, `exporter` currently accepts only `file`, and `samplingRatio` defaults
+to `1`. Relative `file` paths are resolved below the MaybeCode data directory;
+the default is `~/.may/maybecode/traces.jsonl`. Batch defaults are the values
+shown above. `maxExportBatchSize` cannot exceed `maxQueueSize`.
+
+MaybeCode flushes the processor during workspace shutdown. The JSONL file is
+append-only and is not automatically rotated. It is fail-open operational
+telemetry rather than Session or audit truth; see
+[Observability and tracing](../guides/observability.md).
 
 ## Maintenance source of truth
 

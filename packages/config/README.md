@@ -53,6 +53,12 @@ completion and validation is available at
         "baseDelayMs": 500,
         "maxDelayMs": 8000,
         "jitterRatio": 0.2
+      },
+      "observability": {
+        "enabled": true,
+        "exporter": "file",
+        "file": "traces.jsonl",
+        "samplingRatio": 1
       }
     }
   }
@@ -86,8 +92,8 @@ Provider names are user-defined and are not used to choose an adapter.
 
 `apps` is an optional map of application-owned configuration. This package
 validates that each entry is an object but leaves fields such as
-`instructionsDirectory`, `autoCompaction`, and `retry` for the application to
-interpret.
+`instructionsDirectory`, `autoCompaction`, `retry`, and `observability` for the
+application to interpret.
 
 `apiKeyEnv` is resolved only when `resolveProviderConfig()` or
 `resolveModelProfile()` selects that provider. The package does not instantiate

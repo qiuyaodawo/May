@@ -108,6 +108,7 @@ from Context preparation or tool latency.
 - `BatchSpanProcessor` uses a bounded queue and exposes `droppedSpans`; it
   never applies exporter backpressure to a Run.
 - `InMemorySpanExporter` and `ConsoleSpanExporter` are included.
+- `JsonlFileSpanExporter` serializes appends to a local JSONL file.
 - `alwaysOnSampler`, `alwaysOffSampler`, and `ratioSampler()` select root
   traces; child spans inherit their parent's decision.
 
@@ -117,6 +118,35 @@ Closing one application must not shut down a processor shared by another.
 
 External tracing systems should be integrated through a custom
 `SpanExporter` or `SpanProcessor`. Keep provider SDK types outside Core.
+
+## Enable tracing in MaybeCode
+
+MaybeCode owns a ready-to-use local file composition. Add this to May's config:
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "observability": {
+        "enabled": true,
+        "exporter": "file",
+        "file": "traces.jsonl",
+        "samplingRatio": 1
+      }
+    }
+  }
+}
+```
+
+When enabled, every application opened or rebuilt by the workspace shares one
+tracer and batch processor. MaybeCode flushes it only after the whole workspace
+closes. A relative path is based on the MaybeCode data directory, making the
+default `~/.may/maybecode/traces.jsonl`. The file is append-only and is not
+automatically rotated.
+
+With no `observability` entry, or with `false`/`enabled: false`, MaybeCode's
+behavior remains unchanged and no trace file is created. See the
+[configuration reference](../reference/configuration.md) for batch settings.
 
 ## Privacy and failure behavior
 

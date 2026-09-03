@@ -46,7 +46,9 @@ parent trace id and sampling decision. Available processors and exporters are:
 - `BatchSpanProcessor` for bounded, non-blocking batching, with
   `droppedSpans` exposing buffer pressure;
 - `InMemorySpanExporter`; and
-- `ConsoleSpanExporter`, which writes one JSON span per line.
+- `ConsoleSpanExporter`, which writes one JSON span per line; and
+- `JsonlFileSpanExporter`, which serializes appends to a local JSONL file and
+  creates its parent directory on first export.
 
 `alwaysOnSampler`, `alwaysOffSampler`, and deterministic `ratioSampler()` are
 provided. A custom `SpanProcessor` can derive metrics or adapt completed spans

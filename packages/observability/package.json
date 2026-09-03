@@ -24,6 +24,9 @@
   "dependencies": {
     "@may/core": "workspace:*"
   },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  },
   "engines": {
     "node": ">=20"
   },
