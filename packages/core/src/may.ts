@@ -28,6 +28,16 @@ import {
 } from "./tool.js";
 import { ToolRegistry } from "./tool-registry.js";
 import {
+  addTraceEvent,
+  endTraceSpan,
+  startTraceSpan,
+  traceError,
+  type TraceAttributes,
+  type TraceContext,
+  type TraceSpan,
+  type Tracer,
+} from "./tracing.js";
+import {
   textContent,
   toolCancellationMessage,
   userMessage,
@@ -50,21 +60,34 @@ export interface MayOptions {
   concurrentRuns?: "reject" | "allow";
   /** Streaming-event buffer target; lifecycle events are retained. */
   maxBufferedEvents?: number;
+  /** Optional fail-open tracing implementation. */
+  tracer?: Tracer;
+  /** Content-free attributes attached to every Run span. */
+  traceAttributes?: TraceAttributes;
 }
 
 export interface RunOptions {
   input: string | UserMessage;
   signal?: AbortSignal;
+  /** Optional parent span for explicit cross-component propagation. */
+  traceContext?: TraceContext;
+  /** Content-free attributes added to this Run span. */
+  traceAttributes?: TraceAttributes;
 }
 
 export interface ContinueOptions {
   signal?: AbortSignal;
+  /** Optional parent span for explicit cross-component propagation. */
+  traceContext?: TraceContext;
+  /** Content-free attributes added to this Run span. */
+  traceAttributes?: TraceAttributes;
 }
 
 export interface RunHandle {
   readonly id: string;
   readonly events: AsyncIterable<MayEvent>;
   readonly result: Promise<RunResult>;
+  readonly traceContext?: TraceContext;
   cancel(reason?: string): void;
 }
 
@@ -77,6 +100,8 @@ export class May {
   private readonly toolScheduler: ToolScheduler;
   private readonly concurrentRuns: "reject" | "allow";
   private readonly maxBufferedEvents: number;
+  private readonly tracer: Tracer | undefined;
+  private readonly traceAttributes: TraceAttributes;
   private activeRuns = 0;
 
   constructor(options: MayOptions) {
@@ -104,23 +129,37 @@ export class May {
     if (!Number.isSafeInteger(this.maxBufferedEvents) || this.maxBufferedEvents < 1) {
       throw new RangeError("maxBufferedEvents must be a positive safe integer");
     }
+    this.tracer = options.tracer;
+    this.traceAttributes = { ...(options.traceAttributes ?? {}) };
   }
 
   run(options: RunOptions): RunHandle {
     const input = typeof options.input === "string"
       ? userMessage(options.input)
       : options.input;
-    return this.start(input, options.signal);
+    return this.start(
+      input,
+      options.signal,
+      options.traceContext,
+      options.traceAttributes,
+    );
   }
 
   /** Continue from the existing context without appending a user message. */
   continue(options: ContinueOptions = {}): RunHandle {
-    return this.start(undefined, options.signal);
+    return this.start(
+      undefined,
+      options.signal,
+      options.traceContext,
+      options.traceAttributes,
+    );
   }
 
   private start(
     input: UserMessage | undefined,
     externalSignal: AbortSignal | undefined,
+    parentTraceContext: TraceContext | undefined,
+    runTraceAttributes: TraceAttributes | undefined,
   ): RunHandle {
     if (this.concurrentRuns === "reject" && this.activeRuns > 0) {
       throw new ConcurrentRunError();
@@ -133,6 +172,18 @@ export class May {
     });
     const controller = new AbortController();
     let seq = 0;
+    const runSpan = startTraceSpan(this.tracer, "may.run", {
+      ...(parentTraceContext === undefined
+        ? {}
+        : { parent: parentTraceContext }),
+      attributes: {
+        ...this.traceAttributes,
+        ...(runTraceAttributes ?? {}),
+        "may.run.id": runId,
+        "may.run.continuation": input === undefined,
+        "may.run.max_steps": this.maxSteps,
+      },
+    });
 
     const onExternalAbort = () => controller.abort(externalSignal?.reason);
     if (externalSignal?.aborted) {
@@ -150,7 +201,35 @@ export class May {
       });
     };
 
-    const result = this.execute(runId, input, controller.signal, emit)
+    const result = this.execute(
+      runId,
+      input,
+      controller.signal,
+      emit,
+      runSpan?.context,
+    ).then(
+      (value) => {
+        endTraceSpan(runSpan, {
+          status: "ok",
+          attributes: {
+            "may.run.steps": value.steps,
+            "may.run.model_calls": value.modelCalls,
+            "may.run.tool_calls": value.toolCalls,
+            ...usageTraceAttributes(value.usage),
+          },
+        });
+        return value;
+      },
+      (error: unknown) => {
+        endTraceSpan(runSpan, {
+          status: controller.signal.aborted || error instanceof RunCancelledError
+            ? "cancelled"
+            : "error",
+          error: traceError(error),
+        });
+        throw error;
+      },
+    )
       .finally(() => {
         this.activeRuns -= 1;
         externalSignal?.removeEventListener("abort", onExternalAbort);
@@ -164,6 +243,7 @@ export class May {
       id: runId,
       events,
       result,
+      ...(runSpan === undefined ? {} : { traceContext: runSpan.context }),
       cancel: (reason?: string) => controller.abort(reason),
     };
   }
@@ -173,6 +253,7 @@ export class May {
     input: UserMessage | undefined,
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
+    runTraceContext: TraceContext | undefined,
   ): Promise<RunResult> {
     let aggregateUsage: Usage | undefined;
     let modelCalls = 0;
@@ -188,32 +269,99 @@ export class May {
         ? { type: "run.started", continuation: true }
         : { type: "run.started" });
       throwIfAborted(signal);
-      if (input !== undefined) await this.context.append([input], { runId });
+      if (input !== undefined) {
+        await traceOperation(
+          this.tracer,
+          "may.context.append",
+          runTraceContext,
+          {
+            "may.context.phase": "input",
+            "may.context.message_count": 1,
+          },
+          signal,
+          () => this.context.append([input], { runId }),
+        );
+      }
 
       for (let step = 1; step <= this.maxSteps; step++) {
         throwIfAborted(signal);
         emit({ type: "step.started", step });
 
-        const snapshot = await this.context.snapshot({
-          runId,
-          step,
-          signal,
+        const snapshotSpan = startTraceSpan(this.tracer, "may.context.snapshot", {
+          ...(runTraceContext === undefined ? {} : { parent: runTraceContext }),
+          attributes: { "may.step": step },
         });
+        let snapshot: ContextSnapshot;
+        try {
+          snapshot = await this.context.snapshot({
+            runId,
+            step,
+            signal,
+          });
+          endTraceSpan(snapshotSpan, {
+            status: "ok",
+            attributes: {
+              "may.context.message_count": snapshot.messages.length,
+              "may.context.has_instructions": Boolean(snapshot.instructions),
+            },
+          });
+        } catch (error) {
+          endOperationSpan(snapshotSpan, error, signal);
+          throw error;
+        }
         const request = this.createModelRequest(snapshot);
 
         emit({ type: "model.started", step });
         modelCalls += 1;
-        const { message, usage } = await this.consumeModel(
-          request,
-          signal,
-          runId,
-          step,
-          emit,
-        );
+        const modelCallId = `${runId}:model:${step}`;
+        const modelSpan = startTraceSpan(this.tracer, "may.model.call", {
+          ...(runTraceContext === undefined ? {} : { parent: runTraceContext }),
+          attributes: {
+            "may.step": step,
+            "may.model.call_id": modelCallId,
+            "may.model.message_count": request.messages.length,
+            "may.model.tool_definition_count": request.tools.length,
+          },
+        });
+        let modelResponse: { message: AssistantMessage; usage?: Usage };
+        try {
+          modelResponse = await this.consumeModel(
+            request,
+            signal,
+            runId,
+            step,
+            modelCallId,
+            emit,
+            modelSpan,
+          );
+          endTraceSpan(modelSpan, {
+            status: "ok",
+            attributes: {
+              "may.model.tool_call_count":
+                modelResponse.message.toolCalls?.length ?? 0,
+              ...usageTraceAttributes(modelResponse.usage, "may.model"),
+            },
+          });
+        } catch (error) {
+          endOperationSpan(modelSpan, error, signal);
+          throw error;
+        }
+        const { message, usage } = modelResponse;
         aggregateUsage = addUsage(aggregateUsage, usage);
 
         throwIfAborted(signal);
-        await this.context.append([message], { runId, step });
+        await traceOperation(
+          this.tracer,
+          "may.context.append",
+          runTraceContext,
+          {
+            "may.step": step,
+            "may.context.phase": "assistant",
+            "may.context.message_count": 1,
+          },
+          signal,
+          () => this.context.append([message], { runId, step }),
+        );
         emitOptionalUsage(
           emit,
           {
@@ -243,18 +391,53 @@ export class May {
 
         toolCalls += calls.length;
         pendingTools = { step, calls, outcomes: [], executions: [] };
-        const outcomes = await this.scheduleTools(
-          runId,
-          step,
-          calls,
-          signal,
-          emit,
-          pendingTools,
-        );
+        const batchSpan = startTraceSpan(this.tracer, "may.tools.batch", {
+          ...(runTraceContext === undefined ? {} : { parent: runTraceContext }),
+          attributes: {
+            "may.step": step,
+            "may.tool.call_count": calls.length,
+          },
+        });
+        let outcomes: readonly ToolExecutionOutcome[];
+        try {
+          outcomes = await this.scheduleTools(
+            runId,
+            step,
+            calls,
+            signal,
+            emit,
+            pendingTools,
+            batchSpan?.context,
+          );
+          const failedCount = outcomes.filter((outcome) =>
+            outcome.type === "failed"
+          ).length;
+          endTraceSpan(batchSpan, {
+            status: failedCount === 0 ? "ok" : "error",
+            attributes: {
+              "may.tool.completed_count": outcomes.length - failedCount,
+              "may.tool.failed_count": failedCount,
+            },
+          });
+        } catch (error) {
+          endOperationSpan(batchSpan, error, signal);
+          throw error;
+        }
         let fatal: FatalToolExecutionError | undefined;
-        await this.context.append(
-          outcomes.map((outcome) => outcome.message),
-          { runId, step },
+        await traceOperation(
+          this.tracer,
+          "may.context.append",
+          runTraceContext,
+          {
+            "may.step": step,
+            "may.context.phase": "tool_results",
+            "may.context.message_count": outcomes.length,
+          },
+          signal,
+          () => this.context.append(
+            outcomes.map((outcome) => outcome.message),
+            { runId, step },
+          ),
         );
         emitToolOutcomes(step, outcomes, emit);
         for (const outcome of outcomes) {
@@ -341,7 +524,9 @@ export class May {
     signal: AbortSignal,
     runId: string,
     step: number,
+    modelCallId: string,
     emit: (event: MayEventPayload) => void,
+    modelSpan: TraceSpan | undefined,
   ): Promise<{ message: AssistantMessage; usage?: Usage }> {
     let completed: AssistantMessage | undefined;
     let usage: Usage | undefined;
@@ -350,7 +535,10 @@ export class May {
       signal,
       runId,
       step,
-      modelCallId: `${runId}:model:${step}`,
+      modelCallId,
+      ...(modelSpan === undefined
+        ? {}
+        : { traceContext: modelSpan.context }),
     })) {
       throwIfAborted(signal);
 
@@ -365,6 +553,15 @@ export class May {
       }
 
       if (event.type === "retrying") {
+        addTraceEvent(modelSpan, "may.model.retry", {
+          "may.model.retry.attempt": event.attempt,
+          "may.model.retry.max_attempts": event.maxAttempts,
+          "may.model.retry.delay_ms": event.delayMs,
+          "error.type": event.error.name,
+          ...(event.error.code === undefined
+            ? {}
+            : { "error.code": event.error.code }),
+        });
         emit({
           type: "model.retrying",
           step,
@@ -409,6 +606,7 @@ export class May {
       readonly outcomes: Array<ToolExecutionOutcome | undefined>;
       readonly executions: Array<Promise<ToolExecutionOutcome> | undefined>;
     },
+    batchTraceContext: TraceContext | undefined,
   ): Promise<readonly ToolExecutionOutcome[]> {
     const operations = calls.map((call, index) => {
       let execution: Promise<ToolExecutionOutcome> | undefined;
@@ -416,7 +614,14 @@ export class May {
         call,
         tool: this.tools.get(call.name),
         execute: () => {
-          execution ??= this.executeTool(runId, step, call, signal, emit)
+          execution ??= this.executeTool(
+            runId,
+            step,
+            call,
+            signal,
+            emit,
+            batchTraceContext,
+          )
             .then((outcome) => {
               pending.outcomes[index] = outcome;
               return outcome;
@@ -472,9 +677,20 @@ export class May {
     call: ToolCall,
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
+    parentTraceContext: TraceContext | undefined,
   ): Promise<ToolExecutionOutcome> {
     emit({ type: "tool.started", step, call });
     let active = true;
+    const toolSpan = startTraceSpan(this.tracer, "may.tool.call", {
+      ...(parentTraceContext === undefined
+        ? {}
+        : { parent: parentTraceContext }),
+      attributes: {
+        "may.step": step,
+        "may.tool.name": call.name,
+        "may.tool.call_id": call.id,
+      },
+    });
 
     try {
       const tool = this.tools.get(call.name);
@@ -490,6 +706,9 @@ export class May {
           toolCallId: call.id,
           idempotencyKey: `${runId}:${step}:${call.id}`,
           signal,
+          ...(toolSpan === undefined
+            ? {}
+            : { traceContext: toolSpan.context }),
           report: (update) => {
             if (!active || signal.aborted) return;
             emitToolProgress(step, call, update, emit);
@@ -497,6 +716,7 @@ export class May {
         },
       });
 
+      endTraceSpan(toolSpan, { status: "ok" });
       return {
         type: "completed",
         call,
@@ -509,9 +729,16 @@ export class May {
         },
       };
     } catch (error) {
-      if (signal.aborted || error instanceof RunCancelledError) throw error;
+      if (signal.aborted || error instanceof RunCancelledError) {
+        endOperationSpan(toolSpan, error, signal);
+        throw error;
+      }
 
       const serialized = serializeError(error);
+      endTraceSpan(toolSpan, {
+        status: "error",
+        error: traceError(error),
+      });
       const outcome: FailedToolExecution = {
         type: "failed",
         call,
@@ -661,6 +888,59 @@ function addTokenField(
   value: number | undefined,
 ): void {
   if (value !== undefined) target[field] = (target[field] ?? 0) + value;
+}
+
+async function traceOperation<T>(
+  tracer: Tracer | undefined,
+  name: string,
+  parent: TraceContext | undefined,
+  attributes: TraceAttributes,
+  signal: AbortSignal,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const span = startTraceSpan(tracer, name, {
+    ...(parent === undefined ? {} : { parent }),
+    attributes,
+  });
+  try {
+    const value = await operation();
+    endTraceSpan(span, { status: "ok" });
+    return value;
+  } catch (error) {
+    endOperationSpan(span, error, signal);
+    throw error;
+  }
+}
+
+function endOperationSpan(
+  span: TraceSpan | undefined,
+  error: unknown,
+  signal: AbortSignal,
+): void {
+  endTraceSpan(span, {
+    status: signal.aborted || error instanceof RunCancelledError
+      ? "cancelled"
+      : "error",
+    error: traceError(error),
+  });
+}
+
+function usageTraceAttributes(
+  usage: Usage | undefined,
+  prefix = "may.run",
+): TraceAttributes {
+  if (usage === undefined) return {};
+  return {
+    ...(usage.inputTokens === undefined
+      ? {}
+      : { [`${prefix}.input_tokens`]: usage.inputTokens }),
+    ...(usage.outputTokens === undefined
+      ? {}
+      : { [`${prefix}.output_tokens`]: usage.outputTokens }),
+    ...(usage.totalTokens === undefined
+      ? {}
+      : { [`${prefix}.total_tokens`]: usage.totalTokens }),
+  };
 }
 
 function emitToolProgress(

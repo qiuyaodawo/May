@@ -86,6 +86,7 @@ function snapshotDefinitionOptions(
 ): StoredAgentDefinitionOptions {
   const {
     tools,
+    traceAttributes,
     contextBudget,
     autoCompactionStrategies,
     sessionHistory,
@@ -97,6 +98,9 @@ function snapshotDefinitionOptions(
     ...(tools === undefined
       ? {}
       : { tools: new ToolRegistry(tools) }),
+    ...(traceAttributes === undefined
+      ? {}
+      : { traceAttributes: Object.freeze({ ...traceAttributes }) }),
     ...(contextBudget === undefined
       ? {}
       : { contextBudget: Object.freeze({ ...contextBudget }) }),

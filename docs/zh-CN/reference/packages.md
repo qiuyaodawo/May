@@ -20,6 +20,7 @@ May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行�
 | 构建编码 Agent | Headless application controller | `@may/coding-tools` 和执行隔离策略 |
 | 从 May 配置中选择模型 | `@may/config` | `@may/providers` |
 | 让模型查询持久化历史 | `@may/session-tools` | 活动 `Session` 或 `AgentApplication` |
+| 追踪 Agent 延迟与结果 | Core 的 `Tracer` port | `@may/observability` processor 和 exporter |
 
 调用方希望完全控制运行时生命周期时使用 `@may/core`；需要 Session、审批、Context
 管理和有序关闭的应用通常应从 `@may/application` 开始。
@@ -65,6 +66,14 @@ application/Session 生命周期。Model、Context factory、executor、schedule
 由产品注入。参阅
 [Agent 与 Application](../concepts/agent-application.md)和
 [package README](../../../packages/application/README.md)。
+
+### `@may/observability`
+
+这是 Core `Tracer` port 的可选 fail-open tracing 实现，提供 `BasicTracer`、确定性采样、
+不可变完成 span、内存与串行/有界 processor，以及内存/JSON console exporter。Core、
+Application、Session、模型和工具 context 会显式传播 trace identity，不使用进程全局
+tracer。Processor 生命周期仍由调用方拥有。参阅
+[可观测性与 Tracing](../guides/observability.md)。
 
 ## 状态与策略
 

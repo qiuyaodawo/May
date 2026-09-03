@@ -20,6 +20,7 @@ not accidentally undo it.
 | [0002](0002-agent-ui-stays-in-may-tui.md) | Accepted | Agent-aware terminal components remain in `@may/tui` |
 | [0003](0003-headless-application-lifecycle.md) | Accepted | Shared Session orchestration belongs in `@may/application` |
 | [0004](0004-agent-definitions-and-tool-registries.md) | Accepted | Agent definitions and tool registries are reusable, instance-scoped composition objects |
+| [0005](0005-observability-is-an-optional-core-port.md) | Accepted | Observability implements an optional Core-owned tracing port |
 
 ## Adding a record
 

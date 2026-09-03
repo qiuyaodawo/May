@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/core" },
+    { "path": "./packages/observability" },
     { "path": "./packages/application" },
     { "path": "./packages/context" },
     { "path": "./packages/permissions" },

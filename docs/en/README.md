@@ -31,6 +31,7 @@ interfaces are intended for extension.
 - [Custom Session storage](guides/custom-storage.md)
 - [Custom UI](guides/custom-ui.md)
 - [Permission policy](guides/permission-policy.md)
+- [Observability and tracing](guides/observability.md)
 
 ## Reference
 

@@ -70,6 +70,8 @@ definition 阶段的明确可选选择：
 
 - `tools` 默认不包含产品工具；
 - `toolScheduler` 默认使用 Core 的串行 scheduler；
+- 只有提供 `tracer` 才启用 tracing；`traceAttributes` 为每个 Run 增加由调用方负责、
+  不含内容的标签；
 - `instructions` 默认没有 system instruction；
 - `contextFactory` 默认为 `InMemoryContextFactory`；
 - 未配置时禁用 Context budget 与 compaction；
@@ -336,6 +338,18 @@ permission grant 都是 runtime 配置，不会从 Session log 恢复。
 产品拥有 `kind`、`version` 和 data schema，应防御性解码持久化数据。编码产品可以复用
 `@may/coding-tools/change-preview`，无需再发明格式。
 
+### Observability 与 Tracing
+
+可以直接提供 Core `Tracer`，也可以使用可选 `@may/observability` package 的
+`BasicTracer`。Core 随后会创建不含内容的 Run、model、Context、tool 和 permission
+span，并把 `TraceContext` 传播给 model/tool adapter。自定义 attribute 必须保持有界，
+不能放入 prompt、工具数据、credential 或其他敏感内容。
+
+Tracing 是 fail-open 的运行数据，允许采样或丢弃，不能代替 Session history 或
+permission record。创建 processor 的产品负责最后的 `forceFlush()`/`shutdown()`；
+application 不会关闭可能共享的 processor。配置方法和 span name 见
+[可观测性与 Tracing](observability.md)。
+
 ## 消费一个有序 Application Stream
 
 长生命周期 UI 通常在打开 application 后立刻启动一个 relay：
@@ -481,6 +495,8 @@ Session 上打开替换 application。Profile 选择等产品状态应留在通�
 - **Context：** 实际 model budget 是多少，何时压缩，Agent 能否找回被省略历史？
 - **持久化：** 使用内存、本地单 writer，还是满足并发/加密要求的自定义后端？
 - **事件：** 是否有持续 consumer 处理审批与 terminal failure，而不把 delta 当权威数据？
+- **可观测性：** 哪些 Trace 被采样和导出，attribute 是否不含内容，由哪个 owner flush
+  并 shutdown processor？
 - **Session：** 如何发现 id、校验 metadata、拒绝不兼容恢复？
 - **生命周期：** 谁负责取消与 `close()`，包括启动或渲染失败时？
 - **产品边界：** 其他 UI 或 provider 能否复用 headless 组合，而不导入产品渲染代码？
@@ -495,5 +511,7 @@ Session 上打开替换 application。Profile 选择等产品状态应留在通�
 - [`@may/session`](../../../packages/session/README.md)：持久化 history、恢复、file store
   与 Catalog
 - [`@may/permissions`](../../../packages/permissions/README.md)：headless policy 与审批协议
+- [`@may/observability`](../../../packages/observability/README.md)：fail-open tracing、采样、
+  processor 与 exporter
 - [`@may/coding-tools`](../../../packages/tools/coding-tools/README.md)：有界编码 capability、
   指令、preview 与 shell 安全边界

@@ -1,10 +1,15 @@
 import {
   AsyncEventQueue,
   directToolExecutor,
+  endTraceSpan,
   FatalToolExecutionError,
   RunCancelledError,
+  startTraceSpan,
+  traceError,
   type ToolExecution,
   type ToolExecutor,
+  type TraceSpan,
+  type Tracer,
 } from "@may/core";
 
 import {
@@ -25,6 +30,8 @@ import type {
 export interface PermissionToolExecutorOptions {
   policy: PermissionPolicy;
   executor?: ToolExecutor;
+  /** Optional fail-open tracer shared with the surrounding Agent runtime. */
+  tracer?: Tracer;
 }
 
 interface PendingApproval {
@@ -39,6 +46,7 @@ export class PermissionToolExecutor implements ToolExecutor {
 
   private readonly policy: PermissionPolicy;
   private readonly executor: ToolExecutor;
+  private readonly tracer: Tracer | undefined;
   private readonly eventQueue = new AsyncEventQueue<PermissionEvent>();
   private readonly pending = new Map<string, PendingApproval>();
   private readonly sessionGrants = new Set<string>();
@@ -49,6 +57,7 @@ export class PermissionToolExecutor implements ToolExecutor {
   constructor(options: PermissionToolExecutorOptions) {
     this.policy = options.policy;
     this.executor = options.executor ?? directToolExecutor;
+    this.tracer = options.tracer;
     this.events = this.eventQueue;
   }
 
@@ -68,7 +77,7 @@ export class PermissionToolExecutor implements ToolExecutor {
         input: execution.input,
         context: execution.context,
       };
-      const outcome = normalizeDecision(await this.policy(check));
+      const outcome = await this.evaluatePolicy(check);
 
       this.throwIfClosed();
       throwIfAborted(execution.context.signal);
@@ -80,7 +89,7 @@ export class PermissionToolExecutor implements ToolExecutor {
         const granted = outcome.grantKey !== undefined
           && this.sessionGrants.has(outcome.grantKey);
         if (!granted) {
-          const approval = await this.requestApproval(check, outcome.grantKey);
+          const approval = await this.waitForApproval(check, outcome.grantKey);
           if (approval === "deny") {
             throw new PermissionDeniedError(execution.tool.name);
           }
@@ -101,6 +110,57 @@ export class PermissionToolExecutor implements ToolExecutor {
     }
 
     return this.executor.execute(execution);
+  }
+
+  private async evaluatePolicy(check: PermissionCheck): Promise<NormalizedDecision> {
+    const span = startTraceSpan(this.tracer, "may.permission.check", {
+      ...(check.context.traceContext === undefined
+        ? {}
+        : { parent: check.context.traceContext }),
+      attributes: {
+        "may.step": check.context.step,
+        "may.tool.name": check.tool.name,
+        "may.tool.call_id": check.context.toolCallId,
+      },
+    });
+    try {
+      const outcome = normalizeDecision(await this.policy(check));
+      endTraceSpan(span, {
+        status: "ok",
+        attributes: { "may.permission.decision": outcome.decision },
+      });
+      return outcome;
+    } catch (error) {
+      endPermissionSpan(span, error, check.context.signal);
+      throw error;
+    }
+  }
+
+  private async waitForApproval(
+    check: PermissionCheck,
+    grantKey: string | undefined,
+  ): Promise<ApprovalDecision> {
+    const span = startTraceSpan(this.tracer, "may.permission.approval_wait", {
+      ...(check.context.traceContext === undefined
+        ? {}
+        : { parent: check.context.traceContext }),
+      attributes: {
+        "may.step": check.context.step,
+        "may.tool.name": check.tool.name,
+        "may.tool.call_id": check.context.toolCallId,
+      },
+    });
+    try {
+      const decision = await this.requestApproval(check, grantKey);
+      endTraceSpan(span, {
+        status: "ok",
+        attributes: { "may.permission.approval": decision },
+      });
+      return decision;
+    } catch (error) {
+      endPermissionSpan(span, error, check.context.signal);
+      throw error;
+    }
   }
 
   setEventSink(sink: PermissionEventSink | undefined): void {
@@ -324,4 +384,17 @@ function fatalPermissionError(toolName: string, error: unknown): Error {
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return typeof error === "string" ? error : "Unknown permission error";
+}
+
+function endPermissionSpan(
+  span: TraceSpan | undefined,
+  error: unknown,
+  signal: AbortSignal,
+): void {
+  endTraceSpan(span, {
+    status: signal.aborted || error instanceof RunCancelledError
+      ? "cancelled"
+      : "error",
+    error: traceError(error),
+  });
 }

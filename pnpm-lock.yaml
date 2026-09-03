@@ -116,6 +116,12 @@ importers:
 
   packages/core: {}
 
+  packages/observability:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/permissions:
     dependencies:
       '@may/core':

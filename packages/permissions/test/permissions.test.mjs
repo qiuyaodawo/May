@@ -452,6 +452,55 @@ test("can delegate allowed calls through another executor", async () => {
   assert.equal(delegated, execution);
 });
 
+test("traces permission checks and approval waits under the tool call", async () => {
+  const spans = [];
+  let nextSpan = 0;
+  const tracer = {
+    startSpan(name, options = {}) {
+      const span = {
+        name,
+        parent: options.parent,
+        context: {
+          traceId: options.parent?.traceId ?? "trace_permissions",
+          spanId: `permission_${++nextSpan}`,
+          sampled: true,
+        },
+        attributes: { ...(options.attributes ?? {}) },
+        setAttributes(attributes) {
+          Object.assign(this.attributes, attributes);
+        },
+        addEvent() {},
+        end(endOptions = {}) {
+          Object.assign(this.attributes, endOptions.attributes ?? {});
+          this.status = endOptions.status;
+        },
+      };
+      spans.push(span);
+      return span;
+    },
+  };
+  const permissions = new PermissionToolExecutor({
+    tracer,
+    policy: () => "ask",
+  });
+  const iterator = permissions.events[Symbol.asyncIterator]();
+  const parent = { traceId: "trace_permissions", spanId: "tool_parent" };
+  const result = permissions.execute(createExecution({ traceContext: parent }));
+  const requested = (await iterator.next()).value;
+
+  await permissions.resolve(requested.request.id, "allow");
+  assert.equal(await result, "executed");
+  assert.deepEqual(spans.map((span) => span.name), [
+    "may.permission.check",
+    "may.permission.approval_wait",
+  ]);
+  assert.ok(spans.every((span) => span.parent === parent));
+  assert.equal(spans[0].attributes["may.permission.decision"], "ask");
+  assert.equal(spans[1].attributes["may.permission.approval"], "allow");
+  assert.ok(spans.every((span) => span.status === "ok"));
+  await permissions.close();
+});
+
 function createExecution(options = {}) {
   const controller = new AbortController();
   return {
@@ -468,6 +517,9 @@ function createExecution(options = {}) {
       toolCallId: "call_test",
       idempotencyKey: "run_test:1:call_test",
       signal: options.signal ?? controller.signal,
+      ...(options.traceContext === undefined
+        ? {}
+        : { traceContext: options.traceContext }),
       report() {},
     },
   };

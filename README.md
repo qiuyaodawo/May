@@ -8,6 +8,7 @@ be used independently or combined into complete agents and applications.
 ```text
 packages/
   core/       Agent loop, ToolRegistry, contracts, events, and in-memory Context
+  observability/  Optional fail-open tracing processors and exporters
   application/  Agent definitions plus single-session/workspace lifecycle
   context/    Context factories, compaction, and model-backed summarization
   session/    Serialized runs, durable history, and session catalogs

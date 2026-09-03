@@ -1,4 +1,5 @@
 import type { JsonSchema, ToolCall } from "./types.js";
+import type { TraceContext } from "./tracing.js";
 
 export type ToolProgressUpdate =
   | {
@@ -19,6 +20,8 @@ export interface ToolExecutionContext {
   toolCallId: string;
   idempotencyKey: string;
   signal: AbortSignal;
+  /** Current tool-call span for explicitly propagated instrumentation. */
+  traceContext?: TraceContext;
   /** Emits live, non-durable progress while the tool is active. */
   report(update: ToolProgressUpdate): void;
 }

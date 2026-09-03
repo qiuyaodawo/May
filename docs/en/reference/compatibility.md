@@ -63,6 +63,23 @@ The framework does not currently persist or discover Agent definitions.
 Session history and metadata are not a serialized definition, and resume still
 applies the behavior and policy supplied by the current process.
 
+### Tracing contracts
+
+Core's `Tracer`, `TraceSpan`, `TraceContext`, attributes, and propagation
+fields are public preview contracts. `@may/observability` processors,
+exporters, sampling functions, completed-span shape, span names, and attribute
+names are also preview APIs and may evolve before `1.0.0`.
+
+Tracing is deliberately fail-open and non-durable. It may be sampled or
+dropped, so callers must not use spans as Session, permission, billing, or
+security audit truth. Built-in instrumentation excludes prompts, messages,
+reasoning, and tool input/output; caller-supplied attributes have no automatic
+redaction and must be bounded and non-sensitive.
+
+Tracer and processor lifetime is caller-owned. Closing an `AgentApplication`
+does not flush or shut down a shared processor; the product must do that once
+at its real ownership boundary.
+
 ## Events
 
 Run and permission streams are live observation channels. High-volume
@@ -136,4 +153,5 @@ Before declaring `1.0.0`, the project should explicitly version and document:
 3. persisted presentation kinds;
 4. event evolution rules;
 5. supported Node.js and provider-adapter versions;
-6. deprecation and release-note policy.
+6. tracing span/attribute evolution and exporter compatibility; and
+7. deprecation and release-note policy.

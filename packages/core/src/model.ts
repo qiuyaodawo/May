@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import type { ContextSnapshot } from "./context.js";
 import type { SerializedError } from "./events.js";
+import type { TraceContext } from "./tracing.js";
 
 export interface ToolDefinition {
   readonly name: string;
@@ -65,6 +66,8 @@ export interface ModelStreamOptions {
   readonly step?: number;
   /** Stable across retries of the same model call. */
   readonly modelCallId?: string;
+  /** Current model-call span for explicitly propagated instrumentation. */
+  readonly traceContext?: TraceContext;
 }
 
 export interface Model {

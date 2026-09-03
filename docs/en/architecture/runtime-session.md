@@ -63,6 +63,7 @@ under `apps`. The dependency rule is:
 apps/*
   |-> @may/application -> context / session / permissions / core /
   |                      session-tools
+  |-> @may/observability -> core (optional tracing implementation)
   |-> @may/tui         -> coding-tools / keybindings / session /
   |                      permissions / core
   `-> provider / tool / config packages
@@ -90,7 +91,9 @@ runtime is constructed; it does not read later registry mutations.
 
 Core does not own session discovery, persistence, resume, fork, user-interface
 state, or a specific permission policy. It must remain usable for an ephemeral
-one-shot run.
+one-shot run. Core owns only the small `Tracer`/`TraceSpan` port and explicit
+`TraceContext` propagation needed to instrument its own execution; it does not
+import a concrete telemetry implementation or vendor SDK.
 
 ### `@may/context`
 
@@ -129,6 +132,20 @@ for its lifetime. Applications use one executor per Session so grants cannot
 leak between sessions. Its awaited event sink lets Session persist approval
 requests and decisions before related tool outcomes. Durable grants remain
 future storage work and do not belong to the UI.
+
+### `@may/observability`
+
+The observability package is an optional implementation of Core's tracing
+port. It provides sampling, immutable completed spans, in-memory and
+serialized/bounded processors, and basic exporters. The dependency points
+from `@may/observability` to `@may/core`: Core defines the capability it needs,
+while the optional outer package implements it and is injected by a product.
+
+Tracing is fail-open operational data. It may be sampled, buffered, or dropped
+and never replaces Session history or permission records. Built-in spans omit
+prompts, messages, reasoning, and tool input/output. Tracer and processor
+lifecycle is caller-owned so one application cannot shut down telemetry shared
+by another.
 
 ### `@may/application`
 
@@ -230,3 +247,7 @@ source of truth.
 The session package includes in-memory storage and an optional Node.js JSONL
 file-store entry point. Sessions can rebuild Core context from durable history;
 the history model does not depend on a terminal UI or a specific backend.
+
+Tracing is a third observation channel with different semantics: it records
+causal timing and status, is allowed to be sampled or dropped, and is not
+replayed into Context. See [Observability and tracing](../guides/observability.md).

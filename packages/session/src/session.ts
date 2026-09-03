@@ -226,15 +226,22 @@ export class Session {
   }
 
   private async start(options: RunOptions): Promise<RunHandle> {
+    const runtimeOptions: RunOptions = {
+      ...options,
+      traceAttributes: {
+        ...(options.traceAttributes ?? {}),
+        "may.session.id": this.id,
+      },
+    };
     const input: UserMessage = typeof options.input === "string"
       ? userMessage(options.input)
       : options.input;
     if (options.signal?.aborted === true) {
-      return this.wrapRun(this.runtime.run(options));
+      return this.wrapRun(this.runtime.run(runtimeOptions));
     }
     await this.record({ type: "input.submitted", message: input });
 
-    return this.wrapRun(this.runAfterInputCommit(options));
+    return this.wrapRun(this.runAfterInputCommit(runtimeOptions));
   }
 
   private runAfterInputCommit(options: RunOptions): RunHandle {
@@ -259,7 +266,13 @@ export class Session {
   }
 
   private startContinuation(options: ContinueOptions): RunHandle {
-    return this.wrapRun(this.runtime.continue(options));
+    return this.wrapRun(this.runtime.continue({
+      ...options,
+      traceAttributes: {
+        ...(options.traceAttributes ?? {}),
+        "may.session.id": this.id,
+      },
+    }));
   }
 
   private wrapRun(run: RunHandle): RunHandle {
@@ -286,6 +299,9 @@ export class Session {
       id: run.id,
       events,
       result,
+      ...(run.traceContext === undefined
+        ? {}
+        : { traceContext: run.traceContext }),
       cancel: (reason?: string) => run.cancel(reason),
     };
   }

@@ -22,6 +22,7 @@ surface or persistence format as stable.
 | Build a coding Agent | Headless application controller | `@may/coding-tools` and an execution isolation policy |
 | Select models from May configuration | `@may/config` | `@may/providers` |
 | Let the model inspect durable history | `@may/session-tools` | An active `Session` or `AgentApplication` |
+| Trace Agent latency and outcomes | Core's `Tracer` port | `@may/observability` processors and exporters |
 
 `@may/core` is appropriate when the caller wants to own the complete runtime
 lifecycle. `@may/application` is the normal starting point for an application
@@ -74,6 +75,15 @@ scheduler—remain caller-owned and shared. Tool iterable membership is
 snapshotted when the definition is created.
 See [Agent and Application](../concepts/agent-application.md) and the
 [package README](../../../packages/application/README.md).
+
+### `@may/observability`
+
+Optional fail-open tracing implementation for Core's `Tracer` port. It
+provides `BasicTracer`, deterministic sampling, immutable completed spans,
+in-memory and serialized/bounded processors, and in-memory/JSON-console
+exporters. Core, Application, Session, model, and tool contexts propagate
+trace identity without a process-global tracer. Processor lifetime remains
+caller-owned. See [Observability and tracing](../guides/observability.md).
 
 ## State and policy
 

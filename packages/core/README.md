@@ -125,8 +125,20 @@ mutable `Context`. `concurrentRuns: "allow"` is an explicit escape hatch for a
 context implementation that provides its own isolation or serialization.
 
 Each model call receives `runId`, `step`, and a retry-stable `modelCallId` in
-`ModelStreamOptions`. A successful `RunResult` reports `modelCalls`,
+`ModelStreamOptions`. When a tracer is configured it also receives the current
+`traceContext`; tools receive their tool-call context through
+`ToolExecutionContext`. A successful `RunResult` reports `modelCalls`,
 `toolCalls`, and token usage aggregated across all completed model calls.
+
+Core exports the minimal `Tracer`, `TraceSpan`, `TraceContext`, and attribute
+contracts. Supply `tracer` and optional content-free `traceAttributes` to
+`May`; `RunOptions` can add attributes or an explicit parent context, and the
+returned `RunHandle` exposes the created context. Built-in instrumentation
+creates Run, Context, model, tool-batch, and tool-call spans. Calls into an
+injected tracer are protected so telemetry failure never becomes a Run
+failure. Sampling, buffering, and exporters live in optional
+`@may/observability`; see the
+[tracing guide](../../docs/en/guides/observability.md).
 
 Live event queues retain at most `maxBufferedEvents` high-volume streaming
 events by default. When a consumer falls behind, text, reasoning, tool-output,

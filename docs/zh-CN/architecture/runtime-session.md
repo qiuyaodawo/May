@@ -56,6 +56,7 @@ grant 都属于这一层。
 apps/*
   |-> @may/application -> context / session / permissions / core /
   |                      session-tools
+  |-> @may/observability -> core（可选 tracing 实现）
   |-> @may/tui         -> coding-tools / keybindings / session /
   |                      permissions / core
   `-> provider / tool / config packages
@@ -80,7 +81,8 @@ Core runtime 默认拒绝重叠 Run，因为它只拥有一个可变 Context。S
 所以之后修改源数组或 registry 不会改变该 runtime。
 
 Core 不负责 Session 发现、持久化、恢复、fork、UI 状态或某种具体权限策略。它必须
-继续支持临时的一次性 Run。
+继续支持临时的一次性 Run。Core 只拥有为自身执行插桩所需的小型
+`Tracer`/`TraceSpan` port 与显式 `TraceContext` 传播，不导入具体遥测实现或厂商 SDK。
 
 ### `@may/context`
 
@@ -112,6 +114,17 @@ Permission executor 支持一次性决定和生命周期内的显式 scope grant
 Session 使用一个 executor，避免 grant 跨 Session 泄露。它的 awaited event sink
 使 Session 能在对应工具结果之前持久化审批请求和决定。持久化 grant 是未来存储工作，
 不属于 UI。
+
+### `@may/observability`
+
+Observability package 是 Core tracing port 的可选实现，提供采样、不可变的完成 span、
+内存及串行/有界 processor 和基础 exporter。依赖方向从 `@may/observability` 指向
+`@may/core`：Core 定义自己所需的 capability，外层可选 package 实现它，再由产品注入。
+
+Tracing 是 fail-open 的运行数据，允许采样、缓冲或丢弃，不能代替 Session history 或
+permission record。内置 span 不记录 prompt、message、reasoning 和工具输入输出。
+Tracer 与 processor 生命周期由调用方拥有，避免一个 application 关闭其他 application
+仍在共享的遥测资源。
 
 ### `@may/application`
 
@@ -195,3 +208,6 @@ Session 事实，例如提交消息、完整 assistant 消息、审批、工具�
 
 Session package 提供内存存储，以及可选的 Node.js JSONL file-store 入口。Session
 可以从持久化历史重建 Core Context；历史模型不依赖终端 UI 或某种特定后端。
+
+Tracing 是语义不同的第三种观察通道：它记录因果关系、耗时与状态，允许采样或丢弃，
+也不会回放进 Context。参阅[可观测性与 Tracing](../guides/observability.md)。

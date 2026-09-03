@@ -77,6 +77,8 @@ Everything else is a deliberate optional choice:
 - `tools` defaults to no product tools;
 - `toolExecutor` defaults to direct execution beneath the permission wrapper;
 - `toolScheduler` defaults to Core's sequential scheduler;
+- tracing is disabled unless a `tracer` is supplied; `traceAttributes` adds
+  caller-owned, content-free labels to every Run;
 - `instructions` defaults to no system instructions;
 - `contextFactory` defaults to `InMemoryContextFactory`;
 - Context budgets and compaction are disabled unless configured;
@@ -366,6 +368,20 @@ The product owns the `kind`, `version`, and data schema. Decode persisted data
 defensively. Coding products can reuse change-preview helpers from
 `@may/coding-tools/change-preview` rather than inventing another format.
 
+### Observability and tracing
+
+Supply a Core `Tracer` directly or use `BasicTracer` from the optional
+`@may/observability` package. Core then creates content-free Run, model,
+Context, tool, and permission spans and propagates `TraceContext` to model and
+tool adapters. Keep custom attributes bounded and free of prompts, tool data,
+credentials, or other sensitive content.
+
+Tracing is operational and fail-open: it can be sampled or dropped and cannot
+replace Session history or permission records. The product that creates a
+processor owns its final `forceFlush()`/`shutdown()`; an application never
+closes a potentially shared processor. See
+[Observability and tracing](observability.md) for configuration and span names.
+
 ## Consume one ordered application stream
 
 A long-lived UI normally starts one relay immediately after opening the
@@ -532,6 +548,8 @@ for the following:
   backend with the required concurrency and encryption guarantees?
 - **Events:** Does one continuously running consumer handle approvals and
   terminal failures without treating deltas as authoritative?
+- **Observability:** Which traces are sampled and exported, are attributes
+  content-free, and which owner flushes/shuts down the processor?
 - **Sessions:** How are ids discovered, metadata validated, and incompatible
   resumes rejected?
 - **Lifecycle:** Who owns cancellation and `close()`, including on startup or
@@ -554,5 +572,7 @@ for the following:
   local file store, and catalogs
 - [`@may/permissions`](../../../packages/permissions/README.md): headless policy
   and approval protocol
+- [`@may/observability`](../../../packages/observability/README.md): fail-open
+  tracing, sampling, processors, and exporters
 - [`@may/coding-tools`](../../../packages/tools/coding-tools/README.md): bounded
   coding capabilities, instructions, previews, and shell safety boundary

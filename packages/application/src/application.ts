@@ -12,10 +12,13 @@ import {
 } from "@may/context";
 import {
   AsyncEventQueue,
+  endTraceSpan,
   isStreamingMayEvent,
   May,
   serializeError,
+  startTraceSpan,
   ToolRegistry,
+  traceError,
   type Message,
   type Model,
   type RunHandle,
@@ -23,6 +26,8 @@ import {
   type Tool,
   type ToolExecutor,
   type ToolScheduler,
+  type TraceAttributes,
+  type Tracer,
 } from "@may/core";
 import {
   PermissionToolExecutor,
@@ -60,6 +65,9 @@ export interface AgentApplicationOptions {
   readonly tools?: Iterable<Tool>;
   readonly toolExecutor?: ToolExecutor;
   readonly toolScheduler?: ToolScheduler;
+  readonly tracer?: Tracer;
+  /** Content-free attributes attached to every Run opened by this application. */
+  readonly traceAttributes?: TraceAttributes;
   readonly instructions?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly contextMetadata?: Readonly<Record<string, unknown>>;
@@ -111,6 +119,7 @@ export class AgentApplication implements AgentController {
   private readonly contextController: ContextController | undefined;
   private readonly compactionStrategy: ContextCompactionStrategy | undefined;
   private readonly closeReason: string;
+  private readonly tracer: Tracer | undefined;
   private readonly eventQueue = new AsyncEventQueue<AgentApplicationEvent>({
     maxBufferedValues: 1024,
     isDroppable: (value) =>
@@ -129,6 +138,7 @@ export class AgentApplication implements AgentController {
     contextController: ContextController | undefined,
     compactionStrategy: ContextCompactionStrategy | undefined,
     closeReason: string,
+    tracer: Tracer | undefined,
   ) {
     this.session = session;
     this.sessionId = session.id;
@@ -137,6 +147,7 @@ export class AgentApplication implements AgentController {
     this.contextController = contextController;
     this.compactionStrategy = compactionStrategy;
     this.closeReason = closeReason;
+    this.tracer = tracer;
     this.events = this.eventQueue;
     this.permissionRelay = this.relayPermissionEvents();
   }
@@ -175,6 +186,7 @@ export class AgentApplication implements AgentController {
       ...(options.toolExecutor === undefined
         ? {}
         : { executor: options.toolExecutor }),
+      ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
     });
 
     const contextFactory = options.contextFactory ?? new InMemoryContextFactory();
@@ -216,6 +228,10 @@ export class AgentApplication implements AgentController {
         tools: configuredTools,
         context: managedContext.context,
         toolExecutor: permissions,
+        ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
+        ...(options.traceAttributes === undefined
+          ? {}
+          : { traceAttributes: options.traceAttributes }),
         ...(options.toolScheduler === undefined
           ? {}
           : { toolScheduler: options.toolScheduler }),
@@ -223,6 +239,15 @@ export class AgentApplication implements AgentController {
       });
     };
 
+    const openSpan = startTraceSpan(options.tracer, "may.application.open", {
+      attributes: {
+        ...(options.traceAttributes ?? {}),
+        "may.application.resume": options.resume === true,
+        ...(options.sessionId === undefined
+          ? {}
+          : { "may.session.id": options.sessionId }),
+      },
+    });
     try {
       const session = options.resume === true
         ? await resumeSession(options, createRuntime)
@@ -243,6 +268,7 @@ export class AgentApplication implements AgentController {
         contextController,
         options.compactionStrategy,
         options.closeReason ?? "Agent application is closing",
+        options.tracer,
       );
       contextController?.setAutoCompactionSink?.((result, compactionOptions) =>
         application!.recordAutomaticCompaction(result, compactionOptions)
@@ -250,8 +276,13 @@ export class AgentApplication implements AgentController {
       contextController?.setAutoCompactionFailureSink?.((failure) =>
         application!.recordAutomaticCompactionFailure(failure)
       );
+      endTraceSpan(openSpan, {
+        status: "ok",
+        attributes: { "may.session.id": session.id },
+      });
       return application;
     } catch (error) {
+      endTraceSpan(openSpan, { status: "error", error: traceError(error) });
       await permissions.close();
       throw error;
     }
@@ -292,6 +323,9 @@ export class AgentApplication implements AgentController {
       const wrapped: AgentRun = {
         id: run.id,
         result,
+        ...(run.traceContext === undefined
+          ? {}
+          : { traceContext: run.traceContext }),
         cancel: (reason?: string) => run.cancel(reason),
       };
       this.currentRun = wrapped;
@@ -351,7 +385,37 @@ export class AgentApplication implements AgentController {
     }
 
     const controller = new AbortController();
-    const operation = this.performCompaction(strategy, controller.signal);
+    const span = startTraceSpan(this.tracer, "may.context.compact", {
+      attributes: {
+        "may.session.id": this.sessionId,
+        ...(strategy === undefined
+          ? {}
+          : { "may.context.compaction.strategy": strategy.name }),
+      },
+    });
+    const operation = this.performCompaction(strategy, controller.signal).then(
+      (result) => {
+        endTraceSpan(span, {
+          status: "ok",
+          attributes: {
+            "may.context.compaction.strategy": result.strategy,
+            "may.context.compaction.changed": result.changed,
+            "may.context.before_message_count": result.before.messageCount,
+            "may.context.after_message_count": result.after.messageCount,
+            "may.context.before_estimated_tokens": result.before.estimatedTokens,
+            "may.context.after_estimated_tokens": result.after.estimatedTokens,
+          },
+        });
+        return result;
+      },
+      (error: unknown) => {
+        endTraceSpan(span, {
+          status: controller.signal.aborted ? "cancelled" : "error",
+          error: traceError(error),
+        });
+        throw error;
+      },
+    );
     const active: ActiveCompaction = { controller, result: operation };
     this.activeCompaction = active;
     try {

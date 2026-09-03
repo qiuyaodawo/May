@@ -19,6 +19,7 @@
 | [0002](0002-agent-ui-stays-in-may-tui.md) | 已接受 | Agent 感知的终端组件保留在 `@may/tui` |
 | [0003](0003-headless-application-lifecycle.md) | 已接受 | 共享 Session 编排属于 `@may/application` |
 | [0004](0004-agent-definitions-and-tool-registries.md) | 已接受 | Agent definition 与工具 registry 是实例级可复用组合对象 |
+| [0005](0005-observability-is-an-optional-core-port.md) | 已接受 | Observability 实现 Core 拥有的可选 tracing port |
 
 ## 添加记录
 

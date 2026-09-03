@@ -44,6 +44,13 @@ separation is unnecessary. It accepts any `Iterable<Tool>` and snapshots it
 during opening. It also accepts an optional `toolScheduler` and forwards it to
 the Core runtime; definitions capture the same option as reusable policy.
 
+Definitions and direct applications also accept an optional Core `tracer` and
+content-free `traceAttributes`. The tracer is forwarded to Core and the
+permission executor; Run handles expose their `traceContext`, and Sessions add
+their id as an attribute. A tracer is a caller-owned shared collaborator:
+closing an application does not flush or shut it down. Standard processors and
+exporters live in `@may/observability`.
+
 `AgentWorkspace` adds a session catalog, auto-resume, session switching and a
 serialized application-transition primitive. Products retain their own model
 profiles and can use `transitionApplication` to rebuild the same session after a

@@ -1,5 +1,10 @@
 import type { ContextInspection } from "@may/context";
-import type { MayEvent, RunResult, SerializedError } from "@may/core";
+import type {
+  MayEvent,
+  RunResult,
+  SerializedError,
+  TraceContext,
+} from "@may/core";
 import type { PermissionEvent } from "@may/permissions";
 import type { SessionToolPresentation } from "@may/session";
 
@@ -26,6 +31,7 @@ export type AgentApplicationEvent =
 export interface AgentRun {
   readonly id: string;
   readonly result: Promise<RunResult>;
+  readonly traceContext?: TraceContext;
   cancel(reason?: string): void;
 }
 

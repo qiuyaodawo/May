@@ -51,6 +51,20 @@ Session 生命周期；Session id、恢复选项和 metadata 不属于 definitio
 隔离有状态 adapter，也不要把 `AgentDefinition` 当作可持久化 wire format。需要跨进程
 保存 definition 的产品应定义自己的带版本配置格式，并在恢复时重新构造这些对象。
 
+### Tracing 契约
+
+Core 的 `Tracer`、`TraceSpan`、`TraceContext`、attribute 与传播字段是公共预览契约。
+`@may/observability` 的 processor、exporter、采样函数、完成 span 结构、span name 和
+attribute name 同样属于预览 API，在 `1.0.0` 前可能演进。
+
+Tracing 有意采用 fail-open、非持久化语义。它允许采样或丢弃，因此调用方不能把 span
+当成 Session、权限、计费或安全审计的事实来源。内置 instrumentation 不记录 prompt、
+message、reasoning 和工具输入输出；调用方提供的 attribute 不会自动脱敏，必须保持
+有界且不含敏感数据。
+
+Tracer 与 processor 生命周期由调用方拥有。关闭 `AgentApplication` 不会 flush 或
+shutdown 共享 processor；产品必须在真正的 ownership 边界只执行一次。
+
 ## 事件
 
 Run 和 permission stream 是实时观察通道。消费者过慢时，有界队列可能丢弃高频
@@ -111,4 +125,5 @@ project references。真实联网的 provider 集成测试需要显式开启；�
 3. 持久化 presentation kind；
 4. 事件演进规则；
 5. 支持的 Node.js 和 provider adapter 版本；
-6. 弃用与发布说明策略。
+6. tracing span/attribute 演进与 exporter 兼容方式；
+7. 弃用与发布说明策略。

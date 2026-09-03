@@ -54,6 +54,11 @@ Pending requests are cancelled when their Run signal is aborted. Call
 `close()` when the owning application or session ends to reject remaining
 requests and close the permission event stream.
 
+Pass the same optional Core `tracer` used by the surrounding runtime to record
+`may.permission.check` and `may.permission.approval_wait` beneath each tool
+span. Only the decision and content-free tool/call identifiers are recorded;
+the policy input is not captured. `AgentApplication` wires this automatically.
+
 ## Current scope
 
 The package intentionally has no UI and no global permission registry. Grants
