@@ -192,8 +192,9 @@ MaybeCode tracing is disabled when `apps.maybecode.observability` is absent or
       "observability": {
         "enabled": true,
         "exporter": "file",
-        "file": "traces.jsonl",
+        "file": "traces/traces.jsonl",
         "samplingRatio": 1,
+        "retentionDays": 60,
         "batch": {
           "maxQueueSize": 2048,
           "maxExportBatchSize": 512,
@@ -205,12 +206,19 @@ MaybeCode tracing is disabled when `apps.maybecode.observability` is absent or
 }
 ```
 
-Relative trace paths use the MaybeCode data directory, so the default output
-is `~/.may/maybecode/traces.jsonl`. MaybeCode flushes and shuts down the batch
-processor after its workspace closes. The append-only file is not rotated and
-its preview span schema is not an audit contract. It contains operational ids,
-tool/model names, counts, timings, statuses, usage, and decisions, but no
-prompts, reasoning, or tool input/output from built-in instrumentation.
+`file` is a base path. MaybeCode inserts the local `YYYY-MM-DD` before its
+extension and writes one file per calendar day. Relative paths use the
+MaybeCode data directory, so the default output is
+`~/.may/maybecode/traces/traces-YYYY-MM-DD.jsonl`. On the first export of each
+day, files from calendar dates outside the latest 60 days are removed;
+`retentionDays` can override that positive-day limit. Unrelated files and the
+current 60-day window are left untouched.
+
+MaybeCode flushes and shuts down the batch processor after its workspace
+closes. The preview span schema is not an audit contract. Trace files contain
+operational ids, tool/model names, counts, timings, statuses, usage, and
+decisions, but no prompts, reasoning, or tool input/output from built-in
+instrumentation.
 
 OpenAI compaction is opt-in. `serverCompactThreshold` enables provider-side
 context management on normal Responses requests, while

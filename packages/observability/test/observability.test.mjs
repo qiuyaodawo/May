@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { InMemoryContext, May } from "@may/core";
@@ -6,6 +9,7 @@ import {
   BasicTracer,
   BatchSpanProcessor,
   InMemorySpanProcessor,
+  JsonlFileSpanExporter,
 } from "../dist/index.js";
 
 test("records a content-free Core trace with explicit parent relationships", async () => {
@@ -143,8 +147,58 @@ test("tracing and bounded export failures remain off the Agent failure path", as
   assert.equal(exported.length, 3);
 });
 
+test("rotates JSONL spans by local date and retains sixty calendar days", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "may-traces-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "traces-2026-07-05.jsonl"), "expired\n");
+  await writeFile(join(directory, "traces-2026-07-06.jsonl"), "retained\n");
+  await writeFile(join(directory, "other-2026-07-05.jsonl"), "unrelated\n");
+
+  const exporter = new JsonlFileSpanExporter({
+    path: join(directory, "traces.jsonl"),
+    rotation: "daily",
+    retentionDays: 60,
+    clock: () => new Date(2026, 8, 3, 12).getTime(),
+  });
+  await exporter.export([
+    finishedSpan("previous", new Date(2026, 8, 2, 23, 59).getTime()),
+    finishedSpan("today", new Date(2026, 8, 3, 0, 1).getTime()),
+  ]);
+  await exporter.shutdown();
+
+  const files = (await readdir(directory)).sort();
+  assert.deepEqual(files, [
+    "other-2026-07-05.jsonl",
+    "traces-2026-07-06.jsonl",
+    "traces-2026-09-02.jsonl",
+    "traces-2026-09-03.jsonl",
+  ]);
+  assert.match(
+    await readFile(join(directory, "traces-2026-09-02.jsonl"), "utf8"),
+    /"name":"previous"/u,
+  );
+  assert.match(
+    await readFile(join(directory, "traces-2026-09-03.jsonl"), "utf8"),
+    /"name":"today"/u,
+  );
+});
+
 function one(spans, name) {
   const matches = spans.filter((span) => span.name === name);
   assert.equal(matches.length, 1, `expected exactly one ${name} span`);
   return matches[0];
+}
+
+function finishedSpan(name, endTime) {
+  return {
+    name,
+    context: { traceId: `trace_${name}`, spanId: `span_${name}`, sampled: true },
+    startTime: endTime - 1,
+    endTime,
+    durationMs: 1,
+    status: "ok",
+    attributes: {},
+    events: [],
+  };
 }

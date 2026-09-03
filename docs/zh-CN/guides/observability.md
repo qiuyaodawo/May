@@ -100,7 +100,8 @@ may.tool.call                    9.72s
 - `BatchSpanProcessor` 使用有界队列并暴露 `droppedSpans`，不会把 exporter backpressure
   施加给 Run；
 - 内置 `InMemorySpanExporter` 和 `ConsoleSpanExporter`；
-- `JsonlFileSpanExporter` 会把 append 串行写入本地 JSONL 文件；
+- `JsonlFileSpanExporter` 会把 append 串行写入本地 JSONL 文件，并可按本地日历日期
+  轮转及限制保留窗口；
 - `alwaysOnSampler`、`alwaysOffSampler` 和 `ratioSampler()` 决定根 Trace 是否采样，
   子 span 继承父节点决定。
 
@@ -122,8 +123,9 @@ MaybeCode 提供了可直接使用的本地文件组合。在 May config 中加�
       "observability": {
         "enabled": true,
         "exporter": "file",
-        "file": "traces.jsonl",
-        "samplingRatio": 1
+        "file": "traces/traces.jsonl",
+        "samplingRatio": 1,
+        "retentionDays": 60
       }
     }
   }
@@ -131,8 +133,13 @@ MaybeCode 提供了可直接使用的本地文件组合。在 May config 中加�
 ```
 
 启用后，workspace 打开或重建的所有 application 会共享一个 tracer 和 batch processor；
-MaybeCode 只在整个 workspace 关闭后 flush。相对路径基于 MaybeCode data directory，
-所以默认位置是 `~/.may/maybecode/traces.jsonl`。文件只追加且不会自动轮转。
+MaybeCode 只在整个 workspace 关闭后 flush。`file` 是基础路径，本地日期会插入扩展名
+之前。相对路径基于 MaybeCode data directory，因此默认文件为
+`~/.may/maybecode/traces/traces-YYYY-MM-DD.jsonl`。
+
+除非用 `retentionDays` 覆盖，MaybeCode 默认保留包括今天在内的最近 60 个本地日历日。
+每天首次导出时，只会删除早于窗口且匹配已配置基础文件名与日期格式的文件，不会处理
+无关文件。
 
 没有 `observability` 配置，或配置为 `false`/`enabled: false` 时，MaybeCode 行为不变，
 也不会创建 trace 文件。Batch 设置见[配置参考](../reference/configuration.md)。

@@ -94,9 +94,9 @@ streaming delta；终结生命周期事件、返回的 Run 结果和持久化 Se
 `SessionStore` 与 `SessionCatalog`，并自行管理迁移策略。参阅
 [自定义存储](../guides/custom-storage.md)。
 
-MaybeCode 的可选 `traces.jsonl` 同样是不会自动轮转的 append-only 本地数据。完成 span
-的 JSON 结构和 attribute name 属于预览遥测契约，不是 Session storage 或稳定 audit
-schema。
+MaybeCode 的可选每日 trace JSONL 是 append-only 本地数据；它按本地日历日期轮转，
+默认保留 60 天，但完成 span 的 JSON 结构和 attribute name 仍属于预览遥测契约，
+不是 Session storage 或稳定 audit schema。
 
 ## Provider 自有状态
 

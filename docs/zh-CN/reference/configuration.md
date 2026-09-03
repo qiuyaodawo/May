@@ -175,8 +175,9 @@ Anthropic 接受禁用、自适应或显式 token budget：
       "observability": {
         "enabled": true,
         "exporter": "file",
-        "file": "traces.jsonl",
+        "file": "traces/traces.jsonl",
         "samplingRatio": 1,
+        "retentionDays": 60,
         "batch": {
           "maxQueueSize": 2048,
           "maxExportBatchSize": 512,
@@ -193,12 +194,16 @@ Anthropic 接受禁用、自适应或显式 token budget：
 
 `observability` 缺失、为 `false` 或包含 `enabled: false` 时禁用可观测性。配置 object
 会启用文件 exporter；`enabled` 默认为 `true`，`exporter` 目前只接受 `file`，
-`samplingRatio` 默认为 `1`。相对 `file` 路径基于 MaybeCode data directory 解析，默认
-位置为 `~/.may/maybecode/traces.jsonl`。Batch 默认值如上，且
+`samplingRatio` 默认为 `1`。`file` 是基础路径；MaybeCode 会在扩展名前插入本地日期
+`YYYY-MM-DD`。相对路径基于 MaybeCode data directory 解析，默认文件为
+`~/.may/maybecode/traces/traces-YYYY-MM-DD.jsonl`。
+
+`retentionDays` 默认保留包括今天在内的最近 `60` 个本地日历日。每天首次导出时，
+MaybeCode 只删除早于保留窗口、且名称与轮转规则匹配的文件。Batch 默认值如上，且
 `maxExportBatchSize` 不能超过 `maxQueueSize`。
 
-MaybeCode 会在 workspace 关闭时 flush processor。JSONL 文件只追加且不会自动轮转；
-它是 fail-open 的运行遥测，不是 Session 或 audit 事实来源。参阅
+MaybeCode 会在 workspace 关闭时 flush processor。每天的 JSONL 文件只追加；这些文件
+是 fail-open 的运行遥测，不是 Session 或 audit 事实来源。参阅
 [可观测性与 Tracing](../guides/observability.md)。
 
 ## 维护时的事实来源

@@ -313,6 +313,7 @@
                 "exporter": { "const": "file", "default": "file" },
                 "file": { "$ref": "#/$defs/nonEmptyString" },
                 "samplingRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+                "retentionDays": { "$ref": "#/$defs/positiveInteger", "default": 60 },
                 "batch": {
                   "type": "object",
                   "properties": {

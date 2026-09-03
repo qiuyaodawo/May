@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -241,7 +248,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
 test("writes configured content-free traces and flushes them on close", async (t) => {
   const directory = await temporaryDirectory(t);
   const dataDirectory = join(directory, "data");
-  const tracePath = join(dataDirectory, "telemetry", "traces.jsonl");
+  const traceDirectory = join(dataDirectory, "telemetry");
   const app = await openConfiguredMaybeCode(
     { workspace: directory, dataDirectory, autoResume: false },
     {
@@ -286,7 +293,11 @@ test("writes configured content-free traces and flushes them on close", async (t
   const sessionId = app.sessionId;
   await app.close();
 
-  const content = await readFile(tracePath, "utf8");
+  const traceFiles = (await readdir(traceDirectory)).filter((name) =>
+    /^traces-\d{4}-\d{2}-\d{2}\.jsonl$/u.test(name)
+  );
+  assert.equal(traceFiles.length, 1);
+  const content = await readFile(join(traceDirectory, traceFiles[0]), "utf8");
   const spans = content.trim().split("\n").map((line) => JSON.parse(line));
   const run = spans.find((span) => span.name === "may.run");
   assert.ok(run);
@@ -311,6 +322,7 @@ test("resolves and validates MaybeCode observability configuration", () => {
         observability: {
           file: "trace/output.jsonl",
           samplingRatio: 0.25,
+          retentionDays: 30,
           batch: { maxQueueSize: 32, maxExportBatchSize: 8 },
         },
       },
@@ -318,6 +330,7 @@ test("resolves and validates MaybeCode observability configuration", () => {
   }), {
     file: "trace/output.jsonl",
     samplingRatio: 0.25,
+    retentionDays: 30,
     maxQueueSize: 32,
     maxExportBatchSize: 8,
   });

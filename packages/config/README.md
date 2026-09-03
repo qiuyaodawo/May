@@ -57,8 +57,9 @@ completion and validation is available at
       "observability": {
         "enabled": true,
         "exporter": "file",
-        "file": "traces.jsonl",
-        "samplingRatio": 1
+        "file": "traces/traces.jsonl",
+        "samplingRatio": 1,
+        "retentionDays": 60
       }
     }
   }

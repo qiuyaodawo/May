@@ -70,6 +70,8 @@ export interface MaybeCodeObservabilityOptions {
   /** Absolute path, or a path relative to MaybeCode's data directory. */
   readonly file?: string;
   readonly samplingRatio?: number;
+  /** Local calendar days retained, including today. Defaults to 60. */
+  readonly retentionDays?: number;
   readonly maxQueueSize?: number;
   readonly maxExportBatchSize?: number;
   readonly scheduledDelayMs?: number;
@@ -233,7 +235,14 @@ export function resolveMaybeCodeObservability(
   const candidate = value as Record<string, unknown>;
   rejectUnknownOptions(
     candidate,
-    ["enabled", "exporter", "file", "samplingRatio", "batch"],
+    [
+      "enabled",
+      "exporter",
+      "file",
+      "samplingRatio",
+      "retentionDays",
+      "batch",
+    ],
     "apps.maybecode.observability",
   );
   const enabled = candidate.enabled;
@@ -256,6 +265,10 @@ export function resolveMaybeCodeObservability(
   const samplingRatio = optionalRatio(
     candidate.samplingRatio,
     "apps.maybecode.observability.samplingRatio",
+  );
+  const retentionDays = optionalPositiveInteger(
+    candidate.retentionDays,
+    "apps.maybecode.observability.retentionDays",
   );
   const batch = candidate.batch === undefined
     ? {}
@@ -286,6 +299,7 @@ export function resolveMaybeCodeObservability(
   return {
     ...(file === undefined ? {} : { file }),
     ...(samplingRatio === undefined ? {} : { samplingRatio }),
+    ...(retentionDays === undefined ? {} : { retentionDays }),
     ...(maxQueueSize === undefined ? {} : { maxQueueSize }),
     ...(maxExportBatchSize === undefined ? {} : { maxExportBatchSize }),
     ...(scheduledDelayMs === undefined ? {} : { scheduledDelayMs }),
@@ -297,7 +311,9 @@ function createMaybeCodeObservability(
   dataDirectory: string,
 ) {
   const exporter = new JsonlFileSpanExporter({
-    path: resolve(dataDirectory, options.file ?? "traces.jsonl"),
+    path: resolve(dataDirectory, options.file ?? "traces/traces.jsonl"),
+    rotation: "daily",
+    retentionDays: options.retentionDays ?? 60,
   });
   const processor = new BatchSpanProcessor(exporter, {
     ...(options.maxQueueSize === undefined

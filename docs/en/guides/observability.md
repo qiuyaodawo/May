@@ -108,7 +108,8 @@ from Context preparation or tool latency.
 - `BatchSpanProcessor` uses a bounded queue and exposes `droppedSpans`; it
   never applies exporter backpressure to a Run.
 - `InMemorySpanExporter` and `ConsoleSpanExporter` are included.
-- `JsonlFileSpanExporter` serializes appends to a local JSONL file.
+- `JsonlFileSpanExporter` serializes local JSONL appends and can rotate by
+  local calendar date with a bounded retention window.
 - `alwaysOnSampler`, `alwaysOffSampler`, and `ratioSampler()` select root
   traces; child spans inherit their parent's decision.
 
@@ -130,8 +131,9 @@ MaybeCode owns a ready-to-use local file composition. Add this to May's config:
       "observability": {
         "enabled": true,
         "exporter": "file",
-        "file": "traces.jsonl",
-        "samplingRatio": 1
+        "file": "traces/traces.jsonl",
+        "samplingRatio": 1,
+        "retentionDays": 60
       }
     }
   }
@@ -140,9 +142,14 @@ MaybeCode owns a ready-to-use local file composition. Add this to May's config:
 
 When enabled, every application opened or rebuilt by the workspace shares one
 tracer and batch processor. MaybeCode flushes it only after the whole workspace
-closes. A relative path is based on the MaybeCode data directory, making the
-default `~/.may/maybecode/traces.jsonl`. The file is append-only and is not
-automatically rotated.
+closes. `file` is a base path; the local date is inserted before its extension.
+A relative path is based on the MaybeCode data directory, making the default
+files `~/.may/maybecode/traces/traces-YYYY-MM-DD.jsonl`.
+
+MaybeCode retains 60 local calendar days, including today, unless
+`retentionDays` overrides it. On the first export of each day it removes only
+older files matching the configured base name and date pattern. Unrelated
+files are not touched.
 
 With no `observability` entry, or with `false`/`enabled: false`, MaybeCode's
 behavior remains unchanged and no trace file is created. See the

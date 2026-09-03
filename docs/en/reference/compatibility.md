@@ -116,9 +116,10 @@ schema should implement a `SessionStore` and `SessionCatalog` behind the public
 interfaces and own their migration policy. See
 [Custom storage](../guides/custom-storage.md).
 
-MaybeCode's optional `traces.jsonl` is also append-only local data without
-automatic rotation. Its completed-span JSON shape and attribute names are
-preview telemetry contracts, not Session storage or a stable audit schema.
+MaybeCode's optional daily trace JSONL files are append-only local data. It
+rotates them by local calendar date and defaults to a 60-day retention window,
+but their completed-span JSON shape and attribute names remain preview
+telemetry contracts rather than Session storage or a stable audit schema.
 
 ## Provider-owned state
 

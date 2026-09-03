@@ -180,8 +180,9 @@ Anthropic accepts disabled, adaptive, or explicitly budgeted thinking:
       "observability": {
         "enabled": true,
         "exporter": "file",
-        "file": "traces.jsonl",
+        "file": "traces/traces.jsonl",
         "samplingRatio": 1,
+        "retentionDays": 60,
         "batch": {
           "maxQueueSize": 2048,
           "maxExportBatchSize": 512,
@@ -199,13 +200,19 @@ directories are resolved from the directory containing `config.json`.
 Observability is disabled when `observability` is absent, `false`, or has
 `enabled: false`. An object enables the file exporter; `enabled` defaults to
 `true`, `exporter` currently accepts only `file`, and `samplingRatio` defaults
-to `1`. Relative `file` paths are resolved below the MaybeCode data directory;
-the default is `~/.may/maybecode/traces.jsonl`. Batch defaults are the values
-shown above. `maxExportBatchSize` cannot exceed `maxQueueSize`.
+to `1`. `file` is a base path: MaybeCode inserts the local `YYYY-MM-DD` before
+its extension. Relative paths are resolved below the MaybeCode data directory;
+the default files are
+`~/.may/maybecode/traces/traces-YYYY-MM-DD.jsonl`.
 
-MaybeCode flushes the processor during workspace shutdown. The JSONL file is
-append-only and is not automatically rotated. It is fail-open operational
-telemetry rather than Session or audit truth; see
+`retentionDays` defaults to `60` local calendar days, including today. On the
+first export of a new day, MaybeCode deletes only matching rotated files older
+than that window. Batch defaults are the values shown above;
+`maxExportBatchSize` cannot exceed `maxQueueSize`.
+
+MaybeCode flushes the processor during workspace shutdown. Each daily JSONL
+file is append-only. The files are fail-open operational telemetry rather than
+Session or audit truth; see
 [Observability and tracing](../guides/observability.md).
 
 ## Maintenance source of truth

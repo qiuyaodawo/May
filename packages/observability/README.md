@@ -47,8 +47,9 @@ parent trace id and sampling decision. Available processors and exporters are:
   `droppedSpans` exposing buffer pressure;
 - `InMemorySpanExporter`; and
 - `ConsoleSpanExporter`, which writes one JSON span per line; and
-- `JsonlFileSpanExporter`, which serializes appends to a local JSONL file and
-  creates its parent directory on first export.
+- `JsonlFileSpanExporter`, which serializes appends to local JSONL files,
+  optionally rotates by local calendar date, and enforces a day-based
+  retention window (60 days by default when rotation is enabled).
 
 `alwaysOnSampler`, `alwaysOffSampler`, and deterministic `ratioSampler()` are
 provided. A custom `SpanProcessor` can derive metrics or adapt completed spans
