@@ -30,6 +30,7 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 - [自定义 UI](guides/custom-ui.md)
 - [权限策略](guides/permission-policy.md)
 - [可观测性与 Tracing](guides/observability.md)
+- [MCP 工具](guides/mcp.md)
 
 ## 参考
 

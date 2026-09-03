@@ -21,6 +21,7 @@ May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行�
 | 从 May 配置中选择模型 | `@may/config` | `@may/providers` |
 | 让模型查询持久化历史 | `@may/session-tools` | 活动 `Session` 或 `AgentApplication` |
 | 追踪 Agent 延迟与结果 | Core 的 `Tracer` port | `@may/observability` processor 和 exporter |
+| 使用 MCP server 工具 | `@may/mcp` | `ToolRegistry`、permissions 和可选 tracing |
 
 调用方希望完全控制运行时生命周期时使用 `@may/core`；需要 Session、审批、Context
 管理和有序关闭的应用通常应从 `@may/application` 开始。
@@ -74,6 +75,14 @@ application/Session 生命周期。Model、Context factory、executor、schedule
 Application、Session、模型和工具 context 会显式传播 trace identity，不使用进程全局
 tracer。Processor 生命周期仍由调用方拥有。参阅
 [可观测性与 Tracing](../guides/observability.md)。
+
+### `@may/mcp`
+
+可选的 Model Context Protocol client 集成。它启动已配置的 stdio server，执行初始化
+和 `tools/list`，再把每个发现的工具适配为 Core 既有的 `Tool` 接口。模型可见名称带
+namespace 并检查冲突；调用会转发 cancellation 和 progress，可选 MCP span 使用注入
+的 Core tracer。Client pool 拥有它启动的进程，打开它的应用必须负责关闭。参阅
+[MCP 工具](../guides/mcp.md)。
 
 ## 状态与策略
 

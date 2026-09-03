@@ -32,6 +32,7 @@ interfaces are intended for extension.
 - [Custom UI](guides/custom-ui.md)
 - [Permission policy](guides/permission-policy.md)
 - [Observability and tracing](guides/observability.md)
+- [MCP tools](guides/mcp.md)
 
 ## Reference
 

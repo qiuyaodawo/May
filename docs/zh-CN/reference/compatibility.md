@@ -65,6 +65,17 @@ attribute 不会自动脱敏，必须保持有界且不含敏感数据。
 Tracer 与 processor 生命周期由调用方拥有。关闭 `AgentApplication` 不会 flush 或
 shutdown 共享 processor；产品必须在真正的 ownership 边界只执行一次。
 
+### MCP 契约
+
+`@may/mcp` 的 client-pool option、错误码、namespace、工具输出结构和 span name 都是
+开发预览 API。当前实现只支持 stdio tool client，并在启动时快照发现结果。不要假定
+未来的 resources、prompts、HTTP 连接、重连或动态刷新会使用相同配置与 lifecycle
+接口。
+
+模型可见名称目前使用 `mcp__<server>__<tool>`，执行 provider-safe 归一化并限制为
+64 个字符。持久 Session 可以在工具调用和结果中包含这些名称，因此修改 server id
+或远程工具名后，历史调用可能只剩描述意义，不再对应当前可执行 capability。
+
 ## 事件
 
 Run 和 permission stream 是实时观察通道。消费者过慢时，有界队列可能丢弃高频

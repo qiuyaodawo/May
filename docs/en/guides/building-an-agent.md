@@ -540,6 +540,8 @@ for the following:
 - **Capabilities:** Are tool registries instance-scoped, duplicate-free and
   snapshotted at the intended boundary? Are inputs parsed, outputs bounded,
   and cancellations forwarded?
+- **External tools:** Are MCP servers trusted, namespaced, least-privileged,
+  permission-gated, and closed by their client-pool owner?
 - **Safety:** Which calls allow, deny, or ask? What constrains an allowed tool
   beyond the approval prompt?
 - **Context:** What is the actual model budget, what triggers compaction, and
@@ -574,5 +576,7 @@ for the following:
   and approval protocol
 - [`@may/observability`](../../../packages/observability/README.md): fail-open
   tracing, sampling, processors, and exporters
+- [`@may/mcp`](../../../packages/mcp/README.md): stdio MCP clients and remote
+  tool adapters
 - [`@may/coding-tools`](../../../packages/tools/coding-tools/README.md): bounded
   coding capabilities, instructions, previews, and shell safety boundary

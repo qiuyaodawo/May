@@ -30,6 +30,13 @@ function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
         };
   }
 
+  if (check.tool.name.startsWith("mcp__")) {
+    return {
+      decision: "ask",
+      grantKey: `mcp:${check.tool.name}`,
+    };
+  }
+
   return "ask";
 }
 

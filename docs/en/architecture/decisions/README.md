@@ -21,6 +21,7 @@ not accidentally undo it.
 | [0003](0003-headless-application-lifecycle.md) | Accepted | Shared Session orchestration belongs in `@may/application` |
 | [0004](0004-agent-definitions-and-tool-registries.md) | Accepted | Agent definitions and tool registries are reusable, instance-scoped composition objects |
 | [0005](0005-observability-is-an-optional-core-port.md) | Accepted | Observability implements an optional Core-owned tracing port |
+| [0006](0006-mcp-adapts-to-core-tools.md) | Accepted | MCP servers adapt to Core tools without entering the runtime kernel |
 
 ## Adding a record
 

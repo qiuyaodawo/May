@@ -23,6 +23,7 @@ surface or persistence format as stable.
 | Select models from May configuration | `@may/config` | `@may/providers` |
 | Let the model inspect durable history | `@may/session-tools` | An active `Session` or `AgentApplication` |
 | Trace Agent latency and outcomes | Core's `Tracer` port | `@may/observability` processors and exporters |
+| Consume tools from MCP servers | `@may/mcp` | `ToolRegistry`, permissions, and optional tracing |
 
 `@may/core` is appropriate when the caller wants to own the complete runtime
 lifecycle. `@may/application` is the normal starting point for an application
@@ -84,6 +85,15 @@ in-memory and serialized/bounded processors, and in-memory/JSON-console
 plus local JSONL exporters. Core, Application, Session, model, and tool contexts propagate
 trace identity without a process-global tracer. Processor lifetime remains
 caller-owned. See [Observability and tracing](../guides/observability.md).
+
+### `@may/mcp`
+
+Optional Model Context Protocol client integration. It starts configured stdio
+servers, performs initialization and `tools/list`, and adapts every discovered
+tool to Core's existing `Tool` interface. Model-facing names are namespaced and
+collision-checked. Calls forward cancellation and progress, and optional MCP
+spans use the injected Core tracer. The client pool owns its spawned processes;
+the application that opens it must close it. See [MCP tools](../guides/mcp.md).
 
 ## State and policy
 

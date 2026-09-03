@@ -64,6 +64,7 @@ apps/*
   |-> @may/application -> context / session / permissions / core /
   |                      session-tools
   |-> @may/observability -> core (optional tracing implementation)
+  |-> @may/mcp           -> core (optional remote-tool adapter)
   |-> @may/tui         -> coding-tools / keybindings / session /
   |                      permissions / core
   `-> provider / tool / config packages
@@ -147,6 +148,21 @@ prompts, messages, reasoning, and tool input/output. Tracer and processor
 lifecycle is caller-owned so one application cannot shut down telemetry shared
 by another.
 
+### `@may/mcp`
+
+The MCP package is an optional adapter at the tool boundary. It depends on
+Core's `Tool` and tracing contracts, while Core remains independent of MCP and
+its SDK. A client pool owns stdio connections and child processes, takes a
+startup snapshot with `tools/list`, and exposes immutable model-facing tool
+descriptors backed by `tools/call`.
+
+The adapter does not bypass the runtime. Applications compose its tools through
+`ToolRegistry`, so parsed input still flows through the configured
+`ToolExecutor` (including permissions) and `ToolScheduler` before network or
+process I/O begins. Runtime cancellation propagates to the remote request.
+Pool/process lifetime belongs to the product that opened the pool, not Core or
+an individual Session.
+
 ### `@may/application`
 
 The application package provides headless orchestration above Session and
@@ -213,6 +229,7 @@ The application keeps only product policy and compatibility adapters:
 - provider/model profiles, reasoning-effort overrides, and default-model
   persistence;
 - optional local tracing configuration plus ownership of its shared processor;
+- optional stdio MCP configuration plus ownership of its shared client pool;
 - slash-command definitions, product events, theme, page layout, model/session
   picker flows, and classic-versus-retained terminal behavior.
 

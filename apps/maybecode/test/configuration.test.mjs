@@ -16,9 +16,11 @@ import { InMemoryContext } from "@may/core";
 import {
   createMaybeCodeSlashCommandSuggester,
   createMaybeCodeModel,
+  createCodingPermissionPolicy,
   executeMaybeCodeSlashCommand,
   openConfiguredMaybeCode,
   parseMaybeCodeArgs,
+  resolveMaybeCodeMcp,
   resolveMaybeCodeObservability,
   resolveMaybeCodeRetry,
   selectMaybeCodeModel,
@@ -245,6 +247,77 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   await app.close();
 });
 
+test("adds configured MCP tools and owns the client pool lifecycle", async (t) => {
+  const directory = await temporaryDirectory(t);
+  let openedWith;
+  let request;
+  let closed = false;
+  const app = await openConfiguredMaybeCode(
+    {
+      workspace: directory,
+      dataDirectory: join(directory, "data"),
+      autoResume: false,
+    },
+    {
+      async loadConfig() {
+        return {
+          path: join(directory, "config.json"),
+          providers: { local: { adapter: "test", apiKey: "test" } },
+          models: { chat: { provider: "local", model: "test" } },
+          defaultModel: "chat",
+          apps: {
+            maybecode: {
+              retry: false,
+              mcpServers: {
+                local: { command: "test-server", args: ["--stdio"] },
+              },
+            },
+          },
+        };
+      },
+      createModel() {
+        return {
+          async *stream(value) {
+            request = value;
+            yield {
+              type: "response.completed",
+              message: assistantMessage("ok"),
+            };
+          },
+        };
+      },
+      async openMcp(options) {
+        openedWith = options;
+        return {
+          tools: [{
+            name: "mcp__local__lookup",
+            description: "lookup",
+            inputSchema: { type: "object" },
+            async execute() {
+              return { content: [{ type: "text", text: "found" }] };
+            },
+          }],
+          async close() {
+            closed = true;
+          },
+        };
+      },
+    },
+  );
+
+  assert.deepEqual(openedWith.servers, [{
+    id: "local",
+    command: "test-server",
+    args: ["--stdio"],
+    cwd: directory,
+  }]);
+  await (await app.submit({ input: "hello" })).result;
+  assert.ok(request.tools.some((tool) => tool.name === "read"));
+  assert.ok(request.tools.some((tool) => tool.name === "mcp__local__lookup"));
+  await app.close();
+  assert.equal(closed, true);
+});
+
 test("writes configured content-free traces and flushes them on close", async (t) => {
   const directory = await temporaryDirectory(t);
   const dataDirectory = join(directory, "data");
@@ -348,6 +421,72 @@ test("resolves and validates MaybeCode observability configuration", () => {
     ...base,
     apps: { maybecode: { observability: { destination: "somewhere" } } },
   }), /observability\.destination is not supported/u);
+});
+
+test("resolves workspace-relative MCP servers and environment references", () => {
+  const workspace = join(process.cwd(), "workspace");
+  const base = { path: "config.json", providers: {}, models: {} };
+  assert.equal(resolveMaybeCodeMcp(base, workspace), false);
+  assert.deepEqual(resolveMaybeCodeMcp({
+    ...base,
+    apps: {
+      maybecode: {
+        mcpServers: {
+          files: {
+            command: "node",
+            args: ["server.mjs", "--root", "."],
+            cwd: "tools",
+            env: { TOKEN: "Bearer ${MCP_TOKEN}" },
+            requestTimeoutMs: 1_000,
+          },
+          disabled: { enabled: false },
+        },
+      },
+    },
+  }, workspace, { MCP_TOKEN: "secret" }), {
+    servers: [{
+      id: "files",
+      command: "node",
+      args: ["server.mjs", "--root", "."],
+      cwd: join(workspace, "tools"),
+      env: { TOKEN: "Bearer secret" },
+      requestTimeoutMs: 1_000,
+    }],
+  });
+  assert.throws(() => resolveMaybeCodeMcp({
+    ...base,
+    apps: {
+      maybecode: {
+        mcpServers: {
+          files: { command: "node", env: { TOKEN: "${MISSING}" } },
+        },
+      },
+    },
+  }, workspace, {}), /missing environment variable MISSING/u);
+});
+
+test("scopes MCP approval grants to one namespaced tool", async () => {
+  const policy = createCodingPermissionPolicy();
+  const decision = await policy({
+    tool: {
+      name: "mcp__workspace__lookup",
+      description: "lookup",
+      inputSchema: { type: "object" },
+    },
+    input: { query: "value" },
+    context: {
+      runId: "run",
+      step: 1,
+      toolCallId: "call",
+      idempotencyKey: "run:1:call",
+      signal: new AbortController().signal,
+      report() {},
+    },
+  });
+  assert.deepEqual(decision, {
+    decision: "ask",
+    grantKey: "mcp:mcp__workspace__lookup",
+  });
 });
 
 test("switches configured model profiles by prefix without changing sessions", async (t) => {

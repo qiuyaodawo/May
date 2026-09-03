@@ -20,6 +20,7 @@
 | [0003](0003-headless-application-lifecycle.md) | 已接受 | 共享 Session 编排属于 `@may/application` |
 | [0004](0004-agent-definitions-and-tool-registries.md) | 已接受 | Agent definition 与工具 registry 是实例级可复用组合对象 |
 | [0005](0005-observability-is-an-optional-core-port.md) | 已接受 | Observability 实现 Core 拥有的可选 tracing port |
+| [0006](0006-mcp-adapts-to-core-tools.md) | 已接受 | MCP server 适配为 Core 工具，而不进入 runtime kernel |
 
 ## 添加记录
 

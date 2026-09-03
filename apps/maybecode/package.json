@@ -34,6 +34,7 @@
     "@may/context": "workspace:*",
     "@may/core": "workspace:*",
     "@may/keybindings": "workspace:*",
+    "@may/mcp": "workspace:*",
     "@may/observability": "workspace:*",
     "@may/permissions": "workspace:*",
     "@may/providers": "workspace:*",

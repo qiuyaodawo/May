@@ -70,6 +70,8 @@ export interface MaybeCodeApplicationOptions {
   readonly sessionId?: string;
   readonly resume?: boolean;
   readonly tools?: Iterable<Tool>;
+  /** Tools appended to either the default coding tools or an explicit tool set. */
+  readonly additionalTools?: Iterable<Tool>;
   readonly permissionPolicy?: PermissionPolicy;
   readonly tracer?: Tracer;
   readonly traceAttributes?: TraceAttributes;
@@ -136,8 +138,9 @@ export class MaybeCodeApplication {
     options: MaybeCodeApplicationOptions,
   ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
-    const configuredTools = new ToolRegistry(
+    const configuredTools = ToolRegistry.compose(
       options.tools ?? createCodingTools({ cwd: workspace }),
+      options.additionalTools ?? [],
     );
     const shellInfo = configuredTools.values()
       .map((tool) => getShellToolInfo(tool))

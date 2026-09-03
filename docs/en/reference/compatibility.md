@@ -80,6 +80,19 @@ Tracer and processor lifetime is caller-owned. Closing an `AgentApplication`
 does not flush or shut down a shared processor; the product must do that once
 at its real ownership boundary.
 
+### MCP contracts
+
+`@may/mcp` client-pool options, error codes, namespacing, tool-output shape,
+and span names are developer-preview APIs. The current implementation supports
+only stdio tool clients and snapshots discovery at startup. Do not assume that
+future resources, prompts, HTTP connections, reconnection, or dynamic refresh
+will use the same configuration or lifecycle surface.
+
+Model-facing names currently use `mcp__<server>__<tool>` with provider-safe
+normalization and a 64-character bound. Persisted Sessions can contain these
+names in tool calls and results, so changing server ids or remote tool names can
+make old calls descriptive history rather than executable capabilities.
+
 ## Events
 
 Run and permission streams are live observation channels. High-volume

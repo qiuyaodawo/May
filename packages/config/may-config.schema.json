@@ -327,8 +327,46 @@
               "additionalProperties": false
             }
           ]
+        },
+        "mcpServers": {
+          "oneOf": [
+            { "const": false },
+            {
+              "type": "object",
+              "propertyNames": { "pattern": "^[A-Za-z0-9_-]+$" },
+              "additionalProperties": { "$ref": "#/$defs/mcpStdioServer" }
+            }
+          ]
         }
       },
+      "additionalProperties": false
+    },
+    "mcpStdioServer": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "transport": { "const": "stdio", "default": "stdio" },
+        "command": { "$ref": "#/$defs/nonEmptyString" },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "cwd": { "$ref": "#/$defs/nonEmptyString" },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "requestTimeoutMs": { "$ref": "#/$defs/positiveInteger" },
+        "maxTotalTimeoutMs": { "$ref": "#/$defs/positiveInteger" },
+        "maxBufferSize": { "$ref": "#/$defs/positiveInteger" }
+      },
+      "anyOf": [
+        {
+          "required": ["enabled"],
+          "properties": { "enabled": { "const": false } }
+        },
+        { "required": ["command"] }
+      ],
       "additionalProperties": false
     }
   }

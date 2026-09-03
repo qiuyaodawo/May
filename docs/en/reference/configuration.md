@@ -188,6 +188,18 @@ Anthropic accepts disabled, adaptive, or explicitly budgeted thinking:
           "maxExportBatchSize": 512,
           "scheduledDelayMs": 5000
         }
+      },
+      "mcpServers": {
+        "workspace": {
+          "transport": "stdio",
+          "command": "node",
+          "args": ["tools/mcp-server.mjs"],
+          "cwd": ".",
+          "env": { "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}" },
+          "requestTimeoutMs": 60000,
+          "maxTotalTimeoutMs": 300000,
+          "maxBufferSize": 10485760
+        }
       }
     }
   }
@@ -214,6 +226,19 @@ MaybeCode flushes the processor during workspace shutdown. Each daily JSONL
 file is append-only. The files are fail-open operational telemetry rather than
 Session or audit truth; see
 [Observability and tracing](../guides/observability.md).
+
+MCP is disabled when `mcpServers` is absent or `false`. Each property name is
+the server id used in model-facing tool names. Entries default to the `stdio`
+transport, require `command`, and accept `args`, `cwd`, `env`, request timeout,
+total timeout, and message-buffer limits. Set an entry's `enabled` to `false`
+to skip it without deleting its configuration.
+
+Relative `cwd` values and omitted `cwd` resolve to the active MaybeCode
+workspace. Environment strings expand `${NAME}` from the launching process;
+missing references fail startup. Prefer references because the configuration
+file is plaintext. Discovered tools are namespaced, pass through MaybeCode's
+normal permission and scheduling path, and remain fixed until the next
+application launch. See [MCP tools](../guides/mcp.md).
 
 ## Maintenance source of truth
 

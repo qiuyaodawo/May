@@ -16,6 +16,12 @@ import type {
 } from "@may/context";
 import type { Model } from "@may/core";
 import {
+  openMcpClientPool,
+  type McpClientPool,
+  type McpStdioServerOptions,
+  type OpenMcpClientPoolOptions,
+} from "@may/mcp";
+import {
   BasicTracer,
   BatchSpanProcessor,
   JsonlFileSpanExporter,
@@ -64,6 +70,12 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly retry?: false | RetryingModelOptions;
   /** Disable tracing or override apps.maybecode.observability. */
   readonly observability?: false | MaybeCodeObservabilityOptions;
+  /** Disable MCP or override apps.maybecode.mcpServers. */
+  readonly mcp?: false | MaybeCodeMcpOptions;
+}
+
+export interface MaybeCodeMcpOptions {
+  readonly servers: readonly McpStdioServerOptions[];
 }
 
 export interface MaybeCodeObservabilityOptions {
@@ -85,6 +97,9 @@ export interface ConfiguredMaybeCodeDependencies {
   readonly adapterRegistry?: ProviderAdapterRegistry;
   readonly capabilityResolver?: ModelCapabilityResolver;
   readonly persistDefaultModel?: (profile: string) => Promise<void>;
+  readonly openMcp?: (
+    options: OpenMcpClientPoolOptions,
+  ) => Promise<McpClientPool>;
 }
 
 export function getDefaultMaybeCodeDataDirectory(): string {
@@ -165,8 +180,19 @@ export async function openConfiguredMaybeCode(
   const observability = observabilityOptions === false
     ? undefined
     : createMaybeCodeObservability(observabilityOptions, dataDirectory);
+  const mcpOptions = options.mcp ?? resolveMaybeCodeMcp(config, workspace);
+  let mcp: McpClientPool | undefined;
 
   try {
+    if (mcpOptions !== false && mcpOptions.servers.length > 0) {
+      mcp = await (dependencies.openMcp ?? openMcpClientPool)({
+        servers: mcpOptions.servers,
+        ...(observability === undefined
+          ? {}
+          : { tracer: observability.tracer }),
+        traceAttributes: { "may.agent.name": "maybecode" },
+      });
+    }
     return await MaybeCodeWorkspace.open({
       workspace,
       model: initialModel.model,
@@ -179,11 +205,15 @@ export async function openConfiguredMaybeCode(
       ...resolveDefaultModelPersistence(config, dependencies),
       store: new FileSessionStore(join(dataDirectory, "sessions")),
       catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
-      ...(observability === undefined
+      ...(mcp === undefined ? {} : { additionalTools: mcp.tools }),
+      ...(mcp === undefined && observability === undefined
         ? {}
         : {
-            tracer: observability.tracer,
-            closeOwnedResources: () => observability.processor.shutdown(),
+            ...(observability === undefined
+              ? {}
+              : { tracer: observability.tracer }),
+            closeOwnedResources: () =>
+              closeConfiguredResources(mcp, observability?.processor),
           }),
       ...(options.sessionId === undefined
         ? {}
@@ -216,9 +246,91 @@ export async function openConfiguredMaybeCode(
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
     });
   } catch (error) {
-    await observability?.processor.shutdown();
+    try {
+      await closeConfiguredResources(mcp, observability?.processor);
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        "MaybeCode failed to open and release configured resources",
+      );
+    }
     throw error;
   }
+}
+
+export function resolveMaybeCodeMcp(
+  config: MayConfig,
+  workspace: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): false | MaybeCodeMcpOptions {
+  const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.mcpServers;
+  if (value === undefined || value === false) return false;
+  const servers = objectValue(value, "apps.maybecode.mcpServers");
+  const resolved: McpStdioServerOptions[] = [];
+
+  for (const [id, raw] of Object.entries(servers)) {
+    if (!/^[A-Za-z0-9_-]+$/u.test(id)) {
+      throw new MaybeCodeConfigError(
+        `apps.maybecode.mcpServers server id "${id}" may contain only letters, digits, underscores, and hyphens`,
+      );
+    }
+    const field = `apps.maybecode.mcpServers.${id}`;
+    const server = objectValue(raw, field);
+    rejectUnknownOptions(
+      server,
+      [
+        "enabled",
+        "transport",
+        "command",
+        "args",
+        "cwd",
+        "env",
+        "requestTimeoutMs",
+        "maxTotalTimeoutMs",
+        "maxBufferSize",
+      ],
+      field,
+    );
+    if (server.enabled !== undefined && typeof server.enabled !== "boolean") {
+      throw new MaybeCodeConfigError(`${field}.enabled must be a boolean`);
+    }
+    if (server.enabled === false) continue;
+    if (server.transport !== undefined && server.transport !== "stdio") {
+      throw new MaybeCodeConfigError(`${field}.transport must be "stdio"`);
+    }
+
+    const command = nonEmptyString(server.command, `${field}.command`);
+    const args = optionalStringArray(server.args, `${field}.args`);
+    const cwd = server.cwd === undefined
+      ? workspace
+      : resolve(workspace, nonEmptyString(server.cwd, `${field}.cwd`));
+    const env = resolveMcpEnvironment(server.env, `${field}.env`, environment);
+    const requestTimeoutMs = optionalPositiveInteger(
+      server.requestTimeoutMs,
+      `${field}.requestTimeoutMs`,
+    );
+    const maxTotalTimeoutMs = optionalPositiveInteger(
+      server.maxTotalTimeoutMs,
+      `${field}.maxTotalTimeoutMs`,
+    );
+    const maxBufferSize = optionalPositiveInteger(
+      server.maxBufferSize,
+      `${field}.maxBufferSize`,
+    );
+
+    resolved.push({
+      id,
+      command,
+      ...(args === undefined ? {} : { args }),
+      cwd,
+      ...(env === undefined ? {} : { env }),
+      ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
+      ...(maxTotalTimeoutMs === undefined ? {} : { maxTotalTimeoutMs }),
+      ...(maxBufferSize === undefined ? {} : { maxBufferSize }),
+    });
+  }
+
+  return { servers: resolved };
 }
 
 export function resolveMaybeCodeObservability(
@@ -490,6 +602,72 @@ function objectValue(value: unknown, field: string): Record<string, unknown> {
     throw new MaybeCodeConfigError(`${field} must be an object`);
   }
   return value as Record<string, unknown>;
+}
+
+function optionalStringArray(
+  value: unknown,
+  field: string,
+): readonly string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new MaybeCodeConfigError(`${field} must be an array of strings`);
+  }
+  return [...value] as string[];
+}
+
+function resolveMcpEnvironment(
+  value: unknown,
+  field: string,
+  environment: Readonly<Record<string, string | undefined>>,
+): Readonly<Record<string, string>> | undefined {
+  if (value === undefined) return undefined;
+  const configured = objectValue(value, field);
+  const resolved: Record<string, string> = {};
+  for (const [name, raw] of Object.entries(configured)) {
+    if (name === "" || typeof raw !== "string") {
+      throw new MaybeCodeConfigError(`${field} must contain string values`);
+    }
+    resolved[name] = raw.replace(
+      /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/gu,
+      (_match, environmentName: string) => {
+        const replacement = environment[environmentName];
+        if (replacement === undefined) {
+          throw new MaybeCodeConfigError(
+            `${field}.${name} references missing environment variable ${environmentName}`,
+          );
+        }
+        return replacement;
+      },
+    );
+  }
+  return resolved;
+}
+
+interface Shutdownable {
+  shutdown(): Promise<void>;
+}
+
+async function closeConfiguredResources(
+  mcp: McpClientPool | undefined,
+  observability: Shutdownable | undefined,
+): Promise<void> {
+  const failures: unknown[] = [];
+  try {
+    await mcp?.close();
+  } catch (error) {
+    failures.push(error);
+  }
+  try {
+    await observability?.shutdown();
+  } catch (error) {
+    failures.push(error);
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      "One or more MaybeCode resources failed to close",
+    );
+  }
 }
 
 function rejectUnknownOptions(

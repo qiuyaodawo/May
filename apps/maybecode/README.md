@@ -220,6 +220,33 @@ operational ids, tool/model names, counts, timings, statuses, usage, and
 decisions, but no prompts, reasoning, or tool input/output from built-in
 instrumentation.
 
+MaybeCode can also add tools from local MCP stdio servers:
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "mcpServers": {
+        "workspace": {
+          "command": "node",
+          "args": ["tools/mcp-server.mjs"],
+          "cwd": ".",
+          "env": { "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}" }
+        }
+      }
+    }
+  }
+}
+```
+
+Discovered tools are exposed as `mcp__workspace__<tool>`, composed with the
+built-in coding tools, and require approval under the default policy. Relative
+working directories use the active workspace. Environment references must
+exist when MaybeCode starts. The client pool and its child processes close with
+the workspace; with tracing enabled, disconnect spans are flushed afterward.
+See the bilingual [MCP guide](../../docs/en/guides/mcp.md) for timeout options,
+security, naming, errors, and the intentionally limited first-phase scope.
+
 OpenAI compaction is opt-in. `serverCompactThreshold` enables provider-side
 context management on normal Responses requests, while
 `apps.maybecode.autoCompaction.providerNative` lets MaybeCode call the model's

@@ -57,6 +57,7 @@ apps/*
   |-> @may/application -> context / session / permissions / core /
   |                      session-tools
   |-> @may/observability -> core（可选 tracing 实现）
+  |-> @may/mcp           -> core（可选远程工具 adapter）
   |-> @may/tui         -> coding-tools / keybindings / session /
   |                      permissions / core
   `-> provider / tool / config packages
@@ -126,6 +127,17 @@ permission record。内置 span 不记录 prompt、message、reasoning 和工具
 Tracer 与 processor 生命周期由调用方拥有，避免一个 application 关闭其他 application
 仍在共享的遥测资源。
 
+### `@may/mcp`
+
+MCP package 是位于工具边界的可选 adapter。它依赖 Core 的 `Tool` 与 tracing 契约，
+Core 则不依赖 MCP 或其 SDK。Client pool 拥有 stdio 连接与子进程，通过
+`tools/list` 获取启动快照，并公开由 `tools/call` 支撑的不可变、模型可见工具描述。
+
+Adapter 不会绕过 runtime。应用通过 `ToolRegistry` 组合它的工具，因此已解析 input
+仍会先经过配置的 `ToolExecutor`（包括 permissions）和 `ToolScheduler`，再开始进程
+I/O。Runtime cancellation 会传播到远程请求。Pool/进程生命周期属于打开它的产品，
+而不是 Core 或某个 Session。
+
 ### `@may/application`
 
 Application package 提供位于 Session 与 Core 之上的 headless 编排。
@@ -180,6 +192,7 @@ workspace 生命周期交给 `@may/application`，使用 `@may/tui` 的 Agent tr
 - 命名手动压缩选项和有序自动压缩链；
 - provider/model profile、reasoning effort 覆盖和默认模型持久化；
 - 可选的本地 tracing 配置，以及共享 processor 的生命周期 ownership；
+- 可选的 stdio MCP 配置，以及共享 client pool 的生命周期 ownership；
 - slash command、产品事件、主题、页面布局、模型/Session picker flow，以及 classic
   与 retained 两种终端行为。
 

@@ -491,6 +491,8 @@ Session 上打开替换 application。Profile 选择等产品状态应留在通�
 - **Provider：** Credential 从哪里加载，支持哪些模型限制和 content form？
 - **Capability：** 工具 registry 是否为实例级、没有重名，并在预期边界完成快照？输入
   是否解析，输出是否有限，取消是否转发？
+- **外部工具：** MCP server 是否可信、带 namespace、采用最小权限、经过 permission，
+  并由 client-pool owner 关闭？
 - **安全：** 哪些调用 allow/deny/ask？审批之外有什么机制限制已允许工具？
 - **Context：** 实际 model budget 是多少，何时压缩，Agent 能否找回被省略历史？
 - **持久化：** 使用内存、本地单 writer，还是满足并发/加密要求的自定义后端？
@@ -513,5 +515,6 @@ Session 上打开替换 application。Profile 选择等产品状态应留在通�
 - [`@may/permissions`](../../../packages/permissions/README.md)：headless policy 与审批协议
 - [`@may/observability`](../../../packages/observability/README.md)：fail-open tracing、采样、
   processor 与 exporter
+- [`@may/mcp`](../../../packages/mcp/README.md)：stdio MCP client 与远程工具 adapter
 - [`@may/coding-tools`](../../../packages/tools/coding-tools/README.md)：有界编码 capability、
   指令、preview 与 shell 安全边界
