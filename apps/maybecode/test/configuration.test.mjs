@@ -252,6 +252,7 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
   let openedWith;
   let request;
   let closed = false;
+  let releaseEvents;
   const app = await openConfiguredMaybeCode(
     {
       workspace: directory,
@@ -288,7 +289,32 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
       },
       async openMcp(options) {
         openedWith = options;
+        const closedEvent = new Promise((resolve) => {
+          releaseEvents = resolve;
+        });
         return {
+          events: {
+            async *[Symbol.asyncIterator]() {
+              yield {
+                type: "mcp.server.connected",
+                seq: 1,
+                timestamp: Date.now(),
+                serverId: "local",
+                transport: "stdio",
+                required: true,
+                toolNames: ["mcp__local__lookup"],
+              };
+              await closedEvent;
+              yield {
+                type: "mcp.server.disconnected",
+                seq: 2,
+                timestamp: Date.now(),
+                serverId: "local",
+                transport: "stdio",
+                required: true,
+              };
+            },
+          },
           tools: [{
             name: "mcp__local__lookup",
             description: "lookup",
@@ -297,8 +323,18 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
               return { content: [{ type: "text", text: "found" }] };
             },
           }],
+          status() {
+            return [{
+              serverId: "local",
+              transport: "stdio",
+              required: true,
+              state: "connected",
+              toolNames: ["mcp__local__lookup"],
+            }];
+          },
           async close() {
             closed = true;
+            releaseEvents();
           },
         };
       },
@@ -311,11 +347,27 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
     args: ["--stdio"],
     cwd: directory,
   }]);
+  assert.equal((await app.getMcpStatus())[0].state, "connected");
+  assert.equal(
+    (await executeMaybeCodeSlashCommand("/mcp", app)).type,
+    "mcp.status",
+  );
+  const observedEvents = [];
+  const eventTask = (async () => {
+    for await (const event of app.events) observedEvents.push(event);
+  })();
   await (await app.submit({ input: "hello" })).result;
   assert.ok(request.tools.some((tool) => tool.name === "read"));
   assert.ok(request.tools.some((tool) => tool.name === "mcp__local__lookup"));
   await app.close();
+  await eventTask;
   assert.equal(closed, true);
+  assert.deepEqual(
+    observedEvents
+      .filter((event) => event.type.startsWith("mcp.server."))
+      .map((event) => event.type),
+    ["mcp.server.connected", "mcp.server.disconnected"],
+  );
 });
 
 test("writes configured content-free traces and flushes them on close", async (t) => {
@@ -437,7 +489,9 @@ test("resolves workspace-relative MCP servers and environment references", () =>
             args: ["server.mjs", "--root", "."],
             cwd: "tools",
             env: { TOKEN: "Bearer ${MCP_TOKEN}" },
+            required: false,
             requestTimeoutMs: 1_000,
+            stderrMaxBytes: 2_048,
           },
           disabled: { enabled: false },
         },
@@ -447,10 +501,12 @@ test("resolves workspace-relative MCP servers and environment references", () =>
     servers: [{
       id: "files",
       command: "node",
+      required: false,
       args: ["server.mjs", "--root", "."],
       cwd: join(workspace, "tools"),
       env: { TOKEN: "Bearer secret" },
       requestTimeoutMs: 1_000,
+      stderrMaxBytes: 2_048,
     }],
   });
   assert.throws(() => resolveMaybeCodeMcp({

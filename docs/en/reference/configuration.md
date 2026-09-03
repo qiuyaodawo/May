@@ -195,10 +195,12 @@ Anthropic accepts disabled, adaptive, or explicitly budgeted thinking:
           "command": "node",
           "args": ["tools/mcp-server.mjs"],
           "cwd": ".",
+          "required": false,
           "env": { "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}" },
           "requestTimeoutMs": 60000,
           "maxTotalTimeoutMs": 300000,
-          "maxBufferSize": 10485760
+          "maxBufferSize": 10485760,
+          "stderrMaxBytes": 16384
         }
       }
     }
@@ -230,15 +232,19 @@ Session or audit truth; see
 MCP is disabled when `mcpServers` is absent or `false`. Each property name is
 the server id used in model-facing tool names. Entries default to the `stdio`
 transport, require `command`, and accept `args`, `cwd`, `env`, request timeout,
-total timeout, and message-buffer limits. Set an entry's `enabled` to `false`
-to skip it without deleting its configuration.
+total timeout, message-buffer limits, and stderr-tail limits. Servers are
+required by default, so connection or discovery failure aborts startup. Set
+`required` to `false` to keep the application usable while recording that
+server as failed. Set `enabled` to `false` to skip an entry without deleting
+its configuration.
 
 Relative `cwd` values and omitted `cwd` resolve to the active MaybeCode
 workspace. Environment strings expand `${NAME}` from the launching process;
 missing references fail startup. Prefer references because the configuration
 file is plaintext. Discovered tools are namespaced, pass through MaybeCode's
 normal permission and scheduling path, and remain fixed until the next
-application launch. See [MCP tools](../guides/mcp.md).
+application launch. `/mcp` reports server state, tools, errors, and the bounded
+sanitized stderr tail. See [MCP tools](../guides/mcp.md).
 
 ## Maintenance source of truth
 

@@ -20,6 +20,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     "/context",
     "/compact",
     "/compact history-reference",
+    "/mcp",
     "/quit",
   ]);
   let modelCall = 0;
@@ -99,6 +100,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
     terminal.output,
     /No context changes were eligible for history-reference/u,
   );
+  assert.match(terminal.output, /MCP: disabled \(no servers configured\)/u);
   assert.ok(terminal.closed);
   assert.ok(terminal.prompts.some((prompt) => prompt.includes("for [s]ession")));
   assert.equal(

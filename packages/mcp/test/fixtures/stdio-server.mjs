@@ -1,4 +1,13 @@
+import { writeSync } from "node:fs";
 import { createInterface } from "node:readline";
+
+if (process.argv.includes("--fail")) {
+  writeSync(
+    process.stderr.fd,
+    `\u001b[31m${"x".repeat(200)}STARTUP_DIAGNOSTIC\u001b[0m\n`,
+  );
+  process.exit(2);
+}
 
 const input = createInterface({ input: process.stdin });
 

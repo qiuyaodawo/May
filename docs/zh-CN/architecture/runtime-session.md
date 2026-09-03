@@ -133,6 +133,10 @@ MCP package 是位于工具边界的可选 adapter。它依赖 Core 的 `Tool` �
 Core 则不依赖 MCP 或其 SDK。Client pool 拥有 stdio 连接与子进程，通过
 `tools/list` 获取启动快照，并公开由 `tools/call` 支撑的不可变、模型可见工具描述。
 
+Pool 还公开 server 即时状态视图与有序连接生命周期事件。Required server 会使应用
+启动失败；optional server 则以失败诊断保留，同时健康 server 继续工作。有界、已净化
+的 stderr 末尾片段是 pool 拥有的诊断状态，不属于 Agent context 或 Session history。
+
 Adapter 不会绕过 runtime。应用通过 `ToolRegistry` 组合它的工具，因此已解析 input
 仍会先经过配置的 `ToolExecutor`（包括 permissions）和 `ToolScheduler`，再开始进程
 I/O。Runtime cancellation 会传播到远程请求。Pool/进程生命周期属于打开它的产品，

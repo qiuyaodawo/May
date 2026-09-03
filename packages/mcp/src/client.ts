@@ -9,6 +9,7 @@ import {
   StdioClientTransport,
 } from "@modelcontextprotocol/client/stdio";
 import {
+  AsyncEventQueue,
   endTraceSpan,
   startTraceSpan,
   traceError,
@@ -30,31 +31,44 @@ import {
 import { assertMcpServerId, namespaceMcpToolName } from "./names.js";
 import type {
   McpClientPool,
+  McpClientEvent,
+  McpDiagnostic,
+  McpServerStatus,
   McpStdioServerOptions,
   McpToolOutput,
   OpenMcpClientPoolOptions,
 } from "./types.js";
 
 const DEFAULT_CLIENT_INFO = { name: "may-mcp-client", version: "0.1.0" };
+const DEFAULT_STDERR_MAX_BYTES = 16 * 1_024;
 
 class StdioMcpConnection {
   private closed = false;
+  private closing = false;
+  private connected = false;
+  private lastTransportError: Error | undefined;
 
   private constructor(
     readonly options: McpStdioServerOptions,
     private readonly client: Client,
+    private readonly stderr: BoundedStderrBuffer,
     private readonly tracer: Tracer | undefined,
     private readonly traceAttributes: TraceAttributes,
+    private readonly onUnexpectedClose: (error: Error) => void,
   ) {}
 
   static async open(
     options: McpStdioServerOptions,
     poolOptions: OpenMcpClientPoolOptions,
+    onUnexpectedClose: (error: Error) => void,
   ): Promise<StdioMcpConnection> {
     validateServerOptions(options);
     const client = new Client(poolOptions.clientInfo ?? DEFAULT_CLIENT_INFO, {
       capabilities: {},
     });
+    const stderr = new BoundedStderrBuffer(
+      options.stderrMaxBytes ?? DEFAULT_STDERR_MAX_BYTES,
+    );
     const transport = new StdioClientTransport({
       command: options.command,
       ...(options.args === undefined ? {} : { args: [...options.args] }),
@@ -65,7 +79,9 @@ class StdioMcpConnection {
       ...(options.maxBufferSize === undefined
         ? {}
         : { maxBufferSize: options.maxBufferSize }),
+      stderr: "pipe",
     });
+    transport.stderr?.on("data", (chunk: unknown) => stderr.append(chunk));
     const traceAttributes = {
       ...(poolOptions.traceAttributes ?? {}),
       "may.mcp.server": options.id,
@@ -74,6 +90,18 @@ class StdioMcpConnection {
     const span = startTraceSpan(poolOptions.tracer, "may.mcp.connect", {
       attributes: traceAttributes,
     });
+    const connection = new StdioMcpConnection(
+      options,
+      client,
+      stderr,
+      poolOptions.tracer,
+      traceAttributes,
+      onUnexpectedClose,
+    );
+    client.onerror = (error) => {
+      connection.lastTransportError = error;
+    };
+    client.onclose = () => connection.handleClose();
 
     try {
       await client.connect(
@@ -86,20 +114,20 @@ class StdioMcpConnection {
           ? {}
           : { attributes: { "process.pid": transport.pid } }),
       });
-      return new StdioMcpConnection(
-        options,
-        client,
-        poolOptions.tracer,
-        traceAttributes,
-      );
+      connection.connected = true;
+      return connection;
     } catch (error) {
       endMcpSpan(span, error, poolOptions.signal);
       await closeQuietly(client);
       if (poolOptions.signal?.aborted === true) throw error;
+      const recentStderr = stderr.text();
       throw new McpConnectionError(
         options.id,
-        errorMessage(error),
-        error instanceof Error ? { cause: error } : undefined,
+        sanitizeDiagnosticText(errorMessage(error), 2_000),
+        {
+          ...(error instanceof Error ? { cause: error } : {}),
+          ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
+        },
       );
     }
   }
@@ -123,10 +151,14 @@ class StdioMcpConnection {
     } catch (error) {
       endMcpSpan(span, error, signal);
       if (signal?.aborted === true) throw error;
+      const recentStderr = this.stderr.text();
       throw new McpToolsListError(
         this.options.id,
-        errorMessage(error),
-        error instanceof Error ? { cause: error } : undefined,
+        sanitizeDiagnosticText(errorMessage(error), 2_000),
+        {
+          ...(error instanceof Error ? { cause: error } : {}),
+          ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
+        },
       );
     }
   }
@@ -198,6 +230,7 @@ class StdioMcpConnection {
 
   async close(): Promise<void> {
     if (this.closed) return;
+    this.closing = true;
     this.closed = true;
     const span = startTraceSpan(this.tracer, "may.mcp.disconnect", {
       attributes: this.traceAttributes,
@@ -207,28 +240,141 @@ class StdioMcpConnection {
       endTraceSpan(span, { status: "ok" });
     } catch (error) {
       endMcpSpan(span, error);
+      const recentStderr = this.stderr.text();
       throw new McpConnectionError(
         this.options.id,
         `disconnect failed: ${errorMessage(error)}`,
-        error instanceof Error ? { cause: error } : undefined,
+        {
+          ...(error instanceof Error ? { cause: error } : {}),
+          ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
+        },
       );
     }
+  }
+
+  stderrText(): string | undefined {
+    return this.stderr.text();
   }
 
   private throwIfClosed(): void {
     if (this.closed) throw new McpClientPoolClosedError();
   }
+
+  private handleClose(): void {
+    if (this.closing || this.closed || !this.connected) return;
+    this.closed = true;
+    const recentStderr = this.stderr.text();
+    const cause = this.lastTransportError;
+    this.onUnexpectedClose(new McpConnectionError(
+      this.options.id,
+      cause === undefined
+        ? "connection closed unexpectedly"
+        : `connection closed unexpectedly: ${sanitizeDiagnosticText(
+            cause.message,
+            2_000,
+          )}`,
+      {
+        ...(cause === undefined ? {} : { cause }),
+        ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
+      },
+    ));
+  }
+}
+
+interface MutableMcpServerStatus {
+  readonly serverId: string;
+  readonly required: boolean;
+  state: McpServerStatus["state"];
+  toolNames: readonly string[];
+  diagnostic?: McpDiagnostic;
+}
+
+class McpEventRecorder {
+  readonly events: AsyncIterable<McpClientEvent>;
+  private readonly queue = new AsyncEventQueue<McpClientEvent>({
+    maxBufferedValues: 256,
+  });
+  private sequence = 0;
+
+  constructor() {
+    this.events = this.queue;
+  }
+
+  connected(
+    server: McpStdioServerOptions,
+    toolNames: readonly string[],
+  ): void {
+    this.queue.push({
+      type: "mcp.server.connected",
+      seq: ++this.sequence,
+      timestamp: Date.now(),
+      serverId: server.id,
+      transport: "stdio",
+      required: server.required !== false,
+      toolNames: [...toolNames],
+    });
+  }
+
+  failed(server: McpStdioServerOptions, diagnostic: McpDiagnostic): void {
+    this.queue.push({
+      type: "mcp.server.failed",
+      seq: ++this.sequence,
+      timestamp: Date.now(),
+      serverId: server.id,
+      transport: "stdio",
+      required: server.required !== false,
+      diagnostic: { ...diagnostic },
+    });
+  }
+
+  disconnected(server: McpStdioServerOptions): void {
+    this.queue.push({
+      type: "mcp.server.disconnected",
+      seq: ++this.sequence,
+      timestamp: Date.now(),
+      serverId: server.id,
+      transport: "stdio",
+      required: server.required !== false,
+    });
+  }
+
+  close(): void {
+    this.queue.close();
+  }
 }
 
 class DefaultMcpClientPool implements McpClientPool {
   readonly tools: readonly Tool[];
+  readonly events: AsyncIterable<McpClientEvent>;
   private closed = false;
 
   constructor(
     private readonly connections: readonly StdioMcpConnection[],
+    private readonly statuses: MutableMcpServerStatus[],
+    private readonly eventRecorder: McpEventRecorder,
     tools: readonly Tool[],
   ) {
     this.tools = Object.freeze([...tools]);
+    this.events = eventRecorder.events;
+  }
+
+  status(): readonly McpServerStatus[] {
+    return this.statuses.map((status) => {
+      const stderr = this.connections.find((connection) =>
+        connection.options.id === status.serverId
+      )?.stderrText() ?? status.diagnostic?.stderr;
+      return {
+        serverId: status.serverId,
+        transport: "stdio",
+        required: status.required,
+        state: status.state,
+        toolNames: [...status.toolNames],
+        ...(stderr === undefined ? {} : { stderr }),
+        ...(status.diagnostic === undefined
+          ? {}
+          : { diagnostic: { ...status.diagnostic } }),
+      };
+    });
   }
 
   async close(): Promise<void> {
@@ -236,14 +382,30 @@ class DefaultMcpClientPool implements McpClientPool {
     this.closed = true;
     const failures: unknown[] = [];
     for (const connection of [...this.connections].reverse()) {
+      const status = this.statuses.find((candidate) =>
+        candidate.serverId === connection.options.id
+      )!;
+      if (status.state === "failed") {
+        await closeConnectionQuietly(connection);
+        continue;
+      }
       try {
         await connection.close();
+        status.state = "disconnected";
+        this.eventRecorder.disconnected(connection.options);
       } catch (error) {
         failures.push(error);
+        status.state = "failed";
+        status.diagnostic = toDiagnostic(error);
+        this.eventRecorder.failed(connection.options, status.diagnostic);
       }
     }
+    this.eventRecorder.close();
     if (failures.length > 0) {
-      throw new AggregateError(failures, "One or more MCP clients failed to close");
+      throw new AggregateError(
+        failures,
+        "One or more MCP clients failed to close",
+      );
     }
   }
 }
@@ -261,28 +423,78 @@ export async function openMcpClientPool(
   }
 
   const connections: StdioMcpConnection[] = [];
+  const statuses: MutableMcpServerStatus[] = options.servers.map((server) => ({
+    serverId: server.id,
+    required: server.required !== false,
+    state: "failed",
+    toolNames: [],
+  }));
   const tools: Tool[] = [];
   const exposedNames = new Set<string>();
-  try {
-    for (const server of options.servers) {
+  const eventRecorder = new McpEventRecorder();
+
+  for (const server of options.servers) {
+    const required = server.required !== false;
+    const status = statuses.find((candidate) =>
+      candidate.serverId === server.id
+    )!;
+    let connection: StdioMcpConnection | undefined;
+    try {
       options.signal?.throwIfAborted();
-      const connection = await StdioMcpConnection.open(server, options);
-      connections.push(connection);
-      for (const tool of await connection.listTools(options.signal)) {
-        if (exposedNames.has(tool.name)) {
+      connection = await StdioMcpConnection.open(
+        server,
+        options,
+        (error) => {
+          if (status.state !== "connected") return;
+          status.state = "failed";
+          status.diagnostic = toDiagnostic(error);
+          eventRecorder.failed(server, status.diagnostic);
+        },
+      );
+      const serverTools = await connection.listTools(options.signal);
+      const serverNames = new Set<string>();
+      for (const tool of serverTools) {
+        if (exposedNames.has(tool.name) || serverNames.has(tool.name)) {
           throw new McpConfigurationError(
             `MCP tool namespace collision: ${tool.name}`,
           );
         }
-        exposedNames.add(tool.name);
-        tools.push(tool);
+        serverNames.add(tool.name);
+      }
+
+      connections.push(connection);
+      tools.push(...serverTools);
+      for (const name of serverNames) {
+        exposedNames.add(name);
+      }
+      const toolNames = serverTools.map((tool) => tool.name);
+      status.state = "connected";
+      status.toolNames = toolNames;
+      eventRecorder.connected(server, toolNames);
+    } catch (error) {
+      await closeConnectionQuietly(connection);
+      const diagnostic = toDiagnostic(error);
+      status.state = "failed";
+      status.toolNames = [];
+      status.diagnostic = diagnostic;
+      eventRecorder.failed(server, diagnostic);
+
+      if (options.signal?.aborted === true || required) {
+        await Promise.allSettled(
+          connections.map((opened) => opened.close()),
+        );
+        eventRecorder.close();
+        throw error;
       }
     }
-    return new DefaultMcpClientPool(connections, tools);
-  } catch (error) {
-    await Promise.allSettled(connections.map((connection) => connection.close()));
-    throw error;
   }
+
+  return new DefaultMcpClientPool(
+    connections,
+    statuses,
+    eventRecorder,
+    tools,
+  );
 }
 
 function createTools(
@@ -339,9 +551,15 @@ function validateServerOptions(options: McpStdioServerOptions): void {
       );
     }
   }
+  if (options.required !== undefined && typeof options.required !== "boolean") {
+    throw new McpConfigurationError(
+      `MCP server "${options.id}" required must be a boolean`,
+    );
+  }
   positiveNumber(options.requestTimeoutMs, options.id, "requestTimeoutMs");
   positiveNumber(options.maxTotalTimeoutMs, options.id, "maxTotalTimeoutMs");
   positiveNumber(options.maxBufferSize, options.id, "maxBufferSize");
+  positiveNumber(options.stderrMaxBytes, options.id, "stderrMaxBytes");
 }
 
 function positiveNumber(
@@ -424,6 +642,75 @@ async function closeQuietly(client: Client): Promise<void> {
   } catch {
     // Preserve the connection failure that caused cleanup.
   }
+}
+
+async function closeConnectionQuietly(
+  connection: StdioMcpConnection | undefined,
+): Promise<void> {
+  try {
+    await connection?.close();
+  } catch {
+    // Preserve the startup failure that caused cleanup.
+  }
+}
+
+function toDiagnostic(error: unknown): McpDiagnostic {
+  const summary = error instanceof McpConnectionError ||
+      error instanceof McpToolsListError
+    ? error.summary
+    : errorMessage(error);
+  const code = error instanceof Error && "code" in error &&
+      typeof error.code === "string"
+    ? error.code
+    : undefined;
+  const stderr = error instanceof McpConnectionError ||
+      error instanceof McpToolsListError
+    ? error.stderr
+    : undefined;
+  return {
+    name: error instanceof Error ? error.name : "Error",
+    message: sanitizeDiagnosticText(summary, 2_000),
+    ...(code === undefined ? {} : { code }),
+    ...(stderr === undefined ? {} : { stderr }),
+  };
+}
+
+class BoundedStderrBuffer {
+  private value = Buffer.alloc(0);
+
+  constructor(private readonly maximumBytes: number) {}
+
+  append(value: unknown): void {
+    const incoming = Buffer.isBuffer(value)
+      ? value
+      : Buffer.from(String(value), "utf8");
+    if (incoming.length >= this.maximumBytes) {
+      this.value = Buffer.from(
+        incoming.subarray(incoming.length - this.maximumBytes),
+      );
+      return;
+    }
+    const combined = Buffer.concat([this.value, incoming]);
+    this.value = combined.length <= this.maximumBytes
+      ? combined
+      : Buffer.from(combined.subarray(combined.length - this.maximumBytes));
+  }
+
+  text(): string | undefined {
+    if (this.value.length === 0) return undefined;
+    const value = sanitizeDiagnosticText(
+      this.value.toString("utf8"),
+      this.maximumBytes,
+    ).trim();
+    return value === "" ? undefined : value;
+  }
+}
+
+function sanitizeDiagnosticText(value: string, maximum: number): string {
+  const safe = value
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/gu, "")
+    .replace(/\r\n?/gu, "\n");
+  return truncate(safe, maximum);
 }
 
 function errorMessage(error: unknown): string {

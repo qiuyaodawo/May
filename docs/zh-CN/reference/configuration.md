@@ -190,10 +190,12 @@ Anthropic 接受禁用、自适应或显式 token budget：
           "command": "node",
           "args": ["tools/mcp-server.mjs"],
           "cwd": ".",
+          "required": false,
           "env": { "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}" },
           "requestTimeoutMs": 60000,
           "maxTotalTimeoutMs": 300000,
-          "maxBufferSize": 10485760
+          "maxBufferSize": 10485760,
+          "stderrMaxBytes": 16384
         }
       }
     }
@@ -220,13 +222,16 @@ MaybeCode 会在 workspace 关闭时 flush processor。每天的 JSONL 文件只
 
 `mcpServers` 缺失或为 `false` 时禁用 MCP。每个 property name 都是 server id，并
 用于生成模型可见工具名。Entry 默认使用 `stdio` transport，必须提供 `command`，
-还可提供 `args`、`cwd`、`env`、请求超时、总超时和消息 buffer 上限。将某项的
-`enabled` 设为 `false`，即可在不删除配置的情况下跳过它。
+还可提供 `args`、`cwd`、`env`、请求超时、总超时、消息 buffer 上限和 stderr 末尾
+保留上限。Server 默认 required，因此连接或发现失败会中止启动；将 `required` 设为
+`false`，可在记录该 server 失败的同时继续使用应用。将 `enabled` 设为 `false`，即可
+在不删除配置的情况下跳过它。
 
 相对 `cwd` 和省略的 `cwd` 都以当前 MaybeCode workspace 为基准。环境字符串会从
 启动进程展开 `${NAME}`，缺失引用会使启动失败。配置文件是明文，因此应优先使用
 环境引用。发现的工具会加入 namespace，经过 MaybeCode 的正常 permission 与
-scheduling 路径，并在下次应用启动前保持不变。参阅 [MCP 工具](../guides/mcp.md)。
+scheduling 路径，并在下次应用启动前保持不变。`/mcp` 会显示 server 状态、工具、
+错误和有界、已净化的 stderr 末尾片段。参阅 [MCP 工具](../guides/mcp.md)。
 
 ## 维护时的事实来源
 

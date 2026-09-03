@@ -15,6 +15,7 @@ import type {
 import {
   createMaybeCodeSlashCommandSuggester,
   executeMaybeCodeSlashCommand,
+  formatMaybeCodeMcpStatus,
   parseMaybeCodeSlashCommand,
   type MaybeCodeSlashCommandResult,
 } from "../slash-commands.js";
@@ -194,6 +195,22 @@ function applyMaybeCodeEvent(
     case "model.default.changed":
       store.appendNotice("info", `Default model set to ${event.profile}`);
       break;
+    case "mcp.server.connected":
+      store.appendNotice(
+        "info",
+        `MCP server connected: ${event.serverId} ` +
+          `(${event.toolNames.length} tools)`,
+      );
+      break;
+    case "mcp.server.failed":
+      store.appendNotice(
+        "warning",
+        `MCP server failed: ${event.serverId}: ${event.diagnostic.message}`,
+      );
+      break;
+    case "mcp.server.disconnected":
+      store.appendNotice("info", `MCP server disconnected: ${event.serverId}`);
+      break;
     case "context.compacted":
       store.appendNotice(
         "info",
@@ -270,6 +287,9 @@ async function presentCommandResult(
         `Session: ${app.sessionId}\nWorkspace: ${app.workspace}\n` +
           `Model: ${await resolvedModelLabel(app)}${inspectionText(result.inspection)}`,
       );
+      break;
+    case "mcp.status":
+      store.appendNotice("info", formatMaybeCodeMcpStatus(result.servers));
       break;
     case "context":
       store.appendNotice(

@@ -3,6 +3,7 @@ import type {
   ContextInspection,
 } from "@may/context";
 import type { SessionSummary } from "@may/session/catalog";
+import type { McpServerStatus } from "@may/mcp";
 import {
   SlashCommandRegistry,
   type SlashCommandDefinition,
@@ -28,6 +29,7 @@ export type MaybeCodeSlashCommandName =
   | "/effort"
   | "/retry"
   | "/instructions"
+  | "/mcp"
   | "/status"
   | "/context"
   | "/compact"
@@ -71,6 +73,11 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
     name: "/instructions",
     usage: "/instructions",
     description: "Show active instruction sources and content",
+  },
+  {
+    name: "/mcp",
+    usage: "/mcp",
+    description: "Show configured MCP servers, tools, and diagnostics",
   },
   {
     name: "/status",
@@ -122,6 +129,10 @@ export type MaybeCodeSlashCommandResult =
       readonly inspection: ContextInspection | undefined;
     }
   | {
+      readonly type: "mcp.status";
+      readonly servers: readonly McpServerStatus[];
+    }
+  | {
       readonly type: "context";
       readonly inspection: ContextInspection | undefined;
     }
@@ -160,6 +171,39 @@ export type MaybeCodeSlashCommandResult =
 export type MaybeCodeSlashCommandSuggestion = SlashCommandSuggestion;
 
 export type MaybeCodeSlashCommandSuggester = SlashCommandSuggester;
+
+export function formatMaybeCodeMcpStatus(
+  servers: readonly McpServerStatus[],
+): string {
+  if (servers.length === 0) return "MCP: disabled (no servers configured)";
+  const lines = ["MCP servers:"];
+  for (const server of servers) {
+    const requirement = server.required ? "required" : "optional";
+    lines.push(
+      `- ${server.serverId}: ${server.state} (${requirement}, ${server.transport})`,
+    );
+    if (server.toolNames.length > 0) {
+      lines.push(`  tools (${server.toolNames.length}):`);
+      lines.push(...server.toolNames.map((name) => `    - ${name}`));
+    }
+    if (server.diagnostic !== undefined) {
+      const code = server.diagnostic.code === undefined
+        ? ""
+        : ` [${server.diagnostic.code}]`;
+      lines.push(
+        ...indentLines(
+          `  error${code}: `,
+          server.diagnostic.message,
+        ),
+      );
+    }
+    const stderr = server.stderr ?? server.diagnostic?.stderr;
+    if (stderr !== undefined) {
+      lines.push(...indentLines("  recent stderr: ", stderr));
+    }
+  }
+  return lines.join("\n");
+}
 
 const maybeCodeSlashCommands = new SlashCommandRegistry(MAYBECODE_SLASH_COMMANDS);
 
@@ -304,6 +348,11 @@ export async function executeMaybeCodeSlashCommand(
       if (invalid !== undefined) return invalid;
       return { type: "status", inspection: await controller.inspectContext() };
     }
+    case "/mcp": {
+      const invalid = noArguments(arguments_, definition);
+      if (invalid !== undefined) return invalid;
+      return { type: "mcp.status", servers: await controller.getMcpStatus() };
+    }
     case "/context": {
       const invalid = noArguments(arguments_, definition);
       if (invalid !== undefined) return invalid;
@@ -432,4 +481,11 @@ function isCompactionStrategy(
   value: string,
 ): value is MaybeCodeCompactionStrategyName {
   return MAYBECODE_COMPACTION_STRATEGIES.some((strategy) => strategy === value);
+}
+
+function indentLines(prefix: string, value: string): readonly string[] {
+  const lines = value.split("\n");
+  return lines.map((line, index) =>
+    index === 0 ? `${prefix}${line}` : `    ${line}`
+  );
 }

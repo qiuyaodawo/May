@@ -83,8 +83,9 @@ at its real ownership boundary.
 ### MCP contracts
 
 `@may/mcp` client-pool options, error codes, namespacing, tool-output shape,
-and span names are developer-preview APIs. The current implementation supports
-only stdio tool clients and snapshots discovery at startup. Do not assume that
+server status, lifecycle events, and span names are developer-preview APIs. The
+current implementation supports only stdio tool clients and snapshots discovery
+at startup. Do not assume that
 future resources, prompts, HTTP connections, reconnection, or dynamic refresh
 will use the same configuration or lifecycle surface.
 

@@ -41,6 +41,7 @@ const mcp = await openMcpClientPool({
     args: ["./mcp-server.mjs"],
     cwd: process.cwd(),
     env: { ACCESS_TOKEN: process.env.ACCESS_TOKEN! },
+    required: false,
     requestTimeoutMs: 60_000,
   }],
   tracer,
@@ -62,14 +63,23 @@ try {
 }
 ```
 
-打开时会对每个 server 执行 MCP 初始化握手和聚合的 `tools/list` 请求。后面的 server
-启动失败时，已打开的 server 会先关闭，再让启动整体失败。`close()` 可重复调用；即使
-一个连接关闭失败，它仍会访问所有连接。stdio transport 启动的子进程也由 pool 负责
-终止。
+打开时会对每个 server 执行 MCP 初始化握手和聚合的 `tools/list` 请求。Server 默认是
+required：required server 失败时，已打开的 server 会先关闭，然后启动整体失败。配置
+`required: false` 的 server 失败时只记录失败状态，其余 server 仍可继续启动。
+`close()` 可重复调用；即使一个连接关闭失败，它仍会访问所有连接。stdio transport
+启动的子进程也由 pool 负责终止。
 
 `requestTimeoutMs` 设置单次请求的不活动超时；即使不断收到 progress，
 `maxTotalTimeoutMs` 也可以限制总时长；`maxBufferSize` 限制单条协议消息。省略时使用
 MCP SDK 默认值。
+
+`pool.status()` 返回所有已配置 server 的即时视图，包括连接状态、已发现工具名、最新
+诊断和近期 stderr。`pool.events` 发布 connected、failed 与 disconnected 生命周期
+事件，产品无需解析日志即可观察连接变化。
+
+Stdio stderr 会被 pipe，而不是直接继承到终端。每个 server 只保留经净化的末尾片段，
+大小由 `stderrMaxBytes` 限制（默认 16 KiB），因此高噪声子进程不会无限占用内存。该输出
+可能包含路径、token 或其他 secret，应按敏感信息处理。
 
 ## 名称与冲突
 
@@ -103,12 +113,14 @@ MaybeCode 从 `apps.maybecode.mcpServers` 读取 stdio server：
           "command": "node",
           "args": ["tools/mcp-server.mjs"],
           "cwd": ".",
+          "required": false,
           "env": {
             "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}"
           },
           "requestTimeoutMs": 60000,
           "maxTotalTimeoutMs": 300000,
-          "maxBufferSize": 10485760
+          "maxBufferSize": 10485760,
+          "stderrMaxBytes": 16384
         },
         "temporarily_disabled": {
           "enabled": false
@@ -121,6 +133,7 @@ MaybeCode 从 `apps.maybecode.mcpServers` 读取 stdio server：
 
 `transport` 可省略，目前只接受 `stdio`。`mcpServers` 缺失、为 `false` 或空对象时
 禁用 MCP。相对 `cwd` 从当前编码 workspace 解析；省略 `cwd` 时也使用该 workspace。
+`required` 默认为 `true`；只有产品可在缺少该 server 时继续运行，才应设为 `false`。
 参数不经过 shell，直接传给进程。
 
 环境变量值可以用 `${NAME}` 引用启动 MaybeCode 的进程环境。引用缺失时，启动会失败，
@@ -131,6 +144,9 @@ MaybeCode 会在打开 workspace 之前启动 MCP，把发现的工具加入普�
 并在 Agent workspace 关闭后、observability flush 前关闭 MCP。默认编码权限策略会要求
 审批每一个 MCP 工具。`allow-for-session` 仍由正常的 MaybeCode Session permission
 executor 限定作用域。
+
+在任一 MaybeCode UI 中运行 `/mcp`，可查看已配置 server、连接状态、已发现工具、启动
+错误和保留的 stderr。Controller event stream 也会向其他前端与集成暴露生命周期事件。
 
 ## Tracing 与安全
 

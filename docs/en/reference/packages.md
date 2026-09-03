@@ -93,7 +93,9 @@ servers, performs initialization and `tools/list`, and adapts every discovered
 tool to Core's existing `Tool` interface. Model-facing names are namespaced and
 collision-checked. Calls forward cancellation and progress, and optional MCP
 spans use the injected Core tracer. The client pool owns its spawned processes;
-the application that opens it must close it. See [MCP tools](../guides/mcp.md).
+the application that opens it must close it. It also exposes server status and
+connection lifecycle events, while retaining a bounded sanitized stderr tail
+for diagnostics. See [MCP tools](../guides/mcp.md).
 
 ## State and policy
 

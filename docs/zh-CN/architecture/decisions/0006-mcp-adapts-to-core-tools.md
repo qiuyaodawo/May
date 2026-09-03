@@ -28,12 +28,17 @@ MCP stdio 连接还拥有一个生命周期长于单次工具调用或 Session �
 provider-safe 的名称、冲突失败、有界错误细节，以及显式连接/进程关闭。Resources、
 prompts、HTTP、server 实现和动态列表刷新延后。
 
+Server 默认 required；应用可以将 server 标记为 optional，使其启动失败不影响无关
+工具。Pool 保留有界、已净化的 stderr 供诊断，并公开明确的状态快照与连接生命周期
+事件；产品应观察这些契约，而不是解析进程输出。
+
 ## 后果
 
 - 不使用 MCP 的 Agent 不会加载其 SDK 或进程管理代码。
 - MCP 工具复用已有 permission、scheduling、event、cancellation 与 Session 行为，
   不创建并行 runtime。
 - 应用必须拥有并关闭 pool；Session 不拥有共享 MCP 进程。
+- Optional server 失败是可见且隔离的；required server 失败仍会 fail fast。
 - 本阶段远程工具列表变化后需要重新连接或重启。
 - Server id 与远程名称成为预览版模型可见命名契约，冲突会 fail fast。
 - MCP server 仍是可信可执行依赖；把它适配为 Tool 不会提供 sandbox，也不会让其描述

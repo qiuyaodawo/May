@@ -1,5 +1,6 @@
 import type { AgentWorkspaceController } from "@may/application";
 import type { ContextCompactionStrategy } from "@may/context";
+import type { McpServerStatus } from "@may/mcp";
 import type { MaybeCodeEvent, MaybeCodeSessionEvent } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 
@@ -47,7 +48,11 @@ export type MaybeCodeCompactionSelection =
  */
 type MaybeCodeProductEvent = Extract<
   MaybeCodeEvent,
-  { type: "model.changed" } | { type: "model.default.changed" }
+  | { type: "model.changed" }
+  | { type: "model.default.changed" }
+  | { type: "mcp.server.connected" }
+  | { type: "mcp.server.failed" }
+  | { type: "mcp.server.disconnected" }
 >;
 
 export interface MaybeCodeController extends AgentWorkspaceController<
@@ -58,6 +63,7 @@ export interface MaybeCodeController extends AgentWorkspaceController<
   readonly instructions: MaybeCodeInstructions;
   readonly modelInfo: MaybeCodeModelInfo | undefined;
 
+  getMcpStatus(): Promise<readonly McpServerStatus[]>;
   listModels(): Promise<readonly MaybeCodeModelProfile[]>;
   switchModel(profile: string): Promise<MaybeCodeModelInfo>;
   /** Persist the profile used by future launches without switching models. */

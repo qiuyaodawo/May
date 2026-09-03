@@ -81,8 +81,9 @@ tracer。Processor 生命周期仍由调用方拥有。参阅
 可选的 Model Context Protocol client 集成。它启动已配置的 stdio server，执行初始化
 和 `tools/list`，再把每个发现的工具适配为 Core 既有的 `Tool` 接口。模型可见名称带
 namespace 并检查冲突；调用会转发 cancellation 和 progress，可选 MCP span 使用注入
-的 Core tracer。Client pool 拥有它启动的进程，打开它的应用必须负责关闭。参阅
-[MCP 工具](../guides/mcp.md)。
+的 Core tracer。Client pool 拥有它启动的进程，打开它的应用必须负责关闭；pool 还会
+暴露 server 状态和连接生命周期事件，并为诊断保留有界、已净化的 stderr 末尾片段。
+参阅 [MCP 工具](../guides/mcp.md)。
 
 ## 状态与策略
 

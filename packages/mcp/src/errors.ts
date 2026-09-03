@@ -8,19 +8,43 @@ export class McpConfigurationError extends MayError {
 
 export class McpConnectionError extends MayError {
   readonly serverId: string;
+  readonly summary: string;
+  readonly stderr: string | undefined;
 
-  constructor(serverId: string, message: string, options?: ErrorOptions) {
-    super("MCP_CONNECTION_FAILED", `MCP server "${serverId}": ${message}`, options);
+  constructor(
+    serverId: string,
+    message: string,
+    options?: ErrorOptions & { readonly stderr?: string },
+  ) {
+    super(
+      "MCP_CONNECTION_FAILED",
+      formatDiagnosticMessage(`MCP server "${serverId}": ${message}`, options?.stderr),
+      options,
+    );
     this.serverId = serverId;
+    this.summary = message;
+    this.stderr = options?.stderr;
   }
 }
 
 export class McpToolsListError extends MayError {
   readonly serverId: string;
+  readonly summary: string;
+  readonly stderr: string | undefined;
 
-  constructor(serverId: string, message: string, options?: ErrorOptions) {
-    super("MCP_TOOLS_LIST_FAILED", `MCP server "${serverId}": ${message}`, options);
+  constructor(
+    serverId: string,
+    message: string,
+    options?: ErrorOptions & { readonly stderr?: string },
+  ) {
+    super(
+      "MCP_TOOLS_LIST_FAILED",
+      formatDiagnosticMessage(`MCP server "${serverId}": ${message}`, options?.stderr),
+      options,
+    );
     this.serverId = serverId;
+    this.summary = message;
+    this.stderr = options?.stderr;
   }
 }
 
@@ -62,4 +86,10 @@ export class McpClientPoolClosedError extends MayError {
   constructor() {
     super("MCP_CLIENT_POOL_CLOSED", "MCP client pool is closed");
   }
+}
+
+function formatDiagnosticMessage(message: string, stderr?: string): string {
+  return stderr === undefined || stderr === ""
+    ? message
+    : `${message}\nRecent stderr:\n${stderr}`;
 }

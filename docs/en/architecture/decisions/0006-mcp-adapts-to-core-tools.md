@@ -34,6 +34,12 @@ provider-safe names, collision failure, bounded error details, and explicit
 connection/process shutdown. Resources, prompts, HTTP, server authoring, and
 dynamic list refresh are deferred.
 
+Servers are required by default, while an application may mark a server
+optional so its startup failure does not disable unrelated tools. The pool
+retains bounded sanitized stderr for diagnostics and exposes explicit status
+snapshots and connection lifecycle events; products should observe those
+contracts rather than parse process output.
+
 ## Consequences
 
 - Agents that do not use MCP do not load its SDK or process-management code.
@@ -41,6 +47,8 @@ dynamic list refresh are deferred.
   Session behavior instead of creating a parallel runtime.
 - Applications must own and close a pool; a Session does not own shared MCP
   processes.
+- Optional-server failures are visible and isolated; required-server failures
+  remain fail-fast.
 - A changed remote tool list requires reconnecting/restarting in this phase.
 - Server ids and remote names become part of a preview model-facing naming
   contract and collisions fail fast.

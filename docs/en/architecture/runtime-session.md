@@ -156,6 +156,12 @@ its SDK. A client pool owns stdio connections and child processes, takes a
 startup snapshot with `tools/list`, and exposes immutable model-facing tool
 descriptors backed by `tools/call`.
 
+The pool also exposes a point-in-time server status view and ordered connection
+lifecycle events. Required servers fail application startup; optional servers
+remain visible as failed diagnostics while healthy servers continue. A bounded,
+sanitized stderr tail is diagnostic state owned by the pool, not Agent context
+or Session history.
+
 The adapter does not bypass the runtime. Applications compose its tools through
 `ToolRegistry`, so parsed input still flows through the configured
 `ToolExecutor` (including permissions) and `ToolScheduler` before network or

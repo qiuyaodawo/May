@@ -44,6 +44,7 @@ const mcp = await openMcpClientPool({
     args: ["./mcp-server.mjs"],
     cwd: process.cwd(),
     env: { ACCESS_TOKEN: process.env.ACCESS_TOKEN! },
+    required: false,
     requestTimeoutMs: 60_000,
   }],
   tracer,
@@ -66,15 +67,27 @@ try {
 ```
 
 Opening performs the MCP initialization handshake and an aggregated
-`tools/list` request for each server. If a later server fails, already-opened
-servers are closed before startup fails. `close()` is idempotent, visits every
-connection even if one close fails, and owns termination of the child processes
-spawned by the stdio transport.
+`tools/list` request for each server. Servers are required by default: a
+required server failure closes already-opened servers and fails startup. A
+server with `required: false` instead records a failed status and lets the
+remaining servers start. `close()` is idempotent, visits every connection even
+if one close fails, and owns termination of the child processes spawned by the
+stdio transport.
 
 `requestTimeoutMs` sets the per-request inactivity timeout;
 `maxTotalTimeoutMs` can additionally bound total time even when progress keeps
 arriving. `maxBufferSize` limits one protocol message. When omitted, the MCP
 SDK defaults apply.
+
+`pool.status()` returns a point-in-time view of every configured server,
+including its connection state, discovered tool names, latest diagnostic, and
+recent stderr. `pool.events` publishes connected, failed, and disconnected
+lifecycle events so products do not need to parse logs.
+
+Stdio stderr is piped instead of inherited. Its sanitized tail is retained per
+server for diagnostics and bounded by `stderrMaxBytes` (16 KiB by default), so
+a noisy child cannot grow memory without limit. Treat this output as sensitive:
+servers may print paths, tokens, or other secrets to stderr.
 
 ## Names and collisions
 
@@ -111,12 +124,14 @@ MaybeCode reads stdio servers from `apps.maybecode.mcpServers`:
           "command": "node",
           "args": ["tools/mcp-server.mjs"],
           "cwd": ".",
+          "required": false,
           "env": {
             "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}"
           },
           "requestTimeoutMs": 60000,
           "maxTotalTimeoutMs": 300000,
-          "maxBufferSize": 10485760
+          "maxBufferSize": 10485760,
+          "stderrMaxBytes": 16384
         },
         "temporarily_disabled": {
           "enabled": false
@@ -130,7 +145,8 @@ MaybeCode reads stdio servers from `apps.maybecode.mcpServers`:
 `transport` is optional and currently accepts only `stdio`. A missing
 `mcpServers` entry, `false`, or an empty object disables MCP. Relative `cwd`
 values are resolved from the active coding workspace; omitted `cwd` also uses
-that workspace. Arguments are passed directly without a shell.
+that workspace. `required` defaults to `true`; use `false` only when the product
+can continue without that server. Arguments are passed directly without a shell.
 
 Environment values can reference the launching process with `${NAME}`. A
 missing referenced variable fails startup instead of passing an empty secret.
@@ -143,6 +159,10 @@ its normal `ToolRegistry`, and closes MCP after the Agent workspace but before
 flushing observability. Its default coding permission policy asks for approval
 for every MCP tool. An allow-for-session decision remains scoped to the normal
 MaybeCode Session permission executor.
+
+Run `/mcp` in either MaybeCode UI to inspect configured servers, states,
+discovered tools, startup errors, and retained stderr. The controller event
+stream also exposes the lifecycle events for other front ends and integrations.
 
 ## Tracing and security
 

@@ -9,6 +9,7 @@ import type { MaybeCodeEvent } from "./events.js";
 import {
   createMaybeCodeSlashCommandSuggester,
   executeMaybeCodeSlashCommand,
+  formatMaybeCodeMcpStatus,
   parseMaybeCodeSlashCommand,
   type MaybeCodeSlashCommand,
   type MaybeCodeSlashCommandResult,
@@ -162,6 +163,12 @@ async function consumeEvents(
       renderer.modelChanged(event.model);
     } else if (event.type === "model.default.changed") {
       renderer.defaultModelChanged(event.profile);
+    } else if (
+      event.type === "mcp.server.connected" ||
+      event.type === "mcp.server.failed" ||
+      event.type === "mcp.server.disconnected"
+    ) {
+      renderer.mcpEvent(event);
     } else {
       await renderer.sessionChanged(event, app);
     }
@@ -263,6 +270,11 @@ async function renderSlashCommandResult(
       break;
     case "status":
       terminal.write(`\n${renderStatus(app, result.inspection)}`);
+      break;
+    case "mcp.status":
+      terminal.write(
+        `\n${sanitizeTerminalText(formatMaybeCodeMcpStatus(result.servers))}\n`,
+      );
       break;
     case "context":
       terminal.write(
@@ -694,6 +706,28 @@ class TerminalRenderer {
   defaultModelChanged(profile: string): void {
     this.terminal.write(
       `\nDefault model set to ${sanitizeTerminalText(profile)}\n`,
+    );
+  }
+
+  mcpEvent(
+    event: Extract<MaybeCodeEvent, { type: `mcp.server.${string}` }>,
+  ): void {
+    if (event.type === "mcp.server.connected") {
+      this.terminal.write(
+        `\nMCP server connected: ${sanitizeTerminalText(event.serverId)} ` +
+          `(${event.toolNames.length} tools)\n`,
+      );
+      return;
+    }
+    if (event.type === "mcp.server.failed") {
+      this.terminal.write(
+        `\nMCP server failed: ${sanitizeTerminalText(event.serverId)}: ` +
+          `${sanitizeTerminalText(event.diagnostic.message)}\n`,
+      );
+      return;
+    }
+    this.terminal.write(
+      `\nMCP server disconnected: ${sanitizeTerminalText(event.serverId)}\n`,
     );
   }
 

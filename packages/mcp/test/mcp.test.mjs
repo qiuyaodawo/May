@@ -15,20 +15,46 @@ test("discovers and calls namespaced stdio MCP tools", async (t) => {
   const spans = [];
   const tracer = recordingTracer(spans);
   const pool = await openMcpClientPool({
-    servers: [{
-      id: "test",
-      command: process.execPath,
-      args: [fixture],
-      requestTimeoutMs: 5_000,
-    }],
+    servers: [
+      {
+        id: "optional",
+        command: process.execPath,
+        args: [fixture, "--fail"],
+        requestTimeoutMs: 5_000,
+        stderrMaxBytes: 64,
+        required: false,
+      },
+      {
+        id: "test",
+        command: process.execPath,
+        args: [fixture],
+        requestTimeoutMs: 5_000,
+      },
+    ],
     tracer,
   });
   t.after(() => pool.close());
+  const events = collectEvents(pool.events);
 
   assert.deepEqual(
     pool.tools.map((tool) => tool.name),
     ["mcp__test__echo_value", "mcp__test__reported-error"],
   );
+  assert.deepEqual(
+    pool.status().map((status) => [
+      status.serverId,
+      status.required,
+      status.state,
+      status.toolNames.length,
+    ]),
+    [
+      ["optional", false, "failed", 0],
+      ["test", true, "connected", 2],
+    ],
+  );
+  assert.match(pool.status()[0].diagnostic.stderr, /STARTUP_DIAGNOSTIC/u);
+  assert.doesNotMatch(pool.status()[0].diagnostic.stderr, /\u001b/u);
+  assert.ok(Buffer.byteLength(pool.status()[0].diagnostic.stderr) <= 64);
   const progress = [];
   const output = await pool.tools[0].execute(
     pool.tools[0].parse({ value: "hello" }),
@@ -53,9 +79,19 @@ test("discovers and calls namespaced stdio MCP tools", async (t) => {
   setTimeout(() => cancellation.abort("stop"), 10);
   await assert.rejects(pending);
   await pool.close();
+  assert.equal(pool.status()[1].state, "disconnected");
+  assert.deepEqual(
+    (await events).map((event) => event.type),
+    [
+      "mcp.server.failed",
+      "mcp.server.connected",
+      "mcp.server.disconnected",
+    ],
+  );
   assert.deepEqual(
     spans.map((span) => [span.name, span.status]),
     [
+      ["may.mcp.connect", "error"],
       ["may.mcp.connect", "ok"],
       ["may.mcp.tools.list", "ok"],
       ["may.mcp.tool.call", "ok"],
@@ -79,6 +115,19 @@ test("creates bounded provider-safe names and rejects duplicate servers", async 
       ],
     }),
     (error) => error.code === "MCP_CONFIGURATION_ERROR",
+  );
+
+  await assert.rejects(
+    openMcpClientPool({
+      servers: [{
+        id: "required",
+        command: process.execPath,
+        args: [fixture, "--fail"],
+        requestTimeoutMs: 5_000,
+      }],
+    }),
+    (error) => error.code === "MCP_CONNECTION_FAILED" &&
+      /STARTUP_DIAGNOSTIC/u.test(error.stderr),
   );
 });
 
@@ -114,4 +163,10 @@ function recordingTracer(completed) {
       return span;
     },
   };
+}
+
+async function collectEvents(events) {
+  const collected = [];
+  for await (const event of events) collected.push(event);
+  return collected;
 }

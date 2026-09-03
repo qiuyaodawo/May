@@ -231,6 +231,7 @@ MaybeCode can also add tools from local MCP stdio servers:
           "command": "node",
           "args": ["tools/mcp-server.mjs"],
           "cwd": ".",
+          "required": false,
           "env": { "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}" }
         }
       }
@@ -246,6 +247,10 @@ exist when MaybeCode starts. The client pool and its child processes close with
 the workspace; with tracing enabled, disconnect spans are flushed afterward.
 See the bilingual [MCP guide](../../docs/en/guides/mcp.md) for timeout options,
 security, naming, errors, and the intentionally limited first-phase scope.
+
+Use `/mcp` to inspect every configured server, its required/optional state,
+discovered tools, the latest connection diagnostic, and bounded recent stderr.
+MCP lifecycle events are also forwarded through `MaybeCodeController.events`.
 
 OpenAI compaction is opt-in. `serverCompactThreshold` enables provider-side
 context management on normal Responses requests, while
@@ -354,6 +359,8 @@ continuation lines do not show command suggestions.
   retains the recent tail.
 - `/compact history-reference` keeps the current turn and points the model to
   the bounded `session_history` tool for older details.
+- `/mcp` shows configured MCP server states, discovered tools, errors, and
+  retained stderr diagnostics.
 - `/help` shows commands.
 - `/quit` exits.
 - `Ctrl+C` cancels an active run or summary and exits while idle.

@@ -205,7 +205,9 @@ export async function openConfiguredMaybeCode(
       ...resolveDefaultModelPersistence(config, dependencies),
       store: new FileSessionStore(join(dataDirectory, "sessions")),
       catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
-      ...(mcp === undefined ? {} : { additionalTools: mcp.tools }),
+      ...(mcp === undefined
+        ? {}
+        : { additionalTools: mcp.tools, mcp }),
       ...(mcp === undefined && observability === undefined
         ? {}
         : {
@@ -280,6 +282,7 @@ export function resolveMaybeCodeMcp(
       server,
       [
         "enabled",
+        "required",
         "transport",
         "command",
         "args",
@@ -288,6 +291,7 @@ export function resolveMaybeCodeMcp(
         "requestTimeoutMs",
         "maxTotalTimeoutMs",
         "maxBufferSize",
+        "stderrMaxBytes",
       ],
       field,
     );
@@ -295,6 +299,9 @@ export function resolveMaybeCodeMcp(
       throw new MaybeCodeConfigError(`${field}.enabled must be a boolean`);
     }
     if (server.enabled === false) continue;
+    if (server.required !== undefined && typeof server.required !== "boolean") {
+      throw new MaybeCodeConfigError(`${field}.required must be a boolean`);
+    }
     if (server.transport !== undefined && server.transport !== "stdio") {
       throw new MaybeCodeConfigError(`${field}.transport must be "stdio"`);
     }
@@ -317,16 +324,24 @@ export function resolveMaybeCodeMcp(
       server.maxBufferSize,
       `${field}.maxBufferSize`,
     );
+    const stderrMaxBytes = optionalPositiveInteger(
+      server.stderrMaxBytes,
+      `${field}.stderrMaxBytes`,
+    );
 
     resolved.push({
       id,
       command,
+      ...(server.required === undefined
+        ? {}
+        : { required: server.required }),
       ...(args === undefined ? {} : { args }),
       cwd,
       ...(env === undefined ? {} : { env }),
       ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
       ...(maxTotalTimeoutMs === undefined ? {} : { maxTotalTimeoutMs }),
       ...(maxBufferSize === undefined ? {} : { maxBufferSize }),
+      ...(stderrMaxBytes === undefined ? {} : { stderrMaxBytes }),
     });
   }
 

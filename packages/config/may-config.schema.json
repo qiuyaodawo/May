@@ -345,6 +345,7 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean", "default": true },
+        "required": { "type": "boolean", "default": true },
         "transport": { "const": "stdio", "default": "stdio" },
         "command": { "$ref": "#/$defs/nonEmptyString" },
         "args": {
@@ -358,7 +359,11 @@
         },
         "requestTimeoutMs": { "$ref": "#/$defs/positiveInteger" },
         "maxTotalTimeoutMs": { "$ref": "#/$defs/positiveInteger" },
-        "maxBufferSize": { "$ref": "#/$defs/positiveInteger" }
+        "maxBufferSize": { "$ref": "#/$defs/positiveInteger" },
+        "stderrMaxBytes": {
+          "$ref": "#/$defs/positiveInteger",
+          "default": 16384
+        }
       },
       "anyOf": [
         {

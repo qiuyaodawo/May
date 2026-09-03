@@ -6,7 +6,13 @@ import type {
   ContextCompactionResult,
   ContextInspection,
 } from "@may/context";
-import type { Model, RunOptions } from "@may/core";
+import {
+  AsyncEventQueue,
+  isStreamingMayEvent,
+  type Model,
+  type RunOptions,
+} from "@may/core";
+import type { McpClientPool, McpServerStatus } from "@may/mcp";
 import type { ApprovalDecision } from "@may/permissions";
 import type { ModelCapabilities } from "@may/providers";
 import type {
@@ -56,6 +62,8 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
     profile: string,
   ) => Promise<ModelCapabilities>;
   readonly persistDefaultModel?: (profile: string) => Promise<void>;
+  /** Optional product-owned MCP status and lifecycle event source. */
+  readonly mcp?: Pick<McpClientPool, "events" | "status">;
   /** Product-owned resources, such as tracing processors, closed after the workspace. */
   readonly closeOwnedResources?: () => void | Promise<void>;
 }
@@ -89,6 +97,13 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   private readonly manager: BaseWorkspace;
   private readonly state: WorkspaceState;
+  private readonly eventQueue = new AsyncEventQueue<MaybeCodeEvent>({
+    maxBufferedValues: 1024,
+    isDroppable: (event) =>
+      event.type === "run.event" && isStreamingMayEvent(event.event),
+  });
+  private readonly managerEventRelay: Promise<void>;
+  private readonly mcpEventRelay: Promise<void>;
   private readonly modelOptionOverrides = new Map<
     string,
     Readonly<Record<string, unknown>>
@@ -99,7 +114,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     this.state = state;
     this.manager = manager;
     this.workspace = manager.workspace;
-    this.events = manager.events;
+    this.events = this.eventQueue;
+    this.managerEventRelay = this.relayEvents(manager.events);
+    this.mcpEventRelay = state.options.mcp === undefined
+      ? Promise.resolve()
+      : this.relayEvents(state.options.mcp.events);
   }
 
   static async open(
@@ -151,6 +170,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   get modelInfo(): MaybeCodeModelInfo | undefined {
     return this.manager.activeApplication.modelInfo;
+  }
+
+  async getMcpStatus(): Promise<readonly McpServerStatus[]> {
+    this.throwIfClosed();
+    return this.state.options.mcp?.status() ?? [];
   }
 
   submit(options: RunOptions): Promise<MaybeCodeRun> {
@@ -390,11 +414,31 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    const failures: unknown[] = [];
     try {
       await this.manager.close();
-    } finally {
-      await this.state.options.closeOwnedResources?.();
+    } catch (error) {
+      failures.push(error);
     }
+    try {
+      await this.state.options.closeOwnedResources?.();
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      await Promise.all([this.managerEventRelay, this.mcpEventRelay]);
+    } catch (error) {
+      failures.push(error);
+    } finally {
+      this.eventQueue.close();
+    }
+    if (failures.length > 0) {
+      throw new AggregateError(failures, "MaybeCode workspace failed to close");
+    }
+  }
+
+  private async relayEvents(events: AsyncIterable<MaybeCodeEvent>): Promise<void> {
+    for await (const event of events) this.eventQueue.push(event);
   }
 
   private throwIfClosed(): void {
@@ -419,6 +463,7 @@ function applicationOptions(
     resolveModelCapabilities: _resolveModelCapabilities,
     persistDefaultModel: _persistDefaultModel,
     closeOwnedResources: _closeOwnedResources,
+    mcp: _mcp,
     ...application
   } = options;
   return application;
