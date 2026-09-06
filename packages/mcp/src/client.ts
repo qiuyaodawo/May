@@ -27,6 +27,8 @@ import {
   McpToolsListError,
 } from "./errors.js";
 import { namespaceMcpToolName } from "./names.js";
+import { McpAuthenticationError } from "./oauth.js";
+import { McpCredentialStoreError } from "./credentials.js";
 import {
   createMcpTransport,
   safeMcpTransportError,
@@ -58,13 +60,13 @@ class McpConnection {
     private readonly stderr: BoundedStderrBuffer,
     private readonly tracer: Tracer | undefined,
     private readonly traceAttributes: TraceAttributes,
-    private readonly onUnexpectedClose: (error: Error) => void,
+    private readonly onAvailability: (error?: Error) => void,
   ) {}
 
   static async open(
     options: McpServerOptions,
     poolOptions: OpenMcpClientPoolOptions,
-    onUnexpectedClose: (error: Error) => void,
+    onAvailability: (error?: Error) => void,
   ): Promise<McpConnection> {
     validateMcpServerOptions(options);
     const client = new Client(poolOptions.clientInfo ?? DEFAULT_CLIENT_INFO, {
@@ -84,7 +86,7 @@ class McpConnection {
       options.transport === "streamable-http"
         ? 0 : options.stderrMaxBytes ?? DEFAULT_STDERR_MAX_BYTES,
     );
-    const transport = createMcpTransport(options);
+    const transport = createMcpTransport(options, poolOptions.oauth);
     if (transport instanceof StdioClientTransport) {
       transport.stderr?.on("data", (chunk: unknown) => stderr.append(chunk));
     }
@@ -103,7 +105,7 @@ class McpConnection {
       stderr,
       poolOptions.tracer,
       traceAttributes,
-      onUnexpectedClose,
+      onAvailability,
     );
     client.onerror = (error) => {
       connection.lastTransportError = safeMcpTransportError(error, options) as Error;
@@ -135,6 +137,7 @@ class McpConnection {
       await closeQuietly(client);
       poolOptions.signal?.throwIfAborted();
       const recentStderr = stderr.text();
+      if (safeError instanceof McpAuthenticationError || safeError instanceof McpCredentialStoreError) throw safeError;
       throw new McpConnectionError(
         options.id,
         sanitizeDiagnosticText(errorMessage(safeError), 2_000),
@@ -168,6 +171,7 @@ class McpConnection {
       const safeError = safeMcpTransportError(error, this.options);
       endMcpSpan(span, safeError, signal);
       if (signal?.aborted === true) throw error;
+      if (safeError instanceof McpAuthenticationError || safeError instanceof McpCredentialStoreError) throw safeError;
       const recentStderr = this.stderr.text();
       throw new McpToolsListError(
         this.options.id,
@@ -224,6 +228,7 @@ class McpConnection {
         );
       }
 
+      this.onAvailability();
       endTraceSpan(span, { status: "ok" });
       return {
         content: result.content,
@@ -236,6 +241,10 @@ class McpConnection {
       endMcpSpan(span, safeError, context.signal);
       if (context.signal.aborted || error instanceof McpToolReportedError) {
         throw error;
+      }
+      if (safeError instanceof McpAuthenticationError || safeError instanceof McpCredentialStoreError) {
+        this.onAvailability(safeError);
+        throw safeError;
       }
       throw new McpToolCallError(
         this.options.id,
@@ -294,7 +303,7 @@ class McpConnection {
     this.closed = true;
     const recentStderr = this.stderr.text();
     const cause = this.lastTransportError;
-    this.onUnexpectedClose(new McpConnectionError(
+    this.onAvailability(new McpConnectionError(
       this.options.id,
       cause === undefined
         ? "connection closed unexpectedly"
@@ -478,8 +487,17 @@ export async function openMcpClientPool(
         server,
         options,
         (error) => {
+          if (error === undefined) {
+            if (status.state === "auth-required") {
+              status.state = "connected";
+              delete status.diagnostic;
+              eventRecorder.connected(server, status.toolNames);
+            }
+            return;
+          }
           if (status.state !== "connected") return;
-          status.state = "failed";
+          status.state = error instanceof McpAuthenticationError && error.code === "MCP_AUTHENTICATION_REQUIRED"
+            ? "auth-required" : "failed";
           status.diagnostic = toDiagnostic(error);
           eventRecorder.failed(server, status.diagnostic);
         },
@@ -509,7 +527,7 @@ export async function openMcpClientPool(
     } catch (error) {
       await closeConnectionQuietly(connection);
       const diagnostic = toDiagnostic(error);
-      status.state = "failed";
+      status.state = diagnostic.code === "MCP_AUTHENTICATION_REQUIRED" ? "auth-required" : "failed";
       status.toolNames = [];
       status.diagnostic = diagnostic;
       eventRecorder.failed(server, diagnostic);

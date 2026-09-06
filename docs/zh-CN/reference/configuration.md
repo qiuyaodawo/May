@@ -228,11 +228,14 @@ MaybeCode 会在 workspace 关闭时 flush processor。每天的 JSONL 文件只
 在不删除配置的情况下跳过它。
 
 HTTP 端点设置 `transport: "streamable-http"`，必须提供 `url`，可设置 `headers`
-（支持 `${NAME}` 环境引用）、`required`、请求/总超时及 `protocolMode`。HTTP entry
+（支持 `${NAME}` 环境引用）、`auth`、`required`、请求/总超时及 `protocolMode`。HTTP entry
 不接受 `command`、`args`、`cwd`、`env`、`maxBufferSize`、`stderrMaxBytes`；stdio
 entry 不接受 `url`/`headers`。`protocolMode` 接受 `legacy` 或 `auto`，stdio 默认
 legacy，HTTP 默认 auto。除 loopback 外必须使用 HTTPS，不跟随重定向；尚未实现
-OAuth 登录和自动重连。Header 限制参阅 MCP 指南。
+自动重连。`auth: { "type": "oauth" }` 启用原生 OAuth，可选字段包括 `account`、
+`clientId` 加 `expectedIssuer`、`clientMetadataUrl`、`scopes`、`authorizationOrigins`
+和 `callbackPort`。OAuth 与静态 Authorization header 互斥。登录、退出、凭据存储和
+origin 限制参阅 [MCP 认证](../guides/mcp-auth.md)。
 
 相对 `cwd` 和省略的 `cwd` 都以当前 MaybeCode workspace 为基准。环境字符串会从
 启动进程展开 `${NAME}`，缺失引用会使启动失败。配置文件是明文，因此应优先使用

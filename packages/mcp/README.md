@@ -75,14 +75,14 @@ HTTP defaults to SDK `auto` negotiation (`server/discover`, with legacy
 short-lived discovery process. `status()` includes the selected protocol version.
 HTTP requires HTTPS except for loopback (`localhost`, `127.0.0.1`, `[::1]`),
 rejects credentials/fragments in the URL and protocol-header overrides, and
-never follows redirects. Static headers are supported; OAuth login is not.
+never follows redirects. Static headers and native OAuth are supported; see the [authentication guide](../../docs/en/guides/mcp-auth.md).
 HTTP SDK error details are withheld from diagnostics/traces (status codes are
 retained when available). Tool-level error content remains visible to the caller.
 Legacy HTTP sessions are terminated on close, with at most five seconds for
 DELETE cleanup, followed by local transport cleanup. No automatic reconnect,
-stream resumption, tool-call retry, or fallback to deprecated HTTP+SSE is enabled.
+stream resumption, general tool-call retry, or fallback to deprecated HTTP+SSE is enabled.
 `connected` means setup and discovery succeeded, not continuous HTTP health.
 
-Resources, prompts, OAuth flows, sampling/elicitation handlers, dynamic catalogs,
+Resources, prompts, sampling/elicitation handlers, dynamic catalogs,
 Tasks/Apps extensions, and MCP server authoring remain outside this phase.
-See the [bilingual MCP guide](../../docs/en/guides/mcp.md).
+See the [bilingual MCP guide](../../docs/en/guides/mcp.md) and [full adaptation roadmap](../../docs/en/architecture/mcp-host-roadmap.md).

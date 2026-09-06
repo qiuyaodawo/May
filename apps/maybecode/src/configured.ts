@@ -17,10 +17,13 @@ import type {
 import type { Model } from "@may/core";
 import {
   openMcpClientPool,
+  KeyringMcpCredentialStore,
+  McpOAuthManager,
   validateMcpServerOptions,
   type McpClientPool,
   type McpServerBaseOptions,
   type McpServerOptions,
+  type McpOAuthOptions,
   type OpenMcpClientPoolOptions,
 } from "@may/mcp";
 import {
@@ -78,6 +81,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
 
 export interface MaybeCodeMcpOptions {
   readonly servers: readonly McpServerOptions[];
+  readonly oauth?: McpOAuthManager;
 }
 
 export interface MaybeCodeObservabilityOptions {
@@ -189,6 +193,9 @@ export async function openConfiguredMaybeCode(
     if (mcpOptions !== false && mcpOptions.servers.length > 0) {
       mcp = await (dependencies.openMcp ?? openMcpClientPool)({
         servers: mcpOptions.servers,
+        ...(mcpOptions.servers.some((server) => server.transport === "streamable-http" && server.auth !== undefined)
+          ? { oauth: mcpOptions.oauth ?? new McpOAuthManager(new KeyringMcpCredentialStore(join(dataDirectory, "mcp-credentials"))) }
+          : {}),
         ...(observability === undefined
           ? {}
           : { tracer: observability.tracer }),
@@ -289,6 +296,7 @@ export function resolveMaybeCodeMcp(
         "protocolMode",
         "url",
         "headers",
+        "auth",
         "command",
         "args",
         "cwd",
@@ -340,6 +348,7 @@ export function resolveMaybeCodeMcp(
         transport: "streamable-http",
         url: nonEmptyString(server.url, `${field}.url`),
         ...(headers === undefined ? {} : { headers }),
+        ...(server.auth === undefined ? {} : { auth: objectValue(server.auth, `${field}.auth`) as unknown as McpOAuthOptions }),
       };
       try {
         validateMcpServerOptions(endpoint);
@@ -349,7 +358,7 @@ export function resolveMaybeCodeMcp(
       resolved.push(endpoint);
       continue;
     }
-    for (const key of ["url", "headers"]) {
+    for (const key of ["url", "headers", "auth"]) {
       if (key in server) throw new MaybeCodeConfigError(`${field}.${key} requires streamable-http`);
     }
     const command = nonEmptyString(server.command, `${field}.command`);

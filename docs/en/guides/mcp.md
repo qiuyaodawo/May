@@ -185,7 +185,8 @@ The same `mcpServers` map (or package `servers` array, with an `id`) accepts:
 
 Header environment references expand only in MaybeCode configuration, not in
 direct package API calls. Missing references fail even for optional servers.
-This phase supports static headers, not OAuth discovery/login/token refresh.
+Static headers and native OAuth discovery/login/refresh are supported; see
+[MCP authentication](mcp-auth.md). Authentication does not grant tool permission.
 HTTP entries reject process-only fields (`command`, `args`, `cwd`, `env`,
 `maxBufferSize`, `stderrMaxBytes`); stdio entries reject `url`/`headers`.
 `maxBufferSize` remains a stdio message limit, not an HTTP response-size limit.
@@ -218,7 +219,7 @@ status code is retained when available. MCP `isError` tool results retain their
 bounded text for the caller, but HTTP error spans do not capture that text.
 No HTTP headers or URLs are added to spans. HTTP endpoints have no stderr tail.
 
-There is no automatic reconnect, stream resumption, tool-call retry, or fallback
+There is no automatic reconnect, stream resumption, general tool-call retry, or fallback
 to deprecated HTTP+SSE. `connected` means setup and tool discovery succeeded,
 not a continuous health check. Individual HTTP failures fail their operation;
 they do not automatically remove a discovered tool. Closing attempts DELETE
@@ -250,9 +251,11 @@ environment and filesystem access, and keep the permission layer enabled.
 ## Current scope
 
 This phase intentionally excludes MCP resources, prompts, sampling/elicitation
-handlers, OAuth login, deprecated HTTP+SSE, Tasks/Apps extensions, server authoring, automatic reconnect, and dynamic
+handlers, deprecated HTTP+SSE, Tasks/Apps extensions, server authoring, automatic reconnect, and dynamic
 `tools/list_changed` refresh. Tools are a startup snapshot and become available
 on the next MaybeCode launch after a server changes its list.
+
+Track the remaining phases in the [MCP Host roadmap](../architecture/mcp-host-roadmap.md).
 
 See the [official MCP tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
 and the [TypeScript client documentation](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/client.md)

@@ -4,6 +4,7 @@ export const MAYBE_CODE_USAGE = `MaybeCode
 
 Usage:
   maybecode [options] [workspace]
+  maybecode mcp <login|logout|status> <server-id> [--config <path>]
 
 Options:
   --config <path>      Load another May config file
@@ -12,6 +13,9 @@ Options:
   -c, --continue       Continue the most recent session for this workspace
   -r, --resume <id>    Resume a specific session
   -h, --help           Show this help
+
+MCP login prints a browser authorization URL and waits for a local callback.
+MCP commands also accept --workspace <path>; login accepts repeated --scope <scope>.
 `;
 
 export interface MaybeCodeHelpCommand {
@@ -30,9 +34,19 @@ export interface MaybeCodeStartCommand {
 
 export type MaybeCodeUI = "classic" | "retained";
 
-export type MaybeCodeCommand = MaybeCodeHelpCommand | MaybeCodeStartCommand;
+export interface MaybeCodeMcpCommand {
+  readonly type: "mcp";
+  readonly action: "login" | "logout" | "status";
+  readonly serverId: string;
+  readonly configPath?: string;
+  readonly workspace?: string;
+  readonly scopes?: readonly string[];
+}
+
+export type MaybeCodeCommand = MaybeCodeHelpCommand | MaybeCodeStartCommand | MaybeCodeMcpCommand;
 
 export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
+  if (args[0] === "mcp") return parseMcpCommand(args.slice(1));
   let workspace: string | undefined;
   let configPath: string | undefined;
   let model: string | undefined;
@@ -114,6 +128,30 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
     ...(configPath === undefined ? {} : { configPath }),
     ...(model === undefined ? {} : { model }),
     ...(sessionId === undefined ? {} : { sessionId }),
+  };
+}
+
+function parseMcpCommand(args: readonly string[]): MaybeCodeMcpCommand | MaybeCodeHelpCommand {
+  if (args.includes("--help") || args.includes("-h")) return { type: "help" };
+  const [action, serverId] = args;
+  if (!["login", "logout", "status"].includes(action ?? "") || !serverId || !/^[A-Za-z0-9_-]+$/u.test(serverId)) {
+    throw new MaybeCodeUsageError("Use mcp <login|logout|status> <server-id>");
+  }
+  let configPath: string | undefined;
+  let workspace: string | undefined;
+  const scopes: string[] = [];
+  for (let i = 2; i < args.length; i++) {
+    const name = args[i]!;
+    if (name === "--config") configPath = setOption(name, configPath, readValue(args, ++i, name));
+    else if (name === "--workspace") workspace = setOption(name, workspace, readValue(args, ++i, name));
+    else if (name === "--scope" && action === "login") scopes.push(readValue(args, ++i, name));
+    else throw new MaybeCodeUsageError(`Unsupported MCP option "${name}"`);
+  }
+  return {
+    type: "mcp", action: action as MaybeCodeMcpCommand["action"], serverId,
+    ...(configPath === undefined ? {} : { configPath }),
+    ...(workspace === undefined ? {} : { workspace }),
+    ...(scopes.length === 0 ? {} : { scopes }),
   };
 }
 

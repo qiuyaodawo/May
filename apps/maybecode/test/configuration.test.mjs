@@ -22,6 +22,8 @@ import {
   openConfiguredMaybeCode,
   parseMaybeCodeArgs,
   resolveMaybeCodeMcp,
+  runMaybeCode,
+  runMaybeCodeMcpCommand,
   resolveMaybeCodeObservability,
   resolveMaybeCodeRetry,
   selectMaybeCodeModel,
@@ -549,6 +551,36 @@ test("resolves HTTP MCP headers, validates transport options, and formats protoc
     serverId: "remote", transport: "streamable-http", required: false,
     state: "connected", protocolVersion: "2026-07-28", toolNames: ["mcp__remote__lookup"],
   }]), /optional, streamable-http\)\n  protocol: 2026-07-28/u);
+});
+
+test("MCP login commands run before model startup and accept OAuth configuration", async () => {
+  const command = parseMaybeCodeArgs(["mcp", "login", "remote", "--config", "auth.json", "--scope", "write"]);
+  assert.deepEqual(command, { type: "mcp", action: "login", serverId: "remote", configPath: "auth.json", scopes: ["write"] });
+  assert.throws(() => parseMaybeCodeArgs(["mcp", "logout", "remote", "--scope", "write"]));
+  const configured = {
+    path: "auth.json", providers: {}, models: {},
+    apps: { maybecode: { mcpServers: { remote: {
+      transport: "streamable-http", url: "https://mcp.example.com/mcp",
+      auth: { type: "oauth", scopes: ["read"], authorizationOrigins: ["https://accounts.example.com"] },
+    } } } },
+  };
+  const output = [];
+  let loggedIn;
+  const deps = {
+    write: (text) => output.push(text), loadConfig: async () => configured,
+    oauth: { async login(server) { loggedIn = server; } },
+  };
+  await runMaybeCodeMcpCommand(command, deps);
+  assert.deepEqual(loggedIn.auth.scopes, ["read", "write"]);
+  assert.match(output.join(""), /login complete/u);
+  const code = await runMaybeCode(["mcp", "status", "remote"], {
+    terminal: { write: (text) => output.push(text), close() {} },
+    open: () => { throw new Error("Agent must not start"); },
+    mcpAuth: async (value) => { assert.equal(value.action, "status"); },
+  });
+  assert.equal(code, 0);
+  configured.apps.maybecode.mcpServers.remote.auth.clientId = "public-client";
+  assert.throws(() => resolveMaybeCodeMcp(configured, process.cwd()), /requires expectedIssuer/u);
 });
 
 test("scopes MCP approval grants to one namespaced tool", async () => {

@@ -239,13 +239,17 @@ server as failed. Set `enabled` to `false` to skip an entry without deleting
 its configuration.
 
 Set `transport: "streamable-http"` for HTTP endpoints. They require `url` and
-accept `headers` (with `${NAME}` environment references), `required`, request
+accept `headers` (with `${NAME}` environment references), `auth`, `required`, request
 and total timeouts, and `protocolMode`. Process options (`command`, `args`,
 `cwd`, `env`, `maxBufferSize`, `stderrMaxBytes`) are rejected on HTTP entries.
 `url`/`headers` are rejected on stdio entries. `protocolMode` accepts `legacy`
 or `auto`, defaulting to legacy for stdio and auto for HTTP. HTTPS is required
-except for loopback; redirects are not followed. OAuth login and automatic
-reconnect are not implemented. See the MCP guide for header restrictions.
+except for loopback; redirects are not followed. Automatic reconnect is not yet
+implemented. `auth: { "type": "oauth" }` enables native OAuth; optional fields
+are `account`, `clientId` + `expectedIssuer`, `clientMetadataUrl`, `scopes`,
+`authorizationOrigins`, and `callbackPort`. OAuth and a static Authorization
+header are mutually exclusive. See [MCP authentication](../guides/mcp-auth.md)
+for login/logout, credential storage and origin restrictions.
 
 Relative `cwd` values and omitted `cwd` resolve to the active MaybeCode
 workspace. Environment strings expand `${NAME}` from the launching process;

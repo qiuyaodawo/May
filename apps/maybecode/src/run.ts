@@ -11,6 +11,7 @@ import { createNodeTerminal, type TerminalIO } from "@may/tui/node-terminal";
 import { runTerminalUI } from "./tui.js";
 import type { MaybeCodeController } from "./controller.js";
 import { runRetainedTerminalUI } from "./ui/retained-tui.js";
+import { runMaybeCodeMcpCommand } from "./mcp-auth.js";
 
 export interface RunMaybeCodeDependencies {
   readonly terminal?: TerminalIO;
@@ -18,6 +19,7 @@ export interface RunMaybeCodeDependencies {
     options: OpenConfiguredMaybeCodeOptions,
   ) => Promise<MaybeCodeController>;
   readonly runRetainedUI?: (app: MaybeCodeController) => Promise<void>;
+  readonly mcpAuth?: typeof runMaybeCodeMcpCommand;
 }
 
 export async function runMaybeCode(
@@ -50,6 +52,20 @@ export async function runMaybeCode(
   }
 
   try {
+    if (command.type === "mcp") {
+      const cancellation = new AbortController();
+      const interrupt = () => cancellation.abort(new Error("MCP authentication cancelled"));
+      process.once("SIGINT", interrupt);
+      try {
+        await (dependencies.mcpAuth ?? runMaybeCodeMcpCommand)(command, {
+          write: (text) => outputTerminal().write(text), signal: cancellation.signal,
+        });
+      } finally {
+        process.removeListener("SIGINT", interrupt);
+      }
+      outputTerminal().close();
+      return 0;
+    }
     const open = dependencies.open ?? openConfiguredMaybeCode;
     const app = await open({
       ...(command.workspace === undefined

@@ -167,8 +167,8 @@ executor 限定作用域。
 ```
 
 Header 环境引用只由 MaybeCode 配置解析，直接调用 package API 时不会展开。
-即使 server 是 optional，缺失引用也会使启动失败。本阶段支持静态 header，尚不支持
-OAuth 发现、登录或 token 刷新。HTTP entry 不接受进程专用字段 `command`、`args`、
+即使 server 是 optional，缺失引用也会使启动失败。当前支持静态 header 和原生
+OAuth 发现、登录、刷新，参阅 [MCP 认证](mcp-auth.md)。认证不等于工具授权。HTTP entry 不接受进程专用字段 `command`、`args`、
 `cwd`、`env`、`maxBufferSize`、`stderrMaxBytes`；stdio entry 不接受 `url`/`headers`。
 `maxBufferSize` 仍是 stdio 消息上限，不是 HTTP 响应大小上限。
 
@@ -194,7 +194,7 @@ tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP 
 仍向调用方提供有界文本，但 HTTP error span 不记录该文本。Span 不添加 HTTP header
 或 URL，HTTP 端点也没有 stderr 末尾片段。
 
-不启用自动重连、stream 恢复、工具调用重试，也不回退到旧 HTTP+SSE。`connected`
+不启用自动重连、stream 恢复或通用工具调用重试，也不回退到旧 HTTP+SSE。`connected`
 表示建立和工具发现成功，不代表持续健康检查；单次 HTTP 失败只使对应操作失败，不会
 自动移除已发现工具。关闭时对协商出的旧版 HTTP session 尝试 DELETE（最多五秒，
 或更短的 request timeout），随后无论结果如何都关闭本地 transport 资源；这不会删除
@@ -221,9 +221,11 @@ tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP 
 
 ## 当前范围
 
-本阶段有意不包含 MCP resources、prompts、sampling/elicitation handler、OAuth 登录、
+本阶段有意不包含 MCP resources、prompts、sampling/elicitation handler、
 旧 HTTP+SSE、Tasks/Apps 扩展、server 实现、自动重连和动态 `tools/list_changed` 刷新。工具列表是启动
 快照；server 修改列表后，需要下次启动 MaybeCode 才能看到。
+
+剩余阶段参阅 [MCP Host 路线与验收](../architecture/mcp-host-roadmap.md)。
 
 协议细节参阅 [MCP tools 官方规范](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
 和 [TypeScript client 文档](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/client.md)。

@@ -86,7 +86,7 @@ at its real ownership boundary.
 server status, lifecycle events, and span names are developer-preview APIs. The
 current implementation supports stdio / Streamable HTTP tool clients and snapshots discovery
 at startup. Do not assume that
-future resources, prompts, OAuth, reconnection, or dynamic refresh
+future resources, prompts, reconnection, or dynamic refresh
 will use the same configuration or lifecycle surface.
 
 Model-facing names currently use `mcp__<server>__<tool>` with provider-safe

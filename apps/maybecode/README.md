@@ -256,7 +256,9 @@ security, protocol negotiation, and remaining limitations. HTTP uses automatic
 modern/legacy negotiation by default; stdio keeps the legacy handshake unless
 `protocolMode: "auto"` is requested. HTTPS is required except for loopback;
 redirects and automatic tool-call retries are disabled. Static headers are
-supported, but OAuth login is not yet implemented.
+supported; native OAuth login/refresh/logout is available through `maybecode mcp login`,
+`status`, and `logout`. See [MCP authentication](../../docs/en/guides/mcp-auth.md)
+for OS-keyring-backed storage, origin allowlists, and public client registration.
 
 Use `/mcp` to inspect every configured server, its required/optional state,
 negotiated protocol version, discovered tools, connection diagnostics, and bounded stdio stderr.

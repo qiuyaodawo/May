@@ -95,7 +95,8 @@ collision-checked. Calls forward cancellation and progress, and optional MCP
 spans use the injected Core tracer. The client pool owns its spawned processes;
 the application that opens it must close it. It also exposes server status and
 connection lifecycle events, while retaining a bounded sanitized stderr tail
-for diagnostics. See [MCP tools](../guides/mcp.md).
+for diagnostics. Native OAuth and an OS-keyring-backed encrypted credential vault
+are optional; see [MCP authentication](../guides/mcp-auth.md) and [MCP tools](../guides/mcp.md).
 
 ## State and policy
 

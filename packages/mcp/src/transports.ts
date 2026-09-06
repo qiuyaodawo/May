@@ -7,10 +7,17 @@ import {
 import { McpConfigurationError } from "./errors.js";
 import { assertMcpServerId } from "./names.js";
 import type { McpServerOptions } from "./types.js";
+import { McpAuthenticationError, validateMcpOAuthOptions, type McpOAuthManager } from "./oauth.js";
+import { McpCredentialStoreError } from "./credentials.js";
 
-export function createMcpTransport(options: McpServerOptions) {
+export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthManager) {
   if (options.transport === "streamable-http") {
+    if (options.auth !== undefined && oauth === undefined) {
+      throw new McpConfigurationError(`MCP server "${options.id}" requires an OAuth credential manager`);
+    }
     return new StreamableHTTPClientTransport(new URL(options.url), {
+      ...(options.auth === undefined ? {} : { authProvider: oauth!.binding(options) }),
+      onInsufficientScope: "throw",
       requestInit: {
         ...(options.headers === undefined ? {} : { headers: options.headers }),
         redirect: "error",
@@ -30,11 +37,16 @@ export function createMcpTransport(options: McpServerOptions) {
               AbortSignal.timeout(Math.ceil(Math.min(options.requestTimeoutMs ?? 5_000, 5_000))),
             ])
           : init?.signal;
-        return fetch(input, {
+        const response = await fetch(input, {
           ...init,
           ...(signal === undefined ? {} : { signal }),
           redirect: "error",
         });
+        if (response.status === 403 && options.auth !== undefined) {
+          try { await oauth!.requireConsent(options, response); }
+          catch (error) { await response.body?.cancel().catch(() => {}); throw error; }
+        }
+        return response;
       },
     });
   }
@@ -79,6 +91,13 @@ export function validateMcpServerOptions(options: McpServerOptions): void {
       invalid(options, "url must use HTTPS (HTTP is loopback-only)");
     }
     validateStringMap(options.headers, options, "headers");
+    if (options.auth !== undefined) {
+      try { validateMcpOAuthOptions(options.auth); }
+      catch { invalid(options, "auth contains invalid OAuth options (clientId requires expectedIssuer)"); }
+      if (Object.keys(options.headers ?? {}).some((name) => name.toLowerCase() === "authorization")) {
+        invalid(options, "OAuth and a static Authorization header cannot be combined");
+      }
+    }
     const seen = new Set<string>();
     for (const [name, value] of Object.entries(options.headers ?? {})) {
       const key = name.toLowerCase();
@@ -99,7 +118,7 @@ export function validateMcpServerOptions(options: McpServerOptions): void {
   if (options.transport !== undefined && options.transport !== "stdio") {
     invalid(options, 'transport must be "stdio" or "streamable-http"');
   }
-  rejectFields(options, ["url", "headers"]);
+  rejectFields(options, ["url", "headers", "auth"]);
   if (typeof options.command !== "string" || options.command.trim() === "") {
     invalid(options, "command must be a non-empty string");
   }
@@ -118,6 +137,7 @@ export function validateMcpServerOptions(options: McpServerOptions): void {
 /** HTTP SDK errors can include URLs, response bodies and credentials. */
 export function safeMcpTransportError(error: unknown, options: McpServerOptions): unknown {
   if (options.transport !== "streamable-http") return error;
+  if (error instanceof McpAuthenticationError || error instanceof McpCredentialStoreError) return error;
   const data = error instanceof Error && "data" in error ? error.data : undefined;
   const status = typeof data === "object" && data !== null && "status" in data
     && typeof data.status === "number" && Number.isInteger(data.status)

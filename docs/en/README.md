@@ -33,6 +33,8 @@ interfaces are intended for extension.
 - [Permission policy](guides/permission-policy.md)
 - [Observability and tracing](guides/observability.md)
 - [MCP tools](guides/mcp.md)
+- [MCP authentication](guides/mcp-auth.md)
+- [MCP Host roadmap](architecture/mcp-host-roadmap.md)
 
 ## Reference
 

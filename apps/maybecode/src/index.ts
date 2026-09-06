@@ -28,3 +28,4 @@ export {
   createCodingToolRendererRegistry as createMaybeCodeToolRendererRegistry,
 } from "@may/tui/tool-renderers";
 export * from "./workspace.js";
+export * from "./mcp-auth.js";

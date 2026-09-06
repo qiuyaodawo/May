@@ -3,6 +3,7 @@ import type {
   TraceAttributes,
   Tracer,
 } from "@may/core";
+import type { McpOAuthManager, McpOAuthOptions } from "./oauth.js";
 
 export type McpTransport = "stdio" | "streamable-http";
 
@@ -39,6 +40,7 @@ export interface McpHttpServerOptions extends McpServerBaseOptions {
   readonly url: string;
   /** Static headers, including optional authorization. Never included in diagnostics. */
   readonly headers?: Readonly<Record<string, string>>;
+  readonly auth?: McpOAuthOptions;
 }
 
 export type McpServerOptions = McpStdioServerOptions | McpHttpServerOptions;
@@ -48,6 +50,8 @@ export interface OpenMcpClientPoolOptions {
   readonly tracer?: Tracer;
   readonly traceAttributes?: TraceAttributes;
   readonly signal?: AbortSignal;
+  /** Required for endpoints with auth.type=oauth; credentials stay outside configuration. */
+  readonly oauth?: McpOAuthManager;
   readonly clientInfo?: {
     readonly name: string;
     readonly version: string;
@@ -69,6 +73,7 @@ export interface McpDiagnostic {
 
 export type McpServerConnectionState =
   | "connected"
+  | "auth-required"
   | "failed"
   | "disconnected";
 
