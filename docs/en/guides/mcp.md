@@ -227,6 +227,68 @@ for a negotiated legacy HTTP session (at most five seconds, or the shorter
 request timeout), then always closes local transport resources. It does not
 delete remote user data. No remote session is created by the modern protocol.
 
+## GitHub remote server: opt-in live verification
+
+[GitHub's hosted server](https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md)
+needs no Docker or local server installation. Merge the following entry into
+`apps.maybecode.mcpServers` in `~/.may/config.json`, preserving existing settings:
+
+```json
+{
+  "github": {
+    "enabled": false,
+    "transport": "streamable-http",
+    "url": "https://api.githubcopilot.com/mcp/readonly",
+    "headers": { "Authorization": "Bearer ${GITHUB_MCP_TOKEN}" },
+    "required": false,
+    "protocolMode": "auto",
+    "requestTimeoutMs": 15000,
+    "maxTotalTimeoutMs": 20000
+  }
+}
+```
+
+The `/readonly` endpoint excludes write tools. Create a short-lived,
+least-privilege [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
+This smoke reads only the public `github/github-mcp-server` README; do not grant
+write or private-repository access for it. In PowerShell, enter the token without
+putting its value in command history, then run from the repository root:
+
+```powershell
+$secret = Read-Host "GitHub MCP token" -AsSecureString
+$env:GITHUB_MCP_TOKEN = [System.Net.NetworkCredential]::new("", $secret).Password
+$secret.Dispose()
+Remove-Variable secret
+pnpm run test:integration:github-mcp
+```
+
+The token exists in this process environment and its children, not in the saved
+configuration. Never paste it into chat, print it, or commit it. Remove it with
+`Remove-Item Env:GITHUB_MCP_TOKEN` when finished. The
+[smoke script](../../../scripts/test-maybecode-github-mcp.mjs) loads only the saved
+`github` destination/header reference and enables it **in memory**, with bounded
+timeouts and no extra Host capabilities. It uses a disposable MaybeCode workspace
+and deterministic model, not a provider API. It checks `/mcp`, negotiated protocol,
+catalog discovery, exactly one narrowly approved `get_file_contents` call, and
+tool-result projection into model context. It neither edits the saved entry nor
+prints remote content/credentials. An optional config path can follow the command.
+
+For regular terminal use, set the entry's `enabled` to `true` **after** setting the
+environment variable, run `pnpm maybecode` in that same shell, then inspect `/mcp`
+and `/mcp catalog github`. Missing environment references abort configuration even
+when `required` is false; leave the entry disabled when no token is available.
+This PAT configuration does not use `maybecode mcp login`: GitHub OAuth requires
+the Host's own registered GitHub App/OAuth App, as described in its
+[README](https://github.com/github/github-mcp-server).
+
+Without a token, `pnpm run test:integration:github-mcp --unauthenticated` checks
+real MaybeCode optional-server HTTP 401 handling only; it never sends a credential.
+The authenticated command exits nonzero when blocked or failed, rather than
+silently skipping. On 2026-09-07, the unauthenticated live check passed; authenticated
+discovery/tool execution remained blocked on a user-supplied token. Even a complete
+PASS validates this client tools path, not OAuth, every MCP capability, or May's
+independent MCP server exports. Undeclared capabilities are not test failures.
+
 ## Tracing and security
 
 With a tracer, the adapter emits:
