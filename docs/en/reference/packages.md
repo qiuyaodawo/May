@@ -97,7 +97,8 @@ the application that opens it must close it. It also exposes server status and
 connection lifecycle events, while retaining a bounded sanitized stderr tail
 for diagnostics. `catalog()` exposes versioned metadata and `refresh()`/`reconnect()`
 update the pool; `toolSource: () => pool.tools` supplies immutable per-Run tools.
-Resource reads/prompt expansion are not implied by metadata discovery. Native OAuth and an OS-keyring-backed encrypted credential vault
+Host-driven resources/templates, prompts, completion and watches support bounded
+content and explicit attachment, never automatic URI loading. Native OAuth and an OS-keyring-backed encrypted credential vault
 are optional; see [MCP authentication](../guides/mcp-auth.md) and [MCP tools](../guides/mcp.md).
 
 ## State and policy

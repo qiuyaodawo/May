@@ -69,8 +69,8 @@ shutdown 共享 processor；产品必须在真正的 ownership 边界只执行�
 
 `@may/mcp` 的 client-pool option、错误码、namespace、工具输出结构、server 状态、
 生命周期事件和 span name 都是开发预览 API。当前支持 stdio / Streamable HTTP tool
-client、动态元数据目录、每 Run 工具快照及显式刷新/重连。资源内容和 prompt 展开
-API 仍待完成，不能从目录元数据推断支持。详见 [MCP 指南](../guides/mcp.md)。
+client、动态元数据目录、每 Run 工具快照及显式刷新/重连。资源/模板、prompt、补全
+和 watch 为宿主驱动 API，选中内容以 user message 附加而非高权限指令。详见 [MCP 指南](../guides/mcp.md)。
 
 模型可见名称目前使用 `mcp__<server>__<tool>`，执行 provider-safe 归一化并限制为
 64 个字符。持久 Session 可以在工具调用和结果中包含这些名称，因此修改 server id

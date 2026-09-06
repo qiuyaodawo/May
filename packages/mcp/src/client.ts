@@ -22,6 +22,8 @@ import {
 import {
   McpClientPoolClosedError,
   McpCatalogError,
+  McpCapabilityError,
+  McpContentError,
   McpStaleToolError,
   McpConfigurationError,
   McpConnectionError,
@@ -29,6 +31,8 @@ import {
   McpToolReportedError,
   McpToolsListError,
 } from "./errors.js";
+import { McpCapabilities } from "./capabilities.js";
+import { assertMcpContentSize, mcpToolResultContent } from "./content.js";
 import { namespaceMcpToolName } from "./names.js";
 import { McpAuthenticationError } from "./oauth.js";
 import { McpCredentialStoreError } from "./credentials.js";
@@ -39,6 +43,9 @@ import {
 } from "./transports.js";
 import type {
   McpClientPool,
+  McpOperationOptions,
+  McpReadOptions,
+  McpCompletionParams,
   McpClientEvent,
   McpDiagnostic,
   McpServerStatus,
@@ -53,6 +60,10 @@ const DEFAULT_STDERR_MAX_BYTES = 16 * 1_024;
 
 class McpConnection {
   private closed = false;
+  readonly capabilities: McpCapabilities;
+  private readonly lifetime = new AbortController();
+  private authorizationIdentity: string | undefined;
+  private authorizeIdentity: (() => Promise<string>) | undefined;
   generation = randomUUID();
   private readonly installedTools = new Map<string, string>();
   private stale = true;
@@ -70,7 +81,9 @@ class McpConnection {
     private readonly tracer: Tracer | undefined,
     private readonly traceAttributes: TraceAttributes,
     private readonly onAvailability: (error?: Error) => void,
-  ) {}
+  ) {
+    this.capabilities = new McpCapabilities(client, options, (method, options, work) => this.runCapability(method, options, work));
+  }
 
   static async open(
     options: McpServerOptions,
@@ -144,6 +157,10 @@ class McpConnection {
           ? {}
           : { attributes: { "process.pid": transport.pid } }),
       });
+      if (options.transport === "streamable-http" && options.auth !== undefined) {
+        connection.authorizeIdentity = () => poolOptions.oauth!.authorizationIdentity(options);
+        connection.authorizationIdentity = await connection.authorizeIdentity();
+      }
       connection.connected = true;
       const advertised = client.getServerCapabilities();
       const expected = {
@@ -187,7 +204,7 @@ class McpConnection {
     }
   }
 
-  invalidate(): void { this.stale = true; }
+  invalidate(): void { this.stale = true; this.capabilities.invalidate(); }
 
   get busy(): boolean { return this.activeCalls > 0; }
 
@@ -203,6 +220,7 @@ class McpConnection {
     this.throwIfClosed();
     const span = startTraceSpan(this.tracer, "may.mcp.tools.list", { attributes: this.traceAttributes });
     try {
+      await this.checkAuthorization();
       const capabilities = this.client.getServerCapabilities() ?? {};
       const options = requestOptions(this.options, signal);
       // Explicit page walking rejects repeated cursors rather than publishing a partial catalog.
@@ -273,6 +291,8 @@ class McpConnection {
     });
 
     try {
+      await this.checkAuthorization();
+      context.signal.throwIfAborted();
       const result = await this.client.callTool(
         { name: definition.name, arguments: input },
         {
@@ -288,6 +308,8 @@ class McpConnection {
           },
         },
       );
+      assertMcpContentSize(result);
+      mcpToolResultContent(this.options.id, definition.name, result);
       if (result.isError === true) {
         throw new McpToolReportedError(
           this.options.id,
@@ -300,6 +322,7 @@ class McpConnection {
       endTraceSpan(span, { status: "ok" });
       return {
         content: result.content,
+        ...(result._meta === undefined ? {} : { _meta: result._meta }),
         ...(result.structuredContent === undefined
           ? {}
           : { structuredContent: result.structuredContent }),
@@ -307,7 +330,7 @@ class McpConnection {
     } catch (error) {
       const safeError = safeMcpTransportError(error, this.options);
       endMcpSpan(span, safeError, context.signal);
-      if (context.signal.aborted || error instanceof McpToolReportedError) {
+      if (context.signal.aborted || error instanceof McpToolReportedError || error instanceof McpContentError || error instanceof McpCapabilityError) {
         throw error;
       }
       if (safeError instanceof McpAuthenticationError || safeError instanceof McpCredentialStoreError) {
@@ -325,10 +348,48 @@ class McpConnection {
     }
   }
 
+  private async checkAuthorization(): Promise<void> {
+    if (this.authorizeIdentity === undefined) return;
+    try {
+      if (await this.authorizeIdentity() !== this.authorizationIdentity) {
+        throw new McpCapabilityError(this.options.id, "authentication identity changed; reconnect before further operations");
+      }
+    } catch (error) { this.invalidate(); this.onAvailability(error as Error); throw error; }
+  }
+
+  private async runCapability<T>(method: string, options: McpOperationOptions, work: (request: RequestOptions) => Promise<T>): Promise<T> {
+    this.throwIfClosed();
+    const signal = AbortSignal.any([this.lifetime.signal, ...(options.signal === undefined ? [] : [options.signal])]);
+    signal.throwIfAborted();
+    if (this.stale) throw new McpCapabilityError(this.options.id, "catalog is stale; refresh or reconnect before using capabilities");
+    this.activeCalls++;
+    const span = startTraceSpan(this.tracer, `may.mcp.${method.replaceAll("/", ".")}`, {
+      attributes: this.traceAttributes, ...(options.traceContext === undefined ? {} : { parent: options.traceContext }),
+    });
+    try {
+      await this.checkAuthorization();
+      signal.throwIfAborted();
+      const result = await work({ ...requestOptions(this.options, signal), maxTotalTimeout: this.options.maxTotalTimeoutMs ?? 60_000 });
+      signal.throwIfAborted();
+      await this.checkAuthorization();
+      endTraceSpan(span, { status: "ok" });
+      return result;
+    } catch (error) {
+      const safe = error instanceof McpCapabilityError || error instanceof McpContentError ? error : safeMcpTransportError(error, this.options);
+      endMcpSpan(span, safe, signal);
+      if (signal.aborted) throw error;
+      if (safe instanceof McpAuthenticationError || safe instanceof McpCredentialStoreError) this.onAvailability(safe);
+      if (safe instanceof McpCapabilityError || safe instanceof McpContentError || safe instanceof McpAuthenticationError || safe instanceof McpCredentialStoreError) throw safe;
+      throw new McpCapabilityError(this.options.id, sanitizeDiagnosticText(errorMessage(safe), 2000));
+    } finally { this.activeCalls--; }
+  }
+
   async close(): Promise<void> {
     if (this.closed) return;
     this.closing = true;
     this.closed = true;
+    this.lifetime.abort("MCP connection is closing");
+    await this.capabilities.close();
     const span = startTraceSpan(this.tracer, "may.mcp.disconnect", {
       attributes: this.traceAttributes,
     });
@@ -371,6 +432,8 @@ class McpConnection {
   private handleClose(): void {
     if (this.closing || this.closed || !this.connected) return;
     this.closed = true;
+    this.lifetime.abort("MCP connection closed");
+    void this.capabilities.close();
     const recentStderr = this.stderr.text();
     const cause = this.lastTransportError;
     this.onAvailability(new McpConnectionError(
@@ -512,6 +575,33 @@ class DefaultMcpClientPool implements McpClientPool {
     });
   }
 
+  readResource(serverId: string, uri: string, options: McpReadOptions = {}) {
+    return this.connection(serverId).capabilities.readResource(uri, { ...options, signal: this.signal(options.signal) });
+  }
+
+  readResourceTemplate(serverId: string, template: string, variables: Readonly<Record<string, string | string[]>>, options: McpReadOptions = {}) {
+    return this.connection(serverId).capabilities.readTemplate(template, variables, { ...options, signal: this.signal(options.signal) });
+  }
+
+  getPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>, options: McpOperationOptions = {}) {
+    return this.connection(serverId).capabilities.getPrompt(name, args, { ...options, signal: this.signal(options.signal) });
+  }
+
+  complete(serverId: string, params: McpCompletionParams, options: McpOperationOptions = {}) {
+    return this.connection(serverId).capabilities.complete(params, { ...options, signal: this.signal(options.signal) });
+  }
+
+  subscribeResource(serverId: string, uri: string, options: McpOperationOptions = {}) {
+    return this.connection(serverId).capabilities.subscribe(uri, { ...options, signal: this.signal(options.signal) });
+  }
+
+  private connection(serverId: string): McpConnection {
+    if (this.closed) throw new McpClientPoolClosedError();
+    const connection = this.entry(serverId).connection;
+    if (connection === undefined) throw new McpCapabilityError(serverId, "endpoint is unavailable; reconnect explicitly");
+    return connection;
+  }
+
   async initialize(): Promise<void> {
     for (const entry of this.entries) {
       try {
@@ -644,6 +734,7 @@ class DefaultMcpClientPool implements McpClientPool {
         });
         const revision = (entry.catalog?.revision ?? 0) + (changed || initial ? 1 : 0);
         entry.catalog = freezeTree({ ...candidate, serverId: entry.server.id, revision });
+        connection.capabilities.updateCatalog(entry.catalog);
         entry.tools = tools;
         entry.status.toolNames = tools.map((tool) => tool.name);
         entry.status.state = "connected";
@@ -702,6 +793,7 @@ function createTools(
       }`,
       inputSchema: definition.inputSchema as JsonSchema,
       parse: (input: unknown) => parseArguments(exposedName, input),
+      resultContent: (output: McpToolOutput) => mcpToolResultContent(connection.options.id, definition.name, output),
       execute: (input: Record<string, unknown>, context: ToolExecutionContext) =>
         connection.callTool(definition, exposedName, input, context, generation),
     });

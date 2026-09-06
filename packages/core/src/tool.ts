@@ -1,4 +1,4 @@
-import type { JsonSchema, ToolCall } from "./types.js";
+import type { ContentPart, JsonSchema, ToolCall } from "./types.js";
 import type { TraceContext } from "./tracing.js";
 
 export type ToolProgressUpdate =
@@ -37,6 +37,9 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
   parse?(input: unknown): TInput;
 
   execute(input: TInput, context: ToolExecutionContext): Promise<TOutput>;
+
+  /** Optional model-visible projection; raw output remains in tool events. */
+  resultContent?(output: TOutput): ContentPart[];
 }
 
 export interface ToolExecution<TInput = unknown, TOutput = unknown> {

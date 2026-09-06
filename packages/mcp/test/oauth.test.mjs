@@ -51,7 +51,14 @@ test("OAuth uses PKCE, refreshes, isolates accounts, gates step-up, and revokes 
   await login();
   await pool.reconnect("remote");
   assert.equal((await execute()).content[0].text, "authorized");
+  await pool.readResource("remote", "private:///data");
+  assert.equal((await pool.readResource("remote", "private:///data")).fromCache, true);
+  await login();
+  await assert.rejects(pool.readResource("remote", "private:///data"), (error) => error.code === "MCP_CAPABILITY_ERROR");
+  await pool.reconnect("remote");
+  assert.equal((await pool.readResource("remote", "private:///data")).fromCache, false);
   assert.deepEqual(await oauth.logout(server), { revoked: true });
+  await assert.rejects(pool.readResource("remote", "private:///data"), (error) => error.code === "MCP_AUTHENTICATION_REQUIRED");
   assert.equal(http.counts.revocations, 2);
   assert.equal((await oauth.status(server)).authenticated, false);
 });

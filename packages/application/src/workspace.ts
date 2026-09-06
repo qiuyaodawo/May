@@ -221,6 +221,19 @@ export class AgentWorkspace<
     });
   }
 
+  /** Prepare user input on the Session state queue, then submit to the same application. */
+  submitPrepared(prepare: () => RunOptions | Promise<RunOptions>): Promise<AgentRun> {
+    this.throwIfClosed();
+    return this.state.run(async () => {
+      this.assertIdle("Cannot prepare input while an operation is active");
+      const options = await prepare();
+      options.signal?.throwIfAborted();
+      const run = await this.application.submit(options);
+      void this.recordCurrentSession().catch(() => undefined);
+      return this.withSessionRecord(run);
+    });
+  }
+
   async retry(): Promise<AgentRun> {
     return this.state.run(async () => {
       void this.recordCurrentSession().catch(() => undefined);

@@ -157,7 +157,9 @@ versioned tools/resources/templates/prompts metadata catalogs, and exposes
 per-Run immutable tool descriptors backed by `tools/call`. An additive
 `toolSource` publishes the latest catalog without mutating an active Run.
 List-change notifications refresh metadata; reconnect is explicit and never
-replays a tool call. Resource content/prompt expansion remain separate work.
+replays a tool call. Host-driven resource/prompt/completion APIs produce bounded
+untrusted content. Explicit attachment preparation/submission share the Session
+state queue. Core only knows the generic `Tool.resultContent` projection hook.
 
 The pool also exposes a point-in-time server status view and ordered connection
 lifecycle events. Required servers fail application startup; optional servers

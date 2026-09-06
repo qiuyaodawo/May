@@ -222,8 +222,8 @@ tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP 
 ## 当前范围
 
 工具和元数据目录（resources/templates/prompts）现已支持动态发现。资源读取/附件、
-prompt 展开、completion、sampling/elicitation handler、旧 HTTP+SSE、Tasks/Apps
-扩展及 server 实现仍待完成。重连需要显式操作，绝不自动重放工具调用。
+prompt、completion 和 watch 也已实现，详见下文。Sampling/elicitation handler、
+旧 HTTP+SSE、Tasks/Apps 扩展及 server 实现仍待完成。重连需要显式操作，绝不自动重放工具调用。
 
 剩余阶段参阅 [MCP Host 路线与验收](../architecture/mcp-host-roadmap.md)。
 
@@ -262,3 +262,65 @@ prompt 展开、completion、sampling/elicitation handler、旧 HTTP+SSE、Tasks
 显式 OAuth 登录后，先执行 `/mcp reconnect <server-id>` 再启动新 Run。每连接独享
 缓存；目录保存在 pool 内存中，显式刷新不会信任旧 TTL。关闭会取消排队/运行中的
 目录发现和订阅。
+
+## 资源、提示词、补全与附件
+
+Pool 提供宿主/用户驱动的 `readResource`、`readResourceTemplate`、`getPrompt`、
+`complete` 和 `subscribeResource`，**不会自动作为模型工具导出**。仅基于已授权
+用户意图或显式宿主策略调用；MCP 凭据不替代应用访问控制。方法接受取消信号和
+trace context，复用端点生命周期。
+
+```ts
+const read = await mcp.readResource("workspace", "project:///README", { signal });
+const expanded = await mcp.readResourceTemplate(
+  "workspace", "project:///{path}", { path: "README" }, { signal },
+);
+const prompt = await mcp.getPrompt("workspace", "review", { file: "main.ts" }, { signal });
+const suggestions = await mcp.complete("workspace", {
+  ref: { type: "ref/prompt", name: "review" },
+  argument: { name: "file", value: "ma" },
+}, { signal });
+const watch = await mcp.subscribeResource("workspace", read.uri, { signal });
+// watch.events 只有 { type: "updated", serverId, uri }，没有新内容。
+await watch.close(); // watch.closed 也报告远端/连接终止。
+```
+
+两种终端 UI 均支持以下命令。JSON 直接输入，不加 shell 引号；内部空白保留：
+
+```text
+/mcp catalog [server-id]
+/mcp read server-id resource-uri
+/mcp template server-id uri-template {"path":"README"}
+/mcp prompt server-id prompt-name {"file":"main.ts"}
+/mcp complete server-id {"ref":{"type":"ref/prompt","name":"review"},"argument":{"name":"file","value":"ma"}}
+/mcp attach server-id resource-uri 这个资源包含什么？
+/mcp use-prompt server-id prompt-name {"file":"main.ts"}
+/mcp watch server-id resource-uri
+/mcp unwatch server-id resource-uri
+```
+
+`read`、`template`、`prompt` 仅预览；`attach`、`use-prompt` 以 **user message** 显式
+启动 Run，准备和提交在同一 Session 状态队列内原子执行。Ctrl+C/关闭取消准备，
+不会将数据附加到随后切换的 Session。远端 prompt 的角色标签只是数据，不是实际
+assistant/system 历史。`mcpResourceToUserMessage`、`mcpPromptToUserMessage` 保留
+不可信 MCP 来源信息。Resource link 保持惰性 JSON，不触发本地文件读取或 URL
+自动下载。Watch 通知不改变模型 Context。
+
+每结果最多 128 块/8 MiB，验证 base64/MIME；超限失败，不静默截断结构化数据或
+二进制。终端预览最多 16,000 字符，二进制仅显示标签。媒体转换为 provider-neutral
+base64 内容；模型不支持时通过 `UnsupportedContentError` 明确失败，不偷偷转成
+文本。通用 `Tool.resultContent` hook 向模型投影多模态与 structured output，工具
+事件保留原始结果；`_meta` 仅供宿主使用。补全验证目录引用/参数名，每次最多
+100 项/64 KiB，每连接每秒最多 10 次。终端按 Enter 才请求，GUI 应对输入 debounce。
+
+资源 LRU 遵循正 TTL，最多五分钟；每连接最多 32 项/16 MiB，缺少 TTL 不复用。
+`cache: "refresh"` 强制读取，`"bypass"` 不读写缓存。资源/列表通知使缓存失效；
+读取期间收到更新则不写回过期数据。即使结果宣告 `public`，也不跨端点/账户/连接
+共享。命中前及读取后检查 OAuth 授权代次，另一个进程登录/退出不能暴露旧私有
+缓存；授权变化后需重连。
+
+现代 watch 使用 `subscriptions/listen`，旧版使用 subscribe/unsubscribe。同 URI
+共享引用计数远端流，各 handle 独立取消并缓冲最多 32 条通知；每连接最多 64 个
+handle。流断开会完成 `closed`，不悄悄自动重连。关闭释放全部 handle。HTTP JSON
+响应和每 SSE frame 在 SDK 解析前限制 10 MiB；stdio 保留可配置限制，并保证通知/
+响应有序投递。

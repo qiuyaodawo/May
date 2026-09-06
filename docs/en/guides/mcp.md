@@ -251,9 +251,9 @@ environment and filesystem access, and keep the permission layer enabled.
 ## Current scope
 
 Tools and metadata catalogs (resources/templates/prompts) now support dynamic discovery.
-Resource reads/attachments, prompt expansion, completion, sampling/elicitation
-handlers, deprecated HTTP+SSE, Tasks/Apps extensions and server authoring are not
-implemented yet. Reconnect is explicit, never automatic tool replay.
+Resource reads/attachments, prompts, completion and watches are implemented below.
+Sampling/elicitation, deprecated HTTP+SSE, Tasks/Apps and server authoring remain
+outside this phase. Reconnect is explicit, never automatic tool replay.
 
 Track the remaining phases in the [MCP Host roadmap](../architecture/mcp-host-roadmap.md).
 
@@ -302,3 +302,74 @@ reconnect/recovery creates a new identity. After an explicit OAuth login, run
 `/mcp reconnect <server-id>` before starting another Run. Each connection owns
 its cache; catalogs are retained in pool memory and explicit refresh never trusts
 a server's prior TTL. Closing cancels queued/active discovery and subscriptions.
+
+## Resources, prompts, completion and attachments
+
+The pool exposes host/user-driven `readResource`, `readResourceTemplate`,
+`getPrompt`, `complete` and `subscribeResource`. They are **not** automatically
+exported as model tools. Call them only for authorized user intent or explicit
+host policy: MCP credentials do not replace application access control. They
+accept cancellation/trace context and share the endpoint lifecycle.
+
+```ts
+const read = await mcp.readResource("workspace", "project:///README", { signal });
+const expanded = await mcp.readResourceTemplate(
+  "workspace", "project:///{path}", { path: "README" }, { signal },
+);
+const prompt = await mcp.getPrompt("workspace", "review", { file: "main.ts" }, { signal });
+const suggestions = await mcp.complete("workspace", {
+  ref: { type: "ref/prompt", name: "review" },
+  argument: { name: "file", value: "ma" },
+}, { signal });
+const watch = await mcp.subscribeResource("workspace", read.uri, { signal });
+// watch.events contains { type: "updated", serverId, uri }, never new content.
+await watch.close(); // watch.closed also reports remote/connection termination.
+```
+
+Both terminal UIs support these commands. Enter JSON directly without shell
+quoting; its internal whitespace is preserved:
+
+```text
+/mcp catalog [server-id]
+/mcp read server-id resource-uri
+/mcp template server-id uri-template {"path":"README"}
+/mcp prompt server-id prompt-name {"file":"main.ts"}
+/mcp complete server-id {"ref":{"type":"ref/prompt","name":"review"},"argument":{"name":"file","value":"ma"}}
+/mcp attach server-id resource-uri What does this contain?
+/mcp use-prompt server-id prompt-name {"file":"main.ts"}
+/mcp watch server-id resource-uri
+/mcp unwatch server-id resource-uri
+```
+
+`read`, `template` and `prompt` only preview. `attach` and `use-prompt` explicitly
+start a Run with a **user message**, atomically prepared on the Session state
+queue. Ctrl+C/close cancel preparation without attaching data to a later Session.
+Remote prompt role labels remain data, not actual assistant/system history.
+`mcpResourceToUserMessage` and `mcpPromptToUserMessage` preserve untrusted MCP
+provenance. Resource links stay inert JSON: neither local file reads nor automatic
+URL downloads. Watch notices never change the model Context.
+
+Results allow 128 blocks/8 MiB, validating base64/MIME; oversize results fail rather
+than silently truncating structured data/binary. Terminal previews allow 16,000
+characters, replacing binaries with labels. Media becomes provider-neutral base64
+content; unsupported model media fails with `UnsupportedContentError`, not silent
+text conversion. The generic `Tool.resultContent` hook projects MCP multimodal and
+structured output to the model, while raw tool events retain the original result.
+`_meta` stays host-only. Completion validates catalog references/argument names,
+allows 100 suggestions/64 KiB and ten calls/second/connection. Terminals request on
+Enter; GUI hosts should debounce typing.
+
+The resource LRU honors positive TTLs (maximum five minutes), bounded to 32 entries/
+16 MiB per connection. Missing TTL means no reuse. `cache: "refresh"` refetches;
+`"bypass"` neither reads nor writes cache. Resource/list notifications invalidate
+entries; updates racing a read prevent stale cache writes. Even `public` results
+are never shared across endpoints/accounts/connections. OAuth grant generation is
+checked before cache hits and after reads: separate-process login/logout cannot
+expose old private cached data. Reconnect when the grant changes.
+
+Modern watches use `subscriptions/listen`, legacy uses subscribe/unsubscribe.
+Each URI shares a reference-counted remote stream, with independently cancellable
+local handles and 32-notice buffers; at most 64 handles/connection. Lost streams
+settle `closed`, never silently reconnect. Closing releases all handles. HTTP JSON
+bodies and each SSE frame are capped at 10 MiB before SDK parsing; stdio keeps its
+configurable bound and ordered notification/response delivery.

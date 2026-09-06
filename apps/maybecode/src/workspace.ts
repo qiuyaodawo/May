@@ -12,7 +12,9 @@ import {
   type Model,
   type RunOptions,
 } from "@may/core";
-import type { McpClientPool, McpServerStatus } from "@may/mcp";
+import { mcpResourceToUserMessage, mcpPromptToUserMessage, type McpClientPool, type McpServerStatus,
+  type McpOperationOptions, type McpReadOptions, type McpCompletionParams, type McpResourceSubscription,
+} from "@may/mcp";
 import type { ApprovalDecision } from "@may/permissions";
 import type { ModelCapabilities } from "@may/providers";
 import type {
@@ -63,7 +65,7 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
   ) => Promise<ModelCapabilities>;
   readonly persistDefaultModel?: (profile: string) => Promise<void>;
   /** Optional product-owned MCP status and lifecycle event source. */
-  readonly mcp?: Pick<McpClientPool, "events" | "status"> & Partial<Pick<McpClientPool, "refresh" | "reconnect">>;
+  readonly mcp?: Pick<McpClientPool, "events" | "status"> & Partial<Omit<McpClientPool, "events" | "status" | "tools" | "close">>;
   /** Product-owned resources, such as tracing processors, closed after the workspace. */
   readonly closeOwnedResources?: () => void | Promise<void>;
 }
@@ -100,7 +102,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   private readonly eventQueue = new AsyncEventQueue<MaybeCodeEvent>({
     maxBufferedValues: 1024,
     isDroppable: (event) =>
-      event.type === "run.event" && isStreamingMayEvent(event.event),
+      event.type === "mcp.resource.updated" || event.type === "run.event" && isStreamingMayEvent(event.event),
   });
   private readonly managerEventRelay: Promise<void>;
   private readonly mcpEventRelay: Promise<void>;
@@ -109,6 +111,9 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     Readonly<Record<string, unknown>>
   >();
   private closed = false;
+  private readonly mcpLifetime = new AbortController();
+  private mcpOperationController: AbortController | undefined;
+  private readonly mcpWatches = new Map<string, McpResourceSubscription>();
 
   private constructor(state: WorkspaceState, manager: BaseWorkspace) {
     this.state = state;
@@ -161,7 +166,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   get isRunning(): boolean {
-    return this.manager.isRunning;
+    return this.manager.isRunning || this.mcpOperationController !== undefined;
   }
 
   get instructions(): MaybeCodeInstructions {
@@ -189,6 +194,78 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     await this.state.options.mcp.reconnect(serverId);
   }
 
+  getMcpCatalog() {
+    this.throwIfClosed();
+    return this.state.options.mcp?.catalog?.() ?? [];
+  }
+
+  readMcpResource(serverId: string, uri: string, options: McpReadOptions = {}) {
+    return this.mcpOperation((signal) => this.mcpMethod("readResource")(serverId, uri, { ...options, signal }), options.signal);
+  }
+
+  readMcpResourceTemplate(serverId: string, template: string, variables: Readonly<Record<string, string | string[]>>, options: McpReadOptions = {}) {
+    return this.mcpOperation((signal) => this.mcpMethod("readResourceTemplate")(serverId, template, variables, { ...options, signal }), options.signal);
+  }
+
+  getMcpPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>, options: McpOperationOptions = {}) {
+    return this.mcpOperation((signal) => this.mcpMethod("getPrompt")(serverId, name, args, { ...options, signal }), options.signal);
+  }
+
+  completeMcp(serverId: string, params: McpCompletionParams, options: McpOperationOptions = {}) {
+    return this.mcpOperation((signal) => this.mcpMethod("complete")(serverId, params, { ...options, signal }), options.signal);
+  }
+
+  submitMcpResource(serverId: string, uri: string, instruction?: string): Promise<MaybeCodeRun> {
+    return this.mcpOperation((signal) => this.manager.submitPrepared(async () => ({
+      input: mcpResourceToUserMessage(await this.mcpMethod("readResource")(serverId, uri, { signal }), instruction), signal,
+    })));
+  }
+
+  submitMcpPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>): Promise<MaybeCodeRun> {
+    return this.mcpOperation((signal) => this.manager.submitPrepared(async () => ({
+      input: mcpPromptToUserMessage(await this.mcpMethod("getPrompt")(serverId, name, args, { signal })), signal,
+    })));
+  }
+
+  watchMcpResource(serverId: string, uri: string): Promise<McpResourceSubscription> {
+    return this.mcpOperation(async (signal) => {
+      const key = JSON.stringify([serverId, uri]);
+      if (this.mcpWatches.has(key)) return this.mcpWatches.get(key)!;
+      const watch = await this.mcpMethod("subscribeResource")(serverId, uri, { signal });
+      this.mcpWatches.set(key, watch);
+      void (async () => {
+        for await (const event of watch.events) {
+          if (!this.closed) this.eventQueue.push({ type: "mcp.resource.updated", serverId, uri: event.uri });
+        }
+        const reason = await watch.closed;
+        if (this.mcpWatches.get(key) === watch) this.mcpWatches.delete(key);
+        if (!this.closed) this.eventQueue.push({ type: "mcp.resource.watch-closed", serverId, uri, reason });
+      })();
+      return watch;
+    });
+  }
+
+  async unwatchMcpResource(serverId: string, uri: string): Promise<void> {
+    this.throwIfClosed();
+    await this.mcpWatches.get(JSON.stringify([serverId, uri]))?.close();
+  }
+
+  private mcpMethod<K extends "readResource" | "readResourceTemplate" | "getPrompt" | "complete" | "subscribeResource">(method: K): McpClientPool[K] {
+    const mcp = this.state.options.mcp;
+    if (mcp?.[method] === undefined) throw new Error(`MCP ${method} is unavailable`);
+    return mcp[method].bind(mcp) as McpClientPool[K];
+  }
+
+  private async mcpOperation<T>(work: (signal: AbortSignal) => Promise<T>, external?: AbortSignal): Promise<T> {
+    this.throwIfClosed();
+    if (this.isRunning) throw new Error("Cannot start an MCP user operation while another operation is active");
+    const controller = new AbortController();
+    this.mcpOperationController = controller;
+    const signal = AbortSignal.any([controller.signal, this.mcpLifetime.signal, ...(external === undefined ? [] : [external])]);
+    try { signal.throwIfAborted(); return await work(signal); }
+    finally { if (this.mcpOperationController === controller) this.mcpOperationController = undefined; }
+  }
+
   submit(options: RunOptions): Promise<MaybeCodeRun> {
     return this.manager.submit(options);
   }
@@ -198,6 +275,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   cancel(reason?: string): boolean {
+    if (this.mcpOperationController !== undefined) { this.mcpOperationController.abort(reason); return true; }
     return this.manager.cancel(reason);
   }
 
@@ -426,6 +504,8 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    this.mcpLifetime.abort("MaybeCode workspace is closing");
+    const watchesClosing = Promise.allSettled([...this.mcpWatches.values()].map((watch) => watch.close()));
     const failures: unknown[] = [];
     try {
       await this.manager.close();
@@ -437,6 +517,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     } catch (error) {
       failures.push(error);
     }
+    await watchesClosing;
     try {
       await Promise.all([this.managerEventRelay, this.mcpEventRelay]);
     } catch (error) {

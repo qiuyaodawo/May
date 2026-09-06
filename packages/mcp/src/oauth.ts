@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   auth, computeScopeUnion, extractWWWAuthenticateParams, validateAuthorizationResponseIssuer,
   type AuthProvider, type FetchLike, type OAuthClientProvider, type OAuthDiscoveryState,
@@ -41,6 +41,7 @@ interface Grant {
 }
 interface Credentials {
   version: 1;
+  authorizationId?: string;
   issuer?: string;
   redirectUrl?: string;
   pendingScope?: string;
@@ -66,6 +67,17 @@ export class McpOAuthManager {
       requiresConsent: state.pendingScope !== undefined,
       ...(grant?.expiresAt === undefined ? {} : { expiresAt: grant.expiresAt }),
     };
+  }
+
+  /** Opaque grant generation; validates stored credentials before serving private caches. */
+  async authorizationIdentity(server: McpHttpServerOptions): Promise<string> {
+    const token = await this.binding(server).token();
+    if (token === undefined) throw new McpAuthenticationError(server.id, true);
+    const state = await this.read(server);
+    const grant = state.issuer === undefined ? undefined : state.grants[state.issuer];
+    return createHash("sha256").update(JSON.stringify([
+      state.authorizationId ?? grant?.tokens, state.issuer, grant?.tokens?.scope,
+    ])).digest("hex");
   }
 
   /** Noninteractive binding: refresh on expiry/401, never open a browser in a tool call. */
@@ -116,6 +128,7 @@ export class McpOAuthManager {
       try {
         const state = await this.read(server);
         state.redirectUrl = callback.url;
+        state.authorizationId = randomBytes(32).toString("hex");
         const provider = this.provider(server, state, callback.url, csrf, options.onAuthorizationUrl);
         const fetchFn = this.authFetch(server, signal);
         const scope = computeScopeUnion(settings.scopes?.join(" "), state.pendingScope,

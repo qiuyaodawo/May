@@ -16,6 +16,8 @@ export type MaybeCodeSessionEvent =
 export type MaybeCodeEvent =
   | MaybeCodeSessionEvent
   | McpClientEvent
+  | { type: "mcp.resource.updated"; serverId: string; uri: string }
+  | { type: "mcp.resource.watch-closed"; serverId: string; uri: string; reason: string }
   | {
       type: "session.changed";
       sessionId: string;

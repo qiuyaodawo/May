@@ -14,7 +14,7 @@
   vault，以及模型启动前的 CLI。证据：`packages/mcp/test/oauth.test.mjs`、
   MaybeCode 命令测试、显式运行的 Windows 原生 keyring smoke。参阅
   [认证指南](../guides/mcp-auth.md)。
-- [ ] **能力与动态目录**：工具、资源/模板、提示模板、补全、缓存/订阅、有界内容及
+- [x] **能力与动态目录**：工具、资源/模板、提示模板、补全、缓存/订阅、有界内容及
   附件适配；按 Run 固定的不可变工具快照、定义变化后的旧授权失效、端点刷新/重连，
   不重放结果不确定的有副作用操作。
 - [ ] **Host 交互**：Elicitation 表单/URL、MRTR、workspace/session/run/request
@@ -30,7 +30,7 @@
 OAuth 完成不代表目录、Host 交互或扩展已完成。所有条目都有直接证据前，不得将整体
 迁移标记完成。
 
-动态目录已发布 tools/resources/templates/prompts 元数据，支持新旧协议列表通知、
-显式刷新/重连，并提供每 Run 工具快照及定义绑定授权。证据：`catalog.test.mjs`、
-Core registry/permissions 测试以及 MaybeCode 配置式生命周期测试。资源读取/附件、
-prompt 展开、completion 和资源订阅仍待完成，因此能力目录行保持未勾选。
+能力阶段证据：`catalog.test.mjs`、`capabilities.test.mjs`、OAuth 缓存隔离测试、
+Core registry/permissions 测试及 MaybeCode 配置/MCP 命令测试。工具/资源/模板/
+prompt/补全、有界附件、缓存失效及新旧协议订阅已实现。交互 broker/MRTR、tasks/
+Apps、server 导出和最终审计仍未完成。

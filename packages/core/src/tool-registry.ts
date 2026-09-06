@@ -19,6 +19,7 @@ interface RegisteredTool {
   readonly inputSchema: Tool["inputSchema"];
   readonly parse: Tool["parse"];
   readonly execute: Tool["execute"];
+  readonly resultContent: Tool["resultContent"];
   readonly permissionVersion: Tool["permissionVersion"];
 }
 
@@ -111,6 +112,7 @@ export class ToolRegistry implements Iterable<Tool> {
     return new ToolRegistry(this.values().map((tool) => {
       const execute = tool.execute;
       const parse = tool.parse;
+      const resultContent = tool.resultContent;
       return Object.freeze({
         ...tool,
         name: tool.name,
@@ -118,6 +120,7 @@ export class ToolRegistry implements Iterable<Tool> {
         ...(tool.permissionVersion === undefined ? {} : { permissionVersion: tool.permissionVersion }),
         inputSchema: freezeTree(structuredClone(tool.inputSchema)),
         ...(parse === undefined ? {} : { parse: (input: unknown) => parse.call(tool, input) }),
+        ...(resultContent === undefined ? {} : { resultContent: (output: unknown) => resultContent.call(tool, output) }),
         execute: (input: unknown, context: Parameters<Tool["execute"]>[1]) =>
           execute.call(tool, input, context),
       });
@@ -165,6 +168,9 @@ function validateTool(tool: Tool): void {
   if (typeof tool.execute !== "function") {
     throw new TypeError("tool must define execute(input, context)");
   }
+  if (tool.resultContent !== undefined && typeof tool.resultContent !== "function") {
+    throw new TypeError("tool resultContent must be a function when provided");
+  }
   if (tool.parse !== undefined && typeof tool.parse !== "function") {
     throw new TypeError("tool parse must be a function when provided");
   }
@@ -179,6 +185,7 @@ function createRegistration(tool: Tool): RegisteredTool {
     inputSchema: tool.inputSchema,
     parse: tool.parse,
     execute: tool.execute,
+    resultContent: tool.resultContent,
     permissionVersion: tool.permissionVersion,
   };
 }
@@ -191,6 +198,7 @@ function assertRegistrationUnchanged(registration: RegisteredTool): void {
     tool.inputSchema !== registration.inputSchema ||
     tool.parse !== registration.parse ||
     tool.execute !== registration.execute ||
+    tool.resultContent !== registration.resultContent ||
     tool.permissionVersion !== registration.permissionVersion
   ) {
     throw new TypeError(

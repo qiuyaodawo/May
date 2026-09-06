@@ -1,6 +1,6 @@
 import type { AgentWorkspaceController } from "@may/application";
 import type { ContextCompactionStrategy } from "@may/context";
-import type { McpServerStatus } from "@may/mcp";
+import type { McpClientPool, McpServerStatus, McpResourceSubscription } from "@may/mcp";
 import type { MaybeCodeEvent, MaybeCodeSessionEvent } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 
@@ -50,6 +50,8 @@ type MaybeCodeProductEvent = Extract<
   MaybeCodeEvent,
   | { type: "model.changed" }
   | { type: "model.default.changed" }
+  | { type: "mcp.resource.updated" }
+  | { type: "mcp.resource.watch-closed" }
   | { type: "mcp.server.connected" }
   | { type: "mcp.server.catalog-updated" }
   | { type: "mcp.server.failed" }
@@ -67,6 +69,15 @@ export interface MaybeCodeController extends AgentWorkspaceController<
   getMcpStatus(): Promise<readonly McpServerStatus[]>;
   refreshMcp?(serverId?: string): Promise<void>;
   reconnectMcp?(serverId: string): Promise<void>;
+  getMcpCatalog?: McpClientPool["catalog"];
+  readMcpResource?: McpClientPool["readResource"];
+  readMcpResourceTemplate?: McpClientPool["readResourceTemplate"];
+  getMcpPrompt?: McpClientPool["getPrompt"];
+  completeMcp?: McpClientPool["complete"];
+  watchMcpResource?(serverId: string, uri: string): Promise<McpResourceSubscription>;
+  unwatchMcpResource?(serverId: string, uri: string): Promise<void>;
+  submitMcpResource?(serverId: string, uri: string, instruction?: string): Promise<import("./events.js").MaybeCodeRun>;
+  submitMcpPrompt?(serverId: string, name: string, args?: Readonly<Record<string, string>>): Promise<import("./events.js").MaybeCodeRun>;
   listModels(): Promise<readonly MaybeCodeModelProfile[]>;
   switchModel(profile: string): Promise<MaybeCodeModelInfo>;
   /** Persist the profile used by future launches without switching models. */

@@ -133,8 +133,9 @@ MCP package 是位于工具边界的可选 adapter。它依赖 Core 的 `Tool` �
 Core 则不依赖 MCP 或其 SDK。Client pool 拥有 stdio 子进程与 Streamable HTTP transport，通过
 发现带版本的 tools/resources/templates/prompts 元数据目录，并公开由 `tools/call`
 支撑的每 Run 不可变工具描述。追加式 `toolSource` 发布最新目录而不修改活动 Run。
-列表通知触发元数据刷新；重连需要显式操作，绝不重放工具调用。资源内容/prompt
-展开仍属于后续工作。
+列表通知触发元数据刷新；重连需要显式操作，绝不重放工具调用。宿主驱动的资源/
+prompt/补全输出有界不可信内容，显式附件准备和提交共享 Session 状态队列。Core
+只认识通用 `Tool.resultContent` 投影 hook。
 
 Pool 还公开 server 即时状态视图与有序连接生命周期事件。Required server 会使应用
 启动失败；optional server 则以失败诊断保留，同时健康 server 继续工作。有界、已净化

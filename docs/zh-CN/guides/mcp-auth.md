@@ -101,3 +101,7 @@ trace。授权 URL 仅在认证 UI 中主动展示。OAuth fetch 每次最多 30
 
 参考：[MCP 认证规范](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)、
 [SDK provider 义务](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/upgrade-to-v2.md)。
+
+OAuth 登录现在记录不透明授权代次。资源缓存命中及新的工具/能力操作都会验证代次；
+退出或再次登录（包括另一个进程）使旧连接失效，需要重连。正常 token 刷新不会
+改变已记录的授权代次。

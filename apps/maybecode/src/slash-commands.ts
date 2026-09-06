@@ -1,3 +1,4 @@
+import { executeMcpCommand, MCP_COMMAND_USAGE } from "./mcp-commands.js";
 import type {
   ContextCompactionResult,
   ContextInspection,
@@ -76,7 +77,7 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   },
   {
     name: "/mcp",
-    usage: "/mcp [refresh [server-id] | reconnect <server-id>]",
+    usage: MCP_COMMAND_USAGE,
     description: "Show configured MCP servers, tools, and diagnostics",
   },
   {
@@ -114,6 +115,8 @@ export type MaybeCodeSlashCommandParseResult =
   SlashCommandParseResult<MaybeCodeSlashCommand>;
 
 export type MaybeCodeSlashCommandResult =
+  | { readonly type: "mcp.display"; readonly text: string }
+  | { readonly type: "mcp.run-started"; readonly run: MaybeCodeRun }
   | { readonly type: "exit" }
   | {
       readonly type: "help";
@@ -355,18 +358,7 @@ export async function executeMaybeCodeSlashCommand(
       if (invalid !== undefined) return invalid;
       return { type: "status", inspection: await controller.inspectContext() };
     }
-    case "/mcp": {
-      if (arguments_.length > 0) {
-        const [action, serverId] = arguments_;
-        if (arguments_.length > 2) return usage(definition);
-        if (action === "refresh" && controller.refreshMcp !== undefined) {
-          await controller.refreshMcp(serverId);
-        } else if (action === "reconnect" && serverId !== undefined && controller.reconnectMcp !== undefined) {
-          await controller.reconnectMcp(serverId);
-        } else return usage(definition);
-      }
-      return { type: "mcp.status", servers: await controller.getMcpStatus() };
-    }
+    case "/mcp": return executeMcpCommand(input, controller);
     case "/context": {
       const invalid = noArguments(arguments_, definition);
       if (invalid !== undefined) return invalid;

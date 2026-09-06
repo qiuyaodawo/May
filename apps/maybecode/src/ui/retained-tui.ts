@@ -195,6 +195,12 @@ function applyMaybeCodeEvent(
     case "model.default.changed":
       store.appendNotice("info", `Default model set to ${event.profile}`);
       break;
+    case "mcp.resource.updated":
+      store.appendNotice("info", `MCP resource updated: ${event.serverId} ${event.uri}`);
+      break;
+    case "mcp.resource.watch-closed":
+      store.appendNotice("info", `MCP resource watch closed: ${event.serverId} ${event.uri} (${event.reason})`);
+      break;
     case "mcp.server.connected":
       store.appendNotice(
         "info",
@@ -279,6 +285,7 @@ async function presentCommandResult(
     case "instructions":
       store.appendNotice("info", result.instructions.effective);
       break;
+    case "mcp.run-started":
     case "retry.started":
       await result.run.result.catch((error: unknown) => {
         if (!isCancellation(error)) throw error;
@@ -290,6 +297,9 @@ async function presentCommandResult(
         `Session: ${app.sessionId}\nWorkspace: ${app.workspace}\n` +
           `Model: ${await resolvedModelLabel(app)}${inspectionText(result.inspection)}`,
       );
+      break;
+    case "mcp.display":
+      store.appendNotice("info", result.text);
       break;
     case "mcp.status":
       store.appendNotice("info", formatMaybeCodeMcpStatus(result.servers));

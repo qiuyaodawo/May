@@ -164,6 +164,8 @@ async function consumeEvents(
     } else if (event.type === "model.default.changed") {
       renderer.defaultModelChanged(event.profile);
     } else if (
+      event.type === "mcp.resource.updated" ||
+      event.type === "mcp.resource.watch-closed" ||
       event.type === "mcp.server.connected" ||
       event.type === "mcp.server.catalog-updated" ||
       event.type === "mcp.server.failed" ||
@@ -266,11 +268,15 @@ async function renderSlashCommandResult(
           `Effective instructions:\n---\n${result.instructions.effective}\n---\n`,
       ));
       break;
+    case "mcp.run-started":
     case "retry.started":
       await result.run.result;
       break;
     case "status":
       terminal.write(`\n${renderStatus(app, result.inspection)}`);
+      break;
+    case "mcp.display":
+      terminal.write(`\n${sanitizeTerminalText(result.text)}\n`);
       break;
     case "mcp.status":
       terminal.write(
@@ -711,8 +717,12 @@ class TerminalRenderer {
   }
 
   mcpEvent(
-    event: Extract<MaybeCodeEvent, { type: `mcp.server.${string}` }>,
+    event: Extract<MaybeCodeEvent, { type: `mcp.${string}` }>,
   ): void {
+    if (event.type === "mcp.resource.updated" || event.type === "mcp.resource.watch-closed") {
+      this.terminal.write(`\n${sanitizeTerminalText(`${event.type}: ${event.serverId} ${event.uri}${event.type === "mcp.resource.watch-closed" ? ` (${event.reason})` : ""}`)}\n`);
+      return;
+    }
     if (event.type === "mcp.server.catalog-updated") {
       this.terminal.write(`\nMCP catalog updated: ${sanitizeTerminalText(event.serverId)} (revision ${event.revision})\n`);
       return;

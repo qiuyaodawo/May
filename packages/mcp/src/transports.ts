@@ -4,7 +4,7 @@ import {
   StdioClientTransport,
 } from "@modelcontextprotocol/client/stdio";
 
-import { McpConfigurationError } from "./errors.js";
+import { McpConfigurationError, McpContentError } from "./errors.js";
 import { assertMcpServerId } from "./names.js";
 import type { McpServerOptions } from "./types.js";
 import { McpAuthenticationError, validateMcpOAuthOptions, type McpOAuthManager } from "./oauth.js";
@@ -46,11 +46,11 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
           try { await oauth!.requireConsent(options, response); }
           catch (error) { await response.body?.cancel().catch(() => {}); throw error; }
         }
-        return response;
+        return boundMcpResponse(response);
       },
     });
   }
-  return new StdioClientTransport({
+  return orderedStdio(new StdioClientTransport({
     command: options.command,
     ...(options.args === undefined ? {} : { args: [...options.args] }),
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
@@ -59,7 +59,7 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
       : { env: { ...getDefaultEnvironment(), ...options.env } }),
     ...(options.maxBufferSize === undefined ? {} : { maxBufferSize: options.maxBufferSize }),
     stderr: "pipe",
-  });
+  }));
 }
 
 /** Validate before starting any endpoint, including optional endpoints. */
@@ -169,4 +169,46 @@ function validateStringMap(value: unknown, options: McpServerOptions, field: str
       Object.entries(value).some(([name, item]) => name === "" || typeof item !== "string")) {
     invalid(options, `${field} entries must be string pairs`);
   }
+}
+
+/** Bound a JSON response or each SSE frame before the SDK buffers/parses it. */
+function boundMcpResponse(response: Response): Response {
+  if (response.body === null) return response;
+  const sse = response.headers.get("content-type")?.split(";", 1)[0]?.trim() === "text/event-stream";
+  const maximum = 10 * 1024 * 1024;
+  let bytes = 0;
+  let lineBytes = 0;
+  const body = response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      if (!sse) bytes += chunk.byteLength;
+      else for (const byte of chunk) {
+        bytes++;
+        if (bytes > maximum) throw new McpContentError("MCP protocol frame exceeds 10 MiB");
+        if (byte === 10) {
+          if (lineBytes === 0) bytes = 0;
+          lineBytes = 0;
+        } else if (byte !== 13) lineBytes++;
+      }
+      if (bytes > maximum) throw new McpContentError("MCP protocol frame exceeds 10 MiB");
+      controller.enqueue(chunk);
+    },
+  }));
+  return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
+/** Let SDK notification microtasks settle before a later frame clears request handlers. */
+function orderedStdio(transport: StdioClientTransport): StdioClientTransport {
+  let receiver: StdioClientTransport["onmessage"];
+  let delivery = Promise.resolve();
+  Object.defineProperty(transport, "onmessage", {
+    configurable: true,
+    get: () => receiver,
+    set: (handler: StdioClientTransport["onmessage"]) => {
+      receiver = handler === undefined ? undefined : (...args) => {
+        delivery = delivery.then(() => { handler(...args); })
+          .catch((error: unknown) => transport.onerror?.(error instanceof Error ? error : new Error("MCP message delivery failed")));
+      };
+    },
+  });
+  return transport;
 }

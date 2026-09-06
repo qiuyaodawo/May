@@ -494,6 +494,7 @@ pnpm test:integration:maybecode
 MCP tool catalogs now update at Run boundaries. `/mcp refresh [server-id]`
 refetches metadata; `/mcp reconnect <server-id>` recovers a configured endpoint
 without replaying tool calls (including after OAuth login). `/mcp` reports catalog
-revision/staleness and notification coverage. Resource/prompt metadata discovery
-does not yet provide content attachment or prompt expansion; see the bilingual
+revision/staleness and notification coverage. `/mcp read`, `template`, `prompt`
+and `complete` preview data; `attach` and `use-prompt` explicitly submit user-level
+content; `watch`/`unwatch` manage notification-only subscriptions. See the bilingual
 [MCP guide](../../docs/en/guides/mcp.md).

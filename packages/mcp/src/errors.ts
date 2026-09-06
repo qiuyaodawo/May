@@ -105,3 +105,13 @@ export class McpStaleToolError extends MayError {
     super("MCP_STALE_TOOL", `MCP server "${serverId}" tool snapshot is stale; refresh and start a new Run`);
   }
 }
+
+export class McpCapabilityError extends MayError {
+  constructor(serverId: string, message: string, code = "MCP_CAPABILITY_ERROR") {
+    super(code, `MCP server "${serverId}": ${message}`);
+  }
+}
+
+export class McpContentError extends MayError {
+  constructor(message: string) { super("MCP_CONTENT_ERROR", message); }
+}

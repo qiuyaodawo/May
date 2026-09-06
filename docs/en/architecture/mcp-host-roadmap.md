@@ -16,7 +16,7 @@ permission boundary remains in force.
   partitioning, logout/revocation, encrypted OS-keyring-backed vault, CLI before
   model startup. Evidence: `packages/mcp/test/oauth.test.mjs`, MaybeCode command
   test, and opt-in Windows native keyring smoke. See [authentication](../guides/mcp-auth.md).
-- [ ] **Capabilities and dynamic catalogs:** tools, resources/templates, prompts,
+- [x] **Capabilities and dynamic catalogs:** tools, resources/templates, prompts,
   completion, caching/subscriptions, bounded content/attachment adaptation;
   immutable per-Run tool snapshots, definition-based permission invalidation,
   endpoint refresh/reconnect without unsafe operation replay.
@@ -37,9 +37,8 @@ permission boundary remains in force.
 OAuth changes do not imply completed catalogs, host interactions, or extensions.
 Do not mark the overall migration complete until all rows have direct evidence.
 
-Dynamic catalogs now publish tools/resources/templates/prompts metadata, handle
-modern/legacy list changes and explicit refresh/reconnect, and supply per-Run
-tool snapshots with definition-bound grants. Evidence: `catalog.test.mjs`, Core
-registry/permission tests and MaybeCode configured lifecycle test. Resource
-reads/attachments, prompt expansion, completion and resource subscriptions are
-still pending, so the capabilities row remains unchecked.
+Capabilities evidence: `catalog.test.mjs`, `capabilities.test.mjs`, OAuth cache
+isolation tests, Core registry/permission tests and MaybeCode configured/MCP
+command tests. Tools/resources/templates/prompts/completion, bounded attachments,
+cache invalidation and modern/legacy subscriptions are implemented. Interaction
+broker/MRTR, tasks/Apps, server export and final audit remain open.

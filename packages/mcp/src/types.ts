@@ -1,7 +1,8 @@
-import type { Prompt, Resource, ResourceTemplateType, ServerCapabilities, Tool as ProtocolTool } from "@modelcontextprotocol/client";
+import type { CompleteRequestParams, CompleteResult, GetPromptResult, ReadResourceResult, Prompt, Resource, ResourceTemplateType, ServerCapabilities, Tool as ProtocolTool } from "@modelcontextprotocol/client";
 import type {
   Tool,
   TraceAttributes,
+  TraceContext,
   Tracer,
 } from "@may/core";
 import type { McpOAuthManager, McpOAuthOptions } from "./oauth.js";
@@ -60,6 +61,7 @@ export interface OpenMcpClientPoolOptions {
 }
 
 export interface McpToolOutput {
+  readonly _meta?: Readonly<Record<string, unknown>> | undefined;
   readonly content: readonly unknown[];
   readonly structuredContent?: unknown;
 }
@@ -129,6 +131,41 @@ export type McpClientEvent =
       readonly type: "mcp.server.disconnected";
     };
 
+export interface McpOperationOptions {
+  readonly signal?: AbortSignal;
+  readonly traceContext?: TraceContext;
+}
+
+export interface McpReadOptions extends McpOperationOptions {
+  readonly cache?: "use" | "refresh" | "bypass";
+}
+
+export interface McpResourceRead {
+  readonly serverId: string;
+  readonly uri: string;
+  readonly result: ReadResourceResult;
+  readonly fromCache: boolean;
+}
+
+export interface McpPromptExpansion {
+  readonly serverId: string;
+  readonly name: string;
+  readonly arguments: Readonly<Record<string, string>>;
+  readonly result: GetPromptResult;
+}
+
+export type McpCompletionParams = Pick<CompleteRequestParams, "ref" | "argument" | "context">;
+export type McpCompletion = CompleteResult["completion"];
+
+export interface McpResourceSubscription {
+  readonly serverId: string;
+  readonly uri: string;
+  /** Notification only. Updated data is never loaded or attached automatically. */
+  readonly events: AsyncIterable<{ readonly type: "updated"; readonly serverId: string; readonly uri: string }>;
+  readonly closed: Promise<"local" | "remote" | "connection-closed">;
+  close(): Promise<void>;
+}
+
 export interface McpClientPool {
   /** Latest immutable tool catalog; use toolSource: () => pool.tools for per-Run updates. */
   readonly tools: readonly Tool[];
@@ -142,5 +179,11 @@ export interface McpClientPool {
   refresh(serverId?: string, signal?: AbortSignal): Promise<void>;
   /** Explicitly replace a connection; rejects while an operation is in flight. */
   reconnect(serverId: string, signal?: AbortSignal): Promise<void>;
+  /** Host/user operations, not automatically exported to the model as tools. */
+  readResource(serverId: string, uri: string, options?: McpReadOptions): Promise<McpResourceRead>;
+  readResourceTemplate(serverId: string, template: string, variables: Readonly<Record<string, string | string[]>>, options?: McpReadOptions): Promise<McpResourceRead>;
+  getPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>, options?: McpOperationOptions): Promise<McpPromptExpansion>;
+  complete(serverId: string, params: McpCompletionParams, options?: McpOperationOptions): Promise<McpCompletion>;
+  subscribeResource(serverId: string, uri: string, options?: McpOperationOptions): Promise<McpResourceSubscription>;
   close(): Promise<void>;
 }

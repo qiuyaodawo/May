@@ -86,8 +86,11 @@ export async function startOAuthFixture(t) {
         }
         const message = JSON.parse(body);
         const reply = (result) => json({ jsonrpc: "2.0", id: message.id, result: { resultType: "complete", ...result } });
-        if (message.method === "server/discover") reply({ supportedVersions: ["2026-07-28"], capabilities: { tools: {} } });
+        if (message.method === "server/discover") reply({ supportedVersions: ["2026-07-28"], capabilities: { tools: {}, resources: {} } });
         else if (message.method === "tools/list") reply({ ttlMs: 0, cacheScope: "private", tools: [{ name: "echo", inputSchema: { type: "object" } }] });
+        else if (message.method === "resources/list") reply({ resources: [{ name: "private", uri: "private:///data" }], ttlMs: 0, cacheScope: "private" });
+        else if (message.method === "resources/templates/list") reply({ resourceTemplates: [], ttlMs: 0, cacheScope: "private" });
+        else if (message.method === "resources/read") reply({ contents: [{ uri: message.params.uri, text: "private-account-data" }], ttlMs: 300000, cacheScope: "private" });
         else if (message.method === "tools/call") {
           counts.toolCalls++;
           if (demandWrite && !scope.split(" ").includes("write")) {

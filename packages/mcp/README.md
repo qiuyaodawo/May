@@ -83,7 +83,7 @@ DELETE cleanup, followed by local transport cleanup. No automatic reconnect,
 stream resumption, general tool-call retry, or fallback to deprecated HTTP+SSE is enabled.
 `connected` means setup and discovery succeeded, not continuous HTTP health.
 
-Resource content/prompt expansion, sampling/elicitation handlers,
+Sampling/elicitation handlers,
 Tasks/Apps extensions, and MCP server authoring remain outside this phase.
 See the [bilingual MCP guide](../../docs/en/guides/mcp.md) and [full adaptation roadmap](../../docs/en/architecture/mcp-host-roadmap.md).
 
@@ -128,3 +128,7 @@ reconnect/recovery creates a new identity. After an explicit OAuth login, run
 `/mcp reconnect <server-id>` before starting another Run. Each connection owns
 its cache; catalogs are retained in pool memory and explicit refresh never trusts
 a server's prior TTL. Closing cancels queued/active discovery and subscriptions.
+
+Resource/template reads, prompt expansion, completion, watches and bounded
+multimodal content are available through explicit host APIs. See the
+[resource/attachment guide](../../docs/en/guides/mcp.md#resources-prompts-completion-and-attachments).

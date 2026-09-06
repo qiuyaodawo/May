@@ -236,3 +236,7 @@ schema 副本。目录更新仅影响下一次 Run。普通 registry 查询/`clo
 定义或宿主身份变化，即使 grantKey 不变也需要重新批准；仅 schema 属性顺序
 变化不会失效。`revokeSessionGrant(key)` 撤销该 key 下全部版本，显式 deny 始终
 优先。宿主适配器应将其他影响执行的字段以及端点/账户身份包含在版本中。
+
+`Tool.resultContent(output)` 可选地将成功输出投影为模型可见 `ContentPart[]`，替代
+默认 JSON 块；该回调也由 Run 快照捕获。`tool.completed` 保留原始输出，投影异常
+作为工具失败处理。应验证不可信内容，避免投影仅宿主可见的元数据。

@@ -728,6 +728,7 @@ export class May {
         },
       });
 
+      const content = tool.resultContent?.(output) ?? [{ type: "json" as const, value: output }];
       endTraceSpan(toolSpan, { status: "ok" });
       return {
         type: "completed",
@@ -737,7 +738,7 @@ export class May {
           role: "tool",
           toolCallId: call.id,
           name: call.name,
-          content: [{ type: "json", value: output }],
+          content,
         },
       };
     } catch (error) {

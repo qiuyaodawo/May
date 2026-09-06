@@ -246,3 +246,8 @@ Changed definitions or host identity require new approval even with the same
 key. Equivalent schema key order does not. `revokeSessionGrant(key)` revokes all
 versions under that key; explicit policy deny still wins. Host adapters should
 include other execution-affecting fields and endpoint/account in their version.
+
+`Tool.resultContent(output)` optionally projects successful output to model-visible
+`ContentPart[]`, instead of the default JSON block. It is captured by Run snapshots.
+Raw output remains in `tool.completed`; projection errors become tool failures.
+Validate untrusted content and omit host-only metadata from the projection.

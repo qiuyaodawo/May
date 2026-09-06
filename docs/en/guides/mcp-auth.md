@@ -120,3 +120,8 @@ and 1 MiB per response. Server/tool content remains untrusted.
 
 References: [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization),
 [SDK provider obligations](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/upgrade-to-v2.md).
+
+OAuth login now stamps an opaque authorization generation. Resource cache hits
+and new tool/capability operations validate that generation; logout or a new
+login (even from another process) rejects the old connection until reconnect.
+Normal token refresh does not change a stamped generation.
