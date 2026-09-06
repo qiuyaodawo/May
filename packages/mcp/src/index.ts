@@ -9,3 +9,6 @@ export * from "./content.js";
 export * from "./interactions.js";
 export type { McpServerHostOptions, McpHostRequestContext, McpHostServices, McpSamplingService } from "./host-services.js";
 export * from "./model-sampler.js";
+export { MCP_TASKS_EXTENSION, parseMcpTask } from "./tasks.js";
+export type { McpRemoteTask, McpTaskState, McpTaskStatus } from "./tasks.js";
+export * from "./task-journal.js";

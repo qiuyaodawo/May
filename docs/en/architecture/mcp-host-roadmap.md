@@ -30,6 +30,12 @@ permission boundary remains in force.
 - [ ] **Long tasks and extensions:** task handles, get/update/cancel, durable
   ownership and restart recovery, local-wait vs remote-cancel semantics;
   optional isolated MCP Apps UI with explicit unsupported-terminal behavior.
+  - [x] Storage groundwork: owner-bound encrypted task journal, write-ahead identity
+    reservation, input deduplication/budgets and cancellation intent. Evidence:
+    `task-journal.test.mjs`; see [task persistence](../guides/mcp-tasks.md).
+  - [ ] Task-capable wire calls, handle controller/UI, polling/update/cancel and
+    remote restart recovery. Storage alone does not advertise the extension.
+  - [ ] Optional isolated Apps host and explicit terminal fallback.
 - [ ] **Independent MCP server:** opt-in May tool/resource/prompt export,
   authenticated principals and workspace isolation, normal permission/execution
   pipeline, no blanket export of host tools or Session history.

@@ -229,3 +229,7 @@ Roots/Sampling; `createMcpModelSampler()` makes isolated, bounded provider calls
 without executing tools or reading Session Context. Legacy interactive operations
 use opt-in single-operation processes/sessions, never guessed ownership on a shared
 connection. See [Host compatibility](../guides/mcp.md#roots-sampling-and-legacy-compatibility).
+
+
+`McpTaskJournal` and `parseMcpTask` provide bounded task persistence/parser APIs,
+not yet a task-enabled client pool. See [task persistence](../guides/mcp-tasks.md).

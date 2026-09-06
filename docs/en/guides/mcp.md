@@ -518,3 +518,7 @@ incur child discovery. Per-process/session state is **not retained between these
 operations**; opt in only for servers supporting independent sessions. Shared
 legacy tools still work without this option, but unsolicited/startup callbacks
 never acquire an owner: elicitation declines, roots are empty and sampling fails.
+
+
+Task parser and durable ownership storage are available as library groundwork;
+remote lifecycle/UI integration is still pending. See [task persistence](mcp-tasks.md).

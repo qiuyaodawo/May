@@ -25,6 +25,11 @@
   - [x] 显式 Roots/Sampling 及旧协议请求归属兼容。
 - [ ] **长任务与扩展**：任务句柄、get/update/cancel、持久 ownership 和重启恢复、
   区分本地停止等待与远端取消；可选的隔离 MCP Apps UI，以及终端明确的不支持行为。
+  - [x] 存储基础：绑定归属的加密任务 journal、预写身份占用、输入去重/预算、取消意图。
+    证据：`task-journal.test.mjs`；参阅 [任务持久化](../guides/mcp-tasks.md)。
+  - [ ] 支持任务的 wire 调用、句柄 controller/UI、polling/update/cancel 及远端重启
+    恢复。只有存储不代表可以声明扩展。
+  - [ ] 可选隔离 Apps Host 与明确的终端 fallback。
 - [ ] **独立 MCP Server**：显式选择导出 May 工具/资源/提示模板，认证调用者并隔离
   workspace，经过正常权限/执行路径，不批量暴露本机工具或 Session 历史。
 - [ ] **完成审计**：各阶段具备聚焦行为验证和产品集成证据；更新全部维护语言，检查

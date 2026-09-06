@@ -138,3 +138,8 @@ Modern MRTR form/URL elicitation is opt-in with the pool-owned
 validates reviewed responses, bounds waiting and refuses cross-owner/late answers.
 Unscoped legacy push requests decline; explicit isolated channels support interaction. See the bilingual
 [interaction guide](../../docs/en/guides/mcp.md#scoped-user-interaction-modern-mrtr).
+
+
+Task storage groundwork exports `McpTaskJournal`, `parseMcpTask`, and extension
+frame types. It does not yet enable remote Tasks in the pool or MaybeCode; see
+[task persistence](../../docs/en/guides/mcp-tasks.md) for recovery/security contracts.

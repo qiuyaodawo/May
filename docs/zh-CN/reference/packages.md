@@ -204,3 +204,7 @@ Run 执行还使用 `ToolRegistry.snapshot()` 冻结复制后的 descriptor/sche
 `createMcpModelSampler()` 发起隔离、有界 provider 调用，不执行工具或读取 Session
 Context。旧协议交互操作显式选择单操作进程/session，不在共享连接上猜测归属。
 参阅 [Host 兼容](../guides/mcp.md)。
+
+
+`McpTaskJournal` 和 `parseMcpTask` 提供有界的任务存储/解析 API，尚不是支持任务
+的客户端池。参阅 [任务持久化](../guides/mcp-tasks.md)。
