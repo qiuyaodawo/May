@@ -63,6 +63,8 @@ export interface AgentApplicationOptions {
   readonly store: SessionStore;
   readonly permissionPolicy: PermissionPolicy;
   readonly tools?: Iterable<Tool>;
+  /** Additional host catalog captured per Run; static tools remain fixed. */
+  readonly toolSource?: () => Iterable<Tool>;
   readonly toolExecutor?: ToolExecutor;
   readonly toolScheduler?: ToolScheduler;
   readonly tracer?: Tracer;
@@ -226,6 +228,7 @@ export class AgentApplication implements AgentController {
       return new May({
         model: options.model,
         tools: configuredTools,
+        ...(options.toolSource === undefined ? {} : { toolSource: options.toolSource }),
         context: managedContext.context,
         toolExecutor: permissions,
         ...(options.tracer === undefined ? {} : { tracer: options.tracer }),

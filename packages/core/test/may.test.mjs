@@ -374,7 +374,9 @@ test("routes parsed tool calls through a custom executor", async () => {
   const result = await run.result;
 
   assert.equal(result.steps, 2);
-  assert.equal(observedExecution.tool, double);
+  assert.notEqual(observedExecution.tool, double);
+  assert.equal(observedExecution.tool.name, double.name);
+  assert.ok(Object.isFrozen(observedExecution.tool));
   assert.deepEqual(observedExecution.input, { value: 4 });
   assert.equal(observedExecution.context.runId, run.id);
   assert.equal(observedExecution.context.step, 1);

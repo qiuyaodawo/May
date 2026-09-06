@@ -52,6 +52,8 @@ import {
 export interface MayOptions {
   model: Model;
   tools?: Iterable<Tool>;
+  /** Additional trusted host tools, captured exactly once at each Run/continue start. */
+  toolSource?: () => Iterable<Tool>;
   context: Context;
   maxSteps?: number;
   toolExecutor?: ToolExecutor;
@@ -95,6 +97,7 @@ export class May {
   private readonly model: Model;
   private readonly context: Context;
   private readonly tools: ToolRegistry;
+  private readonly toolSource: MayOptions["toolSource"];
   private readonly maxSteps: number;
   private readonly toolExecutor: ToolExecutor;
   private readonly toolScheduler: ToolScheduler;
@@ -115,6 +118,7 @@ export class May {
     this.model = options.model;
     this.context = options.context;
     this.tools = tools;
+    this.toolSource = options.toolSource;
     this.maxSteps = maxSteps;
     this.toolExecutor = options.toolExecutor ?? directToolExecutor;
     this.toolScheduler = options.toolScheduler ?? sequentialToolScheduler;
@@ -164,6 +168,8 @@ export class May {
     if (this.concurrentRuns === "reject" && this.activeRuns > 0) {
       throw new ConcurrentRunError();
     }
+    // Resolve before touching Context or run bookkeeping; never mid-step.
+    const tools = ToolRegistry.compose(this.tools, this.toolSource?.() ?? []).snapshot();
     this.activeRuns += 1;
     const runId = createRunId();
     const events = new AsyncEventQueue<MayEvent>({
@@ -202,6 +208,7 @@ export class May {
     };
 
     const result = this.execute(
+      tools,
       runId,
       input,
       controller.signal,
@@ -249,6 +256,7 @@ export class May {
   }
 
   private async execute(
+    tools: ToolRegistry,
     runId: string,
     input: UserMessage | undefined,
     signal: AbortSignal,
@@ -309,7 +317,7 @@ export class May {
           endOperationSpan(snapshotSpan, error, signal);
           throw error;
         }
-        const request = this.createModelRequest(snapshot);
+        const request = this.createModelRequest(snapshot, tools);
 
         emit({ type: "model.started", step });
         modelCalls += 1;
@@ -401,6 +409,7 @@ export class May {
         let outcomes: readonly ToolExecutionOutcome[];
         try {
           outcomes = await this.scheduleTools(
+            tools,
             runId,
             step,
             calls,
@@ -498,7 +507,7 @@ export class May {
     }
   }
 
-  private createModelRequest(snapshot: ContextSnapshot): ModelRequest {
+  private createModelRequest(snapshot: ContextSnapshot, tools: ToolRegistry): ModelRequest {
     const messages: Message[] = [];
 
     if (snapshot.instructions) {
@@ -512,7 +521,7 @@ export class May {
 
     return {
       messages,
-      tools: this.tools.definitions(),
+      tools: tools.definitions(),
       ...(snapshot.metadata === undefined
         ? {}
         : { metadata: snapshot.metadata }),
@@ -597,6 +606,7 @@ export class May {
   }
 
   private async scheduleTools(
+    tools: ToolRegistry,
     runId: string,
     step: number,
     calls: readonly ToolCall[],
@@ -612,9 +622,10 @@ export class May {
       let execution: Promise<ToolExecutionOutcome> | undefined;
       return {
         call,
-        tool: this.tools.get(call.name),
+        tool: tools.get(call.name),
         execute: () => {
           execution ??= this.executeTool(
+            tools,
             runId,
             step,
             call,
@@ -672,6 +683,7 @@ export class May {
   }
 
   private async executeTool(
+    tools: ToolRegistry,
     runId: string,
     step: number,
     call: ToolCall,
@@ -693,7 +705,7 @@ export class May {
     });
 
     try {
-      const tool = this.tools.get(call.name);
+      const tool = tools.get(call.name);
       if (!tool) throw new ToolNotFoundError(call.name);
 
       const input = tool.parse ? tool.parse(call.input) : call.input;

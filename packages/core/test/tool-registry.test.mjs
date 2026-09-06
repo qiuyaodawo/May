@@ -132,3 +132,49 @@ test("model-side tool definition mutation does not affect a later step", async (
 
   assert.deepEqual(requests, [["first"], ["first"]]);
 });
+
+
+test("captures a dynamic catalog once per Run, including nested schemas and execution", async () => {
+  let sources = 0;
+  let dynamic = { ...tool("remote", "version one"), permissionVersion: "one",
+    inputSchema: { type: "object", properties: { value: { type: "string" } } },
+    async execute() { return "one"; },
+  };
+  let catalog = [dynamic];
+  const outputs = [];
+  const seen = [];
+  const runtime = new May({
+    context: new InMemoryContext(),
+    toolSource: () => { sources++; return catalog; },
+    toolExecutor: { async execute({ tool, input, context }) {
+      outputs.push([tool.permissionVersion, await tool.execute(input, context)]);
+      return outputs.at(-1);
+    } },
+    model: { async *stream(request, { step }) {
+      seen.push(request.tools[0]?.description);
+      if (sources === 1 && step === 1) {
+        // Both catalog publication and external nested mutation happen mid-Run.
+        catalog = [{ ...dynamic, description: "version two", permissionVersion: "two",
+          async execute() { return "two"; } }];
+        dynamic.inputSchema.properties.value.type = "number";
+        dynamic.execute = async () => "tampered";
+        request.tools[0].inputSchema.properties.value.type = "boolean";
+      }
+      if (sources === 1 && step === 2) {
+        assert.equal(request.tools[0].inputSchema.properties.value.type, "string");
+      }
+      yield { type: "response.completed", message: { role: "assistant", content: [],
+        ...(step === 1 ? { toolCalls: [{ id: "remote-call", name: "remote", input: {} }] } : {}),
+      } };
+    } },
+  });
+  await runtime.run({ input: "first" }).result;
+  await runtime.continue().result;
+  assert.equal(sources, 2);
+  assert.deepEqual(seen, ["version one", "version one", "version two", "version two"]);
+  assert.deepEqual(outputs, [["one", "one"], ["two", "two"]]);
+  catalog = [tool("duplicate"), tool("duplicate")];
+  assert.throws(() => runtime.run({ input: "invalid" }), DuplicateToolNameError);
+  catalog = [];
+  await runtime.run({ input: "not stuck" }).result;
+});

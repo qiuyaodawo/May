@@ -135,3 +135,6 @@ workspace 文件处理，以及执行不可信代码时使用外部 sandbox。Ma
 sandbox，也不是持久化的组织级 policy service。
 
 参阅[自定义工具](custom-tool.md)和[自定义 UI](custom-ui.md)。
+
+Session grant 还绑定工具定义及可选宿主 `permissionVersion`。
+详见 [每次 Run 的动态目录](./custom-tool.md)。

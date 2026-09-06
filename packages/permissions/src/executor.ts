@@ -36,6 +36,7 @@ export interface PermissionToolExecutorOptions {
 
 interface PendingApproval {
   request: ApprovalRequest;
+  definitionKey: string;
   resolve(decision: ApprovalDecision): void;
   reject(error: unknown): void;
   removeAbortListener(): void;
@@ -49,7 +50,7 @@ export class PermissionToolExecutor implements ToolExecutor {
   private readonly tracer: Tracer | undefined;
   private readonly eventQueue = new AsyncEventQueue<PermissionEvent>();
   private readonly pending = new Map<string, PendingApproval>();
-  private readonly sessionGrants = new Set<string>();
+  private readonly sessionGrants = new Map<string, Set<string>>();
   private eventSink: PermissionEventSink | undefined;
   private closed = false;
   private seq = 0;
@@ -72,11 +73,13 @@ export class PermissionToolExecutor implements ToolExecutor {
         tool: {
           name: execution.tool.name,
           description: execution.tool.description,
-          inputSchema: execution.tool.inputSchema,
+          inputSchema: structuredClone(execution.tool.inputSchema),
+          ...(execution.tool.permissionVersion === undefined ? {} : { permissionVersion: execution.tool.permissionVersion }),
         },
         input: execution.input,
         context: execution.context,
       };
+      const definitionKey = permissionDefinitionKey(check.tool);
       const outcome = await this.evaluatePolicy(check);
 
       this.throwIfClosed();
@@ -87,9 +90,9 @@ export class PermissionToolExecutor implements ToolExecutor {
       }
       if (outcome.decision === "ask") {
         const granted = outcome.grantKey !== undefined
-          && this.sessionGrants.has(outcome.grantKey);
+          && this.sessionGrants.get(outcome.grantKey)?.has(definitionKey) === true;
         if (!granted) {
-          const approval = await this.waitForApproval(check, outcome.grantKey);
+          const approval = await this.waitForApproval(check, outcome.grantKey, definitionKey);
           if (approval === "deny") {
             throw new PermissionDeniedError(execution.tool.name);
           }
@@ -139,6 +142,7 @@ export class PermissionToolExecutor implements ToolExecutor {
   private async waitForApproval(
     check: PermissionCheck,
     grantKey: string | undefined,
+    definitionKey: string,
   ): Promise<ApprovalDecision> {
     const span = startTraceSpan(this.tracer, "may.permission.approval_wait", {
       ...(check.context.traceContext === undefined
@@ -151,7 +155,7 @@ export class PermissionToolExecutor implements ToolExecutor {
       },
     });
     try {
-      const decision = await this.requestApproval(check, grantKey);
+      const decision = await this.requestApproval(check, grantKey, definitionKey);
       endTraceSpan(span, {
         status: "ok",
         attributes: { "may.permission.approval": decision },
@@ -216,6 +220,7 @@ export class PermissionToolExecutor implements ToolExecutor {
   private async requestApproval(
     check: PermissionCheck,
     grantKey: string | undefined,
+    definitionKey: string,
   ): Promise<ApprovalDecision> {
     const request: ApprovalRequest = grantKey === undefined
       ? {
@@ -247,6 +252,7 @@ export class PermissionToolExecutor implements ToolExecutor {
       };
       pending = {
         request,
+        definitionKey,
         resolve,
         reject,
         removeAbortListener: () => {
@@ -283,7 +289,9 @@ export class PermissionToolExecutor implements ToolExecutor {
     }
 
     if (sessionGrantKey !== undefined) {
-      this.sessionGrants.add(sessionGrantKey);
+      const definitions = this.sessionGrants.get(sessionGrantKey) ?? new Set<string>();
+      definitions.add(pending.definitionKey);
+      this.sessionGrants.set(sessionGrantKey, definitions);
     }
     pending.resolve(decision);
     return true;
@@ -397,4 +405,13 @@ function endPermissionSpan(
       : "error",
     error: traceError(error),
   });
+}
+
+function permissionDefinitionKey(tool: PermissionCheck["tool"]): string {
+  // Sort keys recursively: equivalent JSON schemas need not preserve property order.
+  const canonical = JSON.stringify(tool, (_key, value: unknown) => {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+  });
+  return canonical;
 }

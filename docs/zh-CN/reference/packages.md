@@ -188,3 +188,7 @@ May 并不需要依赖它。更小的 `@may/cli` 展示了如何直接使用 Cor
 
 接下来可阅读[快速开始](../getting-started.md)或
 [构建 Agent](../guides/building-an-agent.md)。
+
+Run 执行还使用 `ToolRegistry.snapshot()` 冻结复制后的 descriptor/schema 并捕获回调。
+可选的追加式 `toolSource` 在每次 Run/continue 时解析一次；授权绑定定义和宿主版本。
+详见 [自定义工具](../guides/custom-tool.md)。

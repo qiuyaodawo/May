@@ -29,3 +29,6 @@
 
 OAuth 完成不代表目录、Host 交互或扩展已完成。所有条目都有直接证据前，不得将整体
 迁移标记完成。
+
+动态目录基础已落地：每次 Run 的 `toolSource`/冻结执行快照，以及定义绑定的 Session
+grant。证据：Core tool-registry 和 permissions 测试。MCP 目录发布、资源及重连仍待完成。

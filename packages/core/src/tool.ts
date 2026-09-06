@@ -30,6 +30,8 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: JsonSchema;
+  /** Host-owned identity/version for grants, never sent to the model. */
+  readonly permissionVersion?: string;
 
   /** Optional runtime validation/coercion hook. Throw to reject the input. */
   parse?(input: unknown): TInput;

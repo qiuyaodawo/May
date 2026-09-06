@@ -153,3 +153,6 @@ does not provide a sandbox or durable organization-wide policy service.
 
 See [Custom tools](./custom-tool.md) for capability design and
 [Custom UI](./custom-ui.md) for rendering and resolving requests.
+
+Session grants also bind to the tool definition and optional host `permissionVersion`.
+See [per-Run catalogs](./custom-tool.md#per-run-dynamic-tool-catalogs).

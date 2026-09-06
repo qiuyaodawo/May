@@ -19,6 +19,7 @@ interface RegisteredTool {
   readonly inputSchema: Tool["inputSchema"];
   readonly parse: Tool["parse"];
   readonly execute: Tool["execute"];
+  readonly permissionVersion: Tool["permissionVersion"];
 }
 
 /**
@@ -100,9 +101,27 @@ export class ToolRegistry implements Iterable<Tool> {
       return {
         name: registration.name,
         description: registration.description,
-        inputSchema: registration.inputSchema,
+        inputSchema: structuredClone(registration.inputSchema),
       };
     });
+  }
+
+  /** Capture definitions and callbacks for one Run, independent of later catalog edits. */
+  snapshot(): ToolRegistry {
+    return new ToolRegistry(this.values().map((tool) => {
+      const execute = tool.execute;
+      const parse = tool.parse;
+      return Object.freeze({
+        ...tool,
+        name: tool.name,
+        description: tool.description,
+        ...(tool.permissionVersion === undefined ? {} : { permissionVersion: tool.permissionVersion }),
+        inputSchema: freezeTree(structuredClone(tool.inputSchema)),
+        ...(parse === undefined ? {} : { parse: (input: unknown) => parse.call(tool, input) }),
+        execute: (input: unknown, context: Parameters<Tool["execute"]>[1]) =>
+          execute.call(tool, input, context),
+      });
+    }));
   }
 
   clone(): ToolRegistry {
@@ -140,6 +159,9 @@ function validateTool(tool: Tool): void {
   ) {
     throw new TypeError("tool inputSchema must be an object");
   }
+  if (tool.permissionVersion !== undefined && typeof tool.permissionVersion !== "string") {
+    throw new TypeError("tool permissionVersion must be a string when provided");
+  }
   if (typeof tool.execute !== "function") {
     throw new TypeError("tool must define execute(input, context)");
   }
@@ -157,6 +179,7 @@ function createRegistration(tool: Tool): RegisteredTool {
     inputSchema: tool.inputSchema,
     parse: tool.parse,
     execute: tool.execute,
+    permissionVersion: tool.permissionVersion,
   };
 }
 
@@ -167,10 +190,19 @@ function assertRegistrationUnchanged(registration: RegisteredTool): void {
     tool.description !== registration.description ||
     tool.inputSchema !== registration.inputSchema ||
     tool.parse !== registration.parse ||
-    tool.execute !== registration.execute
+    tool.execute !== registration.execute ||
+    tool.permissionVersion !== registration.permissionVersion
   ) {
     throw new TypeError(
       `Tool "${registration.name}" changed after it was registered`,
     );
   }
+}
+
+function freezeTree<T>(value: T): T {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) freezeTree(child);
+  }
+  return value;
 }

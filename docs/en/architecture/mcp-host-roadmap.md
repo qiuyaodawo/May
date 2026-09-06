@@ -36,3 +36,7 @@ permission boundary remains in force.
 
 OAuth changes do not imply completed catalogs, host interactions, or extensions.
 Do not mark the overall migration complete until all rows have direct evidence.
+
+Dynamic-catalog foundation landed: per-Run `toolSource`/frozen execution snapshots
+and definition-bound session grants. Evidence: Core tool-registry and permission
+tests. MCP catalog publication, resources and reconnect are still pending.

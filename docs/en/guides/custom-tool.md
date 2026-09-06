@@ -220,3 +220,29 @@ to the model. Provider behavior does not need to be retested by every tool.
 
 See also [Custom model adapters](./custom-model.md) and
 [Custom UI](./custom-ui.md).
+
+## Per-Run dynamic tool catalogs
+
+`MayOptions.toolSource`, also forwarded by `AgentApplication`, `defineAgent()`
+and `MaybeCodeApplication`, is a trusted synchronous `() => Iterable<Tool>`.
+It adds to static `tools`; it is called exactly once at each `run()` or
+`continue()` start, not on every model step. Duplicate names fail before Context
+mutation. Fetch/discover remote catalogs outside Core and publish their latest
+in-memory snapshot through this callback.
+
+`ToolRegistry.snapshot()` captures a frozen Tool facade and a deep-copied,
+frozen schema. A Run uses the same snapshot for model definitions, scheduler,
+parser, permissions and execution. Model-facing schemas are separate copies.
+Updates affect only the next Run. Ordinary registry lookup/`clone()` still
+preserve original Tool identity, but executors receive the Run facade: attach
+host metadata as Tool fields, not only in an identity-keyed WeakMap. Captured
+callbacks retain their original `this`; this is not a sandbox or a deep clone
+of arbitrary closure state. Tool schema values must support structured cloning.
+
+`Tool.permissionVersion` is optional host-owned grant identity, omitted from
+model definitions. Permission session grants are now bound to canonical name,
+description, input schema and this version as well as the policy's `grantKey`.
+Changed definitions or host identity require new approval even with the same
+key. Equivalent schema key order does not. `revokeSessionGrant(key)` revokes all
+versions under that key; explicit policy deny still wins. Host adapters should
+include other execution-affecting fields and endpoint/account in their version.

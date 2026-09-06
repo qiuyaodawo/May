@@ -209,3 +209,8 @@ them. The smaller `@may/cli` demonstrates direct Core usage.
 
 Continue with [Getting started](../getting-started.md) or
 [Building an Agent](../guides/building-an-agent.md).
+
+Per-Run execution additionally uses `ToolRegistry.snapshot()` to freeze a copied
+descriptor/schema and capture callbacks. The optional additive `toolSource` is
+resolved once per Run/continue; grants bind to the definition plus host version.
+See [custom tools](../guides/custom-tool.md).

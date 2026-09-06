@@ -72,6 +72,8 @@ export interface MaybeCodeApplicationOptions {
   readonly tools?: Iterable<Tool>;
   /** Tools appended to either the default coding tools or an explicit tool set. */
   readonly additionalTools?: Iterable<Tool>;
+  /** Additional dynamic host catalog, snapshotted per Run. */
+  readonly toolSource?: () => Iterable<Tool>;
   readonly permissionPolicy?: PermissionPolicy;
   readonly tracer?: Tracer;
   readonly traceAttributes?: TraceAttributes;
@@ -192,6 +194,7 @@ export class MaybeCodeApplication {
       model: options.model,
       permissionPolicy: options.permissionPolicy ?? createCodingPermissionPolicy(),
       tools: configuredTools,
+      ...(options.toolSource === undefined ? {} : { toolSource: options.toolSource }),
       instructions: instructions.effective,
       ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
       traceAttributes: {

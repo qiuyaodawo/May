@@ -528,3 +528,31 @@ function createExecution(options = {}) {
 function assistantMessage(text) {
   return { role: "assistant", content: [{ type: "text", text }] };
 }
+
+
+test("session grants are definition- and host-version-bound without changing revocation keys", async () => {
+  let requests = 0;
+  const executor = new PermissionToolExecutor({ policy: () => ({ decision: "ask", grantKey: "same" }) });
+  executor.setEventSink(async (event) => {
+    if (event.type !== "approval.requested") return;
+    requests++;
+    queueMicrotask(() => { void executor.resolve(event.request.id, "allow-session"); });
+  });
+  const execute = (changes = {}) => {
+    const execution = createExecution();
+    Object.assign(execution.tool, changes);
+    return executor.execute(execution);
+  };
+  await execute(); await execute();
+  assert.equal(requests, 1);
+  await execute({ description: "changed" });
+  await execute({ inputSchema: { properties: { value: { type: "string" } }, type: "object" } });
+  await execute({ inputSchema: { type: "object", properties: { value: { type: "string" } } } });
+  assert.equal(requests, 3);
+  await execute({ permissionVersion: "new-account-or-output-schema" });
+  assert.equal(requests, 4);
+  assert.equal(executor.revokeSessionGrant("same"), true);
+  await execute();
+  assert.equal(requests, 5);
+  await executor.close();
+});

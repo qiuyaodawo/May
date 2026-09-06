@@ -215,3 +215,24 @@ context 并捕获 `report()`。然后增加一个 runtime 测试，证明标准�
 每个工具无需重复测试 provider 行为。
 
 另请参阅[自定义模型 Adapter](custom-model.md)和[自定义 UI](custom-ui.md)。
+
+## 每次 Run 的动态工具目录
+
+`MayOptions.toolSource`（也由 `AgentApplication`、`defineAgent()` 和
+`MaybeCodeApplication` 透传）是可信宿主提供的同步 `() => Iterable<Tool>`。
+它在静态 `tools` 之外追加工具，每次 `run()` 或 `continue()` 启动时仅调用一次，
+而不是每个模型 step 调用。重名在 Context 修改前失败。远程发现/刷新应在 Core
+之外完成，再通过回调发布最新内存快照。
+
+`ToolRegistry.snapshot()` 创建冻结的 Tool 外观对象，并深拷贝、冻结 schema。
+同一 Run 的模型定义、调度、解析、权限和执行使用同一份快照；模型收到独立的
+schema 副本。目录更新仅影响下一次 Run。普通 registry 查询/`clone()` 仍保留
+原始 Tool 身份，但 executor 收到的是 Run 外观对象：宿主元数据应放在 Tool
+字段上，而不应只依赖对象身份 WeakMap。捕获的回调保持原始 `this`；这不是沙箱，
+也不会深拷贝任意闭包状态。Schema 值必须支持 structured clone。
+
+`Tool.permissionVersion` 是可选的宿主授权身份，不进入模型定义。Session grant
+现在同时绑定策略 `grantKey`、规范化的名称、描述、输入 schema 和此版本。
+定义或宿主身份变化，即使 grantKey 不变也需要重新批准；仅 schema 属性顺序
+变化不会失效。`revokeSessionGrant(key)` 撤销该 key 下全部版本，显式 deny 始终
+优先。宿主适配器应将其他影响执行的字段以及端点/账户身份包含在版本中。

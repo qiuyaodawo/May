@@ -16,7 +16,7 @@ export type PermissionDecision =
 export type ApprovalDecision = "allow" | "allow-session" | "deny";
 
 export interface PermissionCheck {
-  readonly tool: ToolDefinition;
+  readonly tool: ToolDefinition & { readonly permissionVersion?: string };
   readonly input: unknown;
   readonly context: ToolExecutionContext;
 }
