@@ -171,3 +171,11 @@ Run 和资源准备期间同时处理这些事件时，才通过
 `openConfiguredMaybeCode({ mcpInteractions: true })` 启用 broker。不要将答案排在
 Session 状态队列之后。展示服务端和可信归属，校验表单并要求检查/同意，在结算或
 截止时关闭提问。不自动打开浏览器，不记录表单答案历史。参阅 [MCP](./mcp.md)。
+
+
+还须处理宿主拥有的 `params.mode === "review"`：`roots`、`sampling.request` 和
+`sampling.response`。将有大小限制的 `data` 作为不可信内容展示。Roots 为只读；
+sampling 审阅可通过 `{ action: "accept", content: { json: editedDocument } }`
+提交替换 JSON，或省略 content 同意当前展示内容。不得自动批准任一 sampling 阶段。
+拒绝/取消、settled/截止时间处理与表单相同。审阅不代表打开浏览器、提交 Session、
+记录输入历史或执行本机工具。

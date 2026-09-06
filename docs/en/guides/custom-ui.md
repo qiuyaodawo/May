@@ -184,3 +184,12 @@ these events concurrently with Runs and resource preparation. Never place answer
 behind the Session transition queue. Show the server and trusted owner, validate
 forms, require review/consent, and dismiss questions on settlement/deadline. No
 automatic browser navigation or form-answer history. See [MCP](./mcp.md#scoped-user-interaction-modern-mrtr).
+
+
+Also handle host-owned `params.mode === "review"`: `roots`, `sampling.request`,
+and `sampling.response`. Display the bounded `data` document as untrusted content.
+Roots are read-only; sampling reviews can submit replacement JSON through
+`{ action: "accept", content: { json: editedDocument } }`, or omit content to approve
+the displayed document. Never auto-approve either sampling stage. Decline/cancel
+and settled/deadline handling are the same as forms. No browser, Session submission,
+input-history entry or local tool execution is implied by review.

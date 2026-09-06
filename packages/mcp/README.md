@@ -83,8 +83,8 @@ DELETE cleanup, followed by local transport cleanup. No automatic reconnect,
 stream resumption, general tool-call retry, or fallback to deprecated HTTP+SSE is enabled.
 `connected` means setup and discovery succeeded, not continuous HTTP health.
 
-Sampling/elicitation handlers,
-Tasks/Apps extensions, and MCP server authoring remain outside this phase.
+Scoped elicitation, opt-in Roots/Sampling and isolated legacy interactions are
+implemented. Tasks/Apps extensions and MCP server authoring remain separate phases.
 See the [bilingual MCP guide](../../docs/en/guides/mcp.md) and [full adaptation roadmap](../../docs/en/architecture/mcp-host-roadmap.md).
 
 ## Dynamic catalogs and endpoint recovery
@@ -136,5 +136,5 @@ multimodal content are available through explicit host APIs. See the
 Modern MRTR form/URL elicitation is opt-in with the pool-owned
 `McpInteractionBroker`. It routes by trusted workspace/Session/Run/request labels,
 validates reviewed responses, bounds waiting and refuses cross-owner/late answers.
-Legacy push elicitation declines rather than guessing ownership. See the bilingual
+Unscoped legacy push requests decline; explicit isolated channels support interaction. See the bilingual
 [interaction guide](../../docs/en/guides/mcp.md#scoped-user-interaction-modern-mrtr).

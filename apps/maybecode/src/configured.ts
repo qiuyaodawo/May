@@ -1,6 +1,7 @@
 import { realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   loadMayConfig,
@@ -20,6 +21,9 @@ import {
   KeyringMcpCredentialStore,
   McpOAuthManager,
   McpInteractionBroker,
+  createMcpModelSampler,
+  type McpHostRequestContext,
+  type McpServerHostOptions,
   validateMcpServerOptions,
   type McpClientPool,
   type McpServerBaseOptions,
@@ -191,12 +195,28 @@ export async function openConfiguredMaybeCode(
     : createMaybeCodeObservability(observabilityOptions, dataDirectory);
   const mcpOptions = options.mcp ?? resolveMaybeCodeMcp(config, workspace);
   let mcp: McpClientPool | undefined;
+  let application: MaybeCodeWorkspace | undefined;
+  const checkHostOwner = (context: McpHostRequestContext) => {
+    context.signal.throwIfAborted();
+    if (application === undefined || context.owner.workspaceId !== application.workspace || context.owner.sessionId !== application.sessionId) throw new Error("MCP host request has no active workspace/Session owner");
+  };
 
   try {
     if (mcpOptions !== false && mcpOptions.servers.length > 0) {
       mcp = await (dependencies.openMcp ?? openMcpClientPool)({
         servers: mcpOptions.servers,
         ...(options.mcpInteractions === true ? { interactions: new McpInteractionBroker() } : {}),
+        hostServices: {
+          roots: async (context) => { checkHostOwner(context); return [{ uri: pathToFileURL(workspace).href, name: "MaybeCode workspace" }]; },
+          sampling: createMcpModelSampler((maxTokens, context) => {
+            checkHostOwner(context);
+            const selected = selectionFor(application!.modelInfo?.profile);
+            const selection = { ...selected, options: { ...selected.options, maxTokens, maxOutputTokens: maxTokens } };
+            // A separate provider instance, without automatic retry or Session Context.
+            const model = dependencies.createModel === undefined ? createMaybeCodeModel(selection, dependencies.adapterRegistry) : dependencies.createModel(selection);
+            return { model, name: selected.model };
+          }),
+        },
         ...(mcpOptions.servers.some((server) => server.transport === "streamable-http" && server.auth !== undefined)
           ? { oauth: mcpOptions.oauth ?? new McpOAuthManager(new KeyringMcpCredentialStore(join(dataDirectory, "mcp-credentials"))) }
           : {}),
@@ -206,7 +226,7 @@ export async function openConfiguredMaybeCode(
         traceAttributes: { "may.agent.name": "maybecode" },
       });
     }
-    return await MaybeCodeWorkspace.open({
+    application = await MaybeCodeWorkspace.open({
       workspace,
       model: initialModel.model,
       modelInfo: initialModel.modelInfo,
@@ -260,6 +280,7 @@ export async function openConfiguredMaybeCode(
         : { instructionsDirectory }),
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
     });
+    return application;
   } catch (error) {
     try {
       await closeConfiguredResources(mcp, observability?.processor);
@@ -298,6 +319,7 @@ export function resolveMaybeCodeMcp(
         "required",
         "transport",
         "protocolMode",
+        "host",
         "url",
         "headers",
         "auth",
@@ -339,6 +361,7 @@ export function resolveMaybeCodeMcp(
       id,
       ...(server.required === undefined ? {} : { required: server.required }),
       ...(server.protocolMode === undefined ? {} : { protocolMode: server.protocolMode }),
+      ...(server.host === undefined ? {} : { host: objectValue(server.host, `${field}.host`) as McpServerHostOptions }),
       ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
       ...(maxTotalTimeoutMs === undefined ? {} : { maxTotalTimeoutMs }),
     };

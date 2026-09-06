@@ -3,14 +3,10 @@ import { randomUUID } from "node:crypto";
 import { Client, SdkError, SdkErrorCode, type RequestOptions } from "@modelcontextprotocol/client";
 import { McpCapabilityError } from "./errors.js";
 import type { McpInteractionBroker, McpInteractionOwner } from "./interactions.js";
+import { McpHostServiceRunner, hostFailure, type McpHostServices, type McpInputBinding, type McpServerHostOptions } from "./host-services.js";
 
-interface Binding {
-  readonly id: string;
-  readonly owner: McpInteractionOwner | undefined;
-  readonly signal: AbortSignal;
-  readonly expiresAt: number;
-  readonly beforeRetry: () => Promise<void>;
-  count: number;
+interface Binding extends McpInputBinding {
+  readonly controller: AbortController;
 }
 const bindingKey = Symbol("may.mcp.host-request");
 type ScopedRequest = RequestOptions & { [bindingKey]?: Binding };
@@ -19,26 +15,77 @@ type ScopedRequest = RequestOptions & { [bindingKey]?: Binding };
 export class McpHostClient extends Client {
   private readonly activeInput = new AsyncLocalStorage<Binding>();
   private serverId = "";
+  private legacyBinding: Binding | undefined;
 
-  configureHost(serverId: string, broker?: McpInteractionBroker): void {
+  configureHost(serverId: string, broker?: McpInteractionBroker, options?: McpServerHostOptions, services?: McpHostServices): void {
     this.serverId = serverId;
     if (broker === undefined) return;
     this.setRequestHandler("elicitation/create", async (request, context) => {
-      const binding = this.activeInput.getStore();
-      // Legacy push requests do not carry a trustworthy logical parent. Never
-      // infer ownership from whichever Run happens to be active on a connection.
-      if (this.getProtocolEra() !== "modern" || binding === undefined) return { action: "decline" };
-      binding.signal.throwIfAborted();
-      if (++binding.count > 32 || binding.owner === undefined) throw new McpCapabilityError(serverId, "interaction budget exhausted or missing trusted owner", "MCP_INTERACTION_ERROR");
-      return broker.request(serverId, binding.id, binding.owner, request.params,
-        AbortSignal.any([binding.signal, context.mcpReq.signal]), binding.expiresAt);
+      const binding = this.inputBinding();
+      if (binding === undefined) return { action: "decline" };
+      const signal = AbortSignal.any([binding.signal, context.mcpReq.signal]);
+      const result = await broker.request(serverId, binding.id, binding.owner!, request.params, signal, binding.expiresAt);
+      await binding.beforeRetry(); signal.throwIfAborted();
+      return result;
     });
+    const runner = new McpHostServiceRunner(serverId, broker, services ?? {});
+    if (options?.roots && services?.roots) this.setRequestHandler("roots/list", async (_request, context) => {
+      const binding = this.inputBinding();
+      if (binding === undefined) return { roots: [] };
+      const signal = AbortSignal.any([binding.signal, context.mcpReq.signal]);
+      return this.hostResult(runner.roots(binding, signal), signal);
+    });
+    if (options?.sampling && services?.sampling) this.setRequestHandler("sampling/createMessage", async (request, context) => {
+      const binding = this.inputBinding();
+      if (binding === undefined) throw hostFailure(serverId, "unsolicited sampling is not authorized");
+      const signal = AbortSignal.any([binding.signal, context.mcpReq.signal]);
+      return this.hostResult(runner.sample(binding, request.params, signal), signal);
+    });
+  }
+
+  private hostResult<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const abort = () => reject(hostFailure(this.serverId, "host request cancelled or expired"));
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) abort();
+      void pending.then(resolve, (error: unknown) => reject(this.safeHostError(error))).finally(() => signal.removeEventListener("abort", abort));
+    });
+  }
+
+  private safeHostError(error: unknown): Error {
+    // Filesystem/provider exceptions may contain undisclosed paths or credentials.
+    return error instanceof McpCapabilityError && ["MCP_HOST_REQUEST_ERROR", "MCP_INTERACTION_ERROR"].includes(error.code)
+      ? error : hostFailure(this.serverId, "host service unavailable, changed, or cancelled");
+  }
+
+  private inputBinding(): Binding | undefined {
+    // The dedicated legacy channel is assigned ONCE for its only operation.
+    // Ordinary multiplexed connections never guess from a currently active Run.
+    const binding = this.getProtocolEra() === "modern" ? this.activeInput.getStore() : this.legacyBinding;
+    if (binding === undefined) return undefined;
+    binding.signal.throwIfAborted();
+    if (++binding.count > 32 || binding.owner === undefined) throw hostFailure(this.serverId, "input budget exhausted or missing trusted owner");
+    return binding;
+  }
+
+  async runScoped<T>(options: RequestOptions, work: () => Promise<T>, isolatedLegacy = false): Promise<T> {
+    const binding = (options as ScopedRequest)[bindingKey];
+    if (isolatedLegacy && this.getProtocolEra() === "legacy") {
+      if (this.legacyBinding !== undefined) throw hostFailure(this.serverId, "legacy channel is already owned");
+      this.legacyBinding = binding;
+    }
+    try { return await work(); }
+    finally {
+      if (this.legacyBinding === binding) this.legacyBinding = undefined;
+      binding?.controller.abort("MCP logical operation completed");
+    }
   }
 
   scope(options: RequestOptions, owner: McpInteractionOwner | undefined, lifetime: AbortSignal, beforeRetry: () => Promise<void>): RequestOptions {
     const timeout = options.maxTotalTimeout ?? 60_000;
-    const signal = AbortSignal.any([lifetime, AbortSignal.timeout(Math.ceil(timeout)), ...(options.signal === undefined ? [] : [options.signal])]);
-    const binding: Binding = { id: randomUUID(), owner: owner === undefined ? undefined : Object.freeze({ ...owner }), signal, expiresAt: Date.now() + timeout, beforeRetry, count: 0 };
+    const controller = new AbortController();
+    const signal = AbortSignal.any([lifetime, controller.signal, AbortSignal.timeout(Math.ceil(timeout)), ...(options.signal === undefined ? [] : [options.signal])]);
+    const binding: Binding = { id: randomUUID(), owner: owner === undefined ? undefined : Object.freeze({ ...owner }), signal, expiresAt: Date.now() + timeout, beforeRetry, controller, count: 0, samplingCalls: 0, samplingTokens: 0 };
     const scoped: ScopedRequest = { ...options, signal, maxTotalTimeout: timeout, [bindingKey]: binding };
     return scoped;
   }

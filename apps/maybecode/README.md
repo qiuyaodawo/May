@@ -503,4 +503,7 @@ Both interactive terminal UIs support modern MCP form/URL elicitation, with
 explicit review/send, decline/cancel, and manual URL navigation/resume. Answers
 are not command history. Library hosts must opt in with `mcpInteractions: true`
 and consume the controller interaction events; no UI means no advertised
-elicitation. Legacy push requests currently decline safely.
+elicitation. Unscoped legacy requests decline; `host.legacyRequests: "isolated"` enables
+per-operation compatibility. `host.roots` and `host.sampling` enable reviewed root
+sharing and isolated, bounded sampling (including remote tool proposals, never
+execution of host tools). All three options default off.

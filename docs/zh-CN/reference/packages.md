@@ -198,3 +198,9 @@ Run 执行还使用 `ToolRegistry.snapshot()` 冻结复制后的 descriptor/sche
 `@may/mcp` 还导出显式启用的 `McpInteractionBroker`：有界临时表单/URL 交互、
 有归属的现代 MRTR 续接及取消/过期。MaybeCode controller 和两个终端 UI 均已
 接入；headless 配置默认关闭，须主动启用。参阅 [交互指南](../guides/mcp.md)。
+
+
+显式 `McpHostServices` 回调与端点 `host` 开关提供经审阅的 Roots/Sampling；
+`createMcpModelSampler()` 发起隔离、有界 provider 调用，不执行工具或读取 Session
+Context。旧协议交互操作显式选择单操作进程/session，不在共享连接上猜测归属。
+参阅 [Host 兼容](../guides/mcp.md)。

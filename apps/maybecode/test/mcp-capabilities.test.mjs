@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openMcpClientPool, McpInteractionBroker } from "@may/mcp";
 import { FileSessionStore } from "@may/session/file-store";
-import { MaybeCodeWorkspace, InMemorySessionCatalog, executeMaybeCodeSlashCommand, runTerminalUI, MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
+import { MaybeCodeWorkspace, openConfiguredMaybeCode, resolveMaybeCodeMcp, InMemorySessionCatalog, executeMaybeCodeSlashCommand, runTerminalUI, MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
 import { startCatalogFixture } from "../../../packages/mcp/test/fixtures/catalog-server.mjs";
 
 test("MCP user commands preview safely, explicitly attach to one Session, and cancel preparation without context leakage", { timeout: 10_000 }, async (t) => {
@@ -58,6 +58,61 @@ test("MCP user commands preview safely, explicitly attach to one Session, and ca
   assert.notEqual(app.sessionId, oldSession);
   assert.equal(requests.length, 2);
   await app.close(); await relay;
+});
+
+test("configured Host reviews share only the workspace and use a separately bounded, user-reviewed sampling model", { timeout: 10_000 }, async (t) => {
+  const fixture = await startCatalogFixture(t);
+  fixture.state.input = (m) => {
+    if (m.method === "tools/call" && !m.params.inputResponses) return { resultType: "input_required", requestState: "host", inputRequests: {
+      roots: { method: "roots/list" }, sample: { method: "sampling/createMessage", params: {
+        messages: [{ role: "user", content: { type: "text", text: "server sampling input" } }], maxTokens: 32,
+      } },
+    } };
+  };
+  const directory = await mkdtemp(join(tmpdir(), "may-configured-host-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const config = { path: join(directory, "config.json"), providers: { test: { adapter: "deepseek-chat", apiKey: "host-only-key" } },
+    models: { chat: { provider: "test", model: "host-model", maxOutputTokens: 4096 } }, defaultModel: "chat",
+    apps: { maybecode: { mcpServers: { remote: { transport: "streamable-http", url: fixture.url + "/modern", host: { roots: true, sampling: true } } } } },
+  };
+  assert.deepEqual(resolveMaybeCodeMcp(config, directory).servers[0].host, { roots: true, sampling: true });
+  const sampled = [];
+  const app = await openConfiguredMaybeCode({ workspace: directory, dataDirectory: join(directory, "data"),
+    mcpInteractions: true, instructions: "Private Session instructions must not reach the sampler", retry: false, observability: false,
+  }, { loadConfig: async () => config, createModel(selection) {
+    if (selection.options.maxTokens === 32) {
+      assert.equal(selection.options.maxOutputTokens, 32);
+      return { limits: { maxOutputTokens: 32 }, async *stream(request) {
+        sampled.push(request);
+        yield { type: "response.completed", message: { role: "assistant", content: [{ type: "text", text: "sampled output" }] } };
+      } };
+    }
+    return { async *stream(request, { step }) {
+      yield { type: "response.completed", message: { role: "assistant", content: [], ...(step === 1 ? {
+        toolCalls: [{ id: "host-call", name: request.tools.find((tool) => tool.name.startsWith("mcp__remote__")).name, input: {} }],
+      } : {}) } };
+    } };
+  } });
+  t.after(() => app.close());
+  const prompts = []; let initial = true; let edited = false;
+  await runTerminalUI(app, { terminal: { colors: false, write() {}, close() {}, async question(prompt, options = {}) {
+    prompts.push(prompt);
+    if (prompt.includes("Host review:")) {
+      assert.equal(options.history, false);
+      if (prompt.includes("Host review: sampling.request") && !edited) { edited = true; return "edit"; }
+      return "allow";
+    }
+    if (prompt.includes("replacement JSON")) return JSON.stringify({ maxTokens: 32, messages: [{ role: "user", content: { type: "text", text: "user reviewed sampling input" } }] });
+    if (prompt.includes("[a]")) return "a";
+    if (initial) { initial = false; return "Use the MCP tool"; } return "/exit";
+  } } });
+  assert.equal(sampled.length, 1); assert.deepEqual(sampled[0].tools, []);
+  assert.equal(sampled[0].messages[0].content[0].text, "user reviewed sampling input");
+  assert.equal(JSON.stringify(sampled).includes("Private Session"), false);
+  assert.equal(JSON.stringify(prompts).includes("host-only-key"), false);
+  const response = fixture.requests.find((r) => r.message?.params?.inputResponses)?.message.params.inputResponses;
+  assert.equal(response.roots.roots.length, 1); assert.equal(response.sample.model, "host-model");
+  assert.equal(prompts.filter((p) => p.includes("Host review: sampling.response")).length, 1);
 });
 
 test("MCP terminal forms resolve nested preparation and Run requests outside the Session queue without persisting answers", { timeout: 10_000 }, async (t) => {

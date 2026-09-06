@@ -7,6 +7,7 @@ import type {
 } from "@may/core";
 import type { McpOAuthManager, McpOAuthOptions } from "./oauth.js";
 import type { McpInteractionBroker, McpInteractionOwner } from "./interactions.js";
+import type { McpHostServices, McpServerHostOptions } from "./host-services.js";
 
 export type McpTransport = "stdio" | "streamable-http";
 
@@ -21,6 +22,7 @@ export interface McpServerBaseOptions {
   readonly maxTotalTimeoutMs?: number;
   /** SDK negotiation mode. Defaults to legacy for stdio, auto for HTTP. */
   readonly protocolMode?: "legacy" | "auto";
+  readonly host?: McpServerHostOptions;
 }
 
 export interface McpStdioServerOptions extends McpServerBaseOptions {
@@ -51,6 +53,7 @@ export type McpServerOptions = McpStdioServerOptions | McpHttpServerOptions;
 export interface OpenMcpClientPoolOptions {
   /** Opt-in ephemeral host UI broker. Omission leaves elicitation unadvertised. */
   readonly interactions?: McpInteractionBroker;
+  readonly hostServices?: McpHostServices;
   readonly servers: readonly McpServerOptions[];
   readonly tracer?: Tracer;
   readonly traceAttributes?: TraceAttributes;

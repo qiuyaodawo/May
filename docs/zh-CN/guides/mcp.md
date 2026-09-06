@@ -222,8 +222,9 @@ tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP 
 ## 当前范围
 
 工具和元数据目录（resources/templates/prompts）现已支持动态发现。资源读取/附件、
-prompt、completion 和 watch 也已实现，详见下文。Sampling/elicitation handler、
-旧 HTTP+SSE、Tasks/Apps 扩展及 server 实现仍待完成。重连需要显式操作，绝不自动重放工具调用。
+prompt、completion 和 watch 也已实现，详见下文。有归属的 elicitation、
+Roots/Sampling 和显式旧协议交互兼容均已实现。Tasks/Apps 扩展及 server 实现仍是
+独立阶段；已移除的双端点 HTTP+SSE 传输不会启用。重连需要显式操作，绝不自动重放工具调用。
 
 剩余阶段参阅 [MCP Host 路线与验收](../architecture/mcp-host-roadmap.md)。
 
@@ -375,7 +376,7 @@ MaybeCode 将解析后的 workspace 作为 `workspaceId`。直接执行 pool 工
 和附件准备在执行中固定 Session；取消会释放排队的 Session 切换。Retained 弹窗
 临时存在、可滚动查看、独立取消，不会把表单作为新的 agent turn 提交。
 
-限制：8 轮协议续接，每个逻辑流程最多 32 个 elicitation 请求，每个 pool 最多
+限制：8 轮协议续接，每个逻辑流程共最多 32 个 Host 输入请求，每个 pool 最多
 32 个待答问题，每个表单最多 32 个字段，请求/响应各 64 KiB，说明文字最多 4,096
 字符。支持扁平基本类型及单选/多选枚举；不支持的 schema 关键字、外部引用、任意
 正则表达式会被拒绝。响应校验不做类型强制转换、不自动填写默认值，并拒绝额外字段。
@@ -385,6 +386,64 @@ MaybeCode 将解析后的 workspace 作为 `workspaceId`。直接执行 pool 工
 旧的请求状态。资源缓存额外按照 workspace 和 Session 分区。
 
 Broker 不单独持久化或追踪问题与答案，但服务端仍可能将提交的数据作为正常资源/
-工具结果返回。旧协议 push-style elicitation 当前返回 `decline`，不会猜测其逻辑
-父请求。Roots/Sampling 尚未声明或实现，留待显式兼容阶段。Tasks、Apps 和 server
+工具结果返回。无归属的旧 push 请求直接拒绝；显式隔离的旧协议操作可以交互，详见下文。
+Roots/Sampling 是显式兼容选项，不会仅因安装 server 就启用。Tasks、Apps 和 server
 导出仍是独立路线图项目；本功能不代表完整 MCP 一致性。
+
+
+## Roots、Sampling 与旧协议兼容
+
+Roots 和 Sampling 都是**默认关闭**的显式兼容能力。MCP 2026-07-28 已将两者标记
+为 deprecated；新集成宜通过模型服务商的直接 API 获取模型能力。参阅官方
+[Roots](https://modelcontextprotocol.io/specification/2026-07-28/client/roots) 和
+[Sampling](https://modelcontextprotocol.io/specification/2026-07-28/client/sampling) 规范。
+启用不等于授权读取 Session 历史或执行宿主工具。
+
+在 MaybeCode 的单个 stdio 或 HTTP 服务端配置中，分别显式开启：
+
+```json
+"host": {
+  "roots": true,
+  "sampling": true,
+  "legacyRequests": "isolated"
+}
+```
+
+同时需要正在处理交互的 broker/UI。直接使用包 API 时，通过
+`hostServices: McpHostServices` 提供 `roots(context)` 白名单回调和/或
+`sampling.createMessage(params, context)`。有 broker 却缺少已开启的服务时配置
+失败；没有 broker 时不声明任何 Host 能力。回调只接收可信 owner、逻辑请求 id、
+截止时间和取消信号，不获得 Core Context；自定义服务必须检查归属。
+
+- **Roots**：MaybeCode 仅提供当前 workspace。宿主规范化可访问的本地 `file:`
+  路径、去重，展示只读审批后才发送；拒绝则返回空列表，服务端不能指定路径。
+  上限为 32 个根 / 64 KiB，同意后再次检查可访问性。Roots 仅为提示，**不是沙箱
+  或文件访问授权**。不声明 `roots.listChanged`，每次请求重新获取候选根。
+- **Sampling**：UI 先检查/编辑确切的隔离输入，再单独检查/编辑输出后才向服务端
+  披露；拒绝输出不能撤销已产生的模型费用。输入/结果各限 48 KiB，最多 64 条消息、
+  32 个工具；每次最多 4,096 输出 token，每个逻辑流程最多四次调用 / 16,384 个
+  预留输出 token。拒绝除 `none` 外的 `includeContext`，不隐式重试或加入 Session。
+- `createMcpModelSampler(factory)` 适配宿主选择的协议无关 `Model`：每次创建单独
+  有界请求，不经过 May 执行循环或 ToolRegistry。factory 接收已批准的 `maxTokens`，
+  必须在服务商层落实；模型需声明不超过该值的正数 `limits.maxOutputTokens`。
+  MaybeCode 用当前 profile 创建独立的基础 provider 实例，并同时覆盖 `maxTokens`
+  和 `maxOutputTokens`。此桥接器不转发服务端可选的 model/temperature/stop 提示或
+  请求 metadata，由宿主 provider 配置决定。
+- Sampling 工具是**提议，不是执行**。仅发送服务端声明的工具定义；转换
+  tool-use/result 历史，但绝不调用本机工具。文本、支持的内联图片/音频及工具历史
+  均有大小限制，不支持的输出显式失败，不获取 URL/文件。隐去 reasoning、model
+  state 和响应 `_meta`。自定义 sampling 服务可不声明 `supportsTools`。
+
+每次披露前重新检查认证/目录状态。取消或过期会停止本地等待并移除审批；迟到的
+回调结果被丢弃。向服务端返回前会隐藏文件系统/provider 错误细节。自定义回调必须
+遵守 signal 与 provider 预算：宿主无法强制终止任意 JavaScript，也不能撤销远端
+已经处理的模型请求。
+
+`legacyRequests: "isolated"` 使适用的旧版 `tools/call`、`resources/read` 和
+`prompts/get` **每次使用全新进程（stdio）或连接/session（HTTP）**，每个端点最多
+八个并发子连接。发送用户操作前需确认子连接协议和完整目录与父连接一致，交互期间
+继续检查父/子连接有效性。通道只有一个可信 owner，绝不复用，完成/取消/池关闭时
+销毁，不重放结果不确定的操作。命中资源缓存也可能产生子连接发现开销。
+这些操作之间**不保留进程/session 状态**，只适合支持独立会话的服务端。未启用时
+普通共享旧版工具仍可使用，但无归属/启动阶段回调不猜测 owner：elicitation 拒绝、
+roots 为空、sampling 失败。

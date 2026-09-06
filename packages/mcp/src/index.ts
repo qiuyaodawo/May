@@ -7,3 +7,5 @@ export * from "./credentials.js";
 export * from "./oauth.js";
 export * from "./content.js";
 export * from "./interactions.js";
+export type { McpServerHostOptions, McpHostRequestContext, McpHostServices, McpSamplingService } from "./host-services.js";
+export * from "./model-sampler.js";

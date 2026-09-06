@@ -112,3 +112,8 @@ provider-specific options; custom applications may use a different registry.
 atomically updating only `defaultModel`. It preserves the existing indentation,
 line endings, trailing newline, and file mode, and refuses to replace a file
 that changed during the operation.
+
+
+The bundled editor schema also describes MaybeCode MCP stdio/Streamable HTTP,
+OAuth and opt-in `host` compatibility fields. Endpoint/header safety and
+service availability remain application/runtime validation responsibilities.

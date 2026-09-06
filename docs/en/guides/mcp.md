@@ -252,8 +252,9 @@ environment and filesystem access, and keep the permission layer enabled.
 
 Tools and metadata catalogs (resources/templates/prompts) now support dynamic discovery.
 Resource reads/attachments, prompts, completion and watches are implemented below.
-Sampling/elicitation, deprecated HTTP+SSE, Tasks/Apps and server authoring remain
-outside this phase. Reconnect is explicit, never automatic tool replay.
+Scoped elicitation, Roots/Sampling and explicit legacy interaction compatibility
+are implemented below. Tasks/Apps and server authoring remain separate phases;
+the removed two-endpoint HTTP+SSE transport is not enabled. Reconnect is explicit, never automatic tool replay.
 
 Track the remaining phases in the [MCP Host roadmap](../architecture/mcp-host-roadmap.md).
 
@@ -430,7 +431,7 @@ for their own queued answer. Reads/previews and attachments pin their Session
 while executing; cancellation releases queued Session changes. Retained dialogs
 are ephemeral, scrollable, independently dismissible and do not submit agent turns.
 
-Limits: eight protocol rounds, 32 elicitation requests per logical flow, 32 pending
+Limits: eight protocol rounds, 32 total host-input requests per logical flow, 32 pending
 questions per pool, 32 form fields, 64 KiB request/response and 4,096-character
 messages. Forms support flat primitives and single/multi-select enums; unsupported
 schema keywords, external references and arbitrary regexes are rejected. Responses
@@ -443,8 +444,77 @@ continuation; changing login while a question is open never sends old state unde
 a new principal. Resource caches additionally partition by workspace and Session.
 
 Questions/answers are not independently persisted or traced by the broker; a
-server can still return supplied data as normal resource/tool output. Legacy
-push-style elicitation currently receives `decline`: the host does not guess its
-logical parent. Roots and Sampling remain unadvertised/unimplemented pending the
-explicit compatibility phase. Tasks, Apps and server export are separate roadmap
+server can still return supplied data as normal resource/tool output. Unscoped legacy push requests decline; explicitly isolated legacy operations
+can interact as described below. Roots and Sampling are explicit compatibility
+options, never enabled merely by installing a server. Tasks, Apps and server export are separate roadmap
 items; this feature does not claim complete MCP conformance.
+
+
+## Roots, Sampling and legacy compatibility
+
+Roots and Sampling are explicit compatibility features, **off by default**.
+Both are deprecated in MCP 2026-07-28; new integrations should prefer direct
+provider APIs for model access. See the official [Roots](https://modelcontextprotocol.io/specification/2026-07-28/client/roots)
+and [Sampling](https://modelcontextprotocol.io/specification/2026-07-28/client/sampling) references.
+Enabling them does not grant access to Session history or executable host tools.
+
+In a MaybeCode server entry (stdio or HTTP), opt in separately:
+
+```json
+"host": {
+  "roots": true,
+  "sampling": true,
+  "legacyRequests": "isolated"
+}
+```
+
+An active interaction broker/UI is also required. Direct package callers supply
+`hostServices: McpHostServices` with a `roots(context)` allowlist callback and/or
+`sampling.createMessage(params, context)`. Enabling a service without supplying
+it fails configuration when a broker is present; without a broker no host
+capabilities are advertised. Callbacks receive the trusted owner, logical request
+id, deadline and abort signal, not Core Context. Check ownership in custom services.
+
+- **Roots:** MaybeCode offers only its current workspace. The host canonicalizes
+  accessible local `file:` paths, deduplicates them, and asks for read-only consent
+  before sharing with the server. Decline sends an empty list; the server cannot
+  nominate a path. Up to 32 roots / 64 KiB are allowed, with accessibility checked
+  again after approval. Roots are guidance, **not a sandbox or filesystem grant**.
+  No `roots.listChanged` capability is advertised; each request obtains fresh roots.
+- **Sampling:** the UI first reviews/edits the exact isolated request, then separately
+  reviews/edits the response before disclosure. Declining the response cannot undo
+  already incurred provider usage. Limits are 48 KiB per request/result, 64 messages,
+  32 tools, 4,096 output tokens per request and four requests / 16,384 reserved output
+  tokens per logical flow. `includeContext` other than `none` is rejected. There is
+  no implicit retry or host Session inclusion.
+- `createMcpModelSampler(factory)` bridges a host-selected provider-neutral `Model`:
+  one fresh, bounded model request, without a May execution loop or ToolRegistry.
+  The factory receives approved `maxTokens` and must enforce it at the provider;
+  the model must declare a positive `limits.maxOutputTokens` no larger than that
+  bound. MaybeCode creates a separate base provider instance using its selected
+  profile and overrides both `maxTokens` and `maxOutputTokens`. Optional server
+  model/temperature/stop hints and request metadata are not forwarded by this
+  bridge; host provider configuration wins.
+- Sampling tools are **proposals, not execution**. Only server-declared definitions
+  are sent; tool-use/result history is converted, but never invokes local tools.
+  Text, supported inline image/audio and tool history are bounded; unsupported
+  output fails explicitly, and URLs/files are not fetched. Reasoning, model state
+  and response `_meta` are withheld. Custom sampling services may omit `supportsTools`.
+
+Every disclosure rechecks authorization/catalog state. Cancellation/expiry stops
+local waiting and removes pending reviews; late callback results are discarded.
+Filesystem/provider errors are sanitized before reaching the server. Custom
+callbacks must honor the signal and provider budget: the host cannot forcibly
+terminate arbitrary JavaScript or undo a model request already processed remotely.
+
+`legacyRequests: "isolated"` opts eligible legacy `tools/call`, `resources/read`
+and `prompts/get` operations into a **fresh process (stdio) or connection/session
+(HTTP) for each operation**, at most eight per endpoint. Before sending the user's
+operation, the child must match the parent protocol and complete catalog; parent
+and child validity are rechecked during interactions. The channel has exactly one
+trusted owner, is never reused, and closes after completion/cancellation or pool
+shutdown. No uncertain operation is replayed. A cached resource read can still
+incur child discovery. Per-process/session state is **not retained between these
+operations**; opt in only for servers supporting independent sessions. Shared
+legacy tools still work without this option, but unsolicited/startup callbacks
+never acquire an owner: elicitation declines, roots are empty and sampling fails.

@@ -222,3 +222,10 @@ See [custom tools](../guides/custom-tool.md).
 form/URL interaction, scoped modern MRTR continuations and cancellation/expiry.
 MaybeCode's controller and both terminal UIs consume it; headless configuration
 leaves it disabled unless requested. See [the interaction guide](../guides/mcp.md#scoped-user-interaction-modern-mrtr).
+
+
+Explicit `McpHostServices` callbacks and endpoint `host` switches add reviewed
+Roots/Sampling; `createMcpModelSampler()` makes isolated, bounded provider calls
+without executing tools or reading Session Context. Legacy interactive operations
+use opt-in single-operation processes/sessions, never guessed ownership on a shared
+connection. See [Host compatibility](../guides/mcp.md#roots-sampling-and-legacy-compatibility).

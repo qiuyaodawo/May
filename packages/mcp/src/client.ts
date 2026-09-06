@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   StreamableHTTPClientTransport,
   type CallToolResult,
+  type Client,
   type RequestOptions,
   type Tool as ProtocolTool,
 } from "@modelcontextprotocol/client";
@@ -32,6 +33,7 @@ import {
 } from "./errors.js";
 import { McpCapabilities } from "./capabilities.js";
 import { McpHostClient, mcpOwner } from "./host-client.js";
+import { hostCapabilities, hostFailure } from "./host-services.js";
 import { assertMcpContentSize, mcpToolResultContent } from "./content.js";
 import { namespaceMcpToolName } from "./names.js";
 import { McpAuthenticationError } from "./oauth.js";
@@ -72,6 +74,10 @@ class McpConnection {
   private closing = false;
   private connected = false;
   private lastTransportError: Error | undefined;
+  private catalog: McpServerCatalog | undefined;
+  private isolatedLegacy = false;
+  private parentGuard: (() => Promise<void>) | undefined;
+  private readonly legacyOperations = new Set<Promise<unknown>>();
 
   private constructor(
     readonly options: McpServerOptions,
@@ -81,6 +87,7 @@ class McpConnection {
     private readonly tracer: Tracer | undefined,
     private readonly traceAttributes: TraceAttributes,
     private readonly onAvailability: (error?: Error) => void,
+    private readonly poolOptions: OpenMcpClientPoolOptions,
   ) {
     this.capabilities = new McpCapabilities(client, options, (method, options, work) => this.runCapability(method, options, work));
   }
@@ -93,7 +100,7 @@ class McpConnection {
   ): Promise<McpConnection> {
     validateMcpServerOptions(options);
     const client = new McpHostClient(poolOptions.clientInfo ?? DEFAULT_CLIENT_INFO, {
-      capabilities: poolOptions.interactions === undefined ? {} : { elicitation: { form: {}, url: {} } },
+      capabilities: hostCapabilities(options.host, poolOptions.interactions, poolOptions.hostServices),
       inputRequired: { autoFulfill: true, maxRounds: 8 },
       listMaxPages: 64,
       // Each connection owns a separate cache, including after reconnect/login.
@@ -111,7 +118,7 @@ class McpConnection {
         },
       },
     });
-    client.configureHost(options.id, poolOptions.interactions);
+    client.configureHost(options.id, poolOptions.interactions, options.host, poolOptions.hostServices);
     const stderr = new BoundedStderrBuffer(
       options.transport === "streamable-http"
         ? 0 : options.stderrMaxBytes ?? DEFAULT_STDERR_MAX_BYTES,
@@ -136,6 +143,7 @@ class McpConnection {
       poolOptions.tracer,
       traceAttributes,
       onAvailability,
+      poolOptions,
     );
     client.onerror = (error) => {
       connection.lastTransportError = safeMcpTransportError(error, options) as Error;
@@ -207,6 +215,8 @@ class McpConnection {
   }
 
   invalidate(): void { this.stale = true; this.capabilities.invalidate(); }
+
+  updateCatalog(catalog: McpServerCatalog): void { this.catalog = catalog; this.capabilities.updateCatalog(catalog); }
 
   get busy(): boolean { return this.activeCalls > 0; }
 
@@ -295,24 +305,20 @@ class McpConnection {
     try {
       await this.checkAuthorization();
       context.signal.throwIfAborted();
-      const result = await this.client.callTool(
-        { name: definition.name, arguments: input },
-        {
-          ...this.client.scope(requestOptions(this.options, context.signal), mcpOwner(context.scope, context.runId, context.toolCallId), this.lifetime.signal, async () => {
-            await this.checkAuthorization();
-            if (generation !== this.generation || this.stale || this.installedTools.get(definition.name) !== fingerprint(definition)) throw new McpStaleToolError(this.options.id);
-          }),
-          resetTimeoutOnProgress: true,
-          toolDefinition: definition,
-          onprogress: (progress) => {
-            context.report({
-              type: "progress",
-              message: formatProgress(progress),
-              data: progress,
-            });
-          },
-        },
-      );
+      const request = {
+        ...this.client.scope(requestOptions(this.options, context.signal), mcpOwner(context.scope, context.runId, context.toolCallId), this.lifetime.signal, async () => {
+          await this.checkAuthorization();
+          if (generation !== this.generation || this.stale || this.installedTools.get(definition.name) !== fingerprint(definition)) throw new McpStaleToolError(this.options.id);
+        }),
+        resetTimeoutOnProgress: true,
+        toolDefinition: definition,
+        onprogress: (progress: Parameters<NonNullable<RequestOptions["onprogress"]>>[0]) => context.report({ type: "progress", message: formatProgress(progress), data: progress }),
+      };
+      const result = await this.client.runScoped(request, () => this.needsLegacyIsolation()
+        ? this.withLegacyIsolation(request.signal!, (connection, signal) => connection.callTool(definition, exposedName, input, { ...context, signal }, connection.generation)
+          // The child has already validated the SDK result and thrown any tool error.
+          .then((output) => ({ ...output, content: [...output.content] }) as CallToolResult))
+        : this.client.callTool({ name: definition.name, arguments: input }, request), this.isolatedLegacy);
       context.signal.throwIfAborted();
       await this.checkAuthorization();
       assertMcpContentSize(result);
@@ -356,6 +362,7 @@ class McpConnection {
   }
 
   private async checkAuthorization(): Promise<void> {
+    await this.parentGuard?.();
     if (this.authorizeIdentity === undefined) return;
     try {
       if (await this.authorizeIdentity() !== this.authorizationIdentity) {
@@ -364,7 +371,44 @@ class McpConnection {
     } catch (error) { this.invalidate(); this.onAvailability(error as Error); throw error; }
   }
 
-  private async runCapability<T>(method: string, options: McpOperationOptions, work: (request: RequestOptions) => Promise<T>): Promise<T> {
+  private needsLegacyIsolation(): boolean {
+    return !this.isolatedLegacy && this.poolOptions.interactions !== undefined &&
+      this.options.host?.legacyRequests === "isolated" && this.client.getProtocolEra() === "legacy";
+  }
+
+  private withLegacyIsolation<T>(signal: AbortSignal, work: (connection: McpConnection, signal: AbortSignal) => Promise<T>): Promise<T> {
+    if (this.legacyOperations.size >= 8) return Promise.reject(hostFailure(this.options.id, "legacy operation limit exceeded"));
+    const operation = (async () => {
+      const catalog = this.catalog;
+      if (catalog === undefined) throw hostFailure(this.options.id, "missing legacy catalog");
+      let isolated: McpConnection | undefined;
+      let changes = 0;
+      try {
+        // A new client/session (and for stdio a new process) is created BEFORE
+        // sending the user's operation. This is not replay or reconnect-on-error.
+        isolated = await McpConnection.open({ ...this.options, protocolMode: "legacy" }, { ...this.poolOptions, signal }, () => {}, () => { changes++; isolated?.invalidate(); });
+        isolated.isolatedLegacy = true;
+        isolated.parentGuard = async () => {
+          signal.throwIfAborted();
+          await this.checkAuthorization();
+          if (this.stale || this.catalog === undefined || fingerprint(this.catalog) !== fingerprint(catalog)) throw new McpStaleToolError(this.options.id);
+        };
+        const stamp = changes;
+        const candidate = await isolated.discover(signal);
+        const { serverId: _id, revision: _revision, ...expected } = catalog;
+        if (changes !== stamp || isolated.protocolVersion() !== this.protocolVersion() || fingerprint(candidate) !== fingerprint(expected)) throw hostFailure(this.options.id, "isolated legacy catalog differs; refresh before using it");
+        isolated.install(candidate.tools);
+        isolated.updateCatalog({ ...candidate, serverId: this.options.id, revision: catalog.revision });
+        await isolated.parentGuard();
+        return await work(isolated, signal);
+      } finally { await isolated?.close(); }
+    })();
+    this.legacyOperations.add(operation);
+    void operation.then(() => this.legacyOperations.delete(operation), () => this.legacyOperations.delete(operation));
+    return operation;
+  }
+
+  private async runCapability<T>(method: string, options: McpOperationOptions, work: (request: RequestOptions, client: Client) => Promise<T>): Promise<T> {
     this.throwIfClosed();
     const signal = AbortSignal.any([this.lifetime.signal, ...(options.signal === undefined ? [] : [options.signal])]);
     signal.throwIfAborted();
@@ -376,10 +420,13 @@ class McpConnection {
     try {
       await this.checkAuthorization();
       signal.throwIfAborted();
-      const result = await work(this.client.scope(requestOptions(this.options, signal), options.owner, this.lifetime.signal, async () => {
+      const request = this.client.scope(requestOptions(this.options, signal), options.owner, this.lifetime.signal, async () => {
         await this.checkAuthorization();
         if (this.stale) throw new McpCapabilityError(this.options.id, "catalog changed during interaction; start a new operation");
-      }));
+      });
+      const result = await this.client.runScoped(request, () => this.needsLegacyIsolation() && ["resources/read", "prompts/get"].includes(method)
+        ? this.withLegacyIsolation(request.signal!, (connection, signal) => connection.runCapability(method, { ...options, signal }, work))
+        : work(request, this.client), this.isolatedLegacy);
       signal.throwIfAborted();
       await this.checkAuthorization();
       endTraceSpan(span, { status: "ok" });
@@ -399,6 +446,7 @@ class McpConnection {
     this.closing = true;
     this.closed = true;
     this.lifetime.abort("MCP connection is closing");
+    await Promise.allSettled(this.legacyOperations);
     await this.capabilities.close();
     const span = startTraceSpan(this.tracer, "may.mcp.disconnect", {
       attributes: this.traceAttributes,
@@ -746,7 +794,7 @@ class DefaultMcpClientPool implements McpClientPool {
         });
         const revision = (entry.catalog?.revision ?? 0) + (changed || initial ? 1 : 0);
         entry.catalog = freezeTree({ ...candidate, serverId: entry.server.id, revision });
-        connection.capabilities.updateCatalog(entry.catalog);
+        connection.updateCatalog(entry.catalog);
         entry.tools = tools;
         entry.status.toolNames = tools.map((tool) => tool.name);
         entry.status.state = "connected";
@@ -777,6 +825,7 @@ export async function openMcpClientPool(options: OpenMcpClientPoolOptions): Prom
   const serverIds = new Set<string>();
   for (const server of options.servers) {
     validateMcpServerOptions(server);
+    if (options.interactions !== undefined && (server.host?.roots && options.hostServices?.roots === undefined || server.host?.sampling && options.hostServices?.sampling === undefined)) throw new McpConfigurationError(`MCP server "${server.id}" enables a missing host service`);
     if (serverIds.has(server.id)) throw new McpConfigurationError(`Duplicate MCP server id: ${server.id}`);
     serverIds.add(server.id);
   }

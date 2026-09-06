@@ -8,7 +8,7 @@ import type {
 } from "./types.js";
 
 export type McpOperationRunner = <T>(method: string, options: McpOperationOptions,
-  work: (options: RequestOptions) => Promise<T>) => Promise<T>;
+  work: (options: RequestOptions, client: Client) => Promise<T>) => Promise<T>;
 
 interface Watch {
   finish(reason: "local" | "remote" | "connection-closed"): void;
@@ -47,7 +47,7 @@ export class McpCapabilities {
     validUri(uri);
     if (options.cache !== undefined && !["use", "refresh", "bypass"].includes(options.cache)) throw new TypeError("Invalid MCP cache mode");
     this.require("resources");
-    return this.run("resources/read", options, async (request) => {
+    return this.run("resources/read", options, async (request, client) => {
       const key = JSON.stringify([options.owner?.workspaceId, options.owner?.sessionId, uri]);
       const cached = this.cache.get(key);
       if ((options.cache ?? "use") === "use" && cached !== undefined && cached.expiresAt > Date.now()) {
@@ -56,7 +56,7 @@ export class McpCapabilities {
       }
       this.evict(key);
       const generation = this.generation;
-      const result = await this.client.readResource({ uri }, { ...request, cacheMode: "bypass" });
+      const result = await client.readResource({ uri }, { ...request, cacheMode: "bypass" });
       const read = { serverId: this.server.id, uri, result, fromCache: false };
       // Validate even for preview-only consumers. Nothing silently disappears on attachment.
       mcpResourceToUserMessage(read);
@@ -91,8 +91,8 @@ export class McpCapabilities {
     if (Object.keys(args).some((name) => !declared.some((argument) => argument.name === name)) ||
         declared.some((argument) => argument.required && !Object.hasOwn(args, argument.name))) this.invalid("invalid or missing prompt arguments");
     const argumentsCopy = { ...args };
-    return this.run("prompts/get", options, async (request) => {
-      const result = await this.client.getPrompt({ name, arguments: argumentsCopy }, request);
+    return this.run("prompts/get", options, async (request, client) => {
+      const result = await client.getPrompt({ name, arguments: argumentsCopy }, request);
       const expansion = { serverId: this.server.id, name, arguments: argumentsCopy, result };
       mcpPromptToUserMessage(expansion);
       return freezeTree(structuredClone(expansion));

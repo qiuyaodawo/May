@@ -20,6 +20,26 @@ export async function presentMcpInteraction(
   };
   let error = "";
   while (!signal.aborted) {
+    if (request.params.mode === "review") {
+      let data = request.params.data;
+      let edited = false;
+      for (;;) {
+        const choice = (await question(`${header}\nHost review: ${request.params.kind}\n${JSON.stringify(data, null, 2)}\n${error}` +
+          `Type allow to approve${request.params.editable ? ", edit to change the JSON" : ""}, decline, or cancel: `))?.trim().toLowerCase();
+        if (choice === "edit" && request.params.editable) {
+          try {
+            const input = await question(`${header}\nEnter the replacement JSON document (reviewed again before sending), or cancel: `);
+            if (input === undefined || input.trim() === "cancel") { app.respondMcpInteraction(request.id, { action: "cancel" }); return; }
+            if (Buffer.byteLength(input) > 48 * 1024) throw new Error();
+            data = JSON.parse(input); edited = true; error = "";
+          } catch { error = "Invalid JSON or document too large.\n"; }
+          continue;
+        }
+        app.respondMcpInteraction(request.id, { action: choice === "allow" ? "accept" : choice === "decline" ? "decline" : "cancel",
+          ...(choice !== "allow" || !edited ? {} : { content: { json: JSON.stringify(data) } }),
+        }); return;
+      }
+    }
     if (request.params.mode === "url") {
       const url = new URL(request.params.url);
       const consent = await question(`${header}\nExternal host: ${url.host}\nURL: ${request.params.url}\n` +

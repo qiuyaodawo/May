@@ -20,13 +20,13 @@ permission boundary remains in force.
   completion, caching/subscriptions, bounded content/attachment adaptation;
   immutable per-Run tool snapshots, definition-based permission invalidation,
   endpoint refresh/reconnect without unsafe operation replay.
-- [ ] **Host interactions:** Elicitation form/URL, MRTR, scoped
+- [x] **Host interactions:** Elicitation form/URL, MRTR, scoped
   workspace/session/run/request routing, cancellation/expiry/budgets, headless
   controller + UI, explicit legacy Roots/Sampling compatibility, no deadlocks
   or unsolicited context/model access.
   - [x] Modern MRTR form/URL broker, Core host scopes, controller and both UIs,
     bounded waiting/cancellation, Session cache isolation and authorization checks.
-  - [ ] Explicit Roots/Sampling and legacy request ownership compatibility.
+  - [x] Explicit Roots/Sampling and legacy request ownership compatibility.
 - [ ] **Long tasks and extensions:** task handles, get/update/cancel, durable
   ownership and restart recovery, local-wait vs remote-cancel semantics;
   optional isolated MCP Apps UI with explicit unsupported-terminal behavior.
@@ -46,5 +46,10 @@ command tests. Tools/resources/templates/prompts/completion, bounded attachments
 cache invalidation and modern/legacy subscriptions are implemented. Modern Host
 interaction evidence: `interactions.test.mjs`, OAuth identity-change continuation
 test, Core scope snapshot test, and MaybeCode terminal/preparation integration.
-Legacy push elicitation currently declines without guessed ownership. Explicit
-Roots/Sampling compatibility, tasks/Apps, server export and final audit remain open.
+Host compatibility evidence: `host-services.test.mjs` (reviewed Roots/Sampling,
+model/tool-history bridge, budget/cancel/redaction, isolated concurrent legacy stdio
+and HTTP operations, early completion and process/session cleanup) and MaybeCode
+configured-provider/UI integration in `mcp-capabilities.test.mjs`. The editor schema
+also covers HTTP/OAuth/Host options with positive/negative validation smoke.
+Legacy channels are per-operation and not reused; no unsolicited ownership is
+guessed. Tasks/Apps, server export and final audit remain open.

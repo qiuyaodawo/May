@@ -13,6 +13,13 @@ export interface McpInteractionOwner {
 }
 
 export type McpElicitationParams = ElicitRequestFormParams | { readonly mode: "url"; readonly message: string; readonly url: string };
+export interface McpHostReviewParams {
+  readonly mode: "review";
+  readonly kind: "roots" | "sampling.request" | "sampling.response";
+  readonly message: string;
+  readonly data: unknown;
+  readonly editable: boolean;
+}
 
 export interface McpInteractionRequest {
   readonly id: string;
@@ -20,7 +27,7 @@ export interface McpInteractionRequest {
   readonly requestId: string;
   readonly owner: McpInteractionOwner;
   readonly expiresAt: number;
-  readonly params: McpElicitationParams;
+  readonly params: McpElicitationParams | McpHostReviewParams;
 }
 
 export type McpInteractionEvent =
@@ -77,6 +84,18 @@ export class McpInteractionBroker {
       try { validate = new AjvJsonSchemaValidator().getValidator({ ...params.requestedSchema, additionalProperties: false } as JsonSchemaType); }
       catch { throw failure(serverId, "invalid elicitation form schema"); }
     }
+    return this.enqueue(serverId, requestId, owner, params, signal, expiresAt, validate);
+  }
+
+  /** Host-owned review, never interpreted as an elicitation sent by the server. */
+  review(serverId: string, requestId: string, owner: McpInteractionOwner, params: McpHostReviewParams, signal: AbortSignal, expiresAt: number): Promise<ElicitResult> {
+    bounded(params, serverId);
+    return this.enqueue(serverId, requestId, owner, structuredClone(params), signal, expiresAt);
+  }
+
+  private enqueue(serverId: string, requestId: string, owner: McpInteractionOwner, params: McpInteractionRequest["params"], signal: AbortSignal, expiresAt: number, validate?: JsonSchemaValidator<unknown>): Promise<ElicitResult> {
+    signal.throwIfAborted();
+    if (this.closed || this.pending.size >= 32 || expiresAt <= Date.now() || !owner.workspaceId || !owner.sessionId) return Promise.reject(failure(serverId, "interaction unavailable or expired"));
     const request = freezeTree({ id: randomUUID(), serverId, requestId, owner: { ...owner }, expiresAt, params });
     return new Promise((resolve, reject) => {
       const abort = () => entry.finish();
@@ -106,7 +125,13 @@ export class McpInteractionBroker {
     if (request.expiresAt <= Date.now()) { pending.finish(); return false; }
     bounded(response, request.serverId);
     if (!["accept", "decline", "cancel"].includes(response?.action)) throw failure(request.serverId, "invalid elicitation action");
-    if (response.action !== "accept" || request.params.mode === "url") {
+    if (response.action === "accept" && request.params.mode === "review") {
+      if (response.content !== undefined) {
+        if (!request.params.editable || Object.keys(response.content).length !== 1 || typeof response.content.json !== "string") throw failure(request.serverId, "review only accepts an editable JSON document");
+        try { JSON.parse(response.content.json); } catch { throw failure(request.serverId, "invalid review JSON"); }
+      }
+      pending.finish({ action: "accept", ...(response.content === undefined ? {} : { content: { json: response.content.json! } }) });
+    } else if (response.action !== "accept" || request.params.mode === "url") {
       if (response.content !== undefined) throw failure(request.serverId, "this response must not contain form content");
       pending.finish({ action: response.action });
     } else {

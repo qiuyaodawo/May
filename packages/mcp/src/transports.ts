@@ -74,6 +74,13 @@ export function validateMcpServerOptions(options: McpServerOptions): void {
   }
   positiveNumber(options.requestTimeoutMs, options, "requestTimeoutMs");
   positiveNumber(options.maxTotalTimeoutMs, options, "maxTotalTimeoutMs");
+  if (options.host !== undefined) {
+    if (options.host === null || typeof options.host !== "object" || Array.isArray(options.host) ||
+        Object.keys(options.host).some((key) => !["roots", "sampling", "legacyRequests"].includes(key))) invalid(options, "host contains invalid compatibility options");
+    if (options.host.roots !== undefined && typeof options.host.roots !== "boolean" ||
+        options.host.sampling !== undefined && typeof options.host.sampling !== "boolean" ||
+        options.host.legacyRequests !== undefined && options.host.legacyRequests !== "isolated") invalid(options, "host requires boolean roots/sampling and optional legacyRequests=isolated");
+  }
   if (options.transport === "streamable-http") {
     rejectFields(options, ["command", "args", "cwd", "env", "maxBufferSize", "stderrMaxBytes"]);
     let url: URL;

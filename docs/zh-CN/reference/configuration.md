@@ -240,10 +240,19 @@ origin 限制参阅 [MCP 认证](../guides/mcp-auth.md)。
 相对 `cwd` 和省略的 `cwd` 都以当前 MaybeCode workspace 为基准。环境字符串会从
 启动进程展开 `${NAME}`，缺失引用会使启动失败。配置文件是明文，因此应优先使用
 环境引用。发现的工具会加入 namespace，经过 MaybeCode 的正常 permission 与
-scheduling 路径，并在下次应用启动前保持不变。`/mcp` 会显示 server 状态、协商协议版本、工具、
+scheduling 路径，每个 Run 使用固定快照；显式 refresh/reconnect 与目录通知只影响
+后续 Run。`/mcp` 会显示 server 状态、协商协议版本、工具、
 错误和有界、已净化的 stderr 末尾片段。参阅 [MCP 工具](../guides/mcp.md)。
 
 ## 维护时的事实来源
 
 Schema 和本文档都是面向用户的参考。新增或修改内置 adapter 选项时，应同时更新
 它们以及 `packages/providers/src/builtins.ts` 中的运行时解析。
+
+
+两种 transport 都接受 `host: { roots: true, sampling: true, legacyRequests: "isolated" }`，
+三个选项均需主动启用。Roots/Sampling 还需要交互 UI；headless 使用需显式开启并
+消费 `mcpInteractions`。旧协议隔离为每次交互工具/read/prompt 操作创建新进程/session，
+不保留操作间的服务端会话状态。参阅 [Host 兼容](../guides/mcp.md) 中的同意机制、
+预算与自定义服务。内置编辑器 schema 已覆盖 HTTP、OAuth 和 Host 字段；运行时还会
+检查端点/请求头安全约束。

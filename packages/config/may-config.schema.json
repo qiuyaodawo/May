@@ -334,7 +334,12 @@
             {
               "type": "object",
               "propertyNames": { "pattern": "^[A-Za-z0-9_-]+$" },
-              "additionalProperties": { "$ref": "#/$defs/mcpStdioServer" }
+              "additionalProperties": {
+                "oneOf": [
+                  { "$ref": "#/$defs/mcpStdioServer" },
+                  { "$ref": "#/$defs/mcpHttpServer" }
+                ]
+              }
             }
           ]
         }
@@ -347,6 +352,8 @@
         "enabled": { "type": "boolean", "default": true },
         "required": { "type": "boolean", "default": true },
         "transport": { "const": "stdio", "default": "stdio" },
+        "protocolMode": { "enum": ["legacy", "auto"], "default": "legacy" },
+        "host": { "$ref": "#/$defs/mcpHostOptions" },
         "command": { "$ref": "#/$defs/nonEmptyString" },
         "args": {
           "type": "array",
@@ -372,6 +379,54 @@
         },
         { "required": ["command"] }
       ],
+      "additionalProperties": false
+    },
+    "mcpHttpServer": {
+      "type": "object",
+      "required": ["transport"],
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "required": { "type": "boolean", "default": true },
+        "transport": { "const": "streamable-http" },
+        "url": { "$ref": "#/$defs/nonEmptyString", "description": "HTTPS endpoint (HTTP only on loopback); redirects and URL credentials are refused at runtime." },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "auth": { "$ref": "#/$defs/mcpOAuthOptions" },
+        "protocolMode": { "enum": ["legacy", "auto"], "default": "auto" },
+        "host": { "$ref": "#/$defs/mcpHostOptions" },
+        "requestTimeoutMs": { "$ref": "#/$defs/positiveInteger" },
+        "maxTotalTimeoutMs": { "$ref": "#/$defs/positiveInteger" }
+      },
+      "anyOf": [
+        { "required": ["enabled"], "properties": { "enabled": { "const": false } } },
+        { "required": ["url"] }
+      ],
+      "additionalProperties": false
+    },
+    "mcpHostOptions": {
+      "type": "object",
+      "description": "Explicit compatibility options; an active interaction UI and host services are also required.",
+      "properties": {
+        "roots": { "type": "boolean", "default": false },
+        "sampling": { "type": "boolean", "default": false },
+        "legacyRequests": { "const": "isolated", "description": "Use a fresh process/session for each legacy interactive operation, never shared or reused." }
+      },
+      "additionalProperties": false
+    },
+    "mcpOAuthOptions": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "oauth" },
+        "account": { "$ref": "#/$defs/nonEmptyString" },
+        "clientId": { "$ref": "#/$defs/nonEmptyString" },
+        "expectedIssuer": { "$ref": "#/$defs/nonEmptyString" },
+        "clientMetadataUrl": { "$ref": "#/$defs/nonEmptyString" },
+        "scopes": { "type": "array", "items": { "$ref": "#/$defs/nonEmptyString" } },
+        "authorizationOrigins": { "type": "array", "items": { "$ref": "#/$defs/nonEmptyString" } },
+        "callbackPort": { "type": "integer", "minimum": 0, "maximum": 65535 }
+      },
+      "dependentRequired": { "clientId": ["expectedIssuer"] },
+      "not": { "required": ["clientId", "clientMetadataUrl"] },
       "additionalProperties": false
     }
   }

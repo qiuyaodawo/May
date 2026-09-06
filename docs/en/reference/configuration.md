@@ -255,8 +255,8 @@ Relative `cwd` values and omitted `cwd` resolve to the active MaybeCode
 workspace. Environment strings expand `${NAME}` from the launching process;
 missing references fail startup. Prefer references because the configuration
 file is plaintext. Discovered tools are namespaced, pass through MaybeCode's
-normal permission and scheduling path, and remain fixed until the next
-application launch. `/mcp` reports server state, negotiated protocol version, tools, errors, and the bounded
+normal permission and scheduling path, and use a fixed snapshot per Run. Explicit
+refresh/reconnect and catalog notifications update later Runs. `/mcp` reports server state, negotiated protocol version, tools, errors, and the bounded
 sanitized stderr tail. See [MCP tools](../guides/mcp.md).
 
 ## Maintenance source of truth
@@ -264,3 +264,12 @@ sanitized stderr tail. See [MCP tools](../guides/mcp.md).
 The schema and this guide are user-facing references. When adding or changing a
 built-in adapter option, update both alongside the runtime parsing in
 `packages/providers/src/builtins.ts`.
+
+
+Both transports accept `host: { roots: true, sampling: true, legacyRequests: "isolated" }`.
+All three are opt-in. Roots/Sampling also require an interaction UI; headless use
+must explicitly enable and consume `mcpInteractions`. Legacy isolation creates a
+fresh process/session per interactive tool/read/prompt operation and does not retain
+server session state between operations. See [Host compatibility](../guides/mcp.md#roots-sampling-and-legacy-compatibility)
+for consent, budgets and custom services. The bundled editor schema covers HTTP,
+OAuth and Host fields; runtime validation additionally enforces endpoint/header safety.
