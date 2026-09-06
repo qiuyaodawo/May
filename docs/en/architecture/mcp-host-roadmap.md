@@ -44,7 +44,7 @@ permission boundary remains in force.
   pipeline, no blanket export of host tools or Session history. Evidence:
   `server.test.mjs` (real HTTP and modern/legacy stdio), mandatory public projections
   and revocation during approval; see [server exports](../guides/mcp-server.md).
-- [ ] **Completion audit:** verify each phase with focused behavior tests and
+- [x] **Completion audit:** verify each phase with focused behavior tests and
   product integration, update every maintained language, review safety
   boundaries and actual supported versions/extensions, commit completed work.
 
@@ -63,4 +63,28 @@ and HTTP operations, early completion and process/session cleanup) and MaybeCode
 configured-provider/UI integration in `mcp-capabilities.test.mjs`. The editor schema
 also covers HTTP/OAuth/Host options with positive/negative validation smoke.
 Legacy channels are per-operation and not reused; no unsolicited ownership is
-guessed. Only final audit remains open.
+guessed. The planned adaptation phases have implementation and verification evidence.
+This is not a claim that every optional MCP extension is implemented.
+
+## Completion audit — 2026-09-06
+
+| Boundary | Audited result |
+| --- | --- |
+| Architecture | Core/application source and manifests do not depend on MCP. Client tools retain the normal executor/scheduler path; server export explicitly receives a host executor. |
+| Versions | Client modern core `2026-07-28` plus explicit legacy compatibility; native Tasks extension `2026-07-28`; Apps UI `2026-01-26`; SDK client/server 2.0.0. No fabricated compatibility claims for 2025 experimental Tasks. |
+| Ownership | Per-Run snapshots, credential/catalog-bound continuations, durable workspace/Session task ownership, single-owner Apps channels and per-request authenticated server principals. No request-body owner or arbitrary Session history export. |
+| Side effects | No automatic tool replay after unknown outcomes; waiting differs from remote cancellation; task attachment and App/data sharing are explicit; exported results require a public projection. |
+| UI isolation | Dedicated-origin proxy + opaque inner iframe, restrictive CSP, checked message sources, no automatic Context/link actions; terminal HTML stays unsupported. Ignored callback signals cannot retain local App waits. |
+| Packaging | Root client API plus independent `@may/mcp/server` and browser-only `@may/mcp/apps-browser` are importable from installed tarballs outside the repository. |
+| Verification | `pnpm test`: **390 passed, zero failed/skipped**, including opt-in real Chromium smoke. `pnpm build`, `pnpm docs:check` (32 bilingual pairs), package smoke and `git diff --check` passed. No live paid provider or third-party server certification was run. |
+
+Deliberate limits are maintained in the capability guides, not hidden pending work:
+Tasks use explicit polling, not optional task subscription notifications. Apps require
+a custom graphical Host, self-contained content and explicit user actions; no external
+network/device grants or `ui/message`/Context mutation. The independent server exports
+immediate allowlisted tools/resources/prompts, not every client-side feature, and does
+not provide an OAuth issuer. Automatic reconnect/replay and the removed HTTP+SSE
+transport remain disabled. Native keyring integration evidence comes from the earlier
+opt-in Windows smoke; routine tests inject keyring storage rather than changing real
+credentials. Production-specific verifier, filesystem sandbox and UI authentication
+remain the embedding application's responsibilities.

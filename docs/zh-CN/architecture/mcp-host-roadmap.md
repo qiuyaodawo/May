@@ -36,7 +36,7 @@
   workspace，经过正常权限/执行路径，不批量暴露本机工具或 Session 历史。证据：
   `server.test.mjs`（真实 HTTP 及现代/旧版 stdio）、必需公开投影、审批期间撤销；
   参阅 [server 导出](../guides/mcp-server.md)。
-- [ ] **完成审计**：各阶段具备聚焦行为验证和产品集成证据；更新全部维护语言，检查
+- [x] **完成审计**：各阶段具备聚焦行为验证和产品集成证据；更新全部维护语言，检查
   安全边界、实际支持版本/扩展，并提交已完成改动。
 
 OAuth 完成不代表目录、Host 交互或扩展已完成。所有条目都有直接证据前，不得将整体
@@ -51,4 +51,24 @@ MaybeCode 终端/准备阶段集成测试。Host 兼容证据：`host-services.t
 操作、提前完成及进程/session 清理），以及 `mcp-capabilities.test.mjs` 中的
 MaybeCode 配置 provider/UI 集成。编辑器 schema 的 HTTP/OAuth/Host 选项也经过
 正反例校验 smoke。旧版通道按操作创建且不复用，不猜测无归属请求的 owner。
-仅最终审计待完成。
+规划内适配阶段均有实现和验证证据，但不等于实现所有可选 MCP 扩展。
+
+## 完成审计 — 2026-09-06
+
+| 边界 | 审计结论 |
+| --- | --- |
+| 架构 | Core/application 源码和 manifest 不依赖 MCP。客户端工具保留正常 executor/scheduler 路径，server 导出显式接收 Host 执行器。 |
+| 版本 | 客户端现代核心 `2026-07-28` 及显式旧版兼容；Tasks 扩展 `2026-07-28`；Apps UI `2026-01-26`；client/server SDK 2.0.0。不伪称兼容 2025 实验 Tasks。 |
+| 归属 | 按 Run 快照、凭据/目录绑定续接、持久 workspace/Session 任务归属、单 owner App 通道、逐请求认证的 server principal。不采用正文 owner，不任意导出 Session 历史。 |
+| 副作用 | 未知结果不自动重放；等待与远端取消分开；任务附件、App/数据分享均显式进行；导出结果要求公开投影。 |
+| UI 隔离 | 独立 origin 代理 + opaque 内层 iframe、严格 CSP、校验消息来源，不自动改写 Context/打开链接；终端不执行 HTML。回调忽略 signal 不会阻止中止本地 App 等待。 |
+| 打包 | 根客户端 API、独立 `@may/mcp/server`、浏览器专用 `@may/mcp/apps-browser` 均从仓库外安装的 tarball 成功导入。 |
+| 验证 | `pnpm test`：**390 通过，零失败/跳过**，含显式运行的真实 Chromium smoke。`pnpm build`、`pnpm docs:check`（32 对双语文档）、安装包 smoke、`git diff --check` 通过。未运行付费真实 provider 或第三方 server 认证。 |
+
+以下是各能力指南中明确维护的限制，不是隐藏的未完成工作：Tasks 显式轮询，不实现
+可选任务订阅通知。Apps 需要自定义图形 Host、自包含内容和显式用户操作，不授予外部
+网络/设备权限，也不提供 `ui/message` 或 Context 改写。独立 Server 只导出即时白名单
+工具/资源/提示模板，不自动具备所有客户端功能，也不提供 OAuth issuer。自动重连/
+重放和已移除的 HTTP+SSE 保持禁用。原生 keyring 集成证据来自前阶段显式 Windows
+smoke；常规测试注入 keyring 存储，不修改真实凭据。生产 verifier、文件系统 sandbox
+和 UI 通道认证仍由嵌入应用负责。

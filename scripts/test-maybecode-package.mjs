@@ -98,6 +98,7 @@ await writeFile(join(consumerDirectory, "package.json"), JSON.stringify({
   type: "module",
   dependencies: {
     "@may/maybecode": localTarballs["@may/maybecode"],
+    "@may/mcp": localTarballs["@may/mcp"],
   },
 }, null, 2) + "\n", "utf8");
 await writeFile(
@@ -145,6 +146,17 @@ const help = await runPnpm(["exec", "maybecode", "--help"], {
   cwd: consumerDirectory,
 });
 assert.match(help.stdout, /Usage:\s+maybecode/u);
+
+// Verify both optional MCP entry points from the installed tarballs, not workspace dist.
+await writeFile(join(consumerDirectory, "mcp-subpaths.mjs"), `
+import assert from "node:assert/strict";
+const server = await import("@may/mcp/server");
+const browser = await import("@may/mcp/apps-browser");
+assert.equal(typeof server.createMayMcpServer, "function");
+assert.equal(typeof server.createMayMcpBearerAuthenticator, "function");
+assert.equal(typeof browser.mountMcpApp, "function");
+`, "utf8");
+await runPnpm(["exec", "node", "mcp-subpaths.mjs"], { cwd: consumerDirectory });
 
 const launched = await runPnpm([
   "exec",
