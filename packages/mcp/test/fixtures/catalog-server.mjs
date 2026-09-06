@@ -48,7 +48,7 @@ export async function startCatalogFixture(t) {
     }
     if (message.method === "tools/list") {
       if (state.holdList) return;
-      reply({ tools: [{ name: "echo", description: "Echo", inputSchema: { type: "object" },
+      reply({ tools: state.tools ?? [{ name: "echo", description: "Echo", inputSchema: { type: "object" },
         ...(state.outputSchema ? { outputSchema: state.outputSchema } : {}),
         annotations: { readOnlyHint: state.version === 1 } }], ttlMs: 600_000, cacheScope: "public" }); return;
     }

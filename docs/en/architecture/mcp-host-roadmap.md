@@ -27,7 +27,7 @@ permission boundary remains in force.
   - [x] Modern MRTR form/URL broker, Core host scopes, controller and both UIs,
     bounded waiting/cancellation, Session cache isolation and authorization checks.
   - [x] Explicit Roots/Sampling and legacy request ownership compatibility.
-- [ ] **Long tasks and extensions:** task handles, get/update/cancel, durable
+- [x] **Long tasks and extensions:** task handles, get/update/cancel, durable
   ownership and restart recovery, local-wait vs remote-cancel semantics;
   optional isolated MCP Apps UI with explicit unsupported-terminal behavior.
   - [x] Storage groundwork: owner-bound encrypted task journal, write-ahead identity
@@ -37,7 +37,8 @@ permission boundary remains in force.
     recovery across client/server-process restart without replay. Evidence:
     `task-runtime.test.mjs` and MaybeCode task input/attachment integration.
     Opt-in 2026-07-28 extension; explicit polling, no task subscription notifications.
-  - [ ] Optional isolated Apps host and explicit terminal fallback.
+  - [x] Optional isolated Apps host and explicit terminal fallback. Evidence:
+    `apps.test.mjs`, including a real Chromium sandbox smoke; see [Apps](../guides/mcp-apps.md).
 - [ ] **Independent MCP server:** opt-in May tool/resource/prompt export,
   authenticated principals and workspace isolation, normal permission/execution
   pipeline, no blanket export of host tools or Session history.
@@ -60,4 +61,4 @@ and HTTP operations, early completion and process/session cleanup) and MaybeCode
 configured-provider/UI integration in `mcp-capabilities.test.mjs`. The editor schema
 also covers HTTP/OAuth/Host options with positive/negative validation smoke.
 Legacy channels are per-operation and not reused; no unsolicited ownership is
-guessed. Apps, server export and final audit remain open.
+guessed. Server export and final audit remain open.

@@ -208,3 +208,7 @@ Context。旧协议交互操作显式选择单操作进程/session，不在共�
 
 `McpTaskJournal`、`parseMcpTask`、`mcpTaskToUserMessage` 和池任务 API 支持
 显式启用的现代 Tasks、持久归属、经审阅输入及显式结果附件。参阅[长任务](../guides/mcp-tasks.md)。
+
+图形 Host 可使用 `pool.openApp`、`mcpAppSandboxResponse` 和浏览器专用
+`@may/mcp/apps-browser` 入口。同意、origin/CSP 要求和不支持的 API 参阅
+[隔离 Apps](../guides/mcp-apps.md)；终端保留文本 fallback。

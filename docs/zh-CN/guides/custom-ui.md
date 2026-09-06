@@ -188,3 +188,7 @@ sampling 审阅可通过 `{ action: "accept", content: { json: editedDocument } 
 事件，重启后保留原始 owner；必须在状态转换队列之外回答。区分本地中止、远端取消
 意图及已观察到的终态。重试放弃/过期输入需要显式 `retryAbandonedInputs: true`
 和新审阅，不能自动重发。预算、命令和恢复限制参阅[任务](./mcp-tasks.md)。
+
+图形 Host 可使用 `pool.openApp`、`mcpAppSandboxResponse` 和浏览器专用
+`@may/mcp/apps-browser` 入口。同意、origin/CSP 要求和不支持的 API 参阅
+[隔离 Apps](./mcp-apps.md)；终端保留文本 fallback。

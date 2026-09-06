@@ -514,3 +514,7 @@ Opt-in `tasks: true` adds modern long-running MCP jobs with a separate encrypted
 Session-bound controls; `task-attach` alone submits a completed result to a new Run.
 Stopping local waiting is not remote cancellation. No automatic replay after
 restart. See the bilingual [Tasks guide](../../docs/en/guides/mcp-tasks.md).
+
+`/mcp apps` explicitly reports unsupported HTML in both terminal UIs. App-only
+tools are hidden even without a graphical Host; model-visible text fallback remains.
+Optional custom graphical integration: [Apps guide](../../docs/en/guides/mcp-apps.md).

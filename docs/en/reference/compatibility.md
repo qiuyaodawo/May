@@ -205,6 +205,6 @@ Modern MRTR form/URL elicitation is opt-in through `McpInteractionBroker` and is
 enabled by the interactive MaybeCode CLI. Owner scopes, bounded whole-flow waits,
 validated user responses and pre-continuation identity checks are implemented;
 legacy interactions use explicitly isolated, single-operation channels instead
-of guessed ownership. Opt-in Roots/Sampling and modern Tasks are implemented; Apps and server
-export are still separate unfinished phases. Core's optional
+of guessed ownership. Opt-in Roots/Sampling, modern Tasks and an isolated Apps Host are implemented; server
+export is still a separate unfinished phase. Core's optional
 `toolScope` labels remain protocol-independent. See [MCP](../guides/mcp.md).

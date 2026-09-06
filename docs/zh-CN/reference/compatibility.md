@@ -167,5 +167,5 @@ schema 副本。目录更新仅影响下一次 Run。普通 registry 查询/`clo
 现代 MRTR 表单/URL elicitation 通过 `McpInteractionBroker` 显式启用，交互式
 MaybeCode CLI 默认开启。已实现 owner 作用域、整个流程的等待预算、用户答案校验和
 续接前身份检查；旧交互使用显式隔离、单操作的连接，不猜测归属。
-已实现显式启用的 Roots/Sampling 和现代 Tasks，Apps、server 导出仍是未完成的独立阶段。Core 的可选 `toolScope` 标签保持
+已实现显式启用的 Roots/Sampling 和现代 Tasks 及隔离 Apps Host；server 导出仍是未完成的独立阶段。Core 的可选 `toolScope` 标签保持
 协议无关。参阅 [MCP](../guides/mcp.md)。

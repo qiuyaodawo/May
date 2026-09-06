@@ -14,3 +14,5 @@ export type { McpRemoteTask, McpTaskState, McpTaskStatus } from "./tasks.js";
 export * from "./task-journal.js";
 export type { McpTaskSnapshot, McpTaskWaitOptions, McpTaskUpdateOptions } from "./task-runtime.js";
 export { mcpTaskToUserMessage } from "./task-runtime.js";
+export * from "./apps.js";
+export * from "./apps-sandbox.js";

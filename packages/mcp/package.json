@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./apps-browser": {
+      "types": "./dist/apps-browser.d.ts",
+      "import": "./dist/apps-browser.js"
     }
   },
   "files": [

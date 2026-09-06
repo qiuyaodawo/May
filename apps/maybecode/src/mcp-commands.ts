@@ -2,7 +2,7 @@ import { mcpPromptToUserMessage, mcpResourceToUserMessage, previewMcpMessage } f
 import type { MaybeCodeController } from "./controller.js";
 import type { MaybeCodeSlashCommandResult } from "./slash-commands.js";
 
-export const MCP_COMMAND_USAGE = "/mcp [catalog [server] | refresh [server] | reconnect server | read server uri | attach server uri [question] | template server uri-template {arguments} | prompt server name {arguments} | use-prompt server name {arguments} | complete server {params} | watch server uri | unwatch server uri | tasks [server] | task-get server id | task-wait server id | task-update server id | task-retry-input server id | task-cancel server id | task-forget server id | task-attach server id [question]]";
+export const MCP_COMMAND_USAGE = "/mcp [apps | catalog [server] | refresh [server] | reconnect server | read server uri | attach server uri [question] | template server uri-template {arguments} | prompt server name {arguments} | use-prompt server name {arguments} | complete server {params} | watch server uri | unwatch server uri | tasks [server] | task-get server id | task-wait server id | task-update server id | task-retry-input server id | task-cancel server id | task-forget server id | task-attach server id [question]]";
 
 /** Keep JSON tail byte-for-byte, unlike the general whitespace-only command parser. */
 export async function executeMcpCommand(input: string, controller: MaybeCodeController): Promise<MaybeCodeSlashCommandResult> {
@@ -10,6 +10,7 @@ export async function executeMcpCommand(input: string, controller: MaybeCodeCont
   const [, action, serverId, tail] = match;
   const display = (text: string): MaybeCodeSlashCommandResult => ({ type: "mcp.display", text: text.slice(0, 16_000) });
   const usage = (): MaybeCodeSlashCommandResult => ({ type: "usage", usage: MCP_COMMAND_USAGE });
+  if (action === "apps") return display("MCP Apps HTML is not supported in this terminal. Text tool results remain available; use an explicitly configured isolated graphical Host. No HTML was fetched or executed.");
   if (action === undefined) return { type: "mcp.status", servers: await controller.getMcpStatus() };
   if (action === "tasks" && tail === undefined && controller.listMcpTasks !== undefined) {
     const records = (await controller.listMcpTasks()).filter((record) => serverId === undefined || record.binding.serverId === serverId);

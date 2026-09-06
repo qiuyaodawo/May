@@ -205,3 +205,7 @@ outside the transition queue. Distinguish local abort, remote cancellation inten
 and observed terminal state. Retrying abandoned/expired input requires explicit
 `retryAbandonedInputs: true` and fresh review, not automatic resubmission. See
 [tasks](./mcp-tasks.md) for budgets, commands and recovery restrictions.
+
+Graphical hosts can use `pool.openApp`, `mcpAppSandboxResponse` and the browser-only
+`@may/mcp/apps-browser` entry point. See [isolated Apps](./mcp-apps.md) for consent,
+origin/CSP requirements and unsupported APIs. Terminals retain text fallback.

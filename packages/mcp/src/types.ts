@@ -1,3 +1,4 @@
+import type { McpAppSession, McpAppsHostOptions, McpAppOpenOptions } from "./apps.js";
 import type { CompleteRequestParams, CompleteResult, GetPromptResult, ReadResourceResult, Prompt, Resource, ResourceTemplateType, ServerCapabilities, Tool as ProtocolTool } from "@modelcontextprotocol/client";
 import type {
   Tool,
@@ -55,6 +56,8 @@ export interface McpHttpServerOptions extends McpServerBaseOptions {
 export type McpServerOptions = McpStdioServerOptions | McpHttpServerOptions;
 
 export interface OpenMcpClientPoolOptions {
+  /** Optional graphical Host only. Terminals omit this and never execute remote HTML. */
+  readonly apps?: McpAppsHostOptions;
   /** Opt-in ephemeral host UI broker. Omission leaves elicitation unadvertised. */
   readonly interactions?: McpInteractionBroker;
   readonly hostServices?: McpHostServices;
@@ -199,6 +202,7 @@ export interface McpClientPool {
   getPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>, options?: McpOperationOptions): Promise<McpPromptExpansion>;
   complete(serverId: string, params: McpCompletionParams, options?: McpOperationOptions): Promise<McpCompletion>;
   subscribeResource(serverId: string, uri: string, options?: McpOperationOptions): Promise<McpResourceSubscription>;
+  openApp(serverId: string, toolName: string, options: McpAppOpenOptions): Promise<McpAppSession>;
   /** Local inventory only; no remote tasks/list or automatic restart polling. */
   listTasks(owner: McpInteractionOwner): Promise<readonly McpTaskRecord[]>;
   getTask(serverId: string, id: string, options?: McpOperationOptions): Promise<McpTaskSnapshot>;

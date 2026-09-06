@@ -234,3 +234,7 @@ connection. See [Host compatibility](../guides/mcp.md#roots-sampling-and-legacy-
 `McpTaskJournal`, `parseMcpTask`, `mcpTaskToUserMessage` and pool task APIs support
 opt-in modern Tasks, durable ownership, reviewed input and explicit result attachment.
 See [long-running tasks](../guides/mcp-tasks.md).
+
+Graphical hosts can use `pool.openApp`, `mcpAppSandboxResponse` and the browser-only
+`@may/mcp/apps-browser` entry point. See [isolated Apps](../guides/mcp-apps.md) for consent,
+origin/CSP requirements and unsupported APIs. Terminals retain text fallback.

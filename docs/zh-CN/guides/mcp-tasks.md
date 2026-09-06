@@ -9,7 +9,7 @@
 [2026-07-28 Tasks 扩展](https://tasks.extensions.modelcontextprotocol.io/specification/2026-07-28/tasks)，
 标识 `io.modelcontextprotocol/tasks`：使用扁平任务句柄以及 `tasks/get`、
 `tasks/update`、`tasks/cancel`。不兼容的 2025 实验版 `tasks/list`/`tasks/result`
-协议不在支持范围。尚未实现可选的任务订阅通知；支持显式轮询。Apps 和 server 导出
+协议不在支持范围。尚未实现可选的任务订阅通知；支持显式轮询。server 导出
 仍是独立的[路线阶段](../architecture/mcp-host-roadmap.md)。
 
 在端点设置 `tasks: true`（默认 `false`）。连接必须同时协商核心版本 `2026-07-28`
@@ -122,3 +122,5 @@ HTTP 管理请求携带 `Mcp-Name` 任务路由；工具请求保留支持的 `x
 `task-runtime.test.mjs`（HTTP、真实 stdio 进程重启、审阅/重试、取消竞态、身份变化
 及输出校验），以及 MaybeCode 的 `mcp-capabilities.test.mjs`（权限门控、终端输入、
 显式附件）。这些聚焦 fixture 不等于对所有第三方服务端的完整符合性认证。
+
+可选图形集成及终端 fallback 参阅[隔离 Apps Host](mcp-apps.md)。

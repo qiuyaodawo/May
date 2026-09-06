@@ -31,6 +31,7 @@ import {
   McpToolReportedError,
   McpToolsListError,
 } from "./errors.js";
+import { McpAppSession, MCP_APPS_EXTENSION, MCP_APP_MIME, mcpToolVisibility, mcpAppUri, parseMcpAppResource, appError, type McpAppOpenOptions } from "./apps.js";
 import { McpCapabilities } from "./capabilities.js";
 import { McpHostClient, mcpOwner } from "./host-client.js";
 import { hostCapabilities, hostFailure } from "./host-services.js";
@@ -83,6 +84,8 @@ class McpConnection {
   private readonly legacyOperations = new Set<Promise<unknown>>();
   private taskRuntime: McpTaskRuntime | undefined;
   private readonly taskOperations = new Set<Promise<unknown>>();
+  private appOpening = 0;
+  private readonly appSessions = new Set<McpAppSession>();
   private closeResult: Promise<void> | undefined;
 
   private constructor(
@@ -115,7 +118,9 @@ class McpConnection {
   ): Promise<McpConnection> {
     validateMcpServerOptions(options);
     const client = new McpHostClient(poolOptions.clientInfo ?? DEFAULT_CLIENT_INFO, {
-      capabilities: hostCapabilities(options.host, poolOptions.interactions, poolOptions.hostServices),
+      capabilities: { ...hostCapabilities(options.host, poolOptions.interactions, poolOptions.hostServices),
+        ...(poolOptions.apps === undefined ? {} : { extensions: { [MCP_APPS_EXTENSION]: { mimeTypes: [MCP_APP_MIME] } } }),
+      },
       inputRequired: { autoFulfill: true, maxRounds: 8 },
       listMaxPages: 64,
       // Each connection owns a separate cache, including after reconnect/login.
@@ -230,14 +235,14 @@ class McpConnection {
     }
   }
 
-  invalidate(): void { this.stale = true; this.capabilities.invalidate(); }
+  invalidate(): void { for (const app of this.appSessions) app.close(); this.stale = true; this.capabilities.invalidate(); }
 
   updateCatalog(catalog: McpServerCatalog): void { this.catalog = catalog; this.capabilities.updateCatalog(catalog); }
 
   get busy(): boolean { return this.activeCalls > 0; }
 
   install(definitions: readonly ProtocolTool[]): readonly Tool[] {
-    const tools = createTools(this, definitions);
+    const tools = createTools(this, definitions.filter((tool) => mcpToolVisibility(tool, "model")));
     this.installedTools.clear();
     for (const definition of definitions) this.installedTools.set(definition.name, fingerprint(definition));
     this.stale = false;
@@ -458,6 +463,60 @@ class McpConnection {
     } finally { this.activeCalls--; }
   }
 
+  openApp(name: string, options: McpAppOpenOptions): Promise<McpAppSession> {
+    if (this.appOpening + this.appSessions.size >= 16) return Promise.reject(appError());
+    this.appOpening++;
+    return this.openAppOwned(name, options).finally(() => { this.appOpening--; });
+  }
+
+  private async openAppOwned(name: string, options: McpAppOpenOptions): Promise<McpAppSession> {
+    const host = this.poolOptions.apps;
+    const catalog = this.catalog;
+    const tool = catalog?.tools.find((entry) => entry.name === name);
+    const uri = tool === undefined ? undefined : mcpAppUri(tool);
+    const owner = options.owner;
+    const lifetimeMs = options.lifetimeMs ?? 600_000;
+    if (host === undefined || catalog === undefined || tool === undefined || uri === undefined ||
+        !owner?.workspaceId || !owner.sessionId || !Number.isSafeInteger(lifetimeMs) || lifetimeMs < 1 || lifetimeMs > 3_600_000 || this.appSessions.size >= 16) throw appError();
+    const signal = AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(lifetimeMs), ...(options.signal === undefined ? [] : [options.signal])]);
+    const trustedOwner = freezeTree(structuredClone(owner));
+    const generation = this.generation;
+    const guard = async () => {
+      signal.throwIfAborted(); this.throwIfClosed(); await this.checkAuthorization();
+      if (this.stale || this.generation !== generation || this.catalog?.revision !== catalog.revision) throw appError();
+    };
+    const approve = async (kind: "open" | "read", target: string, currentSignal: AbortSignal) => {
+      await guard(); currentSignal.throwIfAborted();
+      if (await host.approve({ kind, serverId: this.options.id, uri: target, owner: trustedOwner, signal: currentSignal }) !== true) throw appError();
+      await guard(); currentSignal.throwIfAborted();
+    };
+    await approve("open", uri, signal);
+    const resource = parseMcpAppResource(uri, (await this.capabilities.readResource(uri, { owner: trustedOwner, signal, cache: "bypass" })).result);
+    await guard();
+    const app = new McpAppSession(resource, tool, { guard,
+      call: async (name, input, currentSignal) => {
+        await guard();
+        const definition = catalog.tools.find((entry) => entry.name === name && mcpToolVisibility(entry, "app"));
+        if (definition === undefined) throw appError();
+        const adapted = createTools(this, [definition])[0]!;
+        const operationId = randomUUID();
+        const context: ToolExecutionContext = { scope: { workspaceId: trustedOwner.workspaceId, sessionId: trustedOwner.sessionId },
+          runId: trustedOwner.runId ?? `mcp-app:${operationId}`, step: 0, toolCallId: operationId, idempotencyKey: operationId, signal: currentSignal, report() {} };
+        const result = await host.executor.execute({ tool: adapted, input: adapted.parse?.(input) ?? input, context });
+        await guard(); return result as McpToolOutput;
+      },
+      read: async (target, currentSignal) => {
+        if (target !== uri && !catalog.resources.some((entry) => entry.uri === target)) throw appError();
+        await approve("read", target, currentSignal);
+        const read = await this.capabilities.readResource(target, { owner: trustedOwner, signal: currentSignal, cache: "bypass" });
+        await guard(); return read.result;
+      },
+    }, signal);
+    this.appSessions.add(app);
+    app.signal.addEventListener("abort", () => this.appSessions.delete(app), { once: true });
+    return app;
+  }
+
   taskOperation(action: "get" | "update" | "wait", id: string, options: McpOperationOptions & McpTaskWaitOptions & McpTaskUpdateOptions) {
     if (options.retryAbandonedInputs !== undefined && typeof options.retryAbandonedInputs !== "boolean") throw taskFailure(this.options.id, "invalid task input retry option");
     if (action === "wait" && options.timeoutMs !== undefined && (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 86_400_000)) throw taskFailure(this.options.id, "invalid local task wait budget");
@@ -489,6 +548,7 @@ class McpConnection {
     this.closing = true;
     this.closed = true;
     this.lifetime.abort("MCP connection is closing");
+    for (const app of this.appSessions) app.close();
     await Promise.allSettled(this.legacyOperations);
     await Promise.allSettled(this.taskOperations);
     await this.capabilities.close();
@@ -698,6 +758,10 @@ class DefaultMcpClientPool implements McpClientPool {
     return this.connection(serverId).capabilities.subscribe(uri, { ...options, signal: this.signal(options.signal) });
   }
 
+  openApp(serverId: string, name: string, options: McpAppOpenOptions) {
+    return this.connection(serverId).openApp(name, { ...options, signal: this.signal(options.signal) });
+  }
+
   async listTasks(owner: McpInteractionOwner) {
     if (this.closed) throw new McpClientPoolClosedError();
     return this.options.taskJournal?.list(owner) ?? [];
@@ -881,6 +945,7 @@ class DefaultMcpClientPool implements McpClientPool {
 }
 
 export async function openMcpClientPool(options: OpenMcpClientPoolOptions): Promise<McpClientPool> {
+  if (options.apps !== undefined && (typeof options.apps.executor?.execute !== "function" || typeof options.apps.approve !== "function")) throw new McpConfigurationError("MCP Apps require a host permission executor and consent service");
   const serverIds = new Set<string>();
   for (const server of options.servers) {
     validateMcpServerOptions(server);

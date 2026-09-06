@@ -84,7 +84,7 @@ stream resumption, general tool-call retry, or fallback to deprecated HTTP+SSE i
 `connected` means setup and discovery succeeded, not continuous HTTP health.
 
 Scoped elicitation, opt-in Roots/Sampling and isolated legacy interactions are
-implemented. Modern Tasks are opt-in; Apps and MCP server authoring remain separate phases.
+implemented. Modern Tasks are opt-in; isolated Apps are optional and MCP server authoring remains a separate phase.
 See the [bilingual MCP guide](../../docs/en/guides/mcp.md) and [full adaptation roadmap](../../docs/en/architecture/mcp-host-roadmap.md).
 
 ## Dynamic catalogs and endpoint recovery
@@ -145,3 +145,8 @@ Enable `tasks: true` with `taskJournal: new McpTaskJournal(secureStore)` for the
 get/update/wait/cancel/forget; `mcpTaskToUserMessage` adapts completed results only
 on user request. See [long-running tasks](../../docs/en/guides/mcp-tasks.md) for
 restart recovery, reviewed input, persistent budgets and cancellation boundaries.
+
+Optional graphical hosts use `apps: { executor, approve }`, `pool.openApp`,
+`mcpAppSandboxResponse` and `@may/mcp/apps-browser`. See the bilingual
+[Apps guide](../../docs/en/guides/mcp-apps.md) for the mandatory dedicated-origin
+sandbox and the deliberately restricted API/network policy.

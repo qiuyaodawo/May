@@ -11,7 +11,7 @@ Streamable HTTP. This targets the
 `io.modelcontextprotocol/tasks`: flat task handles and `tasks/get`, `tasks/update`,
 `tasks/cancel`. The incompatible 2025 experimental `tasks/list`/`tasks/result`
 protocol is not supported. Optional task subscription notifications are not
-implemented; explicit polling is supported. Apps and server export remain separate
+implemented; explicit polling is supported. Server export remains a separate
 [roadmap](../architecture/mcp-host-roadmap.md) phases.
 
 Enable `tasks: true` on an endpoint (default `false`). Both the negotiated core
@@ -149,3 +149,5 @@ Diagnostics omit server RPC error text and input payloads. Evidence:
 review/retry, cancellation races, changed identities and output validation), and
 MaybeCode's `mcp-capabilities.test.mjs` (permission gate, terminal input and explicit
 attachment). These focused fixtures do not claim universal third-party conformance.
+
+Optional graphical integration and terminal fallback: [isolated Apps Host](mcp-apps.md).
