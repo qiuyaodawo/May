@@ -200,62 +200,6 @@ tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP 
 或更短的 request timeout），随后无论结果如何都关闭本地 transport 资源；这不会删除
 远端用户数据。新版协议不会创建远端协议 session。
 
-## GitHub 远程 Server：显式实时验证
-
-[GitHub 托管端点](https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md)
-不需要 Docker 或本地 server 安装。在 `~/.may/config.json` 的
-`apps.maybecode.mcpServers` 中合并以下 entry，保留已有设置：
-
-```json
-{
-  "github": {
-    "enabled": false,
-    "transport": "streamable-http",
-    "url": "https://api.githubcopilot.com/mcp/readonly",
-    "headers": { "Authorization": "Bearer ${GITHUB_MCP_TOKEN}" },
-    "required": false,
-    "protocolMode": "auto",
-    "requestTimeoutMs": 15000,
-    "maxTotalTimeoutMs": 20000
-  }
-}
-```
-
-`/readonly` 端点排除写入工具。创建短有效期、最小权限的
-[个人访问 token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)。
-本检查只读取公开 `github/github-mcp-server` 仓库的 README，不要为此授予写入或
-私有仓库权限。在 PowerShell 中安全输入 token（不把值写进命令历史），随后在
-项目根目录运行：
-
-```powershell
-$secret = Read-Host "GitHub MCP token" -AsSecureString
-$env:GITHUB_MCP_TOKEN = [System.Net.NetworkCredential]::new("", $secret).Password
-$secret.Dispose()
-Remove-Variable secret
-pnpm run test:integration:github-mcp
-```
-
-Token 只存在于当前进程及其子进程环境中，不写入配置。不要发送到聊天、打印或
-提交到 Git。结束后可执行 `Remove-Item Env:GITHUB_MCP_TOKEN` 清除。
-[检查脚本](../../../scripts/test-maybecode-github-mcp.mjs) 只加载已保存的 `github`
-端点/header 引用，**在内存中启用**，设置有界超时且不启用额外 Host 能力。它使用
-临时 MaybeCode workspace 与确定性模型，不调用模型 provider API；检查 `/mcp`、
-协商版本、目录发现、仅一次精确授权的 `get_file_contents` 调用，以及工具结果
-进入模型上下文。它不修改已保存 entry，不打印远程内容或凭据。命令后可加可选
-配置文件路径。
-
-正常使用终端时，**先设置环境变量**，再将 entry 的 `enabled` 改为 `true`，在同一
-PowerShell 中运行 `pnpm maybecode`，检查 `/mcp` 与 `/mcp catalog github`。
-即使 `required` 是 false，缺失环境引用仍会使配置失败；没有 token 时保持禁用。
-PAT 配置不使用 `maybecode mcp login`：GitHub OAuth 要求 Host 自己注册 GitHub
-App/OAuth App，参阅其 [README](https://github.com/github/github-mcp-server)。
-
-没有 token 时，`pnpm run test:integration:github-mcp --unauthenticated` 只检查真实
-MaybeCode 对可选端点 HTTP 401 的处理，不发送凭据。认证检查缺少 token 或失败时
-返回非零退出码，不静默跳过。2026-09-07 的未认证实时检查通过；认证后的目录发现
-与工具调用仍等待用户提供 token。即使完整 PASS，也只验证该客户端工具链路，不
-证明 OAuth、全部 MCP 能力或 May 独立 Server 导出。Server 未声明的能力不算失败。
-
 ## Tracing 与安全
 
 注入 tracer 后，adapter 会产生：
