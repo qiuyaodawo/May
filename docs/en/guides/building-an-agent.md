@@ -576,7 +576,7 @@ for the following:
   and approval protocol
 - [`@may/observability`](../../../packages/observability/README.md): fail-open
   tracing, sampling, processors, and exporters
-- [`@may/mcp`](../../../packages/mcp/README.md): stdio MCP clients and remote
+- [`@may/mcp`](../../../packages/mcp/README.md): stdio / Streamable HTTP MCP clients and remote
   tool adapters
 - [`@may/coding-tools`](../../../packages/tools/coding-tools/README.md): bounded
   coding capabilities, instructions, previews, and shell safety boundary

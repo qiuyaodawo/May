@@ -3,7 +3,7 @@
 [English](../../en/guides/mcp.md) | **简体中文**
 
 `@may/mcp` 使 May 应用可以使用 Model Context Protocol（MCP）服务器提供的工具，
-同时不把协议和进程管理代码放进 Core。首个版本支持本地 stdio client 与 MCP tool
+同时不把协议和进程管理代码放进 Core。当前支持本地 stdio、远程 Streamable HTTP client 与 MCP tool
 能力。
 
 ## 为什么使用独立 package
@@ -63,7 +63,7 @@ try {
 }
 ```
 
-打开时会对每个 server 执行 MCP 初始化握手和聚合的 `tools/list` 请求。Server 默认是
+打开时对每个 server 协商协议（旧版初始化或新版发现），并执行聚合的 `tools/list` 请求。Server 默认是
 required：required server 失败时，已打开的 server 会先关闭，然后启动整体失败。配置
 `required: false` 的 server 失败时只记录失败状态，其余 server 仍可继续启动。
 `close()` 可重复调用；即使一个连接关闭失败，它仍会访问所有连接。stdio transport
@@ -131,7 +131,7 @@ MaybeCode 从 `apps.maybecode.mcpServers` 读取 stdio server：
 }
 ```
 
-`transport` 可省略，目前只接受 `stdio`。`mcpServers` 缺失、为 `false` 或空对象时
+`transport` 可省略，默认 `stdio`；`streamable-http` 用于 HTTP 端点。`mcpServers` 缺失、为 `false` 或空对象时
 禁用 MCP。相对 `cwd` 从当前编码 workspace 解析；省略 `cwd` 时也使用该 workspace。
 `required` 默认为 `true`；只有产品可在缺少该 server 时继续运行，才应设为 `false`。
 参数不经过 shell，直接传给进程。
@@ -148,13 +148,65 @@ executor 限定作用域。
 在任一 MaybeCode UI 中运行 `/mcp`，可查看已配置 server、连接状态、已发现工具、启动
 错误和保留的 stderr。Controller event stream 也会向其他前端与集成暴露生命周期事件。
 
+## Streamable HTTP 与协议模式
+
+同一个 `mcpServers` map（或 package 的 `servers` 数组，另加 `id`）接受：
+
+```json
+{
+  "remote": {
+    "transport": "streamable-http",
+    "url": "https://mcp.example.com/mcp",
+    "headers": { "Authorization": "Bearer ${MCP_REMOTE_TOKEN}" },
+    "protocolMode": "auto",
+    "requestTimeoutMs": 60000,
+    "maxTotalTimeoutMs": 300000,
+    "required": false
+  }
+}
+```
+
+Header 环境引用只由 MaybeCode 配置解析，直接调用 package API 时不会展开。
+即使 server 是 optional，缺失引用也会使启动失败。本阶段支持静态 header，尚不支持
+OAuth 发现、登录或 token 刷新。HTTP entry 不接受进程专用字段 `command`、`args`、
+`cwd`、`env`、`maxBufferSize`、`stderrMaxBytes`；stdio entry 不接受 `url`/`headers`。
+`maxBufferSize` 仍是 stdio 消息上限，不是 HTTP 响应大小上限。
+
+`protocolMode` 接受 `legacy` 或 `auto`。Stdio 默认 legacy，保留原启动行为；HTTP
+默认使用 SDK auto 模式，通过 `server/discover` 发现新版 server，并在适当时回退到
+旧版 `initialize` 握手。主动启用 stdio auto 可能额外启动一个短生命周期探测进程。
+项目已安装的 `@modelcontextprotocol/client@2.0.0` 支持该可选模式，但 SDK 默认仍是
+legacy。本地集成 fixture 验证了 2025-11-25 stdio/HTTP 和 2026-07-28 HTTP tools
+链路，并不代表完整协议合规或第三方 server 兼容认证。`/mcp` 和 `pool.status()` 显示
+协商后的协议版本；Core 仍不依赖协议版本。参阅
+[SDK 协商说明](https://ts.sdk.modelcontextprotocol.io/v2/api/@modelcontextprotocol/client/client/client.html)。
+
+除 `localhost`、`127.0.0.1`、`[::1]` 可用 HTTP 外，只接受 HTTPS。拒绝 URL 中的
+用户名、密码和 fragment；凭据应使用 header，不要写入 URL query。任何重定向都不
+跟随，包括同源重定向。拒绝大小写不敏感的重复 header、无效 header，以及对 `mcp-*`、
+`Host`、`Connection`、`Content-Length`、`Transfer-Encoding`、`Upgrade`、`Accept`、
+`Content-Type`、`Origin`、`Cookie`、`Proxy-Authorization` 的覆盖。
+配置的端点是可信目标，并非网络沙箱；HTTPS 不会阻止私网访问，需要时应在 adapter
+之外施加网络策略。远程工具会把参数发送给该目标，仍经过正常工具权限层。
+
+HTTP SDK 错误可能在 URL、响应 body 或 cause 中带有 secret，因此公开错误、状态和
+tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP `isError` 工具结果
+仍向调用方提供有界文本，但 HTTP error span 不记录该文本。Span 不添加 HTTP header
+或 URL，HTTP 端点也没有 stderr 末尾片段。
+
+不启用自动重连、stream 恢复、工具调用重试，也不回退到旧 HTTP+SSE。`connected`
+表示建立和工具发现成功，不代表持续健康检查；单次 HTTP 失败只使对应操作失败，不会
+自动移除已发现工具。关闭时对协商出的旧版 HTTP session 尝试 DELETE（最多五秒，
+或更短的 request timeout），随后无论结果如何都关闭本地 transport 资源；这不会删除
+远端用户数据。新版协议不会创建远端协议 session。
+
 ## Tracing 与安全
 
 注入 tracer 后，adapter 会产生：
 
 | Span | 含义 |
 | --- | --- |
-| `may.mcp.connect` | 启动子进程并进行协议初始化 |
+| `may.mcp.connect` | 建立 transport 并协商协议 |
 | `may.mcp.tools.list` | 启动时的发现快照 |
 | `may.mcp.tool.call` | 一次远程调用，parent 是 Core tool span |
 | `may.mcp.disconnect` | 关闭 client 与进程 |
@@ -163,14 +215,14 @@ executor 限定作用域。
 耗时。内置插桩不记录 command argument、环境值、请求 input、响应 content、prompt
 或 model message。
 
-MCP server 是拥有当前主机用户权限的可执行代码，不是 sandbox；它还可以提供模型可见
+本地 stdio MCP server 是拥有当前主机用户权限的可执行代码，不是 sandbox；它还可以提供模型可见
 的工具描述。只配置可信 server，检查其 command 与 package source，限制环境变量和
 文件系统权限，并保留 permission 层。
 
 ## 当前范围
 
-本阶段有意不包含 MCP resources、prompts、sampling/elicitation handler、HTTP
-transport、server 实现、自动重连和动态 `tools/list_changed` 刷新。工具列表是启动
+本阶段有意不包含 MCP resources、prompts、sampling/elicitation handler、OAuth 登录、
+旧 HTTP+SSE、Tasks/Apps 扩展、server 实现、自动重连和动态 `tools/list_changed` 刷新。工具列表是启动
 快照；server 修改列表后，需要下次启动 MaybeCode 才能看到。
 
 协议细节参阅 [MCP tools 官方规范](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)

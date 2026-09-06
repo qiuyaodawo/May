@@ -68,8 +68,8 @@ shutdown 共享 processor；产品必须在真正的 ownership 边界只执行�
 ### MCP 契约
 
 `@may/mcp` 的 client-pool option、错误码、namespace、工具输出结构、server 状态、
-生命周期事件和 span name 都是开发预览 API。当前实现只支持 stdio tool client，并在
-启动时快照发现结果。不要假定未来的 resources、prompts、HTTP 连接、重连或动态刷新
+生命周期事件和 span name 都是开发预览 API。当前实现支持 stdio / Streamable HTTP tool client，并在
+启动时快照发现结果。不要假定未来的 resources、prompts、OAuth、重连或动态刷新
 会使用相同配置与 lifecycle 接口。
 
 模型可见名称目前使用 `mcp__<server>__<tool>`，执行 provider-safe 归一化并限制为

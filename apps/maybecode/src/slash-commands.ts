@@ -182,6 +182,9 @@ export function formatMaybeCodeMcpStatus(
     lines.push(
       `- ${server.serverId}: ${server.state} (${requirement}, ${server.transport})`,
     );
+    if (server.protocolVersion !== undefined) {
+      lines.push(`  protocol: ${server.protocolVersion}`);
+    }
     if (server.toolNames.length > 0) {
       lines.push(`  tools (${server.toolNames.length}):`);
       lines.push(...server.toolNames.map((name) => `    - ${name}`));

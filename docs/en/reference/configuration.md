@@ -238,12 +238,21 @@ required by default, so connection or discovery failure aborts startup. Set
 server as failed. Set `enabled` to `false` to skip an entry without deleting
 its configuration.
 
+Set `transport: "streamable-http"` for HTTP endpoints. They require `url` and
+accept `headers` (with `${NAME}` environment references), `required`, request
+and total timeouts, and `protocolMode`. Process options (`command`, `args`,
+`cwd`, `env`, `maxBufferSize`, `stderrMaxBytes`) are rejected on HTTP entries.
+`url`/`headers` are rejected on stdio entries. `protocolMode` accepts `legacy`
+or `auto`, defaulting to legacy for stdio and auto for HTTP. HTTPS is required
+except for loopback; redirects are not followed. OAuth login and automatic
+reconnect are not implemented. See the MCP guide for header restrictions.
+
 Relative `cwd` values and omitted `cwd` resolve to the active MaybeCode
 workspace. Environment strings expand `${NAME}` from the launching process;
 missing references fail startup. Prefer references because the configuration
 file is plaintext. Discovered tools are namespaced, pass through MaybeCode's
 normal permission and scheduling path, and remain fixed until the next
-application launch. `/mcp` reports server state, tools, errors, and the bounded
+application launch. `/mcp` reports server state, negotiated protocol version, tools, errors, and the bounded
 sanitized stderr tail. See [MCP tools](../guides/mcp.md).
 
 ## Maintenance source of truth

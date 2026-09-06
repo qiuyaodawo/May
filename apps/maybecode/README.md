@@ -220,7 +220,7 @@ operational ids, tool/model names, counts, timings, statuses, usage, and
 decisions, but no prompts, reasoning, or tool input/output from built-in
 instrumentation.
 
-MaybeCode can also add tools from local MCP stdio servers:
+MaybeCode can also add tools from local MCP stdio or remote Streamable HTTP servers:
 
 ```json
 {
@@ -233,6 +233,12 @@ MaybeCode can also add tools from local MCP stdio servers:
           "cwd": ".",
           "required": false,
           "env": { "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}" }
+        },
+        "remote": {
+          "transport": "streamable-http",
+          "url": "https://mcp.example.com/mcp",
+          "headers": { "Authorization": "Bearer ${MCP_REMOTE_TOKEN}" },
+          "required": false
         }
       }
     }
@@ -242,14 +248,18 @@ MaybeCode can also add tools from local MCP stdio servers:
 
 Discovered tools are exposed as `mcp__workspace__<tool>`, composed with the
 built-in coding tools, and require approval under the default policy. Relative
-working directories use the active workspace. Environment references must
+working directories use the active workspace. Environment references in `env` and HTTP `headers` must
 exist when MaybeCode starts. The client pool and its child processes close with
 the workspace; with tracing enabled, disconnect spans are flushed afterward.
 See the bilingual [MCP guide](../../docs/en/guides/mcp.md) for timeout options,
-security, naming, errors, and the intentionally limited first-phase scope.
+security, protocol negotiation, and remaining limitations. HTTP uses automatic
+modern/legacy negotiation by default; stdio keeps the legacy handshake unless
+`protocolMode: "auto"` is requested. HTTPS is required except for loopback;
+redirects and automatic tool-call retries are disabled. Static headers are
+supported, but OAuth login is not yet implemented.
 
 Use `/mcp` to inspect every configured server, its required/optional state,
-discovered tools, the latest connection diagnostic, and bounded recent stderr.
+negotiated protocol version, discovered tools, connection diagnostics, and bounded stdio stderr.
 MCP lifecycle events are also forwarded through `MaybeCodeController.events`.
 
 OpenAI compaction is opt-in. `serverCompactThreshold` enables provider-side

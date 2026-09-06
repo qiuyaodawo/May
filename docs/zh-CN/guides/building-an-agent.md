@@ -515,6 +515,6 @@ Session 上打开替换 application。Profile 选择等产品状态应留在通�
 - [`@may/permissions`](../../../packages/permissions/README.md)：headless policy 与审批协议
 - [`@may/observability`](../../../packages/observability/README.md)：fail-open tracing、采样、
   processor 与 exporter
-- [`@may/mcp`](../../../packages/mcp/README.md)：stdio MCP client 与远程工具 adapter
+- [`@may/mcp`](../../../packages/mcp/README.md)：stdio / Streamable HTTP MCP client 与远程工具 adapter
 - [`@may/coding-tools`](../../../packages/tools/coding-tools/README.md)：有界编码 capability、
   指令、preview 与 shell 安全边界

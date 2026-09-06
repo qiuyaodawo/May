@@ -88,8 +88,8 @@ caller-owned. See [Observability and tracing](../guides/observability.md).
 
 ### `@may/mcp`
 
-Optional Model Context Protocol client integration. It starts configured stdio
-servers, performs initialization and `tools/list`, and adapts every discovered
+Optional Model Context Protocol client integration. It connects to configured stdio
+or Streamable HTTP endpoints, negotiates the protocol and calls `tools/list`, and adapts every discovered
 tool to Core's existing `Tool` interface. Model-facing names are namespaced and
 collision-checked. Calls forward cancellation and progress, and optional MCP
 spans use the injected Core tracer. The client pool owns its spawned processes;

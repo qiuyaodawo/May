@@ -227,10 +227,17 @@ MaybeCode 会在 workspace 关闭时 flush processor。每天的 JSONL 文件只
 `false`，可在记录该 server 失败的同时继续使用应用。将 `enabled` 设为 `false`，即可
 在不删除配置的情况下跳过它。
 
+HTTP 端点设置 `transport: "streamable-http"`，必须提供 `url`，可设置 `headers`
+（支持 `${NAME}` 环境引用）、`required`、请求/总超时及 `protocolMode`。HTTP entry
+不接受 `command`、`args`、`cwd`、`env`、`maxBufferSize`、`stderrMaxBytes`；stdio
+entry 不接受 `url`/`headers`。`protocolMode` 接受 `legacy` 或 `auto`，stdio 默认
+legacy，HTTP 默认 auto。除 loopback 外必须使用 HTTPS，不跟随重定向；尚未实现
+OAuth 登录和自动重连。Header 限制参阅 MCP 指南。
+
 相对 `cwd` 和省略的 `cwd` 都以当前 MaybeCode workspace 为基准。环境字符串会从
 启动进程展开 `${NAME}`，缺失引用会使启动失败。配置文件是明文，因此应优先使用
 环境引用。发现的工具会加入 namespace，经过 MaybeCode 的正常 permission 与
-scheduling 路径，并在下次应用启动前保持不变。`/mcp` 会显示 server 状态、工具、
+scheduling 路径，并在下次应用启动前保持不变。`/mcp` 会显示 server 状态、协商协议版本、工具、
 错误和有界、已净化的 stderr 末尾片段。参阅 [MCP 工具](../guides/mcp.md)。
 
 ## 维护时的事实来源

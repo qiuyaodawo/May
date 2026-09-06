@@ -4,7 +4,8 @@
 
 `@may/mcp` lets a May application consume tools from a Model Context Protocol
 (MCP) server without putting protocol or process-management code in Core. The
-first release supports local stdio clients and the MCP tool capability.
+client supports local stdio and remote Streamable HTTP endpoints and the MCP
+tool capability.
 
 ## Why this is a separate package
 
@@ -66,7 +67,7 @@ try {
 }
 ```
 
-Opening performs the MCP initialization handshake and an aggregated
+Opening negotiates the protocol (legacy initialization or modern discovery) and performs an aggregated
 `tools/list` request for each server. Servers are required by default: a
 required server failure closes already-opened servers and fails startup. A
 server with `required: false` instead records a failed status and lets the
@@ -142,7 +143,7 @@ MaybeCode reads stdio servers from `apps.maybecode.mcpServers`:
 }
 ```
 
-`transport` is optional and currently accepts only `stdio`. A missing
+`transport` is optional and defaults to `stdio`; `streamable-http` selects HTTP. A missing
 `mcpServers` entry, `false`, or an empty object disables MCP. Relative `cwd`
 values are resolved from the active coding workspace; omitted `cwd` also uses
 that workspace. `required` defaults to `true`; use `false` only when the product
@@ -164,13 +165,74 @@ Run `/mcp` in either MaybeCode UI to inspect configured servers, states,
 discovered tools, startup errors, and retained stderr. The controller event
 stream also exposes the lifecycle events for other front ends and integrations.
 
+## Streamable HTTP and protocol modes
+
+The same `mcpServers` map (or package `servers` array, with an `id`) accepts:
+
+```json
+{
+  "remote": {
+    "transport": "streamable-http",
+    "url": "https://mcp.example.com/mcp",
+    "headers": { "Authorization": "Bearer ${MCP_REMOTE_TOKEN}" },
+    "protocolMode": "auto",
+    "requestTimeoutMs": 60000,
+    "maxTotalTimeoutMs": 300000,
+    "required": false
+  }
+}
+```
+
+Header environment references expand only in MaybeCode configuration, not in
+direct package API calls. Missing references fail even for optional servers.
+This phase supports static headers, not OAuth discovery/login/token refresh.
+HTTP entries reject process-only fields (`command`, `args`, `cwd`, `env`,
+`maxBufferSize`, `stderrMaxBytes`); stdio entries reject `url`/`headers`.
+`maxBufferSize` remains a stdio message limit, not an HTTP response-size limit.
+
+`protocolMode` accepts `legacy` or `auto`. Stdio defaults to `legacy` to preserve
+existing startup behavior. HTTP defaults to SDK `auto`: discover a modern
+server via `server/discover`, or fall back to a legacy `initialize` handshake
+when appropriate. Opt-in stdio auto mode may launch an additional short-lived
+probe process. The installed `@modelcontextprotocol/client@2.0.0` supports this
+opt-in mode; its default remains legacy. Local integration fixtures verify
+2025-11-25 stdio/HTTP and the 2026-07-28 HTTP tools path, not full protocol
+conformance or third-party server compatibility. `/mcp` and `pool.status()`
+include the negotiated protocol version. Core stays independent of protocol eras.
+See the [SDK negotiation reference](https://ts.sdk.modelcontextprotocol.io/v2/api/@modelcontextprotocol/client/client/client.html).
+
+Only HTTPS is accepted except for HTTP on `localhost`, `127.0.0.1`, or `[::1]`.
+URL credentials and fragments are rejected; use headers for credentials, not
+URL query strings. Redirects are never followed, including same-origin ones.
+Duplicate header names (case-insensitive), invalid headers, `mcp-*`, `Host`,
+`Connection`, `Content-Length`, `Transfer-Encoding`, `Upgrade`, `Accept`,
+`Content-Type`, `Origin`, `Cookie`, and `Proxy-Authorization` overrides are
+rejected. Configured endpoints are trusted destinations, not a network sandbox;
+HTTPS does not prevent access to private networks. Apply network policy outside
+the adapter when required. Remote tools send arguments to that destination;
+normal tool permissions still apply.
+
+HTTP SDK failures may contain secrets in URLs, response bodies, or causes.
+Their details are withheld from public errors, status, and tracing; an HTTP
+status code is retained when available. MCP `isError` tool results retain their
+bounded text for the caller, but HTTP error spans do not capture that text.
+No HTTP headers or URLs are added to spans. HTTP endpoints have no stderr tail.
+
+There is no automatic reconnect, stream resumption, tool-call retry, or fallback
+to deprecated HTTP+SSE. `connected` means setup and tool discovery succeeded,
+not a continuous health check. Individual HTTP failures fail their operation;
+they do not automatically remove a discovered tool. Closing attempts DELETE
+for a negotiated legacy HTTP session (at most five seconds, or the shorter
+request timeout), then always closes local transport resources. It does not
+delete remote user data. No remote session is created by the modern protocol.
+
 ## Tracing and security
 
 With a tracer, the adapter emits:
 
 | Span | Meaning |
 | --- | --- |
-| `may.mcp.connect` | child process start and protocol initialization |
+| `may.mcp.connect` | transport setup and protocol negotiation |
 | `may.mcp.tools.list` | startup discovery snapshot |
 | `may.mcp.tool.call` | one remote call, parented to the Core tool span |
 | `may.mcp.disconnect` | client and process shutdown |
@@ -180,7 +242,7 @@ counts, status, and duration through the tracer. Built-in instrumentation does
 not capture command arguments, environment values, request input, response
 content, prompts, or model messages.
 
-An MCP server is executable code with the host user's authority, not a sandbox.
+A local stdio MCP server is executable code with the host user's authority, not a sandbox.
 It can also supply model-visible tool descriptions. Only configure trusted
 servers, review their command and package source, apply least-privilege
 environment and filesystem access, and keep the permission layer enabled.
@@ -188,7 +250,7 @@ environment and filesystem access, and keep the permission layer enabled.
 ## Current scope
 
 This phase intentionally excludes MCP resources, prompts, sampling/elicitation
-handlers, HTTP transports, server authoring, automatic reconnect, and dynamic
+handlers, OAuth login, deprecated HTTP+SSE, Tasks/Apps extensions, server authoring, automatic reconnect, and dynamic
 `tools/list_changed` refresh. Tools are a startup snapshot and become available
 on the next MaybeCode launch after a server changes its list.
 

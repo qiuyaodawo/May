@@ -1,7 +1,7 @@
 # `@may/mcp`
 
-Model Context Protocol client adapters for May agents. The first implementation
-connects to local stdio servers, snapshots `tools/list`, and exposes every
+Model Context Protocol client adapters for May agents. The client
+connects to local stdio and remote Streamable HTTP servers, snapshots `tools/list`, and exposes every
 remote tool as a normal Core `Tool`.
 
 ```ts
@@ -49,8 +49,40 @@ usable when that server fails; its diagnostic remains available through
 lifecycle events. Stderr is piped instead of written directly to the terminal,
 sanitized, and retained as a bounded 16 KiB tail by default.
 
-MCP servers execute with the host user's authority. Put their tools behind a
+Local stdio MCP servers execute with the host user's authority. Put their tools behind a
 permission policy, pass secrets through the environment rather than source
-control, and only configure servers you trust. Resources, prompts, HTTP
-transport, dynamic tool-list refresh, and an MCP server implementation are not
-part of this first client release.
+control, and only configure servers you trust.
+
+HTTP endpoints use `McpHttpServerOptions` (part of `McpServerOptions`):
+
+```ts
+const remote = await openMcpClientPool({
+  servers: [{
+    id: "remote",
+    transport: "streamable-http",
+    url: "https://mcp.example.com/mcp",
+    headers: { Authorization: `Bearer ${process.env.MCP_ACCESS_TOKEN!}` },
+    protocolMode: "auto",
+  }],
+});
+// Compose remote.tools into the application's registry; close after use.
+await remote.close();
+```
+
+HTTP defaults to SDK `auto` negotiation (`server/discover`, with legacy
+`initialize` fallback); stdio keeps `legacy` as its default. Both accept
+`protocolMode: "auto" | "legacy"`. Auto mode on stdio can spawn a separate
+short-lived discovery process. `status()` includes the selected protocol version.
+HTTP requires HTTPS except for loopback (`localhost`, `127.0.0.1`, `[::1]`),
+rejects credentials/fragments in the URL and protocol-header overrides, and
+never follows redirects. Static headers are supported; OAuth login is not.
+HTTP SDK error details are withheld from diagnostics/traces (status codes are
+retained when available). Tool-level error content remains visible to the caller.
+Legacy HTTP sessions are terminated on close, with at most five seconds for
+DELETE cleanup, followed by local transport cleanup. No automatic reconnect,
+stream resumption, tool-call retry, or fallback to deprecated HTTP+SSE is enabled.
+`connected` means setup and discovery succeeded, not continuous HTTP health.
+
+Resources, prompts, OAuth flows, sampling/elicitation handlers, dynamic catalogs,
+Tasks/Apps extensions, and MCP server authoring remain outside this phase.
+See the [bilingual MCP guide](../../docs/en/guides/mcp.md).

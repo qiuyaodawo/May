@@ -130,7 +130,7 @@ Tracer 与 processor 生命周期由调用方拥有，避免一个 application �
 ### `@may/mcp`
 
 MCP package 是位于工具边界的可选 adapter。它依赖 Core 的 `Tool` 与 tracing 契约，
-Core 则不依赖 MCP 或其 SDK。Client pool 拥有 stdio 连接与子进程，通过
+Core 则不依赖 MCP 或其 SDK。Client pool 拥有 stdio 子进程与 Streamable HTTP transport，通过
 `tools/list` 获取启动快照，并公开由 `tools/call` 支撑的不可变、模型可见工具描述。
 
 Pool 还公开 server 即时状态视图与有序连接生命周期事件。Required server 会使应用
@@ -196,7 +196,7 @@ workspace 生命周期交给 `@may/application`，使用 `@may/tui` 的 Agent tr
 - 命名手动压缩选项和有序自动压缩链；
 - provider/model profile、reasoning effort 覆盖和默认模型持久化；
 - 可选的本地 tracing 配置，以及共享 processor 的生命周期 ownership；
-- 可选的 stdio MCP 配置，以及共享 client pool 的生命周期 ownership；
+- 可选的 stdio / Streamable HTTP MCP 配置，以及共享 client pool 的生命周期 ownership；
 - slash command、产品事件、主题、页面布局、模型/Session picker flow，以及 classic
   与 retained 两种终端行为。
 

@@ -18,6 +18,7 @@ import {
   createMaybeCodeModel,
   createCodingPermissionPolicy,
   executeMaybeCodeSlashCommand,
+  formatMaybeCodeMcpStatus,
   openConfiguredMaybeCode,
   parseMaybeCodeArgs,
   resolveMaybeCodeMcp,
@@ -519,6 +520,35 @@ test("resolves workspace-relative MCP servers and environment references", () =>
       },
     },
   }, workspace, {}), /missing environment variable MISSING/u);
+});
+
+test("resolves HTTP MCP headers, validates transport options, and formats protocol status", () => {
+  const workspace = process.cwd();
+  const base = { path: "config.json", providers: {}, models: {} };
+  const config = (remote) => ({
+    ...base, apps: { maybecode: { mcpServers: { remote } } },
+  });
+  const endpoint = {
+    transport: "streamable-http", url: "https://mcp.example.com/mcp",
+    headers: { Authorization: "Bearer ${MCP_TOKEN}" }, protocolMode: "auto",
+    required: false, requestTimeoutMs: 1_000,
+  };
+  assert.deepEqual(resolveMaybeCodeMcp(config(endpoint), workspace, { MCP_TOKEN: "secret" }), {
+    servers: [{ ...endpoint, id: "remote", headers: { Authorization: "Bearer secret" } }],
+  });
+  assert.throws(() => resolveMaybeCodeMcp(config(endpoint), workspace, {}), /missing environment variable MCP_TOKEN/u);
+  for (const change of [
+    { cwd: "." }, { command: "node" }, { stderrMaxBytes: 1_024 },
+    { url: "http://example.com" }, { transport: "sse" }, { protocolMode: "pin" },
+    { headers: { Host: "spoof" } },
+  ]) {
+    assert.throws(() => resolveMaybeCodeMcp(config({ ...endpoint, ...change }), workspace, { MCP_TOKEN: "secret" }));
+  }
+  assert.throws(() => resolveMaybeCodeMcp(config({ command: "node", headers: {} }), workspace), /requires streamable-http/u);
+  assert.match(formatMaybeCodeMcpStatus([{
+    serverId: "remote", transport: "streamable-http", required: false,
+    state: "connected", protocolVersion: "2026-07-28", toolNames: ["mcp__remote__lookup"],
+  }]), /optional, streamable-http\)\n  protocol: 2026-07-28/u);
 });
 
 test("scopes MCP approval grants to one namespaced tool", async () => {

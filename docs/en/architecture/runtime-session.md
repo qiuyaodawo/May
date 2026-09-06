@@ -152,7 +152,7 @@ by another.
 
 The MCP package is an optional adapter at the tool boundary. It depends on
 Core's `Tool` and tracing contracts, while Core remains independent of MCP and
-its SDK. A client pool owns stdio connections and child processes, takes a
+its SDK. A client pool owns stdio child processes and Streamable HTTP transports, takes a
 startup snapshot with `tools/list`, and exposes immutable model-facing tool
 descriptors backed by `tools/call`.
 
@@ -235,7 +235,7 @@ The application keeps only product policy and compatibility adapters:
 - provider/model profiles, reasoning-effort overrides, and default-model
   persistence;
 - optional local tracing configuration plus ownership of its shared processor;
-- optional stdio MCP configuration plus ownership of its shared client pool;
+- optional stdio / Streamable HTTP MCP configuration plus ownership of its shared client pool;
 - slash-command definitions, product events, theme, page layout, model/session
   picker flows, and classic-versus-retained terminal behavior.
 

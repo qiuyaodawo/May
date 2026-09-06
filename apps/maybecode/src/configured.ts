@@ -17,8 +17,10 @@ import type {
 import type { Model } from "@may/core";
 import {
   openMcpClientPool,
+  validateMcpServerOptions,
   type McpClientPool,
-  type McpStdioServerOptions,
+  type McpServerBaseOptions,
+  type McpServerOptions,
   type OpenMcpClientPoolOptions,
 } from "@may/mcp";
 import {
@@ -75,7 +77,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
 }
 
 export interface MaybeCodeMcpOptions {
-  readonly servers: readonly McpStdioServerOptions[];
+  readonly servers: readonly McpServerOptions[];
 }
 
 export interface MaybeCodeObservabilityOptions {
@@ -268,7 +270,7 @@ export function resolveMaybeCodeMcp(
   const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.mcpServers;
   if (value === undefined || value === false) return false;
   const servers = objectValue(value, "apps.maybecode.mcpServers");
-  const resolved: McpStdioServerOptions[] = [];
+  const resolved: McpServerOptions[] = [];
 
   for (const [id, raw] of Object.entries(servers)) {
     if (!/^[A-Za-z0-9_-]+$/u.test(id)) {
@@ -284,6 +286,9 @@ export function resolveMaybeCodeMcp(
         "enabled",
         "required",
         "transport",
+        "protocolMode",
+        "url",
+        "headers",
         "command",
         "args",
         "cwd",
@@ -302,16 +307,14 @@ export function resolveMaybeCodeMcp(
     if (server.required !== undefined && typeof server.required !== "boolean") {
       throw new MaybeCodeConfigError(`${field}.required must be a boolean`);
     }
-    if (server.transport !== undefined && server.transport !== "stdio") {
-      throw new MaybeCodeConfigError(`${field}.transport must be "stdio"`);
+    if (server.transport !== undefined && server.transport !== "stdio" &&
+        server.transport !== "streamable-http") {
+      throw new MaybeCodeConfigError(`${field}.transport must be "stdio" or "streamable-http"`);
     }
-
-    const command = nonEmptyString(server.command, `${field}.command`);
-    const args = optionalStringArray(server.args, `${field}.args`);
-    const cwd = server.cwd === undefined
-      ? workspace
-      : resolve(workspace, nonEmptyString(server.cwd, `${field}.cwd`));
-    const env = resolveMcpEnvironment(server.env, `${field}.env`, environment);
+    if (server.protocolMode !== undefined && server.protocolMode !== "legacy" &&
+        server.protocolMode !== "auto") {
+      throw new MaybeCodeConfigError(`${field}.protocolMode must be "legacy" or "auto"`);
+    }
     const requestTimeoutMs = optionalPositiveInteger(
       server.requestTimeoutMs,
       `${field}.requestTimeoutMs`,
@@ -320,6 +323,41 @@ export function resolveMaybeCodeMcp(
       server.maxTotalTimeoutMs,
       `${field}.maxTotalTimeoutMs`,
     );
+    const common: McpServerBaseOptions = {
+      id,
+      ...(server.required === undefined ? {} : { required: server.required }),
+      ...(server.protocolMode === undefined ? {} : { protocolMode: server.protocolMode }),
+      ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
+      ...(maxTotalTimeoutMs === undefined ? {} : { maxTotalTimeoutMs }),
+    };
+    if (server.transport === "streamable-http") {
+      for (const key of ["command", "args", "cwd", "env", "maxBufferSize", "stderrMaxBytes"]) {
+        if (key in server) throw new MaybeCodeConfigError(`${field}.${key} is stdio-only`);
+      }
+      const headers = resolveMcpEnvironment(server.headers, `${field}.headers`, environment);
+      const endpoint: McpServerOptions = {
+        ...common,
+        transport: "streamable-http",
+        url: nonEmptyString(server.url, `${field}.url`),
+        ...(headers === undefined ? {} : { headers }),
+      };
+      try {
+        validateMcpServerOptions(endpoint);
+      } catch (error) {
+        throw new MaybeCodeConfigError(error instanceof Error ? error.message : "Invalid MCP endpoint");
+      }
+      resolved.push(endpoint);
+      continue;
+    }
+    for (const key of ["url", "headers"]) {
+      if (key in server) throw new MaybeCodeConfigError(`${field}.${key} requires streamable-http`);
+    }
+    const command = nonEmptyString(server.command, `${field}.command`);
+    const args = optionalStringArray(server.args, `${field}.args`);
+    const cwd = server.cwd === undefined
+      ? workspace
+      : resolve(workspace, nonEmptyString(server.cwd, `${field}.cwd`));
+    const env = resolveMcpEnvironment(server.env, `${field}.env`, environment);
     const maxBufferSize = optionalPositiveInteger(
       server.maxBufferSize,
       `${field}.maxBufferSize`,
@@ -330,16 +368,11 @@ export function resolveMaybeCodeMcp(
     );
 
     resolved.push({
-      id,
+      ...common,
       command,
-      ...(server.required === undefined
-        ? {}
-        : { required: server.required }),
       ...(args === undefined ? {} : { args }),
       cwd,
       ...(env === undefined ? {} : { env }),
-      ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
-      ...(maxTotalTimeoutMs === undefined ? {} : { maxTotalTimeoutMs }),
       ...(maxBufferSize === undefined ? {} : { maxBufferSize }),
       ...(stderrMaxBytes === undefined ? {} : { stderrMaxBytes }),
     });

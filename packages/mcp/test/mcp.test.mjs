@@ -5,7 +5,9 @@ import test from "node:test";
 import {
   namespaceMcpToolName,
   openMcpClientPool,
+  validateMcpServerOptions,
 } from "../dist/index.js";
+import { startHttpFixture } from "./fixtures/http-server.mjs";
 
 const fixture = fileURLToPath(
   new URL("./fixtures/stdio-server.mjs", import.meta.url),
@@ -131,6 +133,100 @@ test("creates bounded provider-safe names and rejects duplicate servers", async 
   );
 });
 
+test("mixes stdio and HTTP endpoints with modern discovery and legacy fallback", async (t) => {
+  const http = await startHttpFixture(t);
+  const spans = [];
+  const pool = await openMcpClientPool({
+    servers: [
+      { id: "local", command: process.execPath, args: [fixture] },
+      ...["legacy", "modern"].map((id) => ({
+        id, transport: "streamable-http", url: `${http.url}/${id}`,
+        headers: { Authorization: "Bearer test-secret" }, requestTimeoutMs: 2_000,
+      })),
+    ],
+    tracer: recordingTracer(spans),
+  });
+  t.after(() => pool.close());
+  const events = collectEvents(pool.events);
+  assert.deepEqual(pool.status().map((s) => [s.transport, s.protocolVersion]), [
+    ["stdio", "2025-11-25"], ["streamable-http", "2025-11-25"], ["streamable-http", "2026-07-28"],
+  ]);
+  for (const id of ["legacy", "modern"]) {
+    const tool = pool.tools.find((entry) => entry.name === `mcp__${id}__echo`);
+    const progress = [];
+    assert.deepEqual(await tool.execute({ value: "hello" }, executionContext(progress)), {
+      content: [{ type: "text", text: "hello" }], structuredContent: { echoed: "hello" },
+    });
+    assert.equal(progress[0].message, "http progress");
+    await assert.rejects(tool.execute({ value: "tool-error" }, executionContext([])),
+      (error) => error.code === "MCP_TOOL_ERROR" && /remote tool failed/u.test(error.message));
+    await assert.rejects(tool.execute({ value: "http-error" }, executionContext([])),
+      (error) => error.code === "MCP_TOOL_CALL_FAILED" && /503/u.test(error.message));
+    const cancellation = new AbortController();
+    const pending = tool.execute({ value: "never" }, executionContext([], cancellation.signal));
+    setTimeout(() => cancellation.abort("stop"), 40);
+    await assert.rejects(pending);
+  }
+  await pool.close();
+  await pool.close();
+  assert.ok(pool.status().every((status) => status.state === "disconnected"));
+  assert.equal((await events).filter((e) => e.transport === "streamable-http").length, 4);
+  assert.ok(http.requests.every((r) => r.headers.authorization === "Bearer test-secret"));
+  assert.equal(http.requests.filter((r) => r.path === "/modern" && r.message?.method === "initialize").length, 0);
+  assert.equal(http.requests.filter((r) => r.method === "DELETE").length, 1);
+  for (const path of ["/legacy", "/modern"]) {
+    assert.equal(http.requests.filter((r) => r.path === path && r.message?.params?.arguments?.value === "http-error").length, 1);
+  }
+  const modernCall = http.requests.find((r) => r.path === "/modern" && r.message?.method === "tools/call");
+  assert.equal(modernCall.message.params._meta["io.modelcontextprotocol/protocolVersion"], "2026-07-28");
+  assert.doesNotMatch(JSON.stringify(spans), /test-secret|sensitive-response-body|127\.0\.0\.1/u);
+});
+
+test("validates HTTP boundaries and keeps denied endpoints isolated without following redirects", async (t) => {
+  const http = await startHttpFixture(t);
+  const base = { id: "remote", transport: "streamable-http", url: `${http.url}/modern` };
+  for (const extra of [
+    { url: "http://example.com/mcp" }, { url: "https://user:password@example.com" },
+    { url: "https://example.com/#fragment" }, { url: "file:///tmp/mcp" },
+    { command: "node" }, { headers: { "Mcp-Session-Id": "spoof" } },
+    { headers: { Authorization: "one", authorization: "two" } },
+    { headers: { Authorization: "line\nbreak" } }, { protocolMode: "unknown" },
+  ]) {
+    assert.throws(() => validateMcpServerOptions({ ...base, ...extra }),
+      (error) => error.code === "MCP_CONFIGURATION_ERROR");
+  }
+  const spans = [];
+  const pool = await openMcpClientPool({
+    servers: ["redirect", "unauthorized", "unavailable", "modern"].map((id) => ({
+      ...base, id, url: `${http.url}/${id}`, required: id === "modern", requestTimeoutMs: 1_000,
+    })),
+    tracer: recordingTracer(spans),
+  });
+  t.after(() => pool.close());
+  assert.deepEqual(pool.status().map((s) => s.state), ["failed", "failed", "failed", "connected"]);
+  assert.match(pool.status()[1].diagnostic.message, /401/u);
+  assert.match(pool.status()[2].diagnostic.message, /503/u);
+  assert.equal(http.requests.some((r) => r.path === "/leaked"), false);
+  assert.doesNotMatch(JSON.stringify([pool.status(), spans]), /sensitive-response-body|test-secret|127\.0\.0\.1/u);
+  await assert.rejects(openMcpClientPool({
+    servers: [{ ...base, url: `${http.url}/unavailable` }],
+  }), (error) => error.code === "MCP_CONNECTION_FAILED" && /503/u.test(error.message));
+
+  const cancelled = new AbortController();
+  const reason = new Error("stop discovery");
+  const pending = openMcpClientPool({
+    servers: [{ ...base, url: `${http.url}/silent`, requestTimeoutMs: 10_000 }],
+    signal: cancelled.signal,
+  });
+  setTimeout(() => cancelled.abort(reason), 30);
+  await assert.rejects(pending, (error) => error === reason);
+  const bounded = await openMcpClientPool({
+    servers: [{ ...base, url: `${http.url}/silent`, requestTimeoutMs: 10_000, maxTotalTimeoutMs: 30, required: false }],
+  });
+  assert.equal(bounded.status()[0].state, "failed");
+  await bounded.close();
+});
+
 function executionContext(progress, signal = new AbortController().signal) {
   return {
     runId: "run-1",
@@ -157,6 +253,7 @@ function recordingTracer(completed) {
             name,
             status: result.status ?? "ok",
             attributes: { ...options.attributes, ...result.attributes },
+            error: result.error,
           });
         },
       };
