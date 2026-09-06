@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import {
   Client,
   StreamableHTTPClientTransport,
@@ -20,6 +21,8 @@ import {
 
 import {
   McpClientPoolClosedError,
+  McpCatalogError,
+  McpStaleToolError,
   McpConfigurationError,
   McpConnectionError,
   McpToolCallError,
@@ -39,6 +42,7 @@ import type {
   McpClientEvent,
   McpDiagnostic,
   McpServerStatus,
+  McpServerCatalog,
   McpServerOptions,
   McpToolOutput,
   OpenMcpClientPoolOptions,
@@ -49,6 +53,11 @@ const DEFAULT_STDERR_MAX_BYTES = 16 * 1_024;
 
 class McpConnection {
   private closed = false;
+  generation = randomUUID();
+  private readonly installedTools = new Map<string, string>();
+  private stale = true;
+  catalogSubscription: NonNullable<McpServerStatus["catalogSubscription"]> = "not-advertised";
+  private activeCalls = 0;
   private closing = false;
   private connected = false;
   private lastTransportError: Error | undefined;
@@ -67,10 +76,16 @@ class McpConnection {
     options: McpServerOptions,
     poolOptions: OpenMcpClientPoolOptions,
     onAvailability: (error?: Error) => void,
+    onCatalogChanged: () => void,
   ): Promise<McpConnection> {
     validateMcpServerOptions(options);
     const client = new Client(poolOptions.clientInfo ?? DEFAULT_CLIENT_INFO, {
       capabilities: {},
+      listMaxPages: 64,
+      // Each connection owns a separate cache, including after reconnect/login.
+      listChanged: Object.fromEntries(["tools", "resources", "prompts"].map((kind) => [kind, {
+        autoRefresh: false, debounceMs: 0, onChanged: onCatalogChanged,
+      }])),
       versionNegotiation: {
         mode: options.protocolMode ?? (options.transport === "streamable-http" ? "auto" : "legacy"),
         probe: {
@@ -130,6 +145,27 @@ class McpConnection {
           : { attributes: { "process.pid": transport.pid } }),
       });
       connection.connected = true;
+      const advertised = client.getServerCapabilities();
+      const expected = {
+        toolsListChanged: advertised?.tools?.listChanged,
+        resourcesListChanged: advertised?.resources?.listChanged,
+        promptsListChanged: advertised?.prompts?.listChanged,
+      };
+      if (Object.values(expected).some(Boolean)) {
+        if (client.getProtocolEra() === "legacy") connection.catalogSubscription = "legacy";
+        else {
+          const subscription = client.autoOpenedSubscription;
+          connection.catalogSubscription = subscription === undefined ? "unavailable" :
+            Object.entries(expected).every(([key, value]) => !value || subscription.honoredFilter[key as keyof typeof expected]) ? "active" : "partial";
+          void subscription?.closed.then(() => {
+            connection.catalogSubscription = "unavailable";
+            if (!connection.closed && !connection.closing) {
+              connection.invalidate();
+              onAvailability(new McpCatalogError(options.id, "catalog subscription ended; refresh or reconnect explicitly"));
+            }
+          });
+        }
+      }
       return connection;
     } catch (error) {
       const safeError = safeMcpTransportError(error, options);
@@ -151,36 +187,62 @@ class McpConnection {
     }
   }
 
-  async listTools(signal?: AbortSignal): Promise<readonly Tool[]> {
+  invalidate(): void { this.stale = true; }
+
+  get busy(): boolean { return this.activeCalls > 0; }
+
+  install(definitions: readonly ProtocolTool[]): readonly Tool[] {
+    const tools = createTools(this, definitions);
+    this.installedTools.clear();
+    for (const definition of definitions) this.installedTools.set(definition.name, fingerprint(definition));
+    this.stale = false;
+    return tools;
+  }
+
+  async discover(signal?: AbortSignal): Promise<Omit<McpServerCatalog, "revision" | "serverId">> {
     this.throwIfClosed();
-    const span = startTraceSpan(this.tracer, "may.mcp.tools.list", {
-      attributes: this.traceAttributes,
-    });
+    const span = startTraceSpan(this.tracer, "may.mcp.tools.list", { attributes: this.traceAttributes });
     try {
-      const result = await this.client.listTools(
-        undefined,
-        requestOptions(this.options, signal),
-      );
-      const tools = createTools(this, result.tools);
-      endTraceSpan(span, {
-        status: "ok",
-        attributes: { "may.mcp.tools.count": tools.length },
+      const capabilities = this.client.getServerCapabilities() ?? {};
+      const options = requestOptions(this.options, signal);
+      // Explicit page walking rejects repeated cursors rather than publishing a partial catalog.
+      const tools = capabilities.tools === undefined ? [] : await listAll(this.options.id, async (cursor) => {
+        const result = await this.client.request({ method: "tools/list", params: cursor === undefined ? {} : { cursor } }, options);
+        return { items: result.tools, nextCursor: result.nextCursor };
       });
-      return tools;
+      const resources = capabilities.resources === undefined ? [] : await listAll(this.options.id, async (cursor) => {
+        const result = await this.client.request({ method: "resources/list", params: cursor === undefined ? {} : { cursor } }, options);
+        return { items: result.resources, nextCursor: result.nextCursor };
+      });
+      const resourceTemplates = capabilities.resources === undefined ? [] : await listAll(this.options.id, async (cursor) => {
+        const result = await this.client.request({ method: "resources/templates/list", params: cursor === undefined ? {} : { cursor } }, options);
+        return { items: result.resourceTemplates, nextCursor: result.nextCursor };
+      });
+      const prompts = capabilities.prompts === undefined ? [] : await listAll(this.options.id, async (cursor) => {
+        const result = await this.client.request({ method: "prompts/list", params: cursor === undefined ? {} : { cursor } }, options);
+        return { items: result.prompts, nextCursor: result.nextCursor };
+      });
+      const catalog = { capabilities, tools, resources, resourceTemplates, prompts };
+      if (tools.length + resources.length + resourceTemplates.length + prompts.length > 4096 ||
+          Buffer.byteLength(JSON.stringify(catalog)) > 8 * 1024 * 1024) {
+        throw new McpCatalogError(this.options.id, "catalog exceeds host limits");
+      }
+      assertUnique(tools.map((tool) => namespaceMcpToolName(this.options.id, tool.name)), this.options.id);
+      assertUnique(resources.map((resource) => resource.uri), this.options.id);
+      assertUnique(resourceTemplates.map((template) => template.uriTemplate), this.options.id);
+      assertUnique(prompts.map((prompt) => prompt.name), this.options.id);
+      endTraceSpan(span, { status: "ok", attributes: { "may.mcp.tools.count": tools.length } });
+      return freezeTree(structuredClone(catalog));
     } catch (error) {
       const safeError = safeMcpTransportError(error, this.options);
       endMcpSpan(span, safeError, signal);
       if (signal?.aborted === true) throw error;
+      if (error instanceof McpCatalogError) throw error;
       if (safeError instanceof McpAuthenticationError || safeError instanceof McpCredentialStoreError) throw safeError;
       const recentStderr = this.stderr.text();
-      throw new McpToolsListError(
-        this.options.id,
-        sanitizeDiagnosticText(errorMessage(safeError), 2_000),
-        {
-          ...(safeError instanceof Error ? { cause: safeError } : {}),
-          ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
-        },
-      );
+      throw new McpToolsListError(this.options.id, sanitizeDiagnosticText(errorMessage(safeError), 2_000), {
+        ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
+      });
     }
   }
 
@@ -189,8 +251,14 @@ class McpConnection {
     exposedName: string,
     input: Record<string, unknown>,
     context: ToolExecutionContext,
+    generation: string,
   ): Promise<McpToolOutput> {
     this.throwIfClosed();
+    context.signal.throwIfAborted();
+    if (generation !== this.generation || this.stale || this.installedTools.get(definition.name) !== fingerprint(definition)) {
+      throw new McpStaleToolError(this.options.id);
+    }
+    this.activeCalls++;
     const span = startTraceSpan(this.tracer, "may.mcp.tool.call", {
       ...(context.traceContext === undefined
         ? {}
@@ -252,6 +320,8 @@ class McpConnection {
         errorMessage(safeError),
         safeError instanceof Error ? { cause: safeError } : undefined,
       );
+    } finally {
+      this.activeCalls--;
     }
   }
 
@@ -326,6 +396,7 @@ interface MutableMcpServerStatus {
   readonly required: boolean;
   state: McpServerStatus["state"];
   toolNames: readonly string[];
+  catalogStale?: boolean;
   diagnostic?: McpDiagnostic;
 }
 
@@ -353,6 +424,12 @@ class McpEventRecorder {
       required: server.required !== false,
       toolNames: [...toolNames],
     });
+  }
+
+  catalogUpdated(server: McpServerOptions, revision: number, toolNames: readonly string[]): void {
+    this.queue.push({ type: "mcp.server.catalog-updated", seq: ++this.sequence, timestamp: Date.now(),
+      serverId: server.id, transport: server.transport ?? "stdio", required: server.required !== false,
+      revision, toolNames: [...toolNames] });
   }
 
   failed(server: McpServerOptions, diagnostic: McpDiagnostic): void {
@@ -383,192 +460,251 @@ class McpEventRecorder {
   }
 }
 
-class DefaultMcpClientPool implements McpClientPool {
-  readonly tools: readonly Tool[];
-  readonly events: AsyncIterable<McpClientEvent>;
-  private closed = false;
+interface PoolEntry {
+  readonly server: McpServerOptions;
+  readonly status: MutableMcpServerStatus;
+  connection?: McpConnection;
+  catalog?: McpServerCatalog;
+  tools: readonly Tool[];
+  invalidations: number;
+  chain: Promise<void>;
+  refreshTimer?: ReturnType<typeof setTimeout>;
+  refreshScheduled?: boolean;
+}
 
-  constructor(
-    private readonly connections: readonly McpConnection[],
-    private readonly statuses: MutableMcpServerStatus[],
-    private readonly eventRecorder: McpEventRecorder,
-    tools: readonly Tool[],
-  ) {
-    this.tools = Object.freeze([...tools]);
-    this.events = eventRecorder.events;
+class DefaultMcpClientPool implements McpClientPool {
+  readonly events: AsyncIterable<McpClientEvent>;
+  private readonly entries: PoolEntry[];
+  private readonly lifetime = new AbortController();
+  private readonly recorder = new McpEventRecorder();
+  private closed = false;
+  private closing: Promise<void> | undefined;
+
+  constructor(private readonly options: OpenMcpClientPoolOptions) {
+    this.events = this.recorder.events;
+    this.entries = options.servers.map((server) => ({
+      server, tools: [], invalidations: 0, chain: Promise.resolve(),
+      status: { serverId: server.id, transport: server.transport ?? "stdio",
+        required: server.required !== false, state: "failed", toolNames: [] },
+    }));
+  }
+
+  get tools(): readonly Tool[] {
+    if (this.closed) return Object.freeze([]);
+    return Object.freeze(this.entries.filter((entry) => entry.status.state === "connected" && entry.status.catalogStale !== true)
+      .flatMap((entry) => entry.tools));
+  }
+
+  catalog(): readonly McpServerCatalog[] {
+    return Object.freeze(this.entries.flatMap((entry) => entry.catalog === undefined ? [] : [entry.catalog]));
   }
 
   status(): readonly McpServerStatus[] {
-    return this.statuses.map((status) => {
-      const stderr = this.connections.find((connection) =>
-        connection.options.id === status.serverId
-      )?.stderrText() ?? status.diagnostic?.stderr;
-      return {
-        serverId: status.serverId,
-        transport: status.transport,
-        ...(status.protocolVersion === undefined ? {} : { protocolVersion: status.protocolVersion }),
-        required: status.required,
-        state: status.state,
+    return this.entries.map(({ status, connection, catalog }) => {
+      const stderr = connection?.stderrText() ?? status.diagnostic?.stderr;
+      return { ...status,
+        ...(connection === undefined ? {} : { catalogSubscription: connection.catalogSubscription }),
         toolNames: [...status.toolNames],
+        ...(catalog === undefined ? {} : { catalogRevision: catalog.revision }),
         ...(stderr === undefined ? {} : { stderr }),
-        ...(status.diagnostic === undefined
-          ? {}
-          : { diagnostic: { ...status.diagnostic } }),
+        ...(status.diagnostic === undefined ? {} : { diagnostic: { ...status.diagnostic } }),
       };
     });
   }
 
-  async close(): Promise<void> {
-    if (this.closed) return;
-    this.closed = true;
-    const failures: unknown[] = [];
-    for (const connection of [...this.connections].reverse()) {
-      const status = this.statuses.find((candidate) =>
-        candidate.serverId === connection.options.id
-      )!;
-      if (status.state === "failed") {
-        await closeConnectionQuietly(connection);
-        continue;
-      }
+  async initialize(): Promise<void> {
+    for (const entry of this.entries) {
       try {
-        await connection.close();
-        status.state = "disconnected";
-        this.eventRecorder.disconnected(connection.options);
+        await this.connect(entry, this.signal(this.options.signal));
       } catch (error) {
-        failures.push(error);
-        status.state = "failed";
-        status.diagnostic = toDiagnostic(error);
-        this.eventRecorder.failed(connection.options, status.diagnostic);
+        if (this.options.signal?.aborted === true || entry.server.required !== false) {
+          await this.close().catch(() => {});
+          throw error;
+        }
       }
     }
-    this.eventRecorder.close();
-    if (failures.length > 0) {
-      throw new AggregateError(
-        failures,
-        "One or more MCP clients failed to close",
-      );
+  }
+
+  async refresh(serverId?: string, signal?: AbortSignal): Promise<void> {
+    const entries = serverId === undefined ? this.entries : [this.entry(serverId)];
+    for (const entry of entries) {
+      await this.enqueue(entry, () => this.refreshEntry(entry, this.signal(signal)));
     }
+  }
+
+  reconnect(serverId: string, signal?: AbortSignal): Promise<void> {
+    const entry = this.entry(serverId);
+    return this.enqueue(entry, async () => {
+      this.signal(signal).throwIfAborted();
+      if (entry.connection?.busy) throw new McpCatalogError(serverId, "cannot reconnect during an active operation");
+      entry.connection?.invalidate();
+      const previous = entry.connection;
+      delete entry.connection;
+      await closeConnectionQuietly(previous);
+      await this.connect(entry, this.signal(signal));
+    });
+  }
+
+  close(): Promise<void> {
+    this.closing ??= this.closeAll();
+    return this.closing;
+  }
+
+  private async closeAll(): Promise<void> {
+    this.closed = true;
+    this.lifetime.abort("MCP pool is closing");
+    for (const entry of this.entries) clearTimeout(entry.refreshTimer);
+    await Promise.allSettled(this.entries.map((entry) => entry.chain));
+    const failures: unknown[] = [];
+    for (const entry of [...this.entries].reverse()) {
+      if (entry.connection === undefined) continue;
+      try {
+        await entry.connection.close();
+        entry.status.state = "disconnected";
+        this.recorder.disconnected(entry.server);
+      } catch (error) { failures.push(error); this.fail(entry, error); }
+    }
+    this.recorder.close();
+    if (failures.length > 0) throw new AggregateError(failures, "One or more MCP clients failed to close");
+  }
+
+  private signal(signal?: AbortSignal): AbortSignal {
+    return signal === undefined ? this.lifetime.signal : AbortSignal.any([signal, this.lifetime.signal]);
+  }
+
+  private entry(serverId: string): PoolEntry {
+    const entry = this.entries.find((entry) => entry.server.id === serverId);
+    if (entry === undefined) throw new McpConfigurationError(`Unknown MCP server: ${serverId}`);
+    return entry;
+  }
+
+  private enqueue(entry: PoolEntry, work: () => Promise<void>): Promise<void> {
+    if (this.closed) return Promise.reject(new McpClientPoolClosedError());
+    const promise = entry.chain.then(() => { this.lifetime.signal.throwIfAborted(); return work(); });
+    entry.chain = promise.catch(() => {});
+    return promise;
+  }
+
+  private async connect(entry: PoolEntry, signal: AbortSignal): Promise<void> {
+    let connection: McpConnection | undefined;
+    try {
+      connection = await McpConnection.open(entry.server, { ...this.options, signal }, (error) => {
+        if (entry.connection !== connection || this.closed) return;
+        if (error !== undefined) this.fail(entry, error);
+      }, () => {
+        if (this.closed || (connection !== undefined && entry.connection !== connection)) return;
+        entry.invalidations++;
+        connection?.invalidate();
+        entry.status.catalogStale = true;
+        if (entry.connection === connection && connection !== undefined) this.scheduleRefresh(entry);
+      });
+      entry.connection = connection;
+      const version = connection.protocolVersion();
+      if (version !== undefined) entry.status.protocolVersion = version;
+      await this.refreshEntry(entry, signal, true);
+      this.recorder.connected(entry.server, entry.status.toolNames);
+    } catch (error) {
+      if (entry.connection === connection) delete entry.connection;
+      await closeConnectionQuietly(connection);
+      entry.tools = [];
+      entry.status.toolNames = [];
+      this.fail(entry, error);
+      throw error;
+    }
+  }
+
+  private scheduleRefresh(entry: PoolEntry): void {
+    if (this.closed || entry.refreshScheduled === true) return;
+    entry.refreshScheduled = true;
+    entry.refreshTimer = setTimeout(() => {
+      delete entry.refreshTimer;
+      void this.enqueue(entry, () => this.refreshEntry(entry, this.lifetime.signal)).catch(() => {}).finally(() => { entry.refreshScheduled = false; });
+    }, 50);
+  }
+
+  private async refreshEntry(entry: PoolEntry, signal: AbortSignal, initial = false): Promise<void> {
+    signal = AbortSignal.any([signal, AbortSignal.timeout(entry.server.maxTotalTimeoutMs ?? 60_000)]);
+    const connection = entry.connection;
+    if (connection === undefined) throw new McpCatalogError(entry.server.id, "endpoint is unavailable; reconnect explicitly");
+    try {
+      // Retry discovery only, not tools; bound an invalidation storm.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        signal.throwIfAborted();
+        const stamp = entry.invalidations;
+        const candidate = await connection.discover(signal);
+        signal.throwIfAborted();
+        if (stamp !== entry.invalidations) continue;
+        const otherNames = new Set(this.entries.filter((other) => other !== entry).flatMap((other) => other.tools.map((tool) => tool.name)));
+        if (!initial && (entry.status.state === "auth-required" || entry.status.state === "failed")) connection.generation = randomUUID();
+        const tools = connection.install(candidate.tools);
+        if (tools.some((tool) => otherNames.has(tool.name))) throw new McpCatalogError(entry.server.id, "tool namespace collision");
+        const changed = entry.catalog === undefined || fingerprint(candidate) !== fingerprint({
+          capabilities: entry.catalog.capabilities, tools: entry.catalog.tools,
+          resources: entry.catalog.resources, resourceTemplates: entry.catalog.resourceTemplates, prompts: entry.catalog.prompts,
+        });
+        const revision = (entry.catalog?.revision ?? 0) + (changed || initial ? 1 : 0);
+        entry.catalog = freezeTree({ ...candidate, serverId: entry.server.id, revision });
+        entry.tools = tools;
+        entry.status.toolNames = tools.map((tool) => tool.name);
+        entry.status.state = "connected";
+        entry.status.catalogStale = false;
+        delete entry.status.diagnostic;
+        if (!initial && changed) this.recorder.catalogUpdated(entry.server, revision, entry.status.toolNames);
+        return;
+      }
+      throw new McpCatalogError(entry.server.id, "catalog changed repeatedly during discovery; refresh again");
+    } catch (error) {
+      connection.invalidate();
+      entry.status.catalogStale = true;
+      if (!initial) this.fail(entry, error);
+      throw error;
+    }
+  }
+
+  private fail(entry: PoolEntry, error: unknown): void {
+    entry.connection?.invalidate();
+    entry.status.catalogStale = true;
+    entry.status.state = error instanceof McpAuthenticationError && error.code === "MCP_AUTHENTICATION_REQUIRED" ? "auth-required" : "failed";
+    entry.status.diagnostic = toDiagnostic(error);
+    this.recorder.failed(entry.server, entry.status.diagnostic);
   }
 }
 
-export async function openMcpClientPool(
-  options: OpenMcpClientPoolOptions,
-): Promise<McpClientPool> {
+export async function openMcpClientPool(options: OpenMcpClientPoolOptions): Promise<McpClientPool> {
   const serverIds = new Set<string>();
   for (const server of options.servers) {
     validateMcpServerOptions(server);
-    if (serverIds.has(server.id)) {
-      throw new McpConfigurationError(`Duplicate MCP server id: ${server.id}`);
-    }
+    if (serverIds.has(server.id)) throw new McpConfigurationError(`Duplicate MCP server id: ${server.id}`);
     serverIds.add(server.id);
   }
-
-  const connections: McpConnection[] = [];
-  const statuses: MutableMcpServerStatus[] = options.servers.map((server) => ({
-    serverId: server.id,
-    transport: server.transport ?? "stdio",
-    required: server.required !== false,
-    state: "failed",
-    toolNames: [],
-  }));
-  const tools: Tool[] = [];
-  const exposedNames = new Set<string>();
-  const eventRecorder = new McpEventRecorder();
-
-  for (const server of options.servers) {
-    const required = server.required !== false;
-    const status = statuses.find((candidate) =>
-      candidate.serverId === server.id
-    )!;
-    let connection: McpConnection | undefined;
-    try {
-      options.signal?.throwIfAborted();
-      connection = await McpConnection.open(
-        server,
-        options,
-        (error) => {
-          if (error === undefined) {
-            if (status.state === "auth-required") {
-              status.state = "connected";
-              delete status.diagnostic;
-              eventRecorder.connected(server, status.toolNames);
-            }
-            return;
-          }
-          if (status.state !== "connected") return;
-          status.state = error instanceof McpAuthenticationError && error.code === "MCP_AUTHENTICATION_REQUIRED"
-            ? "auth-required" : "failed";
-          status.diagnostic = toDiagnostic(error);
-          eventRecorder.failed(server, status.diagnostic);
-        },
-      );
-      const serverTools = await connection.listTools(options.signal);
-      const serverNames = new Set<string>();
-      for (const tool of serverTools) {
-        if (exposedNames.has(tool.name) || serverNames.has(tool.name)) {
-          throw new McpConfigurationError(
-            `MCP tool namespace collision: ${tool.name}`,
-          );
-        }
-        serverNames.add(tool.name);
-      }
-
-      connections.push(connection);
-      tools.push(...serverTools);
-      for (const name of serverNames) {
-        exposedNames.add(name);
-      }
-      const toolNames = serverTools.map((tool) => tool.name);
-      const protocolVersion = connection.protocolVersion();
-      if (protocolVersion !== undefined) status.protocolVersion = protocolVersion;
-      status.state = "connected";
-      status.toolNames = toolNames;
-      eventRecorder.connected(server, toolNames);
-    } catch (error) {
-      await closeConnectionQuietly(connection);
-      const diagnostic = toDiagnostic(error);
-      status.state = diagnostic.code === "MCP_AUTHENTICATION_REQUIRED" ? "auth-required" : "failed";
-      status.toolNames = [];
-      status.diagnostic = diagnostic;
-      eventRecorder.failed(server, diagnostic);
-
-      if (options.signal?.aborted === true || required) {
-        await Promise.allSettled(
-          connections.map((opened) => opened.close()),
-        );
-        eventRecorder.close();
-        throw error;
-      }
-    }
-  }
-
-  return new DefaultMcpClientPool(
-    connections,
-    statuses,
-    eventRecorder,
-    tools,
-  );
+  // Configuration and its account/endpoint identity must not change underneath an open pool.
+  const pool = new DefaultMcpClientPool({ ...options, servers: freezeTree(structuredClone(options.servers)) });
+  await pool.initialize();
+  return pool;
 }
 
 function createTools(
   connection: McpConnection,
   definitions: readonly ProtocolTool[],
 ): readonly Tool[] {
-  return definitions.map((definition) => {
+  return definitions.map((original) => {
+    const definition = freezeTree(structuredClone(original));
+    const generation = connection.generation;
     const exposedName = namespaceMcpToolName(
       connection.options.id,
       definition.name,
     );
-    return {
+    return Object.freeze({
       name: exposedName,
+      permissionVersion: fingerprint([connection.options, generation, definition]),
       description: `[MCP server: ${connection.options.id}] ${
         definition.description ?? definition.name
       }`,
       inputSchema: definition.inputSchema as JsonSchema,
       parse: (input: unknown) => parseArguments(exposedName, input),
       execute: (input: Record<string, unknown>, context: ToolExecutionContext) =>
-        connection.callTool(definition, exposedName, input, context),
-    };
+        connection.callTool(definition, exposedName, input, context, generation),
+    });
   });
 }
 
@@ -724,4 +860,43 @@ function sanitizeDiagnosticText(value: string, maximum: number): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function fingerprint(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value, (_key, item: unknown) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return item;
+    return Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+  })).digest("hex");
+}
+
+function freezeTree<T>(value: T): T {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) freezeTree(child);
+  }
+  return value;
+}
+
+function assertUnique(values: readonly string[], serverId: string): void {
+  if (new Set(values).size !== values.length) throw new McpCatalogError(serverId, "duplicate catalog identity");
+}
+
+async function listAll<T>(serverId: string, page: (cursor?: string) => Promise<{ items: readonly T[]; nextCursor: string | undefined }>): Promise<T[]> {
+  const items: T[] = [];
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+  let bytes = 0;
+  for (let count = 0; count < 64; count++) {
+    const result = await page(cursor);
+    bytes += Buffer.byteLength(JSON.stringify(result));
+    if (items.length + result.items.length > 4096 || bytes > 8 * 1024 * 1024) {
+      throw new McpCatalogError(serverId, "catalog exceeds host limits");
+    }
+    items.push(...result.items);
+    cursor = result.nextCursor;
+    if (cursor === undefined) return items;
+    if (seen.has(cursor)) throw new McpCatalogError(serverId, "catalog cursor repeated");
+    seen.add(cursor);
+  }
+  throw new McpCatalogError(serverId, "catalog pagination exceeds 64 pages");
 }

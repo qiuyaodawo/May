@@ -165,6 +165,7 @@ async function consumeEvents(
       renderer.defaultModelChanged(event.profile);
     } else if (
       event.type === "mcp.server.connected" ||
+      event.type === "mcp.server.catalog-updated" ||
       event.type === "mcp.server.failed" ||
       event.type === "mcp.server.disconnected"
     ) {
@@ -712,6 +713,10 @@ class TerminalRenderer {
   mcpEvent(
     event: Extract<MaybeCodeEvent, { type: `mcp.server.${string}` }>,
   ): void {
+    if (event.type === "mcp.server.catalog-updated") {
+      this.terminal.write(`\nMCP catalog updated: ${sanitizeTerminalText(event.serverId)} (revision ${event.revision})\n`);
+      return;
+    }
     if (event.type === "mcp.server.connected") {
       this.terminal.write(
         `\nMCP server connected: ${sanitizeTerminalText(event.serverId)} ` +

@@ -202,6 +202,9 @@ function applyMaybeCodeEvent(
           `(${event.toolNames.length} tools)`,
       );
       break;
+    case "mcp.server.catalog-updated":
+      store.appendNotice("info", `MCP catalog updated: ${event.serverId} (revision ${event.revision})`);
+      break;
     case "mcp.server.failed":
       store.appendNotice(
         "warning",

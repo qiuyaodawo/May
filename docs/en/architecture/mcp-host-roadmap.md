@@ -37,6 +37,9 @@ permission boundary remains in force.
 OAuth changes do not imply completed catalogs, host interactions, or extensions.
 Do not mark the overall migration complete until all rows have direct evidence.
 
-Dynamic-catalog foundation landed: per-Run `toolSource`/frozen execution snapshots
-and definition-bound session grants. Evidence: Core tool-registry and permission
-tests. MCP catalog publication, resources and reconnect are still pending.
+Dynamic catalogs now publish tools/resources/templates/prompts metadata, handle
+modern/legacy list changes and explicit refresh/reconnect, and supply per-Run
+tool snapshots with definition-bound grants. Evidence: `catalog.test.mjs`, Core
+registry/permission tests and MaybeCode configured lifecycle test. Resource
+reads/attachments, prompt expansion, completion and resource subscriptions are
+still pending, so the capabilities row remains unchecked.

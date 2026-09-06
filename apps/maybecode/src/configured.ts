@@ -216,7 +216,7 @@ export async function openConfiguredMaybeCode(
       catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
       ...(mcp === undefined
         ? {}
-        : { additionalTools: mcp.tools, mcp }),
+        : { toolSource: () => mcp!.tools, mcp }),
       ...(mcp === undefined && observability === undefined
         ? {}
         : {

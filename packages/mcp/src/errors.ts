@@ -93,3 +93,15 @@ function formatDiagnosticMessage(message: string, stderr?: string): string {
     ? message
     : `${message}\nRecent stderr:\n${stderr}`;
 }
+
+export class McpCatalogError extends MayError {
+  constructor(serverId: string, message: string) {
+    super("MCP_CATALOG_ERROR", `MCP server "${serverId}": ${message}`);
+  }
+}
+
+export class McpStaleToolError extends MayError {
+  constructor(serverId: string) {
+    super("MCP_STALE_TOOL", `MCP server "${serverId}" tool snapshot is stale; refresh and start a new Run`);
+  }
+}

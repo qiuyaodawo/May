@@ -63,7 +63,7 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
   ) => Promise<ModelCapabilities>;
   readonly persistDefaultModel?: (profile: string) => Promise<void>;
   /** Optional product-owned MCP status and lifecycle event source. */
-  readonly mcp?: Pick<McpClientPool, "events" | "status">;
+  readonly mcp?: Pick<McpClientPool, "events" | "status"> & Partial<Pick<McpClientPool, "refresh" | "reconnect">>;
   /** Product-owned resources, such as tracing processors, closed after the workspace. */
   readonly closeOwnedResources?: () => void | Promise<void>;
 }
@@ -175,6 +175,18 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   async getMcpStatus(): Promise<readonly McpServerStatus[]> {
     this.throwIfClosed();
     return this.state.options.mcp?.status() ?? [];
+  }
+
+  async refreshMcp(serverId?: string): Promise<void> {
+    this.throwIfClosed();
+    if (this.state.options.mcp?.refresh === undefined) throw new Error("MCP refresh is unavailable");
+    await this.state.options.mcp.refresh(serverId);
+  }
+
+  async reconnectMcp(serverId: string): Promise<void> {
+    this.throwIfClosed();
+    if (this.state.options.mcp?.reconnect === undefined) throw new Error("MCP reconnect is unavailable");
+    await this.state.options.mcp.reconnect(serverId);
   }
 
   submit(options: RunOptions): Promise<MaybeCodeRun> {

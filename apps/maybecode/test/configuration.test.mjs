@@ -253,6 +253,8 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
 test("adds configured MCP tools and owns the client pool lifecycle", async (t) => {
   const directory = await temporaryDirectory(t);
   let openedWith;
+  let mockPool;
+  const refreshed = [];
   let request;
   let closed = false;
   let releaseEvents;
@@ -295,7 +297,9 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
         const closedEvent = new Promise((resolve) => {
           releaseEvents = resolve;
         });
-        return {
+        return mockPool = {
+          async refresh(id) { refreshed.push(["refresh", id]); },
+          async reconnect(id) { refreshed.push(["reconnect", id]); },
           events: {
             async *[Symbol.asyncIterator]() {
               yield {
@@ -362,6 +366,13 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
   await (await app.submit({ input: "hello" })).result;
   assert.ok(request.tools.some((tool) => tool.name === "read"));
   assert.ok(request.tools.some((tool) => tool.name === "mcp__local__lookup"));
+  mockPool.tools = [{ ...mockPool.tools[0], name: "mcp__local__updated" }];
+  await (await app.submit({ input: "next run" })).result;
+  assert.ok(request.tools.some((tool) => tool.name === "mcp__local__updated"));
+  assert.ok(!request.tools.some((tool) => tool.name === "mcp__local__lookup"));
+  await executeMaybeCodeSlashCommand("/mcp refresh local", app);
+  await executeMaybeCodeSlashCommand("/mcp reconnect local", app);
+  assert.deepEqual(refreshed, [["refresh", "local"], ["reconnect", "local"]]);
   await app.close();
   await eventTask;
   assert.equal(closed, true);

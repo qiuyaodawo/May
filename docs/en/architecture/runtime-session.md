@@ -153,8 +153,11 @@ by another.
 The MCP package is an optional adapter at the tool boundary. It depends on
 Core's `Tool` and tracing contracts, while Core remains independent of MCP and
 its SDK. A client pool owns stdio child processes and Streamable HTTP transports, takes a
-startup snapshot with `tools/list`, and exposes immutable model-facing tool
-descriptors backed by `tools/call`.
+versioned tools/resources/templates/prompts metadata catalogs, and exposes
+per-Run immutable tool descriptors backed by `tools/call`. An additive
+`toolSource` publishes the latest catalog without mutating an active Run.
+List-change notifications refresh metadata; reconnect is explicit and never
+replays a tool call. Resource content/prompt expansion remain separate work.
 
 The pool also exposes a point-in-time server status view and ordered connection
 lifecycle events. Required servers fail application startup; optional servers

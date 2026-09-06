@@ -51,6 +51,7 @@ type MaybeCodeProductEvent = Extract<
   | { type: "model.changed" }
   | { type: "model.default.changed" }
   | { type: "mcp.server.connected" }
+  | { type: "mcp.server.catalog-updated" }
   | { type: "mcp.server.failed" }
   | { type: "mcp.server.disconnected" }
 >;
@@ -64,6 +65,8 @@ export interface MaybeCodeController extends AgentWorkspaceController<
   readonly modelInfo: MaybeCodeModelInfo | undefined;
 
   getMcpStatus(): Promise<readonly McpServerStatus[]>;
+  refreshMcp?(serverId?: string): Promise<void>;
+  reconnectMcp?(serverId: string): Promise<void>;
   listModels(): Promise<readonly MaybeCodeModelProfile[]>;
   switchModel(profile: string): Promise<MaybeCodeModelInfo>;
   /** Persist the profile used by future launches without switching models. */

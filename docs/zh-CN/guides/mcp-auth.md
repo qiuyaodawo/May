@@ -68,8 +68,9 @@ discovery state 都只在当前进程内存中保存；退出即取消流程，�
 不会把旧 issuer 的凭据拿到新 issuer 兑换。Transport 在刷新后最多重试一次被 401
 拒绝的请求；其他工具/网络失败不会重放。HTTP 403 `insufficient_scope` 会保存已授予
 与新请求 scope 的并集，返回 `MCP_AUTHENTICATION_REQUIRED`，要求显式重新登录授权，
-不会在工具执行中打开浏览器。`/mcp` 会在适当时显示 `auth-required`，认证后成功调用
-会恢复状态。初次发现失败的端点仍需重启 workspace，直到动态端点生命周期阶段完成。
+不会在工具执行中打开浏览器。`/mcp` 会在适当时显示 `auth-required`。登录后执行
+`/mcp reconnect <server-id>` 重新发现能力并创建新授权身份，也适用于首次发现失败
+的端点。随后启动新 Run，不重放被拒绝的调用。
 
 `status` 只报告是否存有 token、是否等待追加同意以及已知过期时间，并不进行远程 token
 有效性验证。退出在服务宣告支持时尝试 RFC 7009 撤销，并始终清除本地授权。如果远程

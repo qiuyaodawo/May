@@ -27,11 +27,10 @@ MCP 工具则自动经过与其他 Core 工具相同的权限、调度、事件�
 
 ## Package API
 
-打开 client pool，组合它在启动时获得的工具快照，并在产品 ownership 边界关闭 pool：
+打开 client pool，为每次 Run 提供工具目录，并在产品 ownership 边界关闭 pool：
 
 ```ts
 import { defineAgent } from "@may/application";
-import { ToolRegistry } from "@may/core";
 import { openMcpClientPool } from "@may/mcp";
 
 const mcp = await openMcpClientPool({
@@ -49,7 +48,8 @@ const mcp = await openMcpClientPool({
 
 const agent = defineAgent({
   model,
-  tools: ToolRegistry.compose(localTools, mcp.tools),
+  tools: localTools,
+  toolSource: () => mcp.tools,
   permissionPolicy,
   tracer,
 });
@@ -207,7 +207,7 @@ tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP 
 | Span | 含义 |
 | --- | --- |
 | `may.mcp.connect` | 建立 transport 并协商协议 |
-| `may.mcp.tools.list` | 启动时的发现快照 |
+| `may.mcp.tools.list` | 首次及刷新时的能力目录发现 |
 | `may.mcp.tool.call` | 一次远程调用，parent 是 Core tool span |
 | `may.mcp.disconnect` | 关闭 client 与进程 |
 
@@ -221,11 +221,44 @@ tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP 
 
 ## 当前范围
 
-本阶段有意不包含 MCP resources、prompts、sampling/elicitation handler、
-旧 HTTP+SSE、Tasks/Apps 扩展、server 实现、自动重连和动态 `tools/list_changed` 刷新。工具列表是启动
-快照；server 修改列表后，需要下次启动 MaybeCode 才能看到。
+工具和元数据目录（resources/templates/prompts）现已支持动态发现。资源读取/附件、
+prompt 展开、completion、sampling/elicitation handler、旧 HTTP+SSE、Tasks/Apps
+扩展及 server 实现仍待完成。重连需要显式操作，绝不自动重放工具调用。
 
 剩余阶段参阅 [MCP Host 路线与验收](../architecture/mcp-host-roadmap.md)。
 
 协议细节参阅 [MCP tools 官方规范](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
 和 [TypeScript client 文档](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/client.md)。
+
+## 动态目录与端点恢复
+
+在 Agent definition 的静态 `tools` 之外使用 `toolSource: () => mcp.tools`；
+将 `mcp.tools` 直接传入构造器则有意固定当时的集合。配置式 MaybeCode 已自动使用
+动态来源，包括切换模型/Session 之后。新目录仅影响下一次 Run/continue，不修改
+运行中的 Run。定义变化/移除或目录失效时，旧快照抛出 `MCP_STALE_TOOL`，不发送
+远程请求。重连关闭旧连接，因此它的快照不能继续执行。
+
+- `mcp.catalog()` 返回深度冻结的每端点元数据：revision、capabilities、tools、
+  resources、resourceTemplates、prompts。只查询声明的能力，也支持仅提供资源的
+  端点。元数据是不可信服务端数据，不意味着允许加载 URI 或执行 prompt。
+- `await mcp.refresh(serverId?, signal?)` 重新请求声明的列表，只有完整候选目录才
+  会发布。每列表最多 64 页；重复 cursor/身份会失败。所有列表保留的候选目录合计
+  最多 4,096 项/8 MiB。刷新期限为 60 秒或 `maxTotalTimeoutMs`。这是目录限制，
+  并非 HTTP 响应体内存沙箱。
+- 收到声明支持的列表变更通知后立即使工具失效，并合并调度一次刷新。现代协议
+  使用 `subscriptions/listen`，旧协议使用通知 handler。刷新期间继续变更最多重试
+  三次发现；失败保留旧元数据并标记 stale，新 Run 不再暴露这些工具。不会自动
+  读取内容或附加上下文。
+- `await mcp.reconnect(serverId, signal?)` 仅替换指定端点，包括启动失败的 optional
+  端点。存在运行中工具调用时重连失败，避免中断/重放结果未知的副作用。旧 Run
+  快照需要放弃；新连接取得新的权限身份。
+- 两种终端 UI 支持 `/mcp refresh [server-id]` 和 `/mcp reconnect <server-id>`。
+  `/mcp` 显示 revision/stale 和通知覆盖状态（`active`、`partial`、`unavailable`、
+  `legacy`、`not-advertised`）。现代订阅流断开会显式报告失败，不能伪装为健康订阅；
+  需要显式刷新/重连。`mcp.server.catalog-updated` 表示目录发布。
+
+工具授权身份包含完整远程定义（包括 output schema/annotations）、端点/账户配置
+以及连接代次，不暴露配置秘密。定义未变的刷新保留授权；重连/故障恢复产生新身份。
+显式 OAuth 登录后，先执行 `/mcp reconnect <server-id>` 再启动新 Run。每连接独享
+缓存；目录保存在 pool 内存中，显式刷新不会信任旧 TTL。关闭会取消排队/运行中的
+目录发现和订阅。

@@ -131,7 +131,10 @@ Tracer 与 processor 生命周期由调用方拥有，避免一个 application �
 
 MCP package 是位于工具边界的可选 adapter。它依赖 Core 的 `Tool` 与 tracing 契约，
 Core 则不依赖 MCP 或其 SDK。Client pool 拥有 stdio 子进程与 Streamable HTTP transport，通过
-`tools/list` 获取启动快照，并公开由 `tools/call` 支撑的不可变、模型可见工具描述。
+发现带版本的 tools/resources/templates/prompts 元数据目录，并公开由 `tools/call`
+支撑的每 Run 不可变工具描述。追加式 `toolSource` 发布最新目录而不修改活动 Run。
+列表通知触发元数据刷新；重连需要显式操作，绝不重放工具调用。资源内容/prompt
+展开仍属于后续工作。
 
 Pool 还公开 server 即时状态视图与有序连接生命周期事件。Required server 会使应用
 启动失败；optional server 则以失败诊断保留，同时健康 server 继续工作。有界、已净化

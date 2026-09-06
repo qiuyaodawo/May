@@ -30,12 +30,11 @@ Core tool.
 
 ## Package API
 
-Open a client pool, compose its startup tool snapshot, and close the pool at
+Open a client pool, publish its tools per Run, and close the pool at
 the product ownership boundary:
 
 ```ts
 import { defineAgent } from "@may/application";
-import { ToolRegistry } from "@may/core";
 import { openMcpClientPool } from "@may/mcp";
 
 const mcp = await openMcpClientPool({
@@ -53,7 +52,8 @@ const mcp = await openMcpClientPool({
 
 const agent = defineAgent({
   model,
-  tools: ToolRegistry.compose(localTools, mcp.tools),
+  tools: localTools,
+  toolSource: () => mcp.tools,
   permissionPolicy,
   tracer,
 });
@@ -234,7 +234,7 @@ With a tracer, the adapter emits:
 | Span | Meaning |
 | --- | --- |
 | `may.mcp.connect` | transport setup and protocol negotiation |
-| `may.mcp.tools.list` | startup discovery snapshot |
+| `may.mcp.tools.list` | initial and refreshed capability discovery |
 | `may.mcp.tool.call` | one remote call, parented to the Core tool span |
 | `may.mcp.disconnect` | client and process shutdown |
 
@@ -250,13 +250,55 @@ environment and filesystem access, and keep the permission layer enabled.
 
 ## Current scope
 
-This phase intentionally excludes MCP resources, prompts, sampling/elicitation
-handlers, deprecated HTTP+SSE, Tasks/Apps extensions, server authoring, automatic reconnect, and dynamic
-`tools/list_changed` refresh. Tools are a startup snapshot and become available
-on the next MaybeCode launch after a server changes its list.
+Tools and metadata catalogs (resources/templates/prompts) now support dynamic discovery.
+Resource reads/attachments, prompt expansion, completion, sampling/elicitation
+handlers, deprecated HTTP+SSE, Tasks/Apps extensions and server authoring are not
+implemented yet. Reconnect is explicit, never automatic tool replay.
 
 Track the remaining phases in the [MCP Host roadmap](../architecture/mcp-host-roadmap.md).
 
 See the [official MCP tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
 and the [TypeScript client documentation](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/client.md)
 for protocol-level details.
+
+## Dynamic catalogs and endpoint recovery
+
+Use `toolSource: () => mcp.tools` on the Agent definition alongside static
+`tools`; passing `mcp.tools` into a constructor instead intentionally pins that
+collection. Configured MaybeCode uses the dynamic source automatically, including
+after model/session changes. New catalogs affect the next Run/continue, never
+an in-progress Run. Old snapshots reject with `MCP_STALE_TOOL` if a definition
+changed/disappeared or the catalog became untrustworthy. The wire request is not
+sent. A reconnect closes the old connection, so its snapshots cannot execute.
+
+- `mcp.catalog()` returns deeply frozen per-server metadata: revision,
+  capabilities, tools, resources, resource templates and prompts. Only advertised
+  capabilities are queried; resources-only endpoints are valid. Metadata is
+  untrusted server data, not permission to load URIs or execute prompts.
+- `await mcp.refresh(serverId?, signal?)` explicitly refetches all advertised lists
+  and publishes only a complete candidate. Each list has a 64-page cap, repeated
+  cursors/duplicate identities fail closed, and retained candidate data is capped
+  at 4,096 descriptors/8 MiB across lists. The refresh deadline is 60 seconds or
+  `maxTotalTimeoutMs`. These are catalog limits, not an HTTP-body memory sandbox.
+- Advertised list-change notifications invalidate tools immediately and schedule
+  one coalesced refresh. Modern endpoints use `subscriptions/listen`, legacy
+  endpoints use notification handlers. Concurrent invalidations allow at most
+  three discovery attempts; failure preserves the prior metadata as stale and
+  removes its tools from new Runs. No content is automatically read or attached.
+- `await mcp.reconnect(serverId, signal?)` replaces only that configured endpoint,
+  including optional endpoints that failed startup. In-flight tool calls make
+  reconnect fail rather than interrupt/replay uncertain side effects. Old Run
+  snapshots must be abandoned; the new connection gets new permission identity.
+- `/mcp refresh [server-id]` and `/mcp reconnect <server-id>` expose these actions
+  in both terminal UIs. `/mcp` shows revision/staleness and notification coverage
+  (`active`, `partial`, `unavailable`, `legacy`, `not-advertised`). Lost modern
+  subscription streams are visible failures, not silent healthy subscriptions;
+  refresh/reconnect is explicit. `mcp.server.catalog-updated` signals publication.
+
+Tool grant identity includes the complete remote definition (including output
+schema/annotations), endpoint/account configuration and a connection generation,
+without exposing configuration secrets. Unchanged refreshes preserve grants;
+reconnect/recovery creates a new identity. After an explicit OAuth login, run
+`/mcp reconnect <server-id>` before starting another Run. Each connection owns
+its cache; catalogs are retained in pool memory and explicit refresh never trusts
+a server's prior TTL. Closing cancels queued/active discovery and subscriptions.

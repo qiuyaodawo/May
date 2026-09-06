@@ -84,10 +84,10 @@ at its real ownership boundary.
 
 `@may/mcp` client-pool options, error codes, namespacing, tool-output shape,
 server status, lifecycle events, and span names are developer-preview APIs. The
-current implementation supports stdio / Streamable HTTP tool clients and snapshots discovery
-at startup. Do not assume that
-future resources, prompts, reconnection, or dynamic refresh
-will use the same configuration or lifecycle surface.
+current implementation supports stdio / Streamable HTTP tool clients, dynamic
+metadata catalogs, per-Run tool snapshots and explicit refresh/reconnect.
+Resource content and prompt expansion APIs are still pending; do not infer
+support from catalog metadata alone. See the [MCP guide](../guides/mcp.md).
 
 Model-facing names currently use `mcp__<server>__<tool>` with provider-safe
 normalization and a 64-character bound. Persisted Sessions can contain these

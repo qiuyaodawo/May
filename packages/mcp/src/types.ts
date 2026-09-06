@@ -1,3 +1,4 @@
+import type { Prompt, Resource, ResourceTemplateType, ServerCapabilities, Tool as ProtocolTool } from "@modelcontextprotocol/client";
 import type {
   Tool,
   TraceAttributes,
@@ -84,6 +85,9 @@ export interface McpServerStatus {
   readonly required: boolean;
   readonly state: McpServerConnectionState;
   readonly toolNames: readonly string[];
+  readonly catalogRevision?: number;
+  readonly catalogStale?: boolean;
+  readonly catalogSubscription?: "active" | "partial" | "unavailable" | "legacy" | "not-advertised";
   /** Sanitized, bounded recent stderr, including non-fatal server logs. */
   readonly stderr?: string;
   readonly diagnostic?: McpDiagnostic;
@@ -97,9 +101,24 @@ interface McpClientEventBase {
   readonly required: boolean;
 }
 
+export interface McpServerCatalog {
+  readonly serverId: string;
+  readonly revision: number;
+  readonly capabilities: ServerCapabilities;
+  readonly tools: readonly ProtocolTool[];
+  readonly resources: readonly Resource[];
+  readonly resourceTemplates: readonly ResourceTemplateType[];
+  readonly prompts: readonly Prompt[];
+}
+
 export type McpClientEvent =
   | McpClientEventBase & {
       readonly type: "mcp.server.connected";
+      readonly toolNames: readonly string[];
+    }
+  | McpClientEventBase & {
+      readonly type: "mcp.server.catalog-updated";
+      readonly revision: number;
       readonly toolNames: readonly string[];
     }
   | McpClientEventBase & {
@@ -111,11 +130,17 @@ export type McpClientEvent =
     };
 
 export interface McpClientPool {
-  /** Startup snapshot of all tools exposed by the configured servers. */
+  /** Latest immutable tool catalog; use toolSource: () => pool.tools for per-Run updates. */
   readonly tools: readonly Tool[];
   /** Best-effort lifecycle events; startup events are buffered until consumed. */
   readonly events: AsyncIterable<McpClientEvent>;
   /** Current status snapshot, including configured optional servers that failed. */
   status(): readonly McpServerStatus[];
+  /** Metadata only, never fetches resource contents or expands prompts. */
+  catalog(): readonly McpServerCatalog[];
+  /** Refresh discovery, never replay tool operations. Omit serverId for all endpoints. */
+  refresh(serverId?: string, signal?: AbortSignal): Promise<void>;
+  /** Explicitly replace a connection; rejects while an operation is in flight. */
+  reconnect(serverId: string, signal?: AbortSignal): Promise<void>;
   close(): Promise<void>;
 }

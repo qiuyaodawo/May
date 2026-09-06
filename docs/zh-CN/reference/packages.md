@@ -83,7 +83,9 @@ Streamable HTTP 端点，协商协议并执行 `tools/list`，再把每个发现
 namespace 并检查冲突；调用会转发 cancellation 和 progress，可选 MCP span 使用注入
 的 Core tracer。Client pool 拥有它启动的进程，打开它的应用必须负责关闭；pool 还会
 暴露 server 状态和连接生命周期事件，并为诊断保留有界、已净化的 stderr 末尾片段。
-可选的原生 OAuth 与 OS keyring 支持的加密凭据 vault 参阅
+`catalog()` 暴露版本化元数据，`refresh()`/`reconnect()` 更新 pool；
+`toolSource: () => pool.tools` 提供每 Run 不可变工具。元数据发现不代表资源读取/
+prompt 展开已实现。可选的原生 OAuth 与 OS keyring 支持的加密凭据 vault 参阅
 [MCP 认证](../guides/mcp-auth.md) 和 [MCP 工具](../guides/mcp.md)。
 
 ## 状态与策略

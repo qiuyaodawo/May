@@ -76,7 +76,7 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   },
   {
     name: "/mcp",
-    usage: "/mcp",
+    usage: "/mcp [refresh [server-id] | reconnect <server-id>]",
     description: "Show configured MCP servers, tools, and diagnostics",
   },
   {
@@ -185,6 +185,10 @@ export function formatMaybeCodeMcpStatus(
     if (server.protocolVersion !== undefined) {
       lines.push(`  protocol: ${server.protocolVersion}`);
     }
+    if (server.catalogRevision !== undefined) {
+      lines.push(`  catalog: ${server.catalogRevision}${server.catalogStale ? " (stale)" : ""}`);
+    }
+    if (server.catalogSubscription !== undefined) lines.push(`  catalog notifications: ${server.catalogSubscription}`);
     if (server.toolNames.length > 0) {
       lines.push(`  tools (${server.toolNames.length}):`);
       lines.push(...server.toolNames.map((name) => `    - ${name}`));
@@ -352,8 +356,15 @@ export async function executeMaybeCodeSlashCommand(
       return { type: "status", inspection: await controller.inspectContext() };
     }
     case "/mcp": {
-      const invalid = noArguments(arguments_, definition);
-      if (invalid !== undefined) return invalid;
+      if (arguments_.length > 0) {
+        const [action, serverId] = arguments_;
+        if (arguments_.length > 2) return usage(definition);
+        if (action === "refresh" && controller.refreshMcp !== undefined) {
+          await controller.refreshMcp(serverId);
+        } else if (action === "reconnect" && serverId !== undefined && controller.reconnectMcp !== undefined) {
+          await controller.reconnectMcp(serverId);
+        } else return usage(definition);
+      }
       return { type: "mcp.status", servers: await controller.getMcpStatus() };
     }
     case "/context": {

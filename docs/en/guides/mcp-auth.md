@@ -79,9 +79,9 @@ request at most once after refresh. Other tool/network failures are not replayed
 HTTP 403 `insufficient_scope` records the union of granted and requested scopes,
 returns `MCP_AUTHENTICATION_REQUIRED`, and requires an explicit login/consent.
 There is no browser prompt inside a tool execution. `/mcp` shows `auth-required`
-when applicable and recovers on a successful call after authentication.
-An endpoint that failed initial discovery still needs workspace restart until
-the dynamic endpoint lifecycle phase is implemented.
+when applicable. After login, use `/mcp reconnect <server-id>` to discover fresh
+capabilities and create new permission identity, including for endpoints whose
+initial discovery failed. Start a new Run rather than replaying the denied call.
 
 `status` reports whether tokens are stored, whether consent is pending, and an
 expiry timestamp where known; it is not remote token validation. Logout attempts

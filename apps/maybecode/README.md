@@ -490,3 +490,10 @@ reopens the saved session, and sends a follow-up:
 ```sh
 pnpm test:integration:maybecode
 ```
+
+MCP tool catalogs now update at Run boundaries. `/mcp refresh [server-id]`
+refetches metadata; `/mcp reconnect <server-id>` recovers a configured endpoint
+without replaying tool calls (including after OAuth login). `/mcp` reports catalog
+revision/staleness and notification coverage. Resource/prompt metadata discovery
+does not yet provide content attachment or prompt expansion; see the bilingual
+[MCP guide](../../docs/en/guides/mcp.md).

@@ -42,12 +42,14 @@ test("OAuth uses PKCE, refreshes, isolates accounts, gates step-up, and revokes 
   assert.equal((await oauth.status(server)).requiresConsent, true);
   assert.equal(pool.status()[0].state, "auth-required");
   await login();
+  await pool.reconnect("remote");
   assert.equal((await execute()).content[0].text, "authorized");
   assert.equal(pool.status()[0].state, "connected");
   http.rotateIssuer();
   await assert.rejects(execute(), (error) => error.code === "MCP_AUTHENTICATION_REQUIRED");
   assert.equal(http.counts.refreshes, 1, "never redeem the old refresh token with a new issuer");
   await login();
+  await pool.reconnect("remote");
   assert.equal((await execute()).content[0].text, "authorized");
   assert.deepEqual(await oauth.logout(server), { revoked: true });
   assert.equal(http.counts.revocations, 2);

@@ -30,5 +30,7 @@
 OAuth 完成不代表目录、Host 交互或扩展已完成。所有条目都有直接证据前，不得将整体
 迁移标记完成。
 
-动态目录基础已落地：每次 Run 的 `toolSource`/冻结执行快照，以及定义绑定的 Session
-grant。证据：Core tool-registry 和 permissions 测试。MCP 目录发布、资源及重连仍待完成。
+动态目录已发布 tools/resources/templates/prompts 元数据，支持新旧协议列表通知、
+显式刷新/重连，并提供每 Run 工具快照及定义绑定授权。证据：`catalog.test.mjs`、
+Core registry/permissions 测试以及 MaybeCode 配置式生命周期测试。资源读取/附件、
+prompt 展开、completion 和资源订阅仍待完成，因此能力目录行保持未勾选。
