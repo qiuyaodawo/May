@@ -1,3 +1,4 @@
+import { waitForHost } from "./host-wait.js";
 import { randomUUID } from "node:crypto";
 import type { ToolExecutor } from "@may/core";
 import type { Tool, ReadResourceResult } from "@modelcontextprotocol/client";
@@ -87,9 +88,12 @@ export class McpAppSession {
         const key = JSON.stringify(id);
         // Lifetime bound prevents id replay and unbounded renderer traffic.
         if (this.seen.has(key) || this.seen.size >= 256 || this.active >= 4) { this.close(); throw appError(); }
-        this.seen.add(key); this.active++; counted = true;
+        this.seen.add(key);
       }
-      this.signal.throwIfAborted(); await this.operations.guard(); this.signal.throwIfAborted();
+      if (id === undefined && (raw.method !== "ui/notifications/initialized" || this.ready)) return;
+      if (this.active >= 4) { this.close(); throw appError(); }
+      this.active++; counted = true;
+      this.signal.throwIfAborted(); await waitForHost(this.signal, this.operations.guard); this.signal.throwIfAborted();
       if (raw.method === "ui/notifications/initialized" && id === undefined && this.initialized && !this.ready) { this.ready = true; return; }
       if (id === undefined) return; // No log/context/navigation/notification forwarding.
       let result: unknown;
@@ -104,11 +108,14 @@ export class McpAppSession {
         if (!this.ready) throw appError();
         if (raw.method === "ping") result = {};
         else if (raw.method === "tools/call" && typeof params.name === "string" && (params.arguments === undefined || object(params.arguments))) {
-          result = await this.operations.call(params.name, structuredClone(params.arguments ?? {}) as Record<string, unknown>, this.signal);
-        } else if (raw.method === "resources/read" && typeof params.uri === "string") result = await this.operations.read(params.uri, this.signal);
+          const name = params.name; const input = structuredClone(params.arguments ?? {}) as Record<string, unknown>;
+          result = await waitForHost(this.signal, () => this.operations.call(name, input, this.signal));
+        } else if (raw.method === "resources/read" && typeof params.uri === "string") {
+          const uri = params.uri; result = await waitForHost(this.signal, () => this.operations.read(uri, this.signal));
+        }
         else return { jsonrpc: "2.0", id, error: { code: -32601, message: "This App capability is not supported by this host" } };
       }
-      await this.operations.guard(); this.signal.throwIfAborted(); assertMcpContentSize(result);
+      await waitForHost(this.signal, this.operations.guard); this.signal.throwIfAborted(); assertMcpContentSize(result);
       return { jsonrpc: "2.0", id, result };
     } catch {
       return id === undefined ? undefined : { jsonrpc: "2.0", id, error: { code: -32000, message: "App request denied, expired, changed or failed; not replayed" } };
@@ -116,7 +123,7 @@ export class McpAppSession {
   }
   /** Explicit host-selected tool data only. No Session history or automatic Context mutation. */
   async notification(kind: "tool-input" | "tool-result" | "tool-cancelled", params: Record<string, unknown>): Promise<Record<string, unknown>> {
-    await this.operations.guard(); this.signal.throwIfAborted();
+    await waitForHost(this.signal, this.operations.guard); this.signal.throwIfAborted();
     if (!this.ready || !["tool-input", "tool-result", "tool-cancelled"].includes(kind)) throw appError();
     assertMcpContentSize(params);
     return { jsonrpc: "2.0", method: `ui/notifications/${kind}`, params: structuredClone(params) };

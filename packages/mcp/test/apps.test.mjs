@@ -49,6 +49,14 @@ test("Apps isolate same-server tools and consented resources, filter model visib
   const response = mcpAppSandboxResponse("http://127.0.0.1:3000");
   assert.match(response.headers["content-security-policy"], /connect-src 'none'/u);
   assert.throws(() => mcpAppSandboxResponse("https://host.example/"));
+  // A custom consent service ignoring signal cannot keep an opening view alive.
+  let reached; const reviewing = new Promise((resolve) => { reached = resolve; });
+  const stalled = await openMcpClientPool({ servers: [{ id: "remote", transport: "streamable-http", url: fixture.url + "/modern" }],
+    apps: { executor, approve: async () => { reached(); return new Promise(() => {}); } } });
+  t.after(() => stalled.close());
+  const abort = new AbortController();
+  const opening = assert.rejects(stalled.openApp("remote", "visible", { owner, signal: abort.signal }));
+  await reviewing; abort.abort(); await opening;
 });
 
 test("Apps double iframe enforces browser origin/CSP isolation and tears down the channel", { skip: !process.env.MAY_PLAYWRIGHT_MODULE, timeout: 20_000 }, async (t) => {

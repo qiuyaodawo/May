@@ -1,3 +1,4 @@
+import { waitForHost } from "./host-wait.js";
 import { createHash, randomUUID } from "node:crypto";
 import {
   StreamableHTTPClientTransport,
@@ -487,7 +488,7 @@ class McpConnection {
     };
     const approve = async (kind: "open" | "read", target: string, currentSignal: AbortSignal) => {
       await guard(); currentSignal.throwIfAborted();
-      if (await host.approve({ kind, serverId: this.options.id, uri: target, owner: trustedOwner, signal: currentSignal }) !== true) throw appError();
+      if (await waitForHost(currentSignal, () => host.approve({ kind, serverId: this.options.id, uri: target, owner: trustedOwner, signal: currentSignal })) !== true) throw appError();
       await guard(); currentSignal.throwIfAborted();
     };
     await approve("open", uri, signal);
@@ -502,7 +503,7 @@ class McpConnection {
         const operationId = randomUUID();
         const context: ToolExecutionContext = { scope: { workspaceId: trustedOwner.workspaceId, sessionId: trustedOwner.sessionId },
           runId: trustedOwner.runId ?? `mcp-app:${operationId}`, step: 0, toolCallId: operationId, idempotencyKey: operationId, signal: currentSignal, report() {} };
-        const result = await host.executor.execute({ tool: adapted, input: adapted.parse?.(input) ?? input, context });
+        const result = await waitForHost(currentSignal, () => host.executor.execute({ tool: adapted, input: adapted.parse?.(input) ?? input, context }));
         await guard(); return result as McpToolOutput;
       },
       read: async (target, currentSignal) => {

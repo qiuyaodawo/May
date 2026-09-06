@@ -90,3 +90,7 @@ real Chromium test verifies double-iframe origin isolation, CSP-blocked fetch,
 source spoof rejection and teardown. Set `MAY_PLAYWRIGHT_MODULE` to an installed
 Playwright module and optionally `MAY_CHROMIUM_PATH` to run it; no browser download
 or new test dependency is required for normal tests.
+
+Host callback waiting is abortable even when a custom consent/executor callback
+ignores its signal; late completion is never replayed or delivered to a closed view.
+Callbacks must still honor cancellation to stop their own work.
