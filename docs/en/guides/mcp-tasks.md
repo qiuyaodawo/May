@@ -11,8 +11,7 @@ Streamable HTTP. This targets the
 `io.modelcontextprotocol/tasks`: flat task handles and `tasks/get`, `tasks/update`,
 `tasks/cancel`. The incompatible 2025 experimental `tasks/list`/`tasks/result`
 protocol is not supported. Optional task subscription notifications are not
-implemented; explicit polling is supported. Server export remains a separate
-[roadmap](../architecture/mcp-host-roadmap.md) phases.
+implemented; explicit polling is supported. Independent [server export](mcp-server.md) is a separate opt-in surface, not automatic task export.
 
 Enable `tasks: true` on an endpoint (default `false`). Both the negotiated core
 version `2026-07-28` and server Tasks extension are required; an incompatible

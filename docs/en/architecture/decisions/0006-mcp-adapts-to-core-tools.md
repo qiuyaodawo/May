@@ -54,3 +54,10 @@ contracts rather than parse process output.
   contract and collisions fail fast.
 - MCP servers remain trusted executable dependencies; adapting them to a Tool
   does not sandbox them or make their descriptions trustworthy.
+
+## Subsequent implementation
+
+The initial-phase deferrals above are historical. Modern transports, capabilities,
+Host interactions, Tasks, isolated Apps and independent opt-in server exports are
+now implemented outside Core. See the [maintained roadmap](../mcp-host-roadmap.md)
+and [server guide](../../guides/mcp-server.md) for current boundaries and evidence.

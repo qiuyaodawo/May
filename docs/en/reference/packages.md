@@ -238,3 +238,6 @@ See [long-running tasks](../guides/mcp-tasks.md).
 Graphical hosts can use `pool.openApp`, `mcpAppSandboxResponse` and the browser-only
 `@may/mcp/apps-browser` entry point. See [isolated Apps](../guides/mcp-apps.md) for consent,
 origin/CSP requirements and unsupported APIs. Terminals retain text fallback.
+
+Independent, authenticated tool/resource/prompt exports use `@may/mcp/server`.
+See [server authoring](../guides/mcp-server.md); no listener or Session export starts automatically.

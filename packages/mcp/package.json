@@ -1,7 +1,7 @@
 {
   "name": "@may/mcp",
   "version": "0.1.0",
-  "description": "Model Context Protocol client adapters for May agents.",
+  "description": "Model Context Protocol clients, isolated Apps host and opt-in server exports for May.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,6 +13,10 @@
     "./apps-browser": {
       "types": "./dist/apps-browser.d.ts",
       "import": "./dist/apps-browser.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
     }
   },
   "files": [
@@ -27,7 +31,8 @@
   },
   "dependencies": {
     "@may/core": "workspace:*",
-    "@modelcontextprotocol/client": "^2.0.0"
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/server": "2.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

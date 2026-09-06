@@ -32,8 +32,10 @@
     任务输入/附件集成。显式启用 2026-07-28 扩展，支持轮询，尚无任务订阅通知。
   - [x] 可选隔离 Apps Host 与明确的终端 fallback。证据：`apps.test.mjs`，含真实
     Chromium sandbox smoke；参阅 [Apps](../guides/mcp-apps.md)。
-- [ ] **独立 MCP Server**：显式选择导出 May 工具/资源/提示模板，认证调用者并隔离
-  workspace，经过正常权限/执行路径，不批量暴露本机工具或 Session 历史。
+- [x] **独立 MCP Server**：显式选择导出 May 工具/资源/提示模板，认证调用者并隔离
+  workspace，经过正常权限/执行路径，不批量暴露本机工具或 Session 历史。证据：
+  `server.test.mjs`（真实 HTTP 及现代/旧版 stdio）、必需公开投影、审批期间撤销；
+  参阅 [server 导出](../guides/mcp-server.md)。
 - [ ] **完成审计**：各阶段具备聚焦行为验证和产品集成证据；更新全部维护语言，检查
   安全边界、实际支持版本/扩展，并提交已完成改动。
 
@@ -49,4 +51,4 @@ MaybeCode 终端/准备阶段集成测试。Host 兼容证据：`host-services.t
 操作、提前完成及进程/session 清理），以及 `mcp-capabilities.test.mjs` 中的
 MaybeCode 配置 provider/UI 集成。编辑器 schema 的 HTTP/OAuth/Host 选项也经过
 正反例校验 smoke。旧版通道按操作创建且不复用，不猜测无归属请求的 owner。
-server 导出和最终审计仍未完成。
+仅最终审计待完成。

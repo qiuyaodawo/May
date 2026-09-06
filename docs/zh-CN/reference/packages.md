@@ -212,3 +212,6 @@ Context。旧协议交互操作显式选择单操作进程/session，不在共�
 图形 Host 可使用 `pool.openApp`、`mcpAppSandboxResponse` 和浏览器专用
 `@may/mcp/apps-browser` 入口。同意、origin/CSP 要求和不支持的 API 参阅
 [隔离 Apps](../guides/mcp-apps.md)；终端保留文本 fallback。
+
+独立的经认证工具/资源/提示模板导出使用 `@may/mcp/server`，参阅
+[server 编写](../guides/mcp-server.md)；不会自动开启监听或导出 Session。

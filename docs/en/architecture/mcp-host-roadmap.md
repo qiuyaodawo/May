@@ -39,9 +39,11 @@ permission boundary remains in force.
     Opt-in 2026-07-28 extension; explicit polling, no task subscription notifications.
   - [x] Optional isolated Apps host and explicit terminal fallback. Evidence:
     `apps.test.mjs`, including a real Chromium sandbox smoke; see [Apps](../guides/mcp-apps.md).
-- [ ] **Independent MCP server:** opt-in May tool/resource/prompt export,
+- [x] **Independent MCP server:** opt-in May tool/resource/prompt export,
   authenticated principals and workspace isolation, normal permission/execution
-  pipeline, no blanket export of host tools or Session history.
+  pipeline, no blanket export of host tools or Session history. Evidence:
+  `server.test.mjs` (real HTTP and modern/legacy stdio), mandatory public projections
+  and revocation during approval; see [server exports](../guides/mcp-server.md).
 - [ ] **Completion audit:** verify each phase with focused behavior tests and
   product integration, update every maintained language, review safety
   boundaries and actual supported versions/extensions, commit completed work.
@@ -61,4 +63,4 @@ and HTTP operations, early completion and process/session cleanup) and MaybeCode
 configured-provider/UI integration in `mcp-capabilities.test.mjs`. The editor schema
 also covers HTTP/OAuth/Host options with positive/negative validation smoke.
 Legacy channels are per-operation and not reused; no unsolicited ownership is
-guessed. Server export and final audit remain open.
+guessed. Only final audit remains open.

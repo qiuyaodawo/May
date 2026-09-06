@@ -223,8 +223,7 @@ tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP 
 
 工具和元数据目录（resources/templates/prompts）现已支持动态发现。资源读取/附件、
 prompt、completion 和 watch 也已实现，详见下文。有归属的 elicitation、
-Roots/Sampling 和显式旧协议交互兼容均已实现。已实现显式启用的 Tasks；server 实现仍是
-独立阶段；已移除的双端点 HTTP+SSE 传输不会启用。重连需要显式操作，绝不自动重放工具调用。
+Roots/Sampling 和显式旧协议交互兼容均已实现。已实现显式启用的 Tasks；独立 server 导出也已实现；已移除的双端点 HTTP+SSE 传输不会启用。重连需要显式操作，绝不自动重放工具调用。
 
 剩余阶段参阅 [MCP Host 路线与验收](../architecture/mcp-host-roadmap.md)。
 
@@ -388,7 +387,7 @@ MaybeCode 将解析后的 workspace 作为 `workspaceId`。直接执行 pool 工
 Broker 不单独持久化或追踪问题与答案，但服务端仍可能将提交的数据作为正常资源/
 工具结果返回。无归属的旧 push 请求直接拒绝；显式隔离的旧协议操作可以交互，详见下文。
 Roots/Sampling 是显式兼容选项，不会仅因安装 server 就启用。Tasks 需单独显式启用；server
-导出仍是待完成的路线图项目；本功能不代表完整 MCP 一致性。
+导出需另行显式启用；本功能不代表完整 MCP 一致性。
 
 
 ## Roots、Sampling 与旧协议兼容
@@ -453,3 +452,6 @@ roots 为空、sampling 失败。
 完成结果。设置 `tasks: true` 并提供 journal；版本、UI 和安全边界参阅[长任务](mcp-tasks.md)。
 
 可选图形集成及终端 fallback 参阅[隔离 Apps Host](mcp-apps.md)。
+
+独立的经认证工具/资源/提示模板导出使用 `@may/mcp/server`，参阅
+[server 编写](mcp-server.md)；不会自动开启监听或导出 Session。

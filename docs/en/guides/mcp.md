@@ -253,7 +253,7 @@ environment and filesystem access, and keep the permission layer enabled.
 Tools and metadata catalogs (resources/templates/prompts) now support dynamic discovery.
 Resource reads/attachments, prompts, completion and watches are implemented below.
 Scoped elicitation, Roots/Sampling and explicit legacy interaction compatibility
-are implemented below. Opt-in Tasks are implemented; server authoring remains a separate phase;
+are implemented below. Opt-in Tasks are implemented; independent server export is also available;
 the removed two-endpoint HTTP+SSE transport is not enabled. Reconnect is explicit, never automatic tool replay.
 
 Track the remaining phases in the [MCP Host roadmap](../architecture/mcp-host-roadmap.md).
@@ -446,8 +446,7 @@ a new principal. Resource caches additionally partition by workspace and Session
 Questions/answers are not independently persisted or traced by the broker; a
 server can still return supplied data as normal resource/tool output. Unscoped legacy push requests decline; explicitly isolated legacy operations
 can interact as described below. Roots and Sampling are explicit compatibility
-options, never enabled merely by installing a server. Tasks are separately opt-in; Server export remains a roadmap
-items; this feature does not claim complete MCP conformance.
+options, never enabled merely by installing a server. Tasks are separately opt-in; independent server export is separately opt-in; this feature does not claim complete MCP conformance.
 
 
 ## Roots, Sampling and legacy compatibility
@@ -525,3 +524,6 @@ restart recovery and user-controlled completed-result attachment. Enable `tasks:
 with a journal; see [long-running tasks](mcp-tasks.md) for version, UI and safety boundaries.
 
 Optional graphical integration and terminal fallback: [isolated Apps Host](mcp-apps.md).
+
+Independent, authenticated tool/resource/prompt exports use `@may/mcp/server`.
+See [server authoring](mcp-server.md); no listener or Session export starts automatically.

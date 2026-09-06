@@ -9,8 +9,7 @@
 [2026-07-28 Tasks 扩展](https://tasks.extensions.modelcontextprotocol.io/specification/2026-07-28/tasks)，
 标识 `io.modelcontextprotocol/tasks`：使用扁平任务句柄以及 `tasks/get`、
 `tasks/update`、`tasks/cancel`。不兼容的 2025 实验版 `tasks/list`/`tasks/result`
-协议不在支持范围。尚未实现可选的任务订阅通知；支持显式轮询。server 导出
-仍是独立的[路线阶段](../architecture/mcp-host-roadmap.md)。
+协议不在支持范围。尚未实现可选的任务订阅通知；支持显式轮询。[独立 server 导出](mcp-server.md) 是单独的显式入口，不会自动导出任务。
 
 在端点设置 `tasks: true`（默认 `false`）。连接必须同时协商核心版本 `2026-07-28`
 和服务端 Tasks 扩展；必需端点不满足时启动失败。stdio 默认 legacy，因此现代任务

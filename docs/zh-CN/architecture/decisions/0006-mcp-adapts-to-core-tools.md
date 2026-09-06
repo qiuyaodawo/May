@@ -43,3 +43,9 @@ Server 默认 required；应用可以将 server 标记为 optional，使其启�
 - Server id 与远程名称成为预览版模型可见命名契约，冲突会 fail fast。
 - MCP server 仍是可信可执行依赖；把它适配为 Tool 不会提供 sandbox，也不会让其描述
   自动变得可信。
+
+## 后续实现
+
+上文延期项描述的是初始阶段。现代传输、能力目录、Host 交互、Tasks、隔离 Apps 和
+独立显式 server 导出现已在 Core 之外实现。当前边界和证据参阅
+[维护中的路线清单](../mcp-host-roadmap.md)及 [server 指南](../../guides/mcp-server.md)。
