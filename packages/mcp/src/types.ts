@@ -6,6 +6,7 @@ import type {
   Tracer,
 } from "@may/core";
 import type { McpOAuthManager, McpOAuthOptions } from "./oauth.js";
+import type { McpInteractionBroker, McpInteractionOwner } from "./interactions.js";
 
 export type McpTransport = "stdio" | "streamable-http";
 
@@ -48,6 +49,8 @@ export interface McpHttpServerOptions extends McpServerBaseOptions {
 export type McpServerOptions = McpStdioServerOptions | McpHttpServerOptions;
 
 export interface OpenMcpClientPoolOptions {
+  /** Opt-in ephemeral host UI broker. Omission leaves elicitation unadvertised. */
+  readonly interactions?: McpInteractionBroker;
   readonly servers: readonly McpServerOptions[];
   readonly tracer?: Tracer;
   readonly traceAttributes?: TraceAttributes;
@@ -132,6 +135,7 @@ export type McpClientEvent =
     };
 
 export interface McpOperationOptions {
+  readonly owner?: McpInteractionOwner;
   readonly signal?: AbortSignal;
   readonly traceContext?: TraceContext;
 }
@@ -167,6 +171,8 @@ export interface McpResourceSubscription {
 }
 
 export interface McpClientPool {
+  /** Pool-owned, ephemeral UI broker when explicitly enabled. Do not share between pools. */
+  readonly interactions?: McpInteractionBroker | undefined;
   /** Latest immutable tool catalog; use toolSource: () => pool.tools for per-Run updates. */
   readonly tools: readonly Tool[];
   /** Best-effort lifecycle events; startup events are buffered until consumed. */

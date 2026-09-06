@@ -49,6 +49,7 @@ export async function startCatalogFixture(t) {
     if (message.method === "tools/list") {
       if (state.holdList) return;
       reply({ tools: [{ name: "echo", description: "Echo", inputSchema: { type: "object" },
+        ...(state.outputSchema ? { outputSchema: state.outputSchema } : {}),
         annotations: { readOnlyHint: state.version === 1 } }], ttlMs: 600_000, cacheScope: "public" }); return;
     }
     if (message.method === "resources/list") {
@@ -62,6 +63,8 @@ export async function startCatalogFixture(t) {
     if (message.method === "prompts/list") {
       reply({ prompts: [{ name: "review", arguments: [{ name: "file", required: true }] }] }); return;
     }
+    const inputResult = state.input?.(message);
+    if (inputResult !== undefined) { reply(inputResult); return; }
     if (message.method === "resources/read") {
       const uri = message.params.uri;
       if (uri.endsWith("/hold")) return;

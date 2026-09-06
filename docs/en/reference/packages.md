@@ -217,3 +217,8 @@ Per-Run execution additionally uses `ToolRegistry.snapshot()` to freeze a copied
 descriptor/schema and capture callbacks. The optional additive `toolSource` is
 resolved once per Run/continue; grants bind to the definition plus host version.
 See [custom tools](../guides/custom-tool.md).
+
+`@may/mcp` also exports an opt-in `McpInteractionBroker`: bounded ephemeral
+form/URL interaction, scoped modern MRTR continuations and cancellation/expiry.
+MaybeCode's controller and both terminal UIs consume it; headless configuration
+leaves it disabled unless requested. See [the interaction guide](../guides/mcp.md#scoped-user-interaction-modern-mrtr).

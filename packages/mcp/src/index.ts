@@ -6,3 +6,4 @@ export { validateMcpServerOptions } from "./transports.js";
 export * from "./credentials.js";
 export * from "./oauth.js";
 export * from "./content.js";
+export * from "./interactions.js";

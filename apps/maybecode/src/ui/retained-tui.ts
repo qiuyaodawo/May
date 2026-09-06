@@ -21,6 +21,7 @@ import {
 } from "../slash-commands.js";
 import { MaybeCodePrototypeView } from "./prototype-view.js";
 import type { MaybeCodeEvent } from "../events.js";
+import { presentMcpInteraction } from "../mcp-interaction-ui.js";
 
 export interface RunRetainedTerminalUIOptions {
   readonly terminal?: RuntimeTerminal;
@@ -120,8 +121,21 @@ async function consumeEvents(
   isClosing: () => boolean,
 ): Promise<void> {
   const approvals = new Set<Promise<void>>();
+  const interactions = new Map<string, AbortController>();
   for await (const event of app.events) {
     applyMaybeCodeEvent(store, event);
+    if (event.type === "mcp.interaction.requested") {
+      const controller = new AbortController();
+      interactions.set(event.request.id, controller);
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(Math.max(0, Math.ceil(event.request.expiresAt - Date.now())))]);
+      const task = presentMcpInteraction(event.request, app, (prompt, signal) => view.requestMcpInput(prompt, signal), signal)
+        .catch(() => { if (!isClosing() && !signal.aborted) {
+          store.appendNotice("warning", "MCP interaction could not be completed");
+          app.cancel("User interaction is unavailable");
+        } })
+        .finally(() => interactions.delete(event.request.id));
+      approvals.add(task); void task.finally(() => approvals.delete(task));
+    } else if (event.type === "mcp.interaction.settled") interactions.get(event.requestId)?.abort();
     if (event.type === "model.changed") {
       void refreshModelLabel(view, app);
     }
@@ -153,6 +167,7 @@ async function consumeEvents(
       view.dismissApproval(event.event.requestId);
     }
   }
+  for (const controller of interactions.values()) controller.abort();
   await Promise.all(approvals);
 }
 

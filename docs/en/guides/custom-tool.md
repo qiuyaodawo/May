@@ -251,3 +251,10 @@ include other execution-affecting fields and endpoint/account in their version.
 `ContentPart[]`, instead of the default JSON block. It is captured by Run snapshots.
 Raw output remains in `tool.completed`; projection errors become tool failures.
 Validate untrusted content and omit host-only metadata from the projection.
+
+`MayOptions.toolScope()` optionally returns trusted host-only string labels. Core
+copies/freezes them once per Run/continue as `ToolExecutionContext.scope`, including
+at the executor/permission boundary, without adding them to model definitions or
+arguments. Never derive them from tool input. `AgentApplication.toolScope` accepts
+a label record and supplies its own Session id; MaybeCode also supplies workspace
+identity. These labels route interactions; they do not replace access policy.

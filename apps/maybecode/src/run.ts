@@ -68,6 +68,7 @@ export async function runMaybeCode(
     }
     const open = dependencies.open ?? openConfiguredMaybeCode;
     const app = await open({
+      mcpInteractions: true,
       ...(command.workspace === undefined
         ? {}
         : { workspace: command.workspace }),

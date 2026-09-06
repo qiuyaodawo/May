@@ -163,3 +163,9 @@ schema 副本。目录更新仅影响下一次 Run。普通 registry 查询/`clo
 定义或宿主身份变化，即使 grantKey 不变也需要重新批准；仅 schema 属性顺序
 变化不会失效。`revokeSessionGrant(key)` 撤销该 key 下全部版本，显式 deny 始终
 优先。宿主适配器应将其他影响执行的字段以及端点/账户身份包含在版本中。
+
+现代 MRTR 表单/URL elicitation 通过 `McpInteractionBroker` 显式启用，交互式
+MaybeCode CLI 默认开启。已实现 owner 作用域、整个流程的等待预算、用户答案校验和
+续接前身份检查；旧 push elicitation 直接拒绝，不猜测归属。Roots/Sampling、
+tasks/Apps、server 导出仍是未完成的独立阶段。Core 的可选 `toolScope` 标签保持
+协议无关。参阅 [MCP](../guides/mcp.md)。

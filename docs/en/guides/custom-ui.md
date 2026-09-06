@@ -174,3 +174,13 @@ may intentionally omit transient progress seen before shutdown.
 See [Permission policies](./permission-policy.md),
 [Custom tools](./custom-tool.md), and
 [Runtime and session boundaries](../architecture/runtime-session.md).
+
+### MCP user interactions
+
+MaybeCode exposes ephemeral `mcp.interaction.requested` / `settled` events,
+`getMcpInteractions()` and `respondMcpInteraction(id, response)`. Enable the broker
+with `openConfiguredMaybeCode({ mcpInteractions: true })` only when the UI handles
+these events concurrently with Runs and resource preparation. Never place answers
+behind the Session transition queue. Show the server and trusted owner, validate
+forms, require review/consent, and dismiss questions on settlement/deadline. No
+automatic browser navigation or form-answer history. See [MCP](./mcp.md#scoped-user-interaction-modern-mrtr).

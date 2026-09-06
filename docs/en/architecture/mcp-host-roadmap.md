@@ -24,6 +24,9 @@ permission boundary remains in force.
   workspace/session/run/request routing, cancellation/expiry/budgets, headless
   controller + UI, explicit legacy Roots/Sampling compatibility, no deadlocks
   or unsolicited context/model access.
+  - [x] Modern MRTR form/URL broker, Core host scopes, controller and both UIs,
+    bounded waiting/cancellation, Session cache isolation and authorization checks.
+  - [ ] Explicit Roots/Sampling and legacy request ownership compatibility.
 - [ ] **Long tasks and extensions:** task handles, get/update/cancel, durable
   ownership and restart recovery, local-wait vs remote-cancel semantics;
   optional isolated MCP Apps UI with explicit unsupported-terminal behavior.
@@ -40,5 +43,8 @@ Do not mark the overall migration complete until all rows have direct evidence.
 Capabilities evidence: `catalog.test.mjs`, `capabilities.test.mjs`, OAuth cache
 isolation tests, Core registry/permission tests and MaybeCode configured/MCP
 command tests. Tools/resources/templates/prompts/completion, bounded attachments,
-cache invalidation and modern/legacy subscriptions are implemented. Interaction
-broker/MRTR, tasks/Apps, server export and final audit remain open.
+cache invalidation and modern/legacy subscriptions are implemented. Modern Host
+interaction evidence: `interactions.test.mjs`, OAuth identity-change continuation
+test, Core scope snapshot test, and MaybeCode terminal/preparation integration.
+Legacy push elicitation currently declines without guessed ownership. Explicit
+Roots/Sampling compatibility, tasks/Apps, server export and final audit remain open.

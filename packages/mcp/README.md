@@ -132,3 +132,9 @@ a server's prior TTL. Closing cancels queued/active discovery and subscriptions.
 Resource/template reads, prompt expansion, completion, watches and bounded
 multimodal content are available through explicit host APIs. See the
 [resource/attachment guide](../../docs/en/guides/mcp.md#resources-prompts-completion-and-attachments).
+
+Modern MRTR form/URL elicitation is opt-in with the pool-owned
+`McpInteractionBroker`. It routes by trusted workspace/Session/Run/request labels,
+validates reviewed responses, bounds waiting and refuses cross-owner/late answers.
+Legacy push elicitation declines rather than guessing ownership. See the bilingual
+[interaction guide](../../docs/en/guides/mcp.md#scoped-user-interaction-modern-mrtr).

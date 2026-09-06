@@ -15,6 +15,8 @@ export type ToolProgressUpdate =
     };
 
 export interface ToolExecutionContext {
+  /** Trusted host routing labels, never derived from model/tool arguments. */
+  readonly scope?: Readonly<Record<string, string>>;
   runId: string;
   step: number;
   toolCallId: string;

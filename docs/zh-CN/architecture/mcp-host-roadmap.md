@@ -20,6 +20,9 @@
 - [ ] **Host 交互**：Elicitation 表单/URL、MRTR、workspace/session/run/request
   作用域路由、取消/过期/预算、headless controller 与 UI、显式旧 Roots/Sampling
   兼容；不死锁，不主动泄露上下文或提供未授权模型访问。
+  - [x] 现代 MRTR 表单/URL broker、Core Host 作用域、controller 和两个 UI、
+    有界等待/取消、Session 缓存隔离及认证校验。
+  - [ ] 显式 Roots/Sampling 及旧协议请求归属兼容。
 - [ ] **长任务与扩展**：任务句柄、get/update/cancel、持久 ownership 和重启恢复、
   区分本地停止等待与远端取消；可选的隔离 MCP Apps UI，以及终端明确的不支持行为。
 - [ ] **独立 MCP Server**：显式选择导出 May 工具/资源/提示模板，认证调用者并隔离
@@ -32,5 +35,7 @@ OAuth 完成不代表目录、Host 交互或扩展已完成。所有条目都有
 
 能力阶段证据：`catalog.test.mjs`、`capabilities.test.mjs`、OAuth 缓存隔离测试、
 Core registry/permissions 测试及 MaybeCode 配置/MCP 命令测试。工具/资源/模板/
-prompt/补全、有界附件、缓存失效及新旧协议订阅已实现。交互 broker/MRTR、tasks/
-Apps、server 导出和最终审计仍未完成。
+prompt/补全、有界附件、缓存失效及新旧协议订阅已实现。现代 Host 交互证据：
+`interactions.test.mjs`、OAuth 身份变更时续接测试、Core 作用域快照测试，以及
+MaybeCode 终端/准备阶段集成测试。旧 push elicitation 当前直接拒绝，不猜测归属。
+显式 Roots/Sampling 兼容、tasks/Apps、server 导出和最终审计仍未完成。

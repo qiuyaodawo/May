@@ -324,3 +324,67 @@ base64 内容；模型不支持时通过 `UnsupportedContentError` 明确失败�
 handle。流断开会完成 `closed`，不悄悄自动重连。关闭释放全部 handle。HTTP JSON
 响应和每 SSE frame 在 SDK 解析前限制 10 MiB；stdio 保留可配置限制，并保证通知/
 响应有序投递。
+
+## 有作用域的用户交互（现代 MRTR）
+
+现代 `tools/call`、`resources/read`、`prompts/get` 可以暂停并请求表单或 URL
+交互。Host 将续接绑定到原始逻辑请求，而不是服务端提供的 Session id 或碰巧正在
+运行的 Run。SDK 负责新的 wire id 和原样回传不透明的 `requestState`；这是协议
+续接，**不是**重试结果不确定的工具操作。参阅
+[MRTR 规范](https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/mrtr)。
+
+MaybeCode 的两个终端界面都会启用交互：展示服务端及 Session，输入 JSON 表单，
+允许修改，并要求单独输入 `send` 确认发送。也可以明确 `decline` 拒绝或 `cancel`
+取消。表单答案不进入输入历史；不要在表单中输入凭据。URL 模式展示 HTTPS 主机和
+完整地址，询问同意后由用户自行访问，再输入 `retry` 手动继续。客户端不抓取地址、
+不自动打开浏览器、不转发 MCP 凭据，也不会将同意解释为外部流程已经完成。这与
+MCP 客户端 OAuth 登录相互独立。参阅
+[Elicitation 规范](https://modelcontextprotocol.io/specification/2026-07-28/client/elicitation)。
+
+库/headless 使用必须显式启用：
+
+```ts
+import { McpInteractionBroker, openMcpClientPool } from "@may/mcp";
+const interactions = new McpInteractionBroker();
+const pool = await openMcpClientPool({ servers, interactions });
+const owner = { workspaceId: workspaceIdentity, sessionId };
+// 同时消费 interactions.events，并实现明确的用户界面。
+// requested 事件需核验本地 owner，获得用户检查后的答案，再调用：
+// interactions.respond(request.id, request.owner, userReviewedResponse)
+const read = await pool.readResource("remote", "project:///README", { owner, signal });
+await pool.close(); // 同时关闭由 pool 拥有的 broker
+```
+
+每个 pool 使用独立 broker 和一个 UI 消费者，不跨 pool 共享。事件流有界且是
+best-effort；可通过 `list(owner)` 恢复当前待答问题。没有 UI 时省略 broker：此时
+不声明 elicitation 能力，收到输入请求会安全失败，不会调用模型。库入口
+`openConfiguredMaybeCode` 同样默认不创建 broker；只有能够消费并回答 controller
+事件时才传入 `mcpInteractions: true`。交互式 CLI 会自动启用。
+
+工具调用使用 `MayOptions.toolScope()` 提供可信 Host 字符串标签；Core 每个 Run
+只快照一次，并放入 `ToolExecutionContext.scope`，而非模型参数。
+`AgentApplication` 接受 Host 的 `toolScope` 标签并覆盖为自身 `sessionId`；
+MaybeCode 将解析后的 workspace 作为 `workspaceId`。直接执行 pool 工具的调用方
+须自行提供这两个标签。MCP 适配器补充 Run/tool-call id 和随机逻辑请求 id；owner
+标签不会进入 MCP `_meta`。Host 主动操作使用 `McpOperationOptions.owner`。
+缺少可信归属时不发起交互式提问。
+
+产品 UI 消费 `mcp.interaction.requested` / `settled`，通过
+`getMcpInteractions()` 查询、`respondMcpInteraction(id, response)` 回答。回答刻意
+绕过 Session 状态队列，避免资源准备或工具占用队列等待自身答案的死锁。读取/预览
+和附件准备在执行中固定 Session；取消会释放排队的 Session 切换。Retained 弹窗
+临时存在、可滚动查看、独立取消，不会把表单作为新的 agent turn 提交。
+
+限制：8 轮协议续接，每个逻辑流程最多 32 个 elicitation 请求，每个 pool 最多
+32 个待答问题，每个表单最多 32 个字段，请求/响应各 64 KiB，说明文字最多 4,096
+字符。支持扁平基本类型及单选/多选枚举；不支持的 schema 关键字、外部引用、任意
+正则表达式会被拒绝。响应校验不做类型强制转换、不自动填写默认值，并拒绝额外字段。
+绝对期限覆盖 UI 等待和全部网络往返，默认 60 秒，通过 `maxTotalTimeoutMs` 配置。
+取消/过期/关闭会移除待答项、取消排队弹窗，拒绝迟到、重复或归属错误的答案。
+每次续接前重新校验认证身份及目录/工具有效性；提问期间切换登录不会在新身份下发送
+旧的请求状态。资源缓存额外按照 workspace 和 Session 分区。
+
+Broker 不单独持久化或追踪问题与答案，但服务端仍可能将提交的数据作为正常资源/
+工具结果返回。旧协议 push-style elicitation 当前返回 `decline`，不会猜测其逻辑
+父请求。Roots/Sampling 尚未声明或实现，留待显式兼容阶段。Tasks、Apps 和 server
+导出仍是独立路线图项目；本功能不代表完整 MCP 一致性。

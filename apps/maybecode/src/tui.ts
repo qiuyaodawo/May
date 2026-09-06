@@ -25,10 +25,11 @@ import type {
 } from "./controller.js";
 import { runModelPicker } from "./model-picker.js";
 import { runSessionPicker } from "./session-picker.js";
+import { presentMcpInteraction } from "./mcp-interaction-ui.js";
 
 type UIQuestion = (
   prompt: string,
-  options?: Omit<TerminalQuestionOptions, "signal">,
+  options?: TerminalQuestionOptions,
 ) => Promise<string>;
 
 export interface RunTerminalUIOptions {
@@ -65,7 +66,7 @@ export async function runTerminalUI(
     try {
       return await terminal.question(prompt, {
         ...questionOptions,
-        signal: controller.signal,
+        signal: questionOptions.signal === undefined ? controller.signal : AbortSignal.any([controller.signal, questionOptions.signal]),
       });
     } finally {
       if (activeQuestion === controller) activeQuestion = undefined;
@@ -148,11 +149,35 @@ async function consumeEvents(
   renderer: TerminalRenderer,
   question: UIQuestion,
 ): Promise<void> {
+  const pending = new Map<string, AbortController>();
+  let prompts = Promise.resolve();
+  const enqueue = (id: string, work: (signal: AbortSignal) => Promise<void>, expiresAt?: number) => {
+    const controller = new AbortController();
+    pending.set(id, controller);
+    const signal = expiresAt === undefined ? controller.signal : AbortSignal.any([controller.signal, AbortSignal.timeout(Math.max(0, Math.ceil(expiresAt - Date.now())))]);
+    prompts = prompts.then(async () => { if (!signal.aborted) await work(signal); }).catch(() => {
+      if (!signal.aborted) {
+        renderer.write("\nInteraction could not be completed.\n");
+        app.cancel("User interaction is unavailable");
+      }
+    }).finally(() => pending.delete(id));
+  };
   for await (const event of app.events) {
     if (event.type === "run.event") {
       renderer.runEvent(event.event);
     } else if (event.type === "permission.event") {
-      await handlePermissionEvent(event.event, app, renderer, question);
+      if (event.event.type === "approval.requested") {
+        enqueue(`approval:${event.event.request.id}`, (signal) => handlePermissionEvent(event.event, app, renderer,
+          (prompt, options) => question(prompt, { ...options, signal })));
+      } else {
+        if (event.event.type === "approval.resolved" || event.event.type === "approval.cancelled") pending.get(`approval:${event.event.requestId}`)?.abort();
+        renderer.permissionEvent(event.event);
+      }
+    } else if (event.type === "mcp.interaction.requested") {
+      enqueue(event.request.id, (signal) => presentMcpInteraction(event.request, app,
+        (prompt, signal) => question(prompt, { history: false, signal }), signal), event.request.expiresAt);
+    } else if (event.type === "mcp.interaction.settled") {
+      pending.get(event.requestId)?.abort();
     } else if (event.type === "change.preview") {
       renderer.changePreview(event);
     } else if (event.type === "context.compacted") {
@@ -176,6 +201,8 @@ async function consumeEvents(
       await renderer.sessionChanged(event, app);
     }
   }
+  for (const controller of pending.values()) controller.abort();
+  await prompts;
 }
 
 async function handlePermissionEvent(
@@ -717,7 +744,7 @@ class TerminalRenderer {
   }
 
   mcpEvent(
-    event: Extract<MaybeCodeEvent, { type: `mcp.${string}` }>,
+    event: Extract<MaybeCodeEvent, { type: `mcp.server.${string}` | `mcp.resource.${string}` }>,
   ): void {
     if (event.type === "mcp.resource.updated" || event.type === "mcp.resource.watch-closed") {
       this.terminal.write(`\n${sanitizeTerminalText(`${event.type}: ${event.serverId} ${event.uri}${event.type === "mcp.resource.watch-closed" ? ` (${event.reason})` : ""}`)}\n`);

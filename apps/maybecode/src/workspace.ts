@@ -14,6 +14,7 @@ import {
 } from "@may/core";
 import { mcpResourceToUserMessage, mcpPromptToUserMessage, type McpClientPool, type McpServerStatus,
   type McpOperationOptions, type McpReadOptions, type McpCompletionParams, type McpResourceSubscription,
+  type McpInteractionBroker,
 } from "@may/mcp";
 import type { ApprovalDecision } from "@may/permissions";
 import type { ModelCapabilities } from "@may/providers";
@@ -106,6 +107,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   });
   private readonly managerEventRelay: Promise<void>;
   private readonly mcpEventRelay: Promise<void>;
+  private readonly interactionRelay: Promise<void>;
   private readonly modelOptionOverrides = new Map<
     string,
     Readonly<Record<string, unknown>>
@@ -124,6 +126,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     this.mcpEventRelay = state.options.mcp === undefined
       ? Promise.resolve()
       : this.relayEvents(state.options.mcp.events);
+    this.interactionRelay = state.options.mcp?.interactions === undefined ? Promise.resolve() : this.relayEvents(state.options.mcp.interactions.events);
   }
 
   static async open(
@@ -182,6 +185,20 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.state.options.mcp?.status() ?? [];
   }
 
+  getMcpInteractions() {
+    return this.state.options.mcp?.interactions?.list(this.mcpOwner()) ?? [];
+  }
+
+  respondMcpInteraction(id: string, response: Parameters<McpInteractionBroker["respond"]>[2]): boolean {
+    // Deliberately bypass the Session transition queue: submitPrepared/Run may
+    // be waiting for this answer while holding that queue.
+    if (this.closed) return false;
+    const request = this.getMcpInteractions().find((entry) => entry.id === id);
+    return request === undefined ? false : this.state.options.mcp!.interactions!.respond(id, request.owner, response);
+  }
+
+  private mcpOwner() { return { workspaceId: this.workspace, sessionId: this.sessionId }; }
+
   async refreshMcp(serverId?: string): Promise<void> {
     this.throwIfClosed();
     if (this.state.options.mcp?.refresh === undefined) throw new Error("MCP refresh is unavailable");
@@ -200,30 +217,30 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   readMcpResource(serverId: string, uri: string, options: McpReadOptions = {}) {
-    return this.mcpOperation((signal) => this.mcpMethod("readResource")(serverId, uri, { ...options, signal }), options.signal);
+    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("readResource")(serverId, uri, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
 
   readMcpResourceTemplate(serverId: string, template: string, variables: Readonly<Record<string, string | string[]>>, options: McpReadOptions = {}) {
-    return this.mcpOperation((signal) => this.mcpMethod("readResourceTemplate")(serverId, template, variables, { ...options, signal }), options.signal);
+    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("readResourceTemplate")(serverId, template, variables, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
 
   getMcpPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>, options: McpOperationOptions = {}) {
-    return this.mcpOperation((signal) => this.mcpMethod("getPrompt")(serverId, name, args, { ...options, signal }), options.signal);
+    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("getPrompt")(serverId, name, args, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
 
   completeMcp(serverId: string, params: McpCompletionParams, options: McpOperationOptions = {}) {
-    return this.mcpOperation((signal) => this.mcpMethod("complete")(serverId, params, { ...options, signal }), options.signal);
+    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("complete")(serverId, params, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
 
   submitMcpResource(serverId: string, uri: string, instruction?: string): Promise<MaybeCodeRun> {
     return this.mcpOperation((signal) => this.manager.submitPrepared(async () => ({
-      input: mcpResourceToUserMessage(await this.mcpMethod("readResource")(serverId, uri, { signal }), instruction), signal,
+      input: mcpResourceToUserMessage(await this.mcpMethod("readResource")(serverId, uri, { signal, owner: this.mcpOwner() }), instruction), signal,
     })));
   }
 
   submitMcpPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>): Promise<MaybeCodeRun> {
     return this.mcpOperation((signal) => this.manager.submitPrepared(async () => ({
-      input: mcpPromptToUserMessage(await this.mcpMethod("getPrompt")(serverId, name, args, { signal })), signal,
+      input: mcpPromptToUserMessage(await this.mcpMethod("getPrompt")(serverId, name, args, { signal, owner: this.mcpOwner() })), signal,
     })));
   }
 
@@ -231,7 +248,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.mcpOperation(async (signal) => {
       const key = JSON.stringify([serverId, uri]);
       if (this.mcpWatches.has(key)) return this.mcpWatches.get(key)!;
-      const watch = await this.mcpMethod("subscribeResource")(serverId, uri, { signal });
+      const watch = await this.mcpMethod("subscribeResource")(serverId, uri, { signal, owner: this.mcpOwner() });
       this.mcpWatches.set(key, watch);
       void (async () => {
         for await (const event of watch.events) {
@@ -519,7 +536,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     }
     await watchesClosing;
     try {
-      await Promise.all([this.managerEventRelay, this.mcpEventRelay]);
+      await Promise.all([this.managerEventRelay, this.mcpEventRelay, this.interactionRelay]);
     } catch (error) {
       failures.push(error);
     } finally {
@@ -531,7 +548,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   private async relayEvents(events: AsyncIterable<MaybeCodeEvent>): Promise<void> {
-    for await (const event of events) this.eventQueue.push(event);
+    for await (const event of events) {
+      if (event.type === "mcp.interaction.requested" &&
+          (event.request.owner.workspaceId !== this.workspace || event.request.owner.sessionId !== this.sessionId)) continue;
+      this.eventQueue.push(event);
+    }
   }
 
   private throwIfClosed(): void {

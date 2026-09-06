@@ -1,6 +1,6 @@
 import type { AgentWorkspaceController } from "@may/application";
 import type { ContextCompactionStrategy } from "@may/context";
-import type { McpClientPool, McpServerStatus, McpResourceSubscription } from "@may/mcp";
+import type { McpClientPool, McpServerStatus, McpResourceSubscription, McpInteractionBroker } from "@may/mcp";
 import type { MaybeCodeEvent, MaybeCodeSessionEvent } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 
@@ -53,6 +53,8 @@ type MaybeCodeProductEvent = Extract<
   | { type: "mcp.resource.updated" }
   | { type: "mcp.resource.watch-closed" }
   | { type: "mcp.server.connected" }
+  | { type: "mcp.interaction.requested" }
+  | { type: "mcp.interaction.settled" }
   | { type: "mcp.server.catalog-updated" }
   | { type: "mcp.server.failed" }
   | { type: "mcp.server.disconnected" }
@@ -67,6 +69,8 @@ export interface MaybeCodeController extends AgentWorkspaceController<
   readonly modelInfo: MaybeCodeModelInfo | undefined;
 
   getMcpStatus(): Promise<readonly McpServerStatus[]>;
+  getMcpInteractions?(): ReturnType<McpInteractionBroker["list"]>;
+  respondMcpInteraction?(id: string, response: Parameters<McpInteractionBroker["respond"]>[2]): boolean;
   refreshMcp?(serverId?: string): Promise<void>;
   reconnectMcp?(serverId: string): Promise<void>;
   getMcpCatalog?: McpClientPool["catalog"];

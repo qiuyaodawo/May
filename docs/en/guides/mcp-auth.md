@@ -125,3 +125,7 @@ OAuth login now stamps an opaque authorization generation. Resource cache hits
 and new tool/capability operations validate that generation; logout or a new
 login (even from another process) rejects the old connection until reconnect.
 Normal token refresh does not change a stamped generation.
+
+Modern MRTR continuations recheck the original authorization generation before
+each new leg. A login/logout while a user question is open cannot reuse its
+opaque state under another principal; reconnect and start a new operation.

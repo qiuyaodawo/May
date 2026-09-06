@@ -373,3 +373,78 @@ local handles and 32-notice buffers; at most 64 handles/connection. Lost streams
 settle `closed`, never silently reconnect. Closing releases all handles. HTTP JSON
 bodies and each SSE frame are capped at 10 MiB before SDK parsing; stdio keeps its
 configurable bound and ordered notification/response delivery.
+
+## Scoped user interaction (modern MRTR)
+
+Modern `tools/call`, `resources/read` and `prompts/get` can pause for form or URL
+elicitation. The host binds the continuation to the originating logical request,
+not to a server-supplied Session id or whichever Run is currently active. The SDK
+handles fresh wire ids and opaque `requestState` echoing; this is protocol
+continuation, **not** retry of an uncertain failed tool call. See the
+[MRTR specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/mrtr).
+
+Both MaybeCode terminal UIs enable interactions. They show the server and Session,
+accept a JSON form, allow editing, and require a separate `send` confirmation.
+`decline` and `cancel` are explicit alternatives. Form answers are excluded from
+input history. Never enter credentials in forms. URL mode shows the HTTPS host
+and URL, requests consent, and leaves navigation to the user; `retry` explicitly
+continues after visiting. It does not fetch the URL, open a browser, forward MCP
+credentials, or claim the external workflow has completed. This is separate from
+MCP client OAuth login. See the
+[elicitation specification](https://modelcontextprotocol.io/specification/2026-07-28/client/elicitation).
+
+Library/headless use is opt-in:
+
+```ts
+import { McpInteractionBroker, openMcpClientPool } from "@may/mcp";
+const interactions = new McpInteractionBroker();
+const pool = await openMcpClientPool({ servers, interactions });
+const owner = { workspaceId: workspaceIdentity, sessionId };
+// Consume interactions.events concurrently; build an explicit user interface.
+// For requested events, validate the local owner and eventually call:
+// interactions.respond(request.id, request.owner, userReviewedResponse)
+const read = await pool.readResource("remote", "project:///README", { owner, signal });
+await pool.close(); // also closes the pool-owned broker
+```
+
+Use one broker per pool with one UI consumer; do not share it between pools.
+`list(owner)` recovers currently pending questions from the bounded best-effort
+stream. Omit the broker when no UI is available: elicitation is then unadvertised
+and input requests fail closed without invoking a model. `openConfiguredMaybeCode`
+also defaults to no broker; pass `mcpInteractions: true` only when consuming and
+answering its controller events. The interactive CLI does this automatically.
+
+For tool calls, `MayOptions.toolScope()` returns trusted host string labels; Core
+snapshots them once per Run and adds them as `ToolExecutionContext.scope`, not model
+arguments. `AgentApplication` supplies its own `sessionId` and accepts host
+`toolScope` labels; MaybeCode adds its resolved workspace as `workspaceId`.
+Direct pool tool callers must supply those labels themselves. The MCP adapter
+adds Run/tool-call ids and a random logical request id; owner labels never enter
+MCP `_meta`. `McpOperationOptions.owner` provides the equivalent host-operation
+scope. Missing ownership prevents interactive prompting.
+
+Headless product UIs consume `mcp.interaction.requested` / `settled`, inspect
+`getMcpInteractions()`, and call `respondMcpInteraction(id, response)`. Answers bypass
+the Session state queue so resource preparation and tools cannot deadlock waiting
+for their own queued answer. Reads/previews and attachments pin their Session
+while executing; cancellation releases queued Session changes. Retained dialogs
+are ephemeral, scrollable, independently dismissible and do not submit agent turns.
+
+Limits: eight protocol rounds, 32 elicitation requests per logical flow, 32 pending
+questions per pool, 32 form fields, 64 KiB request/response and 4,096-character
+messages. Forms support flat primitives and single/multi-select enums; unsupported
+schema keywords, external references and arbitrary regexes are rejected. Responses
+are validated without coercion or automatic defaults; extra fields are refused.
+The absolute deadline covers UI waiting as well as network legs (60 seconds by
+default, configurable with `maxTotalTimeoutMs`). Cancel/expiry/close removes pending
+questions, cancels queued dialogs and rejects late/duplicate/wrong-owner answers.
+The host rechecks authorization identity and catalog/tool validity before each
+continuation; changing login while a question is open never sends old state under
+a new principal. Resource caches additionally partition by workspace and Session.
+
+Questions/answers are not independently persisted or traced by the broker; a
+server can still return supplied data as normal resource/tool output. Legacy
+push-style elicitation currently receives `decline`: the host does not guess its
+logical parent. Roots and Sampling remain unadvertised/unimplemented pending the
+explicit compatibility phase. Tasks, Apps and server export are separate roadmap
+items; this feature does not claim complete MCP conformance.

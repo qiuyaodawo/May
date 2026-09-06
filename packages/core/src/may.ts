@@ -54,6 +54,8 @@ export interface MayOptions {
   tools?: Iterable<Tool>;
   /** Additional trusted host tools, captured exactly once at each Run/continue start. */
   toolSource?: () => Iterable<Tool>;
+  /** Host-only routing labels, captured once before each Run/continue. */
+  toolScope?: () => Readonly<Record<string, string>>;
   context: Context;
   maxSteps?: number;
   toolExecutor?: ToolExecutor;
@@ -98,6 +100,8 @@ export class May {
   private readonly context: Context;
   private readonly tools: ToolRegistry;
   private readonly toolSource: MayOptions["toolSource"];
+  private readonly toolScope: MayOptions["toolScope"];
+  private readonly runScopes = new Map<string, Readonly<Record<string, string>>>();
   private readonly maxSteps: number;
   private readonly toolExecutor: ToolExecutor;
   private readonly toolScheduler: ToolScheduler;
@@ -119,6 +123,7 @@ export class May {
     this.context = options.context;
     this.tools = tools;
     this.toolSource = options.toolSource;
+    this.toolScope = options.toolScope;
     this.maxSteps = maxSteps;
     this.toolExecutor = options.toolExecutor ?? directToolExecutor;
     this.toolScheduler = options.toolScheduler ?? sequentialToolScheduler;
@@ -170,8 +175,11 @@ export class May {
     }
     // Resolve before touching Context or run bookkeeping; never mid-step.
     const tools = ToolRegistry.compose(this.tools, this.toolSource?.() ?? []).snapshot();
+    const scope = Object.freeze({ ...this.toolScope?.() });
+    if (Object.values(scope).some((value) => typeof value !== "string")) throw new TypeError("Tool scope values must be strings");
     this.activeRuns += 1;
     const runId = createRunId();
+    this.runScopes.set(runId, scope);
     const events = new AsyncEventQueue<MayEvent>({
       maxBufferedValues: this.maxBufferedEvents,
       isDroppable: isStreamingMayEvent,
@@ -239,6 +247,7 @@ export class May {
     )
       .finally(() => {
         this.activeRuns -= 1;
+        this.runScopes.delete(runId);
         externalSignal?.removeEventListener("abort", onExternalAbort);
         events.close();
       });
@@ -713,6 +722,7 @@ export class May {
         tool,
         input,
         context: {
+          scope: this.runScopes.get(runId)!,
           runId,
           step,
           toolCallId: call.id,

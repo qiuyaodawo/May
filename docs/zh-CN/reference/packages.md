@@ -194,3 +194,7 @@ May 并不需要依赖它。更小的 `@may/cli` 展示了如何直接使用 Cor
 Run 执行还使用 `ToolRegistry.snapshot()` 冻结复制后的 descriptor/schema 并捕获回调。
 可选的追加式 `toolSource` 在每次 Run/continue 时解析一次；授权绑定定义和宿主版本。
 详见 [自定义工具](../guides/custom-tool.md)。
+
+`@may/mcp` 还导出显式启用的 `McpInteractionBroker`：有界临时表单/URL 交互、
+有归属的现代 MRTR 续接及取消/过期。MaybeCode controller 和两个终端 UI 均已
+接入；headless 配置默认关闭，须主动启用。参阅 [交互指南](../guides/mcp.md)。

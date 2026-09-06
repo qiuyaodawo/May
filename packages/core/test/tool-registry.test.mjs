@@ -136,6 +136,8 @@ test("model-side tool definition mutation does not affect a later step", async (
 
 test("captures a dynamic catalog once per Run, including nested schemas and execution", async () => {
   let sources = 0;
+  const scope = { workspaceId: "workspace", sessionId: "first" };
+  const scopes = [];
   let dynamic = { ...tool("remote", "version one"), permissionVersion: "one",
     inputSchema: { type: "object", properties: { value: { type: "string" } } },
     async execute() { return "one"; },
@@ -145,14 +147,18 @@ test("captures a dynamic catalog once per Run, including nested schemas and exec
   const seen = [];
   const runtime = new May({
     context: new InMemoryContext(),
+    toolScope: () => scope,
     toolSource: () => { sources++; return catalog; },
     toolExecutor: { async execute({ tool, input, context }) {
+      scopes.push(context.scope.sessionId);
+      assert.equal(Object.isFrozen(context.scope), true);
       outputs.push([tool.permissionVersion, await tool.execute(input, context)]);
       return outputs.at(-1);
     } },
     model: { async *stream(request, { step }) {
       seen.push(request.tools[0]?.description);
       if (sources === 1 && step === 1) {
+        scope.sessionId = "second";
         // Both catalog publication and external nested mutation happen mid-Run.
         catalog = [{ ...dynamic, description: "version two", permissionVersion: "two",
           async execute() { return "two"; } }];
@@ -171,6 +177,7 @@ test("captures a dynamic catalog once per Run, including nested schemas and exec
   await runtime.run({ input: "first" }).result;
   await runtime.continue().result;
   assert.equal(sources, 2);
+  assert.deepEqual(scopes, ["first", "second"]);
   assert.deepEqual(seen, ["version one", "version one", "version two", "version two"]);
   assert.deepEqual(outputs, [["one", "one"], ["two", "two"]]);
   catalog = [tool("duplicate"), tool("duplicate")];

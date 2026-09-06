@@ -162,3 +162,12 @@ event。因此 UI 必须：
 
 参阅[权限策略](permission-policy.md)、[自定义工具](custom-tool.md)和
 [Runtime 与 Session 边界](../architecture/runtime-session.md)。
+
+### MCP 用户交互
+
+MaybeCode 提供临时 `mcp.interaction.requested` / `settled` 事件、
+`getMcpInteractions()` 和 `respondMcpInteraction(id, response)`。只有 UI 能在
+Run 和资源准备期间同时处理这些事件时，才通过
+`openConfiguredMaybeCode({ mcpInteractions: true })` 启用 broker。不要将答案排在
+Session 状态队列之后。展示服务端和可信归属，校验表单并要求检查/同意，在结算或
+截止时关闭提问。不自动打开浏览器，不记录表单答案历史。参阅 [MCP](./mcp.md)。

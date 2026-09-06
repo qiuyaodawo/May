@@ -1,6 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
-  Client,
   StreamableHTTPClientTransport,
   type CallToolResult,
   type RequestOptions,
@@ -32,6 +31,7 @@ import {
   McpToolsListError,
 } from "./errors.js";
 import { McpCapabilities } from "./capabilities.js";
+import { McpHostClient, mcpOwner } from "./host-client.js";
 import { assertMcpContentSize, mcpToolResultContent } from "./content.js";
 import { namespaceMcpToolName } from "./names.js";
 import { McpAuthenticationError } from "./oauth.js";
@@ -75,7 +75,7 @@ class McpConnection {
 
   private constructor(
     readonly options: McpServerOptions,
-    private readonly client: Client,
+    private readonly client: McpHostClient,
     private readonly transport: ReturnType<typeof createMcpTransport>,
     private readonly stderr: BoundedStderrBuffer,
     private readonly tracer: Tracer | undefined,
@@ -92,8 +92,9 @@ class McpConnection {
     onCatalogChanged: () => void,
   ): Promise<McpConnection> {
     validateMcpServerOptions(options);
-    const client = new Client(poolOptions.clientInfo ?? DEFAULT_CLIENT_INFO, {
-      capabilities: {},
+    const client = new McpHostClient(poolOptions.clientInfo ?? DEFAULT_CLIENT_INFO, {
+      capabilities: poolOptions.interactions === undefined ? {} : { elicitation: { form: {}, url: {} } },
+      inputRequired: { autoFulfill: true, maxRounds: 8 },
       listMaxPages: 64,
       // Each connection owns a separate cache, including after reconnect/login.
       listChanged: Object.fromEntries(["tools", "resources", "prompts"].map((kind) => [kind, {
@@ -110,6 +111,7 @@ class McpConnection {
         },
       },
     });
+    client.configureHost(options.id, poolOptions.interactions);
     const stderr = new BoundedStderrBuffer(
       options.transport === "streamable-http"
         ? 0 : options.stderrMaxBytes ?? DEFAULT_STDERR_MAX_BYTES,
@@ -296,7 +298,10 @@ class McpConnection {
       const result = await this.client.callTool(
         { name: definition.name, arguments: input },
         {
-          ...requestOptions(this.options, context.signal),
+          ...this.client.scope(requestOptions(this.options, context.signal), mcpOwner(context.scope, context.runId, context.toolCallId), this.lifetime.signal, async () => {
+            await this.checkAuthorization();
+            if (generation !== this.generation || this.stale || this.installedTools.get(definition.name) !== fingerprint(definition)) throw new McpStaleToolError(this.options.id);
+          }),
           resetTimeoutOnProgress: true,
           toolDefinition: definition,
           onprogress: (progress) => {
@@ -308,6 +313,8 @@ class McpConnection {
           },
         },
       );
+      context.signal.throwIfAborted();
+      await this.checkAuthorization();
       assertMcpContentSize(result);
       mcpToolResultContent(this.options.id, definition.name, result);
       if (result.isError === true) {
@@ -369,7 +376,10 @@ class McpConnection {
     try {
       await this.checkAuthorization();
       signal.throwIfAborted();
-      const result = await work({ ...requestOptions(this.options, signal), maxTotalTimeout: this.options.maxTotalTimeoutMs ?? 60_000 });
+      const result = await work(this.client.scope(requestOptions(this.options, signal), options.owner, this.lifetime.signal, async () => {
+        await this.checkAuthorization();
+        if (this.stale) throw new McpCapabilityError(this.options.id, "catalog changed during interaction; start a new operation");
+      }));
       signal.throwIfAborted();
       await this.checkAuthorization();
       endTraceSpan(span, { status: "ok" });
@@ -536,6 +546,7 @@ interface PoolEntry {
 }
 
 class DefaultMcpClientPool implements McpClientPool {
+  get interactions() { return this.options.interactions; }
   readonly events: AsyncIterable<McpClientEvent>;
   private readonly entries: PoolEntry[];
   private readonly lifetime = new AbortController();
@@ -654,6 +665,7 @@ class DefaultMcpClientPool implements McpClientPool {
         this.recorder.disconnected(entry.server);
       } catch (error) { failures.push(error); this.fail(entry, error); }
     }
+    this.options.interactions?.close();
     this.recorder.close();
     if (failures.length > 0) throw new AggregateError(failures, "One or more MCP clients failed to close");
   }
@@ -873,7 +885,7 @@ function endMcpSpan(
   });
 }
 
-async function closeQuietly(client: Client): Promise<void> {
+async function closeQuietly(client: McpHostClient): Promise<void> {
   try {
     await client.close();
   } catch {

@@ -19,6 +19,7 @@ import {
   openMcpClientPool,
   KeyringMcpCredentialStore,
   McpOAuthManager,
+  McpInteractionBroker,
   validateMcpServerOptions,
   type McpClientPool,
   type McpServerBaseOptions,
@@ -57,6 +58,8 @@ import { MaybeCodeWorkspace } from "./workspace.js";
 import type { MaybeCodeModelConfiguration } from "./workspace.js";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
+  /** Enable only when a UI consumes interaction events and answers the controller. */
+  readonly mcpInteractions?: boolean;
   readonly workspace?: string;
   readonly configPath?: string;
   readonly dataDirectory?: string;
@@ -193,6 +196,7 @@ export async function openConfiguredMaybeCode(
     if (mcpOptions !== false && mcpOptions.servers.length > 0) {
       mcp = await (dependencies.openMcp ?? openMcpClientPool)({
         servers: mcpOptions.servers,
+        ...(options.mcpInteractions === true ? { interactions: new McpInteractionBroker() } : {}),
         ...(mcpOptions.servers.some((server) => server.transport === "streamable-http" && server.auth !== undefined)
           ? { oauth: mcpOptions.oauth ?? new McpOAuthManager(new KeyringMcpCredentialStore(join(dataDirectory, "mcp-credentials"))) }
           : {}),

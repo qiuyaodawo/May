@@ -18,7 +18,7 @@ interface Watch {
 
 /** One connection/authorization generation, no shared or persistent content cache. */
 export class McpCapabilities {
-  private readonly cache = new Map<string, { result: ReadResourceResult; expiresAt: number; bytes: number }>();
+  private readonly cache = new Map<string, { uri: string; result: ReadResourceResult; expiresAt: number; bytes: number }>();
   private cacheBytes = 0;
   private generation = 0;
   private readonly watches = new Map<string, Set<Watch>>();
@@ -34,7 +34,7 @@ export class McpCapabilities {
     client.setNotificationHandler("notifications/resources/updated", (notification) => {
       const uri = notification.params.uri;
       this.generation++;
-      this.evict(uri);
+      for (const [key, entry] of this.cache) if (entry.uri === uri) this.evict(key);
       for (const watch of this.watches.get(uri) ?? []) watch.push();
     });
   }
@@ -48,12 +48,13 @@ export class McpCapabilities {
     if (options.cache !== undefined && !["use", "refresh", "bypass"].includes(options.cache)) throw new TypeError("Invalid MCP cache mode");
     this.require("resources");
     return this.run("resources/read", options, async (request) => {
-      const cached = this.cache.get(uri);
+      const key = JSON.stringify([options.owner?.workspaceId, options.owner?.sessionId, uri]);
+      const cached = this.cache.get(key);
       if ((options.cache ?? "use") === "use" && cached !== undefined && cached.expiresAt > Date.now()) {
-        this.cache.delete(uri); this.cache.set(uri, cached);
+        this.cache.delete(key); this.cache.set(key, cached);
         return { serverId: this.server.id, uri, result: cached.result, fromCache: true };
       }
-      this.evict(uri);
+      this.evict(key);
       const generation = this.generation;
       const result = await this.client.readResource({ uri }, { ...request, cacheMode: "bypass" });
       const read = { serverId: this.server.id, uri, result, fromCache: false };
@@ -64,7 +65,7 @@ export class McpCapabilities {
       if (options.cache !== "bypass" && ttl > 0 && generation === this.generation && !this.closed) {
         const bytes = Buffer.byteLength(JSON.stringify(immutable));
         while (this.cache.size >= 32 || this.cacheBytes + bytes > 16 * 1024 * 1024) this.evict(this.cache.keys().next().value!);
-        this.cache.set(uri, { result: immutable, expiresAt: Date.now() + ttl, bytes });
+        this.cache.set(key, { uri, result: immutable, expiresAt: Date.now() + ttl, bytes });
         this.cacheBytes += bytes;
       }
       return { ...read, result: immutable };

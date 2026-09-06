@@ -13,6 +13,7 @@ export async function startOAuthFixture(t) {
   const codes = new Map();
   const clients = new Map();
   const requests = [];
+  let toolInput;
   const counts = { exchanges: 0, refreshes: 0, revocations: 0, toolCalls: 0, registrations: 0 };
   const failures = [];
   const server = createServer(async (req, res) => {
@@ -95,7 +96,7 @@ export async function startOAuthFixture(t) {
           counts.toolCalls++;
           if (demandWrite && !scope.split(" ").includes("write")) {
             res.writeHead(403, { "www-authenticate": 'Bearer error="insufficient_scope", scope="write"' }).end();
-          } else reply({ content: [{ type: "text", text: "authorized" }] });
+          } else reply(toolInput?.(message) ?? { content: [{ type: "text", text: "authorized" }] });
         } else res.writeHead(202).end();
       } else res.writeHead(404).end();
     } catch (error) { failures.push(error); res.writeHead(500).end(); }
@@ -110,6 +111,7 @@ export async function startOAuthFixture(t) {
   });
   return {
     url: `${origin}/mcp`, origin, counts, requests,
+    setToolInput: (input) => { toolInput = input; },
     invalidateAccess: () => { access = "expired"; },
     demandWrite: () => { demandWrite = true; },
     rotateIssuer: () => { issuer = `${origin}/issuer2`; access = "expired"; },

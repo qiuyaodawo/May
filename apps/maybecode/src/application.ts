@@ -194,6 +194,7 @@ export class MaybeCodeApplication {
       model: options.model,
       permissionPolicy: options.permissionPolicy ?? createCodingPermissionPolicy(),
       tools: configuredTools,
+      toolScope: { workspaceId: resolve(options.workspace) },
       ...(options.toolSource === undefined ? {} : { toolSource: options.toolSource }),
       instructions: instructions.effective,
       ...(options.tracer === undefined ? {} : { tracer: options.tracer }),

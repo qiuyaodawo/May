@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import {
-  InMemoryMcpCredentialStore, KeyringMcpCredentialStore, McpOAuthManager, openMcpClientPool,
+  InMemoryMcpCredentialStore, KeyringMcpCredentialStore, McpOAuthManager, openMcpClientPool, McpInteractionBroker,
 } from "../dist/index.js";
 import { startOAuthFixture } from "./fixtures/oauth-server.mjs";
 
@@ -27,10 +27,11 @@ test("OAuth uses PKCE, refreshes, isolates accounts, gates step-up, and revokes 
   await login();
   assert.equal((await oauth.status(server)).authenticated, true);
   assert.equal((await oauth.status({ ...server, auth: { ...server.auth, account: "other" } })).authenticated, false);
-  const pool = await openMcpClientPool({ servers: [server], oauth });
+  const broker = new McpInteractionBroker();
+  const pool = await openMcpClientPool({ servers: [server], oauth, interactions: broker });
   t.after(() => pool.close());
   const execute = () => pool.tools[0].execute({}, {
-    signal: new AbortController().signal, runId: "run", step: 1, toolCallId: "call", idempotencyKey: "run:call", report() {},
+    scope: { workspaceId: "workspace", sessionId: "session" }, signal: new AbortController().signal, runId: "run", step: 1, toolCallId: "call", idempotencyKey: "run:call", report() {},
   });
   http.invalidateAccess();
   assert.equal((await execute()).content[0].text, "authorized");
@@ -57,6 +58,18 @@ test("OAuth uses PKCE, refreshes, isolates accounts, gates step-up, and revokes 
   await assert.rejects(pool.readResource("remote", "private:///data"), (error) => error.code === "MCP_CAPABILITY_ERROR");
   await pool.reconnect("remote");
   assert.equal((await pool.readResource("remote", "private:///data")).fromCache, false);
+  http.setToolInput(() => ({ resultType: "input_required", requestState: "old-principal", inputRequests: {
+    form: { method: "elicitation/create", params: { mode: "form", message: "Confirm", requestedSchema: { type: "object", properties: {} } } },
+  } }));
+  const waiting = execute(); void waiting.catch(() => {});
+  const question = (await broker.events[Symbol.asyncIterator]().next()).value.request;
+  const callsBeforeLogin = http.counts.toolCalls;
+  await login();
+  broker.respond(question.id, question.owner, { action: "accept", content: {} });
+  await assert.rejects(waiting, /identity changed/);
+  assert.equal(http.counts.toolCalls, callsBeforeLogin, "never continue old requestState under a new authorization principal");
+  http.setToolInput(undefined);
+  await pool.reconnect("remote");
   assert.deepEqual(await oauth.logout(server), { revoked: true });
   await assert.rejects(pool.readResource("remote", "private:///data"), (error) => error.code === "MCP_AUTHENTICATION_REQUIRED");
   assert.equal(http.counts.revocations, 2);

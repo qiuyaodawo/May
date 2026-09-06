@@ -65,6 +65,8 @@ export interface AgentApplicationOptions {
   readonly tools?: Iterable<Tool>;
   /** Additional host catalog captured per Run; static tools remain fixed. */
   readonly toolSource?: () => Iterable<Tool>;
+  /** Trusted host routing labels. The application supplies its own sessionId. */
+  readonly toolScope?: Readonly<Record<string, string>>;
   readonly toolExecutor?: ToolExecutor;
   readonly toolScheduler?: ToolScheduler;
   readonly tracer?: Tracer;
@@ -228,6 +230,7 @@ export class AgentApplication implements AgentController {
       return new May({
         model: options.model,
         tools: configuredTools,
+        toolScope: () => ({ ...options.toolScope, sessionId: historySource!.id }),
         ...(options.toolSource === undefined ? {} : { toolSource: options.toolSource }),
         context: managedContext.context,
         toolExecutor: permissions,

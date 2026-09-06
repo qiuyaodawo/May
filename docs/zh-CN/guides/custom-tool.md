@@ -240,3 +240,9 @@ schema 副本。目录更新仅影响下一次 Run。普通 registry 查询/`clo
 `Tool.resultContent(output)` 可选地将成功输出投影为模型可见 `ContentPart[]`，替代
 默认 JSON 块；该回调也由 Run 快照捕获。`tool.completed` 保留原始输出，投影异常
 作为工具失败处理。应验证不可信内容，避免投影仅宿主可见的元数据。
+
+`MayOptions.toolScope()` 可返回可信、仅 Host 使用的字符串标签。Core 每个
+Run/continue 复制并冻结一次，作为 `ToolExecutionContext.scope` 传到工具及执行器/
+权限边界，不放入模型定义或参数。禁止从工具输入推导这些标签。
+`AgentApplication.toolScope` 接受标签记录并提供自身 Session id，MaybeCode 还
+提供 workspace 身份。标签用于交互路由，不代替访问策略。

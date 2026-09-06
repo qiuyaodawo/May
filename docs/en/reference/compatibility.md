@@ -200,3 +200,10 @@ Changed definitions or host identity require new approval even with the same
 key. Equivalent schema key order does not. `revokeSessionGrant(key)` revokes all
 versions under that key; explicit policy deny still wins. Host adapters should
 include other execution-affecting fields and endpoint/account in their version.
+
+Modern MRTR form/URL elicitation is opt-in through `McpInteractionBroker` and is
+enabled by the interactive MaybeCode CLI. Owner scopes, bounded whole-flow waits,
+validated user responses and pre-continuation identity checks are implemented;
+legacy push elicitation declines without guessing ownership. Roots/Sampling,
+tasks/Apps and server export are still separate unfinished phases. Core's optional
+`toolScope` labels remain protocol-independent. See [MCP](../guides/mcp.md).

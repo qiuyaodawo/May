@@ -82,7 +82,8 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
   private readonly unsubscribe: () => void;
   private readonly approvalQueue: PendingApproval[] = [];
   private dialog: Dialog | undefined;
-  private dialogKind: "approval" | "session" | "model" | "effort" | undefined;
+  private dialogKind: "approval" | "session" | "model" | "effort" | "mcp" | undefined;
+  private readonly mcpQuestions: Array<{ prompt: string; finish(value?: string): void }> = [];
   private resolveSessionDialog: ((action: SessionDialogAction | undefined) => void) | undefined;
   private resolveModelDialog: ((action: ModelDialogAction | undefined) => void) | undefined;
   private resolveEffortDialog: ((effort: string | undefined) => void) | undefined;
@@ -163,6 +164,28 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     return new Promise((resolve) => {
       this.approvalQueue.push({ request, resolve });
       if (this.approvalQueue.length === 1) this.openCurrentApproval();
+    });
+  }
+
+  requestMcpInput(prompt: string, signal: AbortSignal): Promise<string | undefined> {
+    if (signal.aborted) return Promise.resolve(undefined);
+    return new Promise((resolve) => {
+      let settled = false;
+      const abort = () => pending.finish();
+      const pending = { prompt, finish: (value?: string) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", abort);
+        const index = this.mcpQuestions.indexOf(pending);
+        if (index >= 0) this.mcpQuestions.splice(index, 1);
+        if (index === 0 && this.dialogKind === "mcp") {
+          this.dialog = undefined; this.dialogKind = undefined; this.openCurrentApproval();
+        }
+        resolve(value); this.options.onInvalidate?.();
+      } };
+      this.mcpQuestions.push(pending);
+      signal.addEventListener("abort", abort, { once: true });
+      this.openCurrentApproval();
     });
   }
 
@@ -310,6 +333,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     this.focus.clear();
     this.dialog = undefined;
     this.dialogKind = undefined;
+    for (const question of this.mcpQuestions.splice(0)) question.finish();
     this.resolveSessionDialog?.(undefined);
     this.resolveSessionDialog = undefined;
     this.resolveModelDialog?.(undefined);
@@ -521,6 +545,15 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     const pending = this.approvalQueue[0];
     if (pending === undefined) {
       this.dialog = undefined;
+      const question = this.mcpQuestions[0];
+      if (question !== undefined) {
+        this.dialog = new Dialog(this.baseView, new McpInputPrompt(question.prompt, question.finish), {
+          open: true, title: "MCP user interaction — untrusted server", width: 92, height: 24,
+          dismissOnEscape: false, borderStyle: this.theme.warning, titleStyle: this.theme.warning,
+        });
+        this.dialogKind = "mcp";
+        this.options.onInvalidate?.();
+      }
       return;
     }
     const prompt = new ApprovalPrompt(pending.request, this.theme, (decision) => {
@@ -1001,4 +1034,28 @@ function commonPrefix(input: string, values: readonly string[]): string | undefi
     length = index;
   }
   return first.slice(0, length);
+}
+
+/** Ephemeral editor, deliberately without EditorHistory or TranscriptStore writes. */
+class McpInputPrompt implements InteractiveComponent {
+  private readonly body: ScrollView;
+  private readonly editor: Editor;
+  constructor(prompt: string, private readonly complete: (value?: string) => void) {
+    this.body = new ScrollView(new Text(sanitizeTerminalText(prompt)));
+    this.body.setFocused(true);
+    this.editor = new Editor({ prompt: "> ", onSubmit: (value) => complete(value) });
+    this.editor.setFocused(true);
+  }
+  render(size: RenderSize): RenderResult {
+    return new Column([
+      { flex: 1, minHeight: 1, component: this.body },
+      { height: 4, component: this.editor },
+      { height: 1, component: new Text("PgUp/PgDn review request | Enter continue | Esc cancel") },
+    ]).render(size);
+  }
+  handleKey(stroke: KeyStroke): boolean {
+    if (stroke.key === "escape") { this.complete(); return true; }
+    if (stroke.key === "pageup" || stroke.key === "pagedown") return this.body.handleKey(stroke);
+    return this.editor.handleKey(stroke);
+  }
 }
