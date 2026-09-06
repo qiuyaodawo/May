@@ -206,5 +206,5 @@ Context。旧协议交互操作显式选择单操作进程/session，不在共�
 参阅 [Host 兼容](../guides/mcp.md)。
 
 
-`McpTaskJournal` 和 `parseMcpTask` 提供有界的任务存储/解析 API，尚不是支持任务
-的客户端池。参阅 [任务持久化](../guides/mcp-tasks.md)。
+`McpTaskJournal`、`parseMcpTask`、`mcpTaskToUserMessage` 和池任务 API 支持
+显式启用的现代 Tasks、持久归属、经审阅输入及显式结果附件。参阅[长任务](../guides/mcp-tasks.md)。

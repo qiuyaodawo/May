@@ -42,6 +42,7 @@ export interface McpInputBinding {
   count: number;
   samplingCalls: number;
   samplingTokens: number;
+  beforeSampling?: (maxTokens: number) => Promise<void>;
 }
 
 export function hostCapabilities(options: McpServerHostOptions | undefined, broker: McpInteractionBroker | undefined, services: McpHostServices | undefined): ClientCapabilities {
@@ -99,6 +100,8 @@ export class McpHostServiceRunner {
     if (binding.samplingTokens + params.maxTokens > 16_384) throw hostFailure(this.serverId, "sampling flow token budget exceeded");
     binding.samplingTokens += params.maxTokens;
     await binding.beforeRetry(); signal.throwIfAborted();
+    await binding.beforeSampling?.(params.maxTokens);
+    signal.throwIfAborted();
     const result = await this.services.sampling!.createMessage(params, context);
     signal.throwIfAborted(); await binding.beforeRetry();
     const validated = await this.samplingResult(result, params);

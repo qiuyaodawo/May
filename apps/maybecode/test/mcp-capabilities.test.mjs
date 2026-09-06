@@ -3,10 +3,66 @@ import test from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openMcpClientPool, McpInteractionBroker } from "@may/mcp";
+import { openMcpClientPool, McpInteractionBroker, McpTaskJournal, InMemoryMcpCredentialStore } from "@may/mcp";
 import { FileSessionStore } from "@may/session/file-store";
 import { MaybeCodeWorkspace, openConfiguredMaybeCode, resolveMaybeCodeMcp, InMemorySessionCatalog, executeMaybeCodeSlashCommand, runTerminalUI, MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
 import { startCatalogFixture } from "../../../packages/mcp/test/fixtures/catalog-server.mjs";
+import { startTaskServer } from "../../../packages/mcp/test/fixtures/task-server.mjs";
+
+test("configured task tools use normal permissions and terminal controls keep reviewed task input outside Session history", { timeout: 10_000 }, async (t) => {
+  const fixture = await startTaskServer(t); fixture.state.input = true;
+  const directory = await mkdtemp(join(tmpdir(), "may-configured-tasks-")); t.after(() => rm(directory, { recursive: true, force: true }));
+  const config = { path: join(directory, "config.json"), providers: { test: { adapter: "deepseek-chat", apiKey: "host-provider-secret" } },
+    models: { chat: { provider: "test", model: "test-model" } }, defaultModel: "chat",
+    apps: { maybecode: { mcpServers: { jobs: { transport: "streamable-http", url: fixture.url, tasks: true, host: { sampling: true } } } } },
+  };
+  assert.equal(resolveMaybeCodeMcp(config, directory).servers[0].tasks, true);
+  const modelRequests = []; const taskJournal = new McpTaskJournal(new InMemoryMcpCredentialStore());
+  const app = await openConfiguredMaybeCode({ workspace: directory, dataDirectory: join(directory, "data"),
+    mcpInteractions: true, instructions: "Private Session instruction", retry: false, observability: false,
+  }, { loadConfig: async () => config, openMcp: (options) => { assert.ok(options.taskJournal); return openMcpClientPool({ ...options, taskJournal }); },
+    createModel(selection) {
+      if (selection.options.maxTokens === 32) return { limits: { maxOutputTokens: 32 }, async *stream(request) {
+        assert.equal(request.messages[0].content[0].text, "Task-only input");
+        yield { type: "response.completed", message: { role: "assistant", content: [{ type: "text", text: "private sampled output" }] } };
+      } };
+      return { async *stream(request, { step }) {
+        modelRequests.push(request);
+        const attached = JSON.stringify(request.messages.at(-1)).includes("completed task");
+        yield { type: "response.completed", message: { role: "assistant", content: [], ...(step === 1 && !attached ? {
+          toolCalls: [{ id: "job-call", name: request.tools.find((tool) => tool.name.startsWith("mcp__jobs__")).name, input: {} }],
+        } : {}) } };
+      } };
+    },
+  });
+  t.after(() => app.close());
+  let command = 0; let handle; let approvals = 0; const prompts = []; const output = [];
+  await runTerminalUI(app, { terminal: { colors: false, write: (value) => output.push(value), close() {}, async question(prompt, options = {}) {
+    prompts.push(prompt);
+    if (prompt.includes("[a]")) { approvals++; assert.equal(fixture.state.calls, 0); return "a"; }
+    if (prompt.includes("Enter a JSON object")) { assert.equal(options.history, false); return '{"value":"private task form answer"}'; }
+    if (prompt.includes("Type send")) return "send";
+    if (prompt.includes("Host review:")) { assert.equal(options.history, false); return "allow"; }
+    if (command++ === 0) return "Start the long MCP job";
+    handle ??= (await app.listMcpTasks())[0].id;
+    if (command === 2) return "/mcp tasks";
+    if (command === 3) return `/mcp task-update jobs ${handle}`;
+    if (command === 4) return `/mcp task-get jobs ${handle}`;
+    if (command === 5) {
+      assert.doesNotMatch(JSON.stringify(modelRequests), /completed task/u, "preview must not attach");
+      return `/mcp task-attach jobs ${handle} Inspect the completed job`;
+    }
+    if (command === 6) return `/mcp task-forget jobs ${handle}`;
+    return "/exit";
+  } } });
+  assert.equal(approvals, 1); assert.equal(fixture.state.calls, 1); assert.equal(fixture.state.updates.length, 2);
+  assert.ok(output.join("").includes("completed task"));
+  assert.match(JSON.stringify(modelRequests.at(-1).messages.at(-1)), /completed task/u);
+  assert.equal(modelRequests.at(-1).messages.at(-1).role, "user");
+  assert.doesNotMatch(JSON.stringify(modelRequests), /private task form answer|private sampled output/u);
+  assert.doesNotMatch(JSON.stringify(await app.history()), /private task form answer|private sampled output/u);
+  assert.doesNotMatch(JSON.stringify(prompts), /host-provider-secret/u);
+});
 
 test("MCP user commands preview safely, explicitly attach to one Session, and cancel preparation without context leakage", { timeout: 10_000 }, async (t) => {
   const fixture = await startCatalogFixture(t);

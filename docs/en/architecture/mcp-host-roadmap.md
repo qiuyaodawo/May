@@ -33,8 +33,10 @@ permission boundary remains in force.
   - [x] Storage groundwork: owner-bound encrypted task journal, write-ahead identity
     reservation, input deduplication/budgets and cancellation intent. Evidence:
     `task-journal.test.mjs`; see [task persistence](../guides/mcp-tasks.md).
-  - [ ] Task-capable wire calls, handle controller/UI, polling/update/cancel and
-    remote restart recovery. Storage alone does not advertise the extension.
+  - [x] Task-capable wire calls, handle controller/UI, polling/update/cancel and
+    recovery across client/server-process restart without replay. Evidence:
+    `task-runtime.test.mjs` and MaybeCode task input/attachment integration.
+    Opt-in 2026-07-28 extension; explicit polling, no task subscription notifications.
   - [ ] Optional isolated Apps host and explicit terminal fallback.
 - [ ] **Independent MCP server:** opt-in May tool/resource/prompt export,
   authenticated principals and workspace isolation, normal permission/execution
@@ -58,4 +60,4 @@ and HTTP operations, early completion and process/session cleanup) and MaybeCode
 configured-provider/UI integration in `mcp-capabilities.test.mjs`. The editor schema
 also covers HTTP/OAuth/Host options with positive/negative validation smoke.
 Legacy channels are per-operation and not reused; no unsolicited ownership is
-guessed. Tasks/Apps, server export and final audit remain open.
+guessed. Apps, server export and final audit remain open.

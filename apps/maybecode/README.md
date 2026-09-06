@@ -507,3 +507,10 @@ elicitation. Unscoped legacy requests decline; `host.legacyRequests: "isolated"`
 per-operation compatibility. `host.roots` and `host.sampling` enable reviewed root
 sharing and isolated, bounded sampling (including remote tool proposals, never
 execution of host tools). All three options default off.
+
+Opt-in `tasks: true` adds modern long-running MCP jobs with a separate encrypted
+`<dataDirectory>/mcp-tasks` journal. `/mcp tasks`, `task-get`, `task-wait`,
+`task-update`, `task-retry-input`, `task-cancel` and `task-forget` are explicit
+Session-bound controls; `task-attach` alone submits a completed result to a new Run.
+Stopping local waiting is not remote cancellation. No automatic replay after
+restart. See the bilingual [Tasks guide](../../docs/en/guides/mcp-tasks.md).

@@ -70,6 +70,19 @@ test("task journal binds ownership across restart, claims inputs exactly once an
   }
   assert.throws(() => parseMcpTask({ ...pending, inputRequests: {} }, "state", "remote"), /invalid/u);
   assert.throws(() => parseMcpTask({ ...seed, resultType: "complete", status: "failed", error: {} }, "state", "remote"), /invalid/u);
+
+  const recovery = await journal.begin(owner, binding);
+  // An initial sampling request can consume the attempt budget without tokens.
+  await journal.initialUsage(recovery.id, owner, binding, { inputs: 1, samplingCalls: 1, samplingTokens: 0 });
+  await journal.observe(recovery.id, owner, binding, { ...seed, taskId: "lease-recovery" }, "created");
+  await journal.observe(recovery.id, owner, binding, { ...pending, taskId: "lease-recovery" }, "state");
+  const lease = await journal.claimInput(recovery.id, owner, binding, "lease", { method: "roots/list" }, undefined, { expiresAt: Date.now() + 20 });
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  journal = new McpTaskJournal(store);
+  assert.equal((await journal.claimInput(recovery.id, owner, binding, "lease", { method: "roots/list" })).claim, undefined);
+  const renewed = await journal.claimInput(recovery.id, owner, binding, "lease", { method: "roots/list" }, undefined, { retryClaimId: lease.claim.id });
+  assert.notEqual(renewed.claim.id, lease.claim.id);
+  assert.equal(renewed.record.inputAttempts, 2); assert.equal(renewed.record.samplingCalls, 1);
 });
 
 test("task journal uses encrypted atomic storage, fails closed on partial writes/corruption and bounds retained handles", async (t) => {

@@ -273,3 +273,10 @@ fresh process/session per interactive tool/read/prompt operation and does not re
 server session state between operations. See [Host compatibility](../guides/mcp.md#roots-sampling-and-legacy-compatibility)
 for consent, budgets and custom services. The bundled editor schema covers HTTP,
 OAuth and Host fields; runtime validation additionally enforces endpoint/header safety.
+
+Both transports also accept `tasks: true` (default `false`), requiring modern
+2026-07-28 plus the server Tasks extension. For stdio also set `protocolMode: "auto"`.
+MaybeCode uses an encrypted journal at `<dataDirectory>/mcp-tasks`; custom pool
+hosts must inject `taskJournal`. Store failure prevents task creation. Host input
+still requires the corresponding opt-in services and interaction UI. See
+[long-running tasks](../guides/mcp-tasks.md) for controls and restart boundaries.

@@ -115,5 +115,5 @@ that changed during the operation.
 
 
 The bundled editor schema also describes MaybeCode MCP stdio/Streamable HTTP,
-OAuth and opt-in `host` compatibility fields. Endpoint/header safety and
+OAuth, opt-in `host` compatibility fields and the default-off `tasks` flag. Endpoint/header safety and
 service availability remain application/runtime validation responsibilities.

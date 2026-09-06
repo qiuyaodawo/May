@@ -9,6 +9,7 @@ import { assertMcpServerId } from "./names.js";
 import type { McpServerOptions } from "./types.js";
 import { McpAuthenticationError, validateMcpOAuthOptions, type McpOAuthManager } from "./oauth.js";
 import { McpCredentialStoreError } from "./credentials.js";
+import { taskHeaderValue } from "./task-wire.js";
 
 export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthManager) {
   if (options.transport === "streamable-http") {
@@ -30,6 +31,13 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
         reconnectionDelayGrowFactor: 1.5,
       },
       fetch: async (input, init) => {
+        // SDK 2.0's core transport has no Tasks extension routing rule. Add only
+        // the extension-owned body's task id; user headers can never override it.
+        const headers = new Headers(init?.headers);
+        if (init?.method === "POST" && typeof init.body === "string") {
+          const rpc = JSON.parse(init.body) as { id?: unknown; method?: string; params?: { taskId?: unknown } };
+          if (typeof rpc.id === "string" && rpc.id.startsWith("may-task:") && ["tasks/get", "tasks/update", "tasks/cancel"].includes(rpc.method ?? "") && typeof rpc.params?.taskId === "string") headers.set("mcp-name", taskHeaderValue(rpc.params.taskId));
+        }
         // Also bound legacy session DELETE cleanup, which has no RPC timeout.
         const signal = init?.method === "DELETE"
           ? AbortSignal.any([
@@ -39,6 +47,7 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
           : init?.signal;
         const response = await fetch(input, {
           ...init,
+          headers,
           ...(signal === undefined ? {} : { signal }),
           redirect: "error",
         });
@@ -65,6 +74,7 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
 /** Validate before starting any endpoint, including optional endpoints. */
 export function validateMcpServerOptions(options: McpServerOptions): void {
   assertMcpServerId(options.id);
+  if (options.tasks !== undefined && typeof options.tasks !== "boolean") invalid(options, "tasks must be a boolean");
   if (options.required !== undefined && typeof options.required !== "boolean") {
     invalid(options, "required must be a boolean");
   }

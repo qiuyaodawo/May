@@ -8,6 +8,8 @@ import type {
 import type { McpOAuthManager, McpOAuthOptions } from "./oauth.js";
 import type { McpInteractionBroker, McpInteractionOwner } from "./interactions.js";
 import type { McpHostServices, McpServerHostOptions } from "./host-services.js";
+import type { McpTaskJournal, McpTaskRecord } from "./task-journal.js";
+import type { McpTaskSnapshot, McpTaskWaitOptions, McpTaskUpdateOptions } from "./task-runtime.js";
 
 export type McpTransport = "stdio" | "streamable-http";
 
@@ -23,6 +25,8 @@ export interface McpServerBaseOptions {
   /** SDK negotiation mode. Defaults to legacy for stdio, auto for HTTP. */
   readonly protocolMode?: "legacy" | "auto";
   readonly host?: McpServerHostOptions;
+  /** Opt-in modern Tasks extension; requires a journal and advertised server support. */
+  readonly tasks?: boolean;
 }
 
 export interface McpStdioServerOptions extends McpServerBaseOptions {
@@ -54,6 +58,7 @@ export interface OpenMcpClientPoolOptions {
   /** Opt-in ephemeral host UI broker. Omission leaves elicitation unadvertised. */
   readonly interactions?: McpInteractionBroker;
   readonly hostServices?: McpHostServices;
+  readonly taskJournal?: McpTaskJournal;
   readonly servers: readonly McpServerOptions[];
   readonly tracer?: Tracer;
   readonly traceAttributes?: TraceAttributes;
@@ -194,5 +199,13 @@ export interface McpClientPool {
   getPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>, options?: McpOperationOptions): Promise<McpPromptExpansion>;
   complete(serverId: string, params: McpCompletionParams, options?: McpOperationOptions): Promise<McpCompletion>;
   subscribeResource(serverId: string, uri: string, options?: McpOperationOptions): Promise<McpResourceSubscription>;
+  /** Local inventory only; no remote tasks/list or automatic restart polling. */
+  listTasks(owner: McpInteractionOwner): Promise<readonly McpTaskRecord[]>;
+  getTask(serverId: string, id: string, options?: McpOperationOptions): Promise<McpTaskSnapshot>;
+  /** Fulfill current outstanding requests through the normal interaction broker/services. */
+  updateTask(serverId: string, id: string, options?: McpOperationOptions & McpTaskUpdateOptions): Promise<McpTaskSnapshot>;
+  cancelTask(serverId: string, id: string, options?: McpOperationOptions): Promise<McpTaskRecord>;
+  waitTask(serverId: string, id: string, options?: McpOperationOptions & McpTaskWaitOptions): Promise<McpTaskSnapshot>;
+  forgetTask(serverId: string, id: string, owner: McpInteractionOwner): Promise<void>;
   close(): Promise<void>;
 }

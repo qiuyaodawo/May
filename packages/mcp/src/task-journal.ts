@@ -16,8 +16,10 @@ export interface McpTaskBinding {
 export interface McpTaskInputClaim {
   readonly id: string;
   readonly fingerprint: string;
-  readonly state: "claimed" | "submitted" | "acknowledged";
+  readonly state: "claimed" | "submitted" | "acknowledged" | "abandoned";
   readonly samplingReserved?: true;
+  readonly samplingReservations?: number;
+  readonly expiresAt?: number;
 }
 
 export interface McpTaskRecord {
@@ -36,6 +38,8 @@ export interface McpTaskRecord {
   readonly inputs: Readonly<Record<string, McpTaskInputClaim>>;
   readonly samplingCalls: number;
   readonly samplingTokens: number;
+  readonly initialUsage?: { readonly inputs: number; readonly samplingCalls: number; readonly samplingTokens: number };
+  readonly inputAttempts?: number;
 }
 
 type SessionOwner = Pick<McpInteractionOwner, "workspaceId" | "sessionId">;
@@ -97,20 +101,34 @@ export class McpTaskJournal {
     });
   }
 
+  /** Carry synchronous pre-creation MRTR usage into the durable task's budgets. */
+  initialUsage(id: string, owner: SessionOwner, binding: McpTaskBinding, usage: NonNullable<McpTaskRecord["initialUsage"]>): Promise<McpTaskRecord> {
+    if (!integer(usage.inputs, 0) || usage.inputs > 32 || !integer(usage.samplingCalls, 0) || usage.samplingCalls > 4 || !integer(usage.samplingTokens, 0) || usage.samplingTokens > usage.samplingCalls * 4096) throw taskFailure(binding.serverId, "invalid initial task usage");
+    return this.change(id, owner, binding, (record) => {
+      if (record.remote !== undefined || record.initialUsage !== undefined) throw taskFailure(binding.serverId, "initial task usage already recorded");
+      record.initialUsage = { ...usage }; record.samplingCalls = usage.samplingCalls; record.samplingTokens = usage.samplingTokens;
+    });
+  }
+
   /** Reserve a unique input key before any UI/model work. Repeated polls do not reclaim it. */
-  claimInput(id: string, owner: SessionOwner, binding: McpTaskBinding, key: string, input: unknown, signal?: AbortSignal): Promise<{ readonly record: McpTaskRecord; readonly claim?: McpTaskInputClaim }> {
+  claimInput(id: string, owner: SessionOwner, binding: McpTaskBinding, key: string, input: unknown, signal?: AbortSignal, options: { expiresAt?: number; retryClaimId?: string } = {}): Promise<{ readonly record: McpTaskRecord; readonly claim?: McpTaskInputClaim }> {
     if (!text(key, 1024) || !object(input) || Buffer.byteLength(JSON.stringify(input)) > 64 * 1024) throw taskFailure(binding.serverId, "invalid task input");
     const inputKey = digest(key); const fingerprint = digest(stable(input));
+    const expiresAt = options.expiresAt ?? Date.now() + 60_000;
+    if (!integer(expiresAt, Date.now()) || expiresAt > Date.now() + 86_400_000) throw taskFailure(binding.serverId, "invalid task input deadline");
     return this.transact(owner, (journal) => {
       const current = this.find(journal, id, binding); requireInput(current);
       const previous = current.inputs[inputKey];
       if (previous !== undefined) {
         if (previous.fingerprint !== fingerprint) throw taskFailure(binding.serverId, "server reused a task input key for different content");
-        return { record: current };
+        if (options.retryClaimId === undefined) return { record: current };
+        if (options.retryClaimId !== previous.id || previous.state === "acknowledged" || previous.state !== "abandoned" && (previous.expiresAt === undefined || previous.expiresAt > Date.now())) throw taskFailure(binding.serverId, "task input is still active or already acknowledged; cannot retry it");
       }
-      if (Object.keys(current.inputs).length >= 32) throw taskFailure(binding.serverId, "task host-input budget exceeded");
-      const claim: McpTaskInputClaim = { id: randomUUID(), fingerprint, state: "claimed" };
-      const record: McpTaskRecord = { ...current, updatedAt: Math.max(Date.now(), current.updatedAt), inputs: { ...current.inputs, [inputKey]: claim } };
+      const attempts = current.inputAttempts ?? Object.keys(current.inputs).length;
+      if (attempts + (current.initialUsage?.inputs ?? 0) >= 32) throw taskFailure(binding.serverId, "task host-input budget exceeded");
+      const claim: McpTaskInputClaim = { id: randomUUID(), fingerprint, state: "claimed", expiresAt,
+        samplingReservations: previous?.samplingReservations ?? (previous?.samplingReserved ? 1 : 0) };
+      const record: McpTaskRecord = { ...current, inputAttempts: attempts + 1, updatedAt: Math.max(Date.now(), current.updatedAt), inputs: { ...current.inputs, [inputKey]: claim } };
       journal.records[journal.records.indexOf(current)] = record;
       return { record, claim };
     }, signal);
@@ -125,8 +143,17 @@ export class McpTaskJournal {
       if (entry === undefined) throw taskFailure(binding.serverId, "missing unreserved task input claim");
       if (record.samplingCalls >= 4 || record.samplingTokens + maxTokens > 16_384) throw taskFailure(binding.serverId, "task sampling budget exceeded");
       record.samplingCalls++; record.samplingTokens += maxTokens;
-      record.inputs = { ...record.inputs, [entry[0]]: { ...entry[1], samplingReserved: true } };
+      record.inputs = { ...record.inputs, [entry[0]]: { ...entry[1], samplingReserved: true, samplingReservations: (entry[1].samplingReservations ?? 0) + 1 } };
     }, signal);
+  }
+
+  /** End a local attempt, preserving spent budgets and all acknowledged answers. */
+  abandonInput(id: string, owner: SessionOwner, binding: McpTaskBinding, claimId: string): Promise<McpTaskRecord> {
+    return this.change(id, owner, binding, (record) => {
+      const entry = Object.entries(record.inputs).find(([, claim]) => claim.id === claimId);
+      if (entry === undefined || entry[1].state === "acknowledged") return;
+      record.inputs = { ...record.inputs, [entry[0]]: { ...entry[1], state: "abandoned" } };
+    });
   }
 
   /** Persist submitted BEFORE tasks/update; acknowledgement does not mean the task completed. */
@@ -218,7 +245,7 @@ export class McpTaskJournal {
 
 function validateRecord(value: unknown, owner: SessionOwner): asserts value is McpTaskRecord {
   if (!object(value) || value.version !== 1 || !uuid(value.id) || !object(value.owner) || !object(value.binding)) throw new Error();
-  if (Object.keys(value).some((key) => !["version", "id", "owner", "binding", "createdAt", "updatedAt", "status", "remote", "cancellation", "inputs", "samplingCalls", "samplingTokens"].includes(key))) throw new Error();
+  if (Object.keys(value).some((key) => !["version", "id", "owner", "binding", "createdAt", "updatedAt", "status", "remote", "cancellation", "inputs", "samplingCalls", "samplingTokens", "initialUsage", "inputAttempts"].includes(key))) throw new Error();
   validOwner(value.owner as unknown as McpInteractionOwner); validBinding(value.binding as unknown as McpTaskBinding);
   if (value.owner.workspaceId !== owner.workspaceId || value.owner.sessionId !== owner.sessionId || !integer(value.createdAt, 0) || !integer(value.updatedAt, value.createdAt)) throw new Error();
   if (!["starting", "uncertain", "working", "input_required", "completed", "cancelled", "failed"].includes(value.status as string)) throw new Error();
@@ -231,12 +258,16 @@ function validateRecord(value: unknown, owner: SessionOwner): asserts value is M
   if (!integer(value.samplingCalls, 0) || value.samplingCalls > 4 || !integer(value.samplingTokens, 0) || value.samplingTokens > 16_384 || !object(value.inputs) || Object.keys(value.inputs).length > 32) throw new Error();
   const claims = new Set<string>();
   for (const [key, claim] of Object.entries(value.inputs)) {
-    if (!hash(key) || !object(claim) || !uuid(claim.id) || claims.has(claim.id) || !hash(claim.fingerprint) || !["claimed", "submitted", "acknowledged"].includes(claim.state as string) || claim.samplingReserved !== undefined && claim.samplingReserved !== true ||
-        Object.keys(claim).some((key) => !["id", "fingerprint", "state", "samplingReserved"].includes(key))) throw new Error();
+    if (!hash(key) || !object(claim) || !uuid(claim.id) || claims.has(claim.id) || !hash(claim.fingerprint) || !["claimed", "submitted", "acknowledged", "abandoned"].includes(claim.state as string) || claim.samplingReserved !== undefined && claim.samplingReserved !== true ||
+        claim.expiresAt !== undefined && !integer(claim.expiresAt, 0) || claim.samplingReservations !== undefined && (!integer(claim.samplingReservations, claim.samplingReserved ? 1 : 0) || claim.samplingReservations > 4) ||
+        Object.keys(claim).some((key) => !["id", "fingerprint", "state", "samplingReserved", "samplingReservations", "expiresAt"].includes(key))) throw new Error();
     claims.add(claim.id);
   }
-  if (Object.values(value.inputs).filter((claim) => (claim as Record<string, unknown>).samplingReserved).length !== value.samplingCalls ||
-      value.samplingTokens < value.samplingCalls || value.samplingTokens > value.samplingCalls * 4096) throw new Error();
+  const initial = value.initialUsage;
+  if (initial !== undefined && (!object(initial) || !integer(initial.inputs, 0) || initial.inputs + Object.keys(value.inputs).length > 32 || !integer(initial.samplingCalls, 0) || initial.samplingCalls > 4 || !integer(initial.samplingTokens, 0) || initial.samplingTokens > initial.samplingCalls * 4096)) throw new Error();
+  if (value.inputAttempts !== undefined && (!integer(value.inputAttempts, Object.keys(value.inputs).length) || value.inputAttempts + ((initial as { inputs: number } | undefined)?.inputs ?? 0) > 32)) throw new Error();
+  if (Object.values(value.inputs).reduce<number>((total, raw) => { const claim = raw as Record<string, unknown>; return total + (claim.samplingReservations as number | undefined ?? (claim.samplingReserved ? 1 : 0)); }, 0) + ((initial as { samplingCalls: number } | undefined)?.samplingCalls ?? 0) !== value.samplingCalls ||
+      value.samplingTokens < ((initial as { samplingTokens: number } | undefined)?.samplingTokens ?? 0) + value.samplingCalls - ((initial as { samplingCalls: number } | undefined)?.samplingCalls ?? 0) || value.samplingTokens > value.samplingCalls * 4096) throw new Error();
 }
 function validOwner(owner: SessionOwner): void {
   if (!object(owner) || !text(owner.workspaceId, 4096) || !text(owner.sessionId, 1024) || Object.keys(owner).some((key) => !["workspaceId", "sessionId", "runId", "toolCallId"].includes(key)) ||

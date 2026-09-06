@@ -231,5 +231,6 @@ use opt-in single-operation processes/sessions, never guessed ownership on a sha
 connection. See [Host compatibility](../guides/mcp.md#roots-sampling-and-legacy-compatibility).
 
 
-`McpTaskJournal` and `parseMcpTask` provide bounded task persistence/parser APIs,
-not yet a task-enabled client pool. See [task persistence](../guides/mcp-tasks.md).
+`McpTaskJournal`, `parseMcpTask`, `mcpTaskToUserMessage` and pool task APIs support
+opt-in modern Tasks, durable ownership, reviewed input and explicit result attachment.
+See [long-running tasks](../guides/mcp-tasks.md).

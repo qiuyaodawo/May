@@ -12,3 +12,5 @@ export * from "./model-sampler.js";
 export { MCP_TASKS_EXTENSION, parseMcpTask } from "./tasks.js";
 export type { McpRemoteTask, McpTaskState, McpTaskStatus } from "./tasks.js";
 export * from "./task-journal.js";
+export type { McpTaskSnapshot, McpTaskWaitOptions, McpTaskUpdateOptions } from "./task-runtime.js";
+export { mcpTaskToUserMessage } from "./task-runtime.js";

@@ -21,6 +21,7 @@ import {
   KeyringMcpCredentialStore,
   McpOAuthManager,
   McpInteractionBroker,
+  McpTaskJournal,
   createMcpModelSampler,
   type McpHostRequestContext,
   type McpServerHostOptions,
@@ -89,6 +90,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
 export interface MaybeCodeMcpOptions {
   readonly servers: readonly McpServerOptions[];
   readonly oauth?: McpOAuthManager;
+  readonly taskJournal?: McpTaskJournal;
 }
 
 export interface MaybeCodeObservabilityOptions {
@@ -205,6 +207,9 @@ export async function openConfiguredMaybeCode(
     if (mcpOptions !== false && mcpOptions.servers.length > 0) {
       mcp = await (dependencies.openMcp ?? openMcpClientPool)({
         servers: mcpOptions.servers,
+        ...(mcpOptions.servers.some((server) => server.tasks) ? {
+          taskJournal: mcpOptions.taskJournal ?? new McpTaskJournal(new KeyringMcpCredentialStore(join(dataDirectory, "mcp-tasks"))),
+        } : {}),
         ...(options.mcpInteractions === true ? { interactions: new McpInteractionBroker() } : {}),
         hostServices: {
           roots: async (context) => { checkHostOwner(context); return [{ uri: pathToFileURL(workspace).href, name: "MaybeCode workspace" }]; },
@@ -320,6 +325,7 @@ export function resolveMaybeCodeMcp(
         "transport",
         "protocolMode",
         "host",
+        "tasks",
         "url",
         "headers",
         "auth",
@@ -361,6 +367,7 @@ export function resolveMaybeCodeMcp(
       id,
       ...(server.required === undefined ? {} : { required: server.required }),
       ...(server.protocolMode === undefined ? {} : { protocolMode: server.protocolMode }),
+      ...(server.tasks === undefined ? {} : { tasks: server.tasks as boolean }),
       ...(server.host === undefined ? {} : { host: objectValue(server.host, `${field}.host`) as McpServerHostOptions }),
       ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
       ...(maxTotalTimeoutMs === undefined ? {} : { maxTotalTimeoutMs }),

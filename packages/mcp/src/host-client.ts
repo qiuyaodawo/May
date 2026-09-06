@@ -1,6 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
-import { Client, SdkError, SdkErrorCode, type RequestOptions } from "@modelcontextprotocol/client";
+import { Client, SdkError, SdkErrorCode, specTypeSchemas, type RequestOptions, type Tool } from "@modelcontextprotocol/client";
+import { McpTaskWire } from "./task-wire.js";
+import { object, taskFailure } from "./tasks.js";
 import { McpCapabilityError } from "./errors.js";
 import type { McpInteractionBroker, McpInteractionOwner } from "./interactions.js";
 import { McpHostServiceRunner, hostFailure, type McpHostServices, type McpInputBinding, type McpServerHostOptions } from "./host-services.js";
@@ -16,6 +18,54 @@ export class McpHostClient extends Client {
   private readonly activeInput = new AsyncLocalStorage<Binding>();
   private serverId = "";
   private legacyBinding: Binding | undefined;
+  private readonly taskWire = new McpTaskWire(() => this.serverId, () => this.transport, () => this._outboundMetaEnvelope());
+
+  protected override _onresponse(...args: Parameters<Client["_onresponse"]>): void {
+    if (!this.taskWire.receive(args[0])) super._onresponse(...args);
+  }
+  protected override _onnotification(...args: Parameters<Client["_onnotification"]>): void {
+    if (!this.taskWire.notification(args[0])) super._onnotification(...args);
+  }
+  protected override _onclose(): void { this.taskWire.close(); super._onclose(); }
+
+  async taskRequest(method: "tools/call" | "tasks/get" | "tasks/update" | "tasks/cancel", params: Record<string, unknown>, options: RequestOptions, definition?: Tool): Promise<Record<string, unknown>> {
+    const started = Date.now();
+    const result = await this.taskWire.request(method, params, options, definition);
+    if (result.resultType !== "input_required") return result;
+    if (method !== "tools/call") throw taskFailure(this.serverId, "task management must use task inputRequests, not MRTR");
+    const decoded = this._wireCodec().decodeResult(method, result);
+    if (decoded.kind !== "input_required") throw taskFailure(this.serverId, "invalid task-creation MRTR result");
+    return await this._resolveNonCompleteResult(decoded, { codec: this._wireCodec(), request: { method, params },
+      options, flowStartedAt: started, resultSchema: specTypeSchemas.CallToolResult,
+      // The driver owns subsequent MRTR rounds; this callback only sends one leg.
+      retry: (next, leg) => this.taskWire.request(method, next ?? {}, leg, definition),
+    }) as Record<string, unknown>;
+  }
+
+  /** Reuse the SDK's registered/validated host handlers without a protocol retry. */
+  async fulfillTaskInput(options: RequestOptions, key: string, input: unknown, beforeSampling: (maxTokens: number) => Promise<void>): Promise<unknown> {
+    const binding = (options as ScopedRequest)[bindingKey];
+    if (binding === undefined) throw taskFailure(this.serverId, "missing task interaction scope");
+    binding.beforeSampling = beforeSampling;
+    let responses: Record<string, unknown> | undefined;
+    try {
+      await this._resolveNonCompleteResult({ kind: "input_required", inputRequests: { [key]: input } }, {
+        codec: this._wireCodec(), request: { method: "tasks/update" }, resultSchema: specTypeSchemas.EmptyResult,
+        options, flowStartedAt: Date.now(), retry: async (params) => {
+          if (object(params?.inputResponses)) responses = params.inputResponses;
+          return {};
+        },
+      });
+      if (responses === undefined || !Object.hasOwn(responses, key)) throw taskFailure(this.serverId, "task input did not produce a response");
+      return responses[key];
+    } finally { delete binding.beforeSampling; }
+  }
+
+  taskInitialUsage(options: RequestOptions) {
+    const binding = (options as ScopedRequest)[bindingKey];
+    return { inputs: binding?.count ?? 0, samplingCalls: binding?.samplingCalls ?? 0, samplingTokens: binding?.samplingTokens ?? 0 };
+  }
+  taskDeadline(options: RequestOptions): number { return (options as ScopedRequest)[bindingKey]?.expiresAt ?? Date.now() + 60_000; }
 
   configureHost(serverId: string, broker?: McpInteractionBroker, options?: McpServerHostOptions, services?: McpHostServices): void {
     this.serverId = serverId;

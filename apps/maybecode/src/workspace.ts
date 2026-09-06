@@ -12,9 +12,9 @@ import {
   type Model,
   type RunOptions,
 } from "@may/core";
-import { mcpResourceToUserMessage, mcpPromptToUserMessage, type McpClientPool, type McpServerStatus,
+import { mcpResourceToUserMessage, mcpPromptToUserMessage, mcpTaskToUserMessage, type McpClientPool, type McpServerStatus,
   type McpOperationOptions, type McpReadOptions, type McpCompletionParams, type McpResourceSubscription,
-  type McpInteractionBroker,
+  type McpInteractionBroker, type McpTaskWaitOptions, type McpTaskUpdateOptions,
 } from "@may/mcp";
 import type { ApprovalDecision } from "@may/permissions";
 import type { ModelCapabilities } from "@may/providers";
@@ -216,6 +216,31 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.state.options.mcp?.catalog?.() ?? [];
   }
 
+  listMcpTasks() {
+    this.throwIfClosed();
+    return this.state.options.mcp?.listTasks?.(this.mcpOwner()) ?? Promise.resolve([]);
+  }
+  getMcpTask(serverId: string, id: string, options: McpOperationOptions = {}) {
+    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("getTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+  }
+  updateMcpTask(serverId: string, id: string, options: McpOperationOptions & McpTaskUpdateOptions = {}) {
+    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("updateTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+  }
+  waitMcpTask(serverId: string, id: string, options: McpOperationOptions & McpTaskWaitOptions = {}) {
+    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("waitTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+  }
+  cancelMcpTask(serverId: string, id: string, options: McpOperationOptions = {}) {
+    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("cancelTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+  }
+  forgetMcpTask(serverId: string, id: string) {
+    return this.mcpOperation(() => this.manager.runStateTransition(() => this.mcpMethod("forgetTask")(serverId, id, this.mcpOwner())));
+  }
+  submitMcpTask(serverId: string, id: string, instruction?: string): Promise<MaybeCodeRun> {
+    return this.mcpOperation((signal) => this.manager.submitPrepared(async () => ({
+      input: mcpTaskToUserMessage(await this.mcpMethod("getTask")(serverId, id, { signal, owner: this.mcpOwner() }), instruction), signal,
+    })));
+  }
+
   readMcpResource(serverId: string, uri: string, options: McpReadOptions = {}) {
     return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("readResource")(serverId, uri, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
@@ -267,7 +292,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     await this.mcpWatches.get(JSON.stringify([serverId, uri]))?.close();
   }
 
-  private mcpMethod<K extends "readResource" | "readResourceTemplate" | "getPrompt" | "complete" | "subscribeResource">(method: K): McpClientPool[K] {
+  private mcpMethod<K extends "readResource" | "readResourceTemplate" | "getPrompt" | "complete" | "subscribeResource" | "getTask" | "updateTask" | "waitTask" | "cancelTask" | "forgetTask">(method: K): McpClientPool[K] {
     const mcp = this.state.options.mcp;
     if (mcp?.[method] === undefined) throw new Error(`MCP ${method} is unavailable`);
     return mcp[method].bind(mcp) as McpClientPool[K];

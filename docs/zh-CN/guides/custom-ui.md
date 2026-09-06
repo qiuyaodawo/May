@@ -179,3 +179,12 @@ sampling 审阅可通过 `{ action: "accept", content: { json: editedDocument } 
 提交替换 JSON，或省略 content 同意当前展示内容。不得自动批准任一 sampling 阶段。
 拒绝/取消、settled/截止时间处理与表单相同。审阅不代表打开浏览器、提交 Session、
 记录输入历史或执行本机工具。
+
+### MCP 任务控制
+
+使用 `listMcpTasks`、`getMcpTask`、`updateMcpTask`、`waitMcpTask`、`cancelMcpTask`、
+`forgetMcpTask` 显式操作当前 Session 的任务。展示本地句柄及不可信有界状态，不要
+自动追加到聊天。`submitMcpTask` 显式准备完成结果并启动 Run。任务输入共用上述交互
+事件，重启后保留原始 owner；必须在状态转换队列之外回答。区分本地中止、远端取消
+意图及已观察到的终态。重试放弃/过期输入需要显式 `retryAbandonedInputs: true`
+和新审阅，不能自动重发。预算、命令和恢复限制参阅[任务](./mcp-tasks.md)。

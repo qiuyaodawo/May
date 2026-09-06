@@ -256,3 +256,9 @@ Schema 和本文档都是面向用户的参考。新增或修改内置 adapter �
 不保留操作间的服务端会话状态。参阅 [Host 兼容](../guides/mcp.md) 中的同意机制、
 预算与自定义服务。内置编辑器 schema 已覆盖 HTTP、OAuth 和 Host 字段；运行时还会
 检查端点/请求头安全约束。
+
+两种传输还支持 `tasks: true`（默认 `false`），要求现代 2026-07-28 及服务端 Tasks
+扩展。stdio 还需 `protocolMode: "auto"`。MaybeCode 默认使用
+`<dataDirectory>/mcp-tasks` 加密 journal；自定义池 Host 必须注入 `taskJournal`。
+存储失败阻止任务创建。Host 输入仍需相应显式服务及交互 UI。控制命令和重启边界
+参阅[长任务](../guides/mcp-tasks.md)。

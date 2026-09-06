@@ -34,6 +34,9 @@ import {
 import { McpCapabilities } from "./capabilities.js";
 import { McpHostClient, mcpOwner } from "./host-client.js";
 import { hostCapabilities, hostFailure } from "./host-services.js";
+import { McpTaskRuntime, type McpTaskWaitOptions, type McpTaskUpdateOptions } from "./task-runtime.js";
+import { MCP_TASKS_EXTENSION, taskFailure } from "./tasks.js";
+import type { McpInteractionOwner } from "./interactions.js";
 import { assertMcpContentSize, mcpToolResultContent } from "./content.js";
 import { namespaceMcpToolName } from "./names.js";
 import { McpAuthenticationError } from "./oauth.js";
@@ -78,6 +81,9 @@ class McpConnection {
   private isolatedLegacy = false;
   private parentGuard: (() => Promise<void>) | undefined;
   private readonly legacyOperations = new Set<Promise<unknown>>();
+  private taskRuntime: McpTaskRuntime | undefined;
+  private readonly taskOperations = new Set<Promise<unknown>>();
+  private closeResult: Promise<void> | undefined;
 
   private constructor(
     readonly options: McpServerOptions,
@@ -90,6 +96,15 @@ class McpConnection {
     private readonly poolOptions: OpenMcpClientPoolOptions,
   ) {
     this.capabilities = new McpCapabilities(client, options, (method, options, work) => this.runCapability(method, options, work));
+    if (options.tasks && poolOptions.taskJournal !== undefined) this.taskRuntime = new McpTaskRuntime(options.id, client, poolOptions.taskJournal, async (name) => {
+      this.throwIfClosed(); await this.checkAuthorization();
+      const definition = this.catalog?.tools.find((tool) => tool.name === name);
+      if (this.stale || definition === undefined) throw new McpStaleToolError(options.id);
+      const destination = options.transport === "streamable-http"
+        ? ["streamable-http", new URL(options.url).href, Object.entries(options.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]).sort(), this.authorizationIdentity]
+        : ["stdio", options.command, options.args, options.cwd, options.env];
+      return { definition, binding: { serverId: options.id, protocolVersion: "2026-07-28", endpointIdentity: fingerprint(destination), toolName: name, toolDefinitionHash: fingerprint(definition) } };
+    });
   }
 
   static async open(
@@ -173,6 +188,7 @@ class McpConnection {
       }
       connection.connected = true;
       const advertised = client.getServerCapabilities();
+      if (options.tasks && (client.getNegotiatedProtocolVersion() !== "2026-07-28" || advertised?.extensions?.[MCP_TASKS_EXTENSION] === undefined)) throw taskFailure(options.id, "endpoint does not support the enabled 2026-07-28 Tasks extension");
       const expected = {
         toolsListChanged: advertised?.tools?.listChanged,
         resourcesListChanged: advertised?.resources?.listChanged,
@@ -318,7 +334,8 @@ class McpConnection {
         ? this.withLegacyIsolation(request.signal!, (connection, signal) => connection.callTool(definition, exposedName, input, { ...context, signal }, connection.generation)
           // The child has already validated the SDK result and thrown any tool error.
           .then((output) => ({ ...output, content: [...output.content] }) as CallToolResult))
-        : this.client.callTool({ name: definition.name, arguments: input }, request), this.isolatedLegacy);
+        : this.taskRuntime === undefined ? this.client.callTool({ name: definition.name, arguments: input }, request)
+        : this.trackTask(() => this.taskRuntime!.start(definition, input, this.taskOwner(mcpOwner(context.scope, context.runId, context.toolCallId)), request)), this.isolatedLegacy);
       context.signal.throwIfAborted();
       await this.checkAuthorization();
       assertMcpContentSize(result);
@@ -408,7 +425,7 @@ class McpConnection {
     return operation;
   }
 
-  private async runCapability<T>(method: string, options: McpOperationOptions, work: (request: RequestOptions, client: Client) => Promise<T>): Promise<T> {
+  private async runCapability<T>(method: string, options: McpOperationOptions, work: (request: RequestOptions, client: Client) => Promise<T>, wholeTimeoutMs?: number): Promise<T> {
     this.throwIfClosed();
     const signal = AbortSignal.any([this.lifetime.signal, ...(options.signal === undefined ? [] : [options.signal])]);
     signal.throwIfAborted();
@@ -420,7 +437,7 @@ class McpConnection {
     try {
       await this.checkAuthorization();
       signal.throwIfAborted();
-      const request = this.client.scope(requestOptions(this.options, signal), options.owner, this.lifetime.signal, async () => {
+      const request = this.client.scope({ ...requestOptions(this.options, signal), ...(wholeTimeoutMs === undefined ? {} : { maxTotalTimeout: wholeTimeoutMs }) }, options.owner, this.lifetime.signal, async () => {
         await this.checkAuthorization();
         if (this.stale) throw new McpCapabilityError(this.options.id, "catalog changed during interaction; start a new operation");
       });
@@ -441,12 +458,39 @@ class McpConnection {
     } finally { this.activeCalls--; }
   }
 
-  async close(): Promise<void> {
-    if (this.closed) return;
+  taskOperation(action: "get" | "update" | "wait", id: string, options: McpOperationOptions & McpTaskWaitOptions & McpTaskUpdateOptions) {
+    if (options.retryAbandonedInputs !== undefined && typeof options.retryAbandonedInputs !== "boolean") throw taskFailure(this.options.id, "invalid task input retry option");
+    if (action === "wait" && options.timeoutMs !== undefined && (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 86_400_000)) throw taskFailure(this.options.id, "invalid local task wait budget");
+    const runtime = this.requireTaskRuntime(); const owner = this.taskOwner(options.owner);
+    return this.trackTask(() => this.runCapability(`tasks/${action}`, options, (request) => action === "wait"
+      ? runtime.wait(id, owner, request, options) : action === "update" ? runtime.update(id, owner, request, options) : runtime.get(id, owner, request), action === "wait" ? options.timeoutMs ?? 300_000 : undefined));
+  }
+  cancelTask(id: string, options: McpOperationOptions) {
+    const runtime = this.requireTaskRuntime(); const owner = this.taskOwner(options.owner);
+    return this.trackTask(() => this.runCapability("tasks/cancel", options, (request) => runtime.cancel(id, owner, request)));
+  }
+  private trackTask<T>(work: () => Promise<T>): Promise<T> {
+    const operation = work(); this.taskOperations.add(operation);
+    void operation.then(() => this.taskOperations.delete(operation), () => this.taskOperations.delete(operation));
+    return operation;
+  }
+  private taskOwner(owner: McpInteractionOwner | undefined): McpInteractionOwner {
+    if (!owner?.workspaceId || !owner.sessionId) throw taskFailure(this.options.id, "Tasks require a trusted workspace/Session owner");
+    return owner;
+  }
+  private requireTaskRuntime(): McpTaskRuntime {
+    if (this.taskRuntime === undefined) throw taskFailure(this.options.id, "Tasks are not enabled on this endpoint");
+    return this.taskRuntime;
+  }
+
+  close(): Promise<void> { return this.closeResult ??= this.closeOwned(); }
+
+  private async closeOwned(): Promise<void> {
     this.closing = true;
     this.closed = true;
     this.lifetime.abort("MCP connection is closing");
     await Promise.allSettled(this.legacyOperations);
+    await Promise.allSettled(this.taskOperations);
     await this.capabilities.close();
     const span = startTraceSpan(this.tracer, "may.mcp.disconnect", {
       attributes: this.traceAttributes,
@@ -654,6 +698,21 @@ class DefaultMcpClientPool implements McpClientPool {
     return this.connection(serverId).capabilities.subscribe(uri, { ...options, signal: this.signal(options.signal) });
   }
 
+  async listTasks(owner: McpInteractionOwner) {
+    if (this.closed) throw new McpClientPoolClosedError();
+    return this.options.taskJournal?.list(owner) ?? [];
+  }
+  getTask(serverId: string, id: string, options: McpOperationOptions = {}) { return this.connection(serverId).taskOperation("get", id, { ...options, signal: this.signal(options.signal) }); }
+  updateTask(serverId: string, id: string, options: McpOperationOptions & McpTaskUpdateOptions = {}) { return this.connection(serverId).taskOperation("update", id, { ...options, signal: this.signal(options.signal) }); }
+  waitTask(serverId: string, id: string, options: McpOperationOptions & McpTaskWaitOptions = {}) { return this.connection(serverId).taskOperation("wait", id, { ...options, signal: this.signal(options.signal) }); }
+  cancelTask(serverId: string, id: string, options: McpOperationOptions = {}) { return this.connection(serverId).cancelTask(id, { ...options, signal: this.signal(options.signal) }); }
+  async forgetTask(serverId: string, id: string, owner: McpInteractionOwner): Promise<void> {
+    if (this.closed) throw new McpClientPoolClosedError();
+    const record = (await this.listTasks(owner)).find((record) => record.id === id && record.binding.serverId === serverId);
+    if (record === undefined) throw taskFailure(serverId, "task not owned by this Session");
+    await this.options.taskJournal!.forget(id, owner, record.binding, this.lifetime.signal);
+  }
+
   private connection(serverId: string): McpConnection {
     if (this.closed) throw new McpClientPoolClosedError();
     const connection = this.entry(serverId).connection;
@@ -825,6 +884,7 @@ export async function openMcpClientPool(options: OpenMcpClientPoolOptions): Prom
   const serverIds = new Set<string>();
   for (const server of options.servers) {
     validateMcpServerOptions(server);
+    if (server.tasks && options.taskJournal === undefined) throw new McpConfigurationError(`MCP server "${server.id}" enables Tasks without a task journal`);
     if (options.interactions !== undefined && (server.host?.roots && options.hostServices?.roots === undefined || server.host?.sampling && options.hostServices?.sampling === undefined)) throw new McpConfigurationError(`MCP server "${server.id}" enables a missing host service`);
     if (serverIds.has(server.id)) throw new McpConfigurationError(`Duplicate MCP server id: ${server.id}`);
     serverIds.add(server.id);

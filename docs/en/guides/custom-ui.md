@@ -193,3 +193,15 @@ Roots are read-only; sampling reviews can submit replacement JSON through
 the displayed document. Never auto-approve either sampling stage. Decline/cancel
 and settled/deadline handling are the same as forms. No browser, Session submission,
 input-history entry or local tool execution is implied by review.
+
+### MCP task controls
+
+Use `listMcpTasks`, `getMcpTask`, `updateMcpTask`, `waitMcpTask`, `cancelMcpTask`
+and `forgetMcpTask` for explicit current-Session controls. Show local handles and
+untrusted bounded state, never silently append results to chat. `submitMcpTask`
+explicitly prepares a completed result and starts a Run. Task input shares the
+interaction events above and retains the originating owner after restart; answer
+outside the transition queue. Distinguish local abort, remote cancellation intent
+and observed terminal state. Retrying abandoned/expired input requires explicit
+`retryAbandonedInputs: true` and fresh review, not automatic resubmission. See
+[tasks](./mcp-tasks.md) for budgets, commands and recovery restrictions.

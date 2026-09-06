@@ -78,6 +78,13 @@ export interface MaybeCodeController extends AgentWorkspaceController<
   readMcpResourceTemplate?: McpClientPool["readResourceTemplate"];
   getMcpPrompt?: McpClientPool["getPrompt"];
   completeMcp?: McpClientPool["complete"];
+  listMcpTasks?(): ReturnType<McpClientPool["listTasks"]>;
+  getMcpTask?: McpClientPool["getTask"];
+  updateMcpTask?: McpClientPool["updateTask"];
+  waitMcpTask?: McpClientPool["waitTask"];
+  cancelMcpTask?: McpClientPool["cancelTask"];
+  forgetMcpTask?(serverId: string, id: string): Promise<void>;
+  submitMcpTask?(serverId: string, id: string, instruction?: string): Promise<import("./events.js").MaybeCodeRun>;
   watchMcpResource?(serverId: string, uri: string): Promise<McpResourceSubscription>;
   unwatchMcpResource?(serverId: string, uri: string): Promise<void>;
   submitMcpResource?(serverId: string, uri: string, instruction?: string): Promise<import("./events.js").MaybeCodeRun>;

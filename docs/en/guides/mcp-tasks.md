@@ -1,97 +1,151 @@
-# MCP task persistence
+# MCP long-running tasks
 
 **English** | [简体中文](../../zh-CN/guides/mcp-tasks.md)
 
-## Current implementation boundary
+## Supported boundary
 
-`@may/mcp` provides the task-frame parser and durable ownership journal described
-below. **The client pool does not yet advertise Tasks, create remote task handles,
-poll, update, cancel or expose task commands in MaybeCode.** Storage groundwork
-is not end-to-end Tasks support; runtime integration remains unchecked in the
-[roadmap](../architecture/mcp-host-roadmap.md).
+`@may/mcp` and MaybeCode support opt-in task creation, inspection, reviewed input,
+waiting, cooperative cancellation and owner-bound recovery over modern stdio and
+Streamable HTTP. This targets the
+[2026-07-28 Tasks extension](https://tasks.extensions.modelcontextprotocol.io/specification/2026-07-28/tasks),
+`io.modelcontextprotocol/tasks`: flat task handles and `tasks/get`, `tasks/update`,
+`tasks/cancel`. The incompatible 2025 experimental `tasks/list`/`tasks/result`
+protocol is not supported. Optional task subscription notifications are not
+implemented; explicit polling is supported. Apps and server export remain separate
+[roadmap](../architecture/mcp-host-roadmap.md) phases.
 
-This API targets the [2026-07-28 Tasks extension](https://tasks.extensions.modelcontextprotocol.io/specification/2026-07-28/tasks),
-identified as `io.modelcontextprotocol/tasks`. That wire format uses a flat task
-handle and `tasks/get`, `tasks/update`, `tasks/cancel`, rather than the incompatible
-2025 experimental `tasks/list`/`tasks/result` lifecycle. Extension support must
-eventually be negotiated separately from core protocol support.
+Enable `tasks: true` on an endpoint (default `false`). Both the negotiated core
+version `2026-07-28` and server Tasks extension are required; an incompatible
+required endpoint fails startup. Stdio defaults to legacy, so also select
+`protocolMode: "auto"` for a modern task server. The extension is advertised only
+on task-enabled `tools/call` and task-management requests, not globally and not on
+resource/prompt requests. Immediate tool results remain supported.
 
-## Storage API
+```json
+{
+  "apps": { "maybecode": { "mcpServers": {
+    "jobs": {
+      "transport": "streamable-http",
+      "url": "https://jobs.example.com/mcp",
+      "tasks": true,
+      "host": { "sampling": true }
+    }
+  } } }
+}
+```
+
+MaybeCode supplies a separate encrypted OS-keyring-backed journal at
+`<dataDirectory>/mcp-tasks`. Custom hosts must pass `taskJournal` to
+`openMcpClientPool` when enabling Tasks:
 
 ```ts
 import { KeyringMcpCredentialStore, McpTaskJournal } from "@may/mcp";
-
-// Use a separate vault directory; its encryption key is stored in the OS keyring.
-const journal = new McpTaskJournal(new KeyringMcpCredentialStore(taskVaultDirectory));
-const records = await journal.list({ workspaceId, sessionId });
+const taskJournal = new McpTaskJournal(new KeyringMcpCredentialStore(taskVaultDirectory));
 ```
 
-The journal reuses the transactional `McpCredentialStore` port, not OAuth records.
-An injected secure store works for custom hosts; `InMemoryMcpCredentialStore`
-deliberately loses task recovery on process exit. One shared store must serve all
-Sessions whose task ownership needs isolation. Independent stores cannot enforce
-cross-store ownership.
+An injected secure `McpCredentialStore` is supported. `InMemoryMcpCredentialStore`
+deliberately loses recovery on exit. Share one store across all Sessions requiring
+ownership isolation; independent stores cannot enforce cross-store ownership.
 
-- `begin(owner, binding)` writes a host-generated local handle **before** any
-  task-capable call. Failure must prevent the send. The caller supplies the trusted
-  workspace/Session/Run/tool-call owner, protocol version, server/tool names, opaque
-  endpoint/authorization identity and complete tool-definition hash. The endpoint
-  identity must be stable across restart, identify the actual destination and
-  authorization grant (not just a config alias), and change when that identity
-  changes. The journal does not discover or authenticate these identities itself.
-- `observe(..., raw, "created" | "state")` validates and binds metadata. Later
-  polls must preserve the remote id/creation time; timestamps cannot go backwards
-  and terminal states cannot change. A state poll cannot bind a previously unknown
-  handle. A cross-Session ownership index prevents remote-id reuse, even after
-  local history is forgotten. The host still validates final tool output against
-  the original definition before using it.
-- `get` requires the current binding and Session; `list` reads only the local
-  Session partition. Neither makes remote calls. `uncertain` records an unknown
-  initial outcome without authorizing replay. A recovered `starting` record can
-  also represent a crash window; do not interpret it as safe to send again.
-- `claimInput` atomically reserves a unique key/content fingerprint before UI or
-  model work; concurrent/repeated polls do not obtain a second claim. Changed
-  content under an existing key fails closed. Callers must only claim keys from
-  a validated current task response. `reserveSampling` persists approved usage
-  before a provider call, once per claim. `markInput("submitted")` precedes
-  `tasks/update`; acknowledgement is recorded separately. Neither answers nor
-  model output are stored. Interrupted claims remain reserved after restart;
-  they must not silently prompt, bill or submit again.
-- `cancelIntent("requested" | "acknowledged")` records remote cancellation
-  separately from task status. An acknowledgement is not proof of cancellation;
-  subsequent successful completion remains possible. Stopping local waiting
-  requires no remote-cancellation journal write. `forget` only removes the local
-  Session record and does not cancel or delete remote work.
+## User controls and Context
 
-The journal never invokes a model, fulfills a host request, sends an RPC, polls,
-retries, attaches Context or grants tool permission. An integrating runtime must
-enforce those boundaries and check current authorization/catalog state before
-each network or host-service action.
+Task creation is a normal MCP tool call through the Core permission/execution
+pipeline. A deferred result gives the model only a **local task handle**, not an
+invitation to repeat the call. Management APIs are explicit host controls, not
+implicitly exposed model tools. Both terminal UIs share these commands:
 
-## Limits and recovery
+| Command | Effect |
+| --- | --- |
+| `/mcp tasks [server]` | List this Session's local metadata; no network |
+| `/mcp task-get server local-id` | Fetch and preview current state |
+| `/mcp task-wait server local-id` | Poll while working; stop at input-required or terminal |
+| `/mcp task-update server local-id` | Review and fulfill current unclaimed inputs |
+| `/mcp task-retry-input server local-id` | Explicitly re-review abandoned/expired unacknowledged input |
+| `/mcp task-cancel server local-id` | Send cooperative remote cancellation |
+| `/mcp task-forget server local-id` | Remove local history only |
+| `/mcp task-attach server local-id [question]` | Explicitly attach a completed result to a new Run |
 
-Each Session retains at most 64 records / 512 KiB. Each task permits 32 unique
-host-input claims, four sampling reservations and 16,384 reserved output tokens,
-at most 4,096 per reservation. The ownership index retains up to 1,024 hashed
-remote-id tombstones per endpoint identity. It fails closed when full; explicit
-store maintenance requires auditing outstanding handles before removing that
-identity's tombstones. Local forgetting does not remove them automatically.
+Preview, polling and notifications never append results to Context. Attachment
+uses bounded, provenance-labelled user content, preserves multimodal/structured
+results and validates the original tool's output schema (`isError` results need
+not satisfy a success schema). Previewed server content is untrusted and terminal
+output is sanitized. Neither task form answers nor sampling input/output reviews
+are placed in Session history.
 
-Only routing metadata, timestamps, status and hashed claims are persisted—not
-arguments, status messages, input requests, answers, errors or final results.
-Remote ids and owner labels are encrypted by the keyring vault. An ownership
-reservation precedes the Session update, so a partial write leaves a restrictive
-tombstone, never an id another Session can claim. A normal reopen restores the
-metadata without network activity. Corrupt data or an unavailable keyring fails
-closed; unknown formats are not silently migrated. As with the credential vault,
-a crashed process can leave a `.lock` file: verify that its recorded PID has
-exited before removing that specific stale lock. Never reset the vault to make
-an unknown task outcome look safe to replay.
+Pool APIs are `listTasks(owner)`, `getTask`, `updateTask`, `waitTask`, `cancelTask`
+(with server id, local id and trusted owner options), and
+`forgetTask(serverId, localId, owner)`. `mcpTaskToUserMessage` performs explicit
+completed-result adaptation. MaybeCode exposes corresponding `*McpTask` controller
+methods plus `listMcpTasks` and `submitMcpTask`; it supplies the current
+workspace/Session itself and pins state transitions. UIs must answer interaction
+events outside that queue, just as for [Host interactions](mcp.md).
 
-`parseMcpTask` validates the extension discriminator, flat id, states, timestamps,
-TTL/poll hints and bounded status-specific payload shape. It does not validate
-final tool schemas or execute input requests; no TTL or polling policy is hidden
-inside storage. Evidence: `packages/mcp/test/task-journal.test.mjs` covers in-memory
-and encrypted reopen, owner/auth/tool mismatch, cross-Session duplicate ids,
-partial writes, input deduplication/budgets, cancellation races, bounds and tamper
-rejection. These are storage/parser checks, not remote-server conformance tests.
+## Ownership, input and cancellation
+
+A write-ahead local record must succeed **before** sending a task-capable call.
+The runtime binds the original workspace/Session/Run/tool-call owner, actual
+endpoint and authorization identity, protocol version and complete tool definition.
+Each later action checks the current binding and catalog. Changing credentials,
+destination or tool definition fails closed; merely retaining the same config
+alias grants no access. Normal restart reuses a stable identity, never a former
+connection's request ids. A received remote handle is persisted even if its Run
+has just been cancelled. Unknown initial outcomes remain `starting`/`uncertain`
+and are never replayed automatically.
+
+`task-update` uses the existing reviewed form/URL/Roots/Sampling host services.
+Roots/Sampling still require explicit Host options and an interaction consumer.
+The original owner is retained after restart; task input cannot read Session
+history or invoke local tools. Each input key/content fingerprint is claimed
+before UI work; submission is recorded before RPC, acknowledgement separately.
+Repeated polling does not prompt or bill again. A reused key with changed content
+fails closed. Answers themselves are never persisted.
+
+Ordinary update does not retry reserved input. `task-retry-input` (API option
+`retryAbandonedInputs: true`) requests a fresh review only for abandoned or expired
+unacknowledged claims, using an atomic prior-claim check. It never resets budgets,
+replays tool creation, or resends stored answers. Acknowledged input cannot be
+retried. A lost update acknowledgement can represent accepted remote input: poll
+first, and retry only after understanding that uncertainty. Claims have bounded
+operation deadlines; legacy claims without a deadline are not treated as expired.
+
+Waiting defaults to five minutes, configurable up to one day via `waitTask`.
+Per-request timeouts still apply. Polling respects the server interval (minimum
+250 ms; default one second). Expired TTL fails locally. Ctrl+C, a wait deadline,
+connection close or application shutdown stops **local** work only; it does not
+send remote cancellation. `task-cancel` records intent and acknowledgement, not a
+terminal state: remote completion can win the race. Forgetting does not cancel or
+delete remote work. There is no automatic background polling, model invocation,
+reconnect/replay or Context attachment after restart.
+
+## Storage, budgets and evidence
+
+Each Session retains at most 64 records / 512 KiB. Initial creation MRTR usage
+carries into each task's persistent lifetime budget: 32 host-input attempts
+(including retries), four sampling reservations and 16,384 reserved output tokens,
+with at most 4,096 per reservation. Approved sampling usage is persisted before
+the provider call; cancellation, withheld output and retry never refund it.
+
+Only routing metadata, timestamps, status, cancellation intent and hashed claims
+are persisted—not arguments, status messages, input payloads, answers, errors or
+results. Remote ids and owner labels are encrypted in the keyring vault. The
+cross-Session index retains at most 1,024 hashed remote-id tombstones per endpoint
+identity, even after forgetting. Reservation precedes Session binding, so partial
+writes leave restrictive tombstones. A full index requires explicit maintenance
+after auditing outstanding handles; it is not silently evicted.
+
+`McpTaskJournal` supplies `begin`, `initialUsage`, `observe`, `get`/`list`,
+`uncertain`, `claimInput`, `reserveSampling`, `markInput`, `abandonInput`,
+`cancelIntent` and `forget`. The journal itself sends no RPC and grants no
+permission. `parseMcpTask` validates bounded native frames; the runtime additionally
+validates completed tool content/schema. Corruption or an unavailable keyring
+fails closed. If a crash leaves a vault `.lock`, verify its recorded PID has exited
+before removing that specific stale lock; never reset the vault to justify replay.
+
+The extension channel owns distinct string RPC ids, without accessing private SDK
+request maps or fabricating core tool responses. HTTP management requests carry
+`Mcp-Name` task routing; tool requests preserve supported `x-mcp-header` routing.
+Diagnostics omit server RPC error text and input payloads. Evidence:
+`task-journal.test.mjs`, `task-runtime.test.mjs` (HTTP and real stdio process restart,
+review/retry, cancellation races, changed identities and output validation), and
+MaybeCode's `mcp-capabilities.test.mjs` (permission gate, terminal input and explicit
+attachment). These focused fixtures do not claim universal third-party conformance.

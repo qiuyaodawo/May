@@ -354,6 +354,7 @@
         "transport": { "const": "stdio", "default": "stdio" },
         "protocolMode": { "enum": ["legacy", "auto"], "default": "legacy" },
         "host": { "$ref": "#/$defs/mcpHostOptions" },
+        "tasks": { "type": "boolean", "default": false, "description": "Enable the modern Tasks extension with durable encrypted handles." },
         "command": { "$ref": "#/$defs/nonEmptyString" },
         "args": {
           "type": "array",
@@ -393,6 +394,7 @@
         "auth": { "$ref": "#/$defs/mcpOAuthOptions" },
         "protocolMode": { "enum": ["legacy", "auto"], "default": "auto" },
         "host": { "$ref": "#/$defs/mcpHostOptions" },
+        "tasks": { "type": "boolean", "default": false, "description": "Enable the modern Tasks extension with durable encrypted handles." },
         "requestTimeoutMs": { "$ref": "#/$defs/positiveInteger" },
         "maxTotalTimeoutMs": { "$ref": "#/$defs/positiveInteger" }
       },
