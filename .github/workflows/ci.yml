@@ -34,11 +34,15 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Build
+        id: build
         run: pnpm build
       - name: Check bilingual documentation
         run: pnpm docs:check
       - name: Run offline tests
         run: pnpm test
+      - name: Run full suite with temporary path aliases
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm test:path-alias
       - name: Run deterministic example
         run: pnpm example
       - name: Check May CLI entry point

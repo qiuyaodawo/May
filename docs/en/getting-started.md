@@ -46,12 +46,19 @@ and macOS with Node.js 22 and 24. View each job's logs in the Actions tab or
 follow the checks on a pull request to diagnose failures.
 
 Each environment installs dependencies with `pnpm install --frozen-lockfile`,
-then runs `pnpm build`, `pnpm docs:check`, `pnpm test`, `pnpm example`,
+then runs `pnpm build`, `pnpm docs:check`, `pnpm test`, `pnpm test:path-alias`, `pnpm example`,
 `pnpm may --help`, and `pnpm maybecode --help`. Run these same commands locally
 to reproduce a failure. A separate Linux job uses the recommended Node.js
 version from `.node-version` and runs `pnpm test:package:maybecode` to verify
 packed dependencies, MCP subpath exports, and the installed CLI outside the
-repository.
+repository. May packages come from local tarballs; external dependencies reuse
+the pnpm store when available and download missing versions from the registry.
+
+`pnpm test` continues through all workspace packages before reporting failures.
+`pnpm test:path-alias` runs the entire suite with a temporary directory alias
+(a Windows junction or a POSIX symlink), exposing assumptions about canonical
+paths even on machines whose default temporary directory has no alias. CI runs
+this check after a successful build even if the regular suite fails.
 
 The workflow needs no provider API keys and does not run live provider
 integration tests or publish packages. Installation still needs access to the

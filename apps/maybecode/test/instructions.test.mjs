@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -37,7 +37,7 @@ test("replaces the built-in prompt and appends workspace AGENTS.md", async (t) =
 
   assert.deepEqual(instructions.system.source, {
     type: "file",
-    path: join(directory, "system.md"),
+    path: await realpath(join(directory, "system.md")),
   });
   assert.equal(instructions.system.content, "custom system");
   assert.equal(instructions.project.content, "project rules");

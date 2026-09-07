@@ -80,6 +80,7 @@ pnpm install
 pnpm build
 pnpm docs:check
 pnpm test
+pnpm test:path-alias
 pnpm test:coverage
 pnpm may --help
 pnpm maybecode --help

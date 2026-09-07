@@ -124,9 +124,12 @@ await writeFile(join(consumerDirectory, "config.json"), JSON.stringify({
   },
 }, null, 2) + "\n", "utf8");
 
+// A fresh consumer resolves external dependency ranges independently of the
+// workspace lockfile. Reuse cached packages, but allow missing versions to be
+// downloaded on clean CI runners. All May packages still come from local tarballs.
 await runPnpm([
   "install",
-  "--offline",
+  "--prefer-offline",
   "--ignore-scripts",
   "--store-dir",
   repositoryStore,

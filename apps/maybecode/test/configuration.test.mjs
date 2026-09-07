@@ -4,6 +4,7 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  realpath,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -237,7 +238,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   assert.equal(app.instructions.system.source.type, "file");
   assert.equal(app.instructions.runtime.source.type, "runtime");
   assert.equal(app.instructions.project.source.type, "file");
-  assert.deepEqual(contextOptions.metadata, { workspace: directory });
+  assert.deepEqual(contextOptions.metadata, { workspace: await realpath(directory) });
   assert.deepEqual(contextOptions.budget, {
     contextWindowTokens: 64000,
     outputReserveTokens: 4096,
@@ -352,7 +353,7 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
     id: "local",
     command: "test-server",
     args: ["--stdio"],
-    cwd: directory,
+    cwd: await realpath(directory),
   }]);
   assert.equal((await app.getMcpStatus())[0].state, "connected");
   assert.equal(
