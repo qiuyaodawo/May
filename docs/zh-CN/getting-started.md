@@ -43,7 +43,8 @@ Session、权限、历史或 UI-independent 生命周期的产品应从这里开
 `pnpm docs:check`、`pnpm test`、`pnpm example`、`pnpm may --help` 和
 `pnpm maybecode --help`。本地可执行相同命令复现失败。另一个独立 Linux 任务使用
 `.node-version` 中推荐的 Node.js 版本，运行 `pnpm test:package:maybecode`，
-在仓库外验证打包依赖、MCP 子路径导出及安装后的 CLI。
+在仓库外验证打包依赖、MCP 子路径导出及安装后的 CLI。May 包从本地 tarball 安装；
+外部依赖优先复用 pnpm 缓存，缺失的版本从包注册表下载。
 
 工作流不需要 provider API key，不运行真实 provider 集成测试，也不发布包。
 安装依赖仍需要访问包注册表。矩阵表示验证目标，实际支持情况需要成功运行后确认。
