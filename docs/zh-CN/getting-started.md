@@ -10,7 +10,8 @@ application，面向仓库当前 `0.1.0` 开发预览 API。
 
 ## 前置条件
 
-- Node.js 20 或更高版本
+- 仓库开发需要 Node.js 22 或更高版本（推荐 Node.js 24；
+  `.node-version` 记录推荐的主版本）
 - pnpm（仓库在 `package.json` 中固定了预期版本）
 - 本仓库的 checkout
 

@@ -12,7 +12,8 @@ see [Runtime and session boundaries](architecture/runtime-session.md).
 
 ## Prerequisites
 
-- Node.js 20 or newer
+- Node.js 22 or newer for repository development (Node.js 24 recommended;
+  `.node-version` records the recommended major version)
 - pnpm (the repository pins its expected version in `package.json`)
 - a checkout of this repository
 

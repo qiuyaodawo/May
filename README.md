@@ -66,6 +66,10 @@ built-in provider option matrix; its editor schema lives at
 
 ## Development
 
+Repository development requires Node.js 22 or newer and pnpm 11.23.0.
+Node.js 24 is recommended and recorded in `.node-version` for version managers
+that support it. Individual packages retain their existing runtime requirements.
+
 ```bash
 pnpm install
 pnpm build

@@ -2,6 +2,9 @@
   "name": "may",
   "private": true,
   "packageManager": "pnpm@11.23.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
