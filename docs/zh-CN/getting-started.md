@@ -32,6 +32,23 @@ pnpm example
 `@may/core`，适合一次性或嵌入式循环。本文其余部分使用 `@may/application`；需要
 Session、权限、历史或 UI-independent 生命周期的产品应从这里开始。
 
+## 持续集成
+
+[GitHub Actions 工作流](../../.github/workflows/ci.yml) 在推送代码和提交 PR 时
+自动运行。进入默认分支后，也可从 **Actions → CI → Run workflow** 手动启动。
+每次运行检查 Linux、Windows、macOS 与 Node.js 22、24 的组合。在 Actions 页面
+查看各任务日志，或从 PR 的检查结果进入日志排查失败原因。
+
+每种环境先执行 `pnpm install --frozen-lockfile`，然后运行 `pnpm build`、
+`pnpm docs:check`、`pnpm test`、`pnpm example`、`pnpm may --help` 和
+`pnpm maybecode --help`。本地可执行相同命令复现失败。另一个独立 Linux 任务使用
+`.node-version` 中推荐的 Node.js 版本，运行 `pnpm test:package:maybecode`，
+在仓库外验证打包依赖、MCP 子路径导出及安装后的 CLI。
+
+工作流不需要 provider API key，不运行真实 provider 集成测试，也不发布包。
+安装依赖仍需要访问包注册表。矩阵表示验证目标，实际支持情况需要成功运行后确认。
+真实终端的输入、快捷键和窗口缩放仍需人工验证。
+
 ## 创建 Workspace Package
 
 创建 `examples/quickstart-agent/package.json`。根目录 `pnpm-workspace.yaml` 已包含

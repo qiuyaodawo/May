@@ -37,6 +37,28 @@ embedded loop. The rest of this guide uses `@may/application`, the recommended
 starting point for a product that needs a Session, permissions, history, or a
 UI-independent lifecycle.
 
+## Continuous integration
+
+The [GitHub Actions workflow](../../.github/workflows/ci.yml) runs automatically
+on pushes and pull requests. Once it is on the default branch, it can also be
+started from **Actions → CI → Run workflow**. Each run checks Linux, Windows,
+and macOS with Node.js 22 and 24. View each job's logs in the Actions tab or
+follow the checks on a pull request to diagnose failures.
+
+Each environment installs dependencies with `pnpm install --frozen-lockfile`,
+then runs `pnpm build`, `pnpm docs:check`, `pnpm test`, `pnpm example`,
+`pnpm may --help`, and `pnpm maybecode --help`. Run these same commands locally
+to reproduce a failure. A separate Linux job uses the recommended Node.js
+version from `.node-version` and runs `pnpm test:package:maybecode` to verify
+packed dependencies, MCP subpath exports, and the installed CLI outside the
+repository.
+
+The workflow needs no provider API keys and does not run live provider
+integration tests or publish packages. Installation still needs access to the
+package registry. The matrix is a validation target; actual support is confirmed
+by successful runs. Real-terminal input, shortcuts, and resizing still require
+manual verification.
+
 ## Create a workspace package
 
 Create `examples/quickstart-agent/package.json`. The root

@@ -66,6 +66,11 @@ built-in provider option matrix; its editor schema lives at
 
 ## Development
 
+The [CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and
+manual dispatch. It checks Linux, Windows, and macOS on Node.js 22 and 24,
+plus a separate MaybeCode package smoke test on Linux using `.node-version`.
+See [CI usage and local checks](docs/en/getting-started.md#continuous-integration).
+
 Repository development requires Node.js 22 or newer and pnpm 11.23.0.
 Node.js 24 is recommended and recorded in `.node-version` for version managers
 that support it. Individual packages retain their existing runtime requirements.
