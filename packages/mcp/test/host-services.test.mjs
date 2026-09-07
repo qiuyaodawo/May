@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -53,7 +53,7 @@ test("Roots and Sampling require scoped consent, isolate model inputs, review ou
   assert.equal(JSON.stringify(fixture.requests).includes(pathToFileURL(path).href), false);
   assert.throws(() => broker.respond(r.id, r.owner, { action: "accept", content: { json: "[]" } }), /editable/);
   broker.respond(r.id, r.owner, { action: "accept" });
-  assert.deepEqual(JSON.parse((await roots).content[0].text).roots, [{ uri: pathToFileURL(await realpath(path)).href }]);
+  assert.deepEqual(JSON.parse((await roots).content[0].text).roots, [{ uri: pathToFileURL(path).href }]);
   const denied = execute("roots"); const d = await next(); broker.respond(d.id, d.owner, { action: "decline" });
   assert.deepEqual(JSON.parse((await denied).content[0].text), { roots: [] });
 

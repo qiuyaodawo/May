@@ -51,8 +51,7 @@ then runs `pnpm build`, `pnpm docs:check`, `pnpm test`, `pnpm example`,
 to reproduce a failure. A separate Linux job uses the recommended Node.js
 version from `.node-version` and runs `pnpm test:package:maybecode` to verify
 packed dependencies, MCP subpath exports, and the installed CLI outside the
-repository. May packages are installed from local tarballs; external dependencies
-reuse the pnpm store where possible and download missing versions from the registry.
+repository.
 
 The workflow needs no provider API keys and does not run live provider
 integration tests or publish packages. Installation still needs access to the

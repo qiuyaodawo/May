@@ -109,7 +109,7 @@ session. Starting a new session does not delete or overwrite older sessions;
 they remain available through `/resume`.
 
 The private package exposes a `maybecode` executable for local packaging. Its
-complete package graph can be packed, installed in a fresh consumer project, and
+complete package graph can be packed, installed without registry access, and
 launched outside this repository with:
 
 ```sh
@@ -117,10 +117,8 @@ pnpm test:package:maybecode -- --directory /path/to/temporary-parent
 ```
 
 The smoke test builds and packs MaybeCode plus all transitive May workspace
-packages, installs those local tarballs into an isolated consumer project, and
-verifies both `maybecode --help` and an interactive start/quit cycle. External
-dependencies reuse the pnpm store when available; missing versions are downloaded
-from the registry because the consumer resolves its own dependency graph.
+packages, installs only those tarballs into an isolated consumer project, and
+verifies both `maybecode --help` and an interactive start/quit cycle.
 
 In Git Bash on Windows, use forward slashes or quote backslash paths. An
 unquoted `E:\code\project` is changed by Bash before MaybeCode receives it:

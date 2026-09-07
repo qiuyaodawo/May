@@ -3,7 +3,6 @@ import {
   link,
   mkdir,
   mkdtemp,
-  realpath,
   rm,
   symlink,
   writeFile,
@@ -37,12 +36,12 @@ test("loads configurable system, runtime, and project instruction sections", asy
 
   assert.deepEqual(instructions.system.source, {
     type: "file",
-    path: await realpath(join(directory, "agent-system.txt")),
+    path: join(directory, "agent-system.txt"),
   });
   assert.deepEqual(instructions.runtime?.source, { type: "runtime" });
   assert.deepEqual(instructions.project?.source, {
     type: "file",
-    path: await realpath(join(workspace, "PROJECT.md")),
+    path: join(workspace, "PROJECT.md"),
   });
   assert.equal(
     instructions.effective,
