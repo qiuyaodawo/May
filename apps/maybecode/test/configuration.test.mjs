@@ -159,6 +159,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   let contextOptions;
   const app = await openConfiguredMaybeCode(
     {
+      skills: false,
       workspace: directory,
       dataDirectory: join(directory, "data"),
       autoResume: false,

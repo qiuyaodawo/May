@@ -30,6 +30,7 @@ export type MaybeCodeSlashCommandName =
   | "/effort"
   | "/retry"
   | "/recovery"
+  | "/skills"
   | "/instructions"
   | "/mcp"
   | "/status"
@@ -46,6 +47,7 @@ export const MAYBECODE_COMPACTION_STRATEGIES = [
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
+  { name: "/skills", usage: "/skills [show <name>|use <name> [task]]", description: "List skills, preview instructions, or activate a skill" },
   { name: "/recovery", usage: "/recovery [resolve <id> <verified finding>]", description: "Inspect interrupted tools or record verified recovery findings" },
   {
     name: "/new",
@@ -117,6 +119,7 @@ export type MaybeCodeSlashCommandParseResult =
   SlashCommandParseResult<MaybeCodeSlashCommand>;
 
 export type MaybeCodeSlashCommandResult =
+  | { readonly type: "skill.run-started"; readonly run: MaybeCodeRun }
   | { readonly type: "display"; readonly text: string }
   | { readonly type: "mcp.display"; readonly text: string }
   | { readonly type: "mcp.run-started"; readonly run: MaybeCodeRun }
@@ -257,6 +260,15 @@ export function createMaybeCodeSlashCommandSuggester(
 
   return maybeCodeSlashCommands.createSuggester(async (argumentInput) => {
     const { definition, invokedAs: command, argumentPrefix } = argumentInput;
+    if (definition?.name === "/skills") {
+      const match = /^(show|use)\s+(\S*)$/u.exec(argumentPrefix);
+      if (match) return (controller.listSkills?.() ?? [])
+        .filter((skill) => skill.name.startsWith(match[2]!))
+        .map((skill) => ({ value: `${command} ${match[1]} ${skill.name}`, label: skill.name, description: skill.description }));
+      if (/\s/u.test(argumentPrefix)) return [];
+      return ["show", "use"].filter((verb) => verb.startsWith(argumentPrefix))
+        .map((verb) => ({ value: `${command} ${verb}`, label: verb, description: verb === "show" ? "Preview without activation" : "Activate for the current session" }));
+    }
     if (definition?.name === "/compact") {
       if (/\s/u.test(argumentPrefix)) return [];
       return MAYBECODE_COMPACTION_STRATEGIES
@@ -339,6 +351,30 @@ export async function executeMaybeCodeSlashCommand(
 
   const { definition, arguments: arguments_ } = parsed;
   switch (definition.name) {
+    case "/skills": {
+      if (arguments_.length === 0) {
+        const skills = controller.listSkills?.() ?? [];
+        const diagnostics = controller.getSkillDiagnostics?.() ?? [];
+        const text = skills.length === 0 ? "No skills discovered."
+          : skills.map((skill) => `${skill.name}${skill.active ? " [active]" : ""} — ${skill.description}\n  ${skill.directory}`).join("\n");
+        return { type: "display", text: text + (diagnostics.length === 0 ? "" : "\n\nDiscovery diagnostics:\n" + diagnostics.map((item) => `${item.path}: ${item.message}`).join("\n")) };
+      }
+      const [verb, name, ...task] = arguments_;
+      if (name === undefined || !["show", "use"].includes(verb!)) return usage(definition);
+      if (verb === "show") {
+        if (task.length > 0) return usage(definition);
+        if (!controller.readSkill) throw new Error("Skills are unsupported by this controller");
+        const document = await controller.readSkill(name);
+        return { type: "display", text: `${document.name}\n${document.directory}\nRevision: ${document.revision}\n\n${document.body}` };
+      }
+      if (task.length > 0) {
+        if (!controller.submitSkill) throw new Error("Skill submission is unsupported by this controller");
+        return { type: "skill.run-started", run: await controller.submitSkill(name, task.join(" ")) };
+      }
+      if (!controller.activateSkill) throw new Error("Skill activation is unsupported by this controller");
+      await controller.activateSkill(name);
+      return { type: "display", text: `Activated ${name} for this session. Submit a task to use it.` };
+    }
     case "/recovery": {
       if (arguments_.length === 0) {
         const pending = controller.listRecoveries?.() ?? [];

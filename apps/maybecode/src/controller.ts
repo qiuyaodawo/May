@@ -3,6 +3,9 @@ import type { ContextCompactionStrategy } from "@may/context";
 import type { McpClientPool, McpServerStatus, McpResourceSubscription, McpInteractionBroker } from "@may/mcp";
 import type { MaybeCodeEvent, MaybeCodeSessionEvent } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
+import type { SkillDescriptor, SkillDiagnostic, SkillDocument } from "@may/skills";
+
+export interface MaybeCodeSkillInfo extends SkillDescriptor { readonly active: boolean }
 
 export interface MaybeCodeModelInfo {
   readonly profile?: string;
@@ -67,6 +70,11 @@ export interface MaybeCodeController extends AgentWorkspaceController<
 > {
   readonly instructions: MaybeCodeInstructions;
   readonly modelInfo: MaybeCodeModelInfo | undefined;
+  listSkills?(): readonly MaybeCodeSkillInfo[];
+  getSkillDiagnostics?(): readonly SkillDiagnostic[];
+  readSkill?(name: string): Promise<SkillDocument>;
+  activateSkill?(name: string): Promise<SkillDocument>;
+  submitSkill?(name: string, input: string): Promise<import("./events.js").MaybeCodeRun>;
 
   getMcpStatus(): Promise<readonly McpServerStatus[]>;
   getMcpInteractions?(): ReturnType<McpInteractionBroker["list"]>;

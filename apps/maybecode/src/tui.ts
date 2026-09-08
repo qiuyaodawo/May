@@ -296,6 +296,7 @@ async function renderSlashCommandResult(
       ));
       break;
     case "mcp.run-started":
+    case "skill.run-started":
     case "retry.started":
       await result.run.result;
       break;

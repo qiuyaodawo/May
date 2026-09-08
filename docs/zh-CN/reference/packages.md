@@ -28,6 +28,11 @@ May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行�
 
 ## 运行时与应用
 
+### `@may/skills`
+
+通用 Agent Skills 发现、解析、受限资源读取和会话激活。`@may/application` 将其与
+持久化状态、动态 Context 指令组合。参见 [Agent Skills](../guides/skills.md)。
+
 ### `@may/core`
 
 与 provider 无关的执行内核：

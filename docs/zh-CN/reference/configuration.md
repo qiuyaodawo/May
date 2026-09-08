@@ -1,5 +1,8 @@
 # May 配置参考
 
+`apps.maybecode.skills` 支持 `false` 或 `{ "directories": ["./skills"] }`。
+发现优先级和路径解析见 [Agent Skills](../guides/skills.md)。
+
 MaybeCode 支持 `apps.maybecode.runBudget`，限制每次 Run 的时长、步骤、模型／工具调用、
 token 和估算成本。参见[运行预算](../guides/run-budgets.md)。
 

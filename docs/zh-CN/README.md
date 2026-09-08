@@ -2,6 +2,7 @@
 
 - [崩溃恢复](guides/recovery.md)
 - [运行预算](guides/run-budgets.md)
+- [Agent Skills](guides/skills.md)
 
 [English](../en/README.md) | **简体中文**
 

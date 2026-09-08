@@ -76,6 +76,7 @@ export type RecordablePermissionEvent = (
 ) & { timestamp: number };
 
 export type SessionEventPayload =
+  | { type: "state.updated"; key: string; value: unknown }
   | { type: "run.budget.exceeded"; runId: string; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
   | { type: "session.created"; metadata?: Record<string, unknown> }
   | { type: "input.submitted"; message: UserMessage }

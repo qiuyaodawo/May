@@ -2,6 +2,11 @@
 
 Replaceable Context factories and reusable implementations for May agents.
 
+`ContextFactoryOptions.instructionsSource` supplies dynamic instructions to
+inspection and model snapshots, keeping active skills outside message compaction.
+Call `invalidateMeasurement()` when instructions change. Custom factories and
+controllers must honor these contracts for skill activation.
+
 ```ts
 import { InMemoryContextFactory } from "@may/context";
 

@@ -16,6 +16,7 @@ import type {
 export class InMemoryContextFactory implements ContextFactory {
   create(options: ContextFactoryOptions): ManagedContext {
     const context = new ReplaceableInMemoryContext({
+      ...(options.instructionsSource === undefined ? {} : { instructionsSource: options.instructionsSource }),
       ...(options.instructions === undefined
         ? {}
         : { instructions: options.instructions }),
@@ -65,26 +66,30 @@ class ModelViewContext implements Context {
 }
 
 class ReplaceableInMemoryContext implements Context {
+  private readonly instructionsSource: (() => string) | undefined;
   private readonly instructions: string | undefined;
   private readonly messages: Message[];
   private readonly metadata: Record<string, unknown> | undefined;
 
   constructor(options: {
+    instructionsSource?: () => string;
     instructions?: string;
     messages?: Message[];
     metadata?: Record<string, unknown>;
   }) {
     this.instructions = options.instructions;
+    this.instructionsSource = options.instructionsSource;
     this.messages = [...(options.messages ?? [])];
     this.metadata = options.metadata;
   }
 
   async snapshot(): Promise<ContextSnapshot> {
+    const instructions = this.instructionsSource?.() ?? this.instructions;
     return {
       messages: [...this.messages],
-      ...(this.instructions === undefined
+      ...(instructions === undefined
         ? {}
-        : { instructions: this.instructions }),
+        : { instructions }),
       ...(this.metadata === undefined
         ? {}
         : { metadata: { ...this.metadata } }),

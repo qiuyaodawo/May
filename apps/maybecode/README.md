@@ -339,6 +339,12 @@ and may also return a `ContextController` for application-level inspection.
 
 ## Commands
 
+MaybeCode discovers Agent Skills and loads instructions/resources on demand.
+`/skills` lists them, `/skills show <name>` previews them, and
+`/skills use <name> [task]` activates and optionally submits a task. Both UIs
+support name completion. Activation survives compaction/resume and never grants
+script permissions. See [Agent Skills](../../docs/en/guides/skills.md).
+
 Set `apps.maybecode.runBudget` to bound each Run's duration, steps, model/tool
 calls, observed tokens and estimated cost. See [Run budgets](../../docs/en/guides/run-budgets.md).
 

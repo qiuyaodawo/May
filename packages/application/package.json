@@ -22,6 +22,7 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
+    "@may/skills": "workspace:*",
     "@may/context": "workspace:*",
     "@may/core": "workspace:*",
     "@may/permissions": "workspace:*",

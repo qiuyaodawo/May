@@ -1,5 +1,8 @@
 # May configuration reference
 
+`apps.maybecode.skills` accepts `false` or `{ "directories": ["./skills"] }`.
+See [Agent Skills](../guides/skills.md) for discovery precedence and path resolution.
+
 MaybeCode accepts `apps.maybecode.runBudget` for per-Run duration, step,
 model/tool-call, token and estimated cost limits. See [Run budgets](../guides/run-budgets.md).
 

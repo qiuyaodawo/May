@@ -176,6 +176,34 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.manager.activeApplication.instructions;
   }
 
+  listSkills() {
+    const skills = this.manager.activeApplication.skills;
+    const active = new Map(skills?.listActive().map((item) => [item.name, item]));
+    const all = new Map(skills?.registry.list().map((item) => [item.name, item]));
+    for (const [name, item] of active) all.set(name, item);
+    return [...all.values()].map((item) => ({ ...item, active: active.has(item.name) }));
+  }
+
+  getSkillDiagnostics() { return this.manager.activeApplication.skills?.registry.diagnostics ?? []; }
+
+  readSkill(name: string) {
+    return this.manager.runStateTransition(async (app) => {
+      if (!app.skills) throw new Error("Skills are disabled");
+      return app.skills.listActive().find((item) => item.name === name) ?? app.skills.registry.load(name);
+    }, { requireIdle: false });
+  }
+
+  activateSkill(name: string) {
+    return this.manager.runStateTransition((app) => app.activateSkill(name));
+  }
+
+  submitSkill(name: string, input: string): Promise<MaybeCodeRun> {
+    return this.manager.submitPrepared(async () => {
+      await this.manager.activeApplication.activateSkill(name);
+      return { input: `Use the ${name} skill for this task:\n${input}` };
+    });
+  }
+
   get modelInfo(): MaybeCodeModelInfo | undefined {
     return this.manager.activeApplication.modelInfo;
   }

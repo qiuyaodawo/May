@@ -1,4 +1,6 @@
 import { resolve } from "node:path";
+import { SkillRegistry } from "@may/skills";
+import { defaultMaybeCodeSkillDirectories } from "./skills.js";
 
 import {
   contextBudgetFromModel,
@@ -89,6 +91,8 @@ export interface MaybeCodeApplicationOptions {
   readonly instructionsDirectory?: string;
   readonly maxSteps?: number;
   readonly runBudget?: RunBudget;
+  readonly skills?: SkillRegistry | false;
+  readonly skillDirectories?: readonly string[];
 }
 
 /**
@@ -102,7 +106,7 @@ export class MaybeCodeApplication {
   readonly events: AsyncIterable<MaybeCodeSessionEvent>;
   readonly sessionId: string;
   readonly workspace: string;
-  readonly instructions: MaybeCodeInstructions;
+  private readonly baseInstructions: MaybeCodeInstructions;
   readonly modelInfo: MaybeCodeModelInfo | undefined;
 
   private readonly application: AgentApplication;
@@ -129,7 +133,7 @@ export class MaybeCodeApplication {
     this.workspace = workspace;
     this.application = application;
     this.sessionId = application.sessionId;
-    this.instructions = instructions;
+    this.baseInstructions = instructions;
     this.manualCompactionStrategy = manualCompactionStrategy;
     this.summaryTailStrategy = summaryTailStrategy;
     this.historyReferenceStrategy = historyReferenceStrategy;
@@ -142,6 +146,8 @@ export class MaybeCodeApplication {
     options: MaybeCodeApplicationOptions,
   ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
+    const skills = options.skills === false ? undefined : options.skills ??
+      await SkillRegistry.discover(options.skillDirectories ?? defaultMaybeCodeSkillDirectories(workspace, false));
     const configuredTools = ToolRegistry.compose(
       options.tools ?? createCodingTools({ cwd: workspace }),
       options.additionalTools ?? [],
@@ -193,6 +199,7 @@ export class MaybeCodeApplication {
     );
 
     const definition = defineAgent({
+      ...(skills === undefined ? {} : { skills }),
       model: options.model,
       permissionPolicy: options.permissionPolicy ?? createCodingPermissionPolicy(),
       tools: configuredTools,
@@ -269,6 +276,10 @@ export class MaybeCodeApplication {
     return this.application.isRunning;
   }
 
+  get instructions(): MaybeCodeInstructions {
+    return { ...this.baseInstructions, effective: [this.baseInstructions.effective, this.application.skills?.instructions()].filter(Boolean).join("\n\n") };
+  }
+
   submit(options: RunOptions): Promise<MaybeCodeRun> {
     return this.application.submit(options);
   }
@@ -293,6 +304,8 @@ export class MaybeCodeApplication {
   }
 
   listRecoveries() { return this.application.listRecoveries(); }
+  get skills() { return this.application.skills; }
+  activateSkill(name: string) { return this.application.activateSkill(name); }
   resolveRecovery(id: string, finding: string) { return this.application.resolveRecovery(id, finding); }
 
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage> {

@@ -51,6 +51,7 @@ import {
 } from "@may/session-tools";
 
 import type { AgentController } from "./controller.js";
+import { SkillRegistry, SkillSession, SKILL_STATE_KEY } from "@may/skills";
 import type { AgentApplicationEvent, AgentRun } from "./events.js";
 
 export interface AgentToolPresentation {
@@ -74,6 +75,7 @@ export interface AgentApplicationOptions {
   /** Content-free attributes attached to every Run opened by this application. */
   readonly traceAttributes?: TraceAttributes;
   readonly instructions?: string;
+  readonly skills?: SkillRegistry;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly contextMetadata?: Readonly<Record<string, unknown>>;
   readonly sessionId?: string;
@@ -116,6 +118,7 @@ interface ActiveCompaction {
  * live here once for every application.
  */
 export class AgentApplication implements AgentController {
+  readonly skills: SkillSession | undefined;
   readonly events: AsyncIterable<AgentApplicationEvent>;
   readonly sessionId: string;
   readonly metadata: Readonly<Record<string, unknown>> | undefined;
@@ -145,8 +148,10 @@ export class AgentApplication implements AgentController {
     compactionStrategy: ContextCompactionStrategy | undefined,
     closeReason: string,
     tracer: Tracer | undefined,
+    skills: SkillSession | undefined,
   ) {
     this.session = session;
+    this.skills = skills;
     this.sessionId = session.id;
     this.metadata = session.metadata;
     this.permissions = permissions;
@@ -162,6 +167,8 @@ export class AgentApplication implements AgentController {
     let application: AgentApplication | undefined;
     let historySource: Session | undefined;
     const configuredTools = new ToolRegistry(options.tools);
+    const skills = options.skills === undefined ? undefined : new SkillSession(options.skills);
+    if (skills !== undefined) configuredTools.register(skills.readTool());
     if (options.sessionHistory !== false && options.sessionHistory !== undefined) {
       const historyTool = createSessionHistoryTool({
         ...options.sessionHistory,
@@ -208,11 +215,13 @@ export class AgentApplication implements AgentController {
       messages: Message[] = [],
       runtimeInfo: SessionRuntimeInfo = {},
     ) => {
+      skills?.restore(runtimeInfo.state?.[SKILL_STATE_KEY]);
+      const instructionsSource = () => [options.instructions, skills?.instructions()].filter(Boolean).join("\n\n");
       const contextMetadata = options.contextMetadata ?? options.metadata;
       const managedContext = await contextFactory.create({
-        ...(options.instructions === undefined
-          ? {}
-          : { instructions: options.instructions }),
+        ...(skills === undefined
+          ? (options.instructions === undefined ? {} : { instructions: options.instructions })
+          : { instructions: instructionsSource(), instructionsSource }),
         messages,
         ...(contextMetadata === undefined
           ? {}
@@ -220,7 +229,7 @@ export class AgentApplication implements AgentController {
         ...(options.contextBudget === undefined
           ? {}
           : { budget: options.contextBudget }),
-        ...(runtimeInfo.latestModelMeasurement === undefined
+        ...(runtimeInfo.latestModelMeasurement === undefined || (skills !== undefined && (skills.registry.list().length > 0 || skills.listActive().length > 0))
           ? {}
           : { measurement: runtimeInfo.latestModelMeasurement }),
         ...(options.compactionStrategy === undefined
@@ -278,7 +287,12 @@ export class AgentApplication implements AgentController {
         options.compactionStrategy,
         options.closeReason ?? "Agent application is closing",
         options.tracer,
+        skills,
       );
+      skills?.setSink(async (documents) => {
+        await session.recordState(SKILL_STATE_KEY, documents);
+        contextController?.invalidateMeasurement?.();
+      });
       contextController?.setAutoCompactionSink?.((result, compactionOptions) =>
         application!.recordAutomaticCompaction(result, compactionOptions)
       );
@@ -308,6 +322,15 @@ export class AgentApplication implements AgentController {
   }
 
   listRecoveries() { return this.session.listRecoveries(); }
+
+  async activateSkill(name: string) {
+    this.throwIfClosed();
+    if (this.isRunning) throw new Error("Cannot activate a skill while an operation is active");
+    if (!this.skills) throw new Error("Skills are disabled");
+    this.starting = true;
+    try { return await this.skills.activate(name); }
+    finally { this.starting = false; }
+  }
 
   resolveRecovery(id: string, finding: string): Promise<void> {
     this.throwIfClosed();

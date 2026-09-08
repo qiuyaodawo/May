@@ -301,6 +301,7 @@ async function presentCommandResult(
       store.appendNotice("info", result.instructions.effective);
       break;
     case "mcp.run-started":
+    case "skill.run-started":
     case "retry.started":
       await result.run.result.catch((error: unknown) => {
         if (!isCancellation(error)) throw error;

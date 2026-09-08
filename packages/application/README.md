@@ -1,5 +1,10 @@
 # @may/application
 
+Pass `skills: SkillRegistry` to `defineAgent()` / `AgentApplication.open()` for
+catalog guidance, `skill_read` and durable activation. `activateSkill(name)`
+activates while idle; model activation uses the normal permission/tool path.
+See [Agent Skills](../../docs/en/guides/skills.md).
+
 Headless lifecycle components for composing a May Agent product.
 
 `AgentDefinition` captures reusable Agent behavior and policy separately from

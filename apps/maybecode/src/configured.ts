@@ -61,6 +61,8 @@ import {
 } from "./instructions.js";
 import { MaybeCodeWorkspace } from "./workspace.js";
 import type { MaybeCodeModelConfiguration } from "./workspace.js";
+import type { SkillRegistry } from "@may/skills";
+import { resolveMaybeCodeSkillDirectories } from "./skills.js";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   /** Enable only when a UI consumes interaction events and answers the controller. */
@@ -80,6 +82,8 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly instructions?: string;
   readonly maxSteps?: number;
   readonly runBudget?: RunBudget;
+  readonly skills?: SkillRegistry | false;
+  readonly skillDirectories?: readonly string[];
   /** Disable retries with false, or override the configured retry policy. */
   readonly retry?: false | RetryingModelOptions;
   /** Disable tracing or override apps.maybecode.observability. */
@@ -132,6 +136,7 @@ export async function openConfiguredMaybeCode(
     options.configPath === undefined ? {} : { path: options.configPath },
   );
   const retry = options.retry ?? resolveMaybeCodeRetry(config);
+  const skillDirectories = options.skillDirectories ?? resolveMaybeCodeSkillDirectories(config, workspace);
   const runBudget = resolveRunBudget(options.runBudget ?? config.apps?.maybecode?.runBudget as RunBudget | undefined);
   const capabilityResolver = dependencies.capabilityResolver ??
     createModelCapabilityResolver();
@@ -287,6 +292,10 @@ export async function openConfiguredMaybeCode(
         : { instructionsDirectory }),
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
       runBudget,
+      ...(options.skills === undefined ? {} : { skills: options.skills }),
+      ...(skillDirectories === false
+        ? (options.skills === undefined ? { skills: false as const } : {})
+        : { skillDirectories }),
     });
     return application;
   } catch (error) {

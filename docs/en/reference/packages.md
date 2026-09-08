@@ -31,6 +31,12 @@ that needs sessions, approvals, context management and orderly shutdown.
 
 ## Runtime and application
 
+### `@may/skills`
+
+Generic Agent Skills discovery, parsing, bounded resource loading and session
+activation. `@may/application` composes this with durable state and dynamic
+Context instructions. See [Agent Skills](../guides/skills.md).
+
 ### `@may/core`
 
 The provider-neutral execution kernel:

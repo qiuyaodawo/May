@@ -27,6 +27,7 @@ interfaces are intended for extension.
 
 - [Crash recovery](guides/recovery.md)
 - [Run budgets](guides/run-budgets.md)
+- [Agent Skills](guides/skills.md)
 
 - [Custom model](guides/custom-model.md)
 - [Custom tool](guides/custom-tool.md)

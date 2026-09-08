@@ -56,6 +56,7 @@ export interface SessionModelMeasurement {
 }
 
 export interface SessionRuntimeInfo {
+  readonly state?: Readonly<Record<string, unknown>>;
   readonly latestModelMeasurement?: SessionModelMeasurement;
 }
 
@@ -472,6 +473,14 @@ export class Session {
     return [...this.recoveries.values()].map((value) => structuredClone(value));
   }
 
+  /** Persist bounded, application-owned state independently of compactable messages. */
+  async recordState(key: string, value: unknown): Promise<void> {
+    if (!/^[a-z][a-z0-9._-]{0,127}$/u.test(key)) throw new Error("Invalid session state key");
+    const snapshot: unknown = JSON.parse(JSON.stringify(value));
+    if (JSON.stringify(snapshot).length > 1_048_576) throw new Error("Session state exceeds 1 MiB");
+    await this.record({ type: "state.updated", key, value: snapshot });
+  }
+
   /** The host must verify external effects and describe the finding before continuing. */
   resolveRecovery(id: string, finding: string): Promise<void> {
     const operation = this.tail.then(async () => {
@@ -597,10 +606,14 @@ function replaySession(events: readonly SessionEvent[]): {
 } {
   const messages: Message[] = [];
   const pendingTools = new Map<string, Map<string, ToolCall>>();
+  const state: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   let latestModelMeasurement: SessionModelMeasurement | undefined;
 
   for (const event of events) {
     switch (event.type) {
+      case "state.updated":
+        state[event.key] = event.value;
+        break;
       case "run.interrupted":
         for (const recovery of event.recoveries) {
           const error = recovery.status === "not-started"
@@ -677,9 +690,8 @@ function replaySession(events: readonly SessionEvent[]): {
 
   return {
     messages,
-    info: latestModelMeasurement === undefined
-      ? {}
-      : { latestModelMeasurement },
+    info: { ...(latestModelMeasurement === undefined ? {} : { latestModelMeasurement }),
+      ...(Object.keys(state).length === 0 ? {} : { state }) },
   };
 }
 

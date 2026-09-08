@@ -281,6 +281,14 @@
       "type": "object",
       "properties": {
         "instructionsDirectory": { "$ref": "#/$defs/nonEmptyString" },
+        "skills": {
+          "oneOf": [
+            { "const": false },
+            { "type": "object", "properties": {
+                "directories": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/nonEmptyString" } }
+              }, "additionalProperties": false }
+          ]
+        },
         "runBudget": {
           "type": "object",
           "properties": {

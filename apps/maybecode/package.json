@@ -28,6 +28,7 @@
     "test:integration": "pnpm run build && node --test test/integration/*.test.mjs"
   },
   "dependencies": {
+    "@may/skills": "workspace:*",
     "@may/application": "workspace:*",
     "@may/coding-tools": "workspace:*",
     "@may/config": "workspace:*",

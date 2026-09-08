@@ -1,6 +1,7 @@
 {
   "files": [],
   "references": [
+    { "path": "./packages/skills" },
     { "path": "./packages/core" },
     { "path": "./packages/mcp" },
     { "path": "./packages/observability" },

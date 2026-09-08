@@ -9,6 +9,8 @@ import type { ContextCompactionStrategy } from "./compaction.js";
 
 export interface ContextFactoryOptions {
   readonly instructions?: string;
+  /** Dynamic host instructions, included in both inspection and model snapshots. */
+  readonly instructionsSource?: () => string;
   readonly messages?: readonly Message[];
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly budget?: ContextBudget;

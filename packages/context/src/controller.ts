@@ -49,6 +49,8 @@ export interface ContextInspection {
 }
 
 export interface ContextController {
+  /** Invalidate provider measurements when host instructions change. */
+  invalidateMeasurement?(): void;
   inspect(): Promise<ContextInspection>;
   recordModelUsage?(usage: Usage, contextMessageCount: number): void;
   compact?(
@@ -77,6 +79,7 @@ export interface SnapshotContextControllerOptions {
 }
 
 export class SnapshotContextController implements ContextController {
+  invalidateMeasurement(): void { this.measurement = undefined; }
   private readonly budget: ContextBudget | undefined;
   private readonly compactionStrategy: ContextCompactionStrategy | undefined;
   private readonly replaceMessages: SnapshotContextControllerOptions[
