@@ -32,6 +32,9 @@ After every unknown outcome is resolved, submit a new instruction to continue.
 The controller exposes the same methods for custom UIs.
 
 Persistence failures poison the live Session; reopen it before further work.
+Core reports failed barriers as `RUN_CHECKPOINT_FAILED`, aborts parallel peers
+and waits for started executions to settle. It does not invent successful or
+cancelled outcomes for uncertain effects or automatically retry failed writes.
 FileSessionStore syncs records before acknowledging writes, and repairs an
 unterminated final record on read. Corrupt newline-terminated records fail closed.
 Only one writer per session is supported. These guarantees cover process crashes

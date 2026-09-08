@@ -67,6 +67,13 @@ export class RunCancelledError extends MayError {
   }
 }
 
+/** A failed durable barrier leaves external effects uncertain; reopen the Session. */
+export class RunCheckpointError extends MayError {
+  constructor(cause: unknown) {
+    super("RUN_CHECKPOINT_FAILED", `Run checkpoint failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+  }
+}
+
 export class ToolNotFoundError extends MayError {
   constructor(name: string) {
     super("TOOL_NOT_FOUND", `Tool \"${name}\" was not found`);

@@ -6,6 +6,7 @@ import {
   MaxStepsExceededError,
   ModelProtocolError,
   RunCancelledError,
+  RunCheckpointError,
   ToolNotFoundError,
   ToolSchedulerError,
 } from "./errors.js";
@@ -239,6 +240,17 @@ export class May {
       });
     };
 
+    let checkpointFailure: RunCheckpointError | undefined;
+    const durableCheckpoint: RunCheckpoint | undefined = checkpoint === undefined ? undefined : async (event) => {
+      if (checkpointFailure !== undefined) throw checkpointFailure;
+      try { await checkpoint(event); }
+      catch (error) {
+        checkpointFailure ??= new RunCheckpointError(error);
+        controller.abort(checkpointFailure);
+        throw checkpointFailure;
+      }
+    };
+
     const result = this.execute(
       tools,
       runId,
@@ -246,7 +258,7 @@ export class May {
       controller.signal,
       emit,
       runSpan?.context,
-      checkpoint,
+      durableCheckpoint,
       budget,
     ).then(
       (value) => {
@@ -511,6 +523,14 @@ export class May {
       if (budget.limits.maxSteps !== undefined && budget.limits.maxSteps <= this.maxSteps) throw new RunBudgetExceededError("steps", budget.limits.maxSteps, this.maxSteps + 1);
       throw new MaxStepsExceededError(this.maxSteps);
     } catch (error) {
+      if (signal.reason instanceof RunCheckpointError) {
+        // A failed parallel barrier must cancel and settle peers before releasing
+        // the runtime. Never synthesize successful outcomes or cancellation facts
+        // for calls whose durable state is uncertain.
+        await Promise.allSettled(pendingTools?.executions.filter((value) => value !== undefined) ?? []);
+        emit({ type: "run.failed", error: serializeError(signal.reason) });
+        throw signal.reason;
+      }
       const budgetError = signal.reason instanceof RunBudgetExceededError ? signal.reason
         : error instanceof RunBudgetExceededError ? error : undefined;
       const usageUnavailable = error instanceof Error && "code" in error && error.code === "RUN_BUDGET_USAGE_UNAVAILABLE";

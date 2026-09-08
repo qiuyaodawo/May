@@ -337,6 +337,7 @@ export class Session {
     let observationError: unknown;
     try {
       for await (const event of run.events) {
+        if (event.type === "run.failed" && event.error.code === "RUN_CHECKPOINT_FAILED") this.persistenceFailed = true;
         const payload = toSessionEvent(event);
         if (payload !== undefined && !this.checkpointed.delete(checkpointKey(event))) {
           await this.record(payload, event.timestamp);
