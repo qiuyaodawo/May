@@ -23,6 +23,7 @@ import {
   type Model,
   type RunHandle,
   type RunOptions,
+  type RunBudget,
   type Tool,
   type ToolExecutor,
   type ToolScheduler,
@@ -85,6 +86,7 @@ export interface AgentApplicationOptions {
   /** Include the model-native compactor in the automatic chain, when present. */
   readonly providerNativeAutoCompaction?: boolean;
   readonly maxSteps?: number;
+  readonly runBudget?: RunBudget;
   /** Add the bounded session_history tool with these optional limits. */
   readonly sessionHistory?: false | Omit<SessionHistoryToolOptions, "source">;
   /**
@@ -242,6 +244,7 @@ export class AgentApplication implements AgentController {
           ? {}
           : { toolScheduler: options.toolScheduler }),
         ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
+        ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
       });
     };
 

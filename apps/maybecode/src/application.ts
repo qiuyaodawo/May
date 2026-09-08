@@ -37,6 +37,7 @@ import {
   type ContextSnapshot,
   type Model,
   type RunOptions,
+  type RunBudget,
   type Tool,
   type TraceAttributes,
   type Tracer,
@@ -87,6 +88,7 @@ export interface MaybeCodeApplicationOptions {
   readonly instructions?: string;
   readonly instructionsDirectory?: string;
   readonly maxSteps?: number;
+  readonly runBudget?: RunBudget;
 }
 
 /**
@@ -223,6 +225,7 @@ export class MaybeCodeApplication {
         : { compactionStrategy: options.compactionStrategy }),
       autoCompactionStrategies,
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
+      ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
       sessionHistory: {},
       createToolPresentation: async (check) => {
         const preview = await createToolChangePreview(

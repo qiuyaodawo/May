@@ -1,5 +1,8 @@
 # May configuration reference
 
+MaybeCode accepts `apps.maybecode.runBudget` for per-Run duration, step,
+model/tool-call, token and estimated cost limits. See [Run budgets](../guides/run-budgets.md).
+
 **English** | [简体中文](../../zh-CN/reference/configuration.md)
 
 May reads `~/.may/config.json` by default. The configuration separates named

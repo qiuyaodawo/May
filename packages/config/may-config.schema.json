@@ -281,6 +281,28 @@
       "type": "object",
       "properties": {
         "instructionsDirectory": { "$ref": "#/$defs/nonEmptyString" },
+        "runBudget": {
+          "type": "object",
+          "properties": {
+            "maxDurationMs": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+            "maxSteps": { "$ref": "#/$defs/positiveInteger" },
+            "maxModelCalls": { "$ref": "#/$defs/positiveInteger" },
+            "maxToolCalls": { "$ref": "#/$defs/positiveInteger" },
+            "maxTotalTokens": { "$ref": "#/$defs/positiveInteger" },
+            "maxCostUsd": { "type": "number", "exclusiveMinimum": 0 },
+            "tokenPrices": {
+              "type": "object",
+              "required": ["inputUsdPerMillion", "outputUsdPerMillion"],
+              "properties": {
+                "inputUsdPerMillion": { "type": "number", "minimum": 0 },
+                "outputUsdPerMillion": { "type": "number", "minimum": 0 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "dependentRequired": { "maxCostUsd": ["tokenPrices"] },
+          "additionalProperties": false
+        },
         "autoCompaction": {
           "type": "object",
           "properties": {

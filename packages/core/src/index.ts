@@ -1,4 +1,5 @@
 export * from "./context.js";
+export * from "./budget.js";
 export * from "./errors.js";
 export * from "./events.js";
 export * from "./may.js";

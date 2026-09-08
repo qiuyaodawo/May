@@ -1,5 +1,8 @@
 # May 配置参考
 
+MaybeCode 支持 `apps.maybecode.runBudget`，限制每次 Run 的时长、步骤、模型／工具调用、
+token 和估算成本。参见[运行预算](../guides/run-budgets.md)。
+
 [English](../../en/reference/configuration.md) | **简体中文**
 
 May 默认读取 `~/.may/config.json`。配置把命名 provider 连接、可选 model profile

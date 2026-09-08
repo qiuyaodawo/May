@@ -742,6 +742,8 @@ function toPermissionSessionEvent(
 
 function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
   switch (event.type) {
+    case "run.budget.exceeded":
+      return { type: event.type, runId: event.runId, dimension: event.dimension, limit: event.limit, consumed: event.consumed, budget: event.budget };
     case "tool.started":
       return { type: "tool.started", runId: event.runId, step: event.step, call: event.call };
     case "run.started":

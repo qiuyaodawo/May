@@ -1,4 +1,4 @@
-import { ToolRegistry, type Tool } from "@may/core";
+import { ToolRegistry, resolveRunBudget, type Tool } from "@may/core";
 import type { SessionStore } from "@may/session";
 
 import {
@@ -88,6 +88,7 @@ function snapshotDefinitionOptions(
     tools,
     traceAttributes,
     contextBudget,
+    runBudget,
     autoCompactionStrategies,
     sessionHistory,
     ...rest
@@ -95,6 +96,7 @@ function snapshotDefinitionOptions(
 
   return Object.freeze({
     ...rest,
+    ...(runBudget === undefined ? {} : { runBudget: resolveRunBudget(runBudget) }),
     ...(tools === undefined
       ? {}
       : { tools: new ToolRegistry(tools) }),

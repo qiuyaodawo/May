@@ -339,6 +339,9 @@ and may also return a `ContextController` for application-level inspection.
 
 ## Commands
 
+Set `apps.maybecode.runBudget` to bound each Run's duration, steps, model/tool
+calls, observed tokens and estimated cost. See [Run budgets](../../docs/en/guides/run-budgets.md).
+
 Interrupted tools with unknown outcomes block further runs. `/recovery` lists
 their original input; `/recovery resolve <id> <verified finding>` records the
 result of checking external effects. No tool is replayed by recovery. See

@@ -15,7 +15,7 @@ import type {
   ContextFactory,
   ContextSummarizer,
 } from "@may/context";
-import type { Model } from "@may/core";
+import { resolveRunBudget, type Model, type RunBudget } from "@may/core";
 import {
   openMcpClientPool,
   KeyringMcpCredentialStore,
@@ -79,6 +79,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly maxSteps?: number;
+  readonly runBudget?: RunBudget;
   /** Disable retries with false, or override the configured retry policy. */
   readonly retry?: false | RetryingModelOptions;
   /** Disable tracing or override apps.maybecode.observability. */
@@ -131,6 +132,7 @@ export async function openConfiguredMaybeCode(
     options.configPath === undefined ? {} : { path: options.configPath },
   );
   const retry = options.retry ?? resolveMaybeCodeRetry(config);
+  const runBudget = resolveRunBudget(options.runBudget ?? config.apps?.maybecode?.runBudget as RunBudget | undefined);
   const capabilityResolver = dependencies.capabilityResolver ??
     createModelCapabilityResolver();
   const selectionFor = (profile?: string): SelectedMaybeCodeModel =>
@@ -284,6 +286,7 @@ export async function openConfiguredMaybeCode(
         ? {}
         : { instructionsDirectory }),
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
+      runBudget,
     });
     return application;
   } catch (error) {

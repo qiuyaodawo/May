@@ -119,6 +119,7 @@ export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "session.created",
   "input.submitted",
   "run.started",
+  "run.budget.exceeded",
   "tool.started",
   "run.interrupted",
   "recovery.resolved",

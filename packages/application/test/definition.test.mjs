@@ -15,6 +15,20 @@ function assistant(text) {
   return { role: "assistant", content: [{ type: "text", text }] };
 }
 
+test("definitions snapshot run budgets and persist budget exhaustion", async () => {
+  const runBudget = { maxTotalTokens: 1 };
+  const definition = defineAgent({ runBudget, permissionPolicy: () => "allow", model: {
+    async *stream() { yield { type: "response.completed", message: assistant("ok"), usage: { totalTokens: 2 } }; },
+  }});
+  runBudget.maxTotalTokens = 999;
+  const app = await definition.open({ store: new InMemorySessionStore() });
+  try {
+    await assert.rejects((await app.submit({ input: "go", runBudget: { maxTotalTokens: 999 } })).result, { code: "RUN_BUDGET_EXCEEDED" });
+    const history = await app.history();
+    assert.equal(history.find((event) => event.type === "run.budget.exceeded").budget.totalTokens, 2);
+  } finally { await app.close(); }
+});
+
 test("AgentDefinition snapshots behavior and reuses it across Sessions", async () => {
   const requests = [];
   const model = {

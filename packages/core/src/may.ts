@@ -1,4 +1,5 @@
 import type { Context, ContextSnapshot } from "./context.js";
+import { resolveRunBudget, RunBudgetMeter, RunBudgetExceededError, type RunBudget } from "./budget.js";
 import {
   ConcurrentRunError,
   FatalToolExecutionError,
@@ -58,6 +59,7 @@ export interface MayOptions {
   toolScope?: () => Readonly<Record<string, string>>;
   context: Context;
   maxSteps?: number;
+  runBudget?: RunBudget;
   toolExecutor?: ToolExecutor;
   toolScheduler?: ToolScheduler;
   /** Defaults to reject because a May instance owns one mutable Context. */
@@ -71,6 +73,7 @@ export interface MayOptions {
 }
 
 export interface RunOptions {
+  runBudget?: RunBudget;
   input: string | UserMessage;
   /** Awaited durability barrier. Failure stops execution; never retry it blindly. */
   checkpoint?: RunCheckpoint;
@@ -82,6 +85,7 @@ export interface RunOptions {
 }
 
 export interface ContinueOptions {
+  runBudget?: RunBudget;
   checkpoint?: RunCheckpoint;
   signal?: AbortSignal;
   /** Optional parent span for explicit cross-component propagation. */
@@ -111,6 +115,7 @@ export class May {
   private readonly toolScope: MayOptions["toolScope"];
   private readonly runScopes = new Map<string, Readonly<Record<string, string>>>();
   private readonly maxSteps: number;
+  private readonly runBudget: Readonly<RunBudget>;
   private readonly toolExecutor: ToolExecutor;
   private readonly toolScheduler: ToolScheduler;
   private readonly concurrentRuns: "reject" | "allow";
@@ -133,6 +138,7 @@ export class May {
     this.toolSource = options.toolSource;
     this.toolScope = options.toolScope;
     this.maxSteps = maxSteps;
+    this.runBudget = resolveRunBudget(options.runBudget);
     this.toolExecutor = options.toolExecutor ?? directToolExecutor;
     this.toolScheduler = options.toolScheduler ?? sequentialToolScheduler;
     this.concurrentRuns = options.concurrentRuns ?? "reject";
@@ -160,6 +166,7 @@ export class May {
       options.traceContext,
       options.traceAttributes,
       options.checkpoint,
+      options.runBudget,
     );
   }
 
@@ -171,6 +178,7 @@ export class May {
       options.traceContext,
       options.traceAttributes,
       options.checkpoint,
+      options.runBudget,
     );
   }
 
@@ -180,7 +188,9 @@ export class May {
     parentTraceContext: TraceContext | undefined,
     runTraceAttributes: TraceAttributes | undefined,
     checkpoint: RunCheckpoint | undefined,
+    budgetOverride: RunBudget | undefined,
   ): RunHandle {
+    const budget = new RunBudgetMeter(resolveRunBudget(this.runBudget, budgetOverride));
     if (this.concurrentRuns === "reject" && this.activeRuns > 0) {
       throw new ConcurrentRunError();
     }
@@ -196,6 +206,9 @@ export class May {
       isDroppable: isStreamingMayEvent,
     });
     const controller = new AbortController();
+    const timer = budget.limits.maxDurationMs === undefined ? undefined : setTimeout(() => {
+      controller.abort(new RunBudgetExceededError("durationMs", budget.limits.maxDurationMs!, budget.snapshot().elapsedMs));
+    }, budget.limits.maxDurationMs);
     let seq = 0;
     const runSpan = startTraceSpan(this.tracer, "may.run", {
       ...(parentTraceContext === undefined
@@ -234,6 +247,7 @@ export class May {
       emit,
       runSpan?.context,
       checkpoint,
+      budget,
     ).then(
       (value) => {
         endTraceSpan(runSpan, {
@@ -258,6 +272,7 @@ export class May {
       },
     )
       .finally(() => {
+        if (timer !== undefined) clearTimeout(timer);
         this.activeRuns -= 1;
         this.runScopes.delete(runId);
         externalSignal?.removeEventListener("abort", onExternalAbort);
@@ -284,6 +299,7 @@ export class May {
     emit: (event: MayEventPayload) => void,
     runTraceContext: TraceContext | undefined,
     checkpoint: RunCheckpoint | undefined,
+    budget: RunBudgetMeter,
   ): Promise<RunResult> {
     let aggregateUsage: Usage | undefined;
     let modelCalls = 0;
@@ -318,6 +334,7 @@ export class May {
 
       for (let step = 1; step <= this.maxSteps; step++) {
         throwIfAborted(signal);
+        budget.startModel(step);
         emit({ type: "step.started", step });
 
         const snapshotSpan = startTraceSpan(this.tracer, "may.context.snapshot", {
@@ -409,6 +426,8 @@ export class May {
         );
 
         const calls = message.toolCalls ?? [];
+        if (calls.length > 0) pendingTools = { step, calls, outcomes: [], executions: [] };
+        budget.recordUsage(usage);
         if (calls.length === 0) {
           emit({ type: "step.completed", step });
 
@@ -420,10 +439,12 @@ export class May {
             message,
             aggregateUsage,
           );
+          result.budget = budget.snapshot();
           emit({ type: "run.completed", result });
           return result;
         }
 
+        budget.reserveTools(calls.length);
         toolCalls += calls.length;
         pendingTools = { step, calls, outcomes: [], executions: [] };
         const batchSpan = startTraceSpan(this.tracer, "may.tools.batch", {
@@ -487,8 +508,18 @@ export class May {
         emit({ type: "step.completed", step });
       }
 
+      if (budget.limits.maxSteps !== undefined && budget.limits.maxSteps <= this.maxSteps) throw new RunBudgetExceededError("steps", budget.limits.maxSteps, this.maxSteps + 1);
       throw new MaxStepsExceededError(this.maxSteps);
     } catch (error) {
+      const budgetError = signal.reason instanceof RunBudgetExceededError ? signal.reason
+        : error instanceof RunBudgetExceededError ? error : undefined;
+      const usageUnavailable = error instanceof Error && "code" in error && error.code === "RUN_BUDGET_USAGE_UNAVAILABLE";
+      if ((budgetError !== undefined || usageUnavailable) && !signal.aborted && pendingTools !== undefined) {
+        const skipped = pendingTools.calls.map((call) => createSkippedToolOutcome(call, new FatalToolExecutionError(String(error))));
+        await this.context.append(skipped.map((outcome) => outcome.message), { runId, step: pendingTools.step });
+        emitToolOutcomes(pendingTools.step, skipped, emit);
+        pendingTools = undefined;
+      }
       if (signal.aborted || error instanceof RunCancelledError) {
         const cancelled = error instanceof RunCancelledError
           ? error
@@ -520,16 +551,22 @@ export class May {
             emit({ type: "run.failed", error: serializeError(contextError) });
             throw contextError;
           }
-          emitToolOutcomes(pendingTools.step, settledOutcomes, emit);
+          emitToolOutcomes(pendingTools.step, budgetError === undefined ? settledOutcomes : cancellationOutcomes, emit);
           pendingTools = undefined;
         }
 
+        if (budgetError !== undefined) {
+          emit({ type: "run.budget.exceeded", dimension: budgetError.dimension, limit: budgetError.limit, consumed: budgetError.consumed, budget: budget.snapshot() });
+          emit({ type: "run.failed", error: serializeError(budgetError) });
+          throw budgetError;
+        }
         emit(reason === undefined
           ? { type: "run.cancelled" }
           : { type: "run.cancelled", reason });
         throw cancelled;
       }
 
+      if (budgetError !== undefined) emit({ type: "run.budget.exceeded", dimension: budgetError.dimension, limit: budgetError.limit, consumed: budgetError.consumed, budget: budget.snapshot() });
       emit({ type: "run.failed", error: serializeError(error) });
       throw error;
     }

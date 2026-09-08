@@ -1,4 +1,5 @@
 import type { AssistantMessage, ToolCall, Usage } from "./types.js";
+import type { RunBudgetSnapshot } from "./budget.js";
 
 export interface SerializedError {
   name: string;
@@ -14,9 +15,11 @@ export interface RunResult {
   message: AssistantMessage;
   /** Aggregate usage across every completed model call in the run. */
   usage?: Usage;
+  budget?: RunBudgetSnapshot;
 }
 
 export type MayEventPayload =
+  | { type: "run.budget.exceeded"; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
   | { type: "run.started"; continuation?: boolean }
   | { type: "step.started"; step: number }
   | { type: "step.completed"; step: number }
