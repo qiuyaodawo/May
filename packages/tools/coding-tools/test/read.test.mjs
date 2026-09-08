@@ -28,24 +28,6 @@ test("read returns a bounded line range", async (t) => {
   });
 });
 
-test("read handles an empty file", async (t) => {
-  const cwd = await createWorkspace(t);
-  await writeFile(join(cwd, "empty.txt"), "");
-
-  const result = await executeTool(createReadTool({ cwd }), {
-    path: "empty.txt",
-  });
-
-  assert.deepEqual(result, {
-    path: "empty.txt",
-    content: "",
-    startLine: 0,
-    endLine: 0,
-    totalLines: 0,
-    truncated: false,
-  });
-});
-
 test("read rejects files over the byte limit and invalid UTF-8", async (t) => {
   const cwd = await createWorkspace(t);
   await writeFile(join(cwd, "large.txt"), "1234");

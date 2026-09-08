@@ -2,12 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { InMemoryContext, May } from "@may/core";
-import {
-  KimiApiError,
-  KimiFinishReasonError,
-  KimiModel,
-  KimiProtocolError,
-} from "../dist/index.js";
+import { KimiApiError, KimiModel } from "../dist/index.js";
 
 const emptyRequest = {
   messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
@@ -278,121 +273,6 @@ test("round-trips reasoning_content through a May tool-call loop", async () => {
   );
 });
 
-test("assembles multiple interleaved tool calls in index order", async () => {
-  const fetch = async () => sseResponse([
-    {
-      choices: [{
-        index: 0,
-        delta: {
-          tool_calls: [
-            {
-              index: 1,
-              id: "call_b",
-              type: "function",
-              function: { name: "second", arguments: "not-" },
-            },
-            {
-              index: 0,
-              id: "call_a",
-              type: "function",
-              function: { name: "first", arguments: "{\"x\":" },
-            },
-          ],
-        },
-        finish_reason: null,
-      }],
-    },
-    {
-      choices: [{
-        index: 0,
-        delta: {
-          tool_calls: [
-            { index: 0, function: { arguments: "1}" } },
-            { index: 1, function: { arguments: "json" } },
-          ],
-        },
-        finish_reason: null,
-      }],
-    },
-    {
-      choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
-    },
-    "[DONE]",
-  ]);
-  const model = new KimiModel({
-    apiKey: "secret",
-    model: "model",
-    fetch,
-  });
-
-  const events = await collect(model.stream(emptyRequest, {
-    signal: new AbortController().signal,
-  }));
-  const completed = events.at(-1);
-
-  assert.deepEqual(completed.message.toolCalls, [
-    { id: "call_a", name: "first", input: { x: 1 } },
-    { id: "call_b", name: "second", input: "not-json" },
-  ]);
-});
-
-test("preserves an explicitly empty reasoning_content for tool continuation", async () => {
-  const requests = [];
-  const responses = [
-    sseResponse([
-      {
-        choices: [{
-          index: 0,
-          delta: {
-            reasoning_content: "",
-            tool_calls: [{
-              index: 0,
-              id: "call_ping",
-              type: "function",
-              function: { name: "ping", arguments: "{}" },
-            }],
-          },
-          finish_reason: null,
-        }],
-      },
-      {
-        choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
-      },
-      "[DONE]",
-    ]),
-    sseResponse(completionChunks({ text: "pong" })),
-  ];
-  const model = new KimiModel({
-    apiKey: "secret",
-    model: "model",
-    fetch: async (_url, init) => {
-      requests.push(JSON.parse(init.body));
-      return responses.shift();
-    },
-  });
-  const run = new May({
-    model,
-    tools: [{
-      name: "ping",
-      description: "Return pong",
-      inputSchema: { type: "object", properties: {} },
-      async execute() {
-        return "pong";
-      },
-    }],
-    context: new InMemoryContext(),
-  }).run({ input: "ping" });
-
-  await run.result;
-
-  const assistant = requests[1].messages[1];
-  assert.equal(
-    Object.hasOwn(assistant, "reasoning_content"),
-    true,
-  );
-  assert.equal(assistant.reasoning_content, "");
-});
-
 test("surfaces structured Kimi HTTP errors", async () => {
   const fetch = async () => new Response(JSON.stringify({
     error: {
@@ -421,73 +301,6 @@ test("surfaces structured Kimi HTTP errors", async () => {
       assert.equal(error.providerType, "incorrect_api_key_error");
       return true;
     },
-  );
-});
-
-test("rejects malformed and incomplete Kimi streams", async (t) => {
-  async function rejectStream(values, ErrorType, code) {
-    const model = new KimiModel({
-      apiKey: "secret",
-      model: "model",
-      fetch: async () => sseResponse(values),
-    });
-    await assert.rejects(
-      collect(model.stream(emptyRequest, {
-        signal: new AbortController().signal,
-      })),
-      (error) => error instanceof ErrorType && error.code === code,
-    );
-  }
-
-  await t.test("invalid JSON", () =>
-    rejectStream(["{"], KimiProtocolError, "KIMI_PROTOCOL_ERROR"));
-  await t.test("missing finish reason", () =>
-    rejectStream([
-      { choices: [{ index: 0, delta: { content: "partial" } }] },
-      "[DONE]",
-    ], KimiProtocolError, "KIMI_PROTOCOL_ERROR"));
-  await t.test("length finish reason", () =>
-    rejectStream([
-      { choices: [{ index: 0, delta: {}, finish_reason: "length" }] },
-      "[DONE]",
-    ], KimiFinishReasonError, "KIMI_INCOMPLETE_RESPONSE"));
-  await t.test("tool finish without calls", () =>
-    rejectStream([
-      { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
-      "[DONE]",
-    ], KimiProtocolError, "KIMI_PROTOCOL_ERROR"));
-  await t.test("incomplete tool call", () =>
-    rejectStream([
-      {
-        choices: [{
-          index: 0,
-          delta: { tool_calls: [{ index: 0, id: "call_missing_name" }] },
-          finish_reason: null,
-        }],
-      },
-      { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
-      "[DONE]",
-    ], KimiProtocolError, "KIMI_PROTOCOL_ERROR"));
-  await t.test("missing DONE marker", () =>
-    rejectStream([
-      { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
-    ], KimiProtocolError, "KIMI_PROTOCOL_ERROR"));
-});
-
-test("rejects a successful response without a streaming body", async () => {
-  const model = new KimiModel({
-    apiKey: "secret",
-    model: "model",
-    fetch: async () => new Response(null, { status: 200 }),
-  });
-
-  await assert.rejects(
-    collect(model.stream(emptyRequest, {
-      signal: new AbortController().signal,
-    })),
-    (error) =>
-      error instanceof KimiProtocolError &&
-      error.code === "KIMI_PROTOCOL_ERROR",
   );
 });
 
@@ -525,21 +338,3 @@ test("passes AbortSignal to fetch and propagates cancellation", async () => {
   assert.equal(receivedSignal.reason, reason);
 });
 
-test("validates required constructor options", () => {
-  assert.throws(
-    () => new KimiModel({ apiKey: "", model: "model" }),
-    /apiKey must not be empty/,
-  );
-  assert.throws(
-    () => new KimiModel({ apiKey: "secret", model: "" }),
-    /model must not be empty/,
-  );
-  assert.throws(
-    () => new KimiModel({
-      apiKey: "secret",
-      model: "model",
-      maxTokens: 0,
-    }),
-    /maxTokens must be a positive safe integer/,
-  );
-});

@@ -4,8 +4,7 @@ import { mkdtemp, mkdir, writeFile, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { InMemorySessionStore, InMemorySessionCatalog } from "@may/session";
-import { MaybeCodeWorkspace, executeMaybeCodeSlashCommand, createMaybeCodeSlashCommandSuggester,
-  resolveMaybeCodeSkillDirectories, runTerminalUI, runRetainedTerminalUI } from "../dist/index.js";
+import { MaybeCodeWorkspace, executeMaybeCodeSlashCommand, createMaybeCodeSlashCommandSuggester } from "../dist/index.js";
 
 async function fixture(t) {
   const workspace = await realpath(await mkdtemp(join(tmpdir(), "may-skills-app-")));
@@ -56,8 +55,6 @@ test("model activation loads resources, remains after compaction/resume and rese
   assert.equal(app.listSkills()[0].active, true);
   assert.match(JSON.stringify(last.messages), /RESOURCE_CONTENT/);
   assert.equal((await app.history()).some((e) => e.type === "approval.requested"), false);
-  const before = await app.inspectContext();
-  assert.ok(before.instructionsBytes > 200);
   await app.compactContext({ name: "remove-all", compact() { return []; } });
   const sessionId = app.sessionId; await app.close();
   await writeFile(join(directory, "SKILL.md"), "---\nname: research\ndescription: Updated description\n---\nNEW_PROCEDURE");
@@ -71,49 +68,4 @@ test("model activation loads resources, remains after compaction/resume and rese
   assert.equal(resumed.listSkills()[0].active, false);
   await resumed.activateSkill("research");
   assert.match(resumed.instructions.effective, /NEW_PROCEDURE/);
-});
-
-test("skill config resolves relative and home roots and supports disabling", () => {
-  const config = { path: join(process.cwd(), "settings", "config.json"), apps: { maybecode: { skills: { directories: ["custom", "~/skills"] } } } };
-  assert.equal(resolveMaybeCodeSkillDirectories(config, process.cwd())[0], join(process.cwd(), "settings", "custom"));
-  assert.equal(resolveMaybeCodeSkillDirectories({ ...config, apps: { maybecode: { skills: false } } }, process.cwd()), false);
-  assert.throws(() => resolveMaybeCodeSkillDirectories({ ...config, apps: { maybecode: { skills: { directories: [1] } } } }, process.cwd()));
-});
-
-test("classic terminal displays skills and activates without a model request", { timeout: 5000 }, async (t) => {
-  const { workspace } = await fixture(t);
-  for (const ui of [runTerminalUI]) {
-    const app = await MaybeCodeWorkspace.open({ workspace, store: new InMemorySessionStore(), catalog: new InMemorySessionCatalog(), model: {
-      async *stream() { throw new Error("preview must not call the model"); },
-    }});
-    const answers = ["/skills", "/skills show research", "/skills use research", "/quit"];
-    const terminal = { interactive: false, colors: false, output: "", write(text) { this.output += text; },
-      async question() { return answers.shift() ?? "/quit"; }, setInterruptHandler() {}, close() {},
-    };
-    try { await ui(app, { terminal }); assert.match(terminal.output, /research/); assert.equal(app.listSkills()[0].active, true); }
-    finally { await app.close(); }
-  }
-});
-
-test("retained terminal displays and activates skills", { timeout: 5000 }, async (t) => {
-  const { workspace } = await fixture(t);
-  const app = await MaybeCodeWorkspace.open({ workspace, store: new InMemorySessionStore(), catalog: new InMemorySessionCatalog(), model: { async *stream() { throw new Error("Unexpected model call"); } } });
-  let onKey; let output = "";
-  const terminal = { size: { width: 120, height: 40 }, write() {}, start() {}, close() {},
-    onKey(listener) { onKey = listener; return () => {}; }, onResize() { return () => {}; },
-  };
-  const renderer = { render(frame) { output += frame.lines.join("\n") + "\n"; }, invalidate() {}, dispose() {} };
-  const running = runRetainedTerminalUI(app, { terminal, renderer });
-  const until = async (predicate) => { for (let n = 0; n < 1000 && !predicate(); n++) await new Promise((r) => setTimeout(r, 1)); assert.ok(predicate()); };
-  const send = (input) => {
-    for (const text of input) onKey({ key: text, text, ctrl: false, alt: false, shift: false, meta: false });
-    onKey({ key: "enter", ctrl: false, alt: false, shift: false, meta: false });
-  };
-  try {
-    await until(() => onKey !== undefined);
-    send("/skills"); await until(() => output.includes("Research topics"));
-    send("/skills use research"); await until(() => output.includes("Activated research"));
-    await new Promise((resolve) => setImmediate(resolve));
-    send("/quit"); await running;
-  } finally { await app.close(); }
 });

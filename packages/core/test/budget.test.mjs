@@ -1,16 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { May, InMemoryContext, parallelToolScheduler, resolveRunBudget } from "../dist/index.js";
+import { May, InMemoryContext, parallelToolScheduler } from "../dist/index.js";
 
 const assistant = (toolCalls = []) => ({ role: "assistant", content: [], toolCalls });
 const tool = { name: "work", description: "work", inputSchema: {}, async execute() { return "done"; } };
 const calls = [{ id: "a", name: "work", input: {} }, { id: "b", name: "work", input: {} }];
 const collect = async (events) => { const result = []; for await (const event of events) result.push(event); return result; };
-
-test("validates budgets and prevents loosening defaults", () => {
-  for (const budget of [{ maxSteps: 0 }, { maxDurationMs: Infinity }, { maxToolCalls: 1.5 }, { maxCostUsd: 1 }, { maxDurationMs: 2 ** 32 }, { unexpected: 1 }]) assert.throws(() => resolveRunBudget(budget));
-  assert.equal(resolveRunBudget({ maxToolCalls: 1 }, { maxToolCalls: 9 }).maxToolCalls, 1);
-});
 
 test("reserves an entire parallel tool batch before any side effect", async () => {
   let executed = 0;

@@ -98,11 +98,11 @@ test("restores coding change previews and renders their diff on demand", () => {
 
   assert.equal(store.sessionId, "session-1");
   assert.equal(store.items[0].preview.kind, "update");
-  assert.match(
-    new TranscriptView(store, { showToolDetails: true })
-      .render({ width: 80, height: 20 }).lines.join("\n"),
-    /\+new/u,
-  );
+  const view = new TranscriptView(store);
+  assert.doesNotMatch(view.render({ width: 80, height: 20 }).lines.join("\n"), /\+new/u);
+  view.setFocused(true);
+  view.handleKey({ key: "enter", ctrl: false, alt: false, shift: false, meta: false });
+  assert.match(view.render({ width: 80, height: 20 }).lines.join("\n"), /\+new/u);
 });
 
 test("lets applications append product notices and change previews explicitly", () => {

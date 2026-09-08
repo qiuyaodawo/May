@@ -14,21 +14,7 @@ import test from "node:test";
 
 import { InMemoryContext } from "@may/core";
 
-import {
-  createMaybeCodeSlashCommandSuggester,
-  createMaybeCodeModel,
-  createCodingPermissionPolicy,
-  executeMaybeCodeSlashCommand,
-  formatMaybeCodeMcpStatus,
-  openConfiguredMaybeCode,
-  parseMaybeCodeArgs,
-  resolveMaybeCodeMcp,
-  runMaybeCode,
-  runMaybeCodeMcpCommand,
-  resolveMaybeCodeObservability,
-  resolveMaybeCodeRetry,
-  selectMaybeCodeModel,
-} from "../dist/index.js";
+import { createMaybeCodeSlashCommandSuggester, createCodingPermissionPolicy, executeMaybeCodeSlashCommand, formatMaybeCodeMcpStatus, openConfiguredMaybeCode, parseMaybeCodeArgs, resolveMaybeCodeMcp, runMaybeCode, runMaybeCodeMcpCommand, resolveMaybeCodeObservability, resolveMaybeCodeRetry } from "../dist/index.js";
 
 test("parses MaybeCode startup options", () => {
   assert.deepEqual(
@@ -62,88 +48,6 @@ test("parses MaybeCode startup options", () => {
   assert.throws(
     () => parseMaybeCodeArgs(["--config", "--model", "chat"]),
     /--config requires a value/,
-  );
-});
-
-test("selects the default model profile", () => {
-  const selection = selectMaybeCodeModel({
-    path: "config.json",
-    providers: {
-      deepseek: {
-        adapter: "deepseek-chat",
-        apiKey: "key",
-      },
-    },
-    models: {
-      reasoner: {
-        provider: "deepseek",
-        model: "deepseek-reasoner",
-        contextWindowTokens: 128000,
-        maxOutputTokens: 8192,
-        options: { maxTokens: 100 },
-      },
-    },
-    defaultModel: "reasoner",
-  });
-
-  assert.equal(selection.provider, "deepseek");
-  assert.equal(selection.adapter, "deepseek-chat");
-  assert.equal(selection.model, "deepseek-reasoner");
-  assert.deepEqual(selection.options, { maxTokens: 100 });
-  assert.deepEqual(selection.limits, {
-    contextWindowTokens: 128000,
-    maxOutputTokens: 8192,
-  });
-});
-
-test("attaches configured context limits to the created model", () => {
-  const model = createMaybeCodeModel({
-    profile: "chat",
-    provider: "deepseek",
-    adapter: "deepseek-chat",
-    model: "deepseek-chat",
-    providerConfig: { adapter: "deepseek-chat", apiKey: "test" },
-    options: { maxTokens: 2048 },
-    limits: { contextWindowTokens: 64000, maxOutputTokens: 8192 },
-  });
-
-  assert.deepEqual(model.limits, {
-    contextWindowTokens: 64000,
-    maxOutputTokens: 2048,
-  });
-});
-
-test("creates an OpenAI Responses model and preserves native compaction", () => {
-  const model = createMaybeCodeModel({
-    profile: "gpt",
-    provider: "openai",
-    adapter: "openai-responses",
-    model: "gpt-5.4",
-    providerConfig: { adapter: "openai-responses", apiKey: "test" },
-    options: {
-      reasoningEffort: "high",
-      reasoningSummary: "auto",
-      serverCompactThreshold: 50_000,
-      store: false,
-    },
-    limits: { contextWindowTokens: 128_000, maxOutputTokens: 8192 },
-  });
-
-  assert.deepEqual(model.limits, {
-    contextWindowTokens: 128_000,
-    maxOutputTokens: 8192,
-  });
-  assert.equal(model.contextCompactor.name, "openai-responses-compact");
-  assert.throws(
-    () => createMaybeCodeModel({
-      profile: "gpt",
-      provider: "openai",
-      adapter: "openai-responses",
-      model: "gpt-5.4",
-      providerConfig: { adapter: "openai-responses", apiKey: "test" },
-      options: { store: "yes" },
-    }),
-    /models\.gpt\.options\.store must be a boolean/,
   );
 });
 

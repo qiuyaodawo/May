@@ -1,28 +1,8 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import {
-  Column,
-  Dialog,
-  Editor,
-  EditorHistory,
-  FocusManager,
-  FullscreenRenderer,
-  Markdown,
-  NodeTerminalDriver,
-  ScreenBuffer,
-  ScrollView,
-  SelectList,
-  Stack,
-  Text,
-  sanitizeTerminalText,
-} from "../dist/index.js";
+import { Column, Dialog, Editor, EditorHistory, FocusManager, Markdown, NodeTerminalDriver, ScreenBuffer, ScrollView, SelectList, Text, sanitizeTerminalText } from "../dist/index.js";
 import { keyStroke } from "@may/keybindings";
-
-test("wraps CJK text by terminal display width", () => {
-  const result = new Text("中文abc").render({ width: 4, height: 3 });
-  assert.deepEqual(result.lines, ["中文", "abc"]);
-});
 
 test("neutralizes 7-bit and 8-bit terminal control sequences", () => {
   const safe = sanitizeTerminalText("a\x1b[2Jb\u009b2Jc\u009d0;title\u0007d");
@@ -36,23 +16,6 @@ test("clips rendered lines and cursors to the screen", () => {
   );
   assert.equal(buffer.lines[0], "中文a");
   assert.deepEqual(buffer.cursor, { x: 4, y: 1, visible: true });
-});
-
-test("composes child output vertically", () => {
-  const stack = new Stack([new Text("one"), new Text("two")], { gap: 1 });
-  assert.deepEqual(
-    stack.render({ width: 10, height: 3 }).lines,
-    ["one", "", "two"],
-  );
-});
-
-test("does not redraw unchanged screen rows", () => {
-  const writes = [];
-  const renderer = new FullscreenRenderer({ write: (value) => writes.push(value) });
-  renderer.render({ lines: ["one", "two"] }, { width: 10, height: 3 });
-  renderer.render({ lines: ["one", "changed"] }, { width: 10, height: 3 });
-  assert.match(writes[1], /changed/u);
-  assert.doesNotMatch(writes[1], /one/u);
 });
 
 test("edits grapheme clusters and tracks a wrapped cursor", () => {

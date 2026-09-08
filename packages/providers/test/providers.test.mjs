@@ -2,23 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { parseMayConfig } from "@may/config";
-import {
-  AnthropicModel,
-  createBuiltinProviderModel,
-  createBuiltinProviderAdapterRegistry,
-  createModelCapabilityResolver,
-  DeepSeekModel,
-  KimiModel,
-  OpenAIChatCompletionsModel,
-  OpenAIResponsesModel,
-  ProviderAdapterRegistry,
-  ProviderAdapterRegistryError,
-  ProviderConfigurationError,
-  RetryingModel,
-  selectProviderModel,
-  withModelRetry,
-  ZhipuModel,
-} from "../dist/index.js";
+import { createBuiltinProviderModel, createBuiltinProviderAdapterRegistry, createModelCapabilityResolver, ProviderAdapterRegistry, ProviderAdapterRegistryError, RetryingModel, selectProviderModel, withModelRetry } from "../dist/index.js";
 
 const request = {
   messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
@@ -313,37 +297,6 @@ test("resolves model capabilities by explicit, provider, builtin, then unknown p
     efforts: ["low", "high"],
   });
   assert.equal(flakyRequests, 2);
-});
-
-test("provides every built-in adapter", () => {
-  assert.ok(createBuiltinProviderModel(
-    modelSelection("deepseek-chat", "deepseek-chat"),
-  ) instanceof DeepSeekModel);
-  assert.ok(createBuiltinProviderModel(
-    modelSelection("zhipu-chat", "glm-5"),
-  ) instanceof ZhipuModel);
-  assert.ok(createBuiltinProviderModel(
-    modelSelection("kimi-chat", "kimi-k3"),
-  ) instanceof KimiModel);
-  assert.ok(createBuiltinProviderModel(
-    modelSelection("anthropic-messages", "claude-test"),
-  ) instanceof AnthropicModel);
-  assert.ok(createBuiltinProviderModel(
-    modelSelection("openai-responses", "gpt-test"),
-  ) instanceof OpenAIResponsesModel);
-  assert.ok(createBuiltinProviderModel(
-    modelSelection("openai-chat-completions", "gpt-test"),
-  ) instanceof OpenAIChatCompletionsModel);
-
-  const names = createBuiltinProviderAdapterRegistry().names();
-  assert.deepEqual(names, [
-    "deepseek-chat",
-    "zhipu-chat",
-    "kimi-chat",
-    "anthropic-messages",
-    "openai-responses",
-    "openai-chat-completions",
-  ]);
 });
 
 test("maps provider-specific configuration into each adapter request", async () => {

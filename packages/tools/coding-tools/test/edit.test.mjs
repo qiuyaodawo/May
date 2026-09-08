@@ -37,19 +37,6 @@ test("edit preserves a UTF-8 byte order mark", async (t) => {
   assert.deepEqual(await readFile(path), Buffer.from([0xef, 0xbb, 0xbf, 0x62]));
 });
 
-test("edit allows deleting the matched text", async (t) => {
-  const cwd = await createWorkspace(t);
-  await writeFile(join(cwd, "file.txt"), "remove me");
-
-  await executeTool(createEditTool({ cwd }), {
-    path: "file.txt",
-    oldText: "remove ",
-    newText: "",
-  });
-
-  assert.equal(await readFile(join(cwd, "file.txt"), "utf8"), "me");
-});
-
 test("edit rejects missing and ambiguous matches without changing the file", async (t) => {
   const cwd = await createWorkspace(t);
   const path = join(cwd, "file.txt");

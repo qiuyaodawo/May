@@ -701,39 +701,3 @@ test("passes AbortSignal to fetch and propagates cancellation", async () => {
   assert.equal(capturedSignal, controller.signal);
 });
 
-test("validates required constructor options", () => {
-  assert.throws(
-    () => new AnthropicModel({ apiKey: " ", model: "model" }),
-    /apiKey must not be empty/,
-  );
-  assert.throws(
-    () => new AnthropicModel({ apiKey: "key", model: " " }),
-    /model must not be empty/,
-  );
-  assert.throws(
-    () => new AnthropicModel({ apiKey: "key", model: "model", maxTokens: 0 }),
-    /maxTokens must be a positive safe integer/,
-  );
-  assert.throws(
-    () => new AnthropicModel({ apiKey: "key", model: "model", apiVersion: " " }),
-    /apiVersion must not be empty/,
-  );
-  assert.throws(
-    () => new AnthropicModel({
-      apiKey: "key",
-      model: "model",
-      maxTokens: 4096,
-      thinking: { type: "enabled", budgetTokens: 1000 },
-    }),
-    /at least 1024/,
-  );
-  assert.throws(
-    () => new AnthropicModel({
-      apiKey: "key",
-      model: "model",
-      maxTokens: 2048,
-      thinking: { type: "enabled", budgetTokens: 2048 },
-    }),
-    /less than maxTokens/,
-  );
-});

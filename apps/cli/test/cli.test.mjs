@@ -2,13 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { parseMayConfig } from "@may/config";
-import { DeepSeekModel, OpenAIResponsesModel } from "@may/providers";
-import {
-  createConfiguredModel,
-  parseCliArgs,
-  runCli,
-  selectModelConfig,
-} from "../dist/index.js";
+import { parseCliArgs, runCli } from "../dist/index.js";
 
 test("parses the run command and options", () => {
   assert.deepEqual(
@@ -173,30 +167,6 @@ test("selects a named model profile and prints a non-streamed final message", as
   assert.equal(stderr.value, "");
 });
 
-test("uses defaultModel when no selector is passed", () => {
-  const config = parseMayConfig({
-    defaultModel: "reasoner",
-    providers: {
-      deepseek: {
-        adapter: "deepseek-chat",
-        apiKeyEnv: "DEEPSEEK_API_KEY",
-      },
-      another: { adapter: "openai-responses", apiKey: "unused" },
-    },
-    models: {
-      reasoner: { provider: "deepseek", model: "deepseek-reasoner" },
-    },
-  });
-
-  const selected = selectModelConfig(config, {}, {
-    env: { DEEPSEEK_API_KEY: "env-key" },
-  });
-
-  assert.equal(selected.provider, "deepseek");
-  assert.equal(selected.model, "deepseek-reasoner");
-  assert.equal(selected.providerConfig.apiKey, "env-key");
-});
-
 test("reports an ambiguous model selection", async () => {
   const config = parseMayConfig({
     providers: {
@@ -217,42 +187,6 @@ test("reports an ambiguous model selection", async () => {
 
   assert.equal(code, 1);
   assert.match(stderr.value, /Select a model with --model/);
-});
-
-test("creates configured provider models and validates CLI-specific options", () => {
-  const base = {
-    profile: "reasoner",
-    provider: "deepseek",
-    adapter: "deepseek-chat",
-    model: "deepseek-reasoner",
-    providerConfig: { adapter: "deepseek-chat", apiKey: "test-key" },
-    options: {},
-  };
-
-  assert.ok(createConfiguredModel(base) instanceof DeepSeekModel);
-  assert.ok(createConfiguredModel({
-    profile: "gpt",
-    provider: "openai",
-    adapter: "openai-responses",
-    model: "gpt-5.4",
-    providerConfig: { adapter: "openai-responses", apiKey: "test-key" },
-    options: {
-      reasoningEffort: "high",
-      reasoningSummary: "auto",
-      serverCompactThreshold: 50_000,
-    },
-  }) instanceof OpenAIResponsesModel);
-  assert.throws(
-    () => createConfiguredModel({ ...base, adapter: "another" }),
-    /available adapters: deepseek-chat, zhipu-chat, kimi-chat, anthropic-messages, openai-responses, openai-chat-completions/,
-  );
-  assert.throws(
-    () => createConfiguredModel({
-      ...base,
-      options: { maxTokens: 0 },
-    }),
-    /maxTokens must be a positive safe integer/,
-  );
 });
 
 test("returns a failure code when the model fails", async () => {

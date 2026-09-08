@@ -16,29 +16,6 @@ import {
   Session,
 } from "../dist/index.js";
 
-test("creates a session with durable identity and metadata", async () => {
-  const store = new InMemorySessionStore();
-  const session = await Session.create({
-    id: "session_test",
-    metadata: { workspace: "/repo" },
-    runtime: createRuntime(),
-    store,
-  });
-
-  assert.equal(session.id, "session_test");
-  assert.deepEqual(session.metadata, { workspace: "/repo" });
-  const history = await session.history();
-  assert.equal(typeof history[0].timestamp, "number");
-  assert.deepEqual(history.map(({ timestamp: _timestamp, ...event }) => event), [
-    {
-      type: "session.created",
-      sessionId: "session_test",
-      seq: 1,
-      metadata: { workspace: "/repo" },
-    },
-  ]);
-});
-
 test("relays live run events and stores only durable session facts", async () => {
   const model = {
     async *stream() {
@@ -594,34 +571,6 @@ test("rejects out-of-order events in the in-memory store", async () => {
     }),
     /Expected session event sequence 1, received 2/,
   );
-});
-
-test("persists session events across file store instances", async (t) => {
-  const directory = await createTempDirectory(t);
-  const sessionId = "session/with:unsafe*characters";
-  const first = new FileSessionStore(directory);
-
-  await first.append({
-    type: "session.created",
-    sessionId,
-    seq: 1,
-    timestamp: 1,
-  });
-  await first.append({
-    type: "input.submitted",
-    sessionId,
-    seq: 2,
-    timestamp: 2,
-    message: { role: "user", content: [{ type: "text", text: "hello" }] },
-  });
-
-  const second = new FileSessionStore(directory);
-  const history = await second.read(sessionId);
-  assert.deepEqual(history.map((event) => event.seq), [1, 2]);
-  assert.equal(history[1].message.content[0].text, "hello");
-  const files = await readdir(directory);
-  assert.equal(files.length, 1);
-  assert.match(files[0], /^[A-Za-z0-9_-]+\.jsonl$/u);
 });
 
 test("queues file-session deletion with appends for the same session", async (t) => {

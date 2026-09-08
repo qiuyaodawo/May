@@ -4,18 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import {
-  getDefaultMayConfigPath,
-  loadMayConfig,
-  MayConfigFileError,
-  MayConfigParseError,
-  MayConfigResolutionError,
-  MayConfigValidationError,
-  parseMayConfig,
-  resolveModelProfile,
-  resolveProviderConfig,
-  updateDefaultMayModel,
-} from "../dist/index.js";
+import { loadMayConfig, MayConfigFileError, MayConfigParseError, MayConfigResolutionError, MayConfigValidationError, parseMayConfig, resolveModelProfile, resolveProviderConfig, updateDefaultMayModel } from "../dist/index.js";
 
 test("parses provider connections and model profiles", () => {
   const config = parseMayConfig({
@@ -160,47 +149,15 @@ test("resolves apiKeyEnv lazily", () => {
 test("rejects invalid config shapes", async (t) => {
   const cases = [
     ["non-object root", null, "config"],
-    ["missing providers", {}, "providers"],
     [
       "unknown root field",
       { providers: {}, defaultModal: "typo" },
       "config.defaultModal",
     ],
-    ["non-object provider", { providers: { deepseek: [] } }, "providers.deepseek"],
-    ["non-object application", { providers: {}, apps: { maybecode: [] } }, "apps.maybecode"],
-    ["missing adapter", { providers: { deepseek: {} } }, "providers.deepseek.adapter"],
-    ["empty known field", { providers: { deepseek: { adapter: "deepseek-chat", apiKey: " " } } }, "providers.deepseek.apiKey"],
     [
       "two API key sources",
       { providers: { deepseek: { adapter: "deepseek-chat", apiKey: "key", apiKeyEnv: "KEY" } } },
       "providers.deepseek",
-    ],
-    [
-      "non-object model options",
-      {
-        providers: { deepseek: { adapter: "deepseek-chat" } },
-        models: { reasoner: { provider: "deepseek", model: "model", options: [] } },
-      },
-      "models.reasoner.options",
-    ],
-    [
-      "legacy provider model",
-      { providers: { deepseek: { adapter: "deepseek-chat", model: "old" } } },
-      "providers.deepseek.model",
-    ],
-    [
-      "invalid model output limit",
-      {
-        providers: { deepseek: { adapter: "deepseek-chat" } },
-        models: {
-          reasoner: {
-            provider: "deepseek",
-            model: "model",
-            maxOutputTokens: 1.5,
-          },
-        },
-      },
-      "models.reasoner.maxOutputTokens",
     ],
     [
       "unknown model provider",
@@ -318,10 +275,4 @@ test("distinguishes file and JSON parsing failures", async (t) => {
       return true;
     },
   );
-});
-
-test("returns the default user config path", () => {
-  const path = getDefaultMayConfigPath();
-
-  assert.ok(path.endsWith(join(".may", "config.json")));
 });

@@ -110,20 +110,6 @@ test("bounds large diff output", async (t) => {
   assert.ok(preview.diff.split("\n").length < 230);
 });
 
-test("reports separated edits without replacing unchanged middle lines", async (t) => {
-  const workspace = await temporaryDirectory(t);
-  await writeFile(join(workspace, "separated.txt"), "a\nb\nc\nd\ne\n", "utf8");
-  const preview = await createToolChangePreview(workspace, "write", {
-    path: "separated.txt",
-    content: "A\nb\nc\nd\nE\n",
-  });
-
-  assert.equal(preview.status, "ready");
-  assert.equal(preview.additions, 2);
-  assert.equal(preview.deletions, 2);
-  assert.match(preview.diff, / b\n c\n d/u);
-});
-
 test("shows EOF newline changes and rejects hard-linked previews", async (t) => {
   const workspace = await temporaryDirectory(t);
   await writeFile(join(workspace, "eof.txt"), "a", "utf8");

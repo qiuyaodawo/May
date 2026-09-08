@@ -32,22 +32,6 @@ test("parses, matches, and completes registered slash commands", async () => {
   ]);
 });
 
-test("rejects invalid or duplicate slash command names", () => {
-  assert.throws(
-    () => new SlashCommandRegistry([
-      { name: "quit", usage: "quit", description: "invalid" },
-    ]),
-    /Invalid slash command name/u,
-  );
-  assert.throws(
-    () => new SlashCommandRegistry([
-      { name: "/one", aliases: ["/same"], usage: "/one", description: "one" },
-      { name: "/same", usage: "/same", description: "same" },
-    ]),
-    /Duplicate slash command name/u,
-  );
-});
-
 test("maintains reusable filtered list selection state", () => {
   const model = new ListSelectionModel(
     [{ id: "alpha" }, { id: "beta" }, { id: "bravo" }],

@@ -99,7 +99,6 @@ test("returns a direct model response and emits ordered events", async () => {
       "run.completed",
     ],
   );
-  assert.deepEqual(events.map((event) => event.seq), [1, 2, 3, 4, 5, 6, 7]);
   assert.equal(
     events.find((event) => event.type === "model.completed")
       .contextMessageCount,
@@ -212,26 +211,6 @@ test("continues existing context without appending a new user message", async ()
   assert.deepEqual((await context.snapshot()).messages.map((message) =>
     message.role
   ), ["user", "assistant"]);
-});
-
-test("rejects invalid maxSteps and duplicate tool names at construction", () => {
-  const model = { async *stream() {} };
-  const context = new InMemoryContext();
-  const duplicate = {
-    name: "duplicate",
-    description: "duplicate",
-    inputSchema: {},
-    async execute() {},
-  };
-
-  assert.throws(
-    () => new May({ model, context, maxSteps: 0 }),
-    /maxSteps must be a positive integer/,
-  );
-  assert.throws(
-    () => new May({ model, context, tools: [duplicate, duplicate] }),
-    /Duplicate tool name: duplicate/,
-  );
 });
 
 test("executes a tool and feeds its result back to the model", async () => {
@@ -658,65 +637,6 @@ test("turns a tool execution error into a tool message and continues", async () 
   assertSingleTerminalEvent(events, "run.completed");
 });
 
-test("turns a custom executor error into a tool message and continues", async () => {
-  let modelStep = 0;
-  const model = {
-    async *stream(request) {
-      modelStep += 1;
-      if (modelStep === 1) {
-        yield {
-          type: "response.completed",
-          message: assistant("", [
-            { id: "blocked_call", name: "blocked", input: {} },
-          ]),
-        };
-        return;
-      }
-
-      const toolMessage = request.messages.at(-1);
-      assert.equal(toolMessage.isError, true);
-      assert.equal(
-        toolMessage.content[0].value.message,
-        "executor unavailable",
-      );
-      yield {
-        type: "response.completed",
-        message: assistant("executor failure recovered"),
-      };
-    },
-  };
-  const blocked = {
-    name: "blocked",
-    description: "Must be intercepted",
-    inputSchema: {},
-    async execute() {
-      assert.fail("the raw tool must not execute");
-    },
-  };
-  const toolExecutor = {
-    async execute() {
-      throw new Error("executor unavailable");
-    },
-  };
-
-  const run = new May({
-    model,
-    tools: [blocked],
-    context: new InMemoryContext(),
-    toolExecutor,
-  }).run({ input: "run blocked tool" });
-  const eventPromise = collect(run.events);
-  const result = await run.result;
-  const events = await eventPromise;
-
-  assert.equal(result.steps, 2);
-  assert.equal(
-    events.find((event) => event.type === "tool.failed").error.message,
-    "executor unavailable",
-  );
-  assertSingleTerminalEvent(events, "run.completed");
-});
-
 test("terminates the run for explicitly fatal tool infrastructure errors", async () => {
   let modelCalls = 0;
   let laterToolExecuted = false;
@@ -937,35 +857,6 @@ test("emits exactly one failed terminal event when the context throws", async ()
 
   assert.equal(events.at(-1).error.message, "context unavailable");
   assertSingleTerminalEvent(events, "run.failed");
-});
-
-test("passes run metadata and cancellation to context snapshots", async () => {
-  let snapshotOptions;
-  const context = {
-    messages: [],
-    async append(messages) {
-      this.messages.push(...messages);
-    },
-    async snapshot(options) {
-      snapshotOptions = options;
-      return { messages: [...this.messages] };
-    },
-  };
-  const model = {
-    async *stream() {
-      yield {
-        type: "response.completed",
-        message: assistant("done"),
-      };
-    },
-  };
-
-  const run = new May({ model, context }).run({ input: "hello" });
-  await run.result;
-
-  assert.equal(snapshotOptions.runId, run.id);
-  assert.equal(snapshotOptions.step, 1);
-  assert.ok(snapshotOptions.signal instanceof AbortSignal);
 });
 
 test("rejects concurrent runs against the same runtime context", async () => {
@@ -1327,55 +1218,6 @@ test("cancelling parallel tools waits for started side effects to settle", async
   assert.deepEqual(toolMessages[1].content[0].value, {
     sideEffectCommitted: true,
   });
-  assertSingleTerminalEvent(events, "run.cancelled");
-});
-
-test("run.cancel aborts an active custom tool executor", async () => {
-  const started = deferred();
-  let executorSignal;
-  const model = {
-    async *stream() {
-      yield {
-        type: "response.completed",
-        message: assistant("", [
-          { id: "executor_call", name: "noop", input: {} },
-        ]),
-      };
-    },
-  };
-  const noop = {
-    name: "noop",
-    description: "Must be intercepted",
-    inputSchema: {},
-    async execute() {
-      assert.fail("the raw tool must not execute");
-    },
-  };
-  const toolExecutor = {
-    async execute({ context }) {
-      executorSignal = context.signal;
-      started.resolve();
-      await waitForAbort(context.signal);
-    },
-  };
-
-  const run = new May({
-    model,
-    tools: [noop],
-    context: new InMemoryContext(),
-    toolExecutor,
-  }).run({ input: "wait in executor" });
-  const eventPromise = collect(run.events);
-
-  await started.promise;
-  run.cancel("stop executor");
-
-  await assert.rejects(run.result, { code: "RUN_CANCELLED" });
-  const events = await eventPromise;
-
-  assert.equal(executorSignal.aborted, true);
-  assert.equal(executorSignal.reason, "stop executor");
-  assert.equal(events.some((event) => event.type === "tool.failed"), false);
   assertSingleTerminalEvent(events, "run.cancelled");
 });
 

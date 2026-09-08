@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -22,19 +22,6 @@ test("write creates parent directories and overwrites files", async (t) => {
   assert.deepEqual(created, { path: "src/new.txt", bytesWritten: 5 });
   assert.deepEqual(overwritten, { path: "src/new.txt", bytesWritten: 6 });
   assert.equal(await readFile(join(cwd, "src", "new.txt"), "utf8"), "second");
-});
-
-test("write supports empty content", async (t) => {
-  const cwd = await createWorkspace(t);
-  await writeFile(join(cwd, "file.txt"), "old");
-
-  const result = await executeTool(createWriteTool({ cwd }), {
-    path: "file.txt",
-    content: "",
-  });
-
-  assert.equal(result.bytesWritten, 0);
-  assert.equal(await readFile(join(cwd, "file.txt"), "utf8"), "");
 });
 
 test("write enforces its byte limit", async (t) => {

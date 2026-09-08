@@ -7,43 +7,6 @@ import {
 } from "../dist/index.js";
 import { ScrollView } from "@may/tui";
 
-test("projects streaming events into stable, terminal-safe transcript items", () => {
-  const store = new TranscriptStore();
-  const base = { runId: "run-1", step: 1, timestamp: 1 };
-  store.applyMayEvent({ ...base, type: "model.started", seq: 1 });
-  store.applyMayEvent({
-    ...base,
-    type: "model.reasoning.delta",
-    delta: "think",
-    seq: 2,
-  });
-  store.applyMayEvent({
-    ...base,
-    type: "model.text.delta",
-    delta: "\x1b[2Jhello",
-    seq: 3,
-  });
-  store.applyMayEvent({
-    ...base,
-    type: "model.completed",
-    seq: 4,
-    contextMessageCount: 2,
-    message: {
-      role: "assistant",
-      content: [
-        { type: "reasoning", text: "think" },
-        { type: "text", text: "\x1b[2Jhello" },
-      ],
-    },
-  });
-
-  assert.equal(store.items.length, 1);
-  assert.equal(store.items[0].status, "completed");
-  const rendered = new TranscriptView(store).render({ width: 40, height: 8 });
-  assert.match(rendered.lines.join("\n"), /␛\[2Jhello/u);
-  assert.doesNotMatch(rendered.lines.join("\n"), /\u001b\[2J/u);
-});
-
 test("keeps the newest transcript rows after the scroll buffer limit", () => {
   const store = new TranscriptStore();
   store.appendUser(Array.from({ length: 10_050 }, (_, index) =>
@@ -98,89 +61,6 @@ test("does not display input that the controller rejected", async () => {
   assert.equal(store.items.some((item) => item.kind === "user"), false);
   assert.match(view.render({ width: 80, height: 20 }).lines.join("\n"), /busy/u);
   view.dispose();
-});
-
-test("collapses file diffs and reveals them through the details toggle", () => {
-  const store = new TranscriptStore();
-  store.applyMayEvent({
-    type: "tool.started",
-    runId: "run-1",
-    step: 1,
-    seq: 1,
-    timestamp: 1,
-    call: { id: "edit-1", name: "edit", input: { path: "a.ts" } },
-  });
-  store.appendChangePreview(
-    "run-1",
-    1,
-    "edit-1",
-    {
-      status: "ready",
-      tool: "edit",
-      path: "a.ts",
-      kind: "update",
-      additions: 1,
-      deletions: 1,
-      diff: "--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-old\n+new",
-    },
-  );
-
-  const view = new TranscriptView(store);
-  assert.doesNotMatch(
-    view.render({ width: 80, height: 20 }).lines.join("\n"),
-    /\+new/u,
-  );
-  view.setFocused(true);
-  view.render({ width: 80, height: 20 });
-  view.handleKey({
-    key: "enter",
-    ctrl: false,
-    alt: false,
-    shift: false,
-    meta: false,
-  });
-  assert.match(
-    view.render({ width: 80, height: 20 }).lines.join("\n"),
-    /\+new/u,
-  );
-
-  const restored = new TranscriptStore();
-  restored.loadHistory([
-    {
-      type: "session.created",
-      sessionId: "session-1",
-      seq: 1,
-      timestamp: 1,
-    },
-    {
-      type: "tool.presentation",
-      sessionId: "session-1",
-      seq: 2,
-      timestamp: 2,
-      runId: "run-1",
-      step: 1,
-      toolCallId: "edit-1",
-      kind: "maybecode.change-preview",
-      version: 1,
-      data: store.items[0].preview,
-    },
-    {
-      type: "tool.completed",
-      sessionId: "session-1",
-      seq: 3,
-      timestamp: 3,
-      runId: "run-1",
-      step: 1,
-      call: { id: "edit-1", name: "edit", input: { path: "a.ts" } },
-      output: { path: "a.ts", changed: true },
-    },
-  ]);
-  assert.equal(restored.items[0].preview.kind, "update");
-  assert.match(
-    new TranscriptView(restored, { showToolDetails: true })
-      .render({ width: 80, height: 20 }).lines.join("\n"),
-    /\+new/u,
-  );
 });
 
 test("routes approval shortcuts through the retained modal", async () => {

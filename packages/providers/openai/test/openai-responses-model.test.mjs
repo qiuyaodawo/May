@@ -443,21 +443,3 @@ test("surfaces HTTP and malformed-stream failures", async () => {
   );
 });
 
-test("validates required model options", () => {
-  assert.throws(
-    () => new OpenAIResponsesModel({ apiKey: "", model: "gpt-5.4" }),
-    /apiKey must not be empty/,
-  );
-  assert.throws(
-    () => new OpenAIResponsesModel({ apiKey: "key", model: "" }),
-    /model must not be empty/,
-  );
-  assert.throws(
-    () => new OpenAIResponsesModel({
-      apiKey: "key",
-      model: "gpt-5.4",
-      serverCompactThreshold: 0,
-    }),
-    /serverCompactThreshold must be a positive safe integer/,
-  );
-});

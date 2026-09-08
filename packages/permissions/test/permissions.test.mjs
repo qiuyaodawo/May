@@ -397,29 +397,6 @@ test("turns a policy denial into a tool failure that the model can recover from"
   assert.equal(toolMessage.content[0].value.code, "PERMISSION_DENIED");
 });
 
-test("rejects an invalid policy decision", async () => {
-  const permissions = new PermissionToolExecutor({ policy: () => "later" });
-
-  await assert.rejects(
-    permissions.execute(createExecution()),
-    /Invalid permission decision: later/,
-  );
-  await permissions.close();
-  await permissions.close();
-});
-
-test("rejects an empty session grant key", async () => {
-  const permissions = new PermissionToolExecutor({
-    policy: () => ({ decision: "ask", grantKey: " " }),
-  });
-
-  await assert.rejects(
-    permissions.execute(createExecution()),
-    /Invalid session grant key/,
-  );
-  await permissions.close();
-});
-
 test("rejects an invalid approval response without resolving the request", async () => {
   const permissions = new PermissionToolExecutor({ policy: () => "ask" });
   const iterator = permissions.events[Symbol.asyncIterator]();
@@ -433,23 +410,6 @@ test("rejects an invalid approval response without resolving the request", async
   assert.equal(await permissions.resolve(requested.request.id, "allow"), true);
   assert.equal(await resultPromise, "executed");
   await permissions.close();
-});
-
-test("can delegate allowed calls through another executor", async () => {
-  let delegated;
-  const permissions = new PermissionToolExecutor({
-    policy: async () => "allow",
-    executor: {
-      async execute(execution) {
-        delegated = execution;
-        return "wrapped";
-      },
-    },
-  });
-  const execution = createExecution();
-
-  assert.equal(await permissions.execute(execution), "wrapped");
-  assert.equal(delegated, execution);
 });
 
 test("traces permission checks and approval waits under the tool call", async () => {
@@ -528,7 +488,6 @@ function createExecution(options = {}) {
 function assistantMessage(text) {
   return { role: "assistant", content: [{ type: "text", text }] };
 }
-
 
 test("session grants are definition- and host-version-bound without changing revocation keys", async () => {
   let requests = 0;

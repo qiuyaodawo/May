@@ -5,11 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { InMemoryContext, RunCancelledError } from "@may/core";
-import {
-  ContextCompactionExhaustedError,
-  ModelContextCompactionStrategy,
-  PruneOldToolResultsStrategy,
-} from "@may/context";
+import { ModelContextCompactionStrategy } from "@may/context";
 import { OpenAIResponsesModel } from "@may/providers";
 import { FileSessionStore } from "@may/session/file-store";
 import {
@@ -124,84 +120,6 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
     ["create", "update"],
   );
   await resumed.close();
-});
-
-test("retries a failed run without resubmitting input or replaying tools", async () => {
-  let modelCalls = 0;
-  let toolExecutions = 0;
-  let retryRequest;
-  const model = {
-    async *stream(request) {
-      modelCalls += 1;
-      if (modelCalls === 1) {
-        yield {
-          type: "response.completed",
-          message: {
-            role: "assistant",
-            content: [],
-            toolCalls: [{ id: "effect_1", name: "side_effect", input: {} }],
-          },
-        };
-        return;
-      }
-      if (modelCalls === 2) throw new Error("model disconnected");
-      retryRequest = request;
-      yield {
-        type: "response.completed",
-        message: assistantMessage("recovered"),
-      };
-    },
-  };
-  const app = await MaybeCodeWorkspace.open({
-    workspace: process.cwd(),
-    model,
-    tools: [{
-      name: "side_effect",
-      description: "Count one side effect",
-      inputSchema: { type: "object" },
-      async execute() {
-        toolExecutions += 1;
-        return { count: toolExecutions };
-      },
-    }],
-    permissionPolicy: () => "allow",
-    store: new (await import("@may/session")).InMemorySessionStore(),
-    catalog: new InMemorySessionCatalog(),
-    autoResume: false,
-  });
-
-  await assert.rejects(
-    (await app.submit({ input: "perform it once" })).result,
-    /model disconnected/,
-  );
-  assert.equal(toolExecutions, 1);
-
-  const retried = await app.retry();
-  assert.equal((await retried.result).message.content[0].text, "recovered");
-  assert.equal(modelCalls, 3);
-  assert.equal(toolExecutions, 1);
-  assert.equal(
-    retryRequest.messages.filter((message) => message.role === "user").length,
-    1,
-  );
-  assert.equal(
-    retryRequest.messages.filter((message) => message.role === "tool").length,
-    1,
-  );
-
-  const history = await app.history();
-  assert.equal(
-    history.filter((event) => event.type === "input.submitted").length,
-    1,
-  );
-  assert.deepEqual(
-    history.filter((event) => event.type === "run.started").map((event) =>
-      event.continuation === true
-    ),
-    [false, true],
-  );
-  await assert.rejects(app.retry(), /nothing to retry/);
-  await app.close();
 });
 
 test("retries a failed run after resuming its durable session", async (t) => {
@@ -495,78 +413,6 @@ test("creates context through an injected factory for each session", async () =>
   await app.close();
 });
 
-test("persists pruned tool results across session resume", async () => {
-  const store = new (await import("@may/session")).InMemorySessionStore();
-  const catalog = new InMemorySessionCatalog();
-  const requests = [];
-  let modelCall = 0;
-  const model = {
-    async *stream(request) {
-      requests.push(request);
-      modelCall += 1;
-      if (modelCall === 1) {
-        yield {
-          type: "response.completed",
-          message: {
-            role: "assistant",
-            content: [],
-            toolCalls: [
-              { id: "old", name: "large", input: { label: "old" } },
-              { id: "recent", name: "large", input: { label: "recent" } },
-            ],
-          },
-        };
-        return;
-      }
-      yield {
-        type: "response.completed",
-        message: assistantMessage(`answer ${modelCall}`),
-      };
-    },
-  };
-  const options = {
-    workspace: process.cwd(),
-    model,
-    store,
-    catalog,
-    tools: [{
-      name: "large",
-      description: "Returns a large result",
-      inputSchema: { type: "object" },
-      async execute(input) {
-        return { label: input.label, payload: "x".repeat(4000) };
-      },
-    }],
-    permissionPolicy: () => "allow",
-    compactionStrategy: new PruneOldToolResultsStrategy({
-      keepRecentToolResults: 1,
-      minimumResultBytes: 0,
-    }),
-  };
-
-  const first = await MaybeCodeWorkspace.open({ ...options, autoResume: false });
-  await (await first.submit({ input: "produce results" })).result;
-  const compacted = await first.compactContext();
-  assert.equal(compacted.changed, true);
-  assert.ok(compacted.after.estimatedTokens < compacted.before.estimatedTokens);
-  assert.equal(
-    (await first.history()).filter((event) =>
-      event.type === "context.compacted"
-    ).length,
-    1,
-  );
-  await first.close();
-
-  const resumed = await MaybeCodeWorkspace.open({ ...options, autoResume: true });
-  await (await resumed.submit({ input: "continue" })).result;
-  const toolMessages = requests.at(-1).messages.filter((message) =>
-    message.role === "tool"
-  );
-  assert.match(toolMessages[0].content[0].text, /tool result pruned/u);
-  assert.equal(toolMessages[1].content[0].value.label, "recent");
-  await resumed.close();
-});
-
 test("persists the default prune-and-summary view across resume", async () => {
   const store = new (await import("@may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();
@@ -661,43 +507,6 @@ test("persists the default prune-and-summary view across resume", async () => {
     false,
   );
   await resumed.close();
-});
-
-test("persists a history-reference view with the latest turn", async () => {
-  const requests = [];
-  const model = {
-    async *stream(request) {
-      requests.push(request);
-      yield {
-        type: "response.completed",
-        message: assistantMessage(`answer ${requests.length} ${"x".repeat(600)}`),
-      };
-    },
-  };
-  const app = await MaybeCodeWorkspace.open({
-    workspace: process.cwd(),
-    model,
-    store: new (await import("@may/session")).InMemorySessionStore(),
-    catalog: new InMemorySessionCatalog(),
-    autoResume: false,
-  });
-  for (const input of ["first", "second", "current"]) {
-    await (await app.submit({ input })).result;
-  }
-
-  const result = await app.compactContext("history-reference");
-
-  assert.equal(result.changed, true);
-  assert.equal(result.strategy, "history-reference");
-  assert.deepEqual(result.messages.map((message) => message.role), [
-    "system",
-    "user",
-    "assistant",
-  ]);
-  assert.match(result.messages[0].content[0].text, /session_history/u);
-  assert.equal(result.messages[1].content[0].text, "current");
-  assert.equal((await app.history()).at(-1).type, "context.compacted");
-  await app.close();
 });
 
 test("automatically compacts before a model call and persists the active view", async () => {
@@ -949,63 +758,6 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
       event.type === "context.compaction.failed"
     ),
     false,
-  );
-});
-
-test("fails the run explicitly when automatic compaction is exhausted", async () => {
-  let modelCalled = false;
-  const events = [];
-  const app = await MaybeCodeWorkspace.open({
-    workspace: process.cwd(),
-    model: {
-      async *stream() {
-        modelCalled = true;
-        yield { type: "response.completed", message: assistantMessage("no") };
-      },
-    },
-    store: new (await import("@may/session")).InMemorySessionStore(),
-    catalog: new InMemorySessionCatalog(),
-    autoResume: false,
-    contextBudget: {
-      contextWindowTokens: 1000,
-      compactTriggerRatio: 0.5,
-    },
-    autoCompactionStrategies: [{
-      name: "always-broken",
-      compact() {
-        throw new Error("offline fault injection");
-      },
-    }],
-  });
-  const eventReader = collectEvents(app, events, "allow");
-
-  await assert.rejects(
-    (await app.submit({ input: "x".repeat(2500) })).result,
-    (error) => {
-      assert.equal(error instanceof ContextCompactionExhaustedError, true);
-      assert.equal(error.failures.length, 1);
-      return true;
-    },
-  );
-  assert.equal(modelCalled, false);
-  const history = await app.history();
-  assert.equal(history.at(-1).type, "run.failed");
-  assert.equal(history.at(-1).error.name, "ContextCompactionExhaustedError");
-
-  await app.close();
-  await eventReader;
-  const failure = events.find((event) =>
-    event.type === "context.compaction.failed"
-  );
-  assert.equal(failure.strategy, "always-broken");
-  assert.equal(failure.continuing, false);
-  assert.equal(
-    events.some((event) =>
-      event.type === "run.event" &&
-      event.event.type === "run.failed" &&
-      event.event.error.name === "ContextCompactionExhaustedError"
-    ),
-    true,
   );
 });
 

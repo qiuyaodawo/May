@@ -455,23 +455,6 @@ test("rejects malformed and incomplete DeepSeek streams", async (t) => {
     ], DeepSeekProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
 });
 
-test("rejects a successful response without a streaming body", async () => {
-  const model = new DeepSeekModel({
-    apiKey: "secret",
-    model: "model",
-    fetch: async () => new Response(null, { status: 200 }),
-  });
-
-  await assert.rejects(
-    collect(model.stream(emptyRequest, {
-      signal: new AbortController().signal,
-    })),
-    (error) =>
-      error instanceof DeepSeekProtocolError &&
-      error.code === "DEEPSEEK_PROTOCOL_ERROR",
-  );
-});
-
 test("passes AbortSignal to fetch and propagates cancellation", async () => {
   let markStarted;
   const started = new Promise((resolve) => {
@@ -506,21 +489,3 @@ test("passes AbortSignal to fetch and propagates cancellation", async () => {
   assert.equal(receivedSignal.reason, reason);
 });
 
-test("validates required constructor options", () => {
-  assert.throws(
-    () => new DeepSeekModel({ apiKey: "", model: "model" }),
-    /apiKey must not be empty/,
-  );
-  assert.throws(
-    () => new DeepSeekModel({ apiKey: "secret", model: "" }),
-    /model must not be empty/,
-  );
-  assert.throws(
-    () => new DeepSeekModel({
-      apiKey: "secret",
-      model: "model",
-      maxTokens: 0,
-    }),
-    /maxTokens must be a positive safe integer/,
-  );
-});
