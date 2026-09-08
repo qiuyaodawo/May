@@ -72,6 +72,8 @@ export interface MayOptions {
 
 export interface RunOptions {
   input: string | UserMessage;
+  /** Awaited durability barrier. Failure stops execution; never retry it blindly. */
+  checkpoint?: RunCheckpoint;
   signal?: AbortSignal;
   /** Optional parent span for explicit cross-component propagation. */
   traceContext?: TraceContext;
@@ -80,6 +82,7 @@ export interface RunOptions {
 }
 
 export interface ContinueOptions {
+  checkpoint?: RunCheckpoint;
   signal?: AbortSignal;
   /** Optional parent span for explicit cross-component propagation. */
   traceContext?: TraceContext;
@@ -94,6 +97,11 @@ export interface RunHandle {
   readonly traceContext?: TraceContext;
   cancel(reason?: string): void;
 }
+
+export type RunCheckpointEvent = Extract<MayEventPayload, {
+  type: "run.started" | "model.completed" | "tool.started" | "tool.completed" | "tool.failed";
+}> & { readonly runId: string };
+export type RunCheckpoint = (event: RunCheckpointEvent) => Promise<void>;
 
 export class May {
   private readonly model: Model;
@@ -151,6 +159,7 @@ export class May {
       options.signal,
       options.traceContext,
       options.traceAttributes,
+      options.checkpoint,
     );
   }
 
@@ -161,6 +170,7 @@ export class May {
       options.signal,
       options.traceContext,
       options.traceAttributes,
+      options.checkpoint,
     );
   }
 
@@ -169,6 +179,7 @@ export class May {
     externalSignal: AbortSignal | undefined,
     parentTraceContext: TraceContext | undefined,
     runTraceAttributes: TraceAttributes | undefined,
+    checkpoint: RunCheckpoint | undefined,
   ): RunHandle {
     if (this.concurrentRuns === "reject" && this.activeRuns > 0) {
       throw new ConcurrentRunError();
@@ -222,6 +233,7 @@ export class May {
       controller.signal,
       emit,
       runSpan?.context,
+      checkpoint,
     ).then(
       (value) => {
         endTraceSpan(runSpan, {
@@ -271,6 +283,7 @@ export class May {
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
     runTraceContext: TraceContext | undefined,
+    checkpoint: RunCheckpoint | undefined,
   ): Promise<RunResult> {
     let aggregateUsage: Usage | undefined;
     let modelCalls = 0;
@@ -282,9 +295,7 @@ export class May {
       readonly executions: Array<Promise<ToolExecutionOutcome> | undefined>;
     } | undefined;
     try {
-      emit(input === undefined
-        ? { type: "run.started", continuation: true }
-        : { type: "run.started" });
+      if (signal.aborted) emit(input === undefined ? { type: "run.started", continuation: true } : { type: "run.started" });
       throwIfAborted(signal);
       if (input !== undefined) {
         await traceOperation(
@@ -299,6 +310,11 @@ export class May {
           () => this.context.append([input], { runId }),
         );
       }
+
+      await checkpoint?.({ type: "run.started", runId, ...(input === undefined ? { continuation: true } : {}) });
+      emit(input === undefined
+        ? { type: "run.started", continuation: true }
+        : { type: "run.started" });
 
       for (let step = 1; step <= this.maxSteps; step++) {
         throwIfAborted(signal);
@@ -379,6 +395,8 @@ export class May {
           signal,
           () => this.context.append([message], { runId, step }),
         );
+        await checkpoint?.({ type: "model.completed", runId, step, message,
+          contextMessageCount: snapshot.messages.length, ...(usage === undefined ? {} : { usage }) });
         emitOptionalUsage(
           emit,
           {
@@ -426,6 +444,7 @@ export class May {
             emit,
             pendingTools,
             batchSpan?.context,
+            checkpoint,
           );
           const failedCount = outcomes.filter((outcome) =>
             outcome.type === "failed"
@@ -626,6 +645,7 @@ export class May {
       readonly executions: Array<Promise<ToolExecutionOutcome> | undefined>;
     },
     batchTraceContext: TraceContext | undefined,
+    checkpoint: RunCheckpoint | undefined,
   ): Promise<readonly ToolExecutionOutcome[]> {
     const operations = calls.map((call, index) => {
       let execution: Promise<ToolExecutionOutcome> | undefined;
@@ -641,9 +661,13 @@ export class May {
             signal,
             emit,
             batchTraceContext,
+            checkpoint,
           )
-            .then((outcome) => {
+            .then(async (outcome) => {
               pending.outcomes[index] = outcome;
+              await checkpoint?.(outcome.type === "completed"
+                ? { type: "tool.completed", runId, step, call, output: outcome.output }
+                : { type: "tool.failed", runId, step, call, error: outcome.error });
               return outcome;
             });
           pending.executions[index] = execution;
@@ -699,7 +723,10 @@ export class May {
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
     parentTraceContext: TraceContext | undefined,
+    checkpoint: RunCheckpoint | undefined,
   ): Promise<ToolExecutionOutcome> {
+    await checkpoint?.({ type: "tool.started", runId, step, call });
+    throwIfAborted(signal);
     emit({ type: "tool.started", step, call });
     let active = true;
     const toolSpan = startTraceSpan(this.tracer, "may.tool.call", {
@@ -779,6 +806,12 @@ export class May {
     } finally {
       active = false;
     }
+  }
+
+  /** Append trusted host context while idle, without invoking a model. */
+  async appendMessages(messages: Message[]): Promise<void> {
+    if (this.activeRuns > 0) throw new ConcurrentRunError();
+    await this.context.append(messages);
   }
 }
 

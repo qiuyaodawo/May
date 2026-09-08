@@ -25,6 +25,8 @@ interfaces are intended for extension.
 
 ## Extension guides
 
+- [Crash recovery](guides/recovery.md)
+
 - [Custom model](guides/custom-model.md)
 - [Custom tool](guides/custom-tool.md)
 - [Custom Context](guides/custom-context.md)

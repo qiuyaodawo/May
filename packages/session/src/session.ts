@@ -7,6 +7,7 @@ import {
   type ContinueOptions,
   type RunHandle,
   type RunOptions,
+  type RunCheckpointEvent,
   toolCancellationMessage,
   type ToolCall,
   type UserMessage,
@@ -20,6 +21,7 @@ import type {
   SessionEvent,
   SessionEventPayload,
   SessionToolPresentation,
+  SessionRecovery,
 } from "./events.js";
 import {
   SessionHistoryReader,
@@ -74,6 +76,9 @@ export class Session {
   private readonly activeRunObservations = new Set<string>();
   private readonly finishedRunObservationErrors = new Map<string, unknown>();
   private readonly approvalRecords = new Map<string, Promise<void>>();
+  private readonly checkpointed = new Set<string>();
+  private readonly recoveries = new Map<string, SessionRecovery>();
+  private persistenceFailed = false;
 
   private constructor(
     id: string,
@@ -130,15 +135,29 @@ export class Session {
       throw new Error(`Session "${options.id}" has multiple creation events`);
     }
 
-    const replay = replaySession(events);
+    const recoveredEvents = [...events];
+    for (const payload of interruptedRuns(events)) {
+      const event = { ...payload, sessionId: options.id, seq: recoveredEvents.length + 1, timestamp: Date.now() };
+      await options.store.append(event);
+      recoveredEvents.push(event);
+    }
+    const replay = replaySession(recoveredEvents);
     const runtime = await options.createRuntime(replay.messages, replay.info);
-    return new Session(
+    const session = new Session(
       options.id,
       runtime,
       options.store,
       created.metadata,
-      events.length,
+      recoveredEvents.length,
     );
+    for (const event of recoveredEvents) {
+      if (event.type === "run.interrupted") {
+        for (const recovery of event.recoveries) {
+          if (recovery.status === "unknown") session.recoveries.set(recovery.id, recovery);
+        }
+      } else if (event.type === "recovery.resolved") session.recoveries.delete(event.recoveryId);
+    }
+    return session;
   }
 
   submit(options: RunOptions): Promise<RunHandle> {
@@ -226,8 +245,10 @@ export class Session {
   }
 
   private async start(options: RunOptions): Promise<RunHandle> {
+    this.assertRecovered();
     const runtimeOptions: RunOptions = {
       ...options,
+      checkpoint: (event) => this.checkpoint(event, options.checkpoint),
       traceAttributes: {
         ...(options.traceAttributes ?? {}),
         "may.session.id": this.id,
@@ -266,8 +287,10 @@ export class Session {
   }
 
   private startContinuation(options: ContinueOptions): RunHandle {
+    this.assertRecovered();
     return this.wrapRun(this.runtime.continue({
       ...options,
+      checkpoint: (event) => this.checkpoint(event, options.checkpoint),
       traceAttributes: {
         ...(options.traceAttributes ?? {}),
         "may.session.id": this.id,
@@ -314,7 +337,7 @@ export class Session {
     try {
       for await (const event of run.events) {
         const payload = toSessionEvent(event);
-        if (payload !== undefined) {
+        if (payload !== undefined && !this.checkpointed.delete(checkpointKey(event))) {
           await this.record(payload, event.timestamp);
         }
         if (event.type === "model.completed") {
@@ -440,9 +463,92 @@ export class Session {
       seq,
       timestamp,
     };
-    await this.store.append(event);
+    try { await this.store.append(event); }
+    catch (error) { this.persistenceFailed = true; throw error; }
     this.seq = seq;
   }
+
+  listRecoveries(): readonly SessionRecovery[] {
+    return [...this.recoveries.values()].map((value) => structuredClone(value));
+  }
+
+  /** The host must verify external effects and describe the finding before continuing. */
+  resolveRecovery(id: string, finding: string): Promise<void> {
+    const operation = this.tail.then(async () => {
+      if (this.persistenceFailed) throw new Error("Session persistence failed; reopen the session before recovery");
+      const recovery = this.recoveries.get(id);
+      if (recovery === undefined) throw new Error(`Unknown recovery: ${id}`);
+      if (finding.trim() === "" || finding.length > 32768) throw new Error("Recovery finding must contain 1-32768 characters");
+      const message = userMessage(`Verified recovery of tool call ${id} (${recovery.call.name}):\n${finding}`);
+      await this.record({ type: "recovery.resolved", recoveryId: id, message });
+      try { await this.runtime.appendMessages([message]); }
+      catch (error) { this.persistenceFailed = true; throw error; }
+      this.recoveries.delete(id);
+    });
+    this.tail = operation.catch(() => undefined);
+    return operation;
+  }
+
+  private assertRecovered(): void {
+    if (this.persistenceFailed) throw new Error("Session persistence failed; reopen the session before continuing");
+    if (this.recoveries.size > 0) throw new SessionRecoveryRequiredError(this.listRecoveries());
+  }
+
+  private async checkpoint(event: RunCheckpointEvent, extra?: (event: RunCheckpointEvent) => Promise<void>): Promise<void> {
+    const live = { ...event, timestamp: Date.now(), seq: 0 };
+    const payload = event.type === "run.started"
+      ? { ...event, checkpointVersion: 1 as const }
+      : toSessionEvent(live);
+    if (payload !== undefined) {
+      await this.record(payload, live.timestamp);
+      this.checkpointed.add(checkpointKey(event));
+    }
+    await extra?.(event);
+  }
+}
+
+export class SessionRecoveryRequiredError extends Error {
+  readonly code = "SESSION_RECOVERY_REQUIRED";
+  constructor(readonly recoveries: readonly SessionRecovery[]) {
+    super("Interrupted tools have unknown outcomes. Inspect /recovery and record verified findings before continuing.");
+    this.name = "SessionRecoveryRequiredError";
+  }
+}
+
+function checkpointKey(event: { type: string; runId: string; step?: number; call?: ToolCall }): string {
+  return JSON.stringify([event.type, event.runId, event.step, event.call?.id]);
+}
+
+function interruptedRuns(events: readonly SessionEvent[]): SessionEventPayload[] {
+  const runs = new Map<string, { version?: 1; pending: Map<string, SessionRecovery>; started: Set<string> }>();
+  const approvals = new Set<string>();
+  for (const event of events) {
+    if (event.type === "approval.requested") approvals.add(event.request.id);
+    if (event.type === "approval.resolved" || event.type === "approval.cancelled") approvals.delete(event.requestId);
+    if (event.type === "run.started") {
+      runs.set(event.runId, { ...(event.checkpointVersion === undefined ? {} : { version: event.checkpointVersion }), pending: new Map(), started: new Set() });
+    } else if (event.type === "assistant.completed") {
+      const run = runs.get(event.runId);
+      for (const call of event.message.toolCalls ?? []) {
+        const id = `${event.runId}:${event.step}:${call.id}`;
+        run?.pending.set(id, { id, runId: event.runId, step: event.step, call, status: "unknown" });
+      }
+    } else if (event.type === "tool.started") {
+      runs.get(event.runId)?.started.add(`${event.runId}:${event.step}:${event.call.id}`);
+    } else if (event.type === "tool.completed" || event.type === "tool.failed") {
+      runs.get(event.runId)?.pending.delete(`${event.runId}:${event.step}:${event.call.id}`);
+    } else if (event.type === "run.completed" || event.type === "run.cancelled" || event.type === "run.interrupted") {
+      runs.delete(event.runId);
+    } else if (event.type === "run.failed") {
+      // A failure can leave unclosed calls (e.g. a failed persistence barrier).
+      if (runs.get(event.runId)?.pending.size === 0) runs.delete(event.runId);
+    }
+  }
+  const repairs: SessionEventPayload[] = [...runs].map(([runId, run]) => ({ type: "run.interrupted", runId,
+    recoveries: [...run.pending.values()].map((item) => ({ ...item,
+      status: run.version === 1 && !run.started.has(item.id) ? "not-started" : "unknown" })),
+  }));
+  return [...repairs, ...[...approvals].map((requestId) => ({ type: "approval.cancelled" as const, requestId, reason: "Process interrupted; approval was not restored" }))];
 }
 
 interface Deferred<T> {
@@ -495,6 +601,18 @@ function replaySession(events: readonly SessionEvent[]): {
 
   for (const event of events) {
     switch (event.type) {
+      case "run.interrupted":
+        for (const recovery of event.recoveries) {
+          const error = recovery.status === "not-started"
+            ? { code: "TOOL_NOT_EXECUTED", message: "The process stopped before this tool's execution checkpoint. The tool was not executed." }
+            : { code: "TOOL_OUTCOME_UNKNOWN", message: "The process stopped without a durable outcome. External effects may have occurred. Do not repeat this operation without verified recovery findings." };
+          messages.push({ role: "tool", name: recovery.call.name, toolCallId: recovery.call.id,
+            isError: true, content: [{ type: "json", value: error }] });
+        }
+        break;
+      case "recovery.resolved":
+        messages.push(event.message);
+        break;
       case "input.submitted":
         messages.push(event.message);
         break;
@@ -624,6 +742,8 @@ function toPermissionSessionEvent(
 
 function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
   switch (event.type) {
+    case "tool.started":
+      return { type: "tool.started", runId: event.runId, step: event.step, call: event.call };
     case "run.started":
       return event.continuation === true
         ? { type: "run.started", runId: event.runId, continuation: true }

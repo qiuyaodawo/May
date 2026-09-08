@@ -9,6 +9,7 @@ import type {
   SessionEvent,
   SessionHistoryPage,
   SessionHistoryQuery,
+  SessionRecovery,
 } from "@may/session";
 import type { SessionSummary } from "@may/session/catalog";
 
@@ -41,6 +42,8 @@ export interface AgentController<
   ): Promise<boolean>;
   history(): Promise<readonly SessionEvent[]>;
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage>;
+  listRecoveries?(): readonly SessionRecovery[];
+  resolveRecovery?(id: string, finding: string): Promise<void>;
   inspectContext(): Promise<ContextInspection | undefined>;
   compactContext(
     selection?: CompactionSelection,

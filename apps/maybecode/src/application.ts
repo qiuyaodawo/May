@@ -289,6 +289,9 @@ export class MaybeCodeApplication {
     return this.application.history();
   }
 
+  listRecoveries() { return this.application.listRecoveries(); }
+  resolveRecovery(id: string, finding: string) { return this.application.resolveRecovery(id, finding); }
+
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage> {
     return this.application.queryHistory(query);
   }

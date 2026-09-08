@@ -302,6 +302,7 @@ async function renderSlashCommandResult(
     case "status":
       terminal.write(`\n${renderStatus(app, result.inspection)}`);
       break;
+    case "display":
     case "mcp.display":
       terminal.write(`\n${sanitizeTerminalText(result.text)}\n`);
       break;

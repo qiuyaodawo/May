@@ -10,6 +10,14 @@ import type {
   UserMessage,
 } from "@may/core";
 
+export interface SessionRecovery {
+  readonly id: string;
+  readonly runId: string;
+  readonly step: number;
+  readonly call: ToolCall;
+  readonly status: "unknown" | "not-started";
+}
+
 export type SessionApprovalDecision = "allow" | "allow-session" | "deny";
 
 export interface SessionApprovalRequest {
@@ -69,7 +77,10 @@ export type RecordablePermissionEvent = (
 export type SessionEventPayload =
   | { type: "session.created"; metadata?: Record<string, unknown> }
   | { type: "input.submitted"; message: UserMessage }
-  | { type: "run.started"; runId: string; continuation?: boolean }
+  | { type: "run.started"; runId: string; continuation?: boolean; checkpointVersion?: 1 }
+  | { type: "tool.started"; runId: string; step: number; call: ToolCall }
+  | { type: "run.interrupted"; runId: string; recoveries: readonly SessionRecovery[] }
+  | { type: "recovery.resolved"; recoveryId: string; message: UserMessage }
   | {
       type: "context.compacted";
       strategy: string;

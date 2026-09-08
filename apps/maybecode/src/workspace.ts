@@ -529,6 +529,9 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.manager.history();
   }
 
+  listRecoveries() { return this.manager.listRecoveries(); }
+  resolveRecovery(id: string, finding: string) { return this.manager.resolveRecovery(id, finding); }
+
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage> {
     return this.manager.queryHistory(query);
   }

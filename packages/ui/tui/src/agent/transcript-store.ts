@@ -301,6 +301,14 @@ export class TranscriptStore {
 
   private projectSessionEvent(event: SessionEvent): void {
     switch (event.type) {
+      case "run.interrupted":
+        for (const item of event.recoveries) {
+          this.appendHistoryTool(historyTool({ ...event, type: "tool.failed", step: item.step, call: item.call,
+            error: { name: "InterruptedToolError", message: item.status === "unknown" ? "Outcome unknown; inspect /recovery before continuing" : "Not executed before interruption" } }, "failed"));
+        }
+        this.appendNoticeItem(`history:${event.seq}`, "warning", "Run interrupted. Inspect /recovery for unresolved tool outcomes.", event.timestamp);
+        break;
+      case "recovery.resolved":
       case "input.submitted":
         this.append({
           id: `history:${event.seq}`,

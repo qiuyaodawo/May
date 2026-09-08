@@ -1,5 +1,7 @@
 # May 文档
 
+- [崩溃恢复](guides/recovery.md)
+
 [English](../en/README.md) | **简体中文**
 
 May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 package 组装成应用、

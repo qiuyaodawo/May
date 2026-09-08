@@ -123,6 +123,12 @@ older JSONL events are retained as an auditable full history.
 
 ## Current scope
 
+Awaited tool checkpoints and conservative interruption recovery are implemented.
+Unknown external outcomes require `listRecoveries()` / `resolveRecovery()` before
+continuation. A persistence failure requires reopening the Session. File stores
+sync writes and repair incomplete final records; see
+[Crash recovery](../../docs/en/guides/recovery.md).
+
 The package supports new, resumed, and deleted histories with in-memory or
 local JSONL storage, reusable session catalogs, and durable context-replacement
 events. It does not choose or execute compaction strategies. Forking and

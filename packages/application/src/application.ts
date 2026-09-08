@@ -304,6 +304,14 @@ export class AgentApplication implements AgentController {
     return this.startRun(() => this.session.submit(options));
   }
 
+  listRecoveries() { return this.session.listRecoveries(); }
+
+  resolveRecovery(id: string, finding: string): Promise<void> {
+    this.throwIfClosed();
+    if (this.isRunning) throw new Error("Cannot resolve recovery while an operation is active");
+    return this.session.resolveRecovery(id, finding);
+  }
+
   /** Retry the latest failed run without adding another user message. */
   retry(): Promise<AgentRun> {
     return this.startRun(async () => {

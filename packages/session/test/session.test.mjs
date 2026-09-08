@@ -294,6 +294,7 @@ test("records approval decisions before their tool outcomes", async () => {
       "input.submitted",
       "run.started",
       "assistant.completed",
+      "tool.started",
       "approval.requested",
       "approval.resolved",
       "tool.completed",
@@ -854,7 +855,7 @@ test("reports missing sessions and corrupt session files", async (t) => {
   await assert.rejects(store.read("corrupt"), /Invalid session event JSON/);
 });
 
-test("recovers the session sequence after a durable append fails", async () => {
+test("requires reopen after a durable append fails and preserves the sequence", async () => {
   const backing = new InMemorySessionStore();
   let failed = false;
   const store = {
@@ -872,8 +873,10 @@ test("recovers the session sequence after a durable append fails", async () => {
   const run = await session.submit({ input: "hello" });
 
   await assert.rejects(run.result, /store unavailable/);
-  await (await session.submit({ input: "retry" })).result;
-  const history = await session.history();
+  await assert.rejects(session.submit({ input: "retry" }), /reopen/);
+  const resumed = await Session.resume({ id: session.id, store, createRuntime });
+  await (await resumed.submit({ input: "retry" })).result;
+  const history = await resumed.history();
   assert.deepEqual(
     history.map((event) => event.seq),
     history.map((_event, index) => index + 1),

@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, open, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import type { SessionEvent } from "./events.js";
@@ -64,11 +64,11 @@ export class FileSessionStore implements SessionStore {
     }
 
     await mkdir(this.directory, { recursive: true });
-    await appendFile(
-      this.filePath(event.sessionId),
-      `${JSON.stringify(event)}\n`,
-      "utf8",
-    );
+    const file = await open(this.filePath(event.sessionId), "a");
+    try {
+      await file.writeFile(`${JSON.stringify(event)}\n`, "utf8");
+      await file.sync();
+    } finally { await file.close(); }
   }
 
   private async readNow(sessionId: string): Promise<readonly SessionEvent[]> {
@@ -76,7 +76,17 @@ export class FileSessionStore implements SessionStore {
     let contents: string;
 
     try {
-      contents = await readFile(path, "utf8");
+      const bytes = await readFile(path);
+      // Newline terminates a committed record. Repair only an incomplete tail;
+      // malformed complete records still fail closed. Requires one writer.
+      const length = bytes.length === 0 || bytes.at(-1) === 10
+        ? bytes.length : bytes.lastIndexOf(10) + 1;
+      if (length !== bytes.length) {
+        const file = await open(path, "r+");
+        try { await file.truncate(length); await file.sync(); }
+        finally { await file.close(); }
+      }
+      contents = bytes.subarray(0, length).toString("utf8");
     } catch (error) {
       if (isNodeError(error, "ENOENT")) return [];
       throw error;

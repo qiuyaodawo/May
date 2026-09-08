@@ -117,7 +117,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   );
   assert.deepEqual(
     terminal.suggestionSamples.commands.map((suggestion) => suggestion.label),
-    ["/resume", "/retry"],
+    ["/recovery", "/resume", "/retry"],
   );
   assert.deepEqual(
     terminal.suggestionSamples.compaction.map((suggestion) => suggestion.label),

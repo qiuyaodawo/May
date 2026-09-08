@@ -29,6 +29,7 @@ export type MaybeCodeSlashCommandName =
   | "/model"
   | "/effort"
   | "/retry"
+  | "/recovery"
   | "/instructions"
   | "/mcp"
   | "/status"
@@ -45,6 +46,7 @@ export const MAYBECODE_COMPACTION_STRATEGIES = [
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
+  { name: "/recovery", usage: "/recovery [resolve <id> <verified finding>]", description: "Inspect interrupted tools or record verified recovery findings" },
   {
     name: "/new",
     usage: "/new",
@@ -115,6 +117,7 @@ export type MaybeCodeSlashCommandParseResult =
   SlashCommandParseResult<MaybeCodeSlashCommand>;
 
 export type MaybeCodeSlashCommandResult =
+  | { readonly type: "display"; readonly text: string }
   | { readonly type: "mcp.display"; readonly text: string }
   | { readonly type: "mcp.run-started"; readonly run: MaybeCodeRun }
   | { readonly type: "exit" }
@@ -336,6 +339,17 @@ export async function executeMaybeCodeSlashCommand(
 
   const { definition, arguments: arguments_ } = parsed;
   switch (definition.name) {
+    case "/recovery": {
+      if (arguments_.length === 0) {
+        const pending = controller.listRecoveries?.() ?? [];
+        return { type: "display", text: pending.length === 0 ? "No unresolved recovery findings."
+          : pending.map((item) => `${item.id} — ${item.call.name}: outcome unknown\nInput: ${JSON.stringify(item.call.input)}`).join("\n\n") + "\nVerify external effects, then use /recovery resolve <id> <verified finding>." };
+      }
+      if (arguments_[0] !== "resolve" || arguments_.length < 3) return usage(definition);
+      if (!controller.resolveRecovery) throw new Error("Recovery resolution is unsupported");
+      await controller.resolveRecovery(arguments_[1]!, arguments_.slice(2).join(" "));
+      return { type: "display", text: "Recovery finding recorded. No tools were replayed." };
+    }
     case "/quit":
       return noArguments(arguments_, definition) ?? { type: "exit" };
     case "/help":

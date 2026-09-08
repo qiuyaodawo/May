@@ -241,6 +241,17 @@ export class AgentWorkspace<
     });
   }
 
+  listRecoveries() { return this.application.listRecoveries?.() ?? []; }
+
+  resolveRecovery(id: string, finding: string): Promise<void> {
+    return this.state.run(async () => {
+      this.assertIdle("Cannot resolve recovery while an operation is active");
+      if (!this.application.resolveRecovery) throw new Error("Recovery resolution is unsupported");
+      await this.application.resolveRecovery(id, finding);
+      await this.recordCurrentSession();
+    });
+  }
+
   cancel(reason?: string): boolean {
     return this.application.cancel(reason);
   }

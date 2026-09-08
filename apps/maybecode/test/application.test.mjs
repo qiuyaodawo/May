@@ -844,8 +844,10 @@ test("persists automatic compaction after the run events it contains", async () 
   });
 
   const run = await app.submit({ input: "use the large tool" });
-  await Promise.all([assistantStarted, compactionStarted]);
+  await assistantStarted;
+  assert.equal(modelCall, 1, "the next step must wait for the assistant checkpoint");
   releaseAssistant();
+  await compactionStarted;
   await run.result;
 
   const history = await app.history();

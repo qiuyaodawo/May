@@ -313,6 +313,7 @@ async function presentCommandResult(
           `Model: ${await resolvedModelLabel(app)}${inspectionText(result.inspection)}`,
       );
       break;
+    case "display":
     case "mcp.display":
       store.appendNotice("info", result.text);
       break;

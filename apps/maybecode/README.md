@@ -339,6 +339,11 @@ and may also return a `ContextController` for application-level inspection.
 
 ## Commands
 
+Interrupted tools with unknown outcomes block further runs. `/recovery` lists
+their original input; `/recovery resolve <id> <verified finding>` records the
+result of checking external effects. No tool is replayed by recovery. See
+[Crash recovery](../../docs/en/guides/recovery.md).
+
 In an interactive terminal, suggestions are shown as the first input line is
 edited. For example, `/re` shows `/resume` and `/retry`; `/compact ` offers
 `history-reference`; `/resume ` filters known session IDs; and `/model `
