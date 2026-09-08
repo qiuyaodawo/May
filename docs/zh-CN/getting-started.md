@@ -36,20 +36,25 @@ Session、权限、历史或 UI-independent 生命周期的产品应从这里开
 
 [GitHub Actions 工作流](../../.github/workflows/ci.yml) 在推送代码和提交 PR 时
 自动运行。进入默认分支后，也可从 **Actions → CI → Run workflow** 手动启动。
-每次运行检查 Linux、Windows、macOS 与 Node.js 22、24 的组合。在 Actions 页面
+每次运行检查四组环境：Linux 使用 Node.js 22 和 24，Windows 和 macOS 使用
+Node.js 24。在 Actions 页面
 查看各任务日志，或从 PR 的检查结果进入日志排查失败原因。
 
-每种环境先执行 `pnpm install --frozen-lockfile`，然后运行 `pnpm build`、
-`pnpm docs:check`、`pnpm test`、`pnpm test:path-alias`、`pnpm example`、`pnpm may --help` 和
-`pnpm maybecode --help`。本地可执行相同命令复现失败。另一个独立 Linux 任务使用
-`.node-version` 中推荐的 Node.js 版本，运行 `pnpm test:package:maybecode`，
+每种环境先执行 `pnpm install --frozen-lockfile`，然后运行 `pnpm build` 和一遍离线测试。
+只有 Linux 的 Node.js 24 任务运行 `pnpm docs:check`、基础示例和 May CLI 帮助检查，
+后两项直接使用已构建文件。离线测试已包含 MaybeCode CLI 帮助检查。
+本地修改可使用 `pnpm --filter <package-name> test` 只验证受影响的包。
+手动触发时增加一个独立 Linux 任务，使用 `.node-version` 中推荐的 Node.js 版本，
+运行 `pnpm test:package:maybecode`，
 在仓库外验证打包依赖、MCP 子路径导出及安装后的 CLI。May 包从本地 tarball 安装；
 外部依赖优先复用 pnpm 缓存，缺失的版本从包注册表下载。
 
 `pnpm test` 会运行所有 workspace package 后统一报告失败。
 `pnpm test:path-alias` 使用临时目录别名（Windows junction 或 POSIX symlink）
 运行整个测试集，使默认临时目录没有别名的机器也能发现规范化路径相关的错误假设。
-CI 在构建成功后运行此项检查，即使常规测试失败也会继续执行。
+手动触发时，Windows 任务用此项检查替代常规测试；自动运行时省略。
+覆盖率和打包检查也可按需在本地使用 `pnpm test:coverage` 和
+`pnpm test:package:maybecode` 运行。
 
 工作流不需要 provider API key，不运行真实 provider 集成测试，也不发布包。
 安装依赖仍需要访问包注册表。矩阵表示验证目标，实际支持情况需要成功运行后确认。

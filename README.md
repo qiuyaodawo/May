@@ -68,8 +68,9 @@ built-in provider option matrix; its editor schema lives at
 ## Development
 
 The [CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and
-manual dispatch. It checks Linux, Windows, and macOS on Node.js 22 and 24,
-plus a separate MaybeCode package smoke test on Linux using `.node-version`.
+manual dispatch. It runs the offline suite once per environment: Linux on
+Node.js 22 and 24, and Windows and macOS on Node.js 24. Manual dispatch also
+checks temporary path aliases and the standalone MaybeCode package.
 See [CI usage and local checks](docs/en/getting-started.md#continuous-integration).
 
 Repository development requires Node.js 22 or newer and pnpm 11.23.0.
@@ -81,12 +82,10 @@ pnpm install
 pnpm build
 pnpm docs:check
 pnpm test
-pnpm test:path-alias
-pnpm test:coverage
-pnpm may --help
-pnpm maybecode --help
-pnpm example
 ```
+
+Use `pnpm --filter <package-name> test` for a focused package check. Path-alias,
+coverage, and package checks are available separately when needed; see the CI guide.
 
 The live DeepSeek example additionally requires `DEEPSEEK_API_KEY`:
 
