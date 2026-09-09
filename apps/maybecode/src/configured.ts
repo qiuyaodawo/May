@@ -60,6 +60,7 @@ import {
   resolveMaybeCodeInstructionsDirectory,
 } from "./instructions.js";
 import { MaybeCodeWorkspace } from "./workspace.js";
+import type { MaybeCodeAutoCompactionMode } from "./controller.js";
 import type { MaybeCodeModelConfiguration } from "./workspace.js";
 import type { SkillRegistry } from "@may/skills";
 import { resolveMaybeCodeSkillDirectories } from "./skills.js";
@@ -77,6 +78,8 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly contextBudget?: ContextBudget;
   readonly compactionStrategy?: ContextCompactionStrategy;
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
+  readonly autoCompactionMode?: MaybeCodeAutoCompactionMode;
+  /** @deprecated Use autoCompactionMode instead. */
   readonly providerNativeAutoCompaction?: boolean;
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
@@ -191,9 +194,10 @@ export async function openConfiguredMaybeCode(
   const instructionsDirectory = options.instructions === undefined
     ? resolveMaybeCodeInstructionsDirectory(config)
     : undefined;
-  const providerNativeAutoCompaction =
-    options.providerNativeAutoCompaction ??
-      resolveProviderNativeAutoCompaction(config);
+  const autoCompactionMode = options.autoCompactionMode ??
+    (options.providerNativeAutoCompaction === undefined
+      ? resolveMaybeCodeAutoCompactionMode(config)
+      : options.providerNativeAutoCompaction ? "provider-native" : "prune-summary");
   const dataDirectory = resolve(
     options.dataDirectory ?? getDefaultMaybeCodeDataDirectory(),
   );
@@ -280,7 +284,7 @@ export async function openConfiguredMaybeCode(
       ...(options.autoCompactionStrategies === undefined
         ? {}
         : { autoCompactionStrategies: options.autoCompactionStrategies }),
-      providerNativeAutoCompaction,
+      autoCompactionMode,
       ...(options.contextSummarizer === undefined
         ? {}
         : { contextSummarizer: options.contextSummarizer }),
@@ -566,24 +570,34 @@ function resolveDefaultModelPersistence(
   };
 }
 
-export function resolveProviderNativeAutoCompaction(
+export function resolveMaybeCodeAutoCompactionMode(
   config: MayConfig,
-): boolean {
+): MaybeCodeAutoCompactionMode {
   const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.autoCompaction;
-  if (value === undefined) return false;
+  if (value === undefined) return "prune-summary";
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new MaybeCodeConfigError(
       "apps.maybecode.autoCompaction must be an object",
     );
   }
-  const providerNative = (value as Record<string, unknown>).providerNative;
-  if (providerNative === undefined) return false;
-  if (typeof providerNative !== "boolean") {
+  const { mode, providerNative } = value as Record<string, unknown>;
+  if (providerNative !== undefined && typeof providerNative !== "boolean") {
     throw new MaybeCodeConfigError(
       "apps.maybecode.autoCompaction.providerNative must be a boolean",
     );
   }
-  return providerNative;
+  if (mode === undefined) return providerNative === true ? "provider-native" : "prune-summary";
+  if (mode !== "prune-summary" && mode !== "history-reference" && mode !== "provider-native") {
+    throw new MaybeCodeConfigError(
+      "apps.maybecode.autoCompaction.mode must be prune-summary, history-reference, or provider-native",
+    );
+  }
+  return mode;
+}
+
+/** @deprecated Use resolveMaybeCodeAutoCompactionMode instead. */
+export function resolveProviderNativeAutoCompaction(config: MayConfig): boolean {
+  return resolveMaybeCodeAutoCompactionMode(config) === "provider-native";
 }
 
 export function resolveMaybeCodeRetry(

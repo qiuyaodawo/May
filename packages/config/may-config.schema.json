@@ -314,7 +314,16 @@
         "autoCompaction": {
           "type": "object",
           "properties": {
-            "providerNative": { "type": "boolean", "default": false }
+            "mode": {
+              "type": "string",
+              "enum": ["prune-summary", "history-reference", "provider-native"],
+              "default": "prune-summary"
+            },
+            "providerNative": {
+              "type": "boolean",
+              "deprecated": true,
+              "description": "Legacy alias: true selects provider-native mode when mode is absent."
+            }
           },
           "additionalProperties": false
         },

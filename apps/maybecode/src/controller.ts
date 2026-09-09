@@ -33,10 +33,16 @@ export interface MaybeCodeReasoningEffortState {
   readonly overridden: boolean;
 }
 
+export type MaybeCodeAutoCompactionMode =
+  | "prune-summary"
+  | "history-reference"
+  | "provider-native";
+
 export type MaybeCodeCompactionStrategyName =
   | "prune-old-tool-results"
   | "summary-tail"
-  | "history-reference";
+  | "history-reference"
+  | "provider-native";
 
 export type MaybeCodeCompactionSelection =
   | MaybeCodeCompactionStrategyName

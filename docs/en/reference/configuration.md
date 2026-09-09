@@ -169,13 +169,27 @@ Anthropic accepts disabled, adaptive, or explicitly budgeted thinking:
 
 `apps.maybecode` recognizes:
 
+`autoCompaction.mode` selects an independent automatic mode: `prune-summary`
+(default, prune old tool results then summarize if still above threshold),
+`history-reference` (reset older context with a history reference), or
+`provider-native` (native compaction only, requiring model support). Modes never
+fall back to one another; unresolved pressure stops the run. Changed context
+remains persisted even if it is still above threshold. The deprecated
+`autoCompaction.providerNative` boolean selects native-only mode when true and
+no `mode` is set; explicit `mode` wins.
+
+Manual `/compact` uses prune-and-summary by default. `/compact history-reference`
+and `/compact provider-native` select independent operations without changing
+the automatic mode. Programmatic `autoCompactionMode` selects the same modes;
+`autoCompactionStrategies` overrides the mode, with `[]` disabling automation.
+
 ```json
 {
   "apps": {
     "maybecode": {
       "instructionsDirectory": "instructions/maybecode",
       "autoCompaction": {
-        "providerNative": false
+        "mode": "prune-summary"
       },
       "retry": {
         "maxAttempts": 3,

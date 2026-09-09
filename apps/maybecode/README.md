@@ -268,8 +268,8 @@ MCP lifecycle events are also forwarded through `MaybeCodeController.events`.
 
 OpenAI compaction is opt-in. `serverCompactThreshold` enables provider-side
 context management on normal Responses requests, while
-`apps.maybecode.autoCompaction.providerNative` lets MaybeCode call the model's
-native compactor as an automatic fallback:
+`apps.maybecode.autoCompaction.mode: "provider-native"` selects the model's
+native compactor as an independent automatic mode:
 
 ```json
 {
@@ -296,7 +296,7 @@ native compactor as an automatic fallback:
   "apps": {
     "maybecode": {
       "autoCompaction": {
-        "providerNative": true
+        "mode": "provider-native"
       }
     }
   }
@@ -355,7 +355,8 @@ result of checking external effects. No tool is replayed by recovery. See
 
 In an interactive terminal, suggestions are shown as the first input line is
 edited. For example, `/re` shows `/resume` and `/retry`; `/compact ` offers
-`history-reference`; `/resume ` filters known session IDs; and `/model `
+`history-reference` and `provider-native`; `/resume ` filters known session IDs;
+and `/model `
 filters configured model-profile names. `/effort ` filters the active model's
 discovered reasoning levels. Suggestions also participate in input:
 `Enter` executes the first displayed candidate,
@@ -461,18 +462,32 @@ default with their own `ContextCompactionStrategy`.
 the current turn and replaces older model-visible context with a reference to
 the durable `session_history` tool.
 
+`/compact provider-native` invokes only the active model's native compactor,
+without pruning or summarization. Unsupported models report an error. Manual
+commands do not change the configured automatic mode; `/compact` continues to
+use prune-and-summary by default.
+
 Before each model request, MaybeCode automatically checks context pressure
 when the model has a configured context-window limit. By default, the trigger
 ratio is 90%, bounded by the window after the configured output reserve. It
-first tries `prune-old-tool-results`, then `summary-tail`, and finally
-`history-reference`. Provider-native automatic compaction is disabled by
-default. When `apps.maybecode.autoCompaction.providerNative` is `true` and the
-model exposes that capability, it is inserted after prune and before
-`summary-tail`; it is never the first strategy. Each changed view is persisted as `context.compacted`
-before the model request and is restored on session resume. The terminal
-reports automatic compactions. Programmatic callers can replace the ordered
-chain with `autoCompactionStrategies`, pass `providerNativeAutoCompaction`, or
-pass an empty strategy array to disable automatic compaction.
+uses `apps.maybecode.autoCompaction.mode` to select one independent mode:
+
+- `prune-summary` (default): try `prune-old-tool-results`, then `summary-tail`
+  only if pressure remains. It never automatically resets history or calls a
+  native compactor.
+- `history-reference`: run only history-reference reset; no summary call.
+- `provider-native`: run only the model's native compactor; selecting this mode
+  requires native support from the active model.
+
+Modes do not fall back to one another. If the selected mode cannot reduce
+context below the threshold, the run fails with a compaction exhaustion error.
+Each changed view is persisted as `context.compacted` before the model request
+and is restored on resume, including a summary that is still above threshold.
+Programmatic callers select `autoCompactionMode`; an explicit
+`autoCompactionStrategies` array overrides it, and an empty array disables
+automatic compaction. The deprecated `providerNative: true` configuration and
+`providerNativeAutoCompaction: true` option now select native-only mode when no
+mode is specified; an explicit mode takes precedence.
 
 The `read` tool runs without approval. `shell`, `edit`, and `write` require an
 allow-once, allow-for-session, or deny decision. The shell tool is not a sandbox.

@@ -46,7 +46,7 @@ completion and validation is available at
     "maybecode": {
       "instructionsDirectory": "instructions/maybecode",
       "autoCompaction": {
-        "providerNative": false
+        "mode": "prune-summary"
       },
       "retry": {
         "maxAttempts": 3,

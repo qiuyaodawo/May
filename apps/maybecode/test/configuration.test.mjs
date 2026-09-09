@@ -151,7 +151,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   });
   assert.deepEqual(
     contextOptions.autoCompactionStrategies.map((strategy) => strategy.name),
-    ["prune-old-tool-results", "summary-tail", "history-reference"],
+    ["prune-old-tool-results", "summary-tail"],
   );
   await app.close();
 });
@@ -680,23 +680,42 @@ test("does not enable provider-native automatic compaction by default", async (t
   assert.deepEqual(opened.strategyNames, [
     "prune-old-tool-results",
     "summary-tail",
-    "history-reference",
   ]);
   await opened.app.close();
 });
 
-test("adds explicitly enabled provider-native compaction after prune", async (t) => {
+test("legacy providerNative selects native compaction only", async (t) => {
   const opened = await openWithCapturedOpenAIContext(t, {
     maybecode: { autoCompaction: { providerNative: true } },
   });
 
   assert.deepEqual(opened.strategyNames, [
-    "prune-old-tool-results",
     "openai-responses-compact",
-    "summary-tail",
-    "history-reference",
   ]);
   await opened.app.close();
+});
+
+test("selects independent automatic compaction modes", async (t) => {
+  for (const [mode, expected] of [
+    ["prune-summary", ["prune-old-tool-results", "summary-tail"]],
+    ["history-reference", ["history-reference"]],
+    ["provider-native", ["openai-responses-compact"]],
+  ]) {
+    const opened = await openWithCapturedOpenAIContext(t, {
+      maybecode: { autoCompaction: { mode, providerNative: true } },
+    });
+    assert.deepEqual(opened.strategyNames, expected);
+    await opened.app.close();
+  }
+});
+
+test("validates automatic compaction mode", async (t) => {
+  for (const mode of ["unknown", true, null]) {
+    await assert.rejects(
+      openWithCapturedOpenAIContext(t, { maybecode: { autoCompaction: { mode } } }),
+      /autoCompaction\.mode must be prune-summary, history-reference, or provider-native/,
+    );
+  }
 });
 
 test("validates provider-native automatic compaction configuration", async (t) => {

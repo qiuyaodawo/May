@@ -164,13 +164,24 @@ Anthropic 接受禁用、自适应或显式 token budget：
 
 `apps.maybecode` 识别：
 
+`autoCompaction.mode` 选择独立的自动压缩模式：`prune-summary`（默认，先裁剪旧工具
+结果，仍超阈值时再摘要）、`history-reference`（用历史引用重置较早上下文），或
+`provider-native`（仅原生压缩，要求模型支持）。模式之间不会自动降级；压缩后仍超
+阈值时停止 Run，已变化的上下文仍会持久化。旧的 `autoCompaction.providerNative`
+布尔配置已弃用；没有 `mode` 时，`true` 选择仅原生压缩，显式 `mode` 优先。
+
+手动 `/compact` 默认执行裁剪与摘要。`/compact history-reference` 和
+`/compact provider-native` 分别执行独立操作，不改变自动模式。编程接口通过
+`autoCompactionMode` 选择同样的模式；显式 `autoCompactionStrategies` 覆盖模式，
+空数组 `[]` 禁用自动压缩。
+
 ```json
 {
   "apps": {
     "maybecode": {
       "instructionsDirectory": "instructions/maybecode",
       "autoCompaction": {
-        "providerNative": false
+        "mode": "prune-summary"
       },
       "retry": {
         "maxAttempts": 3,

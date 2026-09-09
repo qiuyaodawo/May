@@ -44,6 +44,7 @@ export type MaybeCodeSlashCommand =
 
 export const MAYBECODE_COMPACTION_STRATEGIES = [
   "history-reference",
+  "provider-native",
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
@@ -96,8 +97,8 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   },
   {
     name: "/compact",
-    usage: "/compact [history-reference]",
-    description: "Summarize context or replace older history with a reference",
+    usage: "/compact [history-reference|provider-native]",
+    description: "Prune and summarize context, reset with a history reference, or compact natively",
   },
   {
     name: "/help",
@@ -276,7 +277,9 @@ export function createMaybeCodeSlashCommandSuggester(
         .map((strategy) => ({
           value: `${command} ${strategy}`,
           label: strategy,
-          description: "Keep the current turn and reference durable history",
+          description: strategy === "provider-native"
+            ? "Compact with the active model's native compactor"
+            : "Keep the current turn and reference durable history",
         }));
     }
 

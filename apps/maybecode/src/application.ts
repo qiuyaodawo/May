@@ -52,6 +52,7 @@ import type {
 } from "@may/session";
 
 import type {
+  MaybeCodeAutoCompactionMode,
   MaybeCodeCompactionSelection,
   MaybeCodeModelInfo,
 } from "./controller.js";
@@ -84,7 +85,9 @@ export interface MaybeCodeApplicationOptions {
   readonly contextBudget?: ContextBudget;
   readonly compactionStrategy?: ContextCompactionStrategy;
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
-  /** Include the model's native compactor in the default automatic chain. */
+  /** Defaults to prune-summary; explicit strategies override this mode. */
+  readonly autoCompactionMode?: MaybeCodeAutoCompactionMode;
+  /** @deprecated Use autoCompactionMode: "provider-native" for native-only compaction. */
   readonly providerNativeAutoCompaction?: boolean;
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
@@ -113,6 +116,7 @@ export class MaybeCodeApplication {
   private readonly manualCompactionStrategy: ContextCompactionStrategy;
   private readonly summaryTailStrategy: ContextCompactionStrategy;
   private readonly historyReferenceStrategy: ContextCompactionStrategy;
+  private readonly nativeCompactionStrategy: ContextCompactionStrategy | undefined;
   private readonly eventQueue = new AsyncEventQueue<MaybeCodeSessionEvent>({
     maxBufferedValues: 1024,
     isDroppable: (value) =>
@@ -128,6 +132,7 @@ export class MaybeCodeApplication {
     manualCompactionStrategy: ContextCompactionStrategy,
     summaryTailStrategy: ContextCompactionStrategy,
     historyReferenceStrategy: ContextCompactionStrategy,
+    nativeCompactionStrategy: ContextCompactionStrategy | undefined,
     modelInfo: MaybeCodeModelInfo | undefined,
   ) {
     this.workspace = workspace;
@@ -137,6 +142,7 @@ export class MaybeCodeApplication {
     this.manualCompactionStrategy = manualCompactionStrategy;
     this.summaryTailStrategy = summaryTailStrategy;
     this.historyReferenceStrategy = historyReferenceStrategy;
+    this.nativeCompactionStrategy = nativeCompactionStrategy;
     this.modelInfo = modelInfo === undefined ? undefined : { ...modelInfo };
     this.events = this.eventQueue;
     this.eventRelay = this.relayEvents(application.events);
@@ -181,19 +187,17 @@ export class MaybeCodeApplication {
         "session_history tool. Inspect it when details from earlier work are " +
         "needed, then continue the current request.",
     });
-    const nativeCompactionStrategy =
-      options.providerNativeAutoCompaction === true &&
-        options.model.contextCompactor !== undefined
-        ? new ModelContextCompactionStrategy(options.model.contextCompactor)
-        : undefined;
-    const autoCompactionStrategies = options.autoCompactionStrategies ?? [
-      new PruneOldToolResultsStrategy(),
-      ...(nativeCompactionStrategy === undefined
-        ? []
-        : [nativeCompactionStrategy]),
-      summaryTailStrategy,
-      historyReferenceStrategy,
-    ];
+    const nativeCompactionStrategy = options.model.contextCompactor !== undefined
+      ? new ModelContextCompactionStrategy(options.model.contextCompactor)
+      : undefined;
+    const autoCompactionStrategies = options.autoCompactionStrategies ??
+      automaticStrategies(
+        options.autoCompactionMode ??
+          (options.providerNativeAutoCompaction === true ? "provider-native" : "prune-summary"),
+        summaryTailStrategy,
+        historyReferenceStrategy,
+        nativeCompactionStrategy,
+      );
     const contextBudget = withDefaultCompactionThreshold(
       options.contextBudget ?? contextBudgetFromModel(options.model),
     );
@@ -268,6 +272,7 @@ export class MaybeCodeApplication {
       manualCompactionStrategy,
       summaryTailStrategy,
       historyReferenceStrategy,
+      nativeCompactionStrategy,
       options.modelInfo,
     );
   }
@@ -366,8 +371,32 @@ export class MaybeCodeApplication {
     }
     if (selection === "summary-tail") return this.summaryTailStrategy;
     if (selection === "history-reference") return this.historyReferenceStrategy;
+    if (selection === "provider-native") return requireNativeCompaction(this.nativeCompactionStrategy);
     if (typeof selection === "object") return selection;
     throw new Error(`Unknown context compaction strategy: ${String(selection)}`);
+  }
+}
+
+function requireNativeCompaction(
+  strategy: ContextCompactionStrategy | undefined,
+): ContextCompactionStrategy {
+  if (strategy === undefined) {
+    throw new Error("The active model does not support provider-native context compaction");
+  }
+  return strategy;
+}
+
+function automaticStrategies(
+  mode: MaybeCodeAutoCompactionMode,
+  summary: ContextCompactionStrategy,
+  historyReference: ContextCompactionStrategy,
+  native: ContextCompactionStrategy | undefined,
+): readonly ContextCompactionStrategy[] {
+  switch (mode) {
+    case "prune-summary": return [new PruneOldToolResultsStrategy(), summary];
+    case "history-reference": return [historyReference];
+    case "provider-native": return [requireNativeCompaction(native)];
+    default: throw new Error(`Unknown automatic compaction mode: ${String(mode)}`);
   }
 }
 
