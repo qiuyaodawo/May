@@ -386,8 +386,8 @@ continuation lines do not show command suggestions.
 - `/context` shows message counts, size, measured usage, and window remaining.
 - `/compact` prunes eligible old tool results, summarizes older turns, and
   retains the recent tail.
-- `/compact history-reference` keeps the current turn and points the model to
-  the bounded `session_history` tool for older details.
+- `/compact history-reference` keeps the current request and fresh saved work
+  notes; older details remain available through history tools.
 - `/mcp` shows configured MCP server states, discovered tools, errors, and
   retained stderr diagnostics.
 - `/help` shows commands.
@@ -458,9 +458,12 @@ JSONL, while subsequent model requests and resumed sessions use the compacted
 view. Programmatic callers can inject `contextSummarizer` or replace the
 default with their own `ContextCompactionStrategy`.
 
-`/compact history-reference` is the explicit stronger alternative: it retains
-the current turn and replaces older model-visible context with a reference to
-the durable `session_history` tool.
+`/compact history-reference` is the explicit stronger alternative: it requires
+fresh `context_notes` and retains the latest user request, saved notes, and host
+instructions, rather than the current turn's entire tool transcript. Original
+events remain in Session history. It can therefore release space within one
+long user task. Without valid, fresh notes or enough space for the replacement,
+it fails without removing the existing view.
 
 `/compact provider-native` invokes only the active model's native compactor,
 without pruning or summarization. Unsupported models report an error. Manual
@@ -475,7 +478,8 @@ uses `apps.maybecode.autoCompaction.mode` to select one independent mode:
 - `prune-summary` (default): try `prune-old-tool-results`, then `summary-tail`
   only if pressure remains. It never automatically resets history or calls a
   native compactor.
-- `history-reference`: run only history-reference reset; no summary call.
+- `history-reference`: use work notes and history retrieval; no summary call.
+  The model can request a reset with `new_context` before the threshold.
 - `provider-native`: run only the model's native compactor; selecting this mode
   requires native support from the active model.
 
@@ -488,6 +492,41 @@ Programmatic callers select `autoCompactionMode`; an explicit
 automatic compaction. The deprecated `providerNative: true` configuration and
 `providerNativeAutoCompaction: true` option now select native-only mode when no
 mode is specified; an explicit mode takes precedence.
+
+### History-reference work memory
+
+In `history-reference` automatic mode, the model receives guidance to manage
+long tasks proactively. `get_context_remaining` reports approximate usage,
+window capacity, and remaining space before reset when the model asks; it is
+not a per-request usage broadcast. A system-message warning is inserted once
+per window when usage reaches 80% of the configured compaction threshold.
+The threshold itself remains the hard boundary (90% of the model window by
+default, subject to reserves); a large response may skip the warning range.
+
+`context_notes` reads or replaces one session-local work note, up to 12 KiB of
+serialized UTF-8 JSON. A save requires nonempty `goal`, `constraints`, `progress`,
+and `nextSteps`; optional `historyRefs` contains up to 20 existing event sequence
+numbers. Notes are persisted as Session state and survive resume, model changes,
+and compaction; a new Session has separate notes. This is not a general file
+notebook. The host checks that notes postdate the previous history reset and
+cover the latest user input, non-memory tool outcomes, and recovery changes.
+These checks establish freshness, not the semantic accuracy of model-written notes.
+
+The model saves notes in a single-tool step after other tools finish, then calls
+`new_context` in another single-tool step. Reset happens at the next model
+snapshot, after tool outcomes have been persisted. It retains other system
+messages, the latest user request and the note, but removes old handoffs,
+capacity reminders, assistant messages, and tool results. Missing, stale, or
+oversized notes stop the reset; there is no summary/native fallback. The built-in
+controller restores the old view if checkpoint persistence fails. Unresolved
+tool recovery also blocks reset. A custom context must support deferred
+compaction and rollback to use this mode. A notes write failure stops the Run;
+repair storage and reopen the session before continuing.
+
+`get_context_remaining` and `context_notes` are also available in other modes,
+so notes can be prepared for manual `/compact history-reference`. Only automatic
+history-reference mode exposes `new_context` and adds proactive guidance/warnings.
+Explicit custom strategy arrays keep their existing caller-defined behavior.
 
 The `read` tool runs without approval. `shell`, `edit`, and `write` require an
 allow-once, allow-for-session, or deny decision. The shell tool is not a sandbox.

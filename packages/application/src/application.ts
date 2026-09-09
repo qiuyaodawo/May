@@ -47,6 +47,7 @@ import {
 } from "@may/session";
 import {
   createSessionHistoryTool,
+  createSessionHistoryRetrievalTools,
   type SessionHistoryToolOptions,
 } from "@may/session-tools";
 
@@ -90,7 +91,10 @@ export interface AgentApplicationOptions {
   readonly maxSteps?: number;
   readonly runBudget?: RunBudget;
   /** Add the bounded session_history tool with these optional limits. */
-  readonly sessionHistory?: false | Omit<SessionHistoryToolOptions, "source">;
+  readonly sessionHistory?: false | (Omit<SessionHistoryToolOptions, "source"> & {
+    /** Also expose bounded content search and chunked record reads. */
+    readonly retrieval?: boolean;
+  });
   /**
    * Produce durable, model-invisible display metadata before permission policy
    * evaluation. Coding diffs are one possible use; the application owns data.
@@ -183,6 +187,11 @@ export class AgentApplication implements AgentController {
         throw new Error(`Tool name "${historyTool.name}" is reserved by AgentApplication`);
       }
       configuredTools.register(historyTool);
+      for (const tool of options.sessionHistory.retrieval === true
+        ? createSessionHistoryRetrievalTools({ source: () => historySource! }) : []) {
+        if (configuredTools.has(tool.name)) throw new Error(`Tool name "${tool.name}" is reserved by AgentApplication`);
+        configuredTools.register(tool);
+      }
     }
 
     const permissions = new PermissionToolExecutor({
@@ -315,6 +324,12 @@ export class AgentApplication implements AgentController {
     return this.starting ||
       this.currentRun !== undefined ||
       this.activeCompaction !== undefined;
+  }
+
+  /** Persist application-owned session memory; available during tool execution. */
+  recordState(key: string, value: unknown): Promise<void> {
+    this.throwIfClosed();
+    return this.session.recordState(key, value);
   }
 
   submit(options: RunOptions): Promise<AgentRun> {
@@ -470,7 +485,14 @@ export class AgentApplication implements AgentController {
     signal: AbortSignal,
   ): Promise<ContextCompactionResult> {
     const result = await this.contextController!.compact!(strategy, { signal });
-    if (result.changed) await this.persistCompaction(result);
+    if (result.changed) {
+      try {
+        await this.persistCompaction(result);
+      } catch (error) {
+        await this.contextController!.rollbackCompaction?.(result);
+        throw error;
+      }
+    }
     return result;
   }
 

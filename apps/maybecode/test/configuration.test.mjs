@@ -13,6 +13,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { InMemoryContext } from "@may/core";
+import { InMemoryContextFactory } from "@may/context";
 
 import { createMaybeCodeSlashCommandSuggester, createCodingPermissionPolicy, executeMaybeCodeSlashCommand, formatMaybeCodeMcpStatus, openConfiguredMaybeCode, parseMaybeCodeArgs, resolveMaybeCodeMcp, runMaybeCode, runMaybeCodeMcpCommand, resolveMaybeCodeObservability, resolveMaybeCodeRetry } from "../dist/index.js";
 
@@ -866,13 +867,7 @@ async function openWithCapturedOpenAIContext(t, apps) {
       contextFactory: {
         create(options) {
           contextOptions = options;
-          return {
-            context: new InMemoryContext({
-              instructions: options.instructions,
-              messages: [...(options.messages ?? [])],
-              metadata: { ...options.metadata },
-            }),
-          };
+          return new InMemoryContextFactory().create(options);
         },
       },
     },

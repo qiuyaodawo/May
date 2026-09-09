@@ -79,6 +79,44 @@ result directly. Successful automatic compaction also emits an application
 event, while automatic strategy failure is a live application event and is not
 currently a Session event.
 
+## History-reference work memory
+
+MaybeCode's `history-reference` mode uses saved work notes and on-demand history,
+without a summarization call. Unlike the low-level `HistoryReferenceStrategy`
+(which still retains recent user turns), this product mode can reset inside a
+single long user task.
+
+- `get_context_remaining` lets the model query approximate use, window capacity,
+  and remaining space before reset. Unknown limits are reported as unknown.
+- At 80% of the configured compaction threshold, the host inserts one system
+  reminder per window. The original threshold stays the hard boundary; a large
+  result can jump over the warning range.
+- `context_notes` reads or replaces one work note, persisted in Session state.
+  Saves require `goal`, `constraints`, `progress`, and `nextSteps`, optionally
+  `historyRefs` (up to 20 existing sequence numbers), within 12 KiB of JSON.
+  Notes survive resume but are isolated between Sessions.
+- Save notes by themselves after tool work completes, then call `new_context`
+  by itself. The host rechecks notes before the next model call, after the batch's
+  tool outcomes are durable. New user input, non-memory tool outcomes, or recovery
+  changes require refreshing notes; a previous reset also requires a new save.
+- Replacement keeps host instructions, other system messages, the latest user
+  request and saved notes, not the whole current tool transcript. Missing, stale,
+  or oversized handoff data and unresolved tool recovery block reset. These checks
+  cannot verify whether the model's note is semantically accurate.
+- Full events remain queryable. `session_history_search` scans up to 50 events
+  and returns at most 10 literal, case-insensitive matches per call; follow the
+  sequence cursor even on an empty page. `session_history_read` reads a record by
+  sequence in chunks (default 2000, maximum 4000 UTF-16 code units), using the
+  returned `nextOffset`. Compaction replacement views are omitted.
+
+Only this automatic mode exposes `new_context` and adds proactive guidance and
+warnings. Query/notes tools also support preparing a manual history-reference
+reset in other modes. Custom Contexts need deferred-compaction and rollback
+support. The built-in controller restores the old view if checkpoint persistence
+fails; no model call proceeds with that failed replacement. A notes write failure
+also stops the Run; repair storage and reopen the session before continuing. This mode does not
+fall back to summary or provider-native compaction.
+
 ## Replay semantics
 
 `Session.resume()` validates the Session id and contiguous Session sequence,

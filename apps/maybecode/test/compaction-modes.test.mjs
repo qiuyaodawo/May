@@ -50,19 +50,15 @@ test("default mode retains its summary and fails instead of resetting history", 
   assert.ok(checkpoints[0].messages.some((item) => item.content[0]?.text === "recent request"));
 });
 
-test("history-reference mode resets without invoking summary or native compaction", async (t) => {
+test("history-reference mode refuses to reset without saved work notes", async (t) => {
   const { app, requests } = await open(t, {
     autoCompactionMode: "history-reference",
     contextSummarizer: { summarize() { assert.fail("summary must not run"); } },
   });
-  await (await app.submit({ input: "current request" })).result;
-  assert.equal(requests.length, 1);
-  assert.ok(requests[0].messages.some((item) => item.content[0]?.text.includes("session_history")));
-  assert.equal(requests[0].messages.some((item) => item.content[0]?.text === "recent request"), false);
-  assert.deepEqual(
-    (await app.history()).filter((event) => event.type === "context.compacted").map((event) => event.strategy),
-    ["history-reference"],
-  );
+  await assert.rejects((await app.submit({ input: "current request" })).result,
+    (error) => error.failures?.[0]?.error.message.includes("fresh context_notes"));
+  assert.equal(requests.length, 0);
+  assert.equal((await app.history()).some((event) => event.type === "context.compacted"), false);
 });
 
 test("native mode receives untouched history and fails without other modes", async (t) => {

@@ -98,7 +98,7 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   {
     name: "/compact",
     usage: "/compact [history-reference|provider-native]",
-    description: "Prune and summarize context, reset with a history reference, or compact natively",
+    description: "Prune and summarize context, reset with saved work notes, or compact natively",
   },
   {
     name: "/help",
@@ -279,7 +279,7 @@ export function createMaybeCodeSlashCommandSuggester(
           label: strategy,
           description: strategy === "provider-native"
             ? "Compact with the active model's native compactor"
-            : "Keep the current turn and reference durable history",
+            : "Keep the current request and fresh saved work notes",
         }));
     }
 

@@ -252,15 +252,20 @@ function createOutput(
   };
 }
 
-function projectEvent(event: SessionEvent, maxEventBytes: number): SessionHistoryEntry {
-  let projected: unknown = event;
+/** Omit replacement views to avoid recursively returning compacted history. */
+export function sessionHistoryEventContent(event: SessionEvent): unknown {
   if (event.type === "context.compacted") {
     const { messages, ...details } = event;
-    projected = {
+    return {
       ...details,
       replacementMessageCount: messages.length,
     };
   }
+  return event;
+}
+
+function projectEvent(event: SessionEvent, maxEventBytes: number): SessionHistoryEntry {
+  const projected = sessionHistoryEventContent(event);
   const serialized = JSON.stringify(projected);
   if (utf8Bytes(serialized) <= maxEventBytes) {
     return {

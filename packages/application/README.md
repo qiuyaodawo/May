@@ -44,6 +44,11 @@ relays run and approval events, serializes active-run state, persists context
 compaction, and closes outstanding work safely. Prompts, tools, permission policy
 and optional tool-presentation metadata are injected by the product.
 
+`recordState(key, value)` persists product-owned session state, including from a
+tool during a Run. Pass `sessionHistory: { retrieval: true }` to also expose
+bounded `session_history_search` and chunked `session_history_read` alongside
+`session_history`. These tools only access this application's session.
+
 Call `AgentApplication.open()` directly when reusable definition/open
 separation is unnecessary. It accepts any `Iterable<Tool>` and snapshots it
 during opening. It also accepts an optional `toolScheduler` and forwards it to

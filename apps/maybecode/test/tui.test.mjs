@@ -98,7 +98,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   );
   assert.match(
     terminal.output,
-    /No context changes were eligible for history-reference/u,
+    /Context reset requires fresh context_notes/u,
   );
   assert.match(terminal.output, /MCP: disabled \(no servers configured\)/u);
   assert.ok(terminal.closed);

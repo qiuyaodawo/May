@@ -49,6 +49,10 @@ export interface ContextInspection {
 }
 
 export interface ContextController {
+  /** Request compaction at the next model snapshot, after the tool batch finishes. */
+  requestCompaction?(strategy: ContextCompactionStrategy | undefined): void;
+  /** Restore a replaced view if its checkpoint could not be persisted. */
+  rollbackCompaction?(result: ContextCompactionResult): Promise<void>;
   /** Invalidate provider measurements when host instructions change. */
   invalidateMeasurement?(): void;
   inspect(): Promise<ContextInspection>;
@@ -90,6 +94,29 @@ export class SnapshotContextController implements ContextController {
   private autoCompactionFailureSink: ContextCompactionFailureSink | undefined;
   private measurement: ContextMeasurement | undefined;
   private compactionQueue: Promise<void> = Promise.resolve();
+  private requestedCompaction: ContextCompactionStrategy | undefined;
+  private readonly replacements = new WeakMap<ContextCompactionResult, {
+    messages: readonly Message[];
+    measurement: ContextMeasurement | undefined;
+  }>();
+
+  requestCompaction(strategy: ContextCompactionStrategy | undefined): void {
+    this.requestedCompaction = strategy;
+  }
+
+  async rollbackCompaction(result: ContextCompactionResult): Promise<void> {
+    const previous = this.replacements.get(result);
+    if (previous === undefined) return;
+    const current = await this.context.snapshot();
+    const tail = appendedTail(result.messages, current.messages);
+    if (tail === undefined || await this.replaceMessages!(
+      [...previous.messages, ...tail], current.messages,
+    ) === false) {
+      throw new Error("Cannot restore context after checkpoint failure: context changed");
+    }
+    this.measurement = previous.measurement;
+    this.replacements.delete(result);
+  }
 
   constructor(
     private readonly context: Context,
@@ -138,7 +165,9 @@ export class SnapshotContextController implements ContextController {
   async prepareForModel(
     options: ContextCompactionOptions = {},
   ): Promise<readonly ContextCompactionResult[]> {
-    if (this.autoCompactionStrategies.length === 0) return [];
+    const requested = this.requestedCompaction;
+    const strategies = requested === undefined ? this.autoCompactionStrategies : [requested];
+    if (strategies.length === 0) return [];
     throwIfAborted(options.signal);
 
     const snapshot = await this.context.snapshot();
@@ -146,12 +175,12 @@ export class SnapshotContextController implements ContextController {
       snapshot,
       this.inspectionOptions(),
     );
-    if (inspection.shouldCompact !== true) return [];
+    if (requested === undefined && inspection.shouldCompact !== true) return [];
 
     const results: ContextCompactionResult[] = [];
     const failures: ContextCompactionFailure[] = [];
     let currentInspection = inspection;
-    for (const [index, strategy] of this.autoCompactionStrategies.entries()) {
+    for (const [index, strategy] of strategies.entries()) {
       let result: ContextCompactionResult;
       try {
         result = await this.compact(strategy, options);
@@ -162,21 +191,29 @@ export class SnapshotContextController implements ContextController {
           strategy: strategy.name,
           error: normalizeError(error),
           before: currentInspection,
-          continuing: index < this.autoCompactionStrategies.length - 1,
+          continuing: index < strategies.length - 1,
         };
         failures.push(failure);
         await this.autoCompactionFailureSink?.(failure);
+        if (requested !== undefined) throw error;
         continue;
       }
       currentInspection = result.after;
       if (result.changed) {
-        await this.autoCompactionSink?.(result, options);
+        try {
+          await this.autoCompactionSink?.(result, options);
+        } catch (error) {
+          await this.rollbackCompaction(result);
+          throw error;
+        }
         results.push(result);
       }
       if (result.terminal === true || currentInspection.shouldCompact !== true) {
         break;
       }
     }
+
+    if (this.requestedCompaction === requested) this.requestedCompaction = undefined;
 
     if (currentInspection.shouldCompact === true) {
       currentInspection = await this.inspect();
@@ -277,6 +314,7 @@ export class SnapshotContextController implements ContextController {
         );
         if (replaced === false) continue;
 
+        const previousMeasurement = this.measurement;
         this.applyCompactionMeasurement(
           output.effectiveTokens,
           compactedMessages.length,
@@ -286,7 +324,7 @@ export class SnapshotContextController implements ContextController {
           afterSnapshot,
           this.inspectionOptions(),
         );
-        return {
+        const result: ContextCompactionResult = {
           strategy: strategy.name,
           changed,
           messages: [...afterSnapshot.messages],
@@ -294,6 +332,8 @@ export class SnapshotContextController implements ContextController {
           after,
           ...(output.terminal === true ? { terminal: true } : {}),
         };
+        this.replacements.set(result, { messages: latestSnapshot.messages, measurement: previousMeasurement });
+        return result;
       }
     }
   }

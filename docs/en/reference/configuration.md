@@ -183,6 +183,13 @@ and `/compact provider-native` select independent operations without changing
 the automatic mode. Programmatic `autoCompactionMode` selects the same modes;
 `autoCompactionStrategies` overrides the mode, with `[]` disabling automation.
 
+History-reference mode now requires saved work notes, not just a history pointer.
+The model can query capacity with `get_context_remaining`, save `context_notes`,
+and request `new_context`. The host warns at 80% of the configured reset threshold;
+the threshold remains the hard boundary. Missing or stale notes block reset.
+See [Context and durable history](../concepts/context-and-history.md#history-reference-work-memory)
+for the handoff, retrieval, and failure rules.
+
 ```json
 {
   "apps": {

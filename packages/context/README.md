@@ -76,6 +76,13 @@ after inspections plus the replacement messages. Applications remain
 responsible for persisting those replacement messages. Custom factories may
 omit `compact()` or provide a different strategy and storage mechanism.
 
+The built-in controller also supports `requestCompaction(strategy)` to defer a
+reset until the next model snapshot, after the current tool batch completes.
+Passing `undefined` cancels the request. `rollbackCompaction(result)` restores
+the previous view if saving its checkpoint fails, preserving appended messages.
+Automatic compaction invokes rollback when its persistence sink rejects;
+manual callers are responsible for invoking rollback on persistence failure.
+
 `SummaryTailStrategy` accepts a replaceable `ContextSummarizer`. It summarizes
 complete older user turns into one system message and preserves the configured
 number of recent user turns, so assistant tool calls are not separated from

@@ -19,7 +19,7 @@ import {
   TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
 } from "@may/coding-tools";
 import {
-  HistoryReferenceStrategy,
+  InMemoryContextFactory,
   ModelContextCompactionStrategy,
   type ContextBudget,
   type ContextCompactionOptions,
@@ -63,6 +63,7 @@ import {
 } from "./instructions.js";
 import { createCodingPermissionPolicy } from "./policy.js";
 import { createModelContextSummarizer } from "./summarizer.js";
+import { HistoryReferenceMemory } from "./history-memory.js";
 
 export { DEFAULT_MAYBE_CODE_INSTRUCTIONS } from "./instructions.js";
 
@@ -117,6 +118,7 @@ export class MaybeCodeApplication {
   private readonly summaryTailStrategy: ContextCompactionStrategy;
   private readonly historyReferenceStrategy: ContextCompactionStrategy;
   private readonly nativeCompactionStrategy: ContextCompactionStrategy | undefined;
+  private readonly historyMemory: HistoryReferenceMemory;
   private readonly eventQueue = new AsyncEventQueue<MaybeCodeSessionEvent>({
     maxBufferedValues: 1024,
     isDroppable: (value) =>
@@ -133,6 +135,7 @@ export class MaybeCodeApplication {
     summaryTailStrategy: ContextCompactionStrategy,
     historyReferenceStrategy: ContextCompactionStrategy,
     nativeCompactionStrategy: ContextCompactionStrategy | undefined,
+    historyMemory: HistoryReferenceMemory,
     modelInfo: MaybeCodeModelInfo | undefined,
   ) {
     this.workspace = workspace;
@@ -143,6 +146,7 @@ export class MaybeCodeApplication {
     this.summaryTailStrategy = summaryTailStrategy;
     this.historyReferenceStrategy = historyReferenceStrategy;
     this.nativeCompactionStrategy = nativeCompactionStrategy;
+    this.historyMemory = historyMemory;
     this.modelInfo = modelInfo === undefined ? undefined : { ...modelInfo };
     this.events = this.eventQueue;
     this.eventRelay = this.relayEvents(application.events);
@@ -152,12 +156,21 @@ export class MaybeCodeApplication {
     options: MaybeCodeApplicationOptions,
   ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
+    const autoMode = options.autoCompactionMode ??
+      (options.providerNativeAutoCompaction === true ? "provider-native" : "prune-summary");
+    const historyMemory = new HistoryReferenceMemory(
+      autoMode === "history-reference" && options.autoCompactionStrategies === undefined,
+    );
     const skills = options.skills === false ? undefined : options.skills ??
       await SkillRegistry.discover(options.skillDirectories ?? defaultMaybeCodeSkillDirectories(workspace, false));
     const configuredTools = ToolRegistry.compose(
       options.tools ?? createCodingTools({ cwd: workspace }),
       options.additionalTools ?? [],
     );
+    for (const tool of historyMemory.tools()) {
+      if (configuredTools.has(tool.name)) throw new Error(`Tool name "${tool.name}" is reserved for session memory`);
+      configuredTools.register(tool);
+    }
     const shellInfo = configuredTools.values()
       .map((tool) => getShellToolInfo(tool))
       .find((info) => info !== undefined);
@@ -180,20 +193,13 @@ export class MaybeCodeApplication {
     });
     const manualCompactionStrategy = options.compactionStrategy ??
       new PruneAndSummaryTailStrategy(summaryTailStrategy);
-    const historyReferenceStrategy = new HistoryReferenceStrategy({
-      reference:
-        "Earlier model-visible context was removed to recover context capacity. " +
-        "The complete durable history remains available through the " +
-        "session_history tool. Inspect it when details from earlier work are " +
-        "needed, then continue the current request.",
-    });
+    const historyReferenceStrategy = historyMemory.strategy;
     const nativeCompactionStrategy = options.model.contextCompactor !== undefined
       ? new ModelContextCompactionStrategy(options.model.contextCompactor)
       : undefined;
     const autoCompactionStrategies = options.autoCompactionStrategies ??
       automaticStrategies(
-        options.autoCompactionMode ??
-          (options.providerNativeAutoCompaction === true ? "provider-native" : "prune-summary"),
+        autoMode,
         summaryTailStrategy,
         historyReferenceStrategy,
         nativeCompactionStrategy,
@@ -227,9 +233,7 @@ export class MaybeCodeApplication {
           ? {}
           : { "may.model.name": options.modelInfo.model }),
       },
-      ...(options.contextFactory === undefined
-        ? {}
-        : { contextFactory: options.contextFactory }),
+      contextFactory: historyMemory.wrap(options.contextFactory ?? new InMemoryContextFactory()),
       ...(contextBudget === undefined ? {} : { contextBudget }),
       ...(options.compactionStrategy === undefined
         ? {}
@@ -237,7 +241,7 @@ export class MaybeCodeApplication {
       autoCompactionStrategies,
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
       ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
-      sessionHistory: {},
+      sessionHistory: { retrieval: true },
       createToolPresentation: async (check) => {
         const preview = await createToolChangePreview(
           workspace,
@@ -264,6 +268,7 @@ export class MaybeCodeApplication {
         : { sessionId: options.sessionId }),
       ...(options.resume === undefined ? {} : { resume: options.resume }),
     });
+    historyMemory.attach(application);
 
     return new MaybeCodeApplication(
       workspace,
@@ -273,6 +278,7 @@ export class MaybeCodeApplication {
       summaryTailStrategy,
       historyReferenceStrategy,
       nativeCompactionStrategy,
+      historyMemory,
       options.modelInfo,
     );
   }
@@ -294,6 +300,7 @@ export class MaybeCodeApplication {
   }
 
   cancel(reason?: string): boolean {
+    this.historyMemory.cancelRequest();
     return this.application.cancel(reason);
   }
 

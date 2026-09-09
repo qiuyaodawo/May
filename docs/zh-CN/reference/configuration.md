@@ -175,6 +175,11 @@ Anthropic 接受禁用、自适应或显式 token budget：
 `autoCompactionMode` 选择同样的模式；显式 `autoCompactionStrategies` 覆盖模式，
 空数组 `[]` 禁用自动压缩。
 
+历史引用模式现在要求先保存工作笔记，而不只是放一个历史查询提示。模型可以用
+`get_context_remaining` 查询容量、用 `context_notes` 保存笔记，再调用 `new_context`。
+系统在达到重置阈值的 80% 时提醒，原阈值仍是硬边界；缺少笔记或笔记过时会阻止重置。
+交接、查询与失败处理规则见 [Context 与持久化历史](../concepts/context-and-history.md#历史引用模式的工作记忆)。
+
 ```json
 {
   "apps": {
