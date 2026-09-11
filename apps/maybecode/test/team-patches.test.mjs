@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { link, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, readFile, realpath, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -7,7 +7,8 @@ import { TaskWorkspaceManager } from "@may/coordination";
 import { applyTeamPatch, createTeamPatch, readTeamPatchApplication, renderTeamPatchDiff } from "../dist/team-patches.js";
 
 async function fixture(t) {
-  const root = await mkdtemp(join(tmpdir(), "may-team-patches-"));
+  // Match the CLI's canonical root before invoking the link-rejecting patch APIs.
+  const root = await realpath(await mkdtemp(join(tmpdir(), "may-team-patches-")));
   const source = join(root, "source");
   const directory = join(root, "team");
   await mkdir(source);
