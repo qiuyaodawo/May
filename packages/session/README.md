@@ -4,6 +4,14 @@
 conversation identity. It serializes runs and records durable session facts
 without making Core depend on persistence or UI policy.
 
+`SessionSubmitOptions.inputId` is an optional host delivery identity (1-256
+characters), persisted with `input.submitted`. Submitting an already-persisted id
+is rejected, including after resume; it does not replay the old input or return
+a synthetic Run handle. Input ids are not inserted into model message content.
+`AgentApplication.submit()` also accepts this option. A durable `run.yielded`
+checkpoint closes a Run without completing the surrounding task; later identified
+inputs can continue the same Session after its caller's wait condition is met.
+
 ## Usage
 
 ```ts

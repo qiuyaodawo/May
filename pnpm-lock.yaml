@@ -42,6 +42,9 @@ importers:
       '@may/context':
         specifier: workspace:*
         version: link:../../packages/context
+      '@may/coordination':
+        specifier: workspace:*
+        version: link:../../packages/coordination
       '@may/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -125,6 +128,25 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/coordination:
+    dependencies:
+      '@may/application':
+        specifier: workspace:*
+        version: link:../application
+      '@may/core':
+        specifier: workspace:*
+        version: link:../core
+      '@may/permissions':
+        specifier: workspace:*
+        version: link:../permissions
+      '@may/session':
+        specifier: workspace:*
+        version: link:../session
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
 
   packages/core: {}
 

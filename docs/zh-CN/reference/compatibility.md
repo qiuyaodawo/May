@@ -9,6 +9,20 @@ May 当前是开发预览框架。所有 workspace package 版本均为 `0.1.0`�
 
 ## 公共 API 边界
 
+新增的 `@may/coordination` API 与版本 1 快照日志同样属于预览契约。当前支持任务图、
+受限动态委派、平级邮箱、移交、显式 Attempt 及尚未提交的后续节点改写。可选资源
+日志和远程 Worker 协议也是预览格式。可使用远程叶子 Worker 执行任务，但调度
+仍由单个持久化 coordinator 拥有：不提供任意工作流重放、HA 或多写入者所有权。
+本地共享预算预留/计账不是分布式全局预算服务。MaybeCode 团队 CLI 是只读组合，
+不是多 Agent TUI，也不授予修改源文件的权限。
+
+参阅[协作指南](../guides/coordination.md)、
+[共享资源](../guides/coordination-resources.md)、
+[Attempt 与任务图修订](../guides/coordination-lifecycle.md)、
+[远程 Worker](../guides/coordination-remote.md)及
+[MaybeCode 团队任务](../guides/maybecode-team.md)，了解所有权、版本检查和恢复边界。
+持久化的策略/限制发生变化时不会静默迁移。
+
 只有 package `exports` map 声明的入口属于公共 API。即使本地存在某个文件，直接从
 `src/`、`dist/` 或其他未声明的深层路径导入也不受支持。
 

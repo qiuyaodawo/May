@@ -18,6 +18,7 @@ surface or persistence format as stable.
 | Define reusable Agent behavior and policy | `defineAgent()` from `@may/application` | A `ToolRegistry` from `@may/core` |
 | Build a headless, durable single-session Agent | `AgentDefinition.open()` or `AgentApplication.open()` | `@may/session`, `@may/context`, permissions and tools |
 | Manage multiple sessions in one workspace | `@may/application` | A `SessionCatalog` from `@may/session/catalog` |
+| Coordinate Agent teams, resources and remote workers | `@may/coordination` | Agent definitions, durable coordination and Session stores, explicit host policies |
 | Build a terminal Agent | Headless application controller | `@may/tui`, optionally `@may/keybindings` |
 | Build a coding Agent | Headless application controller | `@may/coding-tools` and an execution isolation policy |
 | Select models from May configuration | `@may/config` | `@may/providers` |
@@ -82,6 +83,36 @@ scheduler—remain caller-owned and shared. Tool iterable membership is
 snapshotted when the definition is created.
 See [Agent and Application](../concepts/agent-application.md) and the
 [package README](../../../packages/application/README.md).
+
+### `@may/coordination`
+
+Single-coordinator, durable task graphs above Application. `CoordinationRuntime` runs
+host-authored DAGs; `pipeline()` and `parallelTasks()` compile to the same graph.
+`createApplicationAgent()` gives each task controller an independent Session, with routed
+approvals, per-Run budgets and evidence-based recovery. Coordination storage is
+in-memory or local single-writer JSONL through `@may/coordination/file-store`.
+Opt-in `delegate_tasks` supports nested children, safe yield and identified wakeup
+turns, with default-deny delegation policy and depth/turn limits. Optional peer
+mailboxes add `send_message` / `wait_for_messages`, default-deny message authority,
+bounded durable envelopes and per-turn inboxes. Opt-in `handoff_task` transfers a
+logical task to a fresh agent Session after a safe yield, with default-deny policy,
+explicit context summaries and bounded, durable controller history. Host-only
+`retryTask()` creates a new attempt; `rewriteGraph()` atomically edits never-submitted
+future nodes. Unknown effects are reconciled, not automatically retried.
+
+`FileSharedBudget`, `FileArtifactStore` and `TaskWorkspaceManager` provide local
+shared usage reservations, immutable scoped text artifacts and isolated file copies.
+They are not a distributed global budget service or an OS sandbox and do not merge
+changes into the source checkout. `@may/coordination/remote` provides independent
+remote leaf workers with their own durable receipts and authority; one coordinator
+retains scheduling ownership, with no HA/multi-writer failover. MaybeCode's team CLI
+composes the local capabilities for read-only investigation, not shell/source edits.
+
+See [Multi-agent task graphs](../guides/coordination.md),
+[Shared resources](../guides/coordination-resources.md),
+[Attempts and graph revisions](../guides/coordination-lifecycle.md),
+[Remote leaf workers](../guides/coordination-remote.md) and
+[MaybeCode teams](../guides/maybecode-team.md).
 
 ### `@may/observability`
 

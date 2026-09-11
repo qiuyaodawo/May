@@ -12,6 +12,7 @@ import { runTerminalUI } from "./tui.js";
 import type { MaybeCodeController } from "./controller.js";
 import { runRetainedTerminalUI } from "./ui/retained-tui.js";
 import { runMaybeCodeMcpCommand } from "./mcp-auth.js";
+import { runMaybeCodeTeamCommand } from "./team.js";
 
 export interface RunMaybeCodeDependencies {
   readonly terminal?: TerminalIO;
@@ -20,6 +21,7 @@ export interface RunMaybeCodeDependencies {
   ) => Promise<MaybeCodeController>;
   readonly runRetainedUI?: (app: MaybeCodeController) => Promise<void>;
   readonly mcpAuth?: typeof runMaybeCodeMcpCommand;
+  readonly team?: typeof runMaybeCodeTeamCommand;
 }
 
 export async function runMaybeCode(
@@ -52,6 +54,19 @@ export async function runMaybeCode(
   }
 
   try {
+    if (command.type === "team") {
+      const cancellation = new AbortController();
+      const interrupt = () => cancellation.abort(new Error("Team cancelled by user"));
+      process.once("SIGINT", interrupt);
+      try {
+        return await (dependencies.team ?? runMaybeCodeTeamCommand)(command, {
+          write: (text) => outputTerminal().write(text), signal: cancellation.signal,
+        });
+      } finally {
+        process.removeListener("SIGINT", interrupt);
+        outputTerminal().close();
+      }
+    }
     if (command.type === "mcp") {
       const cancellation = new AbortController();
       const interrupt = () => cancellation.abort(new Error("MCP authentication cancelled"));

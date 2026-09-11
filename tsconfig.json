@@ -6,6 +6,7 @@
     { "path": "./packages/mcp" },
     { "path": "./packages/observability" },
     { "path": "./packages/application" },
+    { "path": "./packages/coordination" },
     { "path": "./packages/context" },
     { "path": "./packages/permissions" },
     { "path": "./packages/session" },

@@ -332,7 +332,7 @@ export class AgentApplication implements AgentController {
     return this.session.recordState(key, value);
   }
 
-  submit(options: RunOptions): Promise<AgentRun> {
+  submit(options: import("@may/session").SessionSubmitOptions): Promise<AgentRun> {
     return this.startRun(() => this.session.submit(options));
   }
 
@@ -624,7 +624,7 @@ function latestRunFailed(history: readonly SessionEvent[]): boolean {
   for (let index = history.length - 1; index >= 0; index--) {
     const event = history[index]!;
     if (event.type === "run.failed") return true;
-    if (event.type === "run.completed" || event.type === "run.cancelled") {
+    if (event.type === "run.completed" || event.type === "run.yielded" || event.type === "run.cancelled") {
       return false;
     }
   }

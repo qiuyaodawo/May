@@ -74,6 +74,8 @@ export interface MayOptions {
 }
 
 export interface RunOptions {
+  /** Host-only control, checked after a complete model/tool step. Never interrupts tools. */
+  shouldYield?: () => boolean;
   runBudget?: RunBudget;
   input: string | UserMessage;
   /** Awaited durability barrier. Failure stops execution; never retry it blindly. */
@@ -86,6 +88,7 @@ export interface RunOptions {
 }
 
 export interface ContinueOptions {
+  shouldYield?: () => boolean;
   runBudget?: RunBudget;
   checkpoint?: RunCheckpoint;
   signal?: AbortSignal;
@@ -104,7 +107,7 @@ export interface RunHandle {
 }
 
 export type RunCheckpointEvent = Extract<MayEventPayload, {
-  type: "run.started" | "model.completed" | "tool.started" | "tool.completed" | "tool.failed";
+  type: "run.started" | "model.completed" | "tool.started" | "tool.completed" | "tool.failed" | "run.yielded";
 }> & { readonly runId: string };
 export type RunCheckpoint = (event: RunCheckpointEvent) => Promise<void>;
 
@@ -168,6 +171,7 @@ export class May {
       options.traceAttributes,
       options.checkpoint,
       options.runBudget,
+      options.shouldYield,
     );
   }
 
@@ -180,6 +184,7 @@ export class May {
       options.traceAttributes,
       options.checkpoint,
       options.runBudget,
+      options.shouldYield,
     );
   }
 
@@ -190,6 +195,7 @@ export class May {
     runTraceAttributes: TraceAttributes | undefined,
     checkpoint: RunCheckpoint | undefined,
     budgetOverride: RunBudget | undefined,
+    shouldYield: (() => boolean) | undefined,
   ): RunHandle {
     const budget = new RunBudgetMeter(resolveRunBudget(this.runBudget, budgetOverride));
     if (this.concurrentRuns === "reject" && this.activeRuns > 0) {
@@ -260,6 +266,7 @@ export class May {
       runSpan?.context,
       durableCheckpoint,
       budget,
+      shouldYield,
     ).then(
       (value) => {
         endTraceSpan(runSpan, {
@@ -312,6 +319,7 @@ export class May {
     runTraceContext: TraceContext | undefined,
     checkpoint: RunCheckpoint | undefined,
     budget: RunBudgetMeter,
+    shouldYield: (() => boolean) | undefined,
   ): Promise<RunResult> {
     let aggregateUsage: Usage | undefined;
     let modelCalls = 0;
@@ -452,6 +460,12 @@ export class May {
             aggregateUsage,
           );
           result.budget = budget.snapshot();
+          if (shouldYield?.() === true) {
+            result.finishReason = "yielded";
+            await checkpoint?.({ type: "run.yielded", runId, result });
+            emit({ type: "run.yielded", result });
+            return result;
+          }
           emit({ type: "run.completed", result });
           return result;
         }
@@ -518,6 +532,15 @@ export class May {
         if (fatal !== undefined) throw fatal;
 
         emit({ type: "step.completed", step });
+        if (shouldYield?.() === true) {
+          budget.checkTime();
+          const result = createRunResult(runId, step, modelCalls, toolCalls, message, aggregateUsage);
+          result.budget = budget.snapshot();
+          result.finishReason = "yielded";
+          await checkpoint?.({ type: "run.yielded", runId, result });
+          emit({ type: "run.yielded", result });
+          return result;
+        }
       }
 
       if (budget.limits.maxSteps !== undefined && budget.limits.maxSteps <= this.maxSteps) throw new RunBudgetExceededError("steps", budget.limits.maxSteps, this.maxSteps + 1);

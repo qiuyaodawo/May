@@ -5,6 +5,8 @@ export const MAYBE_CODE_USAGE = `MaybeCode
 Usage:
   maybecode [options] [workspace]
   maybecode mcp <login|logout|status> <server-id> [--config <path>]
+  maybecode team run <prompt> [--workspace <path>] [--config <path>] [--model <name>]
+  maybecode team <resume|status|cancel> <id> [--data-directory <path>]
 
 Options:
   --config <path>      Load another May config file
@@ -16,6 +18,8 @@ Options:
 
 MCP login prints a browser authorization URL and waits for a local callback.
 MCP commands also accept --workspace <path>; login accepts repeated --scope <scope>.
+Team mode is noninteractive and read-only, with isolated copies and durable shared limits.
+Team run accepts --max-model-calls <n>, --max-total-tokens <n>, and --max-concurrent <n>.
 `;
 
 export interface MaybeCodeHelpCommand {
@@ -43,10 +47,24 @@ export interface MaybeCodeMcpCommand {
   readonly scopes?: readonly string[];
 }
 
-export type MaybeCodeCommand = MaybeCodeHelpCommand | MaybeCodeStartCommand | MaybeCodeMcpCommand;
+export interface MaybeCodeTeamCommand {
+  readonly type: "team";
+  readonly action: "run" | "resume" | "status" | "cancel";
+  readonly value: string;
+  readonly workspace?: string;
+  readonly configPath?: string;
+  readonly model?: string;
+  readonly dataDirectory?: string;
+  readonly maxModelCalls?: number;
+  readonly maxTotalTokens?: number;
+  readonly maxConcurrent?: number;
+}
+
+export type MaybeCodeCommand = MaybeCodeHelpCommand | MaybeCodeStartCommand | MaybeCodeMcpCommand | MaybeCodeTeamCommand;
 
 export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   if (args[0] === "mcp") return parseMcpCommand(args.slice(1));
+  if (args[0] === "team") return parseTeamCommand(args.slice(1));
   let workspace: string | undefined;
   let configPath: string | undefined;
   let model: string | undefined;
@@ -129,6 +147,38 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
     ...(model === undefined ? {} : { model }),
     ...(sessionId === undefined ? {} : { sessionId }),
   };
+}
+
+function parseTeamCommand(args: readonly string[]): MaybeCodeTeamCommand | MaybeCodeHelpCommand {
+  if (args.includes("--help") || args.includes("-h")) return { type: "help" };
+  const [action, value] = args;
+  if (!["run", "resume", "status", "cancel"].includes(action ?? "") || !value?.trim() || value.startsWith("--")) {
+    throw new MaybeCodeUsageError("Use team run <prompt> or team <resume|status|cancel> <id>");
+  }
+  if (action !== "run" && !/^[A-Za-z0-9_-]{1,128}$/u.test(value)) throw new MaybeCodeUsageError("Invalid team id");
+  const strings: Record<string, string> = {};
+  const numbers: Record<string, number> = {};
+  for (let index = 2; index < args.length; index++) {
+    const option = args[index]!;
+    const key = ({ "--workspace": "workspace", "--config": "configPath", "--model": "model", "--data-directory": "dataDirectory" } as Record<string, string>)[option];
+    if (key && (action === "run" || key === "dataDirectory")) {
+      strings[key] = setOption(option, strings[key], readValue(args, ++index, option));
+      continue;
+    }
+    const numericKey = ({ "--max-model-calls": "maxModelCalls", "--max-total-tokens": "maxTotalTokens", "--max-concurrent": "maxConcurrent" } as Record<string, string>)[option];
+    if (numericKey && action === "run") {
+      if (numbers[numericKey] !== undefined) throw new MaybeCodeUsageError(`${option} may only be specified once`);
+      const raw = readValue(args, ++index, option);
+      const number = Number(raw);
+      if (!/^\d+$/u.test(raw) || !Number.isSafeInteger(number) || number < 1 || (numericKey === "maxConcurrent" && number > 8)) {
+        throw new MaybeCodeUsageError(`${option} requires a positive integer${numericKey === "maxConcurrent" ? " no greater than 8" : ""}`);
+      }
+      numbers[numericKey] = number;
+      continue;
+    }
+    throw new MaybeCodeUsageError(`Unsupported team option "${option}"`);
+  }
+  return { type: "team", action: action as MaybeCodeTeamCommand["action"], value, ...strings, ...numbers };
 }
 
 function parseMcpCommand(args: readonly string[]): MaybeCodeMcpCommand | MaybeCodeHelpCommand {

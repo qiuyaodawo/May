@@ -3,13 +3,13 @@ import type {
   ContextCompactionStrategy,
   ContextInspection,
 } from "@may/context";
-import type { RunOptions } from "@may/core";
 import type { ApprovalDecision } from "@may/permissions";
 import type {
   SessionEvent,
   SessionHistoryPage,
   SessionHistoryQuery,
   SessionRecovery,
+  SessionSubmitOptions,
 } from "@may/session";
 import type { SessionSummary } from "@may/session/catalog";
 
@@ -33,7 +33,7 @@ export interface AgentController<
   readonly sessionId: string;
   readonly isRunning: boolean;
 
-  submit(options: RunOptions): Promise<AgentRun>;
+  submit(options: SessionSubmitOptions): Promise<AgentRun>;
   retry(): Promise<AgentRun>;
   cancel(reason?: string): boolean;
   resolveApproval(

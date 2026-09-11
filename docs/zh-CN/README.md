@@ -1,9 +1,5 @@
 # May 文档
 
-- [崩溃恢复](guides/recovery.md)
-- [运行预算](guides/run-budgets.md)
-- [Agent Skills](guides/skills.md)
-
 [English](../en/README.md) | **简体中文**
 
 May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 package 组装成应用、
@@ -26,6 +22,16 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 - [Runtime 与 Session 架构](architecture/runtime-session.md)
 
 ## 扩展指南
+
+- [多 Agent 任务图](guides/coordination.md)
+- [共享预算、产物与任务工作区](guides/coordination-resources.md)
+- [Attempt 与任务图修订](guides/coordination-lifecycle.md)
+- [远程叶子 Worker](guides/coordination-remote.md)
+- [只读 MaybeCode 团队任务](guides/maybecode-team.md)
+
+- [崩溃恢复](guides/recovery.md)
+- [运行预算](guides/run-budgets.md)
+- [Agent Skills](guides/skills.md)
 
 - [自定义模型](guides/custom-model.md)
 - [自定义工具](guides/custom-tool.md)

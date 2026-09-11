@@ -12,6 +12,7 @@ packages/
   mcp/        Stdio / Streamable HTTP MCP clients and remote-tool adapters
   observability/  Optional fail-open tracing processors and exporters
   application/  Agent definitions plus single-session/workspace lifecycle
+  coordination/  Durable agent teams, attempts, resources and remote leaf workers
   context/    Context factories, compaction, and model-backed summarization
   session/    Serialized runs, durable history, and session catalogs
   permissions/  Headless tool policies and approval requests
@@ -51,6 +52,17 @@ uses the Agent transcript from `@may/tui`. It retains coding-product policy:
 the prompt and instruction sources, coding tools and permission defaults,
 model profiles and reasoning effort, compaction strategy order, commands,
 theme, layout, and terminal interaction flow.
+
+Multi-agent work uses one durable coordinator with optional independent remote
+leaf workers, not a high-availability/multi-writer scheduler. MaybeCode's
+`team run/resume/status/cancel` CLI is read-only: it combines isolated workspace
+copies, local shared usage reservations and immutable result artifacts without
+shell access or writes to the user's checkout. The local budget is not a distributed
+global budget service. See the [task graph guide](docs/en/guides/coordination.md),
+[resources](docs/en/guides/coordination-resources.md),
+[attempts and graph revisions](docs/en/guides/coordination-lifecycle.md),
+[remote workers](docs/en/guides/coordination-remote.md), and
+[MaybeCode teams](docs/en/guides/maybecode-team.md); each guide has a Chinese mirror.
 
 The packages are currently versioned `0.1.0`; their public APIs and the
 file-backed persistence formats should be treated as developer-preview APIs,

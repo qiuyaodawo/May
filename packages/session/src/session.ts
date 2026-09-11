@@ -60,6 +60,11 @@ export interface SessionRuntimeInfo {
   readonly latestModelMeasurement?: SessionModelMeasurement;
 }
 
+/** Optional host delivery identity. Duplicates are rejected, not submitted again. */
+export interface SessionSubmitOptions extends RunOptions {
+  readonly inputId?: string;
+}
+
 export class Session {
   readonly id: string;
   readonly metadata: Readonly<Record<string, unknown>> | undefined;
@@ -161,7 +166,7 @@ export class Session {
     return session;
   }
 
-  submit(options: RunOptions): Promise<RunHandle> {
+  submit(options: SessionSubmitOptions): Promise<RunHandle> {
     const started = this.tail.then(() => this.start(options));
     return this.queue(started);
   }
@@ -245,8 +250,12 @@ export class Session {
     await this.record({ type: "tool.presentation", ...presentation });
   }
 
-  private async start(options: RunOptions): Promise<RunHandle> {
+  private async start(options: SessionSubmitOptions): Promise<RunHandle> {
     this.assertRecovered();
+    if (options.inputId !== undefined) {
+      if (typeof options.inputId !== "string" || options.inputId.length === 0 || options.inputId.length > 256) throw new TypeError("inputId must be a non-empty string of at most 256 characters");
+      if ((await this.history()).some((event) => event.type === "input.submitted" && event.inputId === options.inputId)) throw new Error(`Input already submitted: ${options.inputId}`);
+    }
     const runtimeOptions: RunOptions = {
       ...options,
       checkpoint: (event) => this.checkpoint(event, options.checkpoint),
@@ -261,7 +270,7 @@ export class Session {
     if (options.signal?.aborted === true) {
       return this.wrapRun(this.runtime.run(runtimeOptions));
     }
-    await this.record({ type: "input.submitted", message: input });
+    await this.record({ type: "input.submitted", message: input, ...(options.inputId === undefined ? {} : { inputId: options.inputId }) });
 
     return this.wrapRun(this.runAfterInputCommit(runtimeOptions));
   }
@@ -547,7 +556,7 @@ function interruptedRuns(events: readonly SessionEvent[]): SessionEventPayload[]
       runs.get(event.runId)?.started.add(`${event.runId}:${event.step}:${event.call.id}`);
     } else if (event.type === "tool.completed" || event.type === "tool.failed") {
       runs.get(event.runId)?.pending.delete(`${event.runId}:${event.step}:${event.call.id}`);
-    } else if (event.type === "run.completed" || event.type === "run.cancelled" || event.type === "run.interrupted") {
+    } else if (event.type === "run.completed" || event.type === "run.yielded" || event.type === "run.cancelled" || event.type === "run.interrupted") {
       runs.delete(event.runId);
     } else if (event.type === "run.failed") {
       // A failure can leave unclosed calls (e.g. a failed persistence barrier).
@@ -802,6 +811,8 @@ function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
         runId: event.runId,
         result: event.result,
       };
+    case "run.yielded":
+      return { type: "run.yielded", runId: event.runId, result: event.result };
     case "run.failed":
       return {
         type: "run.failed",

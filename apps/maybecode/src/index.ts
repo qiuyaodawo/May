@@ -30,3 +30,4 @@ export {
 } from "@may/tui/tool-renderers";
 export * from "./workspace.js";
 export * from "./mcp-auth.js";
+export * from "./team.js";

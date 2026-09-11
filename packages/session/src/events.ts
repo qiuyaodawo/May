@@ -79,7 +79,7 @@ export type SessionEventPayload =
   | { type: "state.updated"; key: string; value: unknown }
   | { type: "run.budget.exceeded"; runId: string; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
   | { type: "session.created"; metadata?: Record<string, unknown> }
-  | { type: "input.submitted"; message: UserMessage }
+  | { type: "input.submitted"; message: UserMessage; inputId?: string }
   | { type: "run.started"; runId: string; continuation?: boolean; checkpointVersion?: 1 }
   | { type: "tool.started"; runId: string; step: number; call: ToolCall }
   | { type: "run.interrupted"; runId: string; recoveries: readonly SessionRecovery[] }
@@ -124,6 +124,7 @@ export type SessionEventPayload =
     }
   | { type: "approval.cancelled"; requestId: string; reason?: string }
   | { type: "run.completed"; runId: string; result: RunResult }
+  | { type: "run.yielded"; runId: string; result: RunResult }
   | { type: "run.failed"; runId: string; error: SerializedError }
   | { type: "run.cancelled"; runId: string; reason?: string };
 

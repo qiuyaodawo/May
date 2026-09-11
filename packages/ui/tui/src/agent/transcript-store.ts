@@ -254,6 +254,7 @@ export class TranscriptStore {
       case "step.started":
       case "step.completed":
       case "run.completed":
+      case "run.yielded":
         break;
     }
   }
@@ -397,6 +398,7 @@ export class TranscriptStore {
       case "session.created":
       case "run.started":
       case "run.completed":
+      case "run.yielded":
         break;
     }
   }

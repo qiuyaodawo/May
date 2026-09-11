@@ -6,6 +6,14 @@ May has several event layers because model streaming, live application state,
 and durable Session replay have different requirements. They are related but
 are not interchangeable.
 
+An opt-in host `shouldYield` control ends a complete model/tool step with
+`run.yielded`, rather than `run.completed` or `run.cancelled`. Its result carries
+`finishReason: "yielded"`; all tool-call results are settled before the durable
+yield checkpoint is acknowledged. Consumers should treat it as the end of a Run,
+not the completion of a task. Session stores this event once and does not repair
+it as an interrupted Run on resume. Optional `input.submitted.inputId` identifies
+a host delivery; it is not added to model-visible message content.
+
 See [Session, run, and step](./session-run-step.md) for lifecycle boundaries,
 [Context and durable history](./context-and-history.md) for replay, and
 [Runtime and session boundaries](../architecture/runtime-session.md) for the

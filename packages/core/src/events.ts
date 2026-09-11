@@ -8,6 +8,8 @@ export interface SerializedError {
 }
 
 export interface RunResult {
+  /** Present only when the host ended this Run at a safe boundary, not task completion. */
+  finishReason?: "yielded";
   runId: string;
   steps: number;
   modelCalls: number;
@@ -69,6 +71,7 @@ export type MayEventPayload =
       error: SerializedError;
     }
   | { type: "run.completed"; result: RunResult }
+  | { type: "run.yielded"; result: RunResult }
   | { type: "run.failed"; error: SerializedError }
   | { type: "run.cancelled"; reason?: string };
 

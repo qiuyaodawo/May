@@ -240,3 +240,14 @@ lifecycle.
 an Agent-definition discovery/persistence registry, multiple simultaneously
 active Sessions in one workspace object, multi-Agent delegation, distributed
 locking, or transactional coordination between history and Catalog storage.
+
+For fixed pipelines, DAGs and parallel execution across independent applications,
+use the separate [coordination layer](../guides/coordination.md). This does not
+make a workspace multi-active or add model-driven delegation to Application.
+
+Coordination also supports opt-in subagent delegation above Application.
+`submit({ input, inputId })` rejects duplicate durable input identities;
+`shouldYield` is an optional host callback checked after a complete step. A yielded
+Run resolves with `finishReason: "yielded"`, not task completion or cancellation.
+The caller owns waiting and subsequent submissions; `retry()` does not retry a
+yielded Run. Normal submissions without these options keep their existing behavior.

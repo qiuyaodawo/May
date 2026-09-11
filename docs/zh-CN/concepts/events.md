@@ -5,6 +5,12 @@
 May 具有多个事件层，因为模型 streaming、实时 application 状态和持久化 Session
 回放的要求不同。它们相关，但不能互换。
 
+宿主显式提供 `shouldYield` 时，完整模型/工具步骤可通过 `run.yielded` 结束，
+而非 `run.completed` 或 `run.cancelled`。结果携带 `finishReason: "yielded"`，
+全部工具结果确定后才确认持久化 yield checkpoint。消费者应将其视为 Run 结束，
+而非任务完成。Session 仅保存该事件一次，恢复时不会将其当作中断的 Run 修复。
+可选的 `input.submitted.inputId` 标识宿主投递，不会加入模型可见的消息内容。
+
 生命周期边界见 [Session、Run 与 Step](session-run-step.md)，回放见
 [Context 与持久化历史](context-and-history.md)，整体 package 设计见
 [Runtime 与 Session 边界](../architecture/runtime-session.md)。

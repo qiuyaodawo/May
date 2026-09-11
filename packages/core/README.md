@@ -5,6 +5,15 @@ The model- and tool-agnostic runtime at the heart of May agents.
 It accepts a `Model`, an iterable of `Tool`s, and a `Context`, executes an agent
 loop, and exposes the run as an async event stream.
 
+`run()` and `continue()` accept an optional synchronous host `shouldYield`
+callback. It is checked only after a complete model/tool step: all started tools
+settle and all tool results enter Context before yielding. Yield checkpoints
+`run.yielded` before emitting that terminal event and resolves the Run with
+`finishReason: "yielded"`. It is not task completion or cancellation. Core does
+not schedule wakeups or replay the step; the caller owns subsequent Runs. With no
+callback, normal execution is unchanged. See the [coordination guide](../../docs/en/guides/coordination.md)
+for slot-releasing subagent waits above Core.
+
 ```ts
 import { InMemoryContext, May } from "@may/core";
 

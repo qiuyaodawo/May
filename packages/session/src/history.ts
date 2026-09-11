@@ -133,6 +133,7 @@ export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "approval.resolved",
   "approval.cancelled",
   "run.completed",
+  "run.yielded",
   "run.failed",
   "run.cancelled",
 ] as const;

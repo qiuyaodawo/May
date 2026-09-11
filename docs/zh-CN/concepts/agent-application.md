@@ -197,3 +197,12 @@ Close 是幂等的，但调用方仍应 `await`。正确顺序防止终结事件
 进程级 Agent-definition registry、definition 序列化或迁移、在同一 workspace 对象中
 同时活动的多个 Session、多 Agent 委派、分布式锁，也没有 history 与 Catalog 存储
 之间的事务协调。
+
+需要在独立 application 之间运行固定流水线、DAG 和并行任务时，使用单独的
+[协作层](../guides/coordination.md)。这不会让 workspace 同时拥有多个活动会话，
+也不会向 Application 自动加入模型驱动的委派。
+
+协作层还支持显式启用的 Subagent 委派。`submit({ input, inputId })` 会拒绝重复的
+持久化输入身份；`shouldYield` 是在完整步骤后检查的可选宿主回调。Yielded Run
+返回 `finishReason: "yielded"`，不等于任务完成或取消。等待与后续提交由调用方
+负责，`retry()` 不重试 yielded Run。不使用这些选项的普通提交保持原有行为。

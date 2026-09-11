@@ -11,6 +11,23 @@ they must still plan for.
 
 ## Public API boundary
 
+The new `@may/coordination` API and version-1 snapshot journal are also preview
+contracts. They cover graphs, bounded delegation, peer mailboxes, handoffs,
+explicit attempts, and edits of never-submitted future nodes. Optional resource
+journals and the remote worker protocol are also preview formats. Execution may
+use remote leaf workers, but a single durable coordinator owns scheduling: this
+is not arbitrary workflow replay, high availability, or multi-writer ownership.
+Local shared budget reservations/accounting are not a distributed global budget
+service. MaybeCode's team CLI is a read-only composition, not a multi-agent TUI or
+permission to edit source files.
+
+See [Coordination](../guides/coordination.md),
+[Resources](../guides/coordination-resources.md),
+[Attempts and graph revisions](../guides/coordination-lifecycle.md),
+[Remote workers](../guides/coordination-remote.md) and
+[MaybeCode teams](../guides/maybecode-team.md) for ownership, version checks and
+recovery boundaries. Changed persisted policies/limits are not silently migrated.
+
 Only entry points declared in a package's `exports` map are public. Importing a
 file from `src/`, `dist/` or another undeclared deep path is unsupported even
 when that file happens to exist locally.

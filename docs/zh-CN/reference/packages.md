@@ -16,6 +16,7 @@ May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行�
 | 定义可复用的 Agent 行为与策略 | `@may/application` 的 `defineAgent()` | `@may/core` 的 `ToolRegistry` |
 | 构建 headless、可持久化的单 Session Agent | `AgentDefinition.open()` 或 `AgentApplication.open()` | `@may/session`、`@may/context`、权限和工具 |
 | 在一个 workspace 中管理多个 Session | `@may/application` | `@may/session/catalog` 的 `SessionCatalog` |
+| 协调 Agent 团队、资源与远程 Worker | `@may/coordination` | Agent definition、持久化协作与 Session store、显式宿主策略 |
 | 构建终端 Agent | Headless application controller | `@may/tui`，可选 `@may/keybindings` |
 | 构建编码 Agent | Headless application controller | `@may/coding-tools` 和执行隔离策略 |
 | 从 May 配置中选择模型 | `@may/config` | `@may/providers` |
@@ -72,6 +73,33 @@ application/Session 生命周期。Model、Context factory、executor、schedule
 由产品注入。参阅
 [Agent 与 Application](../concepts/agent-application.md)和
 [package README](../../../packages/application/README.md)。
+
+### `@may/coordination`
+
+位于 Application 之上的单 coordinator 持久化任务图。`CoordinationRuntime` 执行宿主定义
+的 DAG；`pipeline()` 和 `parallelTasks()` 都生成相同的任务图结构。
+`createApplicationAgent()` 为每个任务执行方提供独立 Session，支持审批路由、单 Run
+预算和基于证据的恢复。协作存储可用内存，也可通过 `@may/coordination/file-store`
+使用本地单写入者 JSONL。显式启用的 `delegate_tasks` 支持嵌套子任务、安全 yield
+和带身份的唤醒轮次，委派策略默认拒绝，并限制深度和轮次。可选平级邮箱提供
+`send_message` / `wait_for_messages`、默认拒绝的消息授权、有界持久化消息及每轮邮箱。
+可选 `handoff_task` 在安全 yield 后，将逻辑任务移交给新 Agent Session，提供
+默认拒绝的移交策略、显式上下文摘要及有界持久化执行方历史。宿主专用的
+`retryTask()` 创建新 Attempt；`rewriteGraph()` 原子改写尚未提交的后续节点。
+未知副作用必须先核实恢复，不自动重试。
+
+`FileSharedBudget`、`FileArtifactStore` 和 `TaskWorkspaceManager` 分别提供本地
+共享用量预留、不可变且限定作用域的文本产物以及隔离文件副本。它们不是分布式
+全局预算服务或 OS 沙箱，也不会向用户 checkout 合并修改。`@may/coordination/remote`
+提供带独立持久化凭据及授权的远程叶子 Worker；一个 coordinator 保持调度所有权，
+没有 HA/多写入者切换。MaybeCode 团队 CLI 将这些本地能力组装为只读调查入口，
+不暴露 shell 或源文件编辑。
+
+参阅[多 Agent 任务图](../guides/coordination.md)、
+[共享资源](../guides/coordination-resources.md)、
+[Attempt 与任务图修订](../guides/coordination-lifecycle.md)、
+[远程叶子 Worker](../guides/coordination-remote.md)及
+[MaybeCode 团队任务](../guides/maybecode-team.md)。
 
 ### `@may/observability`
 

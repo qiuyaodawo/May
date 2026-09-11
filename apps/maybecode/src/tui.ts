@@ -614,6 +614,7 @@ class TerminalRenderer {
         );
         break;
       case "run.completed":
+      case "run.yielded":
         this.clearRunPreviews(event.runId);
         break;
       case "run.failed":

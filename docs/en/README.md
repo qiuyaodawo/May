@@ -25,6 +25,12 @@ interfaces are intended for extension.
 
 ## Extension guides
 
+- [Multi-agent task graphs](guides/coordination.md)
+- [Shared budgets, artifacts and task workspaces](guides/coordination-resources.md)
+- [Attempts and graph revisions](guides/coordination-lifecycle.md)
+- [Remote leaf workers](guides/coordination-remote.md)
+- [Read-only MaybeCode teams](guides/maybecode-team.md)
+
 - [Crash recovery](guides/recovery.md)
 - [Run budgets](guides/run-budgets.md)
 - [Agent Skills](guides/skills.md)

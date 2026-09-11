@@ -27,6 +27,17 @@ order, concrete commands, product event compatibility, terminal layout, theme,
 and picker workflows. This separation makes the extracted components reusable;
 it does not make MaybeCode or the `0.1.0` APIs production-stable.
 
+## Noninteractive multi-agent teams
+
+`maybecode team run "Inspect this module" --workspace <path>` runs two
+independent read-only workers and a supervisor with isolated workspace copies,
+shared model-call/token limits, durable task state, and immutable output
+artifacts. It reuses configured model profiles but never enables Shell, MCP, or
+source writes. `team status <id>`, `team resume <id>`, and `team cancel <id>`
+provide terminal lifecycle controls. See the [English guide](../../docs/en/guides/maybecode-team.md)
+or [简体中文指南](../../docs/zh-CN/guides/maybecode-team.md) for bounds, storage,
+cancellation and recovery semantics.
+
 ## Custom UIs
 
 `MaybeCodeController` is the headless UI boundary. A custom terminal, desktop,
