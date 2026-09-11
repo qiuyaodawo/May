@@ -106,7 +106,12 @@ They are not a distributed global budget service or an OS sandbox and do not mer
 changes into the source checkout. `@may/coordination/remote` provides independent
 remote leaf workers with their own durable receipts and authority; one coordinator
 retains scheduling ownership, with no HA/multi-writer failover. MaybeCode's team CLI
-composes the local capabilities for read-only investigation, not shell/source edits.
+uses local agents and defaults to read-only, with configurable plans, structured
+verification and host-confirmed recovery. Explicit coding mode permits edits in
+private copies; source application is a separate reviewed, host-only patch action,
+never an automatic merge. Configured test processes require separate authorization
+and are not OS-sandboxed. The CLI adds no arbitrary Shell/MCP tools, remote workers,
+or multi-agent TUI.
 
 See [Multi-agent task graphs](../guides/coordination.md),
 [Shared resources](../guides/coordination-resources.md),

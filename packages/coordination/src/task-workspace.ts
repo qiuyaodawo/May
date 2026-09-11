@@ -25,6 +25,26 @@ export interface WorkspaceChange {
   readonly afterSha256?: string;
 }
 
+export interface WorkspacePatchChange extends WorkspaceChange {
+  readonly taskId: string;
+  readonly beforeText?: string;
+  readonly afterText?: string;
+}
+
+export interface WorkspacePatchSnapshot {
+  readonly sourceDirectory: string;
+  readonly baselineDigest: string;
+  /** Digest of every included file, not just changed paths. */
+  readonly taskSnapshots: readonly { readonly taskId: string; readonly digest: string }[];
+  readonly changes: readonly WorkspacePatchChange[];
+}
+
+export interface WorkspacePatchLimits {
+  readonly maxChangedFiles?: number;
+  readonly maxFileBytes?: number;
+  readonly maxTotalBytes?: number;
+}
+
 interface Entry { readonly path: string; readonly bytes: number; readonly sha256: string }
 interface WorkspaceState {
   readonly format: 1;
@@ -109,6 +129,55 @@ export class TaskWorkspaceManager {
     return changes;
   }
 
+  /** Bounded UTF-8 review snapshot. No source writes; reject concurrent or unsafe task edits. */
+  async snapshotPatch(taskIds: readonly string[], limits: WorkspacePatchLimits = {}): Promise<WorkspacePatchSnapshot> {
+    const maxChangedFiles = limits.maxChangedFiles ?? 128;
+    const maxFileBytes = limits.maxFileBytes ?? 262_144;
+    const maxTotalBytes = limits.maxTotalBytes ?? 2_097_152;
+    count(maxChangedFiles, "patch maxChangedFiles"); count(maxFileBytes, "patch maxFileBytes"); count(maxTotalBytes, "patch maxTotalBytes");
+    if (!Array.isArray(taskIds) || taskIds.length === 0 || new Set(taskIds).size !== taskIds.length) throw new Error("Select unique task ids for the patch");
+    const state = await this.journal.snapshot();
+    const baseline = join(this.directory, "baseline");
+    await assertPrivateRoot(this.directory, baseline);
+    if (!isDeepStrictEqual(await scan(baseline, state.config, true), state.baseline)) throw new Error("Workspace baseline was modified");
+    const baselineDigest = hash(Buffer.from(JSON.stringify(state.baseline)));
+    const changes: WorkspacePatchChange[] = [];
+    const taskSnapshots: { taskId: string; digest: string }[] = [];
+    let totalBytes = 0;
+    const text = async (root: string, entry: Entry): Promise<string> => {
+      if (entry.bytes > maxFileBytes || totalBytes + entry.bytes > maxTotalBytes) throw new Error("Patch text exceeds its byte limit");
+      const content = await boundedFile(root, join(root, entry.path), entry.bytes);
+      if (hash(content) !== entry.sha256) throw new Error("Workspace changed while producing its patch");
+      totalBytes += content.length;
+      const value = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(content);
+      if (value.includes("\u0000")) throw new Error("Binary files cannot be included in a text patch");
+      return value;
+    };
+    for (const taskId of [...taskIds].sort()) {
+      resourceId(taskId, "workspace task id");
+      if (!state.tasks.includes(taskId)) throw new Error("Task workspace is not prepared");
+      const workspace = join(this.directory, "tasks", hash(Buffer.from(taskId)), "workspace");
+      await assertPrivateRoot(this.directory, workspace);
+      const entries = await scan(workspace, state.config, true);
+      const current = new Map(entries.map((entry) => [entry.path, entry]));
+      for (const before of state.baseline) {
+        const after = current.get(before.path); current.delete(before.path);
+        if (after?.sha256 === before.sha256) continue;
+        if (changes.length >= maxChangedFiles) throw new Error("Patch exceeds its changed-file limit");
+        changes.push({ taskId, path: before.path, kind: after ? "modified" : "deleted", beforeSha256: before.sha256,
+          beforeText: await text(baseline, before), ...(after ? { afterSha256: after.sha256, afterText: await text(workspace, after) } : {}) });
+      }
+      for (const after of current.values()) {
+        if (changes.length >= maxChangedFiles) throw new Error("Patch exceeds its changed-file limit");
+        changes.push({ taskId, path: after.path, kind: "added", afterSha256: after.sha256, afterText: await text(workspace, after) });
+      }
+      if (!isDeepStrictEqual(await scan(workspace, state.config, true), entries)) throw new Error("Task workspace changed during patch capture");
+      taskSnapshots.push({ taskId, digest: hash(Buffer.from(JSON.stringify(entries))) });
+    }
+    if (!isDeepStrictEqual(await scan(baseline, state.config, true), state.baseline)) throw new Error("Workspace baseline changed during patch capture");
+    return { sourceDirectory: state.source, baselineDigest, taskSnapshots, changes };
+  }
+
   close(): Promise<void> { return this.journal.close(); }
 }
 
@@ -118,7 +187,7 @@ function omitted(name: string, extra: readonly string[]): boolean {
     /\.(pem|key|p12|pfx|jks|keystore)$/u.test(lower) || /^(credentials?|secrets?|tokens?|auth)([._-].*)?$/u.test(lower);
 }
 
-async function scan(root: string, config: WorkspaceState["config"]): Promise<Entry[]> {
+async function scan(root: string, config: WorkspaceState["config"], rejectUnsafe = false): Promise<Entry[]> {
   const canonical = await realpath(root);
   if ((await lstat(root)).isSymbolicLink()) throw new Error("Workspace root must not be a symbolic link");
   const entries: Entry[] = [];
@@ -133,9 +202,10 @@ async function scan(root: string, config: WorkspaceState["config"]): Promise<Ent
       const path = join(directory, entry.name);
       const stat = await lstat(path);
       // Links, sockets and devices are never copied or followed.
-      if (stat.isSymbolicLink()) continue;
+      if (stat.isSymbolicLink()) { if (rejectUnsafe) throw new Error("Patch workspace contains a symbolic link"); continue; }
       if (stat.isDirectory()) { await visit(path, depth + 1); continue; }
-      if (!stat.isFile()) continue;
+      if (!stat.isFile()) { if (rejectUnsafe) throw new Error("Patch workspace contains a special file"); continue; }
+      if (rejectUnsafe && stat.nlink > 1) throw new Error("Patch workspace contains a hard-linked file");
       if (entries.length + 1 > config.maxFiles || bytes + stat.size > config.maxBytes) throw new Error("Workspace snapshot quota exceeded");
       const content = await boundedFile(canonical, path, stat.size);
       bytes += content.length;
@@ -185,6 +255,16 @@ function inside(root: string, path: string): boolean {
 }
 
 function hash(bytes: Uint8Array): string { return createHash("sha256").update(bytes).digest("hex"); }
+
+async function assertPrivateRoot(root: string, path: string): Promise<void> {
+  if (!inside(root, path) || !inside(root, await realpath(path))) throw new Error("Patch workspace escaped its private state directory");
+  let cursor = root;
+  for (const part of ["", ...relative(root, path).split(sep).filter(Boolean)]) {
+    cursor = join(cursor, part);
+    const info = await lstat(cursor);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Patch workspace has an unsafe parent directory");
+  }
+}
 
 async function canonicalPotentialPath(path: string): Promise<string> {
   try { return await realpath(path); }

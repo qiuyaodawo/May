@@ -18,8 +18,13 @@ journals and the remote worker protocol are also preview formats. Execution may
 use remote leaf workers, but a single durable coordinator owns scheduling: this
 is not arbitrary workflow replay, high availability, or multi-writer ownership.
 Local shared budget reservations/accounting are not a distributed global budget
-service. MaybeCode's team CLI is a read-only composition, not a multi-agent TUI or
-permission to edit source files.
+service. MaybeCode's team CLI uses local agents and defaults to read-only. New v2
+teams add persisted plans, scoped checks/reports and confirmed recovery controls;
+explicit coding mode permits private-copy edits, while source application requires
+a separately reviewed patch and exact host confirmation. There is no automatic
+merge, remote-worker CLI integration or multi-agent TUI. Authorized check processes
+are not OS-sandboxed. Existing v1 teams retain their original read-only
+resume/status/cancel behavior without a silent permission upgrade.
 
 See [Coordination](../guides/coordination.md),
 [Resources](../guides/coordination-resources.md),

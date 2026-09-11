@@ -10,8 +10,10 @@ the single-active-operation rule of `AgentApplication`.
 
 One durable owner schedules the graph. Optional remote leaf workers execute
 independent tasks, but do not become peer schedulers or provide coordinator HA.
-Host-authorized attempts and graph revisions, local shared resource stores and a
-read-only MaybeCode team CLI build on the same runtime; see the guides below.
+Host-authorized attempts and graph revisions, local shared resource stores and
+MaybeCode's default-read-only team CLI build on the same runtime. The CLI adds
+configured plans/checks, confirmed recovery and explicitly enabled private-copy
+coding with separately reviewed source application; see the guides below.
 
 ## Create and run a graph
 
@@ -488,8 +490,11 @@ leaving orphan work running.
 - [Remote leaf workers](coordination-remote.md): independent worker processes or
   hosts with durable dispatch receipts, authentication and worker-side authority.
   One coordinator remains the sole scheduler; there is no HA/multi-writer ownership.
-- [MaybeCode teams](maybecode-team.md): read-only terminal commands for real team
-  tasks. Shell, source edits and MCP are not exposed; no multi-agent TUI is provided.
+- [MaybeCode teams](maybecode-team.md): local agents with configurable plans,
+  reports/checks and host-confirmed recovery. Read-only by default; explicit coding
+  mode allows private-copy edits, with separate host review/confirmation to apply
+  patches. No automatic merge, arbitrary Shell/MCP tools, remote-worker CLI or
+  multi-agent TUI. Separately authorized check processes are not OS-sandboxed.
 
 New patterns should reuse these composition boundaries rather than make a single
 Agent loop concurrently mutate multiple Contexts.

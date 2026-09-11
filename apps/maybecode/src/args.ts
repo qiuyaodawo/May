@@ -7,6 +7,11 @@ Usage:
   maybecode mcp <login|logout|status> <server-id> [--config <path>]
   maybecode team run <prompt> [--workspace <path>] [--config <path>] [--model <name>]
   maybecode team <resume|status|cancel> <id> [--data-directory <path>]
+  maybecode team verify <id> [--data-directory <path>]
+  maybecode team retry <id> --task <task-id> --finding <text> [--confirm <digest>]
+  maybecode team reconcile <id> --resolution <json-file> [--confirm <digest>]
+  maybecode team diff <id> --tasks <task-a,task-b>
+  maybecode team apply <id> --patch <patch-id> --confirm <digest>
 
 Options:
   --config <path>      Load another May config file
@@ -18,8 +23,12 @@ Options:
 
 MCP login prints a browser authorization URL and waits for a local callback.
 MCP commands also accept --workspace <path>; login accepts repeated --scope <scope>.
-Team mode is noninteractive and read-only, with isolated copies and durable shared limits.
+Team mode defaults to read-only; --mode coding permits edits in isolated copies only.
 Team run accepts --max-model-calls <n>, --max-total-tokens <n>, and --max-concurrent <n>.
+Use --preset <supervisor|pipeline|parallel> or --plan <json-file> for team orchestration.
+--allow-checks explicitly authorizes exact configured test processes (not an OS sandbox).
+Retry/reconcile preview a digest first; confirmation records changes without starting agents.
+All team control commands accept --data-directory <path>. Apply is host-only and explicit.
 `;
 
 export interface MaybeCodeHelpCommand {
@@ -49,7 +58,7 @@ export interface MaybeCodeMcpCommand {
 
 export interface MaybeCodeTeamCommand {
   readonly type: "team";
-  readonly action: "run" | "resume" | "status" | "cancel";
+  readonly action: "run" | "resume" | "status" | "cancel" | "verify" | "retry" | "reconcile" | "diff" | "apply";
   readonly value: string;
   readonly workspace?: string;
   readonly configPath?: string;
@@ -58,6 +67,16 @@ export interface MaybeCodeTeamCommand {
   readonly maxModelCalls?: number;
   readonly maxTotalTokens?: number;
   readonly maxConcurrent?: number;
+  readonly preset?: "supervisor" | "pipeline" | "parallel";
+  readonly planPath?: string;
+  readonly mode?: "read-only" | "coding";
+  readonly allowChecks?: boolean;
+  readonly task?: string;
+  readonly tasks?: string;
+  readonly finding?: string;
+  readonly resolutionPath?: string;
+  readonly patch?: string;
+  readonly confirm?: string;
 }
 
 export type MaybeCodeCommand = MaybeCodeHelpCommand | MaybeCodeStartCommand | MaybeCodeMcpCommand | MaybeCodeTeamCommand;
@@ -152,16 +171,28 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
 function parseTeamCommand(args: readonly string[]): MaybeCodeTeamCommand | MaybeCodeHelpCommand {
   if (args.includes("--help") || args.includes("-h")) return { type: "help" };
   const [action, value] = args;
-  if (!["run", "resume", "status", "cancel"].includes(action ?? "") || !value?.trim() || value.startsWith("--")) {
-    throw new MaybeCodeUsageError("Use team run <prompt> or team <resume|status|cancel> <id>");
+  if (!["run", "resume", "status", "cancel", "verify", "retry", "reconcile", "diff", "apply"].includes(action ?? "") || !value?.trim() || value.startsWith("--")) {
+    throw new MaybeCodeUsageError("Use team run <prompt> or a team control command with <id>; see --help");
   }
   if (action !== "run" && !/^[A-Za-z0-9_-]{1,128}$/u.test(value)) throw new MaybeCodeUsageError("Invalid team id");
   const strings: Record<string, string> = {};
   const numbers: Record<string, number> = {};
+  let allowChecks: boolean | undefined;
   for (let index = 2; index < args.length; index++) {
     const option = args[index]!;
-    const key = ({ "--workspace": "workspace", "--config": "configPath", "--model": "model", "--data-directory": "dataDirectory" } as Record<string, string>)[option];
-    if (key && (action === "run" || key === "dataDirectory")) {
+    if (option === "--allow-checks" && action === "run") {
+      if (allowChecks) throw new MaybeCodeUsageError("--allow-checks may only be specified once");
+      allowChecks = true; continue;
+    }
+    const options: Record<string, readonly [string, readonly string[]]> = {
+      "--workspace": ["workspace", ["run"]], "--config": ["configPath", ["run"]], "--model": ["model", ["run"]],
+      "--data-directory": ["dataDirectory", [action!]], "--preset": ["preset", ["run"]], "--plan": ["planPath", ["run"]],
+      "--mode": ["mode", ["run"]], "--task": ["task", ["retry"]], "--tasks": ["tasks", ["diff"]],
+      "--finding": ["finding", ["retry"]], "--resolution": ["resolutionPath", ["reconcile"]],
+      "--patch": ["patch", ["apply"]], "--confirm": ["confirm", ["retry", "reconcile", "apply"]],
+    };
+    const [key, actions] = options[option] ?? [];
+    if (key && actions?.includes(action!)) {
       strings[key] = setOption(option, strings[key], readValue(args, ++index, option));
       continue;
     }
@@ -178,7 +209,16 @@ function parseTeamCommand(args: readonly string[]): MaybeCodeTeamCommand | Maybe
     }
     throw new MaybeCodeUsageError(`Unsupported team option "${option}"`);
   }
-  return { type: "team", action: action as MaybeCodeTeamCommand["action"], value, ...strings, ...numbers };
+  if (strings.preset && !["supervisor", "pipeline", "parallel"].includes(strings.preset)) throw new MaybeCodeUsageError("Unknown team preset");
+  if (strings.mode && !["read-only", "coding"].includes(strings.mode)) throw new MaybeCodeUsageError("--mode requires read-only or coding");
+  if (strings.preset && strings.planPath) throw new MaybeCodeUsageError("--preset and --plan cannot be combined");
+  if (action === "retry" && (!strings.task || !strings.finding)) throw new MaybeCodeUsageError("retry requires --task and --finding");
+  if (action === "reconcile" && !strings.resolutionPath) throw new MaybeCodeUsageError("reconcile requires --resolution");
+  if (action === "diff" && !strings.tasks) throw new MaybeCodeUsageError("diff requires --tasks");
+  if (action === "apply" && (!strings.patch || !strings.confirm)) throw new MaybeCodeUsageError("apply requires --patch and --confirm");
+  if (strings.confirm && !/^[a-f0-9]{64}$/u.test(strings.confirm)) throw new MaybeCodeUsageError("--confirm requires the exact SHA256 review digest");
+  return { type: "team", action: action as MaybeCodeTeamCommand["action"], value, ...strings, ...numbers,
+    ...(allowChecks ? { allowChecks } : {}) } as MaybeCodeTeamCommand;
 }
 
 function parseMcpCommand(args: readonly string[]): MaybeCodeMcpCommand | MaybeCodeHelpCommand {

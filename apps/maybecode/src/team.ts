@@ -42,8 +42,18 @@ export interface RunMaybeCodeTeamDependencies {
   readonly createModel?: (selection: SelectedMaybeCodeModel) => Model;
 }
 
-/** Noninteractive product composition. It never exposes shell, edits, MCP, or source writes. */
 export async function runMaybeCodeTeamCommand(command: MaybeCodeTeamCommand, dependencies: RunMaybeCodeTeamDependencies): Promise<number> {
+  if (command.action === "run") return (await import("./team-v2.js")).runTeamV2Command(command, dependencies);
+  if (!/^[A-Za-z0-9_-]{1,128}$/u.test(command.value)) throw new MaybeCodeUsageError("Invalid team id");
+  const path = join(resolve(command.dataDirectory ?? getDefaultMaybeCodeDataDirectory()), "teams", command.value, "manifest.json");
+  const manifest = JSON.parse(await readFile(path, "utf8")) as { version?: string };
+  if (manifest.version === "maybecode-team-v2") return (await import("./team-v2.js")).runTeamV2Command(command, dependencies);
+  if (!["resume", "status", "cancel"].includes(command.action)) throw new MaybeCodeUsageError("Legacy v1 teams retain read-only resume/status/cancel. New controls require a new v2 team; authority is never silently upgraded.");
+  return runLegacyMaybeCodeTeamCommand(command, dependencies);
+}
+
+/** Preserve legacy permissions and durable identities; new features use a versioned manifest. */
+async function runLegacyMaybeCodeTeamCommand(command: MaybeCodeTeamCommand, dependencies: RunMaybeCodeTeamDependencies): Promise<number> {
   const data = resolve(command.dataDirectory ?? getDefaultMaybeCodeDataDirectory(), "teams");
   const id = command.action === "run" ? randomUUID() : command.value;
   if (!/^[A-Za-z0-9_-]{1,128}$/u.test(id)) throw new MaybeCodeUsageError("Invalid team id");
@@ -217,7 +227,7 @@ function roleInstructions(role: "worker" | "supervisor"): string {
     : "Work independently and return a factual report with findings and limitations. Do not wait for unsolicited peer messages. The supervisor will receive your final answer automatically."}`;
 }
 
-function createListTool(workspace: string): Tool<{ path: string }, unknown> {
+export function createListTool(workspace: string): Tool<{ path: string }, unknown> {
   return {
     name: "list_files", description: "List up to 200 immediate non-symlink entries inside the isolated workspace.",
     inputSchema: { type: "object", properties: { path: { type: "string", description: "Relative directory path; use . for root" } }, required: ["path"], additionalProperties: false },

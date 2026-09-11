@@ -29,14 +29,41 @@ it does not make MaybeCode or the `0.1.0` APIs production-stable.
 
 ## Noninteractive multi-agent teams
 
-`maybecode team run "Inspect this module" --workspace <path>` runs two
-independent read-only workers and a supervisor with isolated workspace copies,
-shared model-call/token limits, durable task state, and immutable output
-artifacts. It reuses configured model profiles but never enables Shell, MCP, or
-source writes. `team status <id>`, `team resume <id>`, and `team cancel <id>`
-provide terminal lifecycle controls. See the [English guide](../../docs/en/guides/maybecode-team.md)
-or [简体中文指南](../../docs/zh-CN/guides/maybecode-team.md) for bounds, storage,
-cancellation and recovery semantics.
+`maybecode team run "Inspect this module" --workspace <path>` defaults to two
+independent read-only workers and a supervisor. Teams have isolated workspace
+copies, shared model-call/token limits, durable task state, and immutable output
+artifacts. `--preset supervisor|pipeline|parallel` or `--plan <json>` selects
+roles, configured models, tool grants, and dependencies using the same runtime.
+
+New teams distinguish execution completion from acceptance. Structured reports
+retain file/line evidence; exact configured checks produce `passed`, `failed`,
+or `unverified` acceptance. No checks means completed execution may exit `0`
+while acceptance remains unverified. With configured checks, successful exit
+also requires passing acceptance. `team verify <id>` explicitly runs checks;
+status and recovery never replay them.
+
+`--mode coding` allows explicitly listed editing tools in private task copies.
+`--allow-checks` separately authorizes exact configured test processes, not a
+general model-controlled Shell. These processes are **not OS-sandboxed**, even
+for a read-only team. MCP and model-controlled source application stay disabled.
+`team diff <id> --tasks <task-ids>` exports a reviewable patch; only
+`team apply <id> --patch <patch-id> --confirm <digest>` can apply it after human
+review. Another task's passing checks never verify an unchecked patch task.
+
+`team status`, `resume`, and `cancel` remain available. `team retry <id> --task ...
+--finding ...` and `team reconcile <id> --resolution ...` first show a review digest;
+repeating with `--confirm <digest>` records the authorized change without
+starting agents. A retry queues one fresh attempt, followed by a separate
+`resume`; reconciliation never invents success, discards unknown effects, or
+resets budgets. Existing v1 teams keep their original read-only
+`resume`/`status`/`cancel` behavior without a silent authority upgrade.
+
+Guides:
+- Teams: [English](../../docs/en/guides/maybecode-team.md) / [简体中文](../../docs/zh-CN/guides/maybecode-team.md)
+- Plans: [English](../../docs/en/guides/maybecode-team-plan.md) / [简体中文](../../docs/zh-CN/guides/maybecode-team-plan.md)
+- Verification: [English](../../docs/en/guides/maybecode-team-verification.md) / [简体中文](../../docs/zh-CN/guides/maybecode-team-verification.md)
+- Coding: [English](../../docs/en/guides/maybecode-team-coding.md) / [简体中文](../../docs/zh-CN/guides/maybecode-team-coding.md)
+- Recovery: [English](../../docs/en/guides/maybecode-team-recovery.md) / [简体中文](../../docs/zh-CN/guides/maybecode-team-recovery.md)
 
 ## Custom UIs
 
@@ -170,8 +197,9 @@ Optional model limits let MaybeCode report context-window usage:
 }
 ```
 
-MaybeCode retries transient model requests up to three total attempts by
-default. Retries apply to one model request rather than the whole agent run, so
+Interactive MaybeCode retries transient model requests up to three total attempts by
+default. Team mode disables this transparent retry wrapper so every physical
+provider call is metered. Interactive retries apply to one model request rather than the whole agent run, so
 tools completed in earlier steps are not replayed. Configure the backoff under
 `apps.maybecode.retry`, or set it to `false` to disable automatic retries:
 

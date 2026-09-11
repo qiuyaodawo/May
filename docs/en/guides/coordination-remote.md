@@ -119,6 +119,9 @@ storage; do not delete evidence to force a retry.
   host budget allocation; coordinator transport alone does not meter provider calls.
 - There is no automatic lease takeover, worker discovery, load-balancing service,
   TLS certificate management, secret rotation or automatic effect rollback.
-- The [MaybeCode team command](maybecode-team.md) currently uses local read-only
-  agents. Remote workers and [lifecycle controls](coordination-lifecycle.md) are
-  host APIs, not additional model tools or CLI flags.
+- The [MaybeCode team command](maybecode-team.md) uses local agents and defaults
+  to read-only. Explicit coding mode edits private copies; applying source changes
+  needs a separately reviewed patch and host confirmation, never an automatic
+  merge. Configured checks and confirmed retry/reconciliation controls are local
+  CLI features. Remote worker hosting and graph mutation remain host APIs, not
+  remote-worker CLI flags or model tools; no multi-agent TUI is provided.

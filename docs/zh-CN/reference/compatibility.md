@@ -13,8 +13,11 @@ May 当前是开发预览框架。所有 workspace package 版本均为 `0.1.0`�
 受限动态委派、平级邮箱、移交、显式 Attempt 及尚未提交的后续节点改写。可选资源
 日志和远程 Worker 协议也是预览格式。可使用远程叶子 Worker 执行任务，但调度
 仍由单个持久化 coordinator 拥有：不提供任意工作流重放、HA 或多写入者所有权。
-本地共享预算预留/计账不是分布式全局预算服务。MaybeCode 团队 CLI 是只读组合，
-不是多 Agent TUI，也不授予修改源文件的权限。
+本地共享预算预留/计账不是分布式全局预算服务。MaybeCode 团队 CLI 使用本地
+Agent，默认只读。新 v2 团队增加持久化计划、有作用域的检查/报告及确认后恢复；
+显式编码模式允许修改私有副本，应用源文件则需要单独审查补丁和精确的宿主确认。
+不会自动合并，不包含远程 Worker CLI 集成或多 Agent TUI。已授权的检查进程没有
+OS 沙箱。已有 v1 团队保留原来的只读 resume/status/cancel 行为，不静默升级权限。
 
 参阅[协作指南](../guides/coordination.md)、
 [共享资源](../guides/coordination-resources.md)、

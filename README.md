@@ -54,11 +54,15 @@ model profiles and reasoning effort, compaction strategy order, commands,
 theme, layout, and terminal interaction flow.
 
 Multi-agent work uses one durable coordinator with optional independent remote
-leaf workers, not a high-availability/multi-writer scheduler. MaybeCode's
-`team run/resume/status/cancel` CLI is read-only: it combines isolated workspace
-copies, local shared usage reservations and immutable result artifacts without
-shell access or writes to the user's checkout. The local budget is not a distributed
-global budget service. See the [task graph guide](docs/en/guides/coordination.md),
+leaf workers, not a high-availability/multi-writer scheduler. MaybeCode's team CLI
+uses local agents and defaults to read-only. It combines configurable plans,
+isolated workspace copies, local shared usage reservations, immutable artifacts,
+structured verification and explicit host recovery controls. `--mode coding`
+permits role-scoped edits in private copies; source application requires a separate
+reviewed patch and exact host confirmation, never an automatic merge.
+`--allow-checks` separately authorizes configured test processes, not an OS sandbox.
+The CLI has no remote-worker switch or multi-agent TUI; the local budget is not a
+distributed global budget service. See the [task graph guide](docs/en/guides/coordination.md),
 [resources](docs/en/guides/coordination-resources.md),
 [attempts and graph revisions](docs/en/guides/coordination-lifecycle.md),
 [remote workers](docs/en/guides/coordination-remote.md), and

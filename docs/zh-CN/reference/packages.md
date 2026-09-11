@@ -92,8 +92,10 @@ application/Session 生命周期。Model、Context factory、executor、schedule
 共享用量预留、不可变且限定作用域的文本产物以及隔离文件副本。它们不是分布式
 全局预算服务或 OS 沙箱，也不会向用户 checkout 合并修改。`@may/coordination/remote`
 提供带独立持久化凭据及授权的远程叶子 Worker；一个 coordinator 保持调度所有权，
-没有 HA/多写入者切换。MaybeCode 团队 CLI 将这些本地能力组装为只读调查入口，
-不暴露 shell 或源文件编辑。
+没有 HA/多写入者切换。MaybeCode 团队 CLI 使用本地 Agent，默认只读，支持可配置
+计划、结构化验证及宿主确认的恢复。显式编码模式允许修改私有副本；应用到源文件
+属于单独审查后的宿主专用补丁操作，不会自动合并。配置的测试进程另需授权，
+不提供 OS 沙箱。CLI 不开放任意 Shell/MCP 工具、远程 Worker 或多 Agent TUI。
 
 参阅[多 Agent 任务图](../guides/coordination.md)、
 [共享资源](../guides/coordination-resources.md)、

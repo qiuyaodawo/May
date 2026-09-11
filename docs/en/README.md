@@ -29,7 +29,11 @@ interfaces are intended for extension.
 - [Shared budgets, artifacts and task workspaces](guides/coordination-resources.md)
 - [Attempts and graph revisions](guides/coordination-lifecycle.md)
 - [Remote leaf workers](guides/coordination-remote.md)
-- [Read-only MaybeCode teams](guides/maybecode-team.md)
+- [MaybeCode teams](guides/maybecode-team.md)
+- [Configurable team plans](guides/maybecode-team-plan.md)
+- [Team reports and acceptance](guides/maybecode-team-verification.md)
+- [Controlled multi-agent coding](guides/maybecode-team-coding.md)
+- [Team recovery controls](guides/maybecode-team-recovery.md)
 
 - [Crash recovery](guides/recovery.md)
 - [Run budgets](guides/run-budgets.md)

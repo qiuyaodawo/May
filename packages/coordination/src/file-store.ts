@@ -12,6 +12,25 @@ export class FileCoordinationStore implements CoordinationStore {
     positive(maxJournalBytes, "maxJournalBytes");
   }
 
+  /** Non-owning status inspection; incomplete tails are ignored, never repaired. */
+  async inspect(id: string): Promise<CoordinationSnapshot | undefined> {
+    name(id, "coordination id");
+    const file = await open(join(this.directory, `${Buffer.from(id).toString("base64url")}.jsonl`), "r");
+    try {
+      const stat = await file.stat();
+      if (!stat.isFile() || stat.size > this.maxJournalBytes) throw new Error("Coordination journal exceeds maxJournalBytes");
+      const bytes = await file.readFile();
+      if (bytes.length > this.maxJournalBytes) throw new Error("Coordination journal exceeds maxJournalBytes");
+      let current: CoordinationSnapshot | undefined;
+      for (const line of bytes.subarray(0, bytes.lastIndexOf(10) + 1).toString("utf8").split("\n").slice(0, -1)) {
+        const next = JSON.parse(line) as CoordinationSnapshot; validateSnapshot(next, id);
+        if (next.revision !== (current?.revision ?? 0) + 1) throw new Error("Invalid coordination journal sequence");
+        current = next;
+      }
+      return current === undefined ? undefined : copy(current);
+    } finally { await file.close(); }
+  }
+
   async acquire(id: string): Promise<CoordinationJournal> {
     name(id, "coordination id");
     await mkdir(this.directory, { recursive: true });

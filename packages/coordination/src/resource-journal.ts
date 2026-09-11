@@ -14,6 +14,26 @@ export class ResourceJournal<T extends Revision> {
     private readonly lockPath: string, private current: T, private size: number,
     private readonly validate: (value: T) => void, private readonly maxBytes: number) {}
 
+  /** Read-only monitoring. Ignore an in-flight tail, never repair or acquire writer ownership. */
+  static async inspect<T extends Revision>(path: string, validate: (value: T) => void, maxBytes = 67_108_864): Promise<T | undefined> {
+    if ((await lstat(path)).isSymbolicLink()) throw new Error("Resource journal must not be a symbolic link");
+    const file = await open(path, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
+    try {
+      const stat = await file.stat();
+      if (!stat.isFile() || stat.size > maxBytes) throw new Error("Resource journal exceeds its byte limit or is not a file");
+      const bytes = await file.readFile();
+      if (bytes.length > maxBytes) throw new Error("Resource journal exceeds its byte limit");
+      const end = bytes.lastIndexOf(10) + 1;
+      let state: T | undefined;
+      for (const line of bytes.subarray(0, end).toString("utf8").split("\n").slice(0, -1)) {
+        const next = JSON.parse(line) as T; validate(next);
+        if (next.revision !== (state?.revision ?? 0) + 1) throw new Error("Invalid resource journal sequence");
+        state = next;
+      }
+      return state;
+    } finally { await file.close(); }
+  }
+
   static async open<T extends Revision>(path: string, initial: T, validate: (value: T) => void,
     maxBytes = 67_108_864): Promise<ResourceJournal<T>> {
     await mkdir(dirname(path), { recursive: true });

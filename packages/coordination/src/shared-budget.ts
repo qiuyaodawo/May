@@ -47,6 +47,13 @@ export class FileSharedBudget {
   private failed = false;
   private constructor(private readonly journal: ResourceJournal<SharedBudgetSnapshot>, readonly limits: SharedBudgetLimits) {}
 
+  /** Monitoring only: pending calls remain pending, no lock stealing or reconciliation. */
+  static inspect(directory: string, id: string, limits: SharedBudgetLimits): Promise<SharedBudgetSnapshot | undefined> {
+    resourceId(id, "shared budget id"); validateLimits(limits);
+    return ResourceJournal.inspect(join(resolve(directory), `${createHash("sha256").update(id).digest("hex")}.budget.jsonl`),
+      (state: SharedBudgetSnapshot) => validate(state, id, limits));
+  }
+
   static async open(directory: string, id: string, limits: SharedBudgetLimits): Promise<FileSharedBudget> {
     resourceId(id, "shared budget id"); validateLimits(limits);
     const frozen = Object.freeze({ ...limits, ...(limits.tokenPrices ? { tokenPrices: Object.freeze({ ...limits.tokenPrices }) } : {}) });

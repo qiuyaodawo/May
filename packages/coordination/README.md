@@ -73,9 +73,13 @@ copies are not process sandboxes and never merge back automatically. Remote leaf
 workers own their local dispatch evidence and Session execution; the coordinator
 remains the sole scheduler. No automatic coordinator failover is provided.
 
-MaybeCode exposes a read-only `team run/resume/status/cancel` CLI with scoped file
-inspection, isolated copies, shared local budgets and final artifacts. It does not
-expose shell, source edits, MCP or a multi-agent TUI. Single-Agent behavior is
+MaybeCode's team CLI composes local agents with configurable plans, isolated copies,
+shared budgets, artifacts, structured verification and explicit host recovery.
+It defaults to read-only; `--mode coding` allows role-scoped private-copy edits.
+Only a separately reviewed patch and exact host confirmation can apply source
+changes, never an automatic merge. `--allow-checks` independently authorizes exact
+test processes, which are not OS-sandboxed. The CLI exposes no arbitrary Shell or
+MCP tools, remote-worker hosting, or multi-agent TUI. Single-Agent behavior is
 unchanged unless the host supplies `shouldYield`.
 
 See the [English guide](../../docs/en/guides/coordination.md) or

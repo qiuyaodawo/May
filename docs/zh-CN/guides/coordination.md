@@ -9,7 +9,9 @@ Subagent 共用调度、授权和恢复逻辑；不替换 `AgentWorkspace`，也
 
 一个持久化所有者负责调度任务图。可选远程叶子 Worker 可以执行独立任务，但不会
 成为平级调度者，也不提供 coordinator 高可用切换。宿主授权的 Attempt/任务图修订、
-本地共享资源和只读 MaybeCode 团队入口均复用同一运行时，详见文末指南。
+本地共享资源和默认只读的 MaybeCode 团队入口均复用同一运行时。CLI 增加可配置
+计划/检查、确认后的恢复，以及显式开启的私有副本编码；应用源文件仍需单独审查，
+详见文末指南。
 
 ## 创建并运行任务图
 
@@ -428,7 +430,9 @@ Runtime 会拒绝既无等待记录也无移交意图的 yield。父任务进入
   尚未提交的后续节点的原子改写。不任意改写或重放活动/结果未知的执行。
 - [远程叶子 Worker](coordination-remote.md)：带持久化派发凭据、认证及 worker 端
   授权的独立进程/主机。一个 coordinator 仍是唯一调度者，不提供 HA/多写入者所有权。
-- [MaybeCode 团队任务](maybecode-team.md)：可执行真实团队任务的只读终端命令。
-  不暴露 shell、源文件修改或 MCP，也不提供多 Agent TUI。
+- [MaybeCode 团队任务](maybecode-team.md)：本地 Agent、可配置计划、报告/检查与
+  宿主确认的恢复。默认只读，显式编码模式可修改私有副本，应用补丁另需宿主审查
+  和确认。不自动合并，不开放任意 Shell/MCP 工具、远程 Worker CLI 或多 Agent
+  TUI。单独授权的检查进程不具备 OS 沙箱。
 
 后续模式应复用这些组合边界，而非通过放宽单 Agent 循环来并发操作多个可变 Context。

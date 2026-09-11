@@ -108,6 +108,8 @@ dispatch id 和 turn。同一身份的重复请求幂等，冲突输入被拒绝
   服务。远程部署需要明确分配宿主预算，协调器传输层本身不计量 Provider 调用。
 - 不包含自动租约接管、Worker 发现、负载均衡服务、TLS 证书管理、密钥轮换
   或副作用自动回滚。
-- [MaybeCode team 命令](maybecode-team.md) 当前使用本地只读 Agent。
-  远程 Worker 与 [生命周期控制](coordination-lifecycle.md) 是宿主 API，
-  不是新增模型工具或 CLI 开关。
+- [MaybeCode team 命令](maybecode-team.md) 使用本地 Agent，默认只读。
+  显式编码模式编辑私有副本，应用源文件需要另外审查补丁并由宿主确认，不自动
+  合并。配置检查以及确认后的重试/核实属于本地 CLI 能力。远程 Worker 托管和
+  任务图修改仍是宿主 API，不提供远程 Worker CLI 开关或模型工具，也没有多
+  Agent TUI。
