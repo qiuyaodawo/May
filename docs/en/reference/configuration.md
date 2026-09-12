@@ -286,6 +286,22 @@ normal permission and scheduling path, and use a fixed snapshot per Run. Explici
 refresh/reconnect and catalog notifications update later Runs. `/mcp` reports server state, negotiated protocol version, tools, errors, and the bounded
 sanitized stderr tail. See [MCP tools](../guides/mcp.md).
 
+## MaybeClaw settings
+
+`apps.maybeclaw` accepts `runBudget`, `server.maxConcurrent` (1..4, default 1),
+and `channels.telegram` / `channels.feishu`. Channels default to disabled and require
+nonempty user-ID allowlists when enabled. Telegram accepts a literal `botToken` or
+an environment-variable name in `botTokenEnv`; Feishu accepts `appSecret` or
+`appSecretEnv`. Each pair is mutually exclusive. Omitting both uses the default
+environment variable. Inline credentials are stored in plaintext: protect the
+config file and never commit it. Changing channel settings requires restarting `serve`.
+The operator token comes from `MAYBECLAW_CONTROL_TOKEN` or `--token-env`.
+RunBudget can tighten the product's bounded defaults but cannot increase them. Model selection uses `--model`,
+`defaultModel`, or the sole configured profile; MaybeCode settings are not reused.
+The editor schema shares the RunBudget definition across both products. See the
+[MaybeClaw guide](../guides/maybeclaw.md) for persisted model bindings, output caps,
+usage requirements and execution/recovery boundaries.
+
 ## Maintenance source of truth
 
 The schema and this guide are user-facing references. When adding or changing a

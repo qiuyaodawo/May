@@ -33,6 +33,7 @@ packages/
 apps/
   cli/        Minimal command-line interface
   maybecode/ Terminal coding-agent application
+  maybeclaw/ Local durable-task assistant (CLI, Web UI, Feishu and Telegram)
 examples/
   basic/      Minimal Model → Tool → Model example
   deepseek/   Live DeepSeek tool-call example
@@ -71,6 +72,14 @@ distributed global budget service. See the [task graph guide](docs/en/guides/coo
 The packages are currently versioned `0.1.0`; their public APIs and the
 file-backed persistence formats should be treated as developer-preview APIs,
 not as a promise of production or compatibility stability.
+
+MaybeClaw is a second product built directly on the reusable packages, not on
+MaybeCode. It provides persistent local tasks, deduplicated input,
+optional bounded read access, cancellation and evidence-based recovery without
+replaying submitted work, plus a loopback control server/Web UI and allowlisted
+Feishu/Telegram private-chat adapters. See the
+[MaybeClaw guide](docs/en/guides/maybeclaw.md) or its
+[Chinese mirror](docs/zh-CN/guides/maybeclaw.md).
 
 Start with the [English documentation](docs/en/README.md) or the
 [简体中文文档](docs/zh-CN/README.md), then follow

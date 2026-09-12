@@ -252,6 +252,12 @@ does not own terminal rendering or product commands.
 example. It consumes the packages above but is not a prerequisite for using
 them. The smaller `@may/cli` demonstrates direct Core usage.
 
+`@may/maybeclaw` is a local durable-task product using Application and Session
+directly. It provides a CLI, long-running local host, authenticated Web UI/control
+API, Feishu/Telegram private-chat adapters, cancellation and evidence-based recovery.
+Task, inbox/outbox and channel policies remain product-owned, not shared framework packages.
+See [MaybeClaw](../guides/maybeclaw.md).
+
 Continue with [Getting started](../getting-started.md) or
 [Building an Agent](../guides/building-an-agent.md).
 

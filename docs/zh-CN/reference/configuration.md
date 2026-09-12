@@ -266,6 +266,20 @@ scheduling 路径，每个 Run 使用固定快照；显式 refresh/reconnect 与
 后续 Run。`/mcp` 会显示 server 状态、协商协议版本、工具、
 错误和有界、已净化的 stderr 末尾片段。参阅 [MCP 工具](../guides/mcp.md)。
 
+## MaybeClaw 设置
+
+`apps.maybeclaw` 接受 `runBudget`、`server.maxConcurrent`（1..4，默认 1）以及
+`channels.telegram` / `channels.feishu`。渠道默认关闭，启用时必须设置非空用户 ID
+白名单。Telegram 支持直接填写 `botToken`，或用 `botTokenEnv` 指定环境变量名；
+飞书对应 `appSecret` / `appSecretEnv`。每一对字段不能同时填写，都省略时使用默认
+环境变量。直接填写的凭据以明文保存，应保护配置文件且不要提交到仓库。
+渠道配置变更后重启 `serve`。
+控制令牌来自 `MAYBECLAW_CONTROL_TOKEN` 或 `--token-env` 指定的变量。
+`runBudget` 可以收紧产品的有界默认预算，不能扩大。
+模型通过 `--model`、`defaultModel` 或唯一档案选择，不复用 MaybeCode 的应用设置。
+编辑器 schema 为两款产品共享 RunBudget 定义。持久模型绑定、输出上限、用量要求及
+执行/恢复边界参阅 [MaybeClaw 指南](../guides/maybeclaw.md)。
+
 ## 维护时的事实来源
 
 Schema 和本文档都是面向用户的参考。新增或修改内置 adapter 选项时，应同时更新

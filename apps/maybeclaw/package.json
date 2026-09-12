@@ -1,0 +1,39 @@
+{
+  "name": "@may/maybeclaw",
+  "version": "0.1.0",
+  "description": "Local durable-task assistant built on May.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "maybeclaw": "./dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "pnpm run build && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "1.73.3",
+    "@may/application": "workspace:*",
+    "@may/coding-tools": "workspace:*",
+    "@may/config": "workspace:*",
+    "@may/core": "workspace:*",
+    "@may/providers": "workspace:*",
+    "@may/session": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

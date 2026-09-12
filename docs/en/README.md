@@ -59,6 +59,8 @@ interfaces are intended for extension.
 
 ## Reference applications
 
+- [MaybeClaw](guides/maybeclaw.md) provides persistent local tasks, cancellation
+  and evidence-based recovery without replaying submitted inputs.
 - [MaybeCode](../../apps/maybecode/README.md) is the full terminal coding-Agent
   composition.
 - [May CLI](../../apps/cli/README.md) is a smaller direct-runtime example.

@@ -23,6 +23,7 @@
     { "path": "./packages/ui/keybindings" },
     { "path": "./packages/ui/tui" },
     { "path": "./apps/cli" },
-    { "path": "./apps/maybecode" }
+    { "path": "./apps/maybecode" },
+    { "path": "./apps/maybeclaw" }
   ]
 }

@@ -5,3 +5,5 @@ packages:
   - "packages/ui/*"
   - "apps/*"
   - "examples/*"
+allowBuilds:
+  protobufjs: false

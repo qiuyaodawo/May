@@ -57,6 +57,9 @@ jobs:
       - name: Check May CLI entry point
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
         run: node apps/cli/dist/bin.js --help
+      - name: Check MaybeClaw CLI entry point
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
+        run: node apps/maybeclaw/dist/bin.js --help
 
   package:
     name: MaybeCode package smoke test

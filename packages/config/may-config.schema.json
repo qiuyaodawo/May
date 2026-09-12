@@ -30,13 +30,60 @@
       "description": "Application-owned settings.",
       "default": {},
       "properties": {
-        "maybecode": { "$ref": "#/$defs/maybecode" }
+        "maybecode": { "$ref": "#/$defs/maybecode" },
+        "maybeclaw": {
+          "type": "object",
+          "properties": {
+            "runBudget": { "$ref": "#/$defs/runBudget" },
+            "server": {
+              "type": "object",
+              "properties": { "maxConcurrent": { "type": "integer", "minimum": 1, "maximum": 4, "default": 1 } },
+              "additionalProperties": false
+            },
+            "channels": {
+              "type": "object",
+              "properties": {
+                "telegram": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": false },
+                    "botToken": { "$ref": "#/$defs/channelCredential", "description": "Literal bot token. Do not also set botTokenEnv." },
+                    "botTokenEnv": { "$ref": "#/$defs/credentialEnv", "default": "MAYBECLAW_TELEGRAM_TOKEN" },
+                    "allowUsers": { "type": "array", "items": { "type": "string", "pattern": "^[1-9][0-9]{0,19}$" }, "uniqueItems": true }
+                  },
+                  "if": { "required": ["enabled"], "properties": { "enabled": { "const": true } } },
+                  "then": { "required": ["allowUsers"], "properties": { "allowUsers": { "minItems": 1 } } },
+                  "not": { "required": ["botToken", "botTokenEnv"] },
+                  "additionalProperties": false
+                },
+                "feishu": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": false },
+                    "appId": { "type": "string" },
+                    "appSecret": { "$ref": "#/$defs/channelCredential", "description": "Literal app secret. Do not also set appSecretEnv." },
+                    "appSecretEnv": { "$ref": "#/$defs/credentialEnv", "default": "MAYBECLAW_FEISHU_SECRET" },
+                    "allowUsers": { "type": "array", "items": { "type": "string", "pattern": "^ou_[A-Za-z0-9_-]{1,128}$" }, "uniqueItems": true }
+                  },
+                  "if": { "required": ["enabled"], "properties": { "enabled": { "const": true } } },
+                  "then": { "required": ["appId", "allowUsers"], "properties": { "appId": { "pattern": "^cli_[0-9a-fA-F]{16}$" }, "allowUsers": { "minItems": 1 } } },
+                  "not": { "required": ["appSecret", "appSecretEnv"] },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": { "type": "object" }
     }
   },
   "additionalProperties": false,
   "$defs": {
+    "channelCredential": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^\\S+$", "writeOnly": true },
+    "credentialEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$" },
     "nonEmptyString": {
       "type": "string",
       "minLength": 1
@@ -277,6 +324,28 @@
       },
       "additionalProperties": false
     },
+    "runBudget": {
+      "type": "object",
+      "properties": {
+        "maxDurationMs": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "maxSteps": { "$ref": "#/$defs/positiveInteger" },
+        "maxModelCalls": { "$ref": "#/$defs/positiveInteger" },
+        "maxToolCalls": { "$ref": "#/$defs/positiveInteger" },
+        "maxTotalTokens": { "$ref": "#/$defs/positiveInteger" },
+        "maxCostUsd": { "type": "number", "exclusiveMinimum": 0 },
+        "tokenPrices": {
+          "type": "object",
+          "required": ["inputUsdPerMillion", "outputUsdPerMillion"],
+          "properties": {
+            "inputUsdPerMillion": { "type": "number", "minimum": 0 },
+            "outputUsdPerMillion": { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "dependentRequired": { "maxCostUsd": ["tokenPrices"] },
+      "additionalProperties": false
+    },
     "maybecode": {
       "type": "object",
       "properties": {
@@ -289,28 +358,7 @@
               }, "additionalProperties": false }
           ]
         },
-        "runBudget": {
-          "type": "object",
-          "properties": {
-            "maxDurationMs": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
-            "maxSteps": { "$ref": "#/$defs/positiveInteger" },
-            "maxModelCalls": { "$ref": "#/$defs/positiveInteger" },
-            "maxToolCalls": { "$ref": "#/$defs/positiveInteger" },
-            "maxTotalTokens": { "$ref": "#/$defs/positiveInteger" },
-            "maxCostUsd": { "type": "number", "exclusiveMinimum": 0 },
-            "tokenPrices": {
-              "type": "object",
-              "required": ["inputUsdPerMillion", "outputUsdPerMillion"],
-              "properties": {
-                "inputUsdPerMillion": { "type": "number", "minimum": 0 },
-                "outputUsdPerMillion": { "type": "number", "minimum": 0 }
-              },
-              "additionalProperties": false
-            }
-          },
-          "dependentRequired": { "maxCostUsd": ["tokenPrices"] },
-          "additionalProperties": false
-        },
+        "runBudget": { "$ref": "#/$defs/runBudget" },
         "autoCompaction": {
           "type": "object",
           "properties": {

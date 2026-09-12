@@ -57,6 +57,8 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 
 ## 参考应用
 
+- [MaybeClaw](guides/maybeclaw.md) 提供持久化本地任务、取消和不重放已提交输入的证据恢复。
+
 - [MaybeCode](../../apps/maybecode/README.md) 是完整的终端编码 Agent 组合示例。
 - [May CLI](../../apps/cli/README.md) 是更小的 Core 直接使用示例。
 

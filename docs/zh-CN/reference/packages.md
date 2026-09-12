@@ -223,6 +223,11 @@ headless controller，无需依赖 `@may/tui`。
 `@may/maybecode` 是主要的编码 Agent 应用和集成示例。它使用上述 package，但使用
 May 并不需要依赖它。更小的 `@may/cli` 展示了如何直接使用 Core。
 
+`@may/maybeclaw` 是直接使用 Application 和 Session 的本地持久任务产品，提供
+CLI、常驻本地宿主、带鉴权的 Web UI/控制 API、飞书/Telegram 私聊适配、取消与证据恢复。
+任务、收发件箱和渠道策略仍由产品持有，尚未提取为通用框架包。
+参阅 [MaybeClaw](../guides/maybeclaw.md)。
+
 接下来可阅读[快速开始](../getting-started.md)或
 [构建 Agent](../guides/building-an-agent.md)。
 
