@@ -15,15 +15,30 @@ export interface UiResource {
   readonly updatedAt: number;
 }
 
+export type UiBlockStatus = "queued" | "streaming" | "running" | "awaiting-approval" | "completed" | "failed" | "cancelled" | "interrupted" | "unknown" | "not-started" | "denied";
+export interface UiDiagnostic { readonly message: string; readonly code?: string }
+export interface UiPresentation { readonly kind: string; readonly version: number; readonly text: string }
+/** A historical decision is evidence, never an actionable request. */
+export interface UiApprovalRecord {
+  readonly id: string;
+  readonly status: "pending" | "allowed" | "denied" | "cancelled";
+  readonly scope?: "once" | "session";
+}
+
 export interface UiBlock {
   readonly id: string;
   readonly kind: "user" | "assistant" | "tool" | "notice";
   readonly text: string;
   readonly title?: string;
-  readonly status?: string;
+  readonly status?: UiBlockStatus;
+  readonly runId?: string;
+  readonly toolCallId?: string;
+  readonly approval?: UiApprovalRecord;
+  readonly diagnostic?: UiDiagnostic;
+  readonly progress?: string;
   readonly reasoning?: string;
   readonly input?: string;
-  readonly presentation?: { readonly kind: string; readonly version: number; readonly text: string };
+  readonly presentation?: UiPresentation;
 }
 
 export interface UiInteraction {
@@ -31,6 +46,11 @@ export interface UiInteraction {
   readonly kind: "approval";
   readonly title: string;
   readonly detail: string;
+  /** Links a current host request to its transcript evidence, not an execution command. */
+  readonly blockId: string;
+  readonly runId: string;
+  readonly toolCallId: string;
+  readonly toolName: string;
   readonly choices: readonly { readonly value: string; readonly label: string }[];
 }
 

@@ -95,7 +95,13 @@ test("loopback API authenticates, queues independently of clients, bounds concur
 });
 
 test("shared Web UI retains task identity and separates execution, verification and delivery", async t => {
-  const f = await fixture(t);
+  const f = await fixture(t, { async *stream(request, options) {
+    if (JSON.stringify(request.messages).includes("interrupt fixture")) {
+      yield { type: "text.delta", delta: "Partial answer" };
+      await delay(30_000, undefined, { signal: options.signal });
+    }
+    yield finished("Done");
+  } });
   const host = await MaybeClawHost.start({ claw: f.claw, selectSpec: async () => f.spec, startPaused: true });
   const server = await startControlServer({ host, token, port: 0 }); f.cleanup.push(() => server.close());
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
@@ -112,6 +118,14 @@ test("shared Web UI retains task identity and separates execution, verification 
   assert.ok(!done.commands.includes("message.submit"));
   assert.equal((await snapshot()).selectedId, null, "task browsing must remain client-local");
   assert.equal((await f.claw.store.list()).length, 1);
+  const interrupted = await host.submit("interrupt fixture", "interrupt-ui");
+  await until(async () => (await snapshot(interrupted.task.id)).blocks.some(b => b.status === "streaming" && b.text));
+  await f.claw.cancel(interrupted.task.id);
+  await until(async () => (await f.claw.status(interrupted.task.id)).task.status === "cancelled");
+  const cancelled = await snapshot(interrupted.task.id);
+  assert.ok(cancelled.blocks.some(b => b.kind === "assistant" && b.status === "interrupted" && b.text === "Partial answer"));
+  assert.ok(cancelled.blocks.some(b => b.kind === "notice" && b.status === "cancelled"));
+  assert.equal(cancelled.interactions.length, 0);
 });
 
 test("channel inbox owns tasks, deduplicates events, and never replays unknown outbound attempts", async (t) => {

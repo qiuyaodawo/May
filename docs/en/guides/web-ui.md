@@ -142,6 +142,39 @@ existing `/api/tasks` and `/api/health` routes remain compatible.
 - The current browser text is Chinese. Documentation is maintained in English and
   Chinese. Light/dark themes follow the OS; narrow screens use overlay side panels.
 
+## Unified execution evidence
+
+Shared tool cards distinguish waiting for approval, running, completed, failed,
+denied, not-started and unknown outcomes. A cancelled run is not proof that tool
+side effects were rolled back: a started call without a confirmed result is
+unknown. Explicit host recovery records can report not-started. Partial assistant
+answers are labelled interrupted. Errors retain bounded messages/codes, and tool
+progress is live display data, not durable completion evidence.
+
+Approval records inside tool cards are read-only. Only the host's current
+`snapshot.interactions` produces decision controls, linked to block/run/call IDs.
+Historical replay does not recreate actionable requests. Terminal or unavailable
+execution removes live controls; stale or unavailable choices fail at the host.
+A session-wide choice is shown only for requests with a grant key. Truncated
+approval input is deny-only, including server-side validation.
+
+Trusted products can register `tools[toolName]`, `approvalDetails[toolName]`,
+`diagnostics[code]`, `presentations[kind][version]` and `panels[id]` callbacks in
+`WebUiExtensions`. Callbacks return an HTMLElement or null. Tools, approval details
+and diagnostics add content without replacing standard status labels, raw evidence
+or approval buttons. Unsupported presentation kinds/versions, null results and
+exceptions fall back safely. No module is loaded from model output. This preview
+changes presentation registration from a callback per kind to callbacks per version;
+upgrade product extensions alongside host/client packages. MaybeCode's Diff has
+been migrated; evidence-bound pre-approval Diff is still separate work.
+
+This change does not add MaybeClaw history persistence, new recovery commands,
+TUI rendering changes or multi-session concurrency. MaybeClaw consumes the shared
+tool projection; its task/verification/delivery policies remain product-owned.
+`node examples/web-ui/states.mjs` provides a read-only synthetic state/extension
+gallery on port 3944 after building. Type `stop` to shut it down. It exercises UI
+fallbacks, not actual process crash recovery.
+
 ## Browser acceptance
 
 After `pnpm build`, run `node examples/web-ui/acceptance.mjs`. It starts both real
@@ -157,6 +190,13 @@ entry, streaming/cancellation, Markdown/code copy, sessions/models, approvals,
 task browsing, refresh/reconnect and desktop/390 px layouts. This used mock model
 responses, not live providers, actual Chinese IME composition, real mobile
 keyboards, external channel delivery or crash-recovery fault injection.
+
+Additional offline acceptance for unified states covered MaybeCode allow/deny,
+cancellation while awaiting approval, error details, read-only history, and the
+migrated Diff renderer. MaybeClaw covered completed read tools, retained partial
+answers after cancellation and failed-task diagnostics. The synthetic gallery
+covered throwing/unknown-version renderers and 390 px layout without horizontal
+overflow. No live provider or process-crash recovery was used in this check.
 
 ### Live provider check
 

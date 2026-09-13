@@ -7,6 +7,7 @@ import { InMemorySessionCatalog } from "@may/session/catalog";
 import { ApplicationUiHost } from "../dist/application.js";
 import { startUiServer } from "../dist/server.js";
 import { UiClient } from "../dist/index.js";
+import { UiProjection } from "../dist/projection.js";
 
 const token = "fixture-only-token-0123456789abcdef";
 async function until(probe) { for (let i = 0; i < 100; i++) { const value = await probe(); if (value) return value; await delay(20); } throw new Error("Timed out"); }
@@ -44,6 +45,9 @@ test("shared host authenticates, deduplicates commands, restores approvals and s
   assert.equal((await request("/api/ui/commands", { ...command, args: { text: "changed" } })).status, 409);
   const pending = await until(async () => { const s = await (await request("/api/ui/snapshot")).json(); return s.interactions.length ? s : undefined; });
   assert.equal(toolCalls, 0); assert.equal(app.isRunning, true);
+  assert.equal(pending.blocks.find(b => b.kind === "tool").status, "awaiting-approval");
+  const unavailable = { ...command, requestId: "unavailable-choice", name: "approval.resolve", args: { id: pending.interactions[0].id, decision: "allow-session" } };
+  assert.equal((await request("/api/ui/commands", unavailable)).status, 409);
   await clients[1].refresh();
   assert.equal(clients[1].state.snapshot.interactions[0].id, pending.interactions[0].id);
   const approval = { ...command, requestId: "approve-1", name: "approval.resolve", args: { id: pending.interactions[0].id, decision: "allow" } };
@@ -51,6 +55,8 @@ test("shared host authenticates, deduplicates commands, restores approvals and s
   await until(() => !app.isRunning);
   const finished = await (await request("/api/ui/snapshot")).json();
   assert.equal(toolCalls, 1); assert.equal(calls, 2); assert.equal(finished.interactions.length, 0);
+  assert.equal(finished.blocks.find(b => b.kind === "tool").approval.status, "allowed");
+  assert.equal(finished.blocks.find(b => b.kind === "tool").status, "completed");
   assert.equal(finished.blocks.filter(b => b.kind === "user").length, 1);
   assert.ok(finished.blocks.filter(b => b.kind === "assistant").every(b => b.text || b.reasoning), "tool-only responses must not render empty assistant bubbles");
   assert.ok(finished.blocks.some(b => b.text.includes("<script>")));
@@ -137,4 +143,47 @@ test("two clients browse independently without opening runtimes and explicitly g
   if (settled[0].status === "fulfilled") { assert.equal(app.sessionId, first); assert.equal(right.state.snapshot.selectedId, first); }
   else { assert.notEqual(app.sessionId, first); assert.notEqual(app.sessionId, second); assert.equal(right.state.snapshot.selectedId, app.sessionId); }
   await assert.rejects(host.execute({ version: 1, hostId: host.hostId, requestId: "missing-guard", name: "session.new", targetId: app.sessionId, args: {} }));
+});
+
+
+test("projection separates approval evidence, terminal outcomes and unknown effects", () => {
+  const projection = new UiProjection();
+  const call = { id: "call", name: "fixture", input: { text: "<script>text only</script>" } };
+  const event = (type, rest = {}) => ({ type, runId: "run", step: 1, seq: 1, timestamp: 1, ...rest });
+  const run = (type, rest) => projection.event({ type: "run.event", event: event(type, rest) });
+  const request = { id: "approval", tool: { name: "fixture" }, input: call.input, context: { runId: "run", step: 1, toolCallId: "call" }, createdAt: 1 };
+  const permission = (type, rest) => projection.event({ type: "permission.event", event: event(type, rest) });
+  run("tool.started", { call });
+  permission("approval.requested", { request });
+  assert.equal(projection.blocks.get("tool:run:call").status, "awaiting-approval");
+  assert.equal(projection.interactions.get("approval").blockId, "tool:run:call");
+  const history = new UiProjection();
+  history.history([event("tool.started", { call }), event("approval.requested", { request: { ...request, ...request.context } })]);
+  assert.equal(history.interactions.size, 0, "historical request must not become an action");
+  history.settle(); assert.equal(history.blocks.get("tool:run:call").status, "unknown");
+  permission("approval.cancelled", { requestId: "approval" });
+  run("tool.failed", { call, error: { message: "Cancelled", code: "RUN_CANCELLED" } });
+  run("run.cancelled", { reason: "Cancelled by operator" });
+  assert.equal(projection.blocks.get("tool:run:call").status, "not-started");
+  assert.equal(projection.interactions.size, 0);
+
+  for (const [code, expected] of [["PERMISSION_DENIED", "denied"], ["TOOL_SKIPPED", "not-started"], ["RUN_CANCELLED", "unknown"], ["BROKEN", "failed"]]) {
+    const id = code, next = { ...call, id };
+    run("tool.started", { call: next }); run("tool.output.delta", { call: next, delta: "partial output" });
+    run("tool.progress", { call: next, message: "Working" });
+    run("tool.failed", { call: next, error: { message: "Failure", code, stack: "PRIVATE_STACK" } });
+    const block = projection.blocks.get(`tool:run:${id}`);
+    assert.equal(block.status, expected); assert.equal(block.text, "partial output");
+    assert.deepEqual(block.diagnostic, { message: "Failure", code }); assert.equal(block.progress, "Working");
+  }
+  permission("approval.requested", { request: { ...request, id: "long", input: "x".repeat(70_000) } });
+  assert.deepEqual(projection.interactions.get("long").choices.map(c => c.value), ["deny"]);
+  run("run.failed", { error: { code: "MODEL_FAILURE", message: "Model unavailable" } });
+  assert.equal(projection.interactions.size, 0);
+  assert.equal(projection.blocks.get("run:run").diagnostic.code, "MODEL_FAILURE");
+  assert.equal(projection.blocks.get("tool:run:call").status, "unknown");
+  history.history([event("run.interrupted", { recoveries: [{ call, status: "not-started" }, { call: { ...call, id: "unknown" }, status: "unknown" }] })]);
+  assert.equal(history.blocks.get("tool:run:call").status, "not-started");
+  assert.equal(history.blocks.get("tool:run:unknown").status, "unknown");
+  assert.ok(!JSON.stringify([...projection.blocks.values()]).includes("PRIVATE_STACK"));
 });

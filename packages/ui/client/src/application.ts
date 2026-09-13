@@ -56,13 +56,13 @@ export class ApplicationUiHost implements UiHost {
     const projected = new UiProjection(); projected.history(history);
     if (viewingActive) {
       // Durable completed blocks win; only the execution owner's live deltas fill gaps.
-      for (const [id, block] of this.projection.blocks) if (!projected.blocks.has(id) || projected.blocks.get(id)?.status === "running") projected.blocks.set(id, block);
-    } else {
-      for (const [id, block] of projected.blocks) if (["running", "streaming"].includes(block.status ?? "")) projected.blocks.set(id, { ...block, status: "interrupted" });
+      for (const [id, block] of this.projection.blocks) if (!projected.blocks.has(id) || ["running", "streaming", "awaiting-approval"].includes(projected.blocks.get(id)?.status ?? "")) projected.blocks.set(id, block);
     }
+    if (!viewingActive || !running || this.fault) projected.settle();
+    const interactions = viewingActive && running && !this.fault ? [...this.projection.interactions.values()] : [];
     const commands = this.app.readSessionHistory ? ["session.browse"] : [];
     if (!running) commands.push("session.new");
-    if (viewingActive) commands.push(...(running ? ["run.cancel", "approval.resolve"] : ["message.submit", "session.rename", "context.compact", ...(this.options.commands ?? [])]));
+    if (viewingActive) commands.push(...(running ? ["run.cancel", ...(interactions.length ? ["approval.resolve"] : [])] : ["message.submit", "session.rename", "context.compact", ...(this.options.commands ?? [])]));
     else if (!running) commands.push("session.activate");
     if (this.fault) commands.length = 0;
     const panels = viewingActive ? await this.options.panels?.() ?? [] : [];
@@ -73,7 +73,7 @@ export class ApplicationUiHost implements UiHost {
     }
     return { version: 1, hostId: this.hostId, revision, product: this.options.product, resources,
       selectedId: viewingId, activeId, blocks: [...projected.blocks.values()].slice(-500),
-      interactions: viewingActive ? [...projected.interactions.values()] : [], commands,
+      interactions, commands,
       panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "浏览会话", value: viewingId }, { label: "运行会话", value: activeId }, { label: "执行状态", value: running ? "运行中" : "空闲" }] }, ...panels],
       choices,
       notice: this.fault ?? "浏览只影响当前页面。设为运行会话或新建会话会更换宿主的执行对象，但不会切走其它页面；执行期间不能切换。",
@@ -100,6 +100,8 @@ export class ApplicationUiHost implements UiHost {
         commandArgs(command, ["id", "decision"]);
         const decision = command.args.decision;
         if (decision !== "allow" && decision !== "allow-session" && decision !== "deny") throw new UiError(400, "无效的审批决定。");
+        const request = this.projection.interactions.get(command.args.id!);
+        if (!request?.choices.some(choice => choice.value === decision)) throw new UiError(409, "审批已失效或该选项不可用。请刷新后检查。");
         if (!await this.app.resolveApproval(command.args.id!, decision)) throw new UiError(409, "此审批已经结束或失效。");
         break;
       }

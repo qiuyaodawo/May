@@ -1,6 +1,6 @@
 import type { UiClient, UiClientState, UiSnapshot } from "@may/ui-client";
-import { approvalCard, button, detailPanel, element, icon, statusLabel, transcriptBlock, type WebUiExtensions } from "./components.js";
-export { approvalCard, detailPanel, transcriptBlock, type WebUiExtensions, type WebUiContext } from "./components.js";
+import { approvalCard, button, detailPanel, extensionContent, element, icon, statusLabel, transcriptBlock, type WebUiExtensions } from "./components.js";
+export { approvalCard, detailPanel, transcriptBlock, type WebUiExtensions, type WebUiContext, type WebUiRenderer } from "./components.js";
 export { markdown } from "./markdown.js";
 
 export interface WebUiOptions { readonly title?: string; readonly kind?: "session" | "task"; readonly extensions?: WebUiExtensions }
@@ -145,7 +145,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     const ids = new Set(visibleBlocks.map(block => block.id));
     for (const [id, entry] of blocks) if (!ids.has(id)) { entry.node.remove(); blocks.delete(id); }
     for (const block of visibleBlocks) {
-      const signature = JSON.stringify(block), previous = blocks.get(block.id);
+      const signature = JSON.stringify([block, connected, pending(), snapshot?.commands]), previous = blocks.get(block.id);
       if (previous?.signature === signature) continue;
       const node = transcriptBlock(block, options.extensions, { state, command: client.command.bind(client) });
       if (previous) {
@@ -155,10 +155,10 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
       } else messages.append(node);
       blocks.set(block.id, { signature, node });
     }
-    const approvalKey = JSON.stringify([snapshot?.interactions, connected, pending()]);
+    const approvalKey = JSON.stringify([snapshot?.interactions, connected, pending(), snapshot?.commands]);
     if (approvalKey !== approvalSignature) {
       approvalSignature = approvalKey;
-      approvals.replaceChildren(...(snapshot?.interactions ?? []).map(interaction => approvalCard(interaction, decision => act("approval.resolve", { id: interaction.id, decision }), !connected || pending())));
+      approvals.replaceChildren(...(snapshot?.interactions ?? []).map(interaction => approvalCard(interaction, decision => act("approval.resolve", { id: interaction.id, decision }), !connected || pending() || !has("approval.resolve"), options.extensions, { state, command: client.command.bind(client) })));
     }
     welcome.hidden = visibleBlocks.length > 0;
     welcomeTitle.textContent = isTask ? "把下一件事交给 May" : "今天，一起构建什么？";
@@ -189,7 +189,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     if (panelsKey !== panelSignature) {
       panelSignature = panelsKey; details.replaceChildren();
       const detailsHeader = element("div", "details-header"); detailsHeader.append(element("h2", "", "工作详情"), button("关闭", hideDetails, "text-button")); details.append(detailsHeader);
-      for (const panel of snapshot?.panels ?? []) details.append(options.extensions?.panels?.[panel.id]?.(panel, { state, command: client.command.bind(client) }) ?? detailPanel(panel));
+      for (const panel of snapshot?.panels ?? []) details.append(extensionContent(options.extensions?.panels?.[panel.id], panel, { state, command: client.command.bind(client) }) ?? detailPanel(panel));
       const actions = element("div", "detail-actions");
       for (const [command, label] of [["context.compact", "压缩上下文"], ["task.recover", "核对恢复证据"], ["task.dispatch", "重新请求调度"]]) if (has(command!)) {
         const action = button(label!, () => act(command!)); action.disabled = pending(); actions.append(action);

@@ -25,3 +25,21 @@ See [English](../../../docs/en/guides/web-ui.md) or
 `session.new` require `expectedActiveId`; `UiClient` supplies it from the current
 snapshot. Browsing depends on `readSessionHistory` and safe store inspection.
 This preview replaces the old `session.open` UI command; upgrade host and client together.
+
+
+Execution evidence uses `UiBlockStatus`, `UiDiagnostic`, `UiApprovalRecord` and
+`UiPresentation`. Blocks can carry run/call IDs and bounded live progress. A
+cancelled run does not prove a started tool had no effects: without a final
+outcome, tools are `unknown`, while partial assistant text is `interrupted`.
+Explicit recovery `not-started`/`unknown` records override inferred incompleteness.
+Errors expose only bounded message/code, not stacks or provider continuation state.
+
+`UiProjection.history()` creates read-only approval records, never interactions.
+Only live `approval.requested` events produce actionable `UiInteraction` objects,
+linked through block/run/call IDs and tool name. Terminal events clear requests;
+`settle()` removes live authority when a host reports no live execution. Session
+approval choices require a host grant key. Truncated approval inputs are deny-only,
+and `ApplicationUiHost` validates the advertised choice again before resolving it.
+Custom hosts own the same validation and lifecycle responsibilities. Reconnect to
+the same live host retains pending requests; a journal alone cannot restore them.
+These are preview DTO changes: upgrade custom hosts and clients together.

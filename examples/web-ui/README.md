@@ -54,3 +54,13 @@ mobile keyboards, or crash recovery.
 
 See the [Web UI guide](../../docs/en/guides/web-ui.md) or its
 [简体中文版本](../../docs/zh-CN/guides/web-ui.md).
+
+
+## Read-only state and extension gallery
+
+After building, run `node examples/web-ui/states.mjs` and open the printed loopback
+URL (port 3944). It automatically connects using a public disposable fixture token.
+It contains synthetic tool states, historical approval evidence, interrupted text,
+error codes, product supplements, and throwing/unsupported presentation renderers.
+It has no agent, real approvals, provider, filesystem effects or recovery actions.
+Type `stop` to shut it down. Use `acceptance.mjs` for real-host approval flows.

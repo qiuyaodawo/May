@@ -3,7 +3,7 @@ import type { WebUiExtensions } from "@may/web-ui";
 /** Trusted browser-only product extension. No filesystem or runtime objects reach this module. */
 export const extensions: WebUiExtensions = {
   presentations: {
-    "maybecode.change-preview": block => {
+    "maybecode.change-preview": { 1: block => {
       const root = document.createElement("div"); root.className = "change-preview";
       const fallback = () => { const pre = document.createElement("pre"); pre.className = "tool-content"; pre.textContent = block.presentation?.text ?? ""; root.append(pre); return root; };
       if (block.presentation?.version !== 1) return fallback();
@@ -19,6 +19,6 @@ export const extensions: WebUiExtensions = {
         span.textContent = line + "\n"; pre.append(span);
       }
       root.append(pre); return root;
-    },
+    } },
   },
 };

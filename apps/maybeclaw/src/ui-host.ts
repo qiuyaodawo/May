@@ -31,15 +31,17 @@ export class MaybeClawUiHost implements UiHost {
     if (task && !selected.owner && ["running", "blocked"].includes(task.status)) commands.push("task.recover");
     if (task && task.status === "queued" && status.dispatchErrors[task.id]) commands.push("task.dispatch");
     const projection = task ? this.live.get(task.id) : undefined;
+    if (task && projection && (isTerminal(task) || !selected.owner)) projection.settle();
     return { version: 1, hostId: this.hostId, revision,
       product: { id: "maybeclaw", title: "MaybeClaw", resourceKind: "task", subtitle: "提交一个有明确结果的任务。离开页面后，工作仍由本地宿主继续。", suggestions: ["帮我制定一份学习计划", "梳理这个问题的关键假设", "把我的想法整理成行动清单"] },
       resources: [...tasks].sort((a, b) => b.createdAt - a.createdAt).slice(0, 500).map(t => ({ id: t.id, kind: "task", title: t.spec.prompt.slice(0, 72), status: t.status, updatedAt: t.updatedAt })),
       selectedId: task?.id ?? null,
       blocks: task ? [
         { id: `input:${task.id}`, kind: "user", text: task.spec.prompt },
-        ...(projection ? [...projection.blocks.values()].filter(block => !isTerminal(task) || block.kind === "tool") : []),
-        ...(task.result === undefined ? [] : [{ id: `result:${task.id}`, kind: "assistant" as const, text: displayValue(task.result), status: "completed" }]),
-        ...(task.detail ? [{ id: `detail:${task.id}`, kind: "notice" as const, text: task.detail }] : []),
+        ...(projection ? [...projection.blocks.values()].filter(block => !isTerminal(task) || block.kind !== "assistant" || task.result === undefined) : []),
+        ...(task.result === undefined ? [] : [{ id: `result:${task.id}`, kind: "assistant" as const, text: displayValue(task.result), status: "completed" as const }]),
+        ...(task.detail ? [{ id: `detail:${task.id}`, kind: "notice" as const, text: task.detail,
+          ...(["failed", "cancelled", "blocked"].includes(task.status) ? { status: task.status === "failed" ? "failed" as const : task.status === "cancelled" ? "cancelled" as const : "unknown" as const } : {}) }] : []),
         ...(!task.result && !projection?.blocks.size && !task.detail ? [{ id: `status:${task.id}`, kind: "notice" as const, text: selected.cancellationRequested ? "已请求取消，等待宿主确认。" : task.status === "queued" ? "任务已入队，等待宿主执行。" : "任务状态：" + task.status }] : []),
       ] : [],
       interactions: [], commands, choices: [],
