@@ -1,5 +1,5 @@
-import { readFile, realpath, stat } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { resolveWritableWorkspacePath } from "./workspace-path.js";
 
 const MAX_PREVIEW_BYTES = 1024 * 1024;
 const MAX_PREVIEW_LINES = 20_000;
@@ -97,7 +97,7 @@ export async function createToolChangePreview(
       const occurrences = countOccurrences(original, oldText, 2);
       if (occurrences === 0) throw new Error("oldText was not found");
       if (occurrences > 1) throw new Error("oldText occurs more than once");
-      updated = original.replace(oldText, newText);
+      updated = original.replace(oldText, () => newText);
       assertPreviewSize(updated, "updated content");
     }
 
@@ -163,18 +163,13 @@ async function resolvePreviewPath(
   workspace: string,
   inputPath: string,
 ): Promise<PreviewPath> {
-  const root = await realpath(resolve(workspace));
-  const candidate = resolve(root, inputPath);
-  assertInside(root, candidate, inputPath);
-  const displayPath = display(relative(root, candidate));
-
+  const file = await resolveWritableWorkspacePath(workspace, inputPath);
   try {
-    const target = await realpath(candidate);
-    assertInside(root, target, inputPath);
-    return { absolute: target, relative: displayPath, exists: true };
+    await stat(file.absolute);
+    return { ...file, exists: true };
   } catch (error) {
     if (!isMissingPathError(error)) throw error;
-    return { absolute: candidate, relative: displayPath, exists: false };
+    return { ...file, exists: false };
   }
 }
 
@@ -697,21 +692,6 @@ function isToolChangePreview(value: unknown): value is ToolChangePreview {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
-}
-
-function assertInside(root: string, target: string, inputPath: string): void {
-  const pathFromRoot = relative(root, target);
-  if (
-    pathFromRoot === ".." ||
-    pathFromRoot.startsWith(`..${sep}`) ||
-    isAbsolute(pathFromRoot)
-  ) {
-    throw new Error(`path is outside the workspace: ${inputPath}`);
-  }
-}
-
-function display(path: string): string {
-  return path === "" ? "." : path.split(sep).join("/");
 }
 
 function isMissingPathError(error: unknown): boolean {

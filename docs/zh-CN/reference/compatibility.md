@@ -145,10 +145,9 @@ store 不提供加密。
 
 ## 支持的运行时
 
-当前 package 声明要求 Node.js 20 或更高版本。仓库开发需要 Node.js 22 或更高版本，
-与 pnpm 11 工具链保持一致；推荐 Node.js 24，并在根目录 `.node-version` 中记录。
-根目录 `package.json` 的 `engines.node` 声明开发最低版本；各 package 的运行时要求
-保持不变。提高开发最低版本并不代表已验证所有声明的运行时和操作系统的兼容性。
+发布包与仓库开发均要求 Node.js 22 或更高版本。推荐 Node.js 24，记录在 `.node-version`。
+CI 覆盖 Linux 22/24 和 Windows/macOS 24；最低版本声明不等于所有平台组合都经过验证。
+打包冒烟测试在 push/PR 时覆盖 Linux 和 Windows。
 
 仓库使用 pnpm 与 TypeScript project references。真实联网的 provider 集成测试需要
 显式开启；常规测试离线运行。

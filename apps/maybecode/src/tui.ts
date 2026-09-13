@@ -484,7 +484,7 @@ async function readInput(
     });
     if (lines.length === 0 && suggestions !== undefined) {
       const candidates = await suggestions(line);
-      line = candidates[0]?.value ?? line;
+      line = candidates.length === 1 ? candidates[0]!.value : line;
     }
     const continuation = removeLineContinuation(line);
     lines.push(continuation.text);

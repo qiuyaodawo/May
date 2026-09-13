@@ -38,7 +38,7 @@ export function createSessionHistoryRetrievalTools(options: {
           if (offset >= 0) matches.push({
             seq: event.seq, type: event.type,
             // Keep previews small; offsets for complete reads come from the read tool.
-            preview: text.slice(Math.max(0, offset - 80), offset + 160),
+            preview: text.slice(Math.max(0, offset - 80), offset + 160).replace(/^[\uDC00-\uDFFF]|[\uD800-\uDBFF]$/gu, ""),
           });
           if (matches.length === 10) return {
             matches, hasMore: page.hasMore || index < page.events.length - 1,

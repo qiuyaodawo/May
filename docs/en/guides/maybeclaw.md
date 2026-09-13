@@ -242,7 +242,7 @@ the default is `~/.may/maybeclaw`. Later commands must use the same data directo
 With no read directory, the agent receives no tools. An explicit directory grants
 the existing workspace-bounded `read` tool only: at most 256 KiB per file and
 200 lines per call, with bounded offset/limit reads. Existing coding-tool path,
-symlink and hard-link checks apply. There is no arbitrary file discovery tool.
+symlink containment checks apply; read access permits hard links by default. There is no arbitrary file discovery tool.
 The task data directory must not overlap the read directory in either direction.
 The read directory is canonicalized and checked again before execution.
 
@@ -407,3 +407,17 @@ concurrency, graceful shutdown/restart, channel ownership/deduplication, unknown
 send recovery and both adapters' mocked platform protocols. The browser flow is
 also checked with a deterministic local model. Without real credentials these
 checks do **not** establish live Feishu/TG event subscription or delivery success.
+
+## Journal maintenance
+
+Task journals checkpoint the complete current state before accumulated snapshots fill the
+8 MiB limit. Channel journals compact repeated versions of records before the 32 MiB limit.
+Inbox identities, delivery receipts and unknown outcomes are retained; compaction never
+resends a delivery. Unique retained records still consume space and require stopped-host
+archival if the current state alone reaches the cap. Checkpoints require the current reader.
+Library callers of `runMaybeClaw` must supply `dependencies.signal` in serve mode to support
+explicit shutdown.
+
+Local request keys accept up to 128 characters. The HTTP API accepts up to 100 before
+adding its `api:` namespace; use that bound with `--server`. These are deliberately distinct
+idempotency namespaces, not interchangeable task identities.

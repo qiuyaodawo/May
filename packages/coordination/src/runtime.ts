@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AsyncStateSerializer } from "@may/application";
-import { AsyncEventQueue, isStreamingMayEvent } from "@may/core";
+import { AsyncEventQueue } from "@may/core";
 import type { ApprovalDecision } from "@may/permissions";
 import type {
   CoordinationAgent, CoordinationEvent, CoordinationJournal, CoordinationLimits, CoordinationPolicy,
@@ -28,7 +28,7 @@ export class CoordinationRuntime {
   private readonly serial = new AsyncStateSerializer();
   private readonly queue = new AsyncEventQueue<CoordinationEvent>({
     maxBufferedValues: 1024,
-    isDroppable: (event) => event.type === "agent.event" && event.event.type === "run.event" && isStreamingMayEvent(event.event.event),
+    isDroppable: () => true, // Durable state/history remain available through inspection.
   });
   private readonly active = new Map<string, ActiveTask>();
   private readonly cancellationDeliveries = new Set<string>();
@@ -65,7 +65,7 @@ export class CoordinationRuntime {
     name(options.id, "coordination id"); name(options.policy.version, "policy version");
     const budget = limits(options.limits);
     const tasks = copy(options.tasks);
-    validateGraph(tasks, budget.maxTasks);
+    validateGraph(tasks, budget.maxTasks, budget.maxInputBytes);
     const state: CoordinationSnapshot = {
       format: 1, id: options.id, revision: 1, policyVersion: options.policy.version, limits: budget,
       tasks: tasks.map((task) => {
@@ -249,7 +249,7 @@ export class CoordinationRuntime {
       const removedCount = (this.state.graphChanges ?? []).reduce((sum, revision) => sum + (revision.change.remove?.length ?? 0), 0);
       if (this.state.tasks.length + removedCount + add.length > this.state.limits.maxTasks) throw new Error("Graph change exceeds the lifetime maxTasks quota");
       const specs = [...this.state.tasks.filter((task) => !touched.has(task.id)), ...add, ...update];
-      validateGraph(specs, this.state.limits.maxTasks);
+      validateGraph(specs, this.state.limits.maxTasks, this.state.limits.maxInputBytes);
       if (await this.policy.authorizeGraphRewrite?.(change, this.snapshot()) !== true) throw new Error("Graph rewrite authorization denied");
       const fresh = new Map<string, CoordinationTask>();
       for (const spec of [...add, ...update]) {
@@ -518,12 +518,12 @@ export class CoordinationRuntime {
       let ancestor: CoordinationTask | undefined = parent;
       while (ancestor) { depth++; ancestor = ancestor.parentTaskId === undefined ? undefined : this.task(ancestor.parentTaskId); }
       if (depth > (this.state.limits.maxDepth ?? 4)) throw new Error("Delegation exceeds maxDepth");
-      validateGraph(children, this.state.limits.maxTasks);
+      validateGraph(children, this.state.limits.maxTasks, this.state.limits.maxInputBytes);
       if (children.some((task) => task.dependsOn?.length)) throw new Error("Delegated children must be independent; parent waits must not create dependency cycles");
       const graphHistory = this.state.graphChanges ?? [];
       if (this.state.tasks.length + graphHistory.reduce((sum, revision) => sum + (revision.change.remove?.length ?? 0), 0) + children.length > this.state.limits.maxTasks) throw new Error("Delegation exceeds the lifetime maxTasks quota");
       if (children.some((child) => graphHistory.some((revision) => revision.previous.some((old) => old.id === child.id)))) throw new Error("Delegation cannot reuse a historical task id");
-      validateGraph([...this.state.tasks, ...children], this.state.limits.maxTasks);
+      validateGraph([...this.state.tasks, ...children], this.state.limits.maxTasks, this.state.limits.maxInputBytes);
       const records: CoordinationTask[] = [];
       for (const child of children) {
         const agent = this.agents.get(child.agent);

@@ -71,7 +71,7 @@ export class NodeTerminalDriver implements TerminalWriter {
     this.previousRawMode = this.input.isRaw === true;
     this.inputWasPaused = this.input.isPaused();
     if (!this.keypressInitialized) {
-      emitKeypressEvents(this.decodedInput);
+      emitKeypressEvents(this.decodedInput, { escapeCodeTimeout: 30 } as unknown as Parameters<typeof emitKeypressEvents>[1]);
       this.keypressInitialized = true;
     }
     this.inputDecoder.reset();

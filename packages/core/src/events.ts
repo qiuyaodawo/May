@@ -166,8 +166,11 @@ export class AsyncEventQueue<T> implements AsyncIterable<T> {
   }
 
   [Symbol.asyncIterator](): AsyncIterator<T> {
+    let ended = false;
+    const pending = new Set<(value: IteratorResult<T>) => void>();
     return {
       next: () => {
+        if (ended) return Promise.resolve({ value: undefined, done: true });
         const value = this.values.shift();
         if (value !== undefined) {
           return Promise.resolve({ value, done: false });
@@ -178,8 +181,19 @@ export class AsyncEventQueue<T> implements AsyncIterable<T> {
         }
 
         return new Promise<IteratorResult<T>>((resolve) => {
-          this.waiters.push(resolve);
+          const waiter = (result: IteratorResult<T>) => { pending.delete(waiter); resolve(result); };
+          pending.add(waiter);
+          this.waiters.push(waiter);
         });
+      },
+      return: () => {
+        ended = true;
+        for (const waiter of pending) {
+          const index = this.waiters.indexOf(waiter);
+          if (index >= 0) this.waiters.splice(index, 1);
+          waiter({ value: undefined, done: true });
+        }
+        return Promise.resolve({ value: undefined, done: true });
       },
     };
   }

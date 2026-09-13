@@ -398,7 +398,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
         return model;
       }, {
         activeOperationMessage:
-          "Cannot switch sessions while an operation is active",
+          "Cannot switch models while an operation is active",
       });
     }
 
@@ -525,9 +525,6 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
               `"${profile}"; supported values: ${state.efforts.join(", ")}`,
           );
         }
-        this.modelOptionOverrides.set(profile, { reasoningEffort: effort });
-      } else {
-        this.modelOptionOverrides.delete(profile);
       }
 
       const create = this.state.options.createModelConfiguration;
@@ -536,7 +533,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       }
       const configuration = await create(
         profile,
-        this.modelOptionOverrides.get(profile),
+        effort === undefined ? undefined : { reasoningEffort: effort },
       );
       const nextOptions = withModelConfiguration(
         this.state.options,
@@ -548,6 +545,8 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
         resume: true,
       });
       this.state.options = nextOptions;
+      if (effort === undefined) this.modelOptionOverrides.delete(profile);
+      else this.modelOptionOverrides.set(profile, { reasoningEffort: effort });
       return next;
     });
     return this.getReasoningEffort();

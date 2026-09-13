@@ -33,8 +33,8 @@ export function positive(value: unknown, label: string): asserts value is number
 }
 
 export function limits(options: Partial<CoordinationLimits> = {}): CoordinationLimits {
-  const result = { maxConcurrent: 4, maxTasks: 128, maxOutputBytes: 65_536, maxDepth: 4, maxTaskTurns: 16, maxMessages: 1024, maxMessageBytes: 16_384, maxHandoffs: 4, maxHandoffBytes: 16_384, maxAttempts: 3, maxGraphChanges: 32, ...options };
-  for (const key of ["maxConcurrent", "maxTasks", "maxOutputBytes", "maxDepth", "maxTaskTurns", "maxMessages", "maxMessageBytes", "maxHandoffs", "maxHandoffBytes", "maxAttempts", "maxGraphChanges"] as const) positive(result[key], key);
+  const result = { maxConcurrent: 4, maxTasks: 128, maxOutputBytes: 65_536, maxInputBytes: 65_536, maxDepth: 4, maxTaskTurns: 16, maxMessages: 1024, maxMessageBytes: 16_384, maxHandoffs: 4, maxHandoffBytes: 16_384, maxAttempts: 3, maxGraphChanges: 32, ...options };
+  for (const key of ["maxConcurrent", "maxTasks", "maxOutputBytes", "maxInputBytes", "maxDepth", "maxTaskTurns", "maxMessages", "maxMessageBytes", "maxHandoffs", "maxHandoffBytes", "maxAttempts", "maxGraphChanges"] as const) positive(result[key], key);
   if (result.maxDurationMs !== undefined) {
     positive(result.maxDurationMs, "maxDurationMs");
     if (result.maxDurationMs > 2_147_483_647) throw new RangeError("maxDurationMs exceeds the timer limit");
@@ -42,12 +42,13 @@ export function limits(options: Partial<CoordinationLimits> = {}): CoordinationL
   return freeze({ ...result, ...(result.runBudget === undefined ? {} : { runBudget: resolveRunBudget(result.runBudget) }) });
 }
 
-export function validateGraph(tasks: readonly TaskSpec[], maxTasks: number): void {
+export function validateGraph(tasks: readonly TaskSpec[], maxTasks: number, maxInputBytes = 65_536): void {
   if (!Array.isArray(tasks) || tasks.length === 0 || tasks.length > maxTasks) throw new Error(`Expected 1-${maxTasks} tasks`);
   const nodes = new Map<string, TaskSpec>();
   for (const task of tasks) {
     name(task.id, "task id"); name(task.agent, "agent name");
     if (typeof task.input !== "string") throw new TypeError("Task input must be a string");
+    if (Buffer.byteLength(task.input, "utf8") > maxInputBytes) throw new Error("Task input exceeds maxInputBytes");
     if (nodes.has(task.id)) throw new Error(`Duplicate task: ${task.id}`);
     if (task.dependsOn !== undefined && (!Array.isArray(task.dependsOn) || new Set(task.dependsOn).size !== task.dependsOn.length)) throw new Error(`Invalid dependencies: ${task.id}`);
     nodes.set(task.id, task);
@@ -90,7 +91,7 @@ export function validateSnapshot(snapshot: CoordinationSnapshot, id: string): vo
   positive(snapshot.revision, "revision"); name(snapshot.policyVersion, "policy version");
   for (const key of ["maxConcurrent", "maxTasks", "maxOutputBytes"] as const) positive(snapshot.limits?.[key], key);
   limits(snapshot.limits);
-  validateGraph(snapshot.tasks, snapshot.limits.maxTasks);
+  validateGraph(snapshot.tasks, snapshot.limits.maxTasks, snapshot.limits.maxInputBytes);
   if (snapshot.startedAt !== undefined && (!Number.isSafeInteger(snapshot.startedAt) || snapshot.startedAt < 0)) throw new Error("Invalid start time");
   if (snapshot.stopReason !== undefined && typeof snapshot.stopReason !== "string") throw new Error("Invalid stop reason");
   if (!snapshot.commands || typeof snapshot.commands !== "object" || Array.isArray(snapshot.commands)) throw new Error("Invalid command receipts");

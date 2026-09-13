@@ -1,7 +1,8 @@
+import { acquireFileLock, releaseFileLock } from "@may/session/file-store";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readdir, realpath, unlink, type FileHandle } from "node:fs/promises";
+import { lstat, mkdir, open, readdir, realpath, type FileHandle } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { AsyncStateSerializer } from "@may/application";
@@ -57,7 +58,7 @@ export class TeamVerificationStore {
     if ((await lstat(options.directory)).isSymbolicLink()) throw new Error("Verification directory must not be a symbolic link");
     const path = join(await realpath(options.directory), "verification.jsonl");
     const lockPath = `${path}.lock`;
-    const lock = await open(lockPath, "wx", 0o600);
+    const lock = await acquireFileLock(lockPath);
     let file: FileHandle | undefined;
     try {
       await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
@@ -80,7 +81,7 @@ export class TeamVerificationStore {
         await store.append({ type: "check", result: { ...result, status: "unknown", detail: "Interrupted check; inspect effects and reconcile before a new command." } });
       }
       return store;
-    } catch (error) { await file?.close().catch(() => undefined); await lock.close(); await unlink(lockPath); throw error; }
+    } catch (error) { await file?.close().catch(() => undefined); await releaseFileLock(lock, lockPath); throw error; }
   }
 
   /** Read-only status inspection, including while a writer owns the journal. */
@@ -179,7 +180,7 @@ export class TeamVerificationStore {
   close(): Promise<void> {
     return this.closing ??= (async () => {
       await Promise.allSettled([...this.active]); await this.serial.close();
-      await this.file.close(); await this.lock.close(); await unlink(this.lockPath);
+      try { await this.file.close(); } finally { await releaseFileLock(this.lock, this.lockPath); }
     })();
   }
 
@@ -351,6 +352,7 @@ async function readWorkspaceFile(directory: string, path: string): Promise<Buffe
 
 async function runCommand(spec: Extract<TeamCheckSpec, { type: "command" }>, workspace: string, signal?: AbortSignal): Promise<Pick<TeamCheckResult, "status" | "detail" | "exitCode" | "output">> {
   signal?.throwIfAborted();
+  if (process.platform === "win32" && /\.(?:cmd|bat)$/iu.test(spec.command)) return { status: "failed", detail: "Command checks execute native programs directly. Use node.exe with the package manager JavaScript entry point, not .cmd/.bat." };
   const cwd = await realpath(workspace);
   const env: NodeJS.ProcessEnv = {};
   // No inherited API keys, proxy tokens, NODE_OPTIONS, package hooks, or user home config.
@@ -377,7 +379,7 @@ async function runCommand(spec: Extract<TeamCheckSpec, { type: "command" }>, wor
       else output = Buffer.concat([output, chunk]);
     };
     child.stdout.on("data", collect); child.stderr.on("data", collect);
-    child.on("error", (error) => finish("unknown", undefined, message(error)));
+    child.on("error", (error) => finish(child.pid === undefined ? "failed" : "unknown", undefined, message(error)));
     child.on("close", (code, terminationSignal) => {
       if (reason || terminationSignal || code === null) finish("unknown", undefined, reason ?? `Check ended by ${terminationSignal ?? "unknown termination"}`);
       else finish(code === 0 ? "passed" : "failed", code, code === 0 ? "Configured command exited successfully" : "Configured command exited unsuccessfully");

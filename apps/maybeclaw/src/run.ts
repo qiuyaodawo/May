@@ -54,6 +54,7 @@ export async function runMaybeClaw(args: readonly string[], deps: MaybeClawDepen
   const print = (value: unknown) => out.write(`${JSON.stringify(value, null, 2)}\n`);
   try {
     if (command.action === "serve") {
+      if (deps.signal === undefined) throw new Error("serve requires an AbortSignal for shutdown; pass dependencies.signal");
       const token = secretFromEnv(command.tokenEnv ?? "MAYBECLAW_CONTROL_TOKEN");
       const config = await (deps.loadConfig ?? loadMayConfig)(command.config ? { path: command.config } : {});
       const settings = hostSettings(config);

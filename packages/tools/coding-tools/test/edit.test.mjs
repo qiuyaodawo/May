@@ -3,7 +3,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { createEditTool } from "../dist/index.js";
+import { createEditTool, createReadTool, createToolChangePreview } from "../dist/index.js";
+import { atomicWriteText } from "../dist/atomic-write.js";
 import { assertErrorCode, createWorkspace, executeTool } from "./helpers.mjs";
 
 test("edit replaces one exact occurrence", async (t) => {
@@ -21,6 +22,24 @@ test("edit replaces one exact occurrence", async (t) => {
     await readFile(join(cwd, "file.txt"), "utf8"),
     "before updated after",
   );
+});
+
+test("read/edit preserves CRLF and literal dollar sequences; aborted staging preserves the destination", async (t) => {
+  const cwd = await createWorkspace(t);
+  const path = join(cwd, "script.txt");
+  await writeFile(path, "one\r\ntwo\r\n");
+  const { content } = await executeTool(createReadTool({ cwd }), { path: "script.txt" });
+  const replacement = "$$ $& $` $' $1\r\n";
+  const preview = await createToolChangePreview(cwd, "edit", { path: "script.txt", oldText: content, newText: replacement });
+  assert.equal(preview.status, "ready");
+  assert.ok(preview.diff.includes("$$ $& $` $' $1"));
+  await executeTool(createEditTool({ cwd }), { path: "script.txt", oldText: content, newText: replacement });
+  assert.equal(await readFile(path, "utf8"), replacement);
+  const controller = new AbortController();
+  const writing = atomicWriteText(path, "x".repeat(16 * 1024 * 1024), controller.signal);
+  setImmediate(() => controller.abort());
+  await assert.rejects(writing);
+  assert.equal(await readFile(path, "utf8"), replacement);
 });
 
 test("edit preserves a UTF-8 byte order mark", async (t) => {

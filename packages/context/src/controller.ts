@@ -1,3 +1,4 @@
+import { jsonEqual } from "@may/core";
 import type { Context, ContextSnapshot, Message, Usage } from "@may/core";
 
 import type {
@@ -269,7 +270,9 @@ export class SnapshotContextController implements ContextController {
       ));
       throwIfAborted(options.signal);
 
+      let conflicts = 0;
       while (true) {
+        if (++conflicts > 16) throw new Error("Context changed repeatedly during compaction; retry when idle");
         const latestSnapshot = await this.context.snapshot();
         throwIfAborted(options.signal);
         const tail = appendedTail(sourceSnapshot.messages, latestSnapshot.messages);
@@ -378,7 +381,7 @@ function messagesEqual(
   left: readonly Message[],
   right: readonly Message[],
 ): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return jsonEqual(left, right);
 }
 
 function normalizeCompactionOutput(

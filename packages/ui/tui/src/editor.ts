@@ -189,7 +189,7 @@ export class Editor implements InteractiveComponent, FocusTarget {
     if (this.graphemes.length === 0 && this.options.placeholder !== undefined) {
       const prefix = fitPrefix(this.prompt, size.width);
       lines = [sliceAnsi(
-        `${prefix}${styleText(this.options.placeholder, this.options.placeholderStyle)}`,
+        `${prefix}${styleText(this.options.placeholder.replace(/[\r\n]+/gu, " "), this.options.placeholderStyle)}`,
         0,
         size.width,
       )];

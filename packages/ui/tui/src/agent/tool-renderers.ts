@@ -20,6 +20,8 @@ export interface ToolTranscriptRenderer {
 /** Instance-scoped registry: applications can replace presentation without global state. */
 export class ToolRendererRegistry {
   private readonly renderers = new Map<string, ToolTranscriptRenderer>();
+  private generation = 0;
+  get revision(): number { return this.generation; }
 
   constructor(private readonly fallback: ToolTranscriptRenderer = genericRenderer) {}
 
@@ -27,6 +29,7 @@ export class ToolRendererRegistry {
     const normalized = name.trim();
     if (normalized === "") throw new Error("Tool renderer name cannot be empty");
     this.renderers.set(normalized, renderer);
+    this.generation++;
     return this;
   }
 
@@ -283,5 +286,5 @@ function primitiveField(
 function truncateCharacters(value: string, maximum: number): string {
   return value.length <= maximum
     ? value
-    : `${value.slice(0, Math.max(0, maximum - 1))}…`;
+    : `${value.slice(0, Math.max(0, maximum - 1)).replace(/[\uD800-\uDBFF]$/u, "")}…`;
 }

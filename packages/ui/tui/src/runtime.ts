@@ -106,8 +106,7 @@ export class TuiRuntime {
     this.disposeResize?.();
     this.disposeKey = undefined;
     this.disposeResize = undefined;
-    this.renderer.dispose();
-    this.terminal.close();
+    try { this.renderer.dispose(); } finally { this.terminal.close(); }
   }
 
   private readonly handleKey = (stroke: KeyStroke): void => {

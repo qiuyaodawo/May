@@ -33,25 +33,26 @@ export class InMemoryContext implements Context {
 
   constructor(options: InMemoryContextOptions = {}) {
     this.instructions = options.instructions;
-    this.messages = [...(options.messages ?? [])];
-    this.metadata = options.metadata;
+    this.messages = structuredClone(options.messages ?? []);
+    this.metadata = structuredClone(options.metadata);
   }
 
-  async snapshot(): Promise<ContextSnapshot> {
-    const snapshot: ContextSnapshot = { messages: [...this.messages] };
+  async snapshot(options?: SnapshotOptions): Promise<ContextSnapshot> {
+    options?.signal?.throwIfAborted();
+    const snapshot: ContextSnapshot = { messages: structuredClone(this.messages) };
 
     if (this.instructions !== undefined) {
       snapshot.instructions = this.instructions;
     }
 
     if (this.metadata !== undefined) {
-      snapshot.metadata = { ...this.metadata };
+      snapshot.metadata = structuredClone(this.metadata);
     }
 
     return snapshot;
   }
 
   async append(messages: Message[]): Promise<void> {
-    this.messages.push(...messages);
+    this.messages.push(...structuredClone(messages));
   }
 }

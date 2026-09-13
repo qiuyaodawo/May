@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readdir, realpath } from "node:fs/promises";
+import { lstat, mkdir, open, readdir, realpath, rename } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { ResourceJournal, count, resourceId } from "./resource-journal.js";
@@ -81,7 +81,8 @@ export class TaskWorkspaceManager {
     try {
       if (!(await journal.snapshot()).baselineReady) {
         const base = join(directory, "baseline");
-        // An interrupted copy stays quarantined. Never silently replace a partially observed baseline.
+        // Only unpublished copies are quarantined; committed baselines remain immutable.
+        await quarantineUnpublished(base, directory);
         await mkdir(base);
         const entries = await scan(source, config);
         await copyEntries(source, base, entries);
@@ -105,6 +106,7 @@ export class TaskWorkspaceManager {
       const parent = join(this.directory, "tasks", hash(Buffer.from(taskId)));
       await mkdir(join(this.directory, "tasks"), { recursive: true });
       if ((await lstat(join(this.directory, "tasks"))).isSymbolicLink()) throw new Error("Task directory must not be a symbolic link");
+      await quarantineUnpublished(parent, this.directory);
       await mkdir(parent); await mkdir(directory);
       await copyEntries(join(this.directory, "baseline"), directory, state.baseline);
       return { ...state, tasks: [...state.tasks, taskId] };
@@ -196,7 +198,7 @@ async function scan(root: string, config: WorkspaceState["config"], rejectUnsafe
   const visit = async (directory: string, depth: number): Promise<void> => {
     if (depth > 64) throw new Error("Workspace exceeds maximum directory depth");
     if (!inside(canonical, await realpath(directory)) || (await lstat(directory)).isSymbolicLink()) throw new Error("Workspace directory escaped its root");
-    for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
       if (omitted(entry.name, config.excludeNames)) continue;
       if (++visited > config.maxFiles * 4) throw new Error("Workspace has too many directory entries");
       const path = join(directory, entry.name);
@@ -289,4 +291,12 @@ function validate(state: WorkspaceState, source: string, config: WorkspaceState[
   }
   if (total > config.maxBytes || (!state.baselineReady && (state.baseline.length || state.tasks.length))) throw new Error("Invalid workspace baseline");
   for (const task of state.tasks) resourceId(task, "workspace task id");
+}
+
+async function quarantineUnpublished(path: string, root: string): Promise<void> {
+  let info;
+  try { info = await lstat(path); }
+  catch (error) { if (error instanceof Error && "code" in error && error.code === "ENOENT") return; throw error; }
+  if (!info.isDirectory() || info.isSymbolicLink() || !inside(root, await realpath(path))) throw new Error("Unsafe unpublished workspace");
+  await rename(path, `${path}.quarantine-${randomUUID()}`);
 }

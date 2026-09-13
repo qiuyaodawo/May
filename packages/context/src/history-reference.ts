@@ -47,7 +47,6 @@ export class HistoryReferenceStrategy implements ContextCompactionStrategy {
     if (userIndexes.length <= this.keepRecentTurns) return snapshot.messages;
 
     const boundary = userIndexes[userIndexes.length - this.keepRecentTurns]!;
-    if (boundary === 0) return snapshot.messages;
     const reference = (typeof this.reference === "string"
       ? this.reference
       : await this.reference({

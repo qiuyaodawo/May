@@ -246,3 +246,22 @@ Run/continue 复制并冻结一次，作为 `ToolExecutionContext.scope` 传到�
 权限边界，不放入模型定义或参数。禁止从工具输入推导这些标签。
 `AgentApplication.toolScope` 接受标签记录并提供自身 Session id，MaybeCode 还
 提供 workspace 身份。标签用于交互路由，不代替访问策略。
+
+## 文件与进程安全
+
+内置 `read` 保留原始行尾，默认允许读取硬链接；宿主也要禁止读取时可设
+`read.allowHardLinks: false`。路径和符号链接的工作区边界校验仍然生效。
+`write`、`edit` 默认拒绝硬链接，在目标同目录暂存完整 UTF-8 内容、同步并重命名；
+提交前取消不会截断原文件。替换文本按字面值处理，包括 `$` 序列。替换会改变文件身份，
+显式允许的硬链接会断开关联，而不是修改其他别名。它不能防御并发的不可信文件系统修改，
+也不保证 Windows 目录级断电持久性。
+
+shell 默认移除继承环境中含 `TOKEN`、`SECRET`、`PASSWORD`、`CREDENTIAL`、
+`API_KEY`、`APIKEY` 的凭据类变量名。宿主可用 `inheritEnv: false` 禁用继承，
+通过 `envAllowlist` / `envDenylist` 过滤，或通过 `env` 显式传入；值为 `undefined`
+表示移除变量，拒绝列表也约束覆盖值。这不是 OS 沙箱，命令仍可读取有权限访问的凭据文件。
+超时或取消后的管道排空最多等待一秒；这不代表整个进程树已被确认终止。
+
+`MayOptions.toolSettleTimeoutMs` 默认 2,000 ms。工具忽略取消且超时未结束时，
+Run 以 `RUN_CHECKPOINT_FAILED` 失败，该 runtime 不可复用。应停止残留工作、检查外部
+效果并完成 Session 核对后创建新 runtime，不能把截止时间当作外部操作已经停止的证明。

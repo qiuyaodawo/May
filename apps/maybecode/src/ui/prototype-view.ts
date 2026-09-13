@@ -459,9 +459,10 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     void this.resolveSubmission(value, completeCommand)
       .then(
         (status) => this.setStatus(status ?? "Ready"),
-        (error: unknown) => this.setStatus(
-          `Error: ${error instanceof Error ? error.message : String(error)}`,
-        ),
+        (error: unknown) => {
+          if (this.editor.value === "") this.editor.setValue(value);
+          this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`);
+        },
       )
       .finally(() => this.submissionInFlight = false);
   }
@@ -473,7 +474,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     let submission = value;
     if (completeCommand && value.startsWith("/")) {
       const suggestions = await this.suggestionsFor(value);
-      submission = suggestions[0]?.value ?? value;
+      submission = suggestions.length === 1 ? suggestions[0]!.value : value;
     }
     const uiResult = this.uiActions.executeCommand(submission);
     if (uiResult.matched) return uiResult.status;

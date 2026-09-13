@@ -139,7 +139,7 @@ function renderModelPicker(
   selectedIndex: number,
   currentProfile: string | undefined,
 ): string {
-  const pageSize = 12;
+  const pageSize = 10;
   const start = Math.floor(selectedIndex / pageSize) * pageSize;
   let output = "MaybeCode — Select model\n\n";
   for (const [offset, model] of models.slice(start, start + pageSize).entries()) {

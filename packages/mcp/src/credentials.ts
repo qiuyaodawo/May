@@ -14,8 +14,8 @@ export interface McpCredentialStore {
 }
 
 export class McpCredentialStoreError extends MayError {
-  constructor(message = "MCP credential vault is unavailable; unlock the OS keyring or provide a secure credential store") {
-    super("MCP_CREDENTIAL_STORE_UNAVAILABLE", message);
+  constructor(message = "MCP credential vault is unavailable; unlock the OS keyring or provide a secure credential store", readonly reason = "storage-unavailable") {
+    super("MCP_CREDENTIAL_STORE_UNAVAILABLE", message, { cause: new Error(reason) });
   }
 }
 
@@ -74,7 +74,7 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
       finally { plain.fill(0); }
     } catch (error) {
       if (hasCode(error, "ENOENT")) return undefined;
-      throw new McpCredentialStoreError();
+      throw new McpCredentialStoreError(undefined, error instanceof SyntaxError ? "invalid-record" : hasCode(error, "EACCES") || hasCode(error, "EPERM") ? "permission-denied" : error instanceof McpCredentialStoreError ? error.reason : "invalid-or-unreadable-record");
     }
   }
 
@@ -150,7 +150,7 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
         const key = Buffer.from(value, "base64");
         if (key.length !== 32) throw new Error();
         return key;
-      } catch { throw new McpCredentialStoreError(); }
+      } catch { throw new McpCredentialStoreError(undefined, "keyring-unavailable"); }
     }).catch((error: unknown) => { this.key = undefined; throw error; });
     return this.key;
   }

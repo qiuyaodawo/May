@@ -247,7 +247,8 @@ export class Session {
     presentation: SessionToolPresentation,
   ): Promise<void> {
     validateToolPresentation(presentation);
-    await this.record({ type: "tool.presentation", ...presentation });
+    const snapshot = JSON.parse(JSON.stringify(presentation)) as SessionToolPresentation;
+    await this.record({ type: "tool.presentation", ...snapshot });
   }
 
   private async start(options: SessionSubmitOptions): Promise<RunHandle> {
@@ -370,6 +371,7 @@ export class Session {
       this.finishedRunObservationErrors.set(run.id, terminalError);
       this.rejectModelCompletionWaiters(run.id, terminalError);
       this.clearModelCompletionState(run.id);
+      for (const key of this.checkpointed) if ((JSON.parse(key) as unknown[])[1] === run.id) this.checkpointed.delete(key);
       events.close();
     }
   }
@@ -698,6 +700,17 @@ function replaySession(events: readonly SessionEvent[]): {
     }
   }
 
+  // Outcomes are durable in completion order, but model messages follow call order.
+  for (let index = 0; index < messages.length; index++) {
+    const message = messages[index]!;
+    if (message.role !== "assistant" || !message.toolCalls?.length) continue;
+    const order = new Map(message.toolCalls.map((call, position) => [call.id, position]));
+    let end = index + 1;
+    while (messages[end]?.role === "tool") end++;
+    const results = messages.slice(index + 1, end);
+    results.sort((a, b) => (a.role === "tool" ? order.get(a.toolCallId) ?? Infinity : Infinity) - (b.role === "tool" ? order.get(b.toolCallId) ?? Infinity : Infinity));
+    messages.splice(index + 1, results.length, ...results);
+  }
   return {
     messages,
     info: { ...(latestModelMeasurement === undefined ? {} : { latestModelMeasurement }),

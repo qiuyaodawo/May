@@ -1,5 +1,6 @@
+import { acquireFileLock, releaseFileLock, replaceJournalFile } from "@may/session/file-store";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, unlink, type FileHandle } from "node:fs/promises";
+import { lstat, mkdir, open, type FileHandle } from "node:fs/promises";
 import { dirname } from "node:path";
 import { AsyncStateSerializer } from "@may/application";
 
@@ -10,7 +11,7 @@ export class ResourceJournal<T extends Revision> {
   private readonly serial = new AsyncStateSerializer();
   private failed = false;
   private closing: Promise<void> | undefined;
-  private constructor(private readonly file: FileHandle, private readonly lock: FileHandle,
+  private constructor(private file: FileHandle, private readonly path: string, private readonly lock: FileHandle,
     private readonly lockPath: string, private current: T, private size: number,
     private readonly validate: (value: T) => void, private readonly maxBytes: number) {}
 
@@ -26,8 +27,9 @@ export class ResourceJournal<T extends Revision> {
       const end = bytes.lastIndexOf(10) + 1;
       let state: T | undefined;
       for (const line of bytes.subarray(0, end).toString("utf8").split("\n").slice(0, -1)) {
-        const next = JSON.parse(line) as T; validate(next);
-        if (next.revision !== (state?.revision ?? 0) + 1) throw new Error("Invalid resource journal sequence");
+        const record = JSON.parse(line) as T | { checkpoint: T };
+        const next = "checkpoint" in record ? record.checkpoint : record; validate(next);
+        if (!(state === undefined && "checkpoint" in record) && next.revision !== (state?.revision ?? 0) + 1) throw new Error("Invalid resource journal sequence");
         state = next;
       }
       return state;
@@ -38,7 +40,7 @@ export class ResourceJournal<T extends Revision> {
     maxBytes = 67_108_864): Promise<ResourceJournal<T>> {
     await mkdir(dirname(path), { recursive: true });
     const lockPath = `${path}.lock`;
-    const lock = await open(lockPath, "wx");
+    const lock = await acquireFileLock(lockPath);
     let file: FileHandle | undefined;
     try {
       await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
@@ -52,20 +54,21 @@ export class ResourceJournal<T extends Revision> {
       let current = initial;
       validate(current);
       for (const line of bytes.subarray(0, committed).toString("utf8").split("\n").slice(0, -1)) {
-        const next = JSON.parse(line) as T;
+        const record = JSON.parse(line) as T | { checkpoint: T };
+        const next = "checkpoint" in record ? record.checkpoint : record;
         validate(next);
-        if (next.revision !== current.revision + 1) throw new Error("Invalid resource journal sequence");
+        if (!(current === initial && "checkpoint" in record) && next.revision !== current.revision + 1) throw new Error("Invalid resource journal sequence");
         current = next;
       }
       if (committed !== bytes.length) {
         const repair = await open(path, "r+");
         try { await repair.truncate(committed); await repair.sync(); } finally { await repair.close(); }
       }
-      const journal = new ResourceJournal(file, lock, lockPath, current, committed, validate, maxBytes);
+      const journal = new ResourceJournal(file, path, lock, lockPath, current, committed, validate, maxBytes);
       if (committed === 0) await journal.transact((state) => ({ ...state }));
       return journal;
     } catch (error) {
-      await file?.close().catch(() => undefined); await lock.close(); await unlink(lockPath); throw error;
+      await file?.close().catch(() => undefined); await releaseFileLock(lock, lockPath); throw error;
     }
   }
 
@@ -80,17 +83,25 @@ export class ResourceJournal<T extends Revision> {
       this.validate(next);
       const line = `${JSON.stringify(next)}\n`;
       const size = Buffer.byteLength(line);
-      if (this.size + size > this.maxBytes) throw new Error("Resource journal exceeds its byte limit");
-      try { await this.file.writeFile(line, "utf8"); await this.file.sync(); }
+      const compact = this.size + size > this.maxBytes;
+      const checkpoint = `${JSON.stringify({ checkpoint: next })}\n`;
+      if (size > this.maxBytes || compact && Buffer.byteLength(checkpoint) > this.maxBytes) throw new Error("Resource snapshot exceeds its byte limit");
+      try {
+        if (compact) {
+          const previous = this.file;
+          await previous.close();
+          this.file = await replaceJournalFile(this.path, checkpoint);
+        } else { await this.file.writeFile(line, "utf8"); await this.file.sync(); }
+      }
       catch (error) { this.failed = true; throw error; }
-      this.current = next; this.size += size;
+      this.current = next; this.size = compact ? Buffer.byteLength(checkpoint) : this.size + size;
       return structuredClone(next);
     });
   }
 
   close(): Promise<void> {
     return this.closing ??= (async () => {
-      await this.serial.close(); await this.file.close(); await this.lock.close(); await unlink(this.lockPath);
+      await this.serial.close(); try { await this.file.close(); } finally { await releaseFileLock(this.lock, this.lockPath); }
     })();
   }
 

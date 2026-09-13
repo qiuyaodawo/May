@@ -1,7 +1,9 @@
-import { mkdir, open, readFile, rm } from "node:fs/promises";
+import { mkdir, open, readFile, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import type { SessionEvent } from "./events.js";
+import { syncDirectory } from "./file-ownership.js";
+export { acquireFileLock, recoverFileLock, releaseFileLock, syncDirectory, replaceJournalFile } from "./file-ownership.js";
 import {
   type SessionStore,
   validateSessionHistory,
@@ -10,6 +12,7 @@ import {
 export class FileSessionStore implements SessionStore {
   readonly directory: string;
 
+  private readonly validated = new Map<string, { seq: number; size: number; mtimeMs: number; ctimeMs: number; ino: number }>();
   private readonly tails = new Map<string, Promise<void>>();
 
   constructor(directory: string) {
@@ -36,15 +39,15 @@ export class FileSessionStore implements SessionStore {
     return operation;
   }
 
-  async read(sessionId: string): Promise<readonly SessionEvent[]> {
-    await this.tails.get(sessionId);
-    return this.readNow(sessionId);
+  read(sessionId: string): Promise<readonly SessionEvent[]> {
+    return this.enqueue(sessionId, () => this.readNow(sessionId));
   }
 
   delete(sessionId: string): Promise<boolean> {
     return this.enqueue(sessionId, async () => {
       try {
         await rm(this.filePath(sessionId));
+        this.validated.delete(sessionId);
         return true;
       } catch (error) {
         if (isNodeError(error, "ENOENT")) return false;
@@ -54,8 +57,10 @@ export class FileSessionStore implements SessionStore {
   }
 
   private async appendNow(event: SessionEvent): Promise<void> {
-    const events = await this.readNow(event.sessionId);
-    const expectedSeq = events.length + 1;
+    const cached = this.validated.get(event.sessionId);
+    const info = cached === undefined ? undefined : await stat(this.filePath(event.sessionId)).catch(() => undefined);
+    const unchanged = cached !== undefined && info !== undefined && cached.size === info.size && cached.mtimeMs === info.mtimeMs && cached.ctimeMs === info.ctimeMs && cached.ino === info.ino;
+    const expectedSeq = (unchanged ? cached.seq : (await this.readNow(event.sessionId)).length) + 1;
 
     if (event.seq !== expectedSeq) {
       throw new Error(
@@ -68,6 +73,10 @@ export class FileSessionStore implements SessionStore {
     try {
       await file.writeFile(`${JSON.stringify(event)}\n`, "utf8");
       await file.sync();
+      if (expectedSeq === 1) await syncDirectory(this.directory);
+      const info = await file.stat();
+      if (this.validated.size >= 256) this.validated.delete(this.validated.keys().next().value!);
+      this.validated.set(event.sessionId, { seq: expectedSeq, size: info.size, mtimeMs: info.mtimeMs, ctimeMs: info.ctimeMs, ino: info.ino });
     } finally { await file.close(); }
   }
 
@@ -123,14 +132,42 @@ function parseEvent(line: string, path: string, lineNumber: number): SessionEven
     !("sessionId" in value) ||
     typeof value.sessionId !== "string" ||
     !("seq" in value) ||
-    !Number.isInteger(value.seq) ||
+    !Number.isSafeInteger(value.seq) || Number(value.seq) < 1 ||
     !("timestamp" in value) ||
-    typeof value.timestamp !== "number"
+    typeof value.timestamp !== "number" || !Number.isFinite(value.timestamp) ||
+    !validPayload(value as Record<string, unknown>)
   ) {
     throw new Error(`Invalid session event at ${path}:${lineNumber}`);
   }
 
   return value as SessionEvent;
+}
+
+function validPayload(event: Record<string, unknown>): boolean {
+  const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+  const call = (value: unknown): boolean => object(value) && typeof value.id === "string" && typeof value.name === "string";
+  const message = (value: unknown): boolean => object(value) && ["system", "user", "assistant", "tool"].includes(String(value.role)) && Array.isArray(value.content) && value.content.every((part) => object(part) && (part.type === "json" || ["text", "reasoning"].includes(String(part.type)) && typeof part.text === "string" || ["image", "audio", "file"].includes(String(part.type)) && object(part.source) || part.type === "resource" && typeof part.uri === "string")) && (value.toolCalls === undefined || Array.isArray(value.toolCalls) && value.toolCalls.every(call));
+  if ((String(event.type).startsWith("run.") || String(event.type).startsWith("tool.") || event.type === "assistant.completed") && typeof event.runId !== "string") return false;
+  if ((String(event.type).startsWith("tool.") || event.type === "assistant.completed") && (!Number.isSafeInteger(event.step) || Number(event.step) < 1)) return false;
+  switch (event.type) {
+    case "session.created": return event.metadata === undefined || object(event.metadata);
+    case "state.updated": return typeof event.key === "string";
+    case "input.submitted": case "assistant.completed": return message(event.message);
+    case "context.compacted": return Array.isArray(event.messages) && event.messages.every(message) && typeof event.strategy === "string";
+    case "tool.started": case "tool.completed": return call(event.call);
+    case "tool.failed": return call(event.call) && object(event.error) && typeof event.error.message === "string";
+    case "tool.presentation": return typeof event.toolCallId === "string" && typeof event.kind === "string" && Number.isSafeInteger(event.version);
+    case "run.started": case "run.cancelled": return true;
+    case "run.failed": return object(event.error) && typeof event.error.message === "string";
+    case "run.completed": case "run.yielded": return object(event.result);
+    case "run.budget.exceeded": return typeof event.dimension === "string" && object(event.budget);
+    case "run.interrupted": return Array.isArray(event.recoveries) && event.recoveries.every((value) => object(value) && typeof value.id === "string" && typeof value.runId === "string" && Number.isSafeInteger(value.step) && call(value.call) && ["unknown", "not-started"].includes(String(value.status)));
+    case "recovery.resolved": return typeof event.recoveryId === "string" && message(event.message);
+    case "approval.requested": return object(event.request) && typeof event.request.id === "string" && object(event.request.tool) && typeof event.request.tool.name === "string";
+    case "approval.resolved": return typeof event.requestId === "string" && ["allow", "allow-session", "deny"].includes(String(event.decision));
+    case "approval.cancelled": return typeof event.requestId === "string";
+    default: return false;
+  }
 }
 
 function isNodeError(error: unknown, code: string): boolean {

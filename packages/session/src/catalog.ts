@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { syncDirectory } from "./file-ownership.js";
 import { join, resolve } from "node:path";
 
 export interface SessionSummary {
@@ -71,6 +72,29 @@ export class FileSessionCatalog implements SessionCatalog {
   private readonly operationsDirectory: string;
   private operationClock = 0;
 
+  /** Offline maintenance: stop other catalog users before compacting operation files. */
+  compact(options: { readonly confirmHostsStopped: true }): Promise<void> {
+    if (options.confirmHostsStopped !== true) return Promise.reject(new Error("Catalog compaction requires stopped hosts"));
+    return this.enqueue(async () => {
+      const sessions = await this.readNow();
+      const names = await readdir(this.operationsDirectory).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return []; throw error;
+      });
+      const absorbed = names.filter((name) => name.endsWith(".json"));
+      if (absorbed.length === 0) return;
+      const temporary = `${this.path}.${randomUUID()}.tmp`;
+      try {
+        const file = await open(temporary, "wx", 0o600);
+        try { await file.writeFile(JSON.stringify({ version: 2, sessions, absorbed })); await file.sync(); }
+        finally { await file.close(); }
+        await rename(temporary, this.path);
+        await syncDirectory(resolve(this.path, ".."));
+        // The snapshot records exact absorbed names, so a crash during cleanup is replay-safe.
+        for (const name of absorbed) await rm(join(this.operationsDirectory, name), { force: true });
+      } finally { await rm(temporary, { force: true }); }
+    });
+  }
+
   constructor(path: string) {
     this.path = resolve(path);
     this.operationsDirectory = `${this.path}.operations`;
@@ -127,10 +151,9 @@ export class FileSessionCatalog implements SessionCatalog {
   }
 
   private async readNow(): Promise<SessionSummary[]> {
-    const sessions = new Map(
-      (await this.readLegacyCatalog()).map((summary) => [summary.id, summary]),
-    );
-    for (const operation of await this.readOperations()) {
+    const snapshot = await this.readLegacyCatalog();
+    const sessions = new Map(snapshot.sessions.map((summary) => [summary.id, summary]));
+    for (const operation of await this.readOperations(new Set(snapshot.absorbed))) {
       if (operation.type === "record") {
         sessions.set(
           operation.summary.id,
@@ -154,12 +177,12 @@ export class FileSessionCatalog implements SessionCatalog {
     return [...sessions.values()];
   }
 
-  private async readLegacyCatalog(): Promise<SessionSummary[]> {
+  private async readLegacyCatalog(): Promise<{ sessions: SessionSummary[]; absorbed: string[] }> {
     let source: string;
     try {
       source = await readFile(this.path, "utf8");
     } catch (error) {
-      if (isNodeError(error, "ENOENT")) return [];
+      if (isNodeError(error, "ENOENT")) return { sessions: [], absorbed: [] };
       throw error;
     }
 
@@ -171,20 +194,22 @@ export class FileSessionCatalog implements SessionCatalog {
     }
     if (
       typeof value !== "object" || value === null ||
-      !("version" in value) || value.version !== 1 ||
+      !("version" in value) || (value.version !== 1 && value.version !== 2) ||
       !("sessions" in value) || !Array.isArray(value.sessions) ||
       !value.sessions.every(isSessionSummary)
     ) {
       throw new Error(`Invalid May session catalog: ${this.path}`);
     }
-    return value.sessions.map((item) => ({ ...item }));
+    const absorbed = value.version === 2 && "absorbed" in value ? value.absorbed : [];
+    if (!Array.isArray(absorbed) || absorbed.some((name) => typeof name !== "string" || !/^[\w.-]+\.json$/u.test(name))) throw new Error(`Invalid May session catalog checkpoint: ${this.path}`);
+    return { sessions: value.sessions.map((item) => ({ ...item })), absorbed };
   }
 
-  private async readOperations(): Promise<CatalogOperation[]> {
+  private async readOperations(absorbed = new Set<string>()): Promise<CatalogOperation[]> {
     let names: string[];
     try {
       names = (await readdir(this.operationsDirectory))
-        .filter((name) => name.endsWith(".json"))
+        .filter((name) => name.endsWith(".json") && !absorbed.has(name))
         .sort();
     } catch (error) {
       if (isNodeError(error, "ENOENT")) return [];

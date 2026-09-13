@@ -132,11 +132,12 @@ export class McpHostClient extends Client {
   }
 
   scope(options: RequestOptions, owner: McpInteractionOwner | undefined, lifetime: AbortSignal, beforeRetry: () => Promise<void>): RequestOptions {
-    const timeout = options.maxTotalTimeout ?? 60_000;
+    const timeout = options.maxTotalTimeout;
     const controller = new AbortController();
-    const signal = AbortSignal.any([lifetime, controller.signal, AbortSignal.timeout(Math.ceil(timeout)), ...(options.signal === undefined ? [] : [options.signal])]);
-    const binding: Binding = { id: randomUUID(), owner: owner === undefined ? undefined : Object.freeze({ ...owner }), signal, expiresAt: Date.now() + timeout, beforeRetry, controller, count: 0, samplingCalls: 0, samplingTokens: 0 };
-    const scoped: ScopedRequest = { ...options, signal, maxTotalTimeout: timeout, [bindingKey]: binding };
+    const deadline = timeout === undefined ? Infinity : Date.now() + timeout;
+    const signal = AbortSignal.any([lifetime, controller.signal, ...(timeout === undefined ? [] : [AbortSignal.timeout(Math.ceil(timeout))]), ...(options.signal === undefined ? [] : [options.signal])]);
+    const binding: Binding = { id: randomUUID(), owner: owner === undefined ? undefined : Object.freeze({ ...owner }), signal, get expiresAt() { return Math.min(deadline, Date.now() + (options.timeout ?? 60_000)); }, beforeRetry, controller, count: 0, samplingCalls: 0, samplingTokens: 0 };
+    const scoped: ScopedRequest = { ...options, signal, [bindingKey]: binding };
     return scoped;
   }
 

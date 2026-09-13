@@ -287,7 +287,11 @@ export class AgentApplication implements AgentController {
             ...(options.sessionId === undefined ? {} : { id: options.sessionId }),
           });
       historySource = session;
-      await options.validateSession?.(session.metadata);
+      try { await options.validateSession?.(session.metadata); }
+      catch (error) {
+        if (options.resume !== true) await options.store?.delete?.(session.id);
+        throw error;
+      }
       permissions.setEventSink((event) => session.recordPermissionEvent(event));
       application = new AgentApplication(
         session,
@@ -370,9 +374,14 @@ export class AgentApplication implements AgentController {
     this.starting = true;
     try {
       const run = await start();
+      if (this.closed) {
+        run.cancel(this.closeReason);
+        await run.result.catch(() => undefined);
+        this.throwIfClosed();
+      }
       const relay = this.relayRunEvents(run.events);
       this.runRelays.add(relay);
-      void relay.finally(() => this.runRelays.delete(relay));
+      void relay.then(() => this.runRelays.delete(relay), () => this.runRelays.delete(relay));
 
       const result = relay.then(() => run.result);
       const wrapped: AgentRun = {
@@ -562,18 +571,21 @@ export class AgentApplication implements AgentController {
     if (this.closed) return;
     this.closed = true;
 
-    const active = this.currentRun;
-    active?.cancel(this.closeReason);
-    await active?.result.catch(() => undefined);
-    const compaction = this.activeCompaction;
-    compaction?.controller.abort(this.closeReason);
-    await compaction?.result.catch(() => undefined);
-    await this.permissions.close(this.closeReason);
-    await Promise.all([...this.runRelays]);
-    await this.permissionRelay;
-    this.contextController?.setAutoCompactionSink?.(undefined);
-    this.contextController?.setAutoCompactionFailureSink?.(undefined);
-    this.eventQueue.close();
+    try {
+      const active = this.currentRun;
+      active?.cancel(this.closeReason);
+      await active?.result.catch(() => undefined);
+      const compaction = this.activeCompaction;
+      compaction?.controller.abort(this.closeReason);
+      await compaction?.result.catch(() => undefined);
+      await this.permissions.close(this.closeReason);
+      await Promise.all([...this.runRelays]);
+      await this.permissionRelay;
+    } finally {
+      this.contextController?.setAutoCompactionSink?.(undefined);
+      this.contextController?.setAutoCompactionFailureSink?.(undefined);
+      this.eventQueue.close();
+    }
   }
 
   private async relayRunEvents(events: AsyncIterable<import("@may/core").MayEvent>) {
@@ -623,7 +635,7 @@ async function resumeSession(
 function latestRunFailed(history: readonly SessionEvent[]): boolean {
   for (let index = history.length - 1; index >= 0; index--) {
     const event = history[index]!;
-    if (event.type === "run.failed") return true;
+    if (event.type === "run.failed" || event.type === "run.interrupted") return true;
     if (event.type === "run.completed" || event.type === "run.yielded" || event.type === "run.cancelled") {
       return false;
     }

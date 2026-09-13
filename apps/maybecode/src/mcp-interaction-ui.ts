@@ -41,7 +41,11 @@ export async function presentMcpInteraction(
       }
     }
     if (request.params.mode === "url") {
-      const url = new URL(request.params.url);
+      let url: URL;
+      try {
+        url = new URL(request.params.url);
+        if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) throw new Error("Unsafe URL");
+      } catch { app.respondMcpInteraction(request.id, { action: "decline" }); return; }
       const consent = await question(`${header}\nExternal host: ${url.host}\nURL: ${request.params.url}\n` +
         "This is an untrusted external website, not MCP client login. Nothing opens automatically.\n" +
         "Type accept to consent, decline to refuse, or cancel to dismiss: ");

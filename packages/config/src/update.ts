@@ -23,6 +23,16 @@ export async function updateDefaultMayModel(
   profile: string,
 ): Promise<MayConfig> {
   const path = resolve(configPath);
+  let lock;
+  try { lock = await open(`${path}.lock`, "wx", 0o600); }
+  catch (error) { throw new MayConfigWriteError(path, `configuration is locked: ${path}.lock; stop competing writers before recovering a stale lock`, { cause: error }); }
+  try {
+    await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
+    return await updateLocked(path, profile);
+  } finally { try { await lock.close(); } finally { await rm(`${path}.lock`); } }
+}
+
+async function updateLocked(path: string, profile: string): Promise<MayConfig> {
   const { source, information } = await readConfigSnapshot(path);
   let value: unknown;
   try {

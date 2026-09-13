@@ -424,7 +424,7 @@ class McpConnection {
         isolated.updateCatalog({ ...candidate, serverId: this.options.id, revision: catalog.revision });
         await isolated.parentGuard();
         return await work(isolated, signal);
-      } finally { await isolated?.close(); }
+      } finally { await isolated?.close().catch(() => undefined); }
     })();
     this.legacyOperations.add(operation);
     void operation.then(() => this.legacyOperations.delete(operation), () => this.legacyOperations.delete(operation));
@@ -589,7 +589,7 @@ class McpConnection {
   }
 
   private throwIfClosed(): void {
-    if (this.closed) throw new McpClientPoolClosedError();
+    if (this.closed) throw new McpConnectionError(this.options.id, "connection is closed; reconnect the server");
   }
 
   private handleClose(): void {
@@ -630,6 +630,7 @@ class McpEventRecorder {
   readonly events: AsyncIterable<McpClientEvent>;
   private readonly queue = new AsyncEventQueue<McpClientEvent>({
     maxBufferedValues: 256,
+    isDroppable: () => true,
   });
   private sequence = 0;
 
@@ -966,6 +967,7 @@ function createTools(
   definitions: readonly ProtocolTool[],
 ): readonly Tool[] {
   return definitions.map((original) => {
+    validateToolSchema(original.inputSchema);
     const definition = freezeTree(structuredClone(original));
     const generation = connection.generation;
     const exposedName = namespaceMcpToolName(
@@ -985,6 +987,44 @@ function createTools(
         connection.callTool(definition, exposedName, input, context, generation),
     });
   });
+}
+
+function validateToolSchema(value: unknown): void {
+  const invalid = () => { throw new TypeError("MCP tool inputSchema is invalid or exceeds host limits"); };
+  if (!value || typeof value !== "object" || Array.isArray(value) || (value as { type?: unknown }).type !== "object") invalid();
+  if (Buffer.byteLength(JSON.stringify(value)) > 256 * 1024) invalid();
+  let nodes = 0;
+  const visit = (schema: unknown, depth: number): void => {
+    if (++nodes > 4096 || depth > 32) invalid();
+    if (typeof schema === "boolean") return;
+    if (!schema || typeof schema !== "object" || Array.isArray(schema)) invalid();
+    const record = schema as Record<string, unknown>;
+    if (record.type !== undefined) {
+      const types = typeof record.type === "string" ? [record.type] : Array.isArray(record.type) ? record.type : [];
+      if (types.length === 0 || !types.every((type) => ["object", "array", "string", "number", "integer", "boolean", "null"].includes(type))) invalid();
+    }
+    if (record.required !== undefined && (!Array.isArray(record.required) || record.required.some((key) => typeof key !== "string") || new Set(record.required).size !== record.required.length)) invalid();
+    for (const key of ["properties", "patternProperties", "$defs", "definitions"] as const) {
+      const children = record[key];
+      if (children === undefined) continue;
+      if (!children || typeof children !== "object" || Array.isArray(children)) invalid();
+      for (const child of Object.values(children as object)) visit(child, depth + 1);
+    }
+    for (const key of ["allOf", "anyOf", "oneOf", "prefixItems"] as const) {
+      const children = record[key];
+      if (children === undefined) continue;
+      if (!Array.isArray(children)) invalid();
+      for (const child of children as unknown[]) visit(child, depth + 1);
+    }
+    for (const key of ["items", "additionalProperties", "not", "if", "then", "else", "contains"] as const) {
+      const child = record[key];
+      if (child !== undefined) {
+        if (key === "items" && Array.isArray(child)) for (const entry of child) visit(entry, depth + 1);
+        else visit(child, depth + 1);
+      }
+    }
+  };
+  visit(value, 0);
 }
 
 function parseArguments(

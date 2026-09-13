@@ -37,6 +37,9 @@ export interface ShellToolOptions {
   readonly maxOutputBytes?: number;
   readonly profile?: ShellProfile;
   readonly env?: Readonly<NodeJS.ProcessEnv>;
+  readonly inheritEnv?: boolean;
+  readonly envAllowlist?: readonly string[];
+  readonly envDenylist?: readonly string[];
 }
 
 export interface ShellToolInput {
@@ -218,9 +221,7 @@ function executeCommand(
     const child = spawn(profile.executable, [...profile.args(command)], {
       cwd,
       shell: false,
-      env: options.env === undefined
-        ? process.env
-        : { ...process.env, ...options.env },
+      env: shellEnvironment(options),
       detached: process.platform !== "win32",
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
@@ -230,6 +231,15 @@ function executeCommand(
     let settled = false;
     let timedOut = false;
     let cancelled = false;
+    let drainTimer: ReturnType<typeof setTimeout> | undefined;
+    const stop = () => {
+      terminateProcessTree(child);
+      drainTimer ??= setTimeout(() => {
+        child.kill("SIGKILL");
+        child.stdout.destroy(); child.stderr.destroy(); child.unref();
+        fail(new CodingToolError(cancelled ? "CODING_TOOL_CANCELLED" : "CODING_TOOL_COMMAND_TIMEOUT", "shell: command stopped; process-tree termination could not be confirmed"));
+      }, 1000);
+    };
 
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -244,17 +254,18 @@ function executeCommand(
 
     const timeout = setTimeout(() => {
       timedOut = true;
-      terminateProcessTree(child);
+      stop();
     }, timeoutMs);
     const abort = () => {
       cancelled = true;
-      terminateProcessTree(child);
+      stop();
     };
     abortSignal.addEventListener("abort", abort, { once: true });
     if (abortSignal.aborted) abort();
 
     const cleanup = () => {
       clearTimeout(timeout);
+      if (drainTimer !== undefined) clearTimeout(drainTimer);
       abortSignal.removeEventListener("abort", abort);
     };
     const fail = (error: unknown) => {
@@ -357,6 +368,7 @@ function terminateProcessTree(child: ChildProcess): void {
       { stdio: "ignore", windowsHide: true },
     );
     killer.once("error", () => child.kill("SIGKILL"));
+    killer.once("exit", (code) => { if (code !== 0) child.kill("SIGKILL"); });
     return;
   }
   try {
@@ -387,7 +399,25 @@ function createOutputCollector(maxBytes: number): OutputCollector {
       }
       if (buffer.byteLength > remaining) wasTruncated = true;
     },
-    text: () => Buffer.concat(chunks).toString("utf8"),
+    text: () => new TextDecoder().decode(Buffer.concat(chunks), { stream: true }),
     truncated: () => wasTruncated,
   };
+}
+
+function shellEnvironment(options: ShellToolOptions): NodeJS.ProcessEnv {
+  const normalize = (key: string) => process.platform === "win32" ? key.toUpperCase() : key;
+  const allowed = options.envAllowlist?.map(normalize);
+  const denied = (options.envDenylist ?? []).map(normalize);
+  const result: NodeJS.ProcessEnv = {};
+  if (options.inheritEnv !== false) for (const [key, value] of Object.entries(process.env)) {
+    if (allowed !== undefined && !allowed.includes(normalize(key))) continue;
+    if (denied.includes(normalize(key)) || /(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|APIKEY)/iu.test(key)) continue;
+    result[key] = value;
+  }
+  for (const [key, value] of Object.entries(options.env ?? {})) {
+    const old = Object.keys(result).find((entry) => normalize(entry) === normalize(key));
+    if (old !== undefined) delete result[old];
+    if (value !== undefined && !denied.includes(normalize(key))) result[key] = value;
+  }
+  return result;
 }

@@ -198,3 +198,8 @@ registries it accepts.
 
 Next: [Custom tools](./custom-tool.md) and
 [Build an agent](./building-an-agent.md).
+
+Retry-After is never shortened to fit `maxDelayMs`. If a server requests a longer wait than
+the configured backoff limit, RetryingModel returns the original error instead of retrying
+earlier. Responses errors expose `providerType` and `providerCode` separately. Malformed
+Chat Completions tool-argument JSON is a protocol error, not a string tool input.

@@ -13,6 +13,28 @@ function assistant(text) {
   return { role: "assistant", content: [{ type: "text", text }] };
 }
 
+test("close during input persistence cancels the acquired run", async () => {
+  let release, entered;
+  const inputWritten = new Promise((resolve) => { entered = resolve; });
+  const pending = new Promise((resolve) => { release = resolve; });
+  const backing = new InMemorySessionStore();
+  let modelCalls = 0;
+  const app = await AgentApplication.open({
+    store: { read: (id) => backing.read(id), async append(event) {
+      if (event.type === "input.submitted") { entered(); await pending; }
+      await backing.append(event);
+    } },
+    model: { async *stream() { modelCalls++; yield { type: "response.completed", message: assistant("unexpected") }; } },
+    permissionPolicy: () => "allow",
+  });
+  const submitting = app.submit({ input: "hi" });
+  await inputWritten;
+  await app.close();
+  release();
+  await assert.rejects(submitting, /closed/);
+  assert.equal(modelCalls, 0);
+});
+
 test("AgentApplication owns durable run, retry, and event lifecycles", async () => {
   let attempt = 0;
   const model = {

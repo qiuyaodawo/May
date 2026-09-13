@@ -31,3 +31,4 @@ export {
 export * from "./workspace.js";
 export * from "./mcp-auth.js";
 export * from "./team.js";
+export { cleanupTeamPatchTemporaries } from "./team-patches.js";

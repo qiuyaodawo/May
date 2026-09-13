@@ -22,7 +22,7 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "license": "MIT"
 }

@@ -1,3 +1,4 @@
+import { replaceJournalFile } from "@may/session/file-store";
 import { open, type FileHandle } from "node:fs/promises";
 import { digest, validateId } from "./types.js";
 
@@ -24,11 +25,12 @@ export class ChannelStore {
   private records = new Map<string, ChannelRecord>();
   private tail: Promise<void> = Promise.resolve();
   private size = 0;
-  private constructor(private readonly file: FileHandle) {}
+  private constructor(private file: FileHandle, private readonly path: string) {}
   static async open(path: string): Promise<ChannelStore> {
     const file = await open(path, "a+", 0o600);
-    const store = new ChannelStore(file);
+    const store = new ChannelStore(file, path);
     try {
+      if ((await file.stat()).size > 32 * 1024 * 1024) throw new Error("Channel journal exceeds size limit");
       const bytes = await file.readFile();
       if (bytes.length > 32 * 1024 * 1024) throw new Error("Channel journal is full; archive stopped host data before continuing");
       const end = bytes.lastIndexOf(10) + 1;
@@ -55,9 +57,16 @@ export class ChannelStore {
       validateRecord(copy);
       const line = JSON.stringify(copy) + "\n";
       const length = Buffer.byteLength(line);
-      if (this.size + length > 32 * 1024 * 1024) throw new Error("Channel journal limit reached");
-      await this.file.writeFile(line); await this.file.sync();
-      this.size += length; this.records.set(copy.id, copy);
+      if (this.size + length > 32 * 1024 * 1024) {
+        const records = new Map(this.records); records.set(copy.id, copy);
+        const checkpoint = [...records.values()].map((record) => JSON.stringify(record) + "\n").join("");
+        if (Buffer.byteLength(checkpoint) > 32 * 1024 * 1024) throw new Error("Channel state limit reached; archive stopped host data");
+        const previous = this.file;
+        await previous.close();
+        this.file = await replaceJournalFile(this.path, checkpoint);
+        this.size = Buffer.byteLength(checkpoint);
+      } else { await this.file.writeFile(line); await this.file.sync(); this.size += length; }
+      this.records.set(copy.id, copy);
     });
     // Poison after an uncertain write: no later ack or send can pass it.
     this.tail = operation;

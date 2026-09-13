@@ -1,3 +1,4 @@
+import { jsonEqual } from "@may/core";
 import type {
   Context,
   ContextSnapshot,
@@ -79,35 +80,35 @@ class ReplaceableInMemoryContext implements Context {
   }) {
     this.instructions = options.instructions;
     this.instructionsSource = options.instructionsSource;
-    this.messages = [...(options.messages ?? [])];
-    this.metadata = options.metadata;
+    this.messages = structuredClone(options.messages ?? []);
+    this.metadata = structuredClone(options.metadata);
   }
 
   async snapshot(): Promise<ContextSnapshot> {
     const instructions = this.instructionsSource?.() ?? this.instructions;
     return {
-      messages: [...this.messages],
+      messages: structuredClone(this.messages),
       ...(instructions === undefined
         ? {}
         : { instructions }),
       ...(this.metadata === undefined
         ? {}
-        : { metadata: { ...this.metadata } }),
+        : { metadata: structuredClone(this.metadata) }),
     };
   }
 
   async append(messages: Message[]): Promise<void> {
-    this.messages.push(...messages);
+    this.messages.push(...structuredClone(messages));
   }
 
   replaceMessages(
     messages: readonly Message[],
     expectedMessages: readonly Message[],
   ): boolean {
-    if (JSON.stringify(this.messages) !== JSON.stringify(expectedMessages)) {
+    if (!jsonEqual(this.messages, expectedMessages)) {
       return false;
     }
-    this.messages.splice(0, this.messages.length, ...messages);
+    this.messages.splice(0, this.messages.length, ...structuredClone(messages));
     return true;
   }
 }

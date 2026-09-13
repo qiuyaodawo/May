@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { atomicWriteText } from "./atomic-write.js";
 import type { Tool } from "@may/core";
 import { CodingToolError } from "./errors.js";
 import {
@@ -85,13 +85,10 @@ export function createEditTool(options: EditToolOptions): Tool<
         );
       }
 
-      const updated = original.replace(input.oldText, input.newText);
+      const updated = original.replace(input.oldText, () => input.newText);
       assertTextWithinLimit(updated, file.relative, maxBytes);
       context.signal.throwIfAborted();
-      await writeFile(file.absolute, updated, {
-        encoding: "utf8",
-        signal: context.signal,
-      });
+      await atomicWriteText(file.absolute, updated, context.signal);
       return { path: file.relative, replacements: 1 };
     },
   };

@@ -178,3 +178,7 @@ const registry = new ProviderAdapterRegistry().register("uppercase", {
 - 在 adapter 边界测试 malformed stream、取消、tool-call 转换和不支持内容。
 
 接下来阅读[自定义工具](custom-tool.md)和[构建 Agent](building-an-agent.md)。
+
+Retry-After 不会被截短以适应 `maxDelayMs`。服务端要求的等待超过配置退避上限时，
+RetryingModel 返回原始错误，而不是提前重试。Responses 错误分别提供 `providerType`
+和 `providerCode`；Chat Completions 工具参数 JSON 无效时产生协议错误，不作为字符串参数下传。

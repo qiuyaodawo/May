@@ -181,12 +181,10 @@ tool output and provider data. The built-in local stores do not encrypt them.
 
 ## Supported runtime
 
-Current packages declare Node.js 20 or newer. Repository development requires
-Node.js 22 or newer, matching the pnpm 11 toolchain; Node.js 24 is recommended
-and recorded in the root `.node-version`. The root `package.json` declares the
-development minimum in `engines.node`; individual package runtime requirements
-are unchanged. Raising the development minimum does not verify compatibility
-on every declared runtime or operating system.
+Published packages and repository development require Node.js 22 or newer. Node.js 24
+is recommended and recorded in `.node-version`. CI covers Linux on 22/24 and Windows/macOS
+on 24; declaring a minimum does not verify every operating-system/runtime combination.
+Package smoke tests run for push/PR on Linux and Windows.
 
 The repository uses pnpm and TypeScript project references. Provider integration tests that
 make real network requests are opt-in; the regular test suite is offline.

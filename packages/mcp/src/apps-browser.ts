@@ -5,10 +5,13 @@ export interface McpAppChannel {
   receive(message: unknown): Promise<Record<string, unknown> | undefined>;
   close(): void;
   readonly signal?: AbortSignal;
+  readonly lifetimeMs?: number;
 }
 
 /** Mount only on an explicit user action. The sandbox URL is host configuration, not server metadata. */
 export function mountMcpApp(container: HTMLElement, sandboxUrl: string, channel: McpAppChannel) {
+  const lifetime = channel.lifetimeMs ?? 600_000;
+  if (!Number.isSafeInteger(lifetime) || lifetime <= 0 || lifetime > 3_600_000) throw new Error("Invalid MCP App lifetime");
   const document = container.ownerDocument;
   const host = document.defaultView!;
   const url = new URL(sandboxUrl);
@@ -46,7 +49,7 @@ export function mountMcpApp(container: HTMLElement, sandboxUrl: string, channel:
     active++;
     void channel.receive(event.data).then((response) => { if (response !== undefined) post(response); }, close).finally(() => { active--; });
   };
-  const timer = setTimeout(close, 600_000);
+  const timer = setTimeout(close, lifetime);
   host.addEventListener("message", receive);
   channel.signal?.addEventListener("abort", close, { once: true });
   if (channel.signal?.aborted) close();

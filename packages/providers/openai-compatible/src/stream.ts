@@ -166,17 +166,17 @@ function completeToolCalls(
       return {
         id: call.id,
         name: call.name,
-        input: parseToolInput(call.arguments),
+        input: parseToolInput(call.arguments, options),
       };
     });
 }
 
-function parseToolInput(input: string): unknown {
+function parseToolInput(input: string, options: OpenAICompatibleStreamOptions): unknown {
   if (input === "") return {};
   try {
     return JSON.parse(input);
   } catch {
-    return input;
+    throw options.protocolError(`${options.providerName} emitted invalid tool argument JSON`);
   }
 }
 

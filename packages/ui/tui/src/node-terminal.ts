@@ -1,3 +1,4 @@
+import stringWidth from "string-width";
 import { clearLine, cursorTo, moveCursor } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import { keyStroke, type KeyStroke } from "@may/keybindings";
@@ -81,10 +82,29 @@ export function createNodeTerminal(
   let viewActive = false;
   let suppressInterrupt = false;
   let closed = false;
+  let questionReserved = false;
+  const inputWaiters = new Set<() => void>();
+  const wakeInputWaiters = () => { for (const wake of [...inputWaiters]) wake(); };
+  const waitForInput = async (signal?: AbortSignal): Promise<void> => {
+    while (activePrompt !== undefined || activeKeyRead !== undefined || viewActive || questionReserved) {
+      if (closed) throw new Error("Terminal closed");
+      signal?.throwIfAborted();
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => { inputWaiters.delete(wake); signal?.removeEventListener("abort", abort); };
+        const wake = () => { cleanup(); resolve(); };
+        const abort = () => { cleanup(); reject(abortError(signal?.reason)); };
+        inputWaiters.add(wake);
+        signal?.addEventListener("abort", abort, { once: true });
+      });
+    }
+    if (closed) throw new Error("Terminal closed");
+    signal?.throwIfAborted();
+    questionReserved = true;
+  };
 
   const inputColumn = (): number => {
     const prompt = activePrompt?.replace(/^\r?\n/u, "") ?? "";
-    return prompt.length + readline.cursor;
+    return stringWidth(prompt) + stringWidth(readline.line.slice(0, readline.cursor));
   };
 
   const eraseSuggestionRows = (): void => {
@@ -172,6 +192,7 @@ export function createNodeTerminal(
         setImmediate(() => suppressInterrupt = false);
       }
       read.resolve(toKeyStroke(value, key));
+      wakeInputWaiters();
       queueMicrotask(() => {
         if (!closed && activePrompt === undefined) {
           readline.write(undefined, { ctrl: true, name: "u" });
@@ -218,16 +239,16 @@ export function createNodeTerminal(
     colors: options.colors ?? interactive,
     interactive,
     async question(prompt, questionOptions = {}) {
-      if (activePrompt !== undefined) {
-        throw new Error("The terminal already has an active question");
-      }
-      if (activeKeyRead !== undefined) {
-        throw new Error("The terminal is currently reading a key");
-      }
+      if (activePrompt !== undefined || activeKeyRead !== undefined || viewActive || questionReserved) await waitForInput(questionOptions.signal);
+      try {
+        if (closed) throw new Error("Terminal closed");
+        questionOptions.signal?.throwIfAborted();
+      } catch (error) { questionReserved = false; wakeInputWaiters(); throw error; }
       const previousHistory = questionOptions.history === false
         ? [...history]
         : undefined;
       activePrompt = prompt;
+      questionReserved = false;
       activeSuggestionProvider = questionOptions.suggestions;
       activeSuggestions = [];
       activeSuggestionInput = undefined;
@@ -244,6 +265,7 @@ export function createNodeTerminal(
         activeSuggestions = [];
         activeSuggestionInput = undefined;
         activePrompt = undefined;
+        wakeInputWaiters();
         if (previousHistory !== undefined) {
           history.splice(0, history.length, ...previousHistory);
         }
@@ -265,6 +287,7 @@ export function createNodeTerminal(
           activeKeyRead = undefined;
           read.cleanup();
           reject(abortError(signal?.reason));
+          wakeInputWaiters();
         };
         const read: KeyRead = {
           resolve,
@@ -290,6 +313,7 @@ export function createNodeTerminal(
       if (!viewActive) return;
       output.write("\x1b[?1049l");
       viewActive = false;
+      wakeInputWaiters();
     },
     addHistory(value) {
       if (!interactive) return;
@@ -317,7 +341,7 @@ export function createNodeTerminal(
       output.write(update);
       if (update !== "" && !update.endsWith("\n")) output.write("\n");
       output.write(`${activePrompt.replace(/^\r?\n/u, "")}${line}`);
-      const trailing = line.length - position;
+      const trailing = stringWidth(line.slice(position));
       if (trailing > 0) moveCursor(output, -trailing, 0);
       drawSuggestionRows();
     },
@@ -334,6 +358,7 @@ export function createNodeTerminal(
     },
     close() {
       closed = true;
+      wakeInputWaiters();
       activeKeyRead?.reject(new Error("Terminal closed"));
       activeKeyRead?.cleanup();
       activeKeyRead = undefined;

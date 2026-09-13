@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 export async function createWorkspace(t) {
   const path = await mkdtemp(join(tmpdir(), "may-coding-tools-"));
-  t.after(() => rm(path, { recursive: true, force: true }));
+  t.after(() => rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
   return path;
 }
 

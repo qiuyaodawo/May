@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
+import { atomicWriteText } from "./atomic-write.js";
 import { dirname } from "node:path";
 import type { Tool } from "@may/core";
 import {
@@ -70,10 +71,7 @@ export function createWriteTool(options: WriteToolOptions): Tool<
       context.signal.throwIfAborted();
       await mkdir(dirname(file.absolute), { recursive: true });
       context.signal.throwIfAborted();
-      await writeFile(file.absolute, input.content, {
-        encoding: "utf8",
-        signal: context.signal,
-      });
+      await atomicWriteText(file.absolute, input.content, context.signal);
       return { path: file.relative, bytesWritten };
     },
   };

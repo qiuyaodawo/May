@@ -258,3 +258,26 @@ at the executor/permission boundary, without adding them to model definitions or
 arguments. Never derive them from tool input. `AgentApplication.toolScope` accepts
 a label record and supplies its own Session id; MaybeCode also supplies workspace
 identity. These labels route interactions; they do not replace access policy.
+
+## File and process safety
+
+The bundled `read` tool preserves original line endings and permits hard links by default;
+set `read.allowHardLinks: false` when host policy also forbids reading them. Path and
+symbolic-link containment checks still apply. `write` and `edit` reject hard links unless
+explicitly allowed. They stage complete UTF-8 contents in the destination directory, sync,
+and rename, so cancellation before commit leaves the old file intact. Replacement text is
+literal, including `$` sequences. Replacement changes the file identity; explicitly allowed
+hard links are detached rather than modifying other aliases. This is not protection against
+concurrent untrusted filesystem mutation or a guarantee of directory durability on Windows.
+
+The shell removes inherited credential-like environment names (`TOKEN`, `SECRET`, `PASSWORD`,
+`CREDENTIAL`, `API_KEY`, `APIKEY`). Hosts can disable inheritance with `inheritEnv: false`,
+restrict it with `envAllowlist`/`envDenylist`, or explicitly supply `env`. An `undefined`
+override removes a variable; the denylist also applies to overrides. This is not an OS
+sandbox: commands can still read accessible credential files. Timeout/cancellation bounds
+pipe draining to one second; process-tree termination may remain unconfirmed.
+
+`MayOptions.toolSettleTimeoutMs` defaults to 2,000 ms. A tool that ignores cancellation
+fails the run with `RUN_CHECKPOINT_FAILED` and makes that runtime unusable. Stop surviving
+work, inspect external effects, then reconcile the Session before constructing a new runtime;
+never treat the deadline as proof that an external action stopped.

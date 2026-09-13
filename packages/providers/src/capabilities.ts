@@ -191,6 +191,7 @@ class CpaCodexCapabilityDiscovery implements ModelCapabilityDiscovery {
     const apiKey = selection.providerConfig.apiKey;
     try {
       const response = await this.fetchImplementation(url, {
+        signal: AbortSignal.timeout(10_000),
         ...(apiKey === undefined || apiKey.trim() === ""
           ? {}
           : { headers: { Authorization: `Bearer ${apiKey}` } }),

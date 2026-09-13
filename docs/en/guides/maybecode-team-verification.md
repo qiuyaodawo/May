@@ -68,3 +68,12 @@ The local exclusive-writer journal fsyncs a `pending` intent **before** a check 
 Inspect the effects and stop any surviving processes before recovery. Host reconciliation records evidence and can mark an unknown check only `failed` or `cancelled`; it cannot invent a green result and never runs a command. A later explicitly authorized verification needs a new command identity. Crash-left writer locks require host investigation; they are not stolen automatically. A successful check written to the verification ledger does not automatically reconcile a separate interrupted Session tool checkpoint.
 
 The store keeps reports and all check command identities in `verification.jsonl`, with a 16 MiB journal limit, at most 256 reports, and at most 512 checks. Read-only status inspection does not acquire the writer lock. An incomplete final line is ignored by readers and repaired by a subsequent exclusive writer; committed malformed records are rejected.
+
+## Native command checks
+
+Command checks use `shell: false`: on Windows use a native executable such as `node.exe`
+with the package manager's JavaScript entry point and argument array. `.cmd` / `.bat` files
+are not supported, and failure to start a process is recorded as `failed`, not an unknown
+executed action. Pending processes with uncertain effects still require reconciliation.
+The 512-check quota counts distinct command identities, not pending/result journal lines;
+reaching it rejects a new check without making existing status unreadable.

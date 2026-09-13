@@ -1,6 +1,7 @@
 export class OpenAIResponsesError extends Error {
   readonly status: number | undefined;
   readonly providerType: string | undefined;
+  readonly providerCode: string | undefined;
   readonly requestId: string | undefined;
   readonly retryAfterMs: number | undefined;
 
@@ -9,6 +10,7 @@ export class OpenAIResponsesError extends Error {
     options: {
       status?: number;
       providerType?: string;
+      providerCode?: string;
       requestId?: string;
       retryAfterMs?: number;
       cause?: unknown;
@@ -18,6 +20,7 @@ export class OpenAIResponsesError extends Error {
     this.name = "OpenAIResponsesError";
     this.status = options.status;
     this.providerType = options.providerType;
+    this.providerCode = options.providerCode;
     this.requestId = options.requestId;
     this.retryAfterMs = options.retryAfterMs;
   }

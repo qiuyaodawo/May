@@ -82,7 +82,7 @@ export function createReadTool(options: ReadToolOptions): Tool<
     },
     async execute(input, context) {
       const file = await resolveExistingWorkspacePath(options.cwd, input.path, {
-        allowHardLinks: options.allowHardLinks === true,
+        allowHardLinks: options.allowHardLinks !== false,
       });
       const text = await readTextFile(
         file.absolute,
@@ -90,7 +90,8 @@ export function createReadTool(options: ReadToolOptions): Tool<
         maxBytes,
         context.signal,
       );
-      const lines = text === "" ? [] : text.split(/\r\n|\n|\r/);
+      const lines = text === "" ? [] : text.split(/(?<=\n)|(?<=\r)(?!\n)/u);
+      if (/[\r\n]$/u.test(text)) lines.push("");
       const offset = input.offset ?? 1;
       if (offset > Math.max(lines.length, 1)) {
         throw new CodingToolError(
@@ -103,7 +104,8 @@ export function createReadTool(options: ReadToolOptions): Tool<
       const endLine = selected.length === 0 ? 0 : offset + selected.length - 1;
       return {
         path: file.relative,
-        content: selected.join("\n"),
+        content: selected.join("").replace(/[\r\n]+$/u, (ending) =>
+          endLine === lines.length ? ending : ending.replace(/(?:\r\n|\r|\n)$/u, "")),
         startLine,
         endLine,
         totalLines: lines.length,

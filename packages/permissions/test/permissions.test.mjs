@@ -230,7 +230,7 @@ test("requires an explicit grant key for allow-session", async () => {
   const resultPromise = permissions.execute(createExecution());
   const requested = (await iterator.next()).value;
 
-  assert.throws(
+  await assert.rejects(
     () => permissions.resolve(requested.request.id, "allow-session"),
     /does not define a session grant key/,
   );
@@ -403,7 +403,7 @@ test("rejects an invalid approval response without resolving the request", async
   const resultPromise = permissions.execute(createExecution());
   const requested = (await iterator.next()).value;
 
-  assert.throws(
+  await assert.rejects(
     () => permissions.resolve(requested.request.id, "ask"),
     /Invalid approval decision: ask/,
   );

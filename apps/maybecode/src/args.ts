@@ -18,7 +18,7 @@ Options:
   --model <name>       Use a named model profile
   --ui <name>          UI implementation: retained (default) or classic
   -c, --continue       Continue the most recent session for this workspace
-  -r, --resume <id>    Resume a specific session
+  -r, --resume <id>    Resume a specific session (--session is an alias)
   -h, --help           Show this help
 
 MCP login prints a browser authorization URL and waits for a local callback.

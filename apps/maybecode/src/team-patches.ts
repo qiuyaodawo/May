@@ -1,8 +1,9 @@
+import { acquireFileLock, releaseFileLock } from "@may/session/file-store";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath, rename, unlink, type FileHandle } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { TaskWorkspaceManager, WorkspacePatchChange, WorkspacePatchSnapshot } from "@may/coordination";
 
@@ -109,7 +110,7 @@ export async function applyTeamPatch(options: {
   const locks = await privateDirectory(lockDirectory);
   if (inside(source, locks)) throw new Error("Apply lock directory must be outside the source workspace");
   const lockPath = join(locks, `${hash(source)}.lock`);
-  const lock = await open(lockPath, "wx", 0o600);
+  const lock = await acquireFileLock(lockPath);
   let journal: FileHandle | undefined;
   let sequence = 0;
   const appliedPaths: string[] = [];
@@ -186,7 +187,7 @@ export async function applyTeamPatch(options: {
       uncertainPaths: bundle.files.map((file) => file.path).filter((path) => !appliedPaths.includes(path)), journalPath,
       detail: error instanceof Error ? error.message : "Patch application outcome is unknown" };
   } finally {
-    await journal?.close(); await lock.close(); await unlink(lockPath);
+    try { await journal?.close(); } finally { await releaseFileLock(lock, lockPath); }
   }
 }
 
@@ -227,6 +228,38 @@ export async function readTeamPatchApplication(directory: string, patchId: strin
   return { status, patchId, digest: bundle.digest, appliedPaths,
     uncertainPaths: status === "applied" ? [] : bundle.files.map((file) => file.path).filter((path) => !appliedPaths.includes(path)), journalPath,
     ...(status === "unknown" ? { detail: "Incomplete or unknown application evidence; source writes were not replayed" } : {}) };
+}
+
+/** Offline host maintenance. Deletes only recorded staging files, never source targets or backups. */
+export async function cleanupTeamPatchTemporaries(options: {
+  readonly directory: string;
+  readonly patchId: string;
+  readonly confirmDigest: string;
+  readonly confirmHostsStopped: true;
+}): Promise<readonly string[]> {
+  if (options.confirmHostsStopped !== true) throw new Error("Patch cleanup requires stopped hosts and editors");
+  const bundle = await readTeamPatch(options.directory, options.patchId);
+  if (options.confirmDigest !== bundle.digest) throw new Error("Cleanup requires the exact patch digest");
+  const root = await safeRoot(resolve(options.directory));
+  const source = await safeRoot(bundle.sourceDirectory);
+  const bytes = await safeRead(root, join(root, "patches", "applications", bundle.id, "apply.jsonl"), MAX_BUNDLE_BYTES);
+  if (!bytes) return [];
+  const paths = new Set<string>();
+  let revision = 0;
+  for (const line of bytes.toString("utf8").split("\n").slice(0, -1)) {
+    const entry = JSON.parse(line) as ApplyRecord;
+    if (entry.revision !== ++revision || entry.digest !== bundle.digest) throw new Error("Invalid application evidence");
+    if (entry.temporary === undefined) continue;
+    const change = bundle.files.find((file) => file.path === entry.path);
+    if (entry.type !== "intent" || change?.afterText === undefined) throw new Error("Staging file has no patch intent");
+    const path = checkedPath(source, entry.temporary);
+    if (dirname(path) !== dirname(checkedPath(source, change.path)) ||
+      !new RegExp(`^\\.maybecode-${bundle.id.slice(6, 18)}-[a-f0-9-]{36}\\.tmp$`, "u").test(basename(path))) throw new Error("Unsafe staging path");
+    if (await safeRead(source, path, MAX_FILE_BYTES) !== undefined) paths.add(path);
+  }
+  // Validate the entire list first. The caller guarantees no competing writers.
+  for (const path of paths) { await assertParents(source, path); await unlink(path); }
+  return [...paths];
 }
 
 function bundleFrom(snapshot: WorkspacePatchSnapshot): TeamPatchBundle {

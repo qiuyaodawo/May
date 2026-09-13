@@ -101,7 +101,8 @@ export const sequentialToolScheduler: ToolScheduler = {
 
 /** Use only when every selected tool is safe to run concurrently. */
 export const parallelToolScheduler: ToolScheduler = {
-  schedule<T>(operations: readonly ToolOperation<T>[]): Promise<T[]> {
-    return Promise.all(operations.map((operation) => operation.execute()));
+  async schedule<T>(operations: readonly ToolOperation<T>[], context: ToolSchedulingContext): Promise<T[]> {
+    context.signal.throwIfAborted();
+    return Promise.all(operations.map((operation) => { context.signal.throwIfAborted(); return operation.execute(); }));
   },
 };

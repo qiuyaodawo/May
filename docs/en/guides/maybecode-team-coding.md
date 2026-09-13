@@ -58,3 +58,12 @@ The source lock only coordinates cooperating MaybeCode appliers. It cannot exclu
 - `readTeamPatchApplication(directory, patchId)`
 
 Patch bundles are under the team's `patches/` directory. Application records and backups are private host data, outside task tool roots. They must not be exposed as writable Agent tools. See [MaybeCode teams](maybecode-team.md) for general runtime, budget, and cancellation behavior.
+
+## Interrupted staging cleanup
+
+Stop all team hosts, appliers and editors before calling `cleanupTeamPatchTemporaries`
+from `@may/maybecode` with `directory`, `patchId`, the exact `confirmDigest`, and
+`confirmHostsStopped: true`. It validates the journal and staging paths before deleting
+only recorded `.maybecode-*.tmp` files. Source targets and backups are never removed, and
+the application outcome remains unknown until separately reconciled. Cleanup never resumes
+or replays source writes.

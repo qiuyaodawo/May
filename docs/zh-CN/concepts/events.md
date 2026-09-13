@@ -156,3 +156,7 @@ settle 时自动关闭。
 调用方应等待 `close()` 并让 `for await` consumer 结束，不要在请求取消后立即放弃它。
 精确生命周期顺序见
 [Agent definition、Application 与 Workspace](agent-application.md#关闭顺序)。
+
+`AsyncEventQueue` 是消费队列而非广播器，多个迭代器会竞争分配消息。每位订阅者都需要
+完整事件时，应分别建立队列。迭代器 return 会释放自己的等待项，不关闭生产者或其他
+迭代器。Coordination/MCP 的实时队列有界，恢复依据应使用持久状态与历史。

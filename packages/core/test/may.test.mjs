@@ -20,6 +20,35 @@ function assistant(text, toolCalls) {
   return message;
 }
 
+test("unresponsive tools have a bounded drain and cannot silently release execution authority", async () => {
+  const started = deferred();
+  const blocked = deferred();
+  const context = new InMemoryContext();
+  const may = new May({ context, toolSettleTimeoutMs: 20,
+    tools: [{ name: "hang", description: "hang", inputSchema: {}, execute() { started.resolve(); return blocked.promise; } }],
+    model: { async *stream() { yield { type: "response.completed", message: assistant("", [{ id: "a", name: "hang", input: {} }]) }; } },
+  });
+  const run = may.run({ input: "go" });
+  await started.promise;
+  run.cancel();
+  await assert.rejects(run.result, { code: "RUN_CHECKPOINT_FAILED" });
+  assert.throws(() => may.continue(), { code: "RUN_CHECKPOINT_FAILED" });
+  blocked.resolve("late");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal((await context.snapshot()).messages.filter((message) => message.role === "tool").length, 0);
+});
+
+test("scheduler errors preserve completed tool outcomes in call order", async () => {
+  const context = new InMemoryContext();
+  const may = new May({ context,
+    tools: [{ name: "work", description: "work", inputSchema: {}, execute: async () => "done" }],
+    model: { async *stream() { yield { type: "response.completed", message: assistant("", [{ id: "a", name: "work", input: {} }, { id: "b", name: "work", input: {} }]) }; } },
+    toolScheduler: { async schedule(operations) { const values = await Promise.all(operations.map((operation) => operation.execute())); return values.reverse(); } },
+  });
+  await assert.rejects(may.run({ input: "go" }).result, /call order/);
+  assert.deepEqual((await context.snapshot()).messages.filter((message) => message.role === "tool").map((message) => message.toolCallId), ["a", "b"]);
+});
+
 async function collect(iterable) {
   const values = [];
   for await (const value of iterable) values.push(value);

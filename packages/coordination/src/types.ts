@@ -113,6 +113,7 @@ export interface CoordinationLimits {
   readonly maxTasks: number;
   readonly maxDurationMs?: number;
   readonly maxOutputBytes: number;
+  readonly maxInputBytes?: number;
   readonly maxDepth?: number;
   readonly maxTaskTurns?: number;
   readonly maxMessages?: number;
@@ -181,6 +182,7 @@ export interface CoordinationAgent {
   resolveApproval?(sessionId: string, requestId: string, decision: ApprovalDecision): Promise<boolean>;
 }
 
+/** Policy callbacks run inside state serialization. Do not await commands on the same runtime. */
 export interface CoordinationPolicy {
   /** Bump whenever execution authority or task routing changes. Checked on resume. */
   readonly version: string;

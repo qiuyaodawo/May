@@ -211,13 +211,13 @@ export class TranscriptStore {
       case "tool.output.delta":
         this.updateTool(event.runId, event.call.id, (item) => ({
           ...item,
-          streamedOutput: item.streamedOutput + event.delta,
+          streamedOutput: (item.streamedOutput + event.delta).slice(-65_536).replace(/^[\uDC00-\uDFFF]/u, ""),
         }), event.step, event.call, event.timestamp);
         break;
       case "tool.progress":
         this.updateTool(event.runId, event.call.id, (item) => ({
           ...item,
-          progress: [...item.progress, event.message],
+          progress: [...item.progress.slice(-63), event.message.slice(0, 4096)],
         }), event.step, event.call, event.timestamp);
         break;
       case "tool.completed":

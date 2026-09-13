@@ -76,7 +76,7 @@ export class PermissionToolExecutor implements ToolExecutor {
           inputSchema: structuredClone(execution.tool.inputSchema),
           ...(execution.tool.permissionVersion === undefined ? {} : { permissionVersion: execution.tool.permissionVersion }),
         },
-        input: execution.input,
+        input: structuredClone(execution.input),
         context: execution.context,
       };
       const definitionKey = permissionDefinitionKey(check.tool);
@@ -171,7 +171,7 @@ export class PermissionToolExecutor implements ToolExecutor {
     this.eventSink = sink;
   }
 
-  resolve(requestId: string, decision: ApprovalDecision): Promise<boolean> {
+  async resolve(requestId: string, decision: ApprovalDecision): Promise<boolean> {
     if (
       decision !== "allow"
       && decision !== "allow-session"

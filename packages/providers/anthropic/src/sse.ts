@@ -37,6 +37,7 @@ export async function* readAnthropicSseData(
     throwIfAborted(signal);
   } finally {
     signal.removeEventListener("abort", onAbort);
+    void reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }

@@ -61,7 +61,7 @@ export function createModelContextSummarizer(
         }
         throwIfCancelled(signal);
       } catch (error) {
-        if (signal.aborted) {
+        if (signal.aborted && (error === signal.reason || error instanceof RunCancelledError || error instanceof Error && error.name === "AbortError")) {
           throw new RunCancelledError(cancellationReason(signal.reason));
         }
         throw error;

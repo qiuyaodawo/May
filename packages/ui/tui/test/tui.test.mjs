@@ -82,6 +82,9 @@ test("decodes bracketed paste as one terminal input operation", async () => {
       { key: "x", text: "x" },
     ],
   );
+  input.write("\x1b");
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.equal(strokes.at(-1).key, "escape");
   driver.close();
   assert.match(terminalOutput, /\x1b\[\?2004h/u);
   assert.match(terminalOutput, /\x1b\[\?2004l/u);

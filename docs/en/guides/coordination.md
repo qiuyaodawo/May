@@ -498,3 +498,18 @@ leaving orphan work running.
 
 New patterns should reuse these composition boundaries rather than make a single
 Agent loop concurrently mutate multiple Contexts.
+
+## Storage bounds and checkpoints
+
+Task input defaults to at most 65,536 UTF-8 bytes (`limits.maxInputBytes`); creation,
+delegation and graph rewrites all enforce the limit. Policies run inside state serialization
+and must not await commands on the same runtime. Runtime events are a bounded live view,
+not an audit log; inspect durable state/history if the consumer falls behind.
+
+Before accumulated snapshots exceed the journal cap, the exclusive writer atomically
+replaces them with a checkpoint of the complete next state. Revision, command receipts,
+retry findings and recovery state are retained; the cap still applies to a single snapshot.
+Resource journals use the same mechanism. Checkpoint files require the current reader;
+older readers must not reopen them. Reads do not steal locks or repair a live writer.
+See [local storage maintenance](custom-storage.md#local-storage-maintenance) for explicit
+stopped-host lock recovery.

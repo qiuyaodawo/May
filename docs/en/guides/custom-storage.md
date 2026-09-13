@@ -190,3 +190,25 @@ See [Custom Context](./custom-context.md) for the distinction between a
 model-visible working set and durable history, and
 [Runtime and session boundaries](../architecture/runtime-session.md) for the
 full lifecycle.
+
+## Local storage maintenance
+
+`FileSessionStore` serializes reads, writes and tail repair per Session in one instance.
+Append validation reuses the last sequence only while file identity, length and timestamps
+match; explicit history reads still validate complete records. Keep one writer per file.
+New session files sync their parent directory on POSIX; Node does not offer equivalent
+Windows directory fsync.
+
+To collapse catalog operation files, stop all other catalog users and call
+`await catalog.compact({ confirmHostsStopped: true })` on `FileSessionCatalog`.
+The atomic version-2 catalog snapshot records exact absorbed operation names before cleanup,
+so interruption during deletion cannot replay already absorbed operations. Do not use older
+readers after compacting; ordinary version-1 catalogs remain readable.
+
+For local writer locks, import `recoverFileLock` from `@may/session/file-store`. Stop all
+competing hosts/open/recovery operations, read and inspect the lock, then pass its exact
+text as `expectedContents` with `confirmHostsStopped: true`. The helper rejects live PIDs,
+remote-host ownership, unsafe links and changed metadata. Incomplete metadata additionally
+requires `confirmUnknownOwner: true` after independent owner verification. PID probing is
+not atomic lock election; recovery must never race another acquirer. Recovery only releases
+ownership and never replays work.

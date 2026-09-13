@@ -75,7 +75,10 @@ function allocateHeights(items: readonly ColumnItem[], available: number): numbe
   let remaining = available - heights.reduce((sum, value) => sum + value, 0);
 
   if (remaining < 0) {
-    for (let index = heights.length - 1; index >= 0 && remaining < 0; index--) {
+    const order = items.map((_, index) => index).sort((a, b) =>
+      Number(items[a]!.height !== undefined) - Number(items[b]!.height !== undefined) || a - b);
+    for (const index of order) {
+      if (remaining >= 0) break;
       const reduction = Math.min(heights[index]!, -remaining);
       heights[index] = heights[index]! - reduction;
       remaining += reduction;

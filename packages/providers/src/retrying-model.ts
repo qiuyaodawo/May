@@ -143,7 +143,11 @@ export class RetryingModel implements Model {
 
   private retryDelay(error: unknown, failedAttempt: number): number {
     const requested = retryAfterMs(error);
-    if (requested !== undefined) return Math.min(requested, this.maxDelayMs);
+    if (requested !== undefined) {
+      // Never retry earlier than requested. Fail rather than exceed the host backoff budget.
+      if (requested > this.maxDelayMs) throw error;
+      return requested;
+    }
 
     const exponential = Math.min(
       this.baseDelayMs * 2 ** (failedAttempt - 1),

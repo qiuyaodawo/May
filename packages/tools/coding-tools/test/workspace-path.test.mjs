@@ -107,7 +107,7 @@ test("write rejects a dangling symlink before creating its outside target", asyn
   });
 });
 
-test("file tools reject hard links with unverifiable workspace ownership", async (t) => {
+test("read permits hard links while mutations require explicit permission", async (t) => {
   const root = await createWorkspace(t);
   const cwd = join(root, "workspace");
   const outside = join(root, "outside.txt");
@@ -115,8 +115,9 @@ test("file tools reject hard links with unverifiable workspace ownership", async
   await writeFile(outside, "secret");
   await link(outside, join(cwd, "linked.txt"));
 
+  assert.equal((await executeTool(createReadTool({ cwd }), { path: "linked.txt" })).content, "secret");
   await assert.rejects(
-    executeTool(createReadTool({ cwd }), { path: "linked.txt" }),
+    executeTool(createReadTool({ cwd, allowHardLinks: false }), { path: "linked.txt" }),
     assertErrorCode("CODING_TOOL_UNSAFE_HARD_LINK"),
   );
   await assert.rejects(

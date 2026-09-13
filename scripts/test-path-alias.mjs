@@ -35,6 +35,6 @@ try {
   // Unlink only the alias; recursively remove only the dedicated physical target.
   if (linked) await unlink(alias);
   assert.equal(dirname(target), parent);
-  await rm(target, { recursive: true, force: true });
+  await rm(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   await rmdir(parent);
 }

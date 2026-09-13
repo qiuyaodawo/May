@@ -20,7 +20,7 @@ test("read returns a bounded line range", async (t) => {
   assert.equal(tool.name, "read");
   assert.deepEqual(result, {
     path: "notes.txt",
-    content: "two\nthree",
+    content: "two\r\nthree",
     startLine: 2,
     endLine: 3,
     totalLines: 3,

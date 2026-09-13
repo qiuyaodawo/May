@@ -58,3 +58,11 @@ maybecode team apply <team-id> --patch <patch-id> --confirm <exact-digest>
 - `readTeamPatchApplication(directory, patchId)`
 
 补丁包位于团队的 `patches/` 目录。应用记录和备份是私有宿主数据，位于任务工具目录之外，不应暴露为 Agent 可写工具。一般运行时、预算和取消行为见 [MaybeCode 团队](maybecode-team.md)。
+
+## 中断后的暂存清理
+
+停止所有团队宿主、补丁应用进程及编辑器后，可调用 `@may/maybecode` 导出的
+`cleanupTeamPatchTemporaries`，传入 `directory`、`patchId`、精确的 `confirmDigest`
+和 `confirmHostsStopped: true`。函数先验证日志与暂存路径，再仅删除日志中记录的
+`.maybecode-*.tmp` 文件，不删除源目标或备份，也不会续写或重放补丁。
+应用结果仍保持未知，必须另外核对。

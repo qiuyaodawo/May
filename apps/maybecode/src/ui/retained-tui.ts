@@ -141,6 +141,7 @@ async function consumeEvents(
     }
     if (event.type === "session.changed" && event.resumed) {
       store.loadHistory(await app.history());
+      store.appendNotice("info", "Session resumed");
       continue;
     }
     if (

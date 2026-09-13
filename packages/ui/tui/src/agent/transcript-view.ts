@@ -49,6 +49,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   private readonly toolAnchors = new Map<string, ScrollRegion>();
   private readonly theme: TuiTheme;
   private readonly toolRenderers: ToolRendererRegistry;
+  private readonly tailCache = new WeakMap<TranscriptItem, { key: string; lines: readonly string[] }>();
 
   constructor(
     private readonly store: TranscriptStore,
@@ -85,7 +86,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   }
 
   handleKey(stroke: KeyStroke): boolean {
-    if (!this.focused) return false;
+    if (!this.focused || stroke.ctrl || stroke.alt || stroke.meta) return false;
     if (stroke.key === "j") return this.moveToolSelection(1);
     if (stroke.key === "k") return this.moveToolSelection(-1);
     if (stroke.key === "enter" || stroke.key === "space" || stroke.text === " ") {
@@ -179,11 +180,13 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
       const separator = chunks.length === 0 ? 0 : 1;
       const available = remaining - separator;
       if (available <= 0) break;
-      const rendered = this.renderItem(
-        tailBoundItem(item, size.width, size.height),
-        size.width,
-        Number.MAX_SAFE_INTEGER,
-      ).lines;
+      const key = `${this.toolRenderers.revision}:${size.width}:${size.height}:${this.reasoningVisible}:${item.kind === "tool" && this.isToolExpanded(item.id)}:${this.focused && item.id === this.selectedToolId}`;
+      let cached = this.tailCache.get(item);
+      if (cached?.key !== key) {
+        cached = { key, lines: this.renderItem(tailBoundItem(item, size.width, size.height), size.width, Number.MAX_SAFE_INTEGER).lines };
+        this.tailCache.set(item, cached);
+      }
+      const rendered = cached.lines;
       const visible = rendered.length <= available
         ? rendered
         : rendered.slice(-available);

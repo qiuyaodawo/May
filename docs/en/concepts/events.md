@@ -188,3 +188,8 @@ Callers should await `close()` and let their `for await` consumer finish rather
 than abandoning it as soon as cancellation is requested. The exact lifecycle
 order is documented in
 [Agent definition, application, and workspace](./agent-application.md#shutdown-order).
+
+`AsyncEventQueue` is a consumption queue, not a broadcaster. Multiple iterators compete for
+values; give each subscriber its own queue if it needs every event. Returning an iterator
+releases its pending waits without closing producers or other iterators. Coordination/MCP
+live queues are bounded views; consult durable state/history for authoritative recovery.

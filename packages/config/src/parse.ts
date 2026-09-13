@@ -15,6 +15,7 @@ export function parseMayConfig(value: unknown, path = "<inline>"): MayConfig {
     path,
     "config",
   );
+  if (root.providers === undefined) throw new MayConfigValidationError(path, "providers", "is required");
   const providersValue = requireObject(root.providers, path, "providers");
   const providers = Object.fromEntries(
     Object.entries(providersValue).map(([name, provider]) => {

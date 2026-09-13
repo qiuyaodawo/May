@@ -31,6 +31,9 @@ test("persists and updates session summaries", async (t) => {
   });
   assert.equal(await first.rename("one", directory, "renamed"), true);
 
+  const beforeCompaction = await first.list(directory);
+  await first.compact({ confirmHostsStopped: true });
+  assert.deepEqual(await first.list(directory), beforeCompaction);
   const reopened = new FileSessionCatalog(path);
   const sessions = await reopened.list(directory);
   assert.deepEqual(sessions.map((session) => session.id), ["one", "two"]);

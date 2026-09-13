@@ -175,6 +175,8 @@ const launched = await runPnpm([
     ...process.env,
     HOME: homeDirectory,
     USERPROFILE: homeDirectory,
+    APPDATA: join(homeDirectory, "AppData", "Roaming"),
+    LOCALAPPDATA: join(homeDirectory, "AppData", "Local"),
   },
   input: "/quit\n",
   inputAfter: /Type \/help/u,
@@ -305,6 +307,16 @@ function run(command, args, options = {}) {
       stdio: options.inherit ? "inherit" : ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });
+    const timer = setTimeout(() => {
+      if (process.platform === "win32" && child.pid !== undefined) {
+        const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+        killer.on("error", () => child.kill("SIGKILL"));
+      } else child.kill("SIGKILL");
+      child.stdin?.destroy(); child.stdout?.destroy(); child.stderr?.destroy(); child.unref();
+      reject(new Error(`${command} timed out after ${options.timeoutMs ?? 120_000}ms`));
+    }, options.timeoutMs ?? 120_000);
+    child.once("exit", () => clearTimeout(timer));
+    child.once("error", () => clearTimeout(timer));
     if (options.inherit) {
       child.once("error", reject);
       child.once("exit", (code, signal) => {

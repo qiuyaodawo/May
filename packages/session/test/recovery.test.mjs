@@ -24,12 +24,29 @@ test("file recovery removes only an incomplete final record and permits the next
   await assert.rejects(store.read("s"), /Invalid session event JSON/);
 });
 
+test("history polling serializes with large appends and rejects malformed complete payloads", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "may-poll-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const store = new FileSessionStore(dir);
+  await store.append({ type: "session.created", sessionId: "s", seq: 1, timestamp: 0 });
+  const work = [];
+  for (let seq = 2; seq <= 12; seq++) {
+    work.push(store.read("s"));
+    work.push(store.append({ type: "state.updated", key: "data", value: "x".repeat(256 * 1024), sessionId: "s", seq, timestamp: seq }));
+  }
+  await Promise.all(work);
+  assert.equal((await store.read("s")).length, 12);
+  const [file] = await readdir(dir);
+  await appendFile(join(dir, file), JSON.stringify({ type: "assistant.completed", runId: "r", step: 1, message: null, sessionId: "s", seq: 13, timestamp: 13 }) + "\n");
+  await assert.rejects(store.read("s"), /Invalid session event/);
+});
+
 test("recovery distinguishes unknown effects from unstarted calls, blocks execution, and persists findings", async () => {
   const store = new InMemorySessionStore();
   const facts = [
     { type: "session.created" },
     { type: "run.started", runId: "r", checkpointVersion: 1 },
-    { type: "assistant.completed", runId: "r", step: 1, message: assistant([call("a"), call("b"), call("c")]) },
+    { type: "assistant.completed", runId: "r", step: 1, message: assistant([call("b"), call("a"), call("c")]) },
     { type: "tool.started", runId: "r", step: 1, call: call("a") },
     { type: "tool.completed", runId: "r", step: 1, call: call("a"), output: "done" },
     { type: "tool.started", runId: "r", step: 1, call: call("b") },
@@ -51,6 +68,7 @@ test("recovery distinguishes unknown effects from unstarted calls, blocks execut
   await reopened.resolveRecovery("r:1:b", "Checked the destination: write completed successfully; do not repeat it.");
   await (await reopened.continue()).result;
   assert.equal(seen.filter((m) => m.role === "tool").length, 3);
+  assert.deepEqual(seen.filter((m) => m.role === "tool").map((m) => m.toolCallId), ["b", "a", "c"]);
   assert.match(seen.at(-1).content[0].text, /Checked the destination/);
   const again = await Session.resume({ id: "s", store, createRuntime });
   assert.equal(again.listRecoveries().length, 0);

@@ -50,7 +50,7 @@ export function resolveRunBudget(defaults?: RunBudget, override?: RunBudget): Re
   for (const key of ["maxDurationMs", "maxSteps", "maxModelCalls", "maxToolCalls", "maxTotalTokens", "maxCostUsd"] as const) {
     if (defaults?.[key] !== undefined && override?.[key] !== undefined) result[key] = Math.min(defaults[key], override[key]);
   }
-  if (defaults?.tokenPrices && override?.tokenPrices && JSON.stringify(defaults.tokenPrices) !== JSON.stringify(override.tokenPrices)) throw new Error("Per-run tokenPrices cannot override agent prices");
+  if (defaults?.tokenPrices && override?.tokenPrices && (defaults.tokenPrices.inputUsdPerMillion !== override.tokenPrices.inputUsdPerMillion || defaults.tokenPrices.outputUsdPerMillion !== override.tokenPrices.outputUsdPerMillion)) throw new Error("Per-run tokenPrices cannot override agent prices");
   if (result.maxCostUsd !== undefined && result.tokenPrices === undefined) throw new Error("maxCostUsd requires explicit tokenPrices");
   if (result.tokenPrices) result.tokenPrices = Object.freeze({ ...result.tokenPrices });
   return Object.freeze(result);

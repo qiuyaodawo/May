@@ -436,8 +436,10 @@ questions per pool, 32 form fields, 64 KiB request/response and 4,096-character
 messages. Forms support flat primitives and single/multi-select enums; unsupported
 schema keywords, external references and arbitrary regexes are rejected. Responses
 are validated without coercion or automatic defaults; extra fields are refused.
-The absolute deadline covers UI waiting as well as network legs (60 seconds by
-default, configurable with `maxTotalTimeoutMs`). Cancel/expiry/close removes pending
+`requestTimeoutMs` remains the SDK request timeout and tool progress can reset it.
+An absolute deadline is added only when `maxTotalTimeoutMs` is configured; it also covers UI waiting.
+Each host interaction is bounded from arrival by the request timeout (60 seconds when unset),
+clipped to any configured absolute deadline. Cancel/expiry/close removes pending
 questions, cancels queued dialogs and rejects late/duplicate/wrong-owner answers.
 The host rechecks authorization identity and catalog/tool validity before each
 continuation; changing login while a question is open never sends old state under

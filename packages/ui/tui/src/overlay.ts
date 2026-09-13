@@ -90,7 +90,7 @@ export class Panel implements Component {
     );
     const styledTop = title === "" || this.options.titleStyle === undefined
       ? top
-      : replaceTitleStyle(top, title, this.options.titleStyle);
+      : replaceTitleStyle(top, sliceAnsi(title, 0, innerWidth), this.options.titleStyle, this.options.borderStyle);
     return {
       lines: [styledTop, ...body, bottom],
       ...(child.cursor === undefined
@@ -192,11 +192,12 @@ function replaceTitleStyle(
   line: string,
   title: string,
   titleStyle: TextStyle,
+  borderStyle?: TextStyle,
 ): string {
   const start = 1;
   const before = sliceAnsi(line, 0, start);
   const after = sliceAnsi(line, start + stringWidth(title));
-  return `${before}${styleText(title, titleStyle)}${after}`;
+  return `${before}${styleText(title, titleStyle)}${styleText(after, borderStyle)}`;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

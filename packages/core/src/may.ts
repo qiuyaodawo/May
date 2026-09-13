@@ -63,6 +63,8 @@ export interface MayOptions {
   runBudget?: RunBudget;
   toolExecutor?: ToolExecutor;
   toolScheduler?: ToolScheduler;
+  /** Maximum cancellation drain time; unresponsive tools require host reconciliation. */
+  toolSettleTimeoutMs?: number;
   /** Defaults to reject because a May instance owns one mutable Context. */
   concurrentRuns?: "reject" | "allow";
   /** Streaming-event buffer target; lifecycle events are retained. */
@@ -127,6 +129,8 @@ export class May {
   private readonly tracer: Tracer | undefined;
   private readonly traceAttributes: TraceAttributes;
   private activeRuns = 0;
+  private unsafeToReuse = false;
+  private readonly toolSettleTimeoutMs: number;
 
   constructor(options: MayOptions) {
     const maxSteps = options.maxSteps ?? 16;
@@ -134,6 +138,8 @@ export class May {
       throw new RangeError("maxSteps must be a positive integer");
     }
 
+    this.toolSettleTimeoutMs = options.toolSettleTimeoutMs ?? 2000;
+    if (!Number.isSafeInteger(this.toolSettleTimeoutMs) || this.toolSettleTimeoutMs < 1 || this.toolSettleTimeoutMs > 2_147_483_647) throw new RangeError("toolSettleTimeoutMs must be a valid positive timer duration");
     const tools = new ToolRegistry(options.tools);
 
     this.model = options.model;
@@ -197,6 +203,7 @@ export class May {
     budgetOverride: RunBudget | undefined,
     shouldYield: (() => boolean) | undefined,
   ): RunHandle {
+    if (this.unsafeToReuse) throw new RunCheckpointError(new Error("Tool outcomes or Context are uncertain; reconcile before creating a new runtime"));
     const budget = new RunBudgetMeter(resolveRunBudget(this.runBudget, budgetOverride));
     if (this.concurrentRuns === "reject" && this.activeRuns > 0) {
       throw new ConcurrentRunError();
@@ -267,6 +274,7 @@ export class May {
       durableCheckpoint,
       budget,
       shouldYield,
+      (reason) => controller.abort(reason),
     ).then(
       (value) => {
         endTraceSpan(runSpan, {
@@ -320,11 +328,13 @@ export class May {
     checkpoint: RunCheckpoint | undefined,
     budget: RunBudgetMeter,
     shouldYield: (() => boolean) | undefined,
+    abortPending: (reason: unknown) => void,
   ): Promise<RunResult> {
     let aggregateUsage: Usage | undefined;
     let modelCalls = 0;
     let toolCalls = 0;
     let pendingTools: {
+      closed?: boolean;
       readonly step: number;
       readonly calls: readonly ToolCall[];
       readonly outcomes: Array<ToolExecutionOutcome | undefined>;
@@ -546,23 +556,51 @@ export class May {
       if (budget.limits.maxSteps !== undefined && budget.limits.maxSteps <= this.maxSteps) throw new RunBudgetExceededError("steps", budget.limits.maxSteps, this.maxSteps + 1);
       throw new MaxStepsExceededError(this.maxSteps);
     } catch (error) {
+      const wasAborted = signal.aborted;
+      if (pendingTools !== undefined) {
+        abortPending(error);
+        const settled = await settleWithin(pendingTools.executions.filter((value) => value !== undefined), this.toolSettleTimeoutMs);
+        pendingTools.closed = true;
+        if (!settled) {
+          this.unsafeToReuse = true;
+          const failure = new RunCheckpointError(new Error("Tools did not settle before the cancellation deadline; external effects are unknown"));
+          emit({ type: "run.failed", error: serializeError(failure) });
+          throw failure;
+        }
+        if (!wasAborted && !(error instanceof RunCancelledError) && !(error instanceof RunBudgetExceededError) && !(error instanceof RunCheckpointError)) {
+          if (pendingTools.executions.some((execution, index) => execution !== undefined && pendingTools!.outcomes[index] === undefined)) {
+            this.unsafeToReuse = true;
+            const failure = new RunCheckpointError(new Error("Tool execution ended without a known outcome; host reconciliation is required"));
+            emit({ type: "run.failed", error: serializeError(failure) });
+            throw failure;
+          }
+          const outcomes = pendingTools.calls.map((call, index) => pendingTools!.outcomes[index] ?? createSkippedToolOutcome(call, new FatalToolExecutionError(String(error))));
+          try {
+            const snapshot = await this.context.snapshot();
+            const assistantIndex = snapshot.messages.map((message) => message.role).lastIndexOf("assistant");
+            const existing = new Set(snapshot.messages.slice(assistantIndex + 1).filter((message) => message.role === "tool").map((message) => message.toolCallId));
+            await this.context.append(outcomes.filter((outcome) => !existing.has(outcome.call.id)).map((outcome) => outcome.message), { runId, step: pendingTools.step });
+            emitToolOutcomes(pendingTools.step, outcomes, emit);
+          } catch (contextError) {
+            this.unsafeToReuse = true;
+            const failure = new RunCheckpointError(contextError);
+            emit({ type: "run.failed", error: serializeError(failure) });
+            throw failure;
+          }
+          emit({ type: "run.failed", error: serializeError(error) });
+          throw error;
+        }
+      }
       if (signal.reason instanceof RunCheckpointError) {
+        this.unsafeToReuse = true;
         // A failed parallel barrier must cancel and settle peers before releasing
         // the runtime. Never synthesize successful outcomes or cancellation facts
         // for calls whose durable state is uncertain.
-        await Promise.allSettled(pendingTools?.executions.filter((value) => value !== undefined) ?? []);
         emit({ type: "run.failed", error: serializeError(signal.reason) });
         throw signal.reason;
       }
       const budgetError = signal.reason instanceof RunBudgetExceededError ? signal.reason
         : error instanceof RunBudgetExceededError ? error : undefined;
-      const usageUnavailable = error instanceof Error && "code" in error && error.code === "RUN_BUDGET_USAGE_UNAVAILABLE";
-      if ((budgetError !== undefined || usageUnavailable) && !signal.aborted && pendingTools !== undefined) {
-        const skipped = pendingTools.calls.map((call) => createSkippedToolOutcome(call, new FatalToolExecutionError(String(error))));
-        await this.context.append(skipped.map((outcome) => outcome.message), { runId, step: pendingTools.step });
-        emitToolOutcomes(pendingTools.step, skipped, emit);
-        pendingTools = undefined;
-      }
       if (signal.aborted || error instanceof RunCancelledError) {
         const cancelled = error instanceof RunCancelledError
           ? error
@@ -570,12 +608,6 @@ export class May {
         const reason = toReason(signal.reason);
 
         if (pendingTools !== undefined) {
-          await Promise.allSettled(
-            pendingTools.executions.filter(
-              (execution): execution is Promise<ToolExecutionOutcome> =>
-                execution !== undefined,
-            ),
-          );
           const settledOutcomes = pendingTools.outcomes.filter(
             (outcome): outcome is ToolExecutionOutcome => outcome !== undefined,
           );
@@ -721,6 +753,7 @@ export class May {
     signal: AbortSignal,
     emit: (event: MayEventPayload) => void,
     pending: {
+      closed?: boolean;
       readonly outcomes: Array<ToolExecutionOutcome | undefined>;
       readonly executions: Array<Promise<ToolExecutionOutcome> | undefined>;
     },
@@ -733,6 +766,7 @@ export class May {
         call,
         tool: tools.get(call.name),
         execute: () => {
+          signal.throwIfAborted();
           execution ??= this.executeTool(
             tools,
             runId,
@@ -744,6 +778,7 @@ export class May {
             checkpoint,
           )
             .then(async (outcome) => {
+              if (pending.closed) return outcome;
               pending.outcomes[index] = outcome;
               await checkpoint?.(outcome.type === "completed"
                 ? { type: "tool.completed", runId, step, call, output: outcome.output }
@@ -757,11 +792,7 @@ export class May {
           outcome.type === "failed" && outcome.fatal !== undefined,
       };
     });
-    const outcomes = await this.toolScheduler.schedule(operations, {
-      runId,
-      step,
-      signal,
-    });
+    const outcomes = await abortable(this.toolScheduler.schedule(operations, { runId, step, signal }), signal);
     if (outcomes.length > calls.length) {
       throw new ToolSchedulerError(
         `Tool scheduler returned ${outcomes.length} results for ${calls.length} calls`,
@@ -890,6 +921,7 @@ export class May {
 
   /** Append trusted host context while idle, without invoking a model. */
   async appendMessages(messages: Message[]): Promise<void> {
+    if (this.unsafeToReuse) throw new RunCheckpointError(new Error("Runtime requires reconciliation"));
     if (this.activeRuns > 0) throw new ConcurrentRunError();
     await this.context.append(messages);
   }
@@ -1122,4 +1154,18 @@ function emitOptionalUsage(
   usage: Usage | undefined,
 ): void {
   emit(usage === undefined ? event : { ...event, usage });
+}
+
+async function settleWithin(pending: readonly Promise<unknown>[], timeoutMs: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { return await Promise.race([Promise.allSettled(pending).then(() => true), new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), timeoutMs); })]); }
+  finally { if (timer !== undefined) clearTimeout(timer); }
+}
+function abortable<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(signal.reason ?? new RunCancelledError());
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+    void pending.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+  });
 }

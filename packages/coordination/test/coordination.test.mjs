@@ -9,6 +9,8 @@ import { InMemorySessionStore } from "../../session/dist/index.js";
 import { FileSessionStore } from "../../session/dist/file-store.js";
 import { CoordinationRuntime, InMemoryCoordinationStore, createApplicationAgent, pipeline, parallelTasks } from "../dist/index.js";
 import { FileCoordinationStore } from "../dist/file-store.js";
+import { recoverFileLock } from "@may/session/file-store";
+import { spawnSync } from "node:child_process";
 
 const policy = { version: "v1", authorize: () => true };
 const answer = (text) => ({ role: "assistant", content: [{ type: "text", text }] });
@@ -195,6 +197,33 @@ test("file journals enforce ownership, version matching, tail repair and complet
   await assert.rejects(CoordinationRuntime.resume(options), /identity\/format/);
   await writeFile(file, before);
   const repaired = await CoordinationRuntime.resume(options); await repaired.close();
+});
+
+test("bounded journals checkpoint snapshots, reject oversized inputs, and expose guarded lock recovery", async (t) => {
+  const path = await directory(t);
+  const store = new FileCoordinationStore(path, 2048);
+  const worker = agent({ async *stream() { yield { type: "response.completed", message: answer("ok") }; } });
+  const options = { id: "compact", store, agents: { worker }, policy };
+  await assert.rejects(CoordinationRuntime.create({ ...options, tasks: [{ ...task("a"), input: "超".repeat(4) }], limits: { maxInputBytes: 10 } }), /maxInputBytes/);
+  const runtime = await CoordinationRuntime.create({ ...options, tasks: [task("a")] });
+  await runtime.wait();
+  const expected = runtime.snapshot();
+  await runtime.close();
+  assert.deepEqual(await store.inspect("compact"), expected);
+  const file = join(path, `${Buffer.from("compact").toString("base64url")}.jsonl`);
+  assert.ok(Buffer.byteLength(await readFile(file)) <= 2048);
+  const resumed = await CoordinationRuntime.resume(options);
+  await resumed.close();
+  const lock = join(path, "owner.lock");
+  const live = JSON.stringify({ pid: process.pid });
+  await writeFile(lock, live);
+  await assert.rejects(recoverFileLock(lock, { expectedContents: live, confirmHostsStopped: true }), /alive/);
+  const child = spawnSync(process.execPath, ["-e", ""]);
+  assert.equal(child.status, 0);
+  const stale = JSON.stringify({ pid: child.pid });
+  await writeFile(lock, stale);
+  await recoverFileLock(lock, { expectedContents: stale, confirmHostsStopped: true });
+  await assert.rejects(readFile(lock), { code: "ENOENT" });
 });
 
 test("deadlines stop pending dispatches and uncertain adapters are not restarted", async (t) => {

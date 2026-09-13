@@ -148,7 +148,7 @@ test("shows EOF newline changes and rejects hard-linked previews", async (t) => 
     content: "replacement",
   });
   assert.equal(linked.status, "unavailable");
-  assert.match(linked.reason, /hard-linked files cannot be previewed/u);
+  assert.match(linked.reason, /hard-linked file/u);
 });
 
 async function temporaryDirectory(t) {

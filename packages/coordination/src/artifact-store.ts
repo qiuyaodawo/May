@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, realpath } from "node:fs/promises";
+import { link, lstat, mkdir, open, realpath, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { Tool } from "@may/core";
@@ -95,14 +95,16 @@ export class FileArtifactStore {
       if (bytes.length > current.config.maxArtifactBytes || current.artifacts.length >= current.config.maxArtifacts ||
         current.artifacts.reduce((total, entry) => total + entry.bytes, 0) + bytes.length > current.config.maxTotalBytes) throw new Error("Artifact quota exceeded");
       const path = join(this.blobs, `${artifact.id}.blob`);
+      const temporary = `${path}.${randomUUID()}.tmp`;
       try {
-        const file = await open(path, "wx", 0o600);
+        const file = await open(temporary, "wx", 0o600);
         try { await file.writeFile(bytes); await file.sync(); } finally { await file.close(); }
+        await link(temporary, path);
       } catch (error) {
         if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
         // A crash may leave an unreferenced blob. Only identical complete bytes can be adopted.
         await this.readBlob(artifact);
-      }
+      } finally { await unlink(temporary).catch(() => undefined); }
       return { ...current, artifacts: [...current.artifacts, artifact] };
     });
     return state.artifacts.find((entry) => entry.id === artifact.id)!;

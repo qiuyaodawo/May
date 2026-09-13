@@ -1,3 +1,4 @@
+import { replaceJournalFile } from "@may/session/file-store";
 import { mkdir, open, readdir, unlink, type FileHandle } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join, resolve } from "node:path";
@@ -85,7 +86,7 @@ export class FileTaskStore {
         try { await repair.truncate(length); await repair.sync(); }
         finally { await repair.close(); }
       }
-      const handle = file;
+      let handle = file;
       let closed = false;
       let failed = false;
       let tail: Promise<void> = Promise.resolve();
@@ -100,10 +101,15 @@ export class FileTaskStore {
             validateSnapshot(snapshot, id);
             checkNext(current, snapshot);
             const record = `${JSON.stringify(snapshot)}\n`;
-            if (length + Buffer.byteLength(record) > MAX_JOURNAL_BYTES) throw new Error("Task journal size limit exceeded");
-            try { await handle.writeFile(record); await handle.sync(); }
+            const compact = length + Buffer.byteLength(record) > MAX_JOURNAL_BYTES;
+            const checkpoint = `${JSON.stringify({ checkpoint: snapshot })}\n`;
+            if (Buffer.byteLength(checkpoint) > MAX_JOURNAL_BYTES) throw new Error("Task snapshot size limit exceeded");
+            try {
+              if (compact) { const previous = handle; await previous.close(); handle = await replaceJournalFile(this.path(id, "jsonl"), checkpoint); }
+              else { await handle.writeFile(record); await handle.sync(); }
+            }
             catch (error) { failed = true; throw error; }
-            current = snapshot; length += Buffer.byteLength(record);
+            current = snapshot; length = compact ? Buffer.byteLength(checkpoint) : length + Buffer.byteLength(record);
           });
           tail = next.catch(() => undefined);
           return next;
@@ -132,8 +138,11 @@ function parse(bytes: Buffer, id: string): { current?: TaskSnapshot; length: num
   const length = bytes.lastIndexOf(10) + 1;
   let current: TaskSnapshot | undefined;
   for (const line of bytes.subarray(0, length).toString("utf8").split("\n").slice(0, -1)) {
-    const next = JSON.parse(line) as TaskSnapshot;
-    validateSnapshot(next, id); checkNext(current, next); current = next;
+    const record = JSON.parse(line) as TaskSnapshot | { checkpoint: TaskSnapshot };
+    const next = "checkpoint" in record ? record.checkpoint : record;
+    validateSnapshot(next, id);
+    if (!(current === undefined && "checkpoint" in record)) checkNext(current, next);
+    current = next;
   }
   return { ...(current ? { current } : {}), length };
 }

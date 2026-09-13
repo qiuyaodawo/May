@@ -268,7 +268,7 @@ test("assembles multiple interleaved tool calls in index order", async () => {
               index: 1,
               id: "call_b",
               type: "function",
-              function: { name: "second", arguments: "not-" },
+              function: { name: "second", arguments: '"not-' },
             },
             {
               index: 0,
@@ -287,7 +287,7 @@ test("assembles multiple interleaved tool calls in index order", async () => {
         delta: {
           tool_calls: [
             { index: 0, function: { arguments: "1}" } },
-            { index: 1, function: { arguments: "json" } },
+            { index: 1, function: { arguments: 'json"' } },
           ],
         },
         finish_reason: null,

@@ -194,13 +194,14 @@ async function createApiError(response: Response): Promise<OpenAIResponsesError>
   const text = await response.text();
   let message = text || `OpenAI request failed with status ${response.status}`;
   let providerType: string | undefined;
+  let providerCode: string | undefined;
   let requestId = response.headers.get("x-request-id") ?? undefined;
   try {
     const body = requireRecord(JSON.parse(text), "error response");
     const error = requireRecord(body.error, "error response.error");
     if (typeof error.message === "string") message = error.message;
     if (typeof error.type === "string") providerType = error.type;
-    if (typeof error.code === "string") providerType = error.code;
+    if (typeof error.code === "string") providerCode = error.code;
     if (typeof body.request_id === "string") requestId = body.request_id;
   } catch {
     // Preserve the HTTP response text when the body is not structured JSON.
@@ -209,6 +210,7 @@ async function createApiError(response: Response): Promise<OpenAIResponsesError>
   return new OpenAIResponsesError(message, {
     status: response.status,
     ...(providerType === undefined ? {} : { providerType }),
+    ...(providerCode === undefined ? {} : { providerCode }),
     ...(requestId === undefined ? {} : { requestId }),
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
   });

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { TaskWorkspaceManager } from "@may/coordination";
-import { applyTeamPatch, createTeamPatch, readTeamPatchApplication, renderTeamPatchDiff } from "../dist/team-patches.js";
+import { applyTeamPatch, cleanupTeamPatchTemporaries, createTeamPatch, readTeamPatchApplication, renderTeamPatchDiff } from "../dist/team-patches.js";
 
 async function fixture(t) {
   // Match the CLI's canonical root before invoking the link-rejecting patch APIs.
@@ -68,6 +68,13 @@ test("partial application is durable unknown and is never automatically replayed
   assert.equal((await readTeamPatchApplication(setup.directory, bundle.id)).status, "unknown");
   assert.equal((await applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest })).status, "unknown");
   assert.equal(await readFile(join(setup.source, "b.txt"), "utf8"), "before-b\n", "unknown is evidence, not a retry instruction");
+  const entries = (await readFile(result.journalPath, "utf8")).trim().split("\n").map(JSON.parse);
+  const staged = join(setup.source, entries.find((entry) => entry.temporary).temporary);
+  await writeFile(staged, "partial staging bytes");
+  await assert.rejects(cleanupTeamPatchTemporaries({ ...setup, patchId: bundle.id, confirmDigest: "wrong", confirmHostsStopped: true }), /exact patch digest/);
+  assert.deepEqual(await cleanupTeamPatchTemporaries({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest, confirmHostsStopped: true }), [staged]);
+  await assert.rejects(readFile(staged), { code: "ENOENT" });
+  assert.equal((await readTeamPatchApplication(setup.directory, bundle.id)).status, "unknown");
 });
 
 test("unsafe linked source or task files are rejected rather than treated as ordinary text changes", async (t) => {

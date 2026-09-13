@@ -74,7 +74,7 @@ export async function runCli(
       dependencies.signal,
     );
   } catch (error) {
-    if (dependencies.signal?.aborted) {
+    if (dependencies.signal?.aborted && (error === dependencies.signal.reason || error instanceof Error && (error.name === "AbortError" || "code" in error && error.code === "RUN_CANCELLED"))) {
       stderr.write("Cancelled\n");
       return 130;
     }

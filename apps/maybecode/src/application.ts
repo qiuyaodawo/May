@@ -339,9 +339,8 @@ export class MaybeCodeApplication {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    await this.application.close();
-    await this.eventRelay;
-    this.eventQueue.close();
+    try { await this.application.close(); await this.eventRelay; }
+    finally { this.eventQueue.close(); }
   }
 
   private async relayEvents(

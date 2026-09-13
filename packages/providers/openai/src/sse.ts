@@ -30,6 +30,7 @@ export async function* readOpenAIResponsesSse(
     throwIfAborted(signal);
   } finally {
     signal.removeEventListener("abort", onAbort);
+    void reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }

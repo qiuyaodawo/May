@@ -174,3 +174,20 @@ History 删除和 Catalog 移除是两个调用，不是跨 store 事务。两�
 
 Context 工作集与持久化历史的区别见[自定义 Context](custom-context.md)，完整生命周期
 见 [Runtime 与 Session 边界](../architecture/runtime-session.md)。
+
+## 本地存储维护
+
+同一个 `FileSessionStore` 实例按 Session 串行执行读取、写入与残尾修复。追加操作仅在
+文件身份、长度和时间戳一致时复用上次验证的序号；显式历史读取仍校验完整记录。
+每个文件仍要求单写者。POSIX 上新建会话后同步父目录；Node 没有等价的 Windows 目录 fsync。
+
+需要合并目录操作文件时，停止其他目录使用者，对 `FileSessionCatalog` 调用
+`await catalog.compact({ confirmHostsStopped: true })`。原子写入的版本 2 快照在清理前
+记录已吸收的精确操作文件名，因此清理中断不会重复重放。合并后不能使用旧版读取器；
+普通版本 1 目录仍可读取。
+
+本地写者锁可从 `@may/session/file-store` 导入 `recoverFileLock` 处理。必须先停止所有
+竞争宿主、打开和恢复操作，检查锁内容，再以 `expectedContents` 传入完整原文，并设置
+`confirmHostsStopped: true`。辅助函数拒绝存活 PID、远端宿主、危险链接和已变化的元数据。
+元数据不完整时，独立核实所有者后还需显式设置 `confirmUnknownOwner: true`。
+PID 探测不是原子的锁竞争算法，恢复不得与其他获取锁操作并发。释放锁不重放任何工作。

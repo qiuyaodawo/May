@@ -94,3 +94,7 @@ or new test dependency is required for normal tests.
 Host callback waiting is abortable even when a custom consent/executor callback
 ignores its signal; late completion is never replayed or delivered to a closed view.
 Callbacks must still honor cancellation to stop their own work.
+
+The browser `McpAppChannel.lifetimeMs` defaults to ten minutes and accepts up to one hour.
+Pass the host-authorized view lifetime through the channel when using a longer backend
+session; its abort signal remains authoritative.
