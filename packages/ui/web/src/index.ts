@@ -1,6 +1,7 @@
-import type { UiClient, UiClientState, UiSnapshot } from "@may/ui-client";
-import { approvalCard, button, detailPanel, extensionContent, element, icon, statusLabel, transcriptBlock, type WebUiExtensions } from "./components.js";
+import type { UiClient, UiClientState, UiSnapshot, UiResource } from "@may/ui-client";
+import { button, detailPanel, extensionContent, element, icon, statusLabel, type WebUiExtensions } from "./components.js";
 export { approvalCard, detailPanel, transcriptBlock, type WebUiExtensions, type WebUiContext, type WebUiRenderer } from "./components.js";
+import { createInspector, createTranscriptReader } from "./reading.js";
 export { markdown } from "./markdown.js";
 
 export interface WebUiOptions { readonly title?: string; readonly kind?: "session" | "task"; readonly extensions?: WebUiExtensions }
@@ -24,7 +25,9 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const connectionButton = button("连接本地服务", () => dialog.showModal(), "connection-button");
   const connectionDot = element("span", "connection-dot"); connectionButton.prepend(connectionDot);
   footer.append(connectionButton, element("span", "local-label", "LOCAL WORKSPACE"));
-  sidebar.append(brand, newButton, searchLabel, listTitle, list, footer);
+  const resourceMore = button("加载更多记录", () => { void loadResources(true); }); resourceMore.hidden = true;
+  const resourceInfo = element("p", "list-empty"); resourceInfo.setAttribute("role", "status");
+  sidebar.append(brand, newButton, searchLabel, listTitle, list, resourceMore, resourceInfo, footer);
 
   const main = element("main", "main");
   const header = element("header", "topbar");
@@ -71,6 +74,14 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   composerArea.append(form, composerHint);
   main.append(header, sessionBar, errorBox, scroll, composerArea);
   const details = element("aside", "details-panel"); details.setAttribute("aria-label", "详情");
+  const workspaceDetails = element("div");
+  const inspector = createInspector(client, options.extensions ?? {}, open => {
+    workspaceDetails.hidden = open;
+    if (open) { shell.classList.add("details-open"); detailButton.setAttribute("aria-expanded", "true"); }
+  });
+  details.append(inspector.root, workspaceDetails);
+  const reader = createTranscriptReader(client, { scroll, messages, approvals }, options.extensions ?? {}, block => inspector.inspect(block));
+  main.insertBefore(reader.toolbar, scroll);
   shell.append(sidebar, main, details);
 
   const dialog = element("dialog", "connect-dialog");
@@ -87,8 +98,22 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   root.replaceChildren(shell, dialog);
 
   let state: UiClientState = client.state, draftKey = "new", selected: string | null = null;
-  const drafts = new Map<string, string>(); let listSignature = "", panelSignature = "", choiceSignature = "", suggestionSignature = "", approvalSignature = "";
-  const blocks = new Map<string, { signature: string; node: HTMLElement }>();
+  const drafts = new Map<string, string>(); let listSignature = "", panelSignature = "", choiceSignature = "", suggestionSignature = "";
+  let resourceItems: UiResource[] | null = null, resourceCursor: string | null = null, resourceRequest = 0, resourceHost = "";
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  async function loadResources(append = false) {
+    if (!state.snapshot?.reads?.resources) { renderList(); return; }
+    const id = ++resourceRequest, hostId = state.snapshot.hostId, query = search.value.trim();
+    resourceInfo.textContent = "正在读取…"; resourceMore.disabled = true;
+    try {
+      const page = await client.readResources(query, append ? resourceCursor ?? undefined : undefined);
+      if (id !== resourceRequest || hostId !== state.snapshot?.hostId || query !== search.value.trim()) return;
+      resourceItems = [...new Map([...(append ? resourceItems ?? [] : []), ...page.items].map(item => [item.id, item])).values()];
+      resourceCursor = page.nextCursor; resourceInfo.textContent = `已加载 ${resourceItems.length} / ${page.total} 条`;
+      renderList();
+    } catch (error) { if (id === resourceRequest) resourceInfo.textContent = error instanceof Error ? error.message : "读取失败，请重试搜索。"; }
+    finally { if (id === resourceRequest) { resourceMore.disabled = false; resourceMore.hidden = !resourceCursor; } }
+  }
   const showError = (error: unknown) => { errorBox.textContent = error instanceof Error ? error.message : "操作失败。"; errorBox.hidden = false; };
   const act = (name: string, args: Record<string, string> = {}) => { void client.command(name, args).catch(showError); };
   const pending = () => state.busy || state.selecting;
@@ -96,7 +121,10 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
 
   function renderList(): void {
     const snapshot = state.snapshot, query = search.value.trim().toLocaleLowerCase();
-    const resources = snapshot?.resources.filter(r => r.title.toLocaleLowerCase().includes(query)) ?? [];
+    const resources = resourceItems === null ? snapshot?.resources.filter(r => r.title.toLocaleLowerCase().includes(query)) ?? [] : resourceItems.map(item => snapshot?.resources.find(current => current.id === item.id) ?? item);
+    if (!query && snapshot?.selectedId && !resources.some(item => item.id === snapshot.selectedId)) {
+      const selectedResource = snapshot.resources.find(item => item.id === snapshot.selectedId); if (selectedResource) resources.unshift(selectedResource);
+    }
     list.replaceChildren();
     for (const resource of resources) {
       const item = button("", () => {
@@ -118,7 +146,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     const snapshot = state.snapshot, connected = state.connection === "connected";
     const nextSelected = snapshot?.selectedId ?? null;
     const changedSelection = selected !== nextSelected;
-    if (changedSelection) { drafts.set(draftKey, composer.value); selected = nextSelected; draftKey = selected ?? "new"; composer.value = drafts.get(draftKey) ?? ""; blocks.clear(); messages.replaceChildren(); }
+    if (changedSelection) { drafts.set(draftKey, composer.value); selected = nextSelected; draftKey = selected ?? "new"; composer.value = drafts.get(draftKey) ?? "";  }
     connectionButton.lastChild!.textContent = ({ connected: "已连接本地服务", connecting: "正在连接…", reconnecting: "连接中断，重连中…", disconnected: "连接本地服务" })[state.connection];
     connectionDot.className = `connection-dot ${state.connection}`;
     productName.textContent = snapshot?.product.title ?? options.title ?? "May";
@@ -137,29 +165,15 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     listTitle.textContent = isTask ? "最近任务" : "最近会话";
     const active = snapshot?.resources.find(r => r.id === snapshot.selectedId);
     title.textContent = active?.title ?? "";
+    if (resourceHost !== (snapshot?.hostId ?? "")) {
+      resourceHost = snapshot?.hostId ?? ""; resourceRequest++; resourceItems = null; resourceCursor = null; resourceInfo.textContent = ""; resourceMore.hidden = true;
+      if (snapshot?.reads?.resources) void loadResources();
+    }
     const sig = JSON.stringify([snapshot?.resources, selected, snapshot?.activeId, pending(), snapshot?.commands, connected]);
     if (sig !== listSignature) { listSignature = sig; renderList(); }
     errorBox.textContent = state.error ?? ""; errorBox.hidden = !state.error;
-    const nearBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 140;
+    inspector.update(state); reader.update(state);
     const visibleBlocks = snapshot?.blocks ?? [];
-    const ids = new Set(visibleBlocks.map(block => block.id));
-    for (const [id, entry] of blocks) if (!ids.has(id)) { entry.node.remove(); blocks.delete(id); }
-    for (const block of visibleBlocks) {
-      const signature = JSON.stringify([block, connected, pending(), snapshot?.commands]), previous = blocks.get(block.id);
-      if (previous?.signature === signature) continue;
-      const node = transcriptBlock(block, options.extensions, { state, command: client.command.bind(client) });
-      if (previous) {
-        const open = previous.node.querySelector("details")?.open;
-        if (open && node.querySelector("details")) node.querySelector("details")!.open = true;
-        previous.node.replaceWith(node);
-      } else messages.append(node);
-      blocks.set(block.id, { signature, node });
-    }
-    const approvalKey = JSON.stringify([snapshot?.interactions, connected, pending(), snapshot?.commands]);
-    if (approvalKey !== approvalSignature) {
-      approvalSignature = approvalKey;
-      approvals.replaceChildren(...(snapshot?.interactions ?? []).map(interaction => approvalCard(interaction, decision => act("approval.resolve", { id: interaction.id, decision }), !connected || pending() || !has("approval.resolve"), options.extensions, { state, command: client.command.bind(client) })));
-    }
     welcome.hidden = visibleBlocks.length > 0;
     welcomeTitle.textContent = isTask ? "把下一件事交给 May" : "今天，一起构建什么？";
     welcomeText.textContent = snapshot?.product.subtitle ?? "连接你的本地 Agent。对话、工具与执行状态，在同一个工作区。";
@@ -187,9 +201,9 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     composerHint.textContent = !connected ? "需要连接本地服务 · 不会自动发送输入" : browsingHistory ? "浏览不改变执行对象 · 不会发送消息或处理运行中的审批" : isTask && selected ? "关闭页面不会中止任务 · 执行、验证与送达分别记录" : "Enter 发送 · Shift + Enter 换行 · 请核对 Agent 的输出";
     const panelsKey = JSON.stringify([snapshot?.panels, snapshot?.notice, snapshot?.commands, pending()]);
     if (panelsKey !== panelSignature) {
-      panelSignature = panelsKey; details.replaceChildren();
-      const detailsHeader = element("div", "details-header"); detailsHeader.append(element("h2", "", "工作详情"), button("关闭", hideDetails, "text-button")); details.append(detailsHeader);
-      for (const panel of snapshot?.panels ?? []) details.append(extensionContent(options.extensions?.panels?.[panel.id], panel, { state, command: client.command.bind(client) }) ?? detailPanel(panel));
+      panelSignature = panelsKey; workspaceDetails.replaceChildren();
+      const detailsHeader = element("div", "details-header"); detailsHeader.append(element("h2", "", "工作详情"), button("关闭", hideDetails, "text-button")); workspaceDetails.append(detailsHeader);
+      for (const panel of snapshot?.panels ?? []) workspaceDetails.append(extensionContent(options.extensions?.panels?.[panel.id], panel, { state, command: client.command.bind(client) }) ?? detailPanel(panel));
       const actions = element("div", "detail-actions");
       for (const [command, label] of [["context.compact", "压缩上下文"], ["task.recover", "核对恢复证据"], ["task.dispatch", "重新请求调度"]]) if (has(command!)) {
         const action = button(label!, () => act(command!)); action.disabled = pending(); actions.append(action);
@@ -202,10 +216,10 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
         renameForm.onsubmit = event => { event.preventDefault(); act("session.rename", { title: input.value }); rename.close(); };
         rename.onclose = () => rename.remove(); rename.showModal();
       }));
-      details.append(actions);
-      if (snapshot?.notice) details.append(element("p", "detail-note", snapshot.notice));
+      workspaceDetails.append(actions);
+      if (snapshot?.notice) workspaceDetails.append(element("p", "detail-note", snapshot.notice));
     }
-    if (nearBottom || changedSelection) scroll.scrollTop = scroll.scrollHeight;
+
   }
   function updateComposer(): void {
     send.disabled = !composer.value.trim() || pending() || state.connection !== "connected" || !(has("message.submit") || has("task.submit") && !selected);
@@ -222,7 +236,12 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     event.preventDefault(); connectSubmit.disabled = true; dialogError.textContent = "";
     void client.connect(tokenInput.value.trim()).then(() => { tokenInput.value = ""; dialog.close(); }, error => { dialogError.textContent = error instanceof Error ? error.message : "连接失败"; }).finally(() => { connectSubmit.disabled = false; });
   };
-  search.oninput = renderList;
+  search.maxLength = 256;
+  search.oninput = () => {
+    clearTimeout(searchTimer); resourceRequest++; resourceItems = null; resourceCursor = null;
+    if (!state.snapshot?.reads?.resources) renderList();
+    else { resourceItems = []; renderList(); searchTimer = setTimeout(() => { void loadResources(); }, 250); }
+  };
   function hideDetails(): void { shell.classList.remove("details-open"); detailButton.setAttribute("aria-expanded", "false"); if (details.contains(document.activeElement)) detailButton.focus(); }
   const keyboard = (event: KeyboardEvent) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); shell.classList.add("sidebar-open"); shell.classList.remove("sidebar-collapsed"); syncSidebar(); search.focus(); }
@@ -230,5 +249,5 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   };
   document.addEventListener("keydown", keyboard);
   const unsubscribe = client.subscribe(render);
-  return () => { unsubscribe(); client.disconnect(); document.removeEventListener("keydown", keyboard); mobileQuery.removeEventListener("change", syncSidebar); root.replaceChildren(); };
+  return () => { resourceRequest++; clearTimeout(searchTimer); reader.dispose(); inspector.dispose(); unsubscribe(); client.disconnect(); document.removeEventListener("keydown", keyboard); mobileQuery.removeEventListener("change", syncSidebar); root.replaceChildren(); };
 }

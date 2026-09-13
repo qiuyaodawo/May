@@ -59,6 +59,14 @@ export class MaybeClaw {
       note: "Persisted snapshot; use recover after the owner stops to reconcile Session evidence." };
   }
 
+  /** Inspect committed execution evidence without acquiring an owner, repairing a tail or recovering. */
+  async readSessionHistory(id: string): Promise<readonly SessionEvent[]> {
+    const task = await this.require(id);
+    const events = await new FileSessionStore(join(this.store.directory, "sessions")).inspect(id);
+    inspectEvidence(task, events);
+    return events;
+  }
+
   async cancel(id: string) {
     const task = await this.require(id);
     if (!isTerminal(task)) await this.store.requestCancel(id);

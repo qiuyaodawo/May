@@ -69,11 +69,12 @@ test("shared host authenticates, deduplicates commands, restores approvals and s
 
 test("client preserves the browser fetch receiver, ignores stale selections and never retries mutations", async t => {
   const snapshot = id => ({ version: 1, hostId: "host", revision: 1, selectedId: id, product: { id: "fixture" }, blocks: [], resources: [], commands: [] });
-  let resolveOld, posts = 0;
+  let resolveOld, resolveRead, posts = 0;
   const request = async function (url, init) {
     assert.equal(this, globalThis, "browser fetch requires the Window receiver");
     if (init.method === "POST") { posts++; throw new Error("Response lost"); }
     if (url.includes("events")) return new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(new Error("Aborted")), { once: true }));
+    if (url.includes("/api/ui/history")) return new Promise(resolve => { resolveRead = () => resolve(Response.json({ hostId: "host", items: [], nextCursor: null, total: 0 })); });
     if (url.includes("selected=old")) return new Promise(resolve => { resolveOld = () => resolve(Response.json(snapshot("old"))); });
     if (url.includes("selected=missing")) return Response.json({ error: "Unknown session" }, { status: 404 });
     return Response.json(snapshot(url.includes("selected=new") ? "new" : null));
@@ -86,6 +87,9 @@ test("client preserves the browser fetch receiver, ignores stale selections and 
   await assert.rejects(client.command("message.submit", { text: "during selection" })); assert.equal(posts, 0);
   await client.select("new"); resolveOld(); await old;
   assert.equal(client.state.snapshot.selectedId, "new");
+  const staleRead = client.readHistory();
+  const rejectedRead = assert.rejects(staleRead, /浏览对象已改变/);
+  await client.select("new"); resolveRead(); await rejectedRead;
   await assert.rejects(client.select("missing")); await client.refresh();
   assert.equal(client.state.snapshot.selectedId, "new"); assert.equal(client.state.selecting, false);
   await assert.rejects(client.command("message.submit", { text: "hi" }), /Response lost/);
@@ -186,4 +190,55 @@ test("projection separates approval evidence, terminal outcomes and unknown effe
   assert.equal(history.blocks.get("tool:run:call").status, "not-started");
   assert.equal(history.blocks.get("tool:run:unknown").status, "unknown");
   assert.ok(!JSON.stringify([...projection.blocks.values()]).includes("PRIVATE_STACK"));
+});
+
+// Full-history coverage in one integration scenario, not a separate test per UI control.
+test("read APIs page beyond the snapshot, search stored text and bind detail chunks without executing", async t => {
+  const store = new InMemorySessionStore(), catalog = new InMemorySessionCatalog();
+  let calls = 0, opens = 0;
+  const large = "x".repeat(80_000) + "deep-search-marker";
+  const definition = defineAgent({ model: { async *stream(request) {
+    calls++;
+    const last = request.messages.at(-1);
+    const text = last?.role === "user" ? last.content.map(p => p.text ?? "").join("") : "Tool complete";
+    yield { type: "response.completed", message: { role: "assistant", content: [{ type: "text", text }], modelState: { type: "private", data: { secret: "DO_NOT_EXPOSE" } },
+      ...(text === "large" ? { toolCalls: [{ id: "large-call", name: "fixture", input: {} }] } : {}) } };
+  } }, tools: [{ name: "fixture", description: "Fixture", inputSchema: { type: "object" }, execute: () => large }], permissionPolicy: () => "allow", sessionHistory: false });
+  const app = await AgentWorkspace.open({ workspace: "reading", store, catalog, openApplication: selection => { opens++; return definition.open({ ...selection, store }); } });
+  const host = new ApplicationUiHost(app, { product: { id: "reading", title: "Reading", subtitle: "Fixture", resourceKind: "session", suggestions: [] } });
+  const server = await startUiServer({ host, token, port: 0, assets: new Map(), close: () => host.close() }); t.after(() => server.close());
+  for (let i = 0; i < 260; i++) await (await app.submit({ input: `turn ${i}` })).result;
+  await (await app.submit({ input: "large" })).result;
+  const sessionId = app.sessionId;
+  for (let i = 0; i < 510; i++) await catalog.record({ id: `catalog-${i}`, workspace: "reading", title: `archived ${i}`, createdAt: i, lastUsedAt: 10_000 + i });
+  const before = JSON.stringify(await store.inspect(sessionId)), previousOpens = opens, previousCalls = calls;
+  const read = async (kind, args = {}) => fetch(`${server.url}/api/ui/${kind}?${new URLSearchParams({ hostId: host.hostId, selected: sessionId, ...args })}`, { headers: { authorization: `Bearer ${token}` } });
+  const snapshot = await host.snapshot(); assert.ok(snapshot.blocks.length <= 50); assert.ok(snapshot.historyPage.total > 500);
+  const ids = new Set(); let cursor;
+  do {
+    const page = await (await read("history", cursor ? { cursor } : {})).json();
+    assert.ok(page.items.length <= 50);
+    for (const block of page.items) { assert.ok(!ids.has(block.id)); ids.add(block.id); }
+    cursor = page.nextCursor;
+  } while (cursor);
+  assert.equal(ids.size, snapshot.historyPage.total);
+  const searched = await (await read("history", { query: "deep-search-marker" })).json();
+  const block = searched.items.find(b => b.kind === "tool"); assert.ok(block, "search includes stored output beyond the snapshot truncation");
+  assert.ok(!JSON.stringify(searched).includes("DO_NOT_EXPOSE"));
+  const first = await (await read("field", { block: block.id, field: "text", offset: "0" })).json();
+  assert.equal(first.text.length, 32_768); assert.equal(first.total, large.length);
+  const next = await (await read("field", { block: block.id, field: "text", offset: String(first.nextOffset), version: first.version })).json();
+  assert.equal(next.offset, first.nextOffset); assert.equal(next.version, first.version);
+  assert.equal((await read("field", { block: block.id, field: "text", offset: "1", version: "stale" })).status, 409);
+  assert.equal((await read("field", { block: "foreign", field: "text" })).status, 404);
+  assert.equal((await read("history", { cursor: snapshot.historyPage.nextCursor, query: "changed" })).status, 409);
+  assert.equal((await read("history", { selected: "not-owned" })).status, 404);
+  assert.equal((await read("history", { hostId: "old-host" })).status, 409);
+  assert.equal((await fetch(`${server.url}/api/ui/history?hostId=${host.hostId}&selected=${sessionId}`)).status, 401);
+  assert.equal((await (await read("resources", { query: "archived 0" })).json()).items[0].id, "catalog-0");
+  let count = 0; cursor = undefined;
+  do { const page = await (await read("resources", cursor ? { cursor } : {})).json(); count += page.items.length; cursor = page.nextCursor; } while (cursor);
+  assert.equal(count, 511);
+  assert.equal(JSON.stringify(await store.inspect(sessionId)), before);
+  assert.equal(app.sessionId, sessionId); assert.equal(opens, previousOpens); assert.equal(calls, previousCalls);
 });

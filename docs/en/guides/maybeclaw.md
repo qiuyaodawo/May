@@ -68,8 +68,10 @@ executed by this host, final results, cancellation, evidence reconciliation,
 failed-dispatch retry, channel state and the most recent 100 delivery records.
 Each submission is an independent task, not a turn in a shared conversation.
 Tokens live only in page memory: reload requires connecting again. Output uses
-a safe Markdown subset, never executable HTML. Historical tasks show persisted
-final results; transient tool details are not reconstructed after host restart.
+a safe Markdown subset, never executable HTML. Historical tasks now include tool
+calls/results read from existing Session journals, even after restart. Read-only
+pagination, content search and field inspection never acquire an execution owner,
+repair incomplete log tails or rerun a task. Unrecorded live deltas are not restored.
 
 The server listens **only on 127.0.0.1**, requires bearer authentication for every
 API request, checks Host/Origin, and sends a restrictive CSP. The operator token

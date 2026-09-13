@@ -78,6 +78,8 @@ export interface UiSnapshot {
   /** Workspace execution owner, independent of this client's selected history. Absent for task hosts. */
   readonly activeId?: string;
   readonly blocks: readonly UiBlock[];
+  readonly historyPage?: { readonly nextCursor: string | null; readonly total: number };
+  readonly reads?: { readonly resources: boolean; readonly history: boolean; readonly fields: boolean };
   readonly interactions: readonly UiInteraction[];
   /** Namespaced, explicitly implemented commands, not arbitrary method names. */
   readonly commands: readonly string[];
@@ -99,12 +101,21 @@ export interface UiCommand {
 
 export interface UiReceipt { readonly selectedId?: string | null }
 
+export interface UiPageRequest { readonly query?: string; readonly cursor?: string }
+export interface UiPage<T> { readonly hostId: string; readonly items: readonly T[]; readonly nextCursor: string | null; readonly total: number }
+export type UiField = "input" | "text" | "reasoning" | "diagnostic" | "presentation";
+export interface UiFieldRequest { readonly blockId: string; readonly field: UiField; readonly offset: number; readonly version?: string }
+export interface UiFieldPage { readonly hostId: string; readonly text: string; readonly offset: number; readonly nextOffset: number | null; readonly total: number; readonly version: string }
+
 /** One owner consumes runtime events; many clients subscribe to invalidations. */
 export interface UiHost {
   readonly hostId: string;
   snapshot(selectedId?: string): Promise<UiSnapshot>;
   execute(command: UiCommand): Promise<UiReceipt>;
   subscribe(listener: () => void): () => void;
+  resources?(request: UiPageRequest): Promise<UiPage<UiResource>>;
+  history?(selectedId: string, request: UiPageRequest): Promise<UiPage<UiBlock>>;
+  field?(selectedId: string, request: UiFieldRequest): Promise<UiFieldPage>;
 }
 
 export class UiError extends Error {

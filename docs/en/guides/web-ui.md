@@ -124,15 +124,18 @@ existing `/api/tasks` and `/api/health` routes remain compatible.
   Closing a page stops only its connection; stopping the host closes the agent.
 - Snapshot projection excludes provider continuation state. Tool inputs/results
   remain sensitive workspace data available to the authenticated operator.
-- Display is bounded to 500 recent transcript blocks and roughly 64 KiB per text
-  field. Oversized approval inputs offer denial only in the UI. Full-history
-  pagination and large-artifact retrieval are not implemented.
+- Snapshots return at most 50 recent blocks; older committed blocks are available
+  through read-only pagination and search. Preview fields remain bounded to roughly
+  64K characters. The inspector reads stored fields in 32,768-character chunks.
+  Oversized approval inputs remain deny-only; reading details does not expand grants.
+  File/artifact downloads are not implemented.
 - Supported Markdown is a safe subset: paragraphs, headings, lists, quotes, code
   fences, tables, bold, inline code and HTTP(S) links. Raw HTML, remote images,
   generated JavaScript and executable artifact previews are not enabled.
-- MaybeClaw retains tool cards after completion for up to eight tasks in host memory. After restart, historical
-  tasks show their final persisted result, not a reconstructed token stream. Tasks
-  run by a different process have status/final-result visibility, not live deltas.
+- MaybeClaw now reads existing Session journals for historical tool calls/results,
+  including after restart. Its bounded live projection still retains eight tasks;
+  transient progress/partial token streams are not reconstructed from missing data.
+  Reading does not add persistence, acquire an execution owner or run recovery.
 - MaybeCode team controls, interactive MCP forms/sampling, skill pickers, full file
   browsing, artifact downloads and recovery resolution have not yet been connected.
   Web mode does not opt into interactive MCP callbacks. Use existing terminal/CLI
@@ -175,7 +178,66 @@ tool projection; its task/verification/delivery policies remain product-owned.
 gallery on port 3944 after building. Type `stop` to shut it down. It exercises UI
 fallbacks, not actual process crash recovery.
 
+## Long conversations, inspection and history reads
+
+The shared workbench groups records by host-provided run ID, with request text as
+the heading where available. Tool counts, waiting approvals and exceptional states
+are visible without expanding every call. Expand/collapse all and exception-only
+filtering are view-local; approval controls remain outside these filters. A pinned
+approval shortcut locates the current request. When reading older content, live
+updates preserve the visible anchor and offer a new-content/back-to-latest button.
+
+Tool transcripts contain labelled previews. **View details** opens an independent
+side panel with overview/product renderers, input, output, error and presentation
+fields. Long answers and diagnostics also have an inspection action. Read-only
+field tabs provide previous/next chunks and an explicit refresh; the host hashes
+field content and scope so changed data cannot be silently spliced across chunks.
+The overview reuses the existing versioned Diff extension. Large presentation JSON
+is available as raw text chunks, not a newly implemented large-Diff renderer.
+
+The sidebar searches all session titles or task prompts and pages resources by
+creation time (with a stable ID tie-breaker); the current selection may be pinned
+in addition to the page. Within a resource, **Search content** searches committed
+user/assistant text, reasoning, tool input/output, diagnostics and presentation
+text, including text beyond preview limits. Results contain matching blocks, not
+a complete run, and are read-only snapshots refreshed by searching again. Clear
+search restores the recent timeline. Older pages are prepended without activating
+a session or discarding current approvals. The UI reports counts for loaded data,
+not a total count of runtime operations that were never recorded.
+
+Custom hosts opt in through `snapshot.reads` and optional `UiHost.resources`,
+`history` and `field` methods. The authenticated GET routes are `/api/ui/resources`,
+`/api/ui/history` and `/api/ui/field`; all require the current `hostId`, and the last
+two require `selected`. Page requests accept `query` and opaque `cursor`. Each page
+contains at most 50 records with an approximately 256K-character payload budget
+(one large bounded block may exceed that budget). Cursors bind host/resource/query
+and an anchor, not authorization. Deleted anchors or changed scope fail closed;
+restart the search after these errors. Metadata can change between pages. Client
+read responses from an old host/selection are discarded independently of commands.
+
+History uses safe `SessionStore.inspect`; MaybeClaw additionally validates task
+ownership and existing journal evidence. No provider continuation state, permission
+context, new tool execution or log-tail repair is exposed through reads. This
+implementation scans the existing catalog/journal in memory: transport paging is
+not a storage index, virtualized timeline or constant-memory database query. Very
+large journals and many manually loaded pages still have CPU/memory costs.
+
+After building, run `node examples/web-ui/reading.mjs` for a real shared-host,
+in-memory fixture with 520 transcript blocks and 56 sessions. Prompts containing
+`审批` produce a 90,006-character synthetic tool result; `慢速` exercises scrolling
+while streaming. It uses no provider, files or real tools. Type `stop` to close it.
+
 ## Browser acceptance
+
+Reading-workbench acceptance used 520 transcript blocks, 56 browser-visible
+sessions, and an API fixture with more than 500 catalog entries. It verified
+paging/search beyond the snapshot, all three chunks of a 90,006-character tool
+result, collapse/filter-safe approval access, the product Diff inspector and
+persisted MaybeClaw tool results after a host restart. During streamed output,
+the same visible history anchor kept its measured position; back-to-latest reached
+the bottom. Shared controls/inspection also passed a 390 px layout check without
+horizontal overflow. This was scripted offline acceptance, not a live-provider or
+large-scale storage benchmark.
 
 After `pnpm build`, run `node examples/web-ui/acceptance.mjs`. It starts both real
 product hosts on loopback ports 3942/3943 with a scripted model, disabled channels

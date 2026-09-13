@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { commandArgs, UiError, type UiCommand, type UiHost, type UiReceipt, type UiSnapshot } from "@may/ui-client";
+import { commandArgs, UiError, type UiCommand, type UiHost, type UiReceipt, type UiSnapshot, type UiBlock, type UiPageRequest, type UiFieldRequest } from "@may/ui-client";
 import { UiProjection, displayValue } from "@may/ui-client/projection";
+import { historyPage, readPage, recordedField, fieldPage, searchHistory } from "@may/ui-client/reading";
 import type { MaybeClawHost } from "./host.js";
 import { isTerminal } from "./types.js";
 
@@ -21,7 +22,7 @@ export class MaybeClawUiHost implements UiHost {
     });
   }
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
-  async snapshot(selectedId?: string): Promise<UiSnapshot> {
+  async snapshot(selectedId?: string, all = false): Promise<UiSnapshot> {
     const revision = ++this.revision;
     const tasks = await this.host.claw.store.list(), status = this.host.status();
     const selected = selectedId ? await this.host.claw.status(selectedId) : undefined;
@@ -30,20 +31,27 @@ export class MaybeClawUiHost implements UiHost {
     if (task && !isTerminal(task) && !selected.cancellationRequested) commands.push("task.cancel");
     if (task && !selected.owner && ["running", "blocked"].includes(task.status)) commands.push("task.recover");
     if (task && task.status === "queued" && status.dispatchErrors[task.id]) commands.push("task.dispatch");
-    const projection = task ? this.live.get(task.id) : undefined;
-    if (task && projection && (isTerminal(task) || !selected.owner)) projection.settle();
+    const projection = new UiProjection(Infinity);
+    if (task) projection.history(await this.host.claw.readSessionHistory(task.id));
+    if (task) for (const [id, block] of this.live.get(task.id)?.blocks ?? []) {
+      if (!projection.blocks.has(id) || ["running", "streaming", "awaiting-approval"].includes(projection.blocks.get(id)?.status ?? "")) projection.blocks.set(id, block);
+    }
+    if (task && (isTerminal(task) || !selected.owner)) projection.settle();
+    const blocks: UiBlock[] = task ? [
+      ...(![...projection.blocks.values()].some(b => b.kind === "user") ? [{ id: `input:${task.id}`, kind: "user" as const, text: task.spec.prompt }] : []),
+      ...projection.blocks.values(),
+      ...(task.result !== undefined && ![...projection.blocks.values()].some(b => b.kind === "assistant" && b.status === "completed") ? [{ id: `result:${task.id}`, kind: "assistant" as const, text: displayValue(task.result), status: "completed" as const }] : []),
+      ...(task.detail ? [{ id: `detail:${task.id}`, kind: "notice" as const, text: task.detail,
+        ...(["failed", "cancelled", "blocked"].includes(task.status) ? { status: task.status === "failed" ? "failed" as const : task.status === "cancelled" ? "cancelled" as const : "unknown" as const } : {}) }] : []),
+      ...(!task.result && !projection.blocks.size && !task.detail ? [{ id: `status:${task.id}`, kind: "notice" as const, text: selected.cancellationRequested ? "已请求取消，等待宿主确认。" : task.status === "queued" ? "任务已入队，等待宿主执行。" : "任务状态：" + task.status }] : []),
+    ] : [];
+    const page = historyPage(this.hostId, task?.id ?? "", blocks);
     return { version: 1, hostId: this.hostId, revision,
       product: { id: "maybeclaw", title: "MaybeClaw", resourceKind: "task", subtitle: "提交一个有明确结果的任务。离开页面后，工作仍由本地宿主继续。", suggestions: ["帮我制定一份学习计划", "梳理这个问题的关键假设", "把我的想法整理成行动清单"] },
-      resources: [...tasks].sort((a, b) => b.createdAt - a.createdAt).slice(0, 500).map(t => ({ id: t.id, kind: "task", title: t.spec.prompt.slice(0, 72), status: t.status, updatedAt: t.updatedAt })),
+      resources: [...tasks].sort((a, b) => b.createdAt - a.createdAt).filter((t, index) => index < 500 || t.id === task?.id).map(t => ({ id: t.id, kind: "task", title: t.spec.prompt.slice(0, 72), status: t.status, updatedAt: t.updatedAt })),
       selectedId: task?.id ?? null,
-      blocks: task ? [
-        { id: `input:${task.id}`, kind: "user", text: task.spec.prompt },
-        ...(projection ? [...projection.blocks.values()].filter(block => !isTerminal(task) || block.kind !== "assistant" || task.result === undefined) : []),
-        ...(task.result === undefined ? [] : [{ id: `result:${task.id}`, kind: "assistant" as const, text: displayValue(task.result), status: "completed" as const }]),
-        ...(task.detail ? [{ id: `detail:${task.id}`, kind: "notice" as const, text: task.detail,
-          ...(["failed", "cancelled", "blocked"].includes(task.status) ? { status: task.status === "failed" ? "failed" as const : task.status === "cancelled" ? "cancelled" as const : "unknown" as const } : {}) }] : []),
-        ...(!task.result && !projection?.blocks.size && !task.detail ? [{ id: `status:${task.id}`, kind: "notice" as const, text: selected.cancellationRequested ? "已请求取消，等待宿主确认。" : task.status === "queued" ? "任务已入队，等待宿主执行。" : "任务状态：" + task.status }] : []),
-      ] : [],
+      blocks: all ? blocks : page.items, historyPage: { nextCursor: page.nextCursor, total: page.total },
+      reads: { resources: true, history: true, fields: true },
       interactions: [], commands, choices: [],
       panels: [
         ...(task ? [{ id: "task", title: "任务详情", fields: [
@@ -56,8 +64,25 @@ export class MaybeClawUiHost implements UiHost {
         { id: "host", title: "本地宿主", fields: [{ label: "状态", value: status.state }, { label: "执行槽位", value: `${status.active} / ${status.maxConcurrent}` }, ...status.channels.map(c => ({ label: c.name, value: c.state })), ...(status.error ? [{ label: "诊断", value: status.error }] : [])] },
         { id: "deliveries", title: "最近投递", fields: status.deliveries.map(d => ({ label: `${d.channel} · ${d.taskId?.slice(0, 8) ?? "回执"}`, value: d.status })) },
       ],
-      notice: "执行完成不代表已验证或已送达。恢复只核对持久证据，不会重新执行已提交的工作。历史任务目前展示最终结果；实时工具详情只保留在当前宿主中。",
+      notice: "执行完成不代表已验证或已送达。恢复只核对持久证据，不会重新执行已提交的工作。历史记录从已有执行日志只读读取；实时增量仅保留在当前宿主中。",
     };
+  }
+  async resources(request: UiPageRequest) {
+    const tasks = [...await this.host.claw.store.list()].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
+    const items = tasks.map(t => ({ id: t.id, kind: "task" as const, title: t.spec.prompt.slice(0, 72), status: t.status, updatedAt: t.updatedAt }));
+    const prompts = new Map(tasks.map(task => [task.id, task.spec.prompt.toLocaleLowerCase()]));
+    return readPage(this.hostId, "resources", items, request, (item, query) => prompts.get(item.id)!.includes(query));
+  }
+  async history(selectedId: string, request: UiPageRequest) {
+    return historyPage(this.hostId, selectedId, (await this.snapshot(selectedId, true)).blocks, request, searchHistory(await this.host.claw.readSessionHistory(selectedId), request.query));
+  }
+  async field(selectedId: string, request: UiFieldRequest) {
+    const block = (await this.snapshot(selectedId, true)).blocks.find(b => b.id === request.blockId);
+    if (!block) throw new UiError(404, "该记录不属于当前任务或已不可用。");
+    const events = await this.host.claw.readSessionHistory(selectedId);
+    const task = (await this.host.claw.status(selectedId)).task;
+    const text = request.field === "text" && block.id === `result:${selectedId}` ? task.result ?? "" : recordedField(events, block, request.field);
+    return fieldPage(this.hostId, selectedId, request, text);
   }
   async execute(command: UiCommand): Promise<UiReceipt> {
     if (command.hostId !== this.hostId) throw new UiError(409, "宿主已改变。");

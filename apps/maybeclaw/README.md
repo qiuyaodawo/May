@@ -31,3 +31,9 @@ The root entry exports `MaybeClaw`, `FileTaskStore`, task types, configuration
 helpers, `MaybeClawHost`, `startControlServer`, channel adapters and `runMaybeClaw`.
 They are product-owned developer-preview contracts,
 not a new stable `@may/tasks` framework API.
+
+
+`MaybeClaw.readSessionHistory(id)` inspects committed Session evidence read-only,
+validates task ownership and never takes the execution lock, repairs a tail or
+reconciles a task. The shared UI uses it for historical tool cards, pagination,
+search and field details after restart; no new journal writes are introduced.

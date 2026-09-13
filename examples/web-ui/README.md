@@ -64,3 +64,14 @@ It contains synthetic tool states, historical approval evidence, interrupted tex
 error codes, product supplements, and throwing/unsupported presentation renderers.
 It has no agent, real approvals, provider, filesystem effects or recovery actions.
 Type `stop` to shut it down. Use `acceptance.mjs` for real-host approval flows.
+
+
+## Large reading fixture
+
+Run `node examples/web-ui/reading.mjs` after building (loopback port 3945). It seeds
+520 transcript blocks and 56 sessions through a real shared application host using
+only memory and a scripted model. The page auto-connects with its public disposable
+token. Search old records, load both sidebar and transcript pages, submit `审批` for
+a 90,006-character synthetic tool result, or `慢速` to check scroll stability.
+The inspector's output tab reads all chunks, including the final search marker.
+No real provider, file, shell or channel is used. Type `stop` to shut it down.

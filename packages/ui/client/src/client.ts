@@ -1,4 +1,4 @@
-import { UiError, type UiCommand, type UiReceipt, type UiSnapshot } from "./protocol.js";
+import { UiError, type UiCommand, type UiReceipt, type UiSnapshot, type UiPage, type UiResource, type UiBlock, type UiField, type UiFieldPage } from "./protocol.js";
 
 export interface UiClientState {
   readonly snapshot: UiSnapshot | null;
@@ -58,6 +58,23 @@ export class UiClient {
     // Resolve the initial default once; later host changes must not move this view.
     if (selected === undefined && snapshot.product.resourceKind === "session" && snapshot.selectedId) this.selectedId = snapshot.selectedId;
     this.update({ snapshot, connection: "connected" });
+  }
+  readResources(query = "", cursor?: string): Promise<UiPage<UiResource>> {
+    return this.read("resources", { query, ...(cursor ? { cursor } : {}) }, false);
+  }
+  readHistory(query = "", cursor?: string): Promise<UiPage<UiBlock>> {
+    return this.read("history", { query, ...(cursor ? { cursor } : {}) });
+  }
+  readField(blockId: string, field: UiField, offset = 0, version?: string): Promise<UiFieldPage> {
+    return this.read("field", { block: blockId, field, offset: String(offset), ...(version ? { version } : {}) });
+  }
+  private async read<T extends { hostId: string }>(kind: string, args: Record<string, string>, scoped = true): Promise<T> {
+    const snapshot = this.value.snapshot, generation = this.generation, selection = this.selectionVersion;
+    if (!snapshot || this.value.connection !== "connected" || scoped && (this.value.selecting || !snapshot.selectedId)) throw new UiError(409, "请先连接并选择资源。");
+    const params = new URLSearchParams({ ...args, hostId: snapshot.hostId, ...(scoped ? { selected: snapshot.selectedId! } : {}) });
+    const result = await this.json(`/api/ui/${kind}?${params}`) as T;
+    if (generation !== this.generation || result.hostId !== this.value.snapshot?.hostId || scoped && (selection !== this.selectionVersion || snapshot.selectedId !== this.value.snapshot?.selectedId)) throw new UiError(409, "浏览对象已改变，已忽略旧读取结果。");
+    return result;
   }
   async command(name: string, args: Record<string, string> = {}, targetId = this.value.snapshot?.selectedId ?? null): Promise<void> {
     const snapshot = this.value.snapshot;

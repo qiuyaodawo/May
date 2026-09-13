@@ -95,7 +95,9 @@ test("loopback API authenticates, queues independently of clients, bounds concur
 });
 
 test("shared Web UI retains task identity and separates execution, verification and delivery", async t => {
+  let modelCalls = 0;
   const f = await fixture(t, { async *stream(request, options) {
+    modelCalls++;
     if (JSON.stringify(request.messages).includes("interrupt fixture")) {
       yield { type: "text.delta", delta: "Partial answer" };
       await delay(30_000, undefined, { signal: options.signal });
@@ -103,7 +105,7 @@ test("shared Web UI retains task identity and separates execution, verification 
     yield finished("Done");
   } });
   const host = await MaybeClawHost.start({ claw: f.claw, selectSpec: async () => f.spec, startPaused: true });
-  const server = await startControlServer({ host, token, port: 0 }); f.cleanup.push(() => server.close());
+  let server = await startControlServer({ host, token, port: 0 }); f.cleanup.push(() => server.close());
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
   const snapshot = async selected => (await fetch(server.url + "/api/ui/snapshot" + (selected ? `?selected=${selected}` : ""), { headers })).json();
   const initial = await snapshot(); assert.equal(initial.product.resourceKind, "task"); assert.equal(initial.selectedId, null);
@@ -126,6 +128,18 @@ test("shared Web UI retains task identity and separates execution, verification 
   assert.ok(cancelled.blocks.some(b => b.kind === "assistant" && b.status === "interrupted" && b.text === "Partial answer"));
   assert.ok(cancelled.blocks.some(b => b.kind === "notice" && b.status === "cancelled"));
   assert.equal(cancelled.interactions.length, 0);
+  const evidencePath = (await f.claw.status(first.selectedId)).sessionEvidence;
+  const evidenceBefore = await readFile(evidencePath, "utf8");
+  await f.claw.readSessionHistory(first.selectedId);
+  assert.equal(await readFile(evidencePath, "utf8"), evidenceBefore);
+  await server.close();
+  const reopened = await MaybeClawHost.start({ claw: f.claw, selectSpec: async () => f.spec, startPaused: true });
+  server = await startControlServer({ host: reopened, token, port: 0 });
+  const restored = await snapshot(first.selectedId);
+  assert.ok(restored.blocks.some(block => block.kind === "assistant" && block.text === "Done"));
+  const history = await (await fetch(`${server.url}/api/ui/history?hostId=${restored.hostId}&selected=${first.selectedId}&query=Done`, { headers })).json();
+  assert.ok(history.items.some(block => block.text === "Done"));
+  assert.equal(modelCalls, 2, "reading and restart must not execute submitted tasks again");
 });
 
 test("channel inbox owns tasks, deduplicates events, and never replays unknown outbound attempts", async (t) => {

@@ -62,3 +62,21 @@ Approval details do not by themselves implement evidence-bound pre-approval Diff
 Run `node examples/web-ui/states.mjs` from the repository root after building to
 inspect a read-only synthetic gallery, including failed renderers and unsupported
 presentation versions. Use `stop` to close it. It is not runtime recovery evidence.
+
+
+## Reading workbench
+
+The shell groups transcript records by run, retains local collapse/filter state,
+keeps current approvals outside filters, and preserves the visible scroll anchor
+while new output arrives. Its toolbar offers counts, expand/collapse all,
+exception-only filtering, approval location and back-to-latest/new-content controls.
+Tool cards use short labelled previews; the independent inspector reuses trusted
+product renderers and reads full stored fields in version-bound chunks. Long
+answers and diagnostics also expose inspection. The inspector resets on host or
+resource changes; browsing and reading never switch the runtime's execution target.
+
+The sidebar pages/searches all resource titles (task prompts for task hosts), while
+content search and older-record loading use the selected host's read-only APIs.
+Search results are query snapshots, not live replacement approvals. Hosts without
+read capabilities retain their basic snapshot UI; field tabs stay disabled.
+Run `node examples/web-ui/reading.mjs` after building for a large offline fixture.

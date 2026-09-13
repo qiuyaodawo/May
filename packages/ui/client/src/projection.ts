@@ -24,13 +24,16 @@ export class UiProjection {
   readonly blocks = new Map<string, UiBlock>();
   /** Live requests only. Replaying a journal must never manufacture authority. */
   readonly interactions = new Map<string, UiInteraction>();
+  constructor(private readonly maxBlocks = 500) {}
   private set(block: UiBlock): void {
     this.blocks.set(block.id, block);
-    while (this.blocks.size > 500) this.blocks.delete(this.blocks.keys().next().value!);
+    while (this.blocks.size > this.maxBlocks) this.blocks.delete(this.blocks.keys().next().value!);
   }
   history(events: readonly SessionEvent[]): void {
+    let inputId: string | undefined;
     for (const event of events) {
-      if (event.type === "input.submitted") this.set({ id: `input:${event.seq}`, kind: "user", text: contentText(event.message.content) });
+      if (event.type === "input.submitted") { inputId = `input:${event.seq}`; this.set({ id: inputId, kind: "user", text: contentText(event.message.content) }); }
+      else if (event.type === "run.started" && inputId) { const input = this.blocks.get(inputId); if (input) this.set({ ...input, runId: event.runId }); inputId = undefined; }
       else if (event.type === "assistant.completed") this.assistantCompleted(event.runId, event.step, event.message.content);
       else if (event.type === "tool.presentation") this.presentation(event);
       else if (event.type.startsWith("approval.")) this.permission(event as ApprovalEvent, false);

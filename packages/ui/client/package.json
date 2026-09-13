@@ -8,6 +8,7 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./application": { "types": "./dist/application.d.ts", "import": "./dist/application.js" },
+    "./reading": { "types": "./dist/reading.d.ts", "import": "./dist/reading.js" },
     "./projection": { "types": "./dist/projection.d.ts", "import": "./dist/projection.js" },
     "./server": { "types": "./dist/server.d.ts", "import": "./dist/server.js" }
   },

@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { UiError, type UiCommand, type UiHost, type UiReceipt } from "./protocol.js";
+import { UiError, type UiCommand, type UiHost, type UiReceipt, type UiField } from "./protocol.js";
 
 export type UiAssets = ReadonlyMap<string, { readonly type: string; readonly body: string }>;
 
@@ -20,6 +20,19 @@ export function createUiRouter(host: UiHost) {
           const selected = url.searchParams.get("selected") ?? undefined;
           if (selected && selected.length > 256) throw new UiError(400, "无效的资源 ID。");
           sendJson(res, 200, await host.snapshot(selected));
+        } else if (req.method === "GET" && ["/api/ui/resources", "/api/ui/history", "/api/ui/field"].includes(url.pathname)) {
+          if (url.searchParams.get("hostId") !== host.hostId) throw new UiError(409, "宿主已改变，请刷新后重读。");
+          const selected = url.searchParams.get("selected"), query = url.searchParams.get("query") ?? "", cursor = url.searchParams.get("cursor");
+          if (query.length > 256 || (cursor?.length ?? 0) > 4096 || (selected?.length ?? 0) > 256) throw new UiError(400, "读取参数过长。");
+          const request = { query, ...(cursor ? { cursor } : {}) };
+          if (url.pathname.endsWith("/resources") && host.resources) sendJson(res, 200, await host.resources(request));
+          else if (url.pathname.endsWith("/history") && selected && host.history) sendJson(res, 200, await host.history(selected, request));
+          else if (url.pathname.endsWith("/field") && selected && host.field) {
+            const blockId = url.searchParams.get("block") ?? "", field = url.searchParams.get("field") as UiField;
+            const offset = Number(url.searchParams.get("offset") ?? 0), version = url.searchParams.get("version");
+            if (!blockId || blockId.length > 512 || !["input", "text", "reasoning", "diagnostic", "presentation"].includes(field) || !Number.isSafeInteger(offset) || offset < 0 || (version?.length ?? 0) > 128) throw new UiError(400, "详情参数不正确。");
+            sendJson(res, 200, await host.field(selected, { blockId, field, offset, ...(version ? { version } : {}) }));
+          } else throw new UiError(400, "宿主不支持此读取或未指定资源。");
         } else if (req.method === "GET" && url.pathname === "/api/ui/events") {
           if (streams.size >= 16) throw new UiError(429, "连接窗口过多。");
           streams.add(res);

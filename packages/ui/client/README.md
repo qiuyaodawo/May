@@ -43,3 +43,21 @@ and `ApplicationUiHost` validates the advertised choice again before resolving i
 Custom hosts own the same validation and lifecycle responsibilities. Reconnect to
 the same live host retains pending requests; a journal alone cannot restore them.
 These are preview DTO changes: upgrade custom hosts and clients together.
+
+
+## Read-only history
+
+Hosts can advertise `snapshot.reads` and implement optional `resources(request)`,
+`history(selectedId, request)` and `field(selectedId, request)` methods. The client
+exposes `readResources`, `readHistory` and `readField`. These authenticated GETs
+require the current host epoch; resource-scoped reads reject stale client selections.
+No commands or runtime transitions are involved. `snapshot.historyPage` provides
+the initial older-history cursor. Page DTOs contain items, total and nextCursor.
+
+`@may/ui-client/reading` provides shared host-side pagination, safe field extraction
+and chunk versioning. Pages contain at most 50 records with a soft 256K-character
+budget. Search can inspect full persisted display fields beyond preview truncation;
+provider continuation objects and permission execution contexts are excluded.
+Fields return 32,768-character chunks with scope/content hashes: a changed version
+requires restarting from offset zero. Paging scans existing storage; it is not an
+indexed or constant-memory storage API. See the bilingual Web UI guides for limits.

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { AgentApplicationEvent, AgentWorkspaceController } from "@may/application";
-import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice } from "./protocol.js";
+import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice, type UiPageRequest, type UiFieldRequest } from "./protocol.js";
 import { UiProjection } from "./projection.js";
+import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";
 
 export interface ApplicationUiOptions {
   readonly product: UiProduct;
@@ -39,11 +40,12 @@ export class ApplicationUiHost implements UiHost {
       this.changed();
     }
   }
-  snapshot(selectedId?: string): Promise<UiSnapshot> {
-    const work = this.mutation.then(() => this.buildSnapshot(selectedId));
+  snapshot(selectedId?: string): Promise<UiSnapshot> { return this.queuedSnapshot(selectedId); }
+  private queuedSnapshot(selectedId?: string, all = false): Promise<UiSnapshot> {
+    const work = this.mutation.then(() => this.buildSnapshot(selectedId, 0, all));
     this.mutation = work.catch(() => {}); return work;
   }
-  private async buildSnapshot(selectedId?: string, attempt = 0): Promise<UiSnapshot> {
+  private async buildSnapshot(selectedId?: string, attempt = 0, all = false): Promise<UiSnapshot> {
     const revision = this.revision, activeId = this.app.sessionId, running = this.app.isRunning;
     const viewingId = selectedId ?? activeId, viewingActive = viewingId === activeId;
     const sessions = await this.app.listSessions();
@@ -53,7 +55,7 @@ export class ApplicationUiHost implements UiHost {
     // Keep the selected/active entries available even beyond the recent-resource limit.
     const visibleSessions = sessions.filter((session, index) => index < 500 || session.id === viewingId || session.id === activeId);
     const resources = visibleSessions.map(s => ({ id: s.id, kind: "session" as const, title: s.title ?? s.preview?.slice(0, 72) ?? "新会话", status: s.id === activeId && running ? "running" : "idle", updatedAt: s.lastUsedAt }));
-    const projected = new UiProjection(); projected.history(history);
+    const projected = new UiProjection(Infinity); projected.history(history);
     if (viewingActive) {
       // Durable completed blocks win; only the execution owner's live deltas fill gaps.
       for (const [id, block] of this.projection.blocks) if (!projected.blocks.has(id) || ["running", "streaming", "awaiting-approval"].includes(projected.blocks.get(id)?.status ?? "")) projected.blocks.set(id, block);
@@ -68,16 +70,34 @@ export class ApplicationUiHost implements UiHost {
     const panels = viewingActive ? await this.options.panels?.() ?? [] : [];
     const choices = viewingActive ? await this.options.choices?.() ?? [] : [];
     if (activeId !== this.app.sessionId || running !== this.app.isRunning) {
-      if (attempt < 2) return this.buildSnapshot(viewingId, attempt + 1);
+      if (attempt < 2) return this.buildSnapshot(viewingId, attempt + 1, all);
       throw new UiError(409, "运行会话状态已改变，请刷新后重试。");
     }
+    const page = historyPage(this.hostId, viewingId, [...projected.blocks.values()]);
     return { version: 1, hostId: this.hostId, revision, product: this.options.product, resources,
-      selectedId: viewingId, activeId, blocks: [...projected.blocks.values()].slice(-500),
+      selectedId: viewingId, activeId, blocks: all ? [...projected.blocks.values()] : page.items,
+      historyPage: { nextCursor: page.nextCursor, total: page.total }, reads: { resources: true, history: Boolean(this.app.readSessionHistory), fields: Boolean(this.app.readSessionHistory) },
       interactions, commands,
       panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "浏览会话", value: viewingId }, { label: "运行会话", value: activeId }, { label: "执行状态", value: running ? "运行中" : "空闲" }] }, ...panels],
       choices,
       notice: this.fault ?? "浏览只影响当前页面。设为运行会话或新建会话会更换宿主的执行对象，但不会切走其它页面；执行期间不能切换。",
     };
+  }
+  async resources(request: UiPageRequest) {
+    const sessions = [...await this.app.listSessions()].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
+    const items = sessions.map(s => ({ id: s.id, kind: "session" as const, title: s.title ?? s.preview?.slice(0, 72) ?? "新会话", status: s.id === this.app.sessionId && this.app.isRunning ? "running" : "idle", updatedAt: s.lastUsedAt }));
+    return readPage(this.hostId, "resources", items, request, (item, query) => item.title.toLocaleLowerCase().includes(query));
+  }
+  async history(selectedId: string, request: UiPageRequest) {
+    if (!this.app.readSessionHistory) throw new UiError(409, "宿主不支持只读历史。");
+    return historyPage(this.hostId, selectedId, (await this.queuedSnapshot(selectedId, true)).blocks, request, searchHistory(await this.app.readSessionHistory(selectedId), request.query));
+  }
+  async field(selectedId: string, request: UiFieldRequest) {
+    if (!this.app.readSessionHistory) throw new UiError(409, "宿主不支持只读详情。");
+    const snapshot = await this.queuedSnapshot(selectedId, true), block = snapshot.blocks.find(b => b.id === request.blockId);
+    if (!block) throw new UiError(404, "该记录不属于当前资源或已不可用。");
+    const events = await this.app.readSessionHistory(selectedId);
+    return fieldPage(this.hostId, selectedId, request, recordedField(events, block, request.field));
   }
   execute(command: UiCommand): Promise<UiReceipt> {
     const work = this.mutation.then(() => this.apply(command));
