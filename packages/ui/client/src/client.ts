@@ -4,6 +4,7 @@ export interface UiClientState {
   readonly snapshot: UiSnapshot | null;
   readonly connection: "disconnected" | "connecting" | "connected" | "reconnecting";
   readonly busy: boolean;
+  readonly selecting: boolean;
   readonly error: string | null;
 }
 
@@ -14,8 +15,9 @@ export class UiClient {
   private lifetime: AbortController | undefined;
   private generation = 0;
   private refreshId = 0;
+  private selectionVersion = 0;
   private listeners = new Set<(state: UiClientState) => void>();
-  private value: UiClientState = { snapshot: null, connection: "disconnected", busy: false, error: null };
+  private value: UiClientState = { snapshot: null, connection: "disconnected", busy: false, selecting: false, error: null };
   constructor(private readonly baseUrl = "", private readonly request: typeof fetch = globalThis.fetch.bind(globalThis)) {}
   get state(): UiClientState { return this.value; }
   subscribe(listener: (state: UiClientState) => void): () => void {
@@ -35,10 +37,17 @@ export class UiClient {
   }
   disconnect(): void {
     this.generation++; this.lifetime?.abort(); this.lifetime = undefined; this.token = "";
-    this.selectedId = undefined;
-    this.update({ snapshot: null, connection: "disconnected", busy: false, error: null });
+    this.selectedId = undefined; this.selectionVersion++;
+    this.update({ snapshot: null, connection: "disconnected", busy: false, selecting: false, error: null });
   }
-  async select(id?: string): Promise<void> { this.selectedId = id; await this.refresh(); }
+  async select(id?: string): Promise<void> {
+    if (!this.lifetime) throw new UiError(409, "请先连接本地服务。");
+    const version = ++this.selectionVersion, previous = this.value.snapshot?.selectedId ?? undefined;
+    this.selectedId = id; this.update({ selecting: true, error: null });
+    try { await this.refresh(); }
+    catch (error) { if (version === this.selectionVersion) { this.selectedId = previous; this.update({ error: describe(error) }); } throw error; }
+    finally { if (version === this.selectionVersion) this.update({ selecting: false }); }
+  }
   async refresh(): Promise<void> {
     const generation = this.generation, selected = this.selectedId, refreshId = ++this.refreshId;
     const snapshot = await this.json(`/api/ui/snapshot${selected === undefined ? "" : `?selected=${encodeURIComponent(selected)}`}`) as UiSnapshot;
@@ -46,18 +55,20 @@ export class UiClient {
     if (snapshot.version !== 1 || typeof snapshot.hostId !== "string") throw new UiError(409, "不兼容的 UI 协议版本。");
     const previous = this.value.snapshot;
     if (previous?.hostId === snapshot.hostId && snapshot.revision < previous.revision) return;
+    // Resolve the initial default once; later host changes must not move this view.
+    if (selected === undefined && snapshot.product.resourceKind === "session" && snapshot.selectedId) this.selectedId = snapshot.selectedId;
     this.update({ snapshot, connection: "connected" });
   }
   async command(name: string, args: Record<string, string> = {}, targetId = this.value.snapshot?.selectedId ?? null): Promise<void> {
     const snapshot = this.value.snapshot;
-    if (!snapshot || this.value.busy || this.value.connection !== "connected") throw new UiError(409, "当前未连接或已有操作正在提交。");
-    const generation = this.generation;
-    const command: UiCommand = { version: 1, hostId: snapshot.hostId, requestId: crypto.randomUUID(), name, targetId, args };
+    if (!snapshot || this.value.busy || this.value.selecting || (this.selectedId !== undefined && this.selectedId !== snapshot.selectedId) || this.value.connection !== "connected") throw new UiError(409, "当前未连接、正在浏览切换或已有操作正在提交。");
+    const generation = this.generation, selectionVersion = this.selectionVersion;
+    const command: UiCommand = { version: 1, hostId: snapshot.hostId, requestId: crypto.randomUUID(), name, targetId, ...(snapshot.activeId === undefined ? {} : { expectedActiveId: snapshot.activeId }), args };
     this.update({ busy: true, error: null });
     try {
       const receipt = await this.json("/api/ui/commands", command) as UiReceipt;
       if (generation !== this.generation) return;
-      if (receipt.selectedId !== undefined) this.selectedId = receipt.selectedId ?? undefined;
+      if (selectionVersion === this.selectionVersion && receipt.selectedId !== undefined) this.selectedId = receipt.selectedId ?? undefined;
       await this.refresh();
     } catch (error) {
       if (generation === this.generation) this.update({ error: `${describe(error)} 请先检查当前状态；未自动重发命令。` });

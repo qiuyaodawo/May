@@ -63,6 +63,8 @@ export interface AgentWorkspaceController<
   readonly workspace: string;
 
   listSessions(): Promise<readonly SessionSummary[]>;
+  /** Optional read-only history access; must not activate or repair the session. */
+  readSessionHistory?(sessionId: string): Promise<readonly SessionEvent[]>;
   newSession(): Promise<string>;
   resumeSession(sessionId: string): Promise<void>;
   renameSession(sessionId: string, title: string): Promise<void>;

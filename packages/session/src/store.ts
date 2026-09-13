@@ -3,6 +3,8 @@ import type { SessionEvent } from "./events.js";
 export interface SessionStore {
   append(event: SessionEvent): Promise<void>;
   read(sessionId: string): Promise<readonly SessionEvent[]>;
+  /** Read committed records without repair, ownership changes or other writes. */
+  inspect?(sessionId: string): Promise<readonly SessionEvent[]>;
   /** Delete one durable history when supported by the store. */
   delete?(sessionId: string): Promise<boolean>;
 }
@@ -47,6 +49,8 @@ export class InMemorySessionStore implements SessionStore {
   async read(sessionId: string): Promise<readonly SessionEvent[]> {
     return [...(this.sessions.get(sessionId) ?? [])];
   }
+
+  inspect(sessionId: string): Promise<readonly SessionEvent[]> { return this.read(sessionId); }
 
   async delete(sessionId: string): Promise<boolean> {
     return this.sessions.delete(sessionId);

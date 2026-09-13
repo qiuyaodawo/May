@@ -23,6 +23,6 @@ test("MaybeCode web entry serves browser-only modules and preserves session guar
   const state = await (await fetch(server.url + "/api/ui/snapshot", { headers })).json();
   assert.equal(state.product.id, "maybecode"); assert.ok(state.commands.includes("message.submit"));
   assert.ok(!state.commands.includes("team.apply"));
-  const response = await fetch(server.url + "/api/ui/commands", { method: "POST", headers, body: JSON.stringify({ version: 1, hostId: state.hostId, requestId: "new", name: "session.new", targetId: state.selectedId, args: {} }) });
+  const response = await fetch(server.url + "/api/ui/commands", { method: "POST", headers, body: JSON.stringify({ version: 1, hostId: state.hostId, requestId: "new", name: "session.new", targetId: state.selectedId, expectedActiveId: state.activeId, args: {} }) });
   assert.equal(response.status, 200); assert.notEqual((await response.json()).selectedId, state.selectedId);
 });

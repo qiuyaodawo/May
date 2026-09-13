@@ -39,21 +39,44 @@ export class ApplicationUiHost implements UiHost {
       this.changed();
     }
   }
-  async snapshot(): Promise<UiSnapshot> {
-    const revision = this.revision, sessionId = this.app.sessionId;
-    const history = await this.app.history();
-    const resources = (await this.app.listSessions()).slice(0, 500).map(s => ({ id: s.id, kind: "session" as const, title: s.title ?? s.preview?.slice(0, 72) ?? "新会话", status: s.id === sessionId && this.app.isRunning ? "running" : "idle", updatedAt: s.lastUsedAt }));
+  snapshot(selectedId?: string): Promise<UiSnapshot> {
+    const work = this.mutation.then(() => this.buildSnapshot(selectedId));
+    this.mutation = work.catch(() => {}); return work;
+  }
+  private async buildSnapshot(selectedId?: string, attempt = 0): Promise<UiSnapshot> {
+    const revision = this.revision, activeId = this.app.sessionId, running = this.app.isRunning;
+    const viewingId = selectedId ?? activeId, viewingActive = viewingId === activeId;
+    const sessions = await this.app.listSessions();
+    if (!sessions.some(session => session.id === viewingId)) throw new UiError(404, "会话不存在或不属于当前工作区。");
+    if (!viewingActive && !this.app.readSessionHistory) throw new UiError(409, "当前宿主不支持只读历史浏览。");
+    const history = this.app.readSessionHistory ? await this.app.readSessionHistory(viewingId) : await this.app.history();
+    // Keep the selected/active entries available even beyond the recent-resource limit.
+    const visibleSessions = sessions.filter((session, index) => index < 500 || session.id === viewingId || session.id === activeId);
+    const resources = visibleSessions.map(s => ({ id: s.id, kind: "session" as const, title: s.title ?? s.preview?.slice(0, 72) ?? "新会话", status: s.id === activeId && running ? "running" : "idle", updatedAt: s.lastUsedAt }));
     const projected = new UiProjection(); projected.history(history);
-    // Durable completed blocks win; live deltas fill gaps until the checkpoint exists.
-    for (const [id, block] of this.projection.blocks) if (!projected.blocks.has(id) || projected.blocks.get(id)?.status === "running") projected.blocks.set(id, block);
-    const commands = this.app.isRunning ? ["run.cancel", "approval.resolve"] : ["message.submit", "session.new", "session.open", "session.rename", "context.compact", ...(this.options.commands ?? [])];
+    if (viewingActive) {
+      // Durable completed blocks win; only the execution owner's live deltas fill gaps.
+      for (const [id, block] of this.projection.blocks) if (!projected.blocks.has(id) || projected.blocks.get(id)?.status === "running") projected.blocks.set(id, block);
+    } else {
+      for (const [id, block] of projected.blocks) if (["running", "streaming"].includes(block.status ?? "")) projected.blocks.set(id, { ...block, status: "interrupted" });
+    }
+    const commands = this.app.readSessionHistory ? ["session.browse"] : [];
+    if (!running) commands.push("session.new");
+    if (viewingActive) commands.push(...(running ? ["run.cancel", "approval.resolve"] : ["message.submit", "session.rename", "context.compact", ...(this.options.commands ?? [])]));
+    else if (!running) commands.push("session.activate");
     if (this.fault) commands.length = 0;
+    const panels = viewingActive ? await this.options.panels?.() ?? [] : [];
+    const choices = viewingActive ? await this.options.choices?.() ?? [] : [];
+    if (activeId !== this.app.sessionId || running !== this.app.isRunning) {
+      if (attempt < 2) return this.buildSnapshot(viewingId, attempt + 1);
+      throw new UiError(409, "运行会话状态已改变，请刷新后重试。");
+    }
     return { version: 1, hostId: this.hostId, revision, product: this.options.product, resources,
-      selectedId: sessionId, blocks: [...projected.blocks.values()].slice(-500),
-      interactions: [...projected.interactions.values()], commands,
-      panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "会话", value: sessionId }, { label: "状态", value: this.app.isRunning ? "运行中" : "空闲" }] }, ...await this.options.panels?.() ?? []],
-      choices: await this.options.choices?.() ?? [],
-      notice: this.fault ?? "当前服务共享一个活动会话；切换会话会同步影响其它窗口。工具权限由宿主校验。",
+      selectedId: viewingId, activeId, blocks: [...projected.blocks.values()].slice(-500),
+      interactions: viewingActive ? [...projected.interactions.values()] : [], commands,
+      panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "浏览会话", value: viewingId }, { label: "运行会话", value: activeId }, { label: "执行状态", value: running ? "运行中" : "空闲" }] }, ...panels],
+      choices,
+      notice: this.fault ?? "浏览只影响当前页面。设为运行会话或新建会话会更换宿主的执行对象，但不会切走其它页面；执行期间不能切换。",
     };
   }
   execute(command: UiCommand): Promise<UiReceipt> {
@@ -61,8 +84,9 @@ export class ApplicationUiHost implements UiHost {
     this.mutation = work.catch(() => {}); return work;
   }
   private async apply(command: UiCommand): Promise<UiReceipt> {
-    if (command.hostId !== this.hostId || command.targetId !== this.app.sessionId) throw new UiError(409, "活动会话已改变，请刷新后重试。");
-    if (!(await this.snapshot()).commands.includes(command.name)) throw new UiError(409, "当前状态不允许此操作。");
+    const transition = command.name === "session.activate" || command.name === "session.new";
+    if (command.hostId !== this.hostId || !command.targetId || (transition ? command.expectedActiveId !== this.app.sessionId : command.targetId !== this.app.sessionId)) throw new UiError(409, "运行会话已改变，请检查当前状态后重试。");
+    if (command.name === "session.browse" || !(await this.buildSnapshot(command.targetId)).commands.includes(command.name)) throw new UiError(409, "当前状态不允许此操作。");
     switch (command.name) {
       case "message.submit": {
         commandArgs(command, ["text"]);
@@ -80,7 +104,7 @@ export class ApplicationUiHost implements UiHost {
         break;
       }
       case "session.new": commandArgs(command, []); await this.app.newSession(); this.projection = new UiProjection(); break;
-      case "session.open": commandArgs(command, ["id"]); await this.app.resumeSession(command.args.id!); this.projection = new UiProjection(); break;
+      case "session.activate": commandArgs(command, []); await this.app.resumeSession(command.targetId); this.projection = new UiProjection(); break;
       case "session.rename": commandArgs(command, ["title"]); await this.app.renameSession(this.app.sessionId, command.args.title!.slice(0, 160)); break;
       case "context.compact": commandArgs(command, []); await this.app.compactContext(); break;
       default: {

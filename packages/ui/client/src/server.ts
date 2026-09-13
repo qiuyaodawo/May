@@ -115,7 +115,8 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 function validateCommand(value: unknown): UiCommand {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new UiError(400, "无效的命令。");
   const c = value as UiCommand;
-  if (Object.keys(c).some(key => !["version", "hostId", "requestId", "name", "targetId", "args"].includes(key)) || c.version !== 1 || typeof c.hostId !== "string" || c.hostId.length > 128 || typeof c.requestId !== "string" || !/^[a-zA-Z0-9._:-]{1,100}$/.test(c.requestId)
+  if (Object.keys(c).some(key => !["version", "hostId", "requestId", "name", "targetId", "expectedActiveId", "args"].includes(key)) || c.version !== 1 || typeof c.hostId !== "string" || c.hostId.length > 128 || typeof c.requestId !== "string" || !/^[a-zA-Z0-9._:-]{1,100}$/.test(c.requestId)
+    || (c.expectedActiveId !== undefined && (typeof c.expectedActiveId !== "string" || !c.expectedActiveId || c.expectedActiveId.length > 256))
     || typeof c.name !== "string" || !/^[a-z][a-z0-9.-]{1,80}$/.test(c.name) || !(c.targetId === null || typeof c.targetId === "string" && c.targetId.length <= 256)
     || !c.args || typeof c.args !== "object" || Array.isArray(c.args) || Object.keys(c.args).length > 12 || Object.values(c.args).some(v => typeof v !== "string" || v.length > 20_000)) throw new UiError(400, "无效的命令。");
   return c;

@@ -360,6 +360,8 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.manager.listSessions();
   }
 
+  readSessionHistory(sessionId: string) { return this.manager.readSessionHistory(sessionId); }
+
   newSession(): Promise<string> {
     return this.manager.newSession();
   }

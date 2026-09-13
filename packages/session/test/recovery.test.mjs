@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, appendFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, appendFile, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileSessionStore } from "../dist/file-store.js";
@@ -17,10 +17,14 @@ test("file recovery removes only an incomplete final record and permits the next
   await store.append({ type: "session.created", sessionId: "s", seq: 1, timestamp: 0 });
   const [file] = await readdir(dir);
   await appendFile(join(dir, file), '{"type":"run.sta');
+  const before = await readFile(join(dir, file));
+  assert.equal((await store.inspect("s")).length, 1);
+  assert.deepEqual(await readFile(join(dir, file)), before, "inspection must not repair a partial record");
   assert.equal((await store.read("s")).length, 1);
   await store.append({ type: "run.started", runId: "r", sessionId: "s", seq: 2, timestamp: 1 });
   assert.equal((await store.read("s")).length, 2);
   await appendFile(join(dir, file), "corrupt\n");
+  await assert.rejects(store.inspect("s"), /Invalid session event JSON/);
   await assert.rejects(store.read("s"), /Invalid session event JSON/);
 });
 

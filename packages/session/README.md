@@ -4,6 +4,11 @@
 conversation identity. It serializes runs and records durable session facts
 without making Core depend on persistence or UI policy.
 
+`SessionStore.inspect?(id)` is optional, non-mutating access to committed history.
+Both built-in stores implement it. File inspection ignores an incomplete trailing
+record without truncation; malformed complete records still fail. Unlike `read()`,
+inspection never repairs the journal or changes execution ownership.
+
 `SessionSubmitOptions.inputId` is an optional host delivery identity (1-256
 characters), persisted with `input.submitted`. Submitting an already-persisted id
 is rejected, including after resume; it does not replay the old input or return

@@ -56,6 +56,10 @@ export class FileSessionStore implements SessionStore {
     });
   }
 
+  inspect(sessionId: string): Promise<readonly SessionEvent[]> {
+    return this.enqueue(sessionId, () => this.readNow(sessionId, false));
+  }
+
   private async appendNow(event: SessionEvent): Promise<void> {
     const cached = this.validated.get(event.sessionId);
     const info = cached === undefined ? undefined : await stat(this.filePath(event.sessionId)).catch(() => undefined);
@@ -80,7 +84,7 @@ export class FileSessionStore implements SessionStore {
     } finally { await file.close(); }
   }
 
-  private async readNow(sessionId: string): Promise<readonly SessionEvent[]> {
+  private async readNow(sessionId: string, repair = true): Promise<readonly SessionEvent[]> {
     const path = this.filePath(sessionId);
     let contents: string;
 
@@ -90,7 +94,7 @@ export class FileSessionStore implements SessionStore {
       // malformed complete records still fail closed. Requires one writer.
       const length = bytes.length === 0 || bytes.at(-1) === 10
         ? bytes.length : bytes.lastIndexOf(10) + 1;
-      if (length !== bytes.length) {
+      if (repair && length !== bytes.length) {
         const file = await open(path, "r+");
         try { await file.truncate(length); await file.sync(); }
         finally { await file.close(); }

@@ -66,7 +66,7 @@ claim that every future agent will fit without an adapter.
   summaries, selected resource, transcript, pending interactions, choices and panels.
 - `GET /api/ui/events` is an authenticated fetch/SSE **invalidation** stream.
   It does not stream raw provider objects or promise durable event replay.
-- `POST /api/ui/commands` accepts `{ version, hostId, requestId, name, targetId, args }`.
+- `POST /api/ui/commands` accepts `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }`.
   Arguments are bounded string fields; each adapter validates an explicit command allowlist.
 
 Clients resnapshot on attachment, invalidation and reconnect. A two-second
@@ -88,9 +88,26 @@ issuing a fresh request. This is **not** durable exactly-once execution.
 **MaybeCode:** submit messages, see incremental model/tool output, review tool
 inputs and coding change previews, resolve tool approvals, cancel, list/new/open/
 rename sessions, switch model profiles and request context compaction. One host
-has one active session shared by all windows. Session switches are idle-only;
-commands bound to a stale session are rejected. Viewing another session currently
-requires explicitly activating it, not independent per-window runtime selection.
+has one execution session, identified by `activeId`; `selectedId` is the history
+view of this client. Sidebar clicks only read history, including during a run.
+Other windows keep their selection when the execution session changes. The initial
+default is pinned once; reloading the page still requires reconnecting and chooses
+the current execution session again.
+
+Historical views have no send, cancel, approval, model or compaction controls.
+Use **View execution session** to inspect the current run, or **Set as execution
+session** (`session.activate`) to explicitly switch while idle. New-session and
+activation commands carry `expectedActiveId`; stale transitions are rejected,
+not automatically replayed. Execution commands remain bound to their `targetId`.
+The old `session.open` UI command is no longer accepted; update clients together
+with this preview host. `session.browse` is a read capability, not a POST command.
+
+`AgentWorkspace.readSessionHistory(id)` validates workspace catalog membership
+and uses optional `SessionStore.inspect(id)`. It never opens a runtime, changes
+catalog recency, obtains execution ownership or repairs a log. The built-in file
+store ignores incomplete trailing bytes without truncating them and still rejects
+malformed complete records. Custom stores must implement safe inspection; there
+is no fallback to a potentially repairing `read()` for workspace history browsing.
 
 **MaybeClaw:** independent task submission, task-local browsing, live output from
 tasks executed by this host, final results, cancellation intent, evidence recovery,

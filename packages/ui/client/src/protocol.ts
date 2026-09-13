@@ -55,6 +55,8 @@ export interface UiSnapshot {
   readonly product: UiProduct;
   readonly resources: readonly UiResource[];
   readonly selectedId: string | null;
+  /** Workspace execution owner, independent of this client's selected history. Absent for task hosts. */
+  readonly activeId?: string;
   readonly blocks: readonly UiBlock[];
   readonly interactions: readonly UiInteraction[];
   /** Namespaced, explicitly implemented commands, not arbitrary method names. */
@@ -70,6 +72,8 @@ export interface UiCommand {
   readonly requestId: string;
   readonly name: string;
   readonly targetId: string | null;
+  /** Required for explicit workspace activation/new-session commands. */
+  readonly expectedActiveId?: string;
   readonly args: Readonly<Record<string, string>>;
 }
 

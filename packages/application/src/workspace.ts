@@ -269,6 +269,16 @@ export class AgentWorkspace<
     return this.catalog.list(this.workspace);
   }
 
+  readSessionHistory(sessionId: string): Promise<readonly SessionEvent[]> {
+    this.throwIfClosed();
+    return this.state.run(async () => {
+      const known = (await this.catalog.list(this.workspace)).some(session => session.id === sessionId);
+      if (!known) throw new Error("Session does not belong to this workspace");
+      if (!this.store.inspect) throw new Error("Session store does not support read-only inspection");
+      return this.store.inspect(sessionId);
+    });
+  }
+
   async newSession(): Promise<string> {
     return this.state.run(async () => {
       this.assertIdle("Cannot switch sessions while an operation is active");

@@ -60,7 +60,7 @@ pnpm maybeclaw serve
   对话、待处理交互、选择器和详情。
 - `GET /api/ui/events`：带鉴权的 fetch/SSE **失效通知流**。
   不传原始 Provider 对象，也不承诺持久事件重放。
-- `POST /api/ui/commands`：接收 `{ version, hostId, requestId, name, targetId, args }`。
+- `POST /api/ui/commands`：接收 `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }`。
   参数为有长度限制的字符串字段；适配器按明确的命令白名单校验。
 
 连接、收到失效通知和重连时重新读取权威快照。两秒心跳也会观察 CLI/渠道产生的
@@ -76,8 +76,20 @@ pnpm maybeclaw serve
 
 **MaybeCode：**发送消息、增量模型/工具输出、查看工具输入和代码变更预览、
 审批、取消、列出/新建/打开/重命名会话、切换模型配置、请求上下文压缩。
-一个宿主只有一个活动会话，由所有窗口共享。只能空闲切换；旧会话绑定的命令会
-被拒绝。当前查看其它会话需要显式激活它，还不是各窗口独立选择运行时。
+一个宿主只有一个由 `activeId` 标识的运行会话；`selectedId` 是当前页面的浏览
+对象。侧栏点击只读取历史，执行期间也可浏览。运行会话改变不会切走其它页面。
+首次连接后固定本页的默认选择；整页刷新仍需重新连接，并默认查看当前运行会话。
+
+历史视图不提供发送、取消、审批、模型切换或上下文压缩操作。点击“查看运行会话”
+可查看当前执行；空闲时点击“设为运行会话”（`session.activate`）才会显式切换。
+新建与激活命令携带 `expectedActiveId`，拒绝基于旧执行对象的切换，不自动重放。
+执行命令继续绑定 `targetId`。旧的 `session.open` UI 命令不再接受，预览版客户端
+与宿主应同步更新；`session.browse` 是只读能力声明，不是 POST 命令。
+
+`AgentWorkspace.readSessionHistory(id)` 校验会话属于当前工作区，再调用可选的
+`SessionStore.inspect(id)`。不会打开运行时、更新会话最近使用时间、获取执行所有权
+或修复日志。内置文件存储只忽略未提交的尾部字节，不截断文件；完整但损坏的记录
+仍报错。自定义存储必须实现安全的只读检查，不会回退到可能修复日志的 `read()`。
 
 **MaybeClaw：**独立任务提交、客户端各自浏览任务、本宿主执行任务的实时输出、
 最终结果、取消意图、证据恢复、派发失败重试、渠道状态和最近 100 条投递记录。

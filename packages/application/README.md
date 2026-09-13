@@ -7,6 +7,11 @@ See [Agent Skills](../../docs/en/guides/skills.md).
 
 Headless lifecycle components for composing a May Agent product.
 
+`AgentWorkspace.readSessionHistory(id)` reads a catalog-owned session without
+activating it, including while another session runs. Stores must provide the
+optional non-repairing `inspect(id)` operation. The workspace does not fall back
+to `read()` or create another application for browsing.
+
 `AgentDefinition` captures reusable Agent behavior and policy separately from
 Session infrastructure. Create one with `defineAgent({ model, tools,
 instructions, permissionPolicy, ... })`, then call
