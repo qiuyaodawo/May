@@ -1,0 +1,19 @@
+{
+  "name": "@may/web-ui",
+  "version": "0.1.0",
+  "description": "Composable browser workbench for May agents, independent of product policy.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./styles.css": "./assets/workbench.css",
+    "./assets": { "types": "./dist/assets.d.ts", "import": "./dist/assets.js" }
+  },
+  "files": ["dist", "assets", "!dist/.tsbuildinfo"],
+  "scripts": { "build": "tsc -b", "clean": "tsc -b --clean" },
+  "dependencies": { "@may/ui-client": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.0.0" },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}

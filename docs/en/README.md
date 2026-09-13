@@ -44,6 +44,7 @@ interfaces are intended for extension.
 - [Custom Context](guides/custom-context.md)
 - [Custom Session storage](guides/custom-storage.md)
 - [Custom UI](guides/custom-ui.md)
+- [Shared Web UI](guides/web-ui.md)
 - [Permission policy](guides/permission-policy.md)
 - [Observability and tracing](guides/observability.md)
 - [MCP tools](guides/mcp.md)

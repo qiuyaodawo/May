@@ -94,6 +94,26 @@ test("loopback API authenticates, queues independently of clients, bounds concur
   assert.equal((await host.claw.store.list()).length, 4);
 });
 
+test("shared Web UI retains task identity and separates execution, verification and delivery", async t => {
+  const f = await fixture(t);
+  const host = await MaybeClawHost.start({ claw: f.claw, selectSpec: async () => f.spec, startPaused: true });
+  const server = await startControlServer({ host, token, port: 0 }); f.cleanup.push(() => server.close());
+  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  const snapshot = async selected => (await fetch(server.url + "/api/ui/snapshot" + (selected ? `?selected=${selected}` : ""), { headers })).json();
+  const initial = await snapshot(); assert.equal(initial.product.resourceKind, "task"); assert.equal(initial.selectedId, null);
+  const command = { version: 1, hostId: initial.hostId, requestId: "task-1", targetId: null, name: "task.submit", args: { text: "A bounded task" } };
+  const submit = () => fetch(server.url + "/api/ui/commands", { method: "POST", headers, body: JSON.stringify(command) });
+  const first = await (await submit()).json(), second = await (await submit()).json();
+  assert.equal(first.selectedId, second.selectedId);
+  await until(async () => (await f.claw.status(first.selectedId)).task.status === "completed");
+  const done = await snapshot(first.selectedId);
+  assert.equal(done.blocks.filter(b => b.kind === "assistant")[0].text, "Done");
+  assert.ok(done.panels[0].fields.some(f => f.value === "尚未独立验证"));
+  assert.ok(!done.commands.includes("message.submit"));
+  assert.equal((await snapshot()).selectedId, null, "task browsing must remain client-local");
+  assert.equal((await f.claw.store.list()).length, 1);
+});
+
 test("channel inbox owns tasks, deduplicates events, and never replays unknown outbound attempts", async (t) => {
   const f = await fixture(t);
   let store = await ChannelStore.open(join(f.root, "channels.jsonl"));

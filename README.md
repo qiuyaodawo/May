@@ -28,6 +28,8 @@ packages/
     coding-tools/  Read, shell, edit, write, instructions, and change previews
     session-tools/ Read-only access to bounded durable session history
   ui/
+    client/       UI-neutral JSON protocol, client state, host adapters and transport
+    web/          Shared browser workbench and composable presentation components
     keybindings/  Context-aware semantic keyboard mappings
     tui/          Terminal primitives plus reusable Agent transcript components
 apps/
@@ -37,6 +39,7 @@ apps/
 examples/
   basic/      Minimal Model → Tool → Model example
   deepseek/   Live DeepSeek tool-call example
+  web-ui/     Offline shared Web UI example (scripted responses, no model calls)
 ```
 
 `packages` contains the contracts and reusable components used to construct an
@@ -72,6 +75,12 @@ distributed global budget service. See the [task graph guide](docs/en/guides/coo
 The packages are currently versioned `0.1.0`; their public APIs and the
 file-backed persistence formats should be treated as developer-preview APIs,
 not as a promise of production or compatibility stability.
+
+The shared Web UI is available through `maybecode --ui web` and `maybeclaw serve`.
+It uses product adapters rather than treating tasks as sessions, and keeps tokens,
+permissions and execution in the local host. Run `pnpm example:web-ui` for an
+offline preview. See the [Web UI guide](docs/en/guides/web-ui.md) or
+[简体中文指南](docs/zh-CN/guides/web-ui.md) for setup and first-phase limitations.
 
 MaybeClaw is a second product built directly on the reusable packages, not on
 MaybeCode. It provides persistent local tasks, deduplicated input,

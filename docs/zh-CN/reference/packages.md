@@ -18,6 +18,7 @@ May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行�
 | 在一个 workspace 中管理多个 Session | `@may/application` | `@may/session/catalog` 的 `SessionCatalog` |
 | 协调 Agent 团队、资源与远程 Worker | `@may/coordination` | Agent definition、持久化协作与 Session store、显式宿主策略 |
 | 构建终端 Agent | Headless application controller | `@may/tui`，可选 `@may/keybindings` |
+| 构建浏览器 Agent | 产品 `UiHost` 或 `ApplicationUiHost` | `@may/ui-client`、`@may/web-ui` |
 | 构建编码 Agent | Headless application controller | `@may/coding-tools` 和执行隔离策略 |
 | 从 May 配置中选择模型 | `@may/config` | `@may/providers` |
 | 让模型查询持久化历史 | `@may/session-tools` | 活动 `Session` 或 `AgentApplication` |
@@ -212,6 +213,13 @@ Shell 工具以 May 进程的宿主权限执行，明确不属于 sandbox。参�
 
 产品命令、标签、布局和 controller 调用仍属于应用代码。图形或远程 UI 应使用
 headless controller，无需依赖 `@may/tui`。
+
+### `@may/ui-client` / `@may/web-ui`
+
+与终端渲染独立的协议和 Web 组件见
+[`@may/ui-client`](../../../packages/ui/client/README.md)、
+[`@may/web-ui`](../../../packages/ui/web/README.md)和
+[Web UI 指南](../guides/web-ui.md)。产品适配器保留各自的会话/任务语义。
 
 ### `@may/keybindings`
 

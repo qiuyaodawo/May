@@ -2,6 +2,11 @@
 
 **English** | [简体中文](../../zh-CN/guides/custom-ui.md)
 
+For a browser interface, start with the [shared Web UI](web-ui.md):
+`@may/ui-client` supplies the JSON boundary and state synchronization;
+`@may/web-ui` supplies composable components and an optional workbench.
+The direct in-process controller and TUI patterns below remain supported.
+
 May's application layer is headless. A terminal, desktop, web, or remote UI
 should depend on `AgentController` (one active Session) or
 `AgentWorkspaceController` (multiple Sessions), invoke user-intent methods, and

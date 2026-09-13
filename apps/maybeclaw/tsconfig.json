@@ -5,7 +5,9 @@
     "rootDir": "src",
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "references": [
     { "path": "../../packages/application" },
@@ -13,7 +15,11 @@
     { "path": "../../packages/config" },
     { "path": "../../packages/core" },
     { "path": "../../packages/providers" },
-    { "path": "../../packages/session" }
+    { "path": "../../packages/session" },
+    { "path": "../../packages/ui/client" },
+    { "path": "../../packages/ui/web" }
   ],
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts"
+  ]
 }

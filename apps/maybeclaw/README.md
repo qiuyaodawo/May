@@ -5,6 +5,11 @@ developer preview provides a foreground CLI, persistent queue, long-running loca
 server, Web UI, and allowlisted Feishu/Telegram private chats. It does not depend
 on MaybeCode. It is not an automatically installed OS service.
 
+The Web interface now uses `@may/ui-client` and `@may/web-ui`, with a product-owned
+task adapter. The old page has been replaced, while existing control API routes
+remain compatible. See the [shared Web UI guide](../../docs/en/guides/web-ui.md)
+or [简体中文指南](../../docs/zh-CN/guides/web-ui.md).
+
 See the [English guide](../../docs/en/guides/maybeclaw.md) or
 [简体中文指南](../../docs/zh-CN/guides/maybeclaw.md) for commands, recovery,
 permissions, storage, configuration and the implementation boundary.

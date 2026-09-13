@@ -1,0 +1,8 @@
+{
+  "name": "@may/example-web-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node demo.mjs" },
+  "dependencies": { "@may/application": "workspace:*", "@may/session": "workspace:*", "@may/ui-client": "workspace:*", "@may/web-ui": "workspace:*" }
+}

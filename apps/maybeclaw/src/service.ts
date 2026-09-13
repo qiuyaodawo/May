@@ -1,6 +1,6 @@
 import { mkdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
-import { defineAgent, type AgentApplication } from "@may/application";
+import { defineAgent, type AgentApplication, type AgentApplicationEvent } from "@may/application";
 import { createReadTool } from "@may/coding-tools";
 import type { Model } from "@may/core";
 import { type SessionEvent, validateSessionHistory } from "@may/session";
@@ -23,7 +23,13 @@ export interface MaybeClawOptions {
 /** Transport-independent local task product. Its directory is trusted private host state. */
 export class MaybeClaw {
   readonly store: FileTaskStore;
+  private readonly observers = new Set<(taskId: string, event: AgentApplicationEvent) => void>();
   constructor(private readonly options: MaybeClawOptions) { this.store = new FileTaskStore(options.directory); }
+
+  /** Read-only, non-owning presentation observers; disconnects never cancel tasks. */
+  observe(listener: (taskId: string, event: AgentApplicationEvent) => void): () => void {
+    this.observers.add(listener); return () => this.observers.delete(listener);
+  }
 
   async submit(input: TaskSpec): Promise<{ task: TaskSnapshot; created: boolean }> {
     validateSpec(input);
@@ -104,7 +110,9 @@ export class MaybeClaw {
         runBudget: task.spec.runBudget, sessionHistory: false, providerNativeAutoCompaction: false, autoCompactionStrategies: [],
       }).open({ store: sessionStore, sessionId: id, resume: history.length > 0,
         metadata: { maybeclaw: { version: 1, taskId: id, specDigest: digest(task.spec) } } });
-      relay = (async () => { for await (const _event of app!.events) { /* Drain independently from a client. */ } })();
+      relay = (async () => { for await (const event of app!.events) {
+        for (const observer of this.observers) { try { observer(id, event); } catch { /* Presentation cannot fail execution. */ } }
+      } })();
       void relay.catch(() => controller.abort("Event relay failed"));
       const checkCancel = () => {
         poll = poll.then(async () => { if (await this.store.hasCancel(id)) controller.abort("Cancellation requested"); })

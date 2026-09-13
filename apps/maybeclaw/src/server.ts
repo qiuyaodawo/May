@@ -3,7 +3,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 import type { MaybeClawHost } from "./host.js";
 import { validateId } from "./types.js";
-import { WEB_HTML, WEB_CSS, WEB_JS } from "./web.js";
+import { webUiAssets } from "@may/web-ui/assets";
+import { createUiRouter } from "@may/ui-client/server";
+import { MaybeClawUiHost } from "./ui-host.js";
 
 export interface ServerOptions { host: MaybeClawHost; token: string; port?: number }
 
@@ -12,6 +14,9 @@ export async function startControlServer(options: ServerOptions) {
   if (!/^[\x21-\x7e]{32,256}$/.test(options.token)) throw new Error("Control token must be 32..256 printable non-space ASCII characters");
   const port = options.port ?? 3939;
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
+  const assets = await webUiAssets("MaybeClaw", "task");
+  const uiHost = new MaybeClawUiHost(options.host);
+  const ui = createUiRouter(uiHost);
   let origin = "";
   const requests = new Set<Promise<void>>();
   const server = createServer((req, res) => {
@@ -32,13 +37,14 @@ export async function startControlServer(options: ServerOptions) {
     res.setHeader("content-security-policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     if (req.headers.host !== new URL(origin).host || (req.headers.origin !== undefined && req.headers.origin !== origin)) { json(res, 403, { error: "Untrusted origin or host" }); return; }
     const path = req.url ?? "/";
-    if (req.method === "GET" && ["/", "/app.css", "/app.js"].includes(path)) {
-      const [type, body] = path === "/" ? ["text/html", WEB_HTML] : path === "/app.css" ? ["text/css", WEB_CSS] : ["text/javascript", WEB_JS];
-      res.writeHead(200, { "content-type": `${type}; charset=utf-8` }); res.end(body); return;
+    const asset = assets.get(path);
+    if (req.method === "GET" && asset) {
+      res.writeHead(200, { "content-type": asset.type }); res.end(asset.body); return;
     }
     const supplied = req.headers.authorization ?? "";
     const expected = `Bearer ${options.token}`;
     if (Buffer.byteLength(supplied) !== Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) { json(res, 401, { error: "Operator token required" }); return; }
+    if (await ui.route(req, res)) return;
     if (req.method === "GET" && path === "/api/health") { json(res, 200, options.host.status()); return; }
     if (req.method === "GET" && path === "/api/tasks") { json(res, 200, await options.host.claw.store.list()); return; }
     if (req.method === "POST" && path === "/api/tasks") {
@@ -65,11 +71,12 @@ export async function startControlServer(options: ServerOptions) {
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(port, "127.0.0.1", () => { server.removeListener("error", reject); resolve(); });
-  });
+  }).catch(error => { ui.close(); uiHost.close(); throw error; });
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   options.host.startLoops();
   let closing: Promise<void> | undefined;
   return { url: origin, close: () => closing ??= (async () => {
+    ui.close(); uiHost.close();
     const stopped = new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     server.closeAllConnections();
     await Promise.allSettled([...requests]);

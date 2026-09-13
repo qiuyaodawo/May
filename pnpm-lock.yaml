@@ -51,6 +51,12 @@ importers:
       '@may/session':
         specifier: workspace:*
         version: link:../../packages/session
+      '@may/ui-client':
+        specifier: workspace:*
+        version: link:../../packages/ui/client
+      '@may/web-ui':
+        specifier: workspace:*
+        version: link:../../packages/ui/web
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -100,6 +106,12 @@ importers:
       '@may/tui':
         specifier: workspace:*
         version: link:../../packages/ui/tui
+      '@may/ui-client':
+        specifier: workspace:*
+        version: link:../../packages/ui/client
+      '@may/web-ui':
+        specifier: workspace:*
+        version: link:../../packages/ui/web
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -119,6 +131,21 @@ importers:
       '@may/provider-deepseek':
         specifier: workspace:*
         version: link:../../packages/providers/deepseek
+
+  examples/web-ui:
+    dependencies:
+      '@may/application':
+        specifier: workspace:*
+        version: link:../../packages/application
+      '@may/session':
+        specifier: workspace:*
+        version: link:../../packages/session
+      '@may/ui-client':
+        specifier: workspace:*
+        version: link:../../packages/ui/client
+      '@may/web-ui':
+        specifier: workspace:*
+        version: link:../../packages/ui/web
 
   packages/application:
     dependencies:
@@ -359,6 +386,25 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
+  packages/ui/client:
+    dependencies:
+      '@may/application':
+        specifier: workspace:*
+        version: link:../../application
+      '@may/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@may/permissions':
+        specifier: workspace:*
+        version: link:../../permissions
+      '@may/session':
+        specifier: workspace:*
+        version: link:../../session
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+
   packages/ui/keybindings: {}
 
   packages/ui/tui:
@@ -390,6 +436,16 @@ importers:
       wrap-ansi:
         specifier: ^9.0.2
         version: 9.0.2
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+
+  packages/ui/web:
+    dependencies:
+      '@may/ui-client':
+        specifier: workspace:*
+        version: link:../client
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

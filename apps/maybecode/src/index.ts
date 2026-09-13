@@ -19,6 +19,7 @@ export * from "./summarizer.js";
 export * from "@may/tui/node-terminal";
 export type { TerminalIO as MaybeCodeTerminal } from "@may/tui/node-terminal";
 export * from "./tui.js";
+export * from "./web-ui.js";
 export * from "./ui/prototype-view.js";
 export * from "./ui/actions.js";
 export * from "./ui/retained-tui.js";

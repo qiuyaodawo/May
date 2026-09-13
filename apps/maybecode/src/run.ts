@@ -13,6 +13,7 @@ import type { MaybeCodeController } from "./controller.js";
 import { runRetainedTerminalUI } from "./ui/retained-tui.js";
 import { runMaybeCodeMcpCommand } from "./mcp-auth.js";
 import { runMaybeCodeTeamCommand } from "./team.js";
+import { runMaybeCodeWebUI } from "./web-ui.js";
 
 export interface RunMaybeCodeDependencies {
   readonly terminal?: TerminalIO;
@@ -22,6 +23,7 @@ export interface RunMaybeCodeDependencies {
   readonly runRetainedUI?: (app: MaybeCodeController) => Promise<void>;
   readonly mcpAuth?: typeof runMaybeCodeMcpCommand;
   readonly team?: typeof runMaybeCodeTeamCommand;
+  readonly runWebUI?: typeof runMaybeCodeWebUI;
 }
 
 export async function runMaybeCode(
@@ -83,7 +85,7 @@ export async function runMaybeCode(
     }
     const open = dependencies.open ?? openConfiguredMaybeCode;
     const app = await open({
-      mcpInteractions: true,
+      mcpInteractions: command.ui !== "web",
       ...(command.workspace === undefined
         ? {}
         : { workspace: command.workspace }),
@@ -96,7 +98,10 @@ export async function runMaybeCode(
         : { sessionId: command.sessionId }),
       autoResume: command.autoResume,
     });
-    if (command.ui === "retained") {
+    if (command.ui === "web") {
+      await (dependencies.runWebUI ?? runMaybeCodeWebUI)(app, { ...(command.port === undefined ? {} : { port: command.port }), write: text => outputTerminal().write(text) });
+      terminal?.close();
+    } else if (command.ui === "retained") {
       terminal?.close();
       await (dependencies.runRetainedUI ?? runRetainedTerminalUI)(app);
     } else {

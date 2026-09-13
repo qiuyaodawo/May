@@ -27,7 +27,9 @@
     "@may/config": "workspace:*",
     "@may/core": "workspace:*",
     "@may/providers": "workspace:*",
-    "@may/session": "workspace:*"
+    "@may/session": "workspace:*",
+    "@may/ui-client": "workspace:*",
+    "@may/web-ui": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

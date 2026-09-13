@@ -16,12 +16,15 @@ Usage:
 Options:
   --config <path>      Load another May config file
   --model <name>       Use a named model profile
-  --ui <name>          UI implementation: retained (default) or classic
+  --ui <name>          UI implementation: retained (default), classic or web
+  --port <number>      Local Web UI port (default: 3940; requires --ui web)
   -c, --continue       Continue the most recent session for this workspace
   -r, --resume <id>    Resume a specific session (--session is an alias)
   -h, --help           Show this help
 
 MCP login prints a browser authorization URL and waits for a local callback.
+Web mode requires MAYBECODE_CONTROL_TOKEN (32..256 printable ASCII characters).
+The Web host listens only on 127.0.0.1; closing a page does not cancel its run.
 MCP commands also accept --workspace <path>; login accepts repeated --scope <scope>.
 Team mode defaults to read-only; --mode coding permits edits in isolated copies only.
 Team run accepts --max-model-calls <n>, --max-total-tokens <n>, and --max-concurrent <n>.
@@ -43,9 +46,10 @@ export interface MaybeCodeStartCommand {
   readonly sessionId?: string;
   readonly autoResume: boolean;
   readonly ui: MaybeCodeUI;
+  readonly port?: number;
 }
 
-export type MaybeCodeUI = "classic" | "retained";
+export type MaybeCodeUI = "classic" | "retained" | "web";
 
 export interface MaybeCodeMcpCommand {
   readonly type: "mcp";
@@ -89,6 +93,7 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   let model: string | undefined;
   let sessionId: string | undefined;
   let ui: MaybeCodeUI | undefined;
+  let port: number | undefined;
   let continueLatest = false;
 
   for (let index = 0; index < args.length; index++) {
@@ -119,9 +124,9 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
     }
     if (argument === "--ui") {
       const value = readValue(args, ++index, "--ui");
-      if (value !== "classic" && value !== "retained") {
+      if (value !== "classic" && value !== "retained" && value !== "web") {
         throw new MaybeCodeUsageError(
-          '--ui must be either "classic" or "retained"',
+          '--ui must be "classic", "retained" or "web"',
         );
       }
       if (ui !== undefined) {
@@ -129,6 +134,11 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
       }
       ui = value;
       continue;
+    }
+    if (argument === "--port") {
+      const value = readValue(args, ++index, "--port");
+      if (port !== undefined || !/^\d+$/.test(value) || Number(value) > 65535) throw new MaybeCodeUsageError("--port requires one integer from 0 to 65535");
+      port = Number(value); continue;
     }
     if (
       argument === "--resume" ||
@@ -156,11 +166,13 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
       "--continue and --resume cannot be used together",
     );
   }
+  if (port !== undefined && ui !== "web") throw new MaybeCodeUsageError("--port requires --ui web");
 
   return {
     type: "start",
     autoResume: continueLatest,
     ui: ui ?? "retained",
+    ...(port === undefined ? {} : { port }),
     ...(workspace === undefined ? {} : { workspace }),
     ...(configPath === undefined ? {} : { configPath }),
     ...(model === undefined ? {} : { model }),

@@ -5,9 +5,13 @@
     "rootDir": "src",
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "references": [
     { "path": "../../packages/coordination" },
     { "path": "../../packages/skills" },
@@ -22,6 +26,8 @@
     { "path": "../../packages/permissions" },
     { "path": "../../packages/session" },
     { "path": "../../packages/providers" },
-    { "path": "../../packages/tools/coding-tools" }
+    { "path": "../../packages/tools/coding-tools" },
+    { "path": "../../packages/ui/client" },
+    { "path": "../../packages/ui/web" }
   ]
 }

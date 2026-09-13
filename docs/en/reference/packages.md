@@ -20,6 +20,7 @@ surface or persistence format as stable.
 | Manage multiple sessions in one workspace | `@may/application` | A `SessionCatalog` from `@may/session/catalog` |
 | Coordinate Agent teams, resources and remote workers | `@may/coordination` | Agent definitions, durable coordination and Session stores, explicit host policies |
 | Build a terminal Agent | Headless application controller | `@may/tui`, optionally `@may/keybindings` |
+| Build a browser Agent | Product `UiHost` or `ApplicationUiHost` | `@may/ui-client`, `@may/web-ui` |
 | Build a coding Agent | Headless application controller | `@may/coding-tools` and an execution isolation policy |
 | Select models from May configuration | `@may/config` | `@may/providers` |
 | Let the model inspect durable history | `@may/session-tools` | An active `Session` or `AgentApplication` |
@@ -240,6 +241,14 @@ Contains both low-level terminal primitives and Agent-aware projections:
 Product commands, labels, layout and controller calls remain application code.
 Alternative graphical or remote UIs should consume a headless controller and
 do not need `@may/tui`.
+
+### `@may/ui-client` / `@may/web-ui`
+
+For the browser-neutral protocol and browser components, see
+[`@may/ui-client`](../../../packages/ui/client/README.md),
+[`@may/web-ui`](../../../packages/ui/web/README.md), and the
+[Web UI guide](../guides/web-ui.md). They are independent of terminal rendering;
+product-specific adapters retain session/task semantics.
 
 ### `@may/keybindings`
 

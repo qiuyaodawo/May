@@ -2,6 +2,10 @@
 
 [English](../../en/guides/custom-ui.md) | **简体中文**
 
+浏览器界面可以从[共享 Web UI](web-ui.md)开始：`@may/ui-client` 提供 JSON 边界和
+状态同步，`@may/web-ui` 提供可组合组件与可选工作台。下文的进程内 Controller 和
+TUI 接入方式仍然可用。
+
 May 的 application 层是 headless 的。终端、桌面、Web 或远程 UI 应依赖
 `AgentController`（一个活动 Session）或 `AgentWorkspaceController`（多个 Session），
 调用表达用户意图的方法，并把异步 event stream 投影为 view state。

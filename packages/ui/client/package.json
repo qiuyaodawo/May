@@ -1,0 +1,20 @@
+{
+  "name": "@may/ui-client",
+  "version": "0.1.0",
+  "description": "UI-neutral May client contract, state synchronization and host adapters.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./application": { "types": "./dist/application.d.ts", "import": "./dist/application.js" },
+    "./projection": { "types": "./dist/projection.d.ts", "import": "./dist/projection.js" },
+    "./server": { "types": "./dist/server.d.ts", "import": "./dist/server.js" }
+  },
+  "files": ["dist", "!dist/.tsbuildinfo"],
+  "scripts": { "build": "tsc -b", "clean": "tsc -b --clean", "test": "pnpm run build && node --test test/*.test.mjs" },
+  "dependencies": { "@may/application": "workspace:*", "@may/core": "workspace:*", "@may/permissions": "workspace:*", "@may/session": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.0.0" },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}

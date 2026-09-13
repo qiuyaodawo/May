@@ -1,8 +1,18 @@
 # MaybeCode
 
-MaybeCode is the terminal coding-agent application assembled from May's Core,
-application, session, permission, provider, configuration, coding-tool, and TUI
-packages.
+MaybeCode is a coding-agent application assembled from May's Core, application,
+session, permission, provider, configuration, coding-tool and UI packages.
+It offers terminal frontends and a developer-preview Web UI.
+
+## Web UI (developer preview)
+
+Run `pnpm maybecode --ui web [workspace]` with `MAYBECODE_CONTROL_TOKEN` set to a
+random 32..256-character printable ASCII value. It serves an authenticated,
+loopback-only workspace on port 3940 (`--port` overrides it). The shared Web shell
+supports messages, live tool output, approvals, coding Diff previews, cancellation,
+session management and model selection; it does not replace all terminal controls.
+The default remains the retained TUI. See the [English Web UI guide](../../docs/en/guides/web-ui.md)
+or [简体中文指南](../../docs/zh-CN/guides/web-ui.md) for commands and current limits.
 
 ## Component boundary
 

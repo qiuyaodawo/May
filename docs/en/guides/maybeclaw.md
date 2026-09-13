@@ -63,12 +63,13 @@ The server does not print it. `--token-env <name>` selects a different environme
 variable; the token must contain 32..256 printable non-space ASCII characters.
 Use a random value, not a memorable password.
 
-The Web UI provides task submission, polling status, complete text results,
-cancellation, evidence reconciliation, failed-dispatch retry, channel state and
-the most recent 100 delivery records. Each submission is an independent task,
-not a turn in a shared conversation. No streaming-token renderer is implemented.
-Tokens live only in page memory: reload requires logging in again. All model
-output is plain text, not executable HTML or rendered Markdown.
+The [shared Web UI](web-ui.md) provides task submission, live output from tasks
+executed by this host, final results, cancellation, evidence reconciliation,
+failed-dispatch retry, channel state and the most recent 100 delivery records.
+Each submission is an independent task, not a turn in a shared conversation.
+Tokens live only in page memory: reload requires connecting again. Output uses
+a safe Markdown subset, never executable HTML. Historical tasks show persisted
+final results; transient tool details are not reconstructed after host restart.
 
 The server listens **only on 127.0.0.1**, requires bearer authentication for every
 API request, checks Host/Origin, and sends a restrictive CSP. The operator token

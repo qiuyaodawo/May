@@ -22,7 +22,8 @@
     "maybecode": "pnpm run build && node apps/maybecode/dist/bin.js",
     "maybeclaw": "pnpm run build && node apps/maybeclaw/dist/bin.js",
     "example": "pnpm run build && pnpm --filter @may/example-basic run start",
-    "example:deepseek": "pnpm run build && pnpm --filter @may/example-deepseek run start"
+    "example:deepseek": "pnpm run build && pnpm --filter @may/example-deepseek run start",
+    "example:web-ui": "pnpm run build && pnpm --filter @may/example-web-ui start"
   },
   "devDependencies": {
     "typescript": "^7.0.2"
