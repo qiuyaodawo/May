@@ -4,9 +4,26 @@
 
 这是共享 UI 边界的首个开发预览阶段。MaybeCode 与 MaybeClaw 使用相同的浏览器
 组件和传输层，但保留各自的资源模型。MaybeClaw 原有页面已被替换，没有抽成组件库。
-现有 TUI 保持不变。
+MaybeCode 的终端界面也支持通过 `/web` 打开共享工作台。
 
 ## 启动
+
+在 MaybeCode 的任一种终端界面输入 `/web`，即可在默认浏览器打开当前工作区和
+Session。命令自动选择可用的本地回环端口，并生成鉴权凭据，无需设置环境变量或
+手动输入令牌。重复执行 `/web` 会复用服务并打开新的已连接页面。刷新或断开页面后，
+再次执行 `/web` 连接。
+
+TUI 和 Web 分别接收实时事件，共享同一个执行所有者。消息、审批、模型切换
+和 Session 切换使用同一个 controller。在任一界面完成审批后，两端都会关闭对应
+审批提示。关闭浏览器页面后 Agent 继续运行；退出 TUI 时关闭 Agent 和 Web 服务。
+MCP 表单与授权交互继续在终端处理，Web 详情面板会说明处理位置。
+
+连接链接在 URL fragment 中携带一次性凭据。页面立即清除 fragment，再用该凭据
+换取控制令牌。连接凭据有效期为 60 秒，只能兑换一次，同时最多保留八个待连接凭据。
+控制令牌仅保存在页面内存中，不打印，也不写入浏览器存储。Origin 检查和 Bearer
+鉴权保持启用。
+
+独立启动 Web 宿主时，使用以下命令。
 
 沿用现有 May 模型配置。在 PowerShell 中执行：
 
@@ -34,6 +51,13 @@ pnpm maybeclaw serve
 它不会调用真实模型，也不会执行输入框中描述的业务任务。
 
 ## 分层边界
+
+终端拥有 controller 时，可以向 `ApplicationUiHost` 提供独立的 `events` 事件流
+和 `closeApplication: false`。终端负责向两端分别分发每条事件，并在退出时关闭
+controller。`startUiServer({ browserLogin: true, ... })` 提供一次性连接兑换接口，
+返回 `createLoginUrl()`；配合 `webUiAssets(..., { browserLogin: true })` 使用。
+自定义页面可向 `mountWebUI` 提供 `initialToken` 和 `connectionHint`。
+提供 `initialToken` 时，连接窗口显示启动程序的连接说明，并隐藏手动令牌输入。
 
 | 层 | 职责 |
 | --- | --- |

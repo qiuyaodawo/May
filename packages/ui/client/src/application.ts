@@ -5,6 +5,8 @@ import { UiProjection } from "./projection.js";
 import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";
 
 export interface ApplicationUiOptions {
+  readonly events?: AsyncIterable<{ type: string }>;
+  readonly closeApplication?: boolean;
   readonly product: UiProduct;
   readonly panels?: () => Promise<readonly UiPanel[]>;
   readonly choices?: () => Promise<readonly UiChoice[]>;
@@ -27,7 +29,7 @@ export class ApplicationUiHost implements UiHost {
   private mutation: Promise<unknown> = Promise.resolve();
   private fault: string | undefined;
   constructor(private readonly app: UiApplication, private readonly options: ApplicationUiOptions) {
-    this.iterator = app.events[Symbol.asyncIterator]();
+    this.iterator = (options.events ?? app.events)[Symbol.asyncIterator]();
     this.relay = this.consume().catch(() => { this.fault = "运行事件连接已停止。请检查宿主后重新启动。"; this.changed(); });
   }
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
@@ -138,7 +140,8 @@ export class ApplicationUiHost implements UiHost {
   }
   async close(): Promise<void> {
     await this.mutation.catch(() => {});
-    await this.app.close(); await this.iterator.return?.(); await this.relay;
+    if (this.options.closeApplication !== false) await this.app.close();
+    await this.iterator.return?.(); await this.relay;
     this.listeners.clear();
   }
 }

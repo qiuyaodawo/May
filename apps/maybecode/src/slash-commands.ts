@@ -36,6 +36,7 @@ export type MaybeCodeSlashCommandName =
   | "/status"
   | "/context"
   | "/compact"
+  | "/web"
   | "/help"
   | "/quit";
 
@@ -48,6 +49,7 @@ export const MAYBECODE_COMPACTION_STRATEGIES = [
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
+  { name: "/web", usage: "/web", description: "在浏览器中打开当前工作区和会话" },
   { name: "/skills", usage: "/skills [show <name>|use <name> [task]]", description: "List skills, preview instructions, or activate a skill" },
   { name: "/recovery", usage: "/recovery [resolve <id> <verified finding>]", description: "Inspect interrupted tools or record verified recovery findings" },
   {
@@ -120,6 +122,7 @@ export type MaybeCodeSlashCommandParseResult =
   SlashCommandParseResult<MaybeCodeSlashCommand>;
 
 export type MaybeCodeSlashCommandResult =
+  | { readonly type: "web.requested" }
   | { readonly type: "skill.run-started"; readonly run: MaybeCodeRun }
   | { readonly type: "display"; readonly text: string }
   | { readonly type: "mcp.display"; readonly text: string }
@@ -354,6 +357,8 @@ export async function executeMaybeCodeSlashCommand(
 
   const { definition, arguments: arguments_ } = parsed;
   switch (definition.name) {
+    case "/web":
+      return noArguments(arguments_, definition) ?? { type: "web.requested" };
     case "/skills": {
       if (arguments_.length === 0) {
         const skills = controller.listSkills?.() ?? [];

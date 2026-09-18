@@ -28,12 +28,11 @@
     "test:integration": "pnpm run build && node --test test/integration/*.test.mjs"
   },
   "dependencies": {
-    "@may/coordination": "workspace:*",
-    "@may/skills": "workspace:*",
     "@may/application": "workspace:*",
     "@may/coding-tools": "workspace:*",
     "@may/config": "workspace:*",
     "@may/context": "workspace:*",
+    "@may/coordination": "workspace:*",
     "@may/core": "workspace:*",
     "@may/keybindings": "workspace:*",
     "@may/mcp": "workspace:*",
@@ -41,9 +40,11 @@
     "@may/permissions": "workspace:*",
     "@may/providers": "workspace:*",
     "@may/session": "workspace:*",
+    "@may/skills": "workspace:*",
     "@may/tui": "workspace:*",
     "@may/ui-client": "workspace:*",
-    "@may/web-ui": "workspace:*"
+    "@may/web-ui": "workspace:*",
+    "open": "11.0.4"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

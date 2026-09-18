@@ -22,6 +22,7 @@ import {
 import { MaybeCodePrototypeView } from "./prototype-view.js";
 import type { MaybeCodeEvent } from "../events.js";
 import { presentMcpInteraction } from "../mcp-interaction-ui.js";
+import { MaybeCodeTerminalWeb } from "../terminal-web.js";
 
 export interface RunRetainedTerminalUIOptions {
   readonly terminal?: RuntimeTerminal;
@@ -44,6 +45,7 @@ export async function runRetainedTerminalUI(
   }
 
   let runtime: TuiRuntime | undefined;
+  const web = new MaybeCodeTerminalWeb(app);
   let closing = false;
   let eventFailure: unknown;
   let resolveExit!: () => void;
@@ -78,7 +80,7 @@ export async function runRetainedTerminalUI(
     },
     onSubmit: async (value, accepted) => {
       if (value.trimStart().startsWith("/")) {
-        await handleCommand(value, app, store, view, finish);
+        await handleCommand(value, app, store, view, finish, web);
         return;
       }
       try {
@@ -96,7 +98,7 @@ export async function runRetainedTerminalUI(
   let eventTask: Promise<void> | undefined;
   try {
     runtime.start();
-    eventTask = consumeEvents(app, store, view, () => closing).catch((error) => {
+    eventTask = consumeEvents(app, store, view, () => closing, web.events).catch((error) => {
       eventFailure = error;
       store.appendNotice("error", `Event stream failed: ${errorMessage(error)}`);
       finish();
@@ -108,7 +110,7 @@ export async function runRetainedTerminalUI(
     process.removeListener("SIGTERM", handleProcessSignal);
     runtime.stop();
     view.dispose();
-    await app.close();
+    await web.close();
     await eventTask;
   }
   if (eventFailure !== undefined) throw eventFailure;
@@ -119,10 +121,11 @@ async function consumeEvents(
   store: TranscriptStore,
   view: MaybeCodePrototypeView,
   isClosing: () => boolean,
+  events: AsyncIterable<MaybeCodeEvent>,
 ): Promise<void> {
   const approvals = new Set<Promise<void>>();
   const interactions = new Map<string, AbortController>();
-  for await (const event of app.events) {
+  for await (const event of events) {
     applyMaybeCodeEvent(store, event);
     if (event.type === "mcp.interaction.requested") {
       const controller = new AbortController();
@@ -258,6 +261,7 @@ async function handleCommand(
   store: TranscriptStore,
   view: MaybeCodePrototypeView,
   finish: () => void,
+  web: MaybeCodeTerminalWeb,
 ): Promise<void> {
   const parsed = parseMaybeCodeSlashCommand(input);
   if (
@@ -271,6 +275,10 @@ async function handleCommand(
     );
   }
   const result = await executeMaybeCodeSlashCommand(input, app);
+  if (result.type === "web.requested") {
+    store.appendNotice("info", `Web UI 已打开：${await web.open()}`);
+    return;
+  }
   await presentCommandResult(result, app, store, view, finish);
 }
 

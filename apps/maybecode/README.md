@@ -21,6 +21,19 @@ sessions and for replies longer than the normal scroll buffer.
 
 ## Web UI (developer preview)
 
+Type `/web` in either terminal frontend to open the current workspace and Session
+in the default browser. The terminal shares live output, approvals, model selection
+and Session changes with the Web UI. Repeating `/web` opens the same service with
+a fresh one-time connection link. No token environment variable is needed. After
+refreshing or disconnecting a page, run `/web` again to connect. Closing a page
+leaves the task running; exiting the terminal closes the application and Web
+service. MCP forms and authorization interactions remain in the terminal.
+
+The `/web` service uses an available loopback port and generates its control token
+in memory. The browser link contains a separate one-time ticket that expires after
+60 seconds. The page removes the ticket from its URL before exchanging it for the
+token; the token stays in page memory. Startup errors appear in the terminal.
+
 Run `pnpm maybecode --ui web [workspace]` with `MAYBECODE_CONTROL_TOKEN` set to a
 random 32..256-character printable ASCII value. It serves an authenticated,
 loopback-only workspace on port 3940 (`--port` overrides it). The shared Web shell

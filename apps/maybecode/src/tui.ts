@@ -26,6 +26,7 @@ import type {
 import { runModelPicker } from "./model-picker.js";
 import { runSessionPicker } from "./session-picker.js";
 import { presentMcpInteraction } from "./mcp-interaction-ui.js";
+import { MaybeCodeTerminalWeb } from "./terminal-web.js";
 
 type UIQuestion = (
   prompt: string,
@@ -84,7 +85,8 @@ export async function runTerminalUI(
     }
   });
 
-  const eventTask = consumeEvents(app, renderer, question);
+  const web = new MaybeCodeTerminalWeb(app);
+  const eventTask = consumeEvents(app, renderer, question, web.events);
   terminal.write(sanitizeTerminalText(
     `MaybeCode\nWorkspace: ${app.workspace}\n` +
       `Model: ${modelLabel(app)}\n` +
@@ -109,7 +111,7 @@ export async function runTerminalUI(
       terminal.addHistory?.(input);
       if (input.startsWith("/")) {
         try {
-          exit = await handleCommand(input, app, terminal, question);
+          exit = await handleCommand(input, app, terminal, question, web);
         } catch (error) {
           if (!isCancellation(error) && !isAbortError(error)) {
             terminal.write(
@@ -139,7 +141,7 @@ export async function runTerminalUI(
     // Restore readline/raw terminal state before potentially slow application
     // cancellation and event-drain work.
     closeTerminal();
-    await app.close();
+    await web.close();
     await eventTask;
   }
 }
@@ -148,6 +150,7 @@ async function consumeEvents(
   app: MaybeCodeController,
   renderer: TerminalRenderer,
   question: UIQuestion,
+  events: AsyncIterable<MaybeCodeEvent>,
 ): Promise<void> {
   const pending = new Map<string, AbortController>();
   let prompts = Promise.resolve();
@@ -162,7 +165,7 @@ async function consumeEvents(
       }
     }).finally(() => pending.delete(id));
   };
-  for await (const event of app.events) {
+  for await (const event of events) {
     if (event.type === "run.event") {
       renderer.runEvent(event.event);
     } else if (event.type === "permission.event") {
@@ -256,6 +259,7 @@ async function handleCommand(
   app: MaybeCodeController,
   terminal: TerminalIO,
   question: UIQuestion,
+  web: MaybeCodeTerminalWeb,
 ): Promise<boolean> {
   const parsed = parseMaybeCodeSlashCommand(input);
   if (
@@ -274,6 +278,10 @@ async function handleCommand(
   }
 
   const result = await executeMaybeCodeSlashCommand(input, app);
+  if (result.type === "web.requested") {
+    terminal.write(`\nWeb UI 已打开：${await web.open()}\n`);
+    return false;
+  }
   return renderSlashCommandResult(result, app, terminal, question);
 }
 

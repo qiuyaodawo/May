@@ -11,6 +11,12 @@ does not depend on TUI rendering or a product. The root entry exports JSON DTOs,
 - `@may/ui-client/server`: authenticated loopback server and mountable UI router.
   A custom server **must authenticate and validate origins before calling the router**.
 
+`ApplicationUiHost` accepts `events` and `closeApplication: false` for an
+independent view of a controller owned by a terminal. The owner distributes events
+to each view and closes the application. `startUiServer` can opt into `browserLogin`
+and return `createLoginUrl()` for a 60-second, single-use browser connection ticket.
+The exchange keeps the control token out of URLs and preserves API authentication.
+
 `UiClient` synchronizes authoritative snapshots using an authenticated fetch/SSE
 invalidation stream. Reconnects resnapshot; they do not replay commands.
 Host epochs reject uncertain commands after restart. Receipts deduplicate up to

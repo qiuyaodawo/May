@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { BrowserLogin } from "./browser-login.js";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { UiError, type UiCommand, type UiHost, type UiReceipt, type UiField } from "./protocol.js";
@@ -74,17 +75,29 @@ export function createUiRouter(host: UiHost) {
   };
 }
 
-export async function startUiServer(options: { host: UiHost; assets: UiAssets; token: string; port?: number; close?: () => Promise<void> }) {
+export async function startUiServer(options: { host: UiHost; assets: UiAssets; token: string; port?: number; browserLogin?: boolean; close?: () => Promise<void> }) {
   validateToken(options.token);
   const port = options.port ?? 3940;
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
   const router = createUiRouter(options.host);
+  const login = options.browserLogin ? new BrowserLogin(options.token) : undefined;
   let origin = "";
   const requests = new Set<Promise<void>>();
   const server = createServer((req, res) => {
     const work = (async () => {
       secureHeaders(res);
       if (!trustedRequest(req, origin)) { sendJson(res, 403, { error: "Untrusted origin or host" }); return; }
+      if (login && req.method === "POST" && req.url === "/api/ui/connect") {
+        try {
+          const body = await readJson(req);
+          if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 1 || !("ticket" in body)) throw new UiError(400, "连接请求无效。");
+          sendJson(res, 200, { token: login.redeem(body.ticket) });
+        } catch (error) {
+          if (!(error instanceof UiError)) throw error;
+          sendJson(res, error.status, { error: error.message });
+        }
+        return;
+      }
       const asset = options.assets.get(req.url ?? "/");
       if (req.method === "GET" && asset) { res.writeHead(200, { "content-type": asset.type }); res.end(asset.body); return; }
       if (!authorized(req, options.token)) { sendJson(res, 401, { error: "请输入控制令牌。" }); return; }
@@ -98,7 +111,11 @@ export async function startUiServer(options: { host: UiHost; assets: UiAssets; t
   });
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   let closing: Promise<void> | undefined;
-  return { url: origin, close: () => closing ??= (async () => {
+  return { url: origin, createLoginUrl: () => {
+    if (!login || closing) throw new Error("当前服务不接受浏览器连接凭据。");
+    return `${origin}/#may-connect=${login.issue()}`;
+  }, close: () => closing ??= (async () => {
+    login?.clear();
     router.close();
     const stopped = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     server.closeAllConnections();

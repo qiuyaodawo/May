@@ -19,6 +19,13 @@ Use your bundler for imports above, or `webUiAssets()` from `@may/web-ui/assets`
 to serve the bundled native-ES-module shell and CSS through the loopback host.
 Import `@may/web-ui/styles.css` when composing components outside that shell.
 
+`webUiAssets(..., { browserLogin: true })` supports the loopback server's one-time
+connection links. The page removes the ticket fragment before exchange and keeps
+the returned token in memory. Custom shells can pass an `initialToken` promise
+and a `connectionHint` to `mountWebUI`. With `initialToken`, the connection dialog
+shows the launcher instructions and omits manual token entry. Disposing the shell
+prevents a pending promise from connecting a closed view.
+
 Products can register tool, approval-detail, diagnostic, presentation and panel renderers. Each receives its DTO and an
 optional context containing client state and the guarded `command` method. A
 trusted product extension module can be included by `webUiAssets`; no module is

@@ -5,9 +5,30 @@
 This is the first developer-preview slice of a shared UI boundary. MaybeCode and
 MaybeClaw use the same browser components and transport, but retain different
 resource models. The old MaybeClaw page has been replaced, not extracted into a
-library. Existing terminal frontends are unchanged.
+library. MaybeCode terminal frontends can also open the shared workbench with `/web`.
 
 ## Run
+
+In either MaybeCode terminal frontend, enter `/web` to open the current workspace
+and Session in the default browser. The command automatically selects an available
+loopback port and generates authentication credentials. No environment variable or
+manual token entry is needed. Repeating `/web` reuses the service and opens another
+authenticated page. After refreshing or disconnecting a page, run `/web` again.
+
+TUI and Web receive separate copies of live events and share the same execution
+owner. Messages, approvals, model changes and Session changes use the same
+controller. An approval resolved in either frontend disappears from both.
+Closing a browser page leaves the Agent running; exiting the TUI closes the Agent
+and Web service. MCP forms and authorization interactions remain in the terminal;
+the Web details panel shows where to handle them.
+
+The connection link carries a one-time ticket in its URL fragment. The page
+immediately removes the fragment and exchanges the ticket for a control token.
+Tickets expire after 60 seconds, are consumed once, and are limited to eight
+pending connections. The token stays in page memory and is never printed or
+written to browser storage. Origin checks and Bearer authentication remain active.
+
+To launch a standalone Web host, use the following command.
 
 Use your existing May model configuration. In PowerShell:
 
@@ -37,6 +58,15 @@ fixture token auto-connects only this example. It neither invokes a real model
 nor executes the business tasks entered into its composer.
 
 ## Boundaries
+
+`ApplicationUiHost` accepts an independent `events` stream and
+`closeApplication: false` when a terminal owns the controller. The terminal must
+distribute each event to both frontends and close the controller when it exits.
+`startUiServer({ browserLogin: true, ... })` adds a one-time connection exchange
+and returns `createLoginUrl()`. Pair it with `webUiAssets(..., { browserLogin: true })`.
+Custom shells can provide `initialToken` and `connectionHint` to `mountWebUI`.
+With `initialToken`, the connection dialog shows the launcher instructions and
+omits manual token entry.
 
 | Layer | Ownership |
 | --- | --- |

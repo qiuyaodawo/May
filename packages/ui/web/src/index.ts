@@ -4,7 +4,7 @@ export { approvalCard, detailPanel, transcriptBlock, type WebUiExtensions, type 
 import { createInspector, createTranscriptReader } from "./reading.js";
 export { markdown } from "./markdown.js";
 
-export interface WebUiOptions { readonly title?: string; readonly kind?: "session" | "task"; readonly extensions?: WebUiExtensions }
+export interface WebUiOptions { readonly title?: string; readonly kind?: "session" | "task"; readonly extensions?: WebUiExtensions; readonly initialToken?: Promise<string | undefined>; readonly connectionHint?: string }
 
 /** Optional shell. Products can instead compose the exported components with UiClient. */
 export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOptions = {}): () => void {
@@ -87,14 +87,19 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const dialog = element("dialog", "connect-dialog");
   const dialogForm = element("form");
   const dialogTitle = element("h2", "", "连接本地工作区"); dialogTitle.id = "connection-title"; dialog.setAttribute("aria-labelledby", dialogTitle.id);
-  const explanation = element("p", "", "输入启动服务时配置的控制令牌。令牌仅保存在当前页面内存中，刷新后需重新连接。");
+  const explanation = element("p", "", options.connectionHint ?? "输入启动服务时配置的控制令牌。令牌仅保存在当前页面内存中，刷新后需重新连接。");
   const tokenLabel = element("label", "field-label", "控制令牌"); tokenLabel.htmlFor = "control-token";
   const tokenInput = element("input", "token-input"); tokenInput.type = "password"; tokenInput.id = "control-token"; tokenInput.required = true; tokenInput.minLength = 32; tokenInput.maxLength = 256; tokenInput.autocomplete = "off";
   const dialogError = element("p", "dialog-error"); dialogError.setAttribute("role", "alert");
   const dialogActions = element("div", "dialog-actions"); const connectSubmit = element("button", "button primary", "连接"); connectSubmit.type = "submit";
   const disconnect = button("断开连接", () => { client.disconnect(); tokenInput.value = ""; dialog.close(); });
-  dialogActions.append(button("关闭", () => dialog.close()), disconnect, connectSubmit);
-  dialogForm.append(dialogTitle, explanation, tokenLabel, tokenInput, dialogError, dialogActions); dialog.append(dialogForm);
+  dialogActions.append(button("关闭", () => dialog.close()), disconnect);
+  dialogForm.append(dialogTitle, explanation);
+  if (options.initialToken === undefined) {
+    dialogForm.append(tokenLabel, tokenInput);
+    dialogActions.append(connectSubmit);
+  }
+  dialogForm.append(dialogError, dialogActions); dialog.append(dialogForm);
   root.replaceChildren(shell, dialog);
 
   let state: UiClientState = client.state, draftKey = "new", selected: string | null = null;
@@ -233,7 +238,9 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     void client.command(state.snapshot?.product.resourceKind === "task" ? "task.submit" : "message.submit", { text }).then(() => { drafts.delete(key); if (draftKey === key && composer.value === text) composer.value = ""; updateComposer(); }, showError);
   };
   dialogForm.onsubmit = event => {
-    event.preventDefault(); connectSubmit.disabled = true; dialogError.textContent = "";
+    event.preventDefault();
+    if (options.initialToken !== undefined) return;
+    connectSubmit.disabled = true; dialogError.textContent = "";
     void client.connect(tokenInput.value.trim()).then(() => { tokenInput.value = ""; dialog.close(); }, error => { dialogError.textContent = error instanceof Error ? error.message : "连接失败"; }).finally(() => { connectSubmit.disabled = false; });
   };
   search.maxLength = 256;
@@ -249,5 +256,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   };
   document.addEventListener("keydown", keyboard);
   const unsubscribe = client.subscribe(render);
-  return () => { resourceRequest++; clearTimeout(searchTimer); reader.dispose(); inspector.dispose(); unsubscribe(); client.disconnect(); document.removeEventListener("keydown", keyboard); mobileQuery.removeEventListener("change", syncSidebar); root.replaceChildren(); };
+  let disposed = false;
+  void options.initialToken?.then(token => { if (!disposed && token !== undefined) return client.connect(token); }).catch(error => { if (!disposed) showError(error); });
+  return () => { disposed = true; resourceRequest++; clearTimeout(searchTimer); reader.dispose(); inspector.dispose(); unsubscribe(); client.disconnect(); document.removeEventListener("keydown", keyboard); mobileQuery.removeEventListener("change", syncSidebar); root.replaceChildren(); };
 }
