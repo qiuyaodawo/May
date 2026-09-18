@@ -37,6 +37,38 @@ embedded loop. The rest of this guide uses `@may/application`, the recommended
 starting point for a product that needs a Session, permissions, history, or a
 UI-independent lifecycle.
 
+## Run the local MaybeCode build from PowerShell
+
+Add the following line to `$PROFILE.CurrentUserAllHosts`, replacing the checkout
+path with your own. PowerShell 7 and Windows PowerShell use separate profiles.
+
+```powershell
+. 'E:\code\May\scripts\maybecode-powershell.ps1'
+```
+
+Open a new terminal or load that profile with `. $PROFILE.CurrentUserAllHosts`.
+Build after changing source files, then start MaybeCode from the project you
+want to work on:
+
+```powershell
+pnpm --dir E:\code\May build
+Set-Location E:\code\your-project
+pnpm maybecode
+```
+
+The PowerShell function routes `pnpm maybecode` directly to this checkout's
+`apps/maybecode/dist/bin.js`, preserves the current working directory, and forwards
+arguments such as `--continue`, `--config`, and `--ui web`. Each launch uses the
+latest successful build; restart an existing process after rebuilding. A missing
+entry point reports the build command. This shortcut does not build automatically
+or require a global MaybeCode installation. Other pnpm commands use `pnpm.cmd`.
+Inside the May checkout, `pnpm run maybecode` still builds and starts the app through
+the package script. Terminals started with `-NoProfile` must load the script explicitly.
+
+The standalone `maybecode` executable remains the entry point supplied by an
+installed package. To remove a previous global development installation, use
+`pnpm remove --global @may/maybecode`.
+
 ## Continuous integration
 
 The [GitHub Actions workflow](../../.github/workflows/ci.yml) runs automatically

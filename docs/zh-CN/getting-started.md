@@ -32,6 +32,34 @@ pnpm example
 `@may/core`，适合一次性或嵌入式循环。本文其余部分使用 `@may/application`；需要
 Session、权限、历史或 UI-independent 生命周期的产品应从这里开始。
 
+## 在 PowerShell 中运行本地 MaybeCode 构建
+
+在 `$PROFILE.CurrentUserAllHosts` 中加入以下内容，并替换为自己的仓库路径。
+PowerShell 7 和 Windows PowerShell 使用各自的 Profile。
+
+```powershell
+. 'E:\code\May\scripts\maybecode-powershell.ps1'
+```
+
+打开新终端，或者执行 `. $PROFILE.CurrentUserAllHosts` 加载配置。修改源码后执行
+构建，再进入需要处理的项目目录启动 MaybeCode：
+
+```powershell
+pnpm --dir E:\code\May build
+Set-Location E:\code\your-project
+pnpm maybecode
+```
+
+这个 PowerShell 函数将 `pnpm maybecode` 直接转发到当前仓库的
+`apps/maybecode/dist/bin.js`，保留当前工作目录，并传递 `--continue`、`--config`、
+`--ui web` 等参数。每次启动使用最近成功构建的内容；重新构建后需要重启已有进程。
+构建入口缺失时会提示构建命令。该入口不会自动构建，也无需全局安装 MaybeCode。
+其他 pnpm 命令交给 `pnpm.cmd`。在 May 仓库内执行 `pnpm run maybecode` 仍会通过
+package script 构建并启动应用。通过 `-NoProfile` 启动的终端需要显式加载脚本。
+
+独立的 `maybecode` 命令由安装的包提供。移除已有全局开发安装的命令为
+`pnpm remove --global @may/maybecode`。
+
 ## 持续集成
 
 [GitHub Actions 工作流](../../.github/workflows/ci.yml) 在推送代码和提交 PR 时
