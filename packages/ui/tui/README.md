@@ -30,6 +30,23 @@ Use `createNodeTerminal` when it needs line-oriented questions and occasional
 temporary full-screen views. The latter is also available through the
 `@may/tui/node-terminal` subpath.
 
+`NodeTerminalDriver` enables SGR mouse reporting while the alternate screen is
+active and disables it on exit. Mouse input is decoded with `tty-events`;
+vertical wheel events emit `wheelup` and `wheeldown` key strokes without text.
+Other mouse events are consumed. A focused `ScrollView` scrolls three rows per
+wheel event. Product views may route wheel events to their transcript while
+keeping keyboard focus in the editor.
+
+`TranscriptStore.latestReply` exposes the current turn's final assistant item
+after `run.completed`, including restored session events. New input, a new run,
+and session reset clear it. Empty final text has no reply target.
+Call `TranscriptView.revealLatestReply()` and then
+`ScrollView.scrollToAnchor(() => view.latestReplyAnchor)` to position the first
+Markdown body row at the viewport top. The anchor is resolved after rendering
+and follows layout changes until manual navigation. Short replies leave space
+below them. Revealing a reply retains its entire body and subsequent displayed
+items, so this explicit reading operation may exceed the normal tail row limit.
+
 `Editor` supports grapheme-aware editing, optional in-process `EditorHistory`,
 history navigation at the first/last logical line, `Ctrl+W` or modified
 Backspace for backward word deletion, and modified Left/Right for word

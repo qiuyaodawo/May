@@ -433,6 +433,9 @@ importers:
       string-width:
         specifier: ^7.2.0
         version: 7.2.0
+      tty-events:
+        specifier: 1.0.0
+        version: 1.0.0
       wrap-ansi:
         specifier: ^9.0.2
         version: 9.0.2
@@ -927,6 +930,10 @@ packages:
     resolution: {integrity: sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w==}
     engines: {node: '>=12'}
 
+  tty-events@1.0.0:
+    resolution: {integrity: sha512-9dBf9NXGmaTOtM1D4oqwSXVVAaoGyW+/rKUmEwd2FxaG0B4twdzauIBaXzrzKD3SB8lkmDTbyOE5xlXJ9sNAKg==}
+    engines: {node: '>=10.0.0'}
+
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
     engines: {node: '>=16.20.0'}
@@ -1369,6 +1376,8 @@ snapshots:
   strip-ansi@7.2.0:
     dependencies:
       ansi-regex: 6.3.0
+
+  tty-events@1.0.0: {}
 
   typescript@7.0.2:
     optionalDependencies:

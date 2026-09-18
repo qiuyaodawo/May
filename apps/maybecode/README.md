@@ -4,6 +4,21 @@ MaybeCode is a coding-agent application assembled from May's Core, application,
 session, permission, provider, configuration, coding-tool and UI packages.
 It offers terminal frontends and a developer-preview Web UI.
 
+In the retained TUI, the mouse wheel scrolls the conversation by three rows per
+event while preserving editor focus and draft text. Scrolling up keeps the
+reading position as new output arrives; reaching the bottom resumes following
+new output. Keyboard Up/Down in the editor navigates input history. Press Tab
+to focus the transcript and use Up/Down, PageUp/PageDown, Home, or End to browse.
+Mouse scrolling requires a terminal supporting xterm mouse reporting.
+
+Press `Ctrl+X`, then `R` to place the current turn's completed final reply body
+at the top of the conversation, after its thinking and tool activity. This works
+with keyboard focus in either the editor or conversation and preserves the
+draft. The reading position stays at the reply start until you scroll; repeated
+use returns to the same start. While the current turn has no completed final
+reply, the status shows `No final reply yet`. The shortcut also works in resumed
+sessions and for replies longer than the normal scroll buffer.
+
 ## Web UI (developer preview)
 
 Run `pnpm maybecode --ui web [workspace]` with `MAYBECODE_CONTROL_TOKEN` set to a

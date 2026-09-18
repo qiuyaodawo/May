@@ -28,6 +28,8 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
   private lastMaximumOffset = 0;
   private lastPageSize = 1;
   private pendingAnchor: PendingScrollAnchor | undefined;
+  private topAnchor: (() => ScrollRegion | undefined) | undefined;
+  private alignedToStart = false;
 
   constructor(
     private readonly child: Component,
@@ -42,6 +44,14 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
 
   get scrollOffset(): number {
     return this.offset;
+  }
+
+  /** 在渲染后将目标第一行置于顶部，并在内容变化时保持该位置。 */
+  scrollToAnchor(resolveAfterRender: () => ScrollRegion | undefined): void {
+    this.followEnd = false;
+    this.pendingAnchor = undefined;
+    this.topAnchor = resolveAfterRender;
+    this.alignedToStart = true;
   }
 
   setFocused(focused: boolean): void {
@@ -59,6 +69,7 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
     region: ScrollRegion,
     resolveAfterRender: () => ScrollRegion | undefined,
   ): void {
+    if (this.topAnchor !== undefined) return;
     this.followEnd = false;
     if (region.start < this.offset || region.start >= this.offset + this.lastPageSize) {
       this.pendingAnchor = undefined;
@@ -71,6 +82,8 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
   }
 
   ensureVisible(region: ScrollRegion, margin = 1): boolean {
+    this.topAnchor = undefined;
+    this.alignedToStart = false;
     const safeMargin = Math.max(0, Math.min(Math.trunc(margin), this.lastPageSize - 1));
     let next = this.offset;
     if (region.start < this.offset + safeMargin) {
@@ -86,7 +99,8 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
   }
 
   scrollBy(lines: number): boolean {
-    const next = clamp(this.offset + Math.trunc(lines), 0, this.lastMaximumOffset);
+    this.topAnchor = undefined;
+    const next = clamp(this.offset + Math.trunc(lines), 0, Math.max(this.offset, this.lastMaximumOffset));
     if (next === this.offset) return false;
     this.offset = next;
     this.followEnd = this.offset === this.lastMaximumOffset;
@@ -94,6 +108,8 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
   }
 
   scrollToStart(): boolean {
+    this.topAnchor = undefined;
+    this.alignedToStart = false;
     if (this.offset === 0 && !this.followEnd) return false;
     this.offset = 0;
     this.followEnd = false;
@@ -101,6 +117,8 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
   }
 
   scrollToEnd(): boolean {
+    this.topAnchor = undefined;
+    this.alignedToStart = false;
     if (this.offset === this.lastMaximumOffset && this.followEnd) return false;
     this.offset = this.lastMaximumOffset;
     this.followEnd = true;
@@ -109,6 +127,8 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
 
   handleKey(stroke: KeyStroke): boolean {
     if (!this.focused) return false;
+    if (stroke.key === "wheelup") return this.scrollBy(-3);
+    if (stroke.key === "wheeldown") return this.scrollBy(3);
     if (isInteractive(this.child) && this.child.handleKey(stroke)) {
       this.followEnd = false;
       return true;
@@ -144,11 +164,17 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
     const pendingAnchor = this.pendingAnchor;
     this.pendingAnchor = undefined;
     const anchoredRegion = pendingAnchor?.resolveAfterRender();
-    this.offset = anchoredRegion !== undefined && pendingAnchor !== undefined
+    const topRegion = this.topAnchor?.();
+    const maximumOffset = this.alignedToStart
+      ? Math.max(0, content.lines.length - 1)
+      : this.lastMaximumOffset;
+    this.offset = topRegion !== undefined
+      ? clamp(topRegion.start, 0, maximumOffset)
+      : anchoredRegion !== undefined && pendingAnchor !== undefined
       ? clamp(anchoredRegion.start - pendingAnchor.screenRow, 0, this.lastMaximumOffset)
       : this.followEnd
       ? this.lastMaximumOffset
-      : clamp(this.offset, 0, this.lastMaximumOffset);
+      : clamp(this.offset, 0, maximumOffset);
 
     const cursor = content.cursor;
     const cursorVisible = cursor !== undefined &&

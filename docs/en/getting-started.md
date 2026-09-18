@@ -69,6 +69,25 @@ The standalone `maybecode` executable remains the entry point supplied by an
 installed package. To remove a previous global development installation, use
 `pnpm remove --global @may/maybecode`.
 
+## Browse MaybeCode conversations
+
+In the default retained TUI, use the mouse wheel to scroll the conversation.
+Each event moves three rows and keeps the current input text and keyboard focus.
+Scrolling up preserves the reading position while new output arrives. Scrolling
+back to the bottom resumes following new output. Mouse scrolling requires a
+terminal supporting xterm mouse reporting.
+
+Up/Down in the input editor navigates input history. Press Tab to focus the
+conversation, then use Up/Down, PageUp/PageDown, Home, or End to browse it.
+
+Press `Ctrl+X`, then `R` to jump to the start of the current turn's completed
+final reply body, after its thinking and tool activity. It places the body at
+the top of the conversation and preserves your draft and keyboard focus.
+The reading position stays there until you scroll; repeating the shortcut
+returns to the same start. This also works after resuming a session and for
+replies longer than the normal scroll buffer. If the current turn has no
+completed final reply, the status shows `No final reply yet`.
+
 ## Continuous integration
 
 The [GitHub Actions workflow](../../.github/workflows/ci.yml) runs automatically

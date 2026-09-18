@@ -1,5 +1,6 @@
 import { emitKeypressEvents } from "node:readline";
-import { PassThrough } from "node:stream";
+import { PassThrough, type Writable } from "node:stream";
+import TerminalEvents from "tty-events";
 import { keyStroke, type KeyStroke } from "@may/keybindings";
 import type { RenderSize } from "./component.js";
 import type { TerminalWriter } from "./renderer.js";
@@ -36,8 +37,10 @@ export class NodeTerminalDriver implements TerminalWriter {
   private readonly output: TerminalOutput;
   private readonly requireTTY: boolean;
   private readonly decodedInput = new PassThrough();
+  private readonly pointerInput = new PassThrough();
+  private pointerDecoder: TerminalEvents | undefined;
   private readonly inputDecoder = new BracketedPasteDecoder(
-    (value) => this.decodedInput.write(value),
+    (value) => this.pointerInput.write(value),
     (value) => this.emitPaste(value),
   );
   private readonly keyListeners = new Set<KeyListener>();
@@ -76,6 +79,18 @@ export class NodeTerminalDriver implements TerminalWriter {
     }
     this.inputDecoder.reset();
     this.decodedInput.on("keypress", this.handleKeypress);
+    this.pointerDecoder = new TerminalEvents(this.pointerInput, this.output as Writable, { timeout: 30 });
+    this.pointerDecoder.on("keypress", (key) => this.decodedInput.write(key.sequence));
+    this.pointerDecoder.on("unknownSequence", (sequence) => this.decodedInput.write(sequence));
+    this.pointerDecoder.on("wheel", (event) => {
+      if (!this.alternateScreen) return;
+      const stroke = keyStroke(event.direction === -1 ? "wheelup" : "wheeldown", {
+        ctrl: event.ctrl,
+        alt: event.alt,
+        shift: event.shift,
+      });
+      for (const listener of this.keyListeners) listener(stroke);
+    });
     this.input.on("data", this.handleData);
     this.output.on("resize", this.handleResize);
     this.input.ref?.();
@@ -88,13 +103,13 @@ export class NodeTerminalDriver implements TerminalWriter {
 
   enterAlternateScreen(): void {
     if (this.alternateScreen) return;
-    this.write("\x1b[?1049h\x1b[2J\x1b[H");
+    this.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?1000h\x1b[?1006h");
     this.alternateScreen = true;
   }
 
   leaveAlternateScreen(): void {
     if (!this.alternateScreen) return;
-    this.write("\x1b[0m\x1b[?25h\x1b[?1049l");
+    this.write("\x1b[?1000l\x1b[?1006l\x1b[0m\x1b[?25h\x1b[?1049l");
     this.alternateScreen = false;
   }
 
@@ -120,6 +135,9 @@ export class NodeTerminalDriver implements TerminalWriter {
     if (this.alternateScreen) this.leaveAlternateScreen();
     if (!this.started) return;
     this.inputDecoder.reset();
+    this.pointerDecoder?.pause();
+    this.pointerDecoder?.removeAllListeners();
+    this.pointerDecoder = undefined;
     this.input.removeListener("data", this.handleData);
     this.decodedInput.removeListener("keypress", this.handleKeypress);
     this.output.removeListener("resize", this.handleResize);

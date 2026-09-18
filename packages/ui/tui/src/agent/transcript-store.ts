@@ -90,6 +90,13 @@ export class TranscriptStore {
   private readonly listeners = new Set<TranscriptListener>();
   private localSequence = 0;
   private currentSessionId: string | undefined;
+  private latestReplyId: string | undefined;
+
+  /** 当前轮次完成后可供阅读的最终正文。 */
+  get latestReply(): AssistantTranscriptItem | undefined {
+    const item = this.values.find((item) => item.id === this.latestReplyId);
+    return item?.kind === "assistant" && item.text.trim() !== "" ? item : undefined;
+  }
 
   get items(): readonly TranscriptItem[] {
     return this.values;
@@ -106,11 +113,13 @@ export class TranscriptStore {
 
   reset(sessionId?: string): void {
     this.values = [];
+    this.latestReplyId = undefined;
     this.currentSessionId = sessionId;
     this.changed();
   }
 
   appendUser(message: string | UserMessage, timestamp = Date.now()): void {
+    this.latestReplyId = undefined;
     const text = typeof message === "string"
       ? message
       : contentText(message.content, "text");
@@ -151,6 +160,7 @@ export class TranscriptStore {
 
   loadHistory(events: readonly SessionEvent[]): void {
     this.values = [];
+    this.latestReplyId = undefined;
     this.currentSessionId = events[0]?.sessionId ?? this.currentSessionId;
     for (const event of events) this.projectSessionEvent(event);
     this.changed();
@@ -174,6 +184,12 @@ export class TranscriptStore {
 
   private projectMayEvent(event: MayEvent): void {
     switch (event.type) {
+      case "run.started":
+        this.latestReplyId = undefined;
+        break;
+      case "run.completed":
+        this.completeReply(event);
+        break;
       case "model.started":
         this.ensureAssistant(event);
         break;
@@ -250,10 +266,8 @@ export class TranscriptStore {
           event.timestamp,
         );
         break;
-      case "run.started":
       case "step.started":
       case "step.completed":
-      case "run.completed":
       case "run.yielded":
         break;
     }
@@ -302,6 +316,12 @@ export class TranscriptStore {
 
   private projectSessionEvent(event: SessionEvent): void {
     switch (event.type) {
+      case "run.started":
+        this.latestReplyId = undefined;
+        break;
+      case "run.completed":
+        this.completeReply(event);
+        break;
       case "run.interrupted":
         for (const item of event.recoveries) {
           this.appendHistoryTool(historyTool({ ...event, type: "tool.failed", step: item.step, call: item.call,
@@ -311,6 +331,7 @@ export class TranscriptStore {
         break;
       case "recovery.resolved":
       case "input.submitted":
+        this.latestReplyId = undefined;
         this.append({
           id: `history:${event.seq}`,
           kind: "user",
@@ -396,8 +417,6 @@ export class TranscriptStore {
         );
         break;
       case "session.created":
-      case "run.started":
-      case "run.completed":
       case "run.yielded":
         break;
     }
@@ -416,6 +435,18 @@ export class TranscriptStore {
             ...(event.reason === undefined ? {} : { reason: event.reason }),
           };
     });
+  }
+
+  private completeReply(event: Extract<MayEvent | SessionEvent, { type: "run.completed" }>): void {
+    const step = event.result.steps;
+    const content = assistantContent(event.result.message);
+    this.updateAssistant({ ...event, step }, (item) => ({
+      ...item,
+      text: content.text || item.text,
+      reasoning: content.reasoning || item.reasoning,
+      status: "completed",
+    }));
+    this.latestReplyId = assistantId(event.runId, step);
   }
 
   private ensureAssistant(event: { runId: string; step: number; timestamp: number }): void {

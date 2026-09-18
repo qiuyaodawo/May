@@ -392,6 +392,8 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
   }
 
   private handleBaseKey(stroke: KeyStroke): boolean {
+    if (stroke.key === "wheelup") return this.transcript.scrollBy(-3);
+    if (stroke.key === "wheeldown") return this.transcript.scrollBy(3);
     const shortcut = this.keymap.resolve(stroke, ["global"]);
     if (shortcut.type === "pending") {
       this.status = `Shortcut: ${shortcut.completions.join(" / ")}`;
@@ -399,6 +401,15 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
       return true;
     }
     if (shortcut.type === "action") {
+      if (shortcut.action === "app.reply.start") {
+        if (this.transcriptView.revealLatestReply()) {
+          this.transcript.scrollToAnchor(() => this.transcriptView.latestReplyAnchor);
+          this.setStatus("Reply start");
+        } else {
+          this.setStatus("No final reply yet");
+        }
+        return true;
+      }
       if (shortcut.action === "app.tools.toggle") {
         this.executeUiAction("tools.toggle");
         return true;
@@ -993,6 +1004,7 @@ class FooterView implements Component {
       : this.theme.success;
     const value = `${styleText("●", statusStyle)} ${styleText(this.status, statusStyle)}  ` +
       `${styleText(this.focus ?? "none", this.theme.muted)}  ` +
+      `${styleText("Ctrl+X R", this.theme.dim)} reply  ` +
       (this.focus === "transcript"
         ? `${styleText("J/K", this.theme.dim)} tools  ` +
           `${styleText("Enter", this.theme.dim)} toggle  ` +
@@ -1056,7 +1068,8 @@ class McpInputPrompt implements InteractiveComponent {
   }
   handleKey(stroke: KeyStroke): boolean {
     if (stroke.key === "escape") { this.complete(); return true; }
-    if (stroke.key === "pageup" || stroke.key === "pagedown") return this.body.handleKey(stroke);
+    if (stroke.key === "pageup" || stroke.key === "pagedown" ||
+        stroke.key === "wheelup" || stroke.key === "wheeldown") return this.body.handleKey(stroke);
     return this.editor.handleKey(stroke);
   }
 }

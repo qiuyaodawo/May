@@ -47,9 +47,15 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   private selectedToolId: string | undefined;
   private readonly toolDetailOverrides = new Map<string, boolean>();
   private readonly toolAnchors = new Map<string, ScrollRegion>();
+  private revealedReplyId: string | undefined;
+  private replyAnchor: ScrollRegion | undefined;
   private readonly theme: TuiTheme;
   private readonly toolRenderers: ToolRendererRegistry;
-  private readonly tailCache = new WeakMap<TranscriptItem, { key: string; lines: readonly string[] }>();
+  private readonly tailCache = new WeakMap<TranscriptItem, {
+    key: string;
+    lines: readonly string[];
+    replyStart?: number;
+  }>();
 
   constructor(
     private readonly store: TranscriptStore,
@@ -78,6 +84,19 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     return this.selectedToolId === undefined
       ? undefined
       : this.toolAnchors.get(this.selectedToolId);
+  }
+
+  /** 最近一次渲染中，当前最终回复正文的第一行。 */
+  get latestReplyAnchor(): ScrollRegion | undefined {
+    return this.revealedReplyId === this.store.latestReply?.id ? this.replyAnchor : undefined;
+  }
+
+  /** 保留最终回复的完整正文，使其开头可以通过滚动定位。 */
+  revealLatestReply(): boolean {
+    const reply = this.store.latestReply;
+    if (reply === undefined) return false;
+    this.revealedReplyId = reply.id;
+    return true;
   }
 
   setFocused(focused: boolean): void {
@@ -124,6 +143,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   }
 
   private renderItems(size: RenderSize, retainTail: boolean): RenderResult {
+    this.replyAnchor = undefined;
     if (this.store.items.length === 0) {
       return new Text(sanitizeTerminalText(this.options.emptyMessage ?? "No messages yet."), {
         style: this.theme.dim,
@@ -173,26 +193,45 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     const chunks: Array<{
       readonly item: TranscriptItem;
       readonly lines: readonly string[];
+      readonly replyStart?: number;
     }> = [];
     let remaining = size.height;
+    const latestReply = this.store.latestReply;
+    const revealedIndex = latestReply?.id === this.revealedReplyId
+      ? this.store.items.findIndex((item) => item.id === this.revealedReplyId)
+      : -1;
     for (let index = this.store.items.length - 1; index >= 0; index--) {
       const item = this.store.items[index]!;
       const separator = chunks.length === 0 ? 0 : 1;
       const available = remaining - separator;
-      if (available <= 0) break;
-      const key = `${this.toolRenderers.revision}:${size.width}:${size.height}:${this.reasoningVisible}:${item.kind === "tool" && this.isToolExpanded(item.id)}:${this.focused && item.id === this.selectedToolId}`;
+      const revealReply = item.kind === "assistant" && index === revealedIndex;
+      const keepForReply = revealedIndex >= 0 && index >= revealedIndex;
+      if (available <= 0 && !keepForReply) break;
+      const key = `${this.toolRenderers.revision}:${size.width}:${size.height}:${this.reasoningVisible}:${item.kind === "tool" && this.isToolExpanded(item.id)}:${this.focused && item.id === this.selectedToolId}:${revealReply}`;
       let cached = this.tailCache.get(item);
       if (cached?.key !== key) {
-        cached = { key, lines: this.renderItem(tailBoundItem(item, size.width, size.height), size.width, Number.MAX_SAFE_INTEGER).lines };
+        const bounded = tailBoundItem(item, size.width, size.height);
+        const renderedItem = revealReply && bounded.kind === "assistant" && item.kind === "assistant"
+          ? { ...bounded, text: item.text }
+          : bounded;
+        const lines = this.renderItem(renderedItem, size.width, Number.MAX_SAFE_INTEGER).lines;
+        const bodyLines = revealReply
+          ? new Markdown(item.text, { theme: this.theme.markdown })
+            .render({ width: size.width, height: Number.MAX_SAFE_INTEGER }).lines.length
+          : undefined;
+        cached = { key, lines,
+          ...(bodyLines === undefined ? {} : { replyStart: lines.length - bodyLines }) };
         this.tailCache.set(item, cached);
       }
       const rendered = cached.lines;
-      const visible = rendered.length <= available
-        ? rendered
-        : rendered.slice(-available);
-      chunks.unshift({ item, lines: visible });
+      const replyStart = cached.replyStart;
+      const cut = keepForReply && !revealReply ? 0
+        : Math.max(0, Math.min(rendered.length - available, replyStart ?? rendered.length));
+      const visible = rendered.slice(cut);
+      chunks.unshift({ item, lines: visible,
+        ...(replyStart === undefined ? {} : { replyStart: replyStart - cut }) });
       remaining -= visible.length + separator;
-      if (visible.length < rendered.length) break;
+      if (visible.length < rendered.length && (revealedIndex < 0 || index <= revealedIndex)) break;
     }
 
     const lines: string[] = [];
@@ -202,6 +241,9 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
       lines.push(...chunk.lines);
       if (chunk.item.kind === "tool") {
         this.toolAnchors.set(chunk.item.id, { start, end: start });
+      }
+      if (chunk.replyStart !== undefined) {
+        this.replyAnchor = { start: start + chunk.replyStart, end: start + chunk.replyStart };
       }
     }
     return { lines };
