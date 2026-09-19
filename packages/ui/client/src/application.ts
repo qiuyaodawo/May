@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { AgentApplicationEvent, AgentWorkspaceController } from "@may/application";
 import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice, type UiPageRequest, type UiFieldRequest } from "./protocol.js";
 import { UiProjection } from "./projection.js";
@@ -57,6 +57,9 @@ export class ApplicationUiHost implements UiHost {
     // Keep the selected/active entries available even beyond the recent-resource limit.
     const visibleSessions = sessions.filter((session, index) => index < 500 || session.id === viewingId || session.id === activeId);
     const resources = visibleSessions.map(s => ({ id: s.id, kind: "session" as const, title: s.title ?? s.preview?.slice(0, 72) ?? "新会话", status: s.id === activeId && running ? "running" : "idle", updatedAt: s.lastUsedAt }));
+    const resourcesVersion = createHash("sha256").update(JSON.stringify([...sessions]
+      .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))
+      .map(s => [s.id, s.createdAt, s.title ?? s.preview?.slice(0, 72) ?? "新会话"]))).digest("hex");
     const projected = new UiProjection(Infinity); projected.history(history);
     if (viewingActive) {
       // Durable completed blocks win; only the execution owner's live deltas fill gaps.
@@ -76,7 +79,7 @@ export class ApplicationUiHost implements UiHost {
       throw new UiError(409, "运行会话状态已改变，请刷新后重试。");
     }
     const page = historyPage(this.hostId, viewingId, [...projected.blocks.values()]);
-    return { version: 1, hostId: this.hostId, revision, product: this.options.product, resources,
+    return { version: 1, hostId: this.hostId, revision, product: this.options.product, resources, resourcesVersion,
       selectedId: viewingId, activeId, blocks: all ? [...projected.blocks.values()] : page.items,
       historyPage: { nextCursor: page.nextCursor, total: page.total }, reads: { resources: true, history: Boolean(this.app.readSessionHistory), fields: Boolean(this.app.readSessionHistory) },
       interactions, commands,

@@ -1,7 +1,37 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { InMemorySessionStore, SessionHistoryReader } from "@may/session";
-import { createSessionHistoryRetrievalTools } from "../dist/index.js";
+import { createSessionHistoryRetrievalTools, createSessionHistoryTool } from "../dist/index.js";
+
+test("history tools expose saved model content and withhold raw and legacy tool output", async () => {
+  const store = new InMemorySessionStore();
+  const reader = new SessionHistoryReader(store);
+  await store.append({ sessionId: "s", seq: 1, timestamp: 0, type: "session.created" });
+  for (const [index, content] of [[{ type: "text", text: "public-result-marker" }], [], undefined].entries()) {
+    await store.append({ sessionId: "s", seq: index + 2, timestamp: index, type: "tool.completed",
+      runId: "run", step: 1, call: { id: String(index), name: "read", input: {} },
+      output: { content: "raw-result-marker", _meta: { secret: "host-only-marker" } },
+      ...(content === undefined ? {} : { content }),
+    });
+  }
+  const source = { queryHistory: (query) => reader.query("s", query) };
+  const context = { signal: new AbortController().signal };
+  const history = createSessionHistoryTool({ source });
+  const [search, read] = createSessionHistoryRetrievalTools({ source: () => source });
+  const page = await history.execute(history.parse({ types: ["tool.completed"] }), context);
+  assert.doesNotMatch(JSON.stringify(page), /host-only-marker|raw-result-marker/);
+  assert.deepEqual(page.events[0].event.content, [{ type: "text", text: "public-result-marker" }]);
+  assert.deepEqual(page.events[1].event.content, []);
+  assert.match(page.events[2].event.content[0].text, /no saved model-visible content/);
+  assert.equal((await search.execute(search.parse({ query: "host-only-marker" }), context)).matches.length, 0);
+  assert.equal((await search.execute(search.parse({ query: "public-result-marker" }), context)).matches[0].seq, 2);
+  for (const seq of [2, 3, 4]) {
+    const record = await read.execute(read.parse({ seq }), context);
+    assert.doesNotMatch(record.text, /host-only-marker|raw-result-marker/);
+    assert.equal(Object.hasOwn(JSON.parse(record.text), "output"), false);
+  }
+  assert.match(JSON.stringify(await store.read("s")), /host-only-marker/);
+});
 
 test("searches beyond previews and reconstructs large Unicode records without truncation", async () => {
   const store = new InMemorySessionStore();

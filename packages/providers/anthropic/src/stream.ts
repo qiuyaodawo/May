@@ -4,6 +4,7 @@ import type {
   ToolCall,
   Usage,
 } from "@may/core";
+import { readSseData } from "@may/provider-openai-compatible/http";
 import {
   AnthropicFinishReasonError,
   AnthropicProtocolError,
@@ -17,7 +18,6 @@ import {
   type AnthropicThinkingBlock,
   type AnthropicToolUseBlock,
 } from "./protocol.js";
-import { readAnthropicSseData } from "./sse.js";
 
 interface PendingBase {
   stopped: boolean;
@@ -62,7 +62,12 @@ export async function* streamAnthropicResponse(
   let inputTokens: number | undefined;
   let outputTokens: number | undefined;
 
-  for await (const data of readAnthropicSseData(response, signal)) {
+  for await (const data of readSseData(
+    response,
+    signal,
+    (message, options) => new AnthropicProtocolError(message, options),
+    "Anthropic",
+  )) {
     const event = parseEvent(data);
 
     if (event.type === "ping") continue;

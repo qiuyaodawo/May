@@ -23,7 +23,8 @@
     "test:integration": "pnpm --filter @may/config run build && pnpm run build && node --test test-integration/*.test.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*"
+    "@may/core": "workspace:*",
+    "@may/provider-openai-compatible": "workspace:*"
   },
   "devDependencies": {
     "@may/config": "workspace:*"

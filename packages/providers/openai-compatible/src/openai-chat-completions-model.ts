@@ -19,6 +19,7 @@ import type {
   OpenAICompatibleToolDefinition,
 } from "./protocol.js";
 import { streamOpenAICompatibleResponse } from "./stream.js";
+import { parseRetryAfterMs } from "./http.js";
 
 /** Provider/model metadata determines concrete supported values. */
 export type OpenAIChatCompletionsReasoningEffort = string;
@@ -165,16 +166,4 @@ async function createApiError(
   const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
   if (retryAfterMs !== undefined) options.retryAfterMs = retryAfterMs;
   return new OpenAIChatCompletionsApiError(options);
-}
-
-function parseRetryAfterMs(value: string | null): number | undefined {
-  if (value === null) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.round(seconds * 1000);
-  }
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp)
-    ? Math.max(0, timestamp - Date.now())
-    : undefined;
 }

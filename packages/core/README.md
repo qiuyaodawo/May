@@ -212,7 +212,9 @@ include other execution-affecting fields and endpoint/account in their version.
 
 `Tool.resultContent(output)` optionally projects a result to model-visible
 `ContentPart[]` (including media). Run snapshots capture the callback; raw output
-remains in tool events. Projection failures become tool failures.
+remains in `tool.completed.output`, and `tool.completed.content` contains the
+model-visible projection. Both fields are included in the awaited tool checkpoint.
+Projection failures become tool failures.
 
 `MayOptions.toolScope()` snapshots optional trusted string labels per Run/continue
 as `ToolExecutionContext.scope`. Labels are host-only routing data, not model

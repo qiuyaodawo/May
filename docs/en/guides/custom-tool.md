@@ -249,7 +249,12 @@ include other execution-affecting fields and endpoint/account in their version.
 
 `Tool.resultContent(output)` optionally projects successful output to model-visible
 `ContentPart[]`, instead of the default JSON block. It is captured by Run snapshots.
-Raw output remains in `tool.completed`; projection errors become tool failures.
+`tool.completed.output` retains raw output for the host; `tool.completed.content`
+retains the model-visible projection, including media and empty arrays. The tool
+checkpoint persists both fields. Session replay and model-facing history tools
+use saved `content`. Legacy records without it produce an explicit unavailable-content
+message; their raw output remains accessible through host Session history APIs.
+Projection errors become tool failures.
 Validate untrusted content and omit host-only metadata from the projection.
 
 `MayOptions.toolScope()` optionally returns trusted host-only string labels. Core

@@ -227,7 +227,12 @@ is available as raw text chunks, not a newly implemented large-Diff renderer.
 
 The sidebar searches all session titles or task prompts and pages resources by
 creation time (with a stable ID tie-breaker); the current selection may be pinned
-in addition to the page. Within a resource, **Search content** searches committed
+in addition to the page. Resource additions, deletions and title changes refresh
+the loaded sidebar pages while preserving the search query and number of loaded
+pages. Hosts can provide `snapshot.resourcesVersion` for the complete catalog's
+membership, pagination order and searchable text, including entries outside the
+recent-resource window. Hosts without this field refresh when the resource IDs or
+titles in the snapshot change. Within a resource, **Search content** searches committed
 user/assistant text, reasoning, tool input/output, diagnostics and presentation
 text, including text beyond preview limits. Results contain matching blocks, not
 a complete run, and are read-only snapshots refreshed by searching again. Clear
@@ -258,6 +263,13 @@ in-memory fixture with 520 transcript blocks and 56 sessions. Prompts containing
 while streaming. It uses no provider, files or real tools. Type `stop` to close it.
 
 ## Browser acceptance
+
+`pnpm --filter @may/web-ui exec playwright install chromium` installs the browser
+for `pnpm --filter @may/web-ui test:browser`. This automated test checks DOM text
+and controls against the real workspace, session catalog, UI host and HTTP service.
+It covers 520 sessions, additions, deletions outside the recent-resource window,
+renames, retained pagination, search changes and expired cursors. It makes no model
+requests and saves no screenshots. Temporary browser files stay under `review/`.
 
 Reading-workbench acceptance used 520 transcript blocks, 56 browser-visible
 sessions, and an API fixture with more than 500 catalog entries. It verified

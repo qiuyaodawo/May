@@ -13,6 +13,12 @@ filters, ordering, and bounded output. Large events are previewed, and
 `context.compacted` replacement messages are omitted to avoid recursively
 returning an entire model context.
 
+All three history tools expose the saved model-visible `content` of successful
+tool events and omit raw `output`. Legacy tool events without saved `content`
+provide an explicit unavailable-content message. Raw results remain available to
+the host through Session history APIs. Search uses the same projected event data
+as page and record reads.
+
 `createSessionHistoryRetrievalTools({ source: () => session })` adds:
 
 - `session_history_search`: literal case-insensitive search across complete

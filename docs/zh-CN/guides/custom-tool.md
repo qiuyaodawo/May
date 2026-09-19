@@ -238,7 +238,10 @@ schema 副本。目录更新仅影响下一次 Run。普通 registry 查询/`clo
 优先。宿主适配器应将其他影响执行的字段以及端点/账户身份包含在版本中。
 
 `Tool.resultContent(output)` 可选地将成功输出投影为模型可见 `ContentPart[]`，替代
-默认 JSON 块；该回调也由 Run 快照捕获。`tool.completed` 保留原始输出，投影异常
+默认 JSON 内容；该回调也由 Run 快照捕获。`tool.completed.output` 为宿主保留原始
+输出，`tool.completed.content` 保存模型可见投影，包括媒体和空数组。工具检查点
+持久化这两个字段。Session 恢复和模型历史工具使用已保存的 `content`。旧记录缺少
+该字段时返回明确的内容不可用提示；宿主仍可通过 Session 历史 API 读取原始输出。投影异常
 作为工具失败处理。应验证不可信内容，避免投影仅宿主可见的元数据。
 
 `MayOptions.toolScope()` 可返回可信、仅 Host 使用的字符串标签。Core 每个

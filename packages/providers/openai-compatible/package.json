@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "import": "./dist/http.js"
     }
   },
   "files": [
@@ -22,7 +26,8 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*"
+    "@may/core": "workspace:*",
+    "eventsource-parser": "3.1.1"
   },
   "engines": {
     "node": ">=22"

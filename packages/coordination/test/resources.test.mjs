@@ -102,12 +102,18 @@ test("task workspaces share one filtered baseline, never alter source, and prese
   await writeFile(join(first.directory, "src", "main.ts"), "task edit");
   await writeFile(join(source, "src", "main.ts"), "later source edit");
   const second = await manager.prepare("second");
+  const journalPath = join(directory, "workspaces.jsonl");
+  const journal = await readFile(journalPath, "utf8");
+  const repeated = await Promise.all(Array.from({ length: 10 }, () => manager.prepare("first")));
+  assert.ok(repeated.every((workspace) => workspace.directory === first.directory));
+  assert.equal(await readFile(journalPath, "utf8"), journal);
   assert.equal(await readFile(join(second.directory, "src", "main.ts"), "utf8"), "original");
   assert.equal(await readFile(join(source, "src", "main.ts"), "utf8"), "later source edit");
   assert.deepEqual((await manager.changes("first")).map(({ path, kind }) => ({ path, kind })), [{ path: "src/main.ts", kind: "modified" }]);
   await manager.close();
   manager = await TaskWorkspaceManager.open({ sourceDirectory: source, directory });
   assert.deepEqual(await manager.prepare("first"), first);
+  assert.equal(await readFile(journalPath, "utf8"), journal);
   assert.equal(await readFile(join(first.directory, "src", "main.ts"), "utf8"), "task edit");
   await manager.close();
   const forbidden = join(source, "must-not-create");

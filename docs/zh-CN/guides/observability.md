@@ -109,6 +109,9 @@ Processor 拥有异步导出和生命周期。需要等待已排队 span 时调�
 owner 结束时调用一次 `shutdown()`。关闭一个 application 不得关闭仍被其他 application
 共享的 processor。
 
+`BatchSpanProcessor` 通过 `onError` 报告 exporter 的同步及异步错误，释放失败的批次，
+并继续导出后续批次。排队的导出尝试结束后，`forceFlush()` 和 `shutdown()` 完成。
+
 外部 tracing 系统应通过自定义 `SpanExporter` 或 `SpanProcessor` 集成，provider SDK
 类型不能进入 Core。
 

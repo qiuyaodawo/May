@@ -74,6 +74,8 @@ export interface UiSnapshot {
   readonly revision: number;
   readonly product: UiProduct;
   readonly resources: readonly UiResource[];
+  /** 完整资源目录的成员、分页顺序或搜索文本变化时更新。 */
+  readonly resourcesVersion?: string;
   readonly selectedId: string | null;
   /** Workspace execution owner, independent of this client's selected history. Absent for task hosts. */
   readonly activeId?: string;

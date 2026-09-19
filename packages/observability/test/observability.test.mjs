@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { InMemoryContext, May } from "@may/core";
 import {
@@ -182,6 +184,19 @@ test("rotates JSONL spans by local date and retains sixty calendar days", async 
     await readFile(join(directory, "traces-2026-09-03.jsonl"), "utf8"),
     /"name":"today"/u,
   );
+});
+
+test("batch export completes after real synchronous and asynchronous write failures", () => {
+  const fixture = fileURLToPath(new URL("./fixtures/export-failure.mjs", import.meta.url));
+  for (const mode of ["sync", "async"]) {
+    const result = spawnSync(process.execPath, [fixture, mode], {
+      encoding: "utf8",
+      timeout: 10_000,
+      windowsHide: true,
+    });
+    assert.equal(result.error, undefined, `${mode}: ${result.error?.message}`);
+    assert.equal(result.status, 0, `${mode}: ${result.stderr}\n${result.stdout}`);
+  }
 });
 
 function one(spans, name) {

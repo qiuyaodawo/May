@@ -9,6 +9,10 @@ test("yield closes the complete tool step and awaits its own checkpoint before r
       model: { async *stream() { calls++; yield { type: "response.completed", message: { role: "assistant", content: [], toolCalls: [{ id: "work", name: "work", input: {} }] } }; } },
     });
     const run = may.run({ input: "go", shouldYield: () => true, checkpoint: async (event) => {
+      if (event.type === "tool.completed") {
+        assert.equal(event.output, "done");
+        assert.deepEqual(event.content, [{ type: "json", value: "done" }]);
+      }
       if (event.type !== "run.yielded") return;
       persisted++;
       assert.equal((await context.snapshot()).messages.at(-1).role, "tool");
@@ -19,6 +23,7 @@ test("yield closes the complete tool step and awaits its own checkpoint before r
     else assert.equal((await run.result).finishReason, "yielded");
     await observer;
     assert.equal(events.at(-1).type, fail ? "run.failed" : "run.yielded");
+    assert.deepEqual(events.find((event) => event.type === "tool.completed").content, [{ type: "json", value: "done" }]);
     assert.equal(events.some((event) => event.type === "run.completed" || event.type === "run.cancelled"), false);
     assert.equal(calls, 1); assert.equal(persisted, 1);
   }

@@ -1,17 +1,16 @@
-import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { MaybeClawHost } from "./host.js";
 import { validateId } from "./types.js";
 import { webUiAssets } from "@may/web-ui/assets";
-import { createUiRouter } from "@may/ui-client/server";
+import { authorized, createUiRouter, secureHeaders, sendJson as json, trustedRequest, validateToken } from "@may/ui-client/server";
 import { MaybeClawUiHost } from "./ui-host.js";
 
 export interface ServerOptions { host: MaybeClawHost; token: string; port?: number }
 
 /** Loopback-only operator API. The token is intentionally not accepted in URLs/cookies. */
 export async function startControlServer(options: ServerOptions) {
-  if (!/^[\x21-\x7e]{32,256}$/.test(options.token)) throw new Error("Control token must be 32..256 printable non-space ASCII characters");
+  validateToken(options.token);
   const port = options.port ?? 3939;
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
   const assets = await webUiAssets("MaybeClaw", "task");
@@ -31,19 +30,14 @@ export async function startControlServer(options: ServerOptions) {
   server.keepAliveTimeout = 3000;
   server.maxConnections = 64;
   async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    res.setHeader("cache-control", "no-store");
-    res.setHeader("x-content-type-options", "nosniff");
-    res.setHeader("referrer-policy", "no-referrer");
-    res.setHeader("content-security-policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
-    if (req.headers.host !== new URL(origin).host || (req.headers.origin !== undefined && req.headers.origin !== origin)) { json(res, 403, { error: "Untrusted origin or host" }); return; }
+    secureHeaders(res);
+    if (!trustedRequest(req, origin)) { json(res, 403, { error: "Untrusted origin or host" }); return; }
     const path = req.url ?? "/";
     const asset = assets.get(path);
     if (req.method === "GET" && asset) {
       res.writeHead(200, { "content-type": asset.type }); res.end(asset.body); return;
     }
-    const supplied = req.headers.authorization ?? "";
-    const expected = `Bearer ${options.token}`;
-    if (Buffer.byteLength(supplied) !== Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) { json(res, 401, { error: "Operator token required" }); return; }
+    if (!authorized(req, options.token)) { json(res, 401, { error: "Operator token required" }); return; }
     if (await ui.route(req, res)) return;
     if (req.method === "GET" && path === "/api/health") { json(res, 200, options.host.status()); return; }
     if (req.method === "GET" && path === "/api/tasks") { json(res, 200, await options.host.claw.store.list()); return; }
@@ -84,7 +78,6 @@ export async function startControlServer(options: ServerOptions) {
     await stopped;
   })() };
 }
-function json(res: ServerResponse, status: number, value: unknown): void { res.writeHead(status, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(value)); }
 async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   if (req.headers["content-type"]?.split(";")[0]?.trim() !== "application/json") throw new Error("JSON required");
   let size = 0; const chunks: Buffer[] = [];

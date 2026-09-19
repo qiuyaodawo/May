@@ -296,7 +296,9 @@ function resolvePnpmCommand() {
 }
 
 function runPnpm(args, options = {}) {
-  return run(process.execPath, [pnpm, ...args], options);
+  return /\.[cm]?js$/iu.test(pnpm)
+    ? run(process.execPath, [pnpm, ...args], options)
+    : run(pnpm, args, options);
 }
 
 function run(command, args, options = {}) {

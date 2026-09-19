@@ -116,6 +116,14 @@ Session history contains only durable facts: submitted input, complete
 assistant messages, approvals, tool outcomes, and run boundaries. Streaming
 deltas and other transient progress events remain on the live run stream.
 
+Successful tool events store raw `output` for host access and the original
+model-visible `content` for replay. `sessionToolResultContent(event)` returns that
+saved content, including media and deliberately empty projections. Legacy events
+without `content` produce an explicit unavailable-content message during replay
+and model-facing history queries. Their original `output` remains accessible through
+`Session.history()` and `Session.queryHistory()`; hosts must review and explicitly
+provide any old result needed by the model.
+
 Applications may attach versioned display metadata to a tool call with
 `session.recordToolPresentation(...)`. Session persists and exposes these
 `tool.presentation` events, but deliberately ignores them when rebuilding the

@@ -3,7 +3,7 @@ import { commandArgs, UiError, type UiCommand, type UiHost, type UiReceipt, type
 import { UiProjection, displayValue } from "@may/ui-client/projection";
 import { historyPage, readPage, recordedField, fieldPage, searchHistory } from "@may/ui-client/reading";
 import type { MaybeClawHost } from "./host.js";
-import { isTerminal } from "./types.js";
+import { digest, isTerminal } from "./types.js";
 
 /** Task adapter: browsing a task never switches a Session or changes execution ownership. */
 export class MaybeClawUiHost implements UiHost {
@@ -49,6 +49,7 @@ export class MaybeClawUiHost implements UiHost {
     return { version: 1, hostId: this.hostId, revision,
       product: { id: "maybeclaw", title: "MaybeClaw", resourceKind: "task", subtitle: "提交一个有明确结果的任务。离开页面后，工作仍由本地宿主继续。", suggestions: ["帮我制定一份学习计划", "梳理这个问题的关键假设", "把我的想法整理成行动清单"] },
       resources: [...tasks].sort((a, b) => b.createdAt - a.createdAt).filter((t, index) => index < 500 || t.id === task?.id).map(t => ({ id: t.id, kind: "task", title: t.spec.prompt.slice(0, 72), status: t.status, updatedAt: t.updatedAt })),
+      resourcesVersion: digest([...tasks].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id)).map(t => [t.id, t.createdAt, t.spec.prompt])),
       selectedId: task?.id ?? null,
       blocks: all ? blocks : page.items, historyPage: { nextCursor: page.nextCursor, total: page.total },
       reads: { resources: true, history: true, fields: true },

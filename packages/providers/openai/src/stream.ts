@@ -5,6 +5,7 @@ import type {
   ToolCall,
   Usage,
 } from "@may/core";
+import { readSseData } from "@may/provider-openai-compatible/http";
 
 import {
   OpenAIResponsesError,
@@ -14,14 +15,18 @@ import {
   OPENAI_RESPONSES_MODEL_STATE_TYPE,
   type OpenAIResponsesUsage,
 } from "./protocol.js";
-import { readOpenAIResponsesSse } from "./sse.js";
 
 export async function* streamOpenAIResponse(
   response: Response,
   signal: AbortSignal,
 ): AsyncIterable<ModelEvent> {
   let completed: unknown;
-  for await (const data of readOpenAIResponsesSse(response, signal)) {
+  for await (const data of readSseData(
+    response,
+    signal,
+    (message, options) => new OpenAIResponsesProtocolError(message, options),
+    "OpenAI Responses",
+  )) {
     if (data === "[DONE]") continue;
     const event = parseJson(data, "stream event");
     const type = requireString(event.type, "stream event.type");

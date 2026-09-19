@@ -59,6 +59,11 @@ exposes `readResources`, `readHistory` and `readField`. These authenticated GETs
 require the current host epoch; resource-scoped reads reject stale client selections.
 No commands or runtime transitions are involved. `snapshot.historyPage` provides
 the initial older-history cursor. Page DTOs contain items, total and nextCursor.
+`snapshot.resourcesVersion` optionally identifies changes to the complete resource
+catalog's membership, pagination order and searchable text. Resource hosts update
+it for entries outside the snapshot's recent-resource window as well. The shared
+Web shell refreshes its loaded resource pages when this value changes and retains
+the current search query and page count.
 
 `@may/ui-client/reading` provides shared host-side pagination, safe field extraction
 and chunk versioning. Pages contain at most 50 records with a soft 256K-character

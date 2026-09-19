@@ -781,7 +781,7 @@ export class May {
               if (pending.closed) return outcome;
               pending.outcomes[index] = outcome;
               await checkpoint?.(outcome.type === "completed"
-                ? { type: "tool.completed", runId, step, call, output: outcome.output }
+                ? { type: "tool.completed", runId, step, call, output: outcome.output, content: outcome.message.content }
                 : { type: "tool.failed", runId, step, call, error: outcome.error });
               return outcome;
             });
@@ -991,6 +991,7 @@ function emitToolOutcomes(
         step,
         call: outcome.call,
         output: outcome.output,
+        content: outcome.message.content,
       });
     } else {
       emit({

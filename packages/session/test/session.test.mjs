@@ -115,6 +115,8 @@ test("serializes submissions and preserves context between runs", async () => {
 
 test("stores successful and failed tool outcomes", async () => {
   const store = new InMemorySessionStore();
+  const output = { value: 1, _meta: { owner: "host-only-result" } };
+  const projected = [{ type: "text", text: "Public result" }, { type: "json", value: { value: 1 } }];
   let step = 0;
   const model = {
     async *stream() {
@@ -151,8 +153,9 @@ test("stores successful and failed tool outcomes", async () => {
           description: "Succeeds",
           inputSchema: { type: "object" },
           async execute() {
-            return { value: 1 };
+            return output;
           },
+          resultContent() { return projected; },
         },
         {
           name: "fail",
@@ -182,7 +185,8 @@ test("stores successful and failed tool outcomes", async () => {
   );
 
   assert.equal(toolEvents[0].type, "tool.completed");
-  assert.deepEqual(toolEvents[0].output, { value: 1 });
+  assert.deepEqual(toolEvents[0].output, output);
+  assert.deepEqual(toolEvents[0].content, projected);
   assert.equal(toolEvents[1].type, "tool.failed");
   assert.equal(toolEvents[1].error.message, "tool failed");
   assert.deepEqual(
@@ -206,7 +210,8 @@ test("stores successful and failed tool outcomes", async () => {
     "tool",
     "assistant",
   ]);
-  assert.deepEqual(replayed[2].content[0].value, { value: 1 });
+  assert.deepEqual(replayed[2].content, projected);
+  assert.doesNotMatch(JSON.stringify(replayed), /host-only-result/);
   assert.equal(replayed[3].isError, true);
   assert.equal(replayed[3].content[0].value.message, "tool failed");
 });

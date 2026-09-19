@@ -76,10 +76,12 @@ export class ResourceJournal<T extends Revision> {
     return this.serial.run(() => { this.check(); return structuredClone(this.current); });
   }
 
-  transact(update: (state: T) => T | Promise<T>): Promise<T> {
+  transact(update: (state: T) => T | undefined | Promise<T | undefined>): Promise<T> {
     return this.serial.run(async () => {
       this.check();
-      const next = { ...await update(structuredClone(this.current)), revision: this.current.revision + 1 };
+      const updated = await update(structuredClone(this.current));
+      if (updated === undefined) return structuredClone(this.current);
+      const next = { ...updated, revision: this.current.revision + 1 };
       this.validate(next);
       const line = `${JSON.stringify(next)}\n`;
       const size = Buffer.byteLength(line);

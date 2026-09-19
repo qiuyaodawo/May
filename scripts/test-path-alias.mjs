@@ -21,7 +21,8 @@ try {
   assert.notEqual(alias, await realpath(alias), "The test needs a non-canonical temporary path");
   console.log("Running all workspace tests with an aliased temporary directory");
   const code = await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [pnpm, "run", "test"], {
+    const script = /\.[cm]?js$/iu.test(pnpm);
+    const child = spawn(script ? process.execPath : pnpm, script ? [pnpm, "run", "test"] : ["run", "test"], {
       cwd: repository,
       env: { ...process.env, TEMP: alias, TMP: alias, TMPDIR: alias },
       stdio: "inherit",

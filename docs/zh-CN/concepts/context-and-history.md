@@ -82,10 +82,11 @@ MaybeCode 的 `history-reference` 模式使用工作笔记和按需历史查询�
 - 新视图保留宿主指令、其他 system 消息、最新用户请求和笔记，不保留整轮工具记录。
   笔记缺失、过时、交接内容过大或工具恢复未处理时，拒绝重置。检查能确认笔记的新旧，
   不能证明模型写下的内容准确。
-- 完整事件仍可查询。`session_history_search` 每次最多扫描 50 条事件，返回最多
+- 投影后的事件仍可查询。`session_history_search` 每次最多扫描 50 条事件，返回最多
   10 个不区分大小写的字面匹配；空页也应根据游标继续。`session_history_read` 按
   序号分段读取完整记录，默认 2000、最多 4000 个 UTF-16 代码单元，使用返回的
   `nextOffset` 继续。查询不返回压缩事件中的替换视图。
+  成功工具事件提供保存的模型可见 `content`；宿主历史 API 仍可读取原始 `output`。
 
 只有自动历史引用模式暴露 `new_context` 并加入主动指导和提醒。其他模式也提供查询
 与笔记工具，便于准备手动历史重置。自定义 Context 需要支持延迟压缩和回滚。检查点
@@ -102,6 +103,11 @@ MaybeCode 的 `history-reference` 模式使用工作笔记和按需历史查询�
 - `tool.completed` 与 `tool.failed` 恢复 tool message；
 - `context.compacted` 替换截至该点重建的全部消息；
 - 已取消 Run 中，若 assistant tool call 没有持久化 outcome，则补充合成取消消息。
+
+`tool.completed.content` 保存执行当时的模型可见工具结果，包括媒体和空数组。恢复
+过程和三个模型历史工具共用 `sessionToolResultContent(event)`。旧记录缺少这个字段
+时提供明确的内容不可用提示。`Session.history()` 与 `Session.queryHistory()` 仍为
+宿主提供原始 `output`；需要把旧结果加入模型上下文时，由宿主明确审核并添加内容。
 
 回放还会向 runtime factory 返回最近可用的 provider input-token 测量。压缩 checkpoint
 会清除更早的测量，因为被测量的消息前缀已经变化。

@@ -1,6 +1,7 @@
 import type { Tool } from "@may/core";
 import {
   SESSION_EVENT_TYPES,
+  sessionToolResultContent,
   type SessionEvent,
   type SessionEventType,
   type SessionHistoryPage,
@@ -254,6 +255,10 @@ function createOutput(
 
 /** Omit replacement views to avoid recursively returning compacted history. */
 export function sessionHistoryEventContent(event: SessionEvent): unknown {
+  if (event.type === "tool.completed") {
+    const { output, ...details } = event;
+    return { ...details, content: sessionToolResultContent(event) };
+  }
   if (event.type === "context.compacted") {
     const { messages, ...details } = event;
     return {

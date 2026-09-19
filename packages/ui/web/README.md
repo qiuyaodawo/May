@@ -84,6 +84,17 @@ resource changes; browsing and reading never switch the runtime's execution targ
 
 The sidebar pages/searches all resource titles (task prompts for task hosts), while
 content search and older-record loading use the selected host's read-only APIs.
+Resource additions, deletions and title changes refresh the loaded sidebar pages
+while preserving the search query and number of loaded pages. Hosts publish an
+optional `snapshot.resourcesVersion` for their complete resource catalog; it covers
+membership, pagination order and searchable text, including entries outside the
+snapshot's recent-resource window.
 Search results are query snapshots, not live replacement approvals. Hosts without
 read capabilities retain their basic snapshot UI; field tabs stay disabled.
 Run `node examples/web-ui/reading.mjs` after building for a large offline fixture.
+
+Run `pnpm --filter @may/web-ui exec playwright install chromium`, then
+`pnpm --filter @may/web-ui test:browser` for Chromium DOM checks against the real
+workspace, catalog, UI host and HTTP service. The test creates 520 sessions and
+checks additions, deletions, renames, pagination and search. It makes no model
+requests and saves no screenshots. Temporary browser files stay under `review/`.

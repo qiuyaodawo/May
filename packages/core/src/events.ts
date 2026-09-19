@@ -1,4 +1,4 @@
-import type { AssistantMessage, ToolCall, Usage } from "./types.js";
+import type { AssistantMessage, ContentPart, ToolCall, Usage } from "./types.js";
 import type { RunBudgetSnapshot } from "./budget.js";
 
 export interface SerializedError {
@@ -63,6 +63,8 @@ export type MayEventPayload =
       step: number;
       call: ToolCall;
       output: unknown;
+      /** 本次执行提供给模型的内容，供持久化和恢复使用。 */
+      content: ContentPart[];
     }
   | {
       type: "tool.failed";

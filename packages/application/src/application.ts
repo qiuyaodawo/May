@@ -22,7 +22,6 @@ import {
   type Message,
   type Model,
   type RunHandle,
-  type RunOptions,
   type RunBudget,
   type Tool,
   type ToolExecutor,

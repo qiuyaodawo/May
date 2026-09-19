@@ -40,7 +40,9 @@ protocol and turns them into Run events.
 
 `model.completed` contains the complete assistant message, so correctness does
 not depend on retaining every earlier delta. Tool terminal events likewise
-contain the final output or serialized error.
+contain the final output or serialized error. Successful tool events include
+raw `output` for the host and model-visible `content` for durable replay; model
+history tools expose the saved `content`.
 
 ### `PermissionEvent`
 

@@ -23,6 +23,7 @@ import type {
   SessionToolPresentation,
   SessionRecovery,
 } from "./events.js";
+import { sessionToolResultContent } from "./events.js";
 import {
   SessionHistoryReader,
   type SessionHistoryQuery,
@@ -672,7 +673,7 @@ function replaySession(events: readonly SessionEvent[]): {
           role: "tool",
           toolCallId: event.call.id,
           name: event.call.name,
-          content: [{ type: "json", value: event.output }],
+          content: sessionToolResultContent(event),
         });
         resolvePendingTool(pendingTools, event.runId, event.step, event.call.id);
         break;
@@ -809,6 +810,7 @@ function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
         step: event.step,
         call: event.call,
         output: event.output,
+        content: event.content,
       };
     case "tool.failed":
       return {

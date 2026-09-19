@@ -122,6 +122,9 @@ even if the source later changes. Turns, handoffs and explicit retries of that
 task retain its copy; there is no automatic rollback. The user's checkout is never
 modified. There is no automatic Git operation, merge, deletion or write-back.
 
+Repeated `prepare(task.id)` calls validate the existing task directory and return
+its workspace without appending a journal record. Concurrent calls are serialized.
+
 Defaults: 10,000 files, 64 MiB in one snapshot, 128 task copies. All hidden basenames,
 dependency/build/cache/data directories, common credential basenames and key/certificate
 files are excluded. `excludeNames` adds exclusions but does not remove the built-ins.

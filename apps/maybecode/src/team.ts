@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, open, readFile, readdir, realpath, rename, stat } from "node:fs/promises";
+import { lstat, open, readFile, readdir, realpath, rename, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { defineAgent } from "@may/application";
 import { createReadTool } from "@may/coding-tools";
-import { loadMayConfig, type MayConfig } from "@may/config";
+import { loadMayConfig } from "@may/config";
 import {
   CoordinationRuntime, createApplicationAgent, FileArtifactStore, FileSharedBudget, TaskWorkspaceManager,
   type CoordinationAgent, type CoordinationSnapshot, type TaskExecution,
@@ -48,38 +48,23 @@ export async function runMaybeCodeTeamCommand(command: MaybeCodeTeamCommand, dep
   const path = join(resolve(command.dataDirectory ?? getDefaultMaybeCodeDataDirectory()), "teams", command.value, "manifest.json");
   const manifest = JSON.parse(await readFile(path, "utf8")) as { version?: string };
   if (manifest.version === "maybecode-team-v2") return (await import("./team-v2.js")).runTeamV2Command(command, dependencies);
-  if (!["resume", "status", "cancel"].includes(command.action)) throw new MaybeCodeUsageError("Legacy v1 teams retain read-only resume/status/cancel. New controls require a new v2 team; authority is never silently upgraded.");
-  return runLegacyMaybeCodeTeamCommand(command, dependencies);
+  const action = command.action;
+  if (action !== "resume" && action !== "status" && action !== "cancel") throw new MaybeCodeUsageError("Legacy v1 teams retain read-only resume/status/cancel. New controls require a new v2 team; authority is never silently upgraded.");
+  return runLegacyMaybeCodeTeamCommand({ ...command, action }, dependencies);
 }
 
+type LegacyTeamCommand = Pick<MaybeCodeTeamCommand, "value" | "dataDirectory"> & {
+  readonly action: "resume" | "status" | "cancel";
+};
+
 /** Preserve legacy permissions and durable identities; new features use a versioned manifest. */
-async function runLegacyMaybeCodeTeamCommand(command: MaybeCodeTeamCommand, dependencies: RunMaybeCodeTeamDependencies): Promise<number> {
+async function runLegacyMaybeCodeTeamCommand(command: LegacyTeamCommand, dependencies: RunMaybeCodeTeamDependencies): Promise<number> {
   const data = resolve(command.dataDirectory ?? getDefaultMaybeCodeDataDirectory(), "teams");
-  const id = command.action === "run" ? randomUUID() : command.value;
+  const id = command.value;
   if (!/^[A-Za-z0-9_-]{1,128}$/u.test(id)) throw new MaybeCodeUsageError("Invalid team id");
   const directory = join(data, id);
   const manifestPath = join(directory, "manifest.json");
-  let manifest: TeamManifest;
-  let config: MayConfig | undefined;
-  if (command.action === "run") {
-    if (Buffer.byteLength(command.value) > 32_768) throw new MaybeCodeUsageError("Team prompt exceeds 32768 bytes");
-    const workspace = await realpath(resolve(command.workspace ?? process.cwd()));
-    if (!(await stat(workspace)).isDirectory()) throw new MaybeCodeUsageError("Team workspace must be a directory");
-    if (inside(workspace, directory)) throw new MaybeCodeUsageError("Team data directory must be outside the source workspace");
-    config = await (dependencies.loadConfig ?? loadMayConfig)(command.configPath ? { path: command.configPath } : {});
-    const selection = selectMaybeCodeModel(config, command.model ? { model: command.model } : {});
-    manifest = {
-      format: 1, version: VERSION, id, createdAt: new Date().toISOString(), workspace,
-      configPath: resolve(config.path), model: selection.profile, modelFingerprint: fingerprint(selection), prompt: command.value,
-      maxModelCalls: command.maxModelCalls ?? 32, maxTotalTokens: command.maxTotalTokens ?? 524_288,
-      maxConcurrent: command.maxConcurrent ?? 2,
-    };
-    if (manifest.maxTotalTokens < RESERVATION_TOKENS) throw new MaybeCodeUsageError(`--max-total-tokens must be at least ${RESERVATION_TOKENS} for the per-call reservation`);
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    await writeDurable(manifestPath, manifest, "wx");
-  } else {
-    manifest = await readManifest(manifestPath, id);
-  }
+  const manifest = await readManifest(manifestPath, id);
   const write = (text: string) => dependencies.write(terminalSafe(text));
   if (command.action === "status") {
     write(`Team ${id}\nWorkspace: ${manifest.workspace}\nModel profile: ${manifest.model}\n`);
@@ -89,12 +74,12 @@ async function runLegacyMaybeCodeTeamCommand(command: MaybeCodeTeamCommand, depe
     return 0;
   }
   if (command.action === "cancel") {
-    await writeDurable(join(directory, "cancel.request.json"), { id, requestedAt: new Date().toISOString() }, "w");
+    await writeDurable(join(directory, "cancel.request.json"), { id, requestedAt: new Date().toISOString() });
     write(`Cancellation requested for ${id}. The active owner will consume it; otherwise resume the team to record cancellation.\n`);
     return 0;
   }
 
-  config ??= await (dependencies.loadConfig ?? loadMayConfig)({ path: manifest.configPath });
+  const config = await (dependencies.loadConfig ?? loadMayConfig)({ path: manifest.configPath });
   const selected = selectMaybeCodeModel(config, { model: manifest.model });
   if (fingerprint(selected) !== manifest.modelFingerprint) throw new Error("Team model configuration changed; restore the original profile before resuming");
   // Explicit limits replace no caller defaults: resolveRunBudget keeps configured limits non-loosening.
@@ -168,15 +153,7 @@ async function runLegacyMaybeCodeTeamCommand(command: MaybeCodeTeamCommand, depe
         authorizeMessage: () => true,
       },
     };
-    runtime = command.action === "run" ? await CoordinationRuntime.create({
-      ...options, tasks: [
-        { id: "analysis", agent: "worker", input: `Investigate the user's task independently. Inspect relevant files and identify a concrete approach with evidence. Do not change files.\n\nUser task:\n${manifest.prompt}` },
-        { id: "review", agent: "worker", input: `Independently review the user's task for risks, edge cases, and validation needs. Inspect relevant files; provide evidence and practical recommendations. Do not change files.\n\nUser task:\n${manifest.prompt}` },
-        { id: "summary", agent: "supervisor", dependsOn: ["analysis", "review"], input: manifest.prompt },
-      ],
-      limits: { maxConcurrent: manifest.maxConcurrent, maxTasks: 8, maxDepth: 2, maxTaskTurns: 4,
-        maxDurationMs: 600_000, maxOutputBytes: 65_536, maxMessages: 24, maxMessageBytes: 8192, runBudget },
-    }) : await CoordinationRuntime.resume(options);
+    runtime = await CoordinationRuntime.resume(options);
     write(`Team ${id}\nModel profile: ${manifest.model}\nMode: read-only, isolated workspaces; shell/MCP/source writes disabled.\nRecords: ${directory}\n`);
     const statuses = new Map<string, string>();
     relay = (async () => {
@@ -263,8 +240,8 @@ async function readManifest(path: string, id: string): Promise<TeamManifest> {
   return value;
 }
 
-async function writeDurable(path: string, value: unknown, flag: "w" | "wx"): Promise<void> {
-  const file = await open(path, flag, 0o600);
+async function writeDurable(path: string, value: unknown): Promise<void> {
+  const file = await open(path, "w", 0o600);
   try { await file.writeFile(`${JSON.stringify(value, null, 2)}\n`); await file.sync(); }
   finally { await file.close(); }
 }

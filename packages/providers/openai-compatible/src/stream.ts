@@ -8,7 +8,7 @@ import type {
   OpenAICompatibleChunk,
   OpenAICompatibleToolCallDelta,
 } from "./protocol.js";
-import { readSseData } from "./sse.js";
+import { readSseData } from "./http.js";
 
 export interface OpenAICompatibleStreamOptions {
   signal: AbortSignal;

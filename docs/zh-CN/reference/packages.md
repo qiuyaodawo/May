@@ -178,6 +178,12 @@ Registry 是普通实例，不是进程级全局状态。
 
 应用可以直接使用具体 adapter，也可以通过 `@may/providers` 选择。
 
+`@may/provider-openai-compatible/http` 导出 `readSseData` 和
+`parseRetryAfterMs`，供全部内置 HTTP provider 共用。SSE 解码使用
+`eventsource-parser`，支持 LF、CRLF、CR 换行，并接受 EOF 之前没有空白行的最后一个
+事件。中止或提前结束迭代时会释放响应 body。Retry-After 支持秒数（包含小数）和
+HTTP 日期，返回毫秒数；缺失或无法识别的值返回 `undefined`。
+
 ## 工具
 
 ### `@may/coding-tools`

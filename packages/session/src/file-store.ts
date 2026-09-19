@@ -150,7 +150,8 @@ function parseEvent(line: string, path: string, lineNumber: number): SessionEven
 function validPayload(event: Record<string, unknown>): boolean {
   const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
   const call = (value: unknown): boolean => object(value) && typeof value.id === "string" && typeof value.name === "string";
-  const message = (value: unknown): boolean => object(value) && ["system", "user", "assistant", "tool"].includes(String(value.role)) && Array.isArray(value.content) && value.content.every((part) => object(part) && (part.type === "json" || ["text", "reasoning"].includes(String(part.type)) && typeof part.text === "string" || ["image", "audio", "file"].includes(String(part.type)) && object(part.source) || part.type === "resource" && typeof part.uri === "string")) && (value.toolCalls === undefined || Array.isArray(value.toolCalls) && value.toolCalls.every(call));
+  const content = (value: unknown): boolean => Array.isArray(value) && value.every((part) => object(part) && (part.type === "json" || ["text", "reasoning"].includes(String(part.type)) && typeof part.text === "string" || ["image", "audio", "file"].includes(String(part.type)) && object(part.source) || part.type === "resource" && typeof part.uri === "string"));
+  const message = (value: unknown): boolean => object(value) && ["system", "user", "assistant", "tool"].includes(String(value.role)) && content(value.content) && (value.toolCalls === undefined || Array.isArray(value.toolCalls) && value.toolCalls.every(call));
   if ((String(event.type).startsWith("run.") || String(event.type).startsWith("tool.") || event.type === "assistant.completed") && typeof event.runId !== "string") return false;
   if ((String(event.type).startsWith("tool.") || event.type === "assistant.completed") && (!Number.isSafeInteger(event.step) || Number(event.step) < 1)) return false;
   switch (event.type) {
@@ -158,7 +159,8 @@ function validPayload(event: Record<string, unknown>): boolean {
     case "state.updated": return typeof event.key === "string";
     case "input.submitted": case "assistant.completed": return message(event.message);
     case "context.compacted": return Array.isArray(event.messages) && event.messages.every(message) && typeof event.strategy === "string";
-    case "tool.started": case "tool.completed": return call(event.call);
+    case "tool.started": return call(event.call);
+    case "tool.completed": return call(event.call) && (event.content === undefined || content(event.content));
     case "tool.failed": return call(event.call) && object(event.error) && typeof event.error.message === "string";
     case "tool.presentation": return typeof event.toolCallId === "string" && typeof event.kind === "string" && Number.isSafeInteger(event.version);
     case "run.started": case "run.cancelled": return true;

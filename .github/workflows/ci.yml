@@ -45,6 +45,12 @@ jobs:
       - name: Check bilingual documentation
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
         run: pnpm docs:check
+      - name: Install Chromium for browser tests
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
+        run: pnpm --filter @may/web-ui exec playwright install --with-deps chromium
+      - name: Run browser resource synchronization tests
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
+        run: pnpm --filter @may/web-ui test:browser
       - name: Run offline tests
         if: ${{ github.event_name != 'workflow_dispatch' || matrix.os != 'windows-latest' }}
         run: pnpm test

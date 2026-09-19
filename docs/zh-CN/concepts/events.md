@@ -35,6 +35,8 @@ retry notice，以及恰好一个完整响应。这些值不包含 Session 身�
 
 `model.completed` 包含完整 assistant message，因此正确性不依赖此前每个 delta 都被
 保留。Tool terminal event 同样包含最终输出或序列化错误。
+成功工具事件的 `output` 为宿主保留原始输出，`content` 保存模型可见内容并用于
+持久化恢复；模型历史工具提供已保存的 `content`。
 
 ### `PermissionEvent`
 

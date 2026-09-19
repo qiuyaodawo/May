@@ -152,7 +152,7 @@ export class BatchSpanProcessor implements SpanProcessor {
     if (this.exporting !== undefined) return;
     const batch = this.queue.splice(0, this.maxExportBatchSize);
     if (batch.length === 0) return;
-    this.exporting = (async () => {
+    this.exporting = Promise.resolve().then(async () => {
       try {
         await this.exporter.export(batch);
       } catch (error) {
@@ -165,7 +165,7 @@ export class BatchSpanProcessor implements SpanProcessor {
           this.schedule();
         }
       }
-    })();
+    });
   }
 }
 

@@ -117,6 +117,10 @@ Processors own asynchronous export and lifecycle. Call `forceFlush()` when a
 checkpoint needs all queued spans and `shutdown()` once at the actual owner.
 Closing one application must not shut down a processor shared by another.
 
+`BatchSpanProcessor` reports synchronous and asynchronous exporter failures through
+`onError`, releases the failed batch, and continues exporting later batches.
+`forceFlush()` and `shutdown()` finish after the queued export attempts complete.
+
 External tracing systems should be integrated through a custom
 `SpanExporter` or `SpanProcessor`. Keep provider SDK types outside Core.
 

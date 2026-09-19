@@ -1,5 +1,6 @@
 import type {
   AssistantMessage,
+  ContentPart,
   Message,
   RunResult,
   SerializedError,
@@ -107,6 +108,8 @@ export type SessionEventPayload =
       step: number;
       call: ToolCall;
       output: unknown;
+      /** 旧记录可能缺少本次执行的模型可见内容。 */
+      content?: ContentPart[];
     }
   | {
       type: "tool.failed";
@@ -133,3 +136,12 @@ export type SessionEvent = SessionEventPayload & {
   seq: number;
   timestamp: number;
 };
+
+/** 旧记录的原始输出保留给 host，模型读取明确的缺失提示。 */
+export function sessionToolResultContent(
+  event: Extract<SessionEventPayload, { type: "tool.completed" }>,
+): ContentPart[] {
+  return event.content === undefined
+    ? [{ type: "text", text: "This historical tool result has no saved model-visible content. The original output is available only to the host." }]
+    : structuredClone(event.content);
+}

@@ -1,4 +1,4 @@
-import type { UiClient, UiClientState, UiSnapshot, UiResource } from "@may/ui-client";
+import type { UiClient, UiClientState, UiResource } from "@may/ui-client";
 import { button, detailPanel, extensionContent, element, icon, statusLabel, type WebUiExtensions } from "./components.js";
 export { approvalCard, detailPanel, transcriptBlock, type WebUiExtensions, type WebUiContext, type WebUiRenderer } from "./components.js";
 import { createInspector, createTranscriptReader } from "./reading.js";
@@ -105,16 +105,25 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   let state: UiClientState = client.state, draftKey = "new", selected: string | null = null;
   const drafts = new Map<string, string>(); let listSignature = "", panelSignature = "", choiceSignature = "", suggestionSignature = "";
   let resourceItems: UiResource[] | null = null, resourceCursor: string | null = null, resourceRequest = 0, resourceHost = "";
+  let resourceVersion = "", resourcePages = 1;
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   async function loadResources(append = false) {
     if (!state.snapshot?.reads?.resources) { renderList(); return; }
+    if (append && !resourceCursor) return;
     const id = ++resourceRequest, hostId = state.snapshot.hostId, query = search.value.trim();
     resourceInfo.textContent = "正在读取…"; resourceMore.disabled = true;
     try {
-      const page = await client.readResources(query, append ? resourceCursor ?? undefined : undefined);
-      if (id !== resourceRequest || hostId !== state.snapshot?.hostId || query !== search.value.trim()) return;
-      resourceItems = [...new Map([...(append ? resourceItems ?? [] : []), ...page.items].map(item => [item.id, item])).values()];
-      resourceCursor = page.nextCursor; resourceInfo.textContent = `已加载 ${resourceItems.length} / ${page.total} 条`;
+      const items = append ? [...resourceItems ?? []] : [];
+      let cursor = append ? resourceCursor : null, pages = append ? resourcePages : 0, total = 0;
+      const count = append ? 1 : resourcePages;
+      for (let index = 0; index < count; index++) {
+        const page = await client.readResources(query, cursor ?? undefined);
+        if (id !== resourceRequest || hostId !== state.snapshot?.hostId || query !== search.value.trim()) return;
+        items.push(...page.items); cursor = page.nextCursor; total = page.total; pages++;
+        if (!cursor) break;
+      }
+      resourceItems = [...new Map(items.map(item => [item.id, item])).values()];
+      resourcePages = pages; resourceCursor = cursor; resourceInfo.textContent = `已加载 ${resourceItems.length} / ${total} 条`;
       renderList();
     } catch (error) { if (id === resourceRequest) resourceInfo.textContent = error instanceof Error ? error.message : "读取失败，请重试搜索。"; }
     finally { if (id === resourceRequest) { resourceMore.disabled = false; resourceMore.hidden = !resourceCursor; } }
@@ -170,8 +179,15 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     listTitle.textContent = isTask ? "最近任务" : "最近会话";
     const active = snapshot?.resources.find(r => r.id === snapshot.selectedId);
     title.textContent = active?.title ?? "";
-    if (resourceHost !== (snapshot?.hostId ?? "")) {
+    const nextResourceVersion = snapshot?.resourcesVersion ?? JSON.stringify(snapshot?.resources.map(item => [item.id, item.title]) ?? []);
+    const changedHost = resourceHost !== (snapshot?.hostId ?? "");
+    if (changedHost) {
       resourceHost = snapshot?.hostId ?? ""; resourceRequest++; resourceItems = null; resourceCursor = null; resourceInfo.textContent = ""; resourceMore.hidden = true;
+      resourcePages = 1;
+    }
+    if (changedHost || resourceVersion !== nextResourceVersion) {
+      resourceVersion = nextResourceVersion;
+      clearTimeout(searchTimer);
       if (snapshot?.reads?.resources) void loadResources();
     }
     const sig = JSON.stringify([snapshot?.resources, selected, snapshot?.activeId, pending(), snapshot?.commands, connected]);
@@ -245,7 +261,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   };
   search.maxLength = 256;
   search.oninput = () => {
-    clearTimeout(searchTimer); resourceRequest++; resourceItems = null; resourceCursor = null;
+    clearTimeout(searchTimer); resourceRequest++; resourceItems = null; resourceCursor = null; resourcePages = 1;
     if (!state.snapshot?.reads?.resources) renderList();
     else { resourceItems = []; renderList(); searchTimer = setTimeout(() => { void loadResources(); }, 250); }
   };

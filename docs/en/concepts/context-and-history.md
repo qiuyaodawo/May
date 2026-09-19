@@ -103,11 +103,13 @@ single long user task.
   request and saved notes, not the whole current tool transcript. Missing, stale,
   or oversized handoff data and unresolved tool recovery block reset. These checks
   cannot verify whether the model's note is semantically accurate.
-- Full events remain queryable. `session_history_search` scans up to 50 events
+- Projected events remain queryable. `session_history_search` scans up to 50 events
   and returns at most 10 literal, case-insensitive matches per call; follow the
   sequence cursor even on an empty page. `session_history_read` reads a record by
   sequence in chunks (default 2000, maximum 4000 UTF-16 code units), using the
   returned `nextOffset`. Compaction replacement views are omitted.
+  Successful tool events expose saved model-visible `content`; raw `output`
+  remains available to host history APIs.
 
 Only this automatic mode exposes `new_context` and adds proactive guidance and
 warnings. Query/notes tools also support preparing a manual history-reference
@@ -128,6 +130,13 @@ then rebuilds the model view from durable events:
 - `context.compacted` replaces all messages reconstructed so far;
 - a cancelled Run receives synthetic cancellation messages for assistant tool
   calls that have no durable outcome.
+
+`tool.completed.content` preserves the exact model-visible tool result, including
+media and empty arrays. Replay and the three model-facing history tools share
+`sessionToolResultContent(event)`. Legacy records without this field yield an
+explicit unavailable-content message. `Session.history()` and `Session.queryHistory()`
+still expose their original `output` to the host; restoring an old result to model
+context requires an explicit host review and attachment.
 
 Replay also returns the latest usable provider input-token measurement to the
 runtime factory. A compaction checkpoint clears an older measurement because

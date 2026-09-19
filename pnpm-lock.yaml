@@ -280,6 +280,9 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../../core
+      '@may/provider-openai-compatible':
+        specifier: workspace:*
+        version: link:../openai-compatible
     devDependencies:
       '@may/config':
         specifier: workspace:*
@@ -316,6 +319,9 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../../core
+      '@may/provider-openai-compatible':
+        specifier: workspace:*
+        version: link:../openai-compatible
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -326,6 +332,9 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../../core
+      eventsource-parser:
+        specifier: 3.1.1
+        version: 3.1.1
 
   packages/providers/zhipu:
     dependencies:
@@ -453,9 +462,21 @@ importers:
         specifier: workspace:*
         version: link:../client
     devDependencies:
+      '@may/application':
+        specifier: workspace:*
+        version: link:../../application
+      '@may/provider-openai':
+        specifier: workspace:*
+        version: link:../../providers/openai
+      '@may/session':
+        specifier: workspace:*
+        version: link:../../session
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      playwright:
+        specifier: 1.63.0
+        version: 1.63.0
 
 packages:
 
@@ -922,6 +943,16 @@ packages:
   pkce-challenge@5.0.1:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
+
+  playwright-core@1.63.0:
+    resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.63.0:
+    resolution: {integrity: sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
@@ -1397,6 +1428,12 @@ snapshots:
   path-key@3.1.1: {}
 
   pkce-challenge@5.0.1: {}
+
+  playwright-core@1.63.0: {}
+
+  playwright@1.63.0:
+    dependencies:
+      playwright-core: 1.63.0
 
   powershell-utils@0.1.0: {}
 

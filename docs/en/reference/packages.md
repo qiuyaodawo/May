@@ -205,6 +205,14 @@ Protocol implementations remain separately consumable:
 An application can use a concrete adapter directly or select one through
 `@may/providers`.
 
+`@may/provider-openai-compatible/http` exports `readSseData` and
+`parseRetryAfterMs`, shared by all built-in HTTP providers. SSE decoding uses
+`eventsource-parser`, supports LF/CRLF/CR line endings and accepts a final event
+without a blank line at EOF. The reader releases the response body when aborted
+or when iteration ends early. Retry-After values support seconds (including
+decimals) and HTTP dates; the result is milliseconds, or `undefined` when the
+header is missing or unrecognized.
+
 ## Tools
 
 ### `@may/coding-tools`

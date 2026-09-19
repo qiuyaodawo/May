@@ -100,7 +100,7 @@ export class TaskWorkspaceManager {
       if (state.tasks.includes(taskId)) {
         const stat = await lstat(directory);
         if (!stat.isDirectory() || stat.isSymbolicLink() || !inside(this.directory, await realpath(directory))) throw new Error("Task workspace has changed identity");
-        return state;
+        return undefined;
       }
       if (state.tasks.length >= state.config.maxTasks) throw new Error("Task workspace quota exceeded");
       const parent = join(this.directory, "tasks", hash(Buffer.from(taskId)));

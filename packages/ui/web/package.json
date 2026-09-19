@@ -11,9 +11,9 @@
     "./assets": { "types": "./dist/assets.d.ts", "import": "./dist/assets.js" }
   },
   "files": ["dist", "assets", "!dist/.tsbuildinfo"],
-  "scripts": { "build": "tsc -b", "clean": "tsc -b --clean" },
+  "scripts": { "build": "tsc -b", "clean": "tsc -b --clean", "test:browser": "pnpm --filter @may/provider-openai build && pnpm run build && node --test test/browser/*.test.mjs" },
   "dependencies": { "@may/ui-client": "workspace:*" },
-  "devDependencies": { "@types/node": "^22.0.0" },
+  "devDependencies": { "@may/application": "workspace:*", "@may/provider-openai": "workspace:*", "@may/session": "workspace:*", "@types/node": "^22.0.0", "playwright": "1.63.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"
 }
