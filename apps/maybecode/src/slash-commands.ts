@@ -49,7 +49,7 @@ export const MAYBECODE_COMPACTION_STRATEGIES = [
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
-  { name: "/web", usage: "/web", description: "在浏览器中打开当前工作区和会话" },
+  { name: "/web", usage: "/web", description: "Open the current workspace and session in a browser" },
   { name: "/skills", usage: "/skills [show <name>|use <name> [task]]", description: "List skills, preview instructions, or activate a skill" },
   { name: "/recovery", usage: "/recovery [resolve <id> <verified finding>]", description: "Inspect interrupted tools or record verified recovery findings" },
   {

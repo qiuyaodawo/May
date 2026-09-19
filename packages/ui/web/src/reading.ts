@@ -139,7 +139,7 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
     else scroll.scrollTop = oldTop;
     requestAnimationFrame(() => { restoring = false; }); updateControls();
   }
-  return { toolbar,
+  return { toolbar, toggleDetails: () => expand(!defaultExpanded),
     update(next: UiClientState) {
       state = next; const nextScope = `${next.snapshot?.hostId ?? ""}:${next.snapshot?.selectedId ?? ""}`;
       if (scope !== nextScope) {

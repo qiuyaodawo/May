@@ -2,9 +2,8 @@
 
 [English](../../en/guides/web-ui.md) | **简体中文**
 
-这是共享 UI 边界的首个开发预览阶段。MaybeCode 与 MaybeClaw 使用相同的浏览器
-组件和传输层，但保留各自的资源模型。MaybeClaw 原有页面已被替换，没有抽成组件库。
-MaybeCode 的终端界面也支持通过 `/web` 打开共享工作台。
+MaybeCode 与 MaybeClaw 使用相同的浏览器组件和传输层，并保留各自的资源模型。
+MaybeCode 的终端界面支持通过 `/web` 打开共享工作台。
 
 ## 启动
 
@@ -16,7 +15,7 @@ Session。命令自动选择可用的本地回环端口，并生成鉴权凭据�
 TUI 和 Web 分别接收实时事件，共享同一个执行所有者。消息、审批、模型切换
 和 Session 切换使用同一个 controller。在任一界面完成审批后，两端都会关闭对应
 审批提示。关闭浏览器页面后 Agent 继续运行；退出 TUI 时关闭 Agent 和 Web 服务。
-MCP 表单与授权交互继续在终端处理，Web 详情面板会说明处理位置。
+MCP 表单与授权交互可以在任一界面完成，处理完成后两端都会关闭对应提示。
 
 连接链接在 URL fragment 中携带一次性凭据。页面立即清除 fragment，再用该凭据
 换取控制令牌。连接凭据有效期为 60 秒，只能兑换一次，同时最多保留八个待连接凭据。
@@ -50,6 +49,36 @@ pnpm maybeclaw serve
 无外部副作用的审批工具。公开的演示令牌只用于这个样例的自动连接。
 它不会调用真实模型，也不会执行输入框中描述的业务任务。
 
+## MaybeCode 命令与交互
+
+输入框复用终端的斜杠命令注册表、参数补全和执行函数。上下方向键选择补全项，
+Tab 填入内容。未知命令和无效参数直接显示错误。命令输出保存在页面内存中，
+不会作为消息发送给模型，也不会加入对话历史。
+
+| 操作 | Web 入口 |
+| --- | --- |
+| 模型与默认配置 | 模型下拉菜单；`/model` 的切换和默认配置按钮；`/model profile --default` |
+| Reasoning effort | effort 下拉菜单；`/effort`；`/effort default` 恢复配置值 |
+| 会话管理 | `/new`、`/resume [id]`；会话选择结果中的重命名和确认删除 |
+| 重试、指令与状态 | `/retry`、`/instructions`、`/status`、`/context` |
+| 上下文管理 | `/compact [history-reference\|provider-native]` 和压缩按钮 |
+| Skills | `/skills`、`/skills show name`、`/skills use name [task]` |
+| MCP | `/mcp` 及其目录、资源、prompt、订阅和任务操作 |
+| 恢复处置 | `/recovery`、`/recovery resolve id finding` |
+| 页面显示 | `/details`、`/thinking`、历史搜索、详情阅读和滚动 |
+| 退出宿主 | `/quit` 或 `/exit`，随后确认 |
+
+MCP 表单和可编辑 review 窗口显示请求，接收 JSON，预览提交内容，并要求明确确认。
+URL 请求需要同意访问、手动打开网站和单独执行重试。命令等待响应期间仍可处理交互
+或取消操作。broker 验证 schema、请求所属会话和有效期，响应内容不进入对话历史。
+独立 `--ui web` 也启用与终端相同的交互 broker。
+独立的 `team` 和 `mcp login` CLI 子命令继续使用各自的 CLI 入口。
+
+构建后设置 `MAYBECODE_WEB_LIVE=1`，执行
+`pnpm --filter @may/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs`。
+验收使用本地模型配置、真实 Workspace 和 MCP broker，并通过真实模型任务验证
+工具审批和文件创建。测试数据保存在已忽略的 `review` 目录。此命令会发起模型请求。
+
 ## 分层边界
 
 终端拥有 controller 时，可以向 `ApplicationUiHost` 提供独立的 `events` 事件流
@@ -59,10 +88,20 @@ controller。`startUiServer({ browserLogin: true, ... })` 提供一次性连接�
 自定义页面可向 `mountWebUI` 提供 `initialToken` 和 `connectionHint`。
 提供 `initialToken` 时，连接窗口显示启动程序的连接说明，并隐藏手动令牌输入。
 
+`ApplicationUiHost` 提供产品的 `controls`、`complete`、`available`、`submit`、
+`concurrentCommands` 和 `interactionCommands` 接口。产品命令等待期间不占用
+快照队列；交互响应通过独立校验的入口处理。产品负责执行时的可用性和请求归属校验。
+`UiReceipt.output` 描述临时命令输出和操作，`disconnect` 结束发起请求的页面连接。
+`UiSnapshot.controls` 声明命令输入、交互响应和取消操作。`UiClient.interact()`
+可以在 `command()` 等待期间响应交互。`startUiServer` 在退出响应发送完成后调用
+`exit`，并提供 `closed`；未提供回调时关闭宿主。
+`GET /api/ui/complete` 需要鉴权并绑定宿主与 Session。请求正文最多为 256 KiB，
+参数字符串最多为 65,536 个字符；产品命令根据需要继续限制长度。
+
 | 层 | 职责 |
 | --- | --- |
 | Agent 应用 / 产品宿主 | 执行、权限、预算、持久化、恢复 |
-| `@may/ui-client` | JSON 契约和浏览器安全的连接、状态逻辑 |
+| `@may/ui-client` | JSON 协议和浏览器安全的连接、状态逻辑 |
 | `@may/ui-client/application` | 单活动会话工作区适配器 |
 | `@may/ui-client/server` | 本地 HTTP、Bearer 鉴权、来源检查、命令凭据、SSE 失效通知 |
 | `@may/web-ui` | 可选工作台外壳、对话、输入、审批、详情、安全 Markdown |
@@ -136,11 +175,8 @@ controller。`startUiServer({ browserLogin: true, ... })` 提供一次性连接�
 - MaybeClaw 现在从已有 Session 日志读取历史工具调用及结果，重启后也可查看。
   实时投影仍只保留八个任务；未记录的临时进度和部分 token 流不会凭空重建。
   历史读取不增加持久化写入、不取得执行所有权，也不执行恢复。
-- MaybeCode 的 team 控制、交互式 MCP 表单/sampling、Skills 选择器、完整文件浏览、
-  产物下载和恢复处置尚未接入。Web 模式不会启用交互式 MCP 回调；这些功能请使用
-  原有终端/CLI，Web 外壳不声称支持它们。
-  处理会话恢复时，先停止 Web 宿主，再在 TUI 恢复该会话；不要由两个独立运行时
-  同时打开同一会话。
+- 尚未提供完整文件浏览和产物下载。恢复命令使用当前执行所有者。
+  使用 `/web` 共享 TUI 的 Session；每个 Session 由一个运行时拥有。
 - 当前浏览器文案为中文，文档维护中英双语。明暗主题跟随系统；窄屏侧栏使用覆盖面板。
 
 ## 统一执行证据

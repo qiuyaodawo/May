@@ -17,6 +17,17 @@ to each view and closes the application. `startUiServer` can opt into `browserLo
 and return `createLoginUrl()` for a 60-second, single-use browser connection ticket.
 The exchange keeps the control token out of URLs and preserves API authentication.
 
+Product hosts can provide `controls`, `complete`, `available`, `submit`,
+`concurrentCommands` and `interactionCommands` on `ApplicationUiOptions`.
+Concurrent product commands do not hold the snapshot queue. Interaction commands
+validate the host, active Session and product availability before dispatch, allowing
+responses during an awaited command. Products validate the live request owner.
+`UiClient.complete()` reads authenticated Session-scoped suggestions;
+`interact()` sends an advertised response/cancellation without the ordinary busy
+restriction. `UiReceipt.output` supplies page-local text and actions, while
+`disconnect` ends the client connection. `startUiServer` exposes `closed` and an
+optional `exit` callback invoked after an exit receipt is flushed.
+
 `UiClient` synchronizes authoritative snapshots using an authenticated fetch/SSE
 invalidation stream. Reconnects resnapshot; they do not replay commands.
 Host epochs reject uncertain commands after restart. Receipts deduplicate up to

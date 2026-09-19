@@ -27,7 +27,25 @@ and Session changes with the Web UI. Repeating `/web` opens the same service wit
 a fresh one-time connection link. No token environment variable is needed. After
 refreshing or disconnecting a page, run `/web` again to connect. Closing a page
 leaves the task running; exiting the terminal closes the application and Web
-service. MCP forms and authorization interactions remain in the terminal.
+service. MCP forms and authorization interactions can be handled in either frontend.
+
+The Web composer supports the same application slash commands and argument
+completion as the terminal. Use Arrow Up/Down to select a suggestion and Tab to
+complete it. Commands produce local UI output and do not become model messages.
+`/model` manages model selection and the default profile; `/effort` opens the
+reasoning-effort selector. The composer also exposes model and effort dropdowns.
+`/resume` provides resume, rename and confirmed deletion of inactive sessions.
+`/skills`, `/mcp`, `/recovery`, `/retry`, `/instructions`, `/status`, `/context` and
+the `/compact` strategies use the shared controller. `/details` and `/thinking`
+control page presentation. `/quit` and `/exit` request confirmation before closing
+the host, including a connected TUI.
+
+MCP form/review responses require a preview and explicit confirmation. URL requests
+require consent before showing an external link and a separate action to resume.
+Cancellation remains available while commands wait for interaction. Responses are
+bound to the active request and Session and are not added to model history.
+Standalone `--ui web` also enables these interactions. The `team` and `mcp login`
+CLI subcommands retain their separate entry points.
 
 The `/web` service uses an available loopback port and generates its control token
 in memory. The browser link contains a separate one-time ticket that expires after
@@ -38,7 +56,7 @@ Run `pnpm maybecode --ui web [workspace]` with `MAYBECODE_CONTROL_TOKEN` set to 
 random 32..256-character printable ASCII value. It serves an authenticated,
 loopback-only workspace on port 3940 (`--port` overrides it). The shared Web shell
 supports messages, live tool output, approvals, coding Diff previews, cancellation,
-session management and model selection; it does not replace all terminal controls.
+session management, model selection and the shared application command interface.
 The default remains the retained TUI. See the [English Web UI guide](../../docs/en/guides/web-ui.md)
 or [简体中文指南](../../docs/zh-CN/guides/web-ui.md) for commands and current limits.
 

@@ -904,6 +904,15 @@
 .history-search input { flex:1; min-width:120px; background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px; }
 .history-info { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
 .run-group { margin:0 0 26px; min-width:0; }
+.command-workbench { max-width:900px; margin:20px auto; padding:0 20px; }
+.command-output,.command-form { border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
+.command-workbench .tool-content { white-space:pre-wrap; overflow-wrap:anywhere; max-height:50vh; overflow:auto; }
+.command-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.command-json { width:100%; padding:12px; color:inherit; background:transparent; border:1px solid var(--line); border-radius:8px; }
+.command-suggestions { max-height:230px; overflow:auto; border-bottom:1px solid var(--line); }
+.command-suggestion { display:block; width:100%; padding:8px; border:0; color:inherit; background:transparent; text-align:left; cursor:pointer; }
+.command-suggestion[aria-selected="true"] { color:var(--accent); background:var(--surface); }
+.hide-reasoning .reasoning { display:none; }
 .run-heading { border-bottom:1px solid var(--line); margin-bottom:12px; }
 .run-toggle { max-width:100%; text-align:left; overflow-wrap:anywhere; line-height:1.6; }
 .run-body { min-width:0; }

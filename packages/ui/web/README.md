@@ -26,6 +26,13 @@ and a `connectionHint` to `mountWebUI`. With `initialToken`, the connection dial
 shows the launcher instructions and omits manual token entry. Disposing the shell
 prevents a pending promise from connecting a closed view.
 
+When a product supplies `UiSnapshot.controls`, the composer offers slash-command
+completion and displays `UiReceipt.output` with guarded actions and confirmation
+dialogs. Completion uses Arrow Up/Down and Tab. Product interactions support JSON
+forms, editable reviews and explicit URL consent. Drafts survive snapshot updates;
+completed requests remove their controls. Preview and confirmation precede sending
+form content, and responses remain possible while a command is pending.
+
 Products can register tool, approval-detail, diagnostic, presentation and panel renderers. Each receives its DTO and an
 optional context containing client state and the guarded `command` method. A
 trusted product extension module can be included by `webUiAssets`; no module is

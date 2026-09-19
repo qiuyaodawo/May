@@ -1,4 +1,4 @@
-import { UiError, type UiCommand, type UiReceipt, type UiSnapshot, type UiPage, type UiResource, type UiBlock, type UiField, type UiFieldPage } from "./protocol.js";
+import { UiError, type UiCommand, type UiReceipt, type UiSnapshot, type UiPage, type UiResource, type UiBlock, type UiField, type UiFieldPage, type UiCommandOutput, type UiCompletion } from "./protocol.js";
 
 export interface UiClientState {
   readonly snapshot: UiSnapshot | null;
@@ -6,6 +6,7 @@ export interface UiClientState {
   readonly busy: boolean;
   readonly selecting: boolean;
   readonly error: string | null;
+  readonly output?: UiCommandOutput | null;
 }
 
 /** Browser-safe client. Credentials are memory-only; commands are never auto-retried. */
@@ -38,12 +39,12 @@ export class UiClient {
   disconnect(): void {
     this.generation++; this.lifetime?.abort(); this.lifetime = undefined; this.token = "";
     this.selectedId = undefined; this.selectionVersion++;
-    this.update({ snapshot: null, connection: "disconnected", busy: false, selecting: false, error: null });
+    this.update({ snapshot: null, connection: "disconnected", busy: false, selecting: false, error: null, output: null });
   }
   async select(id?: string): Promise<void> {
     if (!this.lifetime) throw new UiError(409, "请先连接本地服务。");
     const version = ++this.selectionVersion, previous = this.value.snapshot?.selectedId ?? undefined;
-    this.selectedId = id; this.update({ selecting: true, error: null });
+    this.selectedId = id; this.update({ selecting: true, error: null, output: null });
     try { await this.refresh(); }
     catch (error) { if (version === this.selectionVersion) { this.selectedId = previous; this.update({ error: describe(error) }); } throw error; }
     finally { if (version === this.selectionVersion) this.update({ selecting: false }); }
@@ -61,6 +62,14 @@ export class UiClient {
   }
   readResources(query = "", cursor?: string): Promise<UiPage<UiResource>> {
     return this.read("resources", { query, ...(cursor ? { cursor } : {}) }, false);
+  }
+  complete(text: string): Promise<{ hostId: string; items: readonly UiCompletion[] }> { return this.read("complete", { text }); }
+  async interact(name: string, args: Record<string, string> = {}): Promise<void> {
+    const snapshot = this.value.snapshot, generation = this.generation;
+    if (!snapshot || this.value.connection !== "connected" || this.value.selecting || !snapshot.commands.includes(name) || ![snapshot.controls?.responseCommand, snapshot.controls?.cancelCommand].includes(name)) throw new UiError(409, "当前交互已不可用。");
+    const command: UiCommand = { version: 1, hostId: snapshot.hostId, requestId: crypto.randomUUID(), name, targetId: snapshot.activeId ?? snapshot.selectedId, args };
+    await this.json("/api/ui/commands", command);
+    if (generation === this.generation) await this.refresh();
   }
   readHistory(query = "", cursor?: string): Promise<UiPage<UiBlock>> {
     return this.read("history", { query, ...(cursor ? { cursor } : {}) });
@@ -85,6 +94,8 @@ export class UiClient {
     try {
       const receipt = await this.json("/api/ui/commands", command) as UiReceipt;
       if (generation !== this.generation) return;
+      if (receipt.disconnect) { this.disconnect(); return; }
+      if (selectionVersion === this.selectionVersion) this.update({ output: receipt.output ?? null });
       if (selectionVersion === this.selectionVersion && receipt.selectedId !== undefined) this.selectedId = receipt.selectedId ?? undefined;
       await this.refresh();
     } catch (error) {

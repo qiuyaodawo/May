@@ -85,7 +85,7 @@ export async function runTerminalUI(
     }
   });
 
-  const web = new MaybeCodeTerminalWeb(app);
+  const web = new MaybeCodeTerminalWeb(app, handleProcessSignal);
   const eventTask = consumeEvents(app, renderer, question, web.events);
   terminal.write(sanitizeTerminalText(
     `MaybeCode\nWorkspace: ${app.workspace}\n` +

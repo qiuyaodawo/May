@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AgentApplicationEvent, AgentWorkspaceController } from "@may/application";
-import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice, type UiPageRequest, type UiFieldRequest } from "./protocol.js";
+import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice, type UiPageRequest, type UiFieldRequest, type UiControls, type UiCompletion } from "./protocol.js";
 import { UiProjection } from "./projection.js";
 import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";
 
@@ -12,6 +12,12 @@ export interface ApplicationUiOptions {
   readonly choices?: () => Promise<readonly UiChoice[]>;
   readonly commands?: readonly string[];
   readonly execute?: (command: UiCommand) => Promise<UiReceipt>;
+  readonly controls?: () => UiControls;
+  readonly concurrentCommands?: readonly string[];
+  readonly interactionCommands?: readonly string[];
+  readonly available?: (name: string) => boolean;
+  readonly complete?: (text: string) => Promise<readonly UiCompletion[]>;
+  readonly submit?: (text: string) => Promise<UiReceipt | undefined>;
 }
 
 type UiApplication = Omit<AgentWorkspaceController<{ type: string }>, "compactContext"> & {
@@ -33,7 +39,7 @@ export class ApplicationUiHost implements UiHost {
     this.relay = this.consume().catch(() => { this.fault = "运行事件连接已停止。请检查宿主后重新启动。"; this.changed(); });
   }
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
-  private changed(): void { this.revision++; for (const listener of this.listeners) { try { listener(); } catch { /* A view cannot stop the relay. */ } } }
+  changed(): void { this.revision++; for (const listener of this.listeners) { try { listener(); } catch { /* A view cannot stop the relay. */ } } }
   private async consume(): Promise<void> {
     while (true) {
       const next = await this.iterator.next(); if (next.done) return;
@@ -53,7 +59,7 @@ export class ApplicationUiHost implements UiHost {
     const sessions = await this.app.listSessions();
     if (!sessions.some(session => session.id === viewingId)) throw new UiError(404, "会话不存在或不属于当前工作区。");
     if (!viewingActive && !this.app.readSessionHistory) throw new UiError(409, "当前宿主不支持只读历史浏览。");
-    const history = this.app.readSessionHistory ? await this.app.readSessionHistory(viewingId) : await this.app.history();
+    const history = viewingActive ? await this.app.history() : await this.app.readSessionHistory!(viewingId);
     // Keep the selected/active entries available even beyond the recent-resource limit.
     const visibleSessions = sessions.filter((session, index) => index < 500 || session.id === viewingId || session.id === activeId);
     const resources = visibleSessions.map(s => ({ id: s.id, kind: "session" as const, title: s.title ?? s.preview?.slice(0, 72) ?? "新会话", status: s.id === activeId && running ? "running" : "idle", updatedAt: s.lastUsedAt }));
@@ -68,6 +74,10 @@ export class ApplicationUiHost implements UiHost {
     if (!running) commands.push("session.new");
     if (viewingActive) commands.push(...(running ? ["run.cancel", ...(interactions.length ? ["approval.resolve"] : [])] : ["message.submit", "session.rename", "context.compact", ...(this.options.commands ?? [])]));
     else if (!running) commands.push("session.activate");
+    if (viewingActive) commands.push(...(this.options.concurrentCommands ?? []));
+    if (this.options.available) {
+      for (let index = commands.length - 1; index >= 0; index--) if (!this.options.available(commands[index]!)) commands.splice(index, 1);
+    }
     if (this.fault) commands.length = 0;
     const panels = viewingActive ? await this.options.panels?.() ?? [] : [];
     const choices = viewingActive ? await this.options.choices?.() ?? [] : [];
@@ -82,6 +92,7 @@ export class ApplicationUiHost implements UiHost {
       interactions, commands,
       panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "浏览会话", value: viewingId }, { label: "运行会话", value: activeId }, { label: "执行状态", value: running ? "运行中" : "空闲" }] }, ...panels],
       choices,
+      ...(viewingActive && this.options.controls ? { controls: this.options.controls() } : {}),
       notice: this.fault ?? "浏览只影响当前页面。设为运行会话或新建会话会更换宿主的执行对象，但不会切走其它页面；执行期间不能切换。",
     };
   }
@@ -102,17 +113,29 @@ export class ApplicationUiHost implements UiHost {
     return fieldPage(this.hostId, selectedId, request, recordedField(events, block, request.field));
   }
   execute(command: UiCommand): Promise<UiReceipt> {
+    if (this.options.concurrentCommands?.includes(command.name)) return this.apply(command);
     const work = this.mutation.then(() => this.apply(command));
     this.mutation = work.catch(() => {}); return work;
+  }
+  async complete(selectedId: string, text: string) {
+    if (selectedId !== this.app.sessionId || !this.options.complete) throw new UiError(409, "当前会话不支持命令补全。");
+    return { hostId: this.hostId, items: await this.options.complete(text) };
   }
   private async apply(command: UiCommand): Promise<UiReceipt> {
     const transition = command.name === "session.activate" || command.name === "session.new";
     if (command.hostId !== this.hostId || !command.targetId || (transition ? command.expectedActiveId !== this.app.sessionId : command.targetId !== this.app.sessionId)) throw new UiError(409, "运行会话已改变，请检查当前状态后重试。");
+    if (this.options.interactionCommands?.includes(command.name)) {
+      if (!this.options.available?.(command.name) || !this.options.execute) throw new UiError(409, "交互已不可用。");
+      return this.options.execute(command);
+    }
     if (command.name === "session.browse" || !(await this.buildSnapshot(command.targetId)).commands.includes(command.name)) throw new UiError(409, "当前状态不允许此操作。");
+    if (this.options.available && !this.options.available(command.name)) throw new UiError(409, "当前状态不允许此操作。");
     switch (command.name) {
       case "message.submit": {
         commandArgs(command, ["text"]);
         if (command.args.text!.length > 16_384) throw new UiError(400, "输入不能超过 16,384 个字符。");
+        const receipt = await this.options.submit?.(command.args.text!);
+        if (receipt) return receipt;
         const run = await this.app.submit({ input: command.args.text!, inputId: `web:${command.requestId}` });
         void run.result.catch(() => {}).finally(() => this.changed());
         break;
