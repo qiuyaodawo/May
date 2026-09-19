@@ -59,7 +59,7 @@ Tab 填入内容。未知命令和无效参数直接显示错误。命令输出�
 | --- | --- |
 | 模型与默认配置 | 模型下拉菜单；`/model` 的切换和默认配置按钮；`/model profile --default` |
 | Reasoning effort | effort 下拉菜单；`/effort`；`/effort default` 恢复配置值 |
-| 会话管理 | `/new`、`/resume [id]`；会话选择结果中的重命名和确认删除 |
+| 会话管理 | 侧栏选择和确认删除；`/new`、`/resume [id]`；会话选择结果中的重命名和删除 |
 | 重试、指令与状态 | `/retry`、`/instructions`、`/status`、`/context` |
 | 上下文管理 | `/compact [history-reference\|provider-native]` 和压缩按钮 |
 | Skills | `/skills`、`/skills show name`、`/skills use name [task]` |
@@ -138,16 +138,19 @@ controller。`startUiServer({ browserLogin: true, ... })` 提供一次性连接�
 ## 两款产品的覆盖范围
 
 **MaybeCode：**发送消息、增量模型/工具输出、查看工具输入和代码变更预览、
-审批、取消、列出/新建/打开/重命名会话、切换模型配置、请求上下文压缩。
-一个宿主只有一个由 `activeId` 标识的运行会话；`selectedId` 是当前页面的浏览
-对象。侧栏点击只读取历史，执行期间也可浏览。运行会话改变不会切走其它页面。
-首次连接后固定本页的默认选择；整页刷新仍需重新连接，并默认查看当前运行会话。
+审批、取消、列出/新建/打开/重命名/删除会话、切换模型配置、请求上下文压缩。
+页面显示宿主的当前会话，`selectedId` 与 `activeId` 相同。点击侧栏会话即可切换，
+随后可以继续对话。所有已连接页面同步显示会话变化，包括 TUI 发起的切换。
+执行或等待 MCP 交互期间禁止切换、新建和删除；完成或取消当前操作后可以继续。
 
-历史视图不提供发送、取消、审批、模型切换或上下文压缩操作。点击“查看运行会话”
-可查看当前执行；空闲时点击“设为运行会话”（`session.activate`）才会显式切换。
-新建与激活命令携带 `expectedActiveId`，拒绝基于旧执行对象的切换，不自动重放。
-执行命令继续绑定 `targetId`。旧的 `session.open` UI 命令不再接受，预览版客户端
-与宿主应同步更新；`session.browse` 是只读能力声明，不是 POST 命令。
+侧栏中其它会话的垃圾桶图标在鼠标悬停或键盘聚焦时显示，触屏设备保持显示。
+确认后删除会话及其历史。当前会话不能删除，宿主也会拒绝直接删除当前会话的
+请求。列表和已连接页面随后同步更新。
+新建、切换和删除命令携带 `expectedActiveId`，拒绝基于旧会话状态的操作，
+不自动重放。命令通过 `targetId` 指定操作对象。
+会话宿主的 `UiClient.select(id)` 发送 `session.activate`，快照读取始终返回当前
+会话。预览版客户端和宿主需要同步升级。任务宿主保留各页面独立选择；工作区内
+的历史搜索和字段读取保持只读。
 
 `AgentWorkspace.readSessionHistory(id)` 校验会话属于当前工作区，再调用可选的
 `SessionStore.inspect(id)`。不会打开运行时、更新会话最近使用时间、获取执行所有权

@@ -96,60 +96,6 @@ test("client preserves the browser fetch receiver, ignores stale selections and 
   assert.equal(posts, 1); assert.match(client.state.error, /未自动重发/); client.disconnect();
 });
 
-test("two clients browse independently without opening runtimes and explicitly guard execution transitions", async t => {
-  const store = new InMemorySessionStore(), catalog = new InMemorySessionCatalog();
-  let opened = 0;
-  const definition = defineAgent({ model: { async *stream(request) {
-    const last = request.messages.at(-1);
-    yield { type: "response.completed", message: last?.role === "user" && last.content.some(p => p.text === "pause")
-      ? { role: "assistant", content: [], toolCalls: [{ id: "approval", name: "check", input: {} }] }
-      : { role: "assistant", content: [{ type: "text", text: "Stored answer" }] } };
-  } }, tools: [{ name: "check", description: "Fixture", inputSchema: { type: "object" }, execute: () => "ok" }], permissionPolicy: () => "ask", sessionHistory: false });
-  const openApplication = selection => { opened++; return definition.open({ ...selection, store }); };
-  const app = await AgentWorkspace.open({ workspace: "owned", store, catalog, openApplication });
-  const first = app.sessionId;
-  await (await app.submit({ input: "seed" })).result;
-  const foreign = await AgentWorkspace.open({ workspace: "other", store, catalog, openApplication });
-  t.after(() => foreign.close());
-  const host = new ApplicationUiHost(app, { product: { id: "fixture", title: "Fixture", subtitle: "", resourceKind: "session", suggestions: [] } });
-  const server = await startUiServer({ host, token, port: 0, assets: new Map(), close: () => host.close() }); t.after(() => server.close());
-  const left = new UiClient(server.url), right = new UiClient(server.url);
-  t.after(() => { left.disconnect(); right.disconnect(); });
-  await left.connect(token); await right.connect(token);
-  await left.command("session.new"); const second = app.sessionId;
-  await right.refresh();
-  assert.equal(right.state.snapshot.selectedId, first);
-  assert.equal(right.state.snapshot.activeId, second);
-  assert.equal(left.state.snapshot.selectedId, second);
-  assert.ok(right.state.snapshot.commands.includes("session.activate"));
-  assert.ok(!right.state.snapshot.commands.includes("message.submit"));
-  await left.command("message.submit", { text: "pause" });
-  await until(async () => { await left.refresh(); return left.state.snapshot.interactions.length; });
-  const beforeCatalog = await catalog.list("owned"), beforeHistory = await store.inspect(first), beforeOpened = opened;
-  await right.select(first); await right.refresh();
-  assert.deepEqual(await catalog.list("owned"), beforeCatalog);
-  assert.deepEqual(await store.inspect(first), beforeHistory);
-  assert.equal(opened, beforeOpened);
-  assert.equal(app.sessionId, second); assert.equal(app.isRunning, true);
-  assert.deepEqual(right.state.snapshot.interactions, []);
-  assert.ok(!right.state.snapshot.commands.includes("session.activate"));
-  for (const name of ["message.submit", "run.cancel", "session.activate"]) await assert.rejects(right.command(name, name === "message.submit" ? { text: "wrong target" } : {}));
-  await assert.rejects(right.select(foreign.sessionId));
-  assert.equal(right.state.snapshot.selectedId, first);
-  await assert.rejects(host.snapshot("unknown"));
-  await left.command("approval.resolve", { id: left.state.snapshot.interactions[0].id, decision: "allow" });
-  await until(() => !app.isRunning);
-  await left.select(first); await right.refresh();
-  const settled = await Promise.allSettled([left.command("session.activate"), right.command("session.new")]);
-  assert.equal(settled.filter(result => result.status === "fulfilled").length, 1, "a stale execution owner cannot authorize a second transition");
-  await left.refresh(); await right.refresh();
-  assert.equal(left.state.snapshot.selectedId, first);
-  if (settled[0].status === "fulfilled") { assert.equal(app.sessionId, first); assert.equal(right.state.snapshot.selectedId, first); }
-  else { assert.notEqual(app.sessionId, first); assert.notEqual(app.sessionId, second); assert.equal(right.state.snapshot.selectedId, app.sessionId); }
-  await assert.rejects(host.execute({ version: 1, hostId: host.hostId, requestId: "missing-guard", name: "session.new", targetId: app.sessionId, args: {} }));
-});
-
-
 test("projection separates approval evidence, terminal outcomes and unknown effects", () => {
   const projection = new UiProjection();
   const call = { id: "call", name: "fixture", input: { text: "<script>text only</script>" } };

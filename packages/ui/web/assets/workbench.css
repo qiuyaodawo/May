@@ -524,7 +524,7 @@
                                                                                                                                                                                                                                   border:1px solid var(--line);
                                                                                                                                                                                                                                   border-radius:8px;
                                                                                                                                                                                                                                   background:var(--bg)}
-                                                                                                                                                                                                                                  .button:hover:not(:disabled) {
+                                                                                                                                                                                                                                  .button:not(.primary):hover:not(:disabled) {
                                                                                                                                                                                                                                     background:var(--surface)}
                                                                                                                                                                                                                                     .button.primary {
                                                                                                                                                                                                                                       background:var(--accent);
@@ -858,27 +858,6 @@
                                                                                                                                                                                                                                                                                                                                                                                                                     color:#eba1ab}
                                                                                                                                                                                                                                                                                                                                                                                                                   }
 
-.session-context {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 22px;
-  border-bottom: 1px solid var(--line);
-  background: var(--sidebar);
-  flex-shrink: 0;
-}
-.session-context-label {
-  flex: 1 1 200px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: 13px;
-}
-.session-context .button { padding: 6px 10px; font-size: 13px; }
-
 /* Shared execution evidence; product renderers cannot replace this status chrome. */
 .status.awaiting-approval,.status.unknown,.status.interrupted { color:var(--accent); }
 .status.denied,.notice.failed,.notice.unknown { border-color:var(--danger); }
@@ -910,6 +889,13 @@
 .command-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 .command-json { width:100%; padding:12px; color:inherit; background:transparent; border:1px solid var(--line); border-radius:8px; }
 .command-suggestions { max-height:230px; overflow:auto; border-bottom:1px solid var(--line); }
+.resource-row { display:flex; align-items:center; gap:2px; min-width:0; }
+.resource-row .resource-item { flex:1; min-width:0; }
+.resource-delete { flex:none; opacity:0; pointer-events:none; }
+.resource-row:is(:hover,:focus-within) .resource-delete { opacity:1; pointer-events:auto; }
+.resource-delete:disabled { cursor:not-allowed; }
+.resource-row:is(:hover,:focus-within) .resource-delete:disabled { opacity:0.4; }
+@media (hover:none) { .resource-delete { opacity:1; pointer-events:auto; } .resource-delete:disabled { opacity:0.4; } }
 .command-suggestion { display:block; width:100%; padding:8px; border:0; color:inherit; background:transparent; text-align:left; cursor:pointer; }
 .command-suggestion[aria-selected="true"] { color:var(--accent); background:var(--surface); }
 .hide-reasoning .reasoning { display:none; }

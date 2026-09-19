@@ -12,7 +12,8 @@ export class MaybeCodeWebCommands {
   available(name: string): boolean {
     if (name === "mcp.respond") return Boolean(this.app.getMcpInteractions?.().length);
     if (name === "console.cancel") return true;
-    if (this.busy) return ["run.cancel", "approval.resolve", "session.browse"].includes(name);
+    if (this.busy) return ["run.cancel", "approval.resolve"].includes(name);
+    if (this.app.getMcpInteractions?.().length && ["session.new", "session.activate", "session.delete", "console.action"].includes(name)) return false;
     if (["console.execute", "console.action"].includes(name)) return !this.app.isRunning;
     return true;
   }
@@ -52,6 +53,7 @@ export class MaybeCodeWebCommands {
       if (command.name === "console.execute") {
         commandArgs(command, ["text"]);
         if (command.args.text!.length > 16_384) throw new UiError(400, "命令过长。");
+        if (this.app.getMcpInteractions?.().length && /^\/(?:new|resume)(?:\s|$)/u.test(command.args.text!.trim())) throw new UiError(409, "请先完成或取消当前 MCP 交互。");
         const result = await executeMaybeCodeSlashCommand(command.args.text!, this.app);
         return await this.present(result);
       }
@@ -73,6 +75,7 @@ export class MaybeCodeWebCommands {
     else if (action === "model.switch") await this.app.switchModel(value!);
     else if (action === "effort.set") await this.app.setReasoningEffort(value === "default" ? undefined : value);
     else if (["session.resume", "session.rename", "session.delete"].includes(action!)) {
+      if (action === "session.delete" && value === this.app.sessionId) throw new UiError(409, "无法删除当前会话，请先切换到其它会话。");
       if (!(await this.app.listSessions()).some(session => session.id === value)) throw new UiError(404, "会话不属于当前工作区。");
       if (action === "session.resume") await this.app.resumeSession(value!);
       else if (action === "session.rename") {

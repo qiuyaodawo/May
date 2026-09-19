@@ -5,7 +5,7 @@ does not depend on TUI rendering or a product. The root entry exports JSON DTOs,
 `UiHost`, `UiClient`, `UiError`, and command validation helpers.
 
 - `@may/ui-client/application`: `ApplicationUiHost`, adapting one
-  `AgentWorkspaceController` with one execution session and independent client history views.
+  `AgentWorkspaceController` with one current session shared by all connected clients.
 - `@may/ui-client/projection`: bounded runtime/history presentation without
   provider continuation state or terminal components.
 - `@may/ui-client/server`: authenticated loopback server and mountable UI router.
@@ -37,11 +37,14 @@ controlled restart. Receipts are not a durable command log or exactly-once netwo
 See [English](../../../docs/en/guides/web-ui.md) or
 [简体中文](../../../docs/zh-CN/guides/web-ui.md) for setup, protocol and limitations.
 
-`selectedId` identifies the viewed resource; session hosts also expose `activeId`.
-`select(id)` reads history without activating it. `session.activate` and
-`session.new` require `expectedActiveId`; `UiClient` supplies it from the current
-snapshot. Browsing depends on `readSessionHistory` and safe store inspection.
-This preview replaces the old `session.open` UI command; upgrade host and client together.
+`selectedId` identifies the viewed resource. For session hosts it equals `activeId`;
+all connected clients follow the current workspace session. `select(id)` sends
+`session.activate`. Activation, `session.new` and `session.delete` require
+`expectedActiveId`, supplied by `UiClient`. Deletion targets `targetId` and rejects
+the current session with HTTP 409, preserving its history and selection.
+Snapshot reads always return the current session; history and field reads use
+safe store inspection. Task hosts retain independent selection. Upgrade this
+preview's host and client together when adopting these selection semantics.
 
 
 Execution evidence uses `UiBlockStatus`, `UiDiagnostic`, `UiApprovalRecord` and

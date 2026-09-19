@@ -7,8 +7,8 @@ export function element<K extends keyof HTMLElementTagNameMap>(tag: K, className
 export function button(label: string, action: () => void, className = "button"): HTMLButtonElement {
   const el = element("button", className, label); el.type = "button"; el.onclick = action; return el;
 }
-export function icon(name: "plus" | "menu" | "send" | "stop" | "panel" | "search" | "arrow" | "code" | "task") {
-  const paths = { plus: "M12 5v14M5 12h14", menu: "M4 6h16M4 12h16M4 18h16", send: "M12 19V5m-6 6 6-6 6 6", stop: "M6 6h12v12H6z", panel: "M4 4h16v16H4zM14 4v16", search: "m16 16 4 4M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0", arrow: "M7 17 17 7M7 7h10v10", code: "m8 6-6 6 6 6m8-12 6 6-6 6m-3-14-2 16", task: "M8 5h12M8 12h12M8 19h12M3 5h.01M3 12h.01M3 19h.01" };
+export function icon(name: "plus" | "menu" | "send" | "stop" | "panel" | "search" | "arrow" | "code" | "task" | "trash") {
+  const paths = { plus: "M12 5v14M5 12h14", menu: "M4 6h16M4 12h16M4 18h16", send: "M12 19V5m-6 6 6-6 6 6", stop: "M6 6h12v12H6z", panel: "M4 4h16v16H4zM14 4v16", search: "m16 16 4 4M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0", arrow: "M7 17 17 7M7 7h10v10", code: "m8 6-6 6 6 6m8-12 6 6-6 6m-3-14-2 16", task: "M8 5h12M8 12h12M8 19h12M3 5h.01M3 12h.01M3 19h.01", trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" };
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "1.6"); svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round");
   const path = document.createElementNS(svg.namespaceURI, "path"); path.setAttribute("d", paths[name]); svg.append(path); return svg;

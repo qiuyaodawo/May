@@ -87,10 +87,15 @@ exception-only filtering, approval location and back-to-latest/new-content contr
 Tool cards use short labelled previews; the independent inspector reuses trusted
 product renderers and reads full stored fields in version-bound chunks. Long
 answers and diagnostics also expose inspection. The inspector resets on host or
-resource changes; browsing and reading never switch the runtime's execution target.
+resource changes. Session selection switches the workspace's current session,
+and all connected pages follow it. History search and field reads remain read-only.
 
 The sidebar pages/searches all resource titles (task prompts for task hosts), while
 content search and older-record loading use the selected host's read-only APIs.
+Inactive session rows expose a confirmed delete action through a trash icon on
+hover or keyboard focus; touch devices keep the icon visible. The current session
+cannot be deleted. Session selection and deletion require an idle host with no
+pending MCP interaction.
 Search results are query snapshots, not live replacement approvals. Hosts without
 read capabilities retain their basic snapshot UI; field tabs stay disabled.
 Run `node examples/web-ui/reading.mjs` after building for a large offline fixture.

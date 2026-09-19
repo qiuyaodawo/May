@@ -43,6 +43,11 @@ export class UiClient {
   }
   async select(id?: string): Promise<void> {
     if (!this.lifetime) throw new UiError(409, "请先连接本地服务。");
+    if (this.value.snapshot?.activeId !== undefined) {
+      if (id === undefined || id === this.value.snapshot.activeId) { await this.refresh(); return; }
+      await this.command("session.activate", {}, id);
+      return;
+    }
     const version = ++this.selectionVersion, previous = this.value.snapshot?.selectedId ?? undefined;
     this.selectedId = id; this.update({ selecting: true, error: null, output: null });
     try { await this.refresh(); }
@@ -56,9 +61,10 @@ export class UiClient {
     if (snapshot.version !== 1 || typeof snapshot.hostId !== "string") throw new UiError(409, "不兼容的 UI 协议版本。");
     const previous = this.value.snapshot;
     if (previous?.hostId === snapshot.hostId && snapshot.revision < previous.revision) return;
-    // Resolve the initial default once; later host changes must not move this view.
-    if (selected === undefined && snapshot.product.resourceKind === "session" && snapshot.selectedId) this.selectedId = snapshot.selectedId;
-    this.update({ snapshot, connection: "connected" });
+    const changedSelection = previous?.hostId !== snapshot.hostId || previous?.selectedId !== snapshot.selectedId;
+    if (snapshot.activeId !== undefined) this.selectedId = snapshot.selectedId ?? undefined;
+    if (changedSelection && snapshot.activeId !== undefined) this.selectionVersion++;
+    this.update({ snapshot, connection: "connected", ...(changedSelection ? { output: null } : {}) });
   }
   readResources(query = "", cursor?: string): Promise<UiPage<UiResource>> {
     return this.read("resources", { query, ...(cursor ? { cursor } : {}) }, false);

@@ -48,7 +48,7 @@ export class ApplicationUiHost implements UiHost {
       this.changed();
     }
   }
-  snapshot(selectedId?: string): Promise<UiSnapshot> { return this.queuedSnapshot(selectedId); }
+  snapshot(_selectedId?: string): Promise<UiSnapshot> { return this.queuedSnapshot(); }
   private queuedSnapshot(selectedId?: string, all = false): Promise<UiSnapshot> {
     const work = this.mutation.then(() => this.buildSnapshot(selectedId, 0, all));
     this.mutation = work.catch(() => {}); return work;
@@ -70,10 +70,9 @@ export class ApplicationUiHost implements UiHost {
     }
     if (!viewingActive || !running || this.fault) projected.settle();
     const interactions = viewingActive && running && !this.fault ? [...this.projection.interactions.values()] : [];
-    const commands = this.app.readSessionHistory ? ["session.browse"] : [];
-    if (!running) commands.push("session.new");
+    const commands: string[] = [];
+    if (!running) commands.push("session.new", "session.activate", "session.delete");
     if (viewingActive) commands.push(...(running ? ["run.cancel", ...(interactions.length ? ["approval.resolve"] : [])] : ["message.submit", "session.rename", "context.compact", ...(this.options.commands ?? [])]));
-    else if (!running) commands.push("session.activate");
     if (viewingActive) commands.push(...(this.options.concurrentCommands ?? []));
     if (this.options.available) {
       for (let index = commands.length - 1; index >= 0; index--) if (!this.options.available(commands[index]!)) commands.splice(index, 1);
@@ -82,7 +81,7 @@ export class ApplicationUiHost implements UiHost {
     const panels = viewingActive ? await this.options.panels?.() ?? [] : [];
     const choices = viewingActive ? await this.options.choices?.() ?? [] : [];
     if (activeId !== this.app.sessionId || running !== this.app.isRunning) {
-      if (attempt < 2) return this.buildSnapshot(viewingId, attempt + 1, all);
+      if (attempt < 2) return this.buildSnapshot(selectedId, attempt + 1, all);
       throw new UiError(409, "运行会话状态已改变，请刷新后重试。");
     }
     const page = historyPage(this.hostId, viewingId, [...projected.blocks.values()]);
@@ -90,10 +89,10 @@ export class ApplicationUiHost implements UiHost {
       selectedId: viewingId, activeId, blocks: all ? [...projected.blocks.values()] : page.items,
       historyPage: { nextCursor: page.nextCursor, total: page.total }, reads: { resources: true, history: Boolean(this.app.readSessionHistory), fields: Boolean(this.app.readSessionHistory) },
       interactions, commands,
-      panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "浏览会话", value: viewingId }, { label: "运行会话", value: activeId }, { label: "执行状态", value: running ? "运行中" : "空闲" }] }, ...panels],
+      panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "当前会话", value: viewingId }, { label: "执行状态", value: running ? "运行中" : "空闲" }] }, ...panels],
       choices,
       ...(viewingActive && this.options.controls ? { controls: this.options.controls() } : {}),
-      notice: this.fault ?? "浏览只影响当前页面。设为运行会话或新建会话会更换宿主的执行对象，但不会切走其它页面；执行期间不能切换。",
+      notice: this.fault ?? "选择会话后即可继续对话，终端和已连接页面同步切换。执行或等待交互期间，请先完成或取消当前操作。",
     };
   }
   async resources(request: UiPageRequest) {
@@ -122,14 +121,19 @@ export class ApplicationUiHost implements UiHost {
     return { hostId: this.hostId, items: await this.options.complete(text) };
   }
   private async apply(command: UiCommand): Promise<UiReceipt> {
-    const transition = command.name === "session.activate" || command.name === "session.new";
-    if (command.hostId !== this.hostId || !command.targetId || (transition ? command.expectedActiveId !== this.app.sessionId : command.targetId !== this.app.sessionId)) throw new UiError(409, "运行会话已改变，请检查当前状态后重试。");
+    const transition = command.name === "session.activate" || command.name === "session.new" || command.name === "session.delete";
+    if (!command.targetId) throw new UiError(409, "请指定会话。");
+    const assertCurrent = () => {
+      if (command.hostId !== this.hostId || (transition ? command.expectedActiveId !== this.app.sessionId : command.targetId !== this.app.sessionId)) throw new UiError(409, "当前会话已改变，请检查当前状态后重试。");
+    };
+    assertCurrent();
     if (this.options.interactionCommands?.includes(command.name)) {
       if (!this.options.available?.(command.name) || !this.options.execute) throw new UiError(409, "交互已不可用。");
       return this.options.execute(command);
     }
-    if (command.name === "session.browse" || !(await this.buildSnapshot(command.targetId)).commands.includes(command.name)) throw new UiError(409, "当前状态不允许此操作。");
+    if (!(await this.buildSnapshot()).commands.includes(command.name)) throw new UiError(409, "当前状态不允许此操作。");
     if (this.options.available && !this.options.available(command.name)) throw new UiError(409, "当前状态不允许此操作。");
+    assertCurrent();
     switch (command.name) {
       case "message.submit": {
         commandArgs(command, ["text"]);
@@ -151,7 +155,21 @@ export class ApplicationUiHost implements UiHost {
         break;
       }
       case "session.new": commandArgs(command, []); await this.app.newSession(); this.projection = new UiProjection(); break;
-      case "session.activate": commandArgs(command, []); await this.app.resumeSession(command.targetId); this.projection = new UiProjection(); break;
+      case "session.activate": {
+        commandArgs(command, []);
+        if (!(await this.app.listSessions()).some(session => session.id === command.targetId)) throw new UiError(404, "会话不属于当前工作区。");
+        assertCurrent();
+        await this.app.resumeSession(command.targetId); this.projection = new UiProjection(); break;
+      }
+      case "session.delete": {
+        commandArgs(command, []);
+        if (command.targetId === this.app.sessionId) throw new UiError(409, "无法删除当前会话，请先切换到其它会话。");
+        const sessions = await this.app.listSessions();
+        if (!sessions.some(session => session.id === command.targetId)) throw new UiError(404, "会话不属于当前工作区。");
+        assertCurrent();
+        if (!await this.app.deleteSession(command.targetId)) throw new UiError(404, "会话已不存在。");
+        break;
+      }
       case "session.rename": commandArgs(command, ["title"]); await this.app.renameSession(this.app.sessionId, command.args.title!.slice(0, 160)); break;
       case "context.compact": commandArgs(command, []); await this.app.compactContext(); break;
       default: {

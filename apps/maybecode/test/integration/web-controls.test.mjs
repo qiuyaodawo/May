@@ -31,10 +31,10 @@ async function connect(app, t) {
   const client = new UiClient(server.url);
   t.after(() => client.disconnect());
   await client.connect(token);
-  return { client, server };
+  return { client, server, token };
 }
 
-test("真实配置：Web 命令、effort、会话管理与只读浏览", { skip: process.env.MAYBECODE_WEB_LIVE !== "1", timeout: 60_000 }, async t => {
+test("真实配置：Web 命令、effort 和会话管理", { skip: process.env.MAYBECODE_WEB_LIVE !== "1", timeout: 60_000 }, async t => {
   const root = await directory();
   const app = await openConfiguredMaybeCode({ workspace: root, dataDirectory: join(root, "data"), mcp: false, skills: false, observability: false });
   const { client } = await connect(app, t);
@@ -69,13 +69,64 @@ test("真实配置：Web 命令、effort、会话管理与只读浏览", { skip:
   await client.command("console.action", { action: "session.rename", value: first, title: "Web 会话" });
   assert.equal((await app.listSessions()).find(session => session.id === first).title, "Web 会话");
   await client.select(first);
-  await assert.rejects(slash("/effort"), { status: 409 });
-  await client.command("session.activate");
+  await slash("/effort");
   assert.equal(app.sessionId, first);
   await slash("/new");
   await client.command("console.action", { action: "session.delete", value: first });
   assert.ok(!(await app.listSessions()).some(session => session.id === first));
   await slash("/quit"); assert.equal(client.state.connection, "disconnected");
+});
+
+test("真实会话：多页面同步、删除、工作区范围及过期操作", { skip: process.env.MAYBECODE_WEB_LIVE !== "1", timeout: 60_000 }, async t => {
+  const root = await directory();
+  const app = await openConfiguredMaybeCode({ workspace: root, dataDirectory: join(root, "data"), mcp: false, skills: false, observability: false });
+  const { client: left, server, token } = await connect(app, t);
+  const right = new UiClient(server.url); t.after(() => right.disconnect()); await right.connect(token);
+  const first = app.sessionId;
+  await assert.rejects(left.command("session.delete", {}, first), { status: 409 });
+  assert.deepEqual((await app.listSessions()).map(session => session.id), [first]);
+  await left.command("session.new"); const second = app.sessionId;
+  await until(() => right.state.snapshot.selectedId === second);
+  await right.select(first);
+  assert.equal(app.sessionId, first);
+  await until(() => left.state.snapshot.selectedId === first);
+  assert.equal(left.state.snapshot.activeId, left.state.snapshot.selectedId);
+  assert.ok(left.state.snapshot.commands.includes("message.submit"));
+  const before = await app.history(); await right.readHistory(); assert.deepEqual(await app.history(), before);
+  const foreignRoot = await directory();
+  const foreign = await openConfiguredMaybeCode({ workspace: foreignRoot, dataDirectory: join(root, "data"), mcp: false, skills: false, observability: false });
+  t.after(() => foreign.close());
+  await assert.rejects(left.select(foreign.sessionId), { status: 404 });
+  await assert.rejects(left.command("session.delete", {}, foreign.sessionId), { status: 404 });
+  assert.equal(app.sessionId, first);
+  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  const post = (name, targetId, expectedActiveId) => fetch(server.url + "/api/ui/commands", { method: "POST", headers,
+    body: JSON.stringify({ version: 1, hostId: left.state.snapshot.hostId, requestId: crypto.randomUUID(), name, targetId, expectedActiveId, args: {} }) });
+  const transitions = await Promise.all([post("session.activate", second, first), post("session.new", first, first)]);
+  assert.deepEqual(transitions.map(response => response.status).sort(), [200, 409]);
+  assert.equal((await post("session.delete", second, first)).status, 409);
+  assert.equal((await post("session.new", app.sessionId, undefined)).status, 409);
+  await until(() => left.state.snapshot.selectedId === app.sessionId && right.state.snapshot.selectedId === app.sessionId);
+  await left.select(first); await right.refresh();
+  await left.command("session.delete", {}, second);
+  assert.equal(app.sessionId, first);
+  assert.ok(!(await right.readResources()).items.some(session => session.id === second));
+  await assert.rejects(left.select(second), { status: 404 });
+  await assert.rejects(left.command("session.delete", {}, second), { status: 404 });
+  for (const session of await app.listSessions()) if (session.id !== first) await left.command("session.delete", {}, session.id);
+  await left.command("session.new"); const replacement = app.sessionId;
+  await left.select(first);
+  const sessions = await app.listSessions(), history = await app.history();
+  await assert.rejects(left.command("session.delete", {}, first), { status: 409 });
+  await assert.rejects(left.command("console.action", { action: "session.delete", value: first }), { status: 409 });
+  assert.equal(app.sessionId, first);
+  assert.deepEqual(await app.listSessions(), sessions);
+  assert.deepEqual(await app.history(), history);
+  await until(() => right.state.snapshot.selectedId === first);
+  await left.command("session.delete", {}, replacement);
+  assert.deepEqual((await app.listSessions()).map(session => session.id), [first]);
+  await app.newSession();
+  await until(() => left.state.snapshot.selectedId === app.sessionId && right.state.snapshot.selectedId === app.sessionId);
 });
 
 test("真实 MCP broker：Web 表单、review、URL、失效响应和取消", { skip: process.env.MAYBECODE_WEB_LIVE !== "1", timeout: 60_000 }, async t => {
@@ -97,6 +148,12 @@ test("真实 MCP broker：Web 表单、review、URL、失效响应和取消", { 
     type: "object", properties: { name: { type: "string", minLength: 2 } }, required: ["name"],
   } }, new AbortController().signal, Date.now() + 30_000);
   const form = await pending();
+  assert.ok(!client.state.snapshot.commands.includes("session.activate"));
+  assert.ok(!client.state.snapshot.commands.includes("session.delete"));
+  await assert.rejects(client.command("session.delete", {}, app.sessionId), { status: 409 });
+  await assert.rejects(client.command("session.new"), { status: 409 });
+  await assert.rejects(client.command("session.activate", {}, app.sessionId), { status: 409 });
+  await assert.rejects(client.command("console.execute", { text: "/new" }), { status: 409 });
   await assert.rejects(client.interact("mcp.respond", { id: form.id, action: "accept", content: '{"name":"x"}' }));
   const viewing = client.command("console.execute", { text: "/mcp" });
   assert.equal(client.state.busy, true);

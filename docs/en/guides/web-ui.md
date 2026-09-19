@@ -66,7 +66,7 @@ Command output is held in page memory, separately from conversation history.
 | --- | --- |
 | Model and default profile | Model dropdown; `/model` selection and default actions; `/model profile --default` |
 | Reasoning effort | Effort dropdown; `/effort`; `/effort default` restores configured options |
-| Sessions | `/new`, `/resume [id]`; rename and confirmed deletion in the session selector |
+| Sessions | Sidebar selection and confirmed deletion; `/new`, `/resume [id]`; rename and deletion in the session selector |
 | Retry, instructions and status | `/retry`, `/instructions`, `/status`, `/context` |
 | Context management | `/compact [history-reference\|provider-native]` and the compact button |
 | Skills | `/skills`, `/skills show name`, `/skills use name [task]` |
@@ -162,20 +162,23 @@ issuing a fresh request. This is **not** durable exactly-once execution.
 
 **MaybeCode:** submit messages, see incremental model/tool output, review tool
 inputs and coding change previews, resolve tool approvals, cancel, list/new/open/
-rename sessions, switch model profiles and request context compaction. One host
-has one execution session, identified by `activeId`; `selectedId` is the history
-view of this client. Sidebar clicks only read history, including during a run.
-Other windows keep their selection when the execution session changes. The initial
-default is pinned once; reloading the page still requires reconnecting and chooses
-the current execution session again.
+rename/delete sessions, switch model profiles and request context compaction.
+The displayed session is the host's current session: `selectedId` equals `activeId`.
+Clicking a sidebar session activates it so the composer can continue that session.
+All connected pages follow session changes, including changes made in the TUI.
+Switching, creating and deleting sessions are disabled during a run or pending MCP
+interaction. Finish or cancel the current operation before changing sessions.
 
-Historical views have no send, cancel, approval, model or compaction controls.
-Use **View execution session** to inspect the current run, or **Set as execution
-session** (`session.activate`) to explicitly switch while idle. New-session and
-activation commands carry `expectedActiveId`; stale transitions are rejected,
-not automatically replayed. Execution commands remain bound to their `targetId`.
-The old `session.open` UI command is no longer accepted; update clients together
-with this preview host. `session.browse` is a read capability, not a POST command.
+Inactive sidebar sessions show a trash icon on hover or keyboard focus; touch
+devices keep the icon visible. Deletion requires confirmation. The current
+session cannot be deleted, and the host rejects direct deletion requests for it.
+The list and connected pages refresh after deletion. New-session,
+activation and deletion commands carry `expectedActiveId`; stale transitions are
+rejected without automatic replay. Commands remain bound to their `targetId`.
+`UiClient.select(id)` sends `session.activate` for session hosts; snapshot reads
+always return the current session. Upgrade this preview's client and host together.
+Task hosts retain independent selection. History search and field reads remain
+read-only operations within the workspace.
 
 `AgentWorkspace.readSessionHistory(id)` validates workspace catalog membership
 and uses optional `SessionStore.inspect(id)`. It never opens a runtime, changes

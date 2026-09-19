@@ -105,7 +105,7 @@ export interface UiSnapshot {
   readonly product: UiProduct;
   readonly resources: readonly UiResource[];
   readonly selectedId: string | null;
-  /** Workspace execution owner, independent of this client's selected history. Absent for task hosts. */
+  /** 工作区当前会话，与 selectedId 相同；任务宿主省略此字段。 */
   readonly activeId?: string;
   readonly blocks: readonly UiBlock[];
   readonly historyPage?: { readonly nextCursor: string | null; readonly total: number };
@@ -125,7 +125,7 @@ export interface UiCommand {
   readonly requestId: string;
   readonly name: string;
   readonly targetId: string | null;
-  /** Required for explicit workspace activation/new-session commands. */
+  /** 切换、新建和删除会话时必须提供的当前会话 ID。 */
   readonly expectedActiveId?: string;
   readonly args: Readonly<Record<string, string>>;
 }

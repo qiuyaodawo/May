@@ -35,6 +35,11 @@ complete it. Commands produce local UI output and do not become model messages.
 `/model` manages model selection and the default profile; `/effort` opens the
 reasoning-effort selector. The composer also exposes model and effort dropdowns.
 `/resume` provides resume, rename and confirmed deletion of inactive sessions.
+The sidebar selects the current session directly. Other sessions expose a trash
+icon on hover or keyboard focus, with confirmation before deletion. Touch devices
+keep the icon visible. The current session cannot be deleted. All connected pages
+follow session changes from Web or TUI. Finish or cancel a run or MCP interaction
+before switching, creating or deleting sessions.
 `/skills`, `/mcp`, `/recovery`, `/retry`, `/instructions`, `/status`, `/context` and
 the `/compact` strategies use the shared controller. `/details` and `/thinking`
 control page presentation. `/quit` and `/exit` request confirmation before closing
