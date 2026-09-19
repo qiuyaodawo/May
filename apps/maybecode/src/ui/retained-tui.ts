@@ -45,7 +45,6 @@ export async function runRetainedTerminalUI(
   }
 
   let runtime: TuiRuntime | undefined;
-  const web = new MaybeCodeTerminalWeb(app);
   let closing = false;
   let eventFailure: unknown;
   let resolveExit!: () => void;
@@ -56,6 +55,7 @@ export async function runRetainedTerminalUI(
     runtime?.stop();
     resolveExit();
   };
+  const web = new MaybeCodeTerminalWeb(app, finish);
   const handleProcessSignal = (): void => {
     if (app.isRunning) app.cancel("Interrupted by process signal");
     finish();

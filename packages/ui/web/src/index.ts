@@ -2,6 +2,7 @@ import type { UiClient, UiClientState, UiResource } from "@may/ui-client";
 import { button, detailPanel, extensionContent, element, icon, statusLabel, type WebUiExtensions } from "./components.js";
 export { approvalCard, detailPanel, transcriptBlock, type WebUiExtensions, type WebUiContext, type WebUiRenderer } from "./components.js";
 import { createInspector, createTranscriptReader } from "./reading.js";
+import { createCommandUI } from "./commands.js";
 export { markdown } from "./markdown.js";
 
 export interface WebUiOptions { readonly title?: string; readonly kind?: "session" | "task"; readonly extensions?: WebUiExtensions; readonly initialToken?: Promise<string | undefined>; readonly connectionHint?: string }
@@ -46,11 +47,6 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const title = element("span", "current-title");
   const detailButton = button("", () => { shell.classList.toggle("details-open"); detailButton.setAttribute("aria-expanded", String(shell.classList.contains("details-open"))); }, "icon-button"); detailButton.append(icon("panel")); detailButton.setAttribute("aria-label", "显示或隐藏详情"); detailButton.setAttribute("aria-expanded", "false");
   header.append(headerLeft, title, detailButton);
-  const sessionBar = element("div", "session-context"); sessionBar.hidden = true;
-  const sessionHint = element("span", "session-context-label");
-  const viewActive = button("查看运行会话", () => { void client.select(state.snapshot?.activeId).catch(showError); }, "button");
-  const activate = button("设为运行会话", () => act("session.activate"), "button primary");
-  sessionBar.append(sessionHint, viewActive, activate);
   const errorBox = element("div", "error-banner"); errorBox.hidden = true; errorBox.setAttribute("role", "alert");
   const scroll = element("div", "conversation-scroll");
   const welcome = element("section", "welcome");
@@ -68,11 +64,15 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const composer = element("textarea"); composer.rows = 2; composer.maxLength = 16_384; composer.placeholder = "描述你想完成的事…"; composer.setAttribute("aria-label", "消息输入");
   const toolbar = element("div", "composer-toolbar"); const choices = element("div", "composer-choices");
   const send = element("button", "send-button"); send.type = "submit"; send.append(icon("send")); send.setAttribute("aria-label", "发送消息");
-  const cancel = button("", () => act(state.snapshot?.product.resourceKind === "task" ? "task.cancel" : "run.cancel"), "send-button stop-button"); cancel.append(icon("stop")); cancel.setAttribute("aria-label", "取消当前运行"); cancel.hidden = true;
+  const cancel = button("", () => {
+    const controls = state.snapshot?.controls;
+    if (controls) void client.interact(controls.cancelCommand).catch(showError);
+    else act(state.snapshot?.product.resourceKind === "task" ? "task.cancel" : "run.cancel");
+  }, "send-button stop-button"); cancel.append(icon("stop")); cancel.setAttribute("aria-label", "取消当前运行"); cancel.hidden = true;
   toolbar.append(choices, cancel, send); form.append(composer, toolbar);
   const composerHint = element("div", "composer-hint", "Enter 发送 · Shift + Enter 换行");
   composerArea.append(form, composerHint);
-  main.append(header, sessionBar, errorBox, scroll, composerArea);
+  main.append(header, errorBox, scroll, composerArea);
   const details = element("aside", "details-panel"); details.setAttribute("aria-label", "详情");
   const workspaceDetails = element("div");
   const inspector = createInspector(client, options.extensions ?? {}, open => {
@@ -81,6 +81,12 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   });
   details.append(inspector.root, workspaceDetails);
   const reader = createTranscriptReader(client, { scroll, messages, approvals }, options.extensions ?? {}, block => inspector.inspect(block));
+  const commandUI = createCommandUI(client, composer, command => {
+    if (command === "/details") { reader.toggleDetails(); return true; }
+    if (command === "/thinking") { shell.classList.toggle("hide-reasoning"); return true; }
+    return false;
+  });
+  scroll.append(commandUI.root); form.insertBefore(commandUI.suggestions, composer);
   main.insertBefore(reader.toolbar, scroll);
   shell.append(sidebar, main, details);
 
@@ -133,6 +139,24 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const pending = () => state.busy || state.selecting;
   const has = (name: string) => state.snapshot?.commands.includes(name) ?? false;
 
+  function deleteSession(resource: UiResource): void {
+    const hostId = state.snapshot?.hostId, currentId = state.snapshot?.activeId;
+    const confirmation = element("dialog", "connect-dialog"), form = element("form");
+    const error = element("p", "dialog-error"); error.setAttribute("role", "alert");
+    const remove = element("button", "button primary", "删除会话"); remove.type = "submit";
+    form.append(element("h2", "", "删除会话"), element("p", "", `确定删除“${resource.title}”及其历史记录？此操作无法撤销。`), error, button("取消", () => confirmation.close()), remove);
+    confirmation.append(form); root.append(confirmation);
+    form.onsubmit = event => {
+      event.preventDefault();
+      if (state.snapshot?.hostId !== hostId || state.snapshot?.activeId !== currentId) { error.textContent = "当前会话已改变，请关闭后重新选择删除操作。"; return; }
+      remove.disabled = true;
+      void client.command("session.delete", {}, resource.id).then(() => {
+        drafts.delete(resource.id); confirmation.close();
+      }, reason => { error.textContent = reason instanceof Error ? reason.message : "删除失败。"; remove.disabled = false; });
+    };
+    confirmation.onclose = () => confirmation.remove(); confirmation.showModal();
+  }
+
   function renderList(): void {
     const snapshot = state.snapshot, query = search.value.trim().toLocaleLowerCase();
     const resources = resourceItems === null ? snapshot?.resources.filter(r => r.title.toLocaleLowerCase().includes(query)) ?? [] : resourceItems.map(item => snapshot?.resources.find(current => current.id === item.id) ?? item);
@@ -141,16 +165,24 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     }
     list.replaceChildren();
     for (const resource of resources) {
+      const row = element("div", "resource-row");
       const item = button("", () => {
         void client.select(resource.id).catch(showError);
         hideSidebar();
       }, `resource-item${resource.id === snapshot?.selectedId ? " selected" : ""}`);
-      item.disabled = pending() || state.connection !== "connected" || snapshot?.product.resourceKind === "session" && !has("session.browse") && resource.id !== snapshot.activeId;
+      item.disabled = pending() || state.connection !== "connected" || snapshot?.product.resourceKind === "session" && !has("session.activate") && resource.id !== snapshot.activeId;
       if (resource.id === snapshot?.selectedId) item.setAttribute("aria-current", "page");
       item.append(icon(resource.kind === "task" ? "task" : "code"), element("span", "resource-title", resource.title));
       if (resource.status !== "idle") item.append(element("span", `resource-status ${resource.status}`, statusLabel(resource.status)));
-      else if (resource.id === snapshot?.activeId) item.append(element("span", "resource-status", "运行会话"));
-      item.title = resource.title; list.append(item);
+      item.title = resource.title; row.append(item);
+      if (resource.kind === "session" && resource.id !== snapshot?.activeId) {
+        const remove = button("", () => deleteSession(resource), "resource-delete icon-button");
+        remove.append(icon("trash")); remove.title = "删除会话";
+        remove.setAttribute("aria-label", `删除会话：${resource.title}`);
+        remove.disabled = pending() || state.connection !== "connected" || !has("session.delete");
+        row.append(remove);
+      }
+      list.append(row);
     }
     if (!resources.length) list.append(element("p", "list-empty", query ? "没有匹配的记录" : snapshot ? "你的工作会保存在这里" : "连接后查看历史记录"));
   }
@@ -165,14 +197,6 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     connectionDot.className = `connection-dot ${state.connection}`;
     productName.textContent = snapshot?.product.title ?? options.title ?? "May";
     const isTask = (snapshot?.product.resourceKind ?? options.kind) === "task";
-    const browsingHistory = !isTask && snapshot?.activeId !== undefined && selected !== snapshot.activeId;
-    const execution = snapshot?.resources.find(r => r.id === snapshot.activeId);
-    sessionBar.hidden = !snapshot?.activeId;
-    sessionHint.textContent = browsingHistory ? `只读浏览 · 运行会话：${execution?.title ?? snapshot?.activeId}${execution?.status === "running" ? "（执行中，暂不能切换）" : ""}` : "当前浏览：运行会话";
-    sessionHint.title = sessionHint.textContent;
-    viewActive.hidden = activate.hidden = !browsingHistory;
-    viewActive.disabled = !connected || pending();
-    activate.disabled = !connected || pending() || !has("session.activate");
     productTag.textContent = isTask ? "任务" : "工作区";
     newButton.lastChild!.textContent = isTask ? "新建任务" : "新建会话";
     newButton.disabled = !connected || pending() || !has(isTask ? "task.submit" : "session.new");
@@ -193,7 +217,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     const sig = JSON.stringify([snapshot?.resources, selected, snapshot?.activeId, pending(), snapshot?.commands, connected]);
     if (sig !== listSignature) { listSignature = sig; renderList(); }
     errorBox.textContent = state.error ?? ""; errorBox.hidden = !state.error;
-    inspector.update(state); reader.update(state);
+    inspector.update(state); reader.update(state); commandUI.update(state);
     const visibleBlocks = snapshot?.blocks ?? [];
     welcome.hidden = visibleBlocks.length > 0;
     welcomeTitle.textContent = isTask ? "把下一件事交给 May" : "今天，一起构建什么？";
@@ -203,9 +227,8 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
       suggestionSignature = suggestionsKey; suggestions.replaceChildren();
       for (const text of snapshot?.product.suggestions ?? []) { const suggestion = button("", () => { composer.value = text; composer.focus(); drafts.set(draftKey, text); updateComposer(); }, "suggestion"); suggestion.append(element("span", "", text), icon("arrow")); suggestions.append(suggestion); }
     }
-    suggestions.hidden = browsingHistory;
-    composer.placeholder = browsingHistory ? "正在只读浏览历史；设为运行会话后可继续对话" : isTask && selected ? "当前任务已提交；新建任务以开始另一项工作" : isTask ? "描述任务、预期结果与约束…" : "描述需求、提问，或一起解决一个问题…";
-    composer.disabled = Boolean(isTask && selected || browsingHistory);
+    composer.placeholder = isTask && selected ? "当前任务已提交；新建任务以开始另一项工作" : isTask ? "描述任务、预期结果与约束…" : "描述需求、提问，或一起解决一个问题…";
+    composer.disabled = Boolean(isTask && selected);
     const choicesKey = JSON.stringify([snapshot?.choices, pending(), snapshot?.commands, state.connection]);
     if (choicesKey !== choiceSignature) {
       choiceSignature = choicesKey; choices.replaceChildren();
@@ -216,10 +239,10 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
       }
       if (!snapshot?.choices.length) choices.append(element("span", "composer-mode", isTask ? "持久任务" : "本地 Agent"));
     }
-    cancel.hidden = !has(isTask ? "task.cancel" : "run.cancel"); cancel.disabled = !connected || pending();
+    cancel.hidden = state.snapshot?.controls ? !(state.busy || state.snapshot.controls.busy || has("run.cancel")) : !has(isTask ? "task.cancel" : "run.cancel"); cancel.disabled = !connected || (state.snapshot?.controls ? state.selecting : pending());
     send.hidden = !cancel.hidden;
     updateComposer();
-    composerHint.textContent = !connected ? "需要连接本地服务 · 不会自动发送输入" : browsingHistory ? "浏览不改变执行对象 · 不会发送消息或处理运行中的审批" : isTask && selected ? "关闭页面不会中止任务 · 执行、验证与送达分别记录" : "Enter 发送 · Shift + Enter 换行 · 请核对 Agent 的输出";
+    composerHint.textContent = !connected ? "需要连接本地服务 · 不会自动发送输入" : isTask && selected ? "关闭页面不会中止任务 · 执行、验证与送达分别记录" : "Enter 发送 · Shift + Enter 换行 · 请核对 Agent 的输出";
     const panelsKey = JSON.stringify([snapshot?.panels, snapshot?.notice, snapshot?.commands, pending()]);
     if (panelsKey !== panelSignature) {
       panelSignature = panelsKey; workspaceDetails.replaceChildren();
@@ -243,7 +266,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
 
   }
   function updateComposer(): void {
-    send.disabled = !composer.value.trim() || pending() || state.connection !== "connected" || !(has("message.submit") || has("task.submit") && !selected);
+    send.disabled = !composer.value.trim() || pending() || state.connection !== "connected" || !(has("message.submit") || has("task.submit") && !selected || state.snapshot?.controls && has(state.snapshot.controls.inputCommand));
     composer.rows = Math.min(8, Math.max(2, composer.value.split("\n").length));
   }
   composer.oninput = () => { drafts.set(draftKey, composer.value); updateComposer(); };
@@ -251,7 +274,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   form.onsubmit = event => {
     event.preventDefault(); if (send.disabled) return;
     const text = composer.value, key = draftKey;
-    void client.command(state.snapshot?.product.resourceKind === "task" ? "task.submit" : "message.submit", { text }).then(() => { drafts.delete(key); if (draftKey === key && composer.value === text) composer.value = ""; updateComposer(); }, showError);
+    void commandUI.submit(text).then(handled => handled ? undefined : client.command(state.snapshot?.product.resourceKind === "task" ? "task.submit" : "message.submit", { text })).then(() => { drafts.delete(key); if (draftKey === key && composer.value === text) composer.value = ""; updateComposer(); }, showError);
   };
   dialogForm.onsubmit = event => {
     event.preventDefault();
@@ -274,5 +297,5 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const unsubscribe = client.subscribe(render);
   let disposed = false;
   void options.initialToken?.then(token => { if (!disposed && token !== undefined) return client.connect(token); }).catch(error => { if (!disposed) showError(error); });
-  return () => { disposed = true; resourceRequest++; clearTimeout(searchTimer); reader.dispose(); inspector.dispose(); unsubscribe(); client.disconnect(); document.removeEventListener("keydown", keyboard); mobileQuery.removeEventListener("change", syncSidebar); root.replaceChildren(); };
+  return () => { disposed = true; resourceRequest++; clearTimeout(searchTimer); commandUI.dispose(); reader.dispose(); inspector.dispose(); unsubscribe(); client.disconnect(); document.removeEventListener("keydown", keyboard); mobileQuery.removeEventListener("change", syncSidebar); root.replaceChildren(); };
 }

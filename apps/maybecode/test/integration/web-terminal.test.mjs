@@ -50,7 +50,14 @@ test("真实 Provider：终端和 Web 共享会话、审批、事件与关闭行
   for (let i = 0; i < 400; i++) {
     const state = await snapshot();
     approval = state.interactions.find(item => item.kind === "approval");
-    if (approval) { await command(state, "approval.resolve", { id: approval.id, decision: "allow" }, "approve"); break; }
+    if (approval) {
+      for (const name of ["session.activate", "session.delete", "session.new"]) {
+        assert.ok(!state.commands.includes(name));
+        const blocked = await fetch(server.url + "/api/ui/commands", { method: "POST", headers, body: JSON.stringify({ version: 1, hostId: state.hostId, requestId: name, name, targetId: state.activeId, expectedActiveId: state.activeId, args: {} }) });
+        assert.equal(blocked.status, 409);
+      }
+      await command(state, "approval.resolve", { id: approval.id, decision: "allow" }, "approve"); break;
+    }
     if (!app.isRunning) break;
     await delay(100);
   }

@@ -7,7 +7,7 @@ import { UiError, type UiCommand, type UiHost, type UiReceipt, type UiField } fr
 export type UiAssets = ReadonlyMap<string, { readonly type: string; readonly body: string }>;
 
 /** Mount behind the host's authentication/origin checks. GET assets contain no secrets. */
-export function createUiRouter(host: UiHost) {
+export function createUiRouter(host: UiHost, exit?: () => void) {
   const receipts = new Map<string, { key: string; result: Promise<UiReceipt> }>();
   const streams = new Set<ServerResponse>();
   let closed = false;
@@ -21,6 +21,10 @@ export function createUiRouter(host: UiHost) {
           const selected = url.searchParams.get("selected") ?? undefined;
           if (selected && selected.length > 256) throw new UiError(400, "无效的资源 ID。");
           sendJson(res, 200, await host.snapshot(selected));
+        } else if (req.method === "GET" && url.pathname === "/api/ui/complete" && host.complete) {
+          const selected = url.searchParams.get("selected") ?? "", text = url.searchParams.get("text") ?? "";
+          if (url.searchParams.get("hostId") !== host.hostId || !selected || selected.length > 256 || text.length > 16_384) throw new UiError(400, "命令补全参数无效。");
+          sendJson(res, 200, await host.complete(selected, text));
         } else if (req.method === "GET" && ["/api/ui/resources", "/api/ui/history", "/api/ui/field"].includes(url.pathname)) {
           if (url.searchParams.get("hostId") !== host.hostId) throw new UiError(409, "宿主已改变，请刷新后重读。");
           const selected = url.searchParams.get("selected"), query = url.searchParams.get("query") ?? "", cursor = url.searchParams.get("cursor");
@@ -63,7 +67,9 @@ export function createUiRouter(host: UiHost) {
             receipt = { key, result: Promise.resolve().then(() => host.execute(command)) };
             receipts.set(command.requestId, receipt);
           }
-          sendJson(res, 200, await receipt.result);
+          const result = await receipt.result;
+          if (result.disconnect && exit) res.once("finish", exit);
+          sendJson(res, 200, result);
         } else throw new UiError(404, "接口不存在。");
       } catch (error) {
         if (!res.headersSent) sendJson(res, error instanceof UiError ? error.status : 400, { error: error instanceof UiError ? error.message : "操作失败。请检查宿主日志、配置或当前状态。" });
@@ -75,11 +81,11 @@ export function createUiRouter(host: UiHost) {
   };
 }
 
-export async function startUiServer(options: { host: UiHost; assets: UiAssets; token: string; port?: number; browserLogin?: boolean; close?: () => Promise<void> }) {
+export async function startUiServer(options: { host: UiHost; assets: UiAssets; token: string; port?: number; browserLogin?: boolean; close?: () => Promise<void>; exit?: () => void }) {
   validateToken(options.token);
   const port = options.port ?? 3940;
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
-  const router = createUiRouter(options.host);
+  const router = createUiRouter(options.host, () => { if (options.exit) options.exit(); else void close(); });
   const login = options.browserLogin ? new BrowserLogin(options.token) : undefined;
   let origin = "";
   const requests = new Set<Promise<void>>();
@@ -111,16 +117,19 @@ export async function startUiServer(options: { host: UiHost; assets: UiAssets; t
   });
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   let closing: Promise<void> | undefined;
-  return { url: origin, createLoginUrl: () => {
-    if (!login || closing) throw new Error("当前服务不接受浏览器连接凭据。");
-    return `${origin}/#may-connect=${login.issue()}`;
-  }, close: () => closing ??= (async () => {
+  const closed = new Promise<void>(resolve => server.once("close", resolve));
+  const close = () => closing ??= (async () => {
     login?.clear();
     router.close();
     const stopped = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     server.closeAllConnections();
-    await Promise.allSettled([...requests]); await options.close?.(); await stopped;
-  })() };
+    await options.close?.();
+    await Promise.allSettled([...requests]); await stopped;
+  })();
+  return { url: origin, closed, createLoginUrl: () => {
+    if (!login || closing) throw new Error("当前服务不接受浏览器连接凭据。");
+    return `${origin}/#may-connect=${login.issue()}`;
+  }, close };
 }
 
 export function secureHeaders(res: ServerResponse): void {
@@ -139,7 +148,7 @@ export function sendJson(res: ServerResponse, status: number, data: unknown): vo
 async function readJson(req: IncomingMessage): Promise<unknown> {
   if (req.headers["content-type"]?.split(";")[0]?.trim() !== "application/json") throw new UiError(400, "需要 JSON。");
   let size = 0; const chunks: Buffer[] = [];
-  for await (const chunk of req) { const bytes = Buffer.from(chunk as Uint8Array); size += bytes.length; if (size > 96 * 1024) throw new UiError(413, "请求过大。"); chunks.push(bytes); }
+  for await (const chunk of req) { const bytes = Buffer.from(chunk as Uint8Array); size += bytes.length; if (size > 256 * 1024) throw new UiError(413, "请求过大。"); chunks.push(bytes); }
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 function validateCommand(value: unknown): UiCommand {
@@ -148,6 +157,6 @@ function validateCommand(value: unknown): UiCommand {
   if (Object.keys(c).some(key => !["version", "hostId", "requestId", "name", "targetId", "expectedActiveId", "args"].includes(key)) || c.version !== 1 || typeof c.hostId !== "string" || c.hostId.length > 128 || typeof c.requestId !== "string" || !/^[a-zA-Z0-9._:-]{1,100}$/.test(c.requestId)
     || (c.expectedActiveId !== undefined && (typeof c.expectedActiveId !== "string" || !c.expectedActiveId || c.expectedActiveId.length > 256))
     || typeof c.name !== "string" || !/^[a-z][a-z0-9.-]{1,80}$/.test(c.name) || !(c.targetId === null || typeof c.targetId === "string" && c.targetId.length <= 256)
-    || !c.args || typeof c.args !== "object" || Array.isArray(c.args) || Object.keys(c.args).length > 12 || Object.values(c.args).some(v => typeof v !== "string" || v.length > 20_000)) throw new UiError(400, "无效的命令。");
+    || !c.args || typeof c.args !== "object" || Array.isArray(c.args) || Object.keys(c.args).length > 12 || Object.values(c.args).some(v => typeof v !== "string" || v.length > 64 * 1024)) throw new UiError(400, "无效的命令。");
   return c;
 }

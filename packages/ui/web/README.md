@@ -26,6 +26,13 @@ and a `connectionHint` to `mountWebUI`. With `initialToken`, the connection dial
 shows the launcher instructions and omits manual token entry. Disposing the shell
 prevents a pending promise from connecting a closed view.
 
+When a product supplies `UiSnapshot.controls`, the composer offers slash-command
+completion and displays `UiReceipt.output` with guarded actions and confirmation
+dialogs. Completion uses Arrow Up/Down and Tab. Product interactions support JSON
+forms, editable reviews and explicit URL consent. Drafts survive snapshot updates;
+completed requests remove their controls. Preview and confirmation precede sending
+form content, and responses remain possible while a command is pending.
+
 Products can register tool, approval-detail, diagnostic, presentation and panel renderers. Each receives its DTO and an
 optional context containing client state and the guarded `command` method. A
 trusted product extension module can be included by `webUiAssets`; no module is
@@ -80,7 +87,8 @@ exception-only filtering, approval location and back-to-latest/new-content contr
 Tool cards use short labelled previews; the independent inspector reuses trusted
 product renderers and reads full stored fields in version-bound chunks. Long
 answers and diagnostics also expose inspection. The inspector resets on host or
-resource changes; browsing and reading never switch the runtime's execution target.
+resource changes. Session selection switches the workspace's current session,
+and all connected pages follow it. History search and field reads remain read-only.
 
 The sidebar pages/searches all resource titles (task prompts for task hosts), while
 content search and older-record loading use the selected host's read-only APIs.
@@ -89,6 +97,10 @@ while preserving the search query and number of loaded pages. Hosts publish an
 optional `snapshot.resourcesVersion` for their complete resource catalog; it covers
 membership, pagination order and searchable text, including entries outside the
 snapshot's recent-resource window.
+Inactive session rows expose a confirmed delete action through a trash icon on
+hover or keyboard focus; touch devices keep the icon visible. The current session
+cannot be deleted. Session selection and deletion require an idle host with no
+pending MCP interaction.
 Search results are query snapshots, not live replacement approvals. Hosts without
 read capabilities retain their basic snapshot UI; field tabs stay disabled.
 Run `node examples/web-ui/reading.mjs` after building for a large offline fixture.

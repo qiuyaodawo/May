@@ -9,7 +9,7 @@ export async function webUiAssets(title: string, kind: "session" | "task", optio
   assets.set("/app.css", { type: "text/css; charset=utf-8", body: await readFile(new URL("../assets/workbench.css", import.meta.url), "utf8") });
   assets.set("/app.js", { type: "text/javascript; charset=utf-8", body: `${options.extensionModule === undefined ? "const extensions = {};" : 'import { extensions } from "/product.js";'} import { UiClient } from "/ui/client.js"; import { mountWebUI } from "/webui/index.js"; ${options.browserLogin ? 'import { browserLogin } from "/webui/browser-login.js";' : ""} const root = document.getElementById("app"); mountWebUI(root, new UiClient(), { title: root.dataset.title, kind: root.dataset.kind, extensions${options.browserLogin ? ', initialToken: browserLogin(), connectionHint: "在终端重新打开 Web UI，即可连接当前会话。"' : ""} });` });
   if (options.extensionModule !== undefined) assets.set("/product.js", { type: "text/javascript; charset=utf-8", body: options.extensionModule });
-  for (const name of ["index", "components", "markdown", "reading", "browser-login"]) assets.set(`/webui/${name}.js`, { type: "text/javascript; charset=utf-8", body: await readFile(new URL(`./${name}.js`, import.meta.url), "utf8") });
+  for (const name of ["index", "components", "markdown", "reading", "browser-login", "commands"]) assets.set(`/webui/${name}.js`, { type: "text/javascript; charset=utf-8", body: await readFile(new URL(`./${name}.js`, import.meta.url), "utf8") });
   const client = new URL(import.meta.resolve("@may/ui-client"));
   for (const name of ["client", "protocol"]) assets.set(`/ui/${name}.js`, { type: "text/javascript; charset=utf-8", body: await readFile(new URL(`./${name}.js`, client), "utf8") });
   return assets;

@@ -22,7 +22,7 @@ export class MaybeCodeTerminalWeb {
   private closing: Promise<void> | undefined;
   readonly events: AsyncIterable<MaybeCodeEvent>;
 
-  constructor(private readonly app: MaybeCodeController) {
+  constructor(private readonly app: MaybeCodeController, private readonly exit?: () => void) {
     this.host = createMaybeCodeWebHost(app, { events: this.webEvents, closeApplication: false, terminal: true });
     this.events = this.readTerminalEvents();
     this.relay = this.forwardEvents().catch(error => { this.failure = error; });
@@ -61,7 +61,7 @@ export class MaybeCodeTerminalWeb {
 
   async startServer(): ReturnType<typeof startMaybeCodeWebServer> {
     if (this.closing) throw new Error("MaybeCode 正在关闭。");
-    this.starting ??= startMaybeCodeWebServer(this.host, { token: randomBytes(32).toString("base64url"), port: 0, browserLogin: true });
+    this.starting ??= startMaybeCodeWebServer(this.host, { token: randomBytes(32).toString("base64url"), port: 0, browserLogin: true, exit: () => { if (this.exit) this.exit(); else void this.close(); } });
     const server = await this.starting;
     if (this.closing) throw new Error("MaybeCode 正在关闭。");
     return server;

@@ -2,10 +2,8 @@
 
 **English** | [简体中文](../../zh-CN/guides/web-ui.md)
 
-This is the first developer-preview slice of a shared UI boundary. MaybeCode and
-MaybeClaw use the same browser components and transport, but retain different
-resource models. The old MaybeClaw page has been replaced, not extracted into a
-library. MaybeCode terminal frontends can also open the shared workbench with `/web`.
+MaybeCode and MaybeClaw share browser components and transport while retaining
+their own resource models. MaybeCode terminal frontends open the workbench with `/web`.
 
 ## Run
 
@@ -19,8 +17,8 @@ TUI and Web receive separate copies of live events and share the same execution
 owner. Messages, approvals, model changes and Session changes use the same
 controller. An approval resolved in either frontend disappears from both.
 Closing a browser page leaves the Agent running; exiting the TUI closes the Agent
-and Web service. MCP forms and authorization interactions remain in the terminal;
-the Web details panel shows where to handle them.
+and Web service. MCP forms and authorization interactions can be completed in
+either frontend; a resolved request disappears from both.
 
 The connection link carries a one-time ticket in its URL fragment. The page
 immediately removes the fragment and exchanges the ticket for a control token.
@@ -57,6 +55,40 @@ responses, memory-only sessions and a no-side-effect approval tool. Its public
 fixture token auto-connects only this example. It neither invokes a real model
 nor executes the business tasks entered into its composer.
 
+## MaybeCode commands and interactions
+
+The composer uses the terminal's slash-command registry, argument completion and
+execution functions. Arrow Up/Down selects a completion; Tab inserts it. Unknown
+commands and invalid arguments are reported without submitting a model message.
+Command output is held in page memory, separately from conversation history.
+
+| Operation | Web entry |
+| --- | --- |
+| Model and default profile | Model dropdown; `/model` selection and default actions; `/model profile --default` |
+| Reasoning effort | Effort dropdown; `/effort`; `/effort default` restores configured options |
+| Sessions | Sidebar selection and confirmed deletion; `/new`, `/resume [id]`; rename and deletion in the session selector |
+| Retry, instructions and status | `/retry`, `/instructions`, `/status`, `/context` |
+| Context management | `/compact [history-reference\|provider-native]` and the compact button |
+| Skills | `/skills`, `/skills show name`, `/skills use name [task]` |
+| MCP | `/mcp` and its catalog, resource, prompt, watch and task operations |
+| Recovery | `/recovery`, `/recovery resolve id finding` |
+| Display | `/details`, `/thinking`, transcript search, inspection and scrolling |
+| Host exit | `/quit` or `/exit`, followed by confirmation |
+
+MCP form and editable review windows display the request, accept JSON, preview the
+exact submitted content and require confirmation. URL requests require consent,
+manual navigation and a separate retry action. Interactions and cancellation can
+be submitted while a command is awaiting a response. The broker validates schema,
+request ownership and expiry, and responses remain outside conversation history.
+Standalone `--ui web` enables the same interaction broker as the terminal.
+The separate `team` and `mcp login` CLI subcommands keep their CLI entry points.
+
+After building, set `MAYBECODE_WEB_LIVE=1` and run
+`pnpm --filter @may/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs`.
+These checks use the local model configuration, real workspace and MCP broker,
+plus a real model task for tool approval and file creation. Test data stays under
+the ignored `review` directory. The command performs model requests.
+
 ## Boundaries
 
 `ApplicationUiHost` accepts an independent `events` stream and
@@ -67,6 +99,19 @@ and returns `createLoginUrl()`. Pair it with `webUiAssets(..., { browserLogin: t
 Custom shells can provide `initialToken` and `connectionHint` to `mountWebUI`.
 With `initialToken`, the connection dialog shows the launcher instructions and
 omits manual token entry.
+
+`ApplicationUiHost` supports product `controls`, `complete`, `available`, `submit`,
+`concurrentCommands` and `interactionCommands` hooks. Awaiting a product command
+does not hold the snapshot queue; interaction responses have their own guarded
+path. Products must validate availability and request ownership when executing.
+`UiReceipt.output` describes transient command output/actions; `disconnect` ends
+the requesting client connection. `UiSnapshot.controls` advertises command input,
+interaction responses and cancellation. `UiClient.interact()` can respond while
+`command()` is pending. `startUiServer` accepts an `exit` callback after the exit
+receipt is flushed and exposes `closed`; without a callback it closes its host.
+`GET /api/ui/complete` is authenticated and bound to host and Session. Request
+bodies are limited to 256 KiB and argument strings to 64 Ki characters; product
+commands apply their own smaller limits where required.
 
 | Layer | Ownership |
 | --- | --- |
@@ -117,20 +162,23 @@ issuing a fresh request. This is **not** durable exactly-once execution.
 
 **MaybeCode:** submit messages, see incremental model/tool output, review tool
 inputs and coding change previews, resolve tool approvals, cancel, list/new/open/
-rename sessions, switch model profiles and request context compaction. One host
-has one execution session, identified by `activeId`; `selectedId` is the history
-view of this client. Sidebar clicks only read history, including during a run.
-Other windows keep their selection when the execution session changes. The initial
-default is pinned once; reloading the page still requires reconnecting and chooses
-the current execution session again.
+rename/delete sessions, switch model profiles and request context compaction.
+The displayed session is the host's current session: `selectedId` equals `activeId`.
+Clicking a sidebar session activates it so the composer can continue that session.
+All connected pages follow session changes, including changes made in the TUI.
+Switching, creating and deleting sessions are disabled during a run or pending MCP
+interaction. Finish or cancel the current operation before changing sessions.
 
-Historical views have no send, cancel, approval, model or compaction controls.
-Use **View execution session** to inspect the current run, or **Set as execution
-session** (`session.activate`) to explicitly switch while idle. New-session and
-activation commands carry `expectedActiveId`; stale transitions are rejected,
-not automatically replayed. Execution commands remain bound to their `targetId`.
-The old `session.open` UI command is no longer accepted; update clients together
-with this preview host. `session.browse` is a read capability, not a POST command.
+Inactive sidebar sessions show a trash icon on hover or keyboard focus; touch
+devices keep the icon visible. Deletion requires confirmation. The current
+session cannot be deleted, and the host rejects direct deletion requests for it.
+The list and connected pages refresh after deletion. New-session,
+activation and deletion commands carry `expectedActiveId`; stale transitions are
+rejected without automatic replay. Commands remain bound to their `targetId`.
+`UiClient.select(id)` sends `session.activate` for session hosts; snapshot reads
+always return the current session. Upgrade this preview's client and host together.
+Task hosts retain independent selection. History search and field reads remain
+read-only operations within the workspace.
 
 `AgentWorkspace.readSessionHistory(id)` validates workspace catalog membership
 and uses optional `SessionStore.inspect(id)`. It never opens a runtime, changes
@@ -166,12 +214,9 @@ existing `/api/tasks` and `/api/health` routes remain compatible.
   including after restart. Its bounded live projection still retains eight tasks;
   transient progress/partial token streams are not reconstructed from missing data.
   Reading does not add persistence, acquire an execution owner or run recovery.
-- MaybeCode team controls, interactive MCP forms/sampling, skill pickers, full file
-  browsing, artifact downloads and recovery resolution have not yet been connected.
-  Web mode does not opt into interactive MCP callbacks. Use existing terminal/CLI
-  controls for these features; the Web shell does not advertise them.
-  For session recovery, stop the Web host before resuming that session in the TUI.
-  Do not open the same session in two independent runtimes.
+- Full file browsing and artifact downloads are not provided. Recovery commands
+  use the current execution owner. Open the Web workbench with `/web` to share a
+  TUI Session; keep each Session owned by a single runtime.
 - The current browser text is Chinese. Documentation is maintained in English and
   Chinese. Light/dark themes follow the OS; narrow screens use overlay side panels.
 

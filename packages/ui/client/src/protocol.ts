@@ -67,6 +67,36 @@ export interface UiChoice {
   readonly options: readonly { readonly value: string; readonly label: string }[];
 }
 
+export interface UiAction {
+  readonly label: string;
+  readonly command: string;
+  readonly args: Readonly<Record<string, string>>;
+  readonly confirm?: string;
+  readonly input?: { readonly name: string; readonly label: string; readonly value: string };
+}
+export interface UiCommandOutput {
+  readonly title: string;
+  readonly text: string;
+  readonly actions?: readonly UiAction[];
+}
+export interface UiForm {
+  readonly id: string;
+  readonly title: string;
+  readonly detail: string;
+  readonly mode: "form" | "review" | "url";
+  readonly editable: boolean;
+  readonly value: string;
+  readonly url?: string;
+}
+export interface UiControls {
+  readonly inputCommand: string;
+  readonly responseCommand: string;
+  readonly cancelCommand: string;
+  readonly busy: boolean;
+  readonly forms: readonly UiForm[];
+}
+export interface UiCompletion { readonly value: string; readonly label: string; readonly description?: string }
+
 export interface UiSnapshot {
   readonly version: 1;
   /** New on each host start; prevents replay of an uncertain command after restart. */
@@ -77,7 +107,7 @@ export interface UiSnapshot {
   /** 完整资源目录的成员、分页顺序或搜索文本变化时更新。 */
   readonly resourcesVersion?: string;
   readonly selectedId: string | null;
-  /** Workspace execution owner, independent of this client's selected history. Absent for task hosts. */
+  /** 工作区当前会话，与 selectedId 相同；任务宿主省略此字段。 */
   readonly activeId?: string;
   readonly blocks: readonly UiBlock[];
   readonly historyPage?: { readonly nextCursor: string | null; readonly total: number };
@@ -88,6 +118,7 @@ export interface UiSnapshot {
   readonly panels: readonly UiPanel[];
   readonly choices: readonly UiChoice[];
   readonly notice?: string;
+  readonly controls?: UiControls;
 }
 
 export interface UiCommand {
@@ -96,12 +127,12 @@ export interface UiCommand {
   readonly requestId: string;
   readonly name: string;
   readonly targetId: string | null;
-  /** Required for explicit workspace activation/new-session commands. */
+  /** 切换、新建和删除会话时必须提供的当前会话 ID。 */
   readonly expectedActiveId?: string;
   readonly args: Readonly<Record<string, string>>;
 }
 
-export interface UiReceipt { readonly selectedId?: string | null }
+export interface UiReceipt { readonly selectedId?: string | null; readonly output?: UiCommandOutput; readonly disconnect?: boolean }
 
 export interface UiPageRequest { readonly query?: string; readonly cursor?: string }
 export interface UiPage<T> { readonly hostId: string; readonly items: readonly T[]; readonly nextCursor: string | null; readonly total: number }
@@ -118,6 +149,7 @@ export interface UiHost {
   resources?(request: UiPageRequest): Promise<UiPage<UiResource>>;
   history?(selectedId: string, request: UiPageRequest): Promise<UiPage<UiBlock>>;
   field?(selectedId: string, request: UiFieldRequest): Promise<UiFieldPage>;
+  complete?(selectedId: string, text: string): Promise<{ readonly hostId: string; readonly items: readonly UiCompletion[] }>;
 }
 
 export class UiError extends Error {
