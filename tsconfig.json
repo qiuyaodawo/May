@@ -3,9 +3,11 @@
   "references": [
     { "path": "./packages/skills" },
     { "path": "./packages/core" },
+    { "path": "./packages/media" },
     { "path": "./packages/mcp" },
     { "path": "./packages/observability" },
     { "path": "./packages/application" },
+    { "path": "./packages/goal" },
     { "path": "./packages/coordination" },
     { "path": "./packages/context" },
     { "path": "./packages/permissions" },

@@ -69,6 +69,19 @@ export class UiClient {
   readResources(query = "", cursor?: string): Promise<UiPage<UiResource>> {
     return this.read("resources", { query, ...(cursor ? { cursor } : {}) }, false);
   }
+  async readMedia(id: string, signal?: AbortSignal): Promise<Blob> {
+    const snapshot = this.value.snapshot, generation = this.generation;
+    if (!snapshot?.selectedId || !this.lifetime) throw new UiError(409, "请先选择会话。");
+    const params = new URLSearchParams({ id, selected: snapshot.selectedId, hostId: snapshot.hostId });
+    const response = await this.request(`${this.baseUrl}/api/ui/media?${params}`, {
+      headers: { authorization: `Bearer ${this.token}` }, credentials: "omit", cache: "no-store",
+      signal: signal ? AbortSignal.any([this.lifetime.signal, signal]) : this.lifetime.signal,
+    });
+    if (!response.ok) throw new UiError(response.status, "图片读取失败。");
+    const blob = await response.blob();
+    if (generation !== this.generation || snapshot.selectedId !== this.value.snapshot?.selectedId) throw new UiError(409, "浏览对象已改变。");
+    return blob;
+  }
   complete(text: string): Promise<{ hostId: string; items: readonly UiCompletion[] }> { return this.read("complete", { text }); }
   async interact(name: string, args: Record<string, string> = {}): Promise<void> {
     const snapshot = this.value.snapshot, generation = this.generation;

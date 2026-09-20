@@ -12,6 +12,9 @@ surface or persistence format as stable.
 
 ## Choose the smallest useful layer
 
+`@may/media` provides reusable image validation, attachments and file storage.
+See [Image replies](../guides/images.md) for Terminal, Web UI and channel integration.
+
 | Goal | Start with | Usually add |
 | --- | --- | --- |
 | Run one model/tool loop in memory | `@may/core` | A provider adapter |
@@ -32,6 +35,12 @@ lifecycle. `@may/application` is the normal starting point for an application
 that needs sessions, approvals, context management and orderly shutdown.
 
 ## Runtime and application
+
+### `@may/goal`
+
+Independent goal execution composed through public Agent, Model and Context interfaces.
+Provides durable state, bounded continuation and model tools. Base Agent packages
+do not depend on it. See [Goals](../guides/goals.md).
 
 ### `@may/skills`
 

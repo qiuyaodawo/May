@@ -2,6 +2,8 @@ import { ChannelStore, inboxId, type ChannelInput, type DeliveryRecord, type Inb
 import type { ChannelAdapter } from "./channels.js";
 import type { MaybeClaw } from "./service.js";
 import { digest, isTerminal, taskId, type TaskSnapshot } from "./types.js";
+import { imageAttachment, readEmbeddedImage, type MediaReader } from "@may/media";
+import { UiProjection } from "@may/ui-client/projection";
 
 export type SubmitTask = (prompt: string, requestId: string) => Promise<{ task: TaskSnapshot; created: boolean }>;
 const HELP = "MaybeClaw：发送文本创建独立任务（无跨消息记忆）。\n/status <完整任务 ID>\n/result <完整任务 ID>\n/cancel <完整任务 ID>\n仅能操作由你在当前私聊创建的任务。";
@@ -9,7 +11,7 @@ const HELP = "MaybeClaw：发送文本创建独立任务（无跨消息记忆）
 export class ChannelHub {
   private ingress: Promise<void> = Promise.resolve();
   readonly processingErrors = new Map<string, string>();
-  constructor(readonly store: ChannelStore, readonly adapters: readonly ChannelAdapter[], private readonly claw: MaybeClaw, private readonly submit: SubmitTask) {}
+  constructor(readonly store: ChannelStore, readonly adapters: readonly ChannelAdapter[], private readonly claw: MaybeClaw, private readonly submit: SubmitTask, private readonly readMedia: MediaReader = readEmbeddedImage) {}
   receive(input: ChannelInput): Promise<void> {
     const operation = this.ingress.then(async () => {
       const adapter = this.adapters.find((v) => v.account === input.account);
@@ -37,7 +39,7 @@ export class ChannelHub {
         else if (value.taskId && !value.terminalNotified) {
           const task = await this.claw.store.inspect(value.taskId);
           if (task && (isTerminal(task) || task.status === "blocked")) {
-            await this.reply(value, "terminal", describe(task));
+            await this.replyResult(value, "terminal", task);
             await this.store.put({ ...value, terminalNotified: true });
           }
         }
@@ -56,6 +58,11 @@ export class ChannelHub {
         else {
           const task = command[1] === "cancel" ? (await this.claw.cancel(id)).task : (await this.claw.status(id)).task;
           response = describe(task, command[1] === "result");
+          if (command[1] === "result" && task.status === "completed") {
+            await this.replyResult({ ...record, taskId: task.id }, "accepted", task);
+            await this.store.put({ ...record, processed: true });
+            return;
+          }
         }
       }
       await this.reply(record, "accepted", response);
@@ -78,17 +85,48 @@ export class ChannelHub {
     await this.store.put({ kind: "delivery", id, account: record.input.account, sender: record.input.sender,
       conversation: record.input.conversation, text: bounded, status: "pending", ...(record.taskId ? { taskId: record.taskId } : {}) });
   }
+  private async replyResult(record: InboxRecord, purpose: string, task: TaskSnapshot): Promise<void> {
+    const history = task.status === "completed" ? await this.claw.readSessionHistory(task.id) : [];
+    const replies = history.filter(event => event.type === "assistant.completed");
+    if (!replies.some(event => event.message.content.some(part => part.type === "image"))) { await this.reply(record, purpose, describe(task)); return; }
+    const adapter = this.adapters.find(value => value.account === record.input.account);
+    const parts: Array<{ text: string; imageId?: string }> = [{ text: describe(task, false) }];
+    for (const reply of replies) for (const part of reply.message.content) {
+      if (part.type === "text") {
+        for (let offset = 0; offset < part.text.length; offset += 3800) parts.push({ text: part.text.slice(offset, offset + 3800) });
+      } else if (part.type === "image") {
+        const image = imageAttachment(part.source);
+        if ((part.source.type === "base64" || this.readMedia !== readEmbeddedImage) && adapter?.media?.images) parts.push({ text: `图片 ${image.id}`, imageId: image.id });
+        else parts.push({ text: image.url ? `图片链接：${image.url}` : `图片 ${image.id}：请在 Web UI 查看。` });
+      }
+    }
+    let after: string | undefined;
+    for (const [index, part] of parts.entries()) {
+      const id = digest({ inbox: record.id, purpose, part: index });
+      if (!this.store.get(id)) await this.store.put({ kind: "delivery", id, account: record.input.account, sender: record.input.sender,
+        conversation: record.input.conversation, taskId: task.id, ...part, ...(after ? { after } : {}), status: "pending" });
+      after = id;
+    }
+  }
   async deliver(signal: AbortSignal): Promise<void> {
     for (const record of this.store.values()) {
       if (signal.aborted) return;
       if (record.kind !== "delivery" || record.status !== "pending") continue;
+      if (record.after) { const previous = this.store.get(record.after); if (previous?.kind !== "delivery" || previous.status !== "sent") continue; }
       const adapter = this.adapters.find((v) => v.account === record.account);
       if (!adapter) continue; // Never deliver through a different bot after credential changes.
       if (!adapter.allowUsers.includes(record.sender)) { await this.store.put({ ...record, status: "suppressed" }); continue; }
       if (!["polling", "connected"].includes(adapter.status())) continue;
+      let image;
+      if (record.imageId) {
+        const projection = new UiProjection(Infinity); projection.history(await this.claw.readSessionHistory(record.taskId!));
+        const source = projection.mediaSources.get(record.imageId);
+        if (!source) throw new Error("Delivery image is absent from task history");
+        image = await this.readMedia(source, signal);
+      }
       await this.store.put({ ...record, status: "sending" });
       let status: DeliveryRecord["status"] = "sent";
-      try { await adapter.send(record, signal); } catch { status = "unknown"; }
+      try { await adapter.send(record, signal, image); } catch { status = "unknown"; }
       await this.store.put({ ...record, status });
     }
   }

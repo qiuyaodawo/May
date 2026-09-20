@@ -2,5 +2,5 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": { "composite": true, "rootDir": "src", "outDir": "dist", "tsBuildInfoFile": "dist/.tsbuildinfo", "types": ["node"] },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../application" }, { "path": "../../core" }, { "path": "../../permissions" }, { "path": "../../session" }]
+  "references": [{ "path": "../../application" }, { "path": "../../core" }, { "path": "../../media" }, { "path": "../../permissions" }, { "path": "../../session" }]
 }

@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
+import { readEmbeddedImage, type MediaReader } from "@may/media";
 import type { AgentApplicationEvent, AgentWorkspaceController } from "@may/application";
 import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice, type UiPageRequest, type UiFieldRequest, type UiControls, type UiCompletion } from "./protocol.js";
 import { UiProjection } from "./projection.js";
 import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";
 
 export interface ApplicationUiOptions {
+  readonly readMedia?: MediaReader;
   readonly events?: AsyncIterable<{ type: string }>;
   readonly closeApplication?: boolean;
   readonly product: UiProduct;
@@ -102,6 +104,15 @@ export class ApplicationUiHost implements UiHost {
     const sessions = [...await this.app.listSessions()].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
     const items = sessions.map(s => ({ id: s.id, kind: "session" as const, title: s.title ?? s.preview?.slice(0, 72) ?? "新会话", status: s.id === this.app.sessionId && this.app.isRunning ? "running" : "idle", updatedAt: s.lastUsedAt }));
     return readPage(this.hostId, "resources", items, request, (item, query) => item.title.toLocaleLowerCase().includes(query));
+  }
+  async media(selectedId: string, id: string) {
+    if (!(await this.app.listSessions()).some(session => session.id === selectedId)) throw new UiError(404, "会话不存在或不属于当前工作区。");
+    const events = selectedId === this.app.sessionId ? await this.app.history() : await this.app.readSessionHistory?.(selectedId);
+    if (!events) throw new UiError(404, "会话历史不可用。");
+    const projection = new UiProjection(Infinity); projection.history(events);
+    const source = projection.mediaSources.get(id);
+    if (!source) throw new UiError(404, "图片不属于此会话。");
+    return (this.options.readMedia ?? readEmbeddedImage)(source);
   }
   async history(selectedId: string, request: UiPageRequest) {
     if (!this.app.readSessionHistory) throw new UiError(409, "宿主不支持只读历史。");

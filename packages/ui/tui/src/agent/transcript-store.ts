@@ -31,6 +31,7 @@ export interface UserTranscriptItem {
 }
 
 export interface AssistantTranscriptItem {
+  readonly content?: readonly ContentPart[];
   readonly id: string;
   readonly kind: "assistant";
   readonly runId: string;
@@ -42,6 +43,7 @@ export interface AssistantTranscriptItem {
 }
 
 export interface ToolTranscriptItem {
+  readonly content?: readonly ContentPart[];
   readonly id: string;
   readonly kind: "tool";
   readonly runId: string;
@@ -95,7 +97,7 @@ export class TranscriptStore {
   /** 当前轮次完成后可供阅读的最终正文。 */
   get latestReply(): AssistantTranscriptItem | undefined {
     const item = this.values.find((item) => item.id === this.latestReplyId);
-    return item?.kind === "assistant" && item.text.trim() !== "" ? item : undefined;
+    return item?.kind === "assistant" && (item.text.trim() !== "" || item.content?.some(part => part.type === "image")) ? item : undefined;
   }
 
   get items(): readonly TranscriptItem[] {
@@ -207,6 +209,7 @@ export class TranscriptStore {
         this.updateAssistant(event, (item) => ({
           ...item,
           text: completed.text || item.text,
+          content: completed.content,
           reasoning: completed.reasoning || item.reasoning,
           status: "completed",
         }));
@@ -241,6 +244,7 @@ export class TranscriptStore {
           ...item,
           status: "completed",
           output: event.output,
+          content: event.content,
         }), event.step, event.call, event.timestamp);
         break;
       case "tool.failed":
@@ -347,6 +351,7 @@ export class TranscriptStore {
           runId: event.runId,
           step: event.step,
           text: content.text,
+          content: content.content,
           reasoning: content.reasoning,
           status: "completed",
           timestamp: event.timestamp,
@@ -443,6 +448,7 @@ export class TranscriptStore {
     this.updateAssistant({ ...event, step }, (item) => ({
       ...item,
       text: content.text || item.text,
+      content: content.content,
       reasoning: content.reasoning || item.reasoning,
       status: "completed",
     }));
@@ -574,17 +580,19 @@ function historyTool(
     streamedOutput: "",
     progress: [],
     ...(event.type === "tool.completed"
-      ? { output: event.output }
+      ? { output: event.output, ...(event.content ? { content: event.content } : {}) }
       : { error: event.error.message }),
     timestamp: event.timestamp,
   };
 }
 
 function assistantContent(message: AssistantMessage): {
+  readonly content: readonly ContentPart[];
   readonly text: string;
   readonly reasoning: string;
 } {
   return {
+    content: message.content,
     text: contentText(message.content, "text"),
     reasoning: contentText(message.content, "reasoning"),
   };

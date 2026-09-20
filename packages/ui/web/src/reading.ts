@@ -108,7 +108,7 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
           // Keep transcripts compact; full evidence and product renderers live in the inspector.
           const { presentation: _presentation, ...withoutPresentation } = block;
           const compact: UiBlock = block.kind === "tool" ? { ...withoutPresentation, input: preview(block.input ?? "", 400), text: preview(block.text, 800), ...(block.diagnostic ? { diagnostic: { ...block.diagnostic, message: preview(block.diagnostic.message, 800) } } : {}) } : block;
-          const node = transcriptBlock(compact, block.kind === "tool" ? {} : extensions, { state, command: client.command.bind(client) });
+          const node = transcriptBlock(compact, block.kind === "tool" ? {} : extensions, { state, command: client.command.bind(client), readMedia: client.readMedia.bind(client) });
           if (block.kind === "tool") {
             const details = node.querySelector("details")!;
             details.open = toolOpen.get(block.id) ?? defaultExpanded;
@@ -172,7 +172,7 @@ export function createInspector(client: UiClient, extensions: WebUiExtensions, v
     }
     root.append(tabs);
     if (field === "overview") {
-      const node = transcriptBlock(selected, extensions, { state, command: client.command.bind(client) });
+      const node = transcriptBlock(selected, extensions, { state, command: client.command.bind(client), readMedia: client.readMedia.bind(client) });
       const details = node.querySelector("details"); if (details) details.open = true; root.append(node);
     } else {
       const content = element("pre", "tool-content field-content", page?.text ?? "正在读取…"); content.setAttribute("aria-label", "记录字段内容"); root.append(content);

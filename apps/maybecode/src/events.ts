@@ -4,6 +4,7 @@ import type { ToolChangePreview } from "@may/coding-tools/change-preview";
 import type { McpClientEvent, McpInteractionEvent } from "@may/mcp";
 
 export type MaybeCodeSessionEvent =
+  | import("@may/goal").GoalEvent
   | Exclude<AgentApplicationEvent, { type: "tool.presentation" }>
   | {
       type: "change.preview";

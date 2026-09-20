@@ -86,6 +86,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly maxSteps?: number;
   readonly runBudget?: RunBudget;
   readonly skills?: SkillRegistry | false;
+  readonly goals?: false;
   readonly skillDirectories?: readonly string[];
   /** Disable retries with false, or override the configured retry policy. */
   readonly retry?: false | RetryingModelOptions;
@@ -297,6 +298,7 @@ export async function openConfiguredMaybeCode(
       ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
       runBudget,
       ...(options.skills === undefined ? {} : { skills: options.skills }),
+      ...(options.goals === undefined ? {} : { goals: options.goals }),
       ...(skillDirectories === false
         ? (options.skills === undefined ? { skills: false as const } : {})
         : { skillDirectories }),

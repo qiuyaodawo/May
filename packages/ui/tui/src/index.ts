@@ -1,4 +1,5 @@
 export * from "./component.js";
+export * from "./images.js";
 export * from "./column.js";
 export * from "./editor.js";
 export * from "./focus.js";

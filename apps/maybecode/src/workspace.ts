@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { mediaHistory } from "./media-history.js";
 
 import { AgentWorkspace } from "@may/application";
 import type {
@@ -340,6 +341,14 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.manager.submit(options);
   }
 
+  getGoal() { return this.manager.activeApplication.getGoal(); }
+  startGoal(objective: string, budget?: import("@may/goal").GoalBudget) {
+    return this.manager.runStateTransition(app => app.startGoal(objective, budget));
+  }
+  resumeGoal() { return this.manager.runStateTransition(app => app.resumeGoal()); }
+  pauseGoal() { return this.manager.runStateTransition(app => app.pauseGoal(), { requireIdle: false }); }
+  cancelGoal() { return this.manager.runStateTransition(app => app.cancelGoal(), { requireIdle: false }); }
+
   retry(): Promise<MaybeCodeRun> {
     return this.manager.retry();
   }
@@ -360,7 +369,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.manager.listSessions();
   }
 
-  readSessionHistory(sessionId: string) { return this.manager.readSessionHistory(sessionId); }
+  async readSessionHistory(sessionId: string) { return mediaHistory(await this.manager.readSessionHistory(sessionId)); }
 
   newSession(): Promise<string> {
     return this.manager.newSession();
@@ -554,8 +563,8 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.getReasoningEffort();
   }
 
-  history() {
-    return this.manager.history();
+  async history() {
+    return mediaHistory(await this.manager.history());
   }
 
   listRecoveries() { return this.manager.listRecoveries(); }

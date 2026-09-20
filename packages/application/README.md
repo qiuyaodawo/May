@@ -1,5 +1,11 @@
 # @may/application
 
+`AgentApplication.continue(options)` continues the current context with the same
+run lifecycle and persistence as `submit()`, without adding a user message.
+It implements `ContinuableAgentController`; `retry()` retains its failed-run check.
+External components can use this API without changing Agent internals. See
+[Goals](../../docs/en/guides/goals.md).
+
 Pass `skills: SkillRegistry` to `defineAgent()` / `AgentApplication.open()` for
 catalog guidance, `skill_read` and durable activation. `activateSkill(name)`
 activates while idle; model activation uses the normal permission/tool path.

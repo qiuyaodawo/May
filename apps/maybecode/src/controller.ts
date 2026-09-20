@@ -1,4 +1,5 @@
 import type { AgentWorkspaceController } from "@may/application";
+import type { GoalBudget, GoalState } from "@may/goal";
 import type { ContextCompactionStrategy } from "@may/context";
 import type { McpClientPool, McpServerStatus, McpResourceSubscription, McpInteractionBroker } from "@may/mcp";
 import type { MaybeCodeEvent, MaybeCodeSessionEvent } from "./events.js";
@@ -76,6 +77,11 @@ export interface MaybeCodeController extends AgentWorkspaceController<
 > {
   readonly instructions: MaybeCodeInstructions;
   readonly modelInfo: MaybeCodeModelInfo | undefined;
+  getGoal?(): GoalState | undefined;
+  startGoal?(objective: string, budget?: GoalBudget): Promise<GoalState>;
+  resumeGoal?(): Promise<GoalState>;
+  pauseGoal?(): Promise<GoalState>;
+  cancelGoal?(): Promise<GoalState>;
   listSkills?(): readonly MaybeCodeSkillInfo[];
   getSkillDiagnostics?(): readonly SkillDiagnostic[];
   readSkill?(name: string): Promise<SkillDocument>;

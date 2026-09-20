@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { mediaHistory } from "./media-history.js";
 import { SkillRegistry } from "@may/skills";
 import { defaultMaybeCodeSkillDirectories } from "./skills.js";
 
@@ -64,6 +65,7 @@ import {
 import { createCodingPermissionPolicy } from "./policy.js";
 import { createModelContextSummarizer } from "./summarizer.js";
 import { HistoryReferenceMemory } from "./history-memory.js";
+import { GoalController, type GoalBudget } from "@may/goal";
 
 export { DEFAULT_MAYBE_CODE_INSTRUCTIONS } from "./instructions.js";
 
@@ -97,6 +99,7 @@ export interface MaybeCodeApplicationOptions {
   readonly runBudget?: RunBudget;
   readonly skills?: SkillRegistry | false;
   readonly skillDirectories?: readonly string[];
+  readonly goals?: false;
 }
 
 /**
@@ -126,6 +129,8 @@ export class MaybeCodeApplication {
   });
   private readonly eventRelay: Promise<void>;
   private closed = false;
+  readonly goals: GoalController | undefined;
+  private readonly removeGoalListener: (() => void) | undefined;
 
   private constructor(
     workspace: string,
@@ -137,6 +142,7 @@ export class MaybeCodeApplication {
     nativeCompactionStrategy: ContextCompactionStrategy | undefined,
     historyMemory: HistoryReferenceMemory,
     modelInfo: MaybeCodeModelInfo | undefined,
+    goals: GoalController | undefined,
   ) {
     this.workspace = workspace;
     this.application = application;
@@ -148,6 +154,8 @@ export class MaybeCodeApplication {
     this.nativeCompactionStrategy = nativeCompactionStrategy;
     this.historyMemory = historyMemory;
     this.modelInfo = modelInfo === undefined ? undefined : { ...modelInfo };
+    this.goals = goals;
+    this.removeGoalListener = goals?.subscribe(event => this.eventQueue.push(event));
     this.events = this.eventQueue;
     this.eventRelay = this.relayEvents(application.events);
   }
@@ -158,6 +166,14 @@ export class MaybeCodeApplication {
     const workspace = resolve(options.workspace);
     const autoMode = options.autoCompactionMode ??
       (options.providerNativeAutoCompaction === true ? "provider-native" : "prune-summary");
+    const goals = options.goals === false ? undefined : new GoalController({
+      validateBudget: budget => {
+        if (budget.maxTotalTokens !== undefined && (autoMode === "provider-native" || options.contextSummarizer !== undefined || options.autoCompactionStrategies !== undefined || options.compactionStrategy !== undefined)) {
+          throw new Error("Goal token budgets require built-in prune-summary or history-reference compaction with the metered model");
+        }
+      },
+    });
+    const model = goals?.wrapModel(options.model) ?? options.model;
     const historyMemory = new HistoryReferenceMemory(
       autoMode === "history-reference" && options.autoCompactionStrategies === undefined,
     );
@@ -189,13 +205,13 @@ export class MaybeCodeApplication {
 
     const summaryTailStrategy = new SummaryTailStrategy({
       summarizer: options.contextSummarizer ??
-        createModelContextSummarizer(options.model),
+        createModelContextSummarizer(model),
     });
     const manualCompactionStrategy = options.compactionStrategy ??
       new PruneAndSummaryTailStrategy(summaryTailStrategy);
     const historyReferenceStrategy = historyMemory.strategy;
-    const nativeCompactionStrategy = options.model.contextCompactor !== undefined
-      ? new ModelContextCompactionStrategy(options.model.contextCompactor)
+    const nativeCompactionStrategy = model.contextCompactor !== undefined
+      ? new ModelContextCompactionStrategy(model.contextCompactor)
       : undefined;
     const autoCompactionStrategies = options.autoCompactionStrategies ??
       automaticStrategies(
@@ -210,11 +226,11 @@ export class MaybeCodeApplication {
 
     const definition = defineAgent({
       ...(skills === undefined ? {} : { skills }),
-      model: options.model,
+      model,
       permissionPolicy: options.permissionPolicy ?? createCodingPermissionPolicy(),
       tools: configuredTools,
       toolScope: { workspaceId: resolve(options.workspace) },
-      ...(options.toolSource === undefined ? {} : { toolSource: options.toolSource }),
+      toolSource: () => [...(options.toolSource?.() ?? []), ...(goals?.tools() ?? [])],
       instructions: instructions.effective,
       ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
       traceAttributes: {
@@ -233,7 +249,7 @@ export class MaybeCodeApplication {
           ? {}
           : { "may.model.name": options.modelInfo.model }),
       },
-      contextFactory: historyMemory.wrap(options.contextFactory ?? new InMemoryContextFactory()),
+      contextFactory: historyMemory.wrap(goals?.wrapContextFactory(options.contextFactory ?? new InMemoryContextFactory()) ?? options.contextFactory ?? new InMemoryContextFactory()),
       ...(contextBudget === undefined ? {} : { contextBudget }),
       ...(options.compactionStrategy === undefined
         ? {}
@@ -269,6 +285,17 @@ export class MaybeCodeApplication {
       ...(options.resume === undefined ? {} : { resume: options.resume }),
     });
     historyMemory.attach(application);
+    if (goals) {
+      try {
+        await goals.attach(application, {
+          read: async () => {
+            const saved = [...await application.history()].reverse().find(event => event.type === "state.updated" && event.key === "may.goal");
+            return saved?.type === "state.updated" ? saved.value : undefined;
+          },
+          write: state => application.recordState("may.goal", state),
+        });
+      } catch (error) { await application.close(); throw error; }
+    }
 
     return new MaybeCodeApplication(
       workspace,
@@ -280,27 +307,41 @@ export class MaybeCodeApplication {
       nativeCompactionStrategy,
       historyMemory,
       options.modelInfo,
+      goals,
     );
   }
 
   get isRunning(): boolean {
-    return this.application.isRunning;
+    return this.application.isRunning || this.goals?.isRunning === true;
   }
 
   get instructions(): MaybeCodeInstructions {
     return { ...this.baseInstructions, effective: [this.baseInstructions.effective, this.application.skills?.instructions()].filter(Boolean).join("\n\n") };
   }
 
-  submit(options: RunOptions): Promise<MaybeCodeRun> {
+  async submit(options: RunOptions): Promise<MaybeCodeRun> {
+    if (this.goals?.isRunning) await this.goals.pause("Paused for a new user message");
     return this.application.submit(options);
   }
 
+  getGoal() { return this.goals?.getGoal(); }
+  startGoal(objective: string, budget?: GoalBudget) { return this.requireGoals().start(objective, budget); }
+  resumeGoal() { return this.requireGoals().resume(); }
+  pauseGoal() { return this.requireGoals().pause(); }
+  cancelGoal() { return this.requireGoals().cancel(); }
+  private requireGoals(): GoalController {
+    if (!this.goals) throw new Error("Goals are disabled in this application");
+    return this.goals;
+  }
+
   retry(): Promise<MaybeCodeRun> {
+    if (this.goals?.isRunning) throw new Error("Pause the goal before retrying a run");
     return this.application.retry();
   }
 
   cancel(reason?: string): boolean {
     this.historyMemory.cancelRequest();
+    if (this.goals?.interrupt(reason)) return true;
     return this.application.cancel(reason);
   }
 
@@ -311,8 +352,8 @@ export class MaybeCodeApplication {
     return this.application.resolveApproval(requestId, decision);
   }
 
-  history() {
-    return this.application.history();
+  async history() {
+    return mediaHistory(await this.application.history());
   }
 
   listRecoveries() { return this.application.listRecoveries(); }
@@ -339,8 +380,10 @@ export class MaybeCodeApplication {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    try { await this.application.close(); await this.eventRelay; }
-    finally { this.eventQueue.close(); }
+    try {
+      try { await this.goals?.close(); }
+      finally { await this.application.close(); await this.eventRelay; }
+    } finally { this.removeGoalListener?.(); this.eventQueue.close(); }
   }
 
   private async relayEvents(

@@ -70,3 +70,8 @@ export interface AgentWorkspaceController<
   renameSession(sessionId: string, title: string): Promise<void>;
   deleteSession(sessionId: string): Promise<boolean>;
 }
+
+/** 可以在当前上下文中继续执行的通用控制接口。 */
+export interface ContinuableAgentController extends AgentController {
+  continue(options?: import("@may/core").ContinueOptions): Promise<AgentRun>;
+}

@@ -2,7 +2,7 @@ import type { ContentPart, MayEvent } from "@may/core";
 import type { ContextInspection } from "@may/context";
 import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
-import { sanitizeTerminalText } from "@may/tui";
+import { sanitizeTerminalText, TerminalImages, encodeImage } from "@may/tui";
 
 import type { FileChangeKind, ToolChangePreview } from "@may/coding-tools/change-preview";
 import type { MaybeCodeEvent } from "./events.js";
@@ -27,6 +27,7 @@ import { runModelPicker } from "./model-picker.js";
 import { runSessionPicker } from "./session-picker.js";
 import { presentMcpInteraction } from "./mcp-interaction-ui.js";
 import { MaybeCodeTerminalWeb } from "./terminal-web.js";
+import { formatGoal } from "./goal-commands.js";
 
 type UIQuestion = (
   prompt: string,
@@ -51,6 +52,8 @@ export async function runTerminalUI(
   const renderer = new TerminalRenderer(terminal);
   const slashCommandSuggestions = createMaybeCodeSlashCommandSuggester(app);
   let activeQuestion: AbortController | undefined;
+  let inputQuestionController: AbortController | undefined;
+  let interactionDone: Promise<void> = Promise.resolve();
   let exit = false;
   const handleProcessSignal = (): void => {
     exit = true;
@@ -62,15 +65,33 @@ export async function runTerminalUI(
   process.on("SIGTERM", handleProcessSignal);
 
   const question: UIQuestion = async (prompt, questionOptions = {}) => {
+    inputQuestionController?.abort();
+    const previousInteraction = interactionDone;
+    let release!: () => void;
+    interactionDone = new Promise<void>(resolve => { release = resolve; });
     const controller = new AbortController();
     activeQuestion = controller;
     try {
+      await previousInteraction;
       return await terminal.question(prompt, {
         ...questionOptions,
         signal: questionOptions.signal === undefined ? controller.signal : AbortSignal.any([controller.signal, questionOptions.signal]),
       });
     } finally {
+      release();
       if (activeQuestion === controller) activeQuestion = undefined;
+    }
+  };
+
+  const inputQuestion: UIQuestion = async (prompt, questionOptions = {}) => {
+    await interactionDone;
+    const controller = new AbortController();
+    inputQuestionController = controller;
+    activeQuestion = controller;
+    try { return await terminal.question(prompt, { ...questionOptions, signal: controller.signal }); }
+    finally {
+      if (activeQuestion === controller) activeQuestion = undefined;
+      if (inputQuestionController === controller) inputQuestionController = undefined;
     }
   };
 
@@ -98,10 +119,10 @@ export async function runTerminalUI(
     while (!exit) {
       let input: string;
       try {
-        input = await readInput(question, slashCommandSuggestions);
+        input = await readInput(inputQuestion, slashCommandSuggestions);
       } catch (error) {
         if (isAbortError(error)) {
-          if (!app.isRunning) break;
+          if (exit) break;
           continue;
         }
         throw error;
@@ -153,6 +174,7 @@ async function consumeEvents(
   events: AsyncIterable<MaybeCodeEvent>,
 ): Promise<void> {
   const pending = new Map<string, AbortController>();
+  let lastGoalDisplay = "";
   let prompts = Promise.resolve();
   const enqueue = (id: string, work: (signal: AbortSignal) => Promise<void>, expiresAt?: number) => {
     const controller = new AbortController();
@@ -166,8 +188,14 @@ async function consumeEvents(
     }).finally(() => pending.delete(id));
   };
   for await (const event of events) {
-    if (event.type === "run.event") {
-      renderer.runEvent(event.event);
+    if (event.type === "goal.changed") {
+      const display = `${event.goal.id}:${event.goal.status}:${event.goal.progress}`;
+      if (display !== lastGoalDisplay) {
+        lastGoalDisplay = display;
+        renderer.write(`\n${sanitizeTerminalText(formatGoal(event.goal))}\n`);
+      }
+    } else if (event.type === "run.event") {
+      await renderer.runEvent(event.event);
     } else if (event.type === "permission.event") {
       if (event.event.type === "approval.requested") {
         enqueue(`approval:${event.event.request.id}`, (signal) => handlePermissionEvent(event.event, app, renderer,
@@ -513,6 +541,7 @@ function removeLineContinuation(line: string): {
 }
 
 class TerminalRenderer {
+  private readonly images = new TerminalImages();
   private textStarted = false;
   private reasoningStarted = false;
   private readonly changePreviews = new Map<string, ToolChangePreview>();
@@ -527,7 +556,7 @@ class TerminalRenderer {
     this.terminal.write(text);
   }
 
-  runEvent(event: MayEvent): void {
+  async runEvent(event: MayEvent): Promise<void> {
     switch (event.type) {
       case "model.started":
         this.textStarted = false;
@@ -561,6 +590,11 @@ class TerminalRenderer {
         break;
       case "model.completed": {
         this.endReasoning();
+        if (event.message.content.some(part => part.type === "image")) {
+          this.terminal.write("\nMaybeCode · 完整图文回复：\n");
+          await this.renderContent(event.message.content);
+          break;
+        }
         const text = textFromContent(event.message.content);
         if (!this.textStarted && text !== "") {
           this.terminal.write(`\nMaybeCode: ${sanitizeTerminalText(text)}`);
@@ -612,6 +646,7 @@ class TerminalRenderer {
       case "tool.completed":
         this.endToolOutput(event.runId, event.call.id);
         this.renderToolCompleted(event);
+        if (event.content.some(part => part.type === "image")) await this.renderContent(event.content);
         break;
       case "tool.failed":
         this.endToolOutput(event.runId, event.call.id);
@@ -641,6 +676,21 @@ class TerminalRenderer {
           }\n`,
         );
         break;
+    }
+  }
+
+  private async renderContent(content: readonly ContentPart[]): Promise<void> {
+    await this.images.prepare(content);
+    for (const part of content) {
+      if (part.type === "text") this.terminal.write(sanitizeTerminalText(part.text) + "\n");
+      if (part.type === "image") {
+        const result = this.images.render(part.source, { width: process.stdout.columns || 80, height: 30 });
+        const image = result.images?.[0];
+        this.terminal.write(result.lines.slice(0, image?.y ?? result.lines.length).join("\n") + "\n");
+        if (image) {
+          this.terminal.write("\n".repeat(image.rows) + `\x1b[${image.rows}A\x1b7` + encodeImage(image) + `\x1b8\x1b[${image.rows}B\r`);
+        }
+      }
     }
   }
 
@@ -734,7 +784,11 @@ class TerminalRenderer {
     );
     if (!event.resumed) return;
     if (app.sessionId !== event.sessionId) return;
-    renderHistory(await app.history(), this.terminal);
+    const history = await app.history();
+    for (const event of history) {
+      if (event.type === "assistant.completed" && event.message.content.some(part => part.type === "image")) await this.renderContent(event.message.content);
+      else renderHistory([event], this.terminal);
+    }
   }
 
   modelChanged(model: NonNullable<MaybeCodeController["modelInfo"]>): void {

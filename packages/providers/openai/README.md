@@ -1,5 +1,10 @@
 # `@may/provider-openai`
 
+Generated image output is represented as ordered `ContentPart` image entries.
+`openAIResponseContent(message)` reads presentation content from native output
+state when required. See [Image replies](../../../docs/en/guides/images.md) /
+[图片回复](../../../docs/zh-CN/guides/images.md).
+
 OpenAI Responses API adapter for May. It supports streaming text and reasoning
 summaries, function tools, stateless opaque continuation state, server context
 management configuration, and explicit `/responses/compact` compaction.

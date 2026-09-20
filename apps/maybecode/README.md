@@ -1,5 +1,18 @@
 # MaybeCode
 
+Image replies retain text/image ordering. Terminal saves embedded images and
+supports Kitty/iTerm2 graphics; `/web` provides image viewing and downloads.
+See [Image replies](../../docs/en/guides/images.md) /
+[图片回复](../../docs/zh-CN/guides/images.md).
+
+`/goal start [--max-runs N] [--tokens N] [--duration-ms N] -- <objective>` starts a
+durable goal. Use `/goal status`, `/goal pause`, `/goal resume` and `/goal cancel`
+in either terminal frontend or the Web UI. New user input pauses active goals.
+Run count and active execution time have no default limits; the corresponding
+flags apply only when specified. Saved goals retain their recorded budgets.
+See [Goals](../../docs/en/guides/goals.md) and
+[目标管理](../../docs/zh-CN/guides/goals.md) for budgets, permissions and recovery.
+
 MaybeCode is a coding-agent application assembled from May's Core, application,
 session, permission, provider, configuration, coding-tool and UI packages.
 It offers terminal frontends and a developer-preview Web UI.

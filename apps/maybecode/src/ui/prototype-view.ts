@@ -17,6 +17,7 @@ import {
   type RenderResult,
   type RenderSize,
   type TuiTheme,
+  type TerminalImages,
 } from "@may/tui";
 import {
   TranscriptStore,
@@ -34,6 +35,7 @@ import { MAYBECODE_DARK_THEME } from "./theme.js";
 import { MaybeCodeUiActionRegistry } from "./actions.js";
 
 export interface MaybeCodePrototypeViewOptions {
+  readonly images?: TerminalImages;
   readonly store: TranscriptStore;
   readonly workspace: string;
   readonly model?: string;
@@ -96,6 +98,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     this.theme = options.theme ?? MAYBECODE_DARK_THEME;
     this.model = options.model ?? "model: unknown";
     this.transcriptView = new TranscriptView(options.store, {
+      ...(options.images ? { images: options.images } : {}),
       theme: this.theme,
       assistantLabel: "MaybeCode",
       selectedToolDetailsHint: "Enter details",

@@ -1,3 +1,4 @@
+import type { DisplayPart, ImageData } from "@may/media";
 /** JSON-only presentation contract. Host policy, not this manifest, grants authority. */
 export interface UiProduct {
   readonly id: string;
@@ -26,6 +27,7 @@ export interface UiApprovalRecord {
 }
 
 export interface UiBlock {
+  readonly content?: readonly DisplayPart[];
   readonly id: string;
   readonly kind: "user" | "assistant" | "tool" | "notice";
   readonly text: string;
@@ -142,6 +144,7 @@ export interface UiFieldPage { readonly hostId: string; readonly text: string; r
 
 /** One owner consumes runtime events; many clients subscribe to invalidations. */
 export interface UiHost {
+  media?(selectedId: string, id: string): Promise<ImageData>;
   readonly hostId: string;
   snapshot(selectedId?: string): Promise<UiSnapshot>;
   execute(command: UiCommand): Promise<UiReceipt>;

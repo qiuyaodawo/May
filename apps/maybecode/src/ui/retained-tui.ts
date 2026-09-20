@@ -2,6 +2,7 @@ import {
   FullscreenRenderer,
   NodeTerminalDriver,
   TuiRuntime,
+  TerminalImages,
   type RuntimeRenderer,
   type RuntimeTerminal,
 } from "@may/tui";
@@ -23,6 +24,7 @@ import { MaybeCodePrototypeView } from "./prototype-view.js";
 import type { MaybeCodeEvent } from "../events.js";
 import { presentMcpInteraction } from "../mcp-interaction-ui.js";
 import { MaybeCodeTerminalWeb } from "../terminal-web.js";
+import { formatGoal } from "../goal-commands.js";
 
 export interface RunRetainedTerminalUIOptions {
   readonly terminal?: RuntimeTerminal;
@@ -37,8 +39,12 @@ export async function runRetainedTerminalUI(
   const terminal = options.terminal ?? new NodeTerminalDriver();
   const renderer = options.renderer ?? new FullscreenRenderer(terminal);
   const store = new TranscriptStore();
+  const images = new TerminalImages();
   try {
-    store.loadHistory(await app.history());
+    const history = await app.history();
+    for (const event of history) if (event.type === "assistant.completed" || event.type === "input.submitted") await images.prepare(event.message.content);
+    for (const event of history) if (event.type === "tool.completed" && event.content) await images.prepare(event.content);
+    store.loadHistory(history);
   } catch (error) {
     await app.close();
     throw error;
@@ -64,6 +70,7 @@ export async function runRetainedTerminalUI(
   process.on("SIGTERM", handleProcessSignal);
 
   const view = new MaybeCodePrototypeView({
+    images,
     store,
     workspace: app.workspace,
     model: modelLabel(app),
@@ -98,7 +105,7 @@ export async function runRetainedTerminalUI(
   let eventTask: Promise<void> | undefined;
   try {
     runtime.start();
-    eventTask = consumeEvents(app, store, view, () => closing, web.events).catch((error) => {
+    eventTask = consumeEvents(app, store, view, () => closing, web.events, images).catch((error) => {
       eventFailure = error;
       store.appendNotice("error", `Event stream failed: ${errorMessage(error)}`);
       finish();
@@ -122,10 +129,22 @@ async function consumeEvents(
   view: MaybeCodePrototypeView,
   isClosing: () => boolean,
   events: AsyncIterable<MaybeCodeEvent>,
+  images: TerminalImages,
 ): Promise<void> {
   const approvals = new Set<Promise<void>>();
   const interactions = new Map<string, AbortController>();
+  let lastGoalDisplay = "";
   for await (const event of events) {
+    if (event.type === "run.event" && event.event.type === "model.completed") await images.prepare(event.event.message.content);
+    if (event.type === "run.event" && event.event.type === "tool.completed") await images.prepare(event.event.content);
+    if (event.type === "goal.changed") {
+      view.setStatus(`Goal ${event.goal.status}`);
+      const display = `${event.goal.id}:${event.goal.status}:${event.goal.progress}`;
+      if (display !== lastGoalDisplay) {
+        lastGoalDisplay = display;
+        store.appendNotice("info", formatGoal(event.goal));
+      }
+    }
     applyMaybeCodeEvent(store, event);
     if (event.type === "mcp.interaction.requested") {
       const controller = new AbortController();
@@ -143,7 +162,10 @@ async function consumeEvents(
       void refreshModelLabel(view, app);
     }
     if (event.type === "session.changed" && event.resumed) {
-      store.loadHistory(await app.history());
+      const history = await app.history();
+      for (const event of history) if (event.type === "assistant.completed" || event.type === "input.submitted") await images.prepare(event.message.content);
+      for (const event of history) if (event.type === "tool.completed" && event.content) await images.prepare(event.content);
+      store.loadHistory(history);
       store.appendNotice("info", "Session resumed");
       continue;
     }

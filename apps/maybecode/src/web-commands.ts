@@ -1,5 +1,6 @@
 import { commandArgs, UiError, type UiAction, type UiCommand, type UiControls, type UiReceipt } from "@may/ui-client";
 import type { MaybeCodeController } from "./controller.js";
+import { parseMaybeCodeSlashCommand } from "./slash-commands.js";
 import { createMaybeCodeSlashCommandSuggester, executeMaybeCodeSlashCommand, formatMaybeCodeMcpStatus, type MaybeCodeSlashCommandResult } from "./slash-commands.js";
 
 export class MaybeCodeWebCommands {
@@ -10,11 +11,13 @@ export class MaybeCodeWebCommands {
   }
 
   available(name: string): boolean {
+    if (name === "message.submit") return !this.app.isRunning || this.app.getGoal?.()?.status === "active";
     if (name === "mcp.respond") return Boolean(this.app.getMcpInteractions?.().length);
     if (name === "console.cancel") return true;
     if (this.busy) return ["run.cancel", "approval.resolve"].includes(name);
     if (this.app.getMcpInteractions?.().length && ["session.new", "session.activate", "session.delete", "console.action"].includes(name)) return false;
-    if (["console.execute", "console.action"].includes(name)) return !this.app.isRunning;
+    if (name === "console.execute") return true;
+    if (name === "console.action") return !this.app.isRunning;
     return true;
   }
 
@@ -53,6 +56,12 @@ export class MaybeCodeWebCommands {
       if (command.name === "console.execute") {
         commandArgs(command, ["text"]);
         if (command.args.text!.length > 16_384) throw new UiError(400, "命令过长。");
+        if (this.app.isRunning) {
+          const parsed = parseMaybeCodeSlashCommand(command.args.text!);
+          const allowed = parsed.type === "command" && (parsed.definition.name === "/help" || parsed.definition.name === "/status" ||
+            parsed.definition.name === "/goal" && ["status", "pause", "cancel"].includes(parsed.arguments[0] ?? "status"));
+          if (!allowed) throw new UiError(409, "请暂停当前运行后执行此命令。");
+        }
         if (this.app.getMcpInteractions?.().length && /^\/(?:new|resume)(?:\s|$)/u.test(command.args.text!.trim())) throw new UiError(409, "请先完成或取消当前 MCP 交互。");
         const result = await executeMaybeCodeSlashCommand(command.args.text!, this.app);
         return await this.present(result);

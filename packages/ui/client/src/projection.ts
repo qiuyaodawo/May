@@ -1,4 +1,5 @@
-import type { ContentPart, MayEvent, SerializedError } from "@may/core";
+import type { ContentPart, MediaSource, MayEvent, SerializedError } from "@may/core";
+import { displayParts, imageAttachment } from "@may/media";
 import type { AgentApplicationEvent } from "@may/application";
 import type { PermissionEvent } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
@@ -21,18 +22,33 @@ type ApprovalEvent = PermissionEvent | Extract<SessionEvent, { type: "approval.r
 
 /** UI-neutral, bounded projection; never imports a terminal renderer or provider state. */
 export class UiProjection {
+  readonly mediaSources = new Map<string, MediaSource>();
+  private content(parts: readonly ContentPart[]) {
+    for (const part of parts) if (part.type === "image") this.mediaSources.set(imageAttachment(part.source).id, part.source);
+    let remaining = LIMIT;
+    return displayParts(parts).map(part => {
+      if (part.type === "image") return part;
+      const text = bounded(part.text).slice(0, remaining); remaining -= text.length;
+      return { ...part, text };
+    });
+  }
   readonly blocks = new Map<string, UiBlock>();
   /** Live requests only. Replaying a journal must never manufacture authority. */
   readonly interactions = new Map<string, UiInteraction>();
   constructor(private readonly maxBlocks = 500) {}
   private set(block: UiBlock): void {
     this.blocks.set(block.id, block);
-    while (this.blocks.size > this.maxBlocks) this.blocks.delete(this.blocks.keys().next().value!);
+    let removed = false;
+    while (this.blocks.size > this.maxBlocks) { this.blocks.delete(this.blocks.keys().next().value!); removed = true; }
+    if (removed) {
+      const referenced = new Set([...this.blocks.values()].flatMap(block => (block.content ?? []).flatMap(part => part.type === "image" ? [part.image.id] : [])));
+      for (const id of this.mediaSources.keys()) if (!referenced.has(id)) this.mediaSources.delete(id);
+    }
   }
   history(events: readonly SessionEvent[]): void {
     let inputId: string | undefined;
     for (const event of events) {
-      if (event.type === "input.submitted") { inputId = `input:${event.seq}`; this.set({ id: inputId, kind: "user", text: contentText(event.message.content) }); }
+      if (event.type === "input.submitted") { inputId = `input:${event.seq}`; this.set({ id: inputId, kind: "user", text: contentText(event.message.content), content: this.content(event.message.content) }); }
       else if (event.type === "run.started" && inputId) { const input = this.blocks.get(inputId); if (input) this.set({ ...input, runId: event.runId }); inputId = undefined; }
       else if (event.type === "assistant.completed") this.assistantCompleted(event.runId, event.step, event.message.content);
       else if (event.type === "tool.presentation") this.presentation(event);
@@ -64,7 +80,7 @@ export class UiProjection {
   private assistantCompleted(runId: string, step: number, content: readonly ContentPart[]): void {
     const id = `assistant:${runId}:${step}`, text = contentText(content), reasoning = contentText(content, "reasoning");
     if (!text && !reasoning) this.blocks.delete(id);
-    else this.set({ id, kind: "assistant", runId, text, reasoning, status: "completed" });
+    else this.set({ id, kind: "assistant", runId, text, reasoning, content: this.content(content), status: "completed" });
   }
   private permission(event: ApprovalEvent, live: boolean): void {
     if (event.type === "approval.requested") {
@@ -107,6 +123,7 @@ export class UiProjection {
       if (event.type === "tool.failed") status = event.error.code === "PERMISSION_DENIED" ? "denied" : event.error.code === "TOOL_SKIPPED" ? "not-started" : event.error.code === "RUN_CANCELLED" ? previous?.approval?.status === "cancelled" ? "not-started" : "unknown" : "failed";
       const text = event.type === "tool.completed" ? displayValue(event.output) : event.type === "tool.output.delta" ? ((previous?.text ?? "") + event.delta).slice(-LIMIT) : previous?.text ?? "";
       this.set({ ...previous, id, kind: "tool", runId: event.runId, toolCallId: event.call.id, title: event.call.name, input: displayValue(event.call.input), text, status,
+        ...(event.type === "tool.completed" && event.content ? { content: this.content(event.content) } : {}),
         ...(event.type === "tool.failed" ? { diagnostic: diagnostic(event.error) } : {}),
         ...(event.type === "tool.progress" ? { progress: bounded(event.message) } : {}) });
     }

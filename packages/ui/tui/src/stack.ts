@@ -4,6 +4,7 @@ import type {
   RenderResult,
   RenderSize,
 } from "./component.js";
+import { placeImages, type ImagePlacement } from "./component.js";
 
 export interface StackOptions {
   readonly gap?: number;
@@ -24,6 +25,7 @@ export class Stack implements Component {
 
   render(size: RenderSize): RenderResult {
     const lines: string[] = [];
+    const images: ImagePlacement[] = [];
     let cursor: CursorPosition | undefined;
 
     for (const child of this.children) {
@@ -40,6 +42,7 @@ export class Stack implements Component {
         height: size.height - lines.length,
       });
       lines.push(...result.lines.slice(0, size.height - lines.length));
+      images.push(...placeImages(result.images, offset, size.height));
       if (cursor === undefined && result.cursor !== undefined) {
         cursor = { ...result.cursor, y: result.cursor.y + offset };
       }
@@ -47,6 +50,7 @@ export class Stack implements Component {
 
     return {
       lines,
+      ...(images.length ? { images } : {}),
       ...(cursor === undefined ? {} : { cursor }),
     };
   }

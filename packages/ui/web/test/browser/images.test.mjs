@@ -1,0 +1,65 @@
+import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
+import { mkdir, mkdtemp } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import test from "node:test";
+import { AgentWorkspace, defineAgent } from "@may/application";
+import { OpenAIResponsesModel } from "@may/provider-openai";
+import { FileSessionStore } from "@may/session/file-store";
+import { InMemorySessionCatalog } from "@may/session/catalog";
+import { ApplicationUiHost } from "@may/ui-client/application";
+import { startUiServer } from "@may/ui-client/server";
+import { imageSource } from "../../../../media/test/fixture.mjs";
+import { chromium } from "playwright";
+import { webUiAssets } from "../../dist/assets.js";
+
+test("浏览器读取持久图片、保持内容顺序、下载和会话权限", { timeout: 120_000 }, async t => {
+  const base = fileURLToPath(new URL("../../../../../review/media-tests/", import.meta.url));
+  await mkdir(base, { recursive: true });
+  const directory = await mkdtemp(join(base, "browser-"));
+  const variables = Object.fromEntries(["TMP", "TEMP", "TMPDIR"].map(key => [key, process.env[key]]));
+  for (const key of Object.keys(variables)) process.env[key] = directory;
+  const store = new FileSessionStore(join(directory, "sessions"));
+  // 运行真实应用与会话存储，仅检查历史读取，不发起模型请求。
+  const definition = defineAgent({ model: new OpenAIResponsesModel({ apiKey: "history-reading", model: "gpt-4.1" }), permissionPolicy: () => "deny", sessionHistory: false });
+  const app = await AgentWorkspace.open({ workspace: directory, store, catalog: new InMemorySessionCatalog(), openApplication: selection => definition.open({ ...selection, store }) });
+  let server, browser;
+  t.after(async () => {
+    await browser?.close(); await server?.close(); await app.close();
+    for (const [key, value] of Object.entries(variables)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  });
+  const source = await imageSource();
+  const message = { role: "assistant", content: [{ type: "text", text: "图片前文" }, { type: "image", source }, { type: "text", text: "图片后文" }] };
+  const history = await store.inspect(app.sessionId);
+  await store.append({ type: "assistant.completed", sessionId: app.sessionId, seq: history.length + 1, timestamp: Date.now(), runId: "image-history", step: 1, message });
+  const host = new ApplicationUiHost(app, { product: { id: "images", title: "Images", subtitle: "", resourceKind: "session", suggestions: [] }, closeApplication: false });
+  const token = randomBytes(32).toString("hex");
+  server = await startUiServer({ host, assets: await webUiAssets("Images", "session", { browserLogin: true }), token, browserLogin: true, port: 0, close: () => host.close() });
+  const snapshot = await host.snapshot();
+  const image = snapshot.blocks.find(block => block.kind === "assistant").content[1].image;
+  assert.equal(JSON.stringify(snapshot).includes(source.data), false);
+  const params = new URLSearchParams({ hostId: host.hostId, selected: app.sessionId, id: image.id });
+  const mediaUrl = `${server.url}/api/ui/media?${params}`;
+  assert.equal((await fetch(mediaUrl)).status, 401);
+  const response = await fetch(mediaUrl, { headers: { authorization: `Bearer ${token}` } });
+  assert.equal(response.status, 200); assert.equal(response.headers.get("content-type"), "image/png");
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), Buffer.from(source.data, "base64"));
+  params.set("selected", "unrelated-session");
+  assert.equal((await fetch(`${server.url}/api/ui/media?${params}`, { headers: { authorization: `Bearer ${token}` } })).status, 404);
+  browser = await chromium.launch({ headless: true, artifactsDir: directory, downloadsPath: directory });
+  const page = await browser.newPage();
+  page.on("pageerror", error => t.diagnostic(error.stack ?? error.message));
+  await page.goto(server.createLoginUrl());
+  await page.waitForFunction(() => document.querySelector(".reply-image")?.naturalWidth === 64);
+  const dimensions = await page.locator(".reply-image").evaluate(image => ({ width: image.naturalWidth, height: image.naturalHeight }));
+  assert.deepEqual(dimensions, { width: 64, height: 32 });
+  assert.deepEqual(await page.locator(".message-assistant .message-content").evaluate(node => [...node.children].map(child => child.tagName)), ["DIV", "MAY-IMAGE", "DIV"]);
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("link", { name: "下载图片" }).click();
+  const download = await downloadPromise; await download.saveAs(join(directory, "download.png"));
+  assert.equal(await download.failure(), null);
+  await page.goto("about:blank");
+  await page.goto(server.createLoginUrl());
+  await page.waitForFunction(() => document.querySelector(".reply-image")?.naturalWidth === 64);
+});

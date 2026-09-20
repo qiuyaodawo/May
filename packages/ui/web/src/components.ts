@@ -26,7 +26,42 @@ export interface WebUiExtensions {
   readonly diagnostics?: Readonly<Record<string, WebUiRenderer<UiDiagnostic>>>;
   readonly panels?: Readonly<Record<string, WebUiRenderer<UiPanel>>>;
 }
-export interface WebUiContext { readonly state: UiClientState; readonly command: UiClient["command"] }
+export interface WebUiContext { readonly state: UiClientState; readonly command: UiClient["command"]; readonly readMedia?: UiClient["readMedia"] }
+
+function messageContent(block: UiBlock, context?: WebUiContext): HTMLElement {
+  const root = element("div", "message-content");
+  for (const part of block.content ?? [{ type: "text", text: block.text }]) {
+    if (part.type === "text") { root.append(markdown(part.text)); continue; }
+    const attachment = part.image;
+    if (!customElements.get("may-image")) customElements.define("may-image", class extends HTMLElement {
+      load?: (signal: AbortSignal) => Promise<Blob>;
+      private controller?: AbortController;
+      private url: string | undefined;
+      connectedCallback() {
+        if (!this.load) return;
+        const controller = new AbortController(); this.controller = controller;
+        this.textContent = "正在读取图片…";
+        void this.load(controller.signal).then(blob => {
+          if (controller.signal.aborted) return;
+          this.url = URL.createObjectURL(blob);
+          const image = element("img", "reply-image"); image.src = this.url; image.alt = "回复中的图片";
+          const open = element("a", "text-button", "查看原图"); open.href = this.url; open.target = "_blank"; open.rel = "noopener";
+          const save = element("a", "text-button", "下载图片"); save.href = this.url; save.download = `image.${blob.type.slice(6)}`;
+          this.replaceChildren(image, open, document.createTextNode(" · "), save);
+        }, error => { if (!controller.signal.aborted) this.textContent = error instanceof Error ? error.message : "图片读取失败。"; });
+      }
+      disconnectedCallback() { this.controller?.abort(); if (this.url) URL.revokeObjectURL(this.url); this.url = undefined; }
+    });
+    if (attachment.url) {
+      const image = element("img", "reply-image"); image.src = attachment.url; image.alt = "回复中的图片"; image.loading = "lazy"; image.referrerPolicy = "no-referrer"; root.append(image);
+      const link = element("a", "text-button", "打开图片链接"); link.href = attachment.url; link.target = "_blank"; link.rel = "noopener noreferrer"; root.append(link);
+    } else if (context?.readMedia) {
+      const image = document.createElement("may-image") as HTMLElement & { load: (signal: AbortSignal) => Promise<Blob> };
+      image.load = signal => context.readMedia!(attachment.id, signal); root.append(image);
+    } else root.append(element("p", "", `图片 ${attachment.id}：当前宿主未提供媒体读取接口。`));
+  }
+  return root;
+}
 
 /** Unsupported versions, declined renderers and exceptions cannot break the workbench. */
 export function extensionContent<T>(renderer: WebUiRenderer<T> | undefined, value: T, context?: WebUiContext): HTMLElement | null {
@@ -49,7 +84,7 @@ const statusHint = (status?: string) => status === "unknown" ? "缺少可确认�
 
 export function transcriptBlock(block: UiBlock, extensions: WebUiExtensions = {}, context?: WebUiContext): HTMLElement {
   const article = element("article", `message message-${block.kind}`); article.dataset.id = block.id;
-  if (block.kind === "user") { article.append(element("div", "user-bubble", block.text)); return article; }
+  if (block.kind === "user") { const bubble = element("div", "user-bubble"); bubble.append(messageContent(block, context)); article.append(bubble); return article; }
   if (block.kind === "notice") {
     const notice = element("div", `notice ${block.status ?? ""}`);
     if (block.status) notice.append(statusBadge(block.status));
@@ -68,6 +103,7 @@ export function transcriptBlock(block: UiBlock, extensions: WebUiExtensions = {}
     if (block.progress) details.append(element("p", "tool-progress", block.progress));
     if (block.input) details.append(element("h4", "", "输入"), element("pre", "tool-content", block.input));
     if (block.text) details.append(element("h4", "", block.status === "completed" ? "输出" : "已收到的输出"), element("pre", "tool-content", block.text));
+    if (block.content?.some(part => part.type === "image")) details.append(messageContent(block, context));
     if (block.diagnostic) appendDiagnostic(details, block.diagnostic, extensions, context);
     const tool = block.title ? extensionContent(extensions.tools?.[block.title], block, context) : null;
     if (tool) { const supplement = element("div", "tool-extension"); supplement.append(tool); details.append(supplement); }
@@ -81,7 +117,7 @@ export function transcriptBlock(block: UiBlock, extensions: WebUiExtensions = {}
   if (block.reasoning) {
     const reasoning = element("details", "reasoning"); reasoning.append(element("summary", "", "思考过程"), element("div", "reasoning-text", block.reasoning)); article.append(reasoning);
   }
-  if (block.text) article.append(markdown(block.text));
+  if (block.content?.length || block.text) article.append(messageContent(block, context));
   if (block.status === "streaming") article.append(element("span", "streaming-indicator", "生成中…"));
   else {
     if (block.status && block.status !== "completed") article.append(statusBadge(block.status), element("p", "state-hint", statusHint(block.status)));

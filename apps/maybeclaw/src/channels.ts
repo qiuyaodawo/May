@@ -1,20 +1,23 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { imagePng, type ImageData, type MediaCapabilities } from "@may/media";
 import type { WSClient } from "@larksuiteoapi/node-sdk";
 import type { ChannelInput, ChannelStore, DeliveryRecord } from "./channel-store.js";
 import { cursorId } from "./channel-store.js";
 import type { TelegramSettings, FeishuSettings } from "./settings.js";
 
 export interface ChannelAdapter {
+  readonly media?: MediaCapabilities;
   readonly name: "telegram" | "feishu";
   readonly account: string;
   readonly allowUsers: readonly string[];
   status(): string;
   run(receive: (input: ChannelInput) => Promise<void>, store: ChannelStore, signal: AbortSignal): Promise<void>;
   /** Exactly one network attempt. An exception is conservatively an unknown outcome. */
-  send(delivery: DeliveryRecord, signal: AbortSignal): Promise<void>;
+  send(delivery: DeliveryRecord, signal: AbortSignal, image?: ImageData): Promise<void>;
 }
 
 export class TelegramAdapter implements ChannelAdapter {
+  readonly media = { images: true, maxImageBytes: 32 * 1024 * 1024, mediaTypes: ["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif"] };
   readonly name = "telegram";
   readonly account: string;
   readonly allowUsers: readonly string[];
@@ -61,14 +64,21 @@ export class TelegramAdapter implements ChannelAdapter {
     }
     this.state = "stopped";
   }
-  async send(delivery: DeliveryRecord, signal: AbortSignal): Promise<void> {
+  async send(delivery: DeliveryRecord, signal: AbortSignal, image?: ImageData): Promise<void> {
+    if (image) {
+      const prepared = telegramImageRequest(delivery.conversation, image);
+      const result = await this.call(prepared.method, prepared.body, signal) as { message_id?: number };
+      if (!Number.isSafeInteger(result.message_id)) throw new Error("Unconfirmed image delivery");
+      return;
+    }
+    if (delivery.imageId) throw new Error("Image delivery has no media data");
     const result = await this.call("sendMessage", { chat_id: delivery.conversation, text: delivery.text,
       link_preview_options: { is_disabled: true } }, signal) as { message_id?: number };
     if (!Number.isSafeInteger(result.message_id)) throw new Error("Unconfirmed delivery");
   }
   private async call(method: string, body: object, signal: AbortSignal): Promise<unknown> {
     const response = await this.request(`https://api.telegram.org/bot${this.token}/${method}`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+      method: "POST", ...(body instanceof FormData ? { body } : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
       signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]), redirect: "error",
     });
     const data = await boundedJson(response) as { ok?: boolean; result?: unknown; error_code?: number; parameters?: { retry_after?: number } };
@@ -96,6 +106,7 @@ export function telegramInput(update: TelegramUpdate, account: string): ChannelI
 }
 
 export class FeishuAdapter implements ChannelAdapter {
+  readonly media = { images: true, maxImageBytes: 10 * 1024 * 1024, mediaTypes: ["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif"] };
   readonly name = "feishu";
   readonly account: string;
   readonly allowUsers: readonly string[];
@@ -131,21 +142,46 @@ export class FeishuAdapter implements ChannelAdapter {
       if (!signal.aborted) await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
     } finally { signal.removeEventListener("abort", close); close(); this.state = "stopped"; }
   }
-  async send(delivery: DeliveryRecord, signal: AbortSignal): Promise<void> {
+  async send(delivery: DeliveryRecord, signal: AbortSignal, image?: ImageData): Promise<void> {
     // Native fetch makes the outbound attempt count explicit; no SDK auto-retry layer.
     const auth = await this.post("/auth/v3/tenant_access_token/internal", { app_id: this.settings.appId, app_secret: this.secret }, signal) as { code?: number; tenant_access_token?: string };
     if (auth.code !== 0 || !auth.tenant_access_token) throw new Error("Feishu authentication failed");
+    let imageKey: string | undefined;
+    if (image) {
+      const form = await feishuImageRequest(image);
+      const upload = await this.post("/im/v1/images", form, signal, auth.tenant_access_token) as { code?: number; data?: { image_key?: string } };
+      if (upload.code !== 0 || !upload.data?.image_key) throw new Error("Feishu image upload was not confirmed");
+      imageKey = upload.data.image_key;
+    }
+    if (delivery.imageId && !imageKey) throw new Error("Image delivery has no media data");
     const result = await this.post("/im/v1/messages?receive_id_type=chat_id", { receive_id: delivery.conversation,
-      msg_type: "text", content: JSON.stringify({ text: delivery.text }), uuid: delivery.id.slice(0, 32) }, signal, auth.tenant_access_token) as { code?: number; data?: { message_id?: string } };
+      msg_type: imageKey ? "image" : "text", content: JSON.stringify(imageKey ? { image_key: imageKey } : { text: delivery.text }), uuid: delivery.id.slice(0, 32) }, signal, auth.tenant_access_token) as { code?: number; data?: { message_id?: string } };
     if (result.code !== 0 || !result.data?.message_id) throw new Error("Feishu delivery was not confirmed");
   }
   private async post(path: string, body: object, signal: AbortSignal, token?: string): Promise<unknown> {
     const response = await this.request(`https://open.feishu.cn/open-apis${path}`, { method: "POST",
-      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(body), signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]), redirect: "error" });
+      headers: { ...(body instanceof FormData ? {} : { "content-type": "application/json" }), ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: body instanceof FormData ? body : JSON.stringify(body), signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]), redirect: "error" });
     if (!response.ok) throw new Error("Feishu request was not confirmed");
     return boundedJson(response);
   }
+}
+
+export function telegramImageRequest(conversation: string, image: ImageData): { method: "sendPhoto" | "sendDocument"; body: FormData } {
+  if (image.data.byteLength > 32 * 1024 * 1024) throw new Error("Telegram attachment exceeds 32 MiB");
+  const photo = ["image/png", "image/jpeg"].includes(image.mediaType) && image.data.byteLength <= 10 * 1024 * 1024 && image.width + image.height <= 10_000 && Math.max(image.width / image.height, image.height / image.width) <= 20;
+  const field = photo ? "photo" : "document", body = new FormData();
+  body.set("chat_id", conversation);
+  body.set(field, new Blob([new Uint8Array(image.data)], { type: image.mediaType }), `image.${image.mediaType.slice(6)}`);
+  return { method: photo ? "sendPhoto" : "sendDocument", body };
+}
+
+export async function feishuImageRequest(image: ImageData): Promise<FormData> {
+  const png = await imagePng(image);
+  if (png.byteLength > 10 * 1024 * 1024) throw new Error("Feishu image exceeds 10 MiB");
+  const body = new FormData(); body.set("image_type", "message");
+  body.set("image", new Blob([new Uint8Array(png)], { type: "image/png" }), "image.png");
+  return body;
 }
 
 interface FeishuEvent {

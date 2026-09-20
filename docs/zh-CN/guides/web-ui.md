@@ -61,6 +61,7 @@ Tab 填入内容。未知命令和无效参数直接显示错误。命令输出�
 | Reasoning effort | effort 下拉菜单；`/effort`；`/effort default` 恢复配置值 |
 | 会话管理 | 侧栏选择和确认删除；`/new`、`/resume [id]`；会话选择结果中的重命名和删除 |
 | 重试、指令与状态 | `/retry`、`/instructions`、`/status`、`/context` |
+| 目标管理 | `/goal start`、`/goal status`、`/goal pause`、`/goal resume`、`/goal cancel` |
 | 上下文管理 | `/compact [history-reference\|provider-native]` 和压缩按钮 |
 | Skills | `/skills`、`/skills show name`、`/skills use name [task]` |
 | MCP | `/mcp` 及其目录、资源、prompt、订阅和任务操作 |

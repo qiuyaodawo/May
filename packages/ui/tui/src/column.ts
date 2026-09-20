@@ -4,6 +4,7 @@ import type {
   RenderResult,
   RenderSize,
 } from "./component.js";
+import { placeImages, type ImagePlacement } from "./component.js";
 
 export interface ColumnItem {
   readonly component: Component;
@@ -45,6 +46,7 @@ export class Column implements Component {
     const available = Math.max(0, size.height - totalGap);
     const heights = allocateHeights(this.items, available);
     const lines: string[] = [];
+    const images: ImagePlacement[] = [];
     let cursor: CursorPosition | undefined;
 
     for (let index = 0; index < this.items.length; index++) {
@@ -57,6 +59,7 @@ export class Column implements Component {
       const offset = lines.length;
       const result = item.component.render({ width: size.width, height });
       const visible = result.lines.slice(0, height);
+      images.push(...placeImages(placeImages(result.images, 0, height), offset, size.height));
       lines.push(...visible, ...blankLines(height - visible.length));
       if (cursor === undefined && result.cursor !== undefined) {
         cursor = { ...result.cursor, y: result.cursor.y + offset };
@@ -65,6 +68,7 @@ export class Column implements Component {
 
     return {
       lines: lines.slice(0, size.height),
+      ...(images.length ? { images } : {}),
       ...(cursor === undefined ? {} : { cursor }),
     };
   }

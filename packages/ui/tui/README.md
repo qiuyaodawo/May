@@ -1,5 +1,11 @@
 # `@may/tui`
 
+`TerminalImages` prepares saved attachments for Kitty/iTerm2 rendering or text
+display. Graphics travel separately through `RenderResult.images`; the renderer
+clears placements when the viewport changes. See
+[Image replies](../../../docs/en/guides/images.md) /
+[图片回复](../../../docs/zh-CN/guides/images.md).
+
 Terminal UI components for May agents. The low-level primitives remain usable
 without a provider or product application, while the agent transcript layer
 projects May runtime, permission, and session events into a retained view.

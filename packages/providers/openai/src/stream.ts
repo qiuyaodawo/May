@@ -82,6 +82,14 @@ export function parseCompletedOpenAIResponse(value: unknown): {
   for (const raw of output) {
     const item = requireRecord(raw, "response.output item");
     const type = requireString(item.type, "response.output item.type");
+    if (type === "image_generation_call" && item.result != null) {
+      const format = item.output_format ?? "png";
+      if (format !== "png" && format !== "jpeg" && format !== "webp") throw new OpenAIResponsesProtocolError("Unsupported generated image format");
+      const data = requireString(item.result, "image_generation_call.result");
+      if (data === "") throw new OpenAIResponsesProtocolError("Generated image is empty");
+      content.push({ type: "image", source: { type: "base64", mediaType: `image/${format}`, data } });
+      continue;
+    }
     if (type === "reasoning") {
       for (const rawSummary of optionalArray(item.summary) ?? []) {
         const summary = requireRecord(rawSummary, "reasoning summary");
@@ -129,6 +137,14 @@ export function parseCompletedOpenAIResponse(value: unknown): {
   };
   const usage = parseUsage(response.usage);
   return usage === undefined ? { message } : { message, usage };
+}
+
+export function openAIResponseContent(message: AssistantMessage): readonly ContentPart[] {
+  if (message.content.some(part => part.type === "image") || message.modelState?.type !== OPENAI_RESPONSES_MODEL_STATE_TYPE) return message.content;
+  const state = requireRecord(message.modelState.data, "modelState.data");
+  const items = requireArray(state.items, "modelState.data.items");
+  if (!items.some(item => typeof item === "object" && item !== null && "type" in item && item.type === "image_generation_call")) return message.content;
+  return parseCompletedOpenAIResponse({ output: items }).message.content;
 }
 
 export function parseUsage(value: unknown): Usage | undefined {

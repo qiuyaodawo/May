@@ -1,5 +1,9 @@
 # @may/web-ui
 
+Ordered image content supports authenticated viewing, original-image links and
+downloads. See [Image replies](../../../docs/en/guides/images.md) /
+[图片回复](../../../docs/zh-CN/guides/images.md).
+
 A new browser workbench, not an extraction of MaybeClaw's old page. No React,
 terminal renderer, CDN, browser runtime compiler, or product import is required.
 The browser entry exports `mountWebUI`, `transcriptBlock`, `approvalCard`,

@@ -14,6 +14,7 @@
     { "path": "../../packages/tools/coding-tools" },
     { "path": "../../packages/config" },
     { "path": "../../packages/core" },
+    { "path": "../../packages/media" },
     { "path": "../../packages/providers" },
     { "path": "../../packages/session" },
     { "path": "../../packages/ui/client" },

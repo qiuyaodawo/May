@@ -1,5 +1,10 @@
 # @may/ui-client
 
+`UiBlock.content` preserves ordered text and image attachments. `UiHost.media`
+and `UiClient.readMedia` provide authenticated, resource-scoped image access.
+See [Image replies](../../../docs/en/guides/images.md) /
+[图片回复](../../../docs/zh-CN/guides/images.md).
+
 UI-neutral developer-preview contracts and a browser-safe client. This package
 does not depend on TUI rendering or a product. The root entry exports JSON DTOs,
 `UiHost`, `UiClient`, `UiError`, and command validation helpers.

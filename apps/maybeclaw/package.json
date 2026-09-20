@@ -26,6 +26,7 @@
     "@may/coding-tools": "workspace:*",
     "@may/config": "workspace:*",
     "@may/core": "workspace:*",
+    "@may/media": "workspace:*",
     "@may/providers": "workspace:*",
     "@may/session": "workspace:*",
     "@may/ui-client": "workspace:*",

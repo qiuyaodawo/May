@@ -1,5 +1,9 @@
 # MaybeClaw
 
+Image replies are available in Web UI and as ordered image/text messages in
+Feishu and Telegram. See [Image replies](../../docs/en/guides/images.md) /
+[图片回复](../../docs/zh-CN/guides/images.md) for capabilities and delivery behavior.
+
 MaybeClaw is a local, single-user durable-task assistant built on May. This
 developer preview provides a foreground CLI, persistent queue, long-running local
 server, Web UI, and allowlisted Feishu/Telegram private chats. It does not depend

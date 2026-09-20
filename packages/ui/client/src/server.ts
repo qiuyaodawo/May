@@ -17,7 +17,14 @@ export function createUiRouter(host: UiHost, exit?: () => void) {
       if (!url.pathname.startsWith("/api/ui/")) return false;
       try {
         if (closed) throw new UiError(503, "宿主正在关闭。");
-        if (req.method === "GET" && url.pathname === "/api/ui/snapshot") {
+        if (req.method === "GET" && url.pathname === "/api/ui/media" && host.media) {
+          const selected = url.searchParams.get("selected") ?? "", id = url.searchParams.get("id") ?? "";
+          if (url.searchParams.get("hostId") !== host.hostId) throw new UiError(409, "宿主已改变。");
+          if (!selected || selected.length > 256 || !/^[a-f0-9]{64}$/.test(id)) throw new UiError(400, "图片参数无效。");
+          const media = await host.media(selected, id);
+          res.writeHead(200, { "content-type": media.mediaType, "content-length": media.data.byteLength, "content-disposition": `inline; filename="${id}.${media.mediaType.slice(6)}"` });
+          res.end(media.data);
+        } else if (req.method === "GET" && url.pathname === "/api/ui/snapshot") {
           const selected = url.searchParams.get("selected") ?? undefined;
           if (selected && selected.length > 256) throw new UiError(400, "无效的资源 ID。");
           sendJson(res, 200, await host.snapshot(selected));
@@ -134,7 +141,7 @@ export async function startUiServer(options: { host: UiHost; assets: UiAssets; t
 
 export function secureHeaders(res: ServerResponse): void {
   res.setHeader("cache-control", "no-store"); res.setHeader("x-content-type-options", "nosniff"); res.setHeader("referrer-policy", "no-referrer");
-  res.setHeader("content-security-policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+  res.setHeader("content-security-policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' blob: https: http:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
 }
 export function validateToken(token: string): void { if (!/^[\x21-\x7e]{32,256}$/.test(token)) throw new Error("Control token must be 32..256 printable non-space ASCII characters"); }
 export function trustedRequest(req: IncomingMessage, origin: string): boolean {

@@ -14,6 +14,8 @@ export interface InboxRecord {
   taskId?: string; terminalNotified?: boolean;
 }
 export interface DeliveryRecord {
+  imageId?: string;
+  after?: string;
   kind: "delivery"; id: string; account: string; sender: string; conversation: string;
   text: string; taskId?: string; status: "pending" | "sending" | "sent" | "unknown" | "suppressed";
 }
@@ -87,6 +89,8 @@ function validateRecord(value: ChannelRecord): void {
     for (const key of ["account", "eventId", "sender", "conversation", "text"] as const) if (typeof input[key] !== "string" || !input[key] || input[key].length > (key === "text" ? 16_384 : 256)) throw new Error("Invalid channel input");
     if (value.taskId) validateId(value.taskId);
   } else if (value.kind === "delivery") {
+    if (value.imageId) { validateId(value.imageId); if (!value.taskId) throw new Error("Image delivery requires a task"); }
+    if (value.after) validateId(value.after);
     for (const key of ["account", "sender", "conversation", "text"] as const) if (typeof value[key] !== "string" || !value[key] || value[key].length > (key === "text" ? 4096 : 256)) throw new Error("Invalid channel delivery");
     if (!["pending", "sending", "sent", "unknown", "suppressed"].includes(value.status)) throw new Error("Invalid delivery status");
     if (value.taskId) validateId(value.taskId);

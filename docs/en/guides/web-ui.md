@@ -68,6 +68,7 @@ Command output is held in page memory, separately from conversation history.
 | Reasoning effort | Effort dropdown; `/effort`; `/effort default` restores configured options |
 | Sessions | Sidebar selection and confirmed deletion; `/new`, `/resume [id]`; rename and deletion in the session selector |
 | Retry, instructions and status | `/retry`, `/instructions`, `/status`, `/context` |
+| Goals | `/goal start`, `/goal status`, `/goal pause`, `/goal resume`, `/goal cancel` |
 | Context management | `/compact [history-reference\|provider-native]` and the compact button |
 | Skills | `/skills`, `/skills show name`, `/skills use name [task]` |
 | MCP | `/mcp` and its catalog, resource, prompt, watch and task operations |

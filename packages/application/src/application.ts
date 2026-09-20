@@ -50,7 +50,7 @@ import {
   type SessionHistoryToolOptions,
 } from "@may/session-tools";
 
-import type { AgentController } from "./controller.js";
+import type { ContinuableAgentController } from "./controller.js";
 import { SkillRegistry, SkillSession, SKILL_STATE_KEY } from "@may/skills";
 import type { AgentApplicationEvent, AgentRun } from "./events.js";
 
@@ -120,7 +120,7 @@ interface ActiveCompaction {
  * is injected; ordering, cancellation, event relays and compaction persistence
  * live here once for every application.
  */
-export class AgentApplication implements AgentController {
+export class AgentApplication implements ContinuableAgentController {
   readonly skills: SkillSession | undefined;
   readonly events: AsyncIterable<AgentApplicationEvent>;
   readonly sessionId: string;
@@ -337,6 +337,11 @@ export class AgentApplication implements AgentController {
 
   submit(options: import("@may/session").SessionSubmitOptions): Promise<AgentRun> {
     return this.startRun(() => this.session.submit(options));
+  }
+
+  /** 在当前上下文中继续执行，沿用运行互斥和保存流程。 */
+  continue(options: import("@may/core").ContinueOptions = {}): Promise<AgentRun> {
+    return this.startRun(() => this.session.continue(options));
   }
 
   listRecoveries() { return this.session.listRecoveries(); }

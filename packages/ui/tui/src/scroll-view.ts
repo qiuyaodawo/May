@@ -6,6 +6,7 @@ import type {
   RenderResult,
   RenderSize,
 } from "./component.js";
+import { placeImages } from "./component.js";
 
 export interface ScrollViewOptions {
   readonly followEnd?: boolean;
@@ -181,6 +182,7 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
       cursor.y >= this.offset && cursor.y < this.offset + size.height;
     return {
       lines: content.lines.slice(this.offset, this.offset + size.height),
+      ...(content.images?.length ? { images: placeImages(content.images, -this.offset, size.height) } : {}),
       ...(cursorVisible
         ? {
             cursor: {

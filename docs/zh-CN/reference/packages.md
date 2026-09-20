@@ -10,6 +10,9 @@ May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行�
 
 ## 选择最小可用层级
 
+`@may/media` 提供可复用的图片校验、附件和文件存储。
+Terminal、Web UI 和渠道接入方式参见[图片回复](../guides/images.md)。
+
 | 目标 | 从这里开始 | 通常还需加入 |
 | --- | --- | --- |
 | 在内存中运行一次模型/工具循环 | `@may/core` | 一个 provider adapter |
@@ -29,6 +32,11 @@ May 使用 pnpm workspace。可复用框架代码位于 `packages/`，可执行�
 管理和有序关闭的应用通常应从 `@may/application` 开始。
 
 ## 运行时与应用
+
+### `@may/goal`
+
+目标执行组件见 [`@may/goal` 指南](../guides/goals.md)。它通过公开的 Agent、Model 和 Context 接口
+提供持久化状态、预算限制和模型工具，基础 Agent package 保持独立。
 
 ### `@may/skills`
 

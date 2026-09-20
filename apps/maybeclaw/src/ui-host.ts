@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readEmbeddedImage, type MediaReader } from "@may/media";
 import { commandArgs, UiError, type UiCommand, type UiHost, type UiReceipt, type UiSnapshot, type UiBlock, type UiPageRequest, type UiFieldRequest } from "@may/ui-client";
 import { UiProjection, displayValue } from "@may/ui-client/projection";
 import { historyPage, readPage, recordedField, fieldPage, searchHistory } from "@may/ui-client/reading";
@@ -12,7 +13,7 @@ export class MaybeClawUiHost implements UiHost {
   private live = new Map<string, UiProjection>();
   private listeners = new Set<() => void>();
   private stop: () => void;
-  constructor(private readonly host: MaybeClawHost) {
+  constructor(private readonly host: MaybeClawHost, private readonly readMedia: MediaReader = readEmbeddedImage) {
     this.stop = host.claw.observe((id, event) => {
       let projection = this.live.get(id);
       if (!projection) { projection = new UiProjection(); this.live.set(id, projection); }
@@ -22,6 +23,13 @@ export class MaybeClawUiHost implements UiHost {
     });
   }
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+  async media(selectedId: string, id: string) {
+    const projection = new UiProjection(Infinity);
+    projection.history(await this.host.claw.readSessionHistory(selectedId));
+    const source = projection.mediaSources.get(id);
+    if (!source) throw new UiError(404, "图片不属于此任务。");
+    return this.readMedia(source);
+  }
   async snapshot(selectedId?: string, all = false): Promise<UiSnapshot> {
     const revision = ++this.revision;
     const tasks = await this.host.claw.store.list(), status = this.host.status();

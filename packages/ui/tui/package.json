@@ -45,6 +45,8 @@
   "dependencies": {
     "@may/coding-tools": "workspace:*",
     "@may/core": "workspace:*",
+    "@may/media": "workspace:*",
+    "supports-terminal-graphics": "0.1.0",
     "@may/keybindings": "workspace:*",
     "@may/permissions": "workspace:*",
     "@may/session": "workspace:*",

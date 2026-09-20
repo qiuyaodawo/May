@@ -7,6 +7,8 @@ import type {
   RenderSize,
 } from "../component.js";
 import { Markdown } from "../markdown.js";
+import { placeImages, type ImagePlacement } from "../component.js";
+import type { TerminalImages } from "../images.js";
 import type { ScrollRegion } from "../scroll-view.js";
 import { Stack } from "../stack.js";
 import { sanitizeTerminalText, Text } from "../text.js";
@@ -25,6 +27,7 @@ import {
 } from "./tool-renderers.js";
 
 export interface TranscriptViewOptions {
+  readonly images?: TerminalImages;
   readonly showReasoning?: boolean;
   readonly showToolDetails?: boolean;
   readonly selected?: boolean;
@@ -54,6 +57,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   private readonly tailCache = new WeakMap<TranscriptItem, {
     key: string;
     lines: readonly string[];
+    images?: readonly ImagePlacement[];
     replyStart?: number;
   }>();
 
@@ -153,6 +157,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     this.toolAnchors.clear();
     if (retainTail) return this.renderTailItems(size);
     const lines: string[] = [];
+    const images: ImagePlacement[] = [];
     for (const item of this.store.items) {
       if (lines.length >= size.height) break;
       if (lines.length > 0) lines.push("");
@@ -160,6 +165,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
       const start = lines.length;
       const selected = item.kind === "tool" && this.focused && item.id === this.selectedToolId;
       const result = new TranscriptItemView(item, {
+        ...(this.options.images ? { images: this.options.images } : {}),
         showReasoning: this.reasoningVisible,
         showToolDetails: item.kind === "tool"
           ? this.isToolExpanded(item.id)
@@ -182,17 +188,19 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
           : { toolDetailsHint: this.options.toolDetailsHint }),
       }).render({ width: size.width, height: size.height - lines.length });
       lines.push(...result.lines.slice(0, size.height - lines.length));
+      images.push(...placeImages(result.images, start, size.height));
       if (item.kind === "tool") {
         this.toolAnchors.set(item.id, { start, end: start });
       }
     }
-    return { lines };
+    return { lines, ...(images.length ? { images } : {}) };
   }
 
   private renderTailItems(size: RenderSize): RenderResult {
     const chunks: Array<{
       readonly item: TranscriptItem;
       readonly lines: readonly string[];
+      readonly images?: readonly ImagePlacement[];
       readonly replyStart?: number;
     }> = [];
     let remaining = size.height;
@@ -214,12 +222,14 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
         const renderedItem = revealReply && bounded.kind === "assistant" && item.kind === "assistant"
           ? { ...bounded, text: item.text }
           : bounded;
-        const lines = this.renderItem(renderedItem, size.width, Number.MAX_SAFE_INTEGER).lines;
+        const result = this.renderItem(renderedItem, size.width, Number.MAX_SAFE_INTEGER);
+        const lines = result.lines;
         const bodyLines = revealReply
-          ? new Markdown(item.text, { theme: this.theme.markdown })
-            .render({ width: size.width, height: Number.MAX_SAFE_INTEGER }).lines.length
+          ? item.kind === "assistant" && item.content?.some(part => part.type === "image")
+            ? this.renderItem({ ...item, reasoning: "" }, size.width, Number.MAX_SAFE_INTEGER).lines.length - 1
+            : new Markdown(item.text, { theme: this.theme.markdown }).render({ width: size.width, height: Number.MAX_SAFE_INTEGER }).lines.length
           : undefined;
-        cached = { key, lines,
+        cached = { key, lines, ...(result.images ? { images: result.images } : {}),
           ...(bodyLines === undefined ? {} : { replyStart: lines.length - bodyLines }) };
         this.tailCache.set(item, cached);
       }
@@ -228,17 +238,19 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
       const cut = keepForReply && !revealReply ? 0
         : Math.max(0, Math.min(rendered.length - available, replyStart ?? rendered.length));
       const visible = rendered.slice(cut);
-      chunks.unshift({ item, lines: visible,
+      chunks.unshift({ item, lines: visible, ...(cached.images ? { images: placeImages(cached.images, -cut, visible.length) } : {}),
         ...(replyStart === undefined ? {} : { replyStart: replyStart - cut }) });
       remaining -= visible.length + separator;
       if (visible.length < rendered.length && (revealedIndex < 0 || index <= revealedIndex)) break;
     }
 
     const lines: string[] = [];
+    const images: ImagePlacement[] = [];
     for (const chunk of chunks) {
       if (lines.length > 0) lines.push("");
       const start = lines.length;
       lines.push(...chunk.lines);
+      images.push(...placeImages(chunk.images, start, Number.MAX_SAFE_INTEGER));
       if (chunk.item.kind === "tool") {
         this.toolAnchors.set(chunk.item.id, { start, end: start });
       }
@@ -246,7 +258,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
         this.replyAnchor = { start: start + chunk.replyStart, end: start + chunk.replyStart };
       }
     }
-    return { lines };
+    return { lines, ...(images.length ? { images } : {}) };
   }
 
   private renderItem(
@@ -257,6 +269,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     const selected = item.kind === "tool" && this.focused &&
       item.id === this.selectedToolId;
     return new TranscriptItemView(item, {
+      ...(this.options.images ? { images: this.options.images } : {}),
       showReasoning: this.reasoningVisible,
       showToolDetails: item.kind === "tool"
         ? this.isToolExpanded(item.id)
@@ -340,6 +353,7 @@ function tailText(
 }
 
 interface TranscriptItemViewOptions {
+  readonly images?: TerminalImages;
   readonly showReasoning: boolean;
   readonly showToolDetails: boolean;
   readonly selected: boolean;
@@ -363,8 +377,8 @@ export class TranscriptItemView implements Component {
     switch (this.item.kind) {
       case "assistant":
         return renderAssistantView(this.item, options, size);
-      case "tool":
-        return new Text(options.toolRenderers.render(this.item, {
+      case "tool": {
+        const description = new Text(options.toolRenderers.render(this.item, {
           expanded: options.showToolDetails,
           selected: options.selected,
           maximumOutputCharacters: options.maximumToolOutputCharacters,
@@ -372,7 +386,10 @@ export class TranscriptItemView implements Component {
           detailsHint: options.selected
             ? options.selectedToolDetailsHint
             : options.toolDetailsHint,
-        })).render(size);
+        }));
+        const images = this.item.content?.filter(part => part.type === "image") ?? [];
+        return new Stack([description, ...images.map(part => options.images?.component(part.source) ?? new Text("图片附件：宿主未配置 TerminalImages。"))]).render(size);
+      }
       case "user":
         return new Text(renderUser(this.item, options)).render(size);
       case "approval":
@@ -385,6 +402,7 @@ export class TranscriptItemView implements Component {
 
 function normalizeOptions(options: TranscriptViewOptions): TranscriptItemViewOptions {
   return {
+    ...(options.images ? { images: options.images } : {}),
     showReasoning: options.showReasoning ?? true,
     showToolDetails: options.showToolDetails ?? false,
     selected: options.selected ?? false,
@@ -411,7 +429,7 @@ function renderAssistantView(
     }));
   }
   const value = item.text === "" && item.status === "streaming" ? "…" : item.text;
-  if (value !== "") {
+  if (value !== "" || item.content?.some(part => part.type === "image")) {
     children.push(new Text(
       `${styleText("◆", options.theme.accent)} ` +
         styleText(
@@ -419,7 +437,12 @@ function renderAssistantView(
           options.theme.assistantLabel,
         ),
     ));
-    children.push(new Markdown(value, { theme: options.theme.markdown }));
+    if (item.content?.some(part => part.type === "image")) {
+      for (const part of item.content) {
+        if (part.type === "text") children.push(new Markdown(part.text, { theme: options.theme.markdown }));
+        else if (part.type === "image") children.push(options.images?.component(part.source) ?? new Text("图片附件：宿主未配置 TerminalImages。"));
+      }
+    } else children.push(new Markdown(value, { theme: options.theme.markdown }));
   }
   return new Stack(children).render(size);
 }

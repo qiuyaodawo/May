@@ -1,4 +1,5 @@
 import type { KeyStroke } from "@may/keybindings";
+import { placeImages } from "./component.js";
 import sliceAnsi from "slice-ansi";
 import stringWidth from "string-width";
 import type {
@@ -93,6 +94,7 @@ export class Panel implements Component {
       : replaceTitleStyle(top, sliceAnsi(title, 0, innerWidth), this.options.titleStyle, this.options.borderStyle);
     return {
       lines: [styledTop, ...body, bottom],
+      ...(child.images?.length ? { images: placeImages(child.images, 1, size.height - 1).map(image => ({ ...image, x: image.x + 1 })) } : {}),
       ...(child.cursor === undefined
         ? {}
         : { cursor: { ...child.cursor, x: child.cursor.x + 1, y: child.cursor.y + 1 } }),

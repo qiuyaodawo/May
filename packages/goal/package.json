@@ -1,0 +1,19 @@
+{
+  "name": "@may/goal",
+  "version": "0.1.0",
+  "description": "Composable durable goal execution for May agents.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "!dist/.tsbuildinfo"],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:integration": "pnpm run build && node --test test/integration/*.test.mjs"
+  },
+  "dependencies": { "@may/core": "workspace:*", "@may/context": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.0.0" },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}

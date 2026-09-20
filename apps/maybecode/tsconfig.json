@@ -16,6 +16,7 @@
     { "path": "../../packages/coordination" },
     { "path": "../../packages/skills" },
     { "path": "../../packages/application" },
+    { "path": "../../packages/goal" },
     { "path": "../../packages/core" },
     { "path": "../../packages/ui/keybindings" },
     { "path": "../../packages/ui/tui" },

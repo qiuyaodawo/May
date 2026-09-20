@@ -10,7 +10,7 @@ export function createCodingPermissionPolicy(): PermissionPolicy {
 
 function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
   if (["read", "skill_read", "session_history", "session_history_search", "session_history_read",
-    "get_context_remaining", "context_notes", "new_context"].includes(check.tool.name)) {
+    "get_context_remaining", "context_notes", "new_context", "get_goal", "update_goal"].includes(check.tool.name)) {
     return "allow";
   }
 

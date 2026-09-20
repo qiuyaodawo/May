@@ -7,3 +7,4 @@ packages:
   - "examples/*"
 allowBuilds:
   protobufjs: false
+  sharp: true
