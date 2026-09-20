@@ -4,6 +4,7 @@ import TerminalEvents from "tty-events";
 import { keyStroke, type KeyStroke } from "@may/keybindings";
 import type { RenderSize } from "./component.js";
 import type { TerminalWriter } from "./renderer.js";
+import { TerminalImageSupport } from "./image-support.js";
 
 export interface TerminalInput extends NodeJS.ReadableStream {
   readonly isTTY?: boolean;
@@ -33,6 +34,7 @@ const BRACKETED_PASTE_END = Buffer.from("\x1b[201~");
 const ESCAPE_PREFIX_TIMEOUT_MS = 25;
 
 export class NodeTerminalDriver implements TerminalWriter {
+  readonly imageSupport: TerminalImageSupport;
   private readonly input: TerminalInput;
   private readonly output: TerminalOutput;
   private readonly requireTTY: boolean;
@@ -56,6 +58,10 @@ export class NodeTerminalDriver implements TerminalWriter {
     this.input = options.input ?? process.stdin;
     this.output = options.output ?? process.stdout;
     this.requireTTY = options.requireTTY ?? true;
+    this.imageSupport = new TerminalImageSupport(this.output);
+    this.imageSupport.onChange(() => {
+      for (const listener of this.resizeListeners) listener(this.size);
+    });
   }
 
   get size(): RenderSize {
@@ -81,7 +87,9 @@ export class NodeTerminalDriver implements TerminalWriter {
     this.decodedInput.on("keypress", this.handleKeypress);
     this.pointerDecoder = new TerminalEvents(this.pointerInput, this.output as Writable, { timeout: 30 });
     this.pointerDecoder.on("keypress", (key) => this.decodedInput.write(key.sequence));
-    this.pointerDecoder.on("unknownSequence", (sequence) => this.decodedInput.write(sequence));
+    this.pointerDecoder.on("unknownSequence", (sequence) => {
+      if (!this.imageSupport.consume(sequence)) this.decodedInput.write(sequence);
+    });
     this.pointerDecoder.on("wheel", (event) => {
       if (!this.alternateScreen) return;
       const stroke = keyStroke(event.direction === -1 ? "wheelup" : "wheeldown", {
@@ -99,6 +107,7 @@ export class NodeTerminalDriver implements TerminalWriter {
     this.write("\x1b[?2004h");
     this.bracketedPaste = true;
     this.started = true;
+    this.imageSupport.query();
   }
 
   enterAlternateScreen(): void {
@@ -160,6 +169,7 @@ export class NodeTerminalDriver implements TerminalWriter {
   };
 
   private readonly handleResize = (): void => {
+    this.imageSupport.query();
     const size = this.size;
     for (const listener of this.resizeListeners) listener(size);
   };

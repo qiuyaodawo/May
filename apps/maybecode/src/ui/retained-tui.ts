@@ -39,7 +39,7 @@ export async function runRetainedTerminalUI(
   const terminal = options.terminal ?? new NodeTerminalDriver();
   const renderer = options.renderer ?? new FullscreenRenderer(terminal);
   const store = new TranscriptStore();
-  const images = new TerminalImages();
+  const images = new TerminalImages(undefined, terminal.imageSupport?.protocol, { cellSize: () => terminal.imageSupport?.cellSize });
   try {
     const history = await app.history();
     for (const event of history) if (event.type === "assistant.completed" || event.type === "input.submitted") await images.prepare(event.message.content);

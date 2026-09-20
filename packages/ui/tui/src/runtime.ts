@@ -5,8 +5,10 @@ import type {
   RenderSize,
 } from "./component.js";
 import type { TerminalWriter } from "./renderer.js";
+import type { TerminalImageSupport } from "./image-support.js";
 
 export interface RuntimeTerminal extends TerminalWriter {
+  readonly imageSupport?: TerminalImageSupport;
   readonly size: RenderSize;
   start(): void;
   close(): void;

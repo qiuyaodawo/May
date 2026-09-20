@@ -40,7 +40,8 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "demo": "pnpm run build && node dist/demo.js",
-    "test": "pnpm run build && node --test test/*.test.mjs"
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:sixel": "pnpm run build && node --test test/terminal/*.test.mjs"
   },
   "dependencies": {
     "@may/coding-tools": "workspace:*",
@@ -51,12 +52,19 @@
     "@may/permissions": "workspace:*",
     "@may/session": "workspace:*",
     "marked": "18.0.11",
+    "jimp": "1.6.1",
+    "image-q": "4.0.0",
+    "node-ansiparser": "2.2.1",
+    "sixel": "0.16.0",
     "slice-ansi": "^7.1.2",
     "string-width": "^7.2.0",
     "tty-events": "1.0.0",
     "wrap-ansi": "^9.0.2"
   },
   "devDependencies": {
+    "@xterm/xterm": "6.0.0",
+    "@xterm/addon-image": "0.9.0",
+    "playwright": "1.63.0",
     "@types/node": "^22.0.0"
   },
   "engines": {

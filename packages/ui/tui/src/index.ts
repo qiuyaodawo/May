@@ -15,6 +15,7 @@ export * from "./select-list.js";
 export * from "./slash-commands.js";
 export * from "./stack.js";
 export * from "./terminal-driver.js";
+export * from "./image-support.js";
 export * from "./text.js";
 export * from "./theme.js";
 export * from "./agent/transcript.js";

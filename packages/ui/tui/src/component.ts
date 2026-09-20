@@ -19,15 +19,14 @@ export interface RenderResult {
   readonly cursor?: CursorPosition;
 }
 
-export interface ImagePlacement {
+export type ImagePlacement = {
   readonly id: string;
   readonly png: string;
-  readonly protocol: "kitty" | "iterm2";
   readonly x: number;
   readonly y: number;
   readonly columns: number;
   readonly rows: number;
-}
+} & ({ readonly protocol: "kitty" | "iterm2" } | { readonly protocol: "sixel"; readonly sixel: string });
 
 export function placeImages(images: readonly ImagePlacement[] | undefined, y: number, height: number): ImagePlacement[] {
   return (images ?? []).map(image => ({ ...image, y: image.y + y })).filter(image => image.y >= 0 && image.y + image.rows <= height);

@@ -14,13 +14,33 @@ path, MIME type, dimensions and byte count. Open the file in an image viewer,
 or use `/web` to view and download images. The readline frontend prints the
 complete ordered reply after any text that was already streamed.
 
-The retained renderer supports Kitty and iTerm2 graphics. Automatic detection
-uses `supports-terminal-graphics`. Set `MAY_IMAGE_PROTOCOL` to `kitty`, `iterm2`,
-`none` or `auto` to select behavior. Automatic mode displays attachment text
-inside tmux/screen and for non-TTY output. Other graphics protocols also use
-attachment text. Images occupy separate rows and are drawn when fully inside
-the viewport. Scrolling, resizing and dialogs remove previous placements.
-Model text cannot introduce graphics control sequences.
+Both terminal frontends support Kitty, iTerm2 and Sixel graphics. Automatic
+detection uses `supports-terminal-graphics` and recognizes Windows Terminal
+through `WT_SESSION`. Sixel candidates are queried with DA1 to confirm support
+and CSI 16 t to obtain character-cell pixel dimensions. Set
+`MAY_IMAGE_PROTOCOL` to `kitty`, `iterm2`, `sixel`, `none` or `auto` to select
+behavior. Explicit `sixel` skips the DA1 support requirement and still requires
+cell-size reporting. Automatic mode displays attachment text inside tmux/screen
+and for non-TTY output. Terminals without the required Sixel responses also
+display attachment information.
+
+Sixel previews preserve aspect ratio within 80 columns and 12 rows, with a
+maximum of 1280 × 768 pixels and 256 colors. Transparent areas use a white
+preview background. Encoding uses an independent pixel buffer to preserve
+pixel positions and the cached source image. Saved original files retain
+their transparency and quality.
+Cell dimensions are queried again on resize. Retained images are redrawn at
+the new size; readline uses the new size for subsequent images. Images occupy
+separate rows and are drawn when fully inside the viewport. Scrolling, resizing
+and dialogs remove previous retained placements. Model text cannot introduce
+graphics control sequences.
+
+To select Sixel explicitly in PowerShell before starting MaybeCode:
+
+```powershell
+$env:MAY_IMAGE_PROTOCOL = "sixel"
+pnpm maybecode
+```
 
 Web UI preserves ordered content and provides original-image and download links.
 Embedded image reads require authentication and ownership by the selected
@@ -43,7 +63,14 @@ Terminal and channel conversion uses a PNG frame. Hosts can supply
 `ApplicationUiOptions.readMedia` or implement `UiHost.media`. The media endpoint
 accepts a session/task ID and attachment ID, never an arbitrary filesystem path.
 `FileMediaStore` accepts a custom directory and reader. `TerminalImages` accepts
-a store and protocol. Components carry graphics separately in `RenderResult.images`.
+a store, protocol and optional `{ cellSize: () => ({ width, height }) }` pixel
+metrics. Sixel requires cell metrics. `NodeTerminalDriver.imageSupport` and
+`createNodeTerminal().imageSupport` expose `TerminalImageSupport`; query
+responses are consumed independently of keyboard input. The retained driver
+starts queries automatically. Readline hosts call `query()` and await `ready()`
+before printing initial images. `TerminalImages.revision` changes with image
+preparation and cell metrics. Components carry graphics separately in
+`RenderResult.images`; Sixel placements contain the encoded `sixel` sequence.
 
 ## Feishu and Telegram
 

@@ -43,6 +43,8 @@ export async function runTerminalUI(
   options: RunTerminalUIOptions = {},
 ): Promise<void> {
   const terminal = options.terminal ?? createNodeTerminal();
+  terminal.imageSupport?.query();
+  await terminal.imageSupport?.ready();
   let terminalClosed = false;
   const closeTerminal = (): void => {
     if (terminalClosed) return;
@@ -541,7 +543,7 @@ function removeLineContinuation(line: string): {
 }
 
 class TerminalRenderer {
-  private readonly images = new TerminalImages();
+  private readonly images: TerminalImages;
   private textStarted = false;
   private reasoningStarted = false;
   private readonly changePreviews = new Map<string, ToolChangePreview>();
@@ -550,7 +552,9 @@ class TerminalRenderer {
     { endsWithNewline: boolean; channel?: string }
   >();
 
-  constructor(private readonly terminal: TerminalIO) {}
+  constructor(private readonly terminal: TerminalIO) {
+    this.images = new TerminalImages(undefined, terminal.imageSupport?.protocol, { cellSize: () => terminal.imageSupport?.cellSize });
+  }
 
   write(text: string): void {
     this.terminal.write(text);

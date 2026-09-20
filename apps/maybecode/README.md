@@ -1,7 +1,10 @@
 # MaybeCode
 
 Image replies retain text/image ordering. Terminal saves embedded images and
-supports Kitty/iTerm2 graphics; `/web` provides image viewing and downloads.
+supports Kitty/iTerm2/Sixel graphics in both terminal frontends; `/web` provides
+image viewing and downloads. Windows Terminal is detected through `WT_SESSION`
+and queried for Sixel support and cell dimensions. `MAY_IMAGE_PROTOCOL=sixel`
+explicitly selects Sixel for a compatible terminal.
 See [Image replies](../../docs/en/guides/images.md) /
 [图片回复](../../docs/zh-CN/guides/images.md).
 

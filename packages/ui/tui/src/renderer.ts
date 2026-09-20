@@ -34,7 +34,7 @@ export class FullscreenRenderer {
     const images = placeImages(result.images, 0, size.height);
     const imagesChanged = images.length !== this.images.length || images.some((image, index) => {
       const old = this.images[index];
-      return !old || image.id !== old.id || image.y !== old.y || image.x !== old.x || image.rows !== old.rows || image.columns !== old.columns || image.protocol !== old.protocol;
+      return !old || image.id !== old.id || image.y !== old.y || image.x !== old.x || image.rows !== old.rows || image.columns !== old.columns || image.protocol !== old.protocol || (image.protocol === "sixel" && old.protocol === "sixel" && image.sixel !== old.sixel);
     });
     const resized = previous !== undefined &&
       (previous.width !== next.width || previous.height !== next.height);
@@ -48,14 +48,19 @@ export class FullscreenRenderer {
     const rowCount = previous === undefined || resized
       ? next.lines.length
       : Math.max(next.lines.length, previous.lines.length);
+    const erasedRows = new Set<number>();
     for (let row = 0; row < rowCount; row++) {
       const line = next.lineAt(row);
       if (!resized && !imagesChanged && previous?.lineAt(row) === line) continue;
       output += moveTo(row, 0);
       output += `\x1b[2K${line}\x1b[0m`;
+      erasedRows.add(row);
     }
 
-    if (imagesChanged || resized || previous === undefined) for (const image of images) output += moveTo(image.y, image.x) + encodeImage(image);
+    for (const image of images) {
+      const erased = image.protocol === "sixel" && Array.from({ length: image.rows }, (_, index) => image.y + index).some(row => erasedRows.has(row));
+      if (imagesChanged || resized || previous === undefined || erased) output += moveTo(image.y, image.x) + encodeImage(image);
+    }
     this.images = images;
     const cursor = next.cursor;
     if (cursor !== undefined) {

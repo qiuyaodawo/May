@@ -1,10 +1,26 @@
 # `@may/tui`
 
-`TerminalImages` prepares saved attachments for Kitty/iTerm2 rendering or text
+`TerminalImages` prepares saved attachments for Kitty/iTerm2/Sixel rendering or text
 display. Graphics travel separately through `RenderResult.images`; the renderer
 clears placements when the viewport changes. See
 [Image replies](../../../docs/en/guides/images.md) /
 [图片回复](../../../docs/zh-CN/guides/images.md).
+
+`TerminalImageSupport` queries Sixel support and character-cell pixel dimensions.
+`NodeTerminalDriver.imageSupport` starts queries with the driver and refreshes
+them on resize. With `createNodeTerminal`, call `imageSupport.query()` when
+starting an image-enabled interface and await `imageSupport.ready()` before
+printing its initial images. Terminal reports are consumed independently of
+keyboard input. Pass `{ cellSize: () => terminal.imageSupport.cellSize }` as the
+third `TerminalImages` argument. Custom hosts can supply their own cell metrics.
+Sixel rendering requires these metrics; pending or unsupported terminals show
+the saved attachment information. `TerminalImages.revision` includes changes
+to prepared images and cell metrics so transcript caches can refresh.
+
+Run `pnpm --filter @may/tui test` for component and codec tests. Run
+`pnpm --filter @may/tui test:sixel` for real xterm browser-terminal tests; this
+requires the Playwright Chromium installation. These tests inspect decoded
+pixels and terminal state without screenshots.
 
 Terminal UI components for May agents. The low-level primitives remain usable
 without a provider or product application, while the agent transcript layer

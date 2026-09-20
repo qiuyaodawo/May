@@ -215,7 +215,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
       const revealReply = item.kind === "assistant" && index === revealedIndex;
       const keepForReply = revealedIndex >= 0 && index >= revealedIndex;
       if (available <= 0 && !keepForReply) break;
-      const key = `${this.toolRenderers.revision}:${size.width}:${size.height}:${this.reasoningVisible}:${item.kind === "tool" && this.isToolExpanded(item.id)}:${this.focused && item.id === this.selectedToolId}:${revealReply}`;
+      const key = `${this.options.images?.revision}:${this.toolRenderers.revision}:${size.width}:${size.height}:${this.reasoningVisible}:${item.kind === "tool" && this.isToolExpanded(item.id)}:${this.focused && item.id === this.selectedToolId}:${revealReply}`;
       let cached = this.tailCache.get(item);
       if (cached?.key !== key) {
         const bounded = tailBoundItem(item, size.width, size.height);

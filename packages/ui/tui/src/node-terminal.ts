@@ -2,6 +2,9 @@ import stringWidth from "string-width";
 import { clearLine, cursorTo, moveCursor } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import { keyStroke, type KeyStroke } from "@may/keybindings";
+import { PassThrough, type Readable, type Writable } from "node:stream";
+import TerminalEvents from "tty-events";
+import { TerminalImageSupport } from "./image-support.js";
 
 export interface TerminalSuggestion {
   /** Full input value represented by the suggestion. */
@@ -31,6 +34,7 @@ export interface TerminalQuestionOptions {
  * retained full-screen rendering.
  */
 export interface TerminalIO {
+  readonly imageSupport?: TerminalImageSupport;
   readonly colors?: boolean;
   readonly interactive?: boolean;
   question(prompt: string, options?: TerminalQuestionOptions): Promise<string>;
@@ -59,9 +63,22 @@ export interface NodeTerminalOptions {
 export function createNodeTerminal(
   options: NodeTerminalOptions = {},
 ): TerminalIO {
-  const input = options.input ?? process.stdin;
+  const source: NodeJS.ReadableStream = options.input ?? process.stdin;
   const output = options.output ?? process.stdout;
   const interactive = output.isTTY === true;
+  const imageSupport = new TerminalImageSupport(output);
+  const filtered = interactive && imageSupport.protocol === "sixel" ? new PassThrough() : undefined;
+  const input: NodeJS.ReadableStream = filtered ?? source;
+  const reports = filtered ? new TerminalEvents(source as Readable, output as Writable, { timeout: 100 }) : undefined;
+  const endFilteredInput = () => filtered?.end();
+  if (filtered && reports) {
+    const terminalSource = source as NodeJS.ReadStream;
+    Object.assign(filtered, { isTTY: terminalSource.isTTY, setRawMode: (enabled: boolean) => terminalSource.setRawMode?.(enabled) });
+    reports.on("keypress", key => filtered.write(key.sequence));
+    reports.on("paste", text => filtered.write(`\x1b[200~${text}\x1b[201~`));
+    reports.on("unknownSequence", sequence => { if (!imageSupport.consume(sequence)) filtered.write(sequence); });
+    source.on("end", endFilteredInput);
+  }
   const historySize = 200;
   const readline = createInterface({
     input,
@@ -234,8 +251,11 @@ export function createNodeTerminal(
     queueMicrotask(() => void refreshSuggestions());
   };
   if (interactive) input.prependListener("keypress", onKeypress);
+  const updateImageSize = () => imageSupport.query();
+  output.on("resize", updateImageSize);
 
   return {
+    imageSupport,
     colors: options.colors ?? interactive,
     interactive,
     async question(prompt, questionOptions = {}) {
@@ -365,6 +385,11 @@ export function createNodeTerminal(
       if (viewActive) output.write("\x1b[?1049l");
       if (interactive) input.removeListener("keypress", onKeypress);
       readline.close();
+      output.removeListener("resize", updateImageSize);
+      reports?.pause();
+      reports?.removeAllListeners();
+      source.removeListener("end", endFilteredInput);
+      filtered?.destroy();
     },
   };
 }
