@@ -2,7 +2,7 @@ import { emitKeypressEvents } from "node:readline";
 import { PassThrough, type Writable } from "node:stream";
 import TerminalEvents from "tty-events";
 import { keyStroke, type KeyStroke } from "@may/keybindings";
-import type { RenderSize } from "./component.js";
+import type { PointerEvent, RenderSize } from "./component.js";
 import type { TerminalWriter } from "./renderer.js";
 import { TerminalImageSupport } from "./image-support.js";
 
@@ -28,6 +28,7 @@ export interface NodeTerminalDriverOptions {
 
 type KeyListener = (stroke: KeyStroke) => void;
 type ResizeListener = (size: RenderSize) => void;
+type PointerListener = (event: PointerEvent) => void;
 
 const BRACKETED_PASTE_START = Buffer.from("\x1b[200~");
 const BRACKETED_PASTE_END = Buffer.from("\x1b[201~");
@@ -47,6 +48,7 @@ export class NodeTerminalDriver implements TerminalWriter {
   );
   private readonly keyListeners = new Set<KeyListener>();
   private readonly resizeListeners = new Set<ResizeListener>();
+  private readonly pointerListeners = new Set<PointerListener>();
   private started = false;
   private alternateScreen = false;
   private previousRawMode = false;
@@ -99,6 +101,9 @@ export class NodeTerminalDriver implements TerminalWriter {
       });
       for (const listener of this.keyListeners) listener(stroke);
     });
+    this.pointerDecoder.on("mousedown", (event) => this.emitPointer("down", event));
+    this.pointerDecoder.on("mousemove", (event) => this.emitPointer("move", event));
+    this.pointerDecoder.on("mouseup", (event) => this.emitPointer("up", event));
     this.input.on("data", this.handleData);
     this.output.on("resize", this.handleResize);
     this.input.ref?.();
@@ -112,13 +117,13 @@ export class NodeTerminalDriver implements TerminalWriter {
 
   enterAlternateScreen(): void {
     if (this.alternateScreen) return;
-    this.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?1000h\x1b[?1006h");
+    this.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?1000h\x1b[?1002h\x1b[?1006h");
     this.alternateScreen = true;
   }
 
   leaveAlternateScreen(): void {
     if (!this.alternateScreen) return;
-    this.write("\x1b[?1000l\x1b[?1006l\x1b[0m\x1b[?25h\x1b[?1049l");
+    this.write("\x1b[?1002l\x1b[?1000l\x1b[?1006l\x1b[0m\x1b[?25h\x1b[?1049l");
     this.alternateScreen = false;
   }
 
@@ -130,6 +135,11 @@ export class NodeTerminalDriver implements TerminalWriter {
   onResize(listener: ResizeListener): () => void {
     this.resizeListeners.add(listener);
     return () => this.resizeListeners.delete(listener);
+  }
+
+  onPointer(listener: PointerListener): () => void {
+    this.pointerListeners.add(listener);
+    return () => this.pointerListeners.delete(listener);
   }
 
   write(value: string): void {
@@ -178,6 +188,20 @@ export class NodeTerminalDriver implements TerminalWriter {
     if (value === "") return;
     const stroke = keyStroke("paste", { text: value });
     for (const listener of this.keyListeners) listener(stroke);
+  }
+
+  private emitPointer(type: PointerEvent["type"], event: TerminalEvents.MouseEvent): void {
+    if (!this.alternateScreen) return;
+    const pointer: PointerEvent = {
+      type,
+      x: event.x - 1,
+      y: event.y - 1,
+      button: event.button === undefined ? -1 : event.button - 1,
+      ctrl: event.ctrl,
+      alt: event.alt,
+      shift: event.shift,
+    };
+    for (const listener of this.pointerListeners) listener(pointer);
   }
 }
 

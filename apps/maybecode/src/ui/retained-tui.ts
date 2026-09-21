@@ -3,6 +3,8 @@ import {
   NodeTerminalDriver,
   TuiRuntime,
   TerminalImages,
+  createTerminalClipboard,
+  type Clipboard,
   type RuntimeRenderer,
   type RuntimeTerminal,
 } from "@may/tui";
@@ -25,10 +27,13 @@ import type { MaybeCodeEvent } from "../events.js";
 import { presentMcpInteraction } from "../mcp-interaction-ui.js";
 import { MaybeCodeTerminalWeb } from "../terminal-web.js";
 import { formatGoal } from "../goal-commands.js";
+import type { MaybeCodeKeymapOptions } from "../keymap.js";
 
 export interface RunRetainedTerminalUIOptions {
   readonly terminal?: RuntimeTerminal;
   readonly renderer?: RuntimeRenderer;
+  readonly clipboard?: Clipboard;
+  readonly keymap?: MaybeCodeKeymapOptions;
 }
 
 /** Experimental retained-screen MaybeCode frontend. */
@@ -66,10 +71,11 @@ export async function runRetainedTerminalUI(
     if (app.isRunning) app.cancel("Interrupted by process signal");
     finish();
   };
-  process.on("SIGINT", handleProcessSignal);
-  process.on("SIGTERM", handleProcessSignal);
-
   const view = new MaybeCodePrototypeView({
+    clipboard: options.clipboard ?? createTerminalClipboard({ output: terminal }),
+    keymap: options.keymap ?? {
+      ...(process.env.MAY_TUI_LEADER === undefined ? {} : { leader: process.env.MAY_TUI_LEADER }),
+    },
     images,
     store,
     workspace: app.workspace,
@@ -99,6 +105,8 @@ export async function runRetainedTerminalUI(
       }
     },
   });
+  process.on("SIGINT", handleProcessSignal);
+  process.on("SIGTERM", handleProcessSignal);
   void refreshModelLabel(view, app);
 
   runtime = new TuiRuntime({ terminal, renderer, root: view });

@@ -1,4 +1,5 @@
 import type { KeyStroke } from "@may/keybindings";
+import type { TextRow } from "./text-selection.js";
 
 export interface RenderSize {
   readonly width: number;
@@ -14,6 +15,7 @@ export interface CursorPosition {
 }
 
 export interface RenderResult {
+  readonly textRows?: readonly (TextRow | undefined)[];
   readonly images?: readonly ImagePlacement[];
   readonly lines: readonly string[];
   readonly cursor?: CursorPosition;
@@ -34,11 +36,29 @@ export function placeImages(images: readonly ImagePlacement[] | undefined, y: nu
 
 export interface Component {
   render(size: RenderSize): RenderResult;
+  handlePointer?(event: PointerEvent): boolean;
+  dispose?(): void;
+}
+
+export interface PointerEvent {
+  readonly type: "down" | "move" | "up";
+  readonly x: number;
+  readonly y: number;
+  readonly button: number;
+  readonly ctrl: boolean;
+  readonly alt: boolean;
+  readonly shift: boolean;
+}
+
+export interface KeyHandlingResult {
+  readonly consumed: boolean;
+  readonly redraw: boolean;
 }
 
 export interface InteractiveComponent extends Component {
-  /** Return true when the key was consumed and the view should be redrawn. */
+  /** 返回按键是否已处理；没有改变内容的边界操作也应返回 true。 */
   handleKey(stroke: KeyStroke): boolean;
+  handleKeyResult?(stroke: KeyStroke): KeyHandlingResult;
 }
 
 export interface FocusTarget {

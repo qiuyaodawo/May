@@ -1,6 +1,7 @@
 import type { KeyStroke } from "@may/keybindings";
 import type {
   InteractiveComponent,
+  PointerEvent,
   RenderResult,
   RenderSize,
 } from "./component.js";
@@ -14,6 +15,7 @@ export interface RuntimeTerminal extends TerminalWriter {
   close(): void;
   enterAlternateScreen?(): void;
   onKey(listener: (stroke: KeyStroke) => void): () => void;
+  onPointer?(listener: (event: PointerEvent) => void): () => void;
   onResize(listener: (size: RenderSize) => void): () => void;
 }
 
@@ -40,8 +42,10 @@ export class TuiRuntime {
   private readonly onError: (error: unknown) => void;
   private disposeKey: (() => void) | undefined;
   private disposeResize: (() => void) | undefined;
+  private disposePointer: (() => void) | undefined;
   private scheduled = false;
   private running = false;
+  private disposed = false;
 
   constructor(options: TuiRuntimeOptions) {
     this.terminal = options.terminal;
@@ -58,6 +62,7 @@ export class TuiRuntime {
   }
 
   start(): void {
+    this.assertActive();
     if (this.running) return;
     let terminalStarted = false;
     try {
@@ -66,21 +71,19 @@ export class TuiRuntime {
       if (this.alternateScreen) this.terminal.enterAlternateScreen?.();
       this.disposeKey = this.terminal.onKey(this.handleKey);
       this.disposeResize = this.terminal.onResize(this.handleResize);
+      this.disposePointer = this.terminal.onPointer?.(this.handlePointer);
       this.running = true;
       this.renderNow();
     } catch (error) {
-      this.running = false;
-      this.disposeKey?.();
-      this.disposeResize?.();
-      this.disposeKey = undefined;
-      this.disposeResize = undefined;
-      if (terminalStarted) this.renderer.dispose();
-      this.terminal.close();
+      this.release(terminalStarted);
       throw error;
     }
   }
 
   setRoot(root: InteractiveComponent): void {
+    this.assertActive();
+    if (this.root === root) return;
+    this.root.dispose?.();
     this.root = root;
     this.renderer.invalidate();
     this.requestRender();
@@ -101,19 +104,47 @@ export class TuiRuntime {
   }
 
   stop(): void {
-    if (!this.running) return;
+    if (this.disposed) return;
+    this.release(this.running);
+  }
+
+  private assertActive(): void {
+    if (this.disposed) throw new Error("TuiRuntime has stopped. Create a new runtime and root component to start again.");
+  }
+
+  private release(terminalStarted: boolean): void {
+    this.disposed = true;
     this.running = false;
     this.scheduled = false;
     this.disposeKey?.();
     this.disposeResize?.();
+    this.disposePointer?.();
     this.disposeKey = undefined;
     this.disposeResize = undefined;
-    try { this.renderer.dispose(); } finally { this.terminal.close(); }
+    this.disposePointer = undefined;
+    try {
+      this.root.dispose?.();
+    } finally {
+      try {
+        if (terminalStarted) this.renderer.dispose();
+      } finally { this.terminal.close(); }
+    }
   }
 
   private readonly handleKey = (stroke: KeyStroke): void => {
     try {
-      if (this.root.handleKey(stroke)) this.requestRender();
+      const redraw = this.root.handleKeyResult
+        ? this.root.handleKeyResult(stroke).redraw
+        : this.root.handleKey(stroke);
+      if (redraw) this.requestRender();
+    } catch (error) {
+      this.fail(error);
+    }
+  };
+
+  private readonly handlePointer = (event: PointerEvent): void => {
+    try {
+      if (this.root.handlePointer?.(event)) this.requestRender();
     } catch (error) {
       this.fail(error);
     }

@@ -1,11 +1,14 @@
-import sliceAnsi from "slice-ansi";
-import wrapAnsi from "wrap-ansi";
+import { stripVTControlCharacters } from "node:util";
 import type { Component, RenderResult, RenderSize } from "./component.js";
+import { renderTextDocument, type TextCopyRange } from "./text-selection.js";
 import { styleText, type TextStyle } from "./theme.js";
 
 export interface TextOptions {
   readonly wrap?: boolean;
   readonly style?: TextStyle;
+  readonly sourceId?: string;
+  /** 按逻辑行指定可复制的文字范围，索引使用 UTF-16。 */
+  readonly copyRanges?: readonly (TextCopyRange | undefined)[];
 }
 
 export class Text implements Component {
@@ -16,17 +19,13 @@ export class Text implements Component {
 
   render(size: RenderSize): RenderResult {
     const value = typeof this.value === "function" ? this.value() : this.value;
-    const lines = value.split(/\r?\n/u).flatMap((plainLine) => {
-      const line = styleText(plainLine, this.options.style);
-      if (this.options.wrap === false) return [sliceAnsi(line, 0, size.width)];
-      const wrapped = wrapAnsi(line, size.width, {
-        hard: true,
-        trim: false,
-        wordWrap: true,
-      });
-      return wrapped === "" ? [""] : wrapped.split("\n");
+    const document = value.split(/\r?\n/u).map((plainLine, index) => {
+      const copy = this.options.copyRanges === undefined
+        ? { start: 0, end: stripVTControlCharacters(plainLine).length }
+        : this.options.copyRanges[index];
+      return { value: styleText(plainLine, this.options.style), ...(copy === undefined ? {} : { copy }) };
     });
-    return { lines: lines.slice(0, size.height) };
+    return renderTextDocument(document, size, this.options);
   }
 }
 

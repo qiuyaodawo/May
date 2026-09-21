@@ -20,3 +20,11 @@ Contexts later in the stack take precedence. Multi-key sequences, configurable
 leader expansion, chord timeouts, action validation, and ambiguous-binding
 validation are supported. Applications own their action names and default
 bindings; views own the behavior triggered by those actions.
+
+Changing the active contexts cancels an unfinished sequence. Call `reset()` when
+focus or modal state changes even if the context names remain the same.
+Set `chordTimeoutMs: null` to wait until the next key or `reset()` without an
+elapsed-time limit. The default remains 1000 milliseconds.
+`keysForAction(action, context?)` returns expanded effective bindings for hints.
+`mergeKeyBindings(defaults, overrides, { leader? })` replaces defaults with the
+same context/action or context/key; construct a `Keymap` to validate the result.

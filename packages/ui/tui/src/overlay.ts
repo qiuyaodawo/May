@@ -7,6 +7,7 @@ import type {
   InteractiveComponent,
   RenderResult,
   RenderSize,
+  PointerEvent,
 } from "./component.js";
 import { styleText, type TextStyle } from "./theme.js";
 
@@ -18,6 +19,8 @@ export interface OverlayOptions {
 }
 
 export class Overlay implements Component {
+  private bounds: { left: number; top: number; width: number; height: number } | undefined;
+  private captured = false;
   constructor(
     private readonly base: Component,
     private readonly foreground: Component,
@@ -30,6 +33,7 @@ export class Overlay implements Component {
     const height = clamp(this.options.height ?? Math.min(12, size.height), 1, size.height);
     const left = alignmentOffset(size.width, width, this.options.horizontal ?? "center");
     const top = alignmentOffset(size.height, height, this.options.vertical ?? "center");
+    this.bounds = { left, top, width, height };
     const foreground = this.foreground.render({ width, height });
     const lines = Array.from({ length: size.height }, (_, row) =>
       fitLine(base.lines[row] ?? "", size.width)
@@ -57,6 +61,19 @@ export class Overlay implements Component {
           }),
     };
   }
+
+  handlePointer(event: PointerEvent): boolean {
+    if (event.type === "down") this.captured = false;
+    const bounds = this.bounds;
+    if (bounds === undefined) return false;
+    const inside = event.x >= bounds.left && event.x < bounds.left + bounds.width &&
+      event.y >= bounds.top && event.y < bounds.top + bounds.height;
+    if (!inside && !this.captured) return false;
+    const handled = this.foreground.handlePointer?.({ ...event, x: event.x - bounds.left, y: event.y - bounds.top }) ?? false;
+    if (event.type === "down" && handled) this.captured = true;
+    if (event.type === "up") this.captured = false;
+    return handled;
+  }
 }
 
 export interface PanelOptions {
@@ -66,12 +83,15 @@ export interface PanelOptions {
 }
 
 export class Panel implements Component {
+  private size: RenderSize | undefined;
+  private captured = false;
   constructor(
     private readonly child: Component,
     private readonly options: PanelOptions = {},
   ) {}
 
   render(size: RenderSize): RenderResult {
+    this.size = size;
     if (size.width < 2 || size.height < 2) {
       return { lines: Array.from({ length: size.height }, () => "·") };
     }
@@ -94,12 +114,31 @@ export class Panel implements Component {
       : replaceTitleStyle(top, sliceAnsi(title, 0, innerWidth), this.options.titleStyle, this.options.borderStyle);
     return {
       lines: [styledTop, ...body, bottom],
+      ...(child.textRows === undefined ? {} : { textRows: [undefined,
+        ...Array.from({ length: innerHeight }, (_, index) => {
+          const row = child.textRows?.[index];
+          return row === undefined ? undefined : { ...row, spans: row.spans.map(span => ({ ...span, x: span.x + 1 })) };
+        }), undefined] }),
       ...(child.images?.length ? { images: placeImages(child.images, 1, size.height - 1).map(image => ({ ...image, x: image.x + 1 })) } : {}),
       ...(child.cursor === undefined
         ? {}
         : { cursor: { ...child.cursor, x: child.cursor.x + 1, y: child.cursor.y + 1 } }),
     };
   }
+
+  handlePointer(event: PointerEvent): boolean {
+    if (event.type === "down") this.captured = false;
+    const size = this.size;
+    if (size === undefined || size.width < 3 || size.height < 3) return false;
+    const inside = event.x >= 1 && event.x < size.width - 1 && event.y >= 1 && event.y < size.height - 1;
+    if (!inside && !this.captured) return false;
+    const handled = this.child.handlePointer?.({ ...event, x: event.x - 1, y: event.y - 1 }) ?? false;
+    if (event.type === "down" && handled) this.captured = true;
+    if (event.type === "up") this.captured = false;
+    return handled;
+  }
+
+  dispose(): void { this.captured = false; this.child.dispose?.(); }
 }
 
 export interface DialogOptions extends OverlayOptions, PanelOptions {
@@ -111,6 +150,7 @@ export interface DialogOptions extends OverlayOptions, PanelOptions {
 /** Modal input routing plus a bordered overlay. */
 export class Dialog implements InteractiveComponent {
   private opened: boolean;
+  private readonly overlay: Overlay;
 
   constructor(
     private readonly base: InteractiveComponent,
@@ -118,6 +158,7 @@ export class Dialog implements InteractiveComponent {
     private readonly options: DialogOptions = {},
   ) {
     this.opened = options.open ?? false;
+    this.overlay = new Overlay(base, new Panel(content, options), options);
   }
 
   get isOpen(): boolean {
@@ -147,14 +188,15 @@ export class Dialog implements InteractiveComponent {
 
   render(size: RenderSize): RenderResult {
     if (!this.opened) return this.base.render(size);
-    return new Overlay(
-      this.base,
-      new Panel(
-        this.content,
-        this.options,
-      ),
-      this.options,
-    ).render(size);
+    return this.overlay.render(size);
+  }
+
+  handlePointer(event: PointerEvent): boolean {
+    return this.opened ? this.overlay.handlePointer(event) : this.base.handlePointer?.(event) ?? false;
+  }
+
+  dispose(): void {
+    this.content.dispose?.();
   }
 }
 

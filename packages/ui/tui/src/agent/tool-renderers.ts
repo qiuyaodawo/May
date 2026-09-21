@@ -1,4 +1,6 @@
 import { sanitizeTerminalText } from "../text.js";
+import { stripVTControlCharacters } from "node:util";
+import type { TextDocumentLine } from "../text-selection.js";
 import { styleText, type TuiTheme } from "../theme.js";
 import type { ToolTranscriptItem } from "./transcript-store.js";
 
@@ -15,6 +17,7 @@ export interface ToolTranscriptRenderer {
     item: ToolTranscriptItem,
     options: ToolTranscriptRenderOptions,
   ): string;
+  renderDocument?(item: ToolTranscriptItem, options: ToolTranscriptRenderOptions): readonly TextDocumentLine[];
 }
 
 /** Instance-scoped registry: applications can replace presentation without global state. */
@@ -37,7 +40,12 @@ export class ToolRendererRegistry {
     item: ToolTranscriptItem,
     options: ToolTranscriptRenderOptions,
   ): string {
-    return (this.renderers.get(item.call.name) ?? this.fallback).render(item, options);
+    return this.renderDocument(item, options).map(line => line.value).join("\n");
+  }
+
+  renderDocument(item: ToolTranscriptItem, options: ToolTranscriptRenderOptions): readonly TextDocumentLine[] {
+    const renderer = this.renderers.get(item.call.name) ?? this.fallback;
+    return renderer.renderDocument?.(item, options) ?? renderer.render(item, options).split("\n").map(line => copyLine(line));
   }
 }
 
@@ -51,8 +59,7 @@ export function createCodingToolRendererRegistry(): ToolRendererRegistry {
     .register("write", fileChangeRenderer);
 }
 
-const shellRenderer: ToolTranscriptRenderer = {
-  render(item, options) {
+const shellRenderer = documentRenderer((item, options) => {
     const command = stringField(item.call.input, "command") ?? inputSummary(item.call.input);
     const lines = [header(item, options, command)];
     appendProgress(lines, item, options);
@@ -62,27 +69,25 @@ const shellRenderer: ToolTranscriptRenderer = {
     const stderr = stringField(output, "stderr") ?? "";
     if (stdout !== "") appendOutput(lines, stdout, options);
     if (stderr !== "") {
-      lines.push(styleText("  stderr", options.theme.error));
+      lines.push(copyLine(styleText("  stderr", options.theme.error), 2));
       appendOutput(lines, stderr, options, options.theme.error);
     }
     if (item.status === "completed") {
       const exitCode = primitiveField(output, "exitCode");
       const signal = primitiveField(output, "signal");
       const result = exitCode === undefined ? "completed" : `exit ${String(exitCode)}`;
-      lines.push(styleText(
+      lines.push(copyLine(styleText(
         `  └─ ${result}${signal == null ? "" : ` · ${String(signal)}`}`,
         exitCode === 0 || exitCode === undefined
           ? options.theme.muted
           : options.theme.warning,
-      ));
+      ), 5));
     }
     appendFailure(lines, item, options);
-    return lines.join("\n");
-  },
-};
+    return lines;
+});
 
-const readRenderer: ToolTranscriptRenderer = {
-  render(item, options) {
+const readRenderer = documentRenderer((item, options) => {
     const inputPath = stringField(item.call.input, "path") ?? "<unknown>";
     const output = objectValue(item.output);
     const path = stringField(output, "path") ?? inputPath;
@@ -95,23 +100,21 @@ const readRenderer: ToolTranscriptRenderer = {
     if (options.expanded) {
       const content = stringField(output, "content");
       if (content !== undefined && content !== "") {
-        const numbered = numberLines(content, start ?? 1);
-        appendOutput(lines, numbered, options, options.theme.toolOutput, true);
+        appendOutput(lines, content, options, options.theme.toolOutput, true, start ?? 1);
       }
     } else if (total !== undefined) {
       const count = start === undefined || end === undefined ? 0 : Math.max(0, end - start + 1);
-      lines.push(styleText(
+      const description = `${count} of ${total} lines`;
+      lines.push(copyLine(styleText(
         `  └─ ${count} of ${total} lines${options.detailsHint === undefined ? "" : ` · ${options.detailsHint}`}`,
         options.theme.muted,
-      ));
+      ), 5, 5 + description.length));
     }
     appendFailure(lines, item, options);
-    return lines.join("\n");
-  },
-};
+    return lines;
+});
 
-const fileChangeRenderer: ToolTranscriptRenderer = {
-  render(item, options) {
+const fileChangeRenderer = documentRenderer((item, options) => {
     const inputPath = stringField(item.call.input, "path") ?? "<unknown>";
     const preview = item.preview;
     const detail = preview?.status === "ready"
@@ -125,24 +128,22 @@ const fileChangeRenderer: ToolTranscriptRenderer = {
         lines.push(...renderDiff(preview.diff, options.theme));
       } else {
         const hint = options.detailsHint === undefined ? "" : ` · ${options.detailsHint}`;
-        lines.push(styleText(`  └─ ${preview.kind}${hint}`, options.theme.muted));
+        lines.push(copyLine(styleText(`  └─ ${preview.kind}${hint}`, options.theme.muted), 5, 5 + preview.kind.length));
       }
     } else if (preview?.status === "unavailable") {
-      lines.push(styleText(
+      lines.push(copyLine(styleText(
         `  Diff unavailable: ${sanitizeTerminalText(preview.reason)}`,
         options.theme.warning,
-      ));
+      ), 2));
     }
     if (item.status === "completed" && preview === undefined) {
       appendOutput(lines, stringify(item.output), options);
     }
     appendFailure(lines, item, options);
-    return lines.join("\n");
-  },
-};
+    return lines;
+});
 
-const genericRenderer: ToolTranscriptRenderer = {
-  render(item, options) {
+const genericRenderer = documentRenderer((item, options) => {
     const lines = [header(item, options, inputSummary(item.call.input))];
     appendProgress(lines, item, options);
     const output = item.streamedOutput !== ""
@@ -152,15 +153,20 @@ const genericRenderer: ToolTranscriptRenderer = {
       : "";
     if (output !== "") appendOutput(lines, output, options);
     appendFailure(lines, item, options);
-    return lines.join("\n");
-  },
-};
+    return lines;
+});
+
+function documentRenderer(
+  renderDocument: (item: ToolTranscriptItem, options: ToolTranscriptRenderOptions) => readonly TextDocumentLine[],
+): ToolTranscriptRenderer {
+  return { renderDocument, render: (item, options) => renderDocument(item, options).map(line => line.value).join("\n") };
+}
 
 function header(
   item: ToolTranscriptItem,
   options: ToolTranscriptRenderOptions,
   detail: string,
-): string {
+): TextDocumentLine {
   const marker = item.status === "completed" ? "✓" : item.status === "failed" ? "✗" : "●";
   const markerStyle = item.status === "completed"
     ? options.theme.toolSuccess
@@ -171,27 +177,28 @@ function header(
   const selection = options.selected === true
     ? styleText("▸", options.theme.accent)
     : " ";
-  return `${selection} ${styleText(marker, markerStyle)} ` +
+  return copyLine(`${selection} ${styleText(marker, markerStyle)} ` +
     `${styleText(sanitizeTerminalText(item.call.name), options.theme.toolTitle)}` +
-    `${safeDetail === "" ? "" : `  ${safeDetail}`}`;
+    `${safeDetail === "" ? "" : `  ${safeDetail}`}`, 4);
 }
 
 function appendProgress(
-  lines: string[],
+  lines: TextDocumentLine[],
   item: ToolTranscriptItem,
   options: ToolTranscriptRenderOptions,
 ): void {
   for (const progress of item.progress.slice(options.expanded ? 0 : -2)) {
-    lines.push(styleText(`  ↳ ${sanitizeTerminalText(progress)}`, options.theme.muted));
+    lines.push(copyLine(styleText(`  ↳ ${sanitizeTerminalText(progress)}`, options.theme.muted), 4));
   }
 }
 
 function appendOutput(
-  lines: string[],
+  lines: TextDocumentLine[],
   value: string,
   options: ToolTranscriptRenderOptions,
   outputStyle = options.theme.toolOutput,
   forceExpanded = false,
+  numberFrom?: number,
 ): void {
   const safe = sanitizeTerminalText(value).replace(/\s+$/gu, "");
   if (safe === "") return;
@@ -199,29 +206,31 @@ function appendOutput(
   const limitedCharacters = truncateCharacters(safe, options.maximumOutputCharacters);
   const allLines = limitedCharacters.split("\n");
   const displayed = allLines.slice(0, maximumLines);
-  for (const line of displayed) {
-    lines.push(`${styleText("  │", options.theme.border)} ${styleText(line, outputStyle)}`);
+  const numberWidth = String((numberFrom ?? 1) + allLines.length - 1).length;
+  for (const [index, line] of displayed.entries()) {
+    const label = numberFrom === undefined ? "" : `${String(numberFrom + index).padStart(numberWidth)} │ `;
+    lines.push(copyLine(`${styleText("  │", options.theme.border)} ${styleText(label + line, outputStyle)}`, 4 + label.length));
   }
   const omittedLines = allLines.length - displayed.length;
   if (omittedLines > 0) {
     const hint = options.detailsHint === undefined ? "" : ` · ${options.detailsHint}`;
-    lines.push(styleText(`  … ${omittedLines} more lines${hint}`, options.theme.muted));
+    lines.push({ value: styleText(`  … ${omittedLines} more lines${hint}`, options.theme.muted) });
   } else if (limitedCharacters.endsWith("…") && safe !== limitedCharacters) {
-    lines.push(styleText("  … output truncated", options.theme.muted));
+    lines.push({ value: styleText("  … output truncated", options.theme.muted) });
   }
 }
 
 function appendFailure(
-  lines: string[],
+  lines: TextDocumentLine[],
   item: ToolTranscriptItem,
   options: ToolTranscriptRenderOptions,
 ): void {
   if (item.status === "failed" && item.error !== undefined) {
-    lines.push(styleText(`  ${sanitizeTerminalText(item.error)}`, options.theme.error));
+    lines.push(copyLine(styleText(`  ${sanitizeTerminalText(item.error)}`, options.theme.error), 2));
   }
 }
 
-function renderDiff(diff: string, theme: TuiTheme): string[] {
+function renderDiff(diff: string, theme: TuiTheme): TextDocumentLine[] {
   return sanitizeTerminalText(diff).split("\n").map((line) => {
     const style = line.startsWith("+++") || line.startsWith("---") || line.startsWith("@@")
       ? theme.muted
@@ -230,15 +239,12 @@ function renderDiff(diff: string, theme: TuiTheme): string[] {
       : line.startsWith("-")
       ? theme.diffRemoved
       : theme.diffContext;
-    return `${styleText("  │", theme.border)} ${styleText(line, style)}`;
+    return copyLine(`${styleText("  │", theme.border)} ${styleText(line, style)}`, 4);
   });
 }
 
-function numberLines(value: string, start: number): string {
-  const width = String(start + Math.max(0, value.split("\n").length - 1)).length;
-  return value.split("\n").map((line, index) =>
-    `${String(start + index).padStart(width)} │ ${line}`
-  ).join("\n");
+function copyLine(value: string, start = 0, end = stripVTControlCharacters(value).length): TextDocumentLine {
+  return { value, copy: { start, end } };
 }
 
 function inputSummary(input: unknown): string {

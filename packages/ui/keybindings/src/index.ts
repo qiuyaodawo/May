@@ -16,7 +16,8 @@ export interface KeyBindingDefinition {
 
 export interface KeymapOptions {
   readonly leader?: string;
-  readonly chordTimeoutMs?: number;
+  /** null 表示等待后续按键，直到匹配结束或调用 reset。 */
+  readonly chordTimeoutMs?: number | null;
   /** Reject bindings which refer to actions outside this registry. */
   readonly actions?: readonly string[];
 }
@@ -36,6 +37,7 @@ interface CompiledBinding extends KeyBindingDefinition {
 interface PendingSequence {
   readonly sequence: readonly KeyStroke[];
   readonly expiresAt: number;
+  readonly contexts: readonly string[];
 }
 
 export class Keymap {
@@ -47,8 +49,8 @@ export class Keymap {
     definitions: readonly KeyBindingDefinition[],
     options: KeymapOptions = {},
   ) {
-    const chordTimeoutMs = options.chordTimeoutMs ?? 1_000;
-    if (!Number.isFinite(chordTimeoutMs) || chordTimeoutMs <= 0) {
+    const chordTimeoutMs = options.chordTimeoutMs === null ? Infinity : options.chordTimeoutMs ?? 1_000;
+    if (options.chordTimeoutMs !== null && (!Number.isFinite(chordTimeoutMs) || chordTimeoutMs <= 0)) {
       throw new RangeError("chordTimeoutMs must be a positive finite number");
     }
     const actions = options.actions === undefined
@@ -80,7 +82,9 @@ export class Keymap {
     now = Date.now(),
   ): KeymapResult {
     const normalized = normalizeKeyStroke(stroke);
-    const previous = this.pending !== undefined && this.pending.expiresAt > now
+    const previous = this.pending !== undefined && this.pending.expiresAt > now &&
+      this.pending.contexts.length === contexts.length &&
+      this.pending.contexts.every((context, index) => context === contexts[index])
       ? this.pending.sequence
       : [];
     this.pending = undefined;
@@ -92,6 +96,12 @@ export class Keymap {
 
   reset(): void {
     this.pending = undefined;
+  }
+
+  keysForAction(action: string, context?: string): readonly string[] {
+    return this.bindings
+      .filter(binding => binding.action === action && (context === undefined || binding.context === context))
+      .map(binding => formatKeySequence(binding.sequence));
   }
 
   private resolveSequence(
@@ -116,6 +126,7 @@ export class Keymap {
       this.pending = {
         sequence: [...sequence],
         expiresAt: now + this.chordTimeoutMs,
+        contexts: [...contexts],
       };
       return {
         type: "pending",
@@ -126,6 +137,19 @@ export class Keymap {
     }
     return { type: "unmatched" };
   }
+}
+
+export function mergeKeyBindings(
+  defaults: readonly KeyBindingDefinition[],
+  overrides: readonly KeyBindingDefinition[] = [],
+  options: { readonly leader?: string } = {},
+): readonly KeyBindingDefinition[] {
+  const replaced = new Set(overrides.map(binding => `${binding.context}\0${binding.action}`));
+  const keyId = (binding: KeyBindingDefinition): string =>
+    `${binding.context}\0${formatKeySequence(parseKeySequence(binding.keys, options))}`;
+  const rebound = new Set(overrides.map(keyId));
+  return [...defaults.filter(binding => !replaced.has(`${binding.context}\0${binding.action}`) &&
+    !rebound.has(keyId(binding))), ...overrides];
 }
 
 export function keyStroke(

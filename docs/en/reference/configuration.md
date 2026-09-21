@@ -286,6 +286,16 @@ normal permission and scheduling path, and use a fixed snapshot per Run. Explici
 refresh/reconnect and catalog notifications update later Runs. `/mcp` reports server state, negotiated protocol version, tools, errors, and the bounded
 sanitized stderr tail. See [MCP tools](../guides/mcp.md).
 
+## MaybeCode terminal interaction
+
+MaybeCode's retained terminal frontend reads `MAY_TUI_LEADER` (default `ctrl+g`)
+for display-action sequences. Choose one modified key that does not conflict
+with editor shortcuts. `MAY_CLIPBOARD` accepts `auto`, `system`, `osc52`, or
+`disabled`; local auto uses the system clipboard, while SSH requires explicit
+OSC 52 configuration and terminal permission. These are frontend environment
+settings and do not enter the agent's context. See
+[terminal interaction](../getting-started.md#browse-maybecode-conversations).
+
 ## MaybeClaw settings
 
 `apps.maybeclaw` accepts `runBudget`, `server.maxConcurrent` (1..4, default 1),

@@ -80,7 +80,8 @@ test("scrolls three rows per wheel event within the content boundaries", () => {
   assert.deepEqual(scroll.render(size).lines, ["4", "5"]);
   scroll.handleKey(keyStroke("wheelup"));
   assert.deepEqual(scroll.render(size).lines, ["1", "2"]);
-  assert.equal(scroll.handleKey(keyStroke("wheelup")), false);
+  assert.equal(scroll.handleKey(keyStroke("wheelup")), true);
+  assert.deepEqual(scroll.handleKeyResult(keyStroke("wheelup")), { consumed: true, redraw: false });
   scroll.handleKey(keyStroke("wheeldown"));
   scroll.handleKey(keyStroke("wheeldown"));
   assert.deepEqual(scroll.render(size).lines, ["7", "8"]);

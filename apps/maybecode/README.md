@@ -27,7 +27,7 @@ new output. Keyboard Up/Down in the editor navigates input history. Press Tab
 to focus the transcript and use Up/Down, PageUp/PageDown, Home, or End to browse.
 Mouse scrolling requires a terminal supporting xterm mouse reporting.
 
-Press `Ctrl+X`, then `R` to place the current turn's completed final reply body
+Press `Ctrl+G`, then `R` to place the current turn's completed final reply body
 at the top of the conversation, after its thinking and tool activity. This works
 with keyboard focus in either the editor or conversation and preserves the
 draft. The reading position stays at the reply start until you scroll; repeated
@@ -193,10 +193,31 @@ rename (`r`), delete (`d`), and resume (`Enter`) actions. It also renders safe
 terminal Markdown and uses specialized, collapsible renderers for `read`,
 `shell`, `edit`, and `write`.
 
-Retained-view display shortcuts use the existing leader key (`Ctrl+X`):
+Retained-view display shortcuts use the leader key `Ctrl+G`:
 
-- `Ctrl+X`, then `D` toggles tool output and unified diff details.
-- `Ctrl+X`, then `T` toggles reasoning-block visibility.
+- `Ctrl+G`, then `D` toggles tool output and unified diff details.
+- `Ctrl+G`, then `T` toggles reasoning-block visibility.
+
+After the leader, MaybeCode waits for the next key without a time limit. Escape,
+focus changes, mouse navigation, and opening a dialog cancel that sequence and
+clear its hint. Waiting for the next key preserves the conversation's position.
+
+Drag to select text in the input editor or conversation. `Ctrl+C` copies the
+selection; without a selection it interrupts the run or exits an idle interface.
+The editor supports `Ctrl+A` to select all, `Ctrl+X` to cut, `Ctrl+V` to paste,
+Shift+arrows and Shift+Home/End to extend selections, and Home/End to move to the
+current logical line's beginning/end. Typing, deletion and paste replace selected
+text. Conversation selection preserves code indentation and original line breaks.
+Drag at the viewport edge to scroll while selecting. Terminal-native paste also
+works through bracketed paste.
+
+Set `MAY_TUI_LEADER` to a single modified key such as `ctrl+g`; editing shortcuts
+`ctrl+a`, `ctrl+c`, `ctrl+v`, and `ctrl+x` are reserved. Shortcut hints reflect the
+effective binding. Set `MAY_CLIPBOARD` to `auto` (default), `system`, `osc52`, or
+`disabled`. Local `auto` uses the system clipboard. Over SSH, explicitly enable
+`osc52` with a terminal configured to permit clipboard writes; paste using the
+terminal's paste command. OSC 52 cannot confirm receipt by the terminal. Host
+terminal shortcuts take precedence over keys sent to the application.
 
 The same display actions are available as TUI-local `/details` and `/thinking`
 commands. They are handled by the retained frontend and do not enter the agent

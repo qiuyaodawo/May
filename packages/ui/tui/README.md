@@ -22,6 +22,13 @@ Run `pnpm --filter @may/tui test` for component and codec tests. Run
 requires the Playwright Chromium installation. These tests inspect decoded
 pixels and terminal state without screenshots.
 
+On Windows, run `powershell -NoProfile -STA -File scripts/test-terminal-clipboard.ps1`
+from the repository root after `pnpm build`. It saves all current clipboard
+formats, runs the system clipboard, Editor and real xterm/MaybeCode interaction
+tests serially, and restores the saved formats. Other platforms can explicitly
+enable text-only clipboard tests with `MAY_TEST_SYSTEM_CLIPBOARD=1` after saving
+their clipboard contents. Ordinary tests do not modify the system clipboard.
+
 Terminal UI components for May agents. The low-level primitives remain usable
 without a provider or product application, while the agent transcript layer
 projects May runtime, permission, and session events into a retained view.
@@ -55,7 +62,10 @@ temporary full-screen views. The latter is also available through the
 `NodeTerminalDriver` enables SGR mouse reporting while the alternate screen is
 active and disables it on exit. Mouse input is decoded with `tty-events`;
 vertical wheel events emit `wheelup` and `wheeldown` key strokes without text.
-Other mouse events are consumed. A focused `ScrollView` scrolls three rows per
+`onPointer` emits zero-based down/move/up coordinates and modifiers. Button-drag
+reporting is enabled only in the alternate screen. `TuiRuntime` routes pointer
+events to `handlePointer`; Column, Stack, Panel, Dialog and ScrollView translate
+coordinates and retain the target through a drag. A focused `ScrollView` scrolls three rows per
 wheel event. Product views may route wheel events to their transcript while
 keeping keyboard focus in the editor.
 
@@ -73,6 +83,45 @@ items, so this explicit reading operation may exceed the normal tail row limit.
 history navigation at the first/last logical line, `Ctrl+W` or modified
 Backspace for backward word deletion, and modified Left/Right for word
 movement. Applications decide whether to provide and persist history.
+
+Editor, ScrollView and SelectList use `@may/keybindings` semantic actions.
+Editor accepts `keybindings` overrides and an injected `Clipboard` with async
+`readText`/`writeText`. It supports mouse selection, Shift navigation, Ctrl+A,
+Ctrl+C/X/V and replacement of selected text. Home/End target logical lines.
+`selectedText`, `hasSelection`, `clearSelection`, and `selectAll` expose selection
+state. Provide `onInvalidate` for asynchronous clipboard and edge scrolling;
+`onError` reports clipboard failures. Without it failures propagate. A cut only
+deletes text after a successful write with unchanged editor state. Dispose editors
+and scrolling components when removing them to release drag timers.
+
+`handleKey` returns whether a key was consumed, including navigation at a boundary.
+Optional `handleKeyResult` distinguishes `consumed` from `redraw`. Runtime invokes
+the richer method when supplied. `TuiRuntime.stop()` permanently releases its
+root component, renderer and terminal; a failed start also releases resources.
+Calling `start()` or `setRoot()` after stopping throws. Create a new runtime and
+root component for another session. `setRoot()` releases the previous root;
+passing the current root leaves it active. `RenderResult.textRows` carries text positions
+through layout; Text and Markdown accept `sourceId` to associate wrapping with a
+stable source. TranscriptView uses these positions for cross-message selection
+and preserves selections through streaming updates and resizing.
+Tab characters display as two columns and retain the original tab in copied text.
+
+Custom tool renderers can implement `renderDocument(item, options)` alongside
+`render()`. It returns `TextDocumentLine[]`: each line supplies `value` and an
+optional `copy: { start, end }` range using UTF-16 positions in the ANSI-stripped
+line. Omit `copy` for decorative lines. `ToolRendererRegistry.renderDocument`
+uses this metadata; legacy string renderers keep their literal text selectable.
+`TerminalImages.component(source, sourceId?)` and
+`TerminalImages.render(source, size, sourceId?)` can associate captions and saved
+paths with selectable text. Image pixels remain separate from text selection.
+
+`createTerminalClipboard` supports `MAY_CLIPBOARD=auto|system|osc52|disabled`.
+Local auto uses clipboardy; SSH auto reports that explicit OSC 52 configuration
+is required. OSC 52 writes require terminal permission and cannot confirm receipt;
+its read operation reports unsupported access. Terminal paste supplies text through
+the existing bracketed paste event. User workflows are documented in
+[English](../../../docs/en/getting-started.md#browse-maybecode-conversations) and
+[中文](../../../docs/zh-CN/getting-started.md#查看-maybecode-对话).
 
 Run the local smoke demo with:
 

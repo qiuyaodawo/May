@@ -37,19 +37,19 @@ export class TerminalImages {
       this.version++;
     }
   }
-  component(source: MediaSource): Component { return { render: size => this.render(source, size) }; }
-  render(source: MediaSource, size: RenderSize): RenderResult {
+  component(source: MediaSource, sourceId?: string): Component { return { render: size => this.render(source, size, sourceId) }; }
+  render(source: MediaSource, size: RenderSize, sourceId?: string): RenderResult {
     const attachment = imageAttachment(source), image = this.values.get(attachment.id);
     const caption = image ? `图片 ${image.width}×${image.height} · ${image.mediaType} · ${image.data.byteLength} bytes\n${image.path}`
       : attachment.url ? `图片链接：${attachment.url}` : `图片 ${attachment.id}（媒体读取接口未提供此资源）`;
-    const label = new Text(sanitizeTerminalText(caption)).render(size);
+    const label = new Text(sanitizeTerminalText(caption), sourceId === undefined ? {} : { sourceId }).render(size);
     if (!image || this.protocol === "none") return label;
     if (this.protocol === "sixel") return this.renderSixel(image, label, size);
     const columns = Math.max(1, Math.min(size.width, 80));
     const rows = Math.max(1, Math.min(12, Math.ceil(columns * image.height / image.width / 2)));
     if (rows + label.lines.length > size.height) return label;
     const width = Math.max(1, Math.min(columns, Math.round(rows * 2 * image.width / image.height)));
-    return { lines: [...label.lines, ...Array.from({ length: rows }, () => "")], images: [{ id: image.id, png: image.png, protocol: this.protocol, x: 0, y: label.lines.length, columns: width, rows }] };
+    return { ...label, lines: [...label.lines, ...Array.from({ length: rows }, () => "")], images: [{ id: image.id, png: image.png, protocol: this.protocol, x: 0, y: label.lines.length, columns: width, rows }] };
   }
 
   private renderSixel(image: PreparedImage, label: RenderResult, size: RenderSize): RenderResult {
@@ -76,6 +76,7 @@ export class TerminalImages {
       image.frame = { key, sixel: introducer(1) + sixelEncode(data, width, height, Array.from(palette.getPointContainer().toUint32Array())) + FINALIZER };
     }
     return {
+      ...label,
       lines: [...label.lines, ...Array.from({ length: rows }, () => "")],
       images: [{ id: image.id, png: image.png, protocol: "sixel", sixel: image.frame.sixel, x: 0, y: label.lines.length, columns: Math.ceil(width / cell.width), rows }],
     };

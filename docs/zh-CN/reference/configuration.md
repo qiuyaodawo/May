@@ -266,6 +266,14 @@ scheduling 路径，每个 Run 使用固定快照；显式 refresh/reconnect 与
 后续 Run。`/mcp` 会显示 server 状态、协商协议版本、工具、
 错误和有界、已净化的 stderr 末尾片段。参阅 [MCP 工具](../guides/mcp.md)。
 
+## MaybeCode 终端交互
+
+MaybeCode 的 retained 终端界面通过 `MAY_TUI_LEADER` 设置显示操作组合键的起始按键，
+默认 `ctrl+g`。应当选择包含修饰键且与输入框快捷键没有冲突的单个按键。
+`MAY_CLIPBOARD` 支持 `auto`、`system`、`osc52` 和 `disabled`；本机 auto 使用系统
+剪贴板，SSH 需要明确配置 OSC 52 并允许终端写入剪贴板。这些环境设置由界面使用，
+不会进入 Agent 的上下文。参阅[终端交互](../getting-started.md#查看-maybecode-对话)。
+
 ## MaybeClaw 设置
 
 `apps.maybeclaw` 接受 `runBudget`、`server.maxConcurrent`（1..4，默认 1）以及

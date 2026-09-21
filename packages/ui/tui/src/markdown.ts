@@ -1,6 +1,8 @@
 import { lexer, type Token, type Tokens } from "marked";
+import { stripVTControlCharacters } from "node:util";
 import type { Component, RenderResult, RenderSize } from "./component.js";
-import { sanitizeTerminalText, Text } from "./text.js";
+import { sanitizeTerminalText } from "./text.js";
+import { renderTextDocument, type TextDocumentLine } from "./text-selection.js";
 import {
   DEFAULT_DARK_THEME,
   styleText,
@@ -11,6 +13,7 @@ import {
 export interface MarkdownOptions {
   readonly colors?: boolean;
   readonly theme?: MarkdownTheme;
+  readonly sourceId?: string;
 }
 
 /** Safe terminal Markdown rendering backed by Marked's lexer, not its HTML output. */
@@ -22,7 +25,7 @@ export class Markdown implements Component {
 
   render(size: RenderSize): RenderResult {
     const source = typeof this.value === "function" ? this.value() : this.value;
-    return new Text(renderTerminalMarkdown(source, this.options)).render(size);
+    return renderTextDocument(markdownDocument(source, this.options), size, this.options);
   }
 }
 
@@ -30,20 +33,33 @@ export function renderTerminalMarkdown(
   source: string,
   options: MarkdownOptions = {},
 ): string {
+  return markdownDocument(source, options).map(line => line.value).join("\n");
+}
+
+function markdownDocument(source: string, options: MarkdownOptions): TextDocumentLine[] {
   const colors = options.colors ?? true;
   const theme = options.theme ?? DEFAULT_DARK_THEME.markdown;
   const tokens = lexer(sanitizeTerminalText(source), { gfm: true, breaks: false });
-  return renderBlocks(tokens, colors, theme).trimEnd();
+  const document = renderBlocks(tokens, colors, theme);
+  while (document.at(-1)?.value === "") document.pop();
+  const last = document.at(-1);
+  if (last !== undefined) {
+    const value = last.value.trimEnd();
+    document[document.length - 1] = { value, ...(last.copy === undefined ? {} : {
+      copy: { start: last.copy.start, end: Math.min(last.copy.end, stripVTControlCharacters(value).length) },
+    }) };
+  }
+  return document.length === 0 ? [{ value: "", copy: { start: 0, end: 0 } }] : document;
 }
 
 function renderBlocks(
   tokens: readonly Token[],
   colors: boolean,
   theme: MarkdownTheme,
-): string {
-  const blocks: string[] = [];
+): TextDocumentLine[] {
+  const blocks: TextDocumentLine[][] = [];
   for (const token of tokens) {
-    let block: string | undefined;
+    let block: TextDocumentLine[] | undefined;
     switch (token.type) {
       case "space":
       case "def":
@@ -51,59 +67,61 @@ function renderBlocks(
       case "heading": {
         const heading = token as Tokens.Heading;
         const marker = heading.depth <= 2 ? `${"#".repeat(heading.depth)} ` : "";
-        block = style(
+        block = copyLines(style(
           `${marker}${renderInline(heading.tokens, colors, theme)}`,
           theme.heading,
           colors,
-        );
+        ));
         break;
       }
       case "paragraph":
-        block = renderInline((token as Tokens.Paragraph).tokens, colors, theme);
+        block = copyLines(renderInline((token as Tokens.Paragraph).tokens, colors, theme));
         break;
       case "text": {
         const text = token as Tokens.Text;
-        block = text.tokens === undefined
+        block = copyLines(text.tokens === undefined
           ? text.text
-          : renderInline(text.tokens, colors, theme);
+          : renderInline(text.tokens, colors, theme));
         break;
       }
       case "code": {
         const code = token as Tokens.Code;
         const language = code.lang === undefined ? "" : ` [${code.lang}]`;
         const label = style(`┌─ code${language}`, theme.codeBlockBorder, colors);
-        const body = code.text.split("\n").map((line) =>
-          `${style("│", theme.codeBlockBorder, colors)} ${style(line, theme.codeBlock, colors)}`
-        ).join("\n");
-        block = `${label}\n${body}`;
+        const body = code.text.split("\n").map((line) => ({
+          value: `${style("│", theme.codeBlockBorder, colors)} ${style(line, theme.codeBlock, colors)}`,
+          copy: { start: 2, end: 2 + line.length },
+        }));
+        block = [{ value: label }, ...body];
         break;
       }
       case "blockquote": {
         const quote = renderBlocks((token as Tokens.Blockquote).tokens, colors, theme);
-        block = quote.split("\n").map((line) =>
-          `${style("│", theme.quoteBorder, colors)} ${style(line, theme.quote, colors)}`
-        ).join("\n");
+        block = quote.map(line => ({
+          value: `${style("│", theme.quoteBorder, colors)} ${style(line.value, theme.quote, colors)}`,
+          ...(line.copy === undefined ? {} : { copy: { start: line.copy.start + 2, end: line.copy.end + 2 } }),
+        }));
         break;
       }
       case "list":
         block = renderList(token as Tokens.List, colors, theme);
         break;
       case "hr":
-        block = style("────────", theme.horizontalRule, colors);
+        block = [{ value: style("────────", theme.horizontalRule, colors) }];
         break;
       case "table":
         block = renderTable(token as Tokens.Table, colors, theme);
         break;
       case "html":
-        block = stripHtml((token as Tokens.HTML).text);
+        block = copyLines(stripHtml((token as Tokens.HTML).text));
         break;
       default:
-        block = "raw" in token ? sanitizeTerminalText(String(token.raw)) : undefined;
+        block = "raw" in token ? copyLines(sanitizeTerminalText(String(token.raw))) : undefined;
         break;
     }
-    if (block !== undefined && block !== "") blocks.push(block);
+    if (block !== undefined && block.some(line => line.value !== "")) blocks.push(block);
   }
-  return blocks.join("\n\n");
+  return blocks.flatMap((block, index) => index === 0 ? block : [{ value: "", copy: { start: 0, end: 0 } }, ...block]);
 }
 
 function renderInline(
@@ -166,29 +184,36 @@ function renderList(
   list: Tokens.List,
   colors: boolean,
   theme: MarkdownTheme,
-): string {
+): TextDocumentLine[] {
   const start = typeof list.start === "number" ? list.start : 1;
-  return list.items.map((item, index) => {
+  return list.items.flatMap((item, index) => {
     const task = item.task ? `[${item.checked ? "x" : " "}] ` : "";
     const marker = list.ordered ? `${start + index}. ` : "• ";
-    const body = renderBlocks(item.tokens, colors, theme).split("\n");
+    const body = renderBlocks(item.tokens, colors, theme);
     const continuation = " ".repeat(marker.length + task.length);
-    return body.map((line, lineIndex) =>
-      `${lineIndex === 0 ? `${style(marker, theme.listBullet, colors)}${task}` : continuation}${line}`
-    ).join("\n");
-  }).join("\n");
+    return body.map((line, lineIndex) => {
+      const prefix = lineIndex === 0 ? `${style(marker, theme.listBullet, colors)}${task}` : continuation;
+      return { value: prefix + line.value, ...(line.copy === undefined ? {} : {
+        copy: { start: line.copy.start === 0 ? 0 : line.copy.start + continuation.length, end: line.copy.end + continuation.length },
+      }) };
+    });
+  });
 }
 
 function renderTable(
   table: Tokens.Table,
   colors: boolean,
   theme: MarkdownTheme,
-): string {
+): TextDocumentLine[] {
   const row = (cells: readonly Tokens.TableCell[]) =>
     `| ${cells.map((cell) => renderInline(cell.tokens, colors, theme)).join(" | ")} |`;
   const header = row(table.header);
   const divider = `| ${table.header.map(() => "---").join(" | ")} |`;
-  return [header, divider, ...table.rows.map(row)].join("\n");
+  return [...copyLines(header), { value: divider }, ...table.rows.flatMap(cells => copyLines(row(cells)))];
+}
+
+function copyLines(value: string): TextDocumentLine[] {
+  return value.split("\n").map(line => ({ value: line, copy: { start: 0, end: stripVTControlCharacters(line).length } }));
 }
 
 function style(value: string, textStyle: TextStyle, enabled: boolean): string {

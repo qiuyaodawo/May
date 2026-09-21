@@ -20,7 +20,7 @@ function openView(t, store) {
   return {
     input,
     view,
-    jump() { input.write("\x18r"); },
+    jump() { input.write("\x07r"); },
     render(width = 100, height = 24) {
       return view.render({ width, height }).lines.map(stripVTControlCharacters);
     },
@@ -65,9 +65,9 @@ test("jumps to final Markdown body through terminal input and preserves draft, f
   store.appendNotice("info", "LATER-NOTICE");
   assert.match(terminal.render()[3], /REPLY-START/u);
   assert.match(terminal.render(45)[3], /REPLY-START/u);
-  terminal.input.write("\x18t");
+  terminal.input.write("\x07t");
   assert.match(terminal.render(45)[3], /REPLY-START/u);
-  terminal.input.write("\x18t");
+  terminal.input.write("\x07t");
   assert.match(terminal.render(45)[3], /REPLY-START/u);
   terminal.input.write("\x1b[<65;5;5M");
   assert.doesNotMatch(terminal.render(45)[3], /REPLY-START/u);

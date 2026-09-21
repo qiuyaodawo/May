@@ -80,13 +80,31 @@ terminal supporting xterm mouse reporting.
 Up/Down in the input editor navigates input history. Press Tab to focus the
 conversation, then use Up/Down, PageUp/PageDown, Home, or End to browse it.
 
-Press `Ctrl+X`, then `R` to jump to the start of the current turn's completed
+Press `Ctrl+G`, then `R` to jump to the start of the current turn's completed
 final reply body, after its thinking and tool activity. It places the body at
 the top of the conversation and preserves your draft and keyboard focus.
 The reading position stays there until you scroll; repeating the shortcut
 returns to the same start. This also works after resuming a session and for
 replies longer than the normal scroll buffer. If the current turn has no
 completed final reply, the status shows `No final reply yet`.
+
+Drag to select conversation text or input text. `Ctrl+C` copies a selection;
+without one, it interrupts the run or exits the idle interface. In the editor,
+`Ctrl+A` selects all, `Ctrl+X` cuts, and `Ctrl+V` pastes. Shift+arrows and
+Shift+Home/End extend the selection. Home/End move to the current logical line's
+beginning/end; typing or pasting replaces selected text. Dragging at a viewport
+edge scrolls the selection. Code indentation and original line breaks are preserved.
+
+`Ctrl+G D` toggles tool details and `Ctrl+G T` toggles reasoning. After the leader,
+MaybeCode waits for the next key without a
+time limit and preserves the reading position. Escape, focus changes, mouse
+navigation and opening a dialog cancel the sequence and clear its hint. Configure the
+single modified leader key with `MAY_TUI_LEADER`; text editing shortcuts are
+reserved. `MAY_CLIPBOARD=auto` uses the local system clipboard. Other modes are
+`system`, `osc52`, and `disabled`. Over SSH, explicitly select `osc52` and enable
+clipboard writes in the terminal; use terminal paste for reading the clipboard.
+OSC 52 writes cannot confirm terminal acceptance. Terminal-owned keybindings may
+need adjustment so application shortcuts reach MaybeCode.
 
 ## Continuous integration
 

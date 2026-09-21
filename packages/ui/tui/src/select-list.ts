@@ -1,4 +1,4 @@
-import type { KeyStroke } from "@may/keybindings";
+import { Keymap, mergeKeyBindings, type KeyStroke, type KeyBindingDefinition } from "@may/keybindings";
 import sliceAnsi from "slice-ansi";
 import stringWidth from "string-width";
 import type {
@@ -6,6 +6,7 @@ import type {
   InteractiveComponent,
   RenderResult,
   RenderSize,
+  PointerEvent,
 } from "./component.js";
 import { styleText, type TextStyle } from "./theme.js";
 import { sanitizeTerminalText } from "./text.js";
@@ -18,6 +19,7 @@ export interface SelectItem<T = string> {
 }
 
 export interface SelectListOptions<T> {
+  readonly keybindings?: readonly KeyBindingDefinition[];
   readonly selectedIndex?: number;
   readonly emptyLabel?: string;
   readonly onSelect?: (item: SelectItem<T>, index: number) => void;
@@ -28,6 +30,17 @@ export interface SelectListOptions<T> {
   readonly markerStyle?: TextStyle;
 }
 
+export const SELECT_LIST_KEYBINDINGS: readonly KeyBindingDefinition[] = [
+  { context: "select", keys: "up", action: "list.up" },
+  { context: "select", keys: "down", action: "list.down" },
+  { context: "select", keys: "pageup", action: "list.pageUp" },
+  { context: "select", keys: "pagedown", action: "list.pageDown" },
+  { context: "select", keys: "home", action: "list.home" },
+  { context: "select", keys: "end", action: "list.end" },
+  { context: "select", keys: "enter", action: "list.accept" },
+  { context: "select", keys: "escape", action: "list.cancel" },
+];
+
 export class SelectList<T = string>
   implements InteractiveComponent, FocusTarget {
   private items: readonly SelectItem<T>[];
@@ -35,6 +48,7 @@ export class SelectList<T = string>
   private offset = 0;
   private pageSize = 1;
   private focused = false;
+  private readonly keymap: Keymap;
 
   constructor(
     items: readonly SelectItem<T>[],
@@ -42,6 +56,9 @@ export class SelectList<T = string>
   ) {
     this.items = [...items];
     this.index = firstEnabled(this.items, options.selectedIndex ?? 0);
+    this.keymap = new Keymap(mergeKeyBindings(SELECT_LIST_KEYBINDINGS, options.keybindings), {
+      actions: SELECT_LIST_KEYBINDINGS.map(binding => binding.action),
+    });
   }
 
   get selectedIndex(): number {
@@ -59,36 +76,45 @@ export class SelectList<T = string>
   }
 
   setFocused(focused: boolean): void {
+    if (focused !== this.focused) this.keymap.reset();
     this.focused = focused;
   }
 
   handleKey(stroke: KeyStroke): boolean {
     if (!this.focused) return false;
-    switch (stroke.key) {
-      case "up":
-        return this.move(-1);
-      case "down":
-        return this.move(1);
-      case "pageup":
-        return this.move(-this.pageSize);
-      case "pagedown":
-        return this.move(this.pageSize);
-      case "home":
-        return this.moveTo(firstEnabled(this.items, 0));
-      case "end":
-        return this.moveTo(lastEnabled(this.items));
-      case "enter": {
+    const result = this.keymap.resolve(stroke, ["select"]);
+    if (result.type !== "action") return result.type === "pending";
+    return this.performAction(result.action);
+  }
+
+  performAction(action: string): boolean {
+    switch (action) {
+      case "list.up": this.move(-1); return true;
+      case "list.down": this.move(1); return true;
+      case "list.pageUp": this.move(-this.pageSize); return true;
+      case "list.pageDown": this.move(this.pageSize); return true;
+      case "list.home": this.moveTo(firstEnabled(this.items, 0)); return true;
+      case "list.end": this.moveTo(lastEnabled(this.items)); return true;
+      case "list.accept": {
         const item = this.selectedItem;
         if (item === undefined) return false;
         this.options.onSelect?.(item, this.index);
         return true;
       }
-      case "escape":
+      case "list.cancel":
         this.options.onCancel?.();
         return this.options.onCancel !== undefined;
       default:
         return false;
     }
+  }
+
+  handlePointer(event: PointerEvent): boolean {
+    if (event.button !== 0 || event.type !== "down" || event.y < 0 || event.y >= this.pageSize) return false;
+    const index = this.offset + event.y;
+    if (this.items[index] === undefined || this.items[index]!.disabled) return false;
+    this.moveTo(index);
+    return true;
   }
 
   render(size: RenderSize): RenderResult {
