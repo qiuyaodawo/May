@@ -25,6 +25,9 @@ import type { MaybeCodeRun } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 
 export type MaybeCodeSlashCommandName =
+  | "/steer"
+  | "/stop"
+  | "/yolo"
   | "/goal"
   | "/new"
   | "/resume"
@@ -51,6 +54,9 @@ export const MAYBECODE_COMPACTION_STRATEGIES = [
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
+  { name: "/steer", usage: "/steer <message>", description: "Deliver additional input after the current Step finishes" },
+  { name: "/stop", usage: "/stop", description: "Cancel the current operation" },
+  { name: "/yolo", usage: "/yolo [on|off|status]", description: "Enable automatic tool approval; use off to disable or status to inspect" },
   { name: "/goal", usage: GOAL_COMMAND_USAGE, description: "Start, inspect, pause, resume, or cancel a durable goal" },
   { name: "/web", usage: "/web", description: "Open the current workspace and session in a browser" },
   { name: "/skills", usage: "/skills [show <name>|use <name> [task]]", description: "List skills, preview instructions, or activate a skill" },
@@ -267,6 +273,10 @@ export function createMaybeCodeSlashCommandSuggester(
 
   return maybeCodeSlashCommands.createSuggester(async (argumentInput) => {
     const { definition, invokedAs: command, argumentPrefix } = argumentInput;
+    if (definition?.name === "/yolo") {
+      return ["on", "off", "status"].filter(value => value.startsWith(argumentPrefix))
+        .map(value => ({ value: `${command} ${value}`, label: value, description: "Permission mode" }));
+    }
     if (definition?.name === "/goal") {
       return ["start", "status", "pause", "resume", "cancel"].filter(verb => verb.startsWith(argumentPrefix))
         .map(verb => ({ value: `${command} ${verb}`, label: verb }));
@@ -364,6 +374,23 @@ export async function executeMaybeCodeSlashCommand(
 
   const { definition, arguments: arguments_ } = parsed;
   switch (definition.name) {
+    case "/steer": {
+      const text = input.trimStart().slice("/steer".length).trimStart();
+      if (!text.trim()) return usage(definition);
+      if (!controller.steer) throw new Error("Steering is unsupported by this controller");
+      const result = await controller.steer({ input: text });
+      return { type: "display", text: `Steering input ${result.inputId}: ${result.status}` };
+    }
+    case "/stop": {
+      const invalid = noArguments(arguments_, definition); if (invalid) return invalid;
+      return { type: "display", text: controller.cancel("Stopped by user") ? "Cancellation requested." : "No active operation." };
+    }
+    case "/yolo": {
+      const action = arguments_[0] ?? "on";
+      if (arguments_.length > 1 || !["on", "off", "status"].includes(action)) return { type: "usage", usage: "/yolo [on|off|status]" };
+      if (action !== "status") await controller.setPermissionMode(action === "on" ? "yolo" : "default");
+      return { type: "display", text: controller.permissionMode === "yolo" ? "YOLO enabled" : "YOLO disabled" };
+    }
     case "/goal": return { type: "display", text: await executeGoalCommand(arguments_, controller) };
     case "/web":
       return noArguments(arguments_, definition) ?? { type: "web.requested" };

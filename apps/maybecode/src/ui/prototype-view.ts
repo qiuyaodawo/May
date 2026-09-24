@@ -38,6 +38,8 @@ import { MAYBECODE_DARK_THEME } from "./theme.js";
 import { MaybeCodeUiActionRegistry } from "./actions.js";
 
 export interface MaybeCodePrototypeViewOptions {
+  readonly isRunning?: () => boolean;
+  readonly permissionMode?: () => import("../policy.js").MaybeCodePermissionMode;
   readonly clipboard?: Clipboard;
   readonly keymap?: MaybeCodeKeymapOptions;
   readonly images?: TerminalImages;
@@ -83,7 +85,8 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
   private suggestions: readonly MaybeCodeSlashCommandSuggestion[] = [];
   private suggestionsVisible = false;
   private suggestionVersion = 0;
-  private submissionInFlight = false;
+  private submissionTail: Promise<void> | undefined;
+  private submissionEpoch = 0;
   private status = "Ready";
   private statusBeforeShortcut: string | undefined;
   private model: string;
@@ -207,6 +210,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
       if (handled) return true;
       const shortcut = this.keymap.resolve(stroke, ["dialog"]);
       if (shortcut.type === "action" && shortcut.action === "app.interrupt") {
+        this.submissionEpoch++;
         this.options.onCancel?.();
         return true;
       }
@@ -490,6 +494,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
       {
         height: 1,
         component: new FooterView(
+          this.options.permissionMode?.() === "yolo",
           this.status,
           this.focus.focusedId,
           this.transcriptView.toolDetailsMode,
@@ -539,6 +544,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
         return true;
       }
       if (shortcut.action === "app.interrupt") {
+        this.submissionEpoch++;
         this.options.onCancel?.();
         return true;
       }
@@ -605,36 +611,41 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
   }
 
   private submit(value: string, completeCommand = true): void {
-    if (value.trim() === "") return;
-    if (this.submissionInFlight) {
-      this.setStatus("An operation is already active");
-      return;
-    }
-    this.submissionInFlight = true;
+    if (this.disposed || value.trim() === "") return;
     this.inputHistory.record(value);
     this.editor.setValue("");
     this.hideSuggestions();
     this.setStatus("Running");
-    void this.resolveSubmission(value, completeCommand)
+    const epoch = this.submissionEpoch;
+    const submit = () => this.disposed || epoch !== this.submissionEpoch ? undefined : this.resolveSubmission(value, completeCommand, epoch);
+    const previous = this.submissionTail;
+    const pending = (previous ? previous.then(submit) : Promise.resolve(submit()))
       .then(
-        (status) => this.setStatus(status ?? "Ready"),
+        (status) => {
+          if (epoch === this.submissionEpoch) this.setStatus(status ?? (this.options.isRunning?.() ? "Running" : "Ready"));
+        },
         (error: unknown) => {
+          if (this.disposed || epoch !== this.submissionEpoch) return;
           if (this.editor.value === "") this.editor.setValue(value);
           this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`);
         },
-      )
-      .finally(() => this.submissionInFlight = false);
+      ).finally(() => {
+        if (this.submissionTail === pending) this.submissionTail = undefined;
+      });
+    this.submissionTail = pending;
   }
 
   private async resolveSubmission(
     value: string,
     completeCommand: boolean,
+    epoch: number,
   ): Promise<string | undefined> {
     let submission = value;
     if (completeCommand && value.startsWith("/")) {
       const suggestions = await this.suggestionsFor(value);
       submission = suggestions.length === 1 ? suggestions[0]!.value : value;
     }
+    if (this.disposed || epoch !== this.submissionEpoch) return undefined;
     const uiResult = this.uiActions.executeCommand(submission);
     if (uiResult.matched) return uiResult.status;
     this.transcript.scrollToEnd();
@@ -1177,6 +1188,7 @@ class HeaderView implements Component {
 
 class FooterView implements Component {
   constructor(
+    private readonly yolo: boolean,
     private readonly status: string,
     private readonly focus: string | undefined,
     private readonly details: "all" | "off" | "custom",
@@ -1193,7 +1205,8 @@ class FooterView implements Component {
       : /running|cancell/iu.test(this.status)
       ? this.theme.warning
       : this.theme.success;
-    const value = `${styleText("●", statusStyle)} ${styleText(this.status, statusStyle)}  ` +
+    const value = (this.yolo ? `${styleText("YOLO · Auto-approve", this.theme.warning)}  ` : "") +
+      `${styleText("●", statusStyle)} ${styleText(this.status, statusStyle)}  ` +
       `${styleText(this.focus ?? "none", this.theme.muted)}  ` +
       `${styleText(this.replyHint, this.theme.dim)} reply  ` +
       (this.focus === "transcript"

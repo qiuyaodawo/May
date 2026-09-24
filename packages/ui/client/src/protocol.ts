@@ -8,6 +8,11 @@ export interface UiProduct {
   readonly suggestions: readonly string[];
 }
 
+export interface UiBadge {
+  readonly label: string;
+  readonly tone?: "neutral" | "warning";
+}
+
 export interface UiResource {
   readonly id: string;
   readonly kind: "session" | "task";
@@ -100,6 +105,7 @@ export interface UiControls {
 export interface UiCompletion { readonly value: string; readonly label: string; readonly description?: string }
 
 export interface UiSnapshot {
+  readonly badges?: readonly UiBadge[];
   readonly version: 1;
   /** New on each host start; prevents replay of an uncertain command after restart. */
   readonly hostId: string;

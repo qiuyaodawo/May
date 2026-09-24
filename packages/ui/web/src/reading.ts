@@ -25,13 +25,35 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
   historyControls.append(searchForm, more, info); scroll.prepend(historyControls);
   let state = client.state, scope = "", disposed = false, requestId = 0, loading = false;
   let older: UiBlock[] = [], results: UiBlock[] | null = null, query = "", cursor: string | null = null, total = 0;
-  let following = true, restoring = false, unread = false, lastTail = "", defaultExpanded = false;
+  let following = true, restoring = false, unread = false, initialized = false, defaultExpanded = false, restoreRaf = 0;
   const toolOpen = new Map<string, boolean>(), groupClosed = new Set<string>();
-  const nodes = new Map<string, { signature: string; node: HTMLElement }>();
+  const previousSignatures = new Map<string, string>();
+  let previousInteractions = "";
+  interface BlockNodeEntry {
+    signature: string;
+    node: HTMLElement;
+    contextKey: string;
+  }
+  const nodes = new Map<string, BlockNodeEntry>();
   const groups = new Map<string, { root: HTMLElement; header: HTMLElement; body: HTMLElement; toggle: HTMLButtonElement }>();
   let visible: UiBlock[] = [];
-  function pinBottom() { restoring = true; scroll.scrollTop = scroll.scrollHeight; requestAnimationFrame(() => { restoring = false; }); }
-  scroll.addEventListener("scroll", () => { if (!restoring) { following = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80; if (following) unread = false; updateControls(); } });
+  function pinBottom() {
+    if (restoreRaf) cancelAnimationFrame(restoreRaf);
+    restoring = true;
+    scroll.scrollTop = scroll.scrollHeight;
+    restoreRaf = requestAnimationFrame(() => {
+      restoring = false;
+      restoreRaf = 0;
+    });
+  }
+  const onScroll = () => {
+    if (!restoring) {
+      following = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80;
+      if (following) unread = false;
+      updateControls();
+    }
+  };
+  scroll.addEventListener("scroll", onScroll);
   function updateControls() {
     more.hidden = !state.snapshot?.reads?.history || !cursor;
     more.disabled = loading || state.connection !== "connected" || state.selecting;
@@ -67,13 +89,38 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
   }
   function render() {
     const snapshot = state.snapshot;
-    const top = scroll.getBoundingClientRect().top;
-    const anchor = [...messages.querySelectorAll<HTMLElement>("article[data-id]")].find(node => !node.closest("[hidden]") && node.getBoundingClientRect().bottom > top && node.getBoundingClientRect().top < scroll.getBoundingClientRect().bottom);
-    const offset = anchor?.getBoundingClientRect().top, oldTop = scroll.scrollTop;
+    let anchor: HTMLElement | undefined;
+    let offset: number | undefined;
+    const oldTop = scroll.scrollTop;
+    if (!following || query) {
+      const top = scroll.getBoundingClientRect().top;
+      const bottom = scroll.getBoundingClientRect().bottom;
+      anchor = [...messages.querySelectorAll<HTMLElement>("article[data-id]")].find(node => !node.closest("[hidden]") && node.getBoundingClientRect().bottom > top && node.getBoundingClientRect().top < bottom);
+      offset = anchor?.getBoundingClientRect().top;
+    }
     visible = results ?? unique([...older, ...(snapshot?.blocks ?? [])]);
-    const tail = JSON.stringify([snapshot?.blocks.at(-1), snapshot?.interactions]);
-    if (lastTail && lastTail !== tail && !following) unread = true;
-    lastTail = tail;
+    const currentSignatures = new Map<string, string>(
+      (snapshot?.blocks ?? []).map(block => [block.id, JSON.stringify(block)]),
+    );
+    const currentInteractions = JSON.stringify(snapshot?.interactions ?? []);
+    let contentChanged = false;
+    if (initialized) {
+      if (currentInteractions !== previousInteractions) {
+        contentChanged = true;
+      } else if (currentSignatures.size !== previousSignatures.size) {
+        contentChanged = true;
+      } else {
+        for (const [id, sig] of currentSignatures) {
+          if (previousSignatures.get(id) !== sig) {
+            contentChanged = true;
+            break;
+          }
+        }
+      }
+    }
+    previousSignatures.clear();
+    for (const [id, sig] of currentSignatures) previousSignatures.set(id, sig);
+    previousInteractions = currentInteractions;
     const tools = visible.filter(b => b.kind === "tool");
     summary.textContent = `已载入 ${tools.length} 次工具调用 · 运行中 ${tools.filter(b => b.status === "running").length} · 待审批 ${snapshot?.interactions.length ?? 0} · 异常 ${tools.filter(b => exceptional(b) && b.status !== "awaiting-approval").length}`;
     const grouped = new Map<string, UiBlock[]>(); let last = "unassigned";
@@ -81,6 +128,7 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
       const key = block.runId ?? (block.kind === "user" ? `request:${block.id}` : last);
       last = key; const list = grouped.get(key) ?? []; list.push(block); grouped.set(key, list);
     }
+    const contextKey = `${state.connection}:${state.busy}:${state.selecting}:${snapshot?.commands?.length ?? 0}:${(snapshot?.commands ?? []).join(",")}`;
     const activeIds = new Set<string>(); let groupIndex = 0;
     for (const [key, list] of grouped) {
       if (onlyErrors.checked && !list.some(exceptional)) continue;
@@ -102,10 +150,10 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
       for (const block of list) {
         if (onlyErrors.checked && block.kind !== "user" && !exceptional(block)) continue;
         activeIds.add(block.id);
-        const signature = JSON.stringify([block, state.connection, state.busy, state.selecting, snapshot?.commands]);
         let entry = nodes.get(block.id);
-        if (!entry || entry.signature !== signature) {
-          // Keep transcripts compact; full evidence and product renderers live in the inspector.
+        const signature = currentSignatures.get(block.id) ?? JSON.stringify(block);
+        if (!entry || entry.contextKey !== contextKey || entry.signature !== signature) {
+          // 保持简明内容，详细数据展示在检查器中
           const { presentation: _presentation, ...withoutPresentation } = block;
           const compact: UiBlock = block.kind === "tool" ? { ...withoutPresentation, input: preview(block.input ?? "", 400), text: preview(block.text, 800), ...(block.diagnostic ? { diagnostic: { ...block.diagnostic, message: preview(block.diagnostic.message, 800) } } : {}) } : block;
           const node = transcriptBlock(compact, block.kind === "tool" ? {} : extensions, { state, command: client.command.bind(client), readMedia: client.readMedia.bind(client) });
@@ -118,7 +166,9 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
           if (block.kind === "tool" || block.text.length > 1200 || block.diagnostic) {
             const action = button("查看详情", () => inspect(block), "text-button inspect-tool"); action.setAttribute("aria-label", `查看 ${block.title ?? (block.kind === "tool" ? "工具" : block.kind === "assistant" ? "回答" : "记录")} 详情`); node.append(action);
           }
-          if (entry) entry.node.replaceWith(node); entry = { signature, node }; nodes.set(block.id, entry);
+          if (entry) entry.node.replaceWith(node);
+          entry = { signature, node, contextKey };
+          nodes.set(block.id, entry);
         }
         if (block.kind === "tool") entry.node.querySelector("details")!.open = toolOpen.get(block.id) ?? defaultExpanded;
         if (group.body.children[index] !== entry.node) group.body.insertBefore(entry.node, group.body.children[index] ?? null); index++;
@@ -126,43 +176,72 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
     }
     for (const [id, entry] of nodes) if (!activeIds.has(id)) { entry.node.remove(); nodes.delete(id); }
     for (const [key, group] of groups) if (!grouped.has(key) || onlyErrors.checked && !grouped.get(key)!.some(exceptional)) { group.root.remove(); groups.delete(key); }
-    const approvalsKey = JSON.stringify([snapshot?.interactions, state.connection, state.busy, state.selecting, snapshot?.commands]);
+    const approvalsDisabled = state.connection !== "connected" || state.busy || state.selecting || !snapshot?.commands.includes("approval.resolve");
+    const approvalsKey = JSON.stringify([snapshot?.interactions, approvalsDisabled, snapshot?.commands]);
     if (approvals.dataset.signature !== approvalsKey) {
       approvals.dataset.signature = approvalsKey;
       approvals.replaceChildren(...(snapshot?.interactions ?? []).map(request => approvalCard(request, decision => {
         void client.command("approval.resolve", { id: request.id, decision }).catch(() => {});
-      }, state.connection !== "connected" || state.busy || state.selecting || !snapshot?.commands.includes("approval.resolve"), extensions, { state, command: client.command.bind(client) })));
+      }, approvalsDisabled, extensions, { state, command: client.command.bind(client) })));
     }
+    if (initialized && !following && contentChanged) {
+      unread = true;
+    }
+    initialized = true;
     restoring = true;
     if (following && !query) scroll.scrollTop = scroll.scrollHeight;
     else if (anchor?.isConnected && offset !== undefined) scroll.scrollTop += anchor.getBoundingClientRect().top - offset;
     else scroll.scrollTop = oldTop;
-    requestAnimationFrame(() => { restoring = false; }); updateControls();
+    if (restoreRaf) cancelAnimationFrame(restoreRaf);
+    restoreRaf = requestAnimationFrame(() => {
+      restoring = false;
+      restoreRaf = 0;
+    });
+    updateControls();
   }
   return { toolbar, toggleDetails: () => expand(!defaultExpanded),
     update(next: UiClientState) {
       state = next; const nextScope = `${next.snapshot?.hostId ?? ""}:${next.snapshot?.selectedId ?? ""}`;
       if (scope !== nextScope) {
         scope = nextScope; requestId++; loading = false; older = []; results = null; query = ""; search.value = ""; info.textContent = "";
-        cursor = next.snapshot?.historyPage?.nextCursor ?? null; following = true; unread = false; lastTail = "";
+        cursor = next.snapshot?.historyPage?.nextCursor ?? null; following = true; unread = false; initialized = false;
         toolOpen.clear(); groupClosed.clear(); nodes.clear(); groups.clear(); messages.replaceChildren();
+        previousSignatures.clear(); previousInteractions = "";
       } else if (!older.length && results === null) cursor = next.snapshot?.historyPage?.nextCursor ?? null;
       if (older.length && results === null) older = unique([...older, ...(next.snapshot?.blocks ?? [])]);
       total = next.snapshot?.historyPage?.total ?? next.snapshot?.blocks.length ?? 0;
       render();
     },
-    dispose() { disposed = true; requestId++; },
+    dispose() {
+      disposed = true;
+      requestId++;
+      scroll.removeEventListener("scroll", onScroll);
+      if (restoreRaf) {
+        cancelAnimationFrame(restoreRaf);
+        restoreRaf = 0;
+      }
+      toolOpen.clear();
+      groupClosed.clear();
+      nodes.clear();
+      groups.clear();
+      previousSignatures.clear();
+      previousInteractions = "";
+    },
   };
 }
 
 /** Dedicated, read-only evidence panel. A chunk version prevents mixing changed output. */
-export function createInspector(client: UiClient, extensions: WebUiExtensions, visibility: (open: boolean) => void) {
+export function createInspector(client: UiClient, extensions: WebUiExtensions, visibility: (open: boolean) => void, dismiss?: () => void) {
   const root = element("div", "evidence-inspector"); root.hidden = true;
   let state = client.state, scope = "", selected: UiBlock | undefined, field: UiField | "overview" = "overview", requestId = 0, page: UiFieldPage | undefined;
   let offsets: number[] = [], disposed = false, loading = false;
   function render() {
     root.replaceChildren(); if (!selected) return;
-    const header = element("div", "details-header"); header.append(element("h2", "", selected.title ?? "记录详情"), button("返回工作详情", () => close(), "text-button")); root.append(header);
+    const header = element("div", "details-header");
+    const closeBtn = button("关闭", () => { close(); dismiss?.(); }, "text-button");
+    closeBtn.setAttribute("aria-label", "关闭详情面板");
+    header.append(element("h2", "", selected.title ?? "记录详情"), button("返回工作详情", () => close(), "text-button"), closeBtn);
+    root.append(header);
     root.append(element("p", "detail-note", `只读详情 · ${statusLabel(selected.status ?? "unknown")} · 不执行工具或审批`));
     const tabs = element("div", "detail-tabs");
     const fields: [UiField | "overview", string][] = [["overview", "概览"], ["input", "输入"], ["text", "输出"], ["diagnostic", "错误"], ["presentation", "展示 / Diff"]];
@@ -196,7 +275,18 @@ export function createInspector(client: UiClient, extensions: WebUiExtensions, v
   }
   function close() { requestId++; selected = undefined; page = undefined; root.hidden = true; visibility(false); }
   return { root, close,
-    inspect(block: UiBlock) { requestId++; selected = block; field = "overview"; page = undefined; offsets = []; root.hidden = false; visibility(true); render(); },
+    inspect(block: UiBlock) {
+      requestId++;
+      selected = block;
+      field = "overview";
+      page = undefined;
+      offsets = [];
+      root.hidden = false;
+      visibility(true);
+      render();
+      const firstButton = root.querySelector<HTMLButtonElement>("button:not([disabled])");
+      firstButton?.focus();
+    },
     update(next: UiClientState) {
       const key = `${next.snapshot?.hostId ?? ""}:${next.snapshot?.selectedId ?? ""}`;
       if (scope !== key) { scope = key; close(); }

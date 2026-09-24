@@ -122,6 +122,31 @@ An application permits one active run or context compaction at a time.
 operations. `cancel()` targets the active run first, otherwise the active
 compaction, and returns whether it found anything to cancel.
 
+`AgentApplication` also implements `SteerableAgentController`.
+`steer({ input, inputId?, runId? })` persists additional user input without
+interrupting the active Step. Complete tool batches and approval waits finish
+before FIFO input enters Context, then the next model request receives it.
+An explicit `runId` must match the active Run. `listSteeringInputs()` exposes
+`pending`, `delivered`, `idle`, and `cancelled` states. Delivered records are
+committed Context input; the model may still be waiting to receive them.
+
+When no Run is active, or when a Run finishes or yields before delivery, the
+host starts idle input using `startSteeringInput(inputId, options?)` in order.
+The returned `AgentRun` identifies this subsequent execution. Its options can
+include `shouldYield`, budget, and cancellation signals. Host yield takes
+precedence over delivery within the current Run. Cancellation, failure, and
+process interruption retain unconsumed input as `cancelled`; user resubmission
+requires a new input identity. All input states survive Session recovery.
+Starting operations and active compaction reject concurrent steering.
+`cancelSteeringInputs(reason?)` persists cancellation for all pending and idle
+inputs while keeping delivered inputs unchanged. A host-wide stop invokes it
+together with `cancel(reason)` to cancel the active operation and its queued work.
+`submit()` and `continue()` accept `SessionSubmitOptions` and
+`SessionContinueOptions`. These Session APIs, including `startSteeringInput()`,
+reject custom `stepInputSource` values with `TypeError` before execution. Send
+durable additional input through `steer()`. Custom sources remain available when
+using `May.run()` or `May.continue()` directly.
+
 `retry()` is intentionally narrow: it is accepted only when the most recent
 durable terminal run event is `run.failed`. It continues the existing Context
 without recording another user input. A cancelled or completed latest run is

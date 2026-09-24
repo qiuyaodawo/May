@@ -47,8 +47,8 @@ export interface GoalRun {
 export interface GoalAgent {
   readonly sessionId: string;
   readonly isRunning: boolean;
-  submit(options: RunOptions): Promise<GoalRun>;
-  continue(options: ContinueOptions): Promise<GoalRun>;
+  submit(options: Omit<RunOptions, "stepInputSource">): Promise<GoalRun>;
+  continue(options: Omit<ContinueOptions, "stepInputSource">): Promise<GoalRun>;
 }
 
 export interface GoalOptions {

@@ -2,6 +2,13 @@
 
 [English](../en/getting-started.md) | **简体中文**
 
+MaybeCode 默认在执行命令或修改文件之前询问。使用 `maybecode --yolo` 开启工具
+自动审批，使用 `--no-yolo` 可以覆盖配置中的 YOLO 默认模式。会话中使用 `/yolo`
+或 `/yolo on` 开启模式，使用 `/yolo off` 关闭，使用 `/yolo status` 查看状态。
+切换模式前需要暂停或取消当前任务。开启期间，
+终端和 WebUI 显示 `YOLO · Auto-approve`；WebUI 也提供 Permissions 选择器。
+作用范围、重新启动时的行为和保留的限制见[权限配置](reference/configuration.md#maybecode-权限模式)。
+
 本指南先在本地运行一个 May Agent，再把同一套模型/工具循环变为可恢复的 headless
 application，面向仓库当前 `0.1.0` 开发预览 API。
 
@@ -59,6 +66,17 @@ package script 构建并启动应用。通过 `-NoProfile` 启动的终端需要
 
 独立的 `maybecode` 命令由安装的包提供。移除已有全局开发安装的命令为
 `pnpm remove --global @may/maybecode`。
+
+## 在 MaybeCode 执行期间发送消息
+
+普通新消息会取消当前操作，等待取消完成，然后在同一个 Session 中执行新请求。
+使用 `/steer <消息>` 可以等待当前 Step 及其中的工具和审批完成，再交付补充消息。
+补充消息会保存到历史，并按接收顺序交付。空闲时使用 `/steer` 会启动 Run；
+Run 完成或者宿主让出执行权后仍有待交付消息时，会在当前操作结束后依次启动。
+
+`/stop` 和 Web 取消按钮会取消当前操作以及所有等待中的输入。终端中没有选择
+文字时，`Ctrl+C` 执行相同操作。已取消的补充消息保留在历史中，需要用户重新
+发送才会再次执行。classic TUI、retained TUI 和 WebUI 都支持这些操作。
 
 ## 查看 MaybeCode 对话
 

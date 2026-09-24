@@ -1,5 +1,25 @@
 # MaybeCode
 
+### Permission modes
+
+Start with `maybecode --yolo` to auto-approve tool requests, or `--no-yolo` to use
+normal approvals even when configuration enables YOLO. The default is normal
+approvals. Configure `apps.maybecode.permissionMode` as `"default"` or `"yolo"`;
+an explicit startup flag takes precedence.
+
+Use `/yolo` or `/yolo on` to enable the mode, `/yolo status` to inspect it, and
+`/yolo off` to disable it. Web UI also provides a Permissions selector. Pause or
+cancel active operations, including active goals, before changing modes. Changes
+apply to the current workspace host and all its sessions and connected views;
+they do not update configuration. Restarting uses the current startup settings.
+
+The terminal status bar and Web UI header show `YOLO · Auto-approve` while enabled.
+Classic terminal mode shows it in the input prompt. Notifications use `YOLO enabled`
+and `YOLO disabled`. Explicit policy denials remain enforced. Tool validation,
+cancellation, execution records, and MCP requests for user-provided input remain
+active. Shell commands run with the host account's OS permissions; YOLO provides
+no filesystem or network isolation. Team commands retain their own authorization.
+
 Image replies retain text/image ordering. Terminal saves embedded images and
 supports Kitty/iTerm2/Sixel graphics in both terminal frontends; `/web` provides
 image viewing and downloads. Windows Terminal is detected through `WT_SESSION`
@@ -78,6 +98,7 @@ random 32..256-character printable ASCII value. It serves an authenticated,
 loopback-only workspace on port 3940 (`--port` overrides it). The shared Web shell
 supports messages, live tool output, approvals, coding Diff previews, cancellation,
 session management, model selection and the shared application command interface.
+Coding Diff previews render structured addition and deletion counts directly from tool metadata, distinguish patch headers from code lines starting with `++` or `--`, support keyboard scrolling on the preformatted container, and maintain responsive layouts without horizontal page overflow at 320 px viewport widths.
 The default remains the retained TUI. See the [English Web UI guide](../../docs/en/guides/web-ui.md)
 or [简体中文指南](../../docs/zh-CN/guides/web-ui.md) for commands and current limits.
 
@@ -181,6 +202,21 @@ strategy, and session suggestions, and
 `executeMaybeCodeSlashCommand(input, controller)` returns a structured result
 for the UI to render. Alternatively, a UI can call `MaybeCodeController`
 directly and define a completely different command system.
+
+Ordinary input submitted during execution cancels the current operation, waits
+for its cancellation to finish, and starts the new input in the same Session.
+Use `/steer <message>` to keep the current Step running: the additional input is
+saved in FIFO order and reaches the Agent after the Step, including its tools
+and approvals, finishes. An idle `/steer` starts a new Run. If the Run completes
+or yields before accepting all queued input, MaybeCode starts the remaining
+inputs in order after the active operation finishes.
+
+`/stop`, the Web cancel control, and `Ctrl+C` without a text selection cancel the
+current operation and every queued input. Cancelled steering inputs remain in
+history and are not submitted again automatically. To use one later, explicitly
+send the message again. These rules apply to both terminal frontends, Web UI,
+and `MaybeCodeWorkspace.submit()` / `steer()`. General `AgentApplication.submit()`
+continues to require that the application has no active operation.
 
 The bundled SessionPicker uses the optional `@may/keybindings` package to map
 context-specific key sequences to semantic actions. Custom UIs may reuse that

@@ -5,12 +5,11 @@ Before editing, inspect the working tree and relevant package boundaries.
 Preserve unrelated user changes.
 
 After completing a coherent feature, fix, or other meaningful change,
-run focused verification and present the changes for review. Add a small
-number of tests for changed behavior when needed. Report the commands
+run focused verification and present the changes for review. Report the commands
 run, their results, and any important verification gaps.
 
 Obtain the user's explicit confirmation before every Git commit.
-Until then, leave changes uncommitted. Treat authorization to commit,
+Until then, leave changes uncommitted. Use English when writing git commit messages. Treat authorization to commit,
 push, and publish as separate permissions.
 
 Update affected documentation whenever behavior, public APIs,

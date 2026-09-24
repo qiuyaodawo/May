@@ -4,8 +4,24 @@ import type {
   PermissionPolicy,
 } from "@may/permissions";
 
-export function createCodingPermissionPolicy(): PermissionPolicy {
-  return (check) => defaultCodingPermission(check);
+export type MaybeCodePermissionMode = "default" | "yolo";
+
+export function parsePermissionMode(value: unknown): MaybeCodePermissionMode {
+  if (value === "default" || value === "yolo") return value;
+  throw new TypeError('permissionMode must be "default" or "yolo"');
+}
+
+export function createCodingPermissionPolicy(options: {
+  readonly mode?: () => MaybeCodePermissionMode;
+  readonly policy?: PermissionPolicy;
+} = {}): PermissionPolicy {
+  const policy = options.policy ?? defaultCodingPermission;
+  return async (check) => {
+    const decision = await policy(check);
+    const asks = decision === "ask" || (typeof decision === "object" && decision !== null &&
+      decision.decision === "ask" && typeof decision.grantKey === "string" && decision.grantKey.trim() !== "");
+    return options.mode?.() === "yolo" && asks ? "allow" : decision;
+  };
 }
 
 function defaultCodingPermission(check: PermissionCheck): PermissionDecision {

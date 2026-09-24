@@ -37,13 +37,21 @@ pnpm maybecode --ui web --port 3940
 `--continue`、`--resume` 保持原有语义。`--port` 要求同时使用 `--ui web`；
 指定 `0` 会分配可用端口。默认界面仍为 `retained` TUI。
 
-MaybeClaw 沿用原有启动方式和控制令牌：
+对于 MaybeClaw，运行以下命令。配置或管理员认证缺失时，会打开本机密码初始化页面。
+初始化会保留已有 May 配置，保存密码哈希，并在同一地址打开控制台。使用刚设置的密码
+登录，然后添加 Agent 并创建会话。使用 `--no-open` 或 `serve` 时，打开终端显示的
+本机初始化 HTML 文件：
 
 ```powershell
-$env:MAYBECLAW_CONTROL_TOKEN = node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
-Set-Clipboard $env:MAYBECLAW_CONTROL_TOKEN
-pnpm maybeclaw serve
+pnpm maybeclaw
 ```
+
+默认启动服务并打开系统浏览器。可以在 Web 控制台通过“Agent 管理”中的“添加 Agent”
+添加首个 Agent，并直接创建会话，无需重启服务。`--no-open` 和 `serve` 子命令只启动服务，
+Ctrl+C 停止服务。
+
+服务启动或配置保存后自动将密码转换为带随机盐的哈希，修改密码会使已有登录失效。
+密码配置、登录有效期和远程 CLI 认证参阅 [MaybeClaw 指南](maybeclaw.md)。
 
 `pnpm example:web-ui` 会在 3941 端口启动**离线演示**：固定脚本回复、内存会话和
 无外部副作用的审批工具。公开的演示令牌只用于这个样例的自动连接。
@@ -52,8 +60,14 @@ pnpm maybeclaw serve
 ## MaybeCode 命令与交互
 
 输入框复用终端的斜杠命令注册表、参数补全和执行函数。上下方向键选择补全项，
-Tab 填入内容。未知命令和无效参数直接显示错误。命令输出保存在页面内存中，
+Tab 填入内容。未知命令和无效参数直接显示错误。管理命令的输出保存在页面内存中，
 不会作为消息发送给模型，也不会加入对话历史。
+普通消息会取消正在执行的操作，等待取消完成后启动新请求。`/steer <消息>`
+保存补充输入，等待当前 Step 及其中的工具和审批完成后交付。补充输入按照接收
+顺序执行，空闲时会启动 Run。`/stop` 和取消按钮会取消当前操作以及等待中的输入。
+已取消的输入需要用户重新发送才会再次执行。
+已交付的补充正文会在对话中显示一次，重新打开 Session 后同样保留。历史搜索和
+字段详情读取完整的已保存正文，不受快照预览长度限制。
 
 | 操作 | Web 入口 |
 | --- | --- |
@@ -61,6 +75,7 @@ Tab 填入内容。未知命令和无效参数直接显示错误。命令输出�
 | Reasoning effort | effort 下拉菜单；`/effort`；`/effort default` 恢复配置值 |
 | 会话管理 | 侧栏选择和确认删除；`/new`、`/resume [id]`；会话选择结果中的重命名和删除 |
 | 重试、指令与状态 | `/retry`、`/instructions`、`/status`、`/context` |
+| 执行期间的输入 | 普通消息打断当前操作；`/steer <消息>` 等待 Step 完成；`/stop` 取消当前操作和等待中的输入 |
 | 目标管理 | `/goal start`、`/goal status`、`/goal pause`、`/goal resume`、`/goal cancel` |
 | 上下文管理 | `/compact [history-reference\|provider-native]` 和压缩按钮 |
 | Skills | `/skills`、`/skills show name`、`/skills use name [task]` |
@@ -86,6 +101,8 @@ URL 请求需要同意访问、手动打开网站和单独执行重试。命令�
 和 `closeApplication: false`。终端负责向两端分别分发每条事件，并在退出时关闭
 controller。`startUiServer({ browserLogin: true, ... })` 提供一次性连接兑换接口，
 返回 `createLoginUrl()`；配合 `webUiAssets(..., { browserLogin: true })` 使用。
+组合其他 API 的产品服务可以从 `@may/ui-client/server` 导入 `BrowserLogin`，通过
+`issue()`、`redeem(ticket)` 和 `clear()` 复用一次性凭据，并继续执行原有来源检查。
 自定义页面可向 `mountWebUI` 提供 `initialToken` 和 `connectionHint`。
 提供 `initialToken` 时，连接窗口显示启动程序的连接说明，并隐藏手动令牌输入。
 
@@ -117,6 +134,12 @@ controller。`startUiServer({ browserLogin: true, ... })` 提供一次性连接�
 不适合，可以直接组合导出的 Web 组件。可信 renderer 扩展可获得客户端状态和
 命令回调；未知展示类型回退为文本，不加载代码。协议和扩展 API 都是有版本的预览
 接口，并不承诺所有未来 Agent 都能零适配接入。
+
+产品可以通过 `WebUiOptions.navigation` 或 `createNavigation()` 声明结构化侧边栏导航分组。每个导航分组包含类型化的项目，支持图标、文本名称、可选悬浮提示、可选徽标、点击动作以及可选的禁用状态。支持的图标包括 `plus`、`menu`、`send`、`stop`、`panel`、`search`、`arrow`、`code`、`task`、`trash`、`gear`、`users`、`message`、`check` 与 `filter`。产品也可以通过 `WebUiOptions.onNew` 与 `newLabel` 定制主新建动作，具备清晰的生命周期回调与统一的错误处理。
+
+在适配移动端视口（`max-width: 760px`）时，展开侧边栏导航会显示无障碍遮罩层（`.mobile-backdrop`）并阻断对正文内容的误触，页面整体无横向溢出。在收起隐藏时，移动侧栏设置 `inert` 与 `aria-hidden="true"` 属性，阻止键盘焦点误入。按下 Escape 按键或者点击遮罩层能够关闭抽屉并恢复焦点至触发按钮。
+
+Tab 和 Shift+Tab 在打开的移动端面板控件之间循环移动焦点。原生模态对话框保留自身的键盘处理。
 
 ## 协议 v1
 
@@ -218,7 +241,7 @@ MaybeClaw 使用共享工具投影，任务、验证和送达策略仍归产品�
 共享工作台按宿主提供的运行 ID 分组，有请求文本时用它作为标题。无需逐个展开即可
 查看工具数量、待审批和异常状态。“展开全部”“收起全部”“只看异常”只影响当前
 页面，审批区不受折叠或过滤影响；固定的审批入口可定位当前请求。阅读旧内容时，
-新输出保留可见内容的位置，并提供“有新内容 / 回到最新”按钮。
+新输出保留可见内容的位置，并提供“有新内容 / 回到最新”按钮。渲染过程基于对话区块与审批互动项的签名比较判定内容更新。
 
 正文工具卡片显示明确标注的预览。“查看详情”打开独立侧栏，包含概览与产品扩展、
 输入、输出、错误和展示字段；长回答及诊断记录也提供详情入口。字段标签页只读，

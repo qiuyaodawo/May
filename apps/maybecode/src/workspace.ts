@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { mediaHistory } from "./media-history.js";
+import { createCodingPermissionPolicy, parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 
 import { AgentWorkspace } from "@may/application";
 import type {
@@ -9,6 +10,7 @@ import type {
 } from "@may/context";
 import {
   AsyncEventQueue,
+  RunCancelledError,
   isStreamingMayEvent,
   type Model,
   type RunOptions,
@@ -22,6 +24,8 @@ import type { ModelCapabilities } from "@may/providers";
 import type {
   SessionHistoryPage,
   SessionHistoryQuery,
+  SessionSteerOptions,
+  SessionSubmitOptions,
 } from "@may/session";
 import type { SessionCatalog, SessionSummary } from "@may/session/catalog";
 
@@ -53,6 +57,7 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
   MaybeCodeApplicationOptions,
   "sessionId" | "resume"
 > {
+  readonly permissionMode?: MaybeCodePermissionMode;
   readonly catalog: SessionCatalog;
   readonly sessionId?: string;
   /** Resume the latest workspace session when no sessionId is given. Defaults to false. */
@@ -117,6 +122,9 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   private readonly mcpLifetime = new AbortController();
   private mcpOperationController: AbortController | undefined;
   private readonly mcpWatches = new Map<string, McpResourceSubscription>();
+  private readonly pendingInputs = new Set<AbortController>();
+  private inputEpoch = 0;
+  private pendingSteering = 0;
 
   private constructor(state: WorkspaceState, manager: BaseWorkspace) {
     this.state = state;
@@ -136,9 +144,14 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     const state: WorkspaceState = {
       options: withoutSelection({
         ...options,
+        permissionMode: parsePermissionMode(options.permissionMode ?? "default"),
         workspace: resolve(options.workspace),
       }),
     };
+    state.options = { ...state.options, permissionPolicy: createCodingPermissionPolicy({
+      mode: () => state.options.permissionMode ?? "default",
+      ...(options.permissionPolicy === undefined ? {} : { policy: options.permissionPolicy }),
+    }) };
     const manager = await AgentWorkspace.open<
       MaybeCodeSessionEvent,
       MaybeCodeProductEvent,
@@ -169,8 +182,25 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.manager.sessionId;
   }
 
+  get permissionMode(): MaybeCodePermissionMode {
+    return this.state.options.permissionMode ?? "default";
+  }
+
+  async setPermissionMode(mode: MaybeCodePermissionMode): Promise<void> {
+    this.throwIfClosed();
+    parsePermissionMode(mode);
+    await this.manager.runStateTransition(() => {
+      if (mode === this.permissionMode) return;
+      if (this.isRunning || this.getGoal()?.status === "active" || this.getMcpInteractions().length > 0) {
+        throw new Error("Pause or cancel the current operation before changing permission mode");
+      }
+      this.state.options = { ...this.state.options, permissionMode: mode };
+      this.eventQueue.push({ type: "permission-mode.changed", mode });
+    }, { activeOperationMessage: "Pause or cancel the current operation before changing permission mode" });
+  }
+
   get isRunning(): boolean {
-    return this.manager.isRunning || this.mcpOperationController !== undefined;
+    return this.manager.isRunning || this.mcpOperationController !== undefined || this.pendingInputs.size > 0 || this.pendingSteering > 0;
   }
 
   get instructions(): MaybeCodeInstructions {
@@ -337,9 +367,26 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     finally { if (this.mcpOperationController === controller) this.mcpOperationController = undefined; }
   }
 
-  submit(options: RunOptions): Promise<MaybeCodeRun> {
-    return this.manager.submit(options);
+  async submit(options: SessionSubmitOptions): Promise<MaybeCodeRun> {
+    const controller = new AbortController();
+    this.pendingInputs.add(controller);
+    try {
+      return await this.manager.submit({ ...options, signal: options.signal === undefined ? controller.signal : AbortSignal.any([controller.signal, options.signal]) });
+    } finally { this.pendingInputs.delete(controller); }
   }
+
+  async steer(options: SessionSteerOptions) {
+    const epoch = this.inputEpoch;
+    this.pendingSteering++;
+    try {
+      return await this.manager.runStateTransition(app => {
+        if (epoch !== this.inputEpoch) throw new RunCancelledError("Input cancelled before acceptance");
+        return app.steer(options);
+      }, { requireIdle: false });
+    } finally { this.pendingSteering--; }
+  }
+
+  listSteeringInputs() { return this.manager.activeApplication.listSteeringInputs(); }
 
   getGoal() { return this.manager.activeApplication.getGoal(); }
   startGoal(objective: string, budget?: import("@may/goal").GoalBudget) {
@@ -354,8 +401,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   cancel(reason?: string): boolean {
-    if (this.mcpOperationController !== undefined) { this.mcpOperationController.abort(reason); return true; }
-    return this.manager.cancel(reason);
+    this.inputEpoch++;
+    const pending = this.pendingInputs.size > 0 || this.pendingSteering > 0 || this.mcpOperationController !== undefined;
+    for (const controller of this.pendingInputs) controller.abort(new RunCancelledError(reason ?? "Input cancelled before execution"));
+    this.mcpOperationController?.abort(reason);
+    return this.manager.cancel(reason) || pending;
   }
 
   resolveApproval(
@@ -637,6 +687,7 @@ function applicationOptions(
   options: ActiveWorkspaceOptions,
 ): MaybeCodeApplicationOptions {
   const {
+    permissionMode: _permissionMode,
     catalog: _catalog,
     modelProfiles: _modelProfiles,
     createModelConfiguration: _createModelConfiguration,

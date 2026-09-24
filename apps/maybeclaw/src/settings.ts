@@ -1,7 +1,10 @@
 import type { MayConfig } from "@may/config";
 
-export interface TelegramSettings { enabled: boolean; botToken?: string; botTokenEnv?: string; allowUsers: string[] }
-export interface FeishuSettings { enabled: boolean; appId: string; appSecret?: string; appSecretEnv?: string; allowUsers: string[] }
+export type GroupTrigger = "explicit" | "all";
+export interface EntranceTrigger { conversation: string; threadId?: string; trigger: GroupTrigger }
+export interface ChannelAccessSettings { allowUsers: string[]; allowGroups?: string[]; groupTrigger?: GroupTrigger; entranceTriggers?: EntranceTrigger[] }
+export interface TelegramSettings extends ChannelAccessSettings { enabled: boolean; botToken?: string; botTokenEnv?: string }
+export interface FeishuSettings extends ChannelAccessSettings { enabled: boolean; appId: string; appSecret?: string; appSecretEnv?: string }
 export interface HostSettings {
   maxConcurrent: number;
   telegram?: TelegramSettings;
@@ -10,24 +13,41 @@ export interface HostSettings {
 
 /** Reject misspelled security settings rather than silently enabling a wider policy. */
 export function hostSettings(config: MayConfig): HostSettings {
-  const app = object(config.apps?.maybeclaw ?? {}, "apps.maybeclaw", ["runBudget", "server", "channels"]);
-  const server = object(app.server ?? {}, "maybeclaw.server", ["maxConcurrent"]);
+  const app = object(config.apps?.maybeclaw ?? {}, "apps.maybeclaw", ["version", "runBudget", "server", "channels", "agents", "access"]);
+  const server = object(app.server ?? {}, "maybeclaw.server", ["maxConcurrent", "idleMs", "shutdownMs", "approvalMs", "publicOrigin", "auth"]);
   const maxConcurrent = server.maxConcurrent ?? 1;
-  if (!Number.isSafeInteger(maxConcurrent) || (maxConcurrent as number) < 1 || (maxConcurrent as number) > 4) throw new Error("maxConcurrent must be 1..4");
+  if (!Number.isSafeInteger(maxConcurrent) || (maxConcurrent as number) < 1 || (app.version !== 2 && (maxConcurrent as number) > 4)) throw new Error("maxConcurrent must be positive; legacy task hosts support 1..4");
   const channels = object(app.channels ?? {}, "maybeclaw.channels", ["telegram", "feishu"]);
   const result: HostSettings = { maxConcurrent: maxConcurrent as number };
   for (const name of ["telegram", "feishu"] as const) {
     if (channels[name] === undefined) continue;
-    const raw = object(channels[name], name, name === "telegram" ? ["enabled", "botToken", "botTokenEnv", "allowUsers"] : ["enabled", "appId", "appSecret", "appSecretEnv", "allowUsers"]);
+    const accessKeys = ["allowUsers", "allowGroups", "groupTrigger", "entranceTriggers"];
+    const raw = object(channels[name], name, name === "telegram" ? ["enabled", "botToken", "botTokenEnv", ...accessKeys] : ["enabled", "appId", "appSecret", "appSecretEnv", ...accessKeys]);
     if (raw.enabled !== undefined && typeof raw.enabled !== "boolean") throw new Error(`${name}.enabled must be boolean`);
     const enabled = raw.enabled === true;
     const users = raw.allowUsers ?? [];
-    if (!Array.isArray(users) || users.some((v) => typeof v !== "string" || !(name === "telegram" ? /^[1-9][0-9]{0,19}$/ : /^ou_[A-Za-z0-9_-]{1,128}$/).test(v)) || (enabled && users.length === 0)) throw new Error(`${name} needs an explicit allowUsers list of user IDs`);
-    if (name === "telegram") result.telegram = { enabled, allowUsers: [...new Set(users as string[])], ...credential(raw, "botToken", "botTokenEnv", "MAYBECLAW_TELEGRAM_TOKEN") };
+    if (!Array.isArray(users) || users.some((v) => typeof v !== "string" || !(name === "telegram" ? /^[1-9][0-9]{0,19}$/ : /^ou_[A-Za-z0-9_-]{1,128}$/).test(v))) throw new Error(`${name} needs an explicit allowUsers list of user IDs`);
+    const groups = raw.allowGroups ?? [];
+    const groupPattern = name === "telegram" ? /^-[1-9][0-9]{0,19}$/ : /^oc_[A-Za-z0-9_-]{1,128}$/;
+    if (!Array.isArray(groups) || groups.some((v) => typeof v !== "string" || !groupPattern.test(v))) throw new Error(`Invalid ${name}.allowGroups`);
+    if (enabled && users.length === 0 && groups.length === 0) throw new Error(`${name} needs an explicit allowUsers or allowGroups list`);
+    const groupTrigger = raw.groupTrigger ?? "explicit";
+    if (groupTrigger !== "explicit" && groupTrigger !== "all") throw new Error(`Invalid ${name}.groupTrigger`);
+    const entranceTriggers = raw.entranceTriggers ?? [];
+    if (!Array.isArray(entranceTriggers)) throw new Error(`Invalid ${name}.entranceTriggers`);
+    const entrances = entranceTriggers.map(value => {
+      const entrance = object(value, `${name}.entranceTriggers`, ["conversation", "threadId", "trigger"]);
+      if (typeof entrance.conversation !== "string" || !groups.includes(entrance.conversation) || !["explicit", "all"].includes(entrance.trigger as string)) throw new Error(`Invalid ${name} entrance trigger`);
+      if (entrance.threadId !== undefined && (typeof entrance.threadId !== "string" || !entrance.threadId || entrance.threadId.length > 256)) throw new Error(`Invalid ${name} entrance threadId`);
+      return entrance as unknown as EntranceTrigger;
+    });
+    if (new Set(entrances.map(value => JSON.stringify([value.conversation, value.threadId]))).size !== entrances.length) throw new Error(`Duplicate ${name} entrance trigger`);
+    const access: ChannelAccessSettings = { allowUsers: [...new Set(users as string[])], allowGroups: [...new Set(groups as string[])], groupTrigger, entranceTriggers: entrances };
+    if (name === "telegram") result.telegram = { enabled, ...access, ...credential(raw, "botToken", "botTokenEnv", "MAYBECLAW_TELEGRAM_TOKEN") };
     else {
       const appId = raw.appId ?? "";
       if (typeof appId !== "string" || (enabled && !/^cli_[0-9a-fA-F]{16}$/.test(appId))) throw new Error("feishu.appId must be a self-built app ID");
-      result.feishu = { enabled, appId, allowUsers: [...new Set(users as string[])], ...credential(raw, "appSecret", "appSecretEnv", "MAYBECLAW_FEISHU_SECRET") };
+      result.feishu = { enabled, appId, ...access, ...credential(raw, "appSecret", "appSecretEnv", "MAYBECLAW_FEISHU_SECRET") };
     }
   }
   return result;

@@ -37,11 +37,15 @@ import {
 } from "@may/permissions";
 import {
   Session,
+  type SessionContinueOptions,
   type SessionEvent,
   type SessionHistoryPage,
   type SessionHistoryQuery,
   type SessionRuntimeInfo,
+  type SessionSteerOptions,
+  type SessionSteeringInput,
   type SessionStore,
+  type SessionSubmitOptions,
   type SessionToolPresentation,
 } from "@may/session";
 import {
@@ -50,7 +54,7 @@ import {
   type SessionHistoryToolOptions,
 } from "@may/session-tools";
 
-import type { ContinuableAgentController } from "./controller.js";
+import type { SteerableAgentController } from "./controller.js";
 import { SkillRegistry, SkillSession, SKILL_STATE_KEY } from "@may/skills";
 import type { AgentApplicationEvent, AgentRun } from "./events.js";
 
@@ -120,7 +124,7 @@ interface ActiveCompaction {
  * is injected; ordering, cancellation, event relays and compaction persistence
  * live here once for every application.
  */
-export class AgentApplication implements ContinuableAgentController {
+export class AgentApplication implements SteerableAgentController {
   readonly skills: SkillSession | undefined;
   readonly events: AsyncIterable<AgentApplicationEvent>;
   readonly sessionId: string;
@@ -335,12 +339,34 @@ export class AgentApplication implements ContinuableAgentController {
     return this.session.recordState(key, value);
   }
 
-  submit(options: import("@may/session").SessionSubmitOptions): Promise<AgentRun> {
+  submit(options: SessionSubmitOptions): Promise<AgentRun> {
+    assertSessionInputOptions(options);
     return this.startRun(() => this.session.submit(options));
   }
 
+  steer(options: SessionSteerOptions): Promise<SessionSteeringInput> {
+    this.throwIfClosed();
+    if (this.starting || this.activeCompaction !== undefined) throw new Error("Cannot steer while an agent operation is starting or compacting context");
+    return this.session.steer(options);
+  }
+
+  listSteeringInputs(): readonly SessionSteeringInput[] {
+    return this.session.listSteeringInputs();
+  }
+
+  cancelSteeringInputs(reason = "Cancelled by user"): Promise<void> {
+    this.throwIfClosed();
+    return this.session.cancelSteeringInputs(reason);
+  }
+
+  startSteeringInput(inputId: string, options: Omit<SessionSubmitOptions, "input" | "inputId"> = {}): Promise<AgentRun> {
+    assertSessionInputOptions(options);
+    return this.startRun(() => this.session.startSteeringInput(inputId, options));
+  }
+
   /** 在当前上下文中继续执行，沿用运行互斥和保存流程。 */
-  continue(options: import("@may/core").ContinueOptions = {}): Promise<AgentRun> {
+  continue(options: SessionContinueOptions = {}): Promise<AgentRun> {
+    assertSessionInputOptions(options);
     return this.startRun(() => this.session.continue(options));
   }
 
@@ -658,6 +684,10 @@ export function contextBudgetFromModel(model: Model): ContextBudget | undefined 
       ? {}
       : { outputReserveTokens: model.limits.maxOutputTokens }),
   };
+}
+
+function assertSessionInputOptions(options: { readonly stepInputSource?: unknown }): void {
+  if (options.stepInputSource !== undefined) throw new TypeError("Session manages step input through steer(); custom stepInputSource is unsupported");
 }
 
 /** Add a default automatic-compaction threshold without overriding callers. */

@@ -35,6 +35,7 @@ import {
 } from "@may/context";
 import {
   AsyncEventQueue,
+  RunCancelledError,
   isStreamingMayEvent,
   ToolRegistry,
   type ContextSnapshot,
@@ -50,6 +51,9 @@ import type {
   SessionHistoryPage,
   SessionHistoryQuery,
   SessionStore,
+  SessionSteerOptions,
+  SessionSteeringInput,
+  SessionSubmitOptions,
 } from "@may/session";
 
 import type {
@@ -129,6 +133,12 @@ export class MaybeCodeApplication {
   });
   private readonly eventRelay: Promise<void>;
   private closed = false;
+  private inputTail: Promise<void> = Promise.resolve();
+  private inputOperations = 0;
+  private currentRun: MaybeCodeRun | undefined;
+  private compaction: Promise<ContextCompactionResult> | undefined;
+  private inputEpoch = 0;
+  private steeringCancellation: Promise<void> = Promise.resolve();
   readonly goals: GoalController | undefined;
   private readonly removeGoalListener: (() => void) | undefined;
 
@@ -155,7 +165,10 @@ export class MaybeCodeApplication {
     this.historyMemory = historyMemory;
     this.modelInfo = modelInfo === undefined ? undefined : { ...modelInfo };
     this.goals = goals;
-    this.removeGoalListener = goals?.subscribe(event => this.eventQueue.push(event));
+    this.removeGoalListener = goals?.subscribe(event => {
+      this.eventQueue.push(event);
+      if (!goals.isRunning) void this.resumeSteering();
+    });
     this.events = this.eventQueue;
     this.eventRelay = this.relayEvents(application.events);
   }
@@ -312,16 +325,82 @@ export class MaybeCodeApplication {
   }
 
   get isRunning(): boolean {
-    return this.application.isRunning || this.goals?.isRunning === true;
+    return this.inputOperations > 0 || this.application.isRunning || this.goals?.isRunning === true;
   }
 
   get instructions(): MaybeCodeInstructions {
     return { ...this.baseInstructions, effective: [this.baseInstructions.effective, this.application.skills?.instructions()].filter(Boolean).join("\n\n") };
   }
 
-  async submit(options: RunOptions): Promise<MaybeCodeRun> {
-    if (this.goals?.isRunning) await this.goals.pause("Paused for a new user message");
-    return this.application.submit(options);
+  submit(options: SessionSubmitOptions): Promise<MaybeCodeRun> {
+    const epoch = this.inputEpoch;
+    return this.serializeInput(async () => {
+      if (epoch !== this.inputEpoch) throw new RunCancelledError("Input cancelled before execution");
+      options.signal?.throwIfAborted();
+      const run = this.currentRun, compaction = this.compaction;
+      const goalPause = this.goals?.isRunning ? this.goals.pause("Paused for a new user message") : undefined;
+      if (run || compaction) {
+        this.historyMemory.cancelRequest();
+        this.application.cancel("Interrupted by a new user message");
+      }
+      await this.application.cancelSteeringInputs("Replaced by a new user message");
+      await goalPause;
+      await Promise.allSettled([...(run ? [run.result] : []), ...(compaction ? [compaction] : [])]);
+      if (epoch !== this.inputEpoch) throw new RunCancelledError("Input cancelled before execution");
+      options.signal?.throwIfAborted();
+      const next = this.track(await this.application.submit(options));
+      if (epoch !== this.inputEpoch) { next.cancel("Input cancelled during startup"); await next.result; }
+      return next;
+    });
+  }
+
+  steer(options: SessionSteerOptions): Promise<SessionSteeringInput> {
+    const epoch = this.inputEpoch;
+    return this.serializeInput(async () => {
+      if (epoch !== this.inputEpoch) throw new RunCancelledError("Input cancelled before acceptance");
+      await this.steeringCancellation;
+      const input = await this.application.steer(options);
+      if (epoch !== this.inputEpoch) { await this.steeringCancellation; return this.application.listSteeringInputs().find(item => item.inputId === input.inputId)!; }
+      if (input.status === "idle" && !this.goals?.isRunning) {
+        const run = this.track(await this.application.startSteeringInput(input.inputId));
+        if (epoch !== this.inputEpoch) run.cancel("Input cancelled during startup");
+      }
+      return this.application.listSteeringInputs().find(item => item.inputId === input.inputId)!;
+    });
+  }
+
+  listSteeringInputs(): readonly SessionSteeringInput[] { return this.application.listSteeringInputs(); }
+
+  private serializeInput<T>(operation: () => Promise<T>, allowClosed = false): Promise<T> {
+    this.inputOperations++;
+    const result = this.inputTail.then(() => {
+      if (this.closed && !allowClosed) throw new Error("MaybeCode is closed");
+      return operation();
+    });
+    this.inputTail = result.then(() => { this.inputOperations--; }, () => { this.inputOperations--; });
+    return result;
+  }
+
+  private track(run: MaybeCodeRun): MaybeCodeRun {
+    this.currentRun = run;
+    const settled = () => {
+      if (this.currentRun === run) this.currentRun = undefined;
+      void this.resumeSteering();
+    };
+    void run.result.then(settled, settled);
+    return run;
+  }
+
+  private async resumeSteering(): Promise<void> {
+    if (this.closed || !this.application.listSteeringInputs().some(input => input.status === "idle")) return;
+    const epoch = this.inputEpoch;
+    await this.serializeInput(async () => {
+      if (this.closed || epoch !== this.inputEpoch || this.application.isRunning || this.goals?.isRunning) return;
+      await this.steeringCancellation;
+      if (this.closed || epoch !== this.inputEpoch) return;
+      const input = this.application.listSteeringInputs().find(item => item.status === "idle");
+      if (input) this.track(await this.application.startSteeringInput(input.inputId));
+    }, true);
   }
 
   getGoal() { return this.goals?.getGoal(); }
@@ -336,13 +415,16 @@ export class MaybeCodeApplication {
 
   retry(): Promise<MaybeCodeRun> {
     if (this.goals?.isRunning) throw new Error("Pause the goal before retrying a run");
-    return this.application.retry();
+    return this.serializeInput(async () => this.track(await this.application.retry()));
   }
 
   cancel(reason?: string): boolean {
+    this.inputEpoch++;
+    const pending = this.inputOperations > 0 || this.application.listSteeringInputs().some(input => input.status === "pending" || input.status === "idle");
+    this.steeringCancellation = this.application.cancelSteeringInputs(reason);
     this.historyMemory.cancelRequest();
     if (this.goals?.interrupt(reason)) return true;
-    return this.application.cancel(reason);
+    return this.application.cancel(reason) || pending;
   }
 
   resolveApproval(
@@ -372,9 +454,13 @@ export class MaybeCodeApplication {
   compactContext(
     selection?: MaybeCodeCompactionSelection,
   ): Promise<ContextCompactionResult> {
-    return this.application.compactContext(
+    const result = this.application.compactContext(
       this.resolveCompactionStrategy(selection),
     );
+    this.compaction = result;
+    const finished = () => { if (this.compaction === result) this.compaction = undefined; };
+    void result.then(finished, finished);
+    return result;
   }
 
   async close(): Promise<void> {
@@ -382,7 +468,7 @@ export class MaybeCodeApplication {
     this.closed = true;
     try {
       try { await this.goals?.close(); }
-      finally { await this.application.close(); await this.eventRelay; }
+      finally { await this.steeringCancellation; await this.application.close(); await this.inputTail; await this.eventRelay; }
     } finally { this.removeGoalListener?.(); this.eventQueue.close(); }
   }
 

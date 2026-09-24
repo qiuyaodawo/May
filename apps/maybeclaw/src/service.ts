@@ -63,7 +63,7 @@ export class MaybeClaw {
   async readSessionHistory(id: string): Promise<readonly SessionEvent[]> {
     const task = await this.require(id);
     const events = await new FileSessionStore(join(this.store.directory, "sessions")).inspect(id);
-    inspectEvidence(task, events);
+    inspectLegacyTaskEvidence(task, events);
     return events;
   }
 
@@ -150,7 +150,7 @@ export class MaybeClaw {
     if (isTerminal(task)) return task;
     // FileSessionStore can repair an incomplete tail, so read only while holding this task's lock.
     const history = await new FileSessionStore(join(this.store.directory, "sessions")).read(id);
-    const outcome = inspectEvidence(task, history);
+    const outcome = inspectLegacyTaskEvidence(task, history);
     if (outcome.status === "queued" && task.status === "blocked") return task;
     if (outcome.status === "queued" && await this.store.hasCancel(id)) {
       return update(journal, task, "cancelled", "Cancelled before execution; no input was submitted.");
@@ -193,7 +193,7 @@ async function update(journal: TaskJournal, task: TaskSnapshot, status: TaskStat
   return next;
 }
 
-function inspectEvidence(task: TaskSnapshot, history: readonly SessionEvent[]): { status: TaskStatus; detail?: string; result?: string } {
+export function inspectLegacyTaskEvidence(task: TaskSnapshot, history: readonly SessionEvent[]): { status: TaskStatus; detail?: string; result?: string } {
   validateSessionHistory(task.id, history);
   if (history.length === 0) return task.status === "queued"
     ? { status: "queued" } : { status: "blocked", detail: "Session evidence is missing; do not resubmit this task." };

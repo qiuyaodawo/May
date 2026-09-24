@@ -1,4 +1,15 @@
 @charset "UTF-8";
+.status-badges { display:flex; gap:8px; }
+.status-badges .status-badge { display:inline-flex; white-space:nowrap; }
+.status-badges .warning { color:#855000; background:#fff0cd; border-color:#d9a64b; }
+@media (prefers-color-scheme:dark) {
+  .status-badges .warning { color:#ffda8b; background:#3b2c13; border-color:#a97a2c; }
+}
+@media (max-width:760px) {
+  .topbar.has-status-badges { height:auto; min-height:76px; padding-top:10px; padding-bottom:10px; }
+  .has-status-badges .header-left { flex-wrap:wrap; white-space:normal; }
+  .has-status-badges .status-badges { flex-basis:100%; }
+}
 :root {
   color-scheme:light dark;
   --bg:#fff;
@@ -33,11 +44,14 @@
             opacity:.45}
             button,input,textarea,select,a {
               -webkit-tap-highlight-color:transparent}
-              button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible {
+              button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,textarea:focus-visible {
                 outline:2px solid var(--accent);
-                outline-offset:3px}
+                outline-offset:2px}
                 textarea:focus {
                   outline:none}
+                textarea:focus-visible {
+                  outline:2px solid var(--accent);
+                  outline-offset:2px}
                   button {
                     border:0;
                     background:none}
@@ -62,6 +76,7 @@
                               padding:28px 16px 20px;
                               border-right:1px solid var(--line);
                               min-height:0;
+                              overflow-y:auto;
                               gap:8px}
                               .brand {
                                 display:flex;
@@ -739,6 +754,7 @@
                                                                                                                                                                                                                                                                                                                                         inset:0 auto 0 0;
                                                                                                                                                                                                                                                                                                                                         width:270px;
                                                                                                                                                                                                                                                                                                                                         z-index:10;
+                                                                                                                                                                                                                                                                                                           overflow-y:auto;
                                                                                                                                                                                                                                                                                                                                         box-shadow:12px 0 60px #0002}
                                                                                                                                                                                                                                                                                                                                         .sidebar-open>.sidebar {
                                                                                                                                                                                                                                                                                                                                           display:flex}
@@ -915,3 +931,56 @@ may-image { display:block; margin:12px 0; }
 .evidence-inspector .diff-content { max-width:100%; overflow:auto; }
 @media(min-width:1100px) { .workbench.details-open { grid-template-columns:248px minmax(0,1fr) 420px; } .workbench.sidebar-collapsed.details-open { grid-template-columns:minmax(0,1fr) 420px; } }
 @media(max-width:760px) { .reading-toolbar { padding:8px 12px; gap:6px; } .reading-summary { flex-basis:100%; } .history-search input { flex-basis:100%; } }
+
+/* 侧栏分组导航 */
+.sidebar-navigation { margin-top:8px; display:flex; flex-direction:column; gap:12px; }
+.sidebar-nav-group { display:flex; flex-direction:column; gap:4px; }
+.nav-group-title { font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); padding:4px 10px 2px; font-weight:600; }
+.sidebar-nav-items { display:flex; flex-direction:column; gap:2px; }
+.sidebar-nav-item { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:8px; font-size:13px; color:var(--ink); text-align:left; width:100%; transition:background 0.12s; border:0; }
+.sidebar-nav-item:hover { background:var(--hover); }
+.sidebar-nav-item svg { width:16px; height:16px; flex-shrink:0; color:var(--muted); }
+.sidebar-nav-item:hover svg { color:var(--accent); }
+.nav-item-label { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nav-item-badge { font-size:11px; padding:1px 6px; border-radius:10px; background:var(--surface); color:var(--muted); }
+
+/* Diff 统计徽标与无障碍辅助样式 */
+.diff-caption { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:13px; font-weight:600; padding:8px 12px; background:var(--surface); border-radius:8px 8px 0 0; border:1px solid var(--line); border-bottom:0; }
+.diff-stats { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+.diff-stat { display:inline-block; padding:1px 6px; border-radius:4px; font-weight:600; font-size:11px; }
+.diff-stat-add { color:#2d774a; background:#e8f7ee; border:1px solid #c2e9d2; }
+.diff-stat-remove { color:#b53e49; background:#fdeef0; border:1px solid #f6ccd1; }
+@media (prefers-color-scheme:dark) {
+  .diff-stat-add { color:#8acda6; background:#183626; border-color:#2a573d; }
+  .diff-stat-remove { color:#eba1ab; background:#3d1a1e; border-color:#652a32; }
+}
+.diff-content:focus-visible { outline:2px solid var(--accent); outline-offset:-1px; }
+textarea:focus-visible, .composer textarea:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+/* MaybeClaw 结构化管理与弹窗信息 */
+.gateway-dialog { max-width:min(42rem,calc(100vw - 24px)); max-height:min(90vh,600px); width:100%; border-radius:12px; overflow:hidden; box-sizing:border-box; }
+.gateway-dialog-form { padding:20px; max-height:min(90vh,600px); overflow-y:auto; overflow-x:hidden; box-sizing:border-box; width:100%; }
+.gateway-summary-bar { display:flex; flex-wrap:wrap; gap:12px; padding:10px 14px; background:var(--surface); border-radius:8px; margin:10px 0 14px; font-size:13px; color:var(--muted); border:1px solid var(--line); }
+.gateway-card { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin:8px 0; background:var(--bg); }
+.gateway-card-header { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+.gateway-card-title { font-weight:600; font-size:14px; overflow-wrap:anywhere; }
+.gateway-card-meta { font-size:12px; color:var(--muted); line-height:1.6; overflow-wrap:anywhere; white-space:pre-wrap; }
+.gateway-card-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.gateway-diag { margin:16px 0 8px; border-top:1px solid var(--line); padding-top:8px; }
+.gateway-diag summary { font-size:12px; color:var(--muted); cursor:pointer; padding:6px 0; }
+.gateway-diag pre { margin-top:8px; max-height:40vh; overflow:auto; }
+.gateway-status-pill { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:2px 8px; border-radius:6px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+
+/* 响应式尺寸与横向防溢出规则（320px、390px、768px、1440px） */
+.tool-content, .diff-content, .field-content, .command-json { max-width:100%; overflow-x:auto; }
+.mobile-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:20; pointer-events:auto; }
+@media(max-width:760px) {
+  .sidebar-open>.sidebar { z-index:30; }
+  .details-open>.details-panel { z-index:25; }
+}
+@media(max-width:400px) {
+  .details-panel { width:100vw; max-width:100vw; }
+  .connect-dialog { width:calc(100vw - 16px); padding:20px 16px; }
+  .composer-area { padding:8px 10px; }
+  .reading-toolbar { padding:6px 8px; }
+}

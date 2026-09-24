@@ -1,111 +1,40 @@
-# MaybeClaw：本地持久任务
+# MaybeClaw：Agent Gateway
 
 [English](../../en/guides/maybeclaw.md) | **简体中文**
 
-MaybeClaw 是与 MaybeCode 并列、基于 May 构建的第二款应用。通过 CLI、Web UI、
-飞书与 Telegram 提供有界、持久化的本地任务，面向单用户、可信本地宿主。数据目录不是多租户隔离
-边界；本轮也没有提取新的通用任务框架。
+MaybeClaw 将 Agent 连接到持久会话、Web、CLI、Telegram 和飞书，管理路由、访问权限、
+审批、执行与消息投递。
 
-## 启动与提交
+## 会话与配置
 
-先在常规 May 配置中配置 Provider 和模型档案，再从仓库运行。根脚本会先构建工作区。
+会话需要名称和一个或多个默认 Agent，可以填写聊天入口和免审批 Agent 名单。默认
+Agent 自动进入名单。个人会话绑定一个平台身份；群聊会话绑定同一平台的群聊或话题。
+每个 Agent 对话专属于一个 MaybeClaw 会话；同一种 Agent 可以通过不同对话 ID 服务
+多个会话。Agent 对话按需创建。
 
-```powershell
-pnpm maybeclaw --help
-pnpm maybeclaw task submit "总结 notes.txt 并引用依据。" --request-id notes-1 --read-directory C:\work\notes
-```
+在仓库根目录运行 `pnpm maybeclaw`。配置文件、MaybeClaw 配置或管理员认证缺失时，
+本机初始化页面会要求设置并确认 10 至 1024 个字符的密码。服务自动写入 `version: 2`、
+`agents: []` 和 Argon2id `passwordHash`，保留已有配置，然后在同一地址打开控制台。
+登录后添加 Agent 并创建会话。新建配置文件还会包含空的 `providers` 对象。
 
-`submit` 先持久化任务，输出完整的 64 位十六进制任务 ID，默认随后在前台执行并输出
-最终快照。Ctrl+C 或 SIGTERM 请求取消。退出该进程不等于分离后台执行；需要持续
-消费队列时，使用下文的 `serve` 常驻服务。
+初始化要求一次性凭据，程序会自动将其传入浏览器。使用 `--no-open` 或 `serve` 时，
+打开终端显示的本机初始化 HTML 文件。该文件需要保密，初始化完成或正常关闭服务后
+自动删除。刷新初始化页面会清除页面中的凭据，重新打开初始化文件可以继续操作。
+初始化仅接受本机来源。已有有效配置直接启动；旧配置要求明确迁移；损坏配置会报错并
+保持原文件。同一配置文件禁止并发初始化。如果进程被强制终止，需要确认进程已经停止，
+再删除对应的 `<配置路径>.initialize.lock` 和遗留的 `*.initialize.html` 文件，重新启动。
 
-只入队、不立即执行：
-
-```powershell
-pnpm maybeclaw task submit "解释这些需求。" --request-id requirements-1 --enqueue
-pnpm maybeclaw task list
-pnpm maybeclaw task run <id>
-pnpm maybeclaw task status <id>
-pnpm maybeclaw task result <id>
-```
-
-将 `<id>` 替换为输出的完整 ID。`--enqueue` 加载并验证模型配置，但不创建或调用
-模型。`task run` 只启动有证据表明尚未提交输入的排队任务；终态任务直接返回已保存
-快照。同一任务只允许一个执行所有者，不同任务可以在不同进程执行。服务端并发上限
-不限制另行启动的前台 CLI；当前没有全局每日总额度服务。
-
-`--request-id` 可省略，省略时生成 UUID。响应丢失后，使用已知的相同键重复提交。
-键的作用域是整个数据目录。相同键和任务规格返回原任务，不再次启动，即使仍是
-排队状态。相同键但输入、读取范围、模型绑定或预算变化会被拒绝。同时创建可能返回
-锁错误，应使用同一个键重试，不能换键绕过。自动生成键的响应丢失后，可通过
-`task list` 和 `task status` 查找。
-
-## 常驻服务与 Web UI
-
-使用 PowerShell 7 生成控制令牌，然后保持服务进程运行：
-
-```powershell
-$env:MAYBECLAW_CONTROL_TOKEN = node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
-pnpm maybeclaw serve --port 3939
-```
-
-打开 `http://127.0.0.1:3939`，在登录表单粘贴该环境变量的值。可在本机使用
-`$env:MAYBECLAW_CONTROL_TOKEN | Set-Clipboard` 复制，粘贴后清理剪贴板。
-不要把令牌放入 URL、仓库或聊天消息；服务不会打印它。
-`--token-env <name>` 可指定其他环境变量名；令牌必须是 32..256 个可打印、非空白
-ASCII 字符。应使用随机值，而不是容易记忆的口令。
-
-[共享 Web UI](web-ui.md) 提供任务提交、本宿主执行任务的实时输出、最终结果、取消、
-证据恢复、派发失败重试、渠道状态和最近 100 条投递记录。每次提交都是独立任务，
-不是共享对话中的一轮。令牌只保存在页面内存，刷新后需要重新连接。输出使用安全的
-Markdown 子集，不执行 HTML。历史任务现在包含从已有 Session 日志读取的工具调用和
-结果，重启后也可查看。只读分页、内容搜索与字段详情不取得执行所有权、不修复未完成
-的日志尾部、不重跑任务；未记录的实时增量不会恢复。
-
-服务**仅监听 127.0.0.1**，每个 API 请求都要求 Bearer 鉴权，检查 Host/Origin，
-并设置严格 CSP。控制令牌可访问**全部任务**，不是分发给聊天用户的个人凭据。
-不要通过隧道或反向代理暴露本服务，也不要将其作为多租户服务。
-
-`serve` 支持 `--config`、`--model`、`--read-directory`、`--data-directory`。
-Web/渠道新任务只能使用宿主选择的模型和读取范围；客户端不能指定路径、工具或预算。
-授权读取目录也等于向**所有白名单聊天用户**开放该目录，应只允许可信用户。
-此前由独立 CLI 入队的任务保留原来显式授权的规格。
-
-服务按创建时间消费队列，`server.maxConcurrent` 默认为 1，支持 1..4。
-服务接收新任务时最多允许 100 个待执行任务。关闭浏览器或 CLI 客户端不取消任务。
-Ctrl+C/SIGTERM 停止服务时，会停止接收消息、请求取消正在运行的任务并刷新日志；
-尚未派发的任务保持排队，下次启动继续处理。这是常驻进程，**不是自动安装的
-Windows/systemd 系统服务**，也不是定时调度器。需要开机自启时另行配置 OS 进程管理。
-
-派发前配置错误会使任务保持排队，并显示在 Web UI；修复后点击“重试调度”。
-该操作不会授权重放已提交输入。收件箱处理失败会保留稳定事件 ID、在健康状态中提示，
-仅在重启服务后重试。
-
-`host.lock` 独占渠道日志与队列进程，任务仍使用各自的锁。异常退出后，应读取锁的
-PID/主机名，确认旧所有者已停止，才能手动删除那一个遗留锁。不得自动抢锁或删除
-执行证据来强制重新开始。
-
-## 聊天渠道
-
-将以下片段合并进现有 May 配置，保留原来的 providers/models，并替换示例应用/用户 ID。
-两个渠道默认关闭，仅 `enabled: true` 时启用；启用时 `allowUsers` 必须非空。
+手动配置时，保留 May 已有的 `providers`、`models`，合并以下内容：
 
 ```json
 {
   "apps": {
     "maybeclaw": {
-      "server": { "maxConcurrent": 1 },
-      "channels": {
-        "telegram": {
-          "enabled": true,
-          "botTokenEnv": "MAYBECLAW_TELEGRAM_TOKEN",
-          "allowUsers": ["123456789"]
-        },
-        "feishu": {
-          "enabled": true,
-          "appId": "cli_0123456789abcdef",
-          "appSecretEnv": "MAYBECLAW_FEISHU_SECRET",
-          "allowUsers": ["ou_replace_with_your_open_id"]
+      "version": 2,
+      "agents": [],
+      "server": {
+        "auth": {
+          "password": "REPLACE_WITH_YOUR_OWN_PASSWORD"
         }
       }
     }
@@ -113,244 +42,219 @@ PID/主机名，确认旧所有者已停止，才能手动删除那一个遗留�
 }
 ```
 
-如果希望直接填写凭据，将 `botTokenEnv` 替换为 `botToken`，飞书则将
-`appSecretEnv` 替换为 `appSecret`，值填写真实凭据。例如 Telegram 对象可写为：
+启动 Web 控制台后，通过管理员密码登录，在 Agent 管理中添加首个 Agent，即可直接创建会话，无需重启服务。已有的 `providers` 与 `models` 配置继续保留供 May Agent 使用。
 
-```json
-{
-  "enabled": true,
-  "botToken": "123456789:REPLACE_WITH_YOUR_REAL_BOT_TOKEN",
-  "allowUsers": ["123456789"]
-}
-```
-
-每一对直接值/环境变量名字段只能选一种。不要将 Token 填入 `botTokenEnv`，它只接受
-变量名；两者都省略时使用默认环境变量。直接填写的密钥以明文保存在配置文件中，
-应限制文件访问权限，不要提交/分享，也不要将配置文件放入 Agent 可读取的目录。
-凭据不写入任务规格、健康状态或正常启动日志。Web UI 控制令牌仍通过环境变量设置，
-此次直接填写选项仅适用于聊天渠道凭据。
-
-如果使用前面的环境变量配置，在启动服务的同一个 PowerShell 7 进程设置凭据
-（已直接填写凭据的渠道可以跳过）：
-
-```powershell
-$env:MAYBECLAW_TELEGRAM_TOKEN = Read-Host -MaskInput "Telegram Bot Token"
-$env:MAYBECLAW_FEISHU_SECRET = Read-Host -MaskInput "Feishu App Secret"
-pnpm maybeclaw serve --config C:\work\may.config.json
-```
-
-**Telegram：**通过 [BotFather](https://t.me/BotFather) 创建机器人，取得 Bot Token，
-将自己的数字用户 ID 以字符串写入白名单，不能填写用户名。可以在 MaybeClaw 停止时，
-从自己机器人 `getUpdates` 返回的私聊消息 `message.from.id` 取得 ID；不要将 Token
-交给第三方 ID 查询网站。适配使用 [Bot API 长轮询](https://core.telegram.org/bots/api#getupdates)，
-先持久化消息与 offset，再推进确认；忽略群聊、编辑消息和非文本事件。
-已有 webhook 时显示 `webhook-conflict`，不会擅自删除其他接收端的配置。
-每个机器人只运行一个接收端。本机必须能访问 `api.telegram.org`；没有内置代理配置。
-鉴权或轮询冲突会停止该接收端；临时读取失败有退避，并遵守 Telegram 返回的重试等待时间。
-
-**飞书：**在[开发者后台](https://open.feishu.cn/app/)创建企业自建应用，启用机器人，
-取得 App ID / App Secret。按平台的[接收消息](https://open.feishu.cn/document/server-docs/im-v1/message/events/receive)
-和[发送消息](https://open.feishu.cn/document/server-docs/im-v1/message/create)说明授予接收机器人
-私聊消息、以机器人身份发消息的权限。先启动服务，再选择长连接事件接收方式，订阅
-`im.message.receive_v1`，发布应用并授权目标用户使用。白名单填写应用范围内的
-**open_id**（`ou_...`），通过平台 API 调试/事件工具获取，不能填显示名称。
-变更配置后重启服务。[官方 Node SDK](https://github.com/larksuite/node-sdk)负责鉴权长连接
-及重连协议；处理器只等待消息持久化，不等待模型执行。此适配面向国内飞书
-`open.feishu.cn`，不支持国际 Lark 或应用商店应用。
-
-两个渠道都只支持私聊文本。普通文本创建任务，`/start`、`/help` 返回帮助。
-`/status <id>`、`/result <id>`、`/cancel <id>` 只能操作该发送者在同一机器人、
-同一私聊中创建的任务，ID 必须完整 64 位。暂不支持群聊、附件、交互卡片和多轮记忆。
-不支持的事件或未授权输入直接忽略；输入文本上限 16,384 字符。
-
-持久发件箱分别发送接收通知和任务终态结果。回复为有界纯文本；较长结果会截断，
-完整结果在操作员 Web UI 中查看。每次网络发送前先落盘发送意图。发送异常、未确认
-或意图落盘后崩溃，都标记为 `unknown`，**不会自动重发**，即使飞书请求包含 UUID。
-这是优先避免重复副作用，不保证最终送达，也不是 exactly-once 消息系统。
-在原私聊再次发送 `/result <id>`，即明确请求一条新回复。移出白名单用户的待发消息
-会被抑制；更换机器人身份不会通过新机器人发送旧结果；禁用渠道会保留待处理数据。
-接收端连接成功不等于事件订阅/发送权限已验证。缺失凭据显示 `credential-error`，
-不影响使用本地 Web UI。
-
-## 控制 API
-
-全部端点要求 `Authorization: Bearer <控制令牌>`，修改操作要求
-`Content-Type: application/json`，不接受 Cookie 或查询字符串令牌。
-
-| 方法/路径 | 含义 |
-| --- | --- |
-| GET `/api/health` | 宿主/渠道状态、调度/收件错误、回传元数据 |
-| GET `/api/tasks` | 持久任务列表 |
-| POST `/api/tasks` | `{ "prompt": "...", "requestId": "stable-key" }`，新任务 202，重复请求 200 |
-| GET `/api/tasks/<id>` | 任务、取消意图和所有者/证据元数据 |
-| POST `/api/tasks/<id>/cancel` | `{}`，持久取消请求 |
-| POST `/api/tasks/<id>/recover` | `{}`，核对证据，不重放 |
-| POST `/api/tasks/<id>/dispatch` | `{}`，清除派发前错误，让排队任务重新参与调度 |
-
-CLI 可使用同一个后台，不需要读取模型凭据：
-
-```powershell
-pnpm maybeclaw task submit "解释这些需求。" --request-id web-1 --server http://127.0.0.1:3939
-pnpm maybeclaw task list --server http://127.0.0.1:3939
-pnpm maybeclaw task result <id> --server http://127.0.0.1:3939
-```
-
-`--server` 拒绝本地 config/model/read/data-directory/enqueue 覆盖。
-客户端 `task run` 请求异步调度，不等待终态。服务运行时优先使用 `--server`；
-独立前台命令会竞争任务所有权，且不受宿主并发上限约束。API 请求 ID 使用 `api:` 命名空间，
-渠道事件使用 `channel:` 命名空间，与独立 CLI 请求分开。API 重复提交保留原模型、
-范围和预算；修改提示文本会被视为冲突。
-
-## 配置与权限
-
-提交支持 `--config <path>`、`--model <profile>`、`--read-directory <path>`。
-所有命令支持 `--data-directory <path>`，默认 `~/.may/maybeclaw`；后续命令必须
-使用相同数据目录。
-
-不提供读取目录时，Agent 没有任何工具。显式目录只授予现有、受工作区范围限制的
-`read` 工具：单文件最多 256 KiB，单次最多 200 行，可通过 offset/limit 分段读取。
-沿用 coding-tools 的路径与符号链接边界检查，默认允许读取硬链接，没有任意文件发现工具。
-读取目录和任务数据目录不能在任何方向相互包含；读取目录先规范化，执行前再次检查。
-
-这属于读取权限边界，不是 OS 沙箱。没有自动秘密文件过滤：授权目录可能包含敏感
-文本，并被发送给模型 Provider、写入持久历史。不要授权整个主目录或凭据目录，应
-使用专用输入目录。读取的是实时文件，不是不可变快照。文档属于数据，不是可信指令。
-MaybeClaw 不加载 MaybeCode 的项目指令、MCP 配置或 Skills。
-
-通过模型档案及 adapter、端点、模型、选项和限制的摘要固定配置。任务记录不包含
-Provider 密钥或原始模型选项值。可以轮换凭据，但修改已绑定模型配置会在派发前阻止
-执行；应恢复原配置，或审查新配置后提交新任务。状态、结果、列表、恢复及返回已终结
-任务都不加载凭据或调用模型。
-
-默认每次 Run 限制 12 步/模型调用、24 次工具调用、3 分钟、131,072 总 token。
-配置模型每次输出最多 4,096 token，或更小的档案限制。禁用自动原生压缩。
-token 限制在响应边界检查，不是 Provider 费用预留；模型不提供必要用量时会以
-`RUN_BUDGET_USAGE_UNAVAILABLE` 失败。
-
-在现有配置中加入以下应用设置可收紧限制：
+已预先登记 Agent 时的完整配置如下。将 `coding-profile` 和 `review-profile` 替换为已有模型配置名称。
 
 ```json
 {
   "apps": {
     "maybeclaw": {
-      "runBudget": {
-        "maxDurationMs": 60000,
-        "maxModelCalls": 6,
-        "maxTotalTokens": 65536
-      }
+      "version": 2,
+      "agents": [
+        { "id": "code", "adapter": "may", "model": "coding-profile" },
+        { "id": "reviewer", "adapter": "may", "model": "review-profile" }
+      ],
+      "server": { "maxConcurrent": 4, "idleMs": 600000, "shutdownMs": 30000, "approvalMs": 600000, "auth": { "password": "REPLACE_WITH_YOUR_OWN_PASSWORD" } },
+      "access": { "sessionAdmins": {}, "creators": [], "deniedUsers": [], "allowedAgents": {} }
     }
   }
 }
 ```
 
-这只是配置片段，不是完整的 Provider 配置。覆盖只能收紧默认值。任务保存接收时的
-预算；宿主之后进一步收紧预算，会阻止旧排队任务，而不是静默保留较宽限制。
-没有逐任务 CLI 预算覆盖。
+May Agent 支持 `model`、`instructions`、`readDirectory`、`permissions`、`runBudget`
+和 `idleMs`。外部适配器声明创建、执行、查询、取消、补充输入、恢复、删除、审批、
+协作与媒体能力。不支持的操作返回错误。`agent check <id>` 加载适配器并显示声明
+能力；加载成功不能证明模型请求或者聊天投递已经成功。
+Agent 状态区分 `unloaded`（尚未加载）、`loading`（正在加载）、`loaded`（已加载）、
+`unavailable`（加载失败）、`releasing`（正在释放）、`reconfiguring`（正在更新配置）
+和 `disabled`（已停用）。加载失败的状态持续显示，直到再次检查成功或者配置更新。
+空闲释放后显示 `unloaded`，已经保存的对话仍然可以恢复。
+后台处理发生未预期错误时，服务显示 `degraded`，向管理员提供错误原因并停止定时
+处理。处理报告的问题后重新启动服务。
 
-## 取消、状态与恢复
+## 启动、Web 与 CLI
+
+直接运行 `pnpm maybeclaw`，即可启动 Web 控制服务并在系统默认浏览器打开初始化
+页面或登录页面，然后通过 Web 管理器创建会话。不填写子命令时，
+同样支持 `--config`、`--port` 和 `--data-directory`。`--no-open` 用于只启动服务；
+`serve` 也只启动服务。保持终端运行，按 Ctrl+C 停止服务。
 
 ```powershell
-pnpm maybeclaw task cancel <id>
-pnpm maybeclaw task recover <id>
+pnpm maybeclaw
+pnpm maybeclaw --config may.config.json --port 3939
+pnpm maybeclaw session create "项目评审" --agent code --allow-agent reviewer --config may.config.json
+pnpm maybeclaw session list --config may.config.json
+pnpm maybeclaw serve --config may.config.json --port 3939
 ```
 
-取消先持久化意图。运行中的所有者轮询消费；空闲且尚未提交输入的任务可以立即转为
-`cancelled`。取消无法撤销 Provider 调用，也不能证明外部操作未发生。已完成任务保留
-结果；执行结果未知的任务即使请求取消，仍保持 `blocked`。
+手动配置密码时，在 `apps.maybeclaw.server.auth.password` 填写自己的管理员密码，
+长度为 10 至 1024 个字符，空格会保留。启动时服务自动将这个字段转换为带随机盐的
+Argon2id `passwordHash`。运行期间每隔 500 ms 检查配置保存，并在认证请求前检查。
+修改密码时，在已有哈希旁增加 `password` 并保存，服务会删除明文字段、重新生成
+哈希，并使已有登录及事件连接失效。服务停止期间保存的密码，在下次启动时转换。
+文件转换无法删除编辑器历史或备份中的明文，需要另外保护这些文件。
+认证配置无效时，管理请求会被拒绝，修正配置后可以重新登录。
+服务只输出地址与渠道状态。默认数据目录为 `~/.may/maybeclaw`，可以通过
+`--data-directory` 修改。
 
-`status` 返回最近持久快照、取消意图、所有者锁信息和私密 Session 证据路径，不修复
-日志、不连接 Provider、不接管执行。崩溃后可能仍显示过时的 `running`。
-`recover` 获得所有权后核对 Session 并更新投影，不启动模型、不重放输入：
+控制服务监听 `127.0.0.1`，对 API 执行身份验证，并检查 Host、Origin 和 CSP。
+在 Web 登录表单中输入原始密码。登录后拥有服务管理员权限，凭据只保存在页面内存，
+刷新后重新登录。`server.auth.sessionMs` 设置登录有效期，默认 28800000 ms（八小时），
+范围为 1000 至 86400000 ms。断开连接会退出登录，服务重启会使全部登录失效。
+可以在没有会话时启动 Web 服务，然后通过管理器创建会话。
 
-| 证据 | 恢复行为 |
-| --- | --- |
-| 排队任务，尚无 Session/输入 | 保持排队，或根据取消请求结束 |
-| 匹配的 Session 已建立、尚无输入 | 可安全返回排队 |
-| 匹配的持久 Run 终态 | 恢复完成、失败或取消状态 |
-| 输入已提交、没有终态结果 | 阻塞，绝不自动重新提交 |
-| 已有执行意图、Session 丢失 | 阻塞；缺失证据不等于允许重试 |
-| 完整记录冲突或损坏 | 拒绝恢复并保留证据 |
+远程 CLI 从 `MAYBECLAW_ADMIN_PASSWORD` 或 `--password-env <name>` 指定的环境变量
+读取密码，登录并执行命令，完成后退出登录。本地命令通过文件系统权限访问数据。
+API 客户端向 `/api/auth/login` POST `{ "password": "..." }`，将返回的 `token`
+作为 Bearer 凭据使用，有效期截止到 `expiresAt`。携带凭据 POST `/api/auth/logout`
+即可退出。密码哈希不能用作登录凭据。密码验证最多并发两次，每分钟最多尝试十次，
+登录成功会清除尝试次数记录。每个服务最多允许 128 个有效登录。
 
-每个任务投影日志上限 8 MiB。只有最后一条未换行结束的记录能在写锁保护下丢弃；
-只读查询忽略该尾部但不截断文件。Session 存储沿用 May 的恢复规则。
-写入在确认前执行 sync，但不保证抵抗文件系统回滚、硬件丢失或所有断电场景。
+Web 管理器提供图形化创建和“直接使用命令创建”，复用相同的 Gateway 命令与校验。
+发送普通消息前必须创建会话。浏览只改变当前页面；设置聊天入口默认会话通过独立
+管理操作完成。会话默认 Agent 的修改对全部获准成员和访问界面共同生效。管理器
+同时提供 Agent 配置、入口绑定、会话管理员、审批、渠道状态和独立历史任务查看。
 
-不自动抢占遗留锁。进程崩溃后，根据 `status` 中的 PID 和主机名确认旧进程已停止，
-然后才能手动删除该任务的精确 `.lock` 文件，再执行 `recover`。不能删除任务或
-Session 日志来强制重试。本预览没有按 PID 自动解锁、核实审批 UI 或已提交任务重试。
-先调查阻塞证据，再明确判断能否建立新任务；换一个请求 ID 并不能证明重复操作安全。
+```powershell
+pnpm maybeclaw task submit "检查这段修改" --session <session-id> --agent reviewer --server http://127.0.0.1:3939 --request-id review-1
+pnpm maybeclaw task status <task-id> --server http://127.0.0.1:3939
+pnpm maybeclaw task result <task-id> --server http://127.0.0.1:3939
+pnpm maybeclaw task cancel <task-id> --server http://127.0.0.1:3939
+pnpm maybeclaw session rename <session-id> --name "发布评审" --server http://127.0.0.1:3939
+pnpm maybeclaw agent save reviewer --definition reviewer.json --server http://127.0.0.1:3939
+pnpm maybeclaw channel status --server http://127.0.0.1:3939
+```
 
-## 结果语义与存储
+`serve` 运行期间使用 `--server`；直接运行本地命令需要取得数据目录的独占使用权限。
+本地提交等待任务完成，并在交互终端读取明确的审批决定。服务端接收任务后返回，
+客户端退出后工作继续。`task recover` 核对指定任务的证据；`task run` 派发其符合
+恢复条件的协作图。工具结果未知时需要完成核对。模型与目录选项通过 Agent 配置管理。
 
-执行状态为 `queued`、`running`、`completed`、`failed`、`cancelled`、`blocked`。
-`completed` 仅表示持久的 Agent 最终回答已经产生，不表示内容正确或业务目标经过独立
-验证。所有快照均为 `verification: "unverified"`。投递状态单独记录：终端打印或渠道
-回传失败不会重新执行任务，可以通过 `result` 再取已保存文本。输出使用 JSON 编码，不将模型
-文本解释为终端控制序列。
+JSON 接口位于 `/api/v2`，包含 `sessions`、`tasks`、`agents`、`approvals`、`commands`
+和 `health`。提交任务需要 `sessionId`、`prompt` 和 `requestId`。同一标识和相同
+正文重复提交已接收任务，会返回原有凭据；正文改变时拒绝。
 
-退出码：查询成功、接受提交/取消、排队或完成快照为 `0`；结果不可用、操作错误以及
-失败/取消/阻塞执行为 `1`；CLI 语法错误为 `2`。重复提交属于接受原任务查询，即使
-旧任务失败也返回 `0`，应检查返回状态。派发前的配置或访问错误使任务保持排队。
-查询成功不等于任务成功。
+其他设备访问控制端时，在 `server.publicOrigin` 填写准确的 HTTPS origin，例如
+`https://gateway.example:8443`。使用 HTTPS 反向代理连接本机监听端口，保留浏览器
+的 Host 与 Origin，将全部路径转发至该端口，并允许 UI 事件使用流式响应。
+服务只接受本地 origin 或配置的公网 origin 对应的 Host/Origin 组合；转发请求头
+不会授权其他地址。API 继续要求服务管理员登录。部署时为代理配置适当的访问限制。
+origin 使用规范形式，不包含末尾斜杠、路径、查询参数、片段、用户信息或显式默认
+端口 `:443`。
 
-数据目录中的私密文件：
+May 工具中断时，在对应会话发送 `/agent command <agent> recovery` 查询待核对
+操作。核实实际结果后，通过 `/agent command <agent> resolve-recovery <id> <核实结论>`
+保存证据，再用 `task recover <task-id>` 检查原任务。这个操作不会重新执行原工具，
+后续工作通过新输入提交。
+
+## 聊天命令与打断
 
 ```text
-tasks/<id>.jsonl     任务规格与状态/结果投影
-tasks/<id>.lock      本地独占执行所有者
-tasks/<id>.cancel    单调的取消意图
-sessions/           May FileSessionStore 执行证据
-host.lock           本地常驻服务独占所有者
-channels.jsonl      消息身份/归属、Telegram 游标及外发证据
+/session create "项目评审" --agent code --allow-agent reviewer
+/session list
+/session select "项目评审"
+/session "项目评审" @reviewer 检查错误处理
+/agent default reviewer
+/steer 同时检查权限处理
+/stop --task <task-id>
+/history --before <sequence>
 ```
 
-任务日志负责接收输入与宿主状态，Session 日志负责执行结果。不存在跨文件事务，
-通过稳定的任务/输入身份和证据核对处理交接。此版本每个任务拥有一个 Session，最多
-提交一次输入。数据是宿主私有的明文状态，不是加密或多租户存储。日志可能包含
-提示、文件内容、回答和 Provider 错误详情；保留期、备份及目录访问控制由宿主负责。
+明确指定的目标优先，其后依次使用平台原生回复关联和入口默认值。
+`/session A 正文` 只指定当前消息；`/session select A` 修改入口默认会话。
+选择回复会显示进行中的任务、未发送消息数量，以及需要核对的投递数量。
+`/agent default` 修改整个会话的默认 Agent，`@agent` 只指定当前消息。
+`/new`、`/resume` 通过 Gateway 会话管理处理。Agent 专用命令使用
+`/agent command <agent> <command>`，并要求适配器声明支持。
 
-渠道日志上限 32 MiB，接收时最多容纳 100 个未处理收件事件。尚无日志自动压缩或
-保留期管理；达到上限后停止新的持久接收。应保留日志/游标、明确规划迁移，不要删除
-去重证据。私密文件模式仅尽力设置；Windows 上应使用账户级 ACL 保护目录。
+普通新消息打断有权操作的目标，等待取消完成后开始后续执行。`/steer` 保持当前
+Step 继续运行，随后按接收顺序在下一次模型请求前交付。审批等待继续等待。
+正常完成后未交付的输入开始后续工作；明确取消后保留输入供用户重新提交。
+不支持的能力返回明确说明。
 
-## 架构与后续范围
+## 渠道、成员与审批
 
-产品 API 为 `MaybeClaw.submit/run/status/cancel/recover`，`FileTaskStore` 还支持列表。
-`TaskSpec` 与本地日志不依赖 CLI 或渠道载荷。`loadModel` 是可信宿主回调；非 CLI
-宿主必须自行执行配置及预算策略。MaybeClaw 直接组合 `defineAgent`、
-`AgentApplication`、`FileSessionStore`、Provider 选择与读取工具，不依赖
-`apps/maybecode`。
+在 `apps.maybeclaw.channels` 中增加渠道配置：
 
-`MaybeClawHost` 管理有界队列，`startControlServer` 提供传输与操作员鉴权，
-`ChannelHub` 将已验证的渠道身份/消息映射为任务，并通过 `ChannelStore` 持久化回传。
-Telegram/飞书适配器只在边缘转换平台消息；CLI、Web 与渠道共用任务服务。
-产品策略保留在 `apps/maybeclaw`，不向 May Core 塞入平台 SDK 代码。
+```json
+{
+  "telegram": { "enabled": true, "botTokenEnv": "MAYBECLAW_TELEGRAM_TOKEN", "allowUsers": ["123456789"], "allowGroups": ["-1001234567890"], "groupTrigger": "explicit" },
+  "feishu": { "enabled": true, "appId": "cli_replace_with_your_app_id", "appSecretEnv": "MAYBECLAW_FEISHU_SECRET", "allowUsers": ["ou_replace_with_your_open_id"], "allowGroups": ["oc_replace_with_your_chat_id"] }
+}
+```
 
-尚未包含：连续 Conversation 路由、保证最终送达的 Outbox、定时任务、
-持久用户审批/等待、长期记忆、MCP、Skills、多 Agent 委派、
-编码修改、沙箱或全局预算。先用实际任务稳定契约，再提取 `@may/tasks`，不把渠道策略
-塞入 Core。
+启用渠道需要明确的用户或群聊允许名单。群聊默认在提及机器人、回复 Gateway 消息、
+发送命令或明确目标标记时触发。专用群聊可以设置 `groupTrigger: "all"`，
+`entranceTriggers` 可以为指定群聊或话题设置触发方式。事件是否可接收由平台决定。
 
-## 验证
+成员退出群聊后，Gateway 撤销其群聊访问权限并取消其活动工作；后续加入事件恢复
+配置范围内的访问。Telegram 订阅 `chat_member`，机器人必须具有群聊管理员权限
+才能收到这些事件。飞书要求机器人位于群内，具备群组信息权限，并订阅
+`im.chat.member.user.added_v1`、`im.chat.member.user.deleted_v1` 和
+`im.chat.member.user.withdrawn_v1`。成员事件适用于群内全部话题，较早的事件不会
+替换更新的成员状态。平台权限不足导致无法收到事件时，Gateway 无法据此确认成员
+变更；服务管理员可以通过 `access.deniedUsers` 撤销访问。
+
+服务管理员通过 `access.sessionAdmins` 或控制管理器指定会话管理员，身份使用
+`telegram:<bot-id>:<user-id>` 等标识。会话管理权限来自这份配置。普通成员参与交流
+并管理自己的工作；会话管理员修改共享设置、管理生命周期和审批。Agent 创建与
+协作继续受服务级限制约束。
+
+创建 Agent 和调用工具分别审批。一次创建决定不会修改免审批 Agent 名单。
+`allow-session` 只适用于声明的授权范围和对应 Agent 对话。审批过期或者重复响应
+不会增加权限。
+
+平台消息在派发前编辑时，更新待处理正文；撤回时取消该待处理输入。派发后的编辑和
+撤回保留原执行输入，并将变更通知写入会话历史，供 Web 和 `/history` 查看。
+变更事件按平台事件 ID 去重，通知中的编辑正文保留原始空白。Web 消息标题显示
+对应的平台账号和成员身份。
+
+回复标明会话和 Agent。渠道断开和页面浏览期间工作继续。投递区分等待、发送中、
+已发送和结果未知；重连不会重复执行。媒体需要 Agent 和平台同时支持。为控制端
+会话绑定聊天入口时，需要明确确认向获准成员开放已有历史。
+
+May Agent 通过 `media` 明确声明可接收类型，例如
+`"media": ["image", "audio", "file", "video"]`，仅开启当前 Provider 支持的类型。
+视频需要独立的 `video` 能力，输入通过文件 ContentPart 传递并保留 `video/*` MIME
+类型；只声明 `file` 不会开启视频。RPC Agent 在能力握手时声明同样的类型。
+Provider 继续验证其实际输入能力。
+
+## 生命周期、存储与迁移
+
+空闲资源按配置延迟释放，对话 ID 与历史继续保存。重启时，访问权限撤销、访问配置
+或 Agent 版本变化会使对应的未完成任务进入待核对状态，其他会话继续恢复。持久记录
+损坏时恢复直接报错。停用 Agent 拒绝新工作并等待
+当前工作完成。模型或启动配置变化时，等待受影响工作完成后替换资源。归档要求
+会话空闲并保留历史。删除需要确认清理 Gateway 记录、专用 Agent 对话和未发送输出；
+用户项目文件与平台已有消息分别管理。外部清理未完成时继续显示状态。
+
+共享进程或连接只在全部使用者均为空闲且适配器支持恢复时关闭。配置更新期间，
+已接收工作的审批和协作继续处理；等待中的协作任务、待处理补充信息或未确认结果
+需要先完成处理。服务关闭在 `shutdownMs` 宽限时间后取消执行，并等待输入、对话创建、
+配置写入及资源清理结束后释放数据目录。
+
+`gateway.sqlite` 通过事务保存会话、对话关联、消息、任务、审批、默认值、请求凭据
+和投递记录。May 历史继续使用 Session 存储。`host.lock` 阻止其他进程同时写入。
+处理遗留文件前需要核对其中记录的所有者已经停止。
 
 ```powershell
-pnpm --filter @may/maybeclaw test
-pnpm docs:check
+pnpm maybeclaw migrate check --data-directory <directory>
+pnpm maybeclaw migrate run --data-directory <directory>
 ```
 
-聚焦离线测试覆盖工具执行与重复输入、取消与竞争所有者、真实子进程终止、不完整及
-损坏日志、不重放恢复、模型/预算绑定，以及连接本地确定性服务的真实 HTTP Provider
-适配器。这些属于工程检查，不是真实模型质量或 benchmark 结果。
-新增聚焦用例覆盖真实回环 HTTP 服务、API 鉴权/Host/Origin、并发、正常退出与重启、
-渠道归属/去重、发送未知状态恢复，以及两个适配器的模拟平台协议。浏览器流程使用
-固定本地模型验收。未提供真实平台凭据时，这些测试**不能证明**飞书/TG 真实事件订阅或投递成功。
+迁移核对使用权限、保存原数据备份、保留独立历史任务与渠道证据，并记录完成状态。
+旧的排队工作等待明确分配到已创建会话。已发送消息保持已发送，结果未知的记录等待
+核对。数据迁移之后需要明确配置 version 2 的 Agent 名单。真实 Provider 和平台
+验证范围取决于实际适配器、凭据与网络。
 
-## 日志维护
+服务管理员通过渠道状态查看迁移后的投递记录。核对未知发送结果之后，可以使用
+`maybeclaw delivery retry-legacy <id> --confirm --server <url>` 明确接受平台消息
+可能重复的情况，并将该记录恢复为等待投递。经过认证的 HTTP 操作为
+`POST /api/v2/legacy-deliveries/<id>/retry`，正文为 `{ "confirmUnknown": true }`。
+已经确认发送的消息不能重新发送。
 
-任务日志在累计快照达到 8 MiB 上限前写入完整状态检查点；通道日志在 32 MiB 上限前
-合并同一记录的多个版本。收件身份、投递回执和未知效果都会保留，合并不会重发投递。
-不同记录仍占用空间；当前状态本身达到上限时，需要停止宿主后归档。检查点要求当前读取器。
-库调用方通过 `runMaybeClaw` 启动 serve 时，必须传入 `dependencies.signal` 以便显式关闭。
-
-本地 request key 最多 128 字符；HTTP API 在添加 `api:` 命名空间前最多接受 100 字符，
-使用 `--server` 时应遵守该上限。两者是不同的幂等命名空间，不能交换任务身份。
+当前消息与渠道回复使用 `delivery retry <id> --confirm --server <url>`，或使用
+`POST /api/v2/deliveries/<id>/retry` 并传入相同的确认正文。Web 渠道管理器为结果
+未知和发送失败的记录提供明确确认操作。重新发送只改变投递状态，不重新执行
+Agent 的工作。

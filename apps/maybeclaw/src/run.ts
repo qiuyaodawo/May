@@ -9,33 +9,9 @@ import { hostSettings, secretFromEnv, channelSecret } from "./settings.js";
 import { TelegramAdapter, FeishuAdapter, type ChannelAdapter } from "./channels.js";
 import { MaybeClawHost } from "./host.js";
 import { startControlServer } from "./server.js";
+import { GATEWAY_USAGE, handlesGatewayCommand, runGatewayCommand } from "./gateway-run.js";
 
-export const MAYBECLAW_USAGE = `MaybeClaw — local durable tasks (developer preview)
-
-maybeclaw task submit <prompt> [--request-id <key>] [--enqueue]
-    [--config <path>] [--model <profile>] [--read-directory <path>]
-maybeclaw task run <id>
-maybeclaw task status <id>
-maybeclaw task result <id>
-maybeclaw task cancel <id>
-maybeclaw task recover <id>
-maybeclaw task list
-maybeclaw serve [--port <number>] [--config <path>] [--model <profile>]
-    [--read-directory <path>] [--token-env <name>]
-
-Server client: task submit/status/result/cancel/recover/list/run --server <url>
-    [--token-env <name>]. Client run requests dispatch, not synchronous completion.
-
-All commands accept --data-directory <path> (default: ~/.may/maybeclaw).
-Submit runs in the foreground unless --enqueue is given. Queued tasks require
-task run or a running serve process. Reusing a request id never reruns a task.
-Serve provides a loopback-only Web UI/API and configured Feishu/Telegram private chats.
-Set MAYBECLAW_CONTROL_TOKEN (32..256 ASCII characters); never put tokens in URLs.
-No scheduling, shell, writes, approvals or long-term memory yet.
---read-directory explicitly grants read access; its text may be sent to your model.
-Status is a persisted snapshot; recover reconciles stopped work without model calls.
-Exit: 0 success/accepted/query; 1 failed, cancelled, blocked or unavailable; 2 syntax.
-`;
+export const MAYBECLAW_USAGE = GATEWAY_USAGE;
 
 export interface MaybeClawDependencies extends ModelDependencies {
   readonly stdout?: { write(text: string): unknown };
@@ -44,6 +20,9 @@ export interface MaybeClawDependencies extends ModelDependencies {
 }
 
 export async function runMaybeClaw(args: readonly string[], deps: MaybeClawDependencies = {}): Promise<number> {
+  if (args.length === 1 && ["--help", "-h"].includes(args[0]!)) { (deps.stdout ?? process.stdout).write(GATEWAY_USAGE); return 0; }
+  if (args.length === 0 || args[0]!.startsWith("--")) return runGatewayCommand(["serve", ...args], deps, { openBrowser: true });
+  if (handlesGatewayCommand(args)) return runGatewayCommand(args, deps);
   const out = deps.stdout ?? process.stdout;
   const err = deps.stderr ?? process.stderr;
   let command: Command;

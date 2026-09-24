@@ -65,6 +65,7 @@ await application.close();
 
 `GoalAgent` 要求 `sessionId`、`isRunning`、`submit` 和 `continue`，运行 handle 提供
 `id`、`result` 和 `cancel`。`GoalStore.read()` 返回最近保存的状态或者 `undefined`；
+提交和继续执行的参数不包含 `stepInputSource`；补充输入及其保存由接入的 Agent 管理。
 `write()` 必须等待持久化成功。宿主管理 Session，为每个活动 Session 创建独立 controller，
 并串行处理影响同一个 Agent 的外部操作。
 `AgentApplication.continue(options)` 是通用执行接口，沿用 `submit()` 的互斥、取消和保存流程。

@@ -1,7 +1,7 @@
 {
   "name": "@may/maybeclaw",
   "version": "0.1.0",
-  "description": "Local durable-task assistant built on May.",
+  "description": "Agent gateway with durable conversations and chat channels.",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./rpc": {
+      "types": "./dist/gateway-rpc-adapter.d.ts",
+      "import": "./dist/gateway-rpc-adapter.js"
     }
   },
   "bin": {
@@ -18,25 +22,34 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "test": "pnpm run build && node --test test/*.test.mjs"
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:browser": "pnpm run build && node --test test/browser/*.test.mjs"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "1.73.3",
     "@may/application": "workspace:*",
     "@may/coding-tools": "workspace:*",
     "@may/config": "workspace:*",
+    "@may/coordination": "workspace:*",
     "@may/core": "workspace:*",
     "@may/media": "workspace:*",
+    "@may/permissions": "workspace:*",
     "@may/providers": "workspace:*",
     "@may/session": "workspace:*",
     "@may/ui-client": "workspace:*",
-    "@may/web-ui": "workspace:*"
+    "@may/web-ui": "workspace:*",
+    "@node-rs/argon2": "2.2.1",
+    "open": "11.0.4",
+    "shell-quote": "^1.10.0",
+    "vscode-jsonrpc": "^9.0.2"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "@types/shell-quote": "^1.7.5",
+    "playwright": "1.63.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "license": "MIT"
 }

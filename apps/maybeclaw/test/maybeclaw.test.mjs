@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { createServer } from "node:http";
 import { appendFile, mkdir, mkdtemp, readFile, realpath, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { DEFAULT_TASK_BUDGET, FileTaskStore, MaybeClaw, digest, runMaybeClaw, taskId } from "../dist/index.js";
+import { DEFAULT_TASK_BUDGET, FileTaskStore, MaybeClaw, digest, runMaybeClaw } from "../dist/index.js";
 
 const assistant = (text, toolCalls) => ({ role: "assistant", content: [{ type: "text", text }], ...(toolCalls ? { toolCalls } : {}) });
 const usage = { inputTokens: 20, outputTokens: 5, totalTokens: 25 };
@@ -127,57 +126,24 @@ test("journal ownership, tail repair and missing execution evidence fail closed"
   await assert.rejects(claw.status("../escape"), /Invalid MaybeClaw task id/);
 });
 
-test("CLI executes the real provider adapter against a local fixture and queries without credentials", async (t) => {
-  const f = await fixture(t);
-  let calls = 0;
-  const server = createServer(async (req, res) => {
-    let raw = ""; for await (const chunk of req) raw += chunk;
-    const body = JSON.parse(raw); calls++;
-    assert.equal(body.model, "local-fixture");
-    assert.equal(body.tools?.length ?? 0, 0);
-    res.writeHead(200, { "Content-Type": "text/event-stream" });
-    res.end(`data: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta: { role: "assistant", content: "Fixture response." }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 } })}\n\ndata: [DONE]\n\n`);
-  });
-  server.listen(0, "127.0.0.1"); await once(server, "listening");
-  t.after(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
-  const config = { providers: { local: { adapter: "openai-chat-completions", apiKey: "fixture-only-key",
-    baseURL: `http://127.0.0.1:${server.address().port}/v1` } }, models: { fixture: { provider: "local", model: "local-fixture" } }, defaultModel: "fixture" };
-  await writeFile(f.spec.configPath, JSON.stringify(config));
+test("CLI requires explicit sessions and rejects obsolete per-task startup options", async () => {
   let output = ""; let error = "";
   const deps = { stdout: { write: (s) => { output += s; } }, stderr: { write: (s) => { error += s; } } };
-  assert.equal(await runMaybeClaw(["task", "submit", "Say hello", "--request-id", "cli", "--config", f.spec.configPath, "--data-directory", f.directory], deps), 0, error);
-  assert.match(output, /Fixture response/);
-  assert.equal(calls, 1);
-  const id = taskId("cli");
-  assert.doesNotMatch(await readFile(new FileTaskStore(f.directory).path(id, "jsonl"), "utf8"), /fixture-only-key/);
-  await unlink(f.spec.configPath);
-  output = "";
-  for (const action of ["status", "result", "run", "recover"]) {
-    assert.equal(await runMaybeClaw(["task", action, id, "--data-directory", f.directory], deps), 0, error);
-  }
-  assert.equal(calls, 1);
-  assert.equal(await runMaybeClaw(["task", "run", id, "--model", "other"], deps), 2);
+  assert.equal(await runMaybeClaw(["task", "submit", "Say hello", "--request-id", "cli"], deps), 2);
+  assert.match(error, /--session/); assert.equal(output, "");
+  assert.equal(await runMaybeClaw(["task", "submit", "hello", "--session", "chosen", "--model", "other"], deps), 2);
+  assert.equal(await runMaybeClaw(["task", "submit", "hello", "--session", "chosen", "--enqueue"], deps), 2);
   assert.equal(await runMaybeClaw(["task", "submit", "a", "b"], deps), 2);
 });
 
-test("queued configuration bindings and budgets are checked before model creation", async (t) => {
+test("CLI manages configured Agent sessions without allocating a model conversation", async (t) => {
   const f = await fixture(t);
-  let modelLoads = 0;
-  const config = { path: f.spec.configPath, providers: { local: { adapter: "openai-chat-completions", apiKey: "test" } },
-    models: { fixture: { provider: "local", model: "before" } }, defaultModel: "fixture" };
-  let error = "";
-  const deps = { loadConfig: async () => config, createModel: () => { modelLoads++; return { async *stream() { yield finished("ok"); } }; },
-    stdout: { write() {} }, stderr: { write(s) { error += s; } } };
-  const common = ["--data-directory", f.directory];
-  assert.equal(await runMaybeClaw(["task", "submit", "hello", "--request-id", "pinned", "--enqueue", ...common], deps), 0);
-  config.models.fixture.model = "after";
-  assert.equal(await runMaybeClaw(["task", "run", taskId("pinned"), ...common], deps), 1);
-  assert.match(error, /configuration changed/); assert.equal(modelLoads, 0);
-  config.models.fixture.model = "before";
-  config.apps = { maybeclaw: { runBudget: { maxSteps: 1 } } };
-  assert.equal(await runMaybeClaw(["task", "run", taskId("pinned"), ...common], deps), 1);
-  assert.equal(modelLoads, 0);
-  delete config.apps;
-  assert.equal(await runMaybeClaw(["task", "run", taskId("pinned"), ...common], deps), 0, error);
-  assert.equal(modelLoads, 1);
+  await writeFile(f.spec.configPath, JSON.stringify({ providers: {}, models: {}, apps: { maybeclaw: { version: 2, agents: [{ id: "code", adapter: "may" }] } } }));
+  let output = "", error = "";
+  const deps = { stdout: { write(value) { output += value; } }, stderr: { write(value) { error += value; } } };
+  const common = ["--config", f.spec.configPath, "--data-directory", f.directory];
+  assert.equal(await runMaybeClaw(["session", "create", "明确会话", "--agent", "code", ...common], deps), 0, error);
+  const id = JSON.parse(output).selectedId; output = "";
+  assert.equal(await runMaybeClaw(["session", "show", id, ...common], deps), 0, error);
+  assert.deepEqual(JSON.parse(output).defaultAgents, ["code"]);
 });

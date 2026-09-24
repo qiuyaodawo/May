@@ -7,6 +7,13 @@ For a browser interface, start with the [shared Web UI](web-ui.md):
 `@may/web-ui` supplies composable components and an optional workbench.
 The direct in-process controller and TUI patterns below remain supported.
 
+`mountWebUI` accepts an optional `authentication` object with `label`,
+`login(password): Promise<string>`, and `logout(): Promise<void>`. The product
+exchanges the password for a temporary UiClient credential and revokes it on
+disconnect. Password spaces are preserved and the input clears after submission.
+Use `connectionHint` for login instructions; `authentication` and `initialToken`
+are mutually exclusive.
+
 May's application layer is headless. A terminal, desktop, web, or remote UI
 should depend on `AgentController` (one active Session) or
 `AgentWorkspaceController` (multiple Sessions), invoke user-intent methods, and
@@ -162,6 +169,11 @@ pressure while retaining lifecycle events. A UI must therefore:
 `TranscriptStore` implements those live/final projection rules. Its
 `loadHistory()` method reconstructs only durable facts, so a restored screen
 may intentionally omit transient progress seen before shutdown.
+Steering messages enter the transcript when `input.received` confirms delivery.
+History reconstruction combines `input.steering.queued` with
+`input.steering.delivered` to preserve their text, order, and row identities.
+Pending or cancelled input remains outside the delivered conversation; a new Run
+started from idle input contributes its ordinary `input.submitted` record.
 
 ## Security and shutdown
 

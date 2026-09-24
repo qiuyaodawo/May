@@ -77,6 +77,8 @@ await application.close();
 `GoalAgent` requires `sessionId`, `isRunning`, `submit` and `continue`. Its run
 handle exposes `id`, `result` and `cancel`. `GoalStore.read()` returns the latest
 saved state or `undefined`; `write()` must acknowledge durable persistence.
+Its submission and continuation options omit `stepInputSource`; the attached
+Agent manages additional input and its persistence.
 The host owns the Session and creates one controller per active Session.
 All external operations affecting the same Agent must be serialized by the host.
 `AgentApplication.continue(options)` is a general execution API and uses the same

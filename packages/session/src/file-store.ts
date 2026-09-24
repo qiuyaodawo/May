@@ -158,6 +158,9 @@ function validPayload(event: Record<string, unknown>): boolean {
     case "session.created": return event.metadata === undefined || object(event.metadata);
     case "state.updated": return typeof event.key === "string";
     case "input.submitted": case "assistant.completed": return message(event.message);
+    case "input.steering.queued": return object(event.input) && typeof event.input.inputId === "string" && event.input.inputId.length > 0 && event.input.inputId.length <= 256 && message(event.input.message) && ["pending", "idle"].includes(String(event.input.status)) && (event.input.status === "idle" || typeof event.input.runId === "string");
+    case "input.steering.delivered": return typeof event.runId === "string" && Number.isSafeInteger(event.step) && Array.isArray(event.inputIds) && event.inputIds.every((value) => typeof value === "string");
+    case "input.steering.finished": return ["idle", "cancelled"].includes(String(event.status)) && typeof event.reason === "string" && Array.isArray(event.inputIds) && event.inputIds.every((value) => typeof value === "string");
     case "context.compacted": return Array.isArray(event.messages) && event.messages.every(message) && typeof event.strategy === "string";
     case "tool.started": return call(event.call);
     case "tool.completed": return call(event.call) && (event.content === undefined || content(event.content));

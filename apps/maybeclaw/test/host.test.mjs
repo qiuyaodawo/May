@@ -6,7 +6,7 @@ import { request as httpRequest } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { ChannelHub, ChannelStore, DEFAULT_TASK_BUDGET, FeishuAdapter, MaybeClaw, MaybeClawHost,
-  TelegramAdapter, channelSecret, cursorId, digest, feishuInput, hostSettings, inboxId, runMaybeClaw, startControlServer, telegramInput } from "../dist/index.js";
+  TelegramAdapter, channelSecret, cursorId, digest, feishuInput, hostSettings, inboxId, startControlServer, telegramInput } from "../dist/index.js";
 
 const token = "local-test-token-not-a-real-secret-0123456789";
 test("channel credentials accept either literal values or environment names without leaking invalid values", () => {
@@ -75,13 +75,8 @@ test("loopback API authenticates, queues independently of clients, bounds concur
   await until(async () => (await f.claw.store.list()).every(t => t.status === "completed"));
   assert.equal(calls, 2); assert.equal(peak, 1);
   assert.match((await f.claw.status(first.task.id)).task.result, /<script>/);
-  const output = [];
-  const previous = process.env.MAYBECLAW_TEST_CONTROL;
-  process.env.MAYBECLAW_TEST_CONTROL = token;
-  try {
-    assert.equal(await runMaybeClaw(["task", "result", first.task.id, "--server", server.url, "--token-env", "MAYBECLAW_TEST_CONTROL"], { stdout: { write: text => output.push(text) } }), 0);
-    assert.match(output.join(""), /unverified/);
-  } finally { if (previous === undefined) delete process.env.MAYBECLAW_TEST_CONTROL; else process.env.MAYBECLAW_TEST_CONTROL = previous; }
+  const persisted = await (await request(`/api/tasks/${first.task.id}`)).json();
+  assert.equal(persisted.task.verification, "unverified");
   const interrupted = await (await request("/api/tasks", { prompt: "interrupt", requestId: "three" })).json();
   await request("/api/tasks", { prompt: "after restart", requestId: "four" });
   await until(async () => calls === 3 && (await f.claw.status(interrupted.task.id)).task.status === "running");
@@ -195,7 +190,7 @@ test("Telegram transport advances its durable cursor after inbox persistence and
   const controller = new AbortController();
   const calls = [];
   const update = { update_id: 12, message: { message_id: 1, text: "hello", from: { id: 7, is_bot: false }, chat: { id: 7, type: "private" } } };
-  assert.equal(telegramInput({ ...update, message: { ...update.message, chat: { id: -1, type: "group" } } }, "telegram:42"), undefined);
+  assert.equal(telegramInput({ ...update, message: { ...update.message, chat: { id: -1, type: "group" } } }, "telegram:42").kind, "group");
   const request = async (url, init) => {
     const method = String(url).split("/").at(-1), body = JSON.parse(init.body); calls.push({ method, body });
     let result = {};
@@ -227,7 +222,7 @@ test("Feishu private-message normalization, credential isolation and single-atte
   const event = { sender: { sender_type: "user", sender_id: { open_id: "ou_user" } }, message: { chat_type: "p2p", chat_id: "oc_chat", message_id: "om_message", message_type: "text", content: JSON.stringify({ text: "hello" }) } };
   const input = feishuInput(event, `feishu:${settings.appId}`);
   assert.equal(input.sender, "ou_user");
-  assert.equal(feishuInput({ ...event, message: { ...event.message, chat_type: "group" } }, input.account), undefined);
+  assert.equal(feishuInput({ ...event, message: { ...event.message, chat_type: "group" } }, input.account).kind, "group");
   const calls = [];
   const adapter = new FeishuAdapter(settings, "fake-app-secret", async (url, init) => {
     calls.push({ url, ...init, body: JSON.parse(init.body) });

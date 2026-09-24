@@ -17,6 +17,32 @@ a synthetic Run handle. Input ids are not inserted into model message content.
 checkpoint closes a Run without completing the surrounding task; later identified
 inputs can continue the same Session after its caller's wait condition is met.
 
+`Session.steer({ input, inputId?, runId? })` durably accepts FIFO input for the
+current Run. Its returned `SessionSteeringInput` has `pending`, `delivered`,
+`idle`, or `cancelled` status; `listSteeringInputs()` returns current snapshots.
+An explicit `runId` must identify the active Run. Inputs enter Context only
+after its complete Step, including all tools and approval waits. Pending input
+does not interrupt execution. The stored input is copied at acceptance.
+
+Idle input and input remaining after normal completion or host yield have
+`idle` status. The host calls `startSteeringInput(inputId, options?)` in FIFO
+order to create another Run; it returns the usual `RunHandle`. Cancellation,
+failure, and interrupted-process recovery preserve unconsumed input as
+`cancelled`; they do not automatically resubmit it. Delivered means committed to
+Context, and does not promise the next model call has completed. Cancelled input
+requires a new explicit user submission with a new identity.
+`cancelSteeringInputs(reason?)` explicitly cancels both pending and idle inputs,
+preserves already-delivered input, and completes after the state is persisted.
+
+`SessionSubmitOptions` and `SessionContinueOptions` reserve Step input for this
+durable queue. Passing a custom `stepInputSource` to `submit()`, `continue()`, or
+`startSteeringInput()` throws `TypeError` before execution. Use `steer()` for
+Session input; direct `May.run()` and `May.continue()` retain custom input sources.
+
+Queued, delivered, and finished steering records survive `Session.resume()`.
+Only delivered records enter reconstructed Context. Starting idle input uses
+the existing `input.submitted` identity, keeping retries and restarts deduplicated.
+
 ## Usage
 
 ```ts

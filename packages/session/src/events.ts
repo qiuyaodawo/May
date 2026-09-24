@@ -11,6 +11,7 @@ import type {
   UserMessage,
   RunBudgetSnapshot,
 } from "@may/core";
+import type { SessionSteeringInput } from "./steering.js";
 
 export interface SessionRecovery {
   readonly id: string;
@@ -81,6 +82,9 @@ export type SessionEventPayload =
   | { type: "run.budget.exceeded"; runId: string; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
   | { type: "session.created"; metadata?: Record<string, unknown> }
   | { type: "input.submitted"; message: UserMessage; inputId?: string }
+  | { type: "input.steering.queued"; input: SessionSteeringInput }
+  | { type: "input.steering.delivered"; runId: string; step: number; inputIds: readonly string[] }
+  | { type: "input.steering.finished"; inputIds: readonly string[]; status: "idle" | "cancelled"; reason: string }
   | { type: "run.started"; runId: string; continuation?: boolean; checkpointVersion?: 1 }
   | { type: "tool.started"; runId: string; step: number; call: ToolCall }
   | { type: "run.interrupted"; runId: string; recoveries: readonly SessionRecovery[] }

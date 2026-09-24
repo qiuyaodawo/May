@@ -2,6 +2,15 @@
 
 **English** | [简体中文](../zh-CN/getting-started.md)
 
+MaybeCode normally asks before executing commands or modifying files. Start with
+`maybecode --yolo` to enable automatic tool approval. Use `--no-yolo` to override
+a configured YOLO default. In a session, `/yolo` or `/yolo on` enables the mode,
+`/yolo off` disables it, and `/yolo status` shows it. Pause or cancel active work
+before changing modes. The terminal and
+Web UI display `YOLO · Auto-approve` while enabled; Web UI also has a Permissions
+selector. See [permission configuration](reference/configuration.md#maybecode-permission-mode)
+for scope, restart behavior, and retained restrictions.
+
 This guide runs a May Agent locally, then turns the same model-and-tool loop
 into a resumable headless application. It targets the current `0.1.0`
 developer-preview API in this repository.
@@ -68,6 +77,20 @@ the package script. Terminals started with `-NoProfile` must load the script exp
 The standalone `maybecode` executable remains the entry point supplied by an
 installed package. To remove a previous global development installation, use
 `pnpm remove --global @may/maybecode`.
+
+## Send input during MaybeCode execution
+
+Ordinary input cancels the current operation, waits for cancellation, and starts
+the new request in the same Session. Use `/steer <message>` to finish the current
+Step, including its tools and approvals, before delivering additional input.
+Steering messages are saved and delivered in FIFO order. An idle `/steer` starts
+a Run; messages that remain after completion or a host yield start in order
+after the active operation finishes.
+
+`/stop` and the Web cancel control cancel the current operation and queued input.
+In a terminal, `Ctrl+C` without a text selection does the same. Cancelled
+steering messages remain in history and need an explicit new submission to run.
+These controls are available in classic TUI, retained TUI, and Web UI.
 
 ## Browse MaybeCode conversations
 

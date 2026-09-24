@@ -276,3 +276,28 @@ test("distinguishes file and JSON parsing failures", async (t) => {
     },
   );
 });
+
+test("parses maybeclaw configuration with empty or omitted agents", () => {
+  const emptyAgents = parseMayConfig({
+    providers: {},
+    apps: {
+      maybeclaw: {
+        version: 2,
+        agents: [],
+        server: { auth: { password: "admin-password-123" } },
+      },
+    },
+  });
+  assert.deepEqual(emptyAgents.apps?.maybeclaw?.agents, []);
+
+  const omittedAgents = parseMayConfig({
+    providers: {},
+    apps: {
+      maybeclaw: {
+        version: 2,
+        server: { auth: { password: "admin-password-123" } },
+      },
+    },
+  });
+  assert.equal(omittedAgents.apps?.maybeclaw?.agents, undefined);
+});

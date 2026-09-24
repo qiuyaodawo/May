@@ -1,4 +1,4 @@
-import type { ContentPart, MayEvent } from "@may/core";
+import type { ContentPart, MayEvent, UserMessage } from "@may/core";
 import type { ContextInspection } from "@may/context";
 import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
@@ -55,7 +55,15 @@ export async function runTerminalUI(
   const slashCommandSuggestions = createMaybeCodeSlashCommandSuggester(app);
   let activeQuestion: AbortController | undefined;
   let inputQuestionController: AbortController | undefined;
+  let inputContinuation = false;
   let interactionDone: Promise<void> = Promise.resolve();
+  const pendingRuns = new Set<Promise<void>>();
+  const observeRun = (result: Promise<unknown>): void => {
+    const pending = result.then(() => undefined, error => {
+      if (!terminalClosed && !isCancellation(error)) terminal.write(`\nError: ${sanitizeTerminalText(errorMessage(error))}\n`);
+    }).finally(() => pendingRuns.delete(pending));
+    pendingRuns.add(pending);
+  };
   let exit = false;
   const handleProcessSignal = (): void => {
     exit = true;
@@ -89,6 +97,7 @@ export async function runTerminalUI(
     await interactionDone;
     const controller = new AbortController();
     inputQuestionController = controller;
+    inputContinuation = prompt.endsWith("... ");
     activeQuestion = controller;
     try { return await terminal.question(prompt, { ...questionOptions, signal: controller.signal }); }
     finally {
@@ -109,10 +118,13 @@ export async function runTerminalUI(
   });
 
   const web = new MaybeCodeTerminalWeb(app, handleProcessSignal);
-  const eventTask = consumeEvents(app, renderer, question, web.events);
+  const eventTask = consumeEvents(app, renderer, question, web.events, () => {
+    if (inputQuestionController !== undefined) terminal.updatePrompt?.(inputPrompt(app.permissionMode === "yolo", inputContinuation));
+  });
   terminal.write(sanitizeTerminalText(
     `MaybeCode\nWorkspace: ${app.workspace}\n` +
       `Model: ${modelLabel(app)}\n` +
+      (app.permissionMode === "yolo" ? "YOLO · Auto-approve\n" : "") +
       `${renderInstructionSources(app)}` +
       "Type /help for commands. End a line with \\ for multiline input.\n",
   ));
@@ -121,7 +133,7 @@ export async function runTerminalUI(
     while (!exit) {
       let input: string;
       try {
-        input = await readInput(inputQuestion, slashCommandSuggestions);
+        input = await readInput(inputQuestion, slashCommandSuggestions, () => app.permissionMode === "yolo");
       } catch (error) {
         if (isAbortError(error)) {
           if (exit) break;
@@ -134,7 +146,7 @@ export async function runTerminalUI(
       terminal.addHistory?.(input);
       if (input.startsWith("/")) {
         try {
-          exit = await handleCommand(input, app, terminal, question, web);
+          exit = await handleCommand(input, app, terminal, question, web, observeRun);
         } catch (error) {
           if (!isCancellation(error) && !isAbortError(error)) {
             terminal.write(
@@ -147,7 +159,7 @@ export async function runTerminalUI(
 
       try {
         const run = await app.submit({ input });
-        await run.result;
+        observeRun(run.result);
       } catch (error) {
         if (!isCancellation(error)) {
           terminal.write(
@@ -165,6 +177,7 @@ export async function runTerminalUI(
     // cancellation and event-drain work.
     closeTerminal();
     await web.close();
+    await Promise.all(pendingRuns);
     await eventTask;
   }
 }
@@ -174,6 +187,7 @@ async function consumeEvents(
   renderer: TerminalRenderer,
   question: UIQuestion,
   events: AsyncIterable<MaybeCodeEvent>,
+  permissionModeChanged: () => void,
 ): Promise<void> {
   const pending = new Map<string, AbortController>();
   let lastGoalDisplay = "";
@@ -196,6 +210,9 @@ async function consumeEvents(
         lastGoalDisplay = display;
         renderer.write(`\n${sanitizeTerminalText(formatGoal(event.goal))}\n`);
       }
+    } else if (event.type === "permission-mode.changed") {
+      permissionModeChanged();
+      renderer.write(event.mode === "yolo" ? "\nYOLO enabled\n" : "\nYOLO disabled\n");
     } else if (event.type === "run.event") {
       await renderer.runEvent(event.event);
     } else if (event.type === "permission.event") {
@@ -290,6 +307,7 @@ async function handleCommand(
   terminal: TerminalIO,
   question: UIQuestion,
   web: MaybeCodeTerminalWeb,
+  observeRun: (result: Promise<unknown>) => void,
 ): Promise<boolean> {
   const parsed = parseMaybeCodeSlashCommand(input);
   if (
@@ -312,7 +330,7 @@ async function handleCommand(
     terminal.write(`\nWeb UI 已打开：${await web.open()}\n`);
     return false;
   }
-  return renderSlashCommandResult(result, app, terminal, question);
+  return renderSlashCommandResult(result, app, terminal, question, observeRun);
 }
 
 async function renderSlashCommandResult(
@@ -320,6 +338,7 @@ async function renderSlashCommandResult(
   app: MaybeCodeController,
   terminal: TerminalIO,
   question: UIQuestion,
+  observeRun: (result: Promise<unknown>) => void,
 ): Promise<boolean> {
   switch (result.type) {
     case "exit":
@@ -336,7 +355,7 @@ async function renderSlashCommandResult(
     case "mcp.run-started":
     case "skill.run-started":
     case "retry.started":
-      await result.run.result;
+      observeRun(result.run.result);
       break;
     case "status":
       terminal.write(`\n${renderStatus(app, result.inspection)}`);
@@ -508,13 +527,18 @@ function renderSlashCommandHelp(
     "  Multiline\n      End a line with \\ to continue on the next line\n";
 }
 
+function inputPrompt(yolo: boolean, continuation: boolean): string {
+  return `${continuation ? "" : "\n"}${yolo ? "YOLO · Auto-approve " : ""}${continuation ? "... " : "> "}`;
+}
+
 async function readInput(
   question: UIQuestion,
   suggestions: TerminalQuestionOptions["suggestions"],
+  yolo: () => boolean,
 ): Promise<string> {
   const lines: string[] = [];
   while (true) {
-    let line = await question(lines.length === 0 ? "\n> " : "... ", {
+    let line = await question(inputPrompt(yolo(), lines.length > 0), {
       history: false,
       ...(lines.length === 0 && suggestions !== undefined
         ? { suggestions }
@@ -562,6 +586,12 @@ class TerminalRenderer {
 
   async runEvent(event: MayEvent): Promise<void> {
     switch (event.type) {
+      case "input.received":
+        this.endReasoning();
+        for (const message of event.messages) {
+          this.terminal.write(`\nYou: ${sanitizeTerminalText(textFromContent(message.content))}\n`);
+        }
+        break;
       case "model.started":
         this.textStarted = false;
         this.reasoningStarted = false;
@@ -789,9 +819,10 @@ class TerminalRenderer {
     if (!event.resumed) return;
     if (app.sessionId !== event.sessionId) return;
     const history = await app.history();
+    const steering = new Map(history.flatMap(event => event.type === "input.steering.queued" ? [[event.input.inputId, event.input.message] as const] : []));
     for (const event of history) {
       if (event.type === "assistant.completed" && event.message.content.some(part => part.type === "image")) await this.renderContent(event.message.content);
-      else renderHistory([event], this.terminal);
+      else renderHistory([event], this.terminal, steering);
     }
   }
 
@@ -895,11 +926,19 @@ class TerminalRenderer {
 function renderHistory(
   history: readonly SessionEvent[],
   terminal: TerminalIO,
+  steering: ReadonlyMap<string, UserMessage>,
 ): void {
   for (const event of history) {
     if (event.type === "input.submitted") {
       const text = textFromContent(event.message.content);
       if (text !== "") terminal.write(`You: ${sanitizeTerminalText(text)}\n`);
+    } else if (event.type === "input.steering.delivered") {
+      for (const inputId of event.inputIds) {
+        const message = steering.get(inputId);
+        if (!message) throw new Error(`Missing steering input: ${inputId}`);
+        const text = textFromContent(message.content);
+        if (text !== "") terminal.write(`You: ${sanitizeTerminalText(text)}\n`);
+      }
     } else if (event.type === "assistant.completed") {
       const text = textFromContent(event.message.content);
       if (text !== "") {
@@ -997,7 +1036,8 @@ function renderStatus(
   let output = `Status:\n` +
     `  model: ${modelLabel(app)}\n` +
     `  session: ${sanitizeTerminalText(app.sessionId)}\n` +
-    `  workspace: ${sanitizeTerminalText(app.workspace)}\n`;
+    `  workspace: ${sanitizeTerminalText(app.workspace)}\n` +
+    `  permissions: ${app.permissionMode === "yolo" ? "YOLO · Auto-approve" : "Default"}\n`;
   if (inspection === undefined) return `${output}  context: unavailable\n`;
   output += `  context: ~${formatNumber(inspection.effectiveTokens)}`;
   if (inspection.contextWindowTokens !== undefined) {

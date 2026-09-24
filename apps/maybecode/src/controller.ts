@@ -5,6 +5,7 @@ import type { McpClientPool, McpServerStatus, McpResourceSubscription, McpIntera
 import type { MaybeCodeEvent, MaybeCodeSessionEvent } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 import type { SkillDescriptor, SkillDiagnostic, SkillDocument } from "@may/skills";
+import type { MaybeCodePermissionMode } from "./policy.js";
 
 export interface MaybeCodeSkillInfo extends SkillDescriptor { readonly active: boolean }
 
@@ -59,6 +60,7 @@ export type MaybeCodeCompactionSelection =
 type MaybeCodeProductEvent = Extract<
   MaybeCodeEvent,
   | { type: "model.changed" }
+  | { type: "permission-mode.changed" }
   | { type: "model.default.changed" }
   | { type: "mcp.resource.updated" }
   | { type: "mcp.resource.watch-closed" }
@@ -75,6 +77,10 @@ export interface MaybeCodeController extends AgentWorkspaceController<
   MaybeCodeProductEvent,
   MaybeCodeCompactionSelection
 > {
+  steer?(options: import("@may/session").SessionSteerOptions): Promise<import("@may/session").SessionSteeringInput>;
+  listSteeringInputs?(): readonly import("@may/session").SessionSteeringInput[];
+  readonly permissionMode: MaybeCodePermissionMode;
+  setPermissionMode(mode: MaybeCodePermissionMode): Promise<void>;
   readonly instructions: MaybeCodeInstructions;
   readonly modelInfo: MaybeCodeModelInfo | undefined;
   getGoal?(): GoalState | undefined;

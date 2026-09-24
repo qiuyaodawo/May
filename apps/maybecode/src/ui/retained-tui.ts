@@ -44,12 +44,17 @@ export async function runRetainedTerminalUI(
   const terminal = options.terminal ?? new NodeTerminalDriver();
   const renderer = options.renderer ?? new FullscreenRenderer(terminal);
   const store = new TranscriptStore();
+  const displayedSteering = new Set<string>();
   const images = new TerminalImages(undefined, terminal.imageSupport?.protocol, { cellSize: () => terminal.imageSupport?.cellSize });
   try {
     const history = await app.history();
     for (const event of history) if (event.type === "assistant.completed" || event.type === "input.submitted") await images.prepare(event.message.content);
     for (const event of history) if (event.type === "tool.completed" && event.content) await images.prepare(event.content);
     store.loadHistory(history);
+    for (const event of history) {
+      if (event.type === "input.submitted" && event.inputId) displayedSteering.add(event.inputId);
+      if (event.type === "input.steering.delivered") for (const inputId of event.inputIds) displayedSteering.add(inputId);
+    }
   } catch (error) {
     await app.close();
     throw error;
@@ -58,6 +63,16 @@ export async function runRetainedTerminalUI(
   let runtime: TuiRuntime | undefined;
   let closing = false;
   let eventFailure: unknown;
+  const pendingRuns = new Set<Promise<void>>();
+  const observeRun = (result: Promise<unknown>): void => {
+    const pending = result.then(() => undefined, error => {
+      if (!closing && !isCancellation(error)) store.appendNotice("error", errorMessage(error));
+    }).finally(() => {
+      pendingRuns.delete(pending);
+      if (!closing) view.setStatus(app.isRunning ? "Running" : "Ready");
+    });
+    pendingRuns.add(pending);
+  };
   let resolveExit!: () => void;
   const exited = new Promise<void>((resolve) => resolveExit = resolve);
   const finish = (): void => {
@@ -72,6 +87,8 @@ export async function runRetainedTerminalUI(
     finish();
   };
   const view = new MaybeCodePrototypeView({
+    isRunning: () => app.isRunning,
+    permissionMode: () => app.permissionMode,
     clipboard: options.clipboard ?? createTerminalClipboard({ output: terminal }),
     keymap: options.keymap ?? {
       ...(process.env.MAY_TUI_LEADER === undefined ? {} : { leader: process.env.MAY_TUI_LEADER }),
@@ -93,13 +110,13 @@ export async function runRetainedTerminalUI(
     },
     onSubmit: async (value, accepted) => {
       if (value.trimStart().startsWith("/")) {
-        await handleCommand(value, app, store, view, finish, web);
+        await handleCommand(value, app, store, view, finish, web, observeRun);
         return;
       }
       try {
         const run = await app.submit({ input: value });
         accepted?.();
-        await run.result;
+        observeRun(run.result);
       } catch (error) {
         if (!isCancellation(error)) throw error;
       }
@@ -113,7 +130,7 @@ export async function runRetainedTerminalUI(
   let eventTask: Promise<void> | undefined;
   try {
     runtime.start();
-    eventTask = consumeEvents(app, store, view, () => closing, web.events, images).catch((error) => {
+    eventTask = consumeEvents(app, store, view, () => closing, web.events, images, displayedSteering).catch((error) => {
       eventFailure = error;
       store.appendNotice("error", `Event stream failed: ${errorMessage(error)}`);
       finish();
@@ -126,6 +143,7 @@ export async function runRetainedTerminalUI(
     runtime.stop();
     view.dispose();
     await web.close();
+    await Promise.all(pendingRuns);
     await eventTask;
   }
   if (eventFailure !== undefined) throw eventFailure;
@@ -138,11 +156,38 @@ async function consumeEvents(
   isClosing: () => boolean,
   events: AsyncIterable<MaybeCodeEvent>,
   images: TerminalImages,
+  displayedSteering: Set<string>,
 ): Promise<void> {
   const approvals = new Set<Promise<void>>();
   const interactions = new Map<string, AbortController>();
   let lastGoalDisplay = "";
   for await (const event of events) {
+    if (event.type === "run.event") {
+      if (event.event.type === "run.started") {
+        view.setStatus("Running");
+        const unread = app.listSteeringInputs?.().filter(input => input.status === "delivered" && !displayedSteering.has(input.inputId)) ?? [];
+        if (unread.length > 0) {
+          const history = await app.history();
+          const runId = event.event.runId;
+          const runIndex = history.findIndex(item => item.type === "run.started" && item.runId === runId);
+          const submitted = runIndex < 0 ? undefined : history.slice(0, runIndex).reverse().find(item => item.type === "input.submitted");
+          if (submitted?.type === "input.submitted" && submitted.inputId && unread.some(input => input.inputId === submitted.inputId)) {
+            store.appendUser(submitted.message.content.filter(part => part.type === "text").map(part => part.text).join(""));
+            displayedSteering.add(submitted.inputId);
+          }
+        }
+      }
+      if (event.event.type === "input.received") {
+        for (const input of app.listSteeringInputs?.() ?? []) {
+          if (input.status === "delivered" && input.runId === event.event.runId) displayedSteering.add(input.inputId);
+        }
+      }
+      if (event.event.type === "run.completed" || event.event.type === "run.yielded" || event.event.type === "run.cancelled") view.setStatus("Ready");
+      if (event.event.type === "run.failed") view.setStatus(`Error: ${event.event.error.message}`);
+    }
+    if (event.type === "permission-mode.changed") {
+      view.setStatus(event.mode === "yolo" ? "YOLO enabled" : "YOLO disabled");
+    }
     if (event.type === "run.event" && event.event.type === "model.completed") await images.prepare(event.event.message.content);
     if (event.type === "run.event" && event.event.type === "tool.completed") await images.prepare(event.event.content);
     if (event.type === "goal.changed") {
@@ -174,6 +219,11 @@ async function consumeEvents(
       for (const event of history) if (event.type === "assistant.completed" || event.type === "input.submitted") await images.prepare(event.message.content);
       for (const event of history) if (event.type === "tool.completed" && event.content) await images.prepare(event.content);
       store.loadHistory(history);
+      displayedSteering.clear();
+      for (const event of history) {
+        if (event.type === "input.submitted" && event.inputId) displayedSteering.add(event.inputId);
+        if (event.type === "input.steering.delivered") for (const inputId of event.inputIds) displayedSteering.add(inputId);
+      }
       store.appendNotice("info", "Session resumed");
       continue;
     }
@@ -292,6 +342,7 @@ async function handleCommand(
   view: MaybeCodePrototypeView,
   finish: () => void,
   web: MaybeCodeTerminalWeb,
+  observeRun: (result: Promise<unknown>) => void,
 ): Promise<void> {
   const parsed = parseMaybeCodeSlashCommand(input);
   if (
@@ -309,7 +360,7 @@ async function handleCommand(
     store.appendNotice("info", `Web UI 已打开：${await web.open()}`);
     return;
   }
-  await presentCommandResult(result, app, store, view, finish);
+  await presentCommandResult(result, app, store, view, finish, observeRun);
 }
 
 async function presentCommandResult(
@@ -318,6 +369,7 @@ async function presentCommandResult(
   store: TranscriptStore,
   view: MaybeCodePrototypeView,
   finish: () => void,
+  observeRun: (result: Promise<unknown>) => void,
 ): Promise<void> {
   switch (result.type) {
     case "exit":
@@ -342,14 +394,13 @@ async function presentCommandResult(
     case "mcp.run-started":
     case "skill.run-started":
     case "retry.started":
-      await result.run.result.catch((error: unknown) => {
-        if (!isCancellation(error)) throw error;
-      });
+      observeRun(result.run.result);
       break;
     case "status":
       store.appendNotice(
         "info",
         `Session: ${app.sessionId}\nWorkspace: ${app.workspace}\n` +
+          `Permissions: ${app.permissionMode === "yolo" ? "YOLO · Auto-approve" : "Default"}\n` +
           `Model: ${await resolvedModelLabel(app)}${inspectionText(result.inspection)}`,
       );
       break;

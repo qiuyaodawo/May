@@ -24,6 +24,7 @@
     "clean": "tsc -b --clean",
     "start": "pnpm run build && node dist/bin.js",
     "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:browser": "pnpm run build && node --test test/browser/*.test.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs",
     "test:integration": "pnpm run build && node --test test/integration/*.test.mjs"
   },
@@ -45,9 +46,11 @@
     "@may/tui": "workspace:*",
     "@may/ui-client": "workspace:*",
     "@may/web-ui": "workspace:*",
+    "diff": "9.0.0",
     "open": "11.0.4"
   },
   "devDependencies": {
+    "playwright": "1.63.0",
     "@types/node": "^22.0.0"
   },
   "engines": {

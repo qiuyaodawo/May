@@ -6,10 +6,13 @@ import type {
 import type { ApprovalDecision } from "@may/permissions";
 import type {
   SessionEvent,
+  SessionContinueOptions,
   SessionHistoryPage,
   SessionHistoryQuery,
   SessionRecovery,
   SessionSubmitOptions,
+  SessionSteerOptions,
+  SessionSteeringInput,
 } from "@may/session";
 import type { SessionSummary } from "@may/session/catalog";
 
@@ -73,5 +76,13 @@ export interface AgentWorkspaceController<
 
 /** 可以在当前上下文中继续执行的通用控制接口。 */
 export interface ContinuableAgentController extends AgentController {
-  continue(options?: import("@may/core").ContinueOptions): Promise<AgentRun>;
+  continue(options?: SessionContinueOptions): Promise<AgentRun>;
+}
+
+/** 支持持久化 Step 边界补充输入的控制接口。 */
+export interface SteerableAgentController extends ContinuableAgentController {
+  steer(options: SessionSteerOptions): Promise<SessionSteeringInput>;
+  listSteeringInputs(): readonly SessionSteeringInput[];
+  cancelSteeringInputs(reason?: string): Promise<void>;
+  startSteeringInput(inputId: string, options?: Omit<SessionSubmitOptions, "input" | "inputId">): Promise<AgentRun>;
 }

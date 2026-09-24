@@ -1,5 +1,15 @@
 # @may/web-ui
 
+`WebUiOptions.authentication` accepts a product-owned `{ label, login, logout }`
+implementation. `login(password)` returns a temporary UiClient Bearer credential;
+`logout()` revokes it when the user disconnects. Password input preserves spaces
+and clears after submission. Set `connectionHint` to explain the product's login.
+This option cannot be combined with `initialToken`.
+
+The workbench displays optional `UiSnapshot.badges` in its fixed header,
+including on narrow screens. Badge labels and tones come from the host and update
+with snapshots, independently of transcript scrolling and detail panels.
+
 Ordered image content supports authenticated viewing, original-image links and
 downloads. See [Image replies](../../../docs/en/guides/images.md) /
 [图片回复](../../../docs/zh-CN/guides/images.md).
@@ -7,14 +17,35 @@ downloads. See [Image replies](../../../docs/en/guides/images.md) /
 A new browser workbench, not an extraction of MaybeClaw's old page. No React,
 terminal renderer, CDN, browser runtime compiler, or product import is required.
 The browser entry exports `mountWebUI`, `transcriptBlock`, `approvalCard`,
-`detailPanel`, `markdown`, and the trusted extension interfaces.
+`detailPanel`, `markdown`, `createNavigation`, and the trusted extension interfaces.
 
 ```ts
 import { UiClient } from "@may/ui-client";
-import { mountWebUI } from "@may/web-ui";
+import { mountWebUI, type WebUiNavigation } from "@may/web-ui";
+
+const navigation: WebUiNavigation = {
+  groups: [
+    {
+      title: "Operations",
+      items: [
+        {
+          id: "manage",
+          label: "Settings",
+          icon: "gear",
+          action: () => openSettings(),
+        },
+      ],
+    },
+  ],
+};
 
 const client = new UiClient();
-const dispose = mountWebUI(root, client, { title: "My Agent", kind: "session" });
+const dispose = mountWebUI(root, client, {
+  title: "My Agent",
+  kind: "session",
+  navigation,
+  onNew: () => startFreshSession(),
+});
 await client.connect(controlToken);
 // dispose() disconnects this view, not the agent host.
 ```
@@ -82,12 +113,56 @@ inspect a read-only synthetic gallery, including failed renderers and unsupporte
 presentation versions. Use `stop` to close it. It is not runtime recovery evidence.
 
 
+## Typed navigation and product extension
+
+Products configure custom sidebar navigation via `WebUiOptions.navigation` or
+compose standalone navigation elements with `createNavigation(navigation, getContext)`.
+Navigation declarations define groups containing typed items with an icon,
+label, optional title, optional badge, action callback, and optional disabled predicates. Supported icons
+include `"plus"`, `"menu"`, `"send"`, `"stop"`, `"panel"`, `"search"`, `"arrow"`, `"code"`, `"task"`, `"trash"`, `"gear"`, `"users"`, `"message"`, `"check"`, and `"filter"`. Custom creation actions use `WebUiOptions.onNew`
+and `newLabel`, replacing internal DOM event interception with typed lifecycles and unified error reporting.
+
+```ts
+export interface WebUiNavigationItem {
+  readonly id: string;
+  readonly label: string;
+  readonly title?: string;
+  readonly badge?: string;
+  readonly icon?: "plus" | "menu" | "send" | "stop" | "panel" | "search" | "arrow" | "code" | "task" | "trash" | "gear" | "users" | "message" | "check" | "filter";
+  readonly ariaLabel?: string;
+  readonly disabled?: boolean | ((state: UiClientState) => boolean);
+  action(context: WebUiContext): void | Promise<void>;
+}
+
+export interface WebUiNavigationGroup {
+  readonly id?: string;
+  readonly title?: string;
+  readonly items: readonly WebUiNavigationItem[];
+}
+
+export interface WebUiNavigation {
+  readonly groups?: readonly WebUiNavigationGroup[];
+  render?(container: HTMLElement, context: WebUiContext): WebUiNavigationLifecycle | (() => void) | void;
+}
+```
+
+The shell renders navigation within an accessible navigation container (`<nav class="sidebar-navigation">`).
+On mobile viewports matching `max-width: 760px`, opening the drawer sidebar activates
+an accessible backdrop overlay (`.mobile-backdrop`) that blocks interaction with the main content.
+When collapsed or hidden on mobile screens, the drawer applies `inert` and `aria-hidden="true"`
+so child controls remain inaccessible to keyboard Tab navigation. Pressing the Escape key or clicking
+the backdrop dismisses the drawer, cleans up overlay state, and restores keyboard focus to the invoking trigger.
+
 ## Reading workbench
 
 The shell groups transcript records by run, retains local collapse/filter state,
 keeps current approvals outside filters, and preserves the visible scroll anchor
-while new output arrives. Its toolbar offers counts, expand/collapse all,
-exception-only filtering, approval location and back-to-latest/new-content controls.
+while new output arrives. During continuous follow mode (`following: true`), the
+reading container skips geometry measurements used to preserve the visible anchor.
+Transcript rendering evaluates block and interaction signatures to detect changes,
+and scroll animation frames are released during teardown or rapid stream updates.
+Its toolbar offers counts, expand/collapse all, exception-only filtering,
+approval location and back-to-latest/new-content controls.
 Tool cards use short labelled previews; the independent inspector reuses trusted
 product renderers and reads full stored fields in version-bound chunks. Long
 answers and diagnostics also expose inspection. The inspector resets on host or

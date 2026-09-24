@@ -64,8 +64,10 @@ import type { MaybeCodeAutoCompactionMode } from "./controller.js";
 import type { MaybeCodeModelConfiguration } from "./workspace.js";
 import type { SkillRegistry } from "@may/skills";
 import { resolveMaybeCodeSkillDirectories } from "./skills.js";
+import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
+  readonly permissionMode?: MaybeCodePermissionMode;
   /** Enable only when a UI consumes interaction events and answers the controller. */
   readonly mcpInteractions?: boolean;
   readonly workspace?: string;
@@ -140,6 +142,10 @@ export async function openConfiguredMaybeCode(
     options.configPath === undefined ? {} : { path: options.configPath },
   );
   const retry = options.retry ?? resolveMaybeCodeRetry(config);
+  const configuredPermissionMode = config.apps?.maybecode?.permissionMode;
+  const permissionMode = options.permissionMode === undefined
+    ? configuredPermissionMode === undefined ? "default" : parsePermissionMode(configuredPermissionMode)
+    : parsePermissionMode(options.permissionMode);
   const skillDirectories = options.skillDirectories ?? resolveMaybeCodeSkillDirectories(config, workspace);
   const runBudget = resolveRunBudget(options.runBudget ?? config.apps?.maybecode?.runBudget as RunBudget | undefined);
   const capabilityResolver = dependencies.capabilityResolver ??
@@ -244,6 +250,7 @@ export async function openConfiguredMaybeCode(
       });
     }
     application = await MaybeCodeWorkspace.open({
+      permissionMode,
       workspace,
       model: initialModel.model,
       modelInfo: initialModel.modelInfo,

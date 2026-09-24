@@ -50,14 +50,33 @@ function eventFields(event: SessionEvent): { id: string; fields: Partial<Record<
   if (event.type === "run.failed") return { id: `run:${event.runId}`, fields: { diagnostic: event.error.message } };
   return undefined;
 }
+function* historyFields(events: readonly SessionEvent[]): Iterable<{ id: string; fields: Partial<Record<UiField, string>> }> {
+  const steering = new Map<string, string>();
+  for (const event of events) {
+    if (event.type === "input.steering.queued") steering.set(event.input.inputId, event.input.message.content.filter(part => part.type === "text").map(part => part.text).join(""));
+    else if (event.type === "input.steering.delivered") {
+      for (const [index, inputId] of event.inputIds.entries()) {
+        const text = steering.get(inputId);
+        if (text === undefined) throw new Error(`Missing steering input in UI history: ${inputId}`);
+        steering.delete(inputId);
+        yield { id: `steering:${event.runId}:${event.step}:${index}`, fields: { text } };
+      }
+    } else {
+      if (event.type === "input.submitted" && event.inputId !== undefined) steering.delete(event.inputId);
+      if (event.type === "input.steering.finished" && event.status === "cancelled") for (const inputId of event.inputIds) steering.delete(inputId);
+      const entry = eventFields(event);
+      if (entry) yield entry;
+    }
+  }
+}
 export function recordedField(events: readonly SessionEvent[], block: UiBlock, field: UiField): string {
   let text = fieldText(block, field);
-  for (const event of events) { const entry = eventFields(event); if (entry?.id === block.id && entry.fields[field] !== undefined) text = entry.fields[field]!; }
+  for (const entry of historyFields(events)) if (entry.id === block.id && entry.fields[field] !== undefined) text = entry.fields[field]!;
   return text;
 }
 export function searchHistory(events: readonly SessionEvent[], query = ""): ReadonlySet<string> {
   const matches = new Set<string>(), needle = query.trim().toLocaleLowerCase();
-  if (needle) for (const event of events) { const entry = eventFields(event); if (entry && Object.values(entry.fields).some(text => text.toLocaleLowerCase().includes(needle))) matches.add(entry.id); }
+  if (needle) for (const entry of historyFields(events)) if (Object.values(entry.fields).some(text => text.toLocaleLowerCase().includes(needle))) matches.add(entry.id);
   return matches;
 }
 export function fieldPage(hostId: string, selectedId: string, request: UiFieldRequest, text: string): UiFieldPage {

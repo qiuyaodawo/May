@@ -13,9 +13,11 @@
     { "path": "../../packages/application" },
     { "path": "../../packages/tools/coding-tools" },
     { "path": "../../packages/config" },
+    { "path": "../../packages/coordination" },
     { "path": "../../packages/core" },
     { "path": "../../packages/media" },
     { "path": "../../packages/providers" },
+    { "path": "../../packages/permissions" },
     { "path": "../../packages/session" },
     { "path": "../../packages/ui/client" },
     { "path": "../../packages/ui/web" }

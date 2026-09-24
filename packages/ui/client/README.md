@@ -1,5 +1,16 @@
 # @may/ui-client
 
+`ApplicationUiOptions.badges` supplies current host status as optional
+`UiSnapshot.badges`. Each `UiBadge` has a text `label` and optional `neutral` or
+`warning` tone. Hosts publish changes through their event stream or `changed()`;
+badges describe current host state even when browsing historical sessions.
+
+`UiProjection` renders delivered steering messages with the same row identities
+for live events and Session history. It preserves delivery order and the owning
+Run; pending or cancelled input does not appear as delivered conversation content.
+History search and field reads include the full saved steering text beyond the
+bounded snapshot preview.
+
 `UiBlock.content` preserves ordered text and image attachments. `UiHost.media`
 and `UiClient.readMedia` provide authenticated, resource-scoped image access.
 See [Image replies](../../../docs/en/guides/images.md) /
@@ -21,6 +32,9 @@ independent view of a controller owned by a terminal. The owner distributes even
 to each view and closes the application. `startUiServer` can opt into `browserLogin`
 and return `createLoginUrl()` for a 60-second, single-use browser connection ticket.
 The exchange keeps the control token out of URLs and preserves API authentication.
+Custom product servers can import `BrowserLogin` from `@may/ui-client/server`
+and mount `issue()`, `redeem(ticket)`, and `clear()` alongside authenticated
+product routes. Tickets retain the same single-use and expiry rules.
 
 Product hosts can provide `controls`, `complete`, `available`, `submit`,
 `concurrentCommands` and `interactionCommands` on `ApplicationUiOptions`.

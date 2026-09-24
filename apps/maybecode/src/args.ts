@@ -1,4 +1,5 @@
 import { MaybeCodeUsageError } from "./errors.js";
+import type { MaybeCodePermissionMode } from "./policy.js";
 
 export const MAYBE_CODE_USAGE = `MaybeCode
 
@@ -16,6 +17,8 @@ Usage:
 Options:
   --config <path>      Load another May config file
   --model <name>       Use a named model profile
+  --yolo               Auto-approve tool requests, preserving explicit denials
+  --no-yolo            Use normal approvals, overriding configuration
   --ui <name>          UI implementation: retained (default), classic or web
   --port <number>      Local Web UI port (default: 3940; requires --ui web)
   -c, --continue       Continue the most recent session for this workspace
@@ -39,6 +42,7 @@ export interface MaybeCodeHelpCommand {
 }
 
 export interface MaybeCodeStartCommand {
+  readonly permissionMode?: MaybeCodePermissionMode;
   readonly type: "start";
   readonly workspace?: string;
   readonly configPath?: string;
@@ -95,10 +99,16 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   let ui: MaybeCodeUI | undefined;
   let port: number | undefined;
   let continueLatest = false;
+  let permissionMode: MaybeCodePermissionMode | undefined;
 
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]!;
     if (argument === "--help" || argument === "-h") return { type: "help" };
+    if (argument === "--yolo" || argument === "--no-yolo") {
+      if (permissionMode !== undefined) throw new MaybeCodeUsageError("Specify only one of --yolo or --no-yolo, once");
+      permissionMode = argument === "--yolo" ? "yolo" : "default";
+      continue;
+    }
     if (argument === "--continue" || argument === "-c") {
       if (continueLatest) {
         throw new MaybeCodeUsageError("--continue may only be specified once");
@@ -170,6 +180,7 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
 
   return {
     type: "start",
+    ...(permissionMode === undefined ? {} : { permissionMode }),
     autoResume: continueLatest,
     ui: ui ?? "retained",
     ...(port === undefined ? {} : { port }),

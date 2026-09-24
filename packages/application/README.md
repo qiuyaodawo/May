@@ -6,6 +6,22 @@ It implements `ContinuableAgentController`; `retry()` retains its failed-run che
 External components can use this API without changing Agent internals. See
 [Goals](../../docs/en/guides/goals.md).
 
+`AgentApplication` implements `SteerableAgentController`. Use
+`steer({ input, inputId?, runId? })` for durable FIFO input at the next complete
+Step, and `listSteeringInputs()` for `pending`, `delivered`, `idle`, or
+`cancelled` status. The host starts idle input with
+`startSteeringInput(inputId, options?)`, which returns an ordinary `AgentRun` and
+accepts Run options such as `shouldYield` and `signal`. Cancellation preserves
+undelivered records; it never starts a subsequent Run automatically. Steering
+while an operation starts or context compaction is active is rejected.
+`cancelSteeringInputs(reason?)` durably cancels every pending or idle input and
+preserves delivered input. A host-wide stop calls both `cancel(reason)` and
+`cancelSteeringInputs(reason)` so idle follow-up work is also cancelled.
+`submit()` and `continue()` use `SessionSubmitOptions` and
+`SessionContinueOptions`. Custom `stepInputSource` callbacks are rejected before
+execution; application input is accepted through `steer()` for durable history.
+Direct `May.run()` and `May.continue()` continue to accept custom sources.
+
 Pass `skills: SkillRegistry` to `defineAgent()` / `AgentApplication.open()` for
 catalog guidance, `skill_read` and durable activation. `activateSkill(name)`
 activates while idle; model activation uses the normal permission/tool path.

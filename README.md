@@ -35,7 +35,7 @@ packages/
 apps/
   cli/        Minimal command-line interface
   maybecode/ Terminal coding-agent application
-  maybeclaw/ Local durable-task assistant (CLI, Web UI, Feishu and Telegram)
+  maybeclaw/ Agent Gateway with sessions, CLI, Web UI, Feishu and Telegram
 examples/
   basic/      Minimal Model → Tool → Model example
   deepseek/   Live DeepSeek tool-call example
@@ -82,11 +82,12 @@ permissions and execution in the local host. Run `pnpm example:web-ui` for an
 offline preview. See the [Web UI guide](docs/en/guides/web-ui.md) or
 [简体中文指南](docs/zh-CN/guides/web-ui.md) for setup and first-phase limitations.
 
-MaybeClaw is a second product built directly on the reusable packages, not on
-MaybeCode. It provides persistent local tasks, deduplicated input,
-optional bounded read access, cancellation and evidence-based recovery without
-replaying submitted work, plus a loopback control server/Web UI and allowlisted
-Feishu/Telegram private-chat adapters. See the
+MaybeClaw connects May Agents and external Agent adapters to personal and group
+sessions through a Gateway. It manages session routing, dedicated Agent
+conversations, collaboration, approvals, cancellation and durable message
+delivery. Administrators configure Agents and session access through the CLI
+and Web control interface; users participate through Feishu or Telegram.
+Gateway state uses SQLite and requires Node.js 22.13 or later. See the
 [MaybeClaw guide](docs/en/guides/maybeclaw.md) or its
 [Chinese mirror](docs/zh-CN/guides/maybeclaw.md).
 

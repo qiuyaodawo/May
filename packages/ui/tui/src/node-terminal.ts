@@ -38,6 +38,8 @@ export interface TerminalIO {
   readonly colors?: boolean;
   readonly interactive?: boolean;
   question(prompt: string, options?: TerminalQuestionOptions): Promise<string>;
+  /** 更新当前问题的提示文字，保留输入内容和光标。 */
+  updatePrompt?(prompt: string): void;
   /** Read one normalized key while no line question is active. */
   readKey?(options?: { readonly signal?: AbortSignal }): Promise<KeyStroke>;
   /** Render a temporary full-screen view. */
@@ -290,6 +292,14 @@ export function createNodeTerminal(
           history.splice(0, history.length, ...previousHistory);
         }
       }
+    },
+    updatePrompt(prompt) {
+      if (activePrompt === undefined) return;
+      eraseSuggestionRows();
+      activePrompt = prompt;
+      readline.setPrompt(prompt.replace(/^\r?\n/u, ""));
+      if (interactive) readline.prompt(true);
+      drawSuggestionRows();
     },
     readKey({ signal } = {}) {
       if (!interactive) {

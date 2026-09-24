@@ -1,5 +1,6 @@
 import { commandArgs, UiError, type UiAction, type UiCommand, type UiControls, type UiReceipt } from "@may/ui-client";
 import type { MaybeCodeController } from "./controller.js";
+import { parsePermissionMode } from "./policy.js";
 import { parseMaybeCodeSlashCommand } from "./slash-commands.js";
 import { createMaybeCodeSlashCommandSuggester, executeMaybeCodeSlashCommand, formatMaybeCodeMcpStatus, type MaybeCodeSlashCommandResult } from "./slash-commands.js";
 
@@ -11,7 +12,8 @@ export class MaybeCodeWebCommands {
   }
 
   available(name: string): boolean {
-    if (name === "message.submit") return !this.app.isRunning || this.app.getGoal?.()?.status === "active";
+    if (name === "permission.set" && (this.app.isRunning || this.app.getGoal?.()?.status === "active" || this.app.getMcpInteractions?.().length)) return false;
+    if (name === "message.submit") return !this.busy;
     if (name === "mcp.respond") return Boolean(this.app.getMcpInteractions?.().length);
     if (name === "console.cancel") return true;
     if (this.busy) return ["run.cancel", "approval.resolve"].includes(name);
@@ -59,6 +61,8 @@ export class MaybeCodeWebCommands {
         if (this.app.isRunning) {
           const parsed = parseMaybeCodeSlashCommand(command.args.text!);
           const allowed = parsed.type === "command" && (parsed.definition.name === "/help" || parsed.definition.name === "/status" ||
+            parsed.definition.name === "/steer" || parsed.definition.name === "/stop" ||
+            parsed.definition.name === "/yolo" && parsed.arguments[0] === "status" ||
             parsed.definition.name === "/goal" && ["status", "pause", "cancel"].includes(parsed.arguments[0] ?? "status"));
           if (!allowed) throw new UiError(409, "请暂停当前运行后执行此命令。");
         }
@@ -66,7 +70,10 @@ export class MaybeCodeWebCommands {
         const result = await executeMaybeCodeSlashCommand(command.args.text!, this.app);
         return await this.present(result);
       }
-      if (command.name === "model.switch") {
+      if (command.name === "permission.set") {
+        commandArgs(command, ["value"]); await this.app.setPermissionMode(parsePermissionMode(command.args.value));
+        return { output: { title: "Permissions", text: this.app.permissionMode === "yolo" ? "YOLO enabled" : "YOLO disabled" } };
+      } else if (command.name === "model.switch") {
         commandArgs(command, ["value"]); await this.app.switchModel(command.args.value!);
       } else if (command.name === "effort.set") {
         commandArgs(command, ["value"]); await this.app.setReasoningEffort(command.args.value === "default" ? undefined : command.args.value);

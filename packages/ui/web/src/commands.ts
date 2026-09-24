@@ -55,7 +55,13 @@ export function createCommandUI(client: UiClient, composer: HTMLTextAreaElement,
     };
     if (!action.confirm && !action.input) { void execute({ ...action.args }).catch(reason => error(output, reason)); return; }
     const dialog = element("dialog", "connect-dialog"), form = element("form");
-    form.append(element("h2", "", action.label));
+    const headingId = "command-action-title-" + Math.random().toString(36).slice(2, 9);
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", headingId);
+    const heading = element("h2", "", action.label);
+    heading.id = headingId;
+    form.append(heading);
     if (action.confirm) form.append(element("p", "", action.confirm));
     const field = element("input", "token-input");
     if (action.input) { field.value = action.input.value; field.required = true; field.maxLength = 160; field.setAttribute("aria-label", action.input.label); form.append(field); }

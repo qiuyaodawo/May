@@ -15,6 +15,7 @@ export type MaybeCodeSessionEvent =
     };
 
 export type MaybeCodeEvent =
+  | { type: "permission-mode.changed"; mode: import("./policy.js").MaybeCodePermissionMode }
   | MaybeCodeSessionEvent
   | McpClientEvent
   | McpInteractionEvent

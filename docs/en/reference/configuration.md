@@ -1,5 +1,29 @@
 # May configuration reference
 
+## MaybeCode permission mode
+
+`apps.maybecode.permissionMode` accepts `"default"` (the default) or `"yolo"`.
+YOLO auto-approves tool requests while preserving explicit policy denials. CLI
+`--yolo` and `--no-yolo` override configuration; using both is an error.
+
+`/yolo [on|off|status]` and the Web UI Permissions selector control the current
+workspace host. `/yolo` and `/yolo on` enable YOLO, `/yolo off` disables it, and
+`/yolo status` only reports the current mode. Repeating `/yolo` keeps it enabled.
+Pause or cancel active runs, goals, and MCP operations before
+changing modes. The mode follows session and model changes within that host;
+it is not restored from conversation history or written to configuration.
+Restarting resolves the current startup options again. `/goal` uses the host's
+current permissions and cannot enable YOLO itself.
+
+The terminal and Web UI show `YOLO · Auto-approve` while enabled, with English
+mode-change notifications. The shared Web UI displays optional host-provided
+`UiSnapshot.badges` in its fixed header, including while reading older sessions.
+Classic terminals use `TerminalIO.updatePrompt` to refresh the mode without
+replacing the draft or cursor position.
+Tool validation, cancellation, and execution records remain active. MCP requests
+for user input still require answers. YOLO does not provide OS isolation; shell
+commands have the host account's permissions. Team authorization is independent.
+
 `apps.maybecode.skills` accepts `false` or `{ "directories": ["./skills"] }`.
 See [Agent Skills](../guides/skills.md) for discovery precedence and path resolution.
 
@@ -298,19 +322,31 @@ settings and do not enter the agent's context. See
 
 ## MaybeClaw settings
 
-`apps.maybeclaw` accepts `runBudget`, `server.maxConcurrent` (1..4, default 1),
-and `channels.telegram` / `channels.feishu`. Channels default to disabled and require
-nonempty user-ID allowlists when enabled. Telegram accepts a literal `botToken` or
+`apps.maybeclaw` uses `version: 2`, an optional `agents` list (defaults to `[]` when
+omitted), `access`, `server`, and `channels.telegram` / `channels.feishu`.
+`server.maxConcurrent` defaults to 4. Missing MaybeClaw configuration or administrator
+authentication opens local password initialization on service startup. Initialization
+preserves existing settings and directly saves `passwordHash`, `version: 2`, and an
+empty Agent list when absent. Existing old configurations require explicit migration.
+For manual setup, users can configure only the administrator password,
+`version: 2`, and `agents: []` (or omit `agents`) to start the Web console, add the first
+Agent through the Web manager, and create sessions without restarting. Existing May
+`providers` and `models` are retained for May Agents.
+Each Agent configures its model, startup settings, permissions, and `runBudget`.
+Channels default to disabled and require permitted users or groups when enabled.
+Telegram accepts a literal `botToken` or
 an environment-variable name in `botTokenEnv`; Feishu accepts `appSecret` or
 `appSecretEnv`. Each pair is mutually exclusive. Omitting both uses the default
 environment variable. Inline credentials are stored in plaintext: protect the
 config file and never commit it. Changing channel settings requires restarting `serve`.
-The operator token comes from `MAYBECLAW_CONTROL_TOKEN` or `--token-env`.
-RunBudget can tighten the product's bounded defaults but cannot increase them. Model selection uses `--model`,
-`defaultModel`, or the sole configured profile; MaybeCode settings are not reused.
+Gateway `serve` requires `server.auth.password` (10–1024 characters) or its
+generated `passwordHash`. Startup and configuration saves convert the password
+to salted Argon2id; changing it invalidates existing logins. `server.auth.sessionMs`
+defaults to 28800000 and accepts 1000–86400000 milliseconds. Web login accepts the
+original password. Remote CLI reads `MAYBECLAW_ADMIN_PASSWORD` or `--password-env`.
 The editor schema shares the RunBudget definition across both products. See the
-[MaybeClaw guide](../guides/maybeclaw.md) for persisted model bindings, output caps,
-usage requirements and execution/recovery boundaries.
+[MaybeClaw guide](../guides/maybeclaw.md) for Agent definitions, permissions,
+chat entrances, authentication, and execution/recovery boundaries.
 
 ## Maintenance source of truth
 

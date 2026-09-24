@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { waitForTerminalRun } from "./terminal-readiness.mjs";
 
 import { InMemorySessionStore } from "@may/session";
 import {
@@ -62,6 +63,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   });
   const initialSessionId = app.sessionId;
 
+  terminal.application = app;
   await runTerminalUI(app, { terminal });
 
   assert.equal(await readFile(join(workspace, "hello.txt"), "utf8"), "hello");
@@ -151,16 +153,17 @@ test("Ctrl+C cancels an active run and keeps the UI usable", async () => {
     autoResume: false,
   });
 
+  terminal.application = app;
   await runTerminalUI(app, { terminal });
 
   assert.match(terminal.output, /Cancelling current operation/);
   assert.match(terminal.output, /Run cancelled: Interrupted/);
 });
 
-test("terminal UI shows automatic compaction failure and fallback progress", async () => {
+test("terminal UI shows automatic compaction failure and fallback progress", async (t) => {
   const terminal = new FakeTerminal(["x".repeat(2500), "/quit"]);
   const app = await MaybeCodeWorkspace.open({
-    workspace: process.cwd(),
+    workspace: await temporaryDirectory(t),
     model: {
       async *stream() {
         yield {
@@ -195,6 +198,7 @@ test("terminal UI shows automatic compaction failure and fallback progress", asy
     ],
   });
 
+  terminal.application = app;
   await runTerminalUI(app, { terminal });
 
   assert.match(
@@ -320,6 +324,7 @@ test("terminal UI retries the latest failed run without duplicating input", asyn
     autoResume: false,
   });
 
+  terminal.application = app;
   await runTerminalUI(app, { terminal });
 
   assert.equal(modelCalls, 2);
@@ -435,6 +440,9 @@ class FakeTerminal {
     }
     if (signal?.aborted) throw abortError();
     if (prompt.includes("[a]llow once")) return "s";
+    if (this.application !== undefined && prompt.endsWith("> ")) {
+      await waitForTerminalRun(this.application, signal);
+    }
     const answer = this.#answers.shift();
     if (answer === undefined) throw new Error(`No answer for prompt: ${prompt}`);
     return answer;

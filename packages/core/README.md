@@ -14,6 +14,16 @@ not schedule wakeups or replay the step; the caller owns subsequent Runs. With n
 callback, normal execution is unchanged. See the [coordination guide](../../docs/en/guides/coordination.md)
 for slot-releasing subagent waits above Core.
 
+`stepInputSource({ runId, step, signal })` optionally returns additional user
+messages after a complete Step. The host must persist these messages before
+returning them. Core appends the committed messages before the next model call
+and emits `input.received`; it never interrupts the Step's tools or approvals.
+`shouldYield` takes precedence. A final assistant response followed by new input
+continues within the same Run, subject to its existing budget. If cancellation
+arrives after the host commits input, Core updates Context before stopping, so
+live Context agrees with durable history. `@may/session` owns this source when
+composing a runtime and exposes its durable `steer()` queue.
+
 ```ts
 import { InMemoryContext, May } from "@may/core";
 

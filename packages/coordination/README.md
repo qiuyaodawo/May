@@ -15,12 +15,22 @@ Root exports:
   `send_message` / `wait_for_messages` with `messaging: true`,
   or `handoff_task` with `handoff: true`;
 - `pipeline()` and `parallelTasks()`: construct ordinary task graphs;
+- `validateCoordinationSnapshot(snapshot, id)`: validate persisted state before host-specific recovery decisions;
 - `InMemoryCoordinationStore` and the public contracts;
 - `FileSharedBudget`: durable local model-call reservations/accounting;
 - `FileArtifactStore`: immutable, scoped UTF-8 artifacts;
 - `TaskWorkspaceManager`: filtered per-task file copies and read-only change manifests.
 
 `FileCoordinationStore` is exported through `@may/coordination/file-store`.
+
+Hosts that own persistent Agent conversations can implement `CoordinationAgent`
+with `coordinationInput(execution)` and
+`createCoordinationTools(context, onYield)`. These helpers preserve dependency,
+mailbox, and handoff input conventions and supply the existing delegation,
+messaging, and handoff tools. The host must serialize each conversation, pass
+the yield signal to its Agent runtime, and inspect durable outcomes in `recover`.
+Cancelling a pending permission request establishes that its tool did not start;
+other interrupted tool effects still require durable evidence.
 `CoordinationWorker` and `createRemoteAgent` use `@may/coordination/remote`.
 
 Opening does not execute agents. `wait()` starts scheduling and resolves when no

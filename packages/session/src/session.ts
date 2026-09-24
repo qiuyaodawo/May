@@ -24,6 +24,7 @@ import type {
   SessionRecovery,
 } from "./events.js";
 import { sessionToolResultContent } from "./events.js";
+import { SessionSteeringQueue, type SessionSteerOptions, type SessionSteeringInput } from "./steering.js";
 import {
   SessionHistoryReader,
   type SessionHistoryQuery,
@@ -62,8 +63,14 @@ export interface SessionRuntimeInfo {
 }
 
 /** Optional host delivery identity. Duplicates are rejected, not submitted again. */
-export interface SessionSubmitOptions extends RunOptions {
+export interface SessionSubmitOptions extends Omit<RunOptions, "stepInputSource"> {
+  readonly stepInputSource?: never;
   readonly inputId?: string;
+}
+
+/** Session 的补充输入统一通过 steer() 保存和交付。 */
+export interface SessionContinueOptions extends Omit<ContinueOptions, "stepInputSource"> {
+  readonly stepInputSource?: never;
 }
 
 export class Session {
@@ -86,6 +93,9 @@ export class Session {
   private readonly checkpointed = new Set<string>();
   private readonly recoveries = new Map<string, SessionRecovery>();
   private persistenceFailed = false;
+  private readonly steering: SessionSteeringQueue;
+  private activeRun: RunHandle | undefined;
+  private readonly submittedInputIds = new Set<string>();
 
   private constructor(
     id: string,
@@ -93,6 +103,7 @@ export class Session {
     store: SessionStore,
     metadata: Record<string, unknown> | undefined,
     seq: number,
+    history: readonly SessionEvent[] = [],
   ) {
     this.id = id;
     this.runtime = runtime;
@@ -100,6 +111,10 @@ export class Session {
     this.historyReader = new SessionHistoryReader(store);
     this.metadata = metadata === undefined ? undefined : { ...metadata };
     this.seq = seq;
+    this.steering = new SessionSteeringQueue((event) => this.record(event), history);
+    for (const event of history) {
+      if (event.type === "input.submitted" && event.inputId !== undefined) this.submittedInputIds.add(event.inputId);
+    }
   }
 
   static async create(options: SessionOptions): Promise<Session> {
@@ -156,6 +171,7 @@ export class Session {
       options.store,
       created.metadata,
       recoveredEvents.length,
+      recoveredEvents,
     );
     for (const event of recoveredEvents) {
       if (event.type === "run.interrupted") {
@@ -164,16 +180,42 @@ export class Session {
         }
       } else if (event.type === "recovery.resolved") session.recoveries.delete(event.recoveryId);
     }
+    for (const runId of new Set(session.steering.list().filter((input) => input.status === "pending").map((input) => input.runId!))) {
+      const terminal = [...recoveredEvents].reverse().find((event) => "runId" in event && event.runId === runId && ["run.completed", "run.yielded", "run.cancelled", "run.failed", "run.interrupted"].includes(event.type));
+      await session.steering.finish(runId, terminal?.type === "run.completed" || terminal?.type === "run.yielded" ? "idle" : "cancelled", terminal?.type ?? "interrupted");
+    }
     return session;
   }
 
   submit(options: SessionSubmitOptions): Promise<RunHandle> {
+    assertSessionInputOptions(options);
     const started = this.tail.then(() => this.start(options));
     return this.queue(started);
   }
 
+  async steer(options: SessionSteerOptions): Promise<SessionSteeringInput> {
+    this.assertRecovered();
+    if (options.inputId !== undefined && this.submittedInputIds.has(options.inputId)) throw new Error(`Input already submitted: ${options.inputId}`);
+    return this.steering.enqueue(options, this.activeRun?.id);
+  }
+
+  listSteeringInputs(): readonly SessionSteeringInput[] {
+    return this.steering.list();
+  }
+
+  cancelSteeringInputs(reason = "Cancelled by user"): Promise<void> {
+    return this.steering.cancel(reason);
+  }
+
+  startSteeringInput(inputId: string, options: Omit<SessionSubmitOptions, "input" | "inputId"> = {}): Promise<RunHandle> {
+    assertSessionInputOptions(options);
+    const input = this.steering.idle(inputId);
+    return this.submit({ ...options, input: input.message, inputId });
+  }
+
   /** Continue the current context without recording a new user input. */
-  continue(options: ContinueOptions = {}): Promise<RunHandle> {
+  continue(options: SessionContinueOptions = {}): Promise<RunHandle> {
+    assertSessionInputOptions(options);
     const started = this.tail.then(() => this.startContinuation(options));
     return this.queue(started);
   }
@@ -257,10 +299,17 @@ export class Session {
     if (options.inputId !== undefined) {
       if (typeof options.inputId !== "string" || options.inputId.length === 0 || options.inputId.length > 256) throw new TypeError("inputId must be a non-empty string of at most 256 characters");
       if ((await this.history()).some((event) => event.type === "input.submitted" && event.inputId === options.inputId)) throw new Error(`Input already submitted: ${options.inputId}`);
+      const steeringInput = this.steering.get(options.inputId);
+      if (steeringInput !== undefined) {
+        this.steering.idle(options.inputId);
+        const message = typeof options.input === "string" ? userMessage(options.input) : options.input;
+        if (JSON.stringify(message) !== JSON.stringify(steeringInput.message)) throw new Error("Steering input content cannot change when starting execution");
+      }
     }
     const runtimeOptions: RunOptions = {
       ...options,
       checkpoint: (event) => this.checkpoint(event, options.checkpoint),
+      stepInputSource: ({ runId, step, signal }) => this.steering.deliver(runId, step, signal),
       traceAttributes: {
         ...(options.traceAttributes ?? {}),
         "may.session.id": this.id,
@@ -272,7 +321,11 @@ export class Session {
     if (options.signal?.aborted === true) {
       return this.wrapRun(this.runtime.run(runtimeOptions));
     }
+    if (options.inputId !== undefined) this.submittedInputIds.add(options.inputId);
     await this.record({ type: "input.submitted", message: input, ...(options.inputId === undefined ? {} : { inputId: options.inputId }) });
+    if (options.inputId !== undefined) {
+      this.steering.submitted(options.inputId);
+    }
 
     return this.wrapRun(this.runAfterInputCommit(runtimeOptions));
   }
@@ -298,11 +351,12 @@ export class Session {
     return run;
   }
 
-  private startContinuation(options: ContinueOptions): RunHandle {
+  private startContinuation(options: SessionContinueOptions): RunHandle {
     this.assertRecovered();
     return this.wrapRun(this.runtime.continue({
       ...options,
       checkpoint: (event) => this.checkpoint(event, options.checkpoint),
+      stepInputSource: ({ runId, step, signal }) => this.steering.deliver(runId, step, signal),
       traceAttributes: {
         ...(options.traceAttributes ?? {}),
         "may.session.id": this.id,
@@ -311,6 +365,17 @@ export class Session {
   }
 
   private wrapRun(run: RunHandle): RunHandle {
+    this.activeRun = run;
+    const completion = run.result.then(async (value) => {
+      if (this.activeRun === run) this.activeRun = undefined;
+      await this.steering.finish(run.id, "idle", value.finishReason === "yielded" ? "yielded" : "completed");
+      return value;
+    }, async (error: unknown) => {
+      if (this.activeRun === run) this.activeRun = undefined;
+      await this.steering.finish(run.id, "cancelled", error instanceof Error ? error.message : "Run failed");
+      throw error;
+    });
+    void completion.catch(() => undefined);
     const events = new AsyncEventQueue<MayEvent>({
       maxBufferedValues: 1024,
       isDroppable: isStreamingMayEvent,
@@ -325,7 +390,7 @@ export class Session {
         run.cancel("Session event persistence failed");
         throw error;
       }
-      return run.result;
+      return completion;
     })();
 
     void result.catch(() => undefined);
@@ -618,6 +683,7 @@ function replaySession(events: readonly SessionEvent[]): {
   info: SessionRuntimeInfo;
 } {
   const messages: Message[] = [];
+  const steeringInputs = new Map<string, UserMessage>();
   const pendingTools = new Map<string, Map<string, ToolCall>>();
   const state: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   let latestModelMeasurement: SessionModelMeasurement | undefined;
@@ -641,6 +707,16 @@ function replaySession(events: readonly SessionEvent[]): {
         break;
       case "input.submitted":
         messages.push(event.message);
+        break;
+      case "input.steering.queued":
+        steeringInputs.set(event.input.inputId, event.input.message);
+        break;
+      case "input.steering.delivered":
+        for (const inputId of event.inputIds) {
+          const input = steeringInputs.get(inputId);
+          if (input === undefined) throw new Error(`Missing steering input: ${inputId}`);
+          messages.push(input);
+        }
         break;
       case "assistant.completed":
         messages.push(event.message);
@@ -845,6 +921,10 @@ function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
     default:
       return undefined;
   }
+}
+
+function assertSessionInputOptions(options: { readonly stepInputSource?: unknown }): void {
+  if (options.stepInputSource !== undefined) throw new TypeError("Session manages step input through steer(); custom stepInputSource is unsupported");
 }
 
 function createSessionId(): string {

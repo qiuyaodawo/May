@@ -6,6 +6,7 @@ import { UiProjection } from "./projection.js";
 import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";
 
 export interface ApplicationUiOptions {
+  readonly badges?: () => readonly import("./protocol.js").UiBadge[];
   readonly readMedia?: MediaReader;
   readonly events?: AsyncIterable<{ type: string }>;
   readonly closeApplication?: boolean;
@@ -91,6 +92,7 @@ export class ApplicationUiHost implements UiHost {
     }
     const page = historyPage(this.hostId, viewingId, [...projected.blocks.values()]);
     return { version: 1, hostId: this.hostId, revision, product: this.options.product, resources, resourcesVersion,
+      ...(this.options.badges ? { badges: this.options.badges() } : {}),
       selectedId: viewingId, activeId, blocks: all ? [...projected.blocks.values()] : page.items,
       historyPage: { nextCursor: page.nextCursor, total: page.total }, reads: { resources: true, history: Boolean(this.app.readSessionHistory), fields: Boolean(this.app.readSessionHistory) },
       interactions, commands,

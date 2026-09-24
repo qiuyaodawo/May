@@ -101,6 +101,27 @@ runtime 前快照工具 iterable。重要的 ownership 规则包括：
 `compactContext()` 会拒绝冲突操作。`cancel()` 优先取消活动 Run，否则取消活动压缩，
 并返回是否找到可取消操作。
 
+`AgentApplication` 同时实现 `SteerableAgentController`。
+`steer({ input, inputId?, runId? })` 保存补充输入，当前 Step 继续执行。全部工具和审批
+等待完成后，补充输入按接收顺序进入 Context，随后由下一次模型请求读取。明确提供
+`runId` 时，它必须对应当前 Run。`listSteeringInputs()` 返回 `pending`、`delivered`、
+`idle` 或 `cancelled` 状态。`delivered` 表示输入已经保存为 Context 内容，模型可能
+仍未开始处理该输入。
+
+没有活动 Run，或者原 Run 在交付前完成或 yield 时，host 按顺序调用
+`startSteeringInput(inputId, options?)`，通过返回的 `AgentRun` 管理后续执行。
+`options` 可以继续提供 `shouldYield`、执行预算和取消信号。host 的 yield 判断优先于
+当前 Run 内的输入交付。取消、失败和进程中断会将未交付输入保留为 `cancelled`；
+用户明确重新提交时需要新的输入标识。全部输入状态可以通过 Session 恢复。
+操作正在启动或者正在压缩 Context 时，补充输入请求被拒绝。
+`cancelSteeringInputs(reason?)` 保存全部 `pending` 和 `idle` 输入的取消状态，
+已交付输入保持不变。宿主的停止操作同时调用它和 `cancel(reason)`，从而取消
+当前操作及其等待中的工作。
+`submit()` 和 `continue()` 分别接受 `SessionSubmitOptions` 和
+`SessionContinueOptions`。这些 Session 接口以及 `startSteeringInput()` 会在执行前
+拒绝自定义 `stepInputSource`，并抛出 `TypeError`。需要保存历史的补充输入通过
+`steer()` 接收；直接使用 `May.run()` 或 `May.continue()` 时仍可提供自定义输入源。
+
 `retry()` 的语义刻意保持狭窄：只有最近的持久化 Run 终态事件为 `run.failed` 时才
 接受。它延续已有 Context，不重复记录用户输入。最近 Run 已取消或完成时不能用该方法
 重试。

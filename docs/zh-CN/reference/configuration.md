@@ -1,5 +1,24 @@
 # May 配置参考
 
+## MaybeCode 权限模式
+
+`apps.maybecode.permissionMode` 接受 `"default"`（默认值）或 `"yolo"`。
+YOLO 自动批准工具请求，并保留权限策略明确禁止的操作。启动参数 `--yolo`
+和 `--no-yolo` 优先于配置；同时使用两个参数会报错。
+
+`/yolo [on|off|status]` 和 WebUI 的 Permissions 选择器控制当前 workspace
+宿主。`/yolo` 和 `/yolo on` 开启模式，`/yolo off` 关闭模式，`/yolo status`
+仅查询当前状态。重复输入 `/yolo` 会保持开启。切换之前需要暂停或取消正在执行的
+run、goal 和 MCP 操作。宿主中的
+会话切换和模型切换继续使用当前模式；模式不会从对话历史恢复，也不会写入配置。
+重新启动时依据当前启动参数和配置确定模式。`/goal` 使用宿主当前权限，无法自行开启 YOLO。
+
+终端与 WebUI 在开启期间显示 `YOLO · Auto-approve`，模式变化提示使用英文。
+通用 WebUI 通过可选的 `UiSnapshot.badges` 在固定顶部显示宿主状态，阅读历史会话时
+也会显示。classic 终端通过 `TerminalIO.updatePrompt` 更新模式，保留输入文字和光标位置。
+工具参数检查、取消机制和执行记录继续生效。MCP 用户输入请求仍然需要回答。
+YOLO 不提供系统隔离，shell 命令具有宿主账户的系统权限。Team 使用独立的授权设置。
+
 `apps.maybecode.skills` 支持 `false` 或 `{ "directories": ["./skills"] }`。
 发现优先级和路径解析见 [Agent Skills](../guides/skills.md)。
 
@@ -276,16 +295,24 @@ MaybeCode 的 retained 终端界面通过 `MAY_TUI_LEADER` 设置显示操作组
 
 ## MaybeClaw 设置
 
-`apps.maybeclaw` 接受 `runBudget`、`server.maxConcurrent`（1..4，默认 1）以及
-`channels.telegram` / `channels.feishu`。渠道默认关闭，启用时必须设置非空用户 ID
-白名单。Telegram 支持直接填写 `botToken`，或用 `botTokenEnv` 指定环境变量名；
+`apps.maybeclaw` 使用 `version: 2`、可选的 `agents` 列表（省略时规范为 `[]`）、`access`、
+`server` 以及 `channels.telegram` / `channels.feishu`。`server.maxConcurrent` 默认值为 4。
+启动服务时，缺少 MaybeClaw 配置或管理员认证会进入本机密码初始化页面。初始化保留
+已有设置，直接保存 `passwordHash`，并补充缺失的 `version: 2` 和空 Agent 列表。
+已有旧配置需要明确迁移。手动配置时，可以填写管理员密码、`version: 2` 和 `agents: []`（或省略 `agents`）启动 Web 控制台，
+通过 Web 管理器添加首个 Agent 并创建会话，无需重启服务。保留 May 已有的 `providers` 和 `models`
+供 May Agent 使用。
+每个 Agent 分别配置模型、启动参数、权限和 `runBudget`。渠道默认关闭，启用时需要
+配置允许访问的用户或群聊。Telegram 支持直接填写 `botToken`，或用 `botTokenEnv` 指定环境变量名；
 飞书对应 `appSecret` / `appSecretEnv`。每一对字段不能同时填写，都省略时使用默认
 环境变量。直接填写的凭据以明文保存，应保护配置文件且不要提交到仓库。
 渠道配置变更后重启 `serve`。
-控制令牌来自 `MAYBECLAW_CONTROL_TOKEN` 或 `--token-env` 指定的变量。
-`runBudget` 可以收紧产品的有界默认预算，不能扩大。
-模型通过 `--model`、`defaultModel` 或唯一档案选择，不复用 MaybeCode 的应用设置。
-编辑器 schema 为两款产品共享 RunBudget 定义。持久模型绑定、输出上限、用量要求及
+Gateway `serve` 需要 `server.auth.password`（10 至 1024 个字符）或自动生成的
+`passwordHash`。启动和配置保存时会将密码转换为带随机盐的 Argon2id 哈希，修改密码
+会使已有登录失效。`server.auth.sessionMs` 默认为 28800000，接受 1000 至 86400000
+毫秒。Web 输入原始密码登录；远程 CLI 从 `MAYBECLAW_ADMIN_PASSWORD` 或
+`--password-env` 指定的变量读取密码。
+编辑器 schema 为两款产品共享 RunBudget 定义。Agent 定义、权限、聊天入口、认证及
 执行/恢复边界参阅 [MaybeClaw 指南](../guides/maybeclaw.md)。
 
 ## 维护时的事实来源

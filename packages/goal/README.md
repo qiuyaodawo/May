@@ -3,6 +3,8 @@
 Independent, durable goal execution composed through public Agent interfaces.
 The package depends on `@may/core` and `@may/context`. Base Agent packages do not
 import it. Importing the package starts no execution.
+`GoalAgent` uses submission and continuation options without `stepInputSource`;
+the attached Agent owns any additional input and its persistence.
 
 Run count, active execution time and token usage are unlimited unless the caller
 supplies the corresponding budget. Saved goals retain their recorded limits.

@@ -1,0 +1,1 @@
+export { parsePatch } from "diff";

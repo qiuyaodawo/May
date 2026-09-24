@@ -78,6 +78,8 @@ export interface MayOptions {
 export interface RunOptions {
   /** Host-only control, checked after a complete model/tool step. Never interrupts tools. */
   shouldYield?: () => boolean;
+  /** 完整 Step 结束后接收输入；返回前由 host 保存输入记录。 */
+  stepInputSource?: StepInputSource;
   runBudget?: RunBudget;
   input: string | UserMessage;
   /** Awaited durability barrier. Failure stops execution; never retry it blindly. */
@@ -91,6 +93,7 @@ export interface RunOptions {
 
 export interface ContinueOptions {
   shouldYield?: () => boolean;
+  stepInputSource?: StepInputSource;
   runBudget?: RunBudget;
   checkpoint?: RunCheckpoint;
   signal?: AbortSignal;
@@ -112,6 +115,12 @@ export type RunCheckpointEvent = Extract<MayEventPayload, {
   type: "run.started" | "model.completed" | "tool.started" | "tool.completed" | "tool.failed" | "run.yielded";
 }> & { readonly runId: string };
 export type RunCheckpoint = (event: RunCheckpointEvent) => Promise<void>;
+
+export type StepInputSource = (boundary: {
+  readonly runId: string;
+  readonly step: number;
+  readonly signal: AbortSignal;
+}) => Promise<readonly UserMessage[]>;
 
 export class May {
   private readonly model: Model;
@@ -178,6 +187,7 @@ export class May {
       options.checkpoint,
       options.runBudget,
       options.shouldYield,
+      options.stepInputSource,
     );
   }
 
@@ -191,6 +201,7 @@ export class May {
       options.checkpoint,
       options.runBudget,
       options.shouldYield,
+      options.stepInputSource,
     );
   }
 
@@ -202,6 +213,7 @@ export class May {
     checkpoint: RunCheckpoint | undefined,
     budgetOverride: RunBudget | undefined,
     shouldYield: (() => boolean) | undefined,
+    stepInputSource: StepInputSource | undefined,
   ): RunHandle {
     if (this.unsafeToReuse) throw new RunCheckpointError(new Error("Tool outcomes or Context are uncertain; reconcile before creating a new runtime"));
     const budget = new RunBudgetMeter(resolveRunBudget(this.runBudget, budgetOverride));
@@ -274,6 +286,7 @@ export class May {
       durableCheckpoint,
       budget,
       shouldYield,
+      stepInputSource,
       (reason) => controller.abort(reason),
     ).then(
       (value) => {
@@ -328,6 +341,7 @@ export class May {
     checkpoint: RunCheckpoint | undefined,
     budget: RunBudgetMeter,
     shouldYield: (() => boolean) | undefined,
+    stepInputSource: StepInputSource | undefined,
     abortPending: (reason: unknown) => void,
   ): Promise<RunResult> {
     let aggregateUsage: Usage | undefined;
@@ -476,6 +490,7 @@ export class May {
             emit({ type: "run.yielded", result });
             return result;
           }
+          if (await this.receiveStepInput(stepInputSource, runId, step, signal, emit)) continue;
           emit({ type: "run.completed", result });
           return result;
         }
@@ -551,6 +566,7 @@ export class May {
           emit({ type: "run.yielded", result });
           return result;
         }
+        await this.receiveStepInput(stepInputSource, runId, step, signal, emit);
       }
 
       if (budget.limits.maxSteps !== undefined && budget.limits.maxSteps <= this.maxSteps) throw new RunBudgetExceededError("steps", budget.limits.maxSteps, this.maxSteps + 1);
@@ -645,6 +661,31 @@ export class May {
       emit({ type: "run.failed", error: serializeError(error) });
       throw error;
     }
+  }
+
+  private async receiveStepInput(
+    source: StepInputSource | undefined,
+    runId: string,
+    step: number,
+    signal: AbortSignal,
+    emit: (event: MayEventPayload) => void,
+  ): Promise<boolean> {
+    throwIfAborted(signal);
+    if (source === undefined) return false;
+    const messages = await source({ runId, step, signal });
+    if (messages.length === 0) {
+      throwIfAborted(signal);
+      return false;
+    }
+    // 输入已经保存时，即使取消同时到达，也要完成 Context 更新以保持恢复一致。
+    try { await this.context.append([...messages], { runId, step }); }
+    catch (error) {
+      this.unsafeToReuse = true;
+      throw new RunCheckpointError(error);
+    }
+    emit({ type: "input.received", step, messages: [...messages] });
+    throwIfAborted(signal);
+    return true;
   }
 
   private createModelRequest(snapshot: ContextSnapshot, tools: ToolRegistry): ModelRequest {

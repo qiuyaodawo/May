@@ -6,6 +6,11 @@
 状态同步，`@may/web-ui` 提供可组合组件与可选工作台。下文的进程内 Controller 和
 TUI 接入方式仍然可用。
 
+`mountWebUI` 接受可选的 `authentication` 对象，包含 `label`、
+`login(password): Promise<string>` 和 `logout(): Promise<void>`。产品负责验证密码，
+返回临时 UiClient 凭据，并在断开连接时撤销凭据。密码中的空格会保留，提交后清空
+输入框。`connectionHint` 提供登录说明；`authentication` 与 `initialToken` 不能同时使用。
+
 May 的 application 层是 headless 的。终端、桌面、Web 或远程 UI 应依赖
 `AgentController`（一个活动 Session）或 `AgentWorkspaceController`（多个 Session），
 调用表达用户意图的方法，并把异步 event stream 投影为 view state。
@@ -153,6 +158,10 @@ event。因此 UI 必须：
 
 `TranscriptStore` 实现这些实时/最终投影规则。`loadHistory()` 只重建持久化事实，因此
 恢复后的屏幕可能有意忽略关机前见过的临时 progress。
+补充输入在 `input.received` 确认交付时显示到对话中。恢复历史时组合
+`input.steering.queued` 和 `input.steering.delivered`，保留正文、顺序和记录标识。
+等待中或者已取消的输入不会显示为已交付的对话内容；从空闲输入启动的新 Run
+使用通常的 `input.submitted` 记录。
 
 ## 安全与关闭
 

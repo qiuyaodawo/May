@@ -8,3 +8,5 @@ packages:
 allowBuilds:
   protobufjs: false
   sharp: true
+patchedDependencies:
+  vscode-jsonrpc@9.0.2: patches/vscode-jsonrpc@9.0.2.patch

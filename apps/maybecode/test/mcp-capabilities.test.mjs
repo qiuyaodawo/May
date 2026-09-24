@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { waitForTerminalRun } from "./terminal-readiness.mjs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -43,6 +44,7 @@ test("configured task tools use normal permissions and terminal controls keep re
     if (prompt.includes("Enter a JSON object")) { assert.equal(options.history, false); return '{"value":"private task form answer"}'; }
     if (prompt.includes("Type send")) return "send";
     if (prompt.includes("Host review:")) { assert.equal(options.history, false); return "allow"; }
+    await waitForTerminalRun(app, options.signal);
     if (command++ === 0) return "Start the long MCP job";
     handle ??= (await app.listMcpTasks())[0].id;
     if (command === 2) return "/mcp tasks";
@@ -160,6 +162,7 @@ test("configured Host reviews share only the workspace and use a separately boun
     }
     if (prompt.includes("replacement JSON")) return JSON.stringify({ maxTokens: 32, messages: [{ role: "user", content: { type: "text", text: "user reviewed sampling input" } }] });
     if (prompt.includes("[a]")) return "a";
+    await waitForTerminalRun(app, options.signal);
     if (initial) { initial = false; return "Use the MCP tool"; } return "/exit";
   } } });
   assert.equal(sampled.length, 1); assert.deepEqual(sampled[0].tools, []);
@@ -205,6 +208,7 @@ test("MCP terminal forms resolve nested preparation and Run requests outside the
     }
     if (prompt.includes("Type send")) return "send";
     if (prompt.includes("[a]")) return "a";
+    await waitForTerminalRun(app, options.signal);
     return questions.length === 1 ? "/mcp attach remote test:///first" : "/exit";
   } };
   await runTerminalUI(app, { terminal });

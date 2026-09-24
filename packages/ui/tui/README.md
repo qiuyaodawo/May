@@ -1,5 +1,15 @@
 # `@may/tui`
 
+The line-oriented `TerminalIO.updatePrompt(prompt)` method updates an active
+question without replacing its draft or cursor position. `createNodeTerminal`
+implements it for hosts that display changing status in their prompt.
+
+`TranscriptStore` displays delivered steering messages from live `input.received`
+events and saved `input.steering.queued` / `input.steering.delivered` records.
+Both paths retain delivery order and stable row identities. Queued or cancelled
+input does not appear as delivered conversation content; idle follow-up Runs use
+their ordinary `input.submitted` history record.
+
 `TerminalImages` prepares saved attachments for Kitty/iTerm2/Sixel rendering or text
 display. Graphics travel separately through `RenderResult.images`; the renderer
 clears placements when the viewport changes. See

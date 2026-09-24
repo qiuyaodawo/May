@@ -1,4 +1,4 @@
-import type { AssistantMessage, ContentPart, ToolCall, Usage } from "./types.js";
+import type { AssistantMessage, ContentPart, ToolCall, Usage, UserMessage } from "./types.js";
 import type { RunBudgetSnapshot } from "./budget.js";
 
 export interface SerializedError {
@@ -25,6 +25,7 @@ export type MayEventPayload =
   | { type: "run.started"; continuation?: boolean }
   | { type: "step.started"; step: number }
   | { type: "step.completed"; step: number }
+  | { type: "input.received"; step: number; messages: readonly UserMessage[] }
   | { type: "model.started"; step: number }
   | { type: "model.text.delta"; step: number; delta: string }
   | { type: "model.reasoning.delta"; step: number; delta: string }

@@ -15,6 +15,17 @@ Subagent 共用调度、授权和恢复逻辑；不替换 `AgentWorkspace`，也
 
 ## 创建并运行任务图
 
+管理持久对话的宿主可以实现 `CoordinationAgent`，使用
+`coordinationInput(execution)` 生成每轮输入，包含依赖结果、协作消息和交接内容。
+将 `createCoordinationTools(context, onYield)` 提供给 Agent 的工具来源，并把
+`onYield` 连接到 Step 完成后的让出执行能力。宿主负责对话串行执行和输入 ID，
+`recover` 依据持久记录查询结果。已经取消的待处理审批可以确认对应工具尚未执行；
+其他没有确认结果的工具操作继续要求核对。
+
+宿主可以在决定恢复方式前调用 `validateCoordinationSnapshot(snapshot, id)`，
+验证持久记录中的任务图、身份、请求回执、限制和历史。此函数不会打开 Agent 资源
+或启动执行。
+
 以下函数接收已有的、与 provider 无关的 `Model`。新任务图使用新 `id`；
 `create()` 打开已存在的 id 会报错，不会将其当作重试。请传入适合应用存储数据的
 绝对目录路径。

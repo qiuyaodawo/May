@@ -93,6 +93,7 @@ export class TranscriptStore {
   private localSequence = 0;
   private currentSessionId: string | undefined;
   private latestReplyId: string | undefined;
+  private readonly steeringInputs = new Map<string, UserMessage>();
 
   /** 当前轮次完成后可供阅读的最终正文。 */
   get latestReply(): AssistantTranscriptItem | undefined {
@@ -116,6 +117,7 @@ export class TranscriptStore {
   reset(sessionId?: string): void {
     this.values = [];
     this.latestReplyId = undefined;
+    this.steeringInputs.clear();
     this.currentSessionId = sessionId;
     this.changed();
   }
@@ -163,6 +165,7 @@ export class TranscriptStore {
   loadHistory(events: readonly SessionEvent[]): void {
     this.values = [];
     this.latestReplyId = undefined;
+    this.steeringInputs.clear();
     this.currentSessionId = events[0]?.sessionId ?? this.currentSessionId;
     for (const event of events) this.projectSessionEvent(event);
     this.changed();
@@ -188,6 +191,9 @@ export class TranscriptStore {
     switch (event.type) {
       case "run.started":
         this.latestReplyId = undefined;
+        break;
+      case "input.received":
+        this.appendSteering(event.runId, event.step, event.messages, event.timestamp);
         break;
       case "run.completed":
         this.completeReply(event);
@@ -335,6 +341,7 @@ export class TranscriptStore {
         break;
       case "recovery.resolved":
       case "input.submitted":
+        if (event.type === "input.submitted" && event.inputId !== undefined) this.steeringInputs.delete(event.inputId);
         this.latestReplyId = undefined;
         this.append({
           id: `history:${event.seq}`,
@@ -342,6 +349,22 @@ export class TranscriptStore {
           text: contentText(event.message.content, "text"),
           timestamp: event.timestamp,
         });
+        break;
+      case "input.steering.queued":
+        this.steeringInputs.set(event.input.inputId, event.input.message);
+        break;
+      case "input.steering.delivered": {
+        const messages = event.inputIds.map(inputId => {
+          const message = this.steeringInputs.get(inputId);
+          if (message === undefined) throw new Error(`Missing steering input in transcript history: ${inputId}`);
+          this.steeringInputs.delete(inputId);
+          return message;
+        });
+        this.appendSteering(event.runId, event.step, messages, event.timestamp);
+        break;
+      }
+      case "input.steering.finished":
+        if (event.status === "cancelled") for (const inputId of event.inputIds) this.steeringInputs.delete(inputId);
         break;
       case "assistant.completed": {
         const content = assistantContent(event.message);
@@ -440,6 +463,13 @@ export class TranscriptStore {
             ...(event.reason === undefined ? {} : { reason: event.reason }),
           };
     });
+  }
+
+  private appendSteering(runId: string, step: number, messages: readonly UserMessage[], timestamp: number): void {
+    this.latestReplyId = undefined;
+    for (const [index, message] of messages.entries()) {
+      this.append({ id: `steering:${runId}:${step}:${index}`, kind: "user", text: contentText(message.content, "text"), timestamp });
+    }
   }
 
   private completeReply(event: Extract<MayEvent | SessionEvent, { type: "run.completed" }>): void {

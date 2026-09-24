@@ -51,6 +51,7 @@ export class FileTaskStore {
   }
 
   async requestCancel(id: string): Promise<void> {
+    await this.requireLegacyFormat();
     // Presence is the monotonic cancellation intent. There is no partially parsed payload.
     const file = await open(this.path(id, "cancel"), "a", 0o600);
     try { await file.sync(); } finally { await file.close(); }
@@ -66,6 +67,7 @@ export class FileTaskStore {
 
   async acquire(id: string): Promise<TaskJournal> {
     validateId(id);
+    await this.requireLegacyFormat();
     await mkdir(join(this.directory, "tasks"), { recursive: true, mode: 0o700 });
     const lockPath = this.path(id, "lock");
     let lock: FileHandle;
@@ -76,6 +78,7 @@ export class FileTaskStore {
     }
     let file: FileHandle | undefined;
     try {
+      await this.requireLegacyFormat();
       await lock.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: Date.now() }));
       await lock.sync();
       file = await open(this.path(id, "jsonl"), "a+", 0o600);
@@ -122,6 +125,16 @@ export class FileTaskStore {
       };
     } catch (error) {
       await file?.close(); await lock.close(); await unlink(lockPath); throw error;
+    }
+  }
+
+  private async requireLegacyFormat(): Promise<void> {
+    for (const name of ["gateway.format.json", "gateway.sqlite"]) {
+      let file: FileHandle;
+      try { file = await open(join(this.directory, name), "r"); }
+      catch (error) { if (isMissing(error)) continue; throw error; }
+      await file.close();
+      throw new Error("This data directory uses the Gateway format; legacy task writes are disabled");
     }
   }
 }

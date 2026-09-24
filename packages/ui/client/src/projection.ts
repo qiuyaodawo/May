@@ -1,4 +1,4 @@
-import type { ContentPart, MediaSource, MayEvent, SerializedError } from "@may/core";
+import type { ContentPart, MediaSource, MayEvent, SerializedError, UserMessage } from "@may/core";
 import { displayParts, imageAttachment } from "@may/media";
 import type { AgentApplicationEvent } from "@may/application";
 import type { PermissionEvent } from "@may/permissions";
@@ -47,8 +47,19 @@ export class UiProjection {
   }
   history(events: readonly SessionEvent[]): void {
     let inputId: string | undefined;
+    const steering = new Map<string, UserMessage>();
     for (const event of events) {
-      if (event.type === "input.submitted") { inputId = `input:${event.seq}`; this.set({ id: inputId, kind: "user", text: contentText(event.message.content), content: this.content(event.message.content) }); }
+      if (event.type === "input.submitted") { if (event.inputId !== undefined) steering.delete(event.inputId); inputId = `input:${event.seq}`; this.set({ id: inputId, kind: "user", text: contentText(event.message.content), content: this.content(event.message.content) }); }
+      else if (event.type === "input.steering.queued") steering.set(event.input.inputId, event.input.message);
+      else if (event.type === "input.steering.delivered") {
+        this.steered(event.runId, event.step, event.inputIds.map(id => {
+          const message = steering.get(id);
+          if (message === undefined) throw new Error(`Missing steering input in UI history: ${id}`);
+          steering.delete(id);
+          return message;
+        }));
+      }
+      else if (event.type === "input.steering.finished" && event.status === "cancelled") for (const id of event.inputIds) steering.delete(id);
       else if (event.type === "run.started" && inputId) { const input = this.blocks.get(inputId); if (input) this.set({ ...input, runId: event.runId }); inputId = undefined; }
       else if (event.type === "assistant.completed") this.assistantCompleted(event.runId, event.step, event.message.content);
       else if (event.type === "tool.presentation") this.presentation(event);
@@ -82,6 +93,9 @@ export class UiProjection {
     if (!text && !reasoning) this.blocks.delete(id);
     else this.set({ id, kind: "assistant", runId, text, reasoning, content: this.content(content), status: "completed" });
   }
+  private steered(runId: string, step: number, messages: readonly UserMessage[]): void {
+    for (const [index, message] of messages.entries()) this.set({ id: `steering:${runId}:${step}:${index}`, kind: "user", runId, text: contentText(message.content), content: this.content(message.content) });
+  }
   private permission(event: ApprovalEvent, live: boolean): void {
     if (event.type === "approval.requested") {
       const request = event.request, scope = "context" in request ? request.context : request;
@@ -109,6 +123,7 @@ export class UiProjection {
     this.set({ id, kind: "tool", runId: event.runId, toolCallId: event.toolCallId, text: "", ...this.blocks.get(id), presentation: { kind: event.kind, version: event.version, text: displayValue(event.data) } });
   }
   private run(event: MayEvent | Extract<SessionEvent, { type: "tool.started" | "tool.completed" | "tool.failed" | "run.failed" | "run.cancelled" | "run.completed" | "run.yielded" }>): void {
+    if (event.type === "input.received") this.steered(event.runId, event.step, event.messages);
     if ("step" in event && event.type.startsWith("model.")) {
       const id = `assistant:${event.runId}:${event.step}`;
       const previous = this.blocks.get(id) ?? { id, kind: "assistant" as const, runId: event.runId, text: "", status: "streaming" as const };

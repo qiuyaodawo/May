@@ -6,7 +6,6 @@ import type {
 import {
   AsyncEventQueue,
   isStreamingMayEvent,
-  type RunOptions,
 } from "@may/core";
 import type { ApprovalDecision } from "@may/permissions";
 import type {
@@ -14,6 +13,7 @@ import type {
   SessionHistoryPage,
   SessionHistoryQuery,
   SessionStore,
+  SessionSubmitOptions,
 } from "@may/session";
 import {
   latestSession,
@@ -213,7 +213,7 @@ export class AgentWorkspace<
     return this.application;
   }
 
-  async submit(options: RunOptions & { readonly inputId?: string }): Promise<AgentRun> {
+  async submit(options: SessionSubmitOptions): Promise<AgentRun> {
     return this.state.run(async () => {
       const run = await this.application.submit(options);
       void this.recordCurrentSession().catch(() => undefined);
@@ -222,7 +222,7 @@ export class AgentWorkspace<
   }
 
   /** Prepare user input on the Session state queue, then submit to the same application. */
-  submitPrepared(prepare: () => (RunOptions & { readonly inputId?: string }) | Promise<RunOptions & { readonly inputId?: string }>): Promise<AgentRun> {
+  submitPrepared(prepare: () => SessionSubmitOptions | Promise<SessionSubmitOptions>): Promise<AgentRun> {
     this.throwIfClosed();
     return this.state.run(async () => {
       this.assertIdle("Cannot prepare input while an operation is active");

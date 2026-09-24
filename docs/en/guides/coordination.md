@@ -17,6 +17,18 @@ coding with separately reviewed source application; see the guides below.
 
 ## Create and run a graph
 
+For a host that manages persistent conversations, implement `CoordinationAgent`
+and use `coordinationInput(execution)` to build each turn's input, including
+dependencies, peer messages, and handoff context. Supply
+`createCoordinationTools(context, onYield)` to the Agent's tool source and connect
+`onYield` to its Step-boundary yield mechanism. The host owns conversation
+serialization and input IDs; its `recover` method queries durable evidence.
+Hosts can call `validateCoordinationSnapshot(snapshot, id)` before making their
+own recovery decisions. It validates the persisted graph, identities, receipts,
+limits, and history without opening Agent resources or scheduling execution.
+Cancelled permission requests confirm that the corresponding tool did not start.
+Unconfirmed tool effects continue to require recovery.
+
 The function below accepts an existing provider-neutral `Model`. Use a fresh `id`
 for a new graph; opening an existing id with `create()` is an error, not a retry.
 Use absolute directories appropriate for your application's data storage.

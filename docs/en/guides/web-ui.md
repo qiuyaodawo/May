@@ -42,13 +42,24 @@ stay in page memory only. Reloading requires connecting again. `--continue` and
 `--resume` retain their existing meaning. `--port` requires `--ui web`; `0`
 requests an available port. The default TUI remains `retained`.
 
-MaybeClaw continues to use its existing command and token:
+For MaybeClaw, run the following command. Missing configuration or administrator
+authentication opens a local password setup page. Initialization preserves existing
+May settings, saves a password hash, and opens the console at the same address.
+Log in with the password you set, add an Agent, and create a session. With `--no-open`
+or `serve`, open the local initialization HTML file printed by the terminal:
 
 ```powershell
-$env:MAYBECLAW_CONTROL_TOKEN = node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
-Set-Clipboard $env:MAYBECLAW_CONTROL_TOKEN
-pnpm maybeclaw serve
+pnpm maybeclaw
 ```
+
+This starts the service and opens the default browser. You can add your first Agent
+through **Agent 管理** -> **添加 Agent** in the Web interface and create sessions
+without restarting the service. `--no-open` and the `serve` subcommand start only the
+service; Ctrl+C stops it.
+
+The service converts the password to a salted hash at startup or after a configuration
+save. Password changes invalidate existing logins. See the [MaybeClaw guide](maybeclaw.md)
+for password configuration, login lifetime, and remote CLI authentication.
 
 `pnpm example:web-ui` starts an **offline fixture** on port 3941: scripted
 responses, memory-only sessions and a no-side-effect approval tool. Its public
@@ -60,7 +71,15 @@ nor executes the business tasks entered into its composer.
 The composer uses the terminal's slash-command registry, argument completion and
 execution functions. Arrow Up/Down selects a completion; Tab inserts it. Unknown
 commands and invalid arguments are reported without submitting a model message.
-Command output is held in page memory, separately from conversation history.
+Management-command output is held in page memory, separately from conversation history.
+Ordinary messages cancel active execution and wait for cancellation before
+starting the new request. `/steer <message>` saves additional input for the next
+complete Step boundary, including tools and approvals. Pending messages run in
+FIFO order; idle steering starts a Run. `/stop` and the cancel control cancel
+active work and queued input. Cancelled input needs explicit resubmission.
+Delivered steering text appears once in the conversation, including after
+reopening the Session. History search and field details read the complete saved
+text even when the snapshot preview is truncated.
 
 | Operation | Web entry |
 | --- | --- |
@@ -68,6 +87,7 @@ Command output is held in page memory, separately from conversation history.
 | Reasoning effort | Effort dropdown; `/effort`; `/effort default` restores configured options |
 | Sessions | Sidebar selection and confirmed deletion; `/new`, `/resume [id]`; rename and deletion in the session selector |
 | Retry, instructions and status | `/retry`, `/instructions`, `/status`, `/context` |
+| Input during execution | Ordinary messages interrupt; `/steer <message>` waits for the Step; `/stop` cancels current and queued input |
 | Goals | `/goal start`, `/goal status`, `/goal pause`, `/goal resume`, `/goal cancel` |
 | Context management | `/compact [history-reference\|provider-native]` and the compact button |
 | Skills | `/skills`, `/skills show name`, `/skills use name [task]` |
@@ -97,6 +117,9 @@ the ignored `review` directory. The command performs model requests.
 distribute each event to both frontends and close the controller when it exits.
 `startUiServer({ browserLogin: true, ... })` adds a one-time connection exchange
 and returns `createLoginUrl()`. Pair it with `webUiAssets(..., { browserLogin: true })`.
+Product servers composing additional API routes can import `BrowserLogin` from
+`@may/ui-client/server` and use `issue()`, `redeem(ticket)`, and `clear()` with the
+same one-time ticket semantics and existing origin checks.
 Custom shells can provide `initialToken` and `connectionHint` to `mountWebUI`.
 With `initialToken`, the connection dialog shows the launcher instructions and
 omits manual token entry.
@@ -135,6 +158,21 @@ default session/task shell does not fit. Trusted renderer extensions receive
 client state and a command callback; unknown presentation kinds show text rather
 than loading code. The protocol and extension API are versioned previews, not a
 claim that every future agent will fit without an adapter.
+
+Products can declare structured sidebar navigation via `WebUiOptions.navigation`
+or compose navigation elements with `createNavigation()`. Each navigation group holds typed items with an icon,
+label, optional title, optional badge, action callback, and optional disabled state. Supported icons
+include `plus`, `menu`, `send`, `stop`, `panel`, `search`, `arrow`, `code`, `task`, `trash`, `gear`, `users`,
+`message`, `check`, and `filter`. Products can also configure `WebUiOptions.onNew`
+and `newLabel` to customize the primary creation action with typed lifecycles and unified error reporting.
+
+On mobile viewports matching `max-width: 760px`, opening the
+navigation drawer activates an overlay backdrop (`.mobile-backdrop`) that blocks clicks to the main content
+without horizontal page overflow. While hidden, the mobile drawer sets `inert` and `aria-hidden="true"`.
+Pressing Escape or clicking the backdrop dismisses the drawer and restores focus
+to the invoking toggle button.
+Tab and Shift+Tab cycle through the open mobile panel's controls. Native modal
+dialogs retain their own keyboard handling.
 
 ## Protocol v1
 
@@ -262,6 +300,7 @@ are visible without expanding every call. Expand/collapse all and exception-only
 filtering are view-local; approval controls remain outside these filters. A pinned
 approval shortcut locates the current request. When reading older content, live
 updates preserve the visible anchor and offer a new-content/back-to-latest button.
+Transcript rendering evaluates block and interaction signatures to detect changes.
 
 Tool transcripts contain labelled previews. **View details** opens an independent
 side panel with overview/product renderers, input, output, error and presentation

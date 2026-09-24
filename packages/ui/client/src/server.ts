@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { BrowserLogin } from "./browser-login.js";
+export { BrowserLogin } from "./browser-login.js";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { UiError, type UiCommand, type UiHost, type UiReceipt, type UiField } from "./protocol.js";
