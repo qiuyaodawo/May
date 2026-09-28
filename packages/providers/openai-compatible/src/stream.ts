@@ -47,6 +47,14 @@ export async function* streamOpenAICompatibleResponse(
       break;
     }
     const chunk = parseChunk(data, options);
+    // 服务端可能在 HTTP 200 的流中报告错误，必须在 [DONE] 与 finish_reason 判定之前处理。
+    if (chunk.error !== undefined) {
+      throw options.protocolError(
+        `${options.providerName} stream reported an error: ${
+          describeStreamError(chunk.error)
+        }`,
+      );
+    }
 
     if (chunk.usage) usage = convertUsage(chunk.usage);
 
@@ -135,6 +143,40 @@ function parseChunk(
       { cause: error },
     );
   }
+}
+
+/** 只提取服务端 error 的 message、type、code，不输出整个响应内容。 */
+function describeStreamError(error: unknown): string {
+  if (typeof error === "string") {
+    return error.trim() === "" ? "an empty error string" : error;
+  }
+  if (typeof error === "number" || typeof error === "boolean") {
+    return `a ${typeof error} error value ${String(error)}`;
+  }
+  if (error === null) return "a null error value";
+  if (Array.isArray(error)) return "an array error value";
+  if (typeof error !== "object") return `an unsupported ${typeof error} error value`;
+
+  const payload = error as { message?: unknown; type?: unknown; code?: unknown };
+  const details: string[] = [];
+  const message = readText(payload.message);
+  const type = readText(payload.type);
+  const code = readText(payload.code) ?? readNumber(payload.code);
+  if (message !== undefined) details.push(message);
+  if (type !== undefined) details.push(`type: ${type}`);
+  if (code !== undefined) details.push(`code: ${code}`);
+  if (details.length === 0) return "an error object without message, type, or code";
+  return details.join(" ");
+}
+
+function readText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  return value.trim() === "" ? undefined : value;
+}
+
+function readNumber(value: unknown): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return String(value);
 }
 
 function mergeToolCall(

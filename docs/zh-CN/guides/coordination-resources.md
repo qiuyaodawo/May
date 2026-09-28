@@ -51,7 +51,15 @@ await budget.close();
   这是持久化的准入与统计上限，**不是外部账单硬上限**；宿主仍需合理配置
   预留和 provider 限制。
 
-`snapshot()` 返回调用凭据；`totals()` 包含尚未结算的预留。原有单 Run 预算保持
+`snapshot()` 返回调用凭据；`totals()` 包含尚未结算的预留。只有每一次调用都按
+provider 上报的 usage 结账时，`totals().usageComplete` 才为 `true`；按预留值计账的
+调用在快照中标记为 `estimated`，并使该总计不完整。
+
+无法使用 `wrapModel` 的宿主可以直接计账：发出请求前 `reserveCall(id, reservation)`，
+随后 `settleCall(id, usage)` 或 `markCallUnknown(id)`。
+`runExternal(id, reservation, operation)` 把这三步包在一次宿主操作外，例如 provider 原生
+压缩：结果带 `usage` 时按它结账，没有 usage 时按预留值结账并标记为估计值；操作失败保持
+unknown。每个 id 对每次调用必须唯一，已预留的调用不会重放。原有单 Run 预算保持
 独立，可进一步限制每次 Run。重开账本时限制和价格必须一致。调用 `close()` 前
 先停止活动模型请求；组件不会自动抢占旧锁。
 

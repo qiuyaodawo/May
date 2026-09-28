@@ -25,6 +25,14 @@ YOLO 不提供系统隔离，shell 命令具有宿主账户的系统权限。Tea
 MaybeCode 支持 `apps.maybecode.runBudget`，限制每次 Run 的时长、步骤、模型／工具调用、
 token 和估算成本。参见[运行预算](../guides/run-budgets.md)。
 
+`apps.maybecode.subagents` 配置子 Agent 委派，默认启用。`false` 或
+`{ "enabled": false }` 关闭它。该对象接受 `roles`（`model`、`reasoningEffort`、
+`instructions`、`tools`、`delegateTo`、`runBudget`）、`defaultRole`、`limits`
+（`maxConcurrent`、`maxTasks`、`maxDepth`、`maxTaskTurns`、`maxDurationMs`、
+`maxInputBytes`、`maxOutputBytes`）、子 Agent 的 `runBudget`，以及请求级额度
+`maxModelCalls`、`maxTotalTokens`、`reservationTokens`。没有配置 `roles` 时注册
+`worker` 角色。参见[子 Agent 委派](../guides/subagent-delegation.md)。
+
 [English](../../en/reference/configuration.md) | **简体中文**
 
 May 默认读取 `~/.may/config.json`。配置把命名 provider 连接、可选 model profile
@@ -206,6 +214,13 @@ Anthropic 接受禁用、自适应或显式 token budget：
       "instructionsDirectory": "instructions/maybecode",
       "autoCompaction": {
         "mode": "prune-summary"
+      },
+      "subagents": {
+        "roles": {
+          "worker": { "tools": ["read", "shell", "edit", "write"], "delegateTo": ["worker"] }
+        },
+        "defaultRole": "worker",
+        "limits": { "maxConcurrent": 2, "maxDepth": 3 }
       },
       "retry": {
         "maxAttempts": 3,

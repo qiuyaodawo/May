@@ -25,7 +25,8 @@ MaybeCode accepts this configuration:
 ```
 
 Limits are optional positive numbers (integers except USD). Existing `maxSteps`
-remains an additional ceiling, default 16. Tool calls are reserved for an entire
+remains an additional ceiling: `May` defaults it to 16, a MaybeCode main Run to 32
+and a sub-agent child Run to 24. Tool calls are reserved for an entire
 batch before any execution, including parallel scheduling. Model-call accounting
 counts admitted loop steps, not provider HTTP retries.
 

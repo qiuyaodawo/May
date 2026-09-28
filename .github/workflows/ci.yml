@@ -66,6 +66,9 @@ jobs:
       - name: Check MaybeClaw CLI entry point
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
         run: node apps/maybeclaw/dist/bin.js --help
+      - name: Check Personal Assistant CLI entry point
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
+        run: node apps/personal-assistant/dist/bin.js --help
 
   package:
     name: MaybeCode package smoke test

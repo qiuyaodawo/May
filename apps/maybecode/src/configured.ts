@@ -65,6 +65,7 @@ import type { MaybeCodeModelConfiguration } from "./workspace.js";
 import type { SkillRegistry } from "@may/skills";
 import { resolveMaybeCodeSkillDirectories } from "./skills.js";
 import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
+import { resolveSubagentConfiguration, type MaybeCodeSubagentConfiguration, type MaybeCodeSubagentRole } from "./subagents.js";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly permissionMode?: MaybeCodePermissionMode;
@@ -96,8 +97,18 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly observability?: false | MaybeCodeObservabilityOptions;
   /** Disable MCP or override apps.maybecode.mcpServers. */
   readonly mcp?: false | MaybeCodeMcpOptions;
+  /** 关闭子 Agent 委派，或覆盖 apps.maybecode.subagents。 */
+  readonly subagents?: false | MaybeCodeSubagentConfigurationOptions;
 }
 
+export interface MaybeCodeSubagentConfigurationOptions {
+  /** 角色、限制与额度；缺省时注册 worker 角色。 */
+  readonly configuration?: MaybeCodeSubagentConfiguration;
+  /** 每次请求的协调记录根目录。 */
+  readonly dataDirectory?: string;
+  /** 声明了自己 profile 的角色使用的模型配置工厂。 */
+  readonly createModel?: (role: MaybeCodeSubagentRole) => MaybeCodeModelConfiguration;
+}
 export interface MaybeCodeMcpOptions {
   readonly servers: readonly McpServerOptions[];
   readonly oauth?: McpOAuthManager;
@@ -214,11 +225,22 @@ export async function openConfiguredMaybeCode(
     ? undefined
     : createMaybeCodeObservability(observabilityOptions, dataDirectory);
   const mcpOptions = options.mcp ?? resolveMaybeCodeMcp(config, workspace);
+  const subagents = resolveMaybeCodeSubagents(options.subagents, config);
+  const subagentCreateModel = (role: MaybeCodeSubagentRole): MaybeCodeModelConfiguration =>
+    role.model === undefined
+      ? initialModel
+      : configureModel(role.model, role.reasoningEffort === undefined
+        ? {}
+        : { reasoningEffort: role.reasoningEffort });
   let mcp: McpClientPool | undefined;
   let application: MaybeCodeWorkspace | undefined;
   const checkHostOwner = (context: McpHostRequestContext) => {
     context.signal.throwIfAborted();
-    if (application === undefined || context.owner.workspaceId !== application.workspace || context.owner.sessionId !== application.sessionId) throw new Error("MCP host request has no active workspace/Session owner");
+    if (application === undefined) throw new Error("MCP host request has no active workspace/Session owner");
+    // 子 Agent Session 属于同一个工作区，并且各自持有身份与授权记录。
+    if (context.owner.workspaceId !== application.workspace || !application.ownsSession(context.owner.sessionId)) {
+      throw new Error("MCP host request has no active workspace/Session owner");
+    }
   };
 
   try {
@@ -306,6 +328,17 @@ export async function openConfiguredMaybeCode(
       runBudget,
       ...(options.skills === undefined ? {} : { skills: options.skills }),
       ...(options.goals === undefined ? {} : { goals: options.goals }),
+      ...(subagents === false
+        ? { subagents: false as const }
+        : {
+            subagents: {
+              configuration: subagents.configuration,
+              dataDirectory: subagents.dataDirectory ?? dataDirectory,
+              // 没有声明 profile 的角色继承主会话模型与 reasoning effort。
+              createRoleModel: (role) => (subagents.createModel ?? subagentCreateModel)(role).model,
+              contextBudgetFor: (role) => (subagents.createModel ?? subagentCreateModel)(role).contextBudget,
+            },
+          }),
       ...(skillDirectories === false
         ? (options.skills === undefined ? { skills: false as const } : {})
         : { skillDirectories }),
@@ -533,6 +566,21 @@ export function resolveMaybeCodeObservability(
     ...(scheduledDelayMs === undefined ? {} : { scheduledDelayMs }),
   };
 }
+
+function resolveMaybeCodeSubagents(
+  value: false | MaybeCodeSubagentConfigurationOptions | undefined,
+  config: MayConfig,
+): false | ResolvedSubagents {
+  if (value === false) return false;
+  if (value?.configuration !== undefined) return value as ResolvedSubagents;
+  const resolved = resolveSubagentConfiguration(config);
+  if (resolved === false) return false;
+  return { ...(value ?? {}), configuration: resolved };
+}
+
+type ResolvedSubagents = MaybeCodeSubagentConfigurationOptions & {
+  readonly configuration: MaybeCodeSubagentConfiguration;
+};
 
 function createMaybeCodeObservability(
   options: MaybeCodeObservabilityOptions,

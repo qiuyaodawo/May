@@ -41,7 +41,7 @@ export class MaybeCodeWebCommands {
       const { id, action, content } = command.args;
       if (!["accept", "decline", "cancel"].includes(action!)) throw new UiError(400, "交互操作无效。");
       const request = this.app.getMcpInteractions?.().find(item => item.id === id);
-      if (!request || request.owner.sessionId !== this.app.sessionId) throw new UiError(409, "交互已结束或会话已改变。");
+      if (!request || this.app.ownsSession?.(request.owner.sessionId) !== true) throw new UiError(409, "交互已结束或会话已改变。");
       const parsed: unknown = content === undefined ? undefined : JSON.parse(content);
       if (parsed !== undefined && (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))) throw new UiError(400, "表单内容必须为 JSON 对象。");
       if (!this.app.respondMcpInteraction?.(id!, { action: action as "accept" | "decline" | "cancel", ...(parsed === undefined ? {} : { content: parsed as Record<string, string | number | boolean | string[]> }) })) throw new UiError(409, "交互已结束。");
@@ -60,8 +60,9 @@ export class MaybeCodeWebCommands {
         if (command.args.text!.length > 16_384) throw new UiError(400, "命令过长。");
         if (this.app.isRunning) {
           const parsed = parseMaybeCodeSlashCommand(command.args.text!);
+          const arguments_ = parsed.type === "command" ? parsed.arguments : [];
           const allowed = parsed.type === "command" && (parsed.definition.name === "/help" || parsed.definition.name === "/status" ||
-            parsed.definition.name === "/steer" || parsed.definition.name === "/stop" ||
+            parsed.definition.name === "/steer" || parsed.definition.name === "/stop" || parsed.definition.name === "/delegations" && (arguments_.length === 0 || arguments_[0] === "show" || arguments_[0] === "tools") ||
             parsed.definition.name === "/yolo" && parsed.arguments[0] === "status" ||
             parsed.definition.name === "/goal" && ["status", "pause", "cancel"].includes(parsed.arguments[0] ?? "status"));
           if (!allowed) throw new UiError(409, "请暂停当前运行后执行此命令。");

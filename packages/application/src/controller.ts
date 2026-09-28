@@ -31,13 +31,14 @@ import type {
 export interface AgentController<
   Event = AgentApplicationEvent,
   CompactionSelection = ContextCompactionStrategy,
+  Run extends AgentRun = AgentRun,
 > {
   readonly events: AsyncIterable<Event>;
   readonly sessionId: string;
   readonly isRunning: boolean;
 
-  submit(options: SessionSubmitOptions): Promise<AgentRun>;
-  retry(): Promise<AgentRun>;
+  submit(options: SessionSubmitOptions): Promise<Run>;
+  retry(): Promise<Run>;
   cancel(reason?: string): boolean;
   resolveApproval(
     requestId: string,
@@ -59,9 +60,11 @@ export interface AgentWorkspaceController<
   ApplicationEvent = AgentApplicationEvent,
   ExtensionEvent = never,
   CompactionSelection = ContextCompactionStrategy,
+  Run extends AgentRun = AgentRun,
 > extends AgentController<
     AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>,
-    CompactionSelection
+    CompactionSelection,
+    Run
   > {
   readonly workspace: string;
 

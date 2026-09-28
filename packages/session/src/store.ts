@@ -1,6 +1,8 @@
 import type { SessionEvent } from "./events.js";
 
 export interface SessionStore {
+  /** 持久化目录；内存存储为 undefined，宿主可用它选择自己的记录目录。 */
+  readonly directory?: string;
   append(event: SessionEvent): Promise<void>;
   read(sessionId: string): Promise<readonly SessionEvent[]>;
   /** Read committed records without repair, ownership changes or other writes. */

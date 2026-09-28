@@ -4,6 +4,7 @@ import {
   type AssistantMessage,
   type Message,
   type Model,
+  type ModelStreamOptions,
 } from "@may/core";
 
 import type { ContextSummarizer } from "./summary-tail.js";
@@ -46,10 +47,17 @@ export function createModelContextSummarizer(
       ];
       let completed: AssistantMessage | undefined;
 
+      // Run 身份一并传给模型，直接使用同一个模型的计账方可以区分摘要调用。
+      const streamOptions: ModelStreamOptions = {
+        signal,
+        ...(request.runId === undefined ? {} : { runId: request.runId }),
+        ...(request.step === undefined ? {} : { step: request.step }),
+      };
+
       try {
         for await (const event of model.stream(
           { messages, tools: [] },
-          { signal },
+          streamOptions,
         )) {
           if (event.type !== "response.completed") continue;
           if (completed !== undefined) {

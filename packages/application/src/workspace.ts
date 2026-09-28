@@ -92,14 +92,17 @@ export class AgentWorkspace<
   ApplicationEvent = AgentApplicationEvent,
   ExtensionEvent = never,
   CompactionSelection = ContextCompactionStrategy,
+  Run extends AgentRun = AgentRun,
   Application extends AgentController<
     ApplicationEvent,
-    CompactionSelection
-  > = AgentController<ApplicationEvent, CompactionSelection>,
+    CompactionSelection,
+    Run
+  > = AgentController<ApplicationEvent, CompactionSelection, Run>,
 > implements AgentWorkspaceController<
     ApplicationEvent,
     ExtensionEvent,
-    CompactionSelection
+    CompactionSelection,
+    Run
   > {
   readonly events: AsyncIterable<
     AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>
@@ -160,10 +163,12 @@ export class AgentWorkspace<
     ApplicationEvent = AgentApplicationEvent,
     ExtensionEvent = never,
     CompactionSelection = ContextCompactionStrategy,
+    Run extends AgentRun = AgentRun,
     Application extends AgentController<
       ApplicationEvent,
-      CompactionSelection
-    > = AgentController<ApplicationEvent, CompactionSelection>,
+      CompactionSelection,
+      Run
+    > = AgentController<ApplicationEvent, CompactionSelection, Run>,
   >(
     options: AgentWorkspaceOptions<
       ApplicationEvent,
@@ -174,6 +179,7 @@ export class AgentWorkspace<
     ApplicationEvent,
     ExtensionEvent,
     CompactionSelection,
+    Run,
     Application
   >> {
     let sessionId = options.sessionId;
@@ -195,7 +201,13 @@ export class AgentWorkspace<
         `Application resumed unexpected session "${application.sessionId}"; expected "${sessionId}"`,
       );
     }
-    const workspace = new AgentWorkspace(options, application, resumed);
+    const workspace = new AgentWorkspace<
+      ApplicationEvent,
+      ExtensionEvent,
+      CompactionSelection,
+      Run,
+      Application
+    >(options, application, resumed);
     await workspace.recordCurrentSession().catch(() => undefined);
     return workspace;
   }
@@ -213,7 +225,7 @@ export class AgentWorkspace<
     return this.application;
   }
 
-  async submit(options: SessionSubmitOptions): Promise<AgentRun> {
+  async submit(options: SessionSubmitOptions): Promise<Run> {
     return this.state.run(async () => {
       const run = await this.application.submit(options);
       void this.recordCurrentSession().catch(() => undefined);
@@ -222,7 +234,7 @@ export class AgentWorkspace<
   }
 
   /** Prepare user input on the Session state queue, then submit to the same application. */
-  submitPrepared(prepare: () => SessionSubmitOptions | Promise<SessionSubmitOptions>): Promise<AgentRun> {
+  submitPrepared(prepare: () => SessionSubmitOptions | Promise<SessionSubmitOptions>): Promise<Run> {
     this.throwIfClosed();
     return this.state.run(async () => {
       this.assertIdle("Cannot prepare input while an operation is active");
@@ -234,7 +246,7 @@ export class AgentWorkspace<
     });
   }
 
-  async retry(): Promise<AgentRun> {
+  async retry(): Promise<Run> {
     return this.state.run(async () => {
       void this.recordCurrentSession().catch(() => undefined);
       return this.withSessionRecord(await this.application.retry());
@@ -480,7 +492,7 @@ export class AgentWorkspace<
     return operation;
   }
 
-  private withSessionRecord(run: AgentRun): AgentRun {
+  private withSessionRecord(run: Run): Run {
     const result = run.result.then(
       async (value) => {
         await this.recordCurrentSession().catch(() => undefined);
@@ -492,7 +504,8 @@ export class AgentWorkspace<
       },
     );
     void result.catch(() => undefined);
-    return { id: run.id, result, cancel: run.cancel };
+    // 浅拷贝保留产品自己附加在 Run 上的字段，例如请求身份。
+    return { ...run, result } as Run;
   }
 
   private async relayEvents(application: Application): Promise<void> {

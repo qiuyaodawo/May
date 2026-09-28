@@ -21,6 +21,8 @@ export interface SharedBudgetCall {
   readonly usage?: Usage;
   readonly totalTokens?: number;
   readonly costUsd?: number;
+  /** provider 上报 usage 时为 true；估计值只是宿主给出的保守计账。 */
+  readonly estimated?: boolean;
   readonly exceededReservation?: boolean;
   readonly reconciliation?: string;
 }
@@ -39,6 +41,19 @@ export interface SharedBudgetTotals {
   readonly totalTokens: number;
   readonly costUsd: number;
   readonly blocked: boolean;
+  /**
+   * 每次调用都按 provider 上报的 usage 结账时为 true。
+   *
+   * 按预留值计账的估计值与没有 usage 的调用都会使它变成 false，
+   * 因此用量统计不会把估计值当成完整统计。
+   */
+  readonly usageComplete: boolean;
+}
+
+/** 不经过 Model 接口发起的调用的结果。 */
+export interface ExternalCallResult {
+  /** provider 上报的 usage；缺失时按预留值计账并标记为估计值。 */
+  readonly usage?: Usage;
 }
 
 /** Team-wide, single-host model-call accounting, independent of individual Run budgets. */
@@ -115,6 +130,60 @@ export class FileSharedBudget {
     };
   }
 
+  /**
+   * 在发起调用前原子预留额度。额度不足或账本已阻塞时立即抛错，不发出任何请求。
+   */
+  async reserveCall(id: string, reservation: ModelReservation): Promise<void> {
+    await this.reserve(id, reservation);
+  }
+
+  /**
+   * 调用完成后按真实 usage 计账。usage 不可用时该调用记为 unknown，账本随即阻塞，
+   * 下一个调用会在发出前失败。
+   */
+  async settleCall(id: string, usage: Usage | undefined): Promise<void> {
+    if (usage === undefined) { await this.markUnknown(id); return; }
+    await this.settle(id, usage);
+  }
+
+  /** 调用失败或被中断：该调用记为 unknown，需要宿主核对外部影响。 */
+  async markCallUnknown(id: string): Promise<void> {
+    await this.markUnknown(id);
+  }
+
+  /**
+   * 为不由 Model 接口发起的调用预留额度并计账，例如 provider 原生上下文压缩。
+   *
+   * 结果带 provider 上报的 usage 时按真实用量结账；没有 usage 时按预留值保守计账，
+   * 并在账本中标记为估计值。调用失败时该调用记为 unknown。
+   *
+   * 预留等待与调用过程都计入在途调用，因此账本不会在它结束之前关闭。
+   */
+  async runExternal<T extends ExternalCallResult>(
+    id: string,
+    reservation: ModelReservation,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    resourceId(id, "model call id");
+    if (this.active.has(id)) throw new Error("Model call already active");
+    this.active.add(id);
+    try {
+      await this.reserve(id, reservation);
+      let settled = false;
+      try {
+        const result = await operation();
+        const reported = result.usage;
+        await this.settle(id, reported ?? { totalTokens: reservation.totalTokens }, reported === undefined);
+        settled = true;
+        return result;
+      } finally {
+        if (!settled) await this.markCallUnknown(id);
+      }
+    } finally {
+      this.active.delete(id);
+    }
+  }
+
   /** Host-only verified accounting. Never retries a provider request or releases a tool result. */
   async reconcile(callId: string, usage: Usage, evidence: string): Promise<void> {
     resourceId(callId, "model call id"); resourceId(evidence, "reconciliation evidence");
@@ -125,12 +194,12 @@ export class FileSharedBudget {
       if (!call || (call.status !== "unknown" && !call.exceededReservation)) throw new Error("Only unknown usage or an exceeded reservation can be reconciled");
       return { ...state, calls: state.calls.map((candidate) => candidate.id === callId
         ? { ...candidate, status: "settled" as const, usage: { ...usage }, ...actual,
-          exceededReservation: false, reconciliation: evidence } : candidate) };
+          estimated: false, exceededReservation: false, reconciliation: evidence } : candidate) };
     });
   }
 
   close(): Promise<void> {
-    if (this.active.size > 0) return Promise.reject(new Error("Cannot close a shared budget while model calls are active"));
+    if (this.active.size > 0) return Promise.reject(new Error("Cannot close a shared budget while model or external calls are active"));
     return this.journal.close();
   }
 
@@ -140,7 +209,7 @@ export class FileSharedBudget {
     await this.journal.transact((state) => {
       if (state.calls.some((call) => call.id === id)) throw new Error("Model call already reserved; inspect/reconcile instead of replaying it");
       const totals = sharedBudgetTotals(state);
-      if (totals.blocked) throw new Error("Shared budget blocked by unknown usage or an exceeded reservation");
+      if (totals.blocked) throw new Error(budgetBlockedMessage(state, totals));
       if (totals.modelCalls + 1 > state.limits.maxModelCalls ||
         (state.limits.maxTotalTokens !== undefined && totals.totalTokens + reservation.totalTokens > state.limits.maxTotalTokens) ||
         (state.limits.maxCostUsd !== undefined && totals.costUsd + reservation.costUsd! > state.limits.maxCostUsd)) throw new Error("Shared budget has insufficient unreserved capacity");
@@ -148,10 +217,11 @@ export class FileSharedBudget {
     });
   }
 
-  private settle(id: string, usage?: Usage): Promise<SharedBudgetSnapshot> {
+  private settle(id: string, usage?: Usage, estimated = false): Promise<SharedBudgetSnapshot> {
     const actual = usageTotals(usage, this.limits);
     return this.journal.transact((state) => ({ ...state, calls: state.calls.map((call) => call.id === id
       ? { ...call, status: "settled" as const, usage: { ...usage }, ...actual,
+        ...(estimated ? { estimated: true } : {}),
         exceededReservation: actual.totalTokens > call.reservation.totalTokens ||
           (call.reservation.costUsd !== undefined && actual.costUsd > call.reservation.costUsd) } : call) }));
   }
@@ -162,14 +232,31 @@ export class FileSharedBudget {
 }
 
 export function sharedBudgetTotals(snapshot: SharedBudgetSnapshot): SharedBudgetTotals {
+  // 预留超出只在账本设有 token 或成本上限时才阻塞：没有上限时真实用量就是事实。
+  const bounded = snapshot.limits.maxTotalTokens !== undefined || snapshot.limits.maxCostUsd !== undefined;
   const totals = snapshot.calls.reduce((sum, call) => ({ modelCalls: sum.modelCalls + 1,
     totalTokens: sum.totalTokens + (call.status === "settled" ? call.totalTokens! : call.reservation.totalTokens),
     costUsd: sum.costUsd + (call.status === "settled" ? call.costUsd! : call.reservation.costUsd ?? 0),
-    blocked: sum.blocked || call.status === "unknown" || call.exceededReservation === true }),
+    blocked: sum.blocked || call.status === "unknown" || (bounded && call.exceededReservation === true) }),
   { modelCalls: 0, totalTokens: 0, costUsd: 0, blocked: false });
-  return { ...totals, blocked: totals.blocked || totals.modelCalls > snapshot.limits.maxModelCalls ||
+  return { ...totals,
+    usageComplete: snapshot.calls.every((call) => call.status === "settled" && call.estimated !== true),
+    blocked: totals.blocked || totals.modelCalls > snapshot.limits.maxModelCalls ||
     (snapshot.limits.maxTotalTokens !== undefined && totals.totalTokens > snapshot.limits.maxTotalTokens) ||
     (snapshot.limits.maxCostUsd !== undefined && totals.costUsd > snapshot.limits.maxCostUsd) };
+}
+
+function budgetBlockedMessage(state: SharedBudgetSnapshot, totals: SharedBudgetTotals): string {
+  if (state.calls.some((call) => call.status === "unknown")) {
+    return "Shared budget has unknown model usage; reconcile it before continuing";
+  }
+  if (totals.modelCalls > state.limits.maxModelCalls) {
+    return `Shared budget model call limit reached (${totals.modelCalls}/${state.limits.maxModelCalls})`;
+  }
+  if (state.limits.maxTotalTokens !== undefined && totals.totalTokens > state.limits.maxTotalTokens) {
+    return `Shared budget token limit reached (${totals.totalTokens}/${state.limits.maxTotalTokens} tokens)`;
+  }
+  return `Shared budget cost limit reached (${totals.costUsd}/${state.limits.maxCostUsd} USD)`;
 }
 
 function validateLimits(limits: SharedBudgetLimits): void {
@@ -206,6 +293,9 @@ function validate(state: SharedBudgetSnapshot, id: string, limits: SharedBudgetL
   for (const call of state.calls) {
     resourceId(call.id, "model call id"); validateReservation(call.reservation, limits);
     if (ids.has(call.id) || !["pending", "settled", "unknown"].includes(call.status)) throw new Error("Invalid shared budget call");
+    if (call.estimated !== undefined && (typeof call.estimated !== "boolean" || call.status !== "settled")) {
+      throw new Error("Invalid shared budget estimate");
+    }
     ids.add(call.id);
     if (call.status === "settled") {
       const actual = usageTotals(call.usage, limits);

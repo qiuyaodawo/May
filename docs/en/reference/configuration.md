@@ -30,6 +30,15 @@ See [Agent Skills](../guides/skills.md) for discovery precedence and path resolu
 MaybeCode accepts `apps.maybecode.runBudget` for per-Run duration, step,
 model/tool-call, token and estimated cost limits. See [Run budgets](../guides/run-budgets.md).
 
+`apps.maybecode.subagents` configures sub-agent delegation, which is on by default.
+`false` or `{ "enabled": false }` turns it off. The object accepts `roles`
+(`model`, `reasoningEffort`, `instructions`, `tools`, `delegateTo`, `runBudget`),
+`defaultRole`, `limits` (`maxConcurrent`, `maxTasks`, `maxDepth`, `maxTaskTurns`,
+`maxDurationMs`, `maxInputBytes`, `maxOutputBytes`), a per-child `runBudget`, and
+the request budget `maxModelCalls`, `maxTotalTokens` and `reservationTokens`. The
+`worker` role is registered when no `roles` are given. See
+[Sub-agent delegation](../guides/subagent-delegation.md).
+
 **English** | [简体中文](../../zh-CN/reference/configuration.md)
 
 May reads `~/.may/config.json` by default. The configuration separates named
@@ -221,6 +230,13 @@ for the handoff, retrieval, and failure rules.
       "instructionsDirectory": "instructions/maybecode",
       "autoCompaction": {
         "mode": "prune-summary"
+      },
+      "subagents": {
+        "roles": {
+          "worker": { "tools": ["read", "shell", "edit", "write"], "delegateTo": ["worker"] }
+        },
+        "defaultRole": "worker",
+        "limits": { "maxConcurrent": 2, "maxDepth": 3 }
       },
       "retry": {
         "maxAttempts": 3,

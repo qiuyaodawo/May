@@ -29,6 +29,8 @@ export interface ModelContextCompactionResult {
   readonly messages: readonly Message[];
   /** Provider-supplied effective size of the compacted model input. */
   readonly effectiveTokens?: number;
+  /** 压缩请求本身也是一次 provider 调用；provider 不上报时该字段缺失。 */
+  readonly usage?: Usage;
 }
 
 export interface ModelContextCompactor {

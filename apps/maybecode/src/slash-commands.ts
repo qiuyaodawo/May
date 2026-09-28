@@ -1,5 +1,6 @@
 import { executeMcpCommand, MCP_COMMAND_USAGE } from "./mcp-commands.js";
 import { executeGoalCommand, GOAL_COMMAND_USAGE } from "./goal-commands.js";
+import { DELEGATION_COMMAND_USAGE, executeDelegationCommand } from "./delegation-commands.js";
 import type {
   ContextCompactionResult,
   ContextInspection,
@@ -35,6 +36,7 @@ export type MaybeCodeSlashCommandName =
   | "/effort"
   | "/retry"
   | "/recovery"
+  | "/delegations"
   | "/skills"
   | "/instructions"
   | "/mcp"
@@ -61,6 +63,7 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   { name: "/web", usage: "/web", description: "Open the current workspace and session in a browser" },
   { name: "/skills", usage: "/skills [show <name>|use <name> [task]]", description: "List skills, preview instructions, or activate a skill" },
   { name: "/recovery", usage: "/recovery [resolve <id> <verified finding>]", description: "Inspect interrupted tools or record verified recovery findings" },
+  { name: "/delegations", usage: DELEGATION_COMMAND_USAGE, description: "Inspect sub-agent requests, child tasks and their tool records" },
   {
     name: "/new",
     usage: "/new",
@@ -189,7 +192,6 @@ export type MaybeCodeSlashCommandResult =
   | { readonly type: "effort.not-found"; readonly query: string }
   | { readonly type: "usage"; readonly usage: string }
   | { readonly type: "unknown"; readonly command: string };
-
 export type MaybeCodeSlashCommandSuggestion = SlashCommandSuggestion;
 
 export type MaybeCodeSlashCommandSuggester = SlashCommandSuggester;
@@ -429,6 +431,7 @@ export async function executeMaybeCodeSlashCommand(
       await controller.resolveRecovery(arguments_[1]!, arguments_.slice(2).join(" "));
       return { type: "display", text: "Recovery finding recorded. No tools were replayed." };
     }
+    case "/delegations": return { type: "display", text: await executeDelegationCommand(arguments_, controller) };
     case "/quit":
       return noArguments(arguments_, definition) ?? { type: "exit" };
     case "/help":

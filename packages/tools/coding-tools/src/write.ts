@@ -9,6 +9,7 @@ import {
 } from "./input.js";
 import { assertTextWithinLimit } from "./text-file.js";
 import { resolveWritableWorkspacePath } from "./workspace-path.js";
+import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
 
 export const DEFAULT_WRITE_MAX_BYTES = 1024 * 1024;
 
@@ -16,6 +17,8 @@ export interface WriteToolOptions {
   readonly cwd: string;
   readonly maxBytes?: number;
   readonly allowHardLinks?: boolean;
+  /** 宿主守卫：在同一把文件锁内完成检查与写入。 */
+  readonly guard?: WorkspaceFileGuard;
 }
 
 export interface WriteToolInput {
@@ -68,11 +71,21 @@ export function createWriteTool(options: WriteToolOptions): Tool<
         file.relative,
         maxBytes,
       );
-      context.signal.throwIfAborted();
-      await mkdir(dirname(file.absolute), { recursive: true });
-      context.signal.throwIfAborted();
-      await atomicWriteText(file.absolute, input.content, context.signal);
-      return { path: file.relative, bytesWritten };
+      const write = async () => {
+        context.signal.throwIfAborted();
+        await mkdir(dirname(file.absolute), { recursive: true });
+        context.signal.throwIfAborted();
+        await atomicWriteText(file.absolute, input.content, context.signal);
+        return { output: { path: file.relative, bytesWritten }, content: input.content };
+      };
+      if (options.guard === undefined) return (await write()).output;
+      const exists = await assertFileExistence(file, context.signal);
+      return (await options.guard<{ readonly output: WriteToolOutput; readonly content: string }>({
+        tool: "write",
+        path: file,
+        exists,
+        run: write,
+      })).output;
     },
   };
 }

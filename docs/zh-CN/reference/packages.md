@@ -83,14 +83,24 @@ application/Session 生命周期。Model、Context factory、executor、schedule
 [Agent 与 Application](../concepts/agent-application.md)和
 [package README](../../../packages/application/README.md)。
 
+`AgentWorkspace` 与 `AgentWorkspace.open` 的类型参数顺序为
+`<Event, Extension, Compaction, Run, Application>`。原来显式填写第四个参数
+`Application` 的调用，需要在它之前增加 `AgentRun` 或应用自己的 Run 类型。
+
 ### `@may/coordination`
 
 位于 Application 之上的单 coordinator 持久化任务图。`CoordinationRuntime` 执行宿主定义
 的 DAG；`pipeline()` 和 `parallelTasks()` 都生成相同的任务图结构。
 `createApplicationAgent()` 为每个任务执行方提供独立 Session，支持审批路由、单 Run
-预算和基于证据的恢复。协作存储可用内存，也可通过 `@may/coordination/file-store`
-使用本地单写入者 JSONL。显式启用的 `delegate_tasks` 支持嵌套子任务、安全 yield
-和带身份的唤醒轮次，委派策略默认拒绝，并限制深度和轮次。可选平级邮箱提供
+预算和基于证据的恢复。`onOpen` 在提交输入之前绑定 Session 独立的辅助对象。
+`resolveRecovery` 也允许在 runtime 尚未启动且没有活动执行时处理 queued 和 waiting
+任务。协作存储可用内存，也可通过 `@may/coordination/file-store`
+使用本地单写入者 JSONL。`createAttachedApplicationAgent()` 服务 Session 已由宿主持有
+的任务：宿主提供 Session 所有者与每轮 submit 选项，agent 负责输入身份、让出边界与
+任务取消信号，拒绝第二次并发认领，并且不打开也不关闭宿主的 application；
+`CreateCoordinationOptions.sessionIds` 把根任务绑定到该 Session。
+`TaskSpec.files` 声明任务可以修改的工作区相对文件。显式启用的 `delegate_tasks` 支持
+嵌套子任务、安全 yield 和带身份的唤醒轮次，委派策略默认拒绝，并限制深度和轮次。可选平级邮箱提供
 `send_message` / `wait_for_messages`、默认拒绝的消息授权、有界持久化消息及每轮邮箱。
 可选 `handoff_task` 在安全 yield 后，将逻辑任务移交给新 Agent Session，提供
 默认拒绝的移交策略、显式上下文摘要及有界持久化执行方历史。宿主专用的
@@ -191,6 +201,11 @@ Registry 是普通实例，不是进程级全局状态。
 `eventsource-parser`，支持 LF、CRLF、CR 换行，并接受 EOF 之前没有空白行的最后一个
 事件。中止或提前结束迭代时会释放响应 body。Retry-After 支持秒数（包含小数）和
 HTTP 日期，返回毫秒数；缺失或无法识别的值返回 `undefined`。
+
+Chat Completions 的 chunk 出现顶层 `error` 字段时，流立即失败。服务端的 `message`、
+`type` 和 `code`（字符串或数字）保留在可见错误消息中；没有可读内容的 error 形状会产生
+明确的诊断消息。此时不会发出 `response.completed`，后续的 `[DONE]` 或 `finish_reason`
+也不会把失败变成成功。
 
 ## 工具
 

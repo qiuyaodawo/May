@@ -58,6 +58,17 @@ May's stable `modelCallId`; an already reserved id is never automatically replay
   billing cap**. The host must select sound reservations and provider limits.
 
 `snapshot()` returns call receipts; `totals()` includes outstanding reservations.
+`totals().usageComplete` is `true` only when every call settled with
+provider-reported usage; a call charged by its reservation is marked `estimated` in
+the snapshot and makes the total incomplete.
+
+A host that cannot route a call through `wrapModel` accounts it directly:
+`reserveCall(id, reservation)` before the request, then `settleCall(id, usage)` or
+`markCallUnknown(id)`. `runExternal(id, reservation, operation)` does all three
+around a host operation that is not a Model call, such as provider-native
+compaction: a result carrying `usage` settles with it, and a result without usage
+settles with the reservation as an estimate. A failed operation stays unknown. Every
+id must be unique per call, and a call that was already reserved is never replayed.
 The original per-Run budget remains independent and can further restrict each Run.
 Limits and prices must match when reopening a ledger. Stop active model calls before
 `close()`; ownership locks are never stolen automatically.

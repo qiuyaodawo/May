@@ -28,6 +28,7 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 - [Attempt 与任务图修订](guides/coordination-lifecycle.md)
 - [远程叶子 Worker](guides/coordination-remote.md)
 - [MaybeCode 团队任务](guides/maybecode-team.md)
+- [普通请求中的子 Agent 委派](guides/subagent-delegation.md)
 - [可配置的团队计划](guides/maybecode-team-plan.md)
 - [团队报告与验收](guides/maybecode-team-verification.md)
 - [受控的多 Agent 编码](guides/maybecode-team-coding.md)
@@ -60,6 +61,7 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 
 ## 参考应用
 
+- [个人助手](guides/personal-assistant.md) 索引 Markdown 个人数据库、处理 Gmail 邮箱、准备 ehall 事务，并把会话交给手机使用。
 - [MaybeClaw](guides/maybeclaw.md) 通过 Gateway 将 May 与外部 Agent 接入个人和群聊会话，提供协作、审批与持久消息投递。
 
 - [MaybeCode](../../apps/maybecode/README.md) 是完整的终端编码 Agent 组合示例。

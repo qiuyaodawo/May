@@ -2,7 +2,7 @@ import type { AgentWorkspaceController } from "@may/application";
 import type { GoalBudget, GoalState } from "@may/goal";
 import type { ContextCompactionStrategy } from "@may/context";
 import type { McpClientPool, McpServerStatus, McpResourceSubscription, McpInteractionBroker } from "@may/mcp";
-import type { MaybeCodeEvent, MaybeCodeSessionEvent } from "./events.js";
+import type { MaybeCodeEvent, MaybeCodeRun, MaybeCodeSessionEvent } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 import type { SkillDescriptor, SkillDiagnostic, SkillDocument } from "@may/skills";
 import type { MaybeCodePermissionMode } from "./policy.js";
@@ -75,7 +75,8 @@ type MaybeCodeProductEvent = Extract<
 export interface MaybeCodeController extends AgentWorkspaceController<
   MaybeCodeSessionEvent,
   MaybeCodeProductEvent,
-  MaybeCodeCompactionSelection
+  MaybeCodeCompactionSelection,
+  MaybeCodeRun
 > {
   steer?(options: import("@may/session").SessionSteerOptions): Promise<import("@may/session").SessionSteeringInput>;
   listSteeringInputs?(): readonly import("@may/session").SessionSteeringInput[];
@@ -93,6 +94,19 @@ export interface MaybeCodeController extends AgentWorkspaceController<
   readSkill?(name: string): Promise<SkillDocument>;
   activateSkill?(name: string): Promise<SkillDocument>;
   submitSkill?(name: string, input: string): Promise<import("./events.js").MaybeCodeRun>;
+
+  /** 普通请求的子 Agent 委派；关闭时返回空列表。 */
+  listDelegationRequests?(): readonly import("./delegation.js").MaybeCodeDelegationRequest[];
+  getDelegationState?(): import("./delegation.js").MaybeCodeDelegationState | undefined;
+  delegationToolRecords?(taskId: string): Promise<import("./delegation.js").MaybeCodeDelegationToolRecords>;
+  resolveDelegationRecovery?(
+    requestId: string,
+    taskId: string,
+    finding: string,
+    outcome: { readonly status: "completed" | "failed" | "cancelled"; readonly detail: string },
+  ): Promise<import("./delegation.js").MaybeCodeDelegationRequest>;
+  /** 对工作区 Session 以及它当前持有的子 Session 返回 true。 */
+  ownsSession?(sessionId: string): boolean;
 
   getMcpStatus(): Promise<readonly McpServerStatus[]>;
   getMcpInteractions?(): ReturnType<McpInteractionBroker["list"]>;

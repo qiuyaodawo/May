@@ -9,6 +9,7 @@ import {
   type RuntimeTerminal,
 } from "@may/tui";
 import { TranscriptStore } from "@may/tui/transcript";
+import type { ApprovalRequest } from "@may/permissions";
 import type { SessionSummary } from "@may/session/catalog";
 import type {
   MaybeCodeController,
@@ -27,6 +28,11 @@ import type { MaybeCodeEvent } from "../events.js";
 import { presentMcpInteraction } from "../mcp-interaction-ui.js";
 import { MaybeCodeTerminalWeb } from "../terminal-web.js";
 import { formatGoal } from "../goal-commands.js";
+import {
+  delegationOrder,
+  formatDelegationTree,
+  renderDelegationTask,
+} from "../delegation-commands.js";
 import type { MaybeCodeKeymapOptions } from "../keymap.js";
 
 export interface RunRetainedTerminalUIOptions {
@@ -160,6 +166,7 @@ async function consumeEvents(
 ): Promise<void> {
   const approvals = new Set<Promise<void>>();
   const interactions = new Map<string, AbortController>();
+  const delegationStatus = new Map<string, string>();
   let lastGoalDisplay = "";
   for await (const event of events) {
     if (event.type === "run.event") {
@@ -182,7 +189,10 @@ async function consumeEvents(
           if (input.status === "delivered" && input.runId === event.event.runId) displayedSteering.add(input.inputId);
         }
       }
-      if (event.event.type === "run.completed" || event.event.type === "run.yielded" || event.event.type === "run.cancelled") view.setStatus("Ready");
+      // 主 Run 让出时子任务还在运行，状态不能显示为 Ready。
+      if (event.event.type === "run.completed" || event.event.type === "run.yielded" || event.event.type === "run.cancelled") {
+        view.setStatus(app.isRunning ? "Delegating" : "Ready");
+      }
       if (event.event.type === "run.failed") view.setStatus(`Error: ${event.event.error.message}`);
     }
     if (event.type === "permission-mode.changed") {
@@ -196,6 +206,19 @@ async function consumeEvents(
       if (display !== lastGoalDisplay) {
         lastGoalDisplay = display;
         store.appendNotice("info", formatGoal(event.goal));
+      }
+    }
+    if (event.type === "delegation.started" || event.type === "delegation.finished") {
+      const label = event.type === "delegation.started" ? "Sub-agent request" : "Sub-agent request finished";
+      store.appendNotice("info", `${label}\n${formatDelegationTree(event.state)}`);
+      view.setStatus(event.type === "delegation.started" ? "Delegating" : "Ready");
+    } else if (event.type === "delegation.updated") {
+      // 只有任务进入终态时才写入记录，运行中的重复状态不显示。
+      for (const task of delegationOrder(event.state.tasks)) {
+        const previous = delegationStatus.get(task.id);
+        delegationStatus.set(task.id, task.status);
+        if (previous === task.status || !["completed", "failed", "cancelled", "recovery-required"].includes(task.status)) continue;
+        store.appendNotice(task.status === "completed" ? "info" : "warning", renderDelegationTask(task));
       }
     }
     applyMaybeCodeEvent(store, event);
@@ -231,16 +254,7 @@ async function consumeEvents(
       event.type === "permission.event" &&
       event.event.type === "approval.requested"
     ) {
-      const request = event.event.request;
-      const task = view.requestApproval(request).then(async (decision) => {
-        if (decision !== undefined && !isClosing()) {
-          await app.resolveApproval(request.id, decision);
-        }
-      }).catch((error: unknown) => {
-        if (!isClosing()) {
-          store.appendNotice("error", `Approval failed: ${errorMessage(error)}`);
-        }
-      });
+      const task = presentApproval(app, view, store, event.event.request, isClosing, approvals);
       approvals.add(task);
       void task.finally(() => approvals.delete(task));
     } else if (
@@ -250,9 +264,41 @@ async function consumeEvents(
     ) {
       view.dismissApproval(event.event.requestId);
     }
+    if (event.type === "delegation.event" && event.event.type === "permission.event") {
+      // 子任务审批：包在外层事件里，同样需要界面与路由。
+      const inner = event.event.event;
+      if (inner.type === "approval.requested") {
+        store.appendNotice("info", `子任务 ${event.taskId} 请求批准 ${inner.request.tool.name}`);
+        const task = presentApproval(app, view, store, inner.request, isClosing, approvals);
+        approvals.add(task);
+        void task.finally(() => approvals.delete(task));
+      } else {
+        view.dismissApproval(inner.requestId);
+      }
+    }
   }
   for (const controller of interactions.values()) controller.abort();
   await Promise.all(approvals);
+}
+
+/** 打开审批对话框并把决定交回宿主，由宿主路由到提出请求的 Session。 */
+function presentApproval(
+  app: MaybeCodeController,
+  view: MaybeCodePrototypeView,
+  store: TranscriptStore,
+  request: ApprovalRequest,
+  isClosing: () => boolean,
+  approvals: Set<Promise<void>>,
+): Promise<void> {
+  return view.requestApproval(request).then(async (decision) => {
+    if (decision !== undefined && !isClosing()) {
+      await app.resolveApproval(request.id, decision);
+    }
+  }).catch((error: unknown) => {
+    if (!isClosing()) {
+      store.appendNotice("error", `Approval failed: ${errorMessage(error)}`);
+    }
+  });
 }
 
 function applyMaybeCodeEvent(
@@ -262,6 +308,11 @@ function applyMaybeCodeEvent(
   switch (event.type) {
     case "run.event":
       store.applyMayEvent(event.event);
+      break;
+    case "delegation.event":
+      // 子 Agent 的 Run 与审批事件进入同一个记录流，Run 身份彼此独立。
+      if (event.event.type === "run.event") store.applyMayEvent(event.event.event);
+      else if (event.event.type === "permission.event") store.applyPermissionEvent(event.event.event);
       break;
     case "permission.event":
       store.applyPermissionEvent(event.event);

@@ -4,12 +4,19 @@ import type { ApprovalDecision } from "@may/permissions";
 
 export type TaskStatus = "queued" | "running" | "waiting" | "cancelling" | "completed" | "failed" | "cancelled" | "recovery-required";
 
-/** Static graph node or host-validated child. Static dependencies must all succeed. */
+/**
+ * 静态图节点或经过宿主校验的子任务。静态依赖必须全部成功。
+ */
 export interface TaskSpec {
   readonly id: string;
   readonly agent: string;
   readonly input: string;
   readonly dependsOn?: readonly string[];
+  /**
+   * 本任务声明可以修改的工作区相对文件。共享同一个工作区的运行时在文件工具上强制执行；
+   * 使用独立工作区的运行时只记录该声明。
+   */
+  readonly files?: readonly string[];
 }
 
 /** Only the explicit answer crosses task boundaries, never reasoning/model state. */

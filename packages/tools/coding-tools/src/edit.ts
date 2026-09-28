@@ -8,6 +8,7 @@ import {
 } from "./input.js";
 import { assertTextWithinLimit, readTextFile } from "./text-file.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
+import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
 
 export const DEFAULT_EDIT_MAX_BYTES = 1024 * 1024;
 
@@ -15,6 +16,8 @@ export interface EditToolOptions {
   readonly cwd: string;
   readonly maxBytes?: number;
   readonly allowHardLinks?: boolean;
+  /** 宿主守卫：在同一把文件锁内完成检查与修改。 */
+  readonly guard?: WorkspaceFileGuard;
 }
 
 export interface EditToolInput {
@@ -65,31 +68,41 @@ export function createEditTool(options: EditToolOptions): Tool<
       const file = await resolveExistingWorkspacePath(options.cwd, input.path, {
         allowHardLinks: options.allowHardLinks === true,
       });
-      const original = await readTextFile(
-        file.absolute,
-        file.relative,
-        maxBytes,
-        context.signal,
-      );
-      const occurrences = countOccurrences(original, input.oldText, 2);
-      if (occurrences === 0) {
-        throw new CodingToolError(
-          "CODING_TOOL_EDIT_NOT_FOUND",
-          `edit: oldText was not found in ${file.relative}`,
+      const edit = async () => {
+        const original = await readTextFile(
+          file.absolute,
+          file.relative,
+          maxBytes,
+          context.signal,
         );
-      }
-      if (occurrences > 1) {
-        throw new CodingToolError(
-          "CODING_TOOL_EDIT_AMBIGUOUS",
-          `edit: oldText occurs more than once in ${file.relative}`,
-        );
-      }
+        const occurrences = countOccurrences(original, input.oldText, 2);
+        if (occurrences === 0) {
+          throw new CodingToolError(
+            "CODING_TOOL_EDIT_NOT_FOUND",
+            `edit: oldText was not found in ${file.relative}`,
+          );
+        }
+        if (occurrences > 1) {
+          throw new CodingToolError(
+            "CODING_TOOL_EDIT_AMBIGUOUS",
+            `edit: oldText occurs more than once in ${file.relative}`,
+          );
+        }
 
-      const updated = original.replace(input.oldText, () => input.newText);
-      assertTextWithinLimit(updated, file.relative, maxBytes);
-      context.signal.throwIfAborted();
-      await atomicWriteText(file.absolute, updated, context.signal);
-      return { path: file.relative, replacements: 1 };
+        const updated = original.replace(input.oldText, () => input.newText);
+        assertTextWithinLimit(updated, file.relative, maxBytes);
+        context.signal.throwIfAborted();
+        await atomicWriteText(file.absolute, updated, context.signal);
+        return { output: { path: file.relative, replacements: 1 as const }, content: updated };
+      };
+      if (options.guard === undefined) return (await edit()).output;
+      const exists = await assertFileExistence(file, context.signal);
+      return (await options.guard<{ readonly output: EditToolOutput; readonly content: string }>({
+        tool: "edit",
+        path: file,
+        exists,
+        run: edit,
+      })).output;
     },
   };
 }

@@ -33,13 +33,51 @@ export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<A
     panels: async () => [
       { id: "permissions", title: "Permissions", fields: [{ label: "Mode", value: app.permissionMode === "yolo" ? "YOLO · Auto-approve" : "Default" }] },
       { id: "model", title: "模型", fields: [{ label: "当前模型", value: app.modelInfo?.model ?? "未知" }, { label: "Provider", value: app.modelInfo?.provider ?? "未知" }] },
-      { id: "recovery", title: "恢复", fields: [{ label: "待处理项", value: String(app.listRecoveries?.().length ?? 0) }, { label: "处理方式", value: "使用 /recovery 查看证据并记录核查结果。" }] },
+      { id: "subagents", title: "子 Agent", ...subagentPanel(app) },      { id: "recovery", title: "恢复", fields: [{ label: "待处理项", value: String(app.listRecoveries?.().length ?? 0) }, { label: "处理方式", value: "使用 /recovery 查看证据并记录核查结果。" }] },
       ...(app.getGoal ? [{ id: "goal", title: "目标", fields: [{ label: "状态", value: formatGoal(app.getGoal()) }] }] : []),
       ...(options.terminal ? [{ id: "terminal", title: "终端", fields: [{ label: "共享会话", value: "MCP 交互可以在终端或当前页面处理。退出宿主会关闭 Web 服务。" }] }] : []),
     ],
     execute: command => commands.execute(command),
   });
   return host;
+}
+
+/** 活动请求的子任务树，条目数量有界，适合面板布局。 */
+function subagentPanel(app: MaybeCodeController): { readonly fields: readonly { readonly label: string; readonly value: string }[] } {
+  const state = app.getDelegationState?.();
+  const requests = app.listDelegationRequests?.() ?? [];
+  if (state === undefined && requests.length === 0) {
+    return { fields: [{ label: "状态", value: "本次会话还没有子 Agent 请求。" }] };
+  }
+  const tasks = state?.tasks ?? requests[0]?.tasks ?? [];
+  const fields = [{
+    label: "当前请求",
+    value: state === undefined ? "空闲" : `${state.status} · ${state.requestId}`,
+  }];
+  for (const task of [...tasks].sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id)).slice(0, 12)) {
+    const detail = task.detail ?? (task.output === undefined ? "" : task.output.replace(/\s+/gu, " ").slice(0, 80));
+    fields.push({
+      label: `${"· ".repeat(Math.max(0, task.depth - 1))}${task.role}/${task.id}`,
+      value: detail === "" ? task.status : `${task.status} · ${detail}`,
+    });
+  }
+  if (state?.budget !== undefined) {
+    // 估计值也计入 token 总计，界面必须说明它不是完整用量。
+    fields.push({
+      label: "请求用量",
+      value: `${state.budget.modelCalls}/${state.budget.maxModelCalls} 次模型调用 · ` +
+        `${state.budget.totalTokens} tokens${state.budget.usageComplete ? "" : "（含预留值计账）"}`,
+    });
+  }
+  const pending = (app.listDelegationRequests?.() ?? []).flatMap((request) =>
+    request.tasks.filter((task) => task.status === "recovery-required").map((task) => task.id));
+  fields.push({
+    label: "查看与恢复",
+    value: pending.length === 0
+      ? "/delegations 查看任务树，/delegations tools <任务> 查看工具记录"
+      : `/delegations resolve <任务> <failed|cancelled> <核查结论>（待核对：${pending.join(", ")}）`,
+  });
+  return { fields };
 }
 
 export async function startMaybeCodeWebServer(host: ApplicationUiHost, options: { token: string; port?: number; browserLogin?: boolean; exit?: () => void }) {

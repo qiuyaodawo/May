@@ -176,6 +176,34 @@
       "type": "integer",
       "minimum": 1
     },
+    "subagentIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+    },
+    "subagentRole": {
+      "type": "object",
+      "properties": {
+        "model": { "$ref": "#/$defs/subagentIdentifier", "description": "Model profile name. Without it the role inherits the main Session model and reasoning effort." },
+        "reasoningEffort": { "$ref": "#/$defs/nonEmptyString" },
+        "instructions": { "type": "string", "minLength": 1, "maxLength": 16384 },
+        "tools": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "enum": ["read", "shell", "edit", "write"] }
+        },
+        "delegateTo": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/subagentIdentifier" }
+        },
+        "runBudget": { "$ref": "#/$defs/runBudget" }
+      },
+      "additionalProperties": false
+    },
     "reasoningEffort": {
       "type": "string",
       "minLength": 1,
@@ -444,6 +472,43 @@
           ]
         },
         "runBudget": { "$ref": "#/$defs/runBudget" },
+        "subagents": {
+          "oneOf": [
+            { "const": false },
+            {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean", "default": true, "description": "Sub-agent delegation for ordinary requests. Enabled by default." },
+                "roles": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "maxProperties": 8,
+                  "propertyNames": { "$ref": "#/$defs/subagentIdentifier" },
+                  "additionalProperties": { "$ref": "#/$defs/subagentRole" }
+                },
+                "defaultRole": { "$ref": "#/$defs/subagentIdentifier" },
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "maxConcurrent": { "type": "integer", "minimum": 1, "maximum": 8, "default": 2 },
+                    "maxTasks": { "type": "integer", "minimum": 1, "maximum": 128, "default": 24 },
+                    "maxDepth": { "type": "integer", "minimum": 2, "maximum": 4, "default": 3 },
+                    "maxTaskTurns": { "type": "integer", "minimum": 2, "maximum": 16, "default": 6 },
+                    "maxDurationMs": { "type": "integer", "minimum": 1, "maximum": 3600000, "default": 900000 },
+                    "maxInputBytes": { "type": "integer", "minimum": 1, "maximum": 65536, "default": 32768 },
+                    "maxOutputBytes": { "type": "integer", "minimum": 1, "maximum": 262144, "default": 65536 }
+                  },
+                  "additionalProperties": false
+                },
+                "runBudget": { "$ref": "#/$defs/runBudget", "description": "Per child Run budget." },
+                "maxModelCalls": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 128, "description": "Model calls reserved across the main Run, child Runs and compaction of one request." },
+                "maxTotalTokens": { "type": "integer", "minimum": 1, "description": "Optional token ceiling checked against per-call reservations." },
+                "reservationTokens": { "type": "integer", "minimum": 1, "maximum": 10000000, "default": 32768 }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
         "autoCompaction": {
           "type": "object",
           "properties": {

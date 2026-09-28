@@ -51,7 +51,16 @@ export interface OpenAICompatibleToolCallDelta {
   };
 }
 
+/** 服务端在 HTTP 200 流中返回的顶层错误，字段内容按各 provider 实现而不同。 */
+export interface OpenAICompatibleStreamError {
+  message?: string | null;
+  type?: string | null;
+  code?: string | number | null;
+}
+
 export interface OpenAICompatibleChunk {
+  /** 顶层错误事件；一旦出现，本次流立即失败。 */
+  error?: OpenAICompatibleStreamError | string | number | boolean | null;
   choices?: Array<{
     index: number;
     delta?: {

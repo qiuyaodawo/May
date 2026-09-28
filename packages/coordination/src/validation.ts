@@ -49,6 +49,7 @@ export function validateGraph(tasks: readonly TaskSpec[], maxTasks: number, maxI
     name(task.id, "task id"); name(task.agent, "agent name");
     if (typeof task.input !== "string") throw new TypeError("Task input must be a string");
     if (Buffer.byteLength(task.input, "utf8") > maxInputBytes) throw new Error("Task input exceeds maxInputBytes");
+    validateTaskFiles(task.files);
     if (nodes.has(task.id)) throw new Error(`Duplicate task: ${task.id}`);
     if (task.dependsOn !== undefined && (!Array.isArray(task.dependsOn) || new Set(task.dependsOn).size !== task.dependsOn.length)) throw new Error(`Invalid dependencies: ${task.id}`);
     nodes.set(task.id, task);
@@ -63,6 +64,22 @@ export function validateGraph(tasks: readonly TaskSpec[], maxTasks: number, maxI
       pending.delete(id); progress = true;
     }
     if (!progress) throw new Error("Task dependencies contain a cycle");
+  }
+}
+
+  /**
+   * 工作区相对、长度有界、不含上级目录的任务文件声明，适用于共享工作区。
+   */
+export function validateTaskFiles(files: readonly string[] | undefined): void {
+  if (files === undefined) return;
+  if (!Array.isArray(files) || files.length < 1 || files.length > 128) throw new TypeError("Task files must contain 1-128 paths");
+  const seen = new Set<string>();
+  for (const file of files) {
+    if (typeof file !== "string" || file.length === 0 || file.length > 512 || file.includes("\0")) throw new TypeError("Task file paths must be nonempty strings of at most 512 characters");
+    const path = file.replace(/\\/gu, "/");
+    if (path.startsWith("/") || /^[A-Za-z]:\//u.test(path) || path.split("/").some((part) => part === "..")) throw new Error(`Task file path must be workspace-relative: ${file}`);
+    if (seen.has(path)) throw new Error(`Duplicate task file: ${file}`);
+    seen.add(path);
   }
 }
 

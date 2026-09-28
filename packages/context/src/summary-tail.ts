@@ -8,6 +8,9 @@ import type {
 export interface ContextSummaryRequest {
   readonly messages: readonly Message[];
   readonly signal?: AbortSignal;
+  /** 触发压缩的 Run 身份；直接调用模型的压缩器据此获得可追踪的调用身份。 */
+  readonly runId?: string;
+  readonly step?: number;
 }
 
 export interface ContextSummarizer {
@@ -55,6 +58,8 @@ export class SummaryTailStrategy implements ContextCompactionStrategy {
     const summary = (await this.summarizer.summarize({
       messages: prefix,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
+      ...(options.runId === undefined ? {} : { runId: options.runId }),
+      ...(options.step === undefined ? {} : { step: options.step }),
     }))
       .trim();
     if (summary === "") {

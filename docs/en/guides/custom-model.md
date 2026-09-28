@@ -163,7 +163,10 @@ An adapter may expose:
 
 Provider-native compaction is optional. `@may/context` adapts it through
 `ModelContextCompactionStrategy`; it does not belong in the normal
-`stream()` implementation. See [Custom Context](./custom-context.md).
+`stream()` implementation. A compactor should also report the usage of its own
+compaction request in `ModelContextCompactionResult.usage`, so a host can account
+that request instead of charging a reservation. See
+[Custom Context](./custom-context.md).
 
 ## Registering a configurable adapter
 
@@ -203,3 +206,6 @@ Retry-After is never shortened to fit `maxDelayMs`. If a server requests a longe
 the configured backoff limit, RetryingModel returns the original error instead of retrying
 earlier. Responses errors expose `providerType` and `providerCode` separately. Malformed
 Chat Completions tool-argument JSON is a protocol error, not a string tool input.
+A Chat Completions stream that reports a top-level `error` field fails at that chunk with the
+server `message`, `type`, and `code` kept in the visible error text. The failure is not replaced
+by the end-of-stream checks, and no `response.completed` is emitted for that call.

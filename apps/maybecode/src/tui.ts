@@ -1,10 +1,15 @@
 import type { ContentPart, MayEvent, UserMessage } from "@may/core";
+import type { AgentApplicationEvent } from "@may/application";
 import type { ContextInspection } from "@may/context";
 import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
 import { sanitizeTerminalText, TerminalImages, encodeImage } from "@may/tui";
 
 import type { FileChangeKind, ToolChangePreview } from "@may/coding-tools/change-preview";
+import type {
+  MaybeCodeDelegationState,
+  MaybeCodeDelegationTask,
+} from "./delegation.js";
 import type { MaybeCodeEvent } from "./events.js";
 import {
   createMaybeCodeSlashCommandSuggester,
@@ -238,6 +243,28 @@ async function consumeEvents(
       renderer.modelChanged(event.model);
     } else if (event.type === "model.default.changed") {
       renderer.defaultModelChanged(event.profile);
+    } else if (
+      event.type === "delegation.started" ||
+      event.type === "delegation.finished"
+    ) {
+      renderer.delegationLifecycle(event);
+    } else if (event.type === "delegation.event") {
+      const inner = event.event;
+      if (inner.type === "permission.event") {
+        if (inner.event.type === "approval.requested") {
+          enqueue(`approval:${inner.event.request.id}`, (signal) => handlePermissionEvent(inner.event, app, renderer,
+            (prompt, options) => question(prompt, { ...options, signal })));
+        } else {
+          if (inner.event.type === "approval.resolved" || inner.event.type === "approval.cancelled") {
+            pending.get(`approval:${inner.event.requestId}`)?.abort();
+          }
+          renderer.permissionEvent(inner.event);
+        }
+      } else {
+        await renderer.delegationEvent(event);
+      }
+    } else if (event.type === "delegation.updated") {
+      renderer.delegationState(event.state);
     } else if (
       event.type === "mcp.resource.updated" ||
       event.type === "mcp.resource.watch-closed" ||
@@ -571,6 +598,9 @@ class TerminalRenderer {
   private textStarted = false;
   private reasoningStarted = false;
   private readonly changePreviews = new Map<string, ToolChangePreview>();
+  private readonly delegationStatus = new Map<string, string>();
+  private lastDelegationKey = "";
+  private label = "";
   private readonly toolOutputState = new Map<
     string,
     { endsWithNewline: boolean; channel?: string }
@@ -582,6 +612,10 @@ class TerminalRenderer {
 
   write(text: string): void {
     this.terminal.write(text);
+  }
+
+  private tagged(text: string): string {
+    return this.label === "" ? text : `${this.label} ${text}`;
   }
 
   async runEvent(event: MayEvent): Promise<void> {
@@ -606,7 +640,7 @@ class TerminalRenderer {
       case "model.text.delta":
         this.endReasoning();
         if (!this.textStarted) {
-          this.terminal.write("\nMaybeCode: ");
+          this.terminal.write(this.label === "" ? "\nMaybeCode: " : `\n${this.label} Sub-agent: `);
           this.textStarted = true;
         }
         this.terminal.write(sanitizeTerminalText(event.delta));
@@ -639,10 +673,10 @@ class TerminalRenderer {
       }
       case "tool.started":
         this.terminal.write(
-          `\n→ ${sanitizeTerminalText(event.call.name)}${toolInputSummary(
+          `\n${this.tagged(`→ ${sanitizeTerminalText(event.call.name)}${toolInputSummary(
             event.call.name,
             event.call.input,
-          )}\n`,
+          )}`)}\n`,
         );
         break;
       case "tool.output.delta": {
@@ -686,8 +720,8 @@ class TerminalRenderer {
         this.endToolOutput(event.runId, event.call.id);
         this.changePreviews.delete(toolCallKey(event.runId, event.call.id));
         this.terminal.write(
-          `✗ ${sanitizeTerminalText(event.call.name)}: ` +
-            `${sanitizeTerminalText(event.error.message)}\n`,
+          `\n${this.tagged(`✗ ${sanitizeTerminalText(event.call.name)}: ` +
+            `${sanitizeTerminalText(event.error.message)}`)}\n`,
         );
         break;
       case "run.completed":
@@ -697,17 +731,17 @@ class TerminalRenderer {
       case "run.failed":
         this.clearRunPreviews(event.runId);
         this.terminal.write(
-          `\nRun failed: ${sanitizeTerminalText(event.error.message)}\n`,
+          `\n${this.tagged(`Run failed: ${sanitizeTerminalText(event.error.message)}`)}\n`,
         );
         break;
       case "run.cancelled":
         this.clearRunPreviews(event.runId);
         this.terminal.write(
-          `\nRun cancelled${
+          `\n${this.tagged(`Run cancelled${
             event.reason === undefined
               ? ""
               : `: ${sanitizeTerminalText(event.reason)}`
-          }\n`,
+          }`)}\n`,
         );
         break;
     }
@@ -843,6 +877,48 @@ class TerminalRenderer {
     );
   }
 
+  /** 子 Agent 请求的开始与结束，包含整棵任务树。 */
+  delegationLifecycle(
+    event: Extract<MaybeCodeEvent, { type: "delegation.started" | "delegation.finished" }>,
+  ): void {
+    this.write(
+      `\n${event.type === "delegation.started" ? "Sub-agent request" : "Sub-agent request finished"} ` +
+      `${sanitizeTerminalText(event.state.requestId)}\n`,
+    );
+    for (const task of delegationOrder(event.state.tasks)) {
+      this.write(`${sanitizeTerminalText(renderDelegationTask(task))}\n`);
+    }
+  }
+
+  /** 子任务运行期间的状态变化；状态未变化时不重复显示。 */
+  delegationState(state: MaybeCodeDelegationState): void {
+    const key = `${state.tasks.map((task) => `${task.id}:${task.status}`).join("|")}#${state.status}`;
+    if (key === this.lastDelegationKey) return;
+    this.lastDelegationKey = key;
+    for (const task of delegationOrder(state.tasks)) {
+      if (this.delegationStatus.get(task.id) === task.status) continue;
+      this.delegationStatus.set(task.id, task.status);
+      this.write(`${sanitizeTerminalText(renderDelegationTask(task))}\n`);
+    }
+  }
+
+  /** 一个子 Agent Run 事件，带上任务身份前缀。 */
+  async delegationEvent(
+    event: Extract<MaybeCodeEvent, { type: "delegation.event" }>,
+  ): Promise<void> {
+    if (event.event.type !== "run.event") {
+      this.endReasoning();
+      this.write(`\n[${event.taskId}] ${sanitizeTerminalText(describeApplicationEvent(event.event))}\n`);
+      return;
+    }
+    this.label = `[${event.taskId}]`;
+    try {
+      await this.runEvent(event.event.event);
+    } finally {
+      this.label = "";
+    }
+  }
+
   mcpEvent(
     event: Extract<MaybeCodeEvent, { type: `mcp.server.${string}` | `mcp.resource.${string}` }>,
   ): void {
@@ -891,17 +967,17 @@ class TerminalRenderer {
     this.changePreviews.delete(key);
     if (preview?.status === "ready") {
       this.terminal.write(
-        `✓ ${sanitizeTerminalText(event.call.name)}: ` +
+        `${this.tagged(`✓ ${sanitizeTerminalText(event.call.name)}: ` +
           `${sanitizeTerminalText(preview.path)} ` +
           `(${changeKindLabel(preview.kind)}, ` +
-          `+${preview.additions} -${preview.deletions})\n`,
+          `+${preview.additions} -${preview.deletions})`)}\n`,
       );
       return;
     }
     this.terminal.write(
-      `${toolResultMarker(event.output)} ${sanitizeTerminalText(event.call.name)}${
+      `${this.tagged(`${toolResultMarker(event.output)} ${sanitizeTerminalText(event.call.name)}${
         toolResultSummary(event.output)
-      }\n`,
+      }`)}\n`,
     );
   }
 
@@ -1014,6 +1090,31 @@ function toolInputSummary(toolName: string, input: unknown): string {
 
 function toolCallKey(runId: string, toolCallId: string): string {
   return `${runId}:${toolCallId}`;
+}
+
+function delegationOrder(
+  tasks: readonly MaybeCodeDelegationTask[],
+): readonly MaybeCodeDelegationTask[] {
+  return [...tasks].sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id));
+}
+
+function renderDelegationTask(task: MaybeCodeDelegationTask): string {
+  const indent = "  ".repeat(Math.max(0, task.depth - 1));
+  const parts = [`${indent}${task.role}/${task.id}: ${task.status}`];
+  if (task.detail !== undefined) parts.push(`(${task.detail})`);
+  else if (task.output !== undefined) parts.push(`(${task.output.replace(/\s+/gu, " ").slice(0, 160)})`);
+  return parts.join(" ");
+}
+
+function describeApplicationEvent(event: AgentApplicationEvent): string {
+  if (event.type === "context.compacted") {
+    return `context compacted with ${event.strategy}: ${event.before.messageCount} -> ${event.after.messageCount} messages`;
+  }
+  if (event.type === "context.compaction.failed") {
+    return `context compaction failed with ${event.strategy}: ${event.error.message}`;
+  }
+  if (event.type === "tool.presentation") return `tool presentation recorded`;
+  return "session event";
 }
 
 function renderInstructionSources(app: MaybeCodeController): string {

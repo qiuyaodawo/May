@@ -14,6 +14,8 @@ export * from "./policy.js";
 export * from "./run.js";
 export * from "./slash-commands.js";
 export * from "./skills.js";
+export * from "./subagents.js";
+export * from "./delegation.js";
 export * from "./session-picker.js";
 export * from "./summarizer.js";
 export * from "@may/tui/node-terminal";

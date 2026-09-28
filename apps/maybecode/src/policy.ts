@@ -26,7 +26,10 @@ export function createCodingPermissionPolicy(options: {
 
 function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
   if (["read", "skill_read", "session_history", "session_history_search", "session_history_read",
-    "get_context_remaining", "context_notes", "new_context", "get_goal", "update_goal"].includes(check.tool.name)) {
+    "get_context_remaining", "context_notes", "new_context", "get_goal", "update_goal",
+    "delegate_tasks"].includes(check.tool.name)) {
+    // 委派是否被允许由宿主的角色授权决定：只有已注册且宿主授权的角色能被创建，
+    // 超出授权范围的委派会在工具执行时失败。显式提供 deny 的自定义策略依然有效。
     return "allow";
   }
 

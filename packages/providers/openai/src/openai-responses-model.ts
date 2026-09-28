@@ -152,6 +152,8 @@ export class OpenAIResponsesModel implements Model {
           data: { items: compacted.output },
         },
       }],
+      // 压缩请求本身就是一次 provider 调用，它的 usage 一并上报给计账方。
+      ...(usage === undefined ? {} : { usage }),
       ...(usage?.outputTokens === undefined
         ? {}
         : { effectiveTokens: usage.outputTokens }),

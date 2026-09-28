@@ -94,13 +94,27 @@ snapshotted when the definition is created.
 See [Agent and Application](../concepts/agent-application.md) and the
 [package README](../../../packages/application/README.md).
 
+`AgentWorkspace` and `AgentWorkspace.open` accept the generic parameters
+`<Event, Extension, Compaction, Run, Application>`. Existing callers that explicitly
+specified `Application` as the fourth parameter must insert `AgentRun` or their
+application's Run type before it.
+
 ### `@may/coordination`
 
 Single-coordinator, durable task graphs above Application. `CoordinationRuntime` runs
 host-authored DAGs; `pipeline()` and `parallelTasks()` compile to the same graph.
 `createApplicationAgent()` gives each task controller an independent Session, with routed
-approvals, per-Run budgets and evidence-based recovery. Coordination storage is
+approvals, per-Run budgets and evidence-based recovery.
+`onOpen` binds Session-owned helpers before the first input is submitted.
+`resolveRecovery` also accepts queued and waiting tasks while the runtime has not
+started and has no active execution. Coordination storage is
 in-memory or local single-writer JSONL through `@may/coordination/file-store`.
+`createAttachedApplicationAgent()` serves tasks whose Session the host already
+owns: the host supplies the Session owner and per-turn submit options, the agent
+keeps input identity, the yield boundary and the task cancellation signal, refuses a
+second concurrent claim and never opens or closes the host application;
+`CreateCoordinationOptions.sessionIds` binds a root task to that Session.
+`TaskSpec.files` declares the workspace-relative files a task may modify.
 Opt-in `delegate_tasks` supports nested children, safe yield and identified wakeup
 turns, with default-deny delegation policy and depth/turn limits. Optional peer
 mailboxes add `send_message` / `wait_for_messages`, default-deny message authority,
@@ -222,12 +236,21 @@ or when iteration ends early. Retry-After values support seconds (including
 decimals) and HTTP dates; the result is milliseconds, or `undefined` when the
 header is missing or unrecognized.
 
+A Chat Completions chunk carrying a top-level `error` field ends the stream
+immediately. The server `message`, `type`, and `code` (string or numeric) are
+preserved in the visible error text; an error shape without readable details
+produces an explicit description. No `response.completed` is emitted, and a
+later `[DONE]` or `finish_reason` does not turn the failure into a success.
+
 ## Tools
 
 ### `@may/coding-tools`
 
 Workspace-bound read, edit, write and shell tools, plus reusable instruction
-loading and coding change previews. Subpath exports are:
+loading and coding change previews. The read, edit and write tools accept a
+`guard` option that runs the operation inside a path-scoped lock owned by the host,
+which is how one workspace serves several concurrent executors. Subpath exports
+are:
 
 - `@may/coding-tools/instructions`;
 - `@may/coding-tools/change-preview`.

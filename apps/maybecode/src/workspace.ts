@@ -45,6 +45,11 @@ import type {
   MaybeCodeRun,
   MaybeCodeSessionEvent,
 } from "./events.js";
+import type {
+  MaybeCodeDelegationRequest,
+  MaybeCodeDelegationState,
+  MaybeCodeDelegationToolRecords,
+} from "./delegation.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 
 export interface MaybeCodeModelConfiguration {
@@ -96,6 +101,7 @@ type BaseWorkspace = AgentWorkspace<
   MaybeCodeSessionEvent,
   MaybeCodeProductEvent,
   MaybeCodeCompactionSelection,
+  MaybeCodeRun,
   MaybeCodeApplication
 >;
 
@@ -156,6 +162,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       MaybeCodeSessionEvent,
       MaybeCodeProductEvent,
       MaybeCodeCompactionSelection,
+      MaybeCodeRun,
       MaybeCodeApplication
     >({
       workspace: state.options.workspace,
@@ -245,7 +252,12 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   getMcpInteractions() {
-    return this.state.options.mcp?.interactions?.list(this.mcpOwner()) ?? [];
+    const interactions = this.state.options.mcp?.interactions;
+    if (interactions === undefined) return [];
+    return [
+      this.mcpOwner(),
+      ...this.delegatedSessions().map((sessionId) => ({ workspaceId: this.workspace, sessionId })),
+    ].flatMap((owner) => [...interactions.list(owner)]);
   }
 
   respondMcpInteraction(id: string, response: Parameters<McpInteractionBroker["respond"]>[2]): boolean {
@@ -257,6 +269,15 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   private mcpOwner() { return { workspaceId: this.workspace, sessionId: this.sessionId }; }
+
+  /** 活动请求的子 Session 保留自己的 MCP 身份与授权记录。 */
+  private delegatedSessions(): readonly string[] {
+    return this.manager.activeApplication.ownedDelegatedSessions();
+  }
+
+  ownsSession(sessionId: string): boolean {
+    return sessionId === this.sessionId || this.manager.activeApplication.ownsSession(sessionId);
+  }
 
   async refreshMcp(serverId?: string): Promise<void> {
     this.throwIfClosed();
@@ -620,6 +641,27 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   listRecoveries() { return this.manager.listRecoveries(); }
   resolveRecovery(id: string, finding: string) { return this.manager.resolveRecovery(id, finding); }
 
+  listDelegationRequests(): readonly MaybeCodeDelegationRequest[] {
+    return this.manager.activeApplication.listDelegationRequests();
+  }
+
+  getDelegationState(): MaybeCodeDelegationState | undefined {
+    return this.manager.activeApplication.getDelegationState();
+  }
+
+  delegationToolRecords(taskId: string): Promise<MaybeCodeDelegationToolRecords> {
+    return this.manager.activeApplication.delegationToolRecords(taskId);
+  }
+
+  resolveDelegationRecovery(
+    requestId: string,
+    taskId: string,
+    finding: string,
+    outcome: { readonly status: "completed" | "failed" | "cancelled"; readonly detail: string },
+  ): Promise<MaybeCodeDelegationRequest> {
+    return this.manager.activeApplication.resolveDelegationRecovery(requestId, taskId, finding, outcome);
+  }
+
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage> {
     return this.manager.queryHistory(query);
   }
@@ -666,7 +708,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   private async relayEvents(events: AsyncIterable<MaybeCodeEvent>): Promise<void> {
     for await (const event of events) {
       if (event.type === "mcp.interaction.requested" &&
-          (event.request.owner.workspaceId !== this.workspace || event.request.owner.sessionId !== this.sessionId)) continue;
+          (event.request.owner.workspaceId !== this.workspace || !this.ownsSession(event.request.owner.sessionId))) continue;
       this.eventQueue.push(event);
     }
   }

@@ -18,6 +18,11 @@ export interface CoordinationRuntimeOptions {
 export interface CreateCoordinationOptions extends CoordinationRuntimeOptions {
   readonly tasks: readonly TaskSpec[];
   readonly limits?: Partial<CoordinationLimits>;
+  /**
+   * 初始任务的 Session 身份，用于根任务在宿主已经打开的 Session 中运行的情况。
+   * 没有给出的任务获得新的身份。
+   */
+  readonly sessionIds?: Readonly<Record<string, string>>;
 }
 
 interface ActiveTask { readonly controller: AbortController; readonly done: Promise<void> }
@@ -72,8 +77,7 @@ export class CoordinationRuntime {
         const agent = options.agents[task.agent];
         if (!Object.hasOwn(options.agents, task.agent) || !agent) throw new Error(`Unknown agent: ${task.agent}`);
         name(agent.version, "agent version");
-        return { id: task.id, agent: task.agent, input: task.input, dependsOn: [...(task.dependsOn ?? [])],
-          agentVersion: agent.version, dispatchId: randomUUID(), sessionId: randomUUID(), turn: 0, status: "queued" };
+        return { ...taskSpecOf(task), agentVersion: agent.version, dispatchId: randomUUID(), sessionId: sessionId(options, task), turn: 0, status: "queued" };
       }), commands: {},
     };
     const journal = await options.store.acquire(options.id);
@@ -170,7 +174,9 @@ export class CoordinationRuntime {
       if (!["completed", "failed", "cancelled"].includes(resolution.status)) throw new Error("Recovery must record a terminal outcome");
       const payload = canonical({ type: "resolve", taskId, finding, outcome: resolution });
       if (this.duplicate(commandId, payload)) return;
-      if (this.task(taskId).status !== "recovery-required") throw new Error("Task does not require recovery");
+      const status = this.task(taskId).status;
+      const suspended = !this.started && this.active.size === 0 && ["queued", "waiting"].includes(status);
+      if (status !== "recovery-required" && !suspended) throw new Error("Task does not require recovery");
       const { waitFor: _wait, waitForMessages: _messages, pendingHandoff: _handoff, ...verified } = this.task(taskId);
       const task = this.recoveredTask(verified, resolution, false);
       await this.save({ ...this.replace({ ...task, detail: finding }), commands: { ...this.state.commands, [commandId]: payload } });
@@ -256,8 +262,7 @@ export class CoordinationRuntime {
         const agent = this.agents.get(spec.agent);
         if (!agent) throw new Error(`Unknown agent: ${spec.agent}`);
         if (await this.policy.authorize(spec, this.state.id) !== true) throw new Error(`Task authorization denied: ${spec.id}`);
-        fresh.set(spec.id, { id: spec.id, agent: spec.agent, input: spec.input, dependsOn: [...(spec.dependsOn ?? [])],
-          agentVersion: agent.version, dispatchId: randomUUID(), sessionId: randomUUID(), turn: 0, status: "queued" });
+        fresh.set(spec.id, { ...taskSpecOf(spec), agentVersion: agent.version, dispatchId: randomUUID(), sessionId: randomUUID(), turn: 0, status: "queued" });
       }
       this.assertHostMutationAllowed();
       await this.save({ ...this.state, tasks: [...this.state.tasks.filter((task) => !remove.includes(task.id)).map((task) => fresh.get(task.id) ?? task), ...add.map((spec) => fresh.get(spec.id)!)],
@@ -385,11 +390,11 @@ export class CoordinationRuntime {
         });
         outcome = "yielded" in output && output.yielded === true ? { status: "yielded" }
           : { status: "completed", output: validateOutput(output as TaskOutput, this.state.limits.maxOutputBytes) };
-      } catch {
-        // An exception alone does not establish whether effects happened.
+      } catch (error) {
+        // 通过持久记录确认执行结果；尚未提交输入时保留原始错误。
         outcome = await this.recover(task);
         if (outcome.status === "not-started") outcome = {
-          status: controller.signal.aborted ? "cancelled" : "failed", detail: "Execution stopped before any durable input was submitted",
+          status: controller.signal.aborted ? "cancelled" : "failed", detail: `Execution stopped before any durable input was submitted: ${message(error)}`,
         };
       }
       await this.serial.run(async () => {
@@ -531,7 +536,7 @@ export class CoordinationRuntime {
         const safeChild = freeze(copy(child));
         if (await this.policy.authorizeDelegation?.(parent, safeChild, this.state.id) !== true ||
           await this.policy.authorize(safeChild, this.state.id) !== true) throw new Error(`Delegation authorization denied: ${child.id}`);
-        records.push({ id: child.id, agent: child.agent, input: child.input, dependsOn: [], parentTaskId: parentId,
+        records.push({ ...taskSpecOf(safeChild), parentTaskId: parentId,
           createdByCommand: commandId, agentVersion: agent.version, dispatchId: randomUUID(), sessionId: randomUUID(), turn: 0, status: "queued" });
       }
       if (this.closing || this.active.get(parentId)?.controller.signal.aborted) throw new Error("Delegation cancelled before commit");
@@ -700,7 +705,28 @@ function controller(task: CoordinationTask): TaskController {
 }
 
 function taskSpec(task: CoordinationTask, agent = task.agent): Readonly<TaskSpec> {
-  return freeze({ id: task.id, agent, input: task.input, dependsOn: [...task.dependsOn] });
+  return freeze(taskSpecOf(task, agent));
+}
+
+/** Immutable task fields shared by graph specs and durable task records. */
+function taskSpecOf(task: TaskSpec, agent = task.agent): TaskSpecFields {
+  return { id: task.id, agent, input: task.input, dependsOn: [...(task.dependsOn ?? [])],
+    ...(task.files === undefined ? {} : { files: [...task.files] }) };
+}
+
+interface TaskSpecFields {
+  readonly id: string;
+  readonly agent: string;
+  readonly input: string;
+  readonly dependsOn: readonly string[];
+  readonly files?: readonly string[];
+}
+
+function sessionId(options: CreateCoordinationOptions, task: TaskSpec): string {
+  const declared = options.sessionIds?.[task.id];
+  if (declared === undefined) return randomUUID();
+  name(declared, `session id of task ${task.id}`);
+  return declared;
 }
 
 function captureOptions<T extends CoordinationRuntimeOptions>(options: T): T {

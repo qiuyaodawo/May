@@ -148,7 +148,9 @@ Adapter 可以暴露：
 - `contextCompactor`，用于 provider 原生压缩。
 
 Provider-native compaction 是可选能力。`@may/context` 通过
-`ModelContextCompactionStrategy` 适配它，不应塞入普通 `stream()` 实现。参阅
+`ModelContextCompactionStrategy` 适配它，不应塞入普通 `stream()` 实现。
+compactor 应当在 `ModelContextCompactionResult.usage` 中报告压缩请求自身的用量，
+宿主才能按真实用量计账，而不是按预留值计账。参阅
 [自定义 Context](custom-context.md)。
 
 ## 注册可配置 Adapter
@@ -182,3 +184,6 @@ const registry = new ProviderAdapterRegistry().register("uppercase", {
 Retry-After 不会被截短以适应 `maxDelayMs`。服务端要求的等待超过配置退避上限时，
 RetryingModel 返回原始错误，而不是提前重试。Responses 错误分别提供 `providerType`
 和 `providerCode`；Chat Completions 工具参数 JSON 无效时产生协议错误，不作为字符串参数下传。
+Chat Completions 的流在出现顶层 `error` 字段时，该 chunk 立即失败，可见错误消息保留服务端
+的 `message`、`type` 和 `code`。流结束检查不会覆盖这个失败，本次调用也不会发出
+`response.completed`。
