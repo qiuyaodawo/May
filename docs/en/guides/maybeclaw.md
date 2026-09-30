@@ -7,6 +7,10 @@ It manages routing, access, approvals, execution, and message delivery.
 
 ## Sessions and configuration
 
+`pnpm maybeclaw --help` and `pnpm maybeclaw -h` print help and exit successfully.
+The CLI handles these options before loading its runtime modules, reading configuration,
+or initializing SQLite.
+
 A session requires a name and one or more default Agents. An optional chat
 entrance binds it to a private identity or one platform group/topic. Optional
 allowed Agents can have conversations created without approval; default Agents

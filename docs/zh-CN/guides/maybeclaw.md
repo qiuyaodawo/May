@@ -7,6 +7,9 @@ MaybeClaw 将 Agent 连接到持久会话、Web、CLI、Telegram 和飞书，管
 
 ## 会话与配置
 
+`pnpm maybeclaw --help` 和 `pnpm maybeclaw -h` 输出帮助内容并成功退出。
+CLI 在加载运行模块、读取配置或初始化 SQLite 之前处理这些参数。
+
 会话需要名称和一个或多个默认 Agent，可以填写聊天入口和免审批 Agent 名单。默认
 Agent 自动进入名单。个人会话绑定一个平台身份；群聊会话绑定同一平台的群聊或话题。
 每个 Agent 对话专属于一个 MaybeClaw 会话；同一种 Agent 可以通过不同对话 ID 服务
