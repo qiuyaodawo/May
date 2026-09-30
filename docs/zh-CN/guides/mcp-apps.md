@@ -69,10 +69,12 @@ MaybeCode 终端不启用/声明 Apps。`/mcp apps` 明确提示不能执行 HTM
 Host。普通资源附件仍是数据，而非可执行 HTML。
 
 `packages/mcp/test/apps.test.mjs` 检查远端执行前权限拒绝、visibility、归属路由、
-资源同意、旧视图失效及 fallback。可选真实 Chromium 测试验证双 iframe origin
-隔离、CSP 阻止 fetch、伪造来源拒绝和销毁。设置 `MAY_PLAYWRIGHT_MODULE` 为已安装
-Playwright 模块路径，必要时设置 `MAY_CHROMIUM_PATH` 即可运行；普通测试不需要
-下载浏览器或增加测试依赖。
+资源同意、旧视图失效及 fallback。
+`packages/mcp/test/browser/apps.test.mjs` 使用 Chromium 验证双 iframe origin
+隔离、CSP 阻止 fetch、伪造来源拒绝和销毁。执行
+`pnpm --filter @may/mcp exec playwright install chromium`，然后执行
+`pnpm --filter @may/mcp test:browser`。CI 仅在 Linux 的 Node.js 24 环境运行这项
+浏览器检查，默认离线测试不启动浏览器。
 
 即使自定义同意/执行器回调忽略 signal，Host 也可中止本地等待；迟到完成不会重放或
 交给已关闭视图。回调仍应遵守取消，才能停止其自身工作。

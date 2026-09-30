@@ -164,6 +164,7 @@ test("terminal UI shows automatic compaction failure and fallback progress", asy
   const terminal = new FakeTerminal(["x".repeat(2500), "/quit"]);
   const app = await MaybeCodeWorkspace.open({
     workspace: await temporaryDirectory(t),
+    subagents: false,
     model: {
       async *stream() {
         yield {
@@ -302,6 +303,7 @@ test("terminal UI retries the latest failed run without duplicating input", asyn
   const terminal = new FakeTerminal(["do work", "/retry", "/quit"]);
   const app = await MaybeCodeWorkspace.open({
     workspace: process.cwd(),
+    subagents: false,
     model: {
       async *stream() {
         modelCalls += 1;

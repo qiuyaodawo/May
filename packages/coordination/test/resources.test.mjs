@@ -37,7 +37,8 @@ test("shared budget reserves concurrent capacity, settles before results, and re
   const missing = ledger.wrapModel({ async *stream() { const value = response(); delete value.usage; yield value; } }, { reservation: { totalTokens: 20, costUsd: 0.1 } });
   await assert.rejects(consume(missing, "unknown"), /unavailable/);
   assert.equal((await ledger.totals()).blocked, true);
-  await assert.rejects(consume(held, "blocked"), /blocked/);
+  await assert.rejects(consume(held, "blocked"), /Shared budget has unknown model usage; reconcile it before continuing/);
+  assert.equal(calls, 2);
   await ledger.close();
   await assert.rejects(FileSharedBudget.open(directory, "team", { ...limits, maxModelCalls: 9 }), /changed limits/);
   ledger = await FileSharedBudget.open(directory, "team", limits);

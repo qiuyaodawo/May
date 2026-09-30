@@ -61,7 +61,6 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 
 ## 参考应用
 
-- [个人助手](guides/personal-assistant.md) 索引 Markdown 个人数据库、处理 Gmail 邮箱、准备 ehall 事务，并把会话交给手机使用。
 - [MaybeClaw](guides/maybeclaw.md) 通过 Gateway 将 May 与外部 Agent 接入个人和群聊会话，提供协作、审批与持久消息投递。
 
 - [MaybeCode](../../apps/maybecode/README.md) 是完整的终端编码 Agent 组合示例。

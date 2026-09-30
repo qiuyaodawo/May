@@ -139,17 +139,26 @@ View each job's logs in the Actions tab or
 follow the checks on a pull request to diagnose failures.
 
 Each environment installs dependencies with `pnpm install --frozen-lockfile`,
-then runs `pnpm build` and the offline suite once. Only Linux with Node.js 24
-runs `pnpm docs:check`, the basic example, and the May CLI help check; the latter
-two use built files directly. The offline suite already checks MaybeCode CLI help.
+then runs `pnpm build` and the offline suite once. Linux with Node.js 24 also
+runs `pnpm docs:check`, WebUI resource synchronization and MCP Apps browser
+isolation checks, the basic example, and the May and MaybeClaw
+CLI help checks. Browser checks use headless Chromium. Examples and CLI checks
+use built files directly. The offline suite already checks MaybeCode CLI help.
 For local changes, use `pnpm --filter <package-name> test` for the affected package.
-Manual dispatch adds a separate Linux job using the recommended Node.js
+Separate Linux and Windows jobs use the recommended Node.js
 version from `.node-version` and `pnpm test:package:maybecode` to verify
 packed dependencies, MCP subpath exports, and the installed CLI outside the
 repository. May packages come from local tarballs; external dependencies reuse
 the pnpm store when available and download missing versions from the registry.
 
 `pnpm test` continues through all workspace packages before reporting failures.
+Single-Session tool, skills, compaction and retry tests configure
+`subagents: false`; cancellation coverage also exercises the default delegation
+workflow. System clipboard checks require a desktop session and are run manually
+with `powershell -NoProfile -STA -File scripts/test-terminal-clipboard.ps1`.
+MaybeClaw live-provider checks use `pnpm --filter @may/maybeclaw test:integration`
+with `MAYBECLAW_LIVE_MODEL` and provider credentials. These desktop and live checks
+are outside the default offline suite.
 `pnpm test:path-alias` runs the entire suite with a temporary directory alias
 (a Windows junction or a POSIX symlink), exposing assumptions about canonical
 paths even on machines whose default temporary directory has no alias. On manual

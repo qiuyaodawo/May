@@ -18,7 +18,7 @@ async function fixture(t) {
 
 test("skills commands list, preview, activate, complete and explicitly submit without granting execution", async (t) => {
   const { workspace } = await fixture(t); let requests = 0; let last;
-  const app = await MaybeCodeWorkspace.open({ workspace, store: new InMemorySessionStore(), catalog: new InMemorySessionCatalog(), model: {
+  const app = await MaybeCodeWorkspace.open({ workspace, subagents: false, store: new InMemorySessionStore(), catalog: new InMemorySessionCatalog(), model: {
     async *stream(request) { requests++; last = request; yield { type: "response.completed", message: { role: "assistant", content: [] } }; },
   }});
   t.after(() => app.close());
@@ -49,7 +49,7 @@ test("model activation loads resources, remains after compaction/resume and rese
     last = request; requests++;
     yield { type: "response.completed", message: { role: "assistant", content: [], ...(requests <= 2 ? { toolCalls: [{ id: `call${requests}`, name: "skill_read", input: requests === 1 ? { name: "research" } : { name: "research", path: "references/guide.md" } }] } : {}) } };
   }};
-  const options = { workspace, store, catalog, model, autoCompactionStrategies: [] };
+  const options = { workspace, store, catalog, model, subagents: false, autoCompactionStrategies: [] };
   const app = await MaybeCodeWorkspace.open(options);
   await (await app.submit({ input: "use research" })).result;
   assert.equal(app.listSkills()[0].active, true);

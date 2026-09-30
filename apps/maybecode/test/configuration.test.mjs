@@ -777,6 +777,7 @@ test("configured MaybeCode automatically retries transient model failures", asyn
       workspace: directory,
       dataDirectory: join(directory, "data"),
       autoResume: false,
+      subagents: false,
     },
     {
       async loadConfig() {

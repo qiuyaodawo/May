@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { loadMayConfig } from "@may/config";
-import { AgentGateway } from "../dist/gateway.js";
+import { AgentGateway } from "../../dist/gateway.js";
 
-const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-live-tests/", import.meta.url));
-const workspace = fileURLToPath(new URL("../../../", import.meta.url));
+const base = fileURLToPath(new URL("../../../../.zcode/tmp/maybeclaw-live-tests/", import.meta.url));
+const workspace = fileURLToPath(new URL("../../../../", import.meta.url));
 const actor = { kind: "operator", id: "live-verification" };
 
 test("real provider: persistent conversations, defaults, collaboration, steering and interruption", {

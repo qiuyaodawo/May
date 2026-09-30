@@ -36,7 +36,6 @@ apps/
   cli/        Minimal command-line interface
   maybecode/ Terminal coding-agent application
   maybeclaw/ Agent Gateway with sessions, CLI, Web UI, Feishu and Telegram
-  personal-assistant/  Personal database, Gmail, ehall and a phone workbench
 examples/
   basic/      Minimal Model → Tool → Model example
   deepseek/   Live DeepSeek tool-call example
@@ -118,15 +117,6 @@ pnpm install
 pnpm build
 pnpm docs:check
 pnpm test
-```
-
-The `assistant` application is described in the
-[personal assistant guide](docs/en/guides/personal-assistant.md) or its
-[简体中文指南](docs/zh-CN/guides/personal-assistant.md).
-
-```bash
-pnpm assistant serve
-pnpm assistant status
 ```
 
 Use `pnpm --filter <package-name> test` for a focused package check. Path-alias,

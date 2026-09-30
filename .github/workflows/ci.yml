@@ -51,6 +51,9 @@ jobs:
       - name: Run browser resource synchronization tests
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
         run: pnpm --filter @may/web-ui test:browser
+      - name: Run MCP Apps browser isolation tests
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
+        run: pnpm --filter @may/mcp test:browser
       - name: Run offline tests
         if: ${{ github.event_name != 'workflow_dispatch' || matrix.os != 'windows-latest' }}
         run: pnpm test
@@ -66,9 +69,6 @@ jobs:
       - name: Check MaybeClaw CLI entry point
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
         run: node apps/maybeclaw/dist/bin.js --help
-      - name: Check Personal Assistant CLI entry point
-        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
-        run: node apps/personal-assistant/dist/bin.js --help
 
   package:
     name: MaybeCode package smoke test

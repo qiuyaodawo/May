@@ -23,7 +23,8 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "test": "pnpm run build && node --test test/*.test.mjs",
-    "test:browser": "pnpm run build && node --test test/browser/*.test.mjs"
+    "test:browser": "pnpm run build && node --test test/browser/*.test.mjs",
+    "test:integration": "pnpm run build && node --test test/integration/*.test.mjs"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "1.73.3",

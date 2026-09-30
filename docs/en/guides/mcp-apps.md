@@ -85,11 +85,12 @@ cannot silently install a browser Host. Generic resource attachment remains data
 not executable HTML.
 
 `packages/mcp/test/apps.test.mjs` checks permission denial before remote execution,
-visibility, owner routing, resource consent, stale views and fallback. Its optional
-real Chromium test verifies double-iframe origin isolation, CSP-blocked fetch,
-source spoof rejection and teardown. Set `MAY_PLAYWRIGHT_MODULE` to an installed
-Playwright module and optionally `MAY_CHROMIUM_PATH` to run it; no browser download
-or new test dependency is required for normal tests.
+visibility, owner routing, resource consent, stale views and fallback.
+`packages/mcp/test/browser/apps.test.mjs` uses Chromium to verify double-iframe
+origin isolation, CSP-blocked fetch, source spoof rejection and teardown. Run
+`pnpm --filter @may/mcp exec playwright install chromium`, then
+`pnpm --filter @may/mcp test:browser`. CI runs this browser check only on Linux
+with Node.js 24. The default offline suite does not launch browsers.
 
 Host callback waiting is abortable even when a custom consent/executor callback
 ignores its signal; late completion is never replayed or delivered to a closed view.

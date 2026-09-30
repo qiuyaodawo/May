@@ -755,7 +755,7 @@ class SubagentRequest {
     this.totals = totals;
     // usage 完整性直接来自账本：没有上报 usage 的调用与按预留值计账的估计值都使它为 false。
     this.usageComplete = totals.usageComplete;
-    if (!totals.blocked) return;
+    if (!totals.blocked || this.cancelling !== undefined) return;
     const configuration = this.host.options.configuration;
     this.budgetReason ??= totals.modelCalls > configuration.maxModelCalls
       ? `Request model call budget exhausted: ${totals.modelCalls}/${configuration.maxModelCalls}`

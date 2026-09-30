@@ -25,7 +25,6 @@
     { "path": "./packages/ui/keybindings" },
     { "path": "./packages/ui/tui" },
     { "path": "./apps/cli" },
-    { "path": "./apps/personal-assistant" },
     { "path": "./apps/maybecode" },
     { "path": "./apps/maybeclaw" },
     { "path": "./packages/ui/client" },

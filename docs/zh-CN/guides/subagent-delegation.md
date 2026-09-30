@@ -119,6 +119,9 @@ pending 调用在重新打开账本时变成 unknown。Goal 与 steering 的 Run
 `resolveApproval` 回答。新的用户输入、`cancel` 和 `close` 会停止请求、子任务及其后代。
 切换会话或模型需要等待当前请求结束，或者取消当前请求。
 
+明确取消的请求返回 `RunCancelledError`。被中断的模型调用在账本中保留 unknown
+用量，请求报告的 `usageComplete` 保持 false。
+
 进程在请求进行中结束时，持久记录会保留下来。再次启动时该请求被报告为中断，未结束的
 任务标记为 recovery-required，并且不会重放任何工具、模型调用或子任务 Run。核对外部
 影响之后，可以在协调 runtime 保持停止的情况下，为排队中的任务以及等待子任务的父任务

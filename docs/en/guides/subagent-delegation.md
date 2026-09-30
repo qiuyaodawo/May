@@ -141,6 +141,10 @@ task that raised them, and TUI, Web UI and headless callers answer through
 request, its children and their descendants. Session and model changes require
 the running request to finish or be cancelled first.
 
+An explicitly cancelled request returns `RunCancelledError`. Interrupted model
+usage stays unknown in the ledger and the request report keeps `usageComplete`
+false.
+
 A process that ends mid-request leaves a durable record. The next start reports
 the request as interrupted, marks unfinished tasks as recovery-required, and never
 replays a tool, a model call or a child Run. After checking external effects,

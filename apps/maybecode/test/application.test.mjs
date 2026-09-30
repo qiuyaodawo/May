@@ -49,6 +49,7 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
   const catalog = new InMemorySessionCatalog();
   const app = await MaybeCodeWorkspace.open({
     workspace,
+    subagents: false,
     model,
     store: new FileSessionStore(sessionDirectory),
     catalog,
@@ -106,6 +107,7 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
 
   const resumed = await MaybeCodeWorkspace.open({
     workspace,
+    subagents: false,
     model,
     store: new FileSessionStore(sessionDirectory),
     catalog,
@@ -218,6 +220,7 @@ test("executes read, write, edit, and shell through the application", async (t) 
     store: new (await import("@may/session")).InMemorySessionStore(),
     catalog: new InMemorySessionCatalog(),
     autoResume: false,
+    subagents: false,
   });
   const events = [];
   const eventReader = collectEvents(app, events, "allow");
@@ -288,6 +291,7 @@ test("exposes bounded active-session history as an approval-free tool", async ()
     store: new (await import("@may/session")).InMemorySessionStore(),
     catalog: new InMemorySessionCatalog(),
     autoResume: false,
+    subagents: false,
   });
 
   await (await app.submit({ input: "inspect this session" })).result;
@@ -460,6 +464,7 @@ test("persists the default prune-and-summary view across resume", async () => {
       },
     }],
     permissionPolicy: () => "allow",
+    subagents: false,
     contextSummarizer: {
       summarize(request) {
         summarized.push(request.messages);
@@ -537,6 +542,7 @@ test("automatically compacts before a model call and persists the active view", 
       contextWindowTokens: 1000,
       compactTriggerRatio: 0.5,
     },
+    subagents: false,
     autoCompactionStrategies: [{
       name: "keep-current-input",
       compact(snapshot) {
@@ -605,6 +611,7 @@ test("persists automatic compaction after the run events it contains", async () 
   let modelCall = 0;
   const app = await MaybeCodeWorkspace.open({
     workspace: process.cwd(),
+    subagents: false,
     model: {
       async *stream() {
         modelCall += 1;
@@ -713,6 +720,7 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
       contextWindowTokens: 1000,
       compactTriggerRatio: 0.5,
     },
+    subagents: false,
     autoCompactionStrategies: [
       new ModelContextCompactionStrategy(model.contextCompactor),
       {
@@ -842,6 +850,8 @@ test("cancels an active model call", async () => {
   );
   assert.equal(app.cancel("stop"), true);
   await assert.rejects(run.result, RunCancelledError);
+  assert.equal(app.getDelegationState().status, "cancelled");
+  assert.equal(app.getDelegationState().budget.usageComplete, false);
   await app.close();
 });
 

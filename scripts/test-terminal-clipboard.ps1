@@ -1,5 +1,5 @@
 param([string[]] $Tests = @(
-    'packages/ui/tui/test/clipboard.test.mjs',
+    'packages/ui/tui/test/terminal/system-clipboard.test.mjs',
     'packages/ui/tui/test/terminal/editor-clipboard.test.mjs',
     'packages/ui/tui/test/terminal/maybecode-selection.test.mjs'
 ))

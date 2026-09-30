@@ -7,7 +7,7 @@ const notes = { goal: "Fix the parser", constraints: "Keep existing APIs", progr
 const assistant = (text) => ({ role: "assistant", content: [{ type: "text", text }] });
 const call = (name, input = {}) => ({ role: "assistant", content: [], toolCalls: [{ id: `call_${name}_${Math.random()}`, name, input }] });
 const options = (model, store = new InMemorySessionStore()) => ({
-  workspace: process.cwd(), model, store, tools: [], skills: false,
+  workspace: process.cwd(), model, store, tools: [], skills: false, subagents: false,
   instructions: "Complete the task.", autoCompactionMode: "history-reference",
   contextBudget: { contextWindowTokens: 10000, compactTriggerRatio: 0.8 },
   contextSummarizer: { summarize() { assert.fail("Do not summarize history"); } },

@@ -116,15 +116,22 @@ Node.js 24。在 Actions 页面
 查看各任务日志，或从 PR 的检查结果进入日志排查失败原因。
 
 每种环境先执行 `pnpm install --frozen-lockfile`，然后运行 `pnpm build` 和一遍离线测试。
-只有 Linux 的 Node.js 24 任务运行 `pnpm docs:check`、基础示例和 May CLI 帮助检查，
-后两项直接使用已构建文件。离线测试已包含 MaybeCode CLI 帮助检查。
+Linux 的 Node.js 24 任务还运行 `pnpm docs:check`、WebUI 资源同步与 MCP Apps 浏览器
+隔离检查、基础示例，以及 May 和 MaybeClaw CLI 帮助检查。
+浏览器检查使用无头 Chromium，示例与 CLI 检查直接使用已构建文件。
+离线测试已包含 MaybeCode CLI 帮助检查。
 本地修改可使用 `pnpm --filter <package-name> test` 只验证受影响的包。
-手动触发时增加一个独立 Linux 任务，使用 `.node-version` 中推荐的 Node.js 版本，
+独立的 Linux 和 Windows 任务使用 `.node-version` 中推荐的 Node.js 版本，
 运行 `pnpm test:package:maybecode`，
 在仓库外验证打包依赖、MCP 子路径导出及安装后的 CLI。May 包从本地 tarball 安装；
 外部依赖优先复用 pnpm 缓存，缺失的版本从包注册表下载。
 
 `pnpm test` 会运行所有 workspace package 后统一报告失败。
+工具、skills、压缩与重试的单 Session 测试配置 `subagents: false`，取消测试同时覆盖
+默认委派流程。系统剪贴板检查需要桌面会话，通过
+`powershell -NoProfile -STA -File scripts/test-terminal-clipboard.ps1` 手动运行。
+MaybeClaw 真实 Provider 检查使用 `pnpm --filter @may/maybeclaw test:integration`，
+需要 `MAYBECLAW_LIVE_MODEL` 和 Provider 凭据。这些桌面与真实服务检查独立于默认离线测试。
 `pnpm test:path-alias` 使用临时目录别名（Windows junction 或 POSIX symlink）
 运行整个测试集，使默认临时目录没有别名的机器也能发现规范化路径相关的错误假设。
 手动触发时，Windows 任务用此项检查替代常规测试；自动运行时省略。

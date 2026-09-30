@@ -63,9 +63,6 @@ interfaces are intended for extension.
 
 ## Reference applications
 
-- [Personal assistant](guides/personal-assistant.md) indexes a Markdown personal
-  database, works a Gmail mailbox, prepares ehall transactions and serves the
-  session to a phone.
 - [MaybeClaw](guides/maybeclaw.md) connects May and external Agents to personal
   and group sessions through a Gateway, with collaboration, approvals and durable delivery.
 - [MaybeCode](../../apps/maybecode/README.md) is the full terminal coding-Agent
