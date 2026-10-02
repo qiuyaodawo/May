@@ -405,6 +405,16 @@ importers:
 
   packages/core: {}
 
+  packages/environment:
+    dependencies:
+      '@landstrip/landstrip-api':
+        specifier: 0.19.4
+        version: 0.19.4
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+
   packages/goal:
     dependencies:
       '@may/context':
@@ -606,6 +616,9 @@ importers:
       '@may/core':
         specifier: workspace:*
         version: link:../../core
+      '@may/environment':
+        specifier: workspace:*
+        version: link:../../environment
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -1012,6 +1025,41 @@ packages:
   '@jimp/utils@1.6.1':
     resolution: {integrity: sha512-veFPRd93FCnS7AgmCkPgARVGoDRrJ9cm1ujuNyA+UfQ5VKbED2002sm5XfFLFwTsKC8j04heTrwe+tU1dluXOw==}
     engines: {node: '>=18'}
+
+  '@landstrip/landstrip-api@0.19.4':
+    resolution: {integrity: sha512-6HCjXA+AxN+JDoXNBuWfb7u/u+iPo4TWXYTW4hQ+r0MRNB1NUw7eZis58Knw7p5enC9RzdysPB93QftESYyXfQ==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  '@landstrip/landstrip-darwin-arm64@0.19.4':
+    resolution: {integrity: sha512-7CA4oMjjF8aKChta7pPPmKL+1EIzrHQ50MrvQWJq34ryay+z8mg5Ss3xTKQ528QY4wuUdFZcyTz8/8QmnItSbA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@landstrip/landstrip-darwin-x64@0.19.4':
+    resolution: {integrity: sha512-deOuJe7atWJUU+X61GnhdapmSESqtE/VnS8YibGbzeWuincBZt7R30sICuke3+cdQfF4AAxsEPoS4R/jDWSlyw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@landstrip/landstrip-linux-arm64@0.19.4':
+    resolution: {integrity: sha512-fCAMpd8fjv9+yhwpmDIlgk2gucTL8iHPz0IRkK0Bq8vImcNWVu4M3mkygFiHbAl82dSQ0glrvgvVPq2dc1Zokg==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@landstrip/landstrip-linux-x64@0.19.4':
+    resolution: {integrity: sha512-FO7ZorGlY02fZcW0X5i6sKMN1ZltAulkp7ZnZBIpn/hNiD7t27k89wFv5/X/5tpccxOoABxcpn/+k+5tAaGhQg==}
+    cpu: [x64]
+    os: [linux]
+
+  '@landstrip/landstrip-win32-arm64@0.19.4':
+    resolution: {integrity: sha512-027FkLgPCKnmQI1ZSM49euJDQDMl6VNdw6sBSHLpKg3OHEBqFFXjDHkVuYcZds4/sSZq+rfsbrHiWbsGkpHPaw==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@landstrip/landstrip-win32-x64@0.19.4':
+    resolution: {integrity: sha512-6Kqxt5gMbOm8CoYPy0bW7Xr1Ifctc+8Y/WZsTuonhVIXFQJUS5JoMBxPziJp1sTRwpA9WXegOVL3uJCg+xsuzA==}
+    cpu: [x64]
+    os: [win32]
 
   '@larksuiteoapi/node-sdk@1.73.3':
     resolution: {integrity: sha512-14Zj8r3f5CEIvpRuzb5HSYyp6O092N1kQkGHg6Kwi/c7B0CmXeCHBVM3Pmn0ozP5JvvAQd/PXBzW48rMH6cj4Q==}
@@ -1591,6 +1639,10 @@ packages:
 
   image-q@4.0.0:
     resolution: {integrity: sha512-PfJGVgIfKQJuq3s0tTDOKtztksibuUEbJQIYT3by6wctQo+Rdlh7ef4evJ5NCdxY4CfMbvFkocEwbl4BF8RlJw==}
+
+  ipaddr.js@2.5.0:
+    resolution: {integrity: sha512-aq+t5NAc+cS6rZQQVWC2x98CPqGtKKTMDd4Gaodv0wShnItdKg/51djkGJ1hqH+Oy0ivDftCbSLCQob8zso01w==}
+    engines: {node: '>= 10'}
 
   is-docker@3.0.0:
     resolution: {integrity: sha512-eljcgEDlEns/7AXFosB5K/2nCM4P7FQPkGc/DWLy5rmFEWvZayGrik1d9/QIY5nJ4f9YsVvBkA6kJpHn9rISdQ==}
@@ -2326,6 +2378,35 @@ snapshots:
       '@jimp/types': 1.6.1
       tinycolor2: 1.6.0
 
+  '@landstrip/landstrip-api@0.19.4':
+    dependencies:
+      ipaddr.js: 2.5.0
+    optionalDependencies:
+      '@landstrip/landstrip-darwin-arm64': 0.19.4
+      '@landstrip/landstrip-darwin-x64': 0.19.4
+      '@landstrip/landstrip-linux-arm64': 0.19.4
+      '@landstrip/landstrip-linux-x64': 0.19.4
+      '@landstrip/landstrip-win32-arm64': 0.19.4
+      '@landstrip/landstrip-win32-x64': 0.19.4
+
+  '@landstrip/landstrip-darwin-arm64@0.19.4':
+    optional: true
+
+  '@landstrip/landstrip-darwin-x64@0.19.4':
+    optional: true
+
+  '@landstrip/landstrip-linux-arm64@0.19.4':
+    optional: true
+
+  '@landstrip/landstrip-linux-x64@0.19.4':
+    optional: true
+
+  '@landstrip/landstrip-win32-arm64@0.19.4':
+    optional: true
+
+  '@landstrip/landstrip-win32-x64@0.19.4':
+    optional: true
+
   '@larksuiteoapi/node-sdk@1.73.3(debug@4.4.3)':
     dependencies:
       axios: 1.20.0(debug@4.4.3)
@@ -2807,6 +2888,8 @@ snapshots:
   image-q@4.0.0:
     dependencies:
       '@types/node': 16.9.1
+
+  ipaddr.js@2.5.0: {}
 
   is-docker@3.0.0: {}
 

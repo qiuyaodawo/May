@@ -55,6 +55,7 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 ## 参考
 
 - [Packages](reference/packages.md)
+- [执行环境](reference/environment.md)
 - [配置](reference/configuration.md)
 - [兼容性与稳定性](reference/compatibility.md)
 - [架构决策记录](architecture/decisions/README.md)

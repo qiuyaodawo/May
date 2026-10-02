@@ -1,5 +1,6 @@
 import type { WorkspacePath } from "./workspace-path.js";
 import { stat } from "node:fs/promises";
+import { EnvironmentError, type EnvironmentProvider } from "@may/environment";
 
 /**
  * 一次受保护的文件操作。工具已经解析并校验过路径，宿主无需再自行解析。
@@ -25,12 +26,15 @@ export type WorkspaceFileGuard = <T>(
 export async function assertFileExistence(
   path: WorkspacePath,
   signal?: AbortSignal,
+  environment?: EnvironmentProvider,
 ): Promise<boolean> {
   signal?.throwIfAborted();
   try {
+    if (environment !== undefined) return (await environment.statFile(path.relative, signal === undefined ? undefined : { signal })).type === "file";
     const information = await stat(path.absolute);
     return information.isFile();
   } catch (error) {
+    if (error instanceof EnvironmentError && error.code === "ENVIRONMENT_PATH_NOT_FOUND") return false;
     if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")) {
       return false;
     }
@@ -41,5 +45,6 @@ export async function assertFileExistence(
 /** Windows 文件系统不区分大小写，统一为小写键值。 */
 export function workspaceFileKey(path: WorkspacePath): string {
   const normalized = path.absolute.replace(/\\/gu, "/");
-  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+  const key = (path.platform ?? process.platform) === "win32" ? normalized.toLowerCase() : normalized;
+  return path.environmentId === undefined ? key : `${path.environmentId}:${key}`;
 }

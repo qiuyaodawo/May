@@ -171,10 +171,12 @@ names, and should treat an unknown capability as unknown.
 
 ## Security boundary
 
-Permission approval is not execution isolation. In particular,
-`@may/coding-tools` shell execution runs with the privileges of the May process.
-Applications processing untrusted instructions or commands need a separate
-sandbox or remote execution backend.
+Permission approval controls whether an operation can run. Execution restrictions
+are supplied separately through an environment. `@may/coding-tools` accepts an
+optional `environment` for all four tools; its default shell uses May process
+privileges. The local `@may/environment` provider supports Windows AppContainer.
+Standard mode permits platform-public reads and grants writes to explicit roots.
+See [Execution environments](environment.md) for limits and remote provider interfaces.
 
 Configuration and Session files may contain sensitive prompts, tool input,
 tool output and provider data. The built-in local stores do not encrypt them.

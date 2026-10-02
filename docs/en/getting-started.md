@@ -19,6 +19,10 @@ For the design choices behind each component, continue with
 [Building an Agent](guides/building-an-agent.md). For the runtime vocabulary,
 see [Runtime and session boundaries](architecture/runtime-session.md).
 
+For file and command execution under a configured Windows AppContainer, see
+[Execution environments](reference/environment.md). The host creates one environment
+and passes it to coding tools with an explicit shell profile.
+
 ## Prerequisites
 
 - Node.js 22 or newer for repository development (Node.js 24 recommended;

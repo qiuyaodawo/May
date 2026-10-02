@@ -15,6 +15,10 @@ application，面向仓库当前 `0.1.0` 开发预览 API。
 各组件的选择方式见[构建 Agent](guides/building-an-agent.md)，运行时术语见
 [Runtime 与 Session 边界](architecture/runtime-session.md)。
 
+在配置好的 Windows AppContainer 中执行文件操作与命令时，参阅
+[执行环境](reference/environment.md)。宿主创建环境，并将它与明确的 shell profile
+一起提供给 coding tools。
+
 ## 前置条件
 
 - 仓库开发需要 Node.js 22 或更高版本（推荐 Node.js 24；

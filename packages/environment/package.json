@@ -1,7 +1,7 @@
 {
-  "name": "@may/coding-tools",
+  "name": "@may/environment",
   "version": "0.1.0",
-  "description": "Read, bash, edit, and write tools for May coding agents.",
+  "description": "Directory-isolated execution environments with file, process and artifact access for May agents.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,18 +9,11 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./change-preview": {
-      "types": "./dist/change-preview.d.ts",
-      "import": "./dist/change-preview.js"
-    },
-    "./instructions": {
-      "types": "./dist/instructions.d.ts",
-      "import": "./dist/instructions.js"
     }
   },
   "files": [
     "dist",
+    "runtime",
     "!dist/.tsbuildinfo"
   ],
   "scripts": {
@@ -30,8 +23,7 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*",
-    "@may/environment": "workspace:*"
+    "@landstrip/landstrip-api": "0.19.4"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

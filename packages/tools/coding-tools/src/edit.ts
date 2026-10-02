@@ -1,5 +1,6 @@
 import { atomicWriteText } from "./atomic-write.js";
 import type { Tool } from "@may/core";
+import type { EnvironmentProvider } from "@may/environment";
 import { CodingToolError } from "./errors.js";
 import {
   requireObject,
@@ -13,6 +14,7 @@ import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
 export const DEFAULT_EDIT_MAX_BYTES = 1024 * 1024;
 
 export interface EditToolOptions {
+  readonly environment?: EnvironmentProvider;
   readonly cwd: string;
   readonly maxBytes?: number;
   readonly allowHardLinks?: boolean;
@@ -67,6 +69,8 @@ export function createEditTool(options: EditToolOptions): Tool<
     async execute(input, context) {
       const file = await resolveExistingWorkspacePath(options.cwd, input.path, {
         allowHardLinks: options.allowHardLinks === true,
+        ...(options.environment === undefined ? {} : { environment: options.environment }),
+        signal: context.signal,
       });
       const edit = async () => {
         const original = await readTextFile(
@@ -74,6 +78,7 @@ export function createEditTool(options: EditToolOptions): Tool<
           file.relative,
           maxBytes,
           context.signal,
+          options.environment,
         );
         const occurrences = countOccurrences(original, input.oldText, 2);
         if (occurrences === 0) {
@@ -92,11 +97,11 @@ export function createEditTool(options: EditToolOptions): Tool<
         const updated = original.replace(input.oldText, () => input.newText);
         assertTextWithinLimit(updated, file.relative, maxBytes);
         context.signal.throwIfAborted();
-        await atomicWriteText(file.absolute, updated, context.signal);
+        await atomicWriteText(file.absolute, updated, context.signal, options.environment, file.relative);
         return { output: { path: file.relative, replacements: 1 as const }, content: updated };
       };
       if (options.guard === undefined) return (await edit()).output;
-      const exists = await assertFileExistence(file, context.signal);
+      const exists = await assertFileExistence(file, context.signal, options.environment);
       return (await options.guard<{ readonly output: EditToolOutput; readonly content: string }>({
         tool: "edit",
         path: file,

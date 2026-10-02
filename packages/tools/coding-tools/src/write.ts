@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { atomicWriteText } from "./atomic-write.js";
 import { dirname } from "node:path";
 import type { Tool } from "@may/core";
+import type { EnvironmentProvider } from "@may/environment";
 import {
   requireObject,
   requirePositiveIntegerOption,
@@ -14,6 +15,7 @@ import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
 export const DEFAULT_WRITE_MAX_BYTES = 1024 * 1024;
 
 export interface WriteToolOptions {
+  readonly environment?: EnvironmentProvider;
   readonly cwd: string;
   readonly maxBytes?: number;
   readonly allowHardLinks?: boolean;
@@ -65,6 +67,8 @@ export function createWriteTool(options: WriteToolOptions): Tool<
     async execute(input, context) {
       const file = await resolveWritableWorkspacePath(options.cwd, input.path, {
         allowHardLinks: options.allowHardLinks === true,
+        ...(options.environment === undefined ? {} : { environment: options.environment }),
+        signal: context.signal,
       });
       const bytesWritten = assertTextWithinLimit(
         input.content,
@@ -73,13 +77,13 @@ export function createWriteTool(options: WriteToolOptions): Tool<
       );
       const write = async () => {
         context.signal.throwIfAborted();
-        await mkdir(dirname(file.absolute), { recursive: true });
+        if (options.environment === undefined) await mkdir(dirname(file.absolute), { recursive: true });
         context.signal.throwIfAborted();
-        await atomicWriteText(file.absolute, input.content, context.signal);
+        await atomicWriteText(file.absolute, input.content, context.signal, options.environment, file.relative);
         return { output: { path: file.relative, bytesWritten }, content: input.content };
       };
       if (options.guard === undefined) return (await write()).output;
-      const exists = await assertFileExistence(file, context.signal);
+      const exists = await assertFileExistence(file, context.signal, options.environment);
       return (await options.guard<{ readonly output: WriteToolOutput; readonly content: string }>({
         tool: "write",
         path: file,

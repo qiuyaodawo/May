@@ -1,4 +1,5 @@
 import type { Tool } from "@may/core";
+import type { EnvironmentProvider } from "@may/environment";
 import { CodingToolError } from "./errors.js";
 import {
   optionalPositiveInteger,
@@ -14,6 +15,7 @@ export const DEFAULT_READ_MAX_BYTES = 1024 * 1024;
 export const DEFAULT_READ_MAX_LINES = 2000;
 
 export interface ReadToolOptions {
+  readonly environment?: EnvironmentProvider;
   readonly cwd: string;
   readonly maxBytes?: number;
   readonly maxLines?: number;
@@ -86,6 +88,8 @@ export function createReadTool(options: ReadToolOptions): Tool<
     async execute(input, context) {
       const file = await resolveExistingWorkspacePath(options.cwd, input.path, {
         allowHardLinks: options.allowHardLinks !== false,
+        ...(options.environment === undefined ? {} : { environment: options.environment }),
+        signal: context.signal,
       });
       const read = async () => {
         const text = await readTextFile(
@@ -93,6 +97,7 @@ export function createReadTool(options: ReadToolOptions): Tool<
           file.relative,
           maxBytes,
           context.signal,
+          options.environment,
         );
         const lines = text === "" ? [] : text.split(/(?<=\n)|(?<=\r)(?!\n)/u);
         if (/[\r\n]$/u.test(text)) lines.push("");

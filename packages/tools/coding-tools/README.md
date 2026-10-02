@@ -107,6 +107,8 @@ and `createBashShellProfile` provide the built-in launch conventions.
 `createBashTool` remains as a deprecated compatibility factory and now means a
 real Bash executable rather than the platform's implicit default shell.
 
-`shell` is **not a sandbox**. It executes with the permissions of the May
-process and inherits its environment by default. An application that runs
-untrusted commands must add its own sandbox and approval policy.
+With the default configuration, `shell` executes with May process permissions
+and inherits its environment. Configure `environment` to route all four tools
+through an `@may/environment` provider, and select an explicit shell profile.
+See the [environment guide](../../../docs/en/reference/environment.md) or
+[执行环境指南](../../../docs/zh-CN/reference/environment.md) for setup and limits.
