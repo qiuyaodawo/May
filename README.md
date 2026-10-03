@@ -110,10 +110,13 @@ built-in provider option matrix; its editor schema lives at
 The [CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and
 manual dispatch. It runs the offline suite once per environment: Linux on
 Node.js 22 and 24, and Windows and macOS on Node.js 24. Manual dispatch also
-checks temporary path aliases and the standalone MaybeCode package.
+checks temporary path aliases on Windows. Separate Linux and Windows jobs check
+the standalone MaybeCode package on every run.
 See [CI usage and local checks](docs/en/getting-started.md#continuous-integration).
 
-Repository development requires Node.js 22 or newer and pnpm 11.23.0.
+Repository development requires Node.js 22.16.0 or newer and pnpm 12.4.2,
+as declared in `package.json`. The offline suite uses `node:sqlite` backup APIs
+available from Node.js 22.16.0.
 Node.js 24 is recommended and recorded in `.node-version` for version managers
 that support it. Individual packages retain their existing runtime requirements.
 

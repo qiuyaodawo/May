@@ -148,7 +148,10 @@ store 不提供加密。
 
 ## 支持的运行时
 
-发布包与仓库开发均要求 Node.js 22 或更高版本。推荐 Node.js 24，记录在 `.node-version`。
+发布的框架包要求 Node.js 22 或更高版本，MaybeClaw 要求 Node.js 22.13 或更高版本。
+仓库开发要求 Node.js 22.16.0 或更高版本，离线测试使用该版本开始提供的
+`node:sqlite` backup API。仓库在 `package.json` 中固定 pnpm 12.4.2。
+推荐 Node.js 24，记录在 `.node-version`。
 CI 覆盖 Linux 22/24 和 Windows/macOS 24；最低版本声明不等于所有平台组合都经过验证。
 打包冒烟测试在 push/PR 时覆盖 Linux 和 Windows。
 

@@ -25,9 +25,10 @@ and passes it to coding tools with an explicit shell profile.
 
 ## Prerequisites
 
-- Node.js 22 or newer for repository development (Node.js 24 recommended;
-  `.node-version` records the recommended major version)
-- pnpm (the repository pins its expected version in `package.json`)
+- Node.js 22.16.0 or newer for repository development (Node.js 24 recommended;
+  `.node-version` records the recommended major version). The offline suite uses
+  `node:sqlite` backup APIs available from Node.js 22.16.0.
+- pnpm 12.4.2 (the repository pins its expected version in `package.json`)
 - a checkout of this repository
 
 Install and build the workspace from its root:

@@ -183,8 +183,11 @@ tool output and provider data. The built-in local stores do not encrypt them.
 
 ## Supported runtime
 
-Published packages and repository development require Node.js 22 or newer. Node.js 24
-is recommended and recorded in `.node-version`. CI covers Linux on 22/24 and Windows/macOS
+Published framework packages require Node.js 22 or newer. MaybeClaw requires Node.js
+22.13 or newer. Repository development requires Node.js 22.16.0 or newer because
+the offline suite uses `node:sqlite` backup APIs. The repository pins pnpm 12.4.2
+in `package.json`. Node.js 24 is recommended and recorded in `.node-version`.
+CI covers Linux on 22/24 and Windows/macOS
 on 24; declaring a minimum does not verify every operating-system/runtime combination.
 Package smoke tests run for push/PR on Linux and Windows.
 

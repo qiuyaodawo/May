@@ -21,9 +21,10 @@ application，面向仓库当前 `0.1.0` 开发预览 API。
 
 ## 前置条件
 
-- 仓库开发需要 Node.js 22 或更高版本（推荐 Node.js 24；
-  `.node-version` 记录推荐的主版本）
-- pnpm（仓库在 `package.json` 中固定了预期版本）
+- 仓库开发需要 Node.js 22.16.0 或更高版本（推荐 Node.js 24；
+  `.node-version` 记录推荐的主版本）。离线测试使用 Node.js 22.16.0 开始提供的
+  `node:sqlite` backup API。
+- pnpm 12.4.2（仓库在 `package.json` 中固定了预期版本）
 - 本仓库的 checkout
 
 在仓库根目录安装并构建：
