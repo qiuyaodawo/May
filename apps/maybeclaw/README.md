@@ -5,6 +5,17 @@ CLI, Telegram, and Feishu. The Gateway owns routing, access checks, approvals,
 message delivery, and Agent lifecycle. May Agents use the built-in adapter;
 external Agents expose declared capabilities through an adapter.
 
+Shared functionality lives in `packages/plugins/`: delivery, Telegram, Feishu,
+Agent adapters, coordination and HTTP listeners. Product composition lives in
+`src/plugins/`. GatewayHost and AgentGateway own plugin hosts and release their
+resources when closing. Configured Model and PermissionPolicy plugins replace
+product defaults by service declaration.
+
+可复用投递、Telegram、Feishu、Agent adapter、coordination 和 HTTP 功能位于
+`packages/plugins/`，产品组合位于 `src/plugins/`。GatewayHost 和 AgentGateway
+管理插件宿主及资源关闭。配置插件可以通过服务声明替换默认 Model 和
+PermissionPolicy。
+
 A session can use several Agents. Each allocated Agent conversation belongs to
 one MaybeClaw session. Personal sessions bind one platform identity; group
 sessions bind one group or topic. The service administrator configures session

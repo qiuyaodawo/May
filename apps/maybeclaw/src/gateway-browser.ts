@@ -718,7 +718,10 @@ export function createGatewayManager(client: UiClient): GatewayManager {
           if (input.value.trim()) result[key] = input.value;
           else delete result[key];
         }
-        if (adapterChoice.value === "module") result.options = JSON.parse(optionsField.value);
+        if (adapterChoice.value === "module") {
+          result.options = JSON.parse(optionsField.value);
+          delete result.plugins;
+        }
         else for (const key of ["module", "export", "options"]) delete result[key];
 
         if (idleMsField.value.trim()) {

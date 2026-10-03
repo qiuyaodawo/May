@@ -56,6 +56,33 @@ export interface ToolExecutor {
   ): Promise<TOutput>;
 }
 
+export function freezeToolInput<T>(input: T): T {
+  const visited = new WeakSet<object>();
+  const values: object[] = [];
+  const visit = (value: unknown): void => {
+    if (value === null || (typeof value !== "object" && typeof value !== "function")) return;
+    if (visited.has(value)) return;
+    if (
+      value instanceof Date || value instanceof Map || value instanceof Set ||
+      value instanceof WeakMap || value instanceof WeakSet ||
+      value instanceof ArrayBuffer || ArrayBuffer.isView(value) ||
+      (typeof SharedArrayBuffer !== "undefined" && value instanceof SharedArrayBuffer) ||
+      value instanceof URL || value instanceof URLSearchParams
+    ) {
+      throw new TypeError(`Tool input cannot contain mutable built-in ${Object.prototype.toString.call(value)}; use immutable data fields`);
+    }
+    visited.add(value);
+    values.push(value);
+    for (const key of Reflect.ownKeys(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+      if ("value" in descriptor) visit(descriptor.value);
+    }
+  };
+  visit(input);
+  for (const value of values.reverse()) Object.freeze(value);
+  return input;
+}
+
 export interface ToolOperation<T> {
   readonly call: ToolCall;
   readonly tool: Tool | undefined;

@@ -1,6 +1,8 @@
-import type { AgentApplicationEvent } from "@may/application";
-import type { ContentPart, RunBudget, Tool, UserMessage } from "@may/core";
+import type { ContentPart, RunBudget } from "@may/core";
 import type { ApprovalDecision } from "@may/permissions";
+import type { PluginModuleSelection } from "@may/plugin";
+import type { AgentAdapter as GatewayAgentAdapter, AgentAdapterContext as GatewayAdapterContext, AgentCapabilities as GatewayCapabilities, AgentTaskStatus as GatewayTaskStatus } from "@may/plugin-agent-adapters";
+export type { GatewayAgentAdapter, GatewayAdapterContext, GatewayCapabilities, GatewayTaskStatus };
 
 export type GatewayActor = { kind: "operator"; id: string } | {
   kind: "platform"; account: string; userId: string; conversation: string; threadId?: string;
@@ -47,7 +49,6 @@ export interface GatewayMessage {
   sourceEntry?: string;
   content?: ContentPart[];
 }
-export type GatewayTaskStatus = "queued" | "running" | "waiting" | "cancelling" | "completed" | "failed" | "cancelled" | "recovery-required";
 export interface GatewayTask {
   id: string;
   sessionId: string;
@@ -80,15 +81,6 @@ export interface GatewayApproval {
   decidedBy?: GatewayActor;
   decision?: ApprovalDecision;
 }
-export interface GatewayCapabilities {
-  cancel: boolean;
-  steer: boolean;
-  resume: boolean;
-  delete: boolean;
-  approvals: boolean;
-  collaboration: boolean;
-  media: readonly string[];
-}
 export interface GatewayAgentConfig {
   id: string;
   name?: string;
@@ -100,34 +92,11 @@ export interface GatewayAgentConfig {
   module?: string;
   export?: string;
   options?: Record<string, unknown>;
+  plugins?: readonly PluginModuleSelection[];
   idleMs?: number;
   runBudget?: RunBudget;
   permissions?: Record<string, "allow" | "deny" | "ask">;
   media?: string[];
-}
-export interface GatewayAdapterContext {
-  conversationId: string;
-  inputId: string;
-  input: UserMessage;
-  signal: AbortSignal;
-  tools: readonly Tool[];
-  shouldYield: () => boolean;
-  report: (event: AgentApplicationEvent) => void;
-}
-export interface GatewayAgentAdapter {
-  readonly capabilities: GatewayCapabilities;
-  createConversation(requestId: string): Promise<string>;
-  inspectCreation?(requestId: string): Promise<{ status: "not-started" | "ready" | "unknown"; conversationId?: string }>;
-  execute(context: GatewayAdapterContext): Promise<{ text: string; runId?: string; yielded?: boolean; content?: ContentPart[] }>;
-  inspect(conversationId: string, inputId: string): Promise<{ status: "not-started" | GatewayTaskStatus; text?: string; detail?: string; content?: ContentPart[]; runId?: string }>;
-  cancel?(conversationId: string): Promise<void>;
-  steer?(conversationId: string, text: string, inputId: string): Promise<{ status: string }>;
-  steeringInputs?(conversationId: string): Promise<readonly { inputId: string; text: string; status: string }[]>;
-  resolveApproval?(conversationId: string, requestId: string, decision: ApprovalDecision): Promise<boolean>;
-  release?(conversationId: string): Promise<void>;
-  deleteConversation?(conversationId: string): Promise<void>;
-  command?(conversationId: string, name: string, args: readonly string[]): Promise<string>;
-  close(): Promise<void>;
 }
 export interface GatewaySettings {
   version: 2;

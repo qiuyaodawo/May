@@ -10,6 +10,17 @@
     ]
   },
   "references": [
+    { "path": "../../packages/plugin" },
+    { "path": "../../packages/plugins/agent-adapters" },
+    { "path": "../../packages/plugins/channel-feishu" },
+    { "path": "../../packages/plugins/channel-telegram" },
+    { "path": "../../packages/plugins/coordination" },
+    { "path": "../../packages/plugins/delivery" },
+    { "path": "../../packages/plugins/models" },
+    { "path": "../../packages/plugins/permissions" },
+    { "path": "../../packages/plugins/runtime" },
+    { "path": "../../packages/plugin-services" },
+    { "path": "../../packages/plugins/web-api" },
     { "path": "../../packages/application" },
     { "path": "../../packages/tools/coding-tools" },
     { "path": "../../packages/config" },

@@ -117,6 +117,9 @@ export class SessionHistoryReader {
 
 export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "session.created",
+  "runtime.state.saved",
+  "runtime.changed",
+  "input.generated",
   "state.updated",
   "input.submitted",
   "input.steering.queued",

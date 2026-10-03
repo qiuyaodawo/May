@@ -10,6 +10,7 @@ import type {
   Usage,
   UserMessage,
   RunBudgetSnapshot,
+  RuntimeDescriptor,
 } from "@may/core";
 import type { SessionSteeringInput } from "./steering.js";
 
@@ -80,13 +81,16 @@ export type RecordablePermissionEvent = (
 export type SessionEventPayload =
   | { type: "state.updated"; key: string; value: unknown }
   | { type: "run.budget.exceeded"; runId: string; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
-  | { type: "session.created"; metadata?: Record<string, unknown> }
+  | { type: "session.created"; metadata?: Record<string, unknown>; runtime?: RuntimeDescriptor }
+  | { type: "runtime.state.saved"; runtime: RuntimeDescriptor; state: unknown }
+  | { type: "runtime.changed"; runtime: RuntimeDescriptor; state?: unknown }
+  | { type: "input.generated"; runId: string; step: number; messages: readonly UserMessage[]; reason: string }
   | { type: "input.submitted"; message: UserMessage; inputId?: string }
   | { type: "input.steering.queued"; input: SessionSteeringInput }
   | { type: "input.steering.delivered"; runId: string; step: number; inputIds: readonly string[] }
   | { type: "input.steering.finished"; inputIds: readonly string[]; status: "idle" | "cancelled"; reason: string }
   | { type: "run.started"; runId: string; continuation?: boolean; checkpointVersion?: 1 }
-  | { type: "tool.started"; runId: string; step: number; call: ToolCall }
+  | { type: "tool.started"; runId: string; step: number; call: ToolCall; input?: unknown }
   | { type: "run.interrupted"; runId: string; recoveries: readonly SessionRecovery[] }
   | { type: "recovery.resolved"; recoveryId: string; message: UserMessage }
   | {

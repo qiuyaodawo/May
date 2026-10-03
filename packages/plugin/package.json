@@ -1,0 +1,33 @@
+{
+  "name": "@may/plugin",
+  "version": "0.1.0",
+  "description": "Typed services, dependency lifecycle, scoped plugin hosts and hooks for May agents.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "!dist/.tsbuildinfo"],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+  },
+  "dependencies": {
+    "@may/core": "workspace:*",
+    "ajv": "^8.17.1",
+    "import-meta-resolve": "^4.2.0",
+    "semver": "^7.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/semver": "^7.7.0"
+  },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}

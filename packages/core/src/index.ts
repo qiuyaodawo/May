@@ -4,6 +4,8 @@ export * from "./budget.js";
 export * from "./errors.js";
 export * from "./events.js";
 export * from "./may.js";
+export * from "./hooks.js";
+export * from "./runtime.js";
 export * from "./model.js";
 export * from "./tool.js";
 export * from "./tool-registry.js";

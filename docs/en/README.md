@@ -25,6 +25,8 @@ interfaces are intended for extension.
 
 ## Extension guides
 
+- [Plugins, services and lifecycle Hooks](guides/plugins.md)
+- [Plugin system specification](architecture/plugin-spec.md)
 - [Multi-agent task graphs](guides/coordination.md)
 - [Shared budgets, artifacts and task workspaces](guides/coordination-resources.md)
 - [Attempts and graph revisions](guides/coordination-lifecycle.md)

@@ -128,6 +128,20 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "pluginSelections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["module"],
+        "properties": {
+          "module": { "type": "string", "minLength": 1 },
+          "export": { "type": "string", "minLength": 1, "default": "default" },
+          "config": {},
+          "enabled": { "type": "boolean", "default": true }
+        },
+        "additionalProperties": false
+      }
+    },
     "maybeclawAgentId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$" },
     "maybeclawIdentifier": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\s\\u0000-\\u001f\\u007f](?:[^\\u0000-\\u001f\\u007f]*[^\\s\\u0000-\\u001f\\u007f])?$" },
     "maybeclawIdentityList": { "type": "array", "items": { "$ref": "#/$defs/maybeclawIdentifier" }, "uniqueItems": true },
@@ -157,12 +171,13 @@
         "module": { "$ref": "#/$defs/maybeclawIdentifier" },
         "export": { "$ref": "#/$defs/maybeclawIdentifier", "default": "createAdapter" },
         "options": { "type": "object" },
+        "plugins": { "$ref": "#/$defs/pluginSelections" },
         "idleMs": { "type": "integer", "minimum": 0 },
         "runBudget": { "$ref": "#/$defs/runBudget" },
         "permissions": { "type": "object", "propertyNames": { "$ref": "#/$defs/maybeclawIdentifier" }, "additionalProperties": { "enum": ["allow", "deny", "ask"] } }
       },
       "if": { "properties": { "adapter": { "const": "module" } } },
-      "then": { "required": ["module"] },
+      "then": { "required": ["module"], "not": { "required": ["plugins"] } },
       "else": { "not": { "anyOf": [{ "required": ["module"] }, { "required": ["export"] }, { "required": ["options"] }] } },
       "additionalProperties": false
     },
@@ -461,6 +476,7 @@
     "maybecode": {
       "type": "object",
       "properties": {
+        "plugins": { "$ref": "#/$defs/pluginSelections" },
         "permissionMode": { "enum": ["default", "yolo"], "default": "default", "description": "Tool approval mode. yolo auto-approves requests while preserving explicit policy denials." },
         "instructionsDirectory": { "$ref": "#/$defs/nonEmptyString" },
         "skills": {

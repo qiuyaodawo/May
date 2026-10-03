@@ -3,6 +3,7 @@ import {
   directToolExecutor,
   endTraceSpan,
   FatalToolExecutionError,
+  freezeToolInput,
   RunCancelledError,
   startTraceSpan,
   traceError,
@@ -68,17 +69,18 @@ export class PermissionToolExecutor implements ToolExecutor {
     try {
       this.throwIfClosed();
       throwIfAborted(execution.context.signal);
+      execution = Object.freeze({ ...execution, input: freezeToolInput(execution.input) });
 
-      const check: PermissionCheck = {
-        tool: {
+      const check: PermissionCheck = Object.freeze({
+        tool: freezeToolInput({
           name: execution.tool.name,
           description: execution.tool.description,
           inputSchema: structuredClone(execution.tool.inputSchema),
           ...(execution.tool.permissionVersion === undefined ? {} : { permissionVersion: execution.tool.permissionVersion }),
-        },
-        input: structuredClone(execution.input),
+        }),
+        input: freezeToolInput(structuredClone(execution.input)),
         context: execution.context,
-      };
+      });
       const definitionKey = permissionDefinitionKey(check.tool);
       const outcome = await this.evaluatePolicy(check);
 

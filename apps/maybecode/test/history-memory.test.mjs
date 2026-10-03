@@ -110,7 +110,7 @@ test("failed note persistence stops the run without creating a handoff or reset"
   } }, {
     read: (id) => backing.read(id),
     async append(event) {
-      if (event.type === "state.updated") throw new Error("notes disk failure");
+      if (event.type === "state.updated" && event.key === "maybecode.context-notes") throw new Error("notes disk failure");
       return backing.append(event);
     },
   }));
@@ -118,6 +118,6 @@ test("failed note persistence stops the run without creating a handoff or reset"
   await assert.rejects((await app.submit({ input: "Fix the parser" })).result);
   assert.equal(calls, 1);
   const history = await app.history();
-  assert.equal(history.some((event) => event.type === "state.updated" || event.type === "context.compacted"), false);
+  assert.equal(history.some((event) => (event.type === "state.updated" && event.key === "maybecode.context-notes") || event.type === "context.compacted"), false);
   assert.ok((await app.inspectContext()).messageCount >= 2);
 });

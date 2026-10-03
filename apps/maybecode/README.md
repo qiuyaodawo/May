@@ -102,7 +102,45 @@ Coding Diff previews render structured addition and deletion counts directly fro
 The default remains the retained TUI. See the [English Web UI guide](../../docs/en/guides/web-ui.md)
 or [简体中文指南](../../docs/zh-CN/guides/web-ui.md) for commands and current limits.
 
-## Component boundary
+## Plugin composition
+
+`src/plugins/application.ts` defines application features and service selection;
+`src/plugins/resources.ts` defines workspace resource ownership and the shared
+MCP and tracing providers supplied to each Session. `MaybeCodeApplication.open`
+and `openConfiguredMaybeCode` use these factories directly.
+
+MaybeCode selects Model, Context, Permission, Skills, Goals, History Memory,
+Delegation, and Workspace Files plugins for each application. Optional MCP and
+Observability plugins belong to the configured workspace host and contribute
+their services to each Session. Switching Sessions retains the same actual MCP
+connections and tracing processor. Closing the workspace closes their owner.
+
+`MaybeCodeApplication.open({ plugins, ... })` accepts custom plugins. A selected
+plugin replaces a default with the same id or provided service token; the host
+validates the complete dependency graph. `goals: false`, `subagents: false`, and
+`skills: false` retain their independent disable controls. Configured MCP and
+tracing also retain their existing disable options. `getService(token)` exposes
+enabled application services for programmatic hosts.
+
+Service selection uses both scope and id. A host service with the same id as an
+application service can coexist with the application's default provider. A
+selected Model plugin supplies the active Model and may also supply `modelInfo`;
+Context and delegation budgets use its Model limits, with explicit
+`contextBudget` taking priority. Model metadata is unknown when that service is
+absent. Configured startup accepts a selected Model without configured profiles.
+
+Workspace MCP commands and events use the active application's `mcpService`.
+An application-owned MCP plugin creates and closes its connection for each
+Session; configured shared MCP providers retain their workspace-owned connection
+across Session changes. Custom MCP providers replace configured MCP resources.
+
+Reusable implementations live in `@may/plugin-goals`,
+`@may/plugin-history-memory`, `@may/plugin-delegation`, `@may/plugin-mcp`, and
+`@may/plugin-observability`. Model, Permission, Skills, and Runtime factories live
+in the corresponding plugin packages. The previous MaybeCode module paths
+continue to re-export history-memory and delegation interfaces.
+
+## Product boundary
 
 MaybeCode is a product composition layer. Generic lifecycle does not live in
 the app:

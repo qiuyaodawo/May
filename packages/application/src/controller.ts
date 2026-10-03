@@ -15,6 +15,8 @@ import type {
   SessionSteeringInput,
 } from "@may/session";
 import type { SessionSummary } from "@may/session/catalog";
+import type { AnyPlugin } from "@may/plugin";
+import type { PluginUpdateOptions } from "./plugins.js";
 
 import type {
   AgentApplicationEvent,
@@ -53,6 +55,7 @@ export interface AgentController<
     selection?: CompactionSelection,
   ): Promise<ContextCompactionResult>;
   close(): Promise<void>;
+  updatePlugins?(plugins: readonly AnyPlugin[], options?: PluginUpdateOptions): Promise<void>;
 }
 
 /** Headless control surface for applications that expose multiple sessions. */

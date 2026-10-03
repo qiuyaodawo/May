@@ -79,3 +79,18 @@ export class ToolNotFoundError extends MayError {
     super("TOOL_NOT_FOUND", `Tool \"${name}\" was not found`);
   }
 }
+
+export class ToolHookDeniedError extends MayError {
+  constructor(reason: string) {
+    super("TOOL_HOOK_DENIED", reason);
+  }
+}
+
+export class HookExecutionError extends MayError {
+  readonly hookName: string;
+
+  constructor(cause: unknown, hookName: string) {
+    super("HOOK_EXECUTION_FAILED", `Hook ${hookName} failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    this.hookName = hookName;
+  }
+}

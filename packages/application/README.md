@@ -66,13 +66,72 @@ by a definition remains caller-owned and is shared by applications opened from
 that definition; the caller must ensure any required concurrency and
 isolation.
 
+## Plugins and lifecycle Hooks
+
+Definitions and direct applications accept `plugins`, `pluginHookTimeoutMs`,
+and `onPluginHookError`. The plugin composition is snapshotted by the definition;
+each application creates its own application, session, and Run scopes.
+`applicationServices` exposes typed service tokens for the model, Context factory,
+session store, permissions, tools, executor, scheduler, tracer, and Runtime factory.
+Options are adapted into component plugin factories. Supplying an option and a
+plugin that both provide the same base service fails before setup.
+`getService(token)` reads an enabled service from the session scope.
+
+`@may/plugin-services` exports the same base tokens and ordered contribution
+registries. Multiple plugins register tool and instruction sources, Model wrappers,
+and Context wrappers, with explicit `order` and `context.pluginOrder`. Each
+Application has independent registries; Models and Context factories are wrapped
+when its Runtime is created. Base tokens retain their original component instances.
+`contextOptions` accepts a configuration object or a callback receiving the effective
+Model, including its wrappers. Tools are checked for duplicate names during opening
+and captured again for each Run.
+Optional `modelInfo` describes the active Model; its fields are included in Runtime
+trace attributes. Model factories provide this service alongside their actual instance.
+The standard `may.model` labels use this service. Missing metadata keeps these
+labels absent, including after plugin replacement; other trace attributes are preserved.
+
+`applicationServices.application` provides `ApplicationAccess.get()`. It returns the
+actual Application from `application.created` handlers; accessing it during setup
+fails immediately. Plugins can use its controller and state APIs and register owned
+resources with `context.defer()`. The Application reference stays outside cloned
+Hook payloads. Builtin Model, permissions, Context/Runtime/tools and Skills factories
+live in `@may/plugin-models`, `@may/plugin-permissions`, `@may/plugin-runtime`, and
+`@may/plugin-skills`. Existing direct options retain their caller ownership semantics.
+
+`applicationHooks` covers application creation and closing, durable input,
+compaction, approval, and recovery. Creation and closing events include Session
+plugins and all ancestor handlers, ordered by their declared priorities. Session
+state and services are prepared before `application.beforeCreate` executes.
+Core `runtimeHooks` covers Run, Step, Context,
+model, and tool execution. Transformation handlers run in sequence; observation
+handlers can choose isolation and report their failures through
+`onPluginHookError`. Plugin application and session state is persisted with its
+version and restored or migrated during resume.
+
+`updatePlugins(plugins, { cancelActive? })` validates the complete composition,
+waits for the current operation boundary, saves and closes the previous Runtime,
+updates plugin resources, and creates a replacement Runtime. `cancelActive: true`
+cancels the current operation before the update. Runs remain unavailable during
+the change. Newly created plugins receive `application.created` again to attach to
+the existing Application. A replacement initialization failure can be repaired with another
+`updatePlugins()` call. Application closing waits for active work and closes the
+Runtime before disposing plugin resources; option-provided collaborators remain
+caller-owned.
+
+See the [English plugin guide](../../docs/en/guides/plugins.md) and
+[Chinese plugin guide](../../docs/zh-CN/guides/plugins.md) for dependency
+declarations, Hook registration, configuration, state migration, and cleanup.
+
 `AgentApplication` owns one durable session: it creates or resumes the runtime,
 relays run and approval events, serializes active-run state, persists context
 compaction, and closes outstanding work safely. Prompts, tools, permission policy
 and optional tool-presentation metadata are injected by the product.
 
 `recordState(key, value)` persists product-owned session state, including from a
-tool during a Run. Pass `sessionHistory: { retrieval: true }` to also expose
+tool during a Run. Closing blocks new agent operations while allowing lifecycle
+handlers and settling work to finish their state writes; closing awaits accepted
+writes, and completed closing rejects subsequent writes.
+Pass `sessionHistory: { retrieval: true }` to also expose
 bounded `session_history_search` and chunked `session_history_read` alongside
 `session_history`. These tools only access this application's session.
 

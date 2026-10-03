@@ -8,7 +8,7 @@ import { AgentGateway } from "../dist/gateway.js";
 import { GatewayHost } from "../dist/gateway-host.js";
 import { startGatewayServer } from "../dist/gateway-server.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
-import { ChannelStore, inboxId } from "../dist/channel-store.js";
+import { inboxId } from "../dist/channel-store.js";
 import { TelegramAdapter } from "../dist/channels.js";
 import { actorKey, entryKey } from "../dist/gateway-types.js";
 
@@ -25,9 +25,8 @@ async function fixture(t) {
   const settings = gatewaySettings(config);
   await writeFile(join(directory, "may.config.json"), JSON.stringify(config));
   const gateway = new AgentGateway({ directory, configPath: join(directory, "may.config.json"), settings });
-  const channels = await ChannelStore.open(join(directory, "gateway-channels.jsonl"));
   const adapter = new TelegramAdapter({ enabled: false, allowUsers: [], allowGroups: [entry.conversation] }, "42:configuration");
-  const host = new GatewayHost({ gateway, adapters: [adapter] }, channels);
+  const host = await GatewayHost.start({ gateway, adapters: [adapter], startPaused: true });
   const server = await startGatewayServer({ gateway, port: 0, close: () => host.close() });
   const loggedIn = await fetch(`${server.url}/api/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
   assert.equal(loggedIn.status, 200); const { token } = await loggedIn.json();
@@ -112,8 +111,7 @@ test("platform edit deduplication remains effective after reopening SQLite and t
   const messages = gateway.messages(session.id, operator);
   await server.close();
   const reopened = new AgentGateway({ directory, configPath: join(directory, "may.config.json"), settings });
-  const channels = await ChannelStore.open(join(directory, "gateway-channels.jsonl"));
-  const nextHost = new GatewayHost({ gateway: reopened, adapters: host.options.adapters }, channels);
+  const nextHost = await GatewayHost.start({ gateway: reopened, adapters: host.options.adapters, startPaused: true });
   onClose(() => nextHost.close());
   await nextHost.receive(edited);
   assert.deepEqual(reopened.messages(session.id, operator), messages);

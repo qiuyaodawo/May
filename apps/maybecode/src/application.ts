@@ -1,11 +1,9 @@
-import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { mediaHistory } from "./media-history.js";
-import { SkillRegistry } from "@may/skills";
-import { defaultMaybeCodeSkillDirectories } from "./skills.js";
+import type { SkillRegistry } from "@may/skills";
 
 import {
-  contextBudgetFromModel,
+  applicationServices,
   defineAgent,
   withDefaultCompactionThreshold,
 } from "@may/application";
@@ -16,6 +14,7 @@ import type {
 } from "@may/application";
 import {
   createToolChangePreview,
+  createCodingTools,
   decodeToolChangePreviewPresentation,
   getShellToolInfo,
   shellRuntimeInstructions,
@@ -23,25 +22,19 @@ import {
   TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
 } from "@may/coding-tools";
 import {
-  InMemoryContextFactory,
-  ModelContextCompactionStrategy,
   type ContextBudget,
-  type ContextCompactionOptions,
-  type ContextCompactionOutput,
   type ContextCompactionResult,
   type ContextCompactionStrategy,
   type ContextSummarizer,
   type ContextFactory,
   type ContextInspection,
   PruneOldToolResultsStrategy,
-  SummaryTailStrategy,
 } from "@may/context";
 import {
   AsyncEventQueue,
   RunCancelledError,
   isStreamingMayEvent,
   ToolRegistry,
-  type ContextSnapshot,
   type Model,
   type RunOptions,
   type RunBudget,
@@ -51,6 +44,8 @@ import {
   type UserMessage,
 } from "@may/core";
 import type { ApprovalDecision, PermissionPolicy } from "@may/permissions";
+import type { AnyPlugin, ServiceToken } from "@may/plugin";
+import type { McpClientPool } from "@may/mcp";
 import type {
   SessionHistoryPage,
   SessionHistoryQuery,
@@ -75,21 +70,19 @@ import {
   loadMaybeCodeInstructions,
   type MaybeCodeInstructions,
 } from "./instructions.js";
-import { createCodingPermissionPolicy } from "./policy.js";
-import { createModelContextSummarizer } from "./summarizer.js";
-import { HistoryReferenceMemory } from "./history-memory.js";
-import { GoalController, type GoalAgent, type GoalBudget } from "@may/goal";
+import { HistoryReferenceMemory, historyMemoryService } from "@may/plugin-history-memory";
+import { goalsService } from "@may/plugin-goals";
+import { delegationService } from "@may/plugin-delegation";
+import type { GoalController, GoalAgent, GoalBudget } from "@may/goal";
+import { createMaybeCodePlugins, requestRecord } from "./plugins/application.js";
 import { SubagentHost, type SubagentRequestPlan } from "./subagent-host.js";
-import { withRequestBudget } from "./subagent-budget.js";
 import {
-  defaultSubagentConfiguration,
-  SUBAGENT_TOOL_NAMES,
   type MaybeCodeSubagentConfiguration,
   type MaybeCodeSubagentRole,
 } from "./subagents.js";
-import { SharedWorkspaceFileGuard } from "./subagent-files.js";
 
 export { DEFAULT_MAYBE_CODE_INSTRUCTIONS } from "./instructions.js";
+export { composeMaybeCodePlugins, createMaybeCodePlugins } from "./plugins/application.js";
 
 /** MaybeCode 主 Run 的默认步数上限；显式 maxSteps 覆盖该值。 */
 const MAYBECODE_MAX_STEPS = 32;
@@ -101,28 +94,16 @@ export interface MaybeCodeSubagentOptions {
   /** 缺省时使用 Session 存储目录下的 subagents。 */
   readonly dataDirectory?: string;
   /** 声明了自己 model profile 的角色使用的宿主模型工厂。 */
-  readonly createRoleModel?: (role: MaybeCodeSubagentRole) => Model;
+  readonly createRoleModel?: (role: MaybeCodeSubagentRole) => Model | undefined;
   /** 角色自有模型的上下文预算；没有配置时继承主会话。 */
   readonly contextBudgetFor?: (role: MaybeCodeSubagentRole) => ContextBudget | undefined;
-}
-
-/** 保存请求、任务、Session 与 Run 映射的会话状态键。 */
-const REQUEST_STATE_KEY = "may.subagents";
-
-/**
- * 子 Agent 记录与额度账本的默认根目录。
- *
- * 持久化的 Session 存储把记录放在同一棵目录下；内存存储没有可用目录，
- * 使用 MaybeCode 的默认数据目录，使请求记录仍然可以核对。
- * 宿主会在该目录下再建立 subagents 子目录。
- */
-function defaultSubagentDataDirectory(store: SessionStore): string {
-  return store.directory === undefined ? join(homedir(), ".may", "maybecode") : dirname(store.directory);
+  readonly toolSource?: () => Iterable<Tool>;
 }
 
 export interface MaybeCodeApplicationOptions {
+  readonly plugins?: readonly AnyPlugin[];
   readonly workspace: string;
-  readonly model: Model;
+  readonly model?: Model;
   readonly modelInfo?: MaybeCodeModelInfo;
   readonly store: SessionStore;
   readonly sessionId?: string;
@@ -184,6 +165,7 @@ export class MaybeCodeApplication {
   private readonly eventRelay: Promise<void>;
   private readonly subagentRelay: Promise<void> | undefined;
   private closed = false;
+  private closing: Promise<void> | undefined;
   private inputTail: Promise<void> = Promise.resolve();
   private inputOperations = 0;
   private currentRun: MaybeCodeRun | undefined;
@@ -206,6 +188,7 @@ export class MaybeCodeApplication {
     modelInfo: MaybeCodeModelInfo | undefined,
     goals: GoalController | undefined,
     subagents: SubagentHost | undefined,
+    readonly mcp: McpClientPool | undefined,
   ) {
     this.workspace = workspace;
     this.application = application;
@@ -232,41 +215,11 @@ export class MaybeCodeApplication {
     options: MaybeCodeApplicationOptions,
   ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
-    const autoMode = options.autoCompactionMode ??
-      (options.providerNativeAutoCompaction === true ? "provider-native" : "prune-summary");
-    const goals = options.goals === false ? undefined : new GoalController({
-      validateBudget: budget => {
-        if (budget.maxTotalTokens !== undefined && (autoMode === "provider-native" || options.contextSummarizer !== undefined || options.autoCompactionStrategies !== undefined || options.compactionStrategy !== undefined)) {
-          throw new Error("Goal token budgets require built-in prune-summary or history-reference compaction with the metered model");
-        }
-      },
-    });
-    // 协作宿主先决定是否启用，主会话模型据此决定是否经过请求额度账本。
-    const subagentConfiguration = options.subagents === false
-      ? undefined
-      : options.subagents?.configuration ?? defaultSubagentConfiguration();
-    const delegation: { host?: SubagentHost } = {};
-    // 子 Agent 使用没有经过额度包装的模型，包装由子 Agent 自己的定义完成，
-    // 避免同一个 modelCallId 被预留两次。
-    const baseModel = goals?.wrapModel(options.model) ?? options.model;
-    const model = withRequestBudget(baseModel, () => delegation.host?.ledger());
-    const historyMemory = new HistoryReferenceMemory(
-      autoMode === "history-reference" && options.autoCompactionStrategies === undefined,
-    );
-    const skills = options.skills === false ? undefined : options.skills ??
-      await SkillRegistry.discover(options.skillDirectories ?? defaultMaybeCodeSkillDirectories(workspace, false));
-    // 主任务与子任务共用同一把文件锁；宿主自带工具对象时不参与该保护。
-    const fileGuard = new SharedWorkspaceFileGuard(workspace);
-    const mainFileTools = fileGuard.create({ names: [...SUBAGENT_TOOL_NAMES], requireRead: false });
     const configuredTools = ToolRegistry.compose(
-      options.tools ?? mainFileTools.tools,
+      options.tools ?? [],
       options.additionalTools ?? [],
     );
-    for (const tool of historyMemory.tools()) {
-      if (configuredTools.has(tool.name)) throw new Error(`Tool name "${tool.name}" is reserved for session memory`);
-      configuredTools.register(tool);
-    }
-    const shellInfo = configuredTools.values()
+    const shellInfo = [...(options.tools === undefined ? createCodingTools({ cwd: workspace }).values() : configuredTools.values())]
       .map((tool) => getShellToolInfo(tool))
       .find((info) => info !== undefined);
     const instructions = await loadMaybeCodeInstructions({
@@ -282,65 +235,40 @@ export class MaybeCodeApplication {
         : { runtimeInstructions: shellRuntimeInstructions(shellInfo) }),
     });
 
-    const summaryTailStrategy = new SummaryTailStrategy({
-      summarizer: options.contextSummarizer ??
-        createModelContextSummarizer(model),
-    });
-    const manualCompactionStrategy = options.compactionStrategy ??
-      new PruneAndSummaryTailStrategy(summaryTailStrategy);
-    const historyReferenceStrategy = historyMemory.strategy;
-    const nativeCompactionStrategy = model.contextCompactor !== undefined
-      ? new ModelContextCompactionStrategy(model.contextCompactor)
-      : undefined;
-    const autoCompactionStrategies = options.autoCompactionStrategies ??
-      automaticCompactionStrategies(
-        autoMode,
-        summaryTailStrategy,
-        historyReferenceStrategy,
-        nativeCompactionStrategy,
-      );
     const contextBudget = withDefaultCompactionThreshold(
-      options.contextBudget ?? contextBudgetFromModel(options.model),
+      options.contextBudget,
     );
+    const initialModelInfo = options.plugins?.some(plugin => plugin.provides?.some(service =>
+      service.id === applicationServices.model.id && service.scope === applicationServices.model.scope))
+      ? undefined : options.modelInfo;
 
+    const composition = createMaybeCodePlugins(options, {
+      workspace,
+      instructions: instructions.effective,
+      ...(contextBudget === undefined ? {} : { contextBudget }),
+    });
     const definition = defineAgent({
-      ...(skills === undefined ? {} : { skills }),
-      model,
-      permissionPolicy: options.permissionPolicy ?? createCodingPermissionPolicy(),
+      plugins: composition.plugins,
       tools: configuredTools,
       toolScope: { workspaceId: resolve(options.workspace) },
-      toolSource: () => [
-        ...(options.toolSource?.() ?? []),
-        ...(goals?.tools() ?? []),
-        ...(delegation.host?.tools() ?? []),
-      ],
       instructions: instructions.effective,
       ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
       traceAttributes: {
         ...(options.traceAttributes ?? {}),
         "may.agent.name": "maybecode",
-        ...(options.modelInfo?.profile === undefined
+        ...(initialModelInfo?.profile === undefined
           ? {}
-          : { "may.model.profile": options.modelInfo.profile }),
-        ...(options.modelInfo?.provider === undefined
+          : { "may.model.profile": initialModelInfo.profile }),
+        ...(initialModelInfo?.provider === undefined
           ? {}
-          : { "may.model.provider": options.modelInfo.provider }),
-        ...(options.modelInfo?.adapter === undefined
+          : { "may.model.provider": initialModelInfo.provider }),
+        ...(initialModelInfo?.adapter === undefined
           ? {}
-          : { "may.model.adapter": options.modelInfo.adapter }),
-        ...(options.modelInfo?.model === undefined
+          : { "may.model.adapter": initialModelInfo.adapter }),
+        ...(initialModelInfo?.model === undefined
           ? {}
-          : { "may.model.name": options.modelInfo.model }),
+          : { "may.model.name": initialModelInfo.model }),
       },
-      contextFactory: withDelegationInstructions(
-        historyMemory.wrap(goals?.wrapContextFactory(options.contextFactory ?? new InMemoryContextFactory()) ?? options.contextFactory ?? new InMemoryContextFactory()),
-        () => delegation.host?.instructions() ?? "",
-      ),
-      ...(contextBudget === undefined ? {} : { contextBudget }),
-      ...(options.compactionStrategy === undefined
-        ? {}
-        : { compactionStrategy: options.compactionStrategy }),
-      autoCompactionStrategies,
       maxSteps: options.maxSteps ?? MAYBECODE_MAX_STEPS,
       ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
       sessionHistory: { retrieval: true },
@@ -370,77 +298,21 @@ export class MaybeCodeApplication {
         : { sessionId: options.sessionId }),
       ...(options.resume === undefined ? {} : { resume: options.resume }),
     });
-    historyMemory.attach(application);
-    const readSessionState = async (key: string): Promise<unknown> => {
-      const saved = [...await application.history()].reverse()
-        .find(event => event.type === "state.updated" && event.key === key);
-      return saved?.type === "state.updated" ? saved.value : undefined;
-    };
-    if (goals) {
-      // 目标状态先不挂接，等协作宿主就绪后再绑定，Goal 的 Run 同样作为一次请求执行。
-    }
-    let subagents: SubagentHost | undefined;
-    if (subagentConfiguration !== undefined) {
-      const configured: MaybeCodeSubagentOptions = options.subagents === false ? {} : options.subagents ?? {};
-      const host = new SubagentHost({
-        configuration: subagentConfiguration,
-        workspace,
-        dataDirectory: configured.dataDirectory ?? defaultSubagentDataDirectory(options.store),
-        sessionId: application.sessionId,
-        application,
-        store: options.store,
-        model: baseModel,
-        ...(configured.createRoleModel === undefined ? {} : { createRoleModel: configured.createRoleModel }),
-        ...(configured.contextBudgetFor === undefined ? {} : { contextBudgetFor: configured.contextBudgetFor }),
-        instructions: instructions.effective,
-        permissionPolicy: options.permissionPolicy ?? createCodingPermissionPolicy(),
-        ...(skills === undefined ? {} : { skills }),
-        ...(options.toolSource === undefined ? {} : { toolSource: options.toolSource }),
-        ...(contextBudget === undefined ? {} : { contextBudget }),
-        ...(options.compactionStrategy === undefined ? {} : { compactionStrategy: options.compactionStrategy }),
-        autoCompactionMode: autoMode,
-        ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
-        ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
-        traceAttributes: { "may.agent.name": "maybecode" },
-        fileGuard,
-        loadRequests: async () => readRequestIndex(await readSessionState(REQUEST_STATE_KEY)),
-        saveRequests: async (requests) => application.recordState(
-          REQUEST_STATE_KEY,
-          { version: 1, requests: requests.slice(0, 16) },
-        ),
-      });
-      delegation.host = host;
-      subagents = host;
-      try {
-        await host.initialize();
-      } catch (error) {
-        await application.close();
-        throw error;
-      }
-    }
-
-    const instance = new MaybeCodeApplication(
+    const history = application.getService(historyMemoryService);
+    return new MaybeCodeApplication(
       workspace,
       application,
       instructions,
-      manualCompactionStrategy,
-      summaryTailStrategy,
-      historyReferenceStrategy,
-      nativeCompactionStrategy,
-      historyMemory,
-      options.modelInfo,
-      goals,
-      subagents,
+      history.manual,
+      history.summary,
+      history.historyReference,
+      history.native,
+      history.memory,
+      composition.modelInfo,
+      composition.hasGoals ? application.getService(goalsService) : undefined,
+      composition.hasDelegation ? application.getService(delegationService).get() : undefined,
+      composition.mcp,
     );
-    if (goals) {
-      try {
-        await goals.attach(instance.goalAgent(), {
-          read: async () => await readSessionState("may.goal") as never,
-          write: state => application.recordState("may.goal", state),
-        });
-      } catch (error) { await instance.close(); throw error; }
-    }
-    return instance;
   }
 
   get isRunning(): boolean {
@@ -550,6 +422,7 @@ export class MaybeCodeApplication {
   }
 
   getGoal() { return this.goals?.getGoal(); }
+  getService<T>(service: ServiceToken<T>): T { return this.application.getService(service); }
   startGoal(objective: string, budget?: GoalBudget) { return this.requireGoals().start(objective, budget); }
   resumeGoal() { return this.requireGoals().resume(); }
   pauseGoal() { return this.requireGoals().pause(); }
@@ -732,23 +605,22 @@ export class MaybeCodeApplication {
     return result;
   }
 
-  async close(): Promise<void> {
-    if (this.closed) return;
+  close(): Promise<void> {
+    return this.closing ??= this.closeOnce();
+  }
+
+  private async closeOnce(): Promise<void> {
     this.closed = true;
     try {
-      try { await this.goals?.close(); }
-      finally {
-        try {
-          await this.steeringCancellation;
-          await this.subagents?.close();
-          await this.application.close();
-          await this.inputTail;
-          await this.eventRelay;
-          await this.subagentRelay;
-        }
-        finally { this.removeGoalListener?.(); this.eventQueue.close(); }
-      }
-    } finally { this.eventQueue.close(); }
+      await this.steeringCancellation;
+      await this.application.close();
+      await this.inputTail;
+      await this.eventRelay;
+      await this.subagentRelay;
+    } finally {
+      this.removeGoalListener?.();
+      this.eventQueue.close();
+    }
   }
 
   private async relaySubagentEvents(
@@ -804,72 +676,6 @@ function requireNativeCompaction(
     throw new Error("The active model does not support provider-native context compaction");
   }
   return strategy;
-}
-
-/** 把实时协作部分追加到本 Session 的每个 Context 指令中。 */
-function withDelegationInstructions(
-  factory: ContextFactory,
-  text: () => string,
-): ContextFactory {
-  return {
-    create: (options) => {
-      const source = () => [
-        options.instructionsSource?.() ?? options.instructions,
-        text(),
-      ].filter(Boolean).join("\n\n");
-      return factory.create({ ...options, instructions: source(), instructionsSource: source });
-    },
-  };
-}
-
-/** 请求的持久文本记录；原始输入仍然保存在 Session 中。 */
-function requestRecord(input: string | UserMessage): string {
-  const text = typeof input === "string"
-    ? input
-    : input.content.filter((part) => part.type === "text").map((part) => part.text).join("");
-  return text.trim() === "" ? "Request without text content" : text;
-}
-
-function readRequestIndex(value: unknown): readonly MaybeCodeDelegationRequest[] {
-  const record = value as { version?: unknown; requests?: unknown } | undefined;
-  if (record?.version !== 1 || !Array.isArray(record.requests)) return [];
-  return record.requests.filter((request): request is MaybeCodeDelegationRequest =>
-    typeof request === "object" && request !== null &&
-    typeof (request as MaybeCodeDelegationRequest).requestId === "string" &&
-    typeof (request as MaybeCodeDelegationRequest).status === "string");
-}
-
-/** 主会话与子 Agent 共用的自动压缩链构造。 */
-function automaticCompactionStrategies(
-  mode: MaybeCodeAutoCompactionMode,
-  summary: ContextCompactionStrategy,
-  historyReference: ContextCompactionStrategy,
-  native: ContextCompactionStrategy | undefined,
-): readonly ContextCompactionStrategy[] {
-  switch (mode) {
-    case "prune-summary": return [new PruneOldToolResultsStrategy(), summary];
-    case "history-reference": return [historyReference];
-    case "provider-native": return [requireNativeCompaction(native)];
-    default: throw new Error(`Unknown automatic compaction mode: ${String(mode)}`);
-  }
-}
-
-class PruneAndSummaryTailStrategy implements ContextCompactionStrategy {
-  readonly name = "prune+summary-tail";
-  private readonly prune = new PruneOldToolResultsStrategy();
-
-  constructor(private readonly summaryTail: ContextCompactionStrategy) {}
-
-  async compact(
-    snapshot: Readonly<ContextSnapshot>,
-    options: ContextCompactionOptions = {},
-  ): Promise<ContextCompactionOutput> {
-    const messages = this.prune.compact(snapshot);
-    return this.summaryTail.compact(
-      { ...snapshot, messages: [...messages] },
-      options,
-    );
-  }
 }
 
 function assertWorkspace(

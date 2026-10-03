@@ -1,6 +1,7 @@
 import { isAbsolute } from "node:path";
 import type { MayConfig } from "@may/config";
 import { resolveRunBudget, type RunBudget } from "@may/core";
+import { parsePluginSelections } from "@may/plugin";
 import { hostSettings } from "./settings.js";
 import { authSettings } from "./gateway-auth.js";
 import type { GatewayAgentConfig, GatewayEntry, GatewaySettings } from "./gateway-types.js";
@@ -14,7 +15,7 @@ export function gatewaySettings(config: MayConfig): GatewaySettings {
   const rawAgents = raw.agents ?? [];
   const ids = new Set<string>();
   const agents = rawAgents.map((value): GatewayAgentConfig => {
-    const item = object(value, "Agent", ["id", "name", "adapter", "enabled", "model", "instructions", "readDirectory", "module", "export", "options", "idleMs", "runBudget", "permissions", "media"]);
+    const item = object(value, "Agent", ["id", "name", "adapter", "enabled", "model", "instructions", "readDirectory", "module", "export", "options", "plugins", "idleMs", "runBudget", "permissions", "media"]);
     const id = identifier(item.id, "Agent ID");
     if (ids.has(id)) throw new Error(`Agent ID 重复：${id}`);
     ids.add(id);
@@ -26,6 +27,10 @@ export function gatewaySettings(config: MayConfig): GatewaySettings {
     if (item.adapter === "module" && !item.module) throw new Error(`Agent ${id} 需要 module。`);
     if (item.adapter === "may" && ["module", "export", "options"].some(key => item[key] !== undefined)) throw new Error(`Agent ${id} 的 module、export、options 仅用于 module 适配器。`);
     if (item.options !== undefined) object(item.options, `Agent ${id}.options`);
+    if (item.plugins !== undefined) {
+      if (item.adapter !== "may") throw new Error(`Agent ${id}.plugins 需要 may adapter。`);
+      item.plugins = parsePluginSelections(item.plugins);
+    }
     if (item.media !== undefined && (!Array.isArray(item.media) || item.media.some(value => !["image", "audio", "file", "video"].includes(value)) || new Set(item.media).size !== item.media.length)) throw new Error(`Agent ${id}.media 需要由 image、audio、file、video 组成的不重复列表。`);
     if (item.readDirectory !== undefined && !isAbsolute(item.readDirectory as string)) throw new Error(`Agent ${id}.readDirectory 必须为绝对目录。`);
     if (item.runBudget !== undefined) resolveRunBudget(item.runBudget as RunBudget);

@@ -3,11 +3,13 @@ import { resolveRunBudget, RunBudgetMeter, RunBudgetExceededError, type RunBudge
 import {
   ConcurrentRunError,
   FatalToolExecutionError,
+  HookExecutionError,
   MaxStepsExceededError,
   ModelProtocolError,
   RunCancelledError,
   RunCheckpointError,
   ToolNotFoundError,
+  ToolHookDeniedError,
   ToolSchedulerError,
 } from "./errors.js";
 import {
@@ -20,8 +22,12 @@ import {
   type SerializedError,
 } from "./events.js";
 import type { Model, ModelRequest } from "./model.js";
+import { runtimeHooks, RUNTIME_HOOKS, type HookContext, type HookDefinition, type HookDispatcher } from "./hooks.js";
+import { DEFAULT_RUNTIME_DESCRIPTOR, type AgentRuntime } from "./runtime.js";
+import { jsonEqual } from "./json-equal.js";
 import {
   directToolExecutor,
+  freezeToolInput,
   sequentialToolScheduler,
   type Tool,
   type ToolExecutor,
@@ -44,6 +50,7 @@ import {
   toolCancellationMessage,
   userMessage,
   type AssistantMessage,
+  type ContentPart,
   type Message,
   type ToolCall,
   type ToolMessage,
@@ -53,6 +60,7 @@ import {
 
 export interface MayOptions {
   model: Model;
+  hooks?: HookDispatcher;
   tools?: Iterable<Tool>;
   /** Additional trusted host tools, captured exactly once at each Run/continue start. */
   toolSource?: () => Iterable<Tool>;
@@ -112,7 +120,7 @@ export interface RunHandle {
 }
 
 export type RunCheckpointEvent = Extract<MayEventPayload, {
-  type: "run.started" | "model.completed" | "tool.started" | "tool.completed" | "tool.failed" | "run.yielded";
+  type: "run.started" | "model.completed" | "tool.started" | "tool.completed" | "tool.failed" | "run.yielded" | "input.generated";
 }> & { readonly runId: string };
 export type RunCheckpoint = (event: RunCheckpointEvent) => Promise<void>;
 
@@ -122,7 +130,10 @@ export type StepInputSource = (boundary: {
   readonly signal: AbortSignal;
 }) => Promise<readonly UserMessage[]>;
 
-export class May {
+export class May implements AgentRuntime {
+  readonly descriptor = DEFAULT_RUNTIME_DESCRIPTOR;
+  readonly supportedHooks = RUNTIME_HOOKS;
+  private readonly hooks: HookDispatcher | undefined;
   private readonly model: Model;
   private readonly context: Context;
   private readonly tools: ToolRegistry;
@@ -152,6 +163,7 @@ export class May {
     const tools = new ToolRegistry(options.tools);
 
     this.model = options.model;
+    this.hooks = options.hooks;
     this.context = options.context;
     this.tools = tools;
     this.toolSource = options.toolSource;
@@ -301,13 +313,18 @@ export class May {
         });
         return value;
       },
-      (error: unknown) => {
+      async (error: unknown) => {
         endTraceSpan(runSpan, {
           status: controller.signal.aborted || error instanceof RunCancelledError
             ? "cancelled"
             : "error",
           error: traceError(error),
         });
+        try {
+          await this.observe(runtimeHooks.runFailed, { error: serializeError(error) }, { runId, signal: controller.signal });
+        } catch (observerError) {
+          throw new AggregateError([error, observerError], "Run and failure Hook both failed", { cause: error });
+        }
         throw error;
       },
     )
@@ -371,14 +388,18 @@ export class May {
         );
       }
 
+      await this.observe(runtimeHooks.runBefore, { continuation: input === undefined }, { runId, signal });
+      throwIfAborted(signal);
       await checkpoint?.({ type: "run.started", runId, ...(input === undefined ? { continuation: true } : {}) });
       emit(input === undefined
         ? { type: "run.started", continuation: true }
         : { type: "run.started" });
+      await this.observe(runtimeHooks.runStarted, { continuation: input === undefined }, { runId, signal });
 
       for (let step = 1; step <= this.maxSteps; step++) {
         throwIfAborted(signal);
         budget.startModel(step);
+        await this.observe(runtimeHooks.stepBefore, { step }, { runId, step, signal });
         emit({ type: "step.started", step });
 
         const snapshotSpan = startTraceSpan(this.tracer, "may.context.snapshot", {
@@ -386,12 +407,16 @@ export class May {
           attributes: { "may.step": step },
         });
         let snapshot: ContextSnapshot;
+        let contextMessageCount: number;
         try {
+          await this.observe(runtimeHooks.contextBefore, { step }, { runId, step, signal });
           snapshot = await this.context.snapshot({
             runId,
             step,
             signal,
           });
+          contextMessageCount = snapshot.messages.length;
+          snapshot = await this.transform(runtimeHooks.contextAfter, snapshot, { runId, step, signal });
           endTraceSpan(snapshotSpan, {
             status: "ok",
             attributes: {
@@ -403,7 +428,11 @@ export class May {
           endOperationSpan(snapshotSpan, error, signal);
           throw error;
         }
-        const request = this.createModelRequest(snapshot, tools);
+        const request = await this.transform(runtimeHooks.modelBefore, this.createModelRequest(snapshot, tools), { runId, step, signal });
+        for (const definition of request.tools) {
+          if (!tools.get(definition.name)) throw new ModelProtocolError(`Hook requested an unavailable tool: ${definition.name}`);
+        }
+        throwIfAborted(signal);
 
         emit({ type: "model.started", step });
         modelCalls += 1;
@@ -438,6 +467,7 @@ export class May {
           });
         } catch (error) {
           endOperationSpan(modelSpan, error, signal);
+          await this.observe(runtimeHooks.modelFailed, { error: serializeError(error) }, { runId, step, signal });
           throw error;
         }
         const { message, usage } = modelResponse;
@@ -457,23 +487,24 @@ export class May {
           () => this.context.append([message], { runId, step }),
         );
         await checkpoint?.({ type: "model.completed", runId, step, message,
-          contextMessageCount: snapshot.messages.length, ...(usage === undefined ? {} : { usage }) });
+          contextMessageCount, ...(usage === undefined ? {} : { usage }) });
         emitOptionalUsage(
           emit,
           {
             type: "model.completed",
             step,
             message,
-            contextMessageCount: snapshot.messages.length,
+            contextMessageCount,
           },
           usage,
         );
-
         const calls = message.toolCalls ?? [];
         if (calls.length > 0) pendingTools = { step, calls, outcomes: [], executions: [] };
+        await this.observe(runtimeHooks.modelAfter, { message }, { runId, step, signal });
         budget.recordUsage(usage);
         if (calls.length === 0) {
           emit({ type: "step.completed", step });
+          await this.observe(runtimeHooks.stepCompleted, { step }, { runId, step, signal });
 
           const result = createRunResult(
             runId,
@@ -487,10 +518,31 @@ export class May {
           if (shouldYield?.() === true) {
             result.finishReason = "yielded";
             await checkpoint?.({ type: "run.yielded", runId, result });
+            await this.observe(runtimeHooks.runEnded, result, { runId, step, signal });
             emit({ type: "run.yielded", result });
             return result;
           }
           if (await this.receiveStepInput(stepInputSource, runId, step, signal, emit)) continue;
+          const settlement = await this.transform(runtimeHooks.runBeforeEnd, { result, continueMessages: [] }, { runId, step, signal });
+          if (!jsonEqual(settlement.result, result)) throw new ModelProtocolError("Run settlement cannot change the completed result");
+          throwIfAborted(signal);
+          budget.checkTime();
+          if (shouldYield?.() === true) {
+            result.finishReason = "yielded";
+            await checkpoint?.({ type: "run.yielded", runId, result });
+            await this.observe(runtimeHooks.runEnded, result, { runId, step, signal });
+            emit({ type: "run.yielded", result });
+            return result;
+          }
+          if (settlement.continueMessages.length > 0) {
+            const generated = { type: "input.generated" as const, runId, step, messages: [...settlement.continueMessages], reason: settlement.reason! };
+            await checkpoint?.(generated);
+            try { await this.context.append(generated.messages, { runId, step }); }
+            catch (error) { this.unsafeToReuse = true; throw new RunCheckpointError(error); }
+            emit(generated);
+            continue;
+          }
+          await this.observe(runtimeHooks.runEnded, result, { runId, step, signal });
           emit({ type: "run.completed", result });
           return result;
         }
@@ -550,19 +602,21 @@ export class May {
         );
         emitToolOutcomes(step, outcomes, emit);
         for (const outcome of outcomes) {
-          if (outcome.type === "failed") fatal ??= outcome.fatal;
+          fatal ??= outcome.fatal;
         }
         pendingTools = undefined;
         throwIfAborted(signal);
         if (fatal !== undefined) throw fatal;
 
         emit({ type: "step.completed", step });
+        await this.observe(runtimeHooks.stepCompleted, { step }, { runId, step, signal });
         if (shouldYield?.() === true) {
           budget.checkTime();
           const result = createRunResult(runId, step, modelCalls, toolCalls, message, aggregateUsage);
           result.budget = budget.snapshot();
           result.finishReason = "yielded";
           await checkpoint?.({ type: "run.yielded", runId, result });
+          await this.observe(runtimeHooks.runEnded, result, { runId, step, signal });
           emit({ type: "run.yielded", result });
           return result;
         }
@@ -731,6 +785,7 @@ export class May {
         : { traceContext: modelSpan.context }),
     })) {
       throwIfAborted(signal);
+      await this.observe(runtimeHooks.modelEvent, event, { runId, step, signal });
 
       if (event.type === "text.delta") {
         emit({ type: "model.text.delta", step, delta: event.delta });
@@ -824,13 +879,15 @@ export class May {
               await checkpoint?.(outcome.type === "completed"
                 ? { type: "tool.completed", runId, step, call, output: outcome.output, content: outcome.message.content }
                 : { type: "tool.failed", runId, step, call, error: outcome.error });
+              if (outcome.type === "completed" && outcome.fatal === undefined) {
+                await this.observe(runtimeHooks.toolAfter, { call, output: outcome.output, content: outcome.message.content }, { runId, step, signal });
+              }
               return outcome;
             });
           pending.executions[index] = execution;
           return execution;
         },
-        isTerminal: (outcome: ToolExecutionOutcome) =>
-          outcome.type === "failed" && outcome.fatal !== undefined,
+        isTerminal: (outcome: ToolExecutionOutcome) => outcome.fatal !== undefined,
       };
     });
     const outcomes = await abortable(this.toolScheduler.schedule(operations, { runId, step, signal }), signal);
@@ -850,8 +907,7 @@ export class May {
 
     const terminal = outcomes.at(-1);
     if (
-      terminal?.type !== "failed" ||
-      terminal.fatal === undefined
+      terminal?.fatal === undefined
     ) {
       throw new ToolSchedulerError(
         `Tool scheduler returned ${outcomes.length} results for ${calls.length} calls`,
@@ -877,10 +933,10 @@ export class May {
     parentTraceContext: TraceContext | undefined,
     checkpoint: RunCheckpoint | undefined,
   ): Promise<ToolExecutionOutcome> {
-    await checkpoint?.({ type: "tool.started", runId, step, call });
     throwIfAborted(signal);
-    emit({ type: "tool.started", step, call });
     let active = true;
+    let progressTail = Promise.resolve();
+    let rawOutput: { readonly value: unknown; readonly content: ContentPart[] } | undefined;
     const toolSpan = startTraceSpan(this.tracer, "may.tool.call", {
       ...(parentTraceContext === undefined
         ? {}
@@ -896,8 +952,15 @@ export class May {
       const tool = tools.get(call.name);
       if (!tool) throw new ToolNotFoundError(call.name);
 
-      const input = tool.parse ? tool.parse(call.input) : call.input;
-      const output = await this.toolExecutor.execute({
+      const prepared = await this.transform(runtimeHooks.toolBefore, { call, input: call.input }, { runId, step, signal });
+      if (prepared.call.id !== call.id || prepared.call.name !== call.name) throw new FatalToolExecutionError("Tool Hook cannot change call identity");
+      if (prepared.denyReason !== undefined) throw new ToolHookDeniedError(prepared.denyReason);
+      throwIfAborted(signal);
+      const input = freezeToolInput(tool.parse ? tool.parse(prepared.input) : prepared.input);
+      await checkpoint?.({ type: "tool.started", runId, step, call, input });
+      throwIfAborted(signal);
+      emit({ type: "tool.started", step, call, input });
+      const output = await this.toolExecutor.execute(Object.freeze({
         tool,
         input,
         context: {
@@ -913,11 +976,21 @@ export class May {
           report: (update) => {
             if (!active || signal.aborted) return;
             emitToolProgress(step, call, update, emit);
+            const savedUpdate = structuredClone(update);
+            progressTail = progressTail.then(() => this.observe(runtimeHooks.toolProgress, { call, update: savedUpdate }, { runId, step, signal }));
+            void progressTail.catch(() => undefined);
           },
         },
-      });
+      }));
 
-      const content = tool.resultContent?.(output) ?? [{ type: "json" as const, value: output }];
+      rawOutput = { value: output, content: [{ type: "json", value: output }] };
+      const originalContent = tool.resultContent?.(output) ?? rawOutput.content;
+      rawOutput = { value: output, content: originalContent };
+      await progressTail;
+      const projected = await this.transform(runtimeHooks.toolResult, { call, content: originalContent }, { runId, step, signal });
+      if (projected.call.id !== call.id || projected.call.name !== call.name) throw new FatalToolExecutionError("Tool result Hook cannot change call identity");
+      const content = [...projected.content];
+      rawOutput = { value: output, content };
       endTraceSpan(toolSpan, { status: "ok" });
       return {
         type: "completed",
@@ -931,12 +1004,21 @@ export class May {
         },
       };
     } catch (error) {
+      if (rawOutput !== undefined) {
+        endTraceSpan(toolSpan, { status: "error", error: traceError(error) });
+        return {
+          type: "completed", call, output: rawOutput.value,
+          message: { role: "tool", toolCallId: call.id, name: call.name, content: rawOutput.content },
+          fatal: error instanceof FatalToolExecutionError ? error : new FatalToolExecutionError(error instanceof Error ? error.message : String(error)),
+        };
+      }
       if (signal.aborted || error instanceof RunCancelledError) {
         endOperationSpan(toolSpan, error, signal);
         throw error;
       }
 
       const serialized = serializeError(error);
+      await this.observe(runtimeHooks.toolFailed, { call, error: serialized }, { runId, step, signal });
       endTraceSpan(toolSpan, {
         status: "error",
         error: traceError(error),
@@ -966,6 +1048,26 @@ export class May {
     if (this.activeRuns > 0) throw new ConcurrentRunError();
     await this.context.append(messages);
   }
+
+  private async transform<T>(hook: HookDefinition<T>, value: T, context: HookContext): Promise<T> {
+    if (this.hooks === undefined) return value;
+    try {
+      return hook.validate(await this.hooks.transform(hook, structuredClone(value), context));
+    } catch (error) {
+      const failure = error instanceof HookExecutionError ? error : new HookExecutionError(error, hook.name);
+      if (hook.name.startsWith("tool.")) throw new FatalToolExecutionError(failure.message, { cause: failure });
+      throw failure;
+    }
+  }
+
+  private async observe<T>(hook: HookDefinition<T>, value: T, context: HookContext): Promise<void> {
+    if (this.hooks === undefined) return;
+    try {
+      await this.hooks.observe(hook, hook.validate(structuredClone(value)), context);
+    } catch (error) {
+      throw error instanceof HookExecutionError ? error : new HookExecutionError(error, hook.name);
+    }
+  }
 }
 
 interface CompletedToolExecution {
@@ -973,6 +1075,7 @@ interface CompletedToolExecution {
   readonly call: ToolCall;
   readonly output: unknown;
   readonly message: ToolMessage;
+  readonly fatal?: FatalToolExecutionError;
 }
 
 interface FailedToolExecution {

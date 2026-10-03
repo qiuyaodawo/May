@@ -1,4 +1,4 @@
-import { jsonEqual } from "@may/core";
+import { HookExecutionError, jsonEqual } from "@may/core";
 import type { Context, ContextSnapshot, Message, Usage } from "@may/core";
 
 import type {
@@ -187,6 +187,7 @@ export class SnapshotContextController implements ContextController {
         result = await this.compact(strategy, options);
       } catch (error) {
         throwIfAborted(options.signal);
+        if (error instanceof HookExecutionError) throw error;
         if (isAbortError(error)) throw error;
         const failure: ContextCompactionFailure = {
           strategy: strategy.name,
