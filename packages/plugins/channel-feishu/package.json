@@ -1,0 +1,9 @@
+{
+  "name": "@may/plugin-channel-feishu", "version": "0.1.0", "description": "Feishu channel plugin for May hosts.",
+  "type": "module", "main": "./dist/index.js", "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "!dist/.tsbuildinfo"],
+  "scripts": { "build": "tsc -b", "clean": "tsc -b --clean", "test": "pnpm run build && node --test test/*.test.mjs" },
+  "dependencies": { "@larksuiteoapi/node-sdk": "1.73.3", "@may/media": "workspace:*", "@may/plugin": "workspace:*", "@may/plugin-delivery": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.0.0" }, "engines": { "node": ">=22" }, "license": "MIT"
+}

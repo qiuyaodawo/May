@@ -716,6 +716,7 @@ test("restores the latest model input measurement when resuming", async () => {
       inputTokens: 123,
       contextMessageCount: 1,
     },
+    runtime: { id: "may", version: "1" },
   });
 });
 
@@ -763,7 +764,7 @@ test("replays the latest compacted context without deleting history", async () =
   });
 
   assert.deepEqual(replayed, compactedMessages);
-  assert.deepEqual(runtimeInfo, {});
+  assert.deepEqual(runtimeInfo, { runtime: { id: "may", version: "1" } });
   const history = await session.history();
   assert.ok(history.some((event) => event.type === "input.submitted"));
   assert.ok(history.some((event) => event.type === "assistant.completed"));

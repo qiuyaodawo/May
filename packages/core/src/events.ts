@@ -26,6 +26,7 @@ export type MayEventPayload =
   | { type: "step.started"; step: number }
   | { type: "step.completed"; step: number }
   | { type: "input.received"; step: number; messages: readonly UserMessage[] }
+  | { type: "input.generated"; step: number; messages: readonly UserMessage[]; reason: string }
   | { type: "model.started"; step: number }
   | { type: "model.text.delta"; step: number; delta: string }
   | { type: "model.reasoning.delta"; step: number; delta: string }
@@ -44,7 +45,7 @@ export type MayEventPayload =
       contextMessageCount: number;
       usage?: Usage;
     }
-  | { type: "tool.started"; step: number; call: ToolCall }
+  | { type: "tool.started"; step: number; call: ToolCall; input?: unknown }
   | {
       type: "tool.output.delta";
       step: number;

@@ -17,11 +17,8 @@ import type {
 } from "@may/context";
 import { resolveRunBudget, type Model, type RunBudget } from "@may/core";
 import {
-  openMcpClientPool,
-  KeyringMcpCredentialStore,
-  McpOAuthManager,
-  McpInteractionBroker,
-  McpTaskJournal,
+  type McpOAuthManager,
+  type McpTaskJournal,
   createMcpModelSampler,
   type McpHostRequestContext,
   type McpServerHostOptions,
@@ -32,12 +29,10 @@ import {
   type McpOAuthOptions,
   type OpenMcpClientPoolOptions,
 } from "@may/mcp";
-import {
-  BasicTracer,
-  BatchSpanProcessor,
-  JsonlFileSpanExporter,
-  ratioSampler,
-} from "@may/observability";
+import { mcpHostService, mcpService } from "@may/plugin-mcp";
+import { observabilityHostService, observabilityService } from "@may/plugin-observability";
+import { services } from "@may/plugin-services";
+import { createMaybeCodeResourcePlugins, createMaybeCodeSharedPlugins } from "./plugins/resources.js";
 import {
   createModelCapabilityResolver,
   type ModelCapabilityResolver,
@@ -63,11 +58,13 @@ import { MaybeCodeWorkspace } from "./workspace.js";
 import type { MaybeCodeAutoCompactionMode } from "./controller.js";
 import type { MaybeCodeModelConfiguration } from "./workspace.js";
 import type { SkillRegistry } from "@may/skills";
+import { PluginHost, loadPluginModules, parsePluginSelections, type AnyPlugin, type ServiceToken } from "@may/plugin";
 import { resolveMaybeCodeSkillDirectories } from "./skills.js";
 import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 import { resolveSubagentConfiguration, type MaybeCodeSubagentConfiguration, type MaybeCodeSubagentRole } from "./subagents.js";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
+  readonly plugins?: readonly AnyPlugin[];
   readonly permissionMode?: MaybeCodePermissionMode;
   /** Enable only when a UI consumes interaction events and answers the controller. */
   readonly mcpInteractions?: boolean;
@@ -153,6 +150,12 @@ export async function openConfiguredMaybeCode(
     options.configPath === undefined ? {} : { path: options.configPath },
   );
   const retry = options.retry ?? resolveMaybeCodeRetry(config);
+  const plugins = options.plugins ?? await loadPluginModules(
+    parsePluginSelections(config.apps?.maybecode?.plugins), config.path,
+  );
+  const provided = (service: ServiceToken<unknown>) => plugins.some(plugin =>
+    plugin.provides?.some(candidate => candidate.id === service.id && candidate.scope === service.scope));
+  const pluginModel = provided(services.model);
   const configuredPermissionMode = config.apps?.maybecode?.permissionMode;
   const permissionMode = options.permissionMode === undefined
     ? configuredPermissionMode === undefined ? "default" : parsePermissionMode(configuredPermissionMode)
@@ -193,8 +196,8 @@ export async function openConfiguredMaybeCode(
       ...(contextBudget === undefined ? {} : { contextBudget }),
     };
   };
-  const initialModel = configureModel(options.model);
-  const modelProfiles = Object.entries(config.models).map(([name, profile]) => {
+  const initialModel = pluginModel ? undefined : configureModel(options.model);
+  const modelProfiles = pluginModel ? [] : Object.entries(config.models).map(([name, profile]) => {
     const provider = config.providers[profile.provider]!;
     const reasoningEffort = {
       ...(provider.options ?? {}),
@@ -219,20 +222,18 @@ export async function openConfiguredMaybeCode(
   const dataDirectory = resolve(
     options.dataDirectory ?? getDefaultMaybeCodeDataDirectory(),
   );
-  const observabilityOptions = options.observability ??
+  const observabilityOptions = provided(observabilityService) || provided(services.tracer) ? false : options.observability ??
     resolveMaybeCodeObservability(config);
-  const observability = observabilityOptions === false
-    ? undefined
-    : createMaybeCodeObservability(observabilityOptions, dataDirectory);
-  const mcpOptions = options.mcp ?? resolveMaybeCodeMcp(config, workspace);
+  const mcpOptions = provided(mcpService) ? false : options.mcp ?? resolveMaybeCodeMcp(config, workspace);
   const subagents = resolveMaybeCodeSubagents(options.subagents, config);
-  const subagentCreateModel = (role: MaybeCodeSubagentRole): MaybeCodeModelConfiguration =>
+  const subagentCreateModel = (role: MaybeCodeSubagentRole): MaybeCodeModelConfiguration | undefined =>
     role.model === undefined
       ? initialModel
       : configureModel(role.model, role.reasoningEffort === undefined
         ? {}
         : { reasoningEffort: role.reasoningEffort });
   let mcp: McpClientPool | undefined;
+  let resourceHost: PluginHost | undefined;
   let application: MaybeCodeWorkspace | undefined;
   const checkHostOwner = (context: McpHostRequestContext) => {
     context.signal.throwIfAborted();
@@ -244,57 +245,53 @@ export async function openConfiguredMaybeCode(
   };
 
   try {
-    if (mcpOptions !== false && mcpOptions.servers.length > 0) {
-      mcp = await (dependencies.openMcp ?? openMcpClientPool)({
+    const resourcePlugins = createMaybeCodeResourcePlugins({
+      dataDirectory,
+      observability: observabilityOptions,
+      mcp: mcpOptions === false ? false : {
         servers: mcpOptions.servers,
-        ...(mcpOptions.servers.some((server) => server.tasks) ? {
-          taskJournal: mcpOptions.taskJournal ?? new McpTaskJournal(new KeyringMcpCredentialStore(join(dataDirectory, "mcp-tasks"))),
-        } : {}),
-        ...(options.mcpInteractions === true ? { interactions: new McpInteractionBroker() } : {}),
+        ...(mcpOptions.taskJournal === undefined ? {} : { taskJournal: mcpOptions.taskJournal }),
+        ...(mcpOptions.oauth === undefined ? {} : { oauth: mcpOptions.oauth }),
+        ...(dependencies.openMcp === undefined ? {} : { open: dependencies.openMcp }),
+        enableInteractions: options.mcpInteractions === true,
         hostServices: {
           roots: async (context) => { checkHostOwner(context); return [{ uri: pathToFileURL(workspace).href, name: "MaybeCode workspace" }]; },
-          sampling: createMcpModelSampler((maxTokens, context) => {
+          ...(pluginModel ? {} : { sampling: createMcpModelSampler((maxTokens, context) => {
             checkHostOwner(context);
             const selected = selectionFor(application!.modelInfo?.profile);
             const selection = { ...selected, options: { ...selected.options, maxTokens, maxOutputTokens: maxTokens } };
-            // A separate provider instance, without automatic retry or Session Context.
+            // sampling 使用独立 provider 实例和本次调用的模型预算。
             const model = dependencies.createModel === undefined ? createMaybeCodeModel(selection, dependencies.adapterRegistry) : dependencies.createModel(selection);
             return { model, name: selected.model };
-          }),
+          }) }),
         },
-        ...(mcpOptions.servers.some((server) => server.transport === "streamable-http" && server.auth !== undefined)
-          ? { oauth: mcpOptions.oauth ?? new McpOAuthManager(new KeyringMcpCredentialStore(join(dataDirectory, "mcp-credentials"))) }
-          : {}),
-        ...(observability === undefined
-          ? {}
-          : { tracer: observability.tracer }),
         traceAttributes: { "may.agent.name": "maybecode" },
-      });
-    }
+      },
+    });
+    resourceHost = await PluginHost.create({ plugins: resourcePlugins });
+    if (resourceHost.provides(mcpHostService)) mcp = resourceHost.get(mcpHostService);
+    const observability = resourceHost.provides(observabilityHostService) ? resourceHost.get(observabilityHostService) : undefined;
+    const applicationPlugins = createMaybeCodeSharedPlugins(resourceHost, plugins);
     application = await MaybeCodeWorkspace.open({
       permissionMode,
       workspace,
-      model: initialModel.model,
-      modelInfo: initialModel.modelInfo,
+      ...(initialModel === undefined ? {} : { model: initialModel.model, modelInfo: initialModel.modelInfo }),
       modelProfiles,
-      createModelConfiguration: (profile, runtimeOptions) =>
-        configureModel(profile, runtimeOptions),
-      resolveModelCapabilities: async (profile) =>
-        capabilityResolver.resolve(selectionFor(profile)),
+      ...(pluginModel ? {} : {
+        createModelConfiguration: (profile: string, runtimeOptions?: Readonly<Record<string, unknown>>) => configureModel(profile, runtimeOptions),
+        resolveModelCapabilities: async (profile: string) => capabilityResolver.resolve(selectionFor(profile)),
+      }),
       ...resolveDefaultModelPersistence(config, dependencies),
       store: new FileSessionStore(join(dataDirectory, "sessions")),
+      plugins: applicationPlugins,
       catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
       ...(mcp === undefined
         ? {}
-        : { toolSource: () => mcp!.tools, mcp }),
+        : { mcp }),
       ...(mcp === undefined && observability === undefined
         ? {}
         : {
-            ...(observability === undefined
-              ? {}
-              : { tracer: observability.tracer }),
-            closeOwnedResources: () =>
-              closeConfiguredResources(mcp, observability?.processor),
+            closeOwnedResources: () => resourceHost!.close(),
           }),
       ...(options.sessionId === undefined
         ? {}
@@ -305,9 +302,9 @@ export async function openConfiguredMaybeCode(
       ...(options.contextFactory === undefined
         ? {}
         : { contextFactory: options.contextFactory }),
-      ...(initialModel.contextBudget === undefined
+      ...((options.contextBudget ?? initialModel?.contextBudget) === undefined
         ? {}
-        : { contextBudget: initialModel.contextBudget }),
+        : { contextBudget: options.contextBudget ?? initialModel!.contextBudget! }),
       ...(options.compactionStrategy === undefined
         ? {}
         : { compactionStrategy: options.compactionStrategy }),
@@ -335,8 +332,8 @@ export async function openConfiguredMaybeCode(
               configuration: subagents.configuration,
               dataDirectory: subagents.dataDirectory ?? dataDirectory,
               // 没有声明 profile 的角色继承主会话模型与 reasoning effort。
-              createRoleModel: (role) => (subagents.createModel ?? subagentCreateModel)(role).model,
-              contextBudgetFor: (role) => (subagents.createModel ?? subagentCreateModel)(role).contextBudget,
+              createRoleModel: (role) => (subagents.createModel ?? subagentCreateModel)(role)?.model,
+              contextBudgetFor: (role) => (subagents.createModel ?? subagentCreateModel)(role)?.contextBudget,
             },
           }),
       ...(skillDirectories === false
@@ -346,7 +343,7 @@ export async function openConfiguredMaybeCode(
     return application;
   } catch (error) {
     try {
-      await closeConfiguredResources(mcp, observability?.processor);
+      await resourceHost?.close();
     } catch (cleanupError) {
       throw new AggregateError(
         [error, cleanupError],
@@ -582,36 +579,6 @@ type ResolvedSubagents = MaybeCodeSubagentConfigurationOptions & {
   readonly configuration: MaybeCodeSubagentConfiguration;
 };
 
-function createMaybeCodeObservability(
-  options: MaybeCodeObservabilityOptions,
-  dataDirectory: string,
-) {
-  const exporter = new JsonlFileSpanExporter({
-    path: resolve(dataDirectory, options.file ?? "traces/traces.jsonl"),
-    rotation: "daily",
-    retentionDays: options.retentionDays ?? 60,
-  });
-  const processor = new BatchSpanProcessor(exporter, {
-    ...(options.maxQueueSize === undefined
-      ? {}
-      : { maxQueueSize: options.maxQueueSize }),
-    ...(options.maxExportBatchSize === undefined
-      ? {}
-      : { maxExportBatchSize: options.maxExportBatchSize }),
-    ...(options.scheduledDelayMs === undefined
-      ? {}
-      : { scheduledDelayMs: options.scheduledDelayMs }),
-  });
-  return {
-    processor,
-    tracer: new BasicTracer({
-      processor,
-      sampler: ratioSampler(options.samplingRatio ?? 1),
-      resourceAttributes: { "service.name": "maybecode" },
-    }),
-  };
-}
-
 function resolveDefaultModelPersistence(
   config: MayConfig,
   dependencies: ConfiguredMaybeCodeDependencies,
@@ -815,33 +782,6 @@ function resolveMcpEnvironment(
     );
   }
   return resolved;
-}
-
-interface Shutdownable {
-  shutdown(): Promise<void>;
-}
-
-async function closeConfiguredResources(
-  mcp: McpClientPool | undefined,
-  observability: Shutdownable | undefined,
-): Promise<void> {
-  const failures: unknown[] = [];
-  try {
-    await mcp?.close();
-  } catch (error) {
-    failures.push(error);
-  }
-  try {
-    await observability?.shutdown();
-  } catch (error) {
-    failures.push(error);
-  }
-  if (failures.length > 0) {
-    throw new AggregateError(
-      failures,
-      "One or more MaybeCode resources failed to close",
-    );
-  }
 }
 
 function rejectUnknownOptions(

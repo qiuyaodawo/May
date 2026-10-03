@@ -1,0 +1,23 @@
+{
+  "name": "@may/plugin-delegation",
+  "version": "0.1.0",
+  "description": "Durable delegated agent lifecycle, budgets and shared workspace file coordination plugin.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./host": { "types": "./dist/subagent-host.d.ts", "import": "./dist/subagent-host.js" },
+    "./budget": { "types": "./dist/subagent-budget.d.ts", "import": "./dist/subagent-budget.js" },
+    "./files": { "types": "./dist/subagent-files.d.ts", "import": "./dist/subagent-files.js" },
+    "./configuration": { "types": "./dist/subagents.d.ts", "import": "./dist/subagents.js" },
+    "./instructions": { "types": "./dist/subagent-instructions.d.ts", "import": "./dist/subagent-instructions.js" },
+    "./types": { "types": "./dist/delegation.d.ts", "import": "./dist/delegation.js" }
+  },
+  "files": ["dist", "!dist/.tsbuildinfo"],
+  "scripts": { "build": "tsc -b", "test": "pnpm run build && node --test test/*.test.mjs" },
+  "dependencies": { "@may/application": "workspace:*", "@may/coding-tools": "workspace:*", "@may/config": "workspace:*", "@may/context": "workspace:*", "@may/coordination": "workspace:*", "@may/core": "workspace:*", "@may/permissions": "workspace:*", "@may/session": "workspace:*", "@may/skills": "workspace:*", "@may/plugin": "workspace:*", "@may/plugin-services": "workspace:*", "@may/plugin-history-memory": "workspace:*", "@may/plugin-goals": "workspace:*", "@may/plugin-mcp": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.0.0" },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}

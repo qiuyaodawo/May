@@ -4,14 +4,19 @@
 
 May uses four lifecycle levels:
 
-```text
-Agent definition -> Session -> Run -> Step
+```mermaid
+flowchart LR
+  Definition[Agent definition] --> Session --> Run --> Step
 ```
 
 Application orchestration sits around these lifecycle levels rather than
 adding another model-execution level. An `AgentApplication` owns one active
 Session, while an `AgentWorkspace` selects and replaces the active application
 when a product creates, resumes, or reconfigures a session.
+
+Plugin resources use nested `host`, `application`, `session`, and `run` scopes.
+The owning application opens these scopes, resolves declared services, and
+dispatches lifecycle Hooks. See [Plugins and services](../guides/plugins.md).
 
 ## Vocabulary
 
@@ -59,15 +64,20 @@ tool calls.
 Reusable code lives under `packages`; executable product composition lives
 under `apps`. The dependency rule is:
 
-```text
-apps/*
-  |-> @may/application -> context / session / permissions / core /
-  |                      session-tools
-  |-> @may/observability -> core (optional tracing implementation)
-  |-> @may/mcp           -> core (optional remote-tool adapter)
-  |-> @may/tui         -> coding-tools / keybindings / session /
-  |                      permissions / core
-  `-> provider / tool / config packages
+```mermaid
+flowchart LR
+  Apps[apps] --> Application["@may/application"]
+  Application --> Plugin["@may/plugin"]
+  Application --> Components[context / session / permissions / session-tools]
+  Plugin --> Core["@may/core"]
+  Components --> Core
+  Apps --> Observability["@may/observability"]
+  Observability --> Core
+  Apps --> MCP["@may/mcp"]
+  MCP --> Core
+  Apps --> TUI["@may/tui"]
+  TUI --> Terminal[coding-tools / keybindings / session / permissions / core]
+  Apps --> Products[provider / tool / config packages]
 ```
 
 This is a layering sketch, not a requirement that every package depend on
@@ -119,6 +129,20 @@ id, metadata, serialized submission, context continuity, session events, and a
 storage seam. It also provides reusable in-memory and file-backed session
 Catalog implementations. It may depend on `@may/core`; Core must not depend on
 it.
+
+Session executes through `AgentRuntime`. The default implementation is `May`;
+custom runtime factories may own their Context and additional resources.
+Runtime identity and versioned state are persisted. At a replacement boundary,
+Session saves state and closes the old runtime while its plugin services are
+available, then restores the replacement before allowing execution.
+
+### `@may/plugin`
+
+The plugin package owns composition validation, typed versioned services,
+scoped initialization, configuration and state validation, lifecycle Hooks,
+serialized changes, and resource cleanup. It depends on Core's Hook interfaces.
+Application supplies runtime and Context services and connects plugin state to
+durable Session storage.
 
 ### `@may/permissions`
 

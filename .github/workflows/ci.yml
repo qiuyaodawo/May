@@ -71,7 +71,7 @@ jobs:
         run: node apps/maybeclaw/dist/bin.js --help
 
   package:
-    name: MaybeCode package smoke test
+    name: Packed package smoke tests
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -91,3 +91,5 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify packed dependencies and installed CLI
         run: pnpm test:package:maybecode
+      - name: Verify independently installed plugin host
+        run: pnpm test:package:plugin

@@ -7,8 +7,11 @@ import { CoordinationRuntime, coordinationInput, createCoordinationTools, valida
 import type { AgentApplicationEvent } from "@may/application";
 import type { ApprovalDecision } from "@may/permissions";
 import type { ContentPart, Tool } from "@may/core";
+import { PluginHost } from "@may/plugin";
+import { agentAdapterRegistryService } from "@may/plugin-agent-adapters";
+import { coordinationService } from "@may/plugin-coordination";
+import { createGatewayAgentPlugins } from "./plugins/agents.js";
 import { GatewayStore } from "./gateway-store.js";
-import { loadGatewayAdapter } from "./gateway-adapters.js";
 import { gatewayEntry } from "./gateway-settings.js";
 import { digest } from "./types.js";
 import type { LegacyTaskRecord } from "./gateway-migration.js";
@@ -56,18 +59,26 @@ export class AgentGateway {
   private closing = false;
   private closePromise: Promise<void> | undefined;
   private error: string | undefined;
+  private plugins: Promise<PluginHost> | undefined;
   constructor(readonly options: { directory: string; configPath: string; settings: GatewaySettings; store?: GatewayStore }) {
     this.store = options.store ?? GatewayStore.open(options.directory);
     for (const delivery of this.store.list<GatewayDelivery>("deliveries")) if (delivery.status === "sending") this.store.put("deliveries", delivery.id, { ...delivery, status: "unknown" });
     for (const approval of this.store.list<GatewayApproval>("approvals")) if (approval.status === "pending") this.store.put("approvals", approval.id, { ...approval, status: "cancelled" });
   }
   observe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+  private pluginHost(): Promise<PluginHost> { return this.plugins ??= PluginHost.create({ plugins: createGatewayAgentPlugins(this.options) }); }
   changed(): void { for (const listener of this.listeners) listener(); }
   status() { return { state: this.closing ? "stopping" : this.error ? "degraded" : "running", error: this.error,
     agents: this.options.settings.agents.map(agent => ({ id: agent.id, name: agent.name ?? agent.id, enabled: agent.enabled !== false,
       status: this.reconfiguring.has(agent.id) ? "reconfiguring" : agent.enabled === false ? "disabled" : this.adapterClosings.has(agent.id) ? "releasing" : this.adapterStates.get(agent.id) ?? "unloaded" })),
     active: this.store.list<GatewayTask>("tasks").filter(task => !terminal(task.status)).length }; }
   async adapter(id: string): Promise<GatewayAgentAdapter> {
+    if (this.closing) throw new Error("Gateway is closing");
+    await this.adapterClosings.get(id);
+    if (this.closing) throw new Error("Gateway is closing");
+    return this.resolveAdapter(id);
+  }
+  private async resolveAdapter(id: string): Promise<GatewayAgentAdapter> {
     await this.adapterClosings.get(id);
     const config = this.options.settings.agents.find(agent => agent.id === id);
     if (!config) throw new Error(`Agent ${id} 未登记。请使用 /agent list 查看可用 Agent。`);
@@ -75,7 +86,7 @@ export class AgentGateway {
     let pending = this.adapters.get(id);
     if (!pending) {
       this.adapterStates.set(id, "loading");
-      pending = loadGatewayAdapter({ directory: this.options.directory, configPath: this.options.configPath, agent: config }).then(adapter => {
+      pending = this.pluginHost().then(host => host.get(agentAdapterRegistryService).get(id)).then(adapter => {
         this.adapterStates.set(id, "loaded"); this.changed(); return adapter;
       }, error => {
         this.adapterStates.set(id, "unavailable");
@@ -111,7 +122,7 @@ export class AgentGateway {
           try {
             if (approval.kind === "tool") {
               const binding = this.store.get<GatewayBinding>("bindings", `${session.id}:${approval.agentId}`);
-              if (binding?.conversationId) await (await this.adapter(approval.agentId)).resolveApproval?.(binding.conversationId, approval.requestId, "deny");
+              if (binding?.conversationId) await (await this.resolveAdapter(approval.agentId)).resolveApproval?.(binding.conversationId, approval.requestId, "deny");
             }
             this.store.put("approvals", approval.id, { ...approval, status: "cancelled" });
           } catch (error) {
@@ -439,7 +450,7 @@ export class AgentGateway {
         const id = words[2] ?? "", name = words[3] ?? "";
         if (["new", "resume", "/new", "/resume"].includes(name)) throw new Error("请通过 MaybeClaw 会话命令管理 Agent 对话。");
         this.requireAdmin(session, actor); this.authorizeAgent(id, actor, session.entry);
-        const adapter = await this.adapter(id), binding = await this.binding(session, id);
+        const adapter = await this.resolveAdapter(id), binding = await this.binding(session, id);
         if (!adapter.command) throw new Error("该 Agent 没有声明命令能力。");
         return { text: await adapter.command(binding.conversationId!, name, words.slice(4)), sessionId: session.id };
       }
@@ -472,14 +483,14 @@ export class AgentGateway {
     try {
     const agents = agentId ? [agentId] : session.defaultAgents;
     for (const id of agents) this.authorizeAgent(id, actor, session.entry);
-    await Promise.all(agents.map(id => this.adapter(id)));
+    await Promise.all(agents.map(id => this.resolveAdapter(id)));
     if (this.closing) throw new Error("Gateway 正在关闭。");
     if (this.session(session.id, actor).status !== "active") throw new Error("会话当前不可接收输入。");
     if (steer && agents.length !== 1) throw new Error("请使用 @Agent 明确补充信息的目标。");
     const active = this.store.list<GatewayTask>("tasks").filter(task => task.sessionId === session.id && agents.includes(task.agentId) && !terminal(task.status));
     for (const task of active) if (!this.isAdmin(session, actor) && actorKey(task.actor) !== actorKey(actor)) throw new Error("目标 Agent 正在处理其他成员的工作。");
     if (steer && active.length) {
-      const id = agents[0]!, adapter = await this.adapter(id), binding = this.store.get<GatewayBinding>("bindings", `${session.id}:${id}`);
+      const id = agents[0]!, adapter = await this.resolveAdapter(id), binding = this.store.get<GatewayBinding>("bindings", `${session.id}:${id}`);
       if (binding?.status !== "ready" || !binding.conversationId) throw new Error("Agent 对话尚未就绪，请等待创建或审批完成。");
       if (!adapter.capabilities.steer || !adapter.steer) throw new Error("此 Agent 不支持 /steer。");
       const steeringId = digest({ actor: actorKey(actor), requestId: input.requestId, session: session.id, agent: id });
@@ -491,7 +502,7 @@ export class AgentGateway {
       return { text: `补充信息状态：${result.status}`, sessionId: session.id };
     }
     for (const task of active) {
-      const adapter = await this.adapter(task.agentId);
+      const adapter = await this.resolveAdapter(task.agentId);
       if (!adapter.capabilities.cancel) throw new Error(`Agent ${task.agentId} 不支持中断，请等待当前执行结束。`);
     }
     for (const task of active) await this.stop(session, actor, undefined, task.id);
@@ -505,7 +516,7 @@ export class AgentGateway {
     const graphId = digest({ requestId: input.requestId, actor: actorKey(actor) });
     this.store.put("graphs", graphId, { id: graphId, sessionId: session.id, actor, messageId: message.id, ...(input.content ? { content: input.content } : {}), ...(input.steeringInputId ? { rootInputId: input.steeringInputId } : {}) } satisfies GraphRecord);
     if (this.closing) throw new Error("Gateway 正在关闭。");
-    const runtime = await CoordinationRuntime.create({ id: graphId, store: this.coordinationStore(), agents: this.coordinationAgents(session, actor, graphId),
+    const runtime = await (await this.pluginHost()).get(coordinationService).create({ id: graphId, store: this.coordinationStore(), agents: this.coordinationAgents(session, actor, graphId),
       policy: this.policy(session, actor), tasks: agents.map((id, index) => ({ id: `request-${index}`, agent: id, input: body })),
       limits: { maxConcurrent: this.options.settings.maxConcurrent, maxTasks: 64, maxTaskTurns: 32, maxDurationMs: 3_600_000 } });
     this.launch(runtime, graphId);
@@ -557,7 +568,7 @@ export class AgentGateway {
           }
         }
         context.signal.throwIfAborted();
-        const binding = await this.binding(current, config.id), adapter = await this.adapter(config.id);
+        const binding = await this.binding(current, config.id), adapter = await this.resolveAdapter(config.id);
         const key = binding.id, previous = this.dialogueJobs.get(key) ?? Promise.resolve();
         let release!: () => void;
         const own = new Promise<void>(resolve => { release = resolve; });
@@ -614,7 +625,7 @@ export class AgentGateway {
         if (!binding?.conversationId) return { status: "not-started" as const };
         const graphRecord = this.store.get<GraphRecord>("graphs", graphId);
         const inputId = graphRecord?.rootInputId && !execution.task.parentTaskId && (execution.task.turn ?? 0) === 0 ? graphRecord.rootInputId : `${execution.task.dispatchId}:${execution.task.turn ?? 0}`;
-        const result = await (await this.adapter(config.id)).inspect(binding.conversationId, inputId);
+        const result = await (await this.resolveAdapter(config.id)).inspect(binding.conversationId, inputId);
         if (result.status === "completed") {
           if (!graphRecord) throw new Error("任务的协作记录不存在。");
           this.completeTask(this.projectTask(graphRecord, execution.task), { ...result, text: result.text ?? "" });
@@ -640,7 +651,7 @@ export class AgentGateway {
     void relay.finally(() => this.relays.delete(id)).catch(error => { this.error = safeError(error); });
     let closed = false;
     const job = runtime.wait().then(async snapshot => {
-      if (snapshot.tasks.every(task => terminal(task.status)) || snapshot.tasks.some(task => task.status === "recovery-required")) { await runtime.close(); await relay; closed = true; }
+      if (snapshot.tasks.every(task => terminal(task.status)) || snapshot.tasks.some(task => task.status === "recovery-required")) { await (await this.pluginHost()).get(coordinationService).release(runtime); await relay; closed = true; }
     })
       .catch(error => { this.error = safeError(error); this.changed(); })
       .finally(() => { if (closed) this.graphs.delete(id); this.jobs.delete(id); });
@@ -659,7 +670,7 @@ export class AgentGateway {
     const session = this.session(task.sessionId, actor); this.requireAdmin(session, actor);
     const binding = this.store.get<GatewayBinding>("bindings", `${session.id}:${task.agentId}`);
     if (!binding?.conversationId) throw new Error("Agent 对话尚未确认。");
-    const outcome = await (await this.adapter(task.agentId)).inspect(binding.conversationId, task.inputId);
+    const outcome = await (await this.resolveAdapter(task.agentId)).inspect(binding.conversationId, task.inputId);
     if (outcome.status === "not-started") return task;
     if (outcome.status === "completed") return this.completeTask(task, { ...outcome, text: outcome.text ?? "" });
     const updated: GatewayTask = { ...task, status: outcome.status, ...(outcome.text ? { result: outcome.text } : {}), ...(outcome.detail ? { detail: outcome.detail } : {}), updatedAt: Date.now() };
@@ -682,7 +693,7 @@ export class AgentGateway {
     if (this.graphs.has(task.graphId)) { await this.graphs.get(task.graphId)!.start(); return this.store.get<GatewayTask>("tasks", taskId)!; }
     const graph = this.store.get<GraphRecord>("graphs", task.graphId);
     if (!graph) throw new Error("任务的协作记录不存在。");
-    const runtime = await CoordinationRuntime.resume({ id: graph.id, store: this.coordinationStore(), agents: this.coordinationAgents(session, graph.actor, graph.id), policy: this.policy(session, graph.actor) });
+    const runtime = await (await this.pluginHost()).get(coordinationService).resume({ id: graph.id, store: this.coordinationStore(), agents: this.coordinationAgents(session, graph.actor, graph.id), policy: this.policy(session, graph.actor) });
     this.launch(runtime, graph.id); return this.store.get<GatewayTask>("tasks", taskId)!;
   }
   async restore(): Promise<void> {
@@ -722,7 +733,7 @@ export class AgentGateway {
         });
         this.changed(); continue;
       }
-      const runtime = await CoordinationRuntime.resume({ id: graph.id, store: this.coordinationStore(), agents: this.coordinationAgents(session, graph.actor, graph.id), policy: this.policy(session, graph.actor) });
+      const runtime = await (await this.pluginHost()).get(coordinationService).resume({ id: graph.id, store: this.coordinationStore(), agents: this.coordinationAgents(session, graph.actor, graph.id), policy: this.policy(session, graph.actor) });
       this.launch(runtime, graph.id);
     }
   }
@@ -758,7 +769,7 @@ export class AgentGateway {
     const config = this.options.settings.agents.find(agent => agent.id === agentId)!;
     const record: GatewayBinding = existing ?? { id, sessionId: session.id, agentId, requestId: randomUUID(), version: digest(config), status: "creating", usedAt: Date.now() };
     this.store.put("bindings", id, record);
-    const adapter = await this.adapter(agentId);
+    const adapter = await this.resolveAdapter(agentId);
     if (existing) {
       const result = await adapter.inspectCreation?.(record.requestId);
       if (result?.status === "ready" && result.conversationId) {
@@ -807,7 +818,7 @@ export class AgentGateway {
       if (waiter) { this.approvalWaiters.delete(id); waiter(decision !== "deny"); }
       else if (decision !== "deny") await this.binding(session, approval.agentId);
     } else {
-      const binding = this.store.get<GatewayBinding>("bindings", `${session.id}:${approval.agentId}`), adapter = await this.adapter(approval.agentId);
+      const binding = this.store.get<GatewayBinding>("bindings", `${session.id}:${approval.agentId}`), adapter = await this.resolveAdapter(approval.agentId);
       if (!binding?.conversationId || !adapter.resolveApproval || !await adapter.resolveApproval(binding.conversationId, approval.requestId, decision)) throw new Error("Agent 已不再等待此审批。");
     }
     this.store.put("approvals", id, { ...approval, status: decision === "deny" ? "denied" : "allowed", decision, decidedBy: actor });
@@ -822,11 +833,11 @@ export class AgentGateway {
     if (!taskId && !agentId && !this.isAdmin(session, actor) && tasks.length > 1) throw new Error("请使用 /stop --task <ID> 指定任务。");
     for (const task of tasks) {
       if (!this.isAdmin(session, actor) && actorKey(actor) !== actorKey(task.actor)) throw new Error("无权停止其他成员的工作。");
-      if (this.activeBindings.get(`${session.id}:${task.agentId}`) === task.id && !(await this.adapter(task.agentId)).capabilities.cancel) throw new CancellationUnsupportedError(`Agent ${task.agentId} 不支持取消，请等待当前执行结束。`);
+      if (this.activeBindings.get(`${session.id}:${task.agentId}`) === task.id && !(await this.resolveAdapter(task.agentId)).capabilities.cancel) throw new CancellationUnsupportedError(`Agent ${task.agentId} 不支持取消，请等待当前执行结束。`);
       const runtime = this.graphs.get(task.graphId);
       if (runtime) await runtime.cancel(randomUUID(), task.graphTaskId);
       const binding = this.store.get<GatewayBinding>("bindings", `${session.id}:${task.agentId}`);
-      if (binding?.conversationId && this.activeBindings.get(binding.id) === task.id) await (await this.adapter(task.agentId)).cancel?.(binding.conversationId);
+      if (binding?.conversationId && this.activeBindings.get(binding.id) === task.id) await (await this.resolveAdapter(task.agentId)).cancel?.(binding.conversationId);
       await this.taskJobs.get(task.id);
       if (runtime) await new Promise<void>(resolve => {
         let unsubscribe = () => {};
@@ -847,7 +858,7 @@ export class AgentGateway {
       this.store.put("sessions", session.id, { ...session, status: "deleting" });
       await Promise.all(this.store.list<GraphRecord>("graphs").filter(graph => graph.sessionId === session.id).map(graph => this.jobs.get(graph.id)));
       for (const binding of this.store.list<GatewayBinding>("bindings").filter(item => item.sessionId === session.id)) {
-        const adapter = await this.adapter(binding.agentId);
+        const adapter = await this.resolveAdapter(binding.agentId);
         if (!adapter.capabilities.delete || !adapter.deleteConversation || !binding.conversationId) throw new Error(`Agent ${binding.agentId} 对话清理尚未完成。`);
         await adapter.deleteConversation(binding.conversationId); this.store.delete("bindings", binding.id);
       }
@@ -891,7 +902,7 @@ export class AgentGateway {
       }
       const binding = this.store.get<GatewayBinding>("bindings", `${item.sessionId}:${item.agentId}`);
       if (!binding?.conversationId || this.dialogueJobs.has(binding.id)) continue;
-      const adapter = await this.adapter(item.agentId), state = (await adapter.steeringInputs?.(binding.conversationId))?.find(input => input.inputId === item.id);
+      const adapter = await this.resolveAdapter(item.agentId), state = (await adapter.steeringInputs?.(binding.conversationId))?.find(input => input.inputId === item.id);
       if (!state) continue;
       if (state.status === "idle") {
         this.store.put("steering", item.id, { ...item, status: "starting" });
@@ -908,7 +919,7 @@ export class AgentGateway {
       }
     }
     for (const approval of this.store.list<GatewayApproval>("approvals")) if (approval.status === "pending" && approval.expiresAt <= Date.now()) {
-      if (approval.kind === "tool") { const binding = this.store.get<GatewayBinding>("bindings", `${approval.sessionId}:${approval.agentId}`); if (binding?.conversationId) await (await this.adapter(approval.agentId)).resolveApproval?.(binding.conversationId, approval.requestId, "deny"); }
+      if (approval.kind === "tool") { const binding = this.store.get<GatewayBinding>("bindings", `${approval.sessionId}:${approval.agentId}`); if (binding?.conversationId) await (await this.resolveAdapter(approval.agentId)).resolveApproval?.(binding.conversationId, approval.requestId, "deny"); }
       this.store.put("approvals", approval.id, { ...approval, status: "expired" }); this.approvalWaiters.get(approval.id)?.(false); this.approvalWaiters.delete(approval.id); this.changed();
     }
     for (const [id, pending] of this.adapters) {
@@ -938,7 +949,7 @@ export class AgentGateway {
     const close = (async () => {
       const adapter = await pending;
       for (const binding of bindings) await adapter.release?.(binding.conversationId!);
-      await adapter.close();
+      await (await this.pluginHost()).get(agentAdapterRegistryService).release(id);
       if (this.adapters.get(id) === pending) this.adapters.delete(id);
       this.adapterStates.delete(id);
       this.adapterUsedAt.delete(id);
@@ -951,26 +962,34 @@ export class AgentGateway {
     if (this.closePromise) return this.closePromise;
     this.closing = true;
     this.closePromise = (async () => {
+      const errors: unknown[] = [];
+      const settle = async (operations: readonly Promise<unknown>[]) => {
+        for (const result of await Promise.allSettled(operations)) if (result.status === "rejected") errors.push(result.reason);
+      };
       const wait = (async () => {
         await Promise.allSettled([...this.admission.values()].map(item => item.job));
-        await Promise.all([...this.jobs.values()]);
+        await settle([...this.jobs.values()]);
       })();
       let timer: ReturnType<typeof setTimeout> | undefined;
       try { await Promise.race([wait, new Promise<void>(resolve => { timer = setTimeout(resolve, this.options.settings.shutdownMs); })]); }
       finally { if (timer) clearTimeout(timer); }
-      await Promise.all([...this.graphs.values()].map(runtime => runtime.close()));
+      await settle([...this.graphs.values()].map(async runtime => (await this.pluginHost()).get(coordinationService).release(runtime)));
       await Promise.allSettled([...this.admission.values()].map(item => item.job));
-      await Promise.all([...this.graphs.values()].map(runtime => runtime.close()));
-      await Promise.all([...this.jobs.values()]);
-      await Promise.all([...this.relays.values()]);
+      await settle([...this.graphs.values()].map(async runtime => (await this.pluginHost()).get(coordinationService).release(runtime)));
+      await settle([...this.jobs.values()]);
+      await settle([...this.relays.values()]);
       await Promise.allSettled([...this.bindingJobs.values()]);
-      for (const approval of this.store.list<GatewayApproval>("approvals")) if (approval.status === "pending") this.store.put("approvals", approval.id, { ...approval, status: "cancelled" });
-      this.changed();
-      await Promise.all([...this.configurationJobs, ...this.maintenanceJobs]);
-      await this.configurationWrite;
-      await Promise.all([...this.adapterClosings.values()]);
-      for (const [id, adapter] of [...this.adapters]) await this.closeAdapter(id, adapter);
-      this.store.close();
+      try {
+        for (const approval of this.store.list<GatewayApproval>("approvals")) if (approval.status === "pending") this.store.put("approvals", approval.id, { ...approval, status: "cancelled" });
+        this.changed();
+      } catch (error) { errors.push(error); }
+      await settle([...this.configurationJobs, ...this.maintenanceJobs]);
+      await settle([this.configurationWrite]);
+      await settle([...this.adapterClosings.values()]);
+      await settle([...this.adapters].map(([id, adapter]) => this.closeAdapter(id, adapter)));
+      if (this.plugins) await settle([this.plugins.then(host => host.close())]);
+      try { this.store.close(); } catch (error) { errors.push(error); }
+      if (errors.length) throw new AggregateError([...new Set(errors)], "Gateway cleanup failed");
     })();
     this.changed();
     return this.closePromise;

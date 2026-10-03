@@ -8,6 +8,7 @@ import { GatewayHost } from "../dist/gateway-host.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { ChannelStore, inboxId } from "../dist/channel-store.js";
 import { TelegramAdapter, telegramMemberInput } from "../dist/channels.js";
+import { createTelegramChannelPlugin } from "@may/plugin-channel-telegram";
 import { digest } from "../dist/types.js";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -25,9 +26,8 @@ async function setup(t) {
 
 test("尚未派发的消息接受编辑后，原事件重传仍按初始摘要去重", async t => {
   const { gateway, directory } = await setup(t);
-  const channels = await ChannelStore.open(join(directory, "gateway-channels.jsonl"));
   const adapter = new TelegramAdapter({ enabled: false, allowUsers: ["7"] }, "42:configuration");
-  const host = new GatewayHost({ gateway, adapters: [adapter] }, channels);
+  const host = await GatewayHost.start({ gateway, adapters: [adapter], startPaused: true });
   t.after(() => host.close());
   await host.receive(input);
   await host.receive({ ...input, eventId: "101", eventType: "edit", text: "更新的问题" });
@@ -35,7 +35,7 @@ test("尚未派发的消息接受编辑后，原事件重传仍按初始摘要�
   assert.equal(gateway.store.get("inbox", inboxId(input)).input.text, "更新的问题");
   assert.equal(gateway.store.get("inbox", inboxId(input)).fingerprint, digest(input));
   await assert.rejects(host.receive({ ...input, text: "其他内容" }), /内容冲突/);
-  assert.equal(channels.values().some(record => record.kind === "inbox"), false);
+  assert.equal((await ChannelStore.inspect(join(directory, "gateway-channels.jsonl"))).some(record => record.kind === "inbox"), false);
   await host.close();
 });
 
@@ -90,10 +90,9 @@ test("会话结果分页保留Unicode，并明确说明渠道未发送的附件"
 });
 
 test("成员事件经Host持久处理后撤销群内全部话题访问，并忽略较早的加入事件", async t => {
-  const { gateway, directory } = await setup(t);
-  const channels = await ChannelStore.open(join(directory, "gateway-channels.jsonl"));
+  const { gateway } = await setup(t);
   const adapter = new TelegramAdapter({ enabled: false, allowUsers: [], allowGroups: ["-10012"] }, "42:configuration");
-  const host = new GatewayHost({ gateway, adapters: [adapter] }, channels);
+  const host = await GatewayHost.start({ gateway, adapters: [adapter], startPaused: true });
   t.after(() => host.close());
   const entry = { account: adapter.account, conversation: "-10012", kind: "group", threadId: "12" };
   const session = gateway.createSession(operator, "群聊话题", ["reader"], [], entry);
@@ -117,14 +116,11 @@ test("成员事件经Host持久处理后撤销群内全部话题访问，并忽�
 });
 
 test("渠道删除会话保留操作回执并清除原输入记录", async t => {
-  const { gateway, directory } = await setup(t);
-  const channels = await ChannelStore.open(join(directory, "gateway-channels.jsonl"));
+  const { gateway } = await setup(t);
   const adapters = [new TelegramAdapter({ enabled: false, allowUsers: ["7"] }, "42:configuration")];
-  const host = new GatewayHost({ gateway, adapters }, channels);
+  const host = await GatewayHost.start({ gateway, adapters, startPaused: true });
   t.after(() => host.close());
   const session = gateway.createSession(operator, "待删除", ["reader"], [], { account: input.account, conversation: input.conversation, kind: "private", owner: input.sender });
-  const unsubscribe = gateway.observe(() => { if (!gateway.store.get("sessions", session.id)) adapters.length = 0; });
-  t.after(unsubscribe);
   const command = { ...input, eventId: "delete", text: `/session delete ${session.id} --confirm` };
   await host.receive(command);
   await host.tick();
@@ -135,5 +131,26 @@ test("渠道删除会话保留操作回执并清除原输入记录", async t => 
   assert.equal(replies[0].input.text, "");
   assert.equal(replies[0].sessionId, undefined);
   assert.match(replies[0].text, /操作已完成/);
+  assert.equal(replies[0].status, "pending");
+  assert.equal(host.status().channels.length, 1);
+  await host.close();
+});
+
+for (const includeAdapter of [false, true]) test(`渠道插件与 adapters 共同注册并接收消息：${includeAdapter ? "具有额外渠道" : "空数组"}`, async t => {
+  const { gateway } = await setup(t);
+  const adapters = includeAdapter ? [new TelegramAdapter({ enabled: false, allowUsers: ["7"] }, "43:configuration")] : [];
+  const host = await GatewayHost.start({ gateway, adapters, plugins: [createTelegramChannelPlugin({
+    settings: { enabled: false, allowUsers: ["7"] }, token: "42:configuration",
+  })], startPaused: true });
+  t.after(() => host.close());
+  assert.deepEqual(host.status().channels.map(channel => channel.account).sort(), includeAdapter ? ["telegram:42", "telegram:43"] : ["telegram:42"]);
+  for (const account of host.status().channels.map(channel => channel.account)) {
+    const event = { ...input, account, eventId: `status:${account}`, text: "/status" };
+    await host.receive(event);
+    assert.equal(gateway.store.get("inbox", inboxId(event)).state, "pending");
+  }
+  await host.tick();
+  assert.equal(gateway.store.list("channel-replies").length, includeAdapter ? 2 : 1);
+  assert.ok(gateway.store.list("channel-replies").every(reply => reply.status === "pending"));
   await host.close();
 });

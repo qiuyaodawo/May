@@ -118,13 +118,16 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       event.type === "mcp.resource.updated" || event.type === "run.event" && isStreamingMayEvent(event.event),
   });
   private readonly managerEventRelay: Promise<void>;
-  private readonly mcpEventRelay: Promise<void>;
-  private readonly interactionRelay: Promise<void>;
+  private readonly mcpEventRelays = new Set<Promise<void>>();
+  private readonly mcpEventIterators = new Set<AsyncIterator<MaybeCodeEvent>>();
+  private readonly mcpRelayErrors: unknown[] = [];
+  private observedMcp: MaybeCodeWorkspaceOptions["mcp"];
   private readonly modelOptionOverrides = new Map<
     string,
     Readonly<Record<string, unknown>>
   >();
   private closed = false;
+  private closing: Promise<void> | undefined;
   private readonly mcpLifetime = new AbortController();
   private mcpOperationController: AbortController | undefined;
   private readonly mcpWatches = new Map<string, McpResourceSubscription>();
@@ -138,10 +141,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     this.workspace = manager.workspace;
     this.events = this.eventQueue;
     this.managerEventRelay = this.relayEvents(manager.events);
-    this.mcpEventRelay = state.options.mcp === undefined
-      ? Promise.resolve()
-      : this.relayEvents(state.options.mcp.events);
-    this.interactionRelay = state.options.mcp?.interactions === undefined ? Promise.resolve() : this.relayEvents(state.options.mcp.interactions.events);
+    this.connectMcpEvents();
   }
 
   static async open(
@@ -248,11 +248,15 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   async getMcpStatus(): Promise<readonly McpServerStatus[]> {
     this.throwIfClosed();
-    return this.state.options.mcp?.status() ?? [];
+    return this.mcp?.status() ?? [];
+  }
+
+  private get mcp(): MaybeCodeWorkspaceOptions["mcp"] {
+    return this.manager.activeApplication.mcp ?? this.state.options.mcp;
   }
 
   getMcpInteractions() {
-    const interactions = this.state.options.mcp?.interactions;
+    const interactions = this.mcp?.interactions;
     if (interactions === undefined) return [];
     return [
       this.mcpOwner(),
@@ -265,7 +269,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     // be waiting for this answer while holding that queue.
     if (this.closed) return false;
     const request = this.getMcpInteractions().find((entry) => entry.id === id);
-    return request === undefined ? false : this.state.options.mcp!.interactions!.respond(id, request.owner, response);
+    return request === undefined ? false : this.mcp!.interactions!.respond(id, request.owner, response);
   }
 
   private mcpOwner() { return { workspaceId: this.workspace, sessionId: this.sessionId }; }
@@ -281,24 +285,26 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   async refreshMcp(serverId?: string): Promise<void> {
     this.throwIfClosed();
-    if (this.state.options.mcp?.refresh === undefined) throw new Error("MCP refresh is unavailable");
-    await this.state.options.mcp.refresh(serverId);
+    const mcp = this.mcp;
+    if (mcp?.refresh === undefined) throw new Error("MCP refresh is unavailable");
+    await mcp.refresh(serverId);
   }
 
   async reconnectMcp(serverId: string): Promise<void> {
     this.throwIfClosed();
-    if (this.state.options.mcp?.reconnect === undefined) throw new Error("MCP reconnect is unavailable");
-    await this.state.options.mcp.reconnect(serverId);
+    const mcp = this.mcp;
+    if (mcp?.reconnect === undefined) throw new Error("MCP reconnect is unavailable");
+    await mcp.reconnect(serverId);
   }
 
   getMcpCatalog() {
     this.throwIfClosed();
-    return this.state.options.mcp?.catalog?.() ?? [];
+    return this.mcp?.catalog?.() ?? [];
   }
 
   listMcpTasks() {
     this.throwIfClosed();
-    return this.state.options.mcp?.listTasks?.(this.mcpOwner()) ?? Promise.resolve([]);
+    return this.mcp?.listTasks?.(this.mcpOwner()) ?? Promise.resolve([]);
   }
   getMcpTask(serverId: string, id: string, options: McpOperationOptions = {}) {
     return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("getTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
@@ -373,7 +379,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   private mcpMethod<K extends "readResource" | "readResourceTemplate" | "getPrompt" | "complete" | "subscribeResource" | "getTask" | "updateTask" | "waitTask" | "cancelTask" | "forgetTask">(method: K): McpClientPool[K] {
-    const mcp = this.state.options.mcp;
+    const mcp = this.mcp;
     if (mcp?.[method] === undefined) throw new Error(`MCP ${method} is unavailable`);
     return mcp[method].bind(mcp) as McpClientPool[K];
   }
@@ -442,12 +448,15 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   async readSessionHistory(sessionId: string) { return mediaHistory(await this.manager.readSessionHistory(sessionId)); }
 
-  newSession(): Promise<string> {
-    return this.manager.newSession();
+  async newSession(): Promise<string> {
+    const sessionId = await this.manager.newSession();
+    this.connectMcpEvents();
+    return sessionId;
   }
 
-  resumeSession(sessionId: string): Promise<void> {
-    return this.manager.resumeSession(sessionId);
+  async resumeSession(sessionId: string): Promise<void> {
+    await this.manager.resumeSession(sessionId);
+    this.connectMcpEvents();
   }
 
   renameSession(sessionId: string, title: string): Promise<void> {
@@ -518,6 +527,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
         model: application.modelInfo!,
       }),
     });
+    this.connectMcpEvents();
     return result!;
   }
 
@@ -631,6 +641,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       else this.modelOptionOverrides.set(profile, { reasoningEffort: effort });
       return next;
     });
+    this.connectMcpEvents();
     return this.getReasoningEffort();
   }
 
@@ -676,8 +687,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.manager.compactContext(strategy);
   }
 
-  async close(): Promise<void> {
-    if (this.closed) return;
+  close(): Promise<void> {
+    return this.closing ??= this.closeOnce();
+  }
+
+  private async closeOnce(): Promise<void> {
     this.closed = true;
     this.mcpLifetime.abort("MaybeCode workspace is closing");
     const watchesClosing = Promise.allSettled([...this.mcpWatches.values()].map((watch) => watch.close()));
@@ -694,12 +708,14 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     }
     await watchesClosing;
     try {
-      await Promise.all([this.managerEventRelay, this.mcpEventRelay, this.interactionRelay]);
+      await this.disconnectMcpEvents();
+      await Promise.all([this.managerEventRelay, ...this.mcpEventRelays]);
     } catch (error) {
       failures.push(error);
     } finally {
       this.eventQueue.close();
     }
+    failures.push(...this.mcpRelayErrors);
     if (failures.length > 0) {
       throw new AggregateError(failures, "MaybeCode workspace failed to close");
     }
@@ -707,10 +723,54 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   private async relayEvents(events: AsyncIterable<MaybeCodeEvent>): Promise<void> {
     for await (const event of events) {
+      if (event.type === "session.changed" || event.type === "model.changed") this.connectMcpEvents();
       if (event.type === "mcp.interaction.requested" &&
           (event.request.owner.workspaceId !== this.workspace || !this.ownsSession(event.request.owner.sessionId))) continue;
       this.eventQueue.push(event);
     }
+  }
+
+  private connectMcpEvents(): void {
+    if (this.closed) return;
+    const mcp = this.mcp;
+    if (mcp === this.observedMcp) return;
+    this.trackMcpRelay(this.disconnectMcpEvents());
+    this.observedMcp = mcp;
+    for (const events of [mcp?.events, mcp?.interactions?.events]) {
+      if (events === undefined) continue;
+      const iterator = events[Symbol.asyncIterator]();
+      this.mcpEventIterators.add(iterator);
+      this.trackMcpRelay((async () => {
+        try {
+          while (true) {
+            const next = await iterator.next();
+            if (next.done) return;
+            const event = next.value;
+            if (event.type === "mcp.interaction.requested" &&
+                (event.request.owner.workspaceId !== this.workspace || !this.ownsSession(event.request.owner.sessionId))) continue;
+            this.eventQueue.push(event);
+          }
+        } finally { this.mcpEventIterators.delete(iterator); }
+      })());
+    }
+  }
+
+  private async disconnectMcpEvents(): Promise<void> {
+    const iterators = [...this.mcpEventIterators];
+    this.mcpEventIterators.clear();
+    this.observedMcp = undefined;
+    const results = await Promise.allSettled(iterators.map(async iterator => { await iterator.return?.(); }));
+    const errors = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+    if (errors.length) throw new AggregateError(errors, "MCP event streams failed to close");
+  }
+
+  private trackMcpRelay(operation: Promise<void>): void {
+    this.mcpEventRelays.add(operation);
+    void operation.then(() => this.mcpEventRelays.delete(operation), error => {
+      this.mcpEventRelays.delete(operation);
+      this.mcpRelayErrors.push(error);
+      if (!this.closed) this.cancel("MCP event forwarding failed");
+    });
   }
 
   private throwIfClosed(): void {

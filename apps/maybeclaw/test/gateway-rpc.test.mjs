@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { createGatewayRpcAdapter, RpcOutcomeUnknownError } from "../dist/gateway-rpc-adapter.js";
+import { AgentGateway } from "../dist/gateway.js";
+import { gatewaySettings } from "../dist/gateway-settings.js";
 
 const example = fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url));
 async function directory(t) {
@@ -20,6 +22,37 @@ async function directory(t) {
 }
 const input = (conversationId, inputId, operation, path, signal = new AbortController().signal) => ({ conversationId, inputId, input: { role: "user", content: [{ type: "text", text: JSON.stringify({ operation, path }) }] }, signal, tools: [], shouldYield: () => false, report: () => {} });
 async function until(probe) { for (let attempt = 0; attempt < 100; attempt++) { if (await probe()) return; await delay(20); } throw new Error("Condition timed out"); }
+
+function fileGateway(path) {
+  const configPath = join(path, "config.json");
+  const settings = gatewaySettings({ path: configPath, providers: {}, models: {}, apps: { maybeclaw: { version: 2,
+    agents: [{ id: "files", adapter: "module", module: "@may/plugin-agent-adapters/rpc", options: {
+      transport: "stdio", command: process.execPath, args: [example, "--directory", join(path, "state"), "--workspace", path],
+    } }],
+  } } });
+  return new AgentGateway({ directory: path, configPath, settings });
+}
+
+test("Gateway 关闭后拒绝创建尚未初始化的 RPC adapter", async t => {
+  const path = await directory(t), gateway = fileGateway(path);
+  t.after(() => gateway.close());
+  assert.equal(gateway.status().agents[0].status, "unloaded");
+  await gateway.close();
+  await assert.rejects(gateway.adapter("files"), /Gateway is closing/);
+  await assert.rejects(access(join(path, "state")), error => error.code === "ENOENT");
+});
+
+test("Gateway 关闭期间拒绝获取 adapter 并终止已创建的 RPC 进程", async t => {
+  const path = await directory(t), gateway = fileGateway(path);
+  t.after(() => gateway.close());
+  const adapter = await gateway.adapter("files"), conversation = await adapter.createConversation("before-close");
+  const { pid } = JSON.parse(await adapter.command(conversation, "process", []));
+  process.kill(pid, 0);
+  const closing = gateway.close();
+  await assert.rejects(gateway.adapter("files"), /Gateway is closing/);
+  await closing;
+  assert.throws(() => process.kill(pid, 0), error => error.code === "ESRCH");
+});
 
 test("stdio RPC 进程执行实际文件计算并按请求 ID 恢复对话", async t => {
   const path = await directory(t), options = { transport: "stdio", command: process.execPath, args: [example, "--directory", join(path, "state"), "--workspace", path] };

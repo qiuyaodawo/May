@@ -8,4 +8,5 @@ coverage/
 *.log
 .zcode/
 review/
+plugin-verification/
 .pi-delegate/

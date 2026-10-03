@@ -13,6 +13,17 @@
     "src/**/*.ts"
   ],
   "references": [
+    { "path": "../../packages/plugins/delegation" },
+    { "path": "../../packages/plugins/goals" },
+    { "path": "../../packages/plugins/history-memory" },
+    { "path": "../../packages/plugins/mcp" },
+    { "path": "../../packages/plugins/models" },
+    { "path": "../../packages/plugins/observability" },
+    { "path": "../../packages/plugins/permissions" },
+    { "path": "../../packages/plugins/runtime" },
+    { "path": "../../packages/plugins/skills" },
+    { "path": "../../packages/plugin-services" },
+    { "path": "../../packages/plugin" },
     { "path": "../../packages/coordination" },
     { "path": "../../packages/skills" },
     { "path": "../../packages/application" },

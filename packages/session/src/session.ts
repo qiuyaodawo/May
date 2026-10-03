@@ -1,7 +1,13 @@
 import {
   AsyncEventQueue,
   isStreamingMayEvent,
-  type May,
+  type AgentRuntime,
+  type RuntimeDescriptor,
+  DEFAULT_RUNTIME_DESCRIPTOR,
+  assertRuntimeCompatible,
+  validateRuntimeDescriptor,
+  runtimeDescriptorsEqual,
+  jsonEqual,
   type MayEvent,
   type Message,
   type ContinueOptions,
@@ -37,7 +43,7 @@ import {
 } from "./store.js";
 
 export interface SessionOptions {
-  runtime: May;
+  runtime: AgentRuntime;
   store?: SessionStore;
   id?: string;
   metadata?: Record<string, unknown>;
@@ -49,7 +55,7 @@ export interface ResumeSessionOptions {
   createRuntime(
     messages: Message[],
     info: SessionRuntimeInfo,
-  ): May | Promise<May>;
+  ): AgentRuntime | Promise<AgentRuntime>;
 }
 
 export interface SessionModelMeasurement {
@@ -60,6 +66,14 @@ export interface SessionModelMeasurement {
 export interface SessionRuntimeInfo {
   readonly state?: Readonly<Record<string, unknown>>;
   readonly latestModelMeasurement?: SessionModelMeasurement;
+  readonly runtime?: RuntimeDescriptor;
+  readonly runtimeState?: unknown;
+}
+
+interface SuspendedRuntime {
+  readonly descriptor: RuntimeDescriptor;
+  readonly state: unknown;
+  readonly closing: Promise<void>;
 }
 
 /** Optional host delivery identity. Duplicates are rejected, not submitted again. */
@@ -77,7 +91,7 @@ export class Session {
   readonly id: string;
   readonly metadata: Readonly<Record<string, unknown>> | undefined;
 
-  private readonly runtime: May;
+  private runtime: AgentRuntime;
   private readonly store: SessionStore;
   private readonly historyReader: SessionHistoryReader;
   private seq: number;
@@ -93,13 +107,19 @@ export class Session {
   private readonly checkpointed = new Set<string>();
   private readonly recoveries = new Map<string, SessionRecovery>();
   private persistenceFailed = false;
+  private runtimeClosed = false;
+  private runtimeClosing: Promise<void> | undefined;
+  private runtimeMutation = false;
+  private pendingStarts = 0;
+  private settlingRuns = 0;
+  private suspendedRuntime: SuspendedRuntime | undefined;
   private readonly steering: SessionSteeringQueue;
   private activeRun: RunHandle | undefined;
   private readonly submittedInputIds = new Set<string>();
 
   private constructor(
     id: string,
-    runtime: May,
+    runtime: AgentRuntime,
     store: SessionStore,
     metadata: Record<string, unknown> | undefined,
     seq: number,
@@ -133,10 +153,17 @@ export class Session {
       options.metadata,
       0,
     );
-    const created: SessionEventPayload = session.metadata === undefined
-      ? { type: "session.created" }
-      : { type: "session.created", metadata: { ...session.metadata } };
+    const runtime = options.runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
+    validateRuntimeDescriptor(runtime);
+    const initialState = options.runtime.saveState === undefined ? undefined : await snapshotRuntimeState(options.runtime);
+    const created: SessionEventPayload = {
+      type: "session.created", runtime: { ...runtime },
+      ...(session.metadata === undefined ? {} : { metadata: { ...session.metadata } }),
+    };
     await session.record(created);
+    if (initialState !== undefined) {
+      await session.record({ type: "runtime.state.saved", runtime: { ...runtime }, state: initialState });
+    }
     return session;
   }
 
@@ -158,39 +185,68 @@ export class Session {
     }
 
     const recoveredEvents = [...events];
+    const repairs: SessionEvent[] = [];
     for (const payload of interruptedRuns(events)) {
       const event = { ...payload, sessionId: options.id, seq: recoveredEvents.length + 1, timestamp: Date.now() };
-      await options.store.append(event);
       recoveredEvents.push(event);
+      repairs.push(event);
     }
     const replay = replaySession(recoveredEvents);
     const runtime = await options.createRuntime(replay.messages, replay.info);
-    const session = new Session(
-      options.id,
-      runtime,
-      options.store,
-      created.metadata,
-      recoveredEvents.length,
-      recoveredEvents,
-    );
-    for (const event of recoveredEvents) {
-      if (event.type === "run.interrupted") {
-        for (const recovery of event.recoveries) {
-          if (recovery.status === "unknown") session.recoveries.set(recovery.id, recovery);
-        }
-      } else if (event.type === "recovery.resolved") session.recoveries.delete(event.recoveryId);
+    try {
+      const savedDescriptor = replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR;
+      const currentDescriptor = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
+      const migrated = !runtimeDescriptorsEqual(savedDescriptor, currentDescriptor);
+      let runtimeState = replay.info.runtimeState;
+      if (migrated) {
+        if (runtime.migrateState === undefined) assertRuntimeCompatible(savedDescriptor, runtime);
+        runtimeState = await runtime.migrateState!(savedDescriptor, runtimeState);
+      }
+      if (runtimeState !== undefined) {
+        if (runtime.restoreState === undefined) throw new Error("Runtime cannot restore its saved Session state");
+        await runtime.restoreState(runtimeState);
+      }
+      if (runtime.saveState !== undefined) runtimeState = await snapshotRuntimeState(runtime);
+      for (const event of repairs) await options.store.append(event);
+      if (migrated || !jsonEqual(runtimeState, replay.info.runtimeState)) {
+        const change: SessionEvent = {
+          ...(migrated
+            ? { type: "runtime.changed", ...(runtimeState === undefined ? {} : { state: structuredClone(runtimeState) }) }
+            : { type: "runtime.state.saved", state: structuredClone(runtimeState) }),
+          runtime: { ...currentDescriptor },
+          sessionId: options.id, seq: recoveredEvents.length + 1, timestamp: Date.now(),
+        };
+        await options.store.append(change);
+        recoveredEvents.push(change);
+      }
+      const session = new Session(
+        options.id,
+        runtime,
+        options.store,
+        created.metadata,
+        recoveredEvents.length,
+        recoveredEvents,
+      );
+      for (const event of recoveredEvents) {
+        if (event.type === "run.interrupted") {
+          for (const recovery of event.recoveries) {
+            if (recovery.status === "unknown") session.recoveries.set(recovery.id, recovery);
+          }
+        } else if (event.type === "recovery.resolved") session.recoveries.delete(event.recoveryId);
+      }
+      for (const runId of new Set(session.steering.list().filter((input) => input.status === "pending").map((input) => input.runId!))) {
+        const terminal = [...recoveredEvents].reverse().find((event) => "runId" in event && event.runId === runId && ["run.completed", "run.yielded", "run.cancelled", "run.failed", "run.interrupted"].includes(event.type));
+        await session.steering.finish(runId, terminal?.type === "run.completed" || terminal?.type === "run.yielded" ? "idle" : "cancelled", terminal?.type ?? "interrupted");
+      }
+      return session;
+    } catch (error) {
+      return closeRejectedRuntime(runtime, error);
     }
-    for (const runId of new Set(session.steering.list().filter((input) => input.status === "pending").map((input) => input.runId!))) {
-      const terminal = [...recoveredEvents].reverse().find((event) => "runId" in event && event.runId === runId && ["run.completed", "run.yielded", "run.cancelled", "run.failed", "run.interrupted"].includes(event.type));
-      await session.steering.finish(runId, terminal?.type === "run.completed" || terminal?.type === "run.yielded" ? "idle" : "cancelled", terminal?.type ?? "interrupted");
-    }
-    return session;
   }
 
   submit(options: SessionSubmitOptions): Promise<RunHandle> {
     assertSessionInputOptions(options);
-    const started = this.tail.then(() => this.start(options));
-    return this.queue(started);
+    return this.enqueueRun(() => this.start(options));
   }
 
   async steer(options: SessionSteerOptions): Promise<SessionSteeringInput> {
@@ -216,7 +272,21 @@ export class Session {
   /** Continue the current context without recording a new user input. */
   continue(options: SessionContinueOptions = {}): Promise<RunHandle> {
     assertSessionInputOptions(options);
-    const started = this.tail.then(() => this.startContinuation(options));
+    return this.enqueueRun(() => this.startContinuation(options));
+  }
+
+  private enqueueRun(operation: () => RunHandle | Promise<RunHandle>): Promise<RunHandle> {
+    if (this.runtimeClosed) throw new Error("Session runtime is closed");
+    if (this.suspendedRuntime !== undefined) throw new Error("Session runtime is suspended");
+    if (this.runtimeMutation) throw new Error("Session runtime is changing");
+    this.pendingStarts += 1;
+    const started = this.tail.then(operation).then((run) => {
+      this.pendingStarts -= 1;
+      return run;
+    }, (error: unknown) => {
+      this.pendingStarts -= 1;
+      throw error;
+    });
     return this.queue(started);
   }
 
@@ -233,6 +303,116 @@ export class Session {
   async history(): Promise<readonly SessionEvent[]> {
     await this.recordTail;
     return this.historyReader.readAll(this.id);
+  }
+
+  async getRuntimeInfo(): Promise<{ readonly messages: Message[]; readonly info: SessionRuntimeInfo }> {
+    this.assertIdleRuntime();
+    this.runtimeMutation = true;
+    try { return replaySession(await this.history()); }
+    finally { this.runtimeMutation = false; }
+  }
+
+  async suspendRuntime(): Promise<void> {
+    if (this.runtimeClosed) throw new Error("Session runtime is closed");
+    if (this.suspendedRuntime !== undefined) return this.suspendedRuntime.closing;
+    this.assertIdleRuntime();
+    this.assertRecovered();
+    this.runtimeMutation = true;
+    try {
+      const descriptor = structuredClone(this.runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR);
+      validateRuntimeDescriptor(descriptor);
+      const state = this.runtime.saveState === undefined
+        ? replaySession(await this.history()).info.runtimeState
+        : await snapshotRuntimeState(this.runtime);
+      if (state !== undefined) {
+        if (descriptor.stateVersion === undefined) throw new Error("Stateful runtime requires a versioned descriptor");
+        await this.record({ type: "runtime.state.saved", runtime: descriptor, state: structuredClone(state) });
+      }
+      const closing = Promise.resolve().then(() => this.runtime.close?.());
+      this.suspendedRuntime = { descriptor, state: structuredClone(state), closing };
+      await closing;
+    } finally {
+      this.runtimeMutation = false;
+    }
+  }
+
+  async replaceRuntime(runtime: AgentRuntime): Promise<void> {
+    const previous = this.runtime;
+    let accepted = false;
+    let changing = false;
+    try {
+      this.assertIdleRuntime();
+      this.assertRecovered(true);
+      this.runtimeMutation = true;
+      changing = true;
+      const suspended = this.suspendedRuntime;
+      if (suspended !== undefined) await suspended.closing;
+      if (suspended !== undefined && runtime === previous) throw new Error("A suspended runtime requires a new replacement instance");
+      const savedDescriptor = suspended?.descriptor ?? this.runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
+      const currentDescriptor = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
+      const migrated = !runtimeDescriptorsEqual(savedDescriptor, currentDescriptor);
+      let state = suspended === undefined
+        ? this.runtime.saveState === undefined
+          ? replaySession(await this.history()).info.runtimeState
+          : await snapshotRuntimeState(this.runtime)
+        : structuredClone(suspended.state);
+      if (migrated) {
+        if (runtime.migrateState === undefined) assertRuntimeCompatible(savedDescriptor, runtime);
+        state = await runtime.migrateState!(savedDescriptor, state);
+      }
+      if (state !== undefined) {
+        if (runtime.restoreState === undefined) throw new Error("Replacement runtime cannot restore Session state");
+        await runtime.restoreState(state);
+      }
+      if (runtime.saveState !== undefined) state = await snapshotRuntimeState(runtime);
+      if (migrated) {
+        await this.record({ type: "runtime.changed", runtime: { ...currentDescriptor }, ...(state === undefined ? {} : { state: structuredClone(state) }) });
+      } else if (state !== undefined) {
+        if (currentDescriptor.stateVersion === undefined) throw new Error("Stateful runtime requires a versioned descriptor");
+        await this.record({ type: "runtime.state.saved", runtime: { ...currentDescriptor }, state: structuredClone(state) });
+      }
+      this.runtime = runtime;
+      this.suspendedRuntime = undefined;
+      accepted = true;
+      if (suspended === undefined && previous !== runtime) await previous.close?.();
+    } catch (error) {
+      if (!accepted && previous !== runtime) return closeRejectedRuntime(runtime, error);
+      throw error;
+    } finally {
+      if (changing) this.runtimeMutation = false;
+    }
+  }
+
+  async closeRuntime(): Promise<void> {
+    if (this.runtimeClosing !== undefined) return this.runtimeClosing;
+    if (this.activeRun !== undefined || this.activeRunObservations.size > 0 || this.settlingRuns > 0 || this.runtimeMutation) {
+      throw new Error("Cannot close a runtime during execution or state changes");
+    }
+    this.runtimeClosed = true;
+    this.runtimeClosing = this.suspendedRuntime?.closing
+      ?? Promise.resolve().then(() => this.runtime.close?.());
+    return this.runtimeClosing;
+  }
+
+  async saveRuntimeState(): Promise<void> {
+    this.assertIdleRuntime();
+    if (this.runtimeClosed) throw new Error("Session runtime is closed");
+    if (this.suspendedRuntime !== undefined) return this.suspendedRuntime.closing;
+    this.runtimeMutation = true;
+    try { await this.persistRuntimeState(); }
+    finally { this.runtimeMutation = false; }
+  }
+
+  private assertIdleRuntime(): void {
+    if (this.activeRun !== undefined || this.pendingStarts > 0 || this.activeRunObservations.size > 0 || this.settlingRuns > 0 || this.runtimeMutation) {
+      throw new Error("Session runtime requires an idle boundary with no queued Runs");
+    }
+  }
+
+  private async persistRuntimeState(): Promise<void> {
+    if (this.runtime.saveState === undefined) return;
+    const state = await snapshotRuntimeState(this.runtime);
+    await this.record({ type: "runtime.state.saved", runtime: { ...this.runtime.descriptor! }, state: structuredClone(state) });
   }
 
   async queryHistory(
@@ -327,6 +507,7 @@ export class Session {
       this.steering.submitted(options.inputId);
     }
 
+    this.assertRecovered();
     return this.wrapRun(this.runAfterInputCommit(runtimeOptions));
   }
 
@@ -367,13 +548,25 @@ export class Session {
   private wrapRun(run: RunHandle): RunHandle {
     this.activeRun = run;
     const completion = run.result.then(async (value) => {
-      if (this.activeRun === run) this.activeRun = undefined;
-      await this.steering.finish(run.id, "idle", value.finishReason === "yielded" ? "yielded" : "completed");
-      return value;
+      this.settlingRuns += 1;
+      try {
+        if (this.activeRun === run) this.activeRun = undefined;
+        await this.persistRuntimeState();
+        await this.steering.finish(run.id, "idle", value.finishReason === "yielded" ? "yielded" : "completed");
+        return value;
+      } finally {
+        this.settlingRuns -= 1;
+      }
     }, async (error: unknown) => {
-      if (this.activeRun === run) this.activeRun = undefined;
-      await this.steering.finish(run.id, "cancelled", error instanceof Error ? error.message : "Run failed");
-      throw error;
+      this.settlingRuns += 1;
+      try {
+        if (this.activeRun === run) this.activeRun = undefined;
+        await this.persistRuntimeState();
+        await this.steering.finish(run.id, "cancelled", error instanceof Error ? error.message : "Run failed");
+        throw error;
+      } finally {
+        this.settlingRuns -= 1;
+      }
     });
     void completion.catch(() => undefined);
     const events = new AsyncEventQueue<MayEvent>({
@@ -576,7 +769,9 @@ export class Session {
     return operation;
   }
 
-  private assertRecovered(): void {
+  private assertRecovered(allowSuspended = false): void {
+    if (this.runtimeClosed) throw new Error("Session runtime is closed");
+    if (!allowSuspended && this.suspendedRuntime !== undefined) throw new Error("Session runtime is suspended");
     if (this.persistenceFailed) throw new Error("Session persistence failed; reopen the session before continuing");
     if (this.recoveries.size > 0) throw new SessionRecoveryRequiredError(this.listRecoveries());
   }
@@ -687,9 +882,28 @@ function replaySession(events: readonly SessionEvent[]): {
   const pendingTools = new Map<string, Map<string, ToolCall>>();
   const state: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   let latestModelMeasurement: SessionModelMeasurement | undefined;
+  let runtime: RuntimeDescriptor | undefined;
+  let runtimeState: unknown;
 
   for (const event of events) {
     switch (event.type) {
+      case "session.created":
+        runtime = event.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR;
+        break;
+      case "runtime.changed":
+        validateRuntimeDescriptor(event.runtime);
+        runtime = event.runtime;
+        runtimeState = structuredClone(event.state);
+        break;
+      case "runtime.state.saved":
+        if (runtime === undefined) throw new Error("Runtime state requires Session creation metadata");
+        validateRuntimeDescriptor(event.runtime);
+        if (runtime.id !== event.runtime.id || runtime.version !== event.runtime.version || runtime.stateVersion !== event.runtime.stateVersion) throw new Error("Saved runtime state has an incompatible descriptor");
+        runtimeState = structuredClone(event.state);
+        break;
+      case "input.generated":
+        messages.push(...event.messages);
+        break;
       case "state.updated":
         state[event.key] = event.value;
         break;
@@ -791,6 +1005,8 @@ function replaySession(events: readonly SessionEvent[]): {
   return {
     messages,
     info: { ...(latestModelMeasurement === undefined ? {} : { latestModelMeasurement }),
+      ...(runtime === undefined ? {} : { runtime }),
+      ...(runtimeState === undefined ? {} : { runtimeState }),
       ...(Object.keys(state).length === 0 ? {} : { state }) },
   };
 }
@@ -854,10 +1070,12 @@ function toPermissionSessionEvent(
 
 function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
   switch (event.type) {
+    case "input.generated":
+      return { type: event.type, runId: event.runId, step: event.step, messages: [...event.messages], reason: event.reason };
     case "run.budget.exceeded":
       return { type: event.type, runId: event.runId, dimension: event.dimension, limit: event.limit, consumed: event.consumed, budget: event.budget };
     case "tool.started":
-      return { type: "tool.started", runId: event.runId, step: event.step, call: event.call };
+      return { type: "tool.started", runId: event.runId, step: event.step, call: event.call, ...(event.input === undefined ? {} : { input: event.input }) };
     case "run.started":
       return event.continuation === true
         ? { type: "run.started", runId: event.runId, continuation: true }
@@ -927,6 +1145,21 @@ function assertSessionInputOptions(options: { readonly stepInputSource?: unknown
   if (options.stepInputSource !== undefined) throw new TypeError("Session manages step input through steer(); custom stepInputSource is unsupported");
 }
 
-function createSessionId(): string {
+export function createSessionId(): string {
   return `session_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function snapshotRuntimeState(runtime: AgentRuntime): Promise<unknown> {
+  const descriptor = runtime.descriptor;
+  if (descriptor === undefined || descriptor.stateVersion === undefined) throw new Error("Stateful runtime requires a versioned descriptor");
+  validateRuntimeDescriptor(descriptor);
+  const state = await runtime.saveState!();
+  if (state === undefined) throw new Error("Stateful runtime must save an explicit state value");
+  return structuredClone(state);
+}
+
+async function closeRejectedRuntime(runtime: AgentRuntime, error: unknown): Promise<never> {
+  try { await runtime.close?.(); }
+  catch (cleanupError) { throw new AggregateError([error, cleanupError], "Runtime initialization and cleanup both failed", { cause: error }); }
+  throw error;
 }

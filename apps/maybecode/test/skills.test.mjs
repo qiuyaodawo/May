@@ -38,7 +38,10 @@ test("skills commands list, preview, activate, complete and explicitly submit wi
   assert.equal(result.type, "skill.run-started"); await result.run.result;
   assert.equal(requests, 1);
   assert.match(last.messages[0].content[0].text, /PINNED_PROCEDURE/);
-  assert.equal((await app.history()).filter((e) => e.type === "state.updated").length, 1);
+  const activations = (await app.history()).filter((event) => event.type === "state.updated" &&
+    event.key === "may.plugins" && event.value.application?.["may.skills"]?.value?.length > 0);
+  assert.equal(activations.length, 1);
+  assert.equal(activations[0].value.application["may.skills"].value[0].name, "research");
   assert.equal((await executeMaybeCodeSlashCommand("/skills show research extra", app)).type, "usage");
 });
 

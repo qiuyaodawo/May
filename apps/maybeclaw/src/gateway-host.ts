@@ -11,6 +11,9 @@ import { AgentGateway } from "./gateway.js";
 import { gatewayInput } from "./gateway-input.js";
 import { actorKey, entryKey, type GatewayActor, type GatewayCapabilities, type GatewayDelivery, type GatewayEntry, type GatewayMessage, type GatewaySession } from "./gateway-types.js";
 import { digest } from "./types.js";
+import { PluginHost, definePlugin, defineService, type AnyPlugin } from "@may/plugin";
+import { createDeliveryPlugin, deliveryServices, type DeliveryService } from "@may/plugin-delivery";
+import { gatewayPluginServices } from "./plugins/services.js";
 
 interface PendingInput { id: string; input: ChannelInput; fingerprint?: string; sessionId?: string; state: "pending" | "processing" | "done" | "failed" | "deleted"; error?: string }
 interface ChannelReply { id: string; input: ChannelInput; text: string; sessionId?: string; status: "pending" | "sending" | "sent" | "unknown"; after?: string }
@@ -19,24 +22,58 @@ interface LegacyDelivery extends Omit<DeliveryRecord, "status"> { status: Delive
 export class GatewayHost {
   readonly gateway: AgentGateway;
   private readonly controller = new AbortController();
-  private readonly channelRuns: Promise<void>[] = [];
   private readonly channelErrors = new Map<string, string>();
   private processingError: Error | undefined;
   private timer: ReturnType<typeof setInterval> | undefined;
   private cycle: Promise<void> | undefined;
   private closePromise: Promise<void> | undefined;
-  private constructor(readonly options: { gateway: AgentGateway; adapters: readonly ChannelAdapter[] }, private readonly channels: ChannelStore) { this.gateway = options.gateway; }
-  static async start(options: { gateway: AgentGateway; adapters: readonly ChannelAdapter[] }): Promise<GatewayHost> {
-    const channels = await ChannelStore.open(join(options.gateway.options.directory, "gateway-channels.jsonl"));
-    try {
-    await channels.remove(channels.values().filter(record => record.kind === "inbox").map(record => record.id));
-    for (const cursor of options.gateway.store.list<Parameters<ChannelStore["put"]>[0]>("legacy-cursors")) if (!channels.get(cursor.id)) await channels.put(cursor);
-    const host = new GatewayHost(options, channels);
-    for (const reply of options.gateway.store.list<ChannelReply>("channel-replies")) if (reply.status === "sending") options.gateway.store.put("channel-replies", reply.id, { ...reply, status: "unknown" });
-    for (const delivery of options.gateway.store.list<LegacyDelivery>("legacy-deliveries")) if (delivery.status === "sending") options.gateway.store.put("legacy-deliveries", delivery.id, { ...delivery, status: "unknown" });
-    await host.applyMemberChanges(); await options.gateway.restore(); host.start(); return host;
-    }
-    catch (error) { await channels.close(); throw error; }
+  private plugins: PluginHost | undefined;
+  private constructor(readonly options: { gateway: AgentGateway; adapters: readonly ChannelAdapter[] }, private readonly delivery: DeliveryService, private readonly channelsReady: () => void) { this.gateway = options.gateway; }
+  static async start(options: { gateway: AgentGateway; adapters?: readonly ChannelAdapter[]; plugins?: readonly AnyPlugin[]; startPaused?: boolean }): Promise<GatewayHost> {
+    let host: GatewayHost | undefined, channels: ChannelStore | undefined;
+    let started!: () => void;
+    const ready = new Promise<void>(resolve => { started = resolve; });
+    const channelPlugins = [
+      ...(options.plugins ?? []),
+      ...(options.adapters ?? []).map(adapter => {
+        const service = defineService<ChannelAdapter>({ id: `maybeclaw.channel.${adapter.account}`, version: "1.0.0", scope: "host" });
+        return definePlugin({ id: service.id, version: "1.0.0", scope: "host", requires: [{ service: deliveryServices.registry }], provides: [service],
+          setup(context) { context.defer(context.get(deliveryServices.registry).register(adapter)); context.provide(service, adapter); } });
+      }),
+    ];
+    const ingress = definePlugin({ id: "maybeclaw.channel-ingress", version: "1.0.0", scope: "host", provides: [gatewayPluginServices.ingress],
+      async setup(context) {
+        channels = await ChannelStore.open(join(options.gateway.options.directory, "gateway-channels.jsonl"));
+        context.defer(() => channels!.close());
+        await channels.remove(channels.values().filter(record => record.kind === "inbox").map(record => record.id));
+        for (const cursor of options.gateway.store.list<Parameters<ChannelStore["put"]>[0]>("legacy-cursors")) if (!channels.get(cursor.id)) await channels.put(cursor);
+        const state: ChannelState = { get: id => channels!.get(id), put: record => channels!.put(record), values: () => [
+          ...channels!.values(),
+          ...options.gateway.store.list<PendingInput>("inbox").map((record): ChannelRecord => ({ kind: "inbox", id: record.id, input: record.input, processed: record.state !== "pending" })),
+        ] };
+        context.provide(gatewayPluginServices.ingress, { store: state, ready, receive: input => {
+          if (!host) throw new Error("GatewayHost has not started");
+          return host.receive(input);
+        }, onError(account) { if (host) { host.channelErrors.set(account, "渠道接收中断，请检查连接配置。"); host.gateway.changed(); } } });
+      },
+    });
+    const runtime = definePlugin({ id: "maybeclaw.gateway-host", version: "1.0.0", scope: "host", provides: [gatewayPluginServices.host],
+      requires: [{ service: gatewayPluginServices.ingress }, { service: deliveryServices.registry }, { service: deliveryServices.delivery },
+        ...channelPlugins.flatMap(plugin => (plugin.provides ?? []).map(service => ({ service })))],
+      async setup(context) {
+        if (!channels) throw new Error("Channel storage has not started");
+        host = new GatewayHost({ gateway: options.gateway, adapters: context.get(deliveryServices.registry).list() }, context.get(deliveryServices.delivery), started);
+        context.defer(() => host!.closeRuntime());
+        for (const reply of options.gateway.store.list<ChannelReply>("channel-replies")) if (reply.status === "sending") options.gateway.store.put("channel-replies", reply.id, { ...reply, status: "unknown" });
+        for (const delivery of options.gateway.store.list<LegacyDelivery>("legacy-deliveries")) if (delivery.status === "sending") options.gateway.store.put("legacy-deliveries", delivery.id, { ...delivery, status: "unknown" });
+        await host.applyMemberChanges(); await options.gateway.restore();
+        context.provide(gatewayPluginServices.host, host);
+        if (!options.startPaused) host.startLoops();
+      },
+    });
+    const plugins = await PluginHost.create({ plugins: [ingress, createDeliveryPlugin({ ingress: gatewayPluginServices.ingress }), ...channelPlugins, runtime] });
+    host = plugins.get(gatewayPluginServices.host); host.plugins = plugins;
+    return host;
   }
   status() { const gateway = this.gateway.status(); return { ...gateway,
     state: gateway.state === "running" && (this.processingError || this.channelErrors.size) ? "degraded" : gateway.state,
@@ -45,17 +82,9 @@ export class GatewayHost {
     deliveries: this.gateway.store.list<GatewayDelivery>("deliveries").slice(-100),
     legacyDeliveries: this.gateway.store.list<LegacyDelivery>("legacy-deliveries").slice(-100),
     channelReplies: this.gateway.store.list<ChannelReply>("channel-replies").slice(-100) }; }
-  private start(): void {
-    const state: ChannelState = { get: id => this.channels.get(id), put: record => this.channels.put(record), values: () => [
-      ...this.channels.values(),
-      ...this.gateway.store.list<PendingInput>("inbox").map((record): ChannelRecord => ({ kind: "inbox", id: record.id, input: record.input, processed: record.state !== "pending" })),
-    ] };
-    for (const adapter of this.options.adapters) {
-      const run = adapter.run(input => this.receive(input), state, this.controller.signal).catch(() => {
-        if (!this.controller.signal.aborted) { this.channelErrors.set(adapter.account, "渠道接收中断，请检查连接配置。"); this.gateway.changed(); }
-      });
-      this.channelRuns.push(run);
-    }
+  startLoops(): void {
+    if (this.timer || this.controller.signal.aborted) return;
+    this.channelsReady();
     const schedule = () => { if (!this.cycle && !this.controller.signal.aborted && !this.processingError) {
       this.cycle = this.tick().catch(error => {
         this.processingError = error instanceof Error ? error : new Error("Gateway 消息处理失败。");
@@ -148,7 +177,7 @@ export class GatewayHost {
         this.queueReply(item, message); this.gateway.store.put("inbox", item.id, { ...item, state: "failed", error: message });
       }
     }
-    await this.deliver();
+    if (this.timer) await this.deliver();
   }
   private queueReply(item: PendingInput, text: string, sessionId?: string): void {
     const adapter = this.options.adapters.find(value => value.account === item.input.account);
@@ -186,17 +215,22 @@ export class GatewayHost {
         this.gateway.changed(); continue;
       }
       if (!store.get("deliveries", delivery.id) || store.get<GatewaySession>("sessions", delivery.sessionId)?.status === "deleting") continue;
-      store.put("deliveries", delivery.id, { ...delivery, status: "sending" });
       try {
-        const result = await adapter.send({ kind: "delivery", id: delivery.id, account: entry.account, sender: entry.owner ?? "gateway", conversation: entry.conversation,
-          text: delivery.text, status: "pending", conversationKind: entry.kind, ...(entry.threadId ? { threadId: entry.threadId } : {}), ...(delivery.replyTo ? { replyTo: delivery.replyTo } : {}) }, this.controller.signal, image);
+        const result = await this.delivery.attempt(adapter, { kind: "delivery", id: delivery.id, account: entry.account, sender: entry.owner ?? "gateway", conversation: entry.conversation,
+          text: delivery.text, status: "pending", conversationKind: entry.kind, ...(entry.threadId ? { threadId: entry.threadId } : {}), ...(delivery.replyTo ? { replyTo: delivery.replyTo } : {}) }, {
+          signal: this.controller.signal, ...(image ? { image } : {}), commit: (status, receipt) => {
+            if (!store.get("deliveries", delivery.id) || status === "sent" && !store.get("sessions", delivery.sessionId)) return;
+            store.put("deliveries", delivery.id, { ...delivery, status, ...(receipt?.messageId ? { platformMessageId: receipt.messageId } : {}) });
+          },
+        });
         if (!store.get("deliveries", delivery.id) || !store.get("sessions", delivery.sessionId)) continue;
-        store.put("deliveries", delivery.id, { ...delivery, status: "sent", ...(result?.messageId ? { platformMessageId: result.messageId } : {}) });
         if (result?.messageId) {
           const message = store.get<GatewayMessage>("messages", delivery.messageId), key = `${entryKey(entry)}:${result.messageId}`;
           store.put("platform-messages", key, { id: key, sessionId: delivery.sessionId, agentId: message?.agentId });
         }
-      } catch { if (store.get("deliveries", delivery.id)) store.put("deliveries", delivery.id, { ...delivery, status: "unknown" }); }
+      } catch (error) {
+        if (store.get<GatewayDelivery>("deliveries", delivery.id)?.status !== "unknown" && store.get("deliveries", delivery.id)) throw error;
+      }
       this.gateway.changed();
     }
     for (const reply of store.list<ChannelReply>("channel-replies")) {
@@ -204,15 +238,17 @@ export class GatewayHost {
       if (!store.get("channel-replies", reply.id)) continue;
       if (reply.after && store.get<ChannelReply>("channel-replies", reply.after)?.status !== "sent") continue;
       const adapter = this.options.adapters.find(item => item.account === reply.input.account); if (!adapter || !(adapter.accepts?.(reply.input) ?? adapter.allowUsers.includes(reply.input.sender))) continue;
-      store.put("channel-replies", reply.id, { ...reply, status: "sending" });
       try {
         const delivery: DeliveryRecord = { kind: "delivery", id: reply.id, account: reply.input.account, sender: reply.input.sender,
           conversation: reply.input.conversation, text: reply.text, status: "pending", ...(reply.input.kind ? { conversationKind: reply.input.kind } : {}), ...(reply.input.threadId ? { threadId: reply.input.threadId } : {}), ...(reply.input.messageId ? { replyTo: reply.input.messageId } : {}) };
-        const result = await adapter.send(delivery, this.controller.signal);
+        const result = await this.delivery.attempt(adapter, delivery, { signal: this.controller.signal, commit: status => {
+          if (store.get("channel-replies", reply.id)) store.put("channel-replies", reply.id, { ...reply, status });
+        } });
         if (!store.get("channel-replies", reply.id)) continue;
-        store.put("channel-replies", reply.id, { ...reply, status: "sent" });
         if (result?.messageId && reply.sessionId) { const key = `${entryKey(channelEntry(reply.input))}:${result.messageId}`; store.put("platform-messages", key, { id: key, sessionId: reply.sessionId }); }
-      } catch { if (store.get("channel-replies", reply.id)) store.put("channel-replies", reply.id, { ...reply, status: "unknown" }); }
+      } catch (error) {
+        if (store.get<ChannelReply>("channel-replies", reply.id)?.status !== "unknown" && store.get("channel-replies", reply.id)) throw error;
+      }
     }
   }
   retryLegacyDelivery(id: string, actor: GatewayActor, confirmUnknown = false): LegacyDelivery {
@@ -254,21 +290,24 @@ export class GatewayHost {
         this.gateway.changed(); continue;
       }
       if (!store.get("legacy-deliveries", delivery.id)) continue;
-      store.put("legacy-deliveries", delivery.id, { ...delivery, status: "sending" });
       try {
-        const result = await adapter.send({ ...delivery, status: "pending" }, this.controller.signal, image);
-        if (!store.get("legacy-deliveries", delivery.id)) continue;
-        store.put("legacy-deliveries", delivery.id, { ...delivery, status: "sent", ...(result?.messageId ? { messageId: result.messageId } : {}) });
-      } catch { if (store.get("legacy-deliveries", delivery.id)) store.put("legacy-deliveries", delivery.id, { ...delivery, status: "unknown" }); }
+        await this.delivery.attempt(adapter, { ...delivery, status: "pending" }, { signal: this.controller.signal, ...(image ? { image } : {}), commit: (status, receipt) => {
+          if (store.get("legacy-deliveries", delivery.id)) store.put("legacy-deliveries", delivery.id, { ...delivery, status, ...(receipt?.messageId ? { messageId: receipt.messageId } : {}) });
+        } });
+      } catch (error) {
+        if (store.get<LegacyDelivery>("legacy-deliveries", delivery.id)?.status !== "unknown" && store.get("legacy-deliveries", delivery.id)) throw error;
+      }
       this.gateway.changed();
     }
   }
   close(): Promise<void> {
-    return this.closePromise ??= (async () => {
+    return this.closePromise ??= this.plugins!.close();
+  }
+  private async closeRuntime(): Promise<void> {
       this.controller.abort(); if (this.timer) clearInterval(this.timer);
-      await this.cycle; await Promise.all(this.channelRuns);
-      await this.channels.close(); await this.gateway.close();
-    })();
+      const results = await Promise.allSettled([this.cycle, this.gateway.close()]);
+      const errors = results.filter((result): result is PromiseRejectedResult => result.status === "rejected").map(result => result.reason);
+      if (errors.length) throw new AggregateError(errors, "GatewayHost cleanup failed");
   }
 }
 export async function readChannelContent(adapter: ChannelAdapter, input: ChannelInput, agents: readonly GatewayCapabilities[], signal: AbortSignal): Promise<ContentPart[]> {

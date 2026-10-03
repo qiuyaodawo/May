@@ -36,6 +36,26 @@ that needs sessions, approvals, context management and orderly shutdown.
 
 ## Runtime and application
 
+### `@may/plugin`
+
+Scoped plugin hosting with typed versioned services, dependency validation,
+configuration schemas, state migration, ordered lifecycle Hooks, resource cleanup
+and serialized composition changes. `@may/application` integrates it with Agent
+definitions, runtime factories and durable Sessions. See
+[Plugins, services and lifecycle Hooks](../guides/plugins.md).
+
+### `@may/plugin-services` and reusable plugins
+
+Shared typed service tokens and ordered tool, instruction, Model and Context
+contribution registries. `@may/application` reexports these tokens through
+`applicationServices` and composes direct options through plugin factories.
+The 15 reusable `@may/plugin-*` packages live in `packages/plugins/`;
+their explicit list and factory APIs appear in the
+[plugin package catalog](../guides/plugins.md#reusable-plugin-packages).
+Product combinations live in each application's `src/plugins/` directory.
+`pnpm test:package:plugin` verifies independently installed tarballs and their
+complete runtime dependency chains. MaybeCode and MaybeClaw remain private.
+
 ### `@may/goal`
 
 Independent goal execution composed through public Agent, Model and Context interfaces.

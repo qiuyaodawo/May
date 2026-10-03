@@ -152,6 +152,10 @@ measurement changes. The run's cancellation signal is forwarded to each
 strategy. The sink is awaited so an application can durably record a changed
 view before the model request proceeds.
 
+Lifecycle control failures identified by `HookExecutionError` propagate
+immediately during automatic strategy selection. This preserves the active
+Hook's decision and its original error cause.
+
 Models may expose a provider-native `contextCompactor`. Wrapping it with
 `ModelContextCompactionStrategy` preserves adapter-owned opaque state, accepts
 a provider-supplied effective token measurement, and terminates the current

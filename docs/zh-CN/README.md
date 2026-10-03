@@ -23,6 +23,8 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 
 ## 扩展指南
 
+- [插件、服务与生命周期 Hooks](guides/plugins.md)
+- [插件系统规格](architecture/plugin-spec.md)
 - [多 Agent 任务图](guides/coordination.md)
 - [共享预算、产物与任务工作区](guides/coordination-resources.md)
 - [Attempt 与任务图修订](guides/coordination-lifecycle.md)

@@ -33,6 +33,23 @@ Terminal、Web UI 和渠道接入方式参见[图片回复](../guides/images.md)
 
 ## 运行时与应用
 
+### `@may/plugin`
+
+管理具有范围的插件，提供带类型及版本的服务、依赖验证、配置 schema、状态迁移、
+顺序生命周期 Hooks、资源清理和顺序组合变更。`@may/application` 将它与 Agent
+定义、runtime factory 和持久 Session 集成。参阅
+[插件、服务与生命周期 Hooks](../guides/plugins.md)。
+
+### `@may/plugin-services` 与可复用插件
+
+提供共享的带类型服务标识，以及有序的工具、指令、Model 和 Context 贡献登记。
+`@may/application` 通过 `applicationServices` 导出相同服务标识，并通过插件工厂
+组合直接 options。全部 15 个可复用 `@may/plugin-*` package 位于
+`packages/plugins/`，明确列表及工厂 API 参见
+[插件 package 目录](../guides/plugins.md#可复用插件-package)。
+产品组合位于各应用的 `src/plugins/` 目录。`pnpm test:package:plugin` 验证
+独立安装的 tarball 及完整运行时依赖。MaybeCode 和 MaybeClaw 继续保持 private。
+
 ### `@may/goal`
 
 目标执行组件见 [`@may/goal` 指南](../guides/goals.md)。它通过公开的 Agent、Model 和 Context 接口

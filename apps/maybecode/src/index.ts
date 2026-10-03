@@ -11,6 +11,7 @@ export * from "./keymap.js";
 export * from "./model.js";
 export * from "./model-picker.js";
 export * from "./policy.js";
+export * from "./plugins/resources.js";
 export * from "./run.js";
 export * from "./slash-commands.js";
 export * from "./skills.js";

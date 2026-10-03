@@ -1,0 +1,6 @@
+{
+  "name":"@may/plugin-permissions","version":"0.1.0","description":"Permission policy plugin factory.","type":"module","main":"./dist/index.js","types":"./dist/index.d.ts",
+  "exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},"files":["dist","!dist/.tsbuildinfo"],
+  "scripts":{"build":"tsc -b","clean":"tsc -b --clean","test":"pnpm run build && node --test test/*.test.mjs","test:coverage":"pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"},
+  "dependencies":{"@may/permissions":"workspace:*","@may/plugin":"workspace:*","@may/plugin-services":"workspace:*"},"devDependencies":{"@types/node":"^22.0.0"},"engines":{"node":">=22"},"license":"MIT"
+}

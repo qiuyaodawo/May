@@ -35,6 +35,23 @@ to the wrapped executor, `deny` raises `PermissionDeniedError`, and `ask`
 suspends execution until `resolve()` receives `allow`, `allow-session`, or
 `deny`.
 
+Final tool arguments are recursively frozen before policy evaluation and
+execution. Policies and approval handlers receive an independent frozen input
+snapshot and frozen tool-definition data. They must derive decisions and grant
+keys without modifying those values. The actual execution input preserves its
+custom class prototype; the policy snapshot uses `structuredClone()` and must
+support structured cloning.
+
+When migrating mutable arguments, use ISO strings or timestamps for `Date`,
+records or entry arrays for `Map`, arrays for `Set`, number arrays or external
+resource identifiers for buffers, and strings or plain data fields for URLs.
+`Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `ArrayBuffer`, `SharedArrayBuffer`,
+typed arrays, `DataView`, `URL`, and `URLSearchParams` are rejected before policy
+evaluation. Custom classes retain their own property structure and must protect
+private fields, accessor state, and inherited mutable state themselves. A tool
+or executor can create an independent local working copy of ordinary data with
+`structuredClone(input)`.
+
 `allow-session` is accepted only when the policy supplies an explicit
 `grantKey`. Reusing that key skips later prompts, but the policy is still
 evaluated first so a later `deny` wins. Use one executor per Session; sharing an

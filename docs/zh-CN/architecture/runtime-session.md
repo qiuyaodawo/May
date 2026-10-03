@@ -4,13 +4,18 @@
 
 May 使用四个生命周期层级：
 
-```text
-Agent definition -> Session -> Run -> Step
+```mermaid
+flowchart LR
+  Definition[Agent definition] --> Session --> Run --> Step
 ```
 
-应用编排包围这些层级，而不是增加另一层模型执行概念。`AgentApplication` 拥有一个
+应用编排管理这些层级。`AgentApplication` 拥有一个
 活动 Session；产品创建、恢复或重新配置 Session 时，`AgentWorkspace` 负责选择并
 替换活动 application。
+
+插件资源使用嵌套的 `host`、`application`、`session` 和 `run` 范围。
+所属应用创建这些范围，解析声明的服务，并触发生命周期 Hooks。
+参阅[插件与服务](../guides/plugins.md)。
 
 ## 术语
 
@@ -52,15 +57,20 @@ grant 都属于这一层。
 
 可复用代码位于 `packages`，可执行产品组合位于 `apps`。依赖规则为：
 
-```text
-apps/*
-  |-> @may/application -> context / session / permissions / core /
-  |                      session-tools
-  |-> @may/observability -> core（可选 tracing 实现）
-  |-> @may/mcp           -> core（可选远程工具 adapter）
-  |-> @may/tui         -> coding-tools / keybindings / session /
-  |                      permissions / core
-  `-> provider / tool / config packages
+```mermaid
+flowchart LR
+  Apps[apps] --> Application["@may/application"]
+  Application --> Plugin["@may/plugin"]
+  Application --> Components[context / session / permissions / session-tools]
+  Plugin --> Core["@may/core"]
+  Components --> Core
+  Apps --> Observability["@may/observability"]
+  Observability --> Core
+  Apps --> MCP["@may/mcp"]
+  MCP --> Core
+  Apps --> TUI["@may/tui"]
+  TUI --> Terminal[coding-tools / keybindings / session / permissions / core]
+  Apps --> Products[provider / tool / config packages]
 ```
 
 这是分层示意，并不要求每个 package 都依赖其右侧的所有 package。不变条件是：可复用
@@ -104,6 +114,16 @@ capability 边界；`@may/context` 将其适配进自动策略链，provider 自
 Session package 把 Core 组合成长生命周期身份。它负责 Session id、metadata、串行
 提交、Context 连续性、Session 事件和存储 seam，也提供可复用的内存及文件 Catalog。
 它可以依赖 `@may/core`，但 Core 不得依赖它。
+
+Session 通过 `AgentRuntime` 执行。默认实现为 `May`；自定义 runtime factory
+可以共同管理 Context 和其他资源。Session 保存 runtime 身份及具有版本的状态。
+替换期间，在插件服务仍然可用时保存状态并关闭旧 runtime，恢复新 runtime 后允许执行。
+
+### `@may/plugin`
+
+Plugin package 负责组合验证、带类型和版本的服务、范围初始化、配置与状态验证、
+生命周期 Hooks、串行变更以及资源清理。它依赖 Core 的 Hook 接口。
+Application 提供 runtime 和 Context 服务，并通过 Session 存储保存插件状态。
 
 ### `@may/permissions`
 

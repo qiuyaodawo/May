@@ -4,6 +4,38 @@
 conversation identity. It serializes runs and records durable session facts
 without making Core depend on persistence or UI policy.
 
+Session accepts the `AgentRuntime` interface. New creation records save its
+`RuntimeDescriptor`; `resume()` passes that descriptor through
+`SessionRuntimeInfo.runtime`. Incompatible identity, version, or state format
+requires an explicit `migrateState(savedDescriptor, state)` implementation;
+successful migration is saved as `runtime.changed`. Histories without a descriptor use the default May
+runtime identity. Compatibility is checked before interrupted-run repair records
+are committed.
+
+Stateful runtimes declare `stateVersion` and implement `saveState()` and
+`restoreState()`. Session validates and saves their initial state, then saves
+additional state after each settled Run
+using `runtime.state.saved`, and restores the latest state when reopened.
+`getRuntimeInfo()` returns reconstructed messages and metadata while idle;
+`replaceRuntime()` accepts an idle, compatible runtime and transfers any runtime
+state, or applies its explicit migration. It closes the previous owned runtime
+after replacement. `closeRuntime()` closes an idle instance and rejects later
+execution. Concurrent and repeated calls await the same resource cleanup and
+preserve its failure. `saveRuntimeState()` supports an explicit idle durability
+barrier.
+`suspendRuntime()` saves and caches the current descriptor/state, closes that
+instance once, and blocks execution. Plugin service replacement can then proceed
+without accessing the old runtime after its dependencies are released.
+`replaceRuntime()` restores the cached state, applies any explicit migration, and
+resumes execution only after accepting the new instance. Failed replacement
+retains suspension and readable history for another replacement attempt.
+Rejected replacement and failed resume initialization close the new instance.
+State inspection and replacement require no active or queued Run. Closing while
+an input write is pending releases the unused runtime; once committed, that input
+remains available for resume and does not start execution on the closed instance.
+Persistent `input.generated` records retain Hook continuation messages and their
+reason, and reconstruct those messages without repeating historical tools.
+
 `SessionStore.inspect?(id)` is optional, non-mutating access to committed history.
 Both built-in stores implement it. File inspection ignores an incomplete trailing
 record without truncation; malformed complete records still fail. Unlike `read()`,

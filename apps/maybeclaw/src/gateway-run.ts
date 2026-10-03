@@ -16,8 +16,8 @@ import { gatewaySettings } from "./gateway-settings.js";
 import { checkLegacy, migrateLegacy } from "./gateway-migration.js";
 import { GatewayUiHost, controlActor } from "./gateway-ui.js";
 import { startGatewayServer } from "./gateway-server.js";
-import { hostSettings, channelSecret } from "./settings.js";
-import { TelegramAdapter, FeishuAdapter, type ChannelAdapter } from "./channels.js";
+import { hostSettings } from "./settings.js";
+import { createGatewayChannelPlugins } from "./plugins/channels.js";
 import type { GatewayApproval, GatewayTask } from "./gateway-types.js";
 import type { MaybeClawDependencies } from "./run.js";
 
@@ -45,10 +45,7 @@ async function runGatewayService(command: Command, deps: MaybeClawDependencies, 
   async function activate(listener?: Server) {
     const config = await (deps.loadConfig ?? loadMayConfig)({ path });
     gateway = new AgentGateway({ directory: command.directory, configPath: config.path, settings: gatewaySettings(config) });
-    const channels = hostSettings(config), adapters: ChannelAdapter[] = [];
-    if (channels.telegram?.enabled) adapters.push(new TelegramAdapter(channels.telegram, channelSecret(channels.telegram.botToken, channels.telegram.botTokenEnv)));
-    if (channels.feishu?.enabled) adapters.push(new FeishuAdapter(channels.feishu, channelSecret(channels.feishu.appSecret, channels.feishu.appSecretEnv)));
-    host = await GatewayHost.start({ gateway, adapters });
+    host = await GatewayHost.start({ gateway, plugins: createGatewayChannelPlugins(hostSettings(config)) });
     server = await startGatewayServer({ gateway, ...(listener ? { server: listener } : {}), ...(command.port === undefined ? {} : { port: command.port }), status: () => host!.status(), close: () => host!.close(), retryLegacyDelivery: (id, confirmUnknown) => host!.retryLegacyDelivery(id, controlActor, confirmUnknown) });
     print({ url: server.url, ...(server.publicUrl ? { publicUrl: server.publicUrl } : {}), directory: command.directory, channels: host.status().channels });
   }

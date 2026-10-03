@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
 import { request as httpRequest } from "node:http";
 import { promisify } from "node:util";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { AgentGateway } from "../dist/gateway.js";
 import { GatewayHost } from "../dist/gateway-host.js";
@@ -25,13 +26,14 @@ async function fixture(t, publicOrigin) {
   const configPath = join(directory, "may.config.json"); await writeFile(configPath, JSON.stringify(configuration));
   const gateway = new AgentGateway({ directory, configPath, settings: gatewaySettings(configuration) });
   const host = await GatewayHost.start({ gateway, adapters: [] });
-  const server = await startGatewayServer({ gateway, port: 0, status: () => host.status(), close: () => host.close(), retryLegacyDelivery: (id, confirm) => host.retryLegacyDelivery(id, { kind: "operator", id: "test" }, confirm) });
+  let closeCalls = 0;
+  const server = await startGatewayServer({ gateway, port: 0, status: () => host.status(), close: () => { closeCalls++; return host.close(); }, retryLegacyDelivery: (id, confirm) => host.retryLegacyDelivery(id, { kind: "operator", id: "test" }, confirm) });
   const token = await login(server, password);
   t.after(async () => { await server.close(); assert.ok(resolve(directory).startsWith(resolve(base) + sep)); await rm(directory, { recursive: true, force: true }); });
   async function request(path, data, extra = {}) {
     return fetch(new URL(path, server.url), { method: data === undefined ? "GET" : "POST", headers: { authorization: `Bearer ${token}`, ...(data === undefined ? {} : { "content-type": "application/json" }), ...extra }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
   }
-  return { directory, gateway, token, password, server, request, configPath };
+  return { directory, gateway, token, password, server, request, configPath, closeCalls: () => closeCalls };
 }
 
 async function login(server, password) {
@@ -123,4 +125,64 @@ test("session request identity survives control server restart", async t => {
     assert.equal((await response.json()).session.id, first.session.id);
     assert.equal(reopened.sessions({ kind: "operator", id: "test" }).length, 1);
   } finally { await nextServer.close(); }
+});
+
+test("HTTP shutdown cancels actual RPC file work while an Agent configuration request waits", { timeout: 15_000 }, async t => {
+  const { directory, gateway, request, server, configPath, closeCalls } = await fixture(t);
+  gateway.options.settings.shutdownMs = 0;
+  const actor = { kind: "operator", id: "test" };
+  const example = fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url));
+  const agent = { id: "files", adapter: "module", module: "@may/plugin-agent-adapters/rpc",
+    options: { transport: "stdio", command: process.execPath, args: [example, "--directory", join(directory, "state"), "--workspace", directory] } };
+  await gateway.updateAgent(agent.id, actor, agent);
+  const session = gateway.createSession(actor, "file wait", [agent.id]);
+  await gateway.handle(JSON.stringify({ operation: "waitForFile", path: "arriving.txt" }), actor, { requestId: "waiting", sessionId: session.id });
+  const until = async probe => {
+    const deadline = Date.now() + 10_000;
+    while (!await probe()) { assert.ok(Date.now() < deadline, "Gateway state did not become ready"); await delay(10); }
+  };
+  let update;
+  try {
+    await until(async () => {
+      const task = gateway.store.list("tasks")[0], binding = gateway.store.list("bindings")[0];
+      return task && binding?.conversationId && (await (await gateway.adapter(agent.id)).inspect(binding.conversationId, task.inputId)).status === "running";
+    });
+    const task = gateway.store.list("tasks")[0], binding = gateway.store.list("bindings")[0];
+    const { pid } = JSON.parse(await (await gateway.adapter(agent.id)).command(binding.conversationId, "process", []));
+    update = request("/api/v2/agents", { id: agent.id, config: { ...agent, name: "updated" } }).then(response => response.text(), () => undefined);
+    await until(() => gateway.status().agents.find(value => value.id === agent.id).status === "reconfiguring");
+    const closing = server.close();
+    assert.equal(server.close(), closing);
+    await Promise.race([closing, delay(5000).then(() => { throw new Error("HTTP shutdown did not cancel the file wait"); })]);
+    await update; assert.equal(closeCalls(), 1);
+    assert.throws(() => process.kill(pid, 0), error => error.code === "ESRCH");
+    const saved = JSON.parse(await readFile(join(directory, "state", `${binding.conversationId}-${createHash("sha256").update(task.inputId).digest("hex")}.json`), "utf8"));
+    assert.equal(saved.status, "cancelled");
+    const configuration = JSON.parse(await readFile(configPath, "utf8"));
+    assert.equal(configuration.apps.maybeclaw.agents.find(value => value.id === agent.id).name, undefined);
+  } finally {
+    await writeFile(join(directory, "arriving.txt"), "release file wait during test cleanup");
+    await server.close(); await update;
+  }
+});
+
+test("HTTP close shares an actual cleanup failure after releasing Gateway and listener resources", async t => {
+  const { directory, configPath, gateway, server } = await fixture(t);
+  const settings = gateway.options.settings; await server.close();
+  const reopened = new AgentGateway({ directory, configPath, settings });
+  let closes = 0;
+  const next = await startGatewayServer({ gateway: reopened, port: 0, close: async () => {
+    closes++; await reopened.close(); await readFile(join(directory, "missing-cleanup-resource"));
+  } });
+  const first = next.close(), second = next.close();
+  assert.equal(first, second);
+  const failures = await Promise.allSettled([first, second]);
+  assert.equal(failures[0].status, "rejected"); assert.equal(failures[1].status, "rejected");
+  assert.equal(failures[0].reason, failures[1].reason); assert.equal(closes, 1);
+  const containsMissingFile = error => error?.code === "ENOENT" || containsMissingFileInChildren(error);
+  const containsMissingFileInChildren = error => Boolean(error?.cause && containsMissingFile(error.cause))
+    || Boolean(error?.errors?.some(containsMissingFile));
+  assert.ok(containsMissingFile(failures[0].reason));
+  await assert.rejects(fetch(next.url));
+  const final = new AgentGateway({ directory, configPath, settings }); await final.close();
 });

@@ -1,0 +1,6 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": { "composite": true, "rootDir": "src", "outDir": "dist", "tsBuildInfoFile": "dist/.tsbuildinfo", "types": ["node"] },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../../application" }, { "path": "../../core" }, { "path": "../../observability" }, { "path": "../../plugin" }, { "path": "../../plugin-services" }]
+}

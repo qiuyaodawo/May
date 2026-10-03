@@ -6,7 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { AgentGateway } from "../dist/gateway.js";
 import { GatewayHost } from "../dist/gateway-host.js";
-import { ChannelStore, inboxId } from "../dist/channel-store.js";
+import { inboxId } from "../dist/channel-store.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 
 const base = fileURLToPath(new URL("../../../.zcode/tmp/gateway-membership/", import.meta.url));
@@ -27,8 +27,7 @@ async function setup(t, noCancel) {
   const settings = gatewaySettings({ apps: { maybeclaw: { version: 2, server: { shutdownMs: 500 }, agents: [{ id: "files", adapter: "module", module,
     options: { transport: "stdio", command: process.execPath, args: [example, "--directory", join(directory, "rpc"), "--workspace", directory, ...(noCancel ? ["--no-cancel"] : [])] } }] } } });
   const gateway = new AgentGateway({ directory: join(directory, "gateway"), configPath: join(directory, "config.json"), settings });
-  const channels = await ChannelStore.open(join(directory, "gateway", "gateway-channels.jsonl"));
-  const host = new GatewayHost({ gateway, adapters: [] }, channels);
+  const host = await GatewayHost.start({ gateway, adapters: [], startPaused: true });
   t.after(async () => {
     await writeFile(join(directory, "ready.txt"), "operation may finish");
     await host.close();

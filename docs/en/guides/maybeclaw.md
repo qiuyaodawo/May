@@ -5,6 +5,15 @@
 MaybeClaw connects Agents to durable sessions, Web, CLI, Telegram, and Feishu.
 It manages routing, access, approvals, execution, and message delivery.
 
+Reusable channel, delivery, Agent adapter, coordination and HTTP functionality
+is provided by `packages/plugins/`. Product plugin composition lives in
+`apps/maybeclaw/src/plugins/`; AgentGateway and GatewayHost manage the complete
+application lifecycle. Configured plugins may replace default Model and
+PermissionPolicy providers. Idle adapters are released through their registry
+and recreated from current configuration when needed. Shutdown starts cancelling
+Gateway work before waiting for HTTP requests and releasing resources. See the
+[plugin guide](plugins.md#reusable-plugin-packages).
+
 ## Sessions and configuration
 
 `pnpm maybeclaw --help` and `pnpm maybeclaw -h` print help and exit successfully.

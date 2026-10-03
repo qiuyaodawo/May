@@ -10,9 +10,15 @@ See [Execution environments](docs/en/reference/environment.md) or
 
 ## Workspace
 
+Reusable plugins live in `packages/plugins/`, shared service tokens and contribution
+registries in `packages/plugin-services/`, and product composition in each
+application's `src/plugins/`. See the [plugin package catalog](docs/en/guides/plugins.md#reusable-plugin-packages)
+or [插件 package 目录](docs/zh-CN/guides/plugins.md#可复用插件-package).
+
 ```text
 packages/
   core/       Agent loop, ToolRegistry, contracts, events, and in-memory Context
+  plugin/     Scoped services, lifecycle Hooks, plugin state and resource ownership
   skills/     Agent Skills discovery, bounded resources, and durable activation
   mcp/        Stdio / Streamable HTTP MCP clients and remote-tool adapters
   observability/  Optional fail-open tracing processors and exporters

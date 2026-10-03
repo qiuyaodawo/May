@@ -13,6 +13,12 @@
     { "path": "../core" },
     { "path": "../context" },
     { "path": "../permissions" },
+    { "path": "../plugin" },
+    { "path": "../plugin-services" },
+    { "path": "../plugins/models" },
+    { "path": "../plugins/runtime" },
+    { "path": "../plugins/permissions" },
+    { "path": "../plugins/skills" },
     { "path": "../session" },
     { "path": "../tools/session-tools" }
   ]

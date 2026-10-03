@@ -1,5 +1,10 @@
 # May 配置参考
 
+MaybeCode 接受 `apps.maybecode.plugins`，MaybeClaw 的 May Agent 接受
+`apps.maybeclaw.agents[].plugins`。每项包含本地模块或已安装 package 名称，以及
+可选导出名称、配置和启用标记。模块按照配置文件位置解析。参阅
+[插件指南](../guides/plugins.md)。
+
 ## MaybeCode 权限模式
 
 `apps.maybecode.permissionMode` 接受 `"default"`（默认值）或 `"yolo"`。

@@ -91,11 +91,13 @@ function snapshotDefinitionOptions(
     runBudget,
     autoCompactionStrategies,
     sessionHistory,
+    plugins,
     ...rest
   } = options;
 
   return Object.freeze({
     ...rest,
+    ...(plugins === undefined ? {} : { plugins: Object.freeze([...plugins]) }),
     ...(runBudget === undefined ? {} : { runBudget: resolveRunBudget(runBudget) }),
     ...(tools === undefined
       ? {}

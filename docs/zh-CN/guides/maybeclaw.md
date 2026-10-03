@@ -5,6 +5,13 @@
 MaybeClaw 将 Agent 连接到持久会话、Web、CLI、Telegram 和飞书，管理路由、访问权限、
 审批、执行与消息投递。
 
+可复用渠道、投递、Agent adapter、coordination 和 HTTP 功能由
+`packages/plugins/` 提供。产品插件组合位于 `apps/maybeclaw/src/plugins/`，
+AgentGateway 和 GatewayHost 管理完整应用生命周期。配置插件可以替换默认
+Model 和 PermissionPolicy 提供方。空闲 adapter 通过 registry 释放，下次使用
+时根据当前配置重新创建。关闭时开始取消 Gateway 工作，随后等待 HTTP 请求并
+释放资源。参见[插件指南](plugins.md#可复用插件-package)。
+
 ## 会话与配置
 
 `pnpm maybeclaw --help` 和 `pnpm maybeclaw -h` 输出帮助内容并成功退出。

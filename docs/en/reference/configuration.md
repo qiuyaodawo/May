@@ -1,5 +1,10 @@
 # May configuration reference
 
+MaybeCode accepts `apps.maybecode.plugins`; MaybeClaw May Agents accept
+`apps.maybeclaw.agents[].plugins`. Each entry contains a local module or installed
+package specifier, optional export name, configuration and enabled flag. Resolution
+uses the configuration file's directory. See [Plugins](../guides/plugins.md).
+
 ## MaybeCode permission mode
 
 `apps.maybecode.permissionMode` accepts `"default"` (the default) or `"yolo"`.
