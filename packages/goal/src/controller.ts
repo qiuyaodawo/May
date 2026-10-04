@@ -3,7 +3,7 @@ import { setImmediate as nextTurn } from "node:timers/promises";
 import type { ContextFactory } from "@may/context";
 import type { Model, ModelRequest, Tool, Usage } from "@may/core";
 import { goalBudget, goalText, restoreGoal } from "./state.js";
-import type { GoalAgent, GoalBudget, GoalEvent, GoalOptions, GoalRun, GoalState, GoalStore } from "./types.js";
+import type { GoalAgent, GoalBudget, GoalEvent, GoalModelOptions, GoalOptions, GoalRun, GoalState, GoalStore } from "./types.js";
 
 class GoalLimitError extends Error {}
 
@@ -78,7 +78,6 @@ export class GoalController {
     if (!this.controller) return false;
     this.requestedStop ??= "paused";
     this.controller.abort(reason);
-    this.currentRun?.cancel(reason);
     return true;
   }
 
@@ -94,7 +93,6 @@ export class GoalController {
     if (this.controller) {
       this.requestedStop = "cancelled";
       this.controller.abort("Goal cancelled by user");
-      this.currentRun?.cancel("Goal cancelled by user");
       await this.execution;
     } else if (!["completed", "cancelled"].includes(this.requireGoal().status)) await this.change(current => ({ ...current, status: "cancelled", reason: "Goal cancelled by user" }));
     return this.getGoal()!;
@@ -181,7 +179,7 @@ export class GoalController {
     return this.getGoal()!;
   }
 
-  wrapModel(model: Model): Model {
+  wrapModel(model: Model, wrapperOptions: GoalModelOptions = {}): Model {
     const goal = this;
     return {
       ...(model.limits === undefined ? {} : { limits: model.limits }),
@@ -200,7 +198,7 @@ export class GoalController {
         if (!goal.isRunning) { yield* model.stream(request, options); return; }
         const signal = AbortSignal.any([options.signal, goal.controller!.signal]);
         signal.throwIfAborted();
-        const currentRequest = options.runId === undefined ? request : goal.currentRequest(request);
+        const currentRequest = options.runId === undefined || wrapperOptions.includeInstructions === false ? request : goal.currentRequest(request);
         const id = randomUUID();
         await goal.change(state => {
           goal.checkLimits(state, false);
@@ -244,7 +242,11 @@ export class GoalController {
   }
 
   private begin(): void {
-    this.controller = new AbortController();
+    const controller = this.controller = new AbortController();
+    controller.signal.addEventListener("abort", () => {
+      const reason = controller.signal.reason;
+      this.currentRun?.cancel(reason instanceof Error ? reason.message : String(reason));
+    }, { once: true });
     this.requestedStop = undefined;
     this.lastTick = Date.now();
   }
@@ -286,35 +288,51 @@ export class GoalController {
           : await this.agent!.continue(options);
         first = false;
         this.currentRun = run;
-        // 取得 handle 后即观察拒绝，状态写入期间也不会产生未处理的 Promise。
         void run.result.catch(() => undefined);
-        try {
-          await this.change(state => ({ ...state, runIds: [...state.runIds, run.id] }));
-        } catch (error) { run.cancel("Goal state could not be saved"); await run.result.catch(() => undefined); throw error; }
-        await run.result;
-        this.currentRun = undefined;
-        signal.throwIfAborted();
-        const report = this.state!.report;
-        if (report) {
-          if (report.status === "blocked") {
-            await this.change(state => ({ ...state, status: "blocked", reason: report.evidence }));
-          } else {
-            const verified = await this.options.verify?.(this.getGoal()!, signal);
-            signal.throwIfAborted();
-            if (verified && !verified.completed) {
-              const evidence = goalText(verified.evidence, "verification evidence");
-              await this.change(state => {
-                const { report: _report, ...rest } = state;
-                return { ...rest, progress: evidence };
-              });
-              await nextTurn();
-              continue;
-            }
-            const evidence = goalText(verified?.evidence ?? report.evidence, "completion evidence");
-            await this.change(state => ({ ...state, status: "completed", completion: { source: verified ? "verifier" : "model", evidence } }));
-          }
-          return;
+        if (signal.aborted) {
+          const reason = signal.reason;
+          run.cancel(reason instanceof Error ? reason.message : String(reason));
         }
+        let finalization: Promise<void> | undefined;
+        const finalize = (outcome: import("./types.js").GoalRunOutcome) =>
+          finalization ??= Promise.resolve().then(() => run.finalize?.(outcome));
+        try {
+          try { await this.change(state => ({ ...state, runIds: [...state.runIds, run.id] })); }
+          catch (error) { run.cancel("Goal state could not be saved"); await run.result.catch(() => undefined); throw error; }
+          await run.result;
+          signal.throwIfAborted();
+          const report = this.state!.report;
+          if (report) {
+            if (report.status === "blocked") {
+              await this.change(state => ({ ...state, status: "blocked", reason: report.evidence }));
+              await finalize("failed");
+            } else {
+              const verified = await this.options.verify?.(this.getGoal()!, signal);
+              signal.throwIfAborted();
+              if (verified && !verified.completed) {
+                const evidence = goalText(verified.evidence, "verification evidence");
+                await this.change(state => {
+                  const { report: _report, ...rest } = state;
+                  return { ...rest, progress: evidence };
+                });
+                await finalize("continued");
+                await nextTurn();
+                continue;
+              }
+              const evidence = goalText(verified?.evidence ?? report.evidence, "completion evidence");
+              await this.change(state => ({ ...state, status: "completed", completion: { source: verified ? "verifier" : "model", evidence } }));
+              await finalize("completed");
+            }
+            return;
+          }
+          await finalize("continued");
+        } catch (error) {
+          try { await finalize(signal.aborted ? "cancelled" : "failed"); }
+          catch (finalizationError) {
+            if (finalizationError !== error) throw new AggregateError([error, finalizationError], "Goal execution and host finalization failed", { cause: error });
+          }
+          throw error;
+        } finally { this.currentRun = undefined; }
         await nextTurn();
       }
     } catch (caught) {

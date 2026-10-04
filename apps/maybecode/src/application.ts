@@ -1,4 +1,6 @@
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
+import type { ProjectGitWorkspace } from "@may/application/git-workspace";
+import { requestMainRunIds, startGitGoalRequest, startGitRequest } from "./git-request.js";
 import { mediaHistory } from "./media-history.js";
 import type { SkillRegistry } from "@may/skills";
 
@@ -11,6 +13,7 @@ import type {
   AgentApplication,
   AgentApplicationEvent,
   AgentRun,
+  AgentApplicationFork,
 } from "@may/application";
 import {
   createToolChangePreview,
@@ -101,13 +104,18 @@ export interface MaybeCodeSubagentOptions {
 }
 
 export interface MaybeCodeApplicationOptions {
+  readonly gitWorkspace?: ProjectGitWorkspace;
+  readonly onGitCheckpoint?: (checkpoint: import("@may/application/git-workspace").GitCheckpoint) => void;
   readonly plugins?: readonly AnyPlugin[];
   readonly workspace: string;
   readonly model?: Model;
   readonly modelInfo?: MaybeCodeModelInfo;
+  readonly modelRuntimeOptions?: Readonly<Record<string, unknown>>;
   readonly store: SessionStore;
   readonly sessionId?: string;
   readonly resume?: boolean;
+  readonly fork?: AgentApplicationFork;
+  readonly sessionMetadata?: Readonly<Record<string, unknown>>;
   readonly tools?: Iterable<Tool>;
   /** Tools appended to either the default coding tools or an explicit tool set. */
   readonly additionalTools?: Iterable<Tool>;
@@ -169,6 +177,7 @@ export class MaybeCodeApplication {
   private inputTail: Promise<void> = Promise.resolve();
   private inputOperations = 0;
   private currentRun: MaybeCodeRun | undefined;
+  private gitWorkspace: ProjectGitWorkspace | undefined;
   private compaction: Promise<ContextCompactionResult> | undefined;
   private inputEpoch = 0;
   private steeringCancellation: Promise<void> = Promise.resolve();
@@ -222,6 +231,11 @@ export class MaybeCodeApplication {
     const shellInfo = [...(options.tools === undefined ? createCodingTools({ cwd: workspace }).values() : configuredTools.values())]
       .map((tool) => getShellToolInfo(tool))
       .find((info) => info !== undefined);
+    const created = options.resume && options.sessionId && options.store.inspect ? (await options.store.inspect(options.sessionId))[0] : undefined;
+    const sessionMetadata = options.sessionMetadata ?? (created?.type === "session.created" ? created.metadata : undefined);
+    const fork = sessionMetadata?.workspaceFork as { currentFiles?: boolean; sourceWorkspace?: string; sourceCommit?: string } | undefined;
+    const runtimeInstructions = [shellInfo ? shellRuntimeInstructions(shellInfo) : "",
+      fork?.currentFiles ? `This Session begins from a historical reply. The current workspace retains its current files and Git branch. Files may have changed after the historical reply${fork.sourceCommit ? ` (${fork.sourceCommit})` : ""}. Read current files before editing them.` : ""].filter(Boolean).join("\n\n");
     const instructions = await loadMaybeCodeInstructions({
       workspace,
       ...(options.instructions === undefined
@@ -230,9 +244,9 @@ export class MaybeCodeApplication {
       ...(options.instructionsDirectory === undefined
         ? {}
         : { instructionsDirectory: options.instructionsDirectory }),
-      ...(shellInfo === undefined
+      ...(runtimeInstructions === ""
         ? {}
-        : { runtimeInstructions: shellRuntimeInstructions(shellInfo) }),
+        : { runtimeInstructions }),
     });
 
     const contextBudget = withDefaultCompactionThreshold(
@@ -242,13 +256,21 @@ export class MaybeCodeApplication {
       service.id === applicationServices.model.id && service.scope === applicationServices.model.scope))
       ? undefined : options.modelInfo;
 
-    const composition = createMaybeCodePlugins(options, {
+    let product: MaybeCodeApplication | undefined;
+    const composition = createMaybeCodePlugins({ ...options, onGitCheckpoint: checkpoint => {
+      options.onGitCheckpoint?.(checkpoint);
+      if (!product) throw new Error("Git checkpoint completed before the MaybeCode application was ready");
+      product.eventQueue.push({ type: "workspace.git.changed", checkpoint });
+    } }, {
       workspace,
       instructions: instructions.effective,
       ...(contextBudget === undefined ? {} : { contextBudget }),
     });
     const definition = defineAgent({
       plugins: composition.plugins,
+      forkStateKeys: ["maybecode.context-notes", "maybecode.model"],
+      forkPluginIds: ["may.history-memory"],
+      forkStateTransform: (key, value) => migrateForkSkillState(key, value, fork?.sourceWorkspace, workspace),
       tools: configuredTools,
       toolScope: { workspaceId: resolve(options.workspace) },
       instructions: instructions.effective,
@@ -291,15 +313,16 @@ export class MaybeCodeApplication {
     });
     const application = await definition.open({
       store: options.store,
-      metadata: { workspace },
+      metadata: { ...options.sessionMetadata, workspace },
       contextMetadata: { workspace },
       ...(options.sessionId === undefined
         ? {}
         : { sessionId: options.sessionId }),
       ...(options.resume === undefined ? {} : { resume: options.resume }),
+      ...(options.fork === undefined ? {} : { fork: options.fork }),
     });
     const history = application.getService(historyMemoryService);
-    return new MaybeCodeApplication(
+    product = new MaybeCodeApplication(
       workspace,
       application,
       instructions,
@@ -313,10 +336,22 @@ export class MaybeCodeApplication {
       composition.hasDelegation ? application.getService(delegationService).get() : undefined,
       composition.mcp,
     );
+    product.gitWorkspace = options.gitWorkspace;
+    if (composition.modelInfo !== undefined) {
+      try { await application.recordState("maybecode.model", {
+        provider: composition.modelInfo.provider, model: composition.modelInfo.model,
+        ...(composition.modelInfo.adapter === undefined ? {} : { adapter: composition.modelInfo.adapter }),
+        ...(composition.modelInfo.profile === undefined ? {} : { profile: composition.modelInfo.profile }),
+        runtimeOptions: typeof options.modelRuntimeOptions?.reasoningEffort === "string"
+          ? { reasoningEffort: options.modelRuntimeOptions.reasoningEffort } : {},
+      }); }
+      catch (error) { await product.close(); throw error; }
+    }
+    return product;
   }
 
   get isRunning(): boolean {
-    return this.inputOperations > 0 || this.application.isRunning ||
+    return this.inputOperations > 0 || this.currentRun !== undefined || this.application.isRunning ||
       this.goals?.isRunning === true || this.subagents?.isRunning === true;
   }
 
@@ -450,6 +485,18 @@ export class MaybeCodeApplication {
     options?: SessionSubmitOptions,
     inputId?: string,
   ): Promise<MaybeCodeRun> {
+    return startGitRequest(this.gitWorkspace, this.sessionId,
+      () => this.startRequestRun(plan, options, inputId),
+      checkpoint => this.eventQueue.push({ type: "workspace.git.changed", checkpoint }),
+      async runId => (await this.application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
+      async firstRunId => requestMainRunIds(await this.application.history(), firstRunId));
+  }
+
+  private async startRequestRun(
+    plan: SubagentRequestPlan & { readonly mode: "submit" | "continue" | "steer" },
+    options?: SessionSubmitOptions,
+    inputId?: string,
+  ): Promise<MaybeCodeRun> {
     if (this.subagents !== undefined) {
       return this.subagents.start({
         input: plan.input,
@@ -494,7 +541,7 @@ export class MaybeCodeApplication {
       get isRunning(): boolean {
         return owner.application.isRunning || owner.subagents?.isRunning === true;
       },
-      submit: (options) => owner.startRequest({
+      submit: (options) => startGitGoalRequest(owner.gitWorkspace, owner.sessionId, () => owner.startRequestRun({
         mode: "submit",
         input: options.input,
         record: requestRecord(options.input),
@@ -502,14 +549,22 @@ export class MaybeCodeApplication {
         ...(options.shouldYield === undefined ? {} : { shouldYield: options.shouldYield }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       }, { ...options, input: options.input }),
-      continue: (options) => owner.startRequest({
+        checkpoint => owner.eventQueue.push({ type: "workspace.git.changed", checkpoint }),
+        runId => owner.application.saveBranchPosition(runId, { allowYielded: true }),
+        async runId => (await owner.application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
+        async firstRunId => requestMainRunIds(await owner.application.history(), firstRunId)),
+      continue: (options) => startGitGoalRequest(owner.gitWorkspace, owner.sessionId, () => owner.subagents ? owner.startRequestRun({
         mode: "continue",
         input: "",
         record: "Continue the active goal",
         ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
         ...(options.shouldYield === undefined ? {} : { shouldYield: options.shouldYield }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
-      }),
+      }) : owner.application.continue(options),
+        checkpoint => owner.eventQueue.push({ type: "workspace.git.changed", checkpoint }),
+        runId => owner.application.saveBranchPosition(runId, { allowYielded: true }),
+        async runId => (await owner.application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
+        async firstRunId => requestMainRunIds(await owner.application.history(), firstRunId)),
     };
   }
 
@@ -584,6 +639,10 @@ export class MaybeCodeApplication {
 
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage> {
     return this.application.queryHistory(query);
+  }
+
+  branchPositions() {
+    return this.application.branchPositions();
   }
 
   inspectContext(): Promise<ContextInspection | undefined> {
@@ -694,4 +753,23 @@ function assertWorkspace(
 function normalizePath(path: string): string {
   const normalized = resolve(path);
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+
+function migrateForkSkillState(key: string, value: unknown, sourceWorkspace: string | undefined, workspace: string): unknown {
+  if (sourceWorkspace === undefined || normalizePath(sourceWorkspace) === normalizePath(workspace)) return value;
+  const migrate = (documents: unknown): unknown => {
+    if (!Array.isArray(documents)) return documents;
+    return documents.map((document) => {
+      if (typeof document !== "object" || document === null || typeof document.directory !== "string") return document;
+      const path = relative(sourceWorkspace, document.directory);
+      if (isAbsolute(path) || path === ".." || path.startsWith(`..${sep}`)) return document;
+      return { ...document, directory: resolve(workspace, path) };
+    });
+  };
+  if (key === "may.skills.active.v1") return migrate(value);
+  if (key !== "may.plugins" || typeof value !== "object" || value === null) return value;
+  const state = value as { application: Readonly<Record<string, { value: unknown }>>; session: Readonly<Record<string, { value: unknown }>> };
+  const migrateScope = (scope: typeof state.application) => Object.fromEntries(Object.entries(scope).map(([id, record]) =>
+    [id, { ...record, value: migrate(record.value) }]));
+  return { ...state, application: migrateScope(state.application), session: migrateScope(state.session) };
 }

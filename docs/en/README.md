@@ -22,6 +22,7 @@ interfaces are intended for extension.
 - [Context and durable history](concepts/context-and-history.md)
 - [Events](concepts/events.md)
 - [Runtime and Session architecture](architecture/runtime-session.md)
+- [Session branching and Git checkpoint specification](architecture/session-fork-checkpoint-spec.md)
 
 ## Extension guides
 
@@ -48,6 +49,7 @@ interfaces are intended for extension.
 - [Custom tool](guides/custom-tool.md)
 - [Custom Context](guides/custom-context.md)
 - [Custom Session storage](guides/custom-storage.md)
+- [Git workspaces and checkpoints](guides/git-workspaces.md)
 - [Custom UI](guides/custom-ui.md)
 - [Shared Web UI](guides/web-ui.md)
 - [Permission policy](guides/permission-policy.md)

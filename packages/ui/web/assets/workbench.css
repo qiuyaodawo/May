@@ -972,6 +972,26 @@ textarea:focus-visible, .composer textarea:focus-visible { outline:2px solid var
 .gateway-status-pill { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:2px 8px; border-radius:6px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
 
 /* 响应式尺寸与横向防溢出规则（320px、390px、768px、1440px） */
+.workspace-git-status { font:12px ui-monospace,SFMono-Regular,Consolas,monospace; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); }
+.workspace-git-status[data-status="error"] { color:#b53e49; }
+.workspace-version-actions, .reply-version-actions, .diff-scopes, .diff-navigation { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.reply-version-actions { margin-top:12px; }
+.checkpoint-version { font:12px ui-monospace,SFMono-Regular,Consolas,monospace; color:var(--muted); overflow-wrap:anywhere; }
+.workspace-dialog { width:min(900px,calc(100vw - 24px)); max-height:90vh; overflow:auto; box-sizing:border-box; padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--bg); color:var(--ink); }
+.workspace-dialog::backdrop { background:rgba(0,0,0,.4); }
+.fork-preview { white-space:pre-wrap; overflow-wrap:anywhere; max-height:20vh; overflow:auto; }
+.diff-files { display:flex; flex-direction:column; max-height:24vh; overflow:auto; margin:12px 0; }
+.diff-files button { text-align:left; overflow-wrap:anywhere; }
+.diff-files [aria-pressed="true"] { color:var(--accent); background:var(--surface); }
+.workspace-patch { max-height:50vh; overflow:auto; font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace; }
+.workspace-patch>span { display:block; min-height:1.6em; white-space:pre; }
+.diff-added { color:#2d774a; background:#e8f7ee; }
+.diff-removed { color:#b53e49; background:#fdeef0; }
+.diff-hunk { color:var(--accent); }
+.diff-match, .diff-current-hunk { outline:2px solid var(--accent); outline-offset:-2px; }
+.worktree-entry { border:1px solid var(--line); border-radius:8px; padding:12px; margin:12px 0; overflow-wrap:anywhere; }
+@media(prefers-color-scheme:dark) { .diff-added { color:#8acda6; background:#183626; } .diff-removed { color:#eba1ab; background:#3d1a1e; } }
+@media(max-width:760px) { .topbar { flex-wrap:wrap; } .workspace-version-actions { width:100%; } .workspace-git-status { max-width:120px; } .workspace-dialog { padding:12px; } }
 .tool-content, .diff-content, .field-content, .command-json { max-width:100%; overflow-x:auto; }
 .mobile-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:20; pointer-events:auto; }
 @media(max-width:760px) {

@@ -6,6 +6,7 @@ import type { MaybeCodeEvent, MaybeCodeRun, MaybeCodeSessionEvent } from "./even
 import type { MaybeCodeInstructions } from "./instructions.js";
 import type { SkillDescriptor, SkillDiagnostic, SkillDocument } from "@may/skills";
 import type { MaybeCodePermissionMode } from "./policy.js";
+import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@may/ui-client";
 
 export interface MaybeCodeSkillInfo extends SkillDescriptor { readonly active: boolean }
 
@@ -72,14 +73,24 @@ type MaybeCodeProductEvent = Extract<
   | { type: "mcp.server.disconnected" }
 >;
 
-export interface MaybeCodeController extends AgentWorkspaceController<
+export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   MaybeCodeSessionEvent,
   MaybeCodeProductEvent,
   MaybeCodeCompactionSelection,
   MaybeCodeRun
-> {
+>, "forkSession"> {
   steer?(options: import("@may/session").SessionSteerOptions): Promise<import("@may/session").SessionSteeringInput>;
   listSteeringInputs?(): readonly import("@may/session").SessionSteeringInput[];
+  getForkPoints?(sessionId?: string): Promise<readonly UiForkPoint[]>;
+  forkSession?(pointId: string, mode: "current" | "worktree"): Promise<string>;
+  getWorkspaceGit?(): Promise<UiWorkspaceGit>;
+  getCheckpoints?(sessionId?: string): Promise<readonly UiCheckpoint[]>;
+  getWorktrees?(): Promise<readonly UiWorktree[]>;
+  openWorktree?(id: string): Promise<void>;
+  deleteWorktree?(id: string): Promise<void>;
+  previewRestore?(runId: string, paths: readonly string[]): Promise<{ previewId: string; diff: UiWorkspaceDiff }>;
+  restoreFiles?(previewId: string): Promise<void>;
+  getChanges?(query: { readonly scope: "run" | "session" | "workspace"; readonly runId?: string; readonly commit?: string }): Promise<UiWorkspaceDiff>;
   readonly permissionMode: MaybeCodePermissionMode;
   setPermissionMode(mode: MaybeCodePermissionMode): Promise<void>;
   readonly instructions: MaybeCodeInstructions;

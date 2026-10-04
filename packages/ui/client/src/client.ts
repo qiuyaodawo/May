@@ -1,4 +1,4 @@
-import { UiError, type UiCommand, type UiReceipt, type UiSnapshot, type UiPage, type UiResource, type UiBlock, type UiField, type UiFieldPage, type UiCommandOutput, type UiCompletion } from "./protocol.js";
+import { UiError, type UiCommand, type UiReceipt, type UiSnapshot, type UiPage, type UiResource, type UiBlock, type UiField, type UiFieldPage, type UiCommandOutput, type UiCompletion, type UiWorkspaceDiff } from "./protocol.js";
 
 export interface UiClientState {
   readonly snapshot: UiSnapshot | null;
@@ -7,6 +7,7 @@ export interface UiClientState {
   readonly selecting: boolean;
   readonly error: string | null;
   readonly output?: UiCommandOutput | null;
+  readonly diff?: UiWorkspaceDiff | null;
 }
 
 /** Browser-safe client. Credentials are memory-only; commands are never auto-retried. */
@@ -39,7 +40,7 @@ export class UiClient {
   disconnect(): void {
     this.generation++; this.lifetime?.abort(); this.lifetime = undefined; this.token = "";
     this.selectedId = undefined; this.selectionVersion++;
-    this.update({ snapshot: null, connection: "disconnected", busy: false, selecting: false, error: null, output: null });
+    this.update({ snapshot: null, connection: "disconnected", busy: false, selecting: false, error: null, output: null, diff: null });
   }
   async select(id?: string): Promise<void> {
     if (!this.lifetime) throw new UiError(409, "请先连接本地服务。");
@@ -49,7 +50,7 @@ export class UiClient {
       return;
     }
     const version = ++this.selectionVersion, previous = this.value.snapshot?.selectedId ?? undefined;
-    this.selectedId = id; this.update({ selecting: true, error: null, output: null });
+    this.selectedId = id; this.update({ selecting: true, error: null, output: null, diff: null });
     try { await this.refresh(); }
     catch (error) { if (version === this.selectionVersion) { this.selectedId = previous; this.update({ error: describe(error) }); } throw error; }
     finally { if (version === this.selectionVersion) this.update({ selecting: false }); }
@@ -64,7 +65,7 @@ export class UiClient {
     const changedSelection = previous?.hostId !== snapshot.hostId || previous?.selectedId !== snapshot.selectedId;
     if (snapshot.activeId !== undefined) this.selectedId = snapshot.selectedId ?? undefined;
     if (changedSelection && snapshot.activeId !== undefined) this.selectionVersion++;
-    this.update({ snapshot, connection: "connected", ...(changedSelection ? { output: null } : {}) });
+    this.update({ snapshot, connection: "connected", ...(changedSelection ? { output: null, diff: null } : {}) });
   }
   readResources(query = "", cursor?: string): Promise<UiPage<UiResource>> {
     return this.read("resources", { query, ...(cursor ? { cursor } : {}) }, false);
@@ -114,7 +115,7 @@ export class UiClient {
       const receipt = await this.json("/api/ui/commands", command) as UiReceipt;
       if (generation !== this.generation) return;
       if (receipt.disconnect) { this.disconnect(); return; }
-      if (selectionVersion === this.selectionVersion) this.update({ output: receipt.output ?? null });
+      if (selectionVersion === this.selectionVersion) this.update({ output: receipt.output ?? null, diff: receipt.diff ?? null });
       if (selectionVersion === this.selectionVersion && receipt.selectedId !== undefined) this.selectedId = receipt.selectedId ?? undefined;
       await this.refresh();
     } catch (error) {

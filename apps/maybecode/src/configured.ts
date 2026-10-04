@@ -1,6 +1,6 @@
 import { realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
@@ -29,8 +29,8 @@ import {
   type McpOAuthOptions,
   type OpenMcpClientPoolOptions,
 } from "@may/mcp";
-import { mcpHostService, mcpService } from "@may/plugin-mcp";
-import { observabilityHostService, observabilityService } from "@may/plugin-observability";
+import { mcpHostService, mcpService, type McpPluginOptions } from "@may/plugin-mcp";
+import { createSharedObservabilityPlugin, observabilityHostService, observabilityService } from "@may/plugin-observability";
 import { services } from "@may/plugin-services";
 import { createMaybeCodeResourcePlugins, createMaybeCodeSharedPlugins } from "./plugins/resources.js";
 import {
@@ -57,6 +57,7 @@ import {
 import { MaybeCodeWorkspace } from "./workspace.js";
 import type { MaybeCodeAutoCompactionMode } from "./controller.js";
 import type { MaybeCodeModelConfiguration } from "./workspace.js";
+import type { ProjectGitWorkspaceOptions } from "@may/application/git-workspace";
 import type { SkillRegistry } from "@may/skills";
 import { PluginHost, loadPluginModules, parsePluginSelections, type AnyPlugin, type ServiceToken } from "@may/plugin";
 import { resolveMaybeCodeSkillDirectories } from "./skills.js";
@@ -64,6 +65,7 @@ import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 import { resolveSubagentConfiguration, type MaybeCodeSubagentConfiguration, type MaybeCodeSubagentRole } from "./subagents.js";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
+  readonly git?: false | Omit<ProjectGitWorkspaceOptions, "workspace">;
   readonly plugins?: readonly AnyPlugin[];
   readonly permissionMode?: MaybeCodePermissionMode;
   /** Enable only when a UI consumes interaction events and answers the controller. */
@@ -140,6 +142,32 @@ export function getDefaultMaybeCodeDataDirectory(): string {
   return join(homedir(), ".may", "maybecode");
 }
 
+export function resolveMaybeCodeGit(config: MayConfig): false | Omit<ProjectGitWorkspaceOptions, "workspace"> {
+  const value = config.apps?.maybecode?.git;
+  if (value === undefined) return {};
+  if (value === false) return false;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new MaybeCodeConfigError("apps.maybecode.git must be false or an object");
+  const fields = value as Record<string, unknown>;
+  const allowed = ["autoCommit", "readOnly", "dataRoot", "worktreesRoot", "excludedPaths"];
+  for (const name of Object.keys(fields)) if (!allowed.includes(name)) throw new MaybeCodeConfigError(`Unknown apps.maybecode.git field: ${name}`);
+  for (const name of ["autoCommit", "readOnly"]) if (fields[name] !== undefined && typeof fields[name] !== "boolean") throw new MaybeCodeConfigError(`apps.maybecode.git.${name} must be boolean`);
+  for (const name of ["dataRoot", "worktreesRoot"]) if (fields[name] !== undefined && (typeof fields[name] !== "string" || !fields[name].trim())) throw new MaybeCodeConfigError(`apps.maybecode.git.${name} must be a non-empty path`);
+  if (fields.excludedPaths !== undefined && (!Array.isArray(fields.excludedPaths) || fields.excludedPaths.some(path => typeof path !== "string" || !path.trim()))) throw new MaybeCodeConfigError("apps.maybecode.git.excludedPaths must contain non-empty paths");
+  return {
+    ...(fields.autoCommit === undefined ? {} : { autoCommit: fields.autoCommit as boolean }),
+    ...(fields.readOnly === undefined ? {} : { readOnly: fields.readOnly as boolean }),
+    ...(fields.dataRoot === undefined ? {} : { dataRoot: resolveGitConfigurationPath(config.path, fields.dataRoot as string) }),
+    ...(fields.worktreesRoot === undefined ? {} : { worktreesRoot: resolveGitConfigurationPath(config.path, fields.worktreesRoot as string) }),
+    ...(fields.excludedPaths === undefined ? {} : { excludedPaths: fields.excludedPaths as string[] }),
+  };
+}
+
+function resolveGitConfigurationPath(configPath: string, path: string): string {
+  if (path === "~") return homedir();
+  if (path.startsWith("~/") || path.startsWith("~\\")) return resolve(homedir(), path.slice(2));
+  return resolve(dirname(configPath), path);
+}
+
 export async function openConfiguredMaybeCode(
   options: OpenConfiguredMaybeCodeOptions = {},
   dependencies: ConfiguredMaybeCodeDependencies = {},
@@ -157,6 +185,7 @@ export async function openConfiguredMaybeCode(
     plugin.provides?.some(candidate => candidate.id === service.id && candidate.scope === service.scope));
   const pluginModel = provided(services.model);
   const configuredPermissionMode = config.apps?.maybecode?.permissionMode;
+  const git = options.git ?? resolveMaybeCodeGit(config);
   const permissionMode = options.permissionMode === undefined
     ? configuredPermissionMode === undefined ? "default" : parsePermissionMode(configuredPermissionMode)
     : parsePermissionMode(options.permissionMode);
@@ -224,7 +253,6 @@ export async function openConfiguredMaybeCode(
   );
   const observabilityOptions = provided(observabilityService) || provided(services.tracer) ? false : options.observability ??
     resolveMaybeCodeObservability(config);
-  const mcpOptions = provided(mcpService) ? false : options.mcp ?? resolveMaybeCodeMcp(config, workspace);
   const subagents = resolveMaybeCodeSubagents(options.subagents, config);
   const subagentCreateModel = (role: MaybeCodeSubagentRole): MaybeCodeModelConfiguration | undefined =>
     role.model === undefined
@@ -234,6 +262,8 @@ export async function openConfiguredMaybeCode(
         : { reasoningEffort: role.reasoningEffort });
   let mcp: McpClientPool | undefined;
   let resourceHost: PluginHost | undefined;
+  const workspaceResourceHosts = new Map<string, PluginHost>();
+  const workspacePlugins = new Map<string, readonly AnyPlugin[]>();
   let application: MaybeCodeWorkspace | undefined;
   const checkHostOwner = (context: McpHostRequestContext) => {
     context.signal.throwIfAborted();
@@ -244,35 +274,70 @@ export async function openConfiguredMaybeCode(
     }
   };
 
-  try {
-    const resourcePlugins = createMaybeCodeResourcePlugins({
-      dataDirectory,
-      observability: observabilityOptions,
-      mcp: mcpOptions === false ? false : {
-        servers: mcpOptions.servers,
-        ...(mcpOptions.taskJournal === undefined ? {} : { taskJournal: mcpOptions.taskJournal }),
-        ...(mcpOptions.oauth === undefined ? {} : { oauth: mcpOptions.oauth }),
-        ...(dependencies.openMcp === undefined ? {} : { open: dependencies.openMcp }),
-        enableInteractions: options.mcpInteractions === true,
-        hostServices: {
-          roots: async (context) => { checkHostOwner(context); return [{ uri: pathToFileURL(workspace).href, name: "MaybeCode workspace" }]; },
-          ...(pluginModel ? {} : { sampling: createMcpModelSampler((maxTokens, context) => {
-            checkHostOwner(context);
-            const selected = selectionFor(application!.modelInfo?.profile);
-            const selection = { ...selected, options: { ...selected.options, maxTokens, maxOutputTokens: maxTokens } };
-            // sampling 使用独立 provider 实例和本次调用的模型预算。
-            const model = dependencies.createModel === undefined ? createMaybeCodeModel(selection, dependencies.adapterRegistry) : dependencies.createModel(selection);
-            return { model, name: selected.model };
-          }) }),
-        },
-        traceAttributes: { "may.agent.name": "maybecode" },
+  const mcpForWorkspace = (nextWorkspace: string): false | McpPluginOptions => {
+    const next = provided(mcpService) ? false : options.mcp === undefined
+      ? resolveMaybeCodeMcp(config, nextWorkspace)
+      : options.mcp === false ? false : { ...options.mcp, servers: options.mcp.servers.map(server => {
+        if (server.transport === "streamable-http") return server;
+        const source = resolve(workspace, server.cwd ?? ".");
+        const path = relative(workspace, source);
+        const inside = path === "" || path !== ".." && !path.startsWith("..\\") && !path.startsWith("../") && !isAbsolute(path);
+        return { ...server, cwd: inside ? resolve(nextWorkspace, path) : source };
+      }) };
+    if (next === false) return false;
+    const tracer = resourceHost?.provides(observabilityHostService) ? resourceHost.get(observabilityHostService).tracer : undefined;
+    return {
+      servers: next.servers,
+      ...(next.taskJournal === undefined ? {} : { taskJournal: next.taskJournal }),
+      ...(next.oauth === undefined ? {} : { oauth: next.oauth }),
+      ...(tracer === undefined ? {} : { tracer }),
+      ...(dependencies.openMcp === undefined ? {} : { open: dependencies.openMcp }),
+      enableInteractions: options.mcpInteractions === true,
+      hostServices: {
+        roots: async (context) => { checkHostOwner(context); return [{ uri: pathToFileURL(application!.workspace).href, name: "MaybeCode workspace" }]; },
+        ...(pluginModel ? {} : { sampling: createMcpModelSampler((maxTokens, context) => {
+          checkHostOwner(context);
+          const selected = selectionFor(application!.modelInfo?.profile);
+          const selection = { ...selected, options: { ...selected.options, maxTokens, maxOutputTokens: maxTokens } };
+          // sampling 使用独立 provider 实例和本次调用的模型预算。
+          const model = dependencies.createModel === undefined ? createMaybeCodeModel(selection, dependencies.adapterRegistry) : dependencies.createModel(selection);
+          return { model, name: selected.model };
+        }) }),
       },
-    });
+      traceAttributes: { "may.agent.name": "maybecode" },
+    };
+  };
+  const closeResources = async () => {
+    const results = await Promise.allSettled([...workspaceResourceHosts.values()].map(host => host.close()));
+    const failures = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+    try { await resourceHost?.close(); } catch (error) { failures.push(error); }
+    if (failures.length) throw new AggregateError(failures, "MaybeCode configured resources failed to close");
+  };
+
+  try {
+    const resourcePlugins = createMaybeCodeResourcePlugins({ dataDirectory, observability: observabilityOptions, mcp: mcpForWorkspace(workspace) });
     resourceHost = await PluginHost.create({ plugins: resourcePlugins });
     if (resourceHost.provides(mcpHostService)) mcp = resourceHost.get(mcpHostService);
     const observability = resourceHost.provides(observabilityHostService) ? resourceHost.get(observabilityHostService) : undefined;
     const applicationPlugins = createMaybeCodeSharedPlugins(resourceHost, plugins);
+    workspacePlugins.set(workspace, applicationPlugins);
     application = await MaybeCodeWorkspace.open({
+      git,
+      configureWorkspace: async nextWorkspace => {
+        const directories = options.skillDirectories ?? resolveMaybeCodeSkillDirectories(config, nextWorkspace);
+        let configuredPlugins = workspacePlugins.get(nextWorkspace);
+        if (configuredPlugins === undefined) {
+          const nextHost = await PluginHost.create({ plugins: createMaybeCodeResourcePlugins({
+            dataDirectory, observability: false, mcp: mcpForWorkspace(nextWorkspace),
+          }) });
+          workspaceResourceHosts.set(nextWorkspace, nextHost);
+          configuredPlugins = createMaybeCodeSharedPlugins(nextHost, [
+            ...(observability === undefined ? [] : [createSharedObservabilityPlugin(observability)]), ...plugins,
+          ]);
+          workspacePlugins.set(nextWorkspace, configuredPlugins);
+        }
+        return { plugins: configuredPlugins, ...(directories === false ? { skills: false } : { skillDirectories: directories }) };
+      },
       permissionMode,
       workspace,
       ...(initialModel === undefined ? {} : { model: initialModel.model, modelInfo: initialModel.modelInfo }),
@@ -288,11 +353,7 @@ export async function openConfiguredMaybeCode(
       ...(mcp === undefined
         ? {}
         : { mcp }),
-      ...(mcp === undefined && observability === undefined
-        ? {}
-        : {
-            closeOwnedResources: () => resourceHost!.close(),
-          }),
+      closeOwnedResources: closeResources,
       ...(options.sessionId === undefined
         ? {}
         : { sessionId: options.sessionId }),
@@ -343,7 +404,7 @@ export async function openConfiguredMaybeCode(
     return application;
   } catch (error) {
     try {
-      await resourceHost?.close();
+      await closeResources();
     } catch (cleanupError) {
       throw new AggregateError(
         [error, cleanupError],

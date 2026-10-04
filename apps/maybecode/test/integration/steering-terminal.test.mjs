@@ -25,7 +25,7 @@ for (const retained of [false, true]) test(`真实 ${retained ? "retained" : "cl
   await mkdir(workspace);
   await writeFile(join(workspace, "input.txt"), "Terminal steering verification file.\n");
   const config = await loadMayConfig();
-  const app = await openConfiguredMaybeCode({ workspace, dataDirectory: join(directory, "data"), configPath: config.path,
+  const app = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory: join(directory, "data"), configPath: config.path,
     model: process.env.MAYBECODE_STEER_LIVE_MODEL, autoResume: false, goals: false, mcp: false, observability: false, skills: false, retry: false,
     runBudget: { maxSteps: 6, maxModelCalls: 6, maxToolCalls: 6, maxDurationMs: 90_000 } });
   const input = new PassThrough(), output = new PassThrough();

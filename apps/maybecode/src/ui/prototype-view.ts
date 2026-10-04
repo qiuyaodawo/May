@@ -21,7 +21,12 @@ import {
   type PointerEvent,
   type Clipboard,
   type EditorOptions,
+  SessionForkPicker,
+  WorkspaceDiffViewer,
+  workspaceGitLabel,
+  type SessionForkSelection,
 } from "@may/tui";
+import type { UiForkPoint, UiWorkspaceDiff, UiWorkspaceGit } from "@may/ui-client";
 import {
   TranscriptStore,
   TranscriptView,
@@ -90,6 +95,8 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
   private status = "Ready";
   private statusBeforeShortcut: string | undefined;
   private model: string;
+  private workspace: string;
+  private gitLabel = "";
   private readonly unsubscribe: () => void;
   private readonly approvalQueue: PendingApproval[] = [];
   private dialog: Dialog | undefined;
@@ -127,7 +134,8 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
       return this.transcript.handlePointer(event);
     },
   };
-  private dialogKind: "approval" | "session" | "model" | "effort" | "mcp" | undefined;
+  private dialogKind: "approval" | "session" | "model" | "effort" | "mcp" | "fork" | "changes" | undefined;
+  private resolveVersionDialog: ((selection?: SessionForkSelection) => void) | undefined;
   private readonly mcpQuestions: Array<{ prompt: string; finish(value?: string): void }> = [];
   private resolveSessionDialog: ((action: SessionDialogAction | undefined) => void) | undefined;
   private resolveModelDialog: ((action: ModelDialogAction | undefined) => void) | undefined;
@@ -142,6 +150,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     this.keymap = createMaybeCodeKeymap(options.keymap);
     this.theme = options.theme ?? MAYBECODE_DARK_THEME;
     this.model = options.model ?? "model: unknown";
+    this.workspace = options.workspace;
     this.transcriptView = new TranscriptView(options.store, {
       ...(options.images ? { images: options.images } : {}),
       theme: this.theme,
@@ -427,6 +436,39 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     this.options.onInvalidate?.();
   }
 
+  setWorkspaceGit(workspace: UiWorkspaceGit): void {
+    if (this.disposed) return;
+    this.workspace = sanitizeTerminalText(workspace.path);
+    this.gitLabel = workspaceGitLabel(workspace);
+    this.options.onInvalidate?.();
+  }
+
+  requestForkSelection(points: readonly UiForkPoint[], currentSessionId: string): Promise<SessionForkSelection | undefined> {
+    if (this.dialog) return Promise.reject(new Error("Another dialog is already open"));
+    return new Promise(resolve => {
+      this.resolveVersionDialog = resolve;
+      const picker = new SessionForkPicker(points, { currentSessionId, theme: this.theme, onComplete: selection => this.completeVersionDialog(selection) });
+      this.dialog = new Dialog(this.baseView, picker, { open: true, title: "Session 分支", width: 100, height: 25, dismissOnEscape: false, borderStyle: this.theme.borderAccent, titleStyle: this.theme.accent });
+      this.dialogKind = "fork"; this.synchronizeDialog(); this.options.onInvalidate?.();
+    });
+  }
+
+  requestChanges(diff: UiWorkspaceDiff, operations: { readonly onRestore?: (path: string) => Promise<UiWorkspaceDiff>; readonly onApply?: (previewId: string) => Promise<void> } = {}): Promise<void> {
+    if (this.dialog) return Promise.reject(new Error("Another dialog is already open"));
+    return new Promise(resolve => {
+      this.resolveVersionDialog = () => resolve();
+      const viewer = new WorkspaceDiffViewer(diff, { theme: this.theme, onClose: () => this.completeVersionDialog(), ...operations, onInvalidate: () => this.options.onInvalidate?.() });
+      this.dialog = new Dialog(this.baseView, viewer, { open: true, title: "文件变化", width: 110, height: 30, dismissOnEscape: false, borderStyle: this.theme.borderAccent, titleStyle: this.theme.accent });
+      this.dialogKind = "changes"; this.synchronizeDialog(); this.options.onInvalidate?.();
+    });
+  }
+
+  private completeVersionDialog(selection?: SessionForkSelection): void {
+    this.dialog = undefined; this.dialogKind = undefined;
+    const resolve = this.resolveVersionDialog; this.resolveVersionDialog = undefined;
+    resolve?.(selection); this.openCurrentApproval(); this.options.onInvalidate?.();
+  }
+
   setModel(model: string): void {
     this.model = sanitizeTerminalText(model);
     this.options.onInvalidate?.();
@@ -457,6 +499,8 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     this.resolveModelDialog = undefined;
     this.resolveEffortDialog?.(undefined);
     this.resolveEffortDialog = undefined;
+    this.resolveVersionDialog?.();
+    this.resolveVersionDialog = undefined;
     this.suggestionVersion += 1;
     for (const approval of this.approvalQueue.splice(0)) {
       approval.resolve(undefined);
@@ -471,7 +515,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
       {
         height: 3,
         component: new HeaderView(
-          this.options.workspace,
+          this.workspace,
           this.model,
           this.theme,
         ),
@@ -503,6 +547,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
           this.shortcutHint("app.reply.start"),
           this.shortcutHint("app.tools.toggle"),
           this.shortcutHint("app.thinking.toggle"),
+          this.gitLabel,
         ),
       },
     ]);
@@ -1197,6 +1242,7 @@ class FooterView implements Component {
     private readonly replyHint: string,
     private readonly detailsHint: string,
     private readonly thinkingHint: string,
+    private readonly gitLabel: string,
   ) {}
 
   render(size: RenderSize): RenderResult {
@@ -1205,7 +1251,7 @@ class FooterView implements Component {
       : /running|cancell/iu.test(this.status)
       ? this.theme.warning
       : this.theme.success;
-    const value = (this.yolo ? `${styleText("YOLO · Auto-approve", this.theme.warning)}  ` : "") +
+    const value = (this.gitLabel ? `${styleText(this.gitLabel, this.theme.accent)}  ` : "") + (this.yolo ? `${styleText("YOLO · Auto-approve", this.theme.warning)}  ` : "") +
       `${styleText("●", statusStyle)} ${styleText(this.status, statusStyle)}  ` +
       `${styleText(this.focus ?? "none", this.theme.muted)}  ` +
       `${styleText(this.replyHint, this.theme.dim)} reply  ` +

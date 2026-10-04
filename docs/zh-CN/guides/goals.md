@@ -68,6 +68,13 @@ await application.close();
 提交和继续执行的参数不包含 `stepInputSource`；补充输入及其保存由接入的 Agent 管理。
 `write()` 必须等待持久化成功。宿主管理 Session，为每个活动 Session 创建独立 controller，
 并串行处理影响同一个 Agent 的外部操作。
+运行 handle 可以提供 `finalize(outcome)`，outcome 为 `completed`、`continued`、
+`failed` 或 `cancelled`。Controller 在验证和目标状态保存之后等待这个回调，然后
+继续调度或者结束执行。验证未通过时使用 `continued`，阻塞或执行失败时使用
+`failed`；取消操作也会调用回调释放资源。重复调用需要返回一致结果。
+`result` 描述 Agent Run 的执行结果，让验证能够继续；该 Promise 不能等待 Goal 完成。
+MaybeCode 在这个回调完成之前保留工作区 Git 互斥保护。完成验证的 Goal 保存最终
+文件版本及宿主确认的历史位置，包括因 Goal 调度而 yielded 的 Run。
 `AgentApplication.continue(options)` 是通用执行接口，沿用 `submit()` 的互斥、取消和保存流程。
 
 使用 `goals.subscribe(listener)` 订阅 `goal.changed`。应用事件仍由原来的消费者处理，
@@ -79,6 +86,14 @@ Goal Context 将动态 instructions 与当前宿主状态加入模型请求，�
 这条提示不写入原始用户消息。MaybeCode 通过应用拥有的 Session 状态，将目标记录保存在
 `may.goal` 下。SDK 调用方可以在打开 MaybeCode 时使用 `goals: false` 禁用组件。
 其他应用自行决定是否导入和连接这个 package。
+
+`wrapModel(model, { includeInstructions: false })` 让子模型调用遵守同一 Goal 的
+token 计量、预算与取消信号，同时由子任务的 Context 提供任务指令。默认包装器要求
+通过 `wrapContextFactory()` 提供主 Agent 当前的 Goal 指令。delegation plugin
+会为默认模型与角色指定的子模型使用这个参数。
+Goal 取消以及时间或 token 预算耗尽时，controller 会取消当前执行 handle，
+包括正在执行的子任务工具。取消之后取得的 handle 会立即收到取消通知；Goal
+等待执行结果和宿主回调结束，然后停止执行。
 
 ## 预算与恢复
 

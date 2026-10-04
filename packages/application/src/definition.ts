@@ -10,6 +10,7 @@ type SessionBoundAgentOption =
   | "store"
   | "sessionId"
   | "resume"
+  | "fork"
   | "metadata"
   | "contextMetadata";
 
@@ -31,6 +32,7 @@ export interface AgentDefinitionOpenOptions {
   readonly store: SessionStore;
   readonly sessionId?: string;
   readonly resume?: boolean;
+  readonly fork?: import("./application.js").AgentApplicationFork;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly contextMetadata?: Readonly<Record<string, unknown>>;
 }
@@ -66,6 +68,7 @@ export class AgentDefinition {
         ? {}
         : { sessionId: options.sessionId }),
       ...(options.resume === undefined ? {} : { resume: options.resume }),
+      ...(options.fork === undefined ? {} : { fork: options.fork }),
       ...(options.metadata === undefined
         ? {}
         : { metadata: { ...options.metadata } }),
@@ -135,6 +138,7 @@ function assertDefinitionOptions(
       "store",
       "sessionId",
       "resume",
+      "fork",
       "metadata",
       "contextMetadata",
     ] as const

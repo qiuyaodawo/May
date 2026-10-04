@@ -47,7 +47,7 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
   };
   const sessionDirectory = join(workspace, ".sessions");
   const catalog = new InMemorySessionCatalog();
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace,
     subagents: false,
     model,
@@ -105,7 +105,7 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
     ["create", "update"],
   );
 
-  const resumed = await MaybeCodeWorkspace.open({
+  const resumed = await MaybeCodeWorkspace.open({ git: false,
     workspace,
     subagents: false,
     model,
@@ -128,7 +128,7 @@ test("retries a failed run after resuming its durable session", async (t) => {
   const workspace = await temporaryDirectory(t);
   const store = new FileSessionStore(join(workspace, ".sessions"));
   const catalog = new InMemorySessionCatalog();
-  const first = await MaybeCodeWorkspace.open({
+  const first = await MaybeCodeWorkspace.open({ git: false,
     workspace,
     model: {
       async *stream() {
@@ -147,7 +147,7 @@ test("retries a failed run after resuming its durable session", async (t) => {
   await first.close();
 
   let request;
-  const resumed = await MaybeCodeWorkspace.open({
+  const resumed = await MaybeCodeWorkspace.open({ git: false,
     workspace,
     model: {
       async *stream(value) {
@@ -214,7 +214,7 @@ test("executes read, write, edit, and shell through the application", async (t) 
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace,
     model,
     store: new (await import("@may/session")).InMemorySessionStore(),
@@ -285,7 +285,7 @@ test("exposes bounded active-session history as an approval-free tool", async ()
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model,
     store: new (await import("@may/session")).InMemorySessionStore(),
@@ -333,12 +333,12 @@ test("starts fresh by default and explicitly resumes workspace sessions", async 
     catalog,
   };
 
-  const first = await MaybeCodeWorkspace.open({ ...options, autoResume: false });
+  const first = await MaybeCodeWorkspace.open({ ...options, git: false, autoResume: false });
   const firstId = first.sessionId;
   await (await first.submit({ input: "first" })).result;
   await first.close();
 
-  const resumed = await MaybeCodeWorkspace.open({ ...options, autoResume: true });
+  const resumed = await MaybeCodeWorkspace.open({ ...options, git: false, autoResume: true });
   assert.equal(resumed.sessionId, firstId);
   const inspection = await resumed.inspectContext();
   assert.equal(inspection.measurementMethod, "measured+estimated");
@@ -360,7 +360,7 @@ test("starts fresh by default and explicitly resumes workspace sessions", async 
   assert.equal(resumed.sessionId, firstId);
   await resumed.close();
 
-  const fresh = await MaybeCodeWorkspace.open(options);
+  const fresh = await MaybeCodeWorkspace.open({ ...options, git: false });
   assert.notEqual(fresh.sessionId, firstId);
   await fresh.close();
 });
@@ -390,7 +390,7 @@ test("creates context through an injected factory for each session", async () =>
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model,
     store,
@@ -473,7 +473,7 @@ test("persists the default prune-and-summary view across resume", async () => {
     },
   };
 
-  const first = await MaybeCodeWorkspace.open({ ...options, autoResume: false });
+  const first = await MaybeCodeWorkspace.open({ ...options, git: false, autoResume: false });
   await (await first.submit({ input: "first request" })).result;
   await (await first.submit({ input: "second request" })).result;
   await (await first.submit({ input: "third request" })).result;
@@ -493,7 +493,7 @@ test("persists the default prune-and-summary view across resume", async () => {
   );
   await first.close();
 
-  const resumed = await MaybeCodeWorkspace.open({ ...options, autoResume: true });
+  const resumed = await MaybeCodeWorkspace.open({ ...options, git: false, autoResume: true });
   await (await resumed.submit({ input: "fourth request" })).result;
   const resumedRequest = requests.at(-1);
   assert.ok(
@@ -532,7 +532,7 @@ test("automatically compacts before a model call and persists the active view", 
     },
   };
   const events = [];
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model,
     store,
@@ -609,7 +609,7 @@ test("persists automatic compaction after the run events it contains", async () 
     compactionDidStart = resolve;
   });
   let modelCall = 0;
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     subagents: false,
     model: {
@@ -710,7 +710,7 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
   });
   const store = new (await import("@may/session")).InMemorySessionStore();
   const events = [];
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model,
     store,
@@ -775,7 +775,7 @@ test("cancels an active summary compaction without persisting it", async () => {
   const started = new Promise((resolve) => {
     summaryStarted = resolve;
   });
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model: {
       async *stream() {
@@ -834,7 +834,7 @@ test("cancels an active model call", async () => {
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model,
     store: new (await import("@may/session")).InMemorySessionStore(),

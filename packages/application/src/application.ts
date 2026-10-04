@@ -55,6 +55,7 @@ import {
   type SessionHistoryPage,
   type SessionHistoryQuery,
   type SessionRuntimeInfo,
+  type SessionBranchPosition,
   type SessionSteerOptions,
   type SessionSteeringInput,
   type SessionStore,
@@ -113,6 +114,10 @@ export interface AgentApplicationOptions {
   readonly contextMetadata?: Readonly<Record<string, unknown>>;
   readonly sessionId?: string;
   readonly resume?: boolean;
+  readonly fork?: AgentApplicationFork;
+  readonly forkStateKeys?: readonly string[];
+  readonly forkPluginIds?: readonly string[];
+  readonly forkStateTransform?: (key: string, value: unknown) => unknown;
   readonly contextFactory?: ContextFactory;
   readonly contextBudget?: ContextBudget;
   /** Default strategy used by explicit compaction and by the context itself. */
@@ -139,6 +144,11 @@ export interface AgentApplicationOptions {
     metadata: Readonly<Record<string, unknown>> | undefined,
   ) => void | Promise<void>;
   readonly closeReason?: string;
+}
+
+export interface AgentApplicationFork {
+  readonly sessionId: string;
+  readonly positionSeq: number;
 }
 
 interface ActiveCompaction {
@@ -236,11 +246,21 @@ export class AgentApplication implements SteerableAgentController {
   static async open(options: AgentApplicationOptions): Promise<AgentApplication> {
     const sessionId = options.sessionId ?? createSessionId();
     if (options.resume === true && options.sessionId === undefined) throw new Error("sessionId is required when resuming a session");
+    if (options.resume === true && options.fork !== undefined) throw new Error("Session resume and fork cannot be combined");
+    const forkPluginIds = ["may.skills", ...(options.forkPluginIds ?? []), ...(options.plugins ?? [])
+      .filter((plugin) => plugin.provides?.some((service) => service.id === applicationServices.skills.id && service.scope === applicationServices.skills.scope))
+      .map((plugin) => plugin.id)];
+    const transformForkState = (key: string, value: unknown): unknown => {
+      const selected = key === PLUGIN_STATE_KEY ? filterForkPluginState(readApplicationPluginState(value), forkPluginIds) : value;
+      return options.forkStateTransform === undefined ? selected : options.forkStateTransform(key, selected);
+    };
     let pluginState = readApplicationPluginState(undefined);
-    if (options.resume === true) {
-      const history = await options.store.read(sessionId);
+    if (options.resume === true || options.fork !== undefined) {
+      const history = options.fork === undefined ? await options.store.read(sessionId) :
+        await inspectForkHistory(options.store, options.fork);
       const event = [...history].reverse().find((event) => event.type === "state.updated" && event.key === PLUGIN_STATE_KEY);
       if (event?.type === "state.updated") pluginState = readApplicationPluginState(event.value);
+      if (options.fork !== undefined) pluginState = readApplicationPluginState(transformForkState(PLUGIN_STATE_KEY, pluginState));
     }
     let application: AgentApplication | undefined;
     let contextController: ContextController | undefined;
@@ -467,7 +487,16 @@ export class AgentApplication implements SteerableAgentController {
           : { "may.session.id": options.sessionId }),
       },
     });
-      const session = options.resume === true
+      const session = options.fork !== undefined
+        ? await Session.fork({ sourceId: options.fork.sessionId, positionSeq: options.fork.positionSeq,
+            id: sessionId, store: options.store, deferBranchPositions: true, deferForkReady: true,
+            stateKeys: [SKILL_STATE_KEY, PLUGIN_STATE_KEY, ...(options.forkStateKeys ?? [])],
+            transformState: transformForkState,
+            ...(options.metadata === undefined ? {} : { metadata: { ...options.metadata } }),
+            createRuntime: async (messages, info) => {
+              const runtime = await createRuntime(messages, info); pendingRuntime = undefined; return runtime;
+            } })
+        : options.resume === true
         ? await resumeSession(options, async (messages, info) => {
             const runtime = await createRuntime(messages, info);
             pendingRuntime = undefined;
@@ -476,6 +505,7 @@ export class AgentApplication implements SteerableAgentController {
         : await Session.create({
             runtime: await createRuntime(),
             store: options.store,
+            deferBranchPositions: true,
             ...(options.metadata === undefined
               ? {}
               : { metadata: { ...options.metadata } }),
@@ -486,7 +516,7 @@ export class AgentApplication implements SteerableAgentController {
       pendingRuntime = undefined;
       try { await options.validateSession?.(session.metadata); }
       catch (error) {
-        if (options.resume !== true) await options.store?.delete?.(session.id);
+        if (options.resume !== true && options.fork === undefined) await options.store?.delete?.(session.id);
         throw error;
       }
       permissions.setEventSink(async (event) => {
@@ -540,6 +570,10 @@ export class AgentApplication implements SteerableAgentController {
       );
       await sessionScope.observe(applicationHooks.created, { sessionId: session.id }, application.hookContext());
       validateToolCatalog();
+      if (options.fork !== undefined) {
+        await Promise.all(application.pendingStateWrites);
+        await session.saveForkReady();
+      }
       endTraceSpan(openSpan, {
         status: "ok",
         attributes: { "may.session.id": session.id },
@@ -691,6 +725,10 @@ export class AgentApplication implements SteerableAgentController {
         .finally(async () => {
           if (this.activeRunScope === runScope) this.activeRunScope = undefined;
           await runScope!.close();
+          await Promise.all(this.pendingStateWrites);
+        }).then(async (value) => {
+          await this.session.saveBranchPosition(run.id);
+          return value;
         });
       const wrapped: AgentRun = {
         id: run.id,
@@ -822,6 +860,16 @@ export class AgentApplication implements SteerableAgentController {
 
   history(): Promise<readonly SessionEvent[]> {
     return this.session.history();
+  }
+
+  branchPositions(): Promise<readonly SessionBranchPosition[]> {
+    return this.session.branchPositions();
+  }
+
+  async saveBranchPosition(runId: string, options: import("@may/session").SessionBranchCompletionOptions = {}): Promise<void> {
+    if (this.isRunning) throw new Error("Branch positions require a settled application Run");
+    await Promise.all(this.pendingStateWrites);
+    await this.session.saveBranchPosition(runId, options);
   }
 
   queryHistory(query: SessionHistoryQuery = {}): Promise<SessionHistoryPage> {
@@ -1057,6 +1105,7 @@ async function resumeSession(
   return Session.resume({
     id: options.sessionId,
     store: options.store,
+    deferBranchPositions: true,
     createRuntime: (messages, info) => createRuntime(messages, info),
   });
 }
@@ -1118,6 +1167,22 @@ function latestRunFailed(history: readonly SessionEvent[]): boolean {
     }
   }
   return false;
+}
+
+async function inspectForkHistory(store: SessionStore, fork: AgentApplicationFork): Promise<readonly SessionEvent[]> {
+  if (store.inspect === undefined) throw new Error("Session forking requires read-only store inspection");
+  const history = await store.inspect(fork.sessionId);
+  const position = history.find((event) => event.seq === fork.positionSeq);
+  if (position?.type !== "run.settled") throw new Error("Selected history position has no recoverable state");
+  return history.slice(0, fork.positionSeq);
+}
+
+function filterForkPluginState(state: ApplicationPluginState, pluginIds: readonly string[] = []): ApplicationPluginState {
+  const allowed = new Set(["may.skills", ...pluginIds]);
+  const select = (snapshot: ApplicationPluginState["application"]) => Object.fromEntries(
+    Object.entries(snapshot).filter(([id]) => allowed.has(id)).map(([id, value]) => [id, structuredClone(value)]),
+  );
+  return { version: 1, application: select(state.application), session: select(state.session) };
 }
 
 /** Derive context capacity from provider-neutral model limits. */

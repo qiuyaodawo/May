@@ -1,5 +1,12 @@
 # @may/web-ui
 
+`createWorkspaceUI(client)` provides a fixed Git status region, completed-reply
+fork dialogs, structured file-diff browsing and registered-worktree management.
+`mountWebUI` composes it automatically when optional workspace capabilities are
+present in the host snapshot. Product hosts implement `session.fork`,
+`changes.view`, `worktree.open` and `worktree.delete`. See the bilingual
+[Web UI guide](../../../docs/en/guides/web-ui.md).
+
 `WebUiOptions.authentication` accepts a product-owned `{ label, login, logout }`
 implementation. `login(password)` returns a temporary UiClient Bearer credential;
 `logout()` revokes it when the user disconnects. Password input preserves spaces

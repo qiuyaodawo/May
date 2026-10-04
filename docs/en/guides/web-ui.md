@@ -110,6 +110,56 @@ These checks use the local model configuration, real workspace and MCP broker,
 plus a real model task for tool approval and file creation. Test data stays under
 the ignored `review` directory. The command performs model requests.
 
+## Session forks and file versions
+
+Hosts with a project workspace show the current Git branch in the conversation
+header. Detached HEAD shows a short commit hash; initialization and read errors
+have explicit states. Workspace information follows Session switches and external
+Git changes. Historical replies retain their recorded branch and commit.
+
+**创建分支** after a completed reply opens the workspace-mode dialog. The current
+workspace preserves current files. A new worktree starts from the reply's recorded
+commit. Missing recoverable Session state disables forking; missing file versions
+disable worktree creation. In-progress messages are not selectable fork positions.
+
+**本轮文件变化** displays a reply's version changes. **查看文件变化** in the header
+offers Session-wide and current-workspace comparisons. The file list identifies
+added, modified, deleted and binary files. Text diffs support scrolling, search and
+change navigation. Uncommitted content is labeled as current workspace changes.
+**预览恢复** reads the selected historical file content and displays the restoration
+diff; **确认恢复文件** applies it. Manual changes after preview prevent restoration
+and produce a conflict diagnostic.
+
+**管理 worktree** lists registered directories, branches, starting commits and
+states, with explicit open and delete actions. The host checks linked sessions,
+processes, uncommitted changes and unmerged commits before deleting a directory.
+
+In the MaybeCode TUI, `/fork` opens the history tree: Arrow Up/Down selects,
+Left/Right expands or collapses, `/` searches, Space previews, Enter chooses the
+position and workspace mode, and Escape cancels. `/changes` opens the file list;
+Enter opens a diff, Page Up/Down scrolls, `/` searches, `N` finds the next match,
+`]` advances to the next change, and Escape returns to the file list. The footer
+displays the current branch.
+In a reply's diff, `R` previews restoration of the selected file and `Y` explicitly
+confirms it.
+
+Shared components receive structured state through optional `workspace`,
+`forkPoints`, `checkpoints` and `worktrees` snapshot fields. They send operations
+through `session.fork`, `changes.view`, `worktree.open` and `worktree.delete`.
+Controls remain hidden when the host does not provide the corresponding capability.
+Restoration uses `changes.restore.preview` and `changes.restore.apply`.
+`UiWorkspaceDiff.restorePreviewId` identifies the preview; the host retains the
+actual content and conflict-check information.
+
+After `pnpm build`, the workspace browser checks use the configured
+`deepseek-v4-flash` profile when `MAY_LIVE_PROVIDER_UI_TESTS=1`. The Session fork
+check also requires `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`, which authorizes commits
+inside its isolated test repository and worktrees. It makes actual provider
+requests and checks reply forks, file restoration through WebUI and TUI, stale
+previews, and fork rejection during a blocked Git checkpoint. Run
+`node --test packages/ui/web/test/browser/workspace-versions.test.mjs packages/ui/web/test/browser/workspace-session-fork.test.mjs`.
+Both checks are skipped without their required environment flags.
+
 ## Boundaries
 
 `ApplicationUiHost` accepts an independent `events` stream and

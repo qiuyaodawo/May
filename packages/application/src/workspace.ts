@@ -14,7 +14,10 @@ import type {
   SessionHistoryQuery,
   SessionStore,
   SessionSubmitOptions,
+  SessionBranchNode,
+  SessionBranchPosition,
 } from "@may/session";
+import { readSessionBranchNode, readSessionBranchPositions } from "@may/session";
 import {
   latestSession,
   type SessionCatalog,
@@ -35,6 +38,14 @@ import { AsyncStateSerializer } from "./state-serializer.js";
 export interface AgentApplicationSelection {
   readonly sessionId?: string;
   readonly resume: boolean;
+  readonly fork?: import("./application.js").AgentApplicationFork;
+  readonly workspace?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface AgentWorkspaceForkOptions {
+  readonly workspace?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export type SessionSummaryFactory = (
@@ -50,6 +61,7 @@ export interface AgentWorkspaceOptions<
   > = AgentController<ApplicationEvent, CompactionSelection>,
 > {
   readonly workspace: string;
+  readonly workspacePaths?: () => readonly string[] | Promise<readonly string[]>;
   readonly store: SessionStore;
   readonly catalog: SessionCatalog;
   readonly openApplication: (
@@ -107,7 +119,7 @@ export class AgentWorkspace<
   readonly events: AsyncIterable<
     AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>
   >;
-  readonly workspace: string;
+  private currentWorkspace: string;
 
   private readonly store: SessionStore;
   private readonly catalog: SessionCatalog;
@@ -118,6 +130,7 @@ export class AgentWorkspace<
   >["openApplication"];
   private readonly summarizeSession: SessionSummaryFactory;
   private readonly now: () => number;
+  private readonly workspacePaths: (() => readonly string[] | Promise<readonly string[]>) | undefined;
   private readonly eventQueue: AsyncEventQueue<
     AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>
   >;
@@ -141,7 +154,8 @@ export class AgentWorkspace<
     this.openApplication = options.openApplication;
     this.summarizeSession = options.summarizeSession ?? summarizeSessionHistory;
     this.now = options.now ?? Date.now;
-    this.workspace = options.workspace;
+    this.workspacePaths = options.workspacePaths;
+    this.currentWorkspace = options.workspace;
     this.eventQueue = new AsyncEventQueue({
       maxBufferedValues: 1024,
       isDroppable: (value) => isDroppableWorkspaceEvent(
@@ -191,9 +205,13 @@ export class AgentWorkspace<
     }
 
     const resumed = sessionId !== undefined;
+    const paths = new Set([options.workspace, ...(await options.workspacePaths?.() ?? [])]);
+    const summaries = sessionId === undefined ? [] : (await Promise.all([...paths].map((path) => options.catalog.list(path)))).flat();
+    const selectedWorkspace = summaries.find((summary) => summary.id === sessionId)?.workspace ?? options.workspace;
     const application = await options.openApplication({
       ...(sessionId === undefined ? {} : { sessionId }),
       resume: resumed,
+      workspace: selectedWorkspace,
     });
     if (sessionId !== undefined && application.sessionId !== sessionId) {
       await application.close();
@@ -208,12 +226,18 @@ export class AgentWorkspace<
       Run,
       Application
     >(options, application, resumed);
+    workspace.currentWorkspace = selectedWorkspace;
     await workspace.recordCurrentSession().catch(() => undefined);
     return workspace;
   }
 
   get sessionId(): string {
     return this.application.sessionId;
+  }
+
+  get workspace(): string {
+    const application = this.application as Application & { readonly workspace?: string };
+    return application.workspace ?? this.currentWorkspace;
   }
 
   get isRunning(): boolean {
@@ -278,23 +302,67 @@ export class AgentWorkspace<
 
   listSessions(): Promise<readonly SessionSummary[]> {
     this.throwIfClosed();
-    return this.catalog.list(this.workspace);
+    return this.listFamilySessions();
   }
 
   readSessionHistory(sessionId: string): Promise<readonly SessionEvent[]> {
     this.throwIfClosed();
     return this.state.run(async () => {
-      const known = (await this.catalog.list(this.workspace)).some(session => session.id === sessionId);
+      const known = (await this.listFamilySessions()).some(session => session.id === sessionId);
       if (!known) throw new Error("Session does not belong to this workspace");
       if (!this.store.inspect) throw new Error("Session store does not support read-only inspection");
       return this.store.inspect(sessionId);
     });
   }
 
+  async branchPositions(): Promise<readonly SessionBranchPosition[]> {
+    return readSessionBranchPositions(await this.history());
+  }
+
+  readSessionBranchTree(): Promise<readonly SessionBranchNode[]> {
+    this.throwIfClosed();
+    return this.state.run(async () => {
+      if (this.store.inspect === undefined) throw new Error("Session tree requires read-only store inspection");
+      const sessions = await this.listFamilySessions();
+      return Promise.all(sessions.map(async (session) => readSessionBranchNode(await this.store.inspect!(session.id))));
+    });
+  }
+
+  forkSession(sourceId: string, positionSeq: number, options: AgentWorkspaceForkOptions = {}): Promise<string> {
+    this.throwIfClosed();
+    return this.state.run(async () => {
+      this.assertIdle("Cannot fork sessions while an operation is active");
+      const known = (await this.listFamilySessions()).some((session) => session.id === sourceId);
+      if (!known) throw new Error("Source Session does not belong to this workspace");
+      if (this.store.inspect === undefined) throw new Error("Session forking requires read-only store inspection");
+      const position = readSessionBranchPositions(await this.store.inspect(sourceId)).find((value) => value.positionSeq === positionSeq);
+      if (position === undefined || !position.available) throw new Error(position?.reason ?? "Selected history position has no recoverable state");
+      const next = await this.openApplication({ resume: false, fork: { sessionId: sourceId, positionSeq },
+        workspace: options.workspace ?? this.workspace, ...(options.metadata === undefined ? {} : { metadata: options.metadata }) });
+      if (next.sessionId === sourceId) { await next.close(); throw new Error("Forked Session must have an independent identity"); }
+      const forked = (await next.history())[0];
+      if (forked?.type !== "session.created" || forked.fork?.sessionId !== sourceId || forked.fork.positionSeq !== positionSeq) {
+        await next.close(); throw new Error("Application did not restore the selected Session branch position");
+      }
+      try { await this.recordCurrentSession(next, options.workspace ?? this.workspace); }
+      catch (error) {
+        try { await next.close(); }
+        catch (cleanupError) { throw new AggregateError([error, cleanupError], `Forked Session "${next.sessionId}" catalog persistence and cleanup failed`, { cause: error }); }
+        throw new Error(`Forked Session "${next.sessionId}" could not be recorded in the catalog; its history is preserved`, { cause: error });
+      }
+      const previousWorkspace = this.currentWorkspace;
+      this.currentWorkspace = options.workspace ?? this.currentWorkspace;
+      try { await this.replaceApplication(next, false); }
+      catch (error) { this.currentWorkspace = previousWorkspace; throw error; }
+      this.eventQueue.push({ type: "session.forked", sessionId: next.sessionId, sourceId, positionSeq, workspace: this.workspace });
+      return next.sessionId;
+    });
+  }
+
   async newSession(): Promise<string> {
     return this.state.run(async () => {
       this.assertIdle("Cannot switch sessions while an operation is active");
-      const next = await this.openApplication({ resume: false });
+      const next = await this.openApplication({ resume: false, workspace: this.workspace });
       await this.replaceApplication(next, false);
       return next.sessionId;
     });
@@ -304,14 +372,19 @@ export class AgentWorkspace<
     return this.state.run(async () => {
       this.assertIdle("Cannot switch sessions while an operation is active");
       if (sessionId === this.sessionId) return;
-      const next = await this.openApplication({ sessionId, resume: true });
+      const summary = (await this.listFamilySessions()).find((session) => session.id === sessionId);
+      if (summary === undefined) throw new Error("Session does not belong to this workspace family");
+      const next = await this.openApplication({ sessionId, resume: true, workspace: summary.workspace });
       if (next.sessionId !== sessionId) {
         await next.close();
         throw new Error(
           `Application resumed unexpected session "${next.sessionId}"; expected "${sessionId}"`,
         );
       }
-      await this.replaceApplication(next, true);
+      const previousWorkspace = this.currentWorkspace;
+      this.currentWorkspace = summary.workspace;
+      try { await this.replaceApplication(next, true); }
+      catch (error) { this.currentWorkspace = previousWorkspace; throw error; }
     });
   }
 
@@ -324,7 +397,8 @@ export class AgentWorkspace<
       if (rename === undefined) {
         throw new Error("The active session catalog does not support renaming");
       }
-      if (!await rename.call(this.catalog, sessionId, this.workspace, normalized)) {
+      const summary = (await this.listFamilySessions()).find((session) => session.id === sessionId);
+      if (summary === undefined || !await rename.call(this.catalog, sessionId, summary.workspace, normalized)) {
         throw new Error(`Session "${sessionId}" does not exist`);
       }
     });
@@ -344,15 +418,13 @@ export class AgentWorkspace<
       if (removeCatalog === undefined) {
         throw new Error("The active session catalog does not support deletion");
       }
-      const known = (await this.catalog.list(this.workspace)).some(
-        (session) => session.id === sessionId,
-      );
-      if (!known) return false;
+      const summary = (await this.listFamilySessions()).find((session) => session.id === sessionId);
+      if (summary === undefined) return false;
       const historyRemoved = await removeHistory.call(this.store, sessionId);
       const catalogRemoved = await removeCatalog.call(
         this.catalog,
         sessionId,
-        this.workspace,
+        summary.workspace,
       );
       return historyRemoved || catalogRemoved;
     });
@@ -475,14 +547,13 @@ export class AgentWorkspace<
     }
   }
 
-  private async recordCurrentSession(): Promise<void> {
-    const application = this.application;
+  private async recordCurrentSession(application = this.application, workspace = this.workspace): Promise<void> {
     const operation = this.sessionRecordTail.then(async () => {
       const history = await application.history();
       const createdAt = history[0]?.timestamp ?? this.now();
       await this.catalog.record({
         id: application.sessionId,
-        workspace: this.workspace,
+        workspace,
         createdAt,
         lastUsedAt: this.now(),
         ...this.summarizeSession(history),
@@ -490,6 +561,12 @@ export class AgentWorkspace<
     });
     this.sessionRecordTail = operation.catch(() => undefined);
     return operation;
+  }
+
+  private async listFamilySessions(): Promise<readonly SessionSummary[]> {
+    const paths = new Set([this.workspace, ...(await this.workspacePaths?.() ?? [])]);
+    const sessions = (await Promise.all([...paths].map((path) => this.catalog.list(path)))).flat();
+    return [...new Map(sessions.map((session) => [session.id, session])).values()].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
   }
 
   private withSessionRecord(run: Run): Run {

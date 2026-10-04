@@ -117,6 +117,8 @@ export class SessionHistoryReader {
 
 export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "session.created",
+  "session.fork.ready",
+  "history.omitted",
   "runtime.state.saved",
   "runtime.changed",
   "input.generated",
@@ -126,6 +128,7 @@ export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "input.steering.delivered",
   "input.steering.finished",
   "run.started",
+  "run.settled",
   "run.budget.exceeded",
   "tool.started",
   "run.interrupted",

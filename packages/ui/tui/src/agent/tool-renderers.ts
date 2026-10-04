@@ -230,7 +230,7 @@ function appendFailure(
   }
 }
 
-function renderDiff(diff: string, theme: TuiTheme): TextDocumentLine[] {
+export function renderDiff(diff: string, theme: TuiTheme): TextDocumentLine[] {
   return sanitizeTerminalText(diff).split("\n").map((line) => {
     const style = line.startsWith("+++") || line.startsWith("---") || line.startsWith("@@")
       ? theme.muted

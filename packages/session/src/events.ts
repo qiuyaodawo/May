@@ -22,6 +22,12 @@ export interface SessionRecovery {
   readonly status: "unknown" | "not-started";
 }
 
+export interface SessionForkOrigin {
+  readonly sessionId: string;
+  readonly positionSeq: number;
+  readonly runId: string;
+}
+
 export type SessionApprovalDecision = "allow" | "allow-session" | "deny";
 
 export interface SessionApprovalRequest {
@@ -81,7 +87,9 @@ export type RecordablePermissionEvent = (
 export type SessionEventPayload =
   | { type: "state.updated"; key: string; value: unknown }
   | { type: "run.budget.exceeded"; runId: string; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
-  | { type: "session.created"; metadata?: Record<string, unknown>; runtime?: RuntimeDescriptor }
+  | { type: "session.created"; metadata?: Record<string, unknown>; runtime?: RuntimeDescriptor; fork?: SessionForkOrigin }
+  | { type: "session.fork.ready" }
+  | { type: "history.omitted"; reason: "permission" | "unconsumed-input" | "application-state" | "fork-initialization" }
   | { type: "runtime.state.saved"; runtime: RuntimeDescriptor; state: unknown }
   | { type: "runtime.changed"; runtime: RuntimeDescriptor; state?: unknown }
   | { type: "input.generated"; runId: string; step: number; messages: readonly UserMessage[]; reason: string }
@@ -90,6 +98,7 @@ export type SessionEventPayload =
   | { type: "input.steering.delivered"; runId: string; step: number; inputIds: readonly string[] }
   | { type: "input.steering.finished"; inputIds: readonly string[]; status: "idle" | "cancelled"; reason: string }
   | { type: "run.started"; runId: string; continuation?: boolean; checkpointVersion?: 1 }
+  | { type: "run.settled"; runId: string; hostCompleted?: true }
   | { type: "tool.started"; runId: string; step: number; call: ToolCall; input?: unknown }
   | { type: "run.interrupted"; runId: string; recoveries: readonly SessionRecovery[] }
   | { type: "recovery.resolved"; recoveryId: string; message: UserMessage }

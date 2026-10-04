@@ -19,7 +19,7 @@ test("configured task tools use normal permissions and terminal controls keep re
   };
   assert.equal(resolveMaybeCodeMcp(config, directory).servers[0].tasks, true);
   const modelRequests = []; const taskJournal = new McpTaskJournal(new InMemoryMcpCredentialStore());
-  const app = await openConfiguredMaybeCode({ workspace: directory, dataDirectory: join(directory, "data"),
+  const app = await openConfiguredMaybeCode({ git: false, workspace: directory, dataDirectory: join(directory, "data"),
     mcpInteractions: true, instructions: "Private Session instruction", retry: false, observability: false,
   }, { loadConfig: async () => config, openMcp: (options) => { assert.ok(options.taskJournal); return openMcpClientPool({ ...options, taskJournal }); },
     createModel(selection) {
@@ -72,7 +72,7 @@ test("MCP user commands preview safely, explicitly attach to one Session, and ca
   t.after(() => rm(directory, { recursive: true, force: true }));
   const pool = await openMcpClientPool({ servers: [{ id: "remote", transport: "streamable-http", url: `${fixture.url}/modern`, requestTimeoutMs: 1000 }] });
   const requests = [];
-  const app = await MaybeCodeWorkspace.open({ workspace: directory, store: new FileSessionStore(join(directory, "sessions")),
+  const app = await MaybeCodeWorkspace.open({ git: false, workspace: directory, store: new FileSessionStore(join(directory, "sessions")),
     catalog: new InMemorySessionCatalog(), mcp: pool, toolSource: () => pool.tools, tools: [], closeOwnedResources: () => pool.close(),
     model: { async *stream(request) {
       requests.push(request);
@@ -135,7 +135,7 @@ test("configured Host reviews share only the workspace and use a separately boun
   };
   assert.deepEqual(resolveMaybeCodeMcp(config, directory).servers[0].host, { roots: true, sampling: true });
   const sampled = [];
-  const app = await openConfiguredMaybeCode({ workspace: directory, dataDirectory: join(directory, "data"),
+  const app = await openConfiguredMaybeCode({ git: false, workspace: directory, dataDirectory: join(directory, "data"),
     mcpInteractions: true, instructions: "Private Session instructions must not reach the sampler", retry: false, observability: false,
   }, { loadConfig: async () => config, createModel(selection) {
     if (selection.options.maxTokens === 32) {
@@ -187,7 +187,7 @@ test("MCP terminal forms resolve nested preparation and Run requests outside the
   t.after(() => rm(directory, { recursive: true, force: true }));
   const pool = await openMcpClientPool({ interactions: new McpInteractionBroker(), servers: [{ id: "remote", transport: "streamable-http", url: `${fixture.url}/modern` }] });
   const modelRequests = [];
-  const app = await MaybeCodeWorkspace.open({ workspace: directory, store: new FileSessionStore(join(directory, "sessions")),
+  const app = await MaybeCodeWorkspace.open({ git: false, workspace: directory, store: new FileSessionStore(join(directory, "sessions")),
     catalog: new InMemorySessionCatalog(), mcp: pool, toolSource: () => pool.tools, tools: [], closeOwnedResources: () => pool.close(),
     model: { async *stream(request, { step }) {
       modelRequests.push(request);

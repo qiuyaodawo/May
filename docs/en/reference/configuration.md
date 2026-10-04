@@ -5,6 +5,24 @@ MaybeCode accepts `apps.maybecode.plugins`; MaybeClaw May Agents accept
 package specifier, optional export name, configuration and enabled flag. Resolution
 uses the configuration file's directory. See [Plugins](../guides/plugins.md).
 
+## MaybeCode project Git management
+
+`apps.maybecode.git` defaults to `{}` and accepts `false` to disable project Git
+management. Its object supports `autoCommit` (default `true`), `readOnly`
+(default `false`), `dataRoot`, `worktreesRoot` and `excludedPaths` (an array of
+project paths). Configuration paths use the configuration file's directory.
+Metadata and worktree roots must be outside the project repository. Existing
+repositories are reused; new projects receive a repository and initial checkpoint.
+Automatic commits happen after complete requests and retain project ignore rules.
+
+`autoCommit: false` keeps Git observation and existing-version checkpoints while
+retaining uncommitted files. `readOnly: true` prevents Git initialization and mutation
+and denies project-changing built-in tools. A headless host can enforce approval
+through `git.authorizeCommit`.
+These Git settings are independent of tool approval mode. See
+[Git workspaces and checkpoints](../guides/git-workspaces.md) for Session forks,
+worktree lifecycle, excluded files and restore previews.
+
 ## MaybeCode permission mode
 
 `apps.maybecode.permissionMode` accepts `"default"` (the default) or `"yolo"`.

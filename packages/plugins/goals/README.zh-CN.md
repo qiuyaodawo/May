@@ -9,5 +9,8 @@
 恢复时保留已完成的目标，并暂停被中断的目标，等待用户明确继续。Token 统计使用
 provider 返回的实际 usage。`validateBudget` 和 `verify` 保留 `@may/goal` 的含义。
 `createAgent(application)` 可以通过插件管理的 delegation host 执行目标 Run。
+`goalsService` 提供的 controller 支持
+`wrapModel(model, { includeInstructions: false })`，子模型遵守 Goal 的 token 计量、
+预算和取消信号，并使用子任务的指令。
 
 参见 [English version](README.md)。

@@ -119,6 +119,16 @@ Session 通过 `AgentRuntime` 执行。默认实现为 `May`；自定义 runtime
 可以共同管理 Context 和其他资源。Session 保存 runtime 身份及具有版本的状态。
 替换期间，在插件服务仍然可用时保存状态并关闭旧 runtime，恢复新 runtime 后允许执行。
 
+完整请求通过 `run.settled` 保存状态边界后，可以作为分支位置。`Session.fork()`
+将选定位置的历史复制到独立身份，并持久记录来源位置。Context、provider continuation
+和 Runtime 状态使用该边界；应用状态通过声明选择。审批授权和未消费输入保持独立。
+`AgentApplication` 提供 Skills 与声明的插件状态恢复，`AgentWorkspace` 提供 Session
+分支树和关联目录的生命周期。Git 版本和 worktree 由工作区宿主管理。
+`Session.fork({ deferForkReady: true, ... })` 将持久化就绪标记交给 `saveForkReady()`。
+`AgentApplication` 在验证、created Hooks、工具检查和排队状态写入全部成功后保存标记。
+初始化失败时保留部分历史，拒绝恢复和分支。`AgentWorkspace` 在关闭或替换来源之前
+保存新 Session 的 Catalog 记录；Catalog 失败时保留新历史，来源 Application 继续活动。
+
 ### `@may/plugin`
 
 Plugin package 负责组合验证、带类型和版本的服务、范围初始化、配置与状态验证、

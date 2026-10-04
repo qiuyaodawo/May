@@ -47,6 +47,7 @@ test("relays live run events and stores only durable session facts", async () =>
       "run.started",
       "assistant.completed",
       "run.completed",
+      "run.settled",
     ],
   );
 
@@ -282,6 +283,7 @@ test("records approval decisions before their tool outcomes", async () => {
       "tool.completed",
       "assistant.completed",
       "run.completed",
+      "run.settled",
     ],
   );
   const approval = history.find((event) => event.type === "approval.requested");
@@ -440,7 +442,7 @@ test("continues a failed run without recording another user input", async () => 
     ),
     [false, true],
   );
-  assert.equal(history.at(-1).type, "run.completed");
+  assert.equal(history.at(-1).type, "run.settled");
 });
 
 test("preserves cancellation and records its reason", async () => {
@@ -773,8 +775,8 @@ test("replays the latest compacted context without deleting history", async () =
     {
       type: "context.compacted",
       sessionId: "compacted",
-      seq: 6,
-      timestamp: history[5].timestamp,
+      seq: 7,
+      timestamp: history[6].timestamp,
       strategy: "test",
       messages: compactedMessages,
       beforeMessageCount: 2,

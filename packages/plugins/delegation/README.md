@@ -23,6 +23,9 @@ package and its documented `host`, `configuration`, `budget`, `files`,
 The default Context budget derives from the active Model's limits. Explicit
 `contextBudget` takes priority, and role-specific models retain their separately
 configured limits and Context budgets.
+When `goalsService` is available, default and role-specific child models share
+the Goal's token accounting, budget checks and cancellation signal. Their own
+Context retains the delegated task's instructions.
 
 When an application provides `mcpService`, delegation declares that optional
 dependency and obtains the pool's current tool catalog for each child Run.

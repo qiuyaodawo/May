@@ -64,9 +64,17 @@ definition/open 分界时，才直接调用 `AgentApplication.open()`；只有 C
 - 一个 `PermissionPolicy`。
 
 `definition.open()` 必须提供一个 `SessionStore`，并可为本次 Session 提供 `sessionId`、
-`resume`、`metadata` 和 `contextMetadata`。Definition option 会明确拒绝这五项
-Session-bound 输入，避免一个可复用 definition 意外捕获单个对话身份。其余行为均是
+`resume`、`fork`、`metadata` 和 `contextMetadata`。Definition option 会明确拒绝这些
+Session-bound 输入，保持单个对话身份与可复用 definition 分别配置。其余行为均是
 definition 阶段的明确可选选择：
+
+`fork: { sessionId, positionSeq }` 使用 `branchPositions()` 返回的可用位置创建独立
+Session。Skills 激活状态来自选定位置。Definition 通过 `forkStateKeys` 和
+`forkPluginIds` 声明需要继承的应用及插件状态，通过 `forkStateTransform` 调整资源
+位置；审批授权、活动资源和未消费输入保持
+独立。工作区工厂接收 `selection.fork`、`selection.workspace` 和可选的
+`selection.metadata`，宿主使用这些信息重建指定目录的 application。
+`workspacePaths` 将相关 worktree 目录加入 Session 列表和分支树浏览范围。
 
 - `tools` 默认不包含产品工具；
 - `toolScheduler` 默认使用 Core 的串行 scheduler；

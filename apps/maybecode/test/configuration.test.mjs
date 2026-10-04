@@ -63,7 +63,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   let request;
   let contextOptions;
   const app = await openConfiguredMaybeCode(
-    {
+    { git: false,
       skills: false,
       workspace: directory,
       dataDirectory: join(directory, "data"),
@@ -166,7 +166,7 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
   let closed = false;
   let releaseEvents;
   const app = await openConfiguredMaybeCode(
-    {
+    { git: false,
       workspace: directory,
       dataDirectory: join(directory, "data"),
       autoResume: false,
@@ -296,7 +296,7 @@ test("writes configured content-free traces and flushes them on close", async (t
   const dataDirectory = join(directory, "data");
   const traceDirectory = join(dataDirectory, "telemetry");
   const app = await openConfiguredMaybeCode(
-    { workspace: directory, dataDirectory, autoResume: false },
+    { git: false, workspace: directory, dataDirectory, autoResume: false },
     {
       async loadConfig() {
         return {
@@ -530,7 +530,7 @@ test("switches configured model profiles by prefix without changing sessions", a
   const created = [];
   const persistedDefaults = [];
   const app = await openConfiguredMaybeCode(
-    {
+    { git: false,
       workspace: directory,
       dataDirectory: join(directory, "data"),
       autoResume: false,
@@ -620,7 +620,7 @@ test("switches supported reasoning effort without duplicating model profiles", a
   const directory = await temporaryDirectory(t);
   const createdEfforts = [];
   const app = await openConfiguredMaybeCode(
-    {
+    { git: false,
       workspace: directory,
       dataDirectory: join(directory, "data"),
       autoResume: false,
@@ -773,7 +773,7 @@ test("configured MaybeCode automatically retries transient model failures", asyn
   const directory = await temporaryDirectory(t);
   let attempts = 0;
   const app = await openConfiguredMaybeCode(
-    {
+    { git: false,
       workspace: directory,
       dataDirectory: join(directory, "data"),
       autoResume: false,
@@ -834,7 +834,7 @@ test(
     for (const workspace of ["E:codeept", "E:"]) {
       await assert.rejects(
         openConfiguredMaybeCode(
-          { workspace },
+          { git: false, workspace },
           {
             async loadConfig() {
               throw new Error("config should not be loaded");
@@ -861,7 +861,7 @@ async function openWithCapturedOpenAIContext(t, apps) {
   const directory = await temporaryDirectory(t);
   let contextOptions;
   const app = await openConfiguredMaybeCode(
-    {
+    { git: false,
       workspace: directory,
       dataDirectory: join(directory, "data"),
       autoResume: false,

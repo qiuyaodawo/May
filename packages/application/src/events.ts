@@ -41,7 +41,15 @@ export interface AgentSessionChangedEvent {
   readonly resumed: boolean;
 }
 
+export interface AgentSessionForkedEvent {
+  readonly type: "session.forked";
+  readonly sessionId: string;
+  readonly sourceId: string;
+  readonly positionSeq: number;
+  readonly workspace: string;
+}
+
 export type AgentWorkspaceEvent<
   ApplicationEvent = AgentApplicationEvent,
   ExtensionEvent = never,
-> = ApplicationEvent | AgentSessionChangedEvent | ExtensionEvent;
+> = ApplicationEvent | AgentSessionChangedEvent | AgentSessionForkedEvent | ExtensionEvent;

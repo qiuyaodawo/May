@@ -19,6 +19,6 @@ export function localModel() {
 
 export async function yoloWorkspace(options = {}) {
   const workspace = options.workspace ?? await yoloDirectory();
-  return MaybeCodeWorkspace.open({ workspace, model: localModel(), store: new InMemorySessionStore(),
+  return MaybeCodeWorkspace.open({ git: false, workspace, model: localModel(), store: new InMemorySessionStore(),
     catalog: new InMemorySessionCatalog(), instructions: "Local permission tests", skills: false, ...options });
 }

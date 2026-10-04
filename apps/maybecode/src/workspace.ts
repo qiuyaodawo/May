@@ -1,8 +1,12 @@
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 import { mediaHistory } from "./media-history.js";
+import { MaybeCodeUsageError } from "./errors.js";
 import { createCodingPermissionPolicy, parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 
 import { AgentWorkspace } from "@may/application";
+import { GitCheckpointError, GitWorkspaceConflictError, ProjectGitWorkspace, type ProjectGitWorkspaceOptions, type GitRestorePreview } from "@may/application/git-workspace";
+import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@may/ui-client";
 import type {
   ContextBudget,
   ContextCompactionResult,
@@ -62,6 +66,8 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
   MaybeCodeApplicationOptions,
   "sessionId" | "resume"
 > {
+  readonly git?: false | Omit<ProjectGitWorkspaceOptions, "workspace">;
+  readonly configureWorkspace?: (workspace: string) => Partial<MaybeCodeApplicationOptions> | Promise<Partial<MaybeCodeApplicationOptions>>;
   readonly permissionMode?: MaybeCodePermissionMode;
   readonly catalog: SessionCatalog;
   readonly sessionId?: string;
@@ -95,6 +101,8 @@ type ActiveWorkspaceOptions = Omit<
 
 interface WorkspaceState {
   options: ActiveWorkspaceOptions;
+  readonly rootWorkspace: string;
+  readonly git: Map<string, ProjectGitWorkspace>;
 }
 
 type BaseWorkspace = AgentWorkspace<
@@ -108,7 +116,6 @@ type BaseWorkspace = AgentWorkspace<
 /** MaybeCode model policy around the reusable multi-session workspace. */
 export class MaybeCodeWorkspace implements MaybeCodeController {
   readonly events: AsyncIterable<MaybeCodeEvent>;
-  readonly workspace: string;
 
   private readonly manager: BaseWorkspace;
   private readonly state: WorkspaceState;
@@ -134,11 +141,13 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   private readonly pendingInputs = new Set<AbortController>();
   private inputEpoch = 0;
   private pendingSteering = 0;
+  private readonly restorePreviews = new Map<string, { readonly sessionId: string; readonly preview: GitRestorePreview }>();
+  private workspaceOperation: Promise<unknown> | undefined;
+  private worktreeProcessId: string | undefined;
 
   private constructor(state: WorkspaceState, manager: BaseWorkspace) {
     this.state = state;
     this.manager = manager;
-    this.workspace = manager.workspace;
     this.events = this.eventQueue;
     this.managerEventRelay = this.relayEvents(manager.events);
     this.connectMcpEvents();
@@ -148,16 +157,26 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     options: MaybeCodeWorkspaceOptions,
   ): Promise<MaybeCodeWorkspace> {
     const state: WorkspaceState = {
+      rootWorkspace: resolve(options.workspace),
+      git: new Map(),
       options: withoutSelection({
         ...options,
         permissionMode: parsePermissionMode(options.permissionMode ?? "default"),
         workspace: resolve(options.workspace),
       }),
     };
-    state.options = { ...state.options, permissionPolicy: createCodingPermissionPolicy({
+    const permissionPolicy = createCodingPermissionPolicy({
       mode: () => state.options.permissionMode ?? "default",
       ...(options.permissionPolicy === undefined ? {} : { policy: options.permissionPolicy }),
-    }) };
+    });
+    state.options = { ...state.options, permissionPolicy: check => {
+      if (state.options.git && state.options.git.readOnly && !["read", "skill_read", "session_history", "session_history_search", "session_history_read", "get_context_remaining", "context_notes", "new_context", "get_goal"].includes(check.tool.name)) return "deny";
+      return permissionPolicy(check);
+    } };
+    if (state.options.git !== false) state.git.set(state.rootWorkspace, await ProjectGitWorkspace.open({
+      ...state.options.git, workspace: state.rootWorkspace,
+      excludedPaths: [...(state.options.git?.excludedPaths ?? []), ...workspaceStoragePaths(state.options, state.rootWorkspace)],
+    }));
     const manager = await AgentWorkspace.open<
       MaybeCodeSessionEvent,
       MaybeCodeProductEvent,
@@ -168,13 +187,51 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       workspace: state.options.workspace,
       store: state.options.store,
       catalog: state.options.catalog,
-      openApplication: (selection) => MaybeCodeApplication.open({
-        ...applicationOptions(state.options),
-        ...(selection.sessionId === undefined
-          ? {}
-          : { sessionId: selection.sessionId }),
-        resume: selection.resume,
-      }),
+      workspacePaths: async () => [state.rootWorkspace, ...((await state.git.get(state.rootWorkspace)?.listWorktrees()) ?? [])
+        .filter(tree => tree.status !== "deleted").map(tree => tree.workspace)],
+      openApplication: async (selection) => {
+        const workspace = selection.workspace ?? state.options.workspace;
+        if (workspace !== state.options.workspace && (state.options.tools || state.options.additionalTools || state.options.toolSource) && !state.options.configureWorkspace) {
+          throw new Error("Custom workspace tools require configureWorkspace before creating or opening a worktree");
+        }
+        const configured = await state.options.configureWorkspace?.(workspace);
+        let gitWorkspace = state.git.get(workspace);
+        if (state.options.git !== false && !gitWorkspace) {
+          gitWorkspace = await ProjectGitWorkspace.open({ ...state.options.git, workspace,
+            excludedPaths: [...(state.options.git?.excludedPaths ?? []), ...workspaceStoragePaths(state.options, workspace)] });
+          state.git.set(workspace, gitWorkspace);
+        }
+        let nextOptions: ActiveWorkspaceOptions = { ...state.options, ...configured, workspace,
+          modelRuntimeOptions: state.options.modelRuntimeOptions ?? configuredModelOptions(state.options, state.options.modelInfo?.profile) };
+        if (selection.fork) {
+          if (!state.options.store.inspect) throw new Error("Historical model selection requires read-only Session inspection");
+          const history = await state.options.store.inspect(selection.fork.sessionId);
+          const event = [...history].reverse().find(item => item.seq <= selection.fork!.positionSeq && item.type === "state.updated" && item.key === "maybecode.model");
+          if (event?.type === "state.updated") {
+            const saved = readHistoricalModel(event.value);
+            if (saved.profile && nextOptions.createModelConfiguration) {
+              const configuration = await nextOptions.createModelConfiguration(saved.profile, saved.runtimeOptions);
+              assertHistoricalModel(saved, configuration.modelInfo);
+              nextOptions = withModelConfiguration(nextOptions, configuration, saved.runtimeOptions);
+            } else {
+              assertHistoricalModel(saved, nextOptions.modelInfo);
+              nextOptions = { ...nextOptions, modelRuntimeOptions: saved.runtimeOptions };
+            }
+          }
+        }
+        const app = await MaybeCodeApplication.open({ ...applicationOptions(nextOptions),
+          ...(gitWorkspace ? { gitWorkspace } : {}),
+          ...(selection.fork ? { fork: selection.fork } : {}),
+          ...(selection.metadata ? { sessionMetadata: selection.metadata } : {}),
+          ...(selection.sessionId ? { sessionId: selection.sessionId } : {}), resume: selection.resume });
+        if (gitWorkspace && !gitWorkspace.readOnly && (await gitWorkspace.status()).state !== "unmanaged" &&
+            !(await gitWorkspace.checkpoints(app.sessionId)).some(checkpoint => checkpoint.status !== "failed")) {
+          try { await gitWorkspace.prepare(app.sessionId); }
+          catch (error) { await app.close(); throw error; }
+        }
+        state.options = nextOptions;
+        return app;
+      },
       ...(options.sessionId === undefined
         ? {}
         : { sessionId: options.sessionId }),
@@ -182,11 +239,276 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
         ? {}
         : { autoResume: options.autoResume }),
     });
-    return new MaybeCodeWorkspace(state, manager);
+    const product = new MaybeCodeWorkspace(state, manager);
+    await product.syncWorktreeProcess();
+    return product;
   }
 
   get sessionId(): string {
     return this.manager.sessionId;
+  }
+
+  get workspace(): string { return this.manager.workspace; }
+
+  private get git(): ProjectGitWorkspace | undefined { return this.state.git.get(this.workspace); }
+
+  async getWorkspaceGit(): Promise<UiWorkspaceGit> {
+    if (!this.git) return { path: this.workspace, status: "disabled", autoCommit: false };
+    try {
+      const status = await this.git.status();
+      return { path: this.workspace, status: status.state === "unborn" ? "initializing" : status.state === "unmanaged" ? "disabled" : "ready",
+        autoCommit: status.autoCommit && !status.readOnly, detached: status.detached,
+        ...(status.branch ? { branch: status.branch } : {}), ...(status.commit ? { commit: status.commit } : {}) };
+    } catch (error) {
+      return { path: this.workspace, status: "error", autoCommit: this.git.autoCommit, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  async getForkPoints(sessionId?: string): Promise<readonly UiForkPoint[]> {
+    const nodes = await this.manager.readSessionBranchTree();
+    const checkpoints = await this.git?.checkpoints() ?? [];
+    const sessions = await this.listSessions();
+    const worktrees = await this.git?.listWorktrees() ?? [];
+    const checkpointFor = (sourceId: string, runId: string): import("@may/application/git-workspace").GitCheckpoint | undefined => {
+      const seen = new Set<string>();
+      while (!seen.has(sourceId)) {
+        seen.add(sourceId);
+        const checkpoint = [...checkpoints].reverse().find(item => item.sessionId === sourceId && (item.runId === runId || item.runIds?.includes(runId)));
+        if (checkpoint) return checkpoint;
+        const source = nodes.find(node => node.sessionId === sourceId)?.fork;
+        if (!source) return undefined;
+        sourceId = source.sessionId;
+      }
+      throw new Error("Session branch lineage contains a cycle");
+    };
+    return nodes.flatMap(node => {
+      if (sessionId && node.sessionId !== sessionId) return [];
+      const workspace = sessions.find(session => session.id === node.sessionId)?.workspace;
+      const worktree = worktrees.find(tree => tree.workspace === workspace);
+      const workspaceReady = worktree === undefined || worktree.status === "ready";
+      return node.positions.map((position, index) => {
+        const checkpoint = checkpointFor(node.sessionId, position.runId);
+        const completeRequest = checkpoint?.runIds?.length ? checkpoint.runId === position.runId : true;
+        const parent = index ? node.positions[index - 1] : undefined;
+        return { id: `${node.sessionId}:${position.positionSeq}`, sessionId: node.sessionId, runId: position.runId,
+          createdAt: position.timestamp, userPreview: position.request, assistantPreview: position.response,
+          available: position.available && completeRequest && workspaceReady,
+          ...(!workspaceReady ? { reason: "The managed worktree did not finish initialization; inspect its diagnostic" } :
+            !completeRequest ? { reason: "The selected Run belongs to an unfinished part of this request" } : position.reason ? { reason: position.reason } : {}),
+          ...(parent ? { parentPointId: `${node.sessionId}:${parent.positionSeq}` } : node.fork ? { parentPointId: `${node.fork.sessionId}:${node.fork.positionSeq}` } : {}),
+          ...(checkpoint?.commit ? { commit: checkpoint.commit } : {}), ...(checkpoint?.branch ? { branch: checkpoint.branch } : {}),
+          worktreeAvailable: position.available && completeRequest && workspaceReady && this.git?.readOnly !== true && checkpoint?.commit !== undefined && ["committed", "unchanged"].includes(checkpoint.status) };
+      });
+    });
+  }
+
+  async forkSession(pointId: string, mode: "current" | "worktree"): Promise<string> {
+    return this.runWorkspaceOperation(() => this.forkWorkspaceSession(pointId, mode));
+  }
+
+  private async forkWorkspaceSession(pointId: string, mode: "current" | "worktree"): Promise<string> {
+    const point = (await this.getForkPoints()).find(item => item.id === pointId);
+    if (!point?.available) throw new Error(point?.reason ?? "Session history position is unavailable");
+    const positionSeq = Number(point.id.slice(point.sessionId.length + 1));
+    const git = this.git;
+    const checkpoint = await this.checkpointForRun(point.sessionId, point.runId);
+    const sourceWorkspace = (await this.listSessions()).find(session => session.id === point.sessionId)?.workspace;
+    if (!sourceWorkspace) throw new Error("Source Session workspace is unavailable");
+    let tree: Awaited<ReturnType<ProjectGitWorkspace["createWorktree"]>> | undefined;
+    if (mode === "worktree") {
+      if (!git || !checkpoint?.commit || !point.worktreeAvailable) throw new Error("Selected reply has no complete Git checkpoint");
+      tree = await git.createWorktree({ sessionId: point.sessionId, historyPosition: positionSeq, checkpointId: checkpoint.id });
+    }
+    let sessionId: string;
+    try {
+      sessionId = await this.manager.forkSession(point.sessionId, positionSeq, {
+        ...(tree ? { workspace: tree.workspace } : {}),
+        metadata: { workspaceFork: { mode, sourceWorkspace, sourceCommit: point.commit ?? null,
+          ...(tree ? { worktreeId: tree.id } : { currentFiles: true }) } },
+      });
+      if (tree) await git!.attachWorktreeSession(tree.id, sessionId);
+      await this.syncWorktreeProcess();
+    } catch (error) {
+      if (tree) await git!.failWorktree(tree.id, error);
+      throw error;
+    }
+    this.connectMcpEvents();
+    return sessionId;
+  }
+
+  async getCheckpoints(sessionId = this.sessionId): Promise<readonly UiCheckpoint[]> {
+    const points = await this.getForkPoints(sessionId);
+    const checkpoints = await this.git?.checkpoints() ?? [];
+    const sourceIds = [sessionId];
+    while (true) {
+      const created = (await this.manager.readSessionHistory(sourceIds[sourceIds.length - 1]!))[0];
+      if (created?.type !== "session.created" || !created.fork) break;
+      if (sourceIds.includes(created.fork.sessionId)) throw new Error("Session branch lineage contains a cycle");
+      sourceIds.push(created.fork.sessionId);
+      if (!(await this.listSessions()).some(session => session.id === created.fork!.sessionId)) break;
+    }
+    return points.map(point => {
+      let checkpoint: import("@may/application/git-workspace").GitCheckpoint | undefined;
+      for (const sourceId of sourceIds) {
+        checkpoint = [...checkpoints].reverse().find(item => item.sessionId === sourceId && (item.runId === point.runId || item.runIds?.includes(point.runId)));
+        if (checkpoint) break;
+      }
+      return { runId: point.runId, pointId: point.id,
+        ...(checkpoint?.fromCommit ? { startCommit: checkpoint.fromCommit } : {}), ...(checkpoint?.commit ? { endCommit: checkpoint.commit } : {}),
+        ...(checkpoint?.branch ? { branch: checkpoint.branch } : {}),
+        status: checkpoint?.status === "failed" ? "failed" as const : !checkpoint || checkpoint.status === "uncommitted" ? "unavailable" as const : "saved" as const,
+        ...(checkpoint?.error ? { error: checkpoint.error } : {}),
+      };
+    });
+  }
+
+  private async checkpointForRun(sessionId: string, runId: string): Promise<import("@may/application/git-workspace").GitCheckpoint | undefined> {
+    if (!this.git) return undefined;
+    const seen = new Set<string>();
+    while (!seen.has(sessionId)) {
+      seen.add(sessionId);
+      const checkpoint = await this.git.checkpointByRun(sessionId, runId);
+      if (checkpoint) return checkpoint;
+      const created = (await this.manager.readSessionHistory(sessionId))[0];
+      if (created?.type !== "session.created" || !created.fork) return undefined;
+      sessionId = created.fork.sessionId;
+    }
+    throw new Error("Session branch lineage contains a cycle");
+  }
+
+  async getWorktrees(): Promise<readonly UiWorktree[]> {
+    return ((await this.git?.listWorktrees()) ?? []).filter(tree => tree.status !== "deleted").map(tree => ({
+      id: tree.id, path: tree.workspace, branch: tree.branch, sourceSessionId: tree.sourceSessionId,
+      pointId: `${tree.sourceSessionId}:${tree.historyPosition}`, commit: tree.commit, sessionIds: tree.sessions,
+      status: tree.status === "failed" ? "error" : tree.status === "creating" ? "creating" : "ready", ...(tree.error ? { error: tree.error } : {}),
+    }));
+  }
+
+  async openWorktree(id: string): Promise<void> {
+    return this.runWorkspaceOperation(() => this.openWorkspaceWorktree(id));
+  }
+
+  private async openWorkspaceWorktree(id: string): Promise<void> {
+    const tree = (await this.getWorktrees()).find(item => item.id === id);
+    if (!tree || tree.status !== "ready") throw new Error("Managed worktree is unavailable");
+    const session = (await this.listSessions()).find(item => tree.sessionIds.includes(item.id));
+    if (!session) throw new Error("Worktree has no available Session");
+    await this.resumeWorkspaceSession(session.id);
+  }
+
+  async deleteWorktree(id: string): Promise<void> {
+    return this.runWorkspaceOperation(() => this.deleteWorkspaceWorktree(id));
+  }
+
+  private async deleteWorkspaceWorktree(id: string): Promise<void> {
+    const git = this.requireGit();
+    const tree = (await git.listWorktrees()).find(item => item.id === id);
+    if (!tree) throw new Error("Managed worktree is unavailable");
+    if (tree.workspace === this.workspace) throw new Error("Switch to another workspace before deleting this worktree");
+    for (const sessionId of tree.sessions) {
+      if ((await this.listSessions()).some(session => session.id === sessionId)) throw new Error("Delete or move associated Sessions before deleting this worktree");
+      await git.attachWorktreeSession(id, sessionId, false);
+    }
+    await git.deleteWorktree(id);
+  }
+
+  async getChanges(query: { readonly scope: "run" | "session" | "workspace"; readonly runId?: string; readonly commit?: string }): Promise<UiWorkspaceDiff> {
+    const git = this.requireGit();
+    const checkpoints = await git.checkpoints(this.sessionId);
+    let from: string | undefined;
+    let to: string | undefined;
+    if (query.scope === "run") {
+      if (!query.runId) throw new Error("Run changes require a runId");
+      const checkpoint = await this.checkpointForRun(this.sessionId, query.runId);
+      from = checkpoint?.fromCommit; to = checkpoint?.status === "uncommitted" || checkpoint?.status === "failed" ? undefined : checkpoint?.commit;
+    } else if (query.scope === "session") {
+      const last = checkpoints[checkpoints.length - 1];
+      from = checkpoints[0]?.commit; to = last?.status === "uncommitted" || last?.status === "failed" ? undefined : last?.commit;
+    } else from = query.commit ?? (await git.status()).commit;
+    if (!from) throw new Error("Git comparison has no available initial version");
+    const diff = await git.diff({ from, ...(to ? { to } : {}) });
+    const files = diff.files.map(file => ({ path: file.path, ...(file.previousPath ? { previousPath: file.previousPath } : {}),
+      status: file.status === "typechanged" || file.status === "unknown" ? "modified" as const : file.status,
+      binary: file.binary, additions: file.insertions, deletions: file.deletions, patch: file.patch }));
+    return { scope: query.scope, title: query.scope === "run" ? "本轮文件变化" : query.scope === "session" ? "Session 文件变化" : "当前工作区文件变化",
+      from: diff.from, ...(diff.to ? { to: diff.to } : {}), ...(query.runId ? { runId: query.runId } : {}), uncommitted: !diff.to, files };
+  }
+
+  async previewRestore(runId: string, paths: readonly string[]): Promise<{ previewId: string; diff: UiWorkspaceDiff }> {
+    return this.runWorkspaceOperation(() => this.previewWorkspaceRestore(runId, paths));
+  }
+
+  private async previewWorkspaceRestore(runId: string, paths: readonly string[]): Promise<{ previewId: string; diff: UiWorkspaceDiff }> {
+    const git = this.requireGit();
+    if (git.readOnly) throw new Error("File restoration is disabled in a read-only workspace");
+    const checkpoint = await this.checkpointForRun(this.sessionId, runId);
+    if (!checkpoint) throw new Error("Run has no Git checkpoint");
+    const preview = await git.previewRestore({ checkpointId: checkpoint.id, paths });
+    const previewId = randomUUID();
+    this.restorePreviews.clear();
+    this.restorePreviews.set(previewId, { sessionId: this.sessionId, preview });
+    return { previewId, diff: { scope: "run", runId, title: "文件恢复预览", to: preview.commit,
+      uncommitted: true, restorePreviewId: previewId, files: preview.files.map(file => ({
+        path: file.path, status: file.targetMode === undefined ? "deleted" : file.beforeFingerprint === undefined ? "added" : "modified",
+        binary: file.binary, additions: 0, deletions: 0, patch: file.patch,
+      })) } };
+  }
+
+  async restoreFiles(previewId: string): Promise<void> {
+    return this.runWorkspaceOperation(() => this.manager.runStateTransition(() => this.restoreWorkspaceFiles(previewId)));
+  }
+
+  private async restoreWorkspaceFiles(previewId: string): Promise<void> {
+    const saved = this.restorePreviews.get(previewId);
+    if (!saved || saved.sessionId !== this.sessionId || saved.preview.workspace !== this.workspace) throw new Error("File restore preview is no longer available");
+    try {
+      const checkpoint = await this.requireGit().restore(saved.preview, { sessionId: this.sessionId, commitMessage: "Restore selected files from a session checkpoint" });
+      this.restorePreviews.delete(previewId);
+      this.eventQueue.push({ type: "workspace.git.changed", checkpoint });
+    } catch (error) {
+      if (error instanceof GitCheckpointError) this.eventQueue.push({ type: "workspace.git.changed", checkpoint: error.checkpoint });
+      throw error;
+    }
+  }
+
+  private requireGit(): ProjectGitWorkspace {
+    if (!this.git) throw new Error("Git workspace management is disabled");
+    return this.git;
+  }
+
+  private assertWorkspaceIdle(): void {
+    this.throwIfClosed();
+    if (this.isRunning || this.getGoal()?.status === "active" || this.getMcpInteractions().length) throw new Error("Finish the active operation before changing the workspace");
+  }
+
+  private assertNoWorkspaceOperation(): void {
+    this.throwIfClosed();
+    if (this.workspaceOperation) throw new GitWorkspaceConflictError("Finish the active workspace operation before changing Session state");
+  }
+
+  private runWorkspaceOperation<T>(work: () => Promise<T>, requireIdle = true): Promise<T> {
+    if (requireIdle) this.assertWorkspaceIdle(); else this.assertNoWorkspaceOperation();
+    if (this.getGoal()?.status === "active") throw new GitWorkspaceConflictError("Pause or finish the active Goal before changing the workspace");
+    const previousSessionId = this.sessionId;
+    const previousOptions = this.state.options;
+    const operation = Promise.resolve().then(work).catch(error => {
+      if (this.sessionId === previousSessionId) this.state.options = previousOptions;
+      throw error;
+    });
+    this.workspaceOperation = operation;
+    return operation.finally(() => { if (this.workspaceOperation === operation) this.workspaceOperation = undefined; });
+  }
+
+  private async syncWorktreeProcess(): Promise<void> {
+    const git = this.state.git.get(this.state.rootWorkspace);
+    if (!git || git.readOnly) return;
+    const tree = (await git.listWorktrees()).find(item => item.workspace === this.workspace && item.status === "ready");
+    if (this.worktreeProcessId && this.worktreeProcessId !== tree?.id) await git.trackWorktreeProcess(this.worktreeProcessId, process.pid, false);
+    this.worktreeProcessId = tree?.id;
+    if (tree) {
+      await git.attachWorktreeSession(tree.id, this.sessionId);
+      await git.trackWorktreeProcess(tree.id, process.pid);
+    }
   }
 
   get permissionMode(): MaybeCodePermissionMode {
@@ -194,6 +516,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   async setPermissionMode(mode: MaybeCodePermissionMode): Promise<void> {
+    this.assertNoWorkspaceOperation();
     this.throwIfClosed();
     parsePermissionMode(mode);
     await this.manager.runStateTransition(() => {
@@ -207,7 +530,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   get isRunning(): boolean {
-    return this.manager.isRunning || this.mcpOperationController !== undefined || this.pendingInputs.size > 0 || this.pendingSteering > 0;
+    return this.workspaceOperation !== undefined || this.manager.isRunning || this.mcpOperationController !== undefined || this.pendingInputs.size > 0 || this.pendingSteering > 0;
   }
 
   get instructions(): MaybeCodeInstructions {
@@ -225,6 +548,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   getSkillDiagnostics() { return this.manager.activeApplication.skills?.registry.diagnostics ?? []; }
 
   readSkill(name: string) {
+    this.assertNoWorkspaceOperation();
     return this.manager.runStateTransition(async (app) => {
       if (!app.skills) throw new Error("Skills are disabled");
       return app.skills.listActive().find((item) => item.name === name) ?? app.skills.registry.load(name);
@@ -232,10 +556,12 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   activateSkill(name: string) {
+    this.assertNoWorkspaceOperation();
     return this.manager.runStateTransition((app) => app.activateSkill(name));
   }
 
   submitSkill(name: string, input: string): Promise<MaybeCodeRun> {
+    this.assertNoWorkspaceOperation();
     return this.manager.submitPrepared(async () => {
       await this.manager.activeApplication.activateSkill(name);
       return { input: `Use the ${name} skill for this task:\n${input}` };
@@ -284,6 +610,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   async refreshMcp(serverId?: string): Promise<void> {
+    this.assertNoWorkspaceOperation();
     this.throwIfClosed();
     const mcp = this.mcp;
     if (mcp?.refresh === undefined) throw new Error("MCP refresh is unavailable");
@@ -291,6 +618,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   async reconnectMcp(serverId: string): Promise<void> {
+    this.assertNoWorkspaceOperation();
     this.throwIfClosed();
     const mcp = this.mcp;
     if (mcp?.reconnect === undefined) throw new Error("MCP reconnect is unavailable");
@@ -357,17 +685,18 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   watchMcpResource(serverId: string, uri: string): Promise<McpResourceSubscription> {
     return this.mcpOperation(async (signal) => {
-      const key = JSON.stringify([serverId, uri]);
+      const owner = this.mcpOwner();
+      const key = JSON.stringify([owner.workspaceId, owner.sessionId, serverId, uri]);
       if (this.mcpWatches.has(key)) return this.mcpWatches.get(key)!;
       const watch = await this.mcpMethod("subscribeResource")(serverId, uri, { signal, owner: this.mcpOwner() });
       this.mcpWatches.set(key, watch);
       void (async () => {
         for await (const event of watch.events) {
-          if (!this.closed) this.eventQueue.push({ type: "mcp.resource.updated", serverId, uri: event.uri });
+          if (!this.closed && owner.workspaceId === this.workspace && owner.sessionId === this.sessionId) this.eventQueue.push({ type: "mcp.resource.updated", serverId, uri: event.uri });
         }
         const reason = await watch.closed;
         if (this.mcpWatches.get(key) === watch) this.mcpWatches.delete(key);
-        if (!this.closed) this.eventQueue.push({ type: "mcp.resource.watch-closed", serverId, uri, reason });
+        if (!this.closed && owner.workspaceId === this.workspace && owner.sessionId === this.sessionId) this.eventQueue.push({ type: "mcp.resource.watch-closed", serverId, uri, reason });
       })();
       return watch;
     });
@@ -375,7 +704,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   async unwatchMcpResource(serverId: string, uri: string): Promise<void> {
     this.throwIfClosed();
-    await this.mcpWatches.get(JSON.stringify([serverId, uri]))?.close();
+    await this.mcpWatches.get(JSON.stringify([this.workspace, this.sessionId, serverId, uri]))?.close();
   }
 
   private mcpMethod<K extends "readResource" | "readResourceTemplate" | "getPrompt" | "complete" | "subscribeResource" | "getTask" | "updateTask" | "waitTask" | "cancelTask" | "forgetTask">(method: K): McpClientPool[K] {
@@ -395,6 +724,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   async submit(options: SessionSubmitOptions): Promise<MaybeCodeRun> {
+    this.assertNoWorkspaceOperation();
     const controller = new AbortController();
     this.pendingInputs.add(controller);
     try {
@@ -403,6 +733,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   async steer(options: SessionSteerOptions) {
+    this.assertNoWorkspaceOperation();
     const epoch = this.inputEpoch;
     this.pendingSteering++;
     try {
@@ -417,13 +748,15 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   getGoal() { return this.manager.activeApplication.getGoal(); }
   startGoal(objective: string, budget?: import("@may/goal").GoalBudget) {
+    this.assertNoWorkspaceOperation();
     return this.manager.runStateTransition(app => app.startGoal(objective, budget));
   }
-  resumeGoal() { return this.manager.runStateTransition(app => app.resumeGoal()); }
+  resumeGoal() { this.assertNoWorkspaceOperation(); return this.manager.runStateTransition(app => app.resumeGoal()); }
   pauseGoal() { return this.manager.runStateTransition(app => app.pauseGoal(), { requireIdle: false }); }
   cancelGoal() { return this.manager.runStateTransition(app => app.cancelGoal(), { requireIdle: false }); }
 
   retry(): Promise<MaybeCodeRun> {
+    this.assertNoWorkspaceOperation();
     return this.manager.retry();
   }
 
@@ -449,22 +782,41 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   async readSessionHistory(sessionId: string) { return mediaHistory(await this.manager.readSessionHistory(sessionId)); }
 
   async newSession(): Promise<string> {
+    return this.runWorkspaceOperation(() => this.newWorkspaceSession(), false);
+  }
+
+  private async newWorkspaceSession(): Promise<string> {
     const sessionId = await this.manager.newSession();
+    await this.syncWorktreeProcess();
     this.connectMcpEvents();
     return sessionId;
   }
 
   async resumeSession(sessionId: string): Promise<void> {
+    return this.runWorkspaceOperation(() => this.resumeWorkspaceSession(sessionId), false);
+  }
+
+  private async resumeWorkspaceSession(sessionId: string): Promise<void> {
     await this.manager.resumeSession(sessionId);
+    await this.syncWorktreeProcess();
     this.connectMcpEvents();
   }
 
   renameSession(sessionId: string, title: string): Promise<void> {
+    this.assertNoWorkspaceOperation();
     return this.manager.renameSession(sessionId, title);
   }
 
-  deleteSession(sessionId: string): Promise<boolean> {
-    return this.manager.deleteSession(sessionId);
+  async deleteSession(sessionId: string): Promise<boolean> {
+    return this.runWorkspaceOperation(() => this.deleteWorkspaceSession(sessionId));
+  }
+
+  private async deleteWorkspaceSession(sessionId: string): Promise<boolean> {
+    const deleted = await this.manager.deleteSession(sessionId);
+    if (deleted && this.git) for (const tree of await this.git.listWorktrees()) {
+      if (tree.sessions.includes(sessionId)) await this.git.attachWorktreeSession(tree.id, sessionId, false);
+    }
+    return deleted;
   }
 
   async listModels(): Promise<readonly MaybeCodeModelProfile[]> {
@@ -473,6 +825,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   async switchModel(profile: string): Promise<MaybeCodeModelInfo> {
+    this.assertNoWorkspaceOperation();
     this.throwIfClosed();
     const selected = (this.state.options.modelProfiles ?? []).find((candidate) =>
       candidate.name === profile
@@ -512,9 +865,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       const nextOptions = withModelConfiguration(
         this.state.options,
         configuration,
+        this.modelOptionOverrides.get(profile),
       );
       const next = await MaybeCodeApplication.open({
         ...applicationOptions(nextOptions),
+        ...(this.git ? { gitWorkspace: this.git } : {}),
         sessionId: current.sessionId,
         resume: true,
       });
@@ -532,6 +887,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   setDefaultModel(profile: string): Promise<void> {
+    this.assertNoWorkspaceOperation();
     this.throwIfClosed();
     return this.manager.runStateTransition(async () => {
       const profiles = this.state.options.modelProfiles ?? [];
@@ -566,9 +922,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     const configured = (this.state.options.modelProfiles ?? []).find(
       (candidate) => candidate.name === profile,
     )?.reasoningEffort;
-    const override = this.modelOptionOverrides.get(profile)?.reasoningEffort;
-    const overridden = typeof override === "string";
-    const effectiveEffort = overridden
+    const requested = this.modelOptionOverrides.get(profile)?.reasoningEffort;
+    const restored = this.state.options.modelRuntimeOptions?.reasoningEffort;
+    const override = typeof restored === "string" ? restored : requested;
+    const overridden = typeof override === "string" && (override !== configured || requested === override);
+    const effectiveEffort = typeof override === "string"
       ? override
       : configured ?? (
         capabilities.status === "known"
@@ -593,6 +951,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   async setReasoningEffort(
     effort?: string,
   ): Promise<MaybeCodeReasoningEffortState> {
+    this.assertNoWorkspaceOperation();
     this.throwIfClosed();
     await this.manager.transitionApplication(async (current) => {
       const profile = current.modelInfo?.profile;
@@ -630,9 +989,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       const nextOptions = withModelConfiguration(
         this.state.options,
         configuration,
+        effort === undefined ? undefined : { reasoningEffort: effort },
       );
       const next = await MaybeCodeApplication.open({
         ...applicationOptions(nextOptions),
+        ...(this.git ? { gitWorkspace: this.git } : {}),
         sessionId: current.sessionId,
         resume: true,
       });
@@ -650,7 +1011,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   listRecoveries() { return this.manager.listRecoveries(); }
-  resolveRecovery(id: string, finding: string) { return this.manager.resolveRecovery(id, finding); }
+  resolveRecovery(id: string, finding: string) { this.assertNoWorkspaceOperation(); return this.manager.resolveRecovery(id, finding); }
 
   listDelegationRequests(): readonly MaybeCodeDelegationRequest[] {
     return this.manager.activeApplication.listDelegationRequests();
@@ -670,6 +1031,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     finding: string,
     outcome: { readonly status: "completed" | "failed" | "cancelled"; readonly detail: string },
   ): Promise<MaybeCodeDelegationRequest> {
+    this.assertNoWorkspaceOperation();
     return this.manager.activeApplication.resolveDelegationRecovery(requestId, taskId, finding, outcome);
   }
 
@@ -684,6 +1046,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   compactContext(
     strategy?: MaybeCodeCompactionSelection,
   ): Promise<ContextCompactionResult> {
+    this.assertNoWorkspaceOperation();
     return this.manager.compactContext(strategy);
   }
 
@@ -695,11 +1058,16 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     this.closed = true;
     this.mcpLifetime.abort("MaybeCode workspace is closing");
     const watchesClosing = Promise.allSettled([...this.mcpWatches.values()].map((watch) => watch.close()));
+    if (this.workspaceOperation) await Promise.allSettled([this.workspaceOperation]);
     const failures: unknown[] = [];
     try {
       await this.manager.close();
     } catch (error) {
       failures.push(error);
+    }
+    if (this.worktreeProcessId) {
+      try { await this.state.git.get(this.state.rootWorkspace)!.trackWorktreeProcess(this.worktreeProcessId, process.pid, false); }
+      catch (error) { failures.push(error); }
     }
     try {
       await this.state.options.closeOwnedResources?.();
@@ -785,6 +1153,16 @@ function withoutSelection(
   return base;
 }
 
+function workspaceStoragePaths(options: ActiveWorkspaceOptions, workspace: string): string[] {
+  const store = options.store as { readonly directory?: unknown };
+  const catalog = options.catalog as { readonly path?: unknown };
+  return [store.directory, catalog.path].filter((value): value is string => {
+    if (typeof value !== "string") return false;
+    const path = relative(workspace, resolve(value));
+    return path !== "" && path !== ".." && !path.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) && !isAbsolute(path);
+  });
+}
+
 function applicationOptions(
   options: ActiveWorkspaceOptions,
 ): MaybeCodeApplicationOptions {
@@ -797,6 +1175,8 @@ function applicationOptions(
     persistDefaultModel: _persistDefaultModel,
     closeOwnedResources: _closeOwnedResources,
     mcp: _mcp,
+    git: _git,
+    configureWorkspace: _configureWorkspace,
     ...application
   } = options;
   return application;
@@ -814,6 +1194,7 @@ function unknownReasoningEffort(): MaybeCodeReasoningEffortState {
 function withModelConfiguration(
   options: ActiveWorkspaceOptions,
   configuration: MaybeCodeModelConfiguration,
+  runtimeOptions?: Readonly<Record<string, unknown>>,
 ): ActiveWorkspaceOptions {
   const {
     model: _model,
@@ -825,8 +1206,29 @@ function withModelConfiguration(
     ...unchanged,
     model: configuration.model,
     modelInfo: configuration.modelInfo,
+    modelRuntimeOptions: runtimeOptions ?? configuredModelOptions(options, configuration.modelInfo.profile),
     ...(configuration.contextBudget === undefined
       ? {}
       : { contextBudget: configuration.contextBudget }),
   };
+}
+
+function configuredModelOptions(options: ActiveWorkspaceOptions, profile: string | undefined): Readonly<Record<string, unknown>> {
+  const effort = options.modelProfiles?.find(item => item.name === profile)?.reasoningEffort;
+  return effort === undefined ? {} : { reasoningEffort: effort };
+}
+
+function readHistoricalModel(value: unknown): MaybeCodeModelInfo & { readonly runtimeOptions: Readonly<Record<string, unknown>> } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new MaybeCodeUsageError("Historical model identity is invalid");
+  const saved = value as Record<string, unknown>;
+  for (const key of ["provider", "model"]) if (typeof saved[key] !== "string" || !saved[key]) throw new MaybeCodeUsageError(`Historical model ${key} is invalid`);
+  for (const key of ["profile", "adapter"]) if (saved[key] !== undefined && typeof saved[key] !== "string") throw new MaybeCodeUsageError(`Historical model ${key} is invalid`);
+  if (!saved.runtimeOptions || typeof saved.runtimeOptions !== "object" || Array.isArray(saved.runtimeOptions)) throw new MaybeCodeUsageError("Historical model options are invalid");
+  return saved as unknown as MaybeCodeModelInfo & { readonly runtimeOptions: Readonly<Record<string, unknown>> };
+}
+
+function assertHistoricalModel(saved: MaybeCodeModelInfo, current: MaybeCodeModelInfo | undefined): void {
+  if (!current || saved.provider !== current.provider || saved.model !== current.model || saved.adapter !== current.adapter) {
+    throw new MaybeCodeUsageError("The selected history position requires its original provider, model and adapter configuration");
+  }
 }

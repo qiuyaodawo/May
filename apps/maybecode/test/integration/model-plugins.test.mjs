@@ -38,7 +38,7 @@ test("a real Model plugin starts, runs and restores a Session with no configured
   let model;
   const plugin = createModelPlugin({ create() { creations += 1; model = createBuiltinProviderModel(selection); return model; } });
   const options = { workspace, configPath, dataDirectory: join(workspace, "data"), plugins: [plugin], skills: false, goals: false, subagents: false, instructions: "Answer the user with the exact text requested. Do not call tools." };
-  const application = await openConfiguredMaybeCode(options);
+  const application = await openConfiguredMaybeCode({ ...options, git: false });
   t.after(() => application.close());
   assert.equal(application.modelInfo, undefined);
   assert.deepEqual(await application.listModels(), []);
@@ -51,7 +51,7 @@ test("a real Model plugin starts, runs and restores a Session with no configured
   assert.match(JSON.stringify(result.message), /CONFIGURED_PLUGIN_OK/u);
   const sessionId = application.sessionId;
   await application.close();
-  const resumed = await openConfiguredMaybeCode({ ...options, sessionId });
+  const resumed = await openConfiguredMaybeCode({ ...options, git: false, sessionId });
   t.after(() => resumed.close());
   assert.equal(resumed.sessionId, sessionId);
   assert.equal(resumed.modelInfo, undefined);
@@ -74,6 +74,7 @@ test("selected real Model metadata and Context limits replace unused configured 
   const info = { provider: selection.provider, adapter: selection.adapter, model: selection.model };
   let model;
   const application = await openConfiguredMaybeCode({
+    git: false,
     workspace, configPath, dataDirectory: join(workspace, "data"),
     plugins: [
       createModelPlugin({ info, create() { model = createBuiltinProviderModel(selection); return model; } }),
@@ -107,6 +108,7 @@ test("an explicit Context budget takes priority over the selected real Model lim
   await writeFile(configPath, JSON.stringify({ providers: {}, models: {} }));
   const selection = await selectionFor();
   const application = await openConfiguredMaybeCode({
+    git: false,
     workspace, configPath, dataDirectory: join(workspace, "data"),
     plugins: [createModelPlugin({ create: () => createBuiltinProviderModel(selection) })],
     contextBudget: { contextWindowTokens: 32768, outputReserveTokens: 1024 },

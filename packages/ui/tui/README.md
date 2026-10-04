@@ -1,5 +1,14 @@
 # `@may/tui`
 
+`SessionForkTree` models history positions and Session ancestry. `SessionForkPicker`
+provides keyboard tree navigation, search, reply previews and current-workspace or
+new-worktree selection. `WorkspaceDiffViewer` provides file selection, colored
+unified diff, scrolling, search and change navigation. `workspaceGitLabel` formats
+branch, detached HEAD, initialization and failure states for a fixed status region.
+All are exported from `@may/tui`; the components consume structured host state and
+perform no Git or model operations. See [Web UI](../../../docs/en/guides/web-ui.md)
+/ [共享 Web UI](../../../docs/zh-CN/guides/web-ui.md).
+
 The line-oriented `TerminalIO.updatePrompt(prompt)` method updates an active
 question without replacing its draft or cursor position. `createNodeTerminal`
 implements it for hosts that display changing status in their prompt.

@@ -13,6 +13,8 @@ import type {
   SessionSubmitOptions,
   SessionSteerOptions,
   SessionSteeringInput,
+  SessionBranchPosition,
+  SessionBranchNode,
 } from "@may/session";
 import type { SessionSummary } from "@may/session/catalog";
 import type { AnyPlugin } from "@may/plugin";
@@ -47,6 +49,7 @@ export interface AgentController<
     decision: ApprovalDecision,
   ): Promise<boolean>;
   history(): Promise<readonly SessionEvent[]>;
+  branchPositions?(): Promise<readonly SessionBranchPosition[]>;
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage>;
   listRecoveries?(): readonly SessionRecovery[];
   resolveRecovery?(id: string, finding: string): Promise<void>;
@@ -74,6 +77,8 @@ export interface AgentWorkspaceController<
   listSessions(): Promise<readonly SessionSummary[]>;
   /** Optional read-only history access; must not activate or repair the session. */
   readSessionHistory?(sessionId: string): Promise<readonly SessionEvent[]>;
+  readSessionBranchTree?(): Promise<readonly SessionBranchNode[]>;
+  forkSession?(sourceId: string, positionSeq: number, options?: import("./workspace.js").AgentWorkspaceForkOptions): Promise<string>;
   newSession(): Promise<string>;
   resumeSession(sessionId: string): Promise<void>;
   renameSession(sessionId: string, title: string): Promise<void>;

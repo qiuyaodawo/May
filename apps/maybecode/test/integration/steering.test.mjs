@@ -54,7 +54,7 @@ test("real model and Web input preserve Step steering, interrupt ordinary work, 
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "case-")), workspace = join(directory, "project");
   await mkdir(workspace);
-  const app = await openConfiguredMaybeCode({ workspace, dataDirectory: join(directory, "state"), model: process.env.MAYBECODE_LIVE_MODEL,
+  const app = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory: join(directory, "state"), model: process.env.MAYBECODE_LIVE_MODEL,
     permissionMode: "default", goals: false, skills: false, mcp: false, retry: false, observability: false,
     instructions: "Follow explicit user requests exactly. Use write for file creation. Do not run shell commands. Keep final answers short.",
     runBudget: { maxSteps: 8, maxModelCalls: 8, maxToolCalls: 8, maxDurationMs: 120000 } });

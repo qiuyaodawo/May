@@ -24,6 +24,7 @@ import type {
 } from "./controller.js";
 import type { MaybeCodeRun } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
+import type { UiForkPoint, UiWorkspaceDiff, UiWorktree } from "@may/ui-client";
 
 export type MaybeCodeSlashCommandName =
   | "/steer"
@@ -32,6 +33,9 @@ export type MaybeCodeSlashCommandName =
   | "/goal"
   | "/new"
   | "/resume"
+  | "/fork"
+  | "/changes"
+  | "/worktrees"
   | "/model"
   | "/effort"
   | "/retry"
@@ -56,6 +60,9 @@ export const MAYBECODE_COMPACTION_STRATEGIES = [
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
+  { name: "/fork", usage: "/fork", description: "Choose a historical reply and fork in this workspace or a new worktree" },
+  { name: "/changes", usage: "/changes [run <run-id>|session|workspace|commit <commit>]", description: "Browse checkpoint and workspace file changes" },
+  { name: "/worktrees", usage: "/worktrees [open|delete <id>]", description: "List, open or delete managed worktrees" },
   { name: "/steer", usage: "/steer <message>", description: "Deliver additional input after the current Step finishes" },
   { name: "/stop", usage: "/stop", description: "Cancel the current operation" },
   { name: "/yolo", usage: "/yolo [on|off|status]", description: "Enable automatic tool approval; use off to disable or status to inspect" },
@@ -134,6 +141,9 @@ export type MaybeCodeSlashCommandParseResult =
   SlashCommandParseResult<MaybeCodeSlashCommand>;
 
 export type MaybeCodeSlashCommandResult =
+  | { readonly type: "fork.selection.requested"; readonly points: readonly UiForkPoint[] }
+  | { readonly type: "changes.selection.requested"; readonly diff: UiWorkspaceDiff }
+  | { readonly type: "worktrees.display"; readonly worktrees: readonly UiWorktree[] }
   | { readonly type: "web.requested" }
   | { readonly type: "skill.run-started"; readonly run: MaybeCodeRun }
   | { readonly type: "display"; readonly text: string }
@@ -376,6 +386,38 @@ export async function executeMaybeCodeSlashCommand(
 
   const { definition, arguments: arguments_ } = parsed;
   switch (definition.name) {
+    case "/fork": {
+      if (arguments_.length) return { type: "usage", usage: "/fork" };
+      if (!controller.getForkPoints || !controller.forkSession) throw new Error("Session forks are unavailable in this host");
+      if (controller.isRunning) throw new Error("Wait for the current request to finish before creating a Session fork");
+      return { type: "fork.selection.requested", points: await controller.getForkPoints() };
+    }
+    case "/changes": {
+      if (!controller.getChanges) throw new Error("Git checkpoints are unavailable in this host");
+      const [scope = "workspace", value] = arguments_;
+      if (arguments_.length > 2 || !["run", "session", "workspace", "commit"].includes(scope) ||
+          (["run", "commit"].includes(scope) && !value) || (["session", "workspace"].includes(scope) && value)) {
+        return { type: "usage", usage: "/changes [run <run-id>|session|workspace|commit <commit>]" };
+      }
+      return { type: "changes.selection.requested", diff: await controller.getChanges({
+        scope: scope === "commit" ? "workspace" : scope as "run" | "session" | "workspace",
+        ...(scope === "run" ? { runId: value! } : scope === "commit" ? { commit: value! } : {}),
+      }) };
+    }
+    case "/worktrees": {
+      if (!controller.getWorktrees) throw new Error("Worktree management is unavailable in this host");
+      if (arguments_.length) {
+        if (arguments_.length !== 2 || !["open", "delete"].includes(arguments_[0]!)) return { type: "usage", usage: "/worktrees [open|delete <id>]" };
+        if (arguments_[0] === "open") {
+          if (!controller.openWorktree) throw new Error("Opening a worktree is unavailable in this host");
+          await controller.openWorktree(arguments_[1]!);
+          return { type: "session.resumed", sessionId: controller.sessionId };
+        }
+        if (!controller.deleteWorktree) throw new Error("Deleting a worktree is unavailable in this host");
+        await controller.deleteWorktree(arguments_[1]!);
+      }
+      return { type: "worktrees.display", worktrees: await controller.getWorktrees() };
+    }
     case "/steer": {
       const text = input.trimStart().slice("/steer".length).trimStart();
       if (!text.trim()) return usage(definition);

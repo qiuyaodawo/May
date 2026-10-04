@@ -1,7 +1,7 @@
 import { openConfiguredMaybeCode } from "../../../dist/index.js";
 
 const [workspace, dataDirectory] = process.argv.slice(2);
-const app = await openConfiguredMaybeCode({ workspace, dataDirectory, model: "deepseek-v4-flash",
+const app = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory, model: "deepseek-v4-flash",
   autoResume: false, mcp: false, observability: false, skills: false, retry: false });
 console.log(`SESSION:${app.sessionId}`);
 const events = (async () => {

@@ -95,6 +95,45 @@ URL 请求需要同意访问、手动打开网站和单独执行重试。命令�
 验收使用本地模型配置、真实 Workspace 和 MCP broker，并通过真实模型任务验证
 工具审批和文件创建。测试数据保存在已忽略的 `review` 目录。此命令会发起模型请求。
 
+## Session 分支与文件版本
+
+具有项目工作区的宿主在会话顶部固定显示当前 Git branch；detached HEAD 显示简短
+commit hash，初始化和读取失败分别显示状态。当前工作区信息跟随 Session 切换与
+外部 Git 变化更新。历史回复保留当时的 branch 和 commit。
+
+完整回复后的“创建分支”打开工作区选择窗口。“当前工作区”保留当前文件，
+“新建 worktree”使用该回复关联的 commit。缺少可恢复会话状态的位置无法创建
+分支；缺少文件版本的位置无法创建 worktree。运行期间的消息不会自动成为分支位置。
+
+“本轮文件变化”显示该回复的版本差异；顶部“查看文件变化”提供整个 Session
+及当前工作区比较。文件列表显示新增、修改、删除和二进制文件的状态，文本 diff
+支持滚动、搜索和修改位置导航。未提交内容明确显示为当前工作区变化。
+本轮文件列表中的“预览恢复”读取目标历史内容，显示恢复差异；“确认恢复文件”
+执行恢复。预览之后发生的人工修改会阻止恢复，并报告冲突。
+
+“管理 worktree”列出登记目录、branch、起点 commit 和状态，可以打开或明确
+删除目录。删除前由宿主检查关联会话、进程、未提交修改和未合并 commit。
+
+在 MaybeCode TUI 使用 `/fork` 打开树形历史选择器：上下方向键选择，左右方向键
+展开或收起，`/` 搜索，Space 预览，Enter 选择位置与工作区，Esc 取消。`/changes`
+打开文件列表；Enter 查看 diff，PgUp/PgDn 滚动，`/` 搜索，`N` 查找下一处匹配，
+`]` 跳转下一处修改，Esc 返回文件列表。底部状态区域显示当前 branch。
+本轮 diff 中使用 `R` 打开所选文件的恢复预览，`Y` 明确确认恢复。
+
+共享组件通过可选 `workspace`、`forkPoints`、`checkpoints` 和 `worktrees` 快照
+字段接收结构化状态，通过 `session.fork`、`changes.view`、`worktree.open` 与
+`worktree.delete` 提交操作。宿主未提供这些能力时，相应控件保持隐藏。
+文件恢复使用 `changes.restore.preview` 和 `changes.restore.apply`，预览记录通过
+`UiWorkspaceDiff.restorePreviewId` 标识，宿主保管实际内容和冲突检查信息。
+
+运行 `pnpm build` 后，设置 `MAY_LIVE_PROVIDER_UI_TESTS=1`，工作区浏览器测试使用
+已配置的 `deepseek-v4-flash` profile。Session 分支测试还需要
+`MAY_GIT_CHECKPOINT_TEST_COMMITS=1`，授权在独立的测试仓库和 worktrees 中提交。
+测试会调用真实 Provider，检查回复分支、WebUI 与 TUI 文件恢复、失效预览，以及
+Git checkpoint 等待期间拒绝创建分支。运行
+`node --test packages/ui/web/test/browser/workspace-versions.test.mjs packages/ui/web/test/browser/workspace-session-fork.test.mjs`。
+没有设置对应的环境变量时，这两个测试会跳过。
+
 ## 分层边界
 
 终端拥有 controller 时，可以向 `ApplicationUiHost` 提供独立的 `events` 事件流

@@ -36,7 +36,7 @@ async function connect(app, t) {
 
 test("真实配置：Web 命令、effort 和会话管理", { skip: process.env.MAYBECODE_WEB_LIVE !== "1", timeout: 60_000 }, async t => {
   const root = await directory();
-  const app = await openConfiguredMaybeCode({ workspace: root, dataDirectory: join(root, "data"), mcp: false, skills: false, observability: false });
+  const app = await openConfiguredMaybeCode({ git: false, workspace: root, dataDirectory: join(root, "data"), mcp: false, skills: false, observability: false });
   const { client } = await connect(app, t);
   const initialHistory = await app.history();
   const slash = text => client.command("console.execute", { text });
@@ -79,7 +79,7 @@ test("真实配置：Web 命令、effort 和会话管理", { skip: process.env.M
 
 test("真实会话：多页面同步、删除、工作区范围及过期操作", { skip: process.env.MAYBECODE_WEB_LIVE !== "1", timeout: 60_000 }, async t => {
   const root = await directory();
-  const app = await openConfiguredMaybeCode({ workspace: root, dataDirectory: join(root, "data"), mcp: false, skills: false, observability: false });
+  const app = await openConfiguredMaybeCode({ git: false, workspace: root, dataDirectory: join(root, "data"), mcp: false, skills: false, observability: false });
   const { client: left, server, token } = await connect(app, t);
   const right = new UiClient(server.url); t.after(() => right.disconnect()); await right.connect(token);
   const first = app.sessionId;
@@ -94,7 +94,7 @@ test("真实会话：多页面同步、删除、工作区范围及过期操作",
   assert.ok(left.state.snapshot.commands.includes("message.submit"));
   const before = await app.history(); await right.readHistory(); assert.deepEqual(await app.history(), before);
   const foreignRoot = await directory();
-  const foreign = await openConfiguredMaybeCode({ workspace: foreignRoot, dataDirectory: join(root, "data"), mcp: false, skills: false, observability: false });
+  const foreign = await openConfiguredMaybeCode({ git: false, workspace: foreignRoot, dataDirectory: join(root, "data"), mcp: false, skills: false, observability: false });
   t.after(() => foreign.close());
   await assert.rejects(left.select(foreign.sessionId), { status: 404 });
   await assert.rejects(left.command("session.delete", {}, foreign.sessionId), { status: 404 });
@@ -134,7 +134,7 @@ test("真实 MCP broker：Web 表单、review、URL、失效响应和取消", { 
   const config = await loadMayConfig();
   const broker = new McpInteractionBroker();
   const pool = await openMcpClientPool({ servers: [], interactions: broker });
-  const app = await MaybeCodeWorkspace.open({ workspace: root, model: createMaybeCodeModel(selectMaybeCodeModel(config)),
+  const app = await MaybeCodeWorkspace.open({ git: false, workspace: root, model: createMaybeCodeModel(selectMaybeCodeModel(config)),
     store: new FileSessionStore(join(root, "sessions")), catalog: new FileSessionCatalog(join(root, "catalog.json")),
     mcp: pool, closeOwnedResources: () => pool.close(), skills: false });
   const { client } = await connect(app, t);

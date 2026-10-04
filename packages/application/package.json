@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./git-workspace": {
+      "types": "./dist/git-workspace.d.ts",
+      "import": "./dist/git-workspace.js"
     }
   },
   "files": [
@@ -19,10 +23,13 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:package": "pnpm run build && node --test test/git-workspace-package.test.mjs",
     "test:integration": "pnpm run build && node --test test/integration/*.test.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
+    "diff": "9.0.0",
+    "simple-git": "^4.0.2",
     "@may/skills": "workspace:*",
     "@may/context": "workspace:*",
     "@may/core": "workspace:*",

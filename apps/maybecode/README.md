@@ -1,5 +1,47 @@
 # MaybeCode
 
+### Session forks and project versions
+
+Project workspaces use Git by default. Existing repositories retain their branch;
+new projects are initialized. The initial project state is saved before execution,
+and a complete user request saves at most one additional commit after its edits,
+checks and delegated tasks. Requests without changes reuse the existing commit.
+Failed and cancelled requests retain their uncommitted files. Git identity must
+already be configured. Checkpoint commits are protected by `refs/may/` references.
+
+`/fork` opens a keyboard history tree with previews and search. Choose a complete
+reply and either the current workspace or a new worktree. The current workspace
+retains current files and branch. A worktree starts from the selected reply's Git
+version under `~/.may/worktrees/<projectId>/<worktreeId>`. Closing a Session retains
+the worktree. `/worktrees` lists registered worktrees; `/worktrees open <id>` opens
+one and `/worktrees delete <id>` validates its Sessions, processes, files and
+unmerged commits before deletion.
+Forks restore their recorded model profile and reasoning effort. Configuration
+changes that select a different provider, model or adapter fail before Context
+restoration. Completed Goals save their final file checkpoint after host
+verification, including Runs yielded for Goal scheduling.
+
+`/changes` browses current changes. Use `/changes run <run-id>`, `/changes session`
+or `/changes commit <commit>` for other comparisons. The keyboard viewer selects
+files, searches text and navigates diff hunks. `R` previews restoring a selected
+file from a run checkpoint, and `Y` confirms the preview. Changed files invalidate
+the preview. Web UI offers the same fork, diff and restore actions. Every frontend
+displays the current branch, including detached HEAD and Git errors.
+
+Configure `apps.maybecode.git` with `autoCommit`, `readOnly`, `dataRoot`,
+`worktreesRoot` and `excludedPaths`; `false` disables project Git management.
+`autoCommit: false` observes an existing repository without automatic commits.
+`readOnly: true` prevents Git initialization, mutations and project-changing
+operations through the built-in tool permission policy. Storage roots must
+remain outside the project repository. Session storage, environment credential
+files and configured exclusion paths are excluded from automatic commits.
+The headless `git.authorizeCommit` callback can enforce host approval policy.
+
+Partially staged files, active history operations and submodules require user
+resolution before automatic commits. External manual edits made during a request
+can be included in its workspace diff. Same-directory May hosts coordinate
+writes with a process lock; independent concurrent edits use separate worktrees.
+
 ### Permission modes
 
 Start with `maybecode --yolo` to auto-approve tool requests, or `--no-yolo` to use
@@ -112,8 +154,10 @@ and `openConfiguredMaybeCode` use these factories directly.
 MaybeCode selects Model, Context, Permission, Skills, Goals, History Memory,
 Delegation, and Workspace Files plugins for each application. Optional MCP and
 Observability plugins belong to the configured workspace host and contribute
-their services to each Session. Switching Sessions retains the same actual MCP
-connections and tracing processor. Closing the workspace closes their owner.
+their services to each Session. Sessions in the same workspace reuse MCP
+connections. Each worktree owns its configured MCP connections and stdio working
+directories; returning to a workspace reuses them. All workspaces share the tracing
+processor. Closing the host releases every workspace connection and the processor.
 
 `MaybeCodeApplication.open({ plugins, ... })` accepts custom plugins. A selected
 plugin replaces a default with the same id or provided service token; the host

@@ -17,6 +17,8 @@
 
 默认 Context 预算根据活动 Model 的 limits 计算。显式 `contextBudget` 优先，
 角色指定的模型保留各自配置的限制与 Context 预算。
+提供 `goalsService` 时，默认模型和角色指定的子模型共同遵守 Goal 的 token 计量、
+预算检查和取消信号。子任务的 Context 保留各自的任务指令。
 
 Application 提供 `mcpService` 时，delegation 声明这项可选依赖，并在每次子 Run
 开始时读取连接池的当前工具目录。子工具调用保留自己的 Session 身份、权限和请求预算。

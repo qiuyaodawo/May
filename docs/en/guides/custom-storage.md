@@ -18,6 +18,7 @@ requires a `SessionCatalog`.
 interface SessionStore {
   append(event: SessionEvent): Promise<void>;
   read(sessionId: string): Promise<readonly SessionEvent[]>;
+  inspect?(sessionId: string): Promise<readonly SessionEvent[]>;
   delete?(sessionId: string): Promise<boolean>;
 }
 ```
@@ -30,6 +31,15 @@ May validates these conditions before replay.
 acknowledge a buffered write that can be silently lost. Session serializes
 writes made through one Session instance, but a shared backend must still make
 the next-sequence check atomic across processes.
+
+`inspect()` returns committed history without repair, writer ownership changes or
+other writes. Session branching and workspace history/tree browsing require this
+operation. A successful branch boundary is recorded as `run.settled`; a fork
+stores its exact source in `session.created.fork` and ends initialization with
+`session.fork.ready`. An incomplete fork remains inspectable and cannot resume.
+Custom adapters must retain these records and reject failed writes.
+`run.settled.hostCompleted: true` means the host verified that a scheduler-yielded
+Run completed successfully after saving final application state.
 
 ## Database adapter skeleton
 

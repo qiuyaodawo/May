@@ -81,7 +81,9 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
         const application = context.get(applicationServices.application).get();
         const store = context.get(applicationServices.sessionStore);
         const rawModel = context.get(applicationServices.model);
-        const model = context.optional(goalsService)?.wrapModel(rawModel) ?? rawModel;
+        const goals = context.optional(goalsService);
+        const wrapChildModel = (model: Model) => goals?.wrapModel(model, { includeInstructions: false }) ?? model;
+        const model = wrapChildModel(rawModel);
         const mcp = context.optional(mcpService);
         const contextBudget = withDefaultCompactionThreshold(options.contextBudget ?? contextBudgetFromModel(model));
         host = new SubagentHost({
@@ -93,7 +95,10 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
           permissionPolicy: context.get(applicationServices.permissionPolicy),
           fileGuard: context.get(workspaceFilesService),
           autoCompactionMode: options.autoCompactionMode ?? "prune-summary",
-          ...(options.createRoleModel === undefined ? {} : { createRoleModel: options.createRoleModel }),
+          ...(options.createRoleModel === undefined ? {} : { createRoleModel: (role: MaybeCodeSubagentRole) => {
+            const selected = options.createRoleModel!(role);
+            return selected === undefined ? undefined : wrapChildModel(selected);
+          } }),
           ...(options.contextBudgetFor === undefined ? {} : { contextBudgetFor: options.contextBudgetFor }),
           ...(options.skills === undefined && application.skills === undefined ? {} : { skills: options.skills ?? application.skills!.registry }),
           ...(options.toolSource === undefined && mcp === undefined ? {} : {

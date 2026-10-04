@@ -1,4 +1,6 @@
 import { commandArgs, UiError, type UiAction, type UiCommand, type UiControls, type UiReceipt } from "@may/ui-client";
+import { GitCheckpointError, GitWorkspaceConflictError } from "@may/application/git-workspace";
+import { MaybeCodeUsageError } from "./errors.js";
 import type { MaybeCodeController } from "./controller.js";
 import { parsePermissionMode } from "./policy.js";
 import { parseMaybeCodeSlashCommand } from "./slash-commands.js";
@@ -12,6 +14,7 @@ export class MaybeCodeWebCommands {
   }
 
   available(name: string): boolean {
+    if (["session.fork", "worktree.open", "worktree.delete", "changes.restore.preview", "changes.restore.apply"].includes(name) && (this.app.isRunning || this.app.getGoal?.()?.status === "active" || this.app.getMcpInteractions?.().length)) return false;
     if (name === "permission.set" && (this.app.isRunning || this.app.getGoal?.()?.status === "active" || this.app.getMcpInteractions?.().length)) return false;
     if (name === "message.submit") return !this.busy;
     if (name === "mcp.respond") return Boolean(this.app.getMcpInteractions?.().length);
@@ -55,6 +58,42 @@ export class MaybeCodeWebCommands {
     if (!this.available(command.name)) throw new UiError(409, "当前操作尚未结束。");
     this.busy = true; this.changed();
     try {
+      if (command.name === "changes.restore.preview") {
+        commandArgs(command, ["runId"], ["path", "paths"]);
+        if (!this.app.previewRestore) throw new UiError(400, "文件恢复能力不可用。");
+        const paths: unknown = command.args.paths ? JSON.parse(command.args.paths) : command.args.path ? [command.args.path] : [];
+        if (!Array.isArray(paths) || paths.length === 0 || paths.some(path => typeof path !== "string")) throw new UiError(400, "请选择需要恢复的文件。");
+        return { diff: (await this.app.previewRestore(command.args.runId!, paths)).diff };
+      }
+      if (command.name === "changes.restore.apply") {
+        commandArgs(command, ["previewId"]);
+        if (!this.app.restoreFiles) throw new UiError(400, "文件恢复能力不可用。");
+        await this.app.restoreFiles(command.args.previewId!);
+        return { selectedId: this.app.sessionId, output: { title: "文件恢复", text: "已恢复选定文件并更新工作区版本记录。" } };
+      }
+      if (command.name === "session.fork") {
+        commandArgs(command, ["pointId", "mode"]);
+        if (!this.app.forkSession || !["current", "worktree"].includes(command.args.mode!)) throw new UiError(400, "Session 分支方式无效。");
+        await this.app.forkSession(command.args.pointId!, command.args.mode as "current" | "worktree");
+        return { selectedId: this.app.sessionId };
+      }
+      if (command.name === "changes.view") {
+        commandArgs(command, ["scope"], ["runId", "commit"]);
+        if (!this.app.getChanges || !["run", "session", "workspace"].includes(command.args.scope!)) throw new UiError(400, "文件变化范围无效。");
+        return { diff: await this.app.getChanges({ scope: command.args.scope as "run" | "session" | "workspace",
+          ...(command.args.runId ? { runId: command.args.runId } : {}), ...(command.args.commit ? { commit: command.args.commit } : {}) }) };
+      }
+      if (command.name === "worktree.open" || command.name === "worktree.delete") {
+        commandArgs(command, ["id"]);
+        if (command.name === "worktree.open") {
+          if (!this.app.openWorktree) throw new UiError(400, "工作区打开能力不可用。");
+          await this.app.openWorktree(command.args.id!);
+        } else {
+          if (!this.app.deleteWorktree) throw new UiError(400, "工作区删除能力不可用。");
+          await this.app.deleteWorktree(command.args.id!);
+        }
+        return { selectedId: this.app.sessionId };
+      }
       if (command.name === "console.execute") {
         commandArgs(command, ["text"]);
         if (command.args.text!.length > 16_384) throw new UiError(400, "命令过长。");
@@ -82,6 +121,10 @@ export class MaybeCodeWebCommands {
         return await this.action(command);
       } else throw new UiError(400, "不支持的操作。");
       return { selectedId: this.app.sessionId };
+    } catch (error) {
+      if (error instanceof GitWorkspaceConflictError || error instanceof MaybeCodeUsageError) throw new UiError(409, error.message);
+      if (error instanceof GitCheckpointError) throw new UiError(409, "Git checkpoint 保存失败。请检查项目 Git 配置与 Hooks。");
+      throw error;
     } finally { this.busy = false; this.changed(); }
   }
 
@@ -108,6 +151,15 @@ export class MaybeCodeWebCommands {
     const output = (title: string, text: string, actions?: readonly UiAction[]): UiReceipt => ({ selectedId: this.app.sessionId, output: { title, text, ...(actions ? { actions } : {}) } });
     const action = (label: string, name: string, value: string): UiAction => ({ label, command: "console.action", args: { action: name, value } });
     switch (result.type) {
+      case "fork.selection.requested": return output("Session 分支", "选择完整回复和工作区方式。", result.points.filter(point => point.available).flatMap(point => [
+        { label: `${point.userPreview} · 当前工作区`, command: "session.fork", args: { pointId: point.id, mode: "current" } },
+        ...(point.worktreeAvailable ? [{ label: `${point.userPreview} · 新建 worktree`, command: "session.fork", args: { pointId: point.id, mode: "worktree" } }] : []),
+      ]));
+      case "changes.selection.requested": return { diff: result.diff };
+      case "worktrees.display": return output("worktrees", result.worktrees.map(tree => `${tree.branch} · ${tree.path}`).join("\n"), result.worktrees.flatMap(tree => [
+        { label: `打开 ${tree.branch}`, command: "worktree.open", args: { id: tree.id } },
+        { label: `删除 ${tree.branch}`, command: "worktree.delete", args: { id: tree.id }, confirm: `删除工作区 ${tree.path}？` },
+      ]));
       case "exit": return { disconnect: true };
       case "web.requested": return output("Web UI", "当前页面已经连接此工作区。");
       case "unknown": throw new UiError(400, `未知命令：${result.command}`);

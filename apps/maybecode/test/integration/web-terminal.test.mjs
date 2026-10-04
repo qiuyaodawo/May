@@ -13,7 +13,7 @@ test("真实 Provider：终端和 Web 共享会话、审批、事件与关闭行
   const directory = await mkdtemp(join(parent, "live-"));
   const workspace = join(directory, "workspace");
   await mkdir(workspace);
-  const app = await openConfiguredMaybeCode({ workspace, dataDirectory: join(directory, "data"), autoResume: false, mcp: false, skills: false, observability: false, retry: false, maxSteps: 4,
+  const app = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory: join(directory, "data"), autoResume: false, mcp: false, skills: false, observability: false, retry: false, maxSteps: 4,
     runBudget: { maxModelCalls: 4, maxDurationMs: 60_000 } });
   const terminal = new MaybeCodeTerminalWeb(app);
   t.after(() => terminal.close());

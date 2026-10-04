@@ -28,8 +28,10 @@ import type {
   SessionEventPayload,
   SessionToolPresentation,
   SessionRecovery,
+  SessionForkOrigin,
 } from "./events.js";
 import { sessionToolResultContent } from "./events.js";
+import { readSessionBranchPositions, type SessionBranchPosition } from "./branch.js";
 import { SessionSteeringQueue, type SessionSteerOptions, type SessionSteeringInput } from "./steering.js";
 import {
   SessionHistoryReader,
@@ -47,15 +49,27 @@ export interface SessionOptions {
   store?: SessionStore;
   id?: string;
   metadata?: Record<string, unknown>;
+  deferBranchPositions?: boolean;
 }
 
 export interface ResumeSessionOptions {
   id: string;
   store: SessionStore;
+  deferBranchPositions?: boolean;
   createRuntime(
     messages: Message[],
     info: SessionRuntimeInfo,
   ): AgentRuntime | Promise<AgentRuntime>;
+}
+
+export interface SessionForkOptions extends Omit<ResumeSessionOptions, "id"> {
+  readonly sourceId: string;
+  readonly positionSeq: number;
+  readonly id?: string;
+  readonly metadata?: Record<string, unknown>;
+  readonly stateKeys?: readonly string[];
+  readonly transformState?: (key: string, value: unknown) => unknown;
+  readonly deferForkReady?: boolean;
 }
 
 export interface SessionModelMeasurement {
@@ -90,6 +104,7 @@ export interface SessionContinueOptions extends Omit<ContinueOptions, "stepInput
 export class Session {
   readonly id: string;
   readonly metadata: Readonly<Record<string, unknown>> | undefined;
+  readonly forkOrigin: SessionForkOrigin | undefined;
 
   private runtime: AgentRuntime;
   private readonly store: SessionStore;
@@ -116,6 +131,7 @@ export class Session {
   private readonly steering: SessionSteeringQueue;
   private activeRun: RunHandle | undefined;
   private readonly submittedInputIds = new Set<string>();
+  private readonly deferBranchPositions: boolean;
 
   private constructor(
     id: string,
@@ -124,13 +140,17 @@ export class Session {
     metadata: Record<string, unknown> | undefined,
     seq: number,
     history: readonly SessionEvent[] = [],
+    deferBranchPositions = false,
   ) {
     this.id = id;
     this.runtime = runtime;
     this.store = store;
     this.historyReader = new SessionHistoryReader(store);
     this.metadata = metadata === undefined ? undefined : { ...metadata };
+    const created = history[0];
+    this.forkOrigin = created?.type === "session.created" && created.fork !== undefined ? structuredClone(created.fork) : undefined;
     this.seq = seq;
+    this.deferBranchPositions = deferBranchPositions;
     this.steering = new SessionSteeringQueue((event) => this.record(event), history);
     for (const event of history) {
       if (event.type === "input.submitted" && event.inputId !== undefined) this.submittedInputIds.add(event.inputId);
@@ -152,6 +172,8 @@ export class Session {
       store,
       options.metadata,
       0,
+      [],
+      options.deferBranchPositions,
     );
     const runtime = options.runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
     validateRuntimeDescriptor(runtime);
@@ -182,6 +204,9 @@ export class Session {
     }
     if (events.slice(1).some((event) => event.type === "session.created")) {
       throw new Error(`Session "${options.id}" has multiple creation events`);
+    }
+    if (created.fork !== undefined && !events.some((event) => event.type === "session.fork.ready")) {
+      throw new Error(`Session "${options.id}" has an incomplete fork; inspect its history before reopening`);
     }
 
     const recoveredEvents = [...events];
@@ -226,6 +251,7 @@ export class Session {
         created.metadata,
         recoveredEvents.length,
         recoveredEvents,
+        options.deferBranchPositions,
       );
       for (const event of recoveredEvents) {
         if (event.type === "run.interrupted") {
@@ -242,6 +268,102 @@ export class Session {
     } catch (error) {
       return closeRejectedRuntime(runtime, error);
     }
+  }
+
+  static async fork(options: SessionForkOptions): Promise<Session> {
+    if (options.store.inspect === undefined) throw new Error("Session forking requires read-only store inspection");
+    const source = await options.store.inspect(options.sourceId);
+    validateSessionHistory(options.sourceId, source);
+    const selected = readSessionBranchPositions(source).find((position) => position.positionSeq === options.positionSeq);
+    if (selected === undefined || !selected.available) throw new Error(selected?.reason ?? "Selected history position has no recoverable state");
+    const id = options.id ?? createSessionId();
+    if (id === options.sourceId || (await options.store.read(id)).length > 0) throw new Error(`Session "${id}" already exists`);
+    const stateKeys = new Set(options.stateKeys ?? []);
+    const queued = new Map<string, UserMessage>();
+    const history: SessionEvent[] = [];
+    const append = (event: SessionEventPayload, timestamp: number) => history.push({ ...structuredClone(event), sessionId: id, seq: history.length + 1, timestamp });
+    const created = source[0];
+    if (created?.type !== "session.created") throw new Error("Source Session has no creation event");
+    append({ type: "session.created", ...(created.runtime === undefined ? {} : { runtime: created.runtime }),
+      ...((options.metadata ?? created.metadata) === undefined ? {} : { metadata: { ...(options.metadata ?? created.metadata) } }),
+      fork: { sessionId: options.sourceId, positionSeq: options.positionSeq, runId: selected.runId } }, Date.now());
+    for (const event of source.slice(1, options.positionSeq)) {
+      if (event.type.startsWith("approval.")) { append({ type: "history.omitted", reason: "permission" }, event.timestamp); continue; }
+      if (event.type === "session.fork.ready") { append({ type: "history.omitted", reason: "fork-initialization" }, event.timestamp); continue; }
+      if (event.type === "state.updated") {
+        if (stateKeys.has(event.key)) append({ type: "state.updated", key: event.key,
+          value: options.transformState === undefined ? event.value : options.transformState(event.key, structuredClone(event.value)) }, event.timestamp);
+        else append({ type: "history.omitted", reason: "application-state" }, event.timestamp);
+        continue;
+      }
+      if (event.type === "input.steering.queued") { queued.set(event.input.inputId, event.input.message); append({ type: "history.omitted", reason: "unconsumed-input" }, event.timestamp); continue; }
+      if (event.type === "input.steering.finished") { append({ type: "history.omitted", reason: "unconsumed-input" }, event.timestamp); continue; }
+      if (event.type === "input.steering.delivered") {
+        const messages = event.inputIds.map((inputId) => {
+          const message = queued.get(inputId);
+          if (message === undefined) throw new Error(`Delivered input has no saved content: ${inputId}`);
+          return message;
+        });
+        append({ type: "input.generated", runId: event.runId, step: event.step, messages, reason: "Inherited delivered input" }, event.timestamp);
+        continue;
+      }
+      if (event.type === "input.submitted") { append({ type: "input.submitted", message: event.message }, event.timestamp); continue; }
+      append(event, event.timestamp);
+    }
+    const replay = replaySession(history);
+    const runtime = await options.createRuntime(replay.messages, replay.info);
+    try {
+      const savedDescriptor = replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR;
+      const currentDescriptor = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
+      let state = replay.info.runtimeState;
+      const migrated = !runtimeDescriptorsEqual(savedDescriptor, currentDescriptor);
+      if (migrated) {
+        if (runtime.migrateState === undefined) assertRuntimeCompatible(savedDescriptor, runtime);
+        state = await runtime.migrateState!(savedDescriptor, state);
+      }
+      if (state !== undefined) {
+        if (runtime.restoreState === undefined) throw new Error("Runtime cannot restore the selected Session state");
+        await runtime.restoreState(state);
+      }
+      if (runtime.saveState !== undefined) state = await snapshotRuntimeState(runtime);
+      if (migrated || state !== undefined) append({ type: migrated ? "runtime.changed" : "runtime.state.saved",
+        runtime: { ...currentDescriptor }, ...(state === undefined ? {} : { state }) } as SessionEventPayload, Date.now());
+      for (const event of history) await options.store.append(event);
+      if (options.deferForkReady !== true) {
+        const ready: SessionEvent = { type: "session.fork.ready", sessionId: id, seq: history.length + 1, timestamp: Date.now() };
+        await options.store.append(ready);
+        history.push(ready);
+      }
+      return new Session(id, runtime, options.store, options.metadata ?? created.metadata, history.length, history, options.deferBranchPositions);
+    } catch (error) { return closeRejectedRuntime(runtime, error); }
+  }
+
+  async branchPositions(): Promise<readonly SessionBranchPosition[]> {
+    return readSessionBranchPositions(await this.history());
+  }
+
+  async saveForkReady(): Promise<void> {
+    if (this.forkOrigin === undefined) throw new Error("Only a forked Session can save initialization readiness");
+    if (this.runtimeClosed) throw new Error("Session runtime is closed");
+    this.assertIdleRuntime();
+    if (this.persistenceFailed) throw new Error("Session persistence failed before branch initialization completed");
+    if ((await this.history()).some(event => event.type === "session.fork.ready")) return;
+    await this.record({ type: "session.fork.ready" });
+  }
+
+  async saveBranchPosition(runId: string, options: import("./branch.js").SessionBranchCompletionOptions = {}): Promise<void> {
+    if (this.persistenceFailed) throw new Error("Session persistence failed; reopen the Session before branching");
+    if (this.activeRun !== undefined || this.activeRunObservations.size > 0 || this.settlingRuns > 0 || this.runtimeMutation) {
+      throw new Error("Branch positions require completed tool execution and saved Runtime state");
+    }
+    const history = await this.history();
+    const latestStarted = [...history].reverse().find((event) => event.type === "run.started");
+    if (latestStarted?.type !== "run.started" || latestStarted.runId !== runId) throw new Error("Only the latest completed Run can save a branch position");
+    if (history.some((event) => event.type === "run.settled" && event.runId === runId)) return;
+    const completed = history.some((event) => event.type === "run.completed" && event.runId === runId);
+    const hostCompleted = options.allowYielded === true && history.some((event) => event.type === "run.yielded" && event.runId === runId);
+    if (!completed && !hostCompleted) return;
+    await this.record({ type: "run.settled", runId, ...(hostCompleted ? { hostCompleted: true as const } : {}) });
   }
 
   submit(options: SessionSubmitOptions): Promise<RunHandle> {
@@ -583,7 +705,9 @@ export class Session {
         run.cancel("Session event persistence failed");
         throw error;
       }
-      return completion;
+      const value = await completion;
+      if (!this.deferBranchPositions) await this.saveBranchPosition(run.id);
+      return value;
     })();
 
     void result.catch(() => undefined);

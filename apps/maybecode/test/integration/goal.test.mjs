@@ -20,9 +20,10 @@ async function open(t, extra = {}) {
   const parent = join(workspace, "review", "goal-tests");
   await mkdir(parent, { recursive: true });
   const dataDirectory = await mkdtemp(join(parent, "session-"));
-  const options = { workspace, dataDirectory, model: "deepseek-v4-flash", autoResume: false,
+  const options = { git: false, workspace, dataDirectory, model: "deepseek-v4-flash", autoResume: false,
     mcp: false, observability: false, skills: false, retry: false, maxSteps: 8, ...extra };
   const app = extra.permissionPolicy === undefined ? await openConfiguredMaybeCode(options) : await MaybeCodeWorkspace.open({
+    git: false,
     workspace, store: new FileSessionStore(join(dataDirectory, "sessions")), catalog: new FileSessionCatalog(join(dataDirectory, "catalog")),
     model: createMaybeCodeModel(selectMaybeCodeModel(await loadMayConfig(), { model: "deepseek-v4-flash" })),
     permissionPolicy: extra.permissionPolicy, skills: false,
@@ -194,7 +195,7 @@ test("process interruption restores a paused goal with unknown usage and no auto
   await exited;
   const sessionId = /SESSION:([^\r\n]+)/u.exec(output)?.[1];
   assert.ok(sessionId);
-  const app = await openConfiguredMaybeCode({ workspace, dataDirectory, sessionId, model: "deepseek-v4-flash", mcp: false, observability: false, skills: false, retry: false });
+  const app = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory, sessionId, model: "deepseek-v4-flash", mcp: false, observability: false, skills: false, retry: false });
   t.after(() => app.close());
   const relay = drain(app);
   assert.equal(app.isRunning, false);

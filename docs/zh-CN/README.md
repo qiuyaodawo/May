@@ -20,6 +20,7 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 - [Context 与持久化历史](concepts/context-and-history.md)
 - [事件](concepts/events.md)
 - [Runtime 与 Session 架构](architecture/runtime-session.md)
+- [Session 分支与 Git checkpoint 规格](architecture/session-fork-checkpoint-spec.md)
 
 ## 扩展指南
 
@@ -46,6 +47,7 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 - [自定义工具](guides/custom-tool.md)
 - [自定义 Context](guides/custom-context.md)
 - [自定义 Session 存储](guides/custom-storage.md)
+- [Git 工作区与 checkpoint](guides/git-workspaces.md)
 - [自定义 UI](guides/custom-ui.md)
 - [共享 Web UI](guides/web-ui.md)
 - [权限策略](guides/permission-policy.md)

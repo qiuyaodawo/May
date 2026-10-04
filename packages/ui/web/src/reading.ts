@@ -1,4 +1,4 @@
-import type { UiBlock, UiClient, UiClientState, UiField, UiFieldPage } from "@may/ui-client";
+import type { UiBlock, UiClient, UiClientState, UiField, UiFieldPage, UiForkPoint } from "@may/ui-client";
 import { approvalCard, button, element, statusLabel, transcriptBlock, type WebUiExtensions } from "./components.js";
 
 const preview = (text: string, limit: number) => text.length > limit ? text.slice(0, limit) + "\n…（预览已截断，完整内容见详情）" : text;
@@ -6,7 +6,7 @@ const exceptional = (block: UiBlock) => ["failed", "unknown", "interrupted", "de
 function unique(blocks: readonly UiBlock[]): UiBlock[] { return [...new Map(blocks.map(block => [block.id, block])).values()]; }
 
 /** View-local reading state. No selection, cancellation or execution commands are issued here. */
-export function createTranscriptReader(client: UiClient, elements: { scroll: HTMLElement; messages: HTMLElement; approvals: HTMLElement }, extensions: WebUiExtensions, inspect: (block: UiBlock) => void) {
+export function createTranscriptReader(client: UiClient, elements: { scroll: HTMLElement; messages: HTMLElement; approvals: HTMLElement }, extensions: WebUiExtensions, inspect: (block: UiBlock) => void, versions?: { fork(point: UiForkPoint): void; changes(runId: string): void }) {
   const { scroll, messages, approvals } = elements;
   const toolbar = element("div", "reading-toolbar"); toolbar.setAttribute("aria-label", "执行过程阅读");
   const summary = element("span", "reading-summary"); summary.setAttribute("aria-live", "polite");
@@ -128,7 +128,7 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
       const key = block.runId ?? (block.kind === "user" ? `request:${block.id}` : last);
       last = key; const list = grouped.get(key) ?? []; list.push(block); grouped.set(key, list);
     }
-    const contextKey = `${state.connection}:${state.busy}:${state.selecting}:${snapshot?.commands?.length ?? 0}:${(snapshot?.commands ?? []).join(",")}`;
+    const contextKey = `${state.connection}:${state.busy}:${state.selecting}:${snapshot?.commands?.length ?? 0}:${(snapshot?.commands ?? []).join(",")}:${JSON.stringify([snapshot?.forkPoints, snapshot?.checkpoints])}`;
     const activeIds = new Set<string>(); let groupIndex = 0;
     for (const [key, list] of grouped) {
       if (onlyErrors.checked && !list.some(exceptional)) continue;
@@ -157,6 +157,16 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
           const { presentation: _presentation, ...withoutPresentation } = block;
           const compact: UiBlock = block.kind === "tool" ? { ...withoutPresentation, input: preview(block.input ?? "", 400), text: preview(block.text, 800), ...(block.diagnostic ? { diagnostic: { ...block.diagnostic, message: preview(block.diagnostic.message, 800) } } : {}) } : block;
           const node = transcriptBlock(compact, block.kind === "tool" ? {} : extensions, { state, command: client.command.bind(client), readMedia: client.readMedia.bind(client) });
+          const point = block.kind === "assistant" && block.runId ? snapshot?.forkPoints?.find(item => item.sessionId === snapshot.selectedId && item.blockId === block.id) : undefined;
+          if (point && versions) {
+            const footer = element("div", "reply-version-actions");
+            if (point.branch || point.commit) footer.append(element("span", "checkpoint-version", [point.branch, point.commit?.slice(0, 12)].filter(Boolean).join(" · ")));
+            const fork = button("创建分支", () => versions.fork(point), "text-button");
+            fork.disabled = !point.available || state.connection !== "connected" || state.busy || state.selecting || !snapshot?.commands.includes("session.fork");
+            fork.title = point.reason ?? "从这次完整回复继续"; footer.append(fork);
+            if (snapshot?.commands.includes("changes.view")) { const changes = button("本轮文件变化", () => versions.changes(point.runId), "text-button"); changes.disabled = state.busy || state.selecting || state.connection !== "connected"; footer.append(changes); }
+            node.append(footer);
+          }
           if (block.kind === "tool") {
             const details = node.querySelector("details")!;
             details.open = toolOpen.get(block.id) ?? defaultExpanded;

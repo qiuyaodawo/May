@@ -6,6 +6,7 @@ import type { MaybeCodeDelegationEvent } from "./delegation.js";
 export type { MaybeCodeRun } from "./delegation.js";
 
 export type MaybeCodeSessionEvent =
+  | { type: "workspace.git.changed"; checkpoint: import("@may/application/git-workspace").GitCheckpoint }
   | import("@may/goal").GoalEvent
   | MaybeCodeDelegationEvent
   | Exclude<AgentApplicationEvent, { type: "tool.presentation" }>
@@ -17,6 +18,7 @@ export type MaybeCodeSessionEvent =
       preview: ToolChangePreview;
     };
 export type MaybeCodeEvent =
+  | import("@may/application").AgentSessionForkedEvent
   | { type: "permission-mode.changed"; mode: import("./policy.js").MaybeCodePermissionMode }
   | MaybeCodeSessionEvent
   | McpClientEvent

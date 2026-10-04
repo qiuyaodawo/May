@@ -115,13 +115,13 @@ test("真实配置文件与启动选项确定 YOLO，运行时切换不写入配
     defaultModel: "offline", models: { offline: { provider: "local", model: "gpt-4.1" }, second: { provider: "local", model: "gpt-4.1-mini" } }, apps: { maybecode: { permissionMode: "yolo" } } });
   await writeFile(configPath, configuration);
   const options = { workspace, configPath, dataDirectory: join(workspace, "data"), skills: false, mcp: false, observability: false, instructions: "Local configuration tests" };
-  const app = await openConfiguredMaybeCode(options); t.after(() => app.close());
+  const app = await openConfiguredMaybeCode({ ...options, git: false }); t.after(() => app.close());
   assert.equal(app.permissionMode, "yolo");
   await Promise.all([app.switchModel("second"), app.setPermissionMode("default")]);
   assert.equal(app.modelInfo.profile, "second"); assert.equal(app.permissionMode, "default");
   assert.equal(await readFile(configPath, "utf8"), configuration); await app.close();
-  const overridden = await openConfiguredMaybeCode({ ...options, permissionMode: "default" });
+  const overridden = await openConfiguredMaybeCode({ ...options, git: false, permissionMode: "default" });
   t.after(() => overridden.close()); assert.equal(overridden.permissionMode, "default"); await overridden.close();
   await writeFile(configPath, configuration.replace('"permissionMode":"yolo"', '"permissionMode":"invalid"'));
-  await assert.rejects(openConfiguredMaybeCode(options), /permissionMode/);
+  await assert.rejects(openConfiguredMaybeCode({ ...options, git: false }), /permissionMode/);
 });

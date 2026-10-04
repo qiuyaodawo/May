@@ -136,6 +136,21 @@ Runtime identity and versioned state are persisted. At a replacement boundary,
 Session saves state and closes the old runtime while its plugin services are
 available, then restores the replacement before allowing execution.
 
+Successful request positions become selectable after `run.settled` saves their
+complete state boundary. `Session.fork()` copies exactly the selected history
+into an independent identity and records the source position durably. Context,
+provider continuation and Runtime state follow that boundary; application state
+is explicitly selected. Permission grants and unconsumed input are independent.
+`AgentApplication` adds Skills and declared plugin-state restoration, while
+`AgentWorkspace` exposes the Session branch tree and directory-aware lifecycle.
+Git versions and worktrees are owned by the workspace host.
+`Session.fork({ deferForkReady: true, ... })` defers the durable readiness marker
+until `saveForkReady()`. `AgentApplication` writes it after validation, created
+Hooks, tool checks and queued state writes succeed. Initialization failures keep
+partial history unavailable for resume and branching. `AgentWorkspace` persists
+the candidate's Catalog entry before closing or replacing the source; a Catalog
+failure preserves candidate history and leaves the source Application active.
+
 ### `@may/plugin`
 
 The plugin package owns composition validation, typed versioned services,

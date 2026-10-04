@@ -6,6 +6,22 @@
 共用运行互斥、事件转发和保存过程。`continue()` 保留当前上下文并继续运行。
 `AgentWorkspace` 管理 Session 目录、恢复、切换和有序 Application 更新。
 
+`agent.open({ store, fork: { sessionId, positionSeq } })` 从完整请求的可恢复位置创建
+独立 Session。`branchPositions()` 返回准确的历史位置；Run 作用域关闭并完成状态
+保存后，Application 才将该位置标记为可用。Skills 激活状态随位置恢复，
+宿主确认调度 yielded 的请求已经完成并保存最终状态后，可以调用
+`saveBranchPosition(runId, { allowYielded: true })` 保存成功边界。
+`forkStateKeys` 和 `forkPluginIds` 声明需要继承的应用与插件状态。
+`forkStateTransform(key, value)` 调整新环境中的资源位置。审批授权、活动资源和未
+消费输入保持独立。
+
+`AgentWorkspace.readSessionBranchTree()` 返回持久保存的来源关系和历史位置。
+`forkSession(sourceId, positionSeq, { workspace?, metadata? })` 使用同一个
+`openApplication` 工厂创建并选择新 Session。工厂收到 `fork`、`workspace` 和
+`metadata`，宿主据此重建目录对应的工具和指令。可选 `workspacePaths` 返回相关
+工作区路径，使 Session 列表、历史、重命名、删除和分支树共同覆盖这些目录。
+恢复时工厂收到保存的工作区路径，`workspace` 始终反映当前 Application。
+
 `plugins` 接受带依赖声明的插件定义，每个 Application 创建独立的 application、session
 和 run 作用域。直接传入的 Model、Context、permissions、tools、Skills 和 Runtime
 配置通过组件插件工厂提供；相同基础服务具有一个提供方，重复提供方在 setup 之前报错。
@@ -53,3 +69,10 @@ Model、permissions、Context/Runtime/tools 和 Skills 的插件工厂分别由
 详见[插件指南](../../docs/zh-CN/guides/plugins.md)。离线验证使用
 `pnpm --filter @may/application test`，真实 provider 集成验证使用
 `pnpm --filter @may/application test:integration`。
+
+`@may/application/git-workspace` 提供 Node.js `ProjectGitWorkspace`，默认初始化项目
+Git 管理并保存初始文件 checkpoint。每次完整请求通过 `beginRound()`、
+`lease.complete()` 保存最终文件版本；组件提供当前 branch、结构化 diff、
+文件恢复预览和持久化 worktree 管理。
+宿主通过 `authorizeCommit` 执行项目要求的提交授权。
+详见 [Git 工作区与文件 checkpoint](../../docs/zh-CN/guides/git-workspaces.md)。

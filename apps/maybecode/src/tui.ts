@@ -3,7 +3,7 @@ import type { AgentApplicationEvent } from "@may/application";
 import type { ContextInspection } from "@may/context";
 import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
 import type { SessionEvent } from "@may/session";
-import { sanitizeTerminalText, TerminalImages, encodeImage } from "@may/tui";
+import { sanitizeTerminalText, TerminalImages, encodeImage, workspaceGitLabel } from "@may/tui";
 
 import type { FileChangeKind, ToolChangePreview } from "@may/coding-tools/change-preview";
 import type {
@@ -30,6 +30,7 @@ import type {
 } from "./controller.js";
 import { runModelPicker } from "./model-picker.js";
 import { runSessionPicker } from "./session-picker.js";
+import { runForkPicker, runChangesPicker } from "./fork-picker.js";
 import { presentMcpInteraction } from "./mcp-interaction-ui.js";
 import { MaybeCodeTerminalWeb } from "./terminal-web.js";
 import { formatGoal } from "./goal-commands.js";
@@ -61,6 +62,7 @@ export async function runTerminalUI(
   let activeQuestion: AbortController | undefined;
   let inputQuestionController: AbortController | undefined;
   let inputContinuation = false;
+  let gitLabel = "";
   let interactionDone: Promise<void> = Promise.resolve();
   const pendingRuns = new Set<Promise<void>>();
   const observeRun = (result: Promise<unknown>): void => {
@@ -124,8 +126,20 @@ export async function runTerminalUI(
 
   const web = new MaybeCodeTerminalWeb(app, handleProcessSignal);
   const eventTask = consumeEvents(app, renderer, question, web.events, () => {
-    if (inputQuestionController !== undefined) terminal.updatePrompt?.(inputPrompt(app.permissionMode === "yolo", inputContinuation));
+    if (inputQuestionController !== undefined) terminal.updatePrompt?.(inputPrompt(app.permissionMode === "yolo", inputContinuation, gitLabel));
   });
+  const refreshWorkspace = async () => {
+    if (!app.getWorkspaceGit || terminalClosed) return;
+    try { gitLabel = workspaceGitLabel(await app.getWorkspaceGit()); }
+    catch (error) { gitLabel = `Git 错误：${sanitizeTerminalText(errorMessage(error))}`; }
+    if (inputQuestionController) terminal.updatePrompt?.(inputPrompt(app.permissionMode === "yolo", inputContinuation, gitLabel));
+  };
+  await refreshWorkspace();
+  let refreshingWorkspace = false;
+  const workspaceTimer = app.getWorkspaceGit ? setInterval(() => {
+    if (refreshingWorkspace || terminalClosed) return;
+    refreshingWorkspace = true; void refreshWorkspace().finally(() => { refreshingWorkspace = false; });
+  }, 2_000) : undefined;
   terminal.write(sanitizeTerminalText(
     `MaybeCode\nWorkspace: ${app.workspace}\n` +
       `Model: ${modelLabel(app)}\n` +
@@ -138,7 +152,7 @@ export async function runTerminalUI(
     while (!exit) {
       let input: string;
       try {
-        input = await readInput(inputQuestion, slashCommandSuggestions, () => app.permissionMode === "yolo");
+        input = await readInput(inputQuestion, slashCommandSuggestions, () => app.permissionMode === "yolo", () => gitLabel);
       } catch (error) {
         if (isAbortError(error)) {
           if (exit) break;
@@ -175,6 +189,7 @@ export async function runTerminalUI(
     }
   } finally {
     process.removeListener("SIGINT", handleProcessSignal);
+    if (workspaceTimer) clearInterval(workspaceTimer);
     process.removeListener("SIGTERM", handleProcessSignal);
     activeQuestion?.abort();
     removeInterrupt?.();
@@ -274,7 +289,9 @@ async function consumeEvents(
       event.type === "mcp.server.disconnected"
     ) {
       renderer.mcpEvent(event);
-    } else {
+    } else if (event.type === "workspace.git.changed") {
+      if (event.checkpoint.error) renderer.write(`\nGit checkpoint：${sanitizeTerminalText(event.checkpoint.error)}\n`);
+    } else if (event.type === "session.changed") {
       await renderer.sessionChanged(event, app);
     }
   }
@@ -424,6 +441,21 @@ async function renderSlashCommandResult(
       }
       break;
     }
+    case "fork.selection.requested": {
+      const selection = await runForkPicker({ points: result.points, currentSessionId: app.sessionId, terminal, question: prompt => question(prompt, { history: false }) });
+      if (selection) {
+        if (!app.forkSession) throw new Error("Session 分支能力不可用。");
+        const id = await app.forkSession(selection.pointId, selection.mode);
+        terminal.write(sanitizeTerminalText(`\nSession 分支已创建：${id}\n`));
+      }
+      break;
+    }
+    case "changes.selection.requested":
+      await runChangesPicker(terminal, result.diff, app);
+      break;
+    case "worktrees.display":
+      terminal.write(sanitizeTerminalText(`\n${result.worktrees.length ? result.worktrees.map(item => `${item.id}\n${item.path}\n${item.branch} · ${item.status} · ${item.commit.slice(0, 12)}`).join("\n\n") : "没有已登记的 worktree。"}\n`));
+      break;
     case "session.resumed":
       terminal.write(`\nResumed session ${result.sessionId}\n`);
       break;
@@ -554,18 +586,19 @@ function renderSlashCommandHelp(
     "  Multiline\n      End a line with \\ to continue on the next line\n";
 }
 
-function inputPrompt(yolo: boolean, continuation: boolean): string {
-  return `${continuation ? "" : "\n"}${yolo ? "YOLO · Auto-approve " : ""}${continuation ? "... " : "> "}`;
+function inputPrompt(yolo: boolean, continuation: boolean, gitLabel = ""): string {
+  return `${continuation ? "" : "\n"}${!continuation && gitLabel ? `[${gitLabel}] ` : ""}${yolo ? "YOLO · Auto-approve " : ""}${continuation ? "... " : "> "}`;
 }
 
 async function readInput(
   question: UIQuestion,
   suggestions: TerminalQuestionOptions["suggestions"],
   yolo: () => boolean,
+  gitLabel: () => string = () => "",
 ): Promise<string> {
   const lines: string[] = [];
   while (true) {
-    let line = await question(inputPrompt(yolo(), lines.length > 0), {
+    let line = await question(inputPrompt(yolo(), lines.length > 0, gitLabel()), {
       history: false,
       ...(lines.length === 0 && suggestions !== undefined
         ? { suggestions }

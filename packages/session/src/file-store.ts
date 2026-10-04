@@ -155,7 +155,13 @@ function validPayload(event: Record<string, unknown>): boolean {
   if ((String(event.type).startsWith("run.") || String(event.type).startsWith("tool.") || event.type === "assistant.completed") && typeof event.runId !== "string") return false;
   if ((String(event.type).startsWith("tool.") || event.type === "assistant.completed") && (!Number.isSafeInteger(event.step) || Number(event.step) < 1)) return false;
   switch (event.type) {
-    case "session.created": return event.metadata === undefined || object(event.metadata);
+    case "session.created": return (event.metadata === undefined || object(event.metadata)) &&
+      (event.fork === undefined || object(event.fork) && typeof event.fork.sessionId === "string" &&
+        typeof event.fork.runId === "string" && Number.isSafeInteger(event.fork.positionSeq) && Number(event.fork.positionSeq) > 0);
+    case "session.fork.ready": return true;
+    case "history.omitted": return ["permission", "unconsumed-input", "application-state", "fork-initialization"].includes(String(event.reason));
+    case "runtime.state.saved": return object(event.runtime) && typeof event.runtime.id === "string" && typeof event.runtime.version === "string" && "state" in event;
+    case "runtime.changed": return object(event.runtime) && typeof event.runtime.id === "string" && typeof event.runtime.version === "string";
     case "state.updated": return typeof event.key === "string";
     case "input.submitted": case "assistant.completed": return message(event.message);
     case "input.steering.queued": return object(event.input) && typeof event.input.inputId === "string" && event.input.inputId.length > 0 && event.input.inputId.length <= 256 && message(event.input.message) && ["pending", "idle"].includes(String(event.input.status)) && (event.input.status === "idle" || typeof event.input.runId === "string");
@@ -167,6 +173,7 @@ function validPayload(event: Record<string, unknown>): boolean {
     case "tool.failed": return call(event.call) && object(event.error) && typeof event.error.message === "string";
     case "tool.presentation": return typeof event.toolCallId === "string" && typeof event.kind === "string" && Number.isSafeInteger(event.version);
     case "run.started": case "run.cancelled": return true;
+    case "run.settled": return event.hostCompleted === undefined || event.hostCompleted === true;
     case "run.failed": return object(event.error) && typeof event.error.message === "string";
     case "run.completed": case "run.yielded": return object(event.result);
     case "run.budget.exceeded": return typeof event.dimension === "string" && object(event.budget);

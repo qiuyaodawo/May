@@ -151,6 +151,7 @@ test("delegation plugin executes an actual child agent with separate Session and
 test("configured MCP and tracing plugins serve actual files across Session changes and flush on close", { timeout: 120000 }, async (t) => {
   const workspace = await workspaceFor(t, "plugin-mcp-live-");
   const application = await openConfiguredMaybeCode({
+    git: false,
     workspace, model: "deepseek-v4-flash", dataDirectory: join(workspace, "data"), skills: false, subagents: false, goals: false,
     instructions: "Use the exact tool name requested and quote evidence from the tool output.",
     observability: { scheduledDelayMs: 60000 },
@@ -191,6 +192,7 @@ test("selected MCP services expose actual catalog, commands and events and own e
     },
   });
   const application = await openConfiguredMaybeCode({
+    git: false,
     workspace, model: "deepseek-v4-flash", dataDirectory: join(workspace, "data"),
     plugins: [plugin], skills: false, goals: false, subagents: false,
     mcp: { servers: [{ id: "unused", command: "unused-mcp-command" }] },
@@ -240,6 +242,7 @@ test("delegation children use the selected MCP service with their own Session an
   const workspace = await workspaceFor(t, "plugin-child-mcp-live-");
   const base = defaultSubagentConfiguration();
   const application = await openConfiguredMaybeCode({
+    git: false,
     workspace, model: "deepseek-v4-flash", dataDirectory: join(workspace, "data"),
     plugins: [createMcpPlugin({
       servers: [{ id: "filesystem", command: process.execPath, args: [fileURLToPath(new URL("../../../../packages/plugins/mcp/test/read-server.mjs", import.meta.url)), workspace], protocolMode: "auto" }],

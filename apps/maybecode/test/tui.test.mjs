@@ -54,7 +54,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace,
     model,
     store: new InMemorySessionStore(),
@@ -145,7 +145,7 @@ test("Ctrl+C cancels an active run and keeps the UI usable", async () => {
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model,
     store: new InMemorySessionStore(),
@@ -162,7 +162,7 @@ test("Ctrl+C cancels an active run and keeps the UI usable", async () => {
 
 test("terminal UI shows automatic compaction failure and fallback progress", async (t) => {
   const terminal = new FakeTerminal(["x".repeat(2500), "/quit"]);
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: await temporaryDirectory(t),
     subagents: false,
     model: {
@@ -222,7 +222,7 @@ test("terminal UI accepts multiline input and renders status", async () => {
     "/hel",
     "/quit",
   ]);
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model: {
       limits: { contextWindowTokens: 10000, maxOutputTokens: 1000 },
@@ -257,7 +257,7 @@ test("terminal UI accepts multiline input and renders status", async () => {
 
 test("terminal UI neutralizes provider-controlled reasoning efforts", async () => {
   const terminal = new FakeTerminal(["/effort", "", "/quit"]);
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model: {
       async *stream() {
@@ -301,7 +301,7 @@ test("terminal UI neutralizes provider-controlled reasoning efforts", async () =
 test("terminal UI retries the latest failed run without duplicating input", async () => {
   let modelCalls = 0;
   const terminal = new FakeTerminal(["do work", "/retry", "/quit"]);
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     subagents: false,
     model: {
@@ -342,7 +342,7 @@ test("terminal UI retries the latest failed run without duplicating input", asyn
 test("resume picker uses contextual keys to rename, delete, and resume", async () => {
   const store = new InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();
-  const app = await MaybeCodeWorkspace.open({
+  const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model: {
       async *stream() {

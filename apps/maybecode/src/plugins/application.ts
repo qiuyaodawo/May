@@ -17,6 +17,7 @@ import { SkillRegistry } from "@may/skills";
 import type { MaybeCodeApplicationOptions } from "../application.js";
 import { createCodingPermissionPolicy } from "../policy.js";
 import { defaultMaybeCodeSkillDirectories } from "../skills.js";
+import { requestMainRunIds, startGitGoalRequest } from "../git-request.js";
 
 export interface MaybeCodePluginComposition {
   readonly plugins: readonly AnyPlugin[];
@@ -67,13 +68,21 @@ export function createMaybeCodePlugins(
       }
     },
     createAgent: application => {
-      if (!hasDelegation) return application;
-      const host = application.getService(delegationService).get();
+      const host = hasDelegation ? application.getService(delegationService).get() : undefined;
+      const completed = options.onGitCheckpoint ?? (() => {});
       return {
         sessionId: application.sessionId,
-        get isRunning() { return application.isRunning || host.isRunning; },
-        submit: plan => host.start({ ...plan, record: requestRecord(plan.input) }, "submit"),
-        continue: plan => host.start({ ...plan, input: "", record: "Continue the active goal" }, "continue"),
+        get isRunning() { return application.isRunning || host?.isRunning === true; },
+        submit: plan => startGitGoalRequest(options.gitWorkspace, application.sessionId,
+          () => host ? host.start({ ...plan, record: requestRecord(plan.input) }, "submit") : application.submit(plan), completed,
+          runId => application.saveBranchPosition(runId, { allowYielded: true }),
+          async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
+          async firstRunId => requestMainRunIds(await application.history(), firstRunId)),
+        continue: plan => startGitGoalRequest(options.gitWorkspace, application.sessionId,
+          () => host ? host.start({ ...plan, input: "", record: "Continue the active goal" }, "continue") : application.continue(plan), completed,
+          runId => application.saveBranchPosition(runId, { allowYielded: true }),
+          async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
+          async firstRunId => requestMainRunIds(await application.history(), firstRunId)),
       };
     },
   }));

@@ -131,6 +131,17 @@ export async function runRetainedTerminalUI(
   process.on("SIGINT", handleProcessSignal);
   process.on("SIGTERM", handleProcessSignal);
   void refreshModelLabel(view, app);
+  const refreshWorkspace = async () => {
+    if (!app.getWorkspaceGit || closing) return;
+    try { view.setWorkspaceGit(await app.getWorkspaceGit()); }
+    catch (error) { view.setWorkspaceGit({ path: app.workspace, status: "error", autoCommit: false, error: errorMessage(error) }); }
+  };
+  await refreshWorkspace();
+  let refreshingWorkspace = false;
+  const workspaceTimer = app.getWorkspaceGit ? setInterval(() => {
+    if (refreshingWorkspace || closing) return;
+    refreshingWorkspace = true; void refreshWorkspace().finally(() => { refreshingWorkspace = false; });
+  }, 2_000) : undefined;
 
   runtime = new TuiRuntime({ terminal, renderer, root: view });
   let eventTask: Promise<void> | undefined;
@@ -144,6 +155,7 @@ export async function runRetainedTerminalUI(
     await exited;
   } finally {
     closing = true;
+    if (workspaceTimer) clearInterval(workspaceTimer);
     process.removeListener("SIGINT", handleProcessSignal);
     process.removeListener("SIGTERM", handleProcessSignal);
     runtime.stop();
@@ -483,6 +495,25 @@ async function presentCommandResult(
       break;
     case "session.selection.requested":
       await runSessionDialog(view, app, store, result.sessions);
+      break;
+    case "fork.selection.requested": {
+      const selection = await view.requestForkSelection(result.points, app.sessionId);
+      if (selection) {
+        if (!app.forkSession) throw new Error("Session 分支能力不可用。");
+        const id = await app.forkSession(selection.pointId, selection.mode);
+        store.appendNotice("info", `Session 分支已创建：${id}`);
+        if (app.getWorkspaceGit) view.setWorkspaceGit(await app.getWorkspaceGit());
+      }
+      break;
+    }
+    case "changes.selection.requested":
+      await view.requestChanges(result.diff, {
+        ...(result.diff.runId && app.previewRestore ? { onRestore: async (path: string) => (await app.previewRestore!(result.diff.runId!, [path])).diff } : {}),
+        ...(app.restoreFiles ? { onApply: (previewId: string) => app.restoreFiles!(previewId) } : {}),
+      });
+      break;
+    case "worktrees.display":
+      store.appendNotice("info", result.worktrees.length ? result.worktrees.map(item => `${item.id}\n${item.path}\n${item.branch} · ${item.status} · ${item.commit.slice(0, 12)}`).join("\n\n") : "没有已登记的 worktree。");
       break;
     case "session.resumed":
       store.appendNotice("info", `Resumed session ${result.sessionId}`);

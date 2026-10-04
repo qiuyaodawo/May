@@ -6,6 +6,10 @@ import { UiProjection } from "./projection.js";
 import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";
 
 export interface ApplicationUiOptions {
+  readonly workspace?: () => Promise<import("./protocol.js").UiWorkspaceGit | undefined>;
+  readonly forkPoints?: (sessionId: string) => Promise<readonly import("./protocol.js").UiForkPoint[]>;
+  readonly checkpoints?: (sessionId: string) => Promise<readonly import("./protocol.js").UiCheckpoint[]>;
+  readonly worktrees?: () => Promise<readonly import("./protocol.js").UiWorktree[]>;
   readonly badges?: () => readonly import("./protocol.js").UiBadge[];
   readonly readMedia?: MediaReader;
   readonly events?: AsyncIterable<{ type: string }>;
@@ -23,7 +27,7 @@ export interface ApplicationUiOptions {
   readonly submit?: (text: string) => Promise<UiReceipt | undefined>;
 }
 
-type UiApplication = Omit<AgentWorkspaceController<{ type: string }>, "compactContext"> & {
+type UiApplication = Omit<AgentWorkspaceController<{ type: string }>, "compactContext" | "forkSession"> & {
   compactContext(): Promise<unknown>;
 };
 
@@ -86,12 +90,22 @@ export class ApplicationUiHost implements UiHost {
     if (this.fault) commands.length = 0;
     const panels = viewingActive ? await this.options.panels?.() ?? [] : [];
     const choices = viewingActive ? await this.options.choices?.() ?? [] : [];
+    const workspace = await this.options.workspace?.();
+    const rawForkPoints = await this.options.forkPoints?.(viewingId);
+    const forkPoints = rawForkPoints?.map(point => {
+      const reply = [...projected.blocks.values()].reverse().find(block => block.kind === "assistant" && block.runId === point.runId);
+      return reply ? { ...point, blockId: reply.id } : point;
+    });
+    const checkpoints = await this.options.checkpoints?.(viewingId);
+    const worktrees = await this.options.worktrees?.();
     if (activeId !== this.app.sessionId || running !== this.app.isRunning) {
       if (attempt < 2) return this.buildSnapshot(selectedId, attempt + 1, all);
       throw new UiError(409, "运行会话状态已改变，请刷新后重试。");
     }
     const page = historyPage(this.hostId, viewingId, [...projected.blocks.values()]);
     return { version: 1, hostId: this.hostId, revision, product: this.options.product, resources, resourcesVersion,
+      ...(workspace ? { workspace } : {}), ...(forkPoints ? { forkPoints } : {}),
+      ...(checkpoints ? { checkpoints } : {}), ...(worktrees ? { worktrees } : {}),
       ...(this.options.badges ? { badges: this.options.badges() } : {}),
       selectedId: viewingId, activeId, blocks: all ? [...projected.blocks.values()] : page.items,
       historyPage: { nextCursor: page.nextCursor, total: page.total }, reads: { resources: true, history: Boolean(this.app.readSessionHistory), fields: Boolean(this.app.readSessionHistory) },

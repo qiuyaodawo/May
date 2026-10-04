@@ -81,6 +81,16 @@ Its submission and continuation options omit `stepInputSource`; the attached
 Agent manages additional input and its persistence.
 The host owns the Session and creates one controller per active Session.
 All external operations affecting the same Agent must be serialized by the host.
+Run handles can additionally implement `finalize(outcome)`, where the outcome is
+`completed`, `continued`, `failed` or `cancelled`. The controller awaits this
+callback after verification and durable goal-state updates, before scheduling
+another Run or finishing execution. A rejected verification uses `continued`;
+blocked or failed execution uses `failed`. The callback also releases resources
+after cancellation and must return a consistent result when called again.
+Its `result` must describe the Agent Run itself so verification can proceed;
+it must not await Goal completion. MaybeCode retains its Git workspace lease
+through this callback. An accepted completed Goal saves its final file version
+and a host-confirmed history position, including Runs yielded for Goal scheduling.
 `AgentApplication.continue(options)` is a general execution API and uses the same
 mutual exclusion, cancellation and persistence path as `submit()`.
 
@@ -94,6 +104,16 @@ Goal context combines dynamic instructions with a current-host-state message in
 each model request. Its content is included in context estimation and its placement
 preserves the stored message count. It is regenerated after context
 compaction. Original user messages remain unchanged.
+
+`wrapModel(model, { includeInstructions: false })` meters delegated model calls
+under the same Goal budget and cancellation signal while the child's Context
+keeps its task instructions. The default wrapper requires `wrapContextFactory()`
+for the main Agent's current Goal instructions. The delegation plugin applies
+the delegated wrapper to default and role-specific child models.
+Goal cancellation and duration or token exhaustion also cancel the current
+execution handle, including delegated tools. A handle obtained after cancellation
+is cancelled immediately, and its result and host finalization finish before the
+Goal stops.
 
 MaybeCode stores goal records under `may.goal` using application-owned Session
 state. SDK callers can disable the component with `goals: false` when opening

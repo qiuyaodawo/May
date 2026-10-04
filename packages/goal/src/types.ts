@@ -8,6 +8,10 @@ export interface GoalBudget {
   readonly maxDurationMs?: number;
 }
 
+export interface GoalModelOptions {
+  readonly includeInstructions?: boolean;
+}
+
 export interface GoalCall {
   readonly id: string;
   readonly runId?: string;
@@ -42,7 +46,11 @@ export interface GoalRun {
   readonly id: string;
   readonly result: Promise<RunResult>;
   cancel(reason?: string): void;
+  /** 在目标验证和状态保存完成后处理文件版本及其他宿主资源。 */
+  finalize?(outcome: GoalRunOutcome): Promise<void>;
 }
+
+export type GoalRunOutcome = "completed" | "continued" | "failed" | "cancelled";
 
 export interface GoalAgent {
   readonly sessionId: string;

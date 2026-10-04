@@ -68,9 +68,19 @@ deliberately small boundary is the feature you need. Do not layer a second
 - a `PermissionPolicy`.
 
 `AgentDefinition.open()` then requires a `SessionStore`. It also accepts the
-Session-bound `sessionId`, `resume`, `metadata`, and `contextMetadata` options.
-Those five values are intentionally rejected as definition options so one
+Session-bound `sessionId`, `resume`, `fork`, `metadata`, and `contextMetadata` options.
+Those values are intentionally rejected as definition options so one
 definition cannot accidentally capture one conversation's identity.
+
+`fork: { sessionId, positionSeq }` creates an independent Session at an available
+position returned by `branchPositions()`. Skills activation follows that position.
+Definitions declare additional transferable state using `forkStateKeys` and
+`forkPluginIds`, and adapt resource locations with `forkStateTransform`;
+permission grants, active resources and unconsumed input remain
+independent. A workspace factory receives `selection.fork`, `selection.workspace`
+and optional `selection.metadata`. The host uses those values to rebuild the
+application for the requested directory. `workspacePaths` adds related worktree
+directories to Session discovery and branch-tree browsing.
 
 Everything else is a deliberate optional choice:
 

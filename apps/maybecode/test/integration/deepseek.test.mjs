@@ -13,6 +13,7 @@ test("runs and resumes a real DeepSeek coding session", async (t) => {
   const workspace = fileURLToPath(new URL("../../../..", import.meta.url));
 
   const first = await openConfiguredMaybeCode({
+    git: false,
     workspace,
     dataDirectory,
     autoResume: false,
@@ -36,7 +37,7 @@ test("runs and resumes a real DeepSeek coding session", async (t) => {
     ),
   );
 
-  const resumed = await openConfiguredMaybeCode({ workspace, dataDirectory });
+  const resumed = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory });
   assert.equal(resumed.sessionId, sessionId);
   const resumedEvents = collectAndApprove(resumed);
   const secondResult = await (await resumed.submit({

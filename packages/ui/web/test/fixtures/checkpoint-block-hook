@@ -1,0 +1,2 @@
+#!/bin/sh
+node "$MAY_UI_CHECKPOINT_HOOK"

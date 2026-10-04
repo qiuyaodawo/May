@@ -16,6 +16,7 @@ May 将持久化对话历史与 Session 发现分开：
 interface SessionStore {
   append(event: SessionEvent): Promise<void>;
   read(sessionId: string): Promise<readonly SessionEvent[]>;
+  inspect?(sessionId: string): Promise<readonly SessionEvent[]>;
   delete?(sessionId: string): Promise<boolean>;
 }
 ```
@@ -26,6 +27,14 @@ interface SessionStore {
 `append()` 必须完整、持久地 commit 一个事件，或 reject；不能确认一个随后可能静默
 丢失的 buffered write。Session 会串行化通过单个 Session 实例发出的写入，但共享
 后端仍需跨进程原子检查 next sequence。
+
+`inspect()` 返回已提交历史，读取过程不会修复记录、改变 writer ownership 或写入
+存储。Session 分支以及工作区历史和树形浏览需要这个操作。完整请求的可恢复边界
+使用 `run.settled` 保存；分支在 `session.created.fork` 中记录准确来源，并通过
+`session.fork.ready` 确认初始化完成。未完成的分支可以读取历史，恢复操作会报告错误。
+自定义 adapter 必须保留这些事件，并报告失败的写入。
+`run.settled.hostCompleted: true` 表示宿主保存最终应用状态，并确认调度 yielded 的
+Run 已经成功完成。
 
 ## 数据库 Adapter 骨架
 

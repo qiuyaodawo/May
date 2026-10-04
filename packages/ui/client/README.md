@@ -1,5 +1,12 @@
 # @may/ui-client
 
+Optional `UiSnapshot.workspace`, `forkPoints`, `checkpoints` and `worktrees` fields
+carry structured workspace versions and Session ancestry. `ApplicationUiOptions`
+accepts asynchronous callbacks with these names; hosts retain Git and fork policy.
+`UiReceipt.diff` returns `UiWorkspaceDiff` with file status, binary flags, statistics
+and unified patches. `UiClientState.diff` exposes the current command's diff and
+clears it when changing Session. The fields remain optional for non-file hosts.
+
 `ApplicationUiOptions.badges` supplies current host status as optional
 `UiSnapshot.badges`. Each `UiBadge` has a text `label` and optional `neutral` or
 `warning` tone. Hosts publish changes through their event stream or `changed()`;

@@ -3,6 +3,8 @@ import { button, detailPanel, extensionContent, element, icon, statusLabel, type
 export { approvalCard, detailPanel, transcriptBlock, type WebUiExtensions, type WebUiContext, type WebUiRenderer } from "./components.js";
 import { createInspector, createTranscriptReader } from "./reading.js";
 import { createCommandUI } from "./commands.js";
+import { createWorkspaceUI } from "./workspace.js";
+export { createWorkspaceUI } from "./workspace.js";
 import { createNavigation, type WebUiNavigation, type WebUiNavigationGroup, type WebUiNavigationItem, type WebUiNavigationLifecycle } from "./navigation.js";
 export type { WebUiNavigationItem, WebUiNavigationGroup, WebUiNavigation, WebUiNavigationLifecycle } from "./navigation.js";
 export { createNavigation } from "./navigation.js";
@@ -136,6 +138,8 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const productTag = element("span", "product-tag", options.kind === "task" ? "任务" : "工作区");
   const headerLeft = element("div", "header-left"); headerLeft.append(toggle, productName, productTag);
   const badges = element("div", "status-badges"); badges.setAttribute("role", "status"); headerLeft.append(badges);
+  const versionUI = createWorkspaceUI(client);
+  headerLeft.append(versionUI.status);
   const title = element("span", "current-title");
   const detailButton = button("", () => {
     const isOpening = !shell.classList.contains("details-open");
@@ -146,7 +150,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
       focusTarget?.focus();
     }
   }, "icon-button"); detailButton.append(icon("panel")); detailButton.setAttribute("aria-label", "显示或隐藏详情"); detailButton.setAttribute("aria-expanded", "false");
-  header.append(headerLeft, title, detailButton);
+  header.append(headerLeft, title, versionUI.actions, detailButton);
   const scroll = element("div", "conversation-scroll");
   const welcome = element("section", "welcome");
   const welcomeMark = element("div", "welcome-mark", "m");
@@ -195,7 +199,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     if (open) { shell.classList.add("details-open"); syncDetails(); }
   }, () => hideDetails());
   details.append(inspector.root, workspaceDetails);
-  const reader = createTranscriptReader(client, { scroll, messages, approvals }, options.extensions ?? {}, block => inspector.inspect(block));
+  const reader = createTranscriptReader(client, { scroll, messages, approvals }, options.extensions ?? {}, block => inspector.inspect(block), { fork: point => versionUI.fork(point), changes: runId => versionUI.changes(runId) });
   const commandUI = createCommandUI(client, composer, command => {
     if (command === "/details") { reader.toggleDetails(); return true; }
     if (command === "/thinking") { shell.classList.toggle("hide-reasoning"); return true; }
@@ -228,7 +232,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     dialogActions.append(connectSubmit);
   }
   dialogForm.append(dialogError, dialogActions); dialog.append(dialogForm);
-  root.replaceChildren(shell, dialog);
+  root.replaceChildren(shell, dialog, versionUI.dialog);
 
   let draftKey = "new", selected: string | null = null;
   const drafts = new Map<string, string>(); let listSignature = "", panelSignature = "", choiceSignature = "", suggestionSignature = "";
@@ -353,7 +357,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     navComponent?.update(state);
     const displayError = state.error ?? localError;
     errorBox.textContent = displayError ?? ""; errorBox.hidden = !displayError;
-    inspector.update(state); reader.update(state); commandUI.update(state);
+    versionUI.update(state); inspector.update(state); reader.update(state); commandUI.update(state);
     const visibleBlocks = snapshot?.blocks ?? [];
     welcome.hidden = visibleBlocks.length > 0;
     welcomeTitle.textContent = isTask ? "把下一件事交给 May" : "今天，一起构建什么？";
@@ -465,5 +469,5 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const unsubscribe = client.subscribe(render);
   let disposed = false;
   void options.initialToken?.then(token => { if (!disposed && token !== undefined) return client.connect(token); }).catch(error => { if (!disposed) showError(error); });
-  return () => { disposed = true; resourceRequest++; clearTimeout(searchTimer); navComponent?.dispose(); commandUI.dispose(); reader.dispose(); inspector.dispose(); unsubscribe(); client.disconnect(); document.removeEventListener("keydown", keyboard); mobileQuery.removeEventListener("change", onMobileChange); root.replaceChildren(); };
+  return () => { disposed = true; resourceRequest++; clearTimeout(searchTimer); navComponent?.dispose(); versionUI.dispose(); commandUI.dispose(); reader.dispose(); inspector.dispose(); unsubscribe(); client.disconnect(); document.removeEventListener("keydown", keyboard); mobileQuery.removeEventListener("change", onMobileChange); root.replaceChildren(); };
 }

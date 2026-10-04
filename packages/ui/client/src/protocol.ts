@@ -13,6 +13,75 @@ export interface UiBadge {
   readonly tone?: "neutral" | "warning";
 }
 
+export interface UiWorkspaceGit {
+  readonly path: string;
+  readonly status: "ready" | "initializing" | "disabled" | "error";
+  readonly autoCommit: boolean;
+  readonly branch?: string;
+  readonly commit?: string;
+  readonly detached?: boolean;
+  readonly error?: string;
+}
+
+export interface UiForkPoint {
+  readonly blockId?: string;
+  readonly id: string;
+  readonly sessionId: string;
+  readonly runId: string;
+  readonly createdAt: number;
+  readonly userPreview: string;
+  readonly assistantPreview: string;
+  readonly available: boolean;
+  readonly reason?: string;
+  readonly parentPointId?: string;
+  readonly commit?: string;
+  readonly branch?: string;
+  readonly worktreeAvailable?: boolean;
+}
+
+export interface UiCheckpoint {
+  readonly runId: string;
+  readonly pointId?: string;
+  readonly startCommit?: string;
+  readonly endCommit?: string;
+  readonly branch?: string;
+  readonly status: "saved" | "failed" | "unavailable";
+  readonly error?: string;
+}
+
+export interface UiFileDiff {
+  readonly path: string;
+  readonly previousPath?: string;
+  readonly status: "added" | "modified" | "deleted" | "renamed" | "copied" | "untracked";
+  readonly binary: boolean;
+  readonly additions: number;
+  readonly deletions: number;
+  readonly patch: string;
+}
+
+export interface UiWorkspaceDiff {
+  readonly runId?: string;
+  readonly restorePreviewId?: string;
+  readonly scope: "run" | "session" | "workspace";
+  readonly title: string;
+  readonly from?: string;
+  readonly to?: string;
+  readonly uncommitted: boolean;
+  readonly files: readonly UiFileDiff[];
+}
+
+export interface UiWorktree {
+  readonly id: string;
+  readonly path: string;
+  readonly branch: string;
+  readonly sourceSessionId: string;
+  readonly pointId: string;
+  readonly commit: string;
+  readonly sessionIds: readonly string[];
+  readonly status: "ready" | "creating" | "error";
+  readonly error?: string;
+}
+
 export interface UiResource {
   readonly id: string;
   readonly kind: "session" | "task";
@@ -105,6 +174,10 @@ export interface UiControls {
 export interface UiCompletion { readonly value: string; readonly label: string; readonly description?: string }
 
 export interface UiSnapshot {
+  readonly workspace?: UiWorkspaceGit;
+  readonly forkPoints?: readonly UiForkPoint[];
+  readonly checkpoints?: readonly UiCheckpoint[];
+  readonly worktrees?: readonly UiWorktree[];
   readonly badges?: readonly UiBadge[];
   readonly version: 1;
   /** New on each host start; prevents replay of an uncertain command after restart. */
@@ -140,7 +213,7 @@ export interface UiCommand {
   readonly args: Readonly<Record<string, string>>;
 }
 
-export interface UiReceipt { readonly selectedId?: string | null; readonly output?: UiCommandOutput; readonly disconnect?: boolean }
+export interface UiReceipt { readonly selectedId?: string | null; readonly output?: UiCommandOutput; readonly diff?: UiWorkspaceDiff; readonly disconnect?: boolean }
 
 export interface UiPageRequest { readonly query?: string; readonly cursor?: string }
 export interface UiPage<T> { readonly hostId: string; readonly items: readonly T[]; readonly nextCursor: string | null; readonly total: number }

@@ -5,6 +5,22 @@ MaybeCode 接受 `apps.maybecode.plugins`，MaybeClaw 的 May Agent 接受
 可选导出名称、配置和启用标记。模块按照配置文件位置解析。参阅
 [插件指南](../guides/plugins.md)。
 
+## MaybeCode 项目 Git 管理
+
+`apps.maybecode.git` 默认值为 `{}`，接受 `false` 关闭项目 Git 管理。
+配置对象支持 `autoCommit`（默认 `true`）、`readOnly`（默认 `false`）、
+`dataRoot`、`worktreesRoot` 和 `excludedPaths`（项目路径数组）。配置中的
+目录按照配置文件所在目录解析。记录目录与 worktree 根目录必须位于项目仓库之外。
+已有仓库继续使用原有版本；新项目建立仓库及初始 checkpoint。自动提交在完整请求
+结束后进行，提交范围遵循项目忽略规则。
+
+`autoCommit: false` 保留 Git 状态读取与已有版本的 checkpoint，文件修改保持
+未提交。`readOnly: true` 禁止 Git 初始化与修改，内置工具审批策略同时禁止改变项目的
+工具操作。headless 宿主可以通过
+`git.authorizeCommit` 执行审批策略。Git 配置与工具审批模式分别控制各自的操作。
+Session 分支、worktree 生命周期、文件排除与恢复预览见
+[Git 工作区与 checkpoint](../guides/git-workspaces.md)。
+
 ## MaybeCode 权限模式
 
 `apps.maybecode.permissionMode` 接受 `"default"`（默认值）或 `"yolo"`。

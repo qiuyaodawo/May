@@ -40,6 +40,27 @@ instructions, permissionPolicy, ... })`, then call
 `definition.open({ store, sessionId?, resume?, metadata?, contextMetadata? })`
 for each Session. Every call creates an independent `AgentApplication`.
 
+Open with `fork: { sessionId, positionSeq }` to restore a selected successful
+request into an independent Session. `branchPositions()` exposes exact settled
+positions. The application saves the boundary after its Run scope closes and
+pending state writes complete. Skills activation is restored automatically;
+hosts can call `saveBranchPosition(runId, { allowYielded: true })` after verifying
+that a scheduler-yielded request completed and saving their final state.
+additional application state keys require `forkStateKeys`, and plugin state
+requires `forkPluginIds`. `forkStateTransform(key, value)` adapts declared state
+to the new environment, including workspace-relative resource locations.
+Permissions, active resources and queued input are
+created independently.
+
+`AgentWorkspace.readSessionBranchTree()` returns durable Session lineage and
+positions. `forkSession(sourceId, positionSeq, { workspace?, metadata? })` opens
+and activates the new Session using the same `openApplication` factory. Its
+selection contains `fork`, `workspace` and `metadata`, allowing the host to
+rebuild tools and instructions for another worktree. `workspacePaths` optionally
+lists related workspaces whose Sessions share discovery, history, rename, delete
+and branch operations. Resume passes the saved workspace to the application
+factory; `workspace` reflects the active application.
+
 ```ts
 import { defineAgent } from "@may/application";
 
@@ -153,6 +174,12 @@ profiles and can use `transitionApplication` to rebuild the same session after a
 model/configuration change. Product-only mutations that do not rebuild the
 runtime can use `runStateTransition` so they share the same FIFO queue as
 session operations.
+
+`@may/application/git-workspace` provides the Node.js `ProjectGitWorkspace`
+component for default project Git management, initial and complete-request file
+checkpoints, current branch status, structured diffs, reviewed restoration,
+and durable worktree management. Hosts supply project commit authorization
+through `authorizeCommit`. See [Git workspaces and file checkpoints](../../docs/en/guides/git-workspaces.md).
 
 This package owns orchestration, not product policy. Callers still choose the
 prompt, tools, permissions, Context strategies, model/provider configuration,

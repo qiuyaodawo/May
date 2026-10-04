@@ -194,6 +194,43 @@ and bounded queries. `Session.resume()` uses full history, while
 descending order, event-type filters, and bounded pages. This lets UIs and
 agent-facing tools inspect history without duplicating store-specific logic.
 
+## Session branches
+
+`branchPositions()` projects complete requests into selectable history positions.
+Successful Runs become available only after `run.settled` confirms that tool
+execution, event observation and Runtime state persistence have completed.
+Failed, cancelled, interrupted, yielded and older histories without a settlement
+record retain an unavailable reason. A host that verifies a yielded request as
+successfully completed can call `saveBranchPosition(runId, { allowYielded: true })`
+after saving its state. This writes `run.settled` with `hostCompleted: true`.
+Positions contain `sessionId`, `runId`,
+`positionSeq`, `timestamp`, `request`, `response` and availability.
+
+`Session.fork({ sourceId, positionSeq, store, createRuntime, id?, metadata?,
+stateKeys?, transformState?, deferForkReady? })` creates a new independent identity from the exact
+selected boundary. It copies historical messages, provider `modelState`, tool
+outcomes and versioned Runtime state. Only application state keys explicitly
+listed in `stateKeys` are copied. Historical tools are never executed. Permission
+records, input delivery identities and unconsumed steering inputs are excluded;
+already-delivered steering content remains in Context.
+Removed payloads become `history.omitted` records, keeping inherited sequence
+numbers stable for application-owned references to historical evidence.
+
+The creation event records `fork: { sessionId, positionSeq, runId }`. A durable
+`session.fork.ready` record confirms completion; reopening a partially written
+fork rejects with a diagnostic. The source store must provide non-mutating
+`inspect()` access. `readSessionBranchNode(history)` exposes durable lineage and
+positions for application tree views. Git and workspace selection remain owned
+by the host.
+`deferForkReady: true` leaves initialization unavailable until the host calls
+`saveForkReady()` after completing its resource setup and state writes. The
+operation is idempotent and requires an idle, open Runtime.
+
+Hosts that persist additional state after a Run use `deferBranchPositions: true`
+when creating or reopening a Session, then call `saveBranchPosition(runId)` after
+their state barrier. That operation requires the latest successful Run and no
+active execution or state mutation.
+
 Applications can persist a context controller's replacement view with
 `session.recordContextCompaction(...)`. This appends a `context.compacted`
 event containing the active replacement messages and before/after statistics.
@@ -210,6 +247,6 @@ sync writes and repair incomplete final records; see
 
 The package supports new, resumed, and deleted histories with in-memory or
 local JSONL storage, reusable session catalogs, and durable context-replacement
-events. It does not choose or execute compaction strategies. Forking and
-cross-process coordination for simultaneous writers to the same session
-history are not implemented yet.
+events and independent selected-position branches. It does not choose or execute
+compaction strategies. Cross-process coordination for simultaneous writers to
+the same session history remains owned by the storage host.
