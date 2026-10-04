@@ -8,8 +8,7 @@
     "types": ["node"]
   },
   "references": [
-    { "path": "../../core" },
-    { "path": "../../environment" }
+    { "path": "../../core" }
   ],
   "include": ["src/**/*.ts"]
 }

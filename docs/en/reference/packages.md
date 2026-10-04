@@ -273,13 +273,6 @@ later `[DONE]` or `finish_reason` does not turn the failure into a success.
 
 ## Tools
 
-### `@may/environment`
-
-File, process and artifact access through an owned execution environment. The local
-provider uses Windows AppContainer, exposes enforced limits and capabilities, and
-preserves the host workspace on close. Remote creation and connection use the public
-`EnvironmentProviderFactory` interface. See [Execution environments](environment.md).
-
 ### `@may/coding-tools`
 
 Workspace-bound read, edit, write and shell tools, plus reusable instruction
@@ -291,9 +284,8 @@ are:
 - `@may/coding-tools/instructions`;
 - `@may/coding-tools/change-preview`.
 
-With `environment`, all four tools use its provider and shell requires an explicit
-profile. Without this option, shell executes with host process permissions. See
-[Execution environments](environment.md) and [Custom tools](../guides/custom-tool.md).
+The shell tool executes with host process permissions. Applications that require
+execution isolation must supply it separately. See [Custom tools](../guides/custom-tool.md).
 
 ### `@may/session-tools`
 

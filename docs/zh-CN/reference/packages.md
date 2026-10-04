@@ -234,12 +234,6 @@ Chat Completions 的 chunk 出现顶层 `error` 字段时，流立即失败。�
 
 ## 工具
 
-### `@may/environment`
-
-通过宿主管理的执行环境提供文件、进程和产物访问。本地 provider 使用 Windows
-AppContainer，报告生效的限制与能力，关闭时保留宿主工作区。远程环境创建和连接
-使用公共 `EnvironmentProviderFactory` 接口。参阅[执行环境](environment.md)。
-
 ### `@may/coding-tools`
 
 提供受 workspace 约束的读取、编辑、写入和 shell 工具，以及可复用的指令加载与编码
@@ -248,8 +242,7 @@ AppContainer，报告生效的限制与能力，关闭时保留宿主工作区�
 - `@may/coding-tools/instructions`；
 - `@may/coding-tools/change-preview`。
 
-配置 `environment` 后，四种工具都使用该 provider，shell 需要明确配置 profile。
-没有配置时，shell 以 May 进程的宿主权限执行。参阅[执行环境](environment.md)和
+Shell 工具以 May 进程的宿主权限执行。需要执行隔离的应用应独立提供相关限制。参阅
 [自定义工具](../guides/custom-tool.md)。
 
 ### `@may/session-tools`

@@ -2,7 +2,6 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import type { Tool, ToolProgressUpdate } from "@may/core";
-import { EnvironmentError, type EnvironmentProvider } from "@may/environment";
 import { CodingToolError } from "./errors.js";
 import {
   optionalPositiveInteger,
@@ -32,7 +31,6 @@ export interface ShellToolInfo {
 }
 
 export interface ShellToolOptions {
-  readonly environment?: EnvironmentProvider;
   readonly cwd: string;
   readonly defaultTimeoutMs?: number;
   readonly maxTimeoutMs?: number;
@@ -125,9 +123,6 @@ export function createShellTool(options: ShellToolOptions): Tool<
   if (defaultTimeoutMs > maxTimeoutMs) {
     throw new RangeError("defaultTimeoutMs must not exceed maxTimeoutMs");
   }
-  if (options.environment !== undefined && options.profile === undefined) {
-    throw new TypeError("an explicit shell profile is required when using an execution environment");
-  }
   const profile = validateShellProfile(
     options.profile ?? createDefaultShellProfile(),
   );
@@ -139,9 +134,7 @@ export function createShellTool(options: ShellToolOptions): Tool<
 
   const tool: Tool<ShellToolInput, ShellToolOutput> = {
     name: "shell",
-    description: options.environment === undefined
-      ? shellDescription(info)
-      : `Run ${info.displayName} commands inside the configured execution environment. Its directory, network and resource restrictions apply to the command and its descendants.`,
+    description: shellDescription(info),
     inputSchema: {
       type: "object",
       properties: {
@@ -179,42 +172,6 @@ export function createShellTool(options: ShellToolOptions): Tool<
           "CODING_TOOL_CANCELLED",
           "shell: command was cancelled",
         );
-      }
-      if (options.environment !== undefined) {
-        const description = await options.environment.describe();
-        await resolveExistingWorkspacePath(options.cwd, ".", { environment: options.environment, signal: context.signal });
-        const variables = shellEnvironment({ ...options, inheritEnv: options.inheritEnv ?? false }, description.platform);
-        const env = Object.fromEntries(Object.entries(variables).filter((entry): entry is [string, string] => entry[1] !== undefined));
-        const running = await options.environment.startProcess({
-          command: profile.executable,
-          args: profile.args(input.command),
-          timeoutMs: input.timeoutMs ?? defaultTimeoutMs,
-          env,
-        }, { signal: context.signal, maxOutputBytes });
-        const unsubscribe = running.onOutput((chunk) => {
-          context.report({ type: "output.delta", channel: chunk.channel, delta: chunk.text });
-        });
-        try {
-          const result = await running.result;
-          return {
-            stdout: result.stdout,
-            stderr: result.stderr,
-            exitCode: result.exitCode,
-            signal: result.signal as NodeJS.Signals | null,
-            stdoutTruncated: result.stdoutTruncated,
-            stderrTruncated: result.stderrTruncated,
-          };
-        } catch (error) {
-          if (error instanceof EnvironmentError && error.code === "ENVIRONMENT_PROCESS_TIMEOUT") {
-            throw new CodingToolError("CODING_TOOL_COMMAND_TIMEOUT", "shell: command exceeded its timeout", { cause: error });
-          }
-          if (error instanceof EnvironmentError && error.code === "ENVIRONMENT_PROCESS_CANCELLED") {
-            throw new CodingToolError("CODING_TOOL_CANCELLED", "shell: command was cancelled", { cause: error });
-          }
-          throw error;
-        } finally {
-          unsubscribe();
-        }
       }
       const workspace = await resolveExistingWorkspacePath(options.cwd, ".");
       return executeCommand(
@@ -447,8 +404,8 @@ function createOutputCollector(maxBytes: number): OutputCollector {
   };
 }
 
-function shellEnvironment(options: ShellToolOptions, platform: NodeJS.Platform = process.platform): NodeJS.ProcessEnv {
-  const normalize = (key: string) => platform === "win32" ? key.toUpperCase() : key;
+function shellEnvironment(options: ShellToolOptions): NodeJS.ProcessEnv {
+  const normalize = (key: string) => process.platform === "win32" ? key.toUpperCase() : key;
   const allowed = options.envAllowlist?.map(normalize);
   const denied = (options.envDenylist ?? []).map(normalize);
   const result: NodeJS.ProcessEnv = {};

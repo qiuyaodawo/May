@@ -62,7 +62,6 @@ interfaces are intended for extension.
 ## Reference
 
 - [Packages](reference/packages.md)
-- [Execution environments](reference/environment.md)
 - [Configuration](reference/configuration.md)
 - [Compatibility and stability](reference/compatibility.md)
 - [Architecture decisions](architecture/decisions/README.md)

@@ -1,6 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
 import { CodingToolError } from "./errors.js";
-import type { EnvironmentProvider } from "@may/environment";
 
 // Keep a leading BOM so edit can round-trip bytes outside the replacement.
 const UTF8_DECODER = new TextDecoder("utf-8", {
@@ -13,18 +12,7 @@ export async function readTextFile(
   displayPath: string,
   maxBytes: number,
   signal: AbortSignal,
-  environment?: EnvironmentProvider,
 ): Promise<string> {
-  if (environment !== undefined) {
-    const information = await environment.statFile(displayPath, { signal });
-    if (information.type !== "file") {
-      throw new CodingToolError("CODING_TOOL_NOT_A_FILE", `Path is not a file: ${displayPath}`);
-    }
-    if (information.size > maxBytes) throw fileTooLarge(displayPath, information.size, maxBytes);
-    const contents = await environment.readFile(displayPath, { signal, encoding: "binary", maxBytes });
-    if (contents.bytes.byteLength > maxBytes) throw fileTooLarge(displayPath, contents.bytes.byteLength, maxBytes);
-    return decodeText(contents.bytes, displayPath);
-  }
   const information = await stat(path);
   if (!information.isFile()) {
     throw new CodingToolError(
@@ -40,10 +28,6 @@ export async function readTextFile(
   if (contents.byteLength > maxBytes) {
     throw fileTooLarge(displayPath, contents.byteLength, maxBytes);
   }
-  return decodeText(contents, displayPath);
-}
-
-function decodeText(contents: Uint8Array, displayPath: string): string {
   try {
     return UTF8_DECODER.decode(contents);
   } catch (error) {

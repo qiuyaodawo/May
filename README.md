@@ -3,11 +3,6 @@
 May is a composable agent framework organized as a monorepo. Its packages can
 be used independently or combined into complete agents and applications.
 
-`@may/environment` supplies Windows AppContainer file/process isolation, artifacts
-and remote provider interfaces. Coding tools can share one configured environment.
-See [Execution environments](docs/en/reference/environment.md) or
-[执行环境](docs/zh-CN/reference/environment.md).
-
 `@may/scheduler` provides opt-in persistent time and event triggers. Hosts explicitly
 start a timer loop or call `tick()`, and supply an idempotent task dispatcher.
 See [Scheduling](docs/en/guides/scheduler.md) or [持久化调度](docs/zh-CN/guides/scheduler.md).

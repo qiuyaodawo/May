@@ -206,8 +206,8 @@ Core 默认串行调度。只有同一模型响应选择的每个工具都可安
 [权限策略](permission-policy.md)。
 
 对于 workspace-safe 的文件和 shell 实现，优先使用 `@may/coding-tools` factory。
-配置 `environment` 和明确的 shell profile 后，通过 provider 执行操作。
-默认 shell 使用 May 进程权限。参阅[执行环境](../reference/environment.md)。
+其 shell 工具以 May 进程权限执行。需要执行隔离的应用应提供独立的 sandbox
+或远程执行后端。
 
 ## 测试边界
 

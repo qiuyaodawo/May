@@ -137,11 +137,8 @@ Provider HTTP API 和模型 capability 会独立于 May 变化。应用应解析
 
 ## 安全边界
 
-权限审批决定操作是否可以执行，执行环境提供访问限制。
-`@may/coding-tools` 的四种工具接受可选的 `environment`，默认 shell 使用 May
-进程权限。本地 `@may/environment` provider 支持 Windows AppContainer。
-standard 模式允许读取平台公共资源，并按明确的目录清单授予写入权限。
-限制与远程 provider 接口见[执行环境](environment.md)。
+权限审批决定操作是否可以执行。`@may/coding-tools` 的 shell 以 May 进程权限
+运行。处理不可信指令或命令时，需要独立的 sandbox 或远程执行后端。
 
 配置与 Session 文件可能含有敏感 prompt、工具输入/输出和 provider 数据；内置本地
 store 不提供加密。

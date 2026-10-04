@@ -18,7 +18,6 @@
     { "path": "./packages/plugins/agent-adapters" },
     { "path": "./packages/plugins/coordination" },
     { "path": "./packages/plugins/web-api" },
-    { "path": "./packages/environment" },
     { "path": "./packages/skills" },
     { "path": "./packages/core" },
     { "path": "./packages/media" },

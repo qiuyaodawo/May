@@ -208,9 +208,9 @@ process can access after approval. See
 [Permission policies](./permission-policy.md).
 
 For workspace-safe file and shell implementations, prefer the factories in
-`@may/coding-tools`. Configure its `environment` option and an explicit shell
-profile to execute through a provider. Its default shell uses May process
-privileges. See [Execution environments](../reference/environment.md).
+`@may/coding-tools`. Its shell tool executes with the May process's privileges.
+Applications that require execution isolation must provide a separate sandbox
+or remote execution backend.
 
 ## Testing boundary
 
