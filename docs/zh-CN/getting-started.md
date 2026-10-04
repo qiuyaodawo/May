@@ -126,6 +126,8 @@ Linux 的 Node.js 24 任务还运行 `pnpm docs:check`、WebUI 资源同步与 M
 运行 `pnpm test:package:maybecode`，
 在仓库外验证打包依赖、MCP 子路径导出及安装后的 CLI。May 包从本地 tarball 安装；
 外部依赖优先复用 pnpm 缓存，缺失的版本从包注册表下载。
+CLI 启动测试在隔离的用户目录中配置 Git 用户名称和邮箱，
+用于创建初始工作目录 checkpoint。
 
 `pnpm test` 会运行所有 workspace package 后统一报告失败。
 工具、skills、压缩与重试的单 Session 测试配置 `subagents: false`，取消测试同时覆盖

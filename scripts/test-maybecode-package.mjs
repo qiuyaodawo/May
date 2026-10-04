@@ -84,6 +84,10 @@ assert.equal(
 );
 await mkdir(workspaceDirectory, { recursive: true });
 await mkdir(homeDirectory, { recursive: true });
+await writeFile(join(homeDirectory, ".gitconfig"),
+  '[user]\n\tname = May package smoke test\n\temail = may-package-smoke@example.invalid\n',
+  "utf8",
+);
 
 const localTarballs = Object.fromEntries(packages.map((pkg) => [
   pkg.name,

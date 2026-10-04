@@ -151,6 +151,8 @@ version from `.node-version` and `pnpm test:package:maybecode` to verify
 packed dependencies, MCP subpath exports, and the installed CLI outside the
 repository. May packages come from local tarballs; external dependencies reuse
 the pnpm store when available and download missing versions from the registry.
+The CLI smoke test configures a Git user name and email in its isolated home
+directory for the initial workspace checkpoint.
 
 `pnpm test` continues through all workspace packages before reporting failures.
 Single-Session tool, skills, compaction and retry tests configure
