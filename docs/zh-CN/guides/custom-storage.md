@@ -188,6 +188,8 @@ Context 工作集与持久化历史的区别见[自定义 Context](custom-contex
 
 同一个 `FileSessionStore` 实例按 Session 串行执行读取、写入与残尾修复。追加操作仅在
 文件身份、长度和时间戳一致时复用上次验证的序号；显式历史读取仍校验完整记录。
+`input.generated` 记录保存 Hook 追加的继续执行消息，以及分支继承的已交付补充输入。
+读取和只读检查会在 Session 恢复前校验 Run identity、正整数 step、user message 内容及 reason。
 每个文件仍要求单写者。POSIX 上新建会话后同步父目录；Node 没有等价的 Windows 目录 fsync。
 
 需要合并目录操作文件时，停止其他目录使用者，对 `FileSessionCatalog` 调用

@@ -245,6 +245,11 @@ Chat Completions 的 chunk 出现顶层 `error` 字段时，流立即失败。�
 Shell 工具以 May 进程的宿主权限执行。需要执行隔离的应用应独立提供相关限制。参阅
 [自定义工具](../guides/custom-tool.md)。
 
+PowerShell 最后一条命令执行成功时返回 `exitCode: 0`。最后一条命令执行失败时，
+保留最近 native process 的非零退出状态；没有该状态时返回 `1`。显式 `exit N`
+返回 `N`。前面的 non-terminating error 输出保留在 `stderr` 中，后续命令成功时
+仍然返回 `0`。
+
 ### `@may/session-tools`
 
 提供有边界、只读的 `session_history` 工具。`AgentApplication` 可以自动安装它；

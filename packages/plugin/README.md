@@ -121,6 +121,12 @@ Pass prior records through `createScope({ state, onStateChange })`. State restor
 
 Use `scope.use(operation, { cancel })` to register an active operation. It holds all ancestor boundaries until completion. New operations are rejected while a change is pending. Changes wait for existing operations by default; `{ cancelActive: true }` calls their registered cancellation handlers and waits for completion before releasing resources. Application integration automatically registers each Run, including its history completion, and rebuilds the runtime after changes.
 
+Composition changes let active operations finish their state writes, then pause
+new state writes and wait for every accepted `set()` and `update()` before
+disposing resources or restoring state. Writes submitted during this pause
+reject. Replacement setup can write the restored state. Closing drains accepted
+state saves before resource cleanup.
+
 ## Module selections
 
 `loadPluginModules(selections, configFile)` resolves installed ESM packages and local file modules relative to a configuration file. A selection declares `module`, optional named `export`, `config`, and `enabled`. The default export is a `PluginDefinition` object. Configuration validation occurs during host creation, and setup owns resource creation.

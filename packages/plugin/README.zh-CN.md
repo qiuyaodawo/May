@@ -121,6 +121,10 @@ handler 按照 `order` 从小到大执行，随后使用配置中的插件顺序
 
 `scope.use(operation, { cancel })` 登记活动操作，在完成前同时占用全部上级范围的执行边界。变更等待期间拒绝新操作；默认等待已有操作完成。`{ cancelActive: true }` 调用已登记的取消方法，等待完成后释放资源。Application 自动登记每次 Run，包括历史保存，并在变更后重新建立 runtime。
 
+组合变更允许活动操作完成状态写入，随后暂停接受新的状态写入，并等待已经接受的
+`set()` 和 `update()` 完成，再释放资源和恢复状态。暂停期间提交的写入会报错。
+替换插件的 setup 可以更新恢复后的状态。关闭时等待已经接受的状态保存完成后清理资源。
+
 ## 模块配置
 
 `loadPluginModules(selections, configFile)` 按配置文件位置解析已安装的 ESM package 和本地模块。配置包含 `module`，以及可选的命名 `export`、`config` 和 `enabled`。模块默认导出 `PluginDefinition` 对象。创建宿主时验证配置，`setup` 负责创建资源。

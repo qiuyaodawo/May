@@ -458,6 +458,9 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2
     devDependencies:
+      '@may/provider-openai':
+        specifier: workspace:*
+        version: link:../providers/openai
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -1053,6 +1056,9 @@ importers:
       '@may/permissions':
         specifier: workspace:*
         version: link:../permissions
+      '@may/provider-openai':
+        specifier: workspace:*
+        version: link:../providers/openai
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1

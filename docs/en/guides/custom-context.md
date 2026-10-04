@@ -146,6 +146,15 @@ Context replacement is not automatically a durable history format. When using
 `context.compacted` events and are replayed on resume. When using Core and a
 controller directly, the application must persist replacement messages itself.
 
+Controllers with `rollbackCompaction(result)` should also provide
+`commitCompaction(result)`. Call commit immediately after persistence succeeds,
+before completion notifications. A later notification failure propagates with
+the saved view intact. Invoke rollback when persistence fails. The built-in
+controller releases its previous messages and measurements at commit; automatic
+compaction also commits when its persistence sink returns successfully. Commit
+completes the deferred request associated with that operation; a later request
+remains pending even when it uses the same strategy instance.
+
 Avoid two competing sources of truth. If a custom Context also loads messages
 from a database, define how those records relate to the Session store; otherwise
 the replayed `messages` passed to `create()` can be duplicated or silently

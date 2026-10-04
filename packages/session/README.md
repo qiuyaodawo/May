@@ -35,6 +35,9 @@ an input write is pending releases the unused runtime; once committed, that inpu
 remains available for resume and does not start execution on the closed instance.
 Persistent `input.generated` records retain Hook continuation messages and their
 reason, and reconstruct those messages without repeating historical tools.
+File reads and read-only inspection validate the Run identity, positive step,
+user messages and continuation reason for these records. The same records preserve
+already-delivered steering content in selected-position branches.
 
 `SessionStore.inspect?(id)` is optional, non-mutating access to committed history.
 Both built-in stores implement it. File inspection ignores an incomplete trailing

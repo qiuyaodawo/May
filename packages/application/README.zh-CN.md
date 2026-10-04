@@ -61,6 +61,11 @@ Model 工厂共同提供实际实例及这一服务。
 `application.beforeCreate` 执行之前准备 Session 状态和服务。
 Core `runtimeHooks` 支持 Run、Step、Context、Model 和工具执行。
 
+手动和自动压缩保存 `context.compacted` 后调用 controller 的
+`commitCompaction(result)`，然后通知 `compactionCompleted`。保存失败时恢复原来的
+Context；完成 Hook 失败时继续传递错误，并保留已经保存的消息，使当前 Context
+与恢复 Session 使用相同消息。提供恢复能力的自定义 controller 也应实现这一成功保存边界。
+
 `updatePlugins(plugins, { cancelActive? })` 验证完整依赖关系，等待当前操作结束，
 保存并关闭旧 Runtime，更新插件资源，并创建新的 Runtime。
 新的插件再次收到 `application.created`，可以关联现有 Application。

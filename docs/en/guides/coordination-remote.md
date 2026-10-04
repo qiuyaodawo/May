@@ -96,6 +96,12 @@ can create a tombstone before a delayed acceptance arrives, preventing that
 request from starting work. The coordinator also sends cancellation for inactive
 remote work whose acceptance is uncertain. Network failure still leaves an
 unknown outcome; cancellation is not a rollback or proof that effects stopped.
+Workers retain an Agent's optional idempotent `cancel(execution)` control and
+deliver it to detached executions after saving cancellation intent. Recovery
+receives `execution.task.cancelRequested`; reopening the worker, querying recovery,
+and closing the worker retry saved cancellation intents that remain uncertain.
+An unconfirmed control delivery remains `recovery-required`. Cancellation acceptance
+confirms the saved request; durable Agent evidence determines the final outcome.
 Late durable results remain evidence rather than being silently discarded.
 `runtime.close()` also requests cancellation for detached uncertain remote work
 before releasing coordinator ownership; closing is not a background-run command.

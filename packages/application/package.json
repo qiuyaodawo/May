@@ -44,6 +44,7 @@
     "@may/session-tools": "workspace:*"
   },
   "devDependencies": {
+    "@may/provider-openai": "workspace:*",
     "@types/node": "^22.0.0"
   },
   "engines": {

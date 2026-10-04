@@ -5,6 +5,7 @@ import { validateJson, validateSchema } from "./validation.js";
 export class StateStore {
   private entries: Record<string, PluginStateRecord>;
   private pending: Promise<void> = Promise.resolve();
+  private acceptingWrites = true;
 
   constructor(snapshot: PluginStateSnapshot, private readonly save?: (snapshot: PluginStateSnapshot) => Promise<void>) {
     validateSchema({ type: "object", additionalProperties: { type: "object", properties: {
@@ -19,6 +20,14 @@ export class StateStore {
 
   snapshot(): PluginStateSnapshot {
     return structuredClone(this.entries);
+  }
+
+  pauseWrites(): void {
+    this.acceptingWrites = false;
+  }
+
+  resumeWrites(): void {
+    this.acceptingWrites = true;
   }
 
   async prepare(plugin: AnyPlugin): Promise<void> {
@@ -47,10 +56,12 @@ export class StateStore {
       },
       set: async (value) => {
         ensure();
+        this.assertAcceptingWrites();
         await this.enqueue(() => { ensure(); return this.write(plugin, value); });
       },
       update: async (update) => {
         ensure();
+        this.assertAcceptingWrites();
         await this.enqueue(async () => {
           ensure();
           const value = await update(structuredClone(this.entries[plugin.id]!.value));
@@ -63,6 +74,10 @@ export class StateStore {
 
   async settled(): Promise<void> {
     await this.pending;
+  }
+
+  private assertAcceptingWrites(): void {
+    if (!this.acceptingWrites) throw new Error("插件生命周期变更期间暂停接受新的状态写入");
   }
 
   private async write(plugin: AnyPlugin, value: unknown): Promise<void> {

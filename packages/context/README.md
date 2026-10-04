@@ -80,8 +80,16 @@ The built-in controller also supports `requestCompaction(strategy)` to defer a
 reset until the next model snapshot, after the current tool batch completes.
 Passing `undefined` cancels the request. `rollbackCompaction(result)` restores
 the previous view if saving its checkpoint fails, preserving appended messages.
-Automatic compaction invokes rollback when its persistence sink rejects;
-manual callers are responsible for invoking rollback on persistence failure.
+After a checkpoint is saved, `commitCompaction(result)` releases the previous
+view and makes later `rollbackCompaction(result)` calls preserve the committed
+view. It also completes the corresponding deferred compaction request while
+preserving requests issued afterward. Manual callers invoke `commitCompaction()` after successful persistence
+and `rollbackCompaction()` on persistence failure. Automatic compaction commits
+when its persistence sink completes. A sink that performs completion
+notifications calls `commitCompaction()` immediately after saving, before those
+notifications; notification errors then propagate while preserving the saved
+view. Custom controllers providing rollback support should implement this
+commit boundary as well.
 
 `SummaryTailStrategy` accepts a replaceable `ContextSummarizer`. It summarizes
 complete older user turns into one system message and preserves the configured

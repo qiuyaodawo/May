@@ -146,6 +146,13 @@ handlers can choose isolation and report their failures through
 `onPluginHookError`. Plugin application and session state is persisted with its
 version and restored or migrated during resume.
 
+Manual and automatic compaction save `context.compacted` and call the
+controller's `commitCompaction(result)` before notifying `compactionCompleted`.
+A persistence failure restores the previous Context. A completion Hook failure
+propagates while preserving the saved view, so the active Context and Session
+resume use the same messages. Custom controllers with rollback support should
+also implement the commit boundary.
+
 `updatePlugins(plugins, { cancelActive? })` validates the complete composition,
 waits for the current operation boundary, saves and closes the previous Runtime,
 updates plugin resources, and creates a replacement Runtime. `cancelActive: true`

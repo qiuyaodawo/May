@@ -295,6 +295,10 @@ Agent creation approval and tool approval have separate scopes. A one-time
 creation decision does not edit the reusable allowed-Agent list. `allow-session`
 applies only to the declared grant in the corresponding Agent conversation.
 Expired and duplicate approval responses grant no additional authority.
+On restart, pending approvals become `cancelled`. Approvals interrupted while
+`resolving` become `unknown`, retaining their `decision` and `decidedBy` for
+inspection. Agent configuration updates report these uncertain approvals
+immediately; verify the Agent's recorded outcome before changing its configuration.
 
 Before dispatch, platform edits update the pending message and recalls cancel it.
 After dispatch, the original execution input stays intact and an edit or recall

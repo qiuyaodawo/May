@@ -172,6 +172,8 @@ function validPayload(event: Record<string, unknown>): boolean {
     case "runtime.changed": return object(event.runtime) && typeof event.runtime.id === "string" && typeof event.runtime.version === "string";
     case "state.updated": return typeof event.key === "string";
     case "input.submitted": case "assistant.completed": return message(event.message);
+    case "input.generated": return text(event.runId) && Number.isSafeInteger(event.step) && Number(event.step) >= 1 &&
+      Array.isArray(event.messages) && event.messages.every((value) => object(value) && value.role === "user" && message(value)) && text(event.reason);
     case "input.steering.queued": return object(event.input) && typeof event.input.inputId === "string" && event.input.inputId.length > 0 && event.input.inputId.length <= 256 && message(event.input.message) && ["pending", "idle"].includes(String(event.input.status)) && (event.input.status === "idle" || typeof event.input.runId === "string");
     case "input.steering.delivered": return typeof event.runId === "string" && Number.isSafeInteger(event.step) && Array.isArray(event.inputIds) && event.inputIds.every((value) => typeof value === "string");
     case "input.steering.finished": return ["idle", "cancelled"].includes(String(event.status)) && typeof event.reason === "string" && Array.isArray(event.inputIds) && event.inputIds.every((value) => typeof value === "string");

@@ -265,8 +265,9 @@ export class PluginHost implements HookDispatcher {
     }
     await this.idle();
     await this.changeQueue;
-    try { await this.stop(); } catch (error) { errors.push(error); }
+    this.stateStore.pauseWrites();
     try { await this.stateStore.settled(); } catch (error) { errors.push(error); }
+    try { await this.stop(); } catch (error) { errors.push(error); }
     await this.externalCleanup?.();
     this.parent?.children.delete(this);
     if (errors.length) throw new AggregateError(errors, `Failed to close plugin scope ${this.id}`);
@@ -281,6 +282,7 @@ export class PluginHost implements HookDispatcher {
     const local = this.ordered.filter((plugin) => pluginScope(plugin) === this.kind);
     try {
       for (const plugin of local) await this.stateStore.prepare(plugin);
+      this.stateStore.resumeWrites();
       for (const plugin of local) await this.startPlugin(plugin);
       this.signal.throwIfAborted();
       this.ready = true;
@@ -474,6 +476,8 @@ export class PluginHost implements HookDispatcher {
       try {
         if (options.cancelActive) await this.cancelActive();
         await this.idle();
+        for (const scope of descendants) scope.stateStore.pauseWrites();
+        await Promise.all(descendants.map((scope) => scope.stateStore.settled()));
         if (this.closed) throw new Error(`Plugin scope ${this.id} is closed`);
         for (const scope of [...descendants].reverse()) {
           if (scope.closed) await scope.closeResult;

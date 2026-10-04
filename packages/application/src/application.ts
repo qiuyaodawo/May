@@ -974,6 +974,7 @@ export class AgentApplication implements SteerableAgentController {
       if (result.changed) {
         try {
           await this.persistCompaction(result);
+          this.contextController!.commitCompaction?.(result);
         } catch (error) {
           await this.contextController!.rollbackCompaction?.(result);
           throw error;
@@ -993,6 +994,7 @@ export class AgentApplication implements SteerableAgentController {
     options: ContextCompactionOptions,
   ): Promise<void> {
     await this.persistCompaction(result, options);
+    this.contextController?.commitCompaction?.(result);
     await this.hookScope().observe(applicationHooks.compactionCompleted, { ...result, automatic: true }, this.hookContext(options.signal));
     this.eventQueue.push({
       type: "context.compacted",

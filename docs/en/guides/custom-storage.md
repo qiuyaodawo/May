@@ -206,6 +206,9 @@ full lifecycle.
 `FileSessionStore` serializes reads, writes and tail repair per Session in one instance.
 Append validation reuses the last sequence only while file identity, length and timestamps
 match; explicit history reads still validate complete records. Keep one writer per file.
+`input.generated` records preserve Hook continuation and inherited delivered steering
+messages. Reads and read-only inspection validate their Run identity, positive step,
+user-message content and reason before Session replay.
 New session files sync their parent directory on POSIX; Node does not offer equivalent
 Windows directory fsync.
 

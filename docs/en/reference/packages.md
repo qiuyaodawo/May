@@ -287,6 +287,11 @@ are:
 The shell tool executes with host process permissions. Applications that require
 execution isolation must supply it separately. See [Custom tools](../guides/custom-tool.md).
 
+PowerShell returns `exitCode: 0` when the final command succeeds. A failed final
+command preserves the latest native process exit code when it is nonzero, and
+returns `1` otherwise. An explicit `exit N` returns `N`. Earlier
+non-terminating errors remain in `stderr` even when a later command succeeds.
+
 ### `@may/session-tools`
 
 Provides a bounded, read-only `session_history` tool. `AgentApplication` can

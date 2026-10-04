@@ -131,6 +131,14 @@ Context 替换不会自动成为持久化 history format。使用 `AgentApplicat
 压缩结果记录为 Session `context.compacted` 并在恢复时回放。直接使用 Core 和
 controller 时，应用必须自行持久化替换消息。
 
+提供 `rollbackCompaction(result)` 的 controller 也应提供
+`commitCompaction(result)`。保存成功后立即调用 commit，再发送完成通知。
+通知失败时继续传递错误，并保留已经保存的 Context。保存失败时调用 rollback。
+内置 controller 在 commit 时释放之前的消息与 measurement；自动压缩也会在保存
+方法成功返回后调用 commit。
+Commit 完成与当前操作对应的延后请求；之后到达的请求继续保留，包括使用相同
+strategy 实例的新请求。
+
 避免两个互相竞争的事实来源。如果自定义 Context 也从数据库加载消息，必须定义这些
 记录与 Session store 的关系，否则传给 `create()` 的 replayed `messages` 可能重复或
 被静默忽略。参阅[自定义存储](custom-storage.md)。

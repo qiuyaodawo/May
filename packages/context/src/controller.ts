@@ -50,6 +50,8 @@ export interface ContextInspection {
 }
 
 export interface ContextController {
+  /** 保存替换后的 Context 成功时，释放恢复所需的旧状态。 */
+  commitCompaction?(result: ContextCompactionResult): void;
   /** Request compaction at the next model snapshot, after the tool batch finishes. */
   requestCompaction?(strategy: ContextCompactionStrategy | undefined): void;
   /** Restore a replaced view if its checkpoint could not be persisted. */
@@ -83,6 +85,10 @@ export interface SnapshotContextControllerOptions {
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
 }
 
+interface RequestedCompaction {
+  readonly strategy: ContextCompactionStrategy;
+}
+
 export class SnapshotContextController implements ContextController {
   invalidateMeasurement(): void { this.measurement = undefined; }
   private readonly budget: ContextBudget | undefined;
@@ -95,14 +101,23 @@ export class SnapshotContextController implements ContextController {
   private autoCompactionFailureSink: ContextCompactionFailureSink | undefined;
   private measurement: ContextMeasurement | undefined;
   private compactionQueue: Promise<void> = Promise.resolve();
-  private requestedCompaction: ContextCompactionStrategy | undefined;
+  private requestedCompaction: RequestedCompaction | undefined;
   private readonly replacements = new WeakMap<ContextCompactionResult, {
     messages: readonly Message[];
     measurement: ContextMeasurement | undefined;
+    requestedCompaction: RequestedCompaction | undefined;
   }>();
 
   requestCompaction(strategy: ContextCompactionStrategy | undefined): void {
-    this.requestedCompaction = strategy;
+    this.requestedCompaction = strategy === undefined ? undefined : { strategy };
+  }
+
+  commitCompaction(result: ContextCompactionResult): void {
+    const previous = this.replacements.get(result);
+    if (previous?.requestedCompaction !== undefined && this.requestedCompaction === previous.requestedCompaction) {
+      this.requestedCompaction = undefined;
+    }
+    this.replacements.delete(result);
   }
 
   async rollbackCompaction(result: ContextCompactionResult): Promise<void> {
@@ -167,7 +182,7 @@ export class SnapshotContextController implements ContextController {
     options: ContextCompactionOptions = {},
   ): Promise<readonly ContextCompactionResult[]> {
     const requested = this.requestedCompaction;
-    const strategies = requested === undefined ? this.autoCompactionStrategies : [requested];
+    const strategies = requested === undefined ? this.autoCompactionStrategies : [requested.strategy];
     if (strategies.length === 0) return [];
     throwIfAborted(options.signal);
 
@@ -184,7 +199,7 @@ export class SnapshotContextController implements ContextController {
     for (const [index, strategy] of strategies.entries()) {
       let result: ContextCompactionResult;
       try {
-        result = await this.compact(strategy, options);
+        result = await this.enqueueCompaction(strategy, options, requested);
       } catch (error) {
         throwIfAborted(options.signal);
         if (error instanceof HookExecutionError) throw error;
@@ -204,6 +219,7 @@ export class SnapshotContextController implements ContextController {
       if (result.changed) {
         try {
           await this.autoCompactionSink?.(result, options);
+          this.commitCompaction(result);
         } catch (error) {
           await this.rollbackCompaction(result);
           throw error;
@@ -230,8 +246,17 @@ export class SnapshotContextController implements ContextController {
     strategy = this.compactionStrategy,
     options: ContextCompactionOptions = {},
   ): Promise<ContextCompactionResult> {
+    return this.enqueueCompaction(strategy, options,
+      this.requestedCompaction?.strategy === strategy ? this.requestedCompaction : undefined);
+  }
+
+  private enqueueCompaction(
+    strategy: ContextCompactionStrategy | undefined,
+    options: ContextCompactionOptions,
+    requestedCompaction: RequestedCompaction | undefined,
+  ): Promise<ContextCompactionResult> {
     const result = this.compactionQueue.then(() =>
-      this.compactExclusive(strategy, options)
+      this.compactExclusive(strategy, options, requestedCompaction)
     );
     this.compactionQueue = result.then(
       () => undefined,
@@ -243,6 +268,7 @@ export class SnapshotContextController implements ContextController {
   private async compactExclusive(
     strategy: ContextCompactionStrategy | undefined,
     options: ContextCompactionOptions,
+    requestedCompaction: RequestedCompaction | undefined,
   ): Promise<ContextCompactionResult> {
     throwIfAborted(options.signal);
     if (strategy === undefined) {
@@ -336,7 +362,11 @@ export class SnapshotContextController implements ContextController {
           after,
           ...(output.terminal === true ? { terminal: true } : {}),
         };
-        this.replacements.set(result, { messages: latestSnapshot.messages, measurement: previousMeasurement });
+        this.replacements.set(result, {
+          messages: latestSnapshot.messages,
+          measurement: previousMeasurement,
+          requestedCompaction,
+        });
         return result;
       }
     }

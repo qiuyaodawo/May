@@ -317,11 +317,14 @@ function powerShellScript(command: string): string {
     "[Console]::OutputEncoding = $utf8\n" +
     "$OutputEncoding = $utf8\n" +
     "$global:LASTEXITCODE = $null\n" +
-    "& {\n" + command + "\n}\n" +
+    command + "\n" +
     "$maySucceeded = $?\n" +
     "$mayExitCode = $LASTEXITCODE\n" +
-    "if ($null -ne $mayExitCode) { exit $mayExitCode }\n" +
-    "if (-not $maySucceeded) { exit 1 }";
+    "if (-not $maySucceeded) {\n" +
+    "  if (($null -ne $mayExitCode) -and ($mayExitCode -ne 0)) { exit $mayExitCode }\n" +
+    "  exit 1\n" +
+    "}\n" +
+    "exit 0";
 }
 
 function defaultPowerShellExecutable(): string {

@@ -274,6 +274,10 @@ run 范围状态为临时状态。`updatePlugins(plugins, { cancelActive })` 顺
 创建替换 runtime。`cancelActive: true` 在等待前请求取消。替换初始化失败后，
 历史查询仍然可用。
 
+组合变更允许活动操作完成状态写入，随后暂停接受新的状态调用，并等待已经接受的
+`set()` 和 `update()` 完成，再清理资源和恢复状态。暂停期间提交的调用会报错。
+替换插件的 setup 可以更新恢复后的状态。
+
 直接宿主提供 `replacePlugins()`、`replace()`、`remove()` 和 `updateConfig()`。
 `validatePlugins()` 验证准备使用的组合，同时保留当前资源。
 移除提供方时，同时移除必需使用方；可选使用方重新初始化并获得缺失结果。子范围

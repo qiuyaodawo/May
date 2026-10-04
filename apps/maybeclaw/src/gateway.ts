@@ -67,7 +67,10 @@ export class AgentGateway {
   constructor(readonly options: { directory: string; configPath: string; settings: GatewaySettings; store?: GatewayStore }) {
     this.store = options.store ?? GatewayStore.open(options.directory);
     for (const delivery of this.store.list<GatewayDelivery>("deliveries")) if (delivery.status === "sending") this.store.put("deliveries", delivery.id, { ...delivery, status: "unknown" });
-    for (const approval of this.store.list<GatewayApproval>("approvals")) if (approval.status === "pending") this.store.put("approvals", approval.id, { ...approval, status: "cancelled" });
+    for (const approval of this.store.list<GatewayApproval>("approvals")) {
+      if (approval.status === "pending") this.store.put("approvals", approval.id, { ...approval, status: "cancelled" });
+      else if (approval.status === "resolving") this.store.put("approvals", approval.id, { ...approval, status: "unknown" });
+    }
   }
   observe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
   private pluginHost(): Promise<PluginHost> { return this.plugins ??= PluginHost.create({ plugins: createGatewayAgentPlugins({ ...this.options, permissionRuleStore: () => this.ruleStore() }) }); }

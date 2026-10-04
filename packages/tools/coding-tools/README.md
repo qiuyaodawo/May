@@ -107,6 +107,12 @@ platforms. Its dynamic tool description and MaybeCode's generated runtime
 instructions tell the model which syntax to use. PowerShell is launched
 directly with UTF-8 stdout/stderr rather than through `cmd.exe`.
 
+For PowerShell, `exitCode` is `0` when the final command succeeds. If the final
+command fails, the latest native process exit code is preserved when it is
+nonzero; otherwise the result is `1`. An explicit `exit N` returns `N`. A successful
+command after a non-terminating error returns `0`, while the earlier error output
+remains in `stderr`.
+
 Pass a `ShellProfile` to select another executable. `createPowerShellProfile`
 and `createBashShellProfile` provide the built-in launch conventions.
 `createBashTool` remains as a deprecated compatibility factory and now means a

@@ -64,6 +64,7 @@ export class CoordinationWorker {
     this.agents = new Map(Object.entries(options.agents).map(([key, agent]) => {
       name(key, "worker agent"); name(agent.version, "worker agent version");
       return [key, Object.freeze({ version: agent.version, execute: agent.execute.bind(agent), recover: agent.recover.bind(agent),
+        ...(agent.cancel ? { cancel: agent.cancel.bind(agent) } : {}),
         ...(agent.resolveApproval ? { resolveApproval: agent.resolveApproval.bind(agent) } : {}) })];
     }));
   }
@@ -90,7 +91,7 @@ export class CoordinationWorker {
         const repair = await open(path, "r+"); try { await repair.truncate(end); await repair.sync(); } finally { await repair.close(); }
       }
       worker.size = end;
-      for (const job of worker.jobs.values()) if (job.status !== "terminal") {
+      for (const job of worker.jobs.values()) if (job.status !== "terminal" || job.cancelRequested && job.outcome?.status === "recovery-required") {
         await worker.recordRecovery(job, await worker.inspect(job));
       }
       return worker;
@@ -122,8 +123,11 @@ export class CoordinationWorker {
         if (url.pathname === "/v1/cancel") {
           if (!current) {
             if (this.jobs.size >= this.maxJobs) throw new Error("Worker maxJobs reached");
-            // A durable tombstone also stops an acceptance request still in flight.
-            await this.recordRecovery({ ...descriptor, cancelRequested: true }, await this.inspect(descriptor));
+            // 查询外部执行前保存取消意图，同时阻止迟到的派发请求。
+            const cancelling: Job = { ...descriptor, cancelRequested: true, status: "terminal",
+              outcome: { status: "recovery-required", detail: "取消请求已经保存，需要查询持久化执行结果" } };
+            await this.save(cancelling);
+            await this.recordRecovery(cancelling, await this.inspect(cancelling));
           } else await this.cancelJob(current);
           return { accepted: true };
         }
@@ -189,18 +193,33 @@ export class CoordinationWorker {
     if (job.status === "terminal") validateOutcome(job.outcome!);
   }
 
-  private async inspect(job: Dispatch): Promise<TaskRecovery> {
-    try { return validateOutcome(await this.agents.get(job.agent)!.recover(freeze(copy(job.execution)))); }
-    catch { return { status: "recovery-required", detail: "Cannot establish durable remote outcome" }; }
+  private async inspect(job: Job): Promise<TaskRecovery> {
+    const agent = this.agents.get(job.agent)!;
+    const execution = freeze(copy({ ...job.execution, task: { ...job.execution.task,
+      ...(job.cancelRequested ? { cancelRequested: true } : {}) } }));
+    let cancellationUnconfirmed = false;
+    if (job.cancelRequested && !this.active.has(job.id) && agent.cancel) {
+      try { await agent.cancel(execution); }
+      catch { cancellationUnconfirmed = true; }
+    }
+    try {
+      const outcome = validateOutcome(await agent.recover(execution));
+      return cancellationUnconfirmed && outcome.status === "recovery-required"
+        ? { status: "recovery-required", detail: "取消请求交付未能确认，需要查询外部执行结果" } : outcome;
+    } catch { return { status: "recovery-required", detail: cancellationUnconfirmed
+      ? "取消请求交付和持久化执行结果均未能确认" : "Cannot establish durable remote outcome" }; }
   }
 
   private async cancelJob(job: Job): Promise<void> {
     if (job.status === "terminal" && job.outcome?.status !== "recovery-required") return;
-    await this.save({ ...job, cancelRequested: true, ...(job.status === "queued" ? {
+    const cancelling: Job = { ...job, cancelRequested: true, ...(job.status === "queued" ? {
       status: "terminal" as const, outcome: { status: "cancelled" as const, detail: "Cancelled before remote execution" },
-    } : {}) });
+    } : {}) };
+    await this.save(cancelling);
     this.ready.delete(job.id);
-    this.active.get(job.id)?.controller.abort("Remote cancellation requested");
+    const active = this.active.get(job.id);
+    if (active) active.controller.abort("Remote cancellation requested");
+    else if (job.status !== "queued") await this.recordRecovery(cancelling, await this.inspect(cancelling));
   }
 
   private recordRecovery(job: Job, outcome: TaskRecovery): Promise<void> {
@@ -229,13 +248,17 @@ export class CoordinationWorker {
           outcome = "yielded" in output ? { status: "recovery-required", detail: "Remote workers cannot yield without coordinator capability RPC" }
             : { status: "completed", output: validateOutput(output, 1_048_576) };
         } catch {
-          outcome = await this.inspect(job);
+          outcome = await this.inspect(this.jobs.get(job.id)!);
           if (outcome.status === "not-started") outcome = { status: controller.signal.aborted ? "cancelled" : "failed", detail: "Remote execution stopped before durable input" };
         }
         await this.serial.run(async () => {
           this.views.set(job.id, { events: active.events, cursor: active.cursor });
           try { if (!this.fatal) await this.recordRecovery(this.jobs.get(job.id)!, outcome); }
           finally { this.active.delete(job.id); }
+          const current = this.jobs.get(job.id)!;
+          if (!this.fatal && current.cancelRequested && current.outcome?.status === "recovery-required") {
+            await this.recordRecovery(current, await this.inspect(current));
+          }
           await this.pump();
         });
       }).catch((error) => { this.active.delete(job.id); this.fail(error); }) };
@@ -271,7 +294,13 @@ export class CoordinationWorker {
       }).catch((error) => this.fail(error));
       for (const active of this.active.values()) active.controller.abort("Worker closing");
       await Promise.all([...this.active.values()].map((active) => active.done));
-      await this.serial.close(); await this.file.close(); await this.lock.close(); await unlink(this.lockPath);
+      try {
+        await this.serial.run(async () => {
+          if (!this.fatal) for (const job of this.jobs.values()) if (job.cancelRequested && job.outcome?.status === "recovery-required") {
+            await this.recordRecovery(job, await this.inspect(job));
+          }
+        });
+      } finally { await this.serial.close(); await this.file.close(); await this.lock.close(); await unlink(this.lockPath); }
     })();
   }
 }

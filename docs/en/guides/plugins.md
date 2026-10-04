@@ -311,6 +311,11 @@ releases affected instances and constructs the replacement runtime from durable
 messages and state. `cancelActive: true` requests cancellation before waiting.
 History queries remain available after a replacement initialization failure.
 
+Composition changes let active operations finish state writes, then pause new
+state calls and drain accepted `set()` and `update()` calls before resource
+cleanup and state restoration. Calls submitted during that pause reject.
+Replacement setup can update the restored state.
+
 Direct hosts expose `replacePlugins()`, `replace()`, `remove()` and
 `updateConfig()`. `validatePlugins()` verifies a prospective composition without
 releasing resources. Removing a provider also removes required dependants; optional
