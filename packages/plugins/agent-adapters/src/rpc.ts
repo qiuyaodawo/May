@@ -4,7 +4,7 @@ import { once } from "node:events";
 import { createMessageConnection, ErrorCodes, ResponseError, StreamMessageReader, StreamMessageWriter, type MessageConnection } from "vscode-jsonrpc/node";
 import type { AgentApplicationEvent } from "@may/application";
 import { freezeToolInput, type ContentPart } from "@may/core";
-import type { ApprovalDecision } from "@may/permissions";
+import type { ApprovalDecision, PersistentApprovalOptions } from "@may/permissions";
 import type { AgentAdapterContext, AgentAdapter, AgentCapabilities, AgentTaskStatus } from "./types.js";
 
 export type GatewayRpcOptions = {
@@ -50,7 +50,7 @@ export async function createGatewayRpcAdapter(agentId: string, options: GatewayR
     cancel: conversationId => adapter.cancel(conversationId),
     steer: (conversationId, text, inputId) => adapter.steer(conversationId, text, inputId),
     steeringInputs: async conversationId => (await queryAdapter()).steeringInputs(conversationId),
-    resolveApproval: (conversationId, requestId, decision) => adapter.resolveApproval(conversationId, requestId, decision),
+    resolveApproval: (conversationId, requestId, decision, options) => adapter.resolveApproval(conversationId, requestId, decision, options),
     release: conversationId => adapter.release(conversationId),
     deleteConversation: conversationId => adapter.deleteConversation(conversationId),
     command: (conversationId, name, args) => adapter.command(conversationId, name, args),
@@ -127,6 +127,7 @@ class RpcAdapter implements AgentAdapter {
     context.signal.addEventListener("abort", abort, { once: true });
     try {
       const result = object(await this.request("conversation/execute", { conversationId: context.conversationId, inputId: context.inputId, input: context.input,
+        ...(context.permissionScope === undefined ? {} : { permissionScope: context.permissionScope }),
         tools: this.capabilities.collaboration ? context.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema })) : [] }, context.inputId, this.options.executionTimeoutMs ?? 0), "execution result");
       const cancellation = this.cancellations.get(context.conversationId); if (cancellation) await cancellation;
       if (cancellationError) throw cancellationError;
@@ -166,8 +167,8 @@ class RpcAdapter implements AgentAdapter {
       ids.add(inputId); return { inputId, text: item.text, status: item.status as string };
     });
   }
-  async resolveApproval(conversationId: string, requestId: string, decision: ApprovalDecision): Promise<boolean> {
-    this.require("approvals"); const result = object(await this.request("conversation/resolveApproval", { conversationId, requestId, decision }, requestId), "approval result");
+  async resolveApproval(conversationId: string, requestId: string, decision: ApprovalDecision, options?: PersistentApprovalOptions): Promise<boolean> {
+    this.require("approvals"); const result = object(await this.request("conversation/resolveApproval", { conversationId, requestId, decision, ...(options === undefined ? {} : { options }) }, requestId), "approval result");
     if (typeof result.resolved !== "boolean") throw new Error("Invalid RPC approval result"); return result.resolved;
   }
   async release(conversationId: string): Promise<void> {

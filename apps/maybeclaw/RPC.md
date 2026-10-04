@@ -54,17 +54,23 @@ Only declare implemented capabilities. `commands` lists the Agent commands that 
 | --- | --- | --- |
 | `conversation/create` | `requestId` | `{ conversationId }` |
 | `conversation/inspectCreation` | `requestId` | `{ status: "not-started" }`, `{ status: "ready", conversationId }`, or `{ status: "unknown" }` |
-| `conversation/execute` | `conversationId`, `inputId`, `input`, `tools` | `{ text, runId?, yielded?, content? }` |
+| `conversation/execute` | `conversationId`, `inputId`, `input`, `tools`, `permissionScope?` | `{ text, runId?, yielded?, content? }` |
 | `conversation/inspect` | `conversationId`, `inputId` | `{ status, text?, detail?, content?, runId? }` |
 | `conversation/cancel` | `conversationId` | `{ cancelled: true }` after cancellation completes |
 | `conversation/steer` | `conversationId`, `inputId`, `text` | `{ status }` |
 | `conversation/steeringInputs` | `conversationId` | `[{ inputId, text, status }]` |
-| `conversation/resolveApproval` | `conversationId`, `requestId`, `decision` | `{ resolved: boolean }` |
+| `conversation/resolveApproval` | `conversationId`, `requestId`, `decision`, `options?` | `{ resolved: boolean }` |
 | `conversation/release` | `conversationId` | `{ released: true }` |
 | `conversation/delete` | `conversationId` | `{ deleted: true }` |
 | `conversation/command` | `conversationId`, `name`, `args` | `{ text }` |
 
 `input` is a May `UserMessage`. `tools` contains the names, descriptions and input schemas of the coordination tools authorized for that execution when collaboration is supported. Execution status is `not-started`, `queued`, `running`, `waiting`, `cancelling`, `completed`, `failed`, `cancelled`, or `recovery-required`.
+
+`permissionScope` is an optional trusted initiator identity supplied by the host.
+For `allow-persistent`, `options` carries `{ createdBy, expiresAt? }`. The external
+Agent validates and stores its own permission rules. The Gateway authorizes
+persistent approvals only for its service administrator and when the request
+declares a persistent scope with the feature enabled.
 
 Persist creation and execution request IDs. Reusing an ID must refer to the same operation, and changed input under the same ID must fail. Resource release preserves conversation history. Deletion removes the dedicated Agent conversation. Only one execution may run within a conversation.
 

@@ -66,6 +66,8 @@ export interface ApprovalTranscriptItem {
   readonly input: unknown;
   readonly status: "pending" | "resolved" | "cancelled";
   readonly decision?: ApprovalDecision;
+  readonly scopeDescription?: string;
+  readonly scopeId?: string;
   readonly reason?: string;
   readonly timestamp: number;
 }
@@ -288,6 +290,7 @@ export class TranscriptStore {
       this.append(approvalItem(event.request, event.timestamp));
       return;
     }
+    if (event.type !== "approval.resolved" && event.type !== "approval.cancelled") return;
     this.replace(`approval:${event.requestId}`, (item) => {
       if (item.kind !== "approval") return item;
       return event.type === "approval.resolved"
@@ -411,6 +414,7 @@ export class TranscriptStore {
           requestId: event.request.id,
           toolName: event.request.tool.name,
           input: event.request.input,
+          ...(event.request.persistent === undefined ? {} : { scopeDescription: event.request.persistent.description, scopeId: event.request.persistent.scopeId }),
           status: "pending",
           timestamp: event.timestamp,
         });
@@ -591,6 +595,7 @@ function approvalItem(request: ApprovalRequest, timestamp: number): ApprovalTran
     requestId: request.id,
     toolName: request.tool.name,
     input: request.input,
+    ...(request.persistent === undefined ? {} : { scopeDescription: request.persistent.description, scopeId: request.persistent.scopeId }),
     status: "pending",
     timestamp,
   };

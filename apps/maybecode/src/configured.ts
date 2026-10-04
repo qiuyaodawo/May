@@ -41,6 +41,8 @@ import {
   type RetryingModelOptions,
 } from "@may/providers";
 import { FileSessionStore } from "@may/session/file-store";
+import { FilePermissionRuleStore } from "@may/permissions/file-store";
+import { userInfo } from "node:os";
 
 import { FileSessionCatalog } from "@may/session/catalog";
 import { MaybeCodeConfigError } from "./errors.js";
@@ -68,6 +70,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly git?: false | Omit<ProjectGitWorkspaceOptions, "workspace">;
   readonly plugins?: readonly AnyPlugin[];
   readonly permissionMode?: MaybeCodePermissionMode;
+  readonly persistentRules?: boolean;
   /** Enable only when a UI consumes interaction events and answers the controller. */
   readonly mcpInteractions?: boolean;
   readonly workspace?: string;
@@ -189,6 +192,8 @@ export async function openConfiguredMaybeCode(
   const permissionMode = options.permissionMode === undefined
     ? configuredPermissionMode === undefined ? "default" : parsePermissionMode(configuredPermissionMode)
     : parsePermissionMode(options.permissionMode);
+  const persistentRules = options.persistentRules ?? config.apps?.maybecode?.persistentRules ?? false;
+  if (typeof persistentRules !== "boolean") throw new MaybeCodeConfigError("apps.maybecode.persistentRules must be boolean");
   const skillDirectories = options.skillDirectories ?? resolveMaybeCodeSkillDirectories(config, workspace);
   const runBudget = resolveRunBudget(options.runBudget ?? config.apps?.maybecode?.runBudget as RunBudget | undefined);
   const capabilityResolver = dependencies.capabilityResolver ??
@@ -264,6 +269,17 @@ export async function openConfiguredMaybeCode(
   let resourceHost: PluginHost | undefined;
   const workspaceResourceHosts = new Map<string, PluginHost>();
   const workspacePlugins = new Map<string, readonly AnyPlugin[]>();
+  const permissionStores = new Map<string, FilePermissionRuleStore>();
+  const permissionsFor = async (directory: string) => {
+    if (!persistentRules) return {};
+    const root = await realpath(directory);
+    let store = permissionStores.get(root);
+    if (!store) {
+      store = await FilePermissionRuleStore.open({ path: join(root, ".may", "permission-rules.json") });
+      permissionStores.set(root, store);
+    }
+    return { permissionRuleStore: store, permissionScopeId: `maybecode:${userInfo().username}:${root}:main` };
+  };
   let application: MaybeCodeWorkspace | undefined;
   const checkHostOwner = (context: McpHostRequestContext) => {
     context.signal.throwIfAborted();
@@ -311,6 +327,9 @@ export async function openConfiguredMaybeCode(
     const results = await Promise.allSettled([...workspaceResourceHosts.values()].map(host => host.close()));
     const failures = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
     try { await resourceHost?.close(); } catch (error) { failures.push(error); }
+    for (const store of permissionStores.values()) {
+      try { await store.close(); } catch (error) { failures.push(error); }
+    }
     if (failures.length) throw new AggregateError(failures, "MaybeCode configured resources failed to close");
   };
 
@@ -323,6 +342,7 @@ export async function openConfiguredMaybeCode(
     workspacePlugins.set(workspace, applicationPlugins);
     application = await MaybeCodeWorkspace.open({
       git,
+      ...await permissionsFor(workspace),
       configureWorkspace: async nextWorkspace => {
         const directories = options.skillDirectories ?? resolveMaybeCodeSkillDirectories(config, nextWorkspace);
         let configuredPlugins = workspacePlugins.get(nextWorkspace);
@@ -336,7 +356,7 @@ export async function openConfiguredMaybeCode(
           ]);
           workspacePlugins.set(nextWorkspace, configuredPlugins);
         }
-        return { plugins: configuredPlugins, ...(directories === false ? { skills: false } : { skillDirectories: directories }) };
+        return { plugins: configuredPlugins, ...await permissionsFor(nextWorkspace), ...(directories === false ? { skills: false } : { skillDirectories: directories }) };
       },
       permissionMode,
       workspace,

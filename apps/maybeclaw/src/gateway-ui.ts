@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { quote } from "shell-quote";
-import { commandArgs, UiError, type UiBlock, type UiCommand, type UiFieldRequest, type UiHost, type UiPageRequest, type UiReceipt, type UiSnapshot } from "@may/ui-client";
+import { commandArgs, UiError, type UiAction, type UiBlock, type UiCommand, type UiFieldRequest, type UiHost, type UiPageRequest, type UiReceipt, type UiSnapshot } from "@may/ui-client";
 import { historyPage, readPage, fieldPage } from "@may/ui-client/reading";
 import { UiProjection } from "@may/ui-client/projection";
 import { displayParts, imageAttachment, readEmbeddedImage } from "@may/media";
@@ -35,6 +35,7 @@ export class GatewayUiHost implements UiHost {
     const page = historyPage(this.hostId, selectedId ?? "", blocks);
     const resources = this.resourceList();
     const commands = ["session.new", "session.create", "session.activate", "gateway.command", "gateway.inspect", "agent.save", "agent.delete", "agent.check", "approval.resolve", "delivery.retry"];
+    if (this.gateway.options.settings.persistentRules) commands.push("permission.rule.create", "permission.rule.revoke");
     if (session) commands.push("session.rename", "session.archive", "session.restore", "session.delete", "session.default", "session.bind", "session.admins", "agent.default", "agent.allow");
     if (session?.status === "active") commands.push("message.submit", "run.cancel");
     return {
@@ -47,7 +48,7 @@ export class GatewayUiHost implements UiHost {
       interactions: approvals.filter(item => item.status === "pending" && item.expiresAt > Date.now()).map(item => ({
         id: item.id, kind: "approval", title: `${item.agentId} · ${item.kind === "tool" ? "工具审批" : "创建 Agent 对话"}`, detail: item.text,
         blockId: `approval:${item.id}`, runId: item.taskId ?? "", toolCallId: item.requestId, toolName: item.agentId,
-        choices: [{ value: "allow", label: "允许本次" }, ...(item.grantKey ? [{ value: "allow-session", label: "允许该 Agent 对话中的同类操作" }] : []), { value: "deny", label: "拒绝" }],
+        choices: [{ value: "allow", label: "允许本次" }, ...(item.grantKey ? [{ value: "allow-session", label: "允许该 Agent 对话中的同类操作" }] : []), ...(item.persistent && this.gateway.options.settings.persistentRules ? [{ value: "allow-persistent", label: "保存持久允许规则" }] : []), { value: "deny", label: "拒绝" }],
       })),
       panels: [
         { id: "agents", title: "已配置 Agent", fields: this.gateway.status().agents.map(agent => ({ label: agent.id, value: `${agent.name} · ${agent.status}` })) },
@@ -60,6 +61,8 @@ export class GatewayUiHost implements UiHost {
         { id: "tasks", title: "执行", fields: tasks.map(task => ({ label: `${task.agentId} · ${task.id}`, value: `${task.status} · graph ${task.graphId} · task ${task.graphTaskId}${task.detail ? ` · ${task.detail}` : ""}` })) },
         { id: "deliveries", title: "消息投递", fields: this.gateway.store.list<GatewayDelivery>("deliveries").filter(item => item.sessionId === session?.id).map(item => ({ label: `${item.entry.account} · ${item.id}`, value: item.status })) },
         { id: "host", title: "服务状态", fields: [{ label: "Gateway", value: JSON.stringify(this.hostStatus(), null, 2) }] },
+        ...(this.gateway.options.settings.persistentRules ? [{ id: "permission-rules", title: "持久权限规则", fields: [],
+          actions: [{ label: "查看和管理规则", command: "gateway.inspect", args: { kind: "permission-rules" } }] }] : []),
       ],
       notice: "浏览页面只改变当前窗口。入口默认会话通过会话管理中的明确操作修改。",
     };
@@ -150,9 +153,18 @@ export class GatewayUiHost implements UiHost {
         : command.args.kind === "bindings" ? this.gateway.store.list<GatewayBinding>("bindings")
         : command.args.kind === "tasks" ? { tasks: this.gateway.store.list<GatewayTask>("tasks"), graphs: this.gateway.store.list("coordination") }
         : command.args.kind === "approvals" ? this.gateway.store.list<GatewayApproval>("approvals")
+        : command.args.kind === "permission-rules" ? await this.gateway.listPermissionRules(controlActor)
         : command.args.kind === "channels" ? { host: this.hostStatus(), defaults: this.gateway.store.list("defaults"), entries: this.gateway.sessions(controlActor).filter(item => item.entry).map(item => ({ sessionId: item.id, name: item.name, entry: item.entry })) }
         : undefined;
       if (data === undefined) throw new UiError(400, "未知管理页面。");
+      if (command.args.kind === "permission-rules") {
+        const rules = await this.gateway.listPermissionRules(controlActor);
+        return { output: { title: "持久权限规则", text: JSON.stringify(rules, null, 2), actions: rules.flatMap<UiAction>(rule => [
+          { label: `${rule.id} · 保存相同范围的${rule.decision === "allow" ? "禁止" : "允许"}规则`, command: "permission.rule.create",
+            args: { sourceId: rule.id, decision: rule.decision === "allow" ? "deny" : "allow" }, confirm: rule.description },
+          { label: `${rule.id} · 撤销规则`, command: "permission.rule.revoke", args: { id: rule.id }, confirm: rule.description },
+        ]) } };
+      }
       return { output: { title: "服务管理", text: JSON.stringify(data, null, 2) } };
     }
     if (command.name === "session.new") {
@@ -175,8 +187,19 @@ export class GatewayUiHost implements UiHost {
     }
     if (command.name === "approval.resolve") {
       commandArgs(command, ["id", "decision"]);
-      if (!["allow", "allow-session", "deny"].includes(command.args.decision!)) throw new UiError(400, "审批决定无效。");
+      if (!["allow", "allow-session", "allow-persistent", "deny"].includes(command.args.decision!)) throw new UiError(400, "审批决定无效。");
       await this.gateway.resolveApproval(command.args.id!, controlActor, command.args.decision as ApprovalDecision); return {};
+    }
+    if (command.name === "permission.rule.revoke") {
+      commandArgs(command, ["id"]);
+      const revoked = await this.gateway.revokePermissionRule(command.args.id!, controlActor);
+      return { output: { title: "持久权限规则", text: revoked ? "已撤销规则。" : "规则不存在。" } };
+    }
+    if (command.name === "permission.rule.create") {
+      commandArgs(command, ["sourceId", "decision"]);
+      if (command.args.decision !== "allow" && command.args.decision !== "deny") throw new UiError(400, "持久权限决定必须为 allow 或 deny。");
+      const rule = await this.gateway.createPermissionRule(command.args.sourceId!, command.args.decision, controlActor);
+      return { output: { title: "持久权限规则", text: JSON.stringify(rule, null, 2) } };
     }
     if (command.name === "agent.save" || command.name === "agent.delete") {
       commandArgs(command, ["id"], command.name === "agent.save" ? ["config"] : ["confirm"]);

@@ -32,6 +32,11 @@ registry.
 
 Individual factories are also available:
 
+Trusted host policies can reuse `resolveExistingWorkspacePath()` and
+`resolveWritableWorkspacePath()` from the package root. Both return the checked
+physical `absolute` path and display `relative` path, and enforce the same workspace/link checks as the
+file tools. Use these results when deriving persistent file permission ranges.
+
 ```ts
 import {
   createEditTool,

@@ -325,6 +325,23 @@ execution removes live controls; stale or unavailable choices fail at the host.
 A session-wide choice is shown only for requests with a grant key. Truncated
 approval input is deny-only, including server-side validation.
 
+Persistent approvals display the trusted scope ID and range description and
+offer `allow-persistent` when the host provides persistent metadata and an
+operator identity. `ApplicationUiHost` obtains that identity from
+`permissionActor()` and rejects client-supplied identity fields. Historical
+approval cards retain the persistent range as read-only evidence. Optional
+`permissionRules: { list, revoke, create? }` callbacks expose `permission.rules.list`
+and `permission.rules.revoke`; list output provides explicit revoke actions.
+Callbacks must restrict rule management to the current operator and scope.
+`create(sourceId, decision)` adds `permission.rules.create` for an existing
+visible range. The callback derives trusted rule fields and operator identity;
+the client supplies only an existing rule ID and an allow or deny decision.
+The confirmation displays the complete range and deny precedence.
+`UiPanel.actions` supplies optional controls in standard and product-rendered
+detail panels. The permissions panel exposes **查看和管理规则** when the host
+provides rule management. Panel actions share command-output confirmation and
+availability checks, and product panels remain present.
+
 Trusted products can register `tools[toolName]`, `approvalDetails[toolName]`,
 `diagnostics[code]`, `presentations[kind][version]` and `panels[id]` callbacks in
 `WebUiExtensions`. Callbacks return an HTMLElement or null. Tools, approval details

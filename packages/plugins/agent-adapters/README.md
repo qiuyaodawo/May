@@ -8,10 +8,17 @@ factory 可以从宿主当前配置读取模型、权限和目录。插件关闭
 不会提前创建全部 Agent。创建失败交付给 `get()` 的调用方，未接收的候选资源会关闭。
 
 `createMayAgentAdapter({ agentId, store, definition, media?, metadata? })` 管理实际
-AgentApplication 对话。`definition(toolsSource)` 由宿主注入，负责配置模型、工具、
+AgentApplication 对话。`definition(toolsSource, contextSource)` 由宿主注入，负责配置模型、工具、
 权限和插件；`store` 提供持久化与恢复，`metadata(conversationId)` 提供宿主身份。
 Adapter 保留重复输入检测、暂停和继续、审批、工具结果核查、对话释放与删除。
 存储支持删除时才声明 `delete` 能力。
+
+`contextSource()` 返回当前对话正在执行的 `AgentAdapterContext`；没有执行时返回
+`undefined`。宿主通过 `permissionScope` 提供可信发起者身份，定义工厂可以在每次
+权限检查时读取当前身份。不同对话的 Context 独立管理。
+`resolveApproval(conversationId, requestId, decision, options?)` 将
+`allow-persistent` 与 `{ createdBy, expiresAt? }` 传入实际 AgentApplication。
+宿主负责批准身份与范围验证，以及共享 PermissionRuleStore 的生命周期。
 
 `loadAgentAdapter({ id, module, export?, options? }, factoryContext?)` 加载模块的
 `createAdapter()`，检查必需方法、能力声明和相应控制方法。模块需要返回

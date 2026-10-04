@@ -42,7 +42,12 @@ export function createMaybeCodePlugins(
       if (options.model === undefined) throw new TypeError("MaybeCode requires a Model or an application Model plugin");
       return options.model;
     }, ...(options.modelInfo === undefined ? {} : { info: options.modelInfo }) }),
-    createPermissionPlugin({ create: () => options.permissionPolicy ?? createCodingPermissionPolicy() }),
+    createPermissionPlugin({ create: () => createCodingPermissionPolicy({
+      ...(options.permissionPolicy === undefined ? {} : { policy: options.permissionPolicy }),
+      ...(options.permissionModeSource === undefined ? {} : { mode: options.permissionModeSource }),
+      ...(options.gitWorkspace?.readOnly === true ? { readOnly: true } : {}),
+      ...(options.permissionRuleStore === undefined ? {} : { persistent: { workspace, scopeId: options.permissionScopeId ?? `maybecode:${workspace}:main` } }),
+    }) }),
     createContextPlugin({ create: () => options.contextFactory ?? new InMemoryContextFactory() }),
     createWorkspaceFilesPlugin({ workspace, defaultTools: options.tools === undefined }),
     createHistoryMemoryPlugin({

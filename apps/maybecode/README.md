@@ -62,6 +62,36 @@ cancellation, execution records, and MCP requests for user-provided input remain
 active. Shell commands run with the host account's OS permissions; YOLO provides
 no filesystem or network isolation. Team commands retain their own authorization.
 
+### Persistent permission rules
+
+Set `apps.maybecode.persistentRules: true` to enable rules saved in the active
+project's `.may/permission-rules.json`. The default is `false`. Each worktree
+uses its own file and a scope containing the local user, canonical project path,
+and main Agent identity. The host shares one store across its Sessions and
+releases its writer lock when it closes.
+
+File `edit` and `write` approvals display a persistent choice for the exact
+canonical file path. This choice survives Session changes and process restarts.
+Shell and MCP requests retain their existing approval choices. Rules contain
+scope metadata and the tool definition; file contents and tool arguments are
+excluded. Changing a tool's definition or `permissionVersion` requires a new
+grant. Policy denials, persistent denials and `requireApproval` continue to apply
+in YOLO mode.
+
+Use `/permissions list`, `/permissions revoke <id>`, or
+`/permissions allow <id>` / `/permissions deny <id>` to manage rules. Creation
+uses the selected rule's existing range and creates a new rule with its own ID.
+Same-range deny rules take precedence; revoke them explicitly to permit that
+range. The Web UI provides the same operations. Trusted headless hosts can
+also provide an expiry when resolving a persistent approval or creating a rule.
+
+The built-in file tools reject access to the rules file, its lock and temporary
+files, including directory aliases. Rules and locks are excluded from project
+Git checkpoints. A corrupt file, changed writer lock or failed write terminates
+the operation. An existing lock requires operator inspection after an abnormal
+process exit. See [Permission policies](../../docs/en/guides/permission-policy.md)
+and [权限策略](../../docs/zh-CN/guides/permission-policy.md).
+
 Image replies retain text/image ordering. Terminal saves embedded images and
 supports Kitty/iTerm2/Sixel graphics in both terminal frontends; `/web` provides
 image viewing and downloads. Windows Terminal is detected through `WT_SESSION`
@@ -815,6 +845,17 @@ reopens the saved session, and sends a follow-up:
 ```sh
 pnpm test:integration:maybecode
 ```
+
+The persistent permission integration check is opt-in. After `pnpm build`, set
+`MAYBECODE_PERSISTENT_RULES_LIVE=1` and optionally
+`MAYBECODE_PERSISTENT_RULES_MODEL=<configured-profile>`, then run
+`node --test apps/maybecode/test/integration/persistent-rules.test.mjs`.
+It uses the current user configuration and actual provider to write one isolated
+file twice, closing and reopening the Session between writes. It verifies one
+persistent approval, automatic reuse, durable rule evidence and model Context
+separation. Each Run allows at most three model calls and 45 seconds; retries,
+Git, MCP, Skills, Goals and subagents are disabled. Evidence remains under the
+ignored `review/persistent-rules` directory. Without the flag the test skips.
 
 MCP tool catalogs now update at Run boundaries. `/mcp refresh [server-id]`
 refetches metadata; `/mcp reconnect <server-id>` recovers a configured endpoint

@@ -1,4 +1,5 @@
 import type { ContentPart, MayEvent, UserMessage } from "@may/core";
+import { userInfo } from "node:os";
 import type { AgentApplicationEvent } from "@may/application";
 import type { ContextInspection } from "@may/context";
 import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
@@ -314,7 +315,7 @@ async function handlePermissionEvent(
   while (true) {
     const choices = event.request.grantKey === undefined
       ? "[a]llow once / [d]eny"
-      : permissionChoices(event.request.tool.name);
+      : permissionChoices(event.request.tool.name) + (event.request.persistent ? ` / [p]ersistent (${event.request.persistent.description})` : "");
     let answer: string;
     try {
       answer = (await question(`${choices}: `, { history: false }))
@@ -331,16 +332,22 @@ async function handlePermissionEvent(
       ? "deny"
       : answer === "s" || answer === "session"
       ? "allow-session"
+      : answer === "p" || answer === "persistent"
+      ? "allow-persistent"
       : undefined;
     if (decision === undefined) {
-      renderer.write("Please enter a, s, or d.\n");
+      renderer.write(event.request.persistent ? "请输入 a、s、p 或 d。\n" : "请输入 a、s 或 d。\n");
       continue;
     }
     if (decision === "allow-session" && event.request.grantKey === undefined) {
       renderer.write("This request cannot be granted for the session.\n");
       continue;
     }
-    await app.resolveApproval(event.request.id, decision);
+    if (decision === "allow-persistent" && !event.request.persistent) {
+      renderer.write("此请求没有可保存的授权范围。\n");
+      continue;
+    }
+    await app.resolveApproval(event.request.id, decision, decision === "allow-persistent" ? { createdBy: `local:${userInfo().username}` } : undefined);
     return;
   }
 }

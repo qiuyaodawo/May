@@ -196,6 +196,17 @@ agent-facing tools inspect history without duplicating store-specific logic.
 
 ## Session branches
 
+`recordPermissionEvent()` records persistent `rule.created`, `rule.used` and
+`rule.revoked` evidence alongside approval events. Approval requests can retain
+`persistent: { scopeId, description, definitionKey }`; decisions include
+`allow-persistent`. File history validates these records on reading, and
+`queryHistory({ types: [...] })` supports their event types. The Session package
+owns its durable record types without a runtime dependency on permissions.
+Reopening reconstructs model Context from conversation events; permission
+evidence stays available in history. Forking replaces approval and rule records
+with `history.omitted` entries. Pending approvals are cancelled during recovery,
+and the configured permission executor independently checks current saved rules.
+
 `branchPositions()` projects complete requests into selectable history positions.
 Successful Runs become available only after `run.settled` confirms that tool
 execution, event observation and Runtime state persistence have completed.

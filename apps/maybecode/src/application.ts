@@ -46,7 +46,8 @@ import {
   type Tracer,
   type UserMessage,
 } from "@may/core";
-import type { ApprovalDecision, PermissionPolicy } from "@may/permissions";
+import type { ApprovalDecision, PermissionPolicy, PermissionRuleStore, PersistentApprovalOptions, PermissionCheck, CreatePermissionRuleOptions } from "@may/permissions";
+import type { MaybeCodePermissionMode } from "./policy.js";
 import type { AnyPlugin, ServiceToken } from "@may/plugin";
 import type { McpClientPool } from "@may/mcp";
 import type {
@@ -122,6 +123,9 @@ export interface MaybeCodeApplicationOptions {
   /** Additional dynamic host catalog, snapshotted per Run. */
   readonly toolSource?: () => Iterable<Tool>;
   readonly permissionPolicy?: PermissionPolicy;
+  readonly permissionRuleStore?: PermissionRuleStore;
+  readonly permissionScopeId?: string;
+  readonly permissionModeSource?: () => MaybeCodePermissionMode;
   readonly tracer?: Tracer;
   readonly traceAttributes?: TraceAttributes;
   readonly contextFactory?: ContextFactory;
@@ -178,6 +182,7 @@ export class MaybeCodeApplication {
   private inputOperations = 0;
   private currentRun: MaybeCodeRun | undefined;
   private gitWorkspace: ProjectGitWorkspace | undefined;
+  private permissionScopeId: string | undefined;
   private compaction: Promise<ContextCompactionResult> | undefined;
   private inputEpoch = 0;
   private steeringCancellation: Promise<void> = Promise.resolve();
@@ -273,6 +278,7 @@ export class MaybeCodeApplication {
       forkStateTransform: (key, value) => migrateForkSkillState(key, value, fork?.sourceWorkspace, workspace),
       tools: configuredTools,
       toolScope: { workspaceId: resolve(options.workspace) },
+      ...(options.permissionRuleStore === undefined ? {} : { permissionRuleStore: options.permissionRuleStore }),
       instructions: instructions.effective,
       ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
       traceAttributes: {
@@ -337,6 +343,8 @@ export class MaybeCodeApplication {
       composition.mcp,
     );
     product.gitWorkspace = options.gitWorkspace;
+    product.permissionScopeId = options.permissionRuleStore === undefined ? undefined
+      : options.permissionScopeId ?? `maybecode:${workspace}:main`;
     if (composition.modelInfo !== undefined) {
       try { await application.recordState("maybecode.model", {
         provider: composition.modelInfo.provider, model: composition.modelInfo.model,
@@ -615,11 +623,28 @@ export class MaybeCodeApplication {
   resolveApproval(
     requestId: string,
     decision: ApprovalDecision,
+    options?: PersistentApprovalOptions,
   ): Promise<boolean> {
     const subagent = this.subagents?.resolveApproval(requestId, decision);
     return subagent === undefined
-      ? this.application.resolveApproval(requestId, decision)
-      : subagent.then(resolved => resolved || this.application.resolveApproval(requestId, decision));
+      ? this.application.resolveApproval(requestId, decision, options)
+      : subagent.then(resolved => resolved || this.application.resolveApproval(requestId, decision, options));
+  }
+
+  get persistentRulesEnabled(): boolean { return this.permissionScopeId !== undefined; }
+  async listPermissionRules(scopeId?: string) {
+    if (this.permissionScopeId === undefined) throw new Error("持久权限规则没有启用。");
+    if (scopeId !== undefined && scopeId !== this.permissionScopeId) throw new Error("权限规则范围不属于当前宿主。");
+    return this.application.listPermissionRules(this.permissionScopeId);
+  }
+  createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions) { return this.application.createPermissionRule(check, options); }
+  async createPermissionRuleFrom(id: string, options: CreatePermissionRuleOptions) {
+    if (!(await this.listPermissionRules()).some(rule => rule.id === id)) throw new Error("规则不属于当前宿主。");
+    return this.application.createPermissionRuleFrom(id, options);
+  }
+  async revokePermissionRule(id: string) {
+    if (!(await this.listPermissionRules()).some(rule => rule.id === id)) return false;
+    return this.application.revokePermissionRule(id);
   }
 
   async history() {

@@ -25,11 +25,13 @@ import type {
 import type { MaybeCodeRun } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
 import type { UiForkPoint, UiWorkspaceDiff, UiWorktree } from "@may/ui-client";
+import { userInfo } from "node:os";
 
 export type MaybeCodeSlashCommandName =
   | "/steer"
   | "/stop"
   | "/yolo"
+  | "/permissions"
   | "/goal"
   | "/new"
   | "/resume"
@@ -60,6 +62,7 @@ export const MAYBECODE_COMPACTION_STRATEGIES = [
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
+  { name: "/permissions", usage: "/permissions [list|allow <id>|deny <id>|revoke <id>]", description: "查看、创建或撤销持久权限规则" },
   { name: "/fork", usage: "/fork", description: "Choose a historical reply and fork in this workspace or a new worktree" },
   { name: "/changes", usage: "/changes [run <run-id>|session|workspace|commit <commit>]", description: "Browse checkpoint and workspace file changes" },
   { name: "/worktrees", usage: "/worktrees [open|delete <id>]", description: "List, open or delete managed worktrees" },
@@ -434,6 +437,26 @@ export async function executeMaybeCodeSlashCommand(
       if (arguments_.length > 1 || !["on", "off", "status"].includes(action)) return { type: "usage", usage: "/yolo [on|off|status]" };
       if (action !== "status") await controller.setPermissionMode(action === "on" ? "yolo" : "default");
       return { type: "display", text: controller.permissionMode === "yolo" ? "YOLO enabled" : "YOLO disabled" };
+    }
+    case "/permissions": {
+      if (controller.persistentRulesEnabled === false || !controller.listPermissionRules || !controller.revokePermissionRule) throw new Error("此宿主没有启用规则管理。");
+      const action = arguments_[0] ?? "list";
+      if (action === "list" && arguments_.length <= 1) {
+        const rules = await controller.listPermissionRules();
+        return { type: "display", text: rules.length === 0 ? "当前没有持久权限规则。" : rules.map(rule =>
+          `${rule.id}\n${rule.decision === "allow" ? "允许" : "禁止"} · ${rule.description}\n范围：${rule.scopeId}\n创建者：${rule.createdBy}\n有效期：${rule.expiresAt === undefined ? "持续有效" : new Date(rule.expiresAt).toISOString()}`,
+        ).join("\n\n") };
+      }
+      if (action === "revoke" && arguments_.length === 2) {
+        if (!await controller.revokePermissionRule(arguments_[1]!)) throw new Error("规则不存在。");
+        return { type: "display", text: "已撤销权限规则。" };
+      }
+      if ((action === "allow" || action === "deny") && arguments_.length === 2) {
+        if (!controller.createPermissionRuleFrom) throw new Error("此宿主没有启用规则创建。");
+        const rule = await controller.createPermissionRuleFrom(arguments_[1]!, { decision: action, createdBy: `local:${userInfo().username}` });
+        return { type: "display", text: `已创建${action === "allow" ? "允许" : "禁止"}规则：${rule.id}\n${rule.description}\n范围：${rule.scopeId}\n同范围的禁止规则优先。` };
+      }
+      return { type: "usage", usage: definition.usage };
     }
     case "/goal": return { type: "display", text: await executeGoalCommand(arguments_, controller) };
     case "/web":

@@ -387,7 +387,19 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     if (panelsKey !== panelSignature) {
       panelSignature = panelsKey; workspaceDetails.replaceChildren();
       const detailsHeader = element("div", "details-header"); detailsHeader.append(element("h2", "", "工作详情"), button("关闭", hideDetails, "text-button")); workspaceDetails.append(detailsHeader);
-      for (const panel of snapshot?.panels ?? []) workspaceDetails.append(extensionContent(options.extensions?.panels?.[panel.id], panel, { state, command: client.command.bind(client) }) ?? detailPanel(panel));
+      for (const panel of snapshot?.panels ?? []) {
+        const content = extensionContent(options.extensions?.panels?.[panel.id], panel, { state, command: client.command.bind(client) }) ?? detailPanel(panel);
+        if (panel.actions?.length) {
+          const actions = element("div", "detail-actions");
+          for (const action of panel.actions) {
+            const control = button(action.label, () => commandUI.perform(action));
+            control.disabled = pending() || !has(action.command);
+            actions.append(control);
+          }
+          content.append(actions);
+        }
+        workspaceDetails.append(content);
+      }
       const actions = element("div", "detail-actions");
       for (const [command, label] of [["context.compact", "压缩上下文"], ["task.recover", "核对恢复证据"], ["task.dispatch", "重新请求调度"]]) if (has(command!)) {
         const action = button(label!, () => act(command!)); action.disabled = pending(); actions.append(action);

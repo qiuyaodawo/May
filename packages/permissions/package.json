@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./file-store": {
+      "types": "./dist/file-store.d.ts",
+      "import": "./dist/file-store.js"
     }
   },
   "files": [
@@ -23,6 +27,9 @@
   },
   "dependencies": {
     "@may/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
   },
   "engines": {
     "node": ">=22"

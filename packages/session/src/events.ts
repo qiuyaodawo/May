@@ -28,7 +28,31 @@ export interface SessionForkOrigin {
   readonly runId: string;
 }
 
-export type SessionApprovalDecision = "allow" | "allow-session" | "deny";
+export type SessionApprovalDecision = "allow" | "allow-session" | "allow-persistent" | "deny";
+
+export interface SessionPersistentPermissionScope {
+  readonly scopeId: string;
+  readonly description: string;
+  readonly definitionKey: string;
+}
+
+export interface SessionPermissionRule {
+  readonly id: string;
+  readonly scopeId: string;
+  readonly toolName: string;
+  readonly definitionKey: string;
+  readonly grantKey: string;
+  readonly description: string;
+  readonly decision: "allow" | "deny";
+  readonly createdAt: number;
+  readonly expiresAt?: number;
+  readonly createdBy: string;
+}
+
+export type SessionPermissionRuleEvent =
+  | { type: "rule.created"; rule: SessionPermissionRule }
+  | { type: "rule.revoked"; ruleId: string; scopeId: string }
+  | { type: "rule.used"; ruleId: string; scopeId: string; decision: "allow" | "deny"; runId: string; toolCallId: string };
 
 export interface SessionApprovalRequest {
   id: string;
@@ -40,6 +64,7 @@ export interface SessionApprovalRequest {
   toolCallId: string;
   idempotencyKey: string;
   grantKey?: string;
+  persistent?: SessionPersistentPermissionScope;
 }
 
 export interface SessionContextCompaction {
@@ -74,6 +99,7 @@ export type RecordablePermissionEvent = (
         input: unknown;
         context: ToolExecutionContext;
         grantKey?: string;
+        persistent?: SessionPersistentPermissionScope;
       };
     }
   | {
@@ -82,6 +108,7 @@ export type RecordablePermissionEvent = (
       decision: SessionApprovalDecision;
     }
   | { type: "approval.cancelled"; requestId: string; reason?: string }
+  | SessionPermissionRuleEvent
 ) & { timestamp: number };
 
 export type SessionEventPayload =
@@ -143,6 +170,7 @@ export type SessionEventPayload =
       decision: SessionApprovalDecision;
     }
   | { type: "approval.cancelled"; requestId: string; reason?: string }
+  | SessionPermissionRuleEvent
   | { type: "run.completed"; runId: string; result: RunResult }
   | { type: "run.yielded"; runId: string; result: RunResult }
   | { type: "run.failed"; runId: string; error: SerializedError }

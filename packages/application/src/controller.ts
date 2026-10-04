@@ -3,7 +3,7 @@ import type {
   ContextCompactionStrategy,
   ContextInspection,
 } from "@may/context";
-import type { ApprovalDecision } from "@may/permissions";
+import type { ApprovalDecision, ApprovalResolveOptions, CreatePermissionRuleOptions, PermissionCheck, PersistentPermissionRule } from "@may/permissions";
 import type {
   SessionEvent,
   SessionContinueOptions,
@@ -47,7 +47,12 @@ export interface AgentController<
   resolveApproval(
     requestId: string,
     decision: ApprovalDecision,
+    options?: ApprovalResolveOptions,
   ): Promise<boolean>;
+  listPermissionRules?(scopeId?: string): Promise<readonly PersistentPermissionRule[]>;
+  createPermissionRule?(check: PermissionCheck, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule>;
+  createPermissionRuleFrom?(sourceId: string, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule>;
+  revokePermissionRule?(id: string): Promise<boolean>;
   history(): Promise<readonly SessionEvent[]>;
   branchPositions?(): Promise<readonly SessionBranchPosition[]>;
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage>;

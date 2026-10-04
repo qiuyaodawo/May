@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readEmbeddedImage, type MediaReader } from "@may/media";
 import type { AgentApplicationEvent, AgentWorkspaceController } from "@may/application";
+import type { PersistentPermissionRule } from "@may/permissions";
 import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice, type UiPageRequest, type UiFieldRequest, type UiControls, type UiCompletion } from "./protocol.js";
 import { UiProjection } from "./projection.js";
 import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";
@@ -25,6 +26,12 @@ export interface ApplicationUiOptions {
   readonly available?: (name: string) => boolean;
   readonly complete?: (text: string) => Promise<readonly UiCompletion[]>;
   readonly submit?: (text: string) => Promise<UiReceipt | undefined>;
+  readonly permissionActor?: () => string;
+  readonly permissionRules?: {
+    readonly list: () => Promise<readonly PersistentPermissionRule[]>;
+    readonly revoke: (id: string) => Promise<boolean>;
+    readonly create?: (sourceId: string, decision: "allow" | "deny") => Promise<PersistentPermissionRule>;
+  };
 }
 
 type UiApplication = Omit<AgentWorkspaceController<{ type: string }>, "compactContext" | "forkSession"> & {
@@ -79,11 +86,16 @@ export class ApplicationUiHost implements UiHost {
       for (const [id, block] of this.projection.blocks) if (!projected.blocks.has(id) || ["running", "streaming", "awaiting-approval"].includes(projected.blocks.get(id)?.status ?? "")) projected.blocks.set(id, block);
     }
     if (!viewingActive || !running || this.fault) projected.settle();
-    const interactions = viewingActive && running && !this.fault ? [...this.projection.interactions.values()] : [];
+    const interactions = viewingActive && running && !this.fault ? [...this.projection.interactions.values()].map(interaction => ({
+      ...interaction,
+      choices: this.options.permissionActor === undefined ? interaction.choices.filter(choice => choice.value !== "allow-persistent") : interaction.choices,
+    })) : [];
     const commands: string[] = [];
     if (!running) commands.push("session.new", "session.activate", "session.delete");
     if (viewingActive) commands.push(...(running ? ["run.cancel", ...(interactions.length ? ["approval.resolve"] : [])] : ["message.submit", "session.rename", "context.compact", ...(this.options.commands ?? [])]));
     if (viewingActive) commands.push(...(this.options.concurrentCommands ?? []));
+    if (viewingActive && this.options.permissionRules !== undefined) commands.push("permission.rules.list", "permission.rules.revoke");
+    if (viewingActive && this.options.permissionRules?.create !== undefined) commands.push("permission.rules.create");
     if (this.options.available) {
       for (let index = commands.length - 1; index >= 0; index--) if (!this.options.available(commands[index]!)) commands.splice(index, 1);
     }
@@ -110,7 +122,8 @@ export class ApplicationUiHost implements UiHost {
       selectedId: viewingId, activeId, blocks: all ? [...projected.blocks.values()] : page.items,
       historyPage: { nextCursor: page.nextCursor, total: page.total }, reads: { resources: true, history: Boolean(this.app.readSessionHistory), fields: Boolean(this.app.readSessionHistory) },
       interactions, commands,
-      panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "当前会话", value: viewingId }, { label: "执行状态", value: running ? "运行中" : "空闲" }] }, ...panels],
+      panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "当前会话", value: viewingId }, { label: "执行状态", value: running ? "运行中" : "空闲" }] }, ...panels,
+        ...(viewingActive && this.options.permissionRules !== undefined ? [{ id: "permission-rules", title: "持久权限规则", fields: [], actions: [{ label: "查看和管理规则", command: "permission.rules.list", args: {} }] }] : [])],
       choices,
       ...(viewingActive && this.options.controls ? { controls: this.options.controls() } : {}),
       notice: this.fault ?? "选择会话后即可继续对话，终端和已连接页面同步切换。执行或等待交互期间，请先完成或取消当前操作。",
@@ -178,10 +191,35 @@ export class ApplicationUiHost implements UiHost {
       case "approval.resolve": {
         commandArgs(command, ["id", "decision"]);
         const decision = command.args.decision;
-        if (decision !== "allow" && decision !== "allow-session" && decision !== "deny") throw new UiError(400, "无效的审批决定。");
+        if (decision !== "allow" && decision !== "allow-session" && decision !== "allow-persistent" && decision !== "deny") throw new UiError(400, "无效的审批决定。");
         const request = this.projection.interactions.get(command.args.id!);
         if (!request?.choices.some(choice => choice.value === decision)) throw new UiError(409, "审批已失效或该选项不可用。请刷新后检查。");
-        if (!await this.app.resolveApproval(command.args.id!, decision)) throw new UiError(409, "此审批已经结束或失效。");
+        const actor = decision === "allow-persistent" ? this.options.permissionActor?.() : undefined;
+        if (decision === "allow-persistent" && !actor?.trim()) throw new UiError(409, "宿主没有提供权限管理身份。");
+        if (!await this.app.resolveApproval(command.args.id!, decision, actor === undefined ? undefined : { createdBy: actor })) throw new UiError(409, "此审批已经结束或失效。");
+        break;
+      }
+      case "permission.rules.list": {
+        commandArgs(command, []);
+        const rules = await this.options.permissionRules!.list();
+        return { selectedId: this.app.sessionId, output: { title: "持久权限规则", text: rules.length === 0 ? "当前没有持久权限规则。" : rules.map(rule => `${rule.decision === "allow" ? "允许" : "禁止"} · ${rule.toolName}\n${rule.description}\n范围：${rule.scopeId}\n创建者：${rule.createdBy}\n有效期：${rule.expiresAt === undefined ? "持续有效" : new Date(rule.expiresAt).toISOString()}\n规则 ID：${rule.id}`).join("\n\n"),
+          actions: rules.flatMap(rule => [
+            { label: `撤销 ${rule.description}`, command: "permission.rules.revoke", args: { id: rule.id }, confirm: `确认撤销规则 ${rule.id}？后续工具调用将重新检查权限。` },
+            ...(this.options.permissionRules!.create === undefined ? [] : (["allow", "deny"] as const).map(decision => ({ label: `按此范围创建${decision === "allow" ? "允许" : "禁止"}规则`, command: "permission.rules.create", args: { sourceId: rule.id, decision }, confirm: `确认${decision === "allow" ? "持续允许" : "持续禁止"}：${rule.description}？范围：${rule.scopeId}。禁止规则优先于允许规则。` }))),
+          ]) } };
+      }
+      case "permission.rules.create": {
+        commandArgs(command, ["sourceId", "decision"]);
+        const decision = command.args.decision;
+        if (decision !== "allow" && decision !== "deny") throw new UiError(400, "无效的规则决定。");
+        if (!(await this.options.permissionRules!.list()).some(rule => rule.id === command.args.sourceId)) throw new UiError(404, "规则不属于当前权限范围。");
+        await this.options.permissionRules!.create!(command.args.sourceId!, decision);
+        break;
+      }
+      case "permission.rules.revoke": {
+        commandArgs(command, ["id"]);
+        if (!(await this.options.permissionRules!.list()).some(rule => rule.id === command.args.id)) throw new UiError(404, "规则不属于当前权限范围。");
+        if (!await this.options.permissionRules!.revoke(command.args.id!)) throw new UiError(404, "规则已经撤销。");
         break;
       }
       case "session.new": commandArgs(command, []); await this.app.newSession(); this.projection = new UiProjection(); break;

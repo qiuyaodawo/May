@@ -6,6 +6,20 @@
 共用运行互斥、事件转发和保存过程。`continue()` 保留当前上下文并继续运行。
 `AgentWorkspace` 管理 Session 目录、恢复、切换和有序 Application 更新。
 
+`AgentApplication.open()` 和 `defineAgent()` 接受 `permissionRuleStore`，
+在多个 Application 和程序重启后复用持久权限规则。调用方管理存储实例及其生命周期。
+宿主 policy 提供可信的 `persistent: { scopeId, description }` 范围和稳定的 `grantKey`。
+`resolveApproval(id, "allow-persistent", { createdBy, expiresAt? })` 完成规则保存后
+允许工具执行，`createdBy` 由宿主依据操作人员身份提供。
+`listPermissionRules(scopeId?)`、
+`createPermissionRule(check, { decision, createdBy, expiresAt? })` 和
+`revokePermissionRule(id)` 提供规则管理，`AgentWorkspace` 转发到当前 Application。
+规则创建、使用和撤销记录保存在 Session 历史中，模型 Context 保持独立。
+Session 分支根据新宿主范围检查配置的规则存储。
+`createPermissionRuleFrom(sourceId, { decision, createdBy, expiresAt? })`
+根据已有可信范围创建新的允许或禁止规则，保留范围、工具定义身份和授权范围键。
+宿主验证操作人员对来源规则的管理权限后提供这一操作。
+
 `agent.open({ store, fork: { sessionId, positionSeq } })` 从完整请求的可恢复位置创建
 独立 Session。`branchPositions()` 返回准确的历史位置；Run 作用域关闭并完成状态
 保存后，Application 才将该位置标记为可用。Skills 激活状态随位置恢复，

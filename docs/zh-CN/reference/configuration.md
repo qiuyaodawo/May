@@ -23,6 +23,16 @@ Session 分支、worktree 生命周期、文件排除与恢复预览见
 
 ## MaybeCode 权限模式
 
+`apps.maybecode.persistentRules` 默认值为 `false`。设置为 `true` 后，文件
+`edit` 和 `write` 的持久授权保存到当前项目的 `.may/permission-rules.json`。
+审批选项显示规范化后的实际文件路径。规则按本地用户、项目或 worktree、主 Agent
+身份隔离，会话或模型切换继续使用已有规则。宿主持有存储与单个进程的写入锁，关闭时
+释放资源。规则文件和锁文件排除在项目 Git checkpoint 之外。
+`/permissions [list|allow <id>|deny <id>|revoke <id>]` 和 WebUI 提供已有范围的
+管理操作，每条规则记录创建者，禁止规则优先。headless 宿主可以通过
+`openConfiguredMaybeCode({ persistentRules })` 覆盖配置。
+参阅[权限策略](../guides/permission-policy.md)。
+
 `apps.maybecode.permissionMode` 接受 `"default"`（默认值）或 `"yolo"`。
 YOLO 自动批准工具请求，并保留权限策略明确禁止的操作。启动参数 `--yolo`
 和 `--no-yolo` 优先于配置；同时使用两个参数会报错。
@@ -338,7 +348,16 @@ MaybeCode 的 retained 终端界面通过 `MAY_TUI_LEADER` 设置显示操作组
 已有旧配置需要明确迁移。手动配置时，可以填写管理员密码、`version: 2` 和 `agents: []`（或省略 `agents`）启动 Web 控制台，
 通过 Web 管理器添加首个 Agent 并创建会话，无需重启服务。保留 May 已有的 `providers` 和 `models`
 供 May Agent 使用。
-每个 Agent 分别配置模型、启动参数、权限和 `runBudget`。渠道默认关闭，启用时需要
+每个 Agent 分别配置模型、启动参数、权限和 `runBudget`。
+
+`apps.maybeclaw.persistentRules` 默认值为 `false`。启用后，规则保存于
+`<data-directory>/permission-rules.json`，由 Gateway 持有单个进程的写入锁。
+May Agent 规则区分发起者身份、Agent 和规范化的项目路径。服务管理员可以选择
+持久授权，并通过 Web 管理器创建、查看和撤销规则。渠道用户继续使用普通审批选项。
+管理事件保存在 Gateway 存储中；工具执行与审批事件保存在 Agent Session 历史中。
+参阅[权限策略](../guides/permission-policy.md)。
+
+渠道默认关闭，启用时需要
 配置允许访问的用户或群聊。Telegram 支持直接填写 `botToken`，或用 `botTokenEnv` 指定环境变量名；
 飞书对应 `appSecret` / `appSecretEnv`。每一对字段不能同时填写，都省略时使用默认
 环境变量。直接填写的凭据以明文保存，应保护配置文件且不要提交到仓库。

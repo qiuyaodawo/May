@@ -97,7 +97,8 @@ export interface UiPresentation { readonly kind: string; readonly version: numbe
 export interface UiApprovalRecord {
   readonly id: string;
   readonly status: "pending" | "allowed" | "denied" | "cancelled";
-  readonly scope?: "once" | "session";
+  readonly scope?: "once" | "session" | "persistent";
+  readonly scopeDescription?: string;
 }
 
 export interface UiBlock {
@@ -134,6 +135,7 @@ export interface UiPanel {
   readonly id: string;
   readonly title: string;
   readonly fields: readonly { readonly label: string; readonly value: string }[];
+  readonly actions?: readonly UiAction[];
 }
 
 export interface UiChoice {

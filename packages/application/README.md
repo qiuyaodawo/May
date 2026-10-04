@@ -29,6 +29,23 @@ See [Agent Skills](../../docs/en/guides/skills.md).
 
 Headless lifecycle components for composing a May Agent product.
 
+Pass `permissionRuleStore` to `AgentApplication.open()` or `defineAgent()` to
+reuse persistent permission rules across applications and process restarts.
+The caller owns the store and its lifetime. Scoped policies supply a trusted
+`persistent: { scopeId, description }` range and a stable `grantKey`.
+`resolveApproval(id, "allow-persistent", { createdBy, expiresAt? })` saves the
+rule before tool execution; the host supplies `createdBy` from the operator
+identity. `listPermissionRules(scopeId?)`,
+`createPermissionRule(check, { decision, createdBy, expiresAt? })` and
+`revokePermissionRule(id)` expose rule management. `AgentWorkspace` forwards
+these operations to its current application. Rule changes and use are durable
+Session evidence and do not enter model Context. Session forks evaluate the
+rules in their configured store using the new host scope.
+`createPermissionRuleFrom(sourceId, { decision, createdBy, expiresAt? })` creates
+a new allow or deny rule for an existing trusted range, preserving its scope,
+tool definition identity and grant key. The host verifies management authority
+over the source rule before exposing this operation to an operator.
+
 `AgentWorkspace.readSessionHistory(id)` reads a catalog-owned session without
 activating it, including while another session runs. Stores must provide the
 optional non-repairing `inspect(id)` operation. The workspace does not fall back

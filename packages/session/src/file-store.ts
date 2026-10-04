@@ -149,6 +149,14 @@ function parseEvent(line: string, path: string, lineNumber: number): SessionEven
 
 function validPayload(event: Record<string, unknown>): boolean {
   const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+  const text = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+  const time = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
+  const persistentScope = (value: unknown): boolean => object(value) && text(value.scopeId) && text(value.description) && text(value.definitionKey) &&
+    Object.keys(value).every(key => ["scopeId", "description", "definitionKey"].includes(key));
+  const rule = (value: unknown): boolean => object(value) && ["id", "scopeId", "toolName", "definitionKey", "grantKey", "description", "createdBy"].every(key => text(value[key])) &&
+    Object.keys(value).every(key => ["id", "scopeId", "toolName", "definitionKey", "grantKey", "description", "createdBy", "decision", "createdAt", "expiresAt"].includes(key)) &&
+    ["allow", "deny"].includes(String(value.decision)) && time(value.createdAt) &&
+    (value.expiresAt === undefined || time(value.expiresAt));
   const call = (value: unknown): boolean => object(value) && typeof value.id === "string" && typeof value.name === "string";
   const content = (value: unknown): boolean => Array.isArray(value) && value.every((part) => object(part) && (part.type === "json" || ["text", "reasoning"].includes(String(part.type)) && typeof part.text === "string" || ["image", "audio", "file"].includes(String(part.type)) && object(part.source) || part.type === "resource" && typeof part.uri === "string"));
   const message = (value: unknown): boolean => object(value) && ["system", "user", "assistant", "tool"].includes(String(value.role)) && content(value.content) && (value.toolCalls === undefined || Array.isArray(value.toolCalls) && value.toolCalls.every(call));
@@ -179,9 +187,13 @@ function validPayload(event: Record<string, unknown>): boolean {
     case "run.budget.exceeded": return typeof event.dimension === "string" && object(event.budget);
     case "run.interrupted": return Array.isArray(event.recoveries) && event.recoveries.every((value) => object(value) && typeof value.id === "string" && typeof value.runId === "string" && Number.isSafeInteger(value.step) && call(value.call) && ["unknown", "not-started"].includes(String(value.status)));
     case "recovery.resolved": return typeof event.recoveryId === "string" && message(event.message);
-    case "approval.requested": return object(event.request) && typeof event.request.id === "string" && object(event.request.tool) && typeof event.request.tool.name === "string";
-    case "approval.resolved": return typeof event.requestId === "string" && ["allow", "allow-session", "deny"].includes(String(event.decision));
+    case "approval.requested": return object(event.request) && typeof event.request.id === "string" && object(event.request.tool) && typeof event.request.tool.name === "string" &&
+      (event.request.persistent === undefined || text(event.request.grantKey) && persistentScope(event.request.persistent));
+    case "approval.resolved": return typeof event.requestId === "string" && ["allow", "allow-session", "allow-persistent", "deny"].includes(String(event.decision));
     case "approval.cancelled": return typeof event.requestId === "string";
+    case "rule.created": return rule(event.rule);
+    case "rule.revoked": return text(event.ruleId) && text(event.scopeId);
+    case "rule.used": return text(event.ruleId) && text(event.scopeId) && ["allow", "deny"].includes(String(event.decision)) && text(event.runId) && text(event.toolCallId);
     default: return false;
   }
 }

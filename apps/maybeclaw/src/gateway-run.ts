@@ -145,9 +145,9 @@ async function waitForTasks(gateway: AgentGateway, taskIds: readonly string[], d
       }
       const reader = createInterface({ input: process.stdin, output: process.stderr });
       try {
-        const answer = await reader.question(`${approval.text}\nallow${approval.grantKey ? "/allow-session" : ""}/deny: `, deps.signal ? { signal: deps.signal } : {});
-        if (!["allow", "deny", ...(approval.grantKey ? ["allow-session"] : [])].includes(answer)) throw new Error("Invalid approval decision");
-        await gateway.resolveApproval(approval.id, controlActor, answer as "allow" | "allow-session" | "deny");
+        const answer = await reader.question(`${approval.text}\nallow${approval.grantKey ? "/allow-session" : ""}${approval.persistent ? "/allow-persistent" : ""}/deny: `, deps.signal ? { signal: deps.signal } : {});
+        if (!["allow", "deny", ...(approval.grantKey ? ["allow-session"] : []), ...(approval.persistent ? ["allow-persistent"] : [])].includes(answer)) throw new Error("Invalid approval decision");
+        await gateway.resolveApproval(approval.id, controlActor, answer as "allow" | "allow-session" | "allow-persistent" | "deny");
       } finally { reader.close(); }
     }
     await gateway.maintain(); await delay(100); tasks = current();

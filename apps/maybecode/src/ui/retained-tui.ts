@@ -10,6 +10,7 @@ import {
 } from "@may/tui";
 import { TranscriptStore } from "@may/tui/transcript";
 import type { ApprovalRequest } from "@may/permissions";
+import { userInfo } from "node:os";
 import type { SessionSummary } from "@may/session/catalog";
 import type {
   MaybeCodeController,
@@ -284,7 +285,7 @@ async function consumeEvents(
         const task = presentApproval(app, view, store, inner.request, isClosing, approvals);
         approvals.add(task);
         void task.finally(() => approvals.delete(task));
-      } else {
+      } else if (inner.type === "approval.resolved" || inner.type === "approval.cancelled") {
         view.dismissApproval(inner.requestId);
       }
     }
@@ -304,7 +305,7 @@ function presentApproval(
 ): Promise<void> {
   return view.requestApproval(request).then(async (decision) => {
     if (decision !== undefined && !isClosing()) {
-      await app.resolveApproval(request.id, decision);
+      await app.resolveApproval(request.id, decision, decision === "allow-persistent" ? { createdBy: `local:${userInfo().username}` } : undefined);
     }
   }).catch((error: unknown) => {
     if (!isClosing()) {

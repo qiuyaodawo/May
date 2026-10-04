@@ -6,7 +6,7 @@ import type { AgentAdapter, AgentAdapterContext } from "./types.js";
 export interface MayAgentAdapterOptions {
   readonly agentId: string;
   readonly store: SessionStore;
-  readonly definition: (tools: () => AgentAdapterContext["tools"]) => AgentDefinition | Promise<AgentDefinition>;
+  readonly definition: (tools: () => AgentAdapterContext["tools"], context: () => AgentAdapterContext | undefined) => AgentDefinition | Promise<AgentDefinition>;
   readonly media?: readonly string[];
   readonly metadata?: (conversationId: string) => Record<string, unknown>;
 }
@@ -23,7 +23,7 @@ export function createMayAgentAdapter(options: MayAgentAdapterOptions): AgentAda
     if (pending) return pending;
     const work = (async () => {
       const source = () => opened.get(id)?.context?.tools ?? [];
-      const definition = await options.definition(source);
+      const definition = await options.definition(source, () => opened.get(id)?.context);
       const history = await historyOf(id);
       const metadata = options.metadata?.(id);
       const app = await definition.open({ store, sessionId: id, resume: history.length > 0, ...(metadata === undefined ? {} : { metadata }) });
@@ -91,7 +91,7 @@ export function createMayAgentAdapter(options: MayAgentAdapterOptions): AgentAda
     async steeringInputs(id) {
       return (await open(id)).listSteeringInputs().map(input => ({ inputId: input.inputId, text: input.message.content.filter(part => part.type === "text").map(part => part.text).join(""), status: input.status }));
     },
-    async resolveApproval(id, requestId, decision) { return await opened.get(id)?.app.resolveApproval(requestId, decision) ?? false; },
+    async resolveApproval(id, requestId, decision, persistentOptions) { return await opened.get(id)?.app.resolveApproval(requestId, decision, persistentOptions) ?? false; },
     async release(id) {
       const pending = opening.get(id); if (pending) await pending;
       const item = opened.get(id); if (!item) return;

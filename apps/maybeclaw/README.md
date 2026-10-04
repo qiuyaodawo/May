@@ -25,6 +25,20 @@ See the [English guide](../../docs/en/guides/maybeclaw.md) or
 [简体中文指南](../../docs/zh-CN/guides/maybeclaw.md) for configuration, commands,
 permissions, adapters, lifecycle, and migration.
 
+`apps.maybeclaw.persistentRules: true` enables administrator-managed permission
+rules in `<data-directory>/permission-rules.json`. Eligible approvals offer
+`allow-persistent`; the Web manager lists, creates and revokes rules using
+verified existing scopes. Rules distinguish the initiating identity, Agent and
+project. Deny rules take precedence. Save failures stop the tool before execution.
+The feature is disabled by default. Custom PermissionPolicy plugins own their
+scope validation and protection of rule-store files.
+
+`apps.maybeclaw.persistentRules: true` 启用服务管理员管理的持久权限规则，保存于
+`<data-directory>/permission-rules.json`。符合条件的审批提供
+`allow-persistent`，Web 管理器根据已经核验的范围查看、创建和撤销规则。规则区分
+发起者身份、Agent 与项目，禁止规则优先；保存失败时工具无法开始执行。缺省状态
+保持关闭。自定义 PermissionPolicy 插件负责范围验证及规则存储文件保护。
+
 ```powershell
 pnpm maybeclaw --help
 pnpm maybeclaw

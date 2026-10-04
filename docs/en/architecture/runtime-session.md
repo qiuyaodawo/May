@@ -305,7 +305,14 @@ streaming deltas. Slow consumers can observe sequence gaps when bounded relay
 queues discard high-volume deltas; finalized results and durable facts do not
 depend on retaining every delta.
 `PermissionEvent` reports live approval requests and their resolution or
-cancellation. `SessionEvent` records durable session facts such as submitted
+cancellation, plus `rule.created`, `rule.used` and `rule.revoked` events.
+Applications configured with `permissionRuleStore` reuse rules according to
+trusted policy scopes and stable tool definition keys. `createdBy` comes from
+the host operator identity. Session persists approval range metadata and rule
+evidence without replaying it into model Context; pending approvals are
+cancelled after interruption. Forks omit permission evidence while the new
+executor checks its configured rule store and scope.
+`SessionEvent` records durable session facts such as submitted
 messages, finalized assistant messages, approvals, tool outcomes, and run
 boundaries. Applications may also record namespaced, versioned
 `tool.presentation` metadata. Session exposes but does not replay this metadata

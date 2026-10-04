@@ -25,6 +25,17 @@ worktree lifecycle, excluded files and restore previews.
 
 ## MaybeCode permission mode
 
+`apps.maybecode.persistentRules` defaults to `false`. Set it to `true` to store
+file `edit` and `write` grants in the active project's
+`.may/permission-rules.json`. The persistent approval choice shows the canonical
+file path. Rules are isolated by local user, project/worktree and main Agent;
+Session or model changes preserve them. The host owns the store and its single
+writer lock until shutdown. Rule files and locks are excluded from project Git
+checkpoints. `/permissions [list|allow <id>|deny <id>|revoke <id>]` and Web UI
+manage existing ranges. An operator creates each rule; deny takes precedence.
+The headless `openConfiguredMaybeCode({ persistentRules })` option overrides
+configuration. See [Permission policies](../guides/permission-policy.md).
+
 `apps.maybecode.permissionMode` accepts `"default"` (the default) or `"yolo"`.
 YOLO auto-approves tool requests while preserving explicit policy denials. CLI
 `--yolo` and `--no-yolo` override configuration; using both is an error.
@@ -372,6 +383,16 @@ For manual setup, users can configure only the administrator password,
 Agent through the Web manager, and create sessions without restarting. Existing May
 `providers` and `models` are retained for May Agents.
 Each Agent configures its model, startup settings, permissions, and `runBudget`.
+
+`apps.maybeclaw.persistentRules` defaults to `false`. Enabling it stores rules
+in `<data-directory>/permission-rules.json` under one Gateway-owned writer lock.
+May Agent rules bind the initiating identity, Agent and canonical project path.
+Only service operators can choose persistent approval or create, list and revoke
+rules in the Web manager. Channel users continue to receive ordinary approval
+choices. Management events are saved in Gateway storage; execution and approval
+events remain in Agent Session history. See
+[Permission policies](../guides/permission-policy.md).
+
 Channels default to disabled and require permitted users or groups when enabled.
 Telegram accepts a literal `botToken` or
 an environment-variable name in `botTokenEnv`; Feishu accepts `appSecret` or

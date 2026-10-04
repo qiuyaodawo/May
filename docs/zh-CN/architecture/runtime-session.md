@@ -252,7 +252,12 @@ UI 的完整边界。
 relay queue 丢弃高频 delta 时，慢消费者可能看到 sequence 缺口；最终结果和持久化
 事实不依赖保留每个 delta。
 
-`PermissionEvent` 报告实时审批请求及其处理或取消。`SessionEvent` 记录持久化的
+`PermissionEvent` 报告实时审批请求及其处理或取消，以及 `rule.created`、
+`rule.used` 和 `rule.revoked` 事件。Application 接受 `permissionRuleStore`，
+依据宿主可信范围和稳定的工具定义身份复用规则。宿主根据操作人员身份提供 `createdBy`。
+Session 保存审批范围与规则证据，模型 Context 保持独立；恢复过程取消尚未完成的审批。
+Session 分支忽略权限记录，新 executor 根据配置的规则存储和范围重新检查权限。
+`SessionEvent` 记录持久化的
 Session 事实，例如提交消息、完整 assistant 消息、审批、工具结果和 Run 边界。
 应用也可以记录带 namespace 和 version 的 `tool.presentation` metadata。Session
 暴露这些数据，但不会将其回放进模型 Context。UI 状态只是这些事件的投影，从不是
