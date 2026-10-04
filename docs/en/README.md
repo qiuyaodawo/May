@@ -43,6 +43,7 @@ interfaces are intended for extension.
 - [Run budgets](guides/run-budgets.md)
 - [Agent Skills](guides/skills.md)
 - [Goals](guides/goals.md)
+- [Persistent time and event scheduling](guides/scheduler.md)
 - [Image replies](guides/images.md)
 
 - [Custom model](guides/custom-model.md)

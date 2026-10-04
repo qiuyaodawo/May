@@ -41,6 +41,7 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 - [运行预算](guides/run-budgets.md)
 - [Agent Skills](guides/skills.md)
 - [目标管理](guides/goals.md)
+- [持久化时间与事件调度](guides/scheduler.md)
 - [图片回复](guides/images.md)
 
 - [自定义模型](guides/custom-model.md)

@@ -8,6 +8,10 @@ and remote provider interfaces. Coding tools can share one configured environmen
 See [Execution environments](docs/en/reference/environment.md) or
 [执行环境](docs/zh-CN/reference/environment.md).
 
+`@may/scheduler` provides opt-in persistent time and event triggers. Hosts explicitly
+start a timer loop or call `tick()`, and supply an idempotent task dispatcher.
+See [Scheduling](docs/en/guides/scheduler.md) or [持久化调度](docs/zh-CN/guides/scheduler.md).
+
 ## Workspace
 
 Reusable plugins live in `packages/plugins/`, shared service tokens and contribution

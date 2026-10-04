@@ -1,0 +1,23 @@
+{
+  "name": "@may/scheduler",
+  "version": "0.1.0",
+  "description": "Opt-in durable time and event scheduling for host-owned tasks.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./sqlite-store": { "types": "./dist/sqlite-store.d.ts", "import": "./dist/sqlite-store.js" }
+  },
+  "files": ["dist", "!dist/.tsbuildinfo"],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:live": "pnpm run build && node test/live-timer.mjs",
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+  },
+  "dependencies": { "cron-parser": "^5.6.0", "luxon": "^3.7.2" },
+  "devDependencies": { "@types/node": "^22.0.0", "@types/luxon": "^3.7.1" },
+  "engines": { "node": ">=22.16.0" },
+  "license": "MIT"
+}

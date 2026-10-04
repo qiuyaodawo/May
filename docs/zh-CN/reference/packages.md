@@ -20,6 +20,7 @@ Terminal、Web UI 和渠道接入方式参见[图片回复](../guides/images.md)
 | 构建 headless、可持久化的单 Session Agent | `AgentDefinition.open()` 或 `AgentApplication.open()` | `@may/session`、`@may/context`、权限和工具 |
 | 在一个 workspace 中管理多个 Session | `@may/application` | `@may/session/catalog` 的 `SessionCatalog` |
 | 协调 Agent 团队、资源与远程 Worker | `@may/coordination` | Agent definition、持久化协作与 Session store、显式宿主策略 |
+| 按照时间或收到的事件触发宿主任务 | `@may/scheduler` | SQLite 存储和按照执行身份去重的宿主任务提交接口 |
 | 构建终端 Agent | Headless application controller | `@may/tui`，可选 `@may/keybindings` |
 | 构建浏览器 Agent | 产品 `UiHost` 或 `ApplicationUiHost` | `@may/ui-client`、`@may/web-ui` |
 | 构建编码 Agent | Headless application controller | `@may/coding-tools` 和执行隔离策略 |
@@ -54,6 +55,13 @@ Terminal、Web UI 和渠道接入方式参见[图片回复](../guides/images.md)
 
 目标执行组件见 [`@may/goal` 指南](../guides/goals.md)。它通过公开的 Agent、Model 和 Context 接口
 提供持久化状态、预算限制和模型工具，基础 Agent package 保持独立。
+
+### `@may/scheduler`
+
+可选的持久化调度组件，支持单次时间、具有时区的五个字段 cron、宿主发布的事件、
+原子事件去重和重启恢复。宿主显式调用 `start()` 或 `tick()`，管理 Agent 执行、
+权限、执行并发和结果投递。`@may/scheduler/sqlite-store` 提供独占使用的 SQLite
+存储。参阅[持久化调度](../guides/scheduler.md)。
 
 ### `@may/skills`
 

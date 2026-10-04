@@ -22,6 +22,7 @@ See [Image replies](../guides/images.md) for Terminal, Web UI and channel integr
 | Build a headless, durable single-session Agent | `AgentDefinition.open()` or `AgentApplication.open()` | `@may/session`, `@may/context`, permissions and tools |
 | Manage multiple sessions in one workspace | `@may/application` | A `SessionCatalog` from `@may/session/catalog` |
 | Coordinate Agent teams, resources and remote workers | `@may/coordination` | Agent definitions, durable coordination and Session stores, explicit host policies |
+| Trigger host tasks on a schedule or incoming event | `@may/scheduler` | SQLite storage and an idempotent host task dispatcher |
 | Build a terminal Agent | Headless application controller | `@may/tui`, optionally `@may/keybindings` |
 | Build a browser Agent | Product `UiHost` or `ApplicationUiHost` | `@may/ui-client`, `@may/web-ui` |
 | Build a coding Agent | Headless application controller | `@may/coding-tools` and an execution isolation policy |
@@ -61,6 +62,14 @@ complete runtime dependency chains. MaybeCode and MaybeClaw remain private.
 Independent goal execution composed through public Agent, Model and Context interfaces.
 Provides durable state, bounded continuation and model tools. Base Agent packages
 do not depend on it. See [Goals](../guides/goals.md).
+
+### `@may/scheduler`
+
+Optional durable scheduling with one-shot times, five-field timezone-aware cron,
+host-published events, atomic event deduplication and restart-safe submissions.
+Hosts explicitly call `start()` or `tick()` and own Agent execution, permissions,
+concurrency and result delivery. `@may/scheduler/sqlite-store` supplies exclusive
+SQLite storage. See [Scheduling](../guides/scheduler.md).
 
 ### `@may/skills`
 

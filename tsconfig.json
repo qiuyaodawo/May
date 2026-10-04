@@ -26,6 +26,7 @@
     { "path": "./packages/observability" },
     { "path": "./packages/application" },
     { "path": "./packages/goal" },
+    { "path": "./packages/scheduler" },
     { "path": "./packages/coordination" },
     { "path": "./packages/context" },
     { "path": "./packages/permissions" },
