@@ -969,6 +969,7 @@ class ApprovalPrompt implements InteractiveComponent {
             description: promptShortcut(this.keymap, "approval.allowSession", "approval"),
           }]),
       { value: "deny", label: "Deny", description: `${promptShortcut(this.keymap, "approval.deny", "approval")} / ${promptShortcut(this.keymap, "list.cancel", "select")}` },
+      ...(request.persistent ? [{ value: "allow-persistent" as const, label: "保存允许规则", description: request.persistent.description }] : []),
     ], {
       onSelect: (item) => this.decide(item.value),
       onCancel: () => this.decide("deny"),
@@ -990,7 +991,7 @@ class ApprovalPrompt implements InteractiveComponent {
       },
       { flex: 1, minHeight: 1, component: new Text(input) },
       {
-        height: this.request.grantKey === undefined ? 2 : 3,
+        height: (this.request.grantKey === undefined ? 2 : 3) + (this.request.persistent ? 2 : 0),
         component: this.choices,
       },
     ]);

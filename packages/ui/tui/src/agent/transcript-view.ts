@@ -595,15 +595,16 @@ function renderUser(
 }
 
 function renderApproval(item: ApprovalTranscriptItem, theme: TuiTheme): string {
+  const scope = item.scopeDescription === undefined ? "" : `\n持续授权范围：${sanitizeTerminalText(item.scopeDescription)}${item.scopeId === undefined ? "" : `\n范围身份：${sanitizeTerminalText(item.scopeId)}`}`;
   if (item.status === "pending") {
     return `${styleText("?", theme.warning)} Approval required for ` +
-      styleText(sanitizeTerminalText(item.toolName), theme.toolTitle);
+      styleText(sanitizeTerminalText(item.toolName), theme.toolTitle) + scope;
   }
   if (item.status === "resolved") {
-    return `${styleText("✓", theme.success)} Permission: ${item.decision ?? "resolved"}`;
+    return `${styleText("✓", theme.success)} Permission: ${item.decision ?? "resolved"}` + scope;
   }
   return `${styleText("!", theme.warning)} Permission cancelled` +
-    (item.reason === undefined ? "" : `: ${sanitizeTerminalText(item.reason)}`);
+    (item.reason === undefined ? "" : `: ${sanitizeTerminalText(item.reason)}`) + scope;
 }
 
 function renderNotice(item: NoticeTranscriptItem, theme: TuiTheme): string {

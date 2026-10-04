@@ -90,6 +90,28 @@ Custom hosts own the same validation and lifecycle responsibilities. Reconnect t
 the same live host retains pending requests; a journal alone cannot restore them.
 These are preview DTO changes: upgrade custom hosts and clients together.
 
+Persistent requests display the host-supplied range description and scope ID,
+with an `allow-persistent` choice. `ApplicationUiHost` accepts
+`permissionActor: () => string` to obtain the trusted operator identity. Hosts
+without this option omit the persistent choice. Web command arguments cannot
+provide `createdBy`; the host passes it to `resolveApproval()`.
+Historical `UiApprovalRecord.scope` can be `persistent`, with
+`scopeDescription` retaining the displayed range. Optional
+`permissionRules: { list, revoke, create? }` callbacks advertise
+`permission.rules.list` and `permission.rules.revoke`. List output includes
+descriptions, scope, creator and expiry with explicit revoke actions. The host
+must restrict callbacks to the current operator's permitted scopes; revoke
+commands also check that the requested ID is in that list.
+An optional `create(sourceId, decision)` callback enables
+`permission.rules.create`. The operator chooses an allow or deny rule based on
+an existing visible range; the callback derives the trusted rule identity and
+operator itself. Commands carry only that source rule ID and the decision.
+The confirmation displays the complete range and deny precedence.
+`UiPanel.actions` contains optional host-declared controls. `ApplicationUiHost`
+adds a permissions panel with a rule-list action while preserving product
+panels. The Web shell applies the same confirmation, pending-state and command
+availability handling used for command-output actions.
+
 
 ## Read-only history
 

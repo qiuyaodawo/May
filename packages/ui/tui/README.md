@@ -159,3 +159,9 @@ headless controller and events directly.
 types. Applications own their concrete palette and may pass it into components.
 Product events and labels stay outside the transcript projection: applications
 use `reset`, `appendNotice`, and `appendChangePreview` to bridge that state.
+
+Approval transcript items retain `scopeDescription` and `scopeId` for persistent
+requests, displaying the full host-supplied range beside the approval status.
+Rule lifecycle events are recorded by Session and leave transcript approval
+requests independent. Only an application-owned live request provides approval
+authority.

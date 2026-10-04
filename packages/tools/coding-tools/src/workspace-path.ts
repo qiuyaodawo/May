@@ -1,5 +1,6 @@
 import { lstat, realpath, stat } from "node:fs/promises";
 import {
+  basename,
   dirname,
   isAbsolute,
   relative,
@@ -78,8 +79,8 @@ async function resolveWorkspacePath(
   }
 
   await assertNotUnresolvedSymbolicLink(candidate, inputPath);
-  await assertExistingParentInside(root, dirname(candidate), inputPath);
-  return { absolute: candidate, relative: displayPath };
+  const parent = await assertExistingParentInside(root, dirname(candidate), inputPath);
+  return { absolute: resolve(parent, basename(candidate)), relative: displayPath };
 }
 
 async function resolveProviderPath(
@@ -194,13 +195,13 @@ async function assertExistingParentInside(
   root: string,
   initialParent: string,
   inputPath: string,
-): Promise<void> {
+): Promise<string> {
   let parent = initialParent;
   while (true) {
     try {
       const existingParent = await realpath(parent);
       assertInside(root, existingParent, inputPath);
-      return;
+      return resolve(existingParent, relative(parent, initialParent));
     } catch (error) {
       if (!isMissingPathError(error)) throw error;
     }

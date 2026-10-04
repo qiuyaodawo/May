@@ -17,6 +17,14 @@ The workbench displays optional `UiSnapshot.badges` in its fixed header,
 including on narrow screens. Badge labels and tones come from the host and update
 with snapshots, independently of transcript scrolling and detail panels.
 
+`UiPanel.actions` adds host-declared controls to standard and product-rendered
+detail panels. Controls use the shared `UiAction` confirmation and command path
+and respect command availability and pending operations. With persistent rule
+management enabled, the permissions panel provides **查看和管理规则**. The
+result lists complete ranges and supports confirmed allow/deny creation and
+revocation. `ApplicationUiHost` supplies trusted operator identity and validates
+source rule membership; clients send only the selected source ID and decision.
+
 Ordered image content supports authenticated viewing, original-image links and
 downloads. See [Image replies](../../../docs/en/guides/images.md) /
 [图片回复](../../../docs/zh-CN/guides/images.md).

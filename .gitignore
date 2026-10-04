@@ -10,3 +10,4 @@ coverage/
 review/
 plugin-verification/
 .pi-delegate/
+.may/permission-rules.json*

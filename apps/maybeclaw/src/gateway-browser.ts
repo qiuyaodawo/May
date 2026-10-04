@@ -760,6 +760,7 @@ export function createGatewayManager(client: UiClient): GatewayManager {
       text: string;
       status: string;
       grantKey?: string;
+      persistent?: { description: string };
     }
     const requests = await data("approvals") as ApprovalItem[];
     if (disposed) return;
@@ -797,6 +798,7 @@ export function createGatewayManager(client: UiClient): GatewayManager {
           for (const [decision, label] of [
             ["allow", "允许本次"],
             ...(request.grantKey ? [["allow-session", "允许该 Agent 对话中的同类操作"]] : []),
+            ...(request.persistent ? [["allow-persistent", "保存持久允许规则"]] : []),
             ["deny", "拒绝"],
           ] as const) {
             actions.append(button(label, async () => {
@@ -811,6 +813,39 @@ export function createGatewayManager(client: UiClient): GatewayManager {
       }
     }
     collapsibleJson(view, "原始审批数据（JSON）", requests);
+  }
+
+  async function permissionRules() {
+    const settingsData = await data("settings") as GatewaySettings;
+    if (disposed) return;
+    if (!settingsData.persistentRules) {
+      const view = modal("持久权限规则");
+      note(view, "apps.maybeclaw.persistentRules 尚未启用。");
+      return;
+    }
+    const rules = await data("permission-rules") as Array<{ id: string; description: string; decision: string; createdBy: string; createdAt: number; expiresAt?: number }>;
+    if (disposed) return;
+    const view = modal("持久权限规则");
+    if (!rules.length) note(view, "当前服务没有持久权限规则。");
+    for (const rule of rules) {
+      const card = document.createElement("div");
+      card.className = "gateway-card";
+      const content = document.createElement("div");
+      content.className = "gateway-card-meta";
+      content.textContent = `${rule.id}\n${rule.description}\n决定：${rule.decision} · 创建者：${rule.createdBy} · 创建时间：${new Date(rule.createdAt).toISOString()}${rule.expiresAt === undefined ? "" : ` · 过期时间：${new Date(rule.expiresAt).toISOString()}`}`;
+      card.append(content, button(rule.decision === "allow" ? "保存相同范围的禁止规则" : "保存相同范围的允许规则", async () => {
+        await client.command("permission.rule.create", { sourceId: rule.id, decision: rule.decision === "allow" ? "deny" : "allow" });
+        view.dialog.close();
+        await permissionRules();
+      }), button("撤销规则", async () => {
+        await client.command("permission.rule.revoke", { id: rule.id });
+        view.dialog.close();
+        await permissionRules();
+      }));
+      view.insert(card);
+    }
+    note(view, "禁止规则优先于允许规则。恢复允许操作需要撤销匹配的禁止规则。");
+    collapsibleJson(view, "规则数据（JSON）", rules);
   }
 
   const navigation: WebUiNavigation = {
@@ -866,6 +901,12 @@ export function createGatewayManager(client: UiClient): GatewayManager {
             label: "服务审批",
             icon: "check",
             action: () => approvals(),
+          },
+          {
+            id: "permission-rules-manage",
+            label: "持久权限规则",
+            icon: "check",
+            action: () => permissionRules(),
           },
           {
             id: "settings-manage",

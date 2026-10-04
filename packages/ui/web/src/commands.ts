@@ -122,7 +122,7 @@ export function createCommandUI(client: UiClient, composer: HTMLTextAreaElement,
     return panel;
   }
 
-  return { root, suggestions,
+  return { root, suggestions, perform,
     async submit(text: string): Promise<boolean> {
       if (!state.snapshot?.controls || !text.trimStart().startsWith("/")) return false;
       clearSuggestions();

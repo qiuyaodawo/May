@@ -288,7 +288,7 @@ export class Session {
       ...((options.metadata ?? created.metadata) === undefined ? {} : { metadata: { ...(options.metadata ?? created.metadata) } }),
       fork: { sessionId: options.sourceId, positionSeq: options.positionSeq, runId: selected.runId } }, Date.now());
     for (const event of source.slice(1, options.positionSeq)) {
-      if (event.type.startsWith("approval.")) { append({ type: "history.omitted", reason: "permission" }, event.timestamp); continue; }
+      if (event.type.startsWith("approval.") || event.type.startsWith("rule.")) { append({ type: "history.omitted", reason: "permission" }, event.timestamp); continue; }
       if (event.type === "session.fork.ready") { append({ type: "history.omitted", reason: "fork-initialization" }, event.timestamp); continue; }
       if (event.type === "state.updated") {
         if (stateKeys.has(event.key)) append({ type: "state.updated", key: event.key,
@@ -545,6 +545,9 @@ export class Session {
   }
 
   recordPermissionEvent(event: RecordablePermissionEvent): Promise<void> {
+    if (event.type === "rule.created" || event.type === "rule.revoked" || event.type === "rule.used") {
+      return this.record(toPermissionSessionEvent(event), event.timestamp);
+    }
     if (event.type === "approval.requested") {
       const operation = this.waitForModelCompletion(
         event.request.context.runId,
@@ -1151,6 +1154,9 @@ function resolvePendingTool(
 function toPermissionSessionEvent(
   event: RecordablePermissionEvent,
 ): SessionEventPayload {
+  if (event.type === "rule.created") return { type: event.type, rule: structuredClone(event.rule) };
+  if (event.type === "rule.revoked") return { type: event.type, ruleId: event.ruleId, scopeId: event.scopeId };
+  if (event.type === "rule.used") return { type: event.type, ruleId: event.ruleId, scopeId: event.scopeId, decision: event.decision, runId: event.runId, toolCallId: event.toolCallId };
   if (event.type === "approval.requested") {
     const request: SessionApprovalRequest = event.request.grantKey === undefined
       ? {
@@ -1174,6 +1180,7 @@ function toPermissionSessionEvent(
           idempotencyKey: event.request.context.idempotencyKey,
           grantKey: event.request.grantKey,
         };
+    if (event.request.persistent !== undefined) request.persistent = structuredClone(event.request.persistent);
     return { type: "approval.requested", request };
   }
   if (event.type === "approval.resolved") {

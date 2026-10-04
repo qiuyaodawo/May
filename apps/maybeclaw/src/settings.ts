@@ -13,7 +13,8 @@ export interface HostSettings {
 
 /** Reject misspelled security settings rather than silently enabling a wider policy. */
 export function hostSettings(config: MayConfig): HostSettings {
-  const app = object(config.apps?.maybeclaw ?? {}, "apps.maybeclaw", ["version", "runBudget", "server", "channels", "agents", "access"]);
+  const app = object(config.apps?.maybeclaw ?? {}, "apps.maybeclaw", ["version", "runBudget", "server", "channels", "agents", "access", "persistentRules"]);
+  if (app.persistentRules !== undefined && typeof app.persistentRules !== "boolean") throw new TypeError("maybeclaw.persistentRules 必须为布尔值。");
   const server = object(app.server ?? {}, "maybeclaw.server", ["maxConcurrent", "idleMs", "shutdownMs", "approvalMs", "publicOrigin", "auth"]);
   const maxConcurrent = server.maxConcurrent ?? 1;
   if (!Number.isSafeInteger(maxConcurrent) || (maxConcurrent as number) < 1 || (app.version !== 2 && (maxConcurrent as number) > 4)) throw new Error("maxConcurrent must be positive; legacy task hosts support 1..4");

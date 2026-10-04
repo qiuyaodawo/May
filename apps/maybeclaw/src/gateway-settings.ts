@@ -7,9 +7,10 @@ import { authSettings } from "./gateway-auth.js";
 import type { GatewayAgentConfig, GatewayEntry, GatewaySettings } from "./gateway-types.js";
 
 export function gatewaySettings(config: MayConfig): GatewaySettings {
-  const raw = object(config.apps?.maybeclaw ?? {}, "maybeclaw", ["version", "agents", "access", "server", "channels", "runBudget"]);
+  const raw = object(config.apps?.maybeclaw ?? {}, "maybeclaw", ["version", "agents", "access", "server", "channels", "runBudget", "persistentRules"]);
   if (raw.version !== 2) throw new Error("MaybeClaw 需要 version: 2 配置。请执行 maybeclaw migrate check 检查已有数据，并配置 agents。");
   if (raw.runBudget !== undefined) throw new Error("请将 maybeclaw.runBudget 配置移至对应的 agents[].runBudget。");
+  if (raw.persistentRules !== undefined && typeof raw.persistentRules !== "boolean") throw new TypeError("maybeclaw.persistentRules 必须为布尔值。");
   hostSettings(config);
   if (raw.agents !== undefined && !Array.isArray(raw.agents)) throw new Error("agents 必须为列表。");
   const rawAgents = raw.agents ?? [];
@@ -54,7 +55,7 @@ export function gatewaySettings(config: MayConfig): GatewaySettings {
   for (const names of Object.values(allowedAgents)) for (const id of names) if (!ids.has(id)) throw new Error(`allowedAgents 引用了未登记的 Agent：${id}`);
   const shutdownMs = positive(server.shutdownMs ?? 30_000, "shutdownMs", true);
   if (shutdownMs > 2_147_483_647) throw new Error("shutdownMs 超过 Node 定时器支持范围。");
-  return { version: 2, agents, access: {
+  return { version: 2, persistentRules: raw.persistentRules === true, agents, access: {
     sessionAdmins: listMap(access.sessionAdmins ?? {}, "sessionAdmins"),
     creators: strings(access.creators ?? [], "creators"),
     deniedUsers: strings(access.deniedUsers ?? [], "deniedUsers"),

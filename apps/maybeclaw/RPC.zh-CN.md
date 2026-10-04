@@ -54,17 +54,21 @@ socket 配置支持 `{ "transport": "socket", "path": "socket-or-Windows-pipe" }
 | --- | --- | --- |
 | `conversation/create` | `requestId` | `{ conversationId }` |
 | `conversation/inspectCreation` | `requestId` | `{ status: "not-started" }`、`{ status: "ready", conversationId }` 或 `{ status: "unknown" }` |
-| `conversation/execute` | `conversationId`、`inputId`、`input`、`tools` | `{ text, runId?, yielded?, content? }` |
+| `conversation/execute` | `conversationId`、`inputId`、`input`、`tools`、`permissionScope?` | `{ text, runId?, yielded?, content? }` |
 | `conversation/inspect` | `conversationId`、`inputId` | `{ status, text?, detail?, content?, runId? }` |
 | `conversation/cancel` | `conversationId` | 取消完成后返回 `{ cancelled: true }` |
 | `conversation/steer` | `conversationId`、`inputId`、`text` | `{ status }` |
 | `conversation/steeringInputs` | `conversationId` | `[{ inputId, text, status }]` |
-| `conversation/resolveApproval` | `conversationId`、`requestId`、`decision` | `{ resolved: boolean }` |
+| `conversation/resolveApproval` | `conversationId`、`requestId`、`decision`、`options?` | `{ resolved: boolean }` |
 | `conversation/release` | `conversationId` | `{ released: true }` |
 | `conversation/delete` | `conversationId` | `{ deleted: true }` |
 | `conversation/command` | `conversationId`、`name`、`args` | `{ text }` |
 
 `input` 使用 May `UserMessage`。支持协作时，`tools` 提供当前执行已经获得授权的协作工具名称、说明和输入 schema。执行状态包括 `not-started`、`queued`、`running`、`waiting`、`cancelling`、`completed`、`failed`、`cancelled` 和 `recovery-required`。
+
+`permissionScope` 是宿主提供的可选可信发起者身份。使用 `allow-persistent` 时，
+`options` 包含 `{ createdBy, expiresAt? }`。外部 Agent 验证并保存自己的权限规则。
+Gateway 仅允许服务管理员保存持久审批，并要求已启用功能且请求声明持久范围。
 
 创建请求和执行请求的 ID 必须持久保存。重复使用同一个 ID 时必须指向同一操作，同一个 ID 对应的输入发生变化时需要报错。释放资源保留对话历史；删除操作清理专属于该会话的 Agent 对话。每个对话同一时间只允许一个执行。
 

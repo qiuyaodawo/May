@@ -63,6 +63,7 @@ export async function startGatewayServer(options: { gateway: AgentGateway; port?
       if (path === "/api/sessions") { sendJson(res, 200, options.gateway.sessions(controlActor)); return; }
       if (path === "/api/agents") { sendJson(res, 200, options.gateway.options.settings.agents); return; }
       if (path === "/api/approvals") { sendJson(res, 200, options.gateway.store.list<GatewayApproval>("approvals")); return; }
+      if (path === "/api/permission-rules") { sendJson(res, 200, await options.gateway.listPermissionRules(controlActor)); return; }
       if (path === "/api/tasks") { sendJson(res, 200, { tasks: options.gateway.store.list<GatewayTask>("tasks"), legacy: options.gateway.store.list<LegacyTaskRecord>("legacy-tasks") }); return; }
       const sessionMatch = /^\/api\/sessions\/([^/]+)(?:\/(messages))?$/u.exec(path);
       if (sessionMatch) {
@@ -126,6 +127,16 @@ export async function startGatewayServer(options: { gateway: AgentGateway; port?
       if (path === "/api/approvals") {
         if (typeof data.id !== "string" || typeof data.decision !== "string") throw new UiError(400, "Approval id and decision are required");
         await execute("approval.resolve", data, { id: data.id, decision: data.decision }, requestId); sendJson(res, 200, { resolved: data.id }); return;
+      }
+      const permissionRule = /^\/api\/permission-rules\/([^/]+)\/revoke$/u.exec(path);
+      if (permissionRule) {
+        const id = decodeURIComponent(permissionRule[1]!);
+        sendJson(res, 200, { revoked: await options.gateway.revokePermissionRule(id, controlActor) }); return;
+      }
+      if (path === "/api/permission-rules") {
+        if (typeof data.sourceId !== "string" || data.decision !== "allow" && data.decision !== "deny") throw new UiError(400, "sourceId 和 allow 或 deny 决定为必填字段。");
+        if (Object.keys(data).some(key => !["sourceId", "decision", "requestId"].includes(key))) throw new UiError(400, "创建规则只能引用已有规则的授权范围。");
+        sendJson(res, 201, await options.gateway.createPermissionRule(data.sourceId, data.decision, controlActor)); return;
       }
     }
     sendJson(res, 404, { error: "Not found" });

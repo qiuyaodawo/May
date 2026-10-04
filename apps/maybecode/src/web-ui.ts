@@ -6,11 +6,18 @@ import type { MaybeCodeController } from "./controller.js";
 import { readFile } from "node:fs/promises";
 import { MaybeCodeWebCommands } from "./web-commands.js";
 import { formatGoal } from "./goal-commands.js";
+import { userInfo } from "node:os";
 
 export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<ApplicationUiOptions, "events" | "closeApplication"> & { terminal?: boolean } = {}) {
   const commands = new MaybeCodeWebCommands(app, () => host.changed());
   const host = new ApplicationUiHost(app, {
     ...options,
+    permissionActor: () => `local:${userInfo().username}`,
+    ...(app.persistentRulesEnabled !== false && app.listPermissionRules && app.revokePermissionRule ? { permissionRules: {
+      list: () => app.listPermissionRules!(), revoke: (id: string) => app.revokePermissionRule!(id),
+      ...(app.createPermissionRuleFrom ? { create: (id: string, decision: "allow" | "deny") =>
+        app.createPermissionRuleFrom!(id, { decision, createdBy: `local:${userInfo().username}` }) } : {}),
+    } } : {}),
     product: { id: "maybecode", title: "MaybeCode", resourceKind: "session", subtitle: "围绕你的代码工作。查看工具执行，在关键操作前确认，让每一步都有迹可循。", suggestions: ["介绍这个项目的结构", "检查当前工作区的改动", "帮我定位一个问题"] },
     commands: ["model.switch", "effort.set", "permission.set",
       ...(app.forkSession ? ["session.fork"] : []), ...(app.getChanges ? ["changes.view"] : []),

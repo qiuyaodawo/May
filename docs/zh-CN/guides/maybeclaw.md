@@ -83,6 +83,42 @@ Agent 状态区分 `unloaded`（尚未加载）、`loading`（正在加载）、
 后台处理发生未预期错误时，服务显示 `degraded`，向管理员提供错误原因并停止定时
 处理。处理报告的问题后重新启动服务。
 
+## 持久权限规则
+
+设置 `apps.maybeclaw.persistentRules: true` 启用保存权限，缺省值为 `false`。
+Gateway 按需打开一个 `FilePermissionRuleStore`，全部 May adapter 共享
+`<data-directory>/permission-rules.json`。正常关闭时，Gateway 完成 adapter
+关闭后释放规则文件的写入锁；资源清理失败时保留规则存储的所有权，供管理员检查。
+出现遗留的 `.lock` 文件时，需要确认所属进程已经停止；运行时不会自动接管文件。
+文件工具拒绝访问规则文件、所有权文件和替换文件，并检查目录链接的实际路径。
+
+内置 policy 为 `read` 提供单个实际文件的授权范围。通过
+`permissions[toolName]: "ask"` 或 `"allow"` 明确配置的其他工具，提供当前完整
+参数对应的授权范围，使用 SHA-256 保存匹配标识。参数必须支持无损的 JSON 保存与
+读取；非有限数值、`undefined`、稀疏数组与负零会使权限检查失败。
+范围还包含 Gateway 数据目录、
+Agent、`readDirectory` 的实际目录，以及发起操作的 operator 或平台用户。
+规则保存说明与匹配标识，原始工具参数保存在审批信息中。尚未明确配置且需要审批的
+工具继续逐次请求批准。明确的 `deny` 继续生效。自定义 PermissionPolicy 插件需要
+自行生成可信的持久范围，并保护规则存储文件。
+
+符合条件的审批显示完整范围，并提供 `allow-persistent`。只有服务管理员可以保存
+持久授权。终端使用相同选项，`/approve <id> --persistent` 也可以保存符合条件的规则。
+会话管理员继续使用单次审批与 `allow-session`。保存失败时工具无法开始执行。
+每次工具调用重新检查已经保存的规则，服务重启后继续使用有效规则。
+
+Web 管理器的“持久权限规则”页面支持查看、撤销规则，以及根据已有范围创建允许或
+禁止规则。创建请求仅接受来源规则 ID 和决定；Gateway 核验来源 Agent、项目目录、
+身份与有效期限，客户端无法指定新的范围字段。禁止规则优先；恢复操作需要撤销
+匹配的禁止规则。管理操作记录在 `gateway.sqlite` 的 `permission-rule-events` 中。
+执行、规则使用和审批事件继续记录在对应 Agent 的 Session 历史中。
+
+经过管理员认证的 API 支持 `GET /api/permission-rules`、
+`POST /api/permission-rules`（参数为 `{ sourceId, decision }`），以及
+`POST /api/permission-rules/<id>/revoke`。对应 UI 命令为
+`gateway.inspect`（`kind: "permission-rules"`）、`permission.rule.create`
+和 `permission.rule.revoke`。这些接口由宿主管理功能使用。
+
 ## 启动、Web 与 CLI
 
 直接运行 `pnpm maybeclaw`，即可启动 Web 控制服务并在系统默认浏览器打开初始化

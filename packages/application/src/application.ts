@@ -44,8 +44,12 @@ import { createSkillsPlugin } from "@may/plugin-skills";
 import {
   PermissionToolExecutor,
   type ApprovalDecision,
+  type ApprovalResolveOptions,
+  type CreatePermissionRuleOptions,
   type PermissionCheck,
   type PermissionPolicy,
+  type PermissionRuleStore,
+  type PersistentPermissionRule,
 } from "@may/permissions";
 import {
   Session,
@@ -95,6 +99,7 @@ export interface AgentApplicationOptions {
   readonly model?: Model;
   readonly store: SessionStore;
   readonly permissionPolicy?: PermissionPolicy;
+  readonly permissionRuleStore?: PermissionRuleStore;
   readonly plugins?: readonly AnyPlugin[];
   readonly pluginHookTimeoutMs?: number;
   readonly onPluginHookError?: PluginHostOptions["onHookError"];
@@ -366,7 +371,8 @@ export class AgentApplication implements SteerableAgentController {
       startSpan: (name, traceOptions) => sessionScope.get(applicationServices.tracer).startSpan(name, traceOptions),
     };
     const permissions = new PermissionToolExecutor({
-      policy: async (check) => {
+      ...(options.permissionRuleStore === undefined ? {} : { ruleStore: options.permissionRuleStore }),
+      beforeCheck: async (check) => {
         const presentation = await options.createToolPresentation?.(check);
         if (presentation !== undefined) {
           if (application === undefined) {
@@ -374,8 +380,8 @@ export class AgentApplication implements SteerableAgentController {
           }
           await application.recordToolPresentation(check, presentation);
         }
-        return sessionScope.get(applicationServices.permissionPolicy)(check);
       },
+      policy: (check) => sessionScope.get(applicationServices.permissionPolicy)(check),
       executor: { execute: (execution) => (sessionScope.provides(applicationServices.toolExecutor)
         ? sessionScope.get(applicationServices.toolExecutor) : directToolExecutor).execute(execution) },
       tracer,
@@ -532,8 +538,10 @@ export class AgentApplication implements SteerableAgentController {
             ...(event.request.context.traceContext === undefined ? {} : { traceContext: event.request.context.traceContext }),
           } },
         } : event;
-        await hooks.observe(event.type === "approval.requested" ? applicationHooks.approvalRequested : applicationHooks.approvalResolved,
-          payload, { signal: new AbortController().signal, sessionId });
+        if (event.type === "approval.requested" || event.type === "approval.resolved" || event.type === "approval.cancelled") {
+          await hooks.observe(event.type === "approval.requested" ? applicationHooks.approvalRequested : applicationHooks.approvalResolved,
+            payload, { signal: new AbortController().signal, sessionId });
+        }
       });
       application = new AgentApplication(
         session,
@@ -853,9 +861,30 @@ export class AgentApplication implements SteerableAgentController {
   resolveApproval(
     requestId: string,
     decision: ApprovalDecision,
+    options?: ApprovalResolveOptions,
   ): Promise<boolean> {
     this.throwIfClosed();
-    return this.permissions.resolve(requestId, decision);
+    return this.permissions.resolve(requestId, decision, options);
+  }
+
+  listPermissionRules(scopeId?: string): Promise<readonly PersistentPermissionRule[]> {
+    this.throwIfClosed();
+    return this.permissions.listRules(scopeId);
+  }
+
+  createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule> {
+    this.throwIfClosed();
+    return this.permissions.createRule(check, options);
+  }
+
+  createPermissionRuleFrom(sourceId: string, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule> {
+    this.throwIfClosed();
+    return this.permissions.createRuleFrom(sourceId, options);
+  }
+
+  revokePermissionRule(id: string): Promise<boolean> {
+    this.throwIfClosed();
+    return this.permissions.revokeRule(id);
   }
 
   history(): Promise<readonly SessionEvent[]> {

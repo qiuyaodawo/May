@@ -96,6 +96,51 @@ An unexpected background-processing failure marks the service `degraded`,
 exposes the reason to administrators, and stops scheduled processing. Correct
 the reported condition before restarting the service.
 
+## Persistent permission rules
+
+Set `apps.maybeclaw.persistentRules: true` to enable saved permissions. The
+default is `false`. One lazily opened `FilePermissionRuleStore` owns
+`<data-directory>/permission-rules.json`; all May adapters share it. Normal
+Gateway shutdown closes adapters before releasing the rule writer lock. Cleanup
+failure preserves rule-store ownership for investigation. A leftover `.lock`
+requires checking that its owner has stopped; the runtime never takes it over
+automatically. File tools deny access to the rule file, its ownership file and
+replacement files, including directory links that resolve to those paths.
+
+The built-in policy gives `read` an exact canonical file scope. Other tools
+configured with `permissions[toolName]: "ask"` or `"allow"` receive a scope for
+the current exact input, represented by a SHA-256 key. Exact input must support
+lossless JSON serialization and parsing; values such as nonfinite numbers,
+`undefined`, sparse arrays and negative zero fail permission evaluation.
+Scope also includes the
+Gateway data directory, Agent, canonical `readDirectory`, and initiating operator
+or platform user. Rule records retain descriptions and keys; they omit original
+tool arguments. Unconfigured tools requiring approval keep per-request approval.
+Explicit `deny` remains effective. Custom PermissionPolicy plugins must provide
+their own verified persistent scopes and protect the rule-store files.
+
+An eligible approval displays its complete scope and offers
+`allow-persistent`. Only the service administrator may choose it. The terminal
+uses the same choice; `/approve <id> --persistent` also saves an eligible rule.
+Session administrators retain their existing per-request and `allow-session`
+choices. Save failure prevents tool execution. Already saved permissions are
+checked again on every call, including after restarting the service.
+
+The Web manager's **Persistent permission rules** page lists rules, revokes
+them, and creates an allow or deny rule from an existing scope. It accepts a
+source rule ID and a decision. The Gateway verifies the source Agent, project,
+identity and expiry; clients cannot submit replacement scope fields. Deny rules
+take precedence, so restoring an operation requires revoking matching deny rules.
+Management changes are recorded in `gateway.sqlite` under
+`permission-rule-events`. Execution, rule usage and approval events remain in
+their Agent Session histories.
+
+Authenticated administrator APIs provide `GET /api/permission-rules`,
+`POST /api/permission-rules` with `{ sourceId, decision }`, and
+`POST /api/permission-rules/<id>/revoke`. The equivalent UI commands are
+`gateway.inspect` with `kind: "permission-rules"`, `permission.rule.create`, and
+`permission.rule.revoke`. These are host management interfaces.
+
 ## Startup, Web, and CLI
 
 Run `pnpm maybeclaw` to start the Web control service and open the default browser

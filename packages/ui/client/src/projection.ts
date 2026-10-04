@@ -18,7 +18,7 @@ function diagnostic(error: SerializedError): UiDiagnostic {
   return { message: bounded(error.message), ...(error.code ? { code: error.code.slice(0, 256) } : {}) };
 }
 const pending = (block: UiBlock) => ["queued", "running", "streaming", "awaiting-approval"].includes(block.status ?? "");
-type ApprovalEvent = PermissionEvent | Extract<SessionEvent, { type: "approval.requested" | "approval.resolved" | "approval.cancelled" }>;
+type ApprovalEvent = Extract<PermissionEvent | SessionEvent, { type: "approval.requested" | "approval.resolved" | "approval.cancelled" }>;
 
 /** UI-neutral, bounded projection; never imports a terminal renderer or provider state. */
 export class UiProjection {
@@ -77,7 +77,7 @@ export class UiProjection {
   }
   event(event: AgentApplicationEvent): void {
     if (event.type === "run.event") this.run(event.event);
-    else if (event.type === "permission.event") this.permission(event.event, true);
+    else if (event.type === "permission.event" && (event.event.type === "approval.requested" || event.event.type === "approval.resolved" || event.event.type === "approval.cancelled")) this.permission(event.event, true);
     else if (event.type === "tool.presentation") this.presentation(event.presentation);
   }
   /** Host says live execution is no longer available; absence of an outcome is not success. */
@@ -101,11 +101,13 @@ export class UiProjection {
       const request = event.request, scope = "context" in request ? request.context : request;
       const id = `tool:${scope.runId}:${scope.toolCallId}`, detail = displayValue(request.input);
       this.set({ ...this.blocks.get(id), id, kind: "tool", runId: scope.runId, toolCallId: scope.toolCallId,
-        title: request.tool.name, input: detail, text: this.blocks.get(id)?.text ?? "", status: "awaiting-approval", approval: { id: request.id, status: "pending" } });
+        title: request.tool.name, input: detail, text: this.blocks.get(id)?.text ?? "", status: "awaiting-approval", approval: { id: request.id, status: "pending",
+          ...(request.persistent === undefined ? {} : { scopeDescription: request.persistent.description }) } });
       if (live) this.interactions.set(request.id, { id: request.id, kind: "approval", blockId: id, runId: scope.runId, toolCallId: scope.toolCallId, toolName: request.tool.name,
-        title: `允许执行 ${request.tool.name}？`, detail, choices: detail.length > LIMIT ? [{ value: "deny", label: "输入过长，拒绝此操作" }] : [
+        title: `允许执行 ${request.tool.name}？`, detail: request.persistent === undefined ? detail : `${detail}\n\n持续授权范围：${request.persistent.description}\n范围身份：${request.persistent.scopeId}`, choices: detail.length > LIMIT ? [{ value: "deny", label: "输入过长，拒绝此操作" }] : [
           { value: "deny", label: "拒绝" }, { value: "allow", label: "仅允许这次" },
           ...(request.grantKey === undefined ? [] : [{ value: "allow-session", label: "本会话允许" }]),
+          ...(request.persistent === undefined ? [] : [{ value: "allow-persistent", label: "持续允许指定范围" }]),
         ] });
     } else {
       this.interactions.delete(event.requestId);
@@ -113,7 +115,8 @@ export class UiProjection {
         const cancelled = event.type === "approval.cancelled", denied = event.type === "approval.resolved" && event.decision === "deny";
         this.set({ ...block, status: cancelled ? "not-started" : denied ? "denied" : "running",
           approval: { id: event.requestId, status: cancelled ? "cancelled" : denied ? "denied" : "allowed",
-            ...(!cancelled && !denied ? { scope: event.decision === "allow-session" ? "session" as const : "once" as const } : {}) } });
+            ...(block.approval.scopeDescription === undefined ? {} : { scopeDescription: block.approval.scopeDescription }),
+            ...(!cancelled && !denied ? { scope: event.decision === "allow-session" ? "session" as const : event.decision === "allow-persistent" ? "persistent" as const : "once" as const } : {}) } });
         break;
       }
     }

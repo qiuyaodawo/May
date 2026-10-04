@@ -886,7 +886,9 @@ class SubagentRequest {
     });
     if (event.type === "permission.event") {
       if (event.event.type === "approval.requested") host.trackApproval(event.event.request.id, taskId);
-      else host.forgetApproval(event.event.requestId);
+      else if (event.event.type === "approval.resolved" || event.event.type === "approval.cancelled") {
+        host.forgetApproval(event.event.requestId);
+      }
     }
   }
 

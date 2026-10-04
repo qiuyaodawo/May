@@ -92,6 +92,7 @@ export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   restoreFiles?(previewId: string): Promise<void>;
   getChanges?(query: { readonly scope: "run" | "session" | "workspace"; readonly runId?: string; readonly commit?: string }): Promise<UiWorkspaceDiff>;
   readonly permissionMode: MaybeCodePermissionMode;
+  readonly persistentRulesEnabled?: boolean;
   setPermissionMode(mode: MaybeCodePermissionMode): Promise<void>;
   readonly instructions: MaybeCodeInstructions;
   readonly modelInfo: MaybeCodeModelInfo | undefined;

@@ -7,7 +7,7 @@ import {
   AsyncEventQueue,
   isStreamingMayEvent,
 } from "@may/core";
-import type { ApprovalDecision } from "@may/permissions";
+import type { ApprovalDecision, ApprovalResolveOptions, CreatePermissionRuleOptions, PermissionCheck, PersistentPermissionRule } from "@may/permissions";
 import type {
   SessionEvent,
   SessionHistoryPage,
@@ -295,9 +295,34 @@ export class AgentWorkspace<
   resolveApproval(
     requestId: string,
     decision: ApprovalDecision,
+    options?: ApprovalResolveOptions,
   ): Promise<boolean> {
     this.throwIfClosed();
-    return this.application.resolveApproval(requestId, decision);
+    return this.application.resolveApproval(requestId, decision, options);
+  }
+
+  listPermissionRules(scopeId?: string): Promise<readonly PersistentPermissionRule[]> {
+    this.throwIfClosed();
+    if (this.application.listPermissionRules === undefined) throw new Error("Application does not support permission rules");
+    return this.application.listPermissionRules(scopeId);
+  }
+
+  createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule> {
+    this.throwIfClosed();
+    if (this.application.createPermissionRule === undefined) throw new Error("Application does not support permission rules");
+    return this.application.createPermissionRule(check, options);
+  }
+
+  createPermissionRuleFrom(sourceId: string, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule> {
+    this.throwIfClosed();
+    if (this.application.createPermissionRuleFrom === undefined) throw new Error("Application does not support permission rule range reuse");
+    return this.application.createPermissionRuleFrom(sourceId, options);
+  }
+
+  revokePermissionRule(id: string): Promise<boolean> {
+    this.throwIfClosed();
+    if (this.application.revokePermissionRule === undefined) throw new Error("Application does not support permission rules");
+    return this.application.revokePermissionRule(id);
   }
 
   listSessions(): Promise<readonly SessionSummary[]> {

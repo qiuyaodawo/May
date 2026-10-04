@@ -2,7 +2,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { mediaHistory } from "./media-history.js";
 import { MaybeCodeUsageError } from "./errors.js";
-import { createCodingPermissionPolicy, parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
+import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 
 import { AgentWorkspace } from "@may/application";
 import { GitCheckpointError, GitWorkspaceConflictError, ProjectGitWorkspace, type ProjectGitWorkspaceOptions, type GitRestorePreview } from "@may/application/git-workspace";
@@ -23,7 +23,7 @@ import { mcpResourceToUserMessage, mcpPromptToUserMessage, mcpTaskToUserMessage,
   type McpOperationOptions, type McpReadOptions, type McpCompletionParams, type McpResourceSubscription,
   type McpInteractionBroker, type McpTaskWaitOptions, type McpTaskUpdateOptions,
 } from "@may/mcp";
-import type { ApprovalDecision } from "@may/permissions";
+import type { ApprovalDecision, PersistentApprovalOptions, PermissionCheck, CreatePermissionRuleOptions } from "@may/permissions";
 import type { ModelCapabilities } from "@may/providers";
 import type {
   SessionHistoryPage,
@@ -165,14 +165,6 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
         workspace: resolve(options.workspace),
       }),
     };
-    const permissionPolicy = createCodingPermissionPolicy({
-      mode: () => state.options.permissionMode ?? "default",
-      ...(options.permissionPolicy === undefined ? {} : { policy: options.permissionPolicy }),
-    });
-    state.options = { ...state.options, permissionPolicy: check => {
-      if (state.options.git && state.options.git.readOnly && !["read", "skill_read", "session_history", "session_history_search", "session_history_read", "get_context_remaining", "context_notes", "new_context", "get_goal"].includes(check.tool.name)) return "deny";
-      return permissionPolicy(check);
-    } };
     if (state.options.git !== false) state.git.set(state.rootWorkspace, await ProjectGitWorkspace.open({
       ...state.options.git, workspace: state.rootWorkspace,
       excludedPaths: [...(state.options.git?.excludedPaths ?? []), ...workspaceStoragePaths(state.options, state.rootWorkspace)],
@@ -220,6 +212,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
           }
         }
         const app = await MaybeCodeApplication.open({ ...applicationOptions(nextOptions),
+          permissionModeSource: () => state.options.permissionMode ?? "default",
           ...(gitWorkspace ? { gitWorkspace } : {}),
           ...(selection.fork ? { fork: selection.fork } : {}),
           ...(selection.metadata ? { sessionMetadata: selection.metadata } : {}),
@@ -771,9 +764,16 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   resolveApproval(
     requestId: string,
     decision: ApprovalDecision,
+    options?: PersistentApprovalOptions,
   ): Promise<boolean> {
-    return this.manager.resolveApproval(requestId, decision);
+    return this.manager.resolveApproval(requestId, decision, options);
   }
+
+  get persistentRulesEnabled(): boolean { return this.manager.activeApplication.persistentRulesEnabled; }
+  listPermissionRules(scopeId?: string) { return this.manager.listPermissionRules(scopeId); }
+  createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions) { return this.manager.createPermissionRule(check, options); }
+  createPermissionRuleFrom(id: string, options: CreatePermissionRuleOptions) { return this.manager.runStateTransition(app => app.createPermissionRuleFrom(id, options)); }
+  revokePermissionRule(id: string) { return this.manager.revokePermissionRule(id); }
 
   listSessions(): Promise<readonly SessionSummary[]> {
     return this.manager.listSessions();
@@ -1156,7 +1156,8 @@ function withoutSelection(
 function workspaceStoragePaths(options: ActiveWorkspaceOptions, workspace: string): string[] {
   const store = options.store as { readonly directory?: unknown };
   const catalog = options.catalog as { readonly path?: unknown };
-  return [store.directory, catalog.path].filter((value): value is string => {
+  return [store.directory, catalog.path, resolve(workspace, ".may", "permission-rules.json"),
+    resolve(workspace, ".may", "permission-rules.json.lock")].filter((value): value is string => {
     if (typeof value !== "string") return false;
     const path = relative(workspace, resolve(value));
     return path !== "" && path !== ".." && !path.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) && !isAbsolute(path);

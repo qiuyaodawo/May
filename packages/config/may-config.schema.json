@@ -35,6 +35,7 @@
           "type": "object",
           "properties": {
             "version": { "const": 2, "description": "Agent Gateway configuration version." },
+            "persistentRules": { "type": "boolean", "default": false, "description": "Enable administrator-managed persistent permissions in the Gateway data directory." },
             "agents": { "type": "array", "items": { "$ref": "#/$defs/maybeclawAgent" } },
             "access": {
               "type": "object",
@@ -490,6 +491,7 @@
         },
         "plugins": { "$ref": "#/$defs/pluginSelections" },
         "permissionMode": { "enum": ["default", "yolo"], "default": "default", "description": "Tool approval mode. yolo auto-approves requests while preserving explicit policy denials." },
+        "persistentRules": { "type": "boolean", "default": false, "description": "Enable project-scoped persistent file permissions in .may/permission-rules.json." },
         "instructionsDirectory": { "$ref": "#/$defs/nonEmptyString" },
         "skills": {
           "oneOf": [

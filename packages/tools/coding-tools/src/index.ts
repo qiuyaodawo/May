@@ -8,3 +8,4 @@ export * from "./instructions.js";
 export * from "./read.js";
 export * from "./shell.js";
 export * from "./write.js";
+export * from "./workspace-path.js";

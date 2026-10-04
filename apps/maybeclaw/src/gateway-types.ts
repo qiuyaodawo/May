@@ -1,5 +1,5 @@
 import type { ContentPart, RunBudget } from "@may/core";
-import type { ApprovalDecision } from "@may/permissions";
+import type { ApprovalDecision, ApprovalRequest } from "@may/permissions";
 import type { PluginModuleSelection } from "@may/plugin";
 import type { AgentAdapter as GatewayAgentAdapter, AgentAdapterContext as GatewayAdapterContext, AgentCapabilities as GatewayCapabilities, AgentTaskStatus as GatewayTaskStatus } from "@may/plugin-agent-adapters";
 export type { GatewayAgentAdapter, GatewayAdapterContext, GatewayCapabilities, GatewayTaskStatus };
@@ -76,6 +76,7 @@ export interface GatewayApproval {
   createdAt: number;
   expiresAt: number;
   grantKey?: string;
+  persistent?: NonNullable<ApprovalRequest["persistent"]>;
   text: string;
   actor: GatewayActor;
   decidedBy?: GatewayActor;
@@ -100,6 +101,7 @@ export interface GatewayAgentConfig {
 }
 export interface GatewaySettings {
   version: 2;
+  persistentRules?: boolean;
   publicOrigin?: string;
   agents: GatewayAgentConfig[];
   access: {

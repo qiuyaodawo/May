@@ -257,6 +257,19 @@ Tab 和 Shift+Tab 在打开的移动端面板控件之间循环移动焦点。�
 不再可用时移除操作入口。过期请求和不可用选项由宿主拒绝。有授权范围键时才提供
 “本会话允许”；输入被截断的审批只能拒绝，服务端同样校验这一限制。
 
+持久审批展示宿主提供的范围身份和完整说明；宿主同时提供持久审批元信息与操作人员
+身份时，出现 `allow-persistent` 选项。`ApplicationUiHost` 从 `permissionActor()`
+取得身份，客户端提交的身份字段会被拒绝。历史审批卡片以只读方式保留持续授权范围。
+可选 `permissionRules: { list, revoke, create? }` 提供 `permission.rules.list` 和
+`permission.rules.revoke`，列表输出包含明确的撤销操作。宿主回调按照当前操作人员
+和权限范围限制规则管理。
+`create(sourceId, decision)` 提供 `permission.rules.create`，基于已有可见范围
+创建允许或禁止规则。宿主回调生成可信规则字段和创建者身份，客户端只提供已有规则
+ID 和决定。确认提示包含完整范围，以及禁止规则优先的说明。
+`UiPanel.actions` 在公共与产品详情面板中提供可选操作。宿主提供规则管理时，
+权限面板显示“查看和管理规则”入口。面板操作共用命令输出的确认流程和可用性
+检查，同时保留产品提供的详情面板。
+
 可信产品可在 `WebUiExtensions` 中注册 `tools[toolName]`、
 `approvalDetails[toolName]`、`diagnostics[code]`、
 `presentations[kind][version]` 和 `panels[id]` 回调，返回 HTMLElement 或 null。

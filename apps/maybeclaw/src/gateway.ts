@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { join, resolve } from "node:path";
+import { realpath } from "node:fs/promises";
 import { channelTextPages } from "./channel-text.js";
 import { inboxId, type ChannelInput } from "./channel-store.js";
 import { gatewayInput } from "./gateway-input.js";
 import { withGatewayConfiguration } from "./gateway-config.js";
 import { CoordinationRuntime, coordinationInput, createCoordinationTools, validateCoordinationSnapshot, type CoordinationAgent, type CoordinationStore, type CoordinationSnapshot, type TaskExecution } from "@may/coordination";
 import type { AgentApplicationEvent } from "@may/application";
-import type { ApprovalDecision } from "@may/permissions";
+import type { ApprovalDecision, ApprovalRequest, PersistentPermissionRule } from "@may/permissions";
+import { FilePermissionRuleStore } from "@may/permissions/file-store";
 import type { ContentPart, Tool } from "@may/core";
 import { PluginHost } from "@may/plugin";
 import { agentAdapterRegistryService } from "@may/plugin-agent-adapters";
@@ -60,13 +63,58 @@ export class AgentGateway {
   private closePromise: Promise<void> | undefined;
   private error: string | undefined;
   private plugins: Promise<PluginHost> | undefined;
+  private permissionStore: Promise<FilePermissionRuleStore> | undefined;
   constructor(readonly options: { directory: string; configPath: string; settings: GatewaySettings; store?: GatewayStore }) {
     this.store = options.store ?? GatewayStore.open(options.directory);
     for (const delivery of this.store.list<GatewayDelivery>("deliveries")) if (delivery.status === "sending") this.store.put("deliveries", delivery.id, { ...delivery, status: "unknown" });
     for (const approval of this.store.list<GatewayApproval>("approvals")) if (approval.status === "pending") this.store.put("approvals", approval.id, { ...approval, status: "cancelled" });
   }
   observe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
-  private pluginHost(): Promise<PluginHost> { return this.plugins ??= PluginHost.create({ plugins: createGatewayAgentPlugins(this.options) }); }
+  private pluginHost(): Promise<PluginHost> { return this.plugins ??= PluginHost.create({ plugins: createGatewayAgentPlugins({ ...this.options, permissionRuleStore: () => this.ruleStore() }) }); }
+  private ruleStore(): Promise<FilePermissionRuleStore> {
+    if (this.closing) return Promise.reject(new Error("Gateway 正在关闭。"));
+    if (!this.options.settings.persistentRules) return Promise.reject(new Error("持久权限规则尚未启用。"));
+    return this.permissionStore ??= FilePermissionRuleStore.open({ path: join(this.options.directory, "permission-rules.json") });
+  }
+  async listPermissionRules(actor: GatewayActor): Promise<readonly PersistentPermissionRule[]> {
+    if (actor.kind !== "operator") throw new Error("查看持久权限规则需要服务管理员权限。");
+    return (await this.ruleStore()).list();
+  }
+  async revokePermissionRule(id: string, actor: GatewayActor): Promise<boolean> {
+    if (actor.kind !== "operator") throw new Error("撤销持久权限规则需要服务管理员权限。");
+    const store = await this.ruleStore();
+    const rule = (await store.list()).find(entry => entry.id === id);
+    const revoked = await store.revoke(id);
+    if (revoked) {
+      const eventId = randomUUID();
+      this.store.put("permission-rule-events", eventId, { type: "rule.revoked", ruleId: id, scopeId: rule?.scopeId, actor, at: Date.now() });
+    }
+    this.changed();
+    return revoked;
+  }
+  async createPermissionRule(sourceId: string, decision: "allow" | "deny", actor: GatewayActor): Promise<PersistentPermissionRule> {
+    if (actor.kind !== "operator") throw new Error("创建持久权限规则需要服务管理员权限。");
+    if (decision !== "allow" && decision !== "deny") throw new TypeError("持久权限决定必须为 allow 或 deny。");
+    const store = await this.ruleStore();
+    const source = (await store.list()).find(rule => rule.id === sourceId);
+    if (!source) throw new Error("来源规则不存在。");
+    const scope: unknown = JSON.parse(source.scopeId);
+    if (!Array.isArray(scope) || scope.length !== 5 || scope[0] !== "maybeclaw-v1" || scope[1] !== resolve(this.options.directory) || typeof scope[2] !== "string" || typeof scope[4] !== "string") throw new Error("来源规则不属于当前 Gateway。");
+    const agent = this.options.settings.agents.find(item => item.id === scope[2]);
+    if (!agent || agent.adapter !== "may" || agent.enabled === false || agent.permissions?.[source.toolName] === "deny") throw new Error("来源规则的 Agent 或工具权限已经失效。");
+    if (scope[3] !== (agent.readDirectory ? await realpath(agent.readDirectory) : null)) throw new Error("来源规则的项目目录已经变化。");
+    const identity: unknown = JSON.parse(scope[4]);
+    if (!Array.isArray(identity) || identity.some(value => typeof value !== "string" || !value.trim()) ||
+      !(identity.length === 2 && identity[0] === "operator" || identity.length === 3 && identity[0] === "platform")) throw new Error("来源规则的身份范围无效。");
+    if (identity[0] === "platform" && this.options.settings.access.deniedUsers.includes(`${identity[1]}:${identity[2]}`)) throw new Error("来源规则的身份权限已经撤销。");
+    const createdAt = Date.now();
+    if (source.expiresAt !== undefined && source.expiresAt <= createdAt) throw new Error("来源规则已经过期。");
+    const rule: PersistentPermissionRule = { ...source, id: randomUUID(), decision, createdAt, createdBy: actorKey(actor) };
+    await store.create(rule);
+    this.store.put("permission-rule-events", rule.id, { type: "rule.created", rule, actor, at: createdAt });
+    this.changed();
+    return rule;
+  }
   changed(): void { for (const listener of this.listeners) listener(); }
   status() { return { state: this.closing ? "stopping" : this.error ? "degraded" : "running", error: this.error,
     agents: this.options.settings.agents.map(agent => ({ id: agent.id, name: agent.name ?? agent.id, enabled: agent.enabled !== false,
@@ -419,7 +467,7 @@ export class AgentGateway {
       return { text: messages.map(message => `${message.seq} · ${message.agentId ?? message.kind}\n${message.text}`).join("\n\n") + (messages.length ? `\n/history --before ${messages[0]!.seq}` : "暂无历史。"), sessionId: session.id };
     }
     if (command === "/approve" || command === "/deny") {
-      await this.resolveApproval(words[1] ?? "", actor, command === "/deny" ? "deny" : words.includes("--session") ? "allow-session" : "allow");
+      await this.resolveApproval(words[1] ?? "", actor, command === "/deny" ? "deny" : words.includes("--persistent") ? "allow-persistent" : words.includes("--session") ? "allow-session" : "allow");
       return { text: "审批已处理。", sessionId: session.id };
     }
     if (command === "/status" || command === "/result") {
@@ -594,6 +642,7 @@ export class AgentGateway {
             },
           }] : [];
           const result = await adapter.execute({ conversationId: binding.conversationId!, inputId, input: taskInput, signal: context.signal,
+            permissionScope: JSON.stringify(actor.kind === "operator" ? ["operator", actor.id] : ["platform", actor.account, actor.userId]),
             tools, shouldYield: () => yielded,
             report: event => { context.report(event); this.onEvent(session, task, event); } });
           this.store.transaction(() => {
@@ -784,12 +833,12 @@ export class AgentGateway {
       this.store.put("bindings", id, ready); return ready;
     } catch (error) { this.store.put("bindings", id, { ...record, status: "unknown", error: safeError(error) }); throw error; }
   }
-  private requestApproval(session: GatewaySession, agentId: string, actor: GatewayActor, kind: GatewayApproval["kind"], requestId: string, text: string, taskId?: string, grantKey?: string): GatewayApproval {
+  private requestApproval(session: GatewaySession, agentId: string, actor: GatewayActor, kind: GatewayApproval["kind"], requestId: string, text: string, taskId?: string, grantKey?: string, persistent?: ApprovalRequest["persistent"]): GatewayApproval {
     const previous = this.store.list<GatewayApproval>("approvals").filter(item => item.sessionId === session.id && item.agentId === agentId && item.requestId === requestId && item.kind === kind);
     const existing = previous.find(item => item.status === "pending"); if (existing) return existing;
     const id = previous.length ? randomUUID() : digest({ session: session.id, agent: agentId, requestId, kind });
     const approval: GatewayApproval = { id, sessionId: session.id, agentId, actor, kind, requestId, text, status: "pending", createdAt: Date.now(), expiresAt: Date.now() + this.options.settings.approvalMs,
-      ...(taskId ? { taskId } : {}), ...(grantKey ? { grantKey } : {}) };
+      ...(taskId ? { taskId } : {}), ...(grantKey ? { grantKey } : {}), ...(persistent ? { persistent } : {}) };
     this.store.put("approvals", id, approval);
     this.record(session, { kind: "notice", text: `${text}\n审批：/approve ${id} 或 /deny ${id}`, agentId, ...(taskId ? { taskId } : {}) });
     return approval;
@@ -799,16 +848,18 @@ export class AgentGateway {
     this.store.put("events", id, { id, sessionId: session.id, taskId: task.id, event, at: Date.now() });
     if (event.type === "permission.event" && event.event.type === "approval.requested") {
       const request = event.event.request;
-      this.requestApproval(session, task.agentId, task.actor, "tool", request.id, `工具 ${request.tool.name} 等待审批。`, task.id, request.grantKey);
+      this.requestApproval(session, task.agentId, task.actor, "tool", request.id, `工具 ${request.tool.name} 等待审批。\n参数：${JSON.stringify(request.input)}${request.persistent ? `\n持久规则范围：${request.persistent.description}` : ""}`, task.id, request.grantKey, request.persistent);
     }
     this.changed();
   }
   async resolveApproval(id: string, actor: GatewayActor, decision: ApprovalDecision): Promise<void> {
+    if (!["allow", "allow-session", "allow-persistent", "deny"].includes(decision)) throw new TypeError("审批决定无效。");
     const approval = this.store.get<GatewayApproval>("approvals", id);
     if (!approval) throw new Error("审批请求不存在。");
     const session = this.session(approval.sessionId, actor); this.requireAdmin(session, actor);
     if (approval.status !== "pending" || approval.expiresAt <= Date.now()) throw new Error("审批已经处理或已经过期。");
     if (decision === "allow-session" && (approval.kind !== "tool" || !approval.grantKey)) throw new Error("此请求不支持持续授权。");
+    if (decision === "allow-persistent" && (actor.kind !== "operator" || !this.options.settings.persistentRules || approval.kind !== "tool" || !approval.persistent)) throw new Error("保存持久权限规则需要服务管理员权限，以及已启用的持久规则范围。");
     if (!this.canAccess(session, approval.actor)) throw new Error("请求发起者的访问权限已失效。");
     this.authorizeAgent(approval.agentId, approval.actor, session.entry, true);
     this.store.put("approvals", id, { ...approval, status: "resolving", decision, decidedBy: actor });
@@ -819,7 +870,8 @@ export class AgentGateway {
       else if (decision !== "deny") await this.binding(session, approval.agentId);
     } else {
       const binding = this.store.get<GatewayBinding>("bindings", `${session.id}:${approval.agentId}`), adapter = await this.resolveAdapter(approval.agentId);
-      if (!binding?.conversationId || !adapter.resolveApproval || !await adapter.resolveApproval(binding.conversationId, approval.requestId, decision)) throw new Error("Agent 已不再等待此审批。");
+      if (!binding?.conversationId || !adapter.resolveApproval || !await adapter.resolveApproval(binding.conversationId, approval.requestId, decision,
+        decision === "allow-persistent" ? { createdBy: actorKey(actor) } : undefined)) throw new Error("Agent 已不再等待此审批。");
     }
     this.store.put("approvals", id, { ...approval, status: decision === "deny" ? "denied" : "allowed", decision, decidedBy: actor });
     } catch (error) { this.store.put("approvals", id, { ...approval, status: "unknown", decision, decidedBy: actor }); this.changed(); throw error; }
@@ -988,6 +1040,7 @@ export class AgentGateway {
       await settle([...this.adapterClosings.values()]);
       await settle([...this.adapters].map(([id, adapter]) => this.closeAdapter(id, adapter)));
       if (this.plugins) await settle([this.plugins.then(host => host.close())]);
+      if (this.permissionStore && errors.length === 0) await settle([this.permissionStore.then(store => store.close())]);
       try { this.store.close(); } catch (error) { errors.push(error); }
       if (errors.length) throw new AggregateError([...new Set(errors)], "Gateway cleanup failed");
     })();
