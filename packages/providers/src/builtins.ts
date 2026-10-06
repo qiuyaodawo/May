@@ -42,6 +42,8 @@ import {
   tuningOption,
 } from "./options.js";
 import { ProviderAdapterRegistry } from "./registry.js";
+import type { CapabilityValidatedModelOptions } from "./capability-validated-model.js";
+import { createModelCapabilityResolver } from "./capabilities.js";
 import type {
   ProviderAdapterFactory,
   ProviderModelSelection,
@@ -60,14 +62,18 @@ const ANTHROPIC_THINKING_TYPES = new Set([
 ] as const);
 const THINKING_DISPLAYS = new Set(["summarized", "omitted"] as const);
 
-export interface BuiltinProviderAdapterRegistryOptions {
+export interface BuiltinProviderAdapterRegistryOptions extends CapabilityValidatedModelOptions {
   readonly fetch?: typeof globalThis.fetch;
 }
 
 export function createBuiltinProviderAdapterRegistry(
   options: BuiltinProviderAdapterRegistryOptions = {},
 ): ProviderAdapterRegistry {
-  const registry = new ProviderAdapterRegistry();
+  const registry = new ProviderAdapterRegistry({
+    ...options,
+    validateRequests: true,
+    resolver: options.resolver ?? createModelCapabilityResolver(options.fetch === undefined ? {} : { fetch: options.fetch }),
+  });
   const zhipu = factory((selection) => createZhipuModel(selection, options));
   registry
     .register("deepseek-chat", factory((selection) =>

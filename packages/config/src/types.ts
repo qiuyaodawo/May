@@ -4,6 +4,7 @@ export interface ProviderConfig {
   readonly apiKeyEnv?: string;
   readonly baseURL?: string;
   readonly options?: Readonly<Record<string, unknown>>;
+  readonly capabilities?: ModelCapabilitiesOverride;
 }
 
 export interface ReasoningEffortCapabilitiesOverride {
@@ -15,7 +16,21 @@ export interface ReasoningEffortCapabilitiesOverride {
 export interface ModelCapabilitiesOverride {
   /** false explicitly declares that effort-based reasoning is unsupported. */
   readonly reasoning?: false | ReasoningEffortCapabilitiesOverride;
+  readonly fields?: Readonly<Partial<Record<ModelCapabilityKey, ModelCapabilityDeclaration>>>;
 }
+
+export const MODEL_CAPABILITY_KEYS = [
+  "input.text", "input.image", "input.audio", "input.file", "input.resource",
+  "input.image.sources", "input.audio.sources", "input.file.sources",
+  "output.text", "output.image", "output.audio", "tools", "tools.maxCalls",
+  "structuredOutput.json", "structuredOutput.jsonSchema", "structuredOutput.schemaDialects",
+  "structuredOutput.schemaConstraint", "contextWindowTokens", "maxOutputTokens",
+  "maxImages", "maxAttachments", "maxAttachmentBytes", "fileTypes", "parameters",
+  "contextCompaction", "reasoning.modes",
+] as const;
+
+export type ModelCapabilityKey = typeof MODEL_CAPABILITY_KEYS[number];
+export type ModelCapabilityDeclaration = boolean | number | readonly string[] | Readonly<Record<string, unknown>>;
 
 export interface ModelProfile {
   readonly provider: string;

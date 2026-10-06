@@ -69,6 +69,7 @@ export class KimiModel implements Model {
     request: ModelRequest,
     options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
+    if (request.responseFormat !== undefined) throw new TypeError("Kimi adapter does not support responseFormat");
     const response = await this.fetchImplementation(
       `${this.baseURL}/chat/completions`,
       {

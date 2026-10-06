@@ -5,6 +5,16 @@
 MaybeCode 与 MaybeClaw 使用相同的浏览器组件和传输层，并保留各自的资源模型。
 MaybeCode 的终端界面支持通过 `/web` 打开共享工作台。
 
+MaybeCode 的模型面板显示能力值、未知与不支持状态、声明来源、查询诊断和刷新操作。
+活动 Session 的诊断面板读取可选的 observability 插件。MaybeClaw 通过
+`agent.check` 提供模型检查，通过 `session.diagnostics` 查询选中会话的诊断。
+认证与 Session 所属范围检查同样适用于诊断查询。
+
+`@may/ui-client` 导出 `createTelemetryPanel(data)`，供宿主复用。组件显示每项
+独立耗时、状态、父级 span 身份、采样选择与保留范围，并行操作的耗时分别显示。
+面板最多显示 40 条记录，宿主可以通过 diagnostics API 独立分页。参见
+[模型与遥测组合](model-telemetry-integration.md)。
+
 ## 启动
 
 在 MaybeCode 的任一种终端界面输入 `/web`，即可在默认浏览器打开当前工作区和

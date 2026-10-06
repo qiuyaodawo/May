@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
+import { isDeepStrictEqual } from "node:util";
 
 import { TaskRejectedError } from "../../dist/index.js";
 
@@ -41,7 +42,9 @@ export class DurableTaskHost extends EventEmitter {
       "SELECT task_id, request_json FROM tasks WHERE execution_id = ?",
     ).get(request.executionId);
     if (existing !== undefined) {
-      if (existing.request_json !== JSON.stringify(request)) {
+      const { telemetry: previousTelemetry, ...previous } = JSON.parse(existing.request_json);
+      const { telemetry: currentTelemetry, ...current } = request;
+      if (!isDeepStrictEqual(previous, current)) {
         throw new TaskRejectedError("The executionId already has a different request.");
       }
       return { taskId: existing.task_id };

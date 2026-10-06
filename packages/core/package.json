@@ -21,6 +21,10 @@
     "test": "pnpm run build && node --test test/*.test.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
   "engines": {
     "node": ">=22"
   },

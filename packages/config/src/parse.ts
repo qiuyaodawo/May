@@ -1,4 +1,5 @@
 import { MayConfigValidationError } from "./errors.js";
+import { MODEL_CAPABILITY_KEYS } from "./types.js";
 import type {
   ApplicationConfig,
   MayConfig,
@@ -89,7 +90,7 @@ function parseProvider(
   const provider = requireObject(value, path, field);
   rejectUnknownKeys(
     provider,
-    new Set(["adapter", "apiKey", "apiKeyEnv", "baseURL", "options"]),
+    new Set(["adapter", "apiKey", "apiKeyEnv", "baseURL", "options", "capabilities"]),
     path,
     field,
   );
@@ -115,6 +116,9 @@ function parseProvider(
     result.options = {
       ...requireObject(provider.options, path, `${field}.options`),
     };
+  }
+  if (provider.capabilities !== undefined) {
+    result.capabilities = parseModelCapabilities(provider.capabilities, path, `${field}.capabilities`);
   }
 
   if (result.apiKey !== undefined && result.apiKeyEnv !== undefined) {
@@ -202,9 +206,10 @@ function parseModelCapabilities(
   field: string,
 ): ModelCapabilitiesOverride {
   const capabilities = requireObject(value, path, field);
-  rejectUnknownKeys(capabilities, new Set(["reasoning"]), path, field);
-  if (capabilities.reasoning === undefined) return {};
-  if (capabilities.reasoning === false) return { reasoning: false };
+  rejectUnknownKeys(capabilities, new Set(["reasoning", "fields"]), path, field);
+  const fields = capabilities.fields === undefined ? undefined : parseCapabilityFields(capabilities.fields, path, `${field}.fields`);
+  if (capabilities.reasoning === undefined) return fields === undefined ? {} : { fields };
+  if (capabilities.reasoning === false) return { reasoning: false, ...(fields === undefined ? {} : { fields }) };
 
   const reasoning = requireObject(
     capabilities.reasoning,
@@ -260,11 +265,37 @@ function parseModelCapabilities(
     );
   }
   return {
+    ...(fields === undefined ? {} : { fields }),
     reasoning: {
       efforts,
       ...(defaultEffort === undefined ? {} : { defaultEffort }),
     },
   };
+}
+
+function parseCapabilityFields(value: unknown, path: string, field: string): NonNullable<ModelCapabilitiesOverride["fields"]> {
+  const fields = requireObject(value, path, field);
+  rejectUnknownKeys(fields, new Set(MODEL_CAPABILITY_KEYS), path, field);
+  for (const [key, declaration] of Object.entries(fields)) {
+    if (declaration === false) continue;
+    if (["contextWindowTokens", "maxOutputTokens", "maxImages", "maxAttachments", "maxAttachmentBytes", "tools.maxCalls"].includes(key)) {
+      requirePositiveSafeInteger(declaration, path, `${field}.${key}`);
+    } else if (key.endsWith(".sources") || key === "fileTypes" || key === "structuredOutput.schemaDialects" || key === "reasoning.modes") {
+      if (!Array.isArray(declaration) || declaration.length === 0) {
+        throw new MayConfigValidationError(path, `${field}.${key}`, "must be a non-empty array");
+      }
+      declaration.forEach((item, index) => requireNonEmptyString(item, path, `${field}.${key}.${index}`));
+      if (new Set(declaration).size !== declaration.length) throw new MayConfigValidationError(path, `${field}.${key}`, "must not contain duplicates");
+      if (key.endsWith(".sources") && declaration.some((source) => !["url", "base64", "file"].includes(source))) {
+        throw new MayConfigValidationError(path, `${field}.${key}`, "sources must be url, base64, or file");
+      }
+    } else if (key === "parameters" || key === "structuredOutput.schemaConstraint") {
+      requireObject(declaration, path, `${field}.${key}`);
+    } else if (declaration !== true) {
+      throw new MayConfigValidationError(path, `${field}.${key}`, "must be a boolean");
+    }
+  }
+  return { ...fields } as NonNullable<ModelCapabilitiesOverride["fields"]>;
 }
 
 function rejectUnknownKeys(

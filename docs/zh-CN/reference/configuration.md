@@ -134,8 +134,8 @@ MaybeCode 的模型选择器可以持久化新的 `defaultModel`。它会重新�
 
 | Adapter | 选项 |
 | --- | --- |
-| `openai-responses` | `maxOutputTokens`、`reasoningEffort`、`reasoningSummary`、`serverCompactThreshold`、`store` |
-| `openai-chat-completions` | `maxOutputTokens`、`reasoningEffort`、`store` |
+| `openai-responses` | `maxOutputTokens`、`reasoningEffort`、`reasoningSummary`、`serverCompactThreshold`、`store`、`responseFormat` |
+| `openai-chat-completions` | `maxOutputTokens`、`reasoningEffort`、`store`、`responseFormat` |
 | `deepseek-chat` | `thinking`、`reasoningEffort`、`maxTokens` |
 | `zhipu-chat` | `thinking`、`clearThinking`、`reasoningEffort`、`maxTokens` |
 | `kimi-chat` | `thinking`、`reasoningEffort`、`maxTokens` |
@@ -163,8 +163,8 @@ May 将模型 capability 与 adapter 的协议级选项校验分开解析，优�
 3. 根据厂商文档维护的 May 内置模型 catalog；
 4. 无可靠来源时为 `unknown`。
 
-标准 OpenAI `/v1/models` 响应只标识模型；May 不会根据模型名称猜测 reasoning
-等级。Provider discovery 失败时也会回退到内置 catalog 或 `unknown`。
+标准 OpenAI `/v1/models` 响应只标识模型。能力记录包含经过内容限制的 discovery
+诊断，缓存具有数量与有效时间限制，并支持显式刷新。未知字段保持 `unknown`。
 
 可在 profile 中覆盖错误或缺失的 metadata：
 
@@ -192,6 +192,79 @@ May 将模型 capability 与 adapter 的协议级选项校验分开解析，优�
 
 `defaultEffort` 必须属于 `efforts`。显式覆盖始终优先，包括优先于 provider 的增强
 catalog。
+
+模型 profile 和 provider 连接的 `capabilities` 都可以声明独立的 `fields`。
+Profile 字段覆盖模型 metadata；provider 字段限制当前连接。有效能力同时考虑
+模型、adapter 和连接。显式 `false` 表示不支持，任何层级明确不支持时，请求会在
+发送之前被拒绝。省略的连接字段不增加限制。
+
+```json
+{
+  "capabilities": {
+    "fields": {
+      "input.text": true,
+      "input.image": true,
+      "input.image.sources": ["url", "base64"],
+      "maxImages": 4,
+      "maxAttachmentBytes": 10485760,
+      "structuredOutput.jsonSchema": true,
+      "structuredOutput.schemaDialects": ["draft-07"],
+      "structuredOutput.schemaConstraint": { "type": "object" }
+    }
+  },
+  "options": {
+    "unknownCapabilityPolicy": "require-known",
+    "responseFormat": {
+      "type": "jsonSchema",
+      "name": "answer",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "properties": { "answer": { "type": "string" } },
+        "required": ["answer"],
+        "additionalProperties": false
+      }
+    }
+  }
+}
+```
+
+这个对象属于模型 profile 的部分配置。`unknownCapabilityPolicy` 默认使用
+`allow`；`require-known` 拒绝未知的请求要求。输入来源、附件大小和 MIME 限制
+分别检查；外部附件信息需要由宿主提供。`options.responseFormat` 为 OpenAI
+Responses 和 Chat Completions adapter 配置默认请求格式。支持 `json` 和
+`jsonSchema`；后者包含 `name`、`schema` 与可选的 `strict`。JSON Schema 使用
+Ajv 验证 draft-07 和 2020-12，最终响应也需要通过验证。工具调用的中间响应允许
+空正文。`structuredOutput.schemaConstraint` 可以声明 provider 支持的 Schema
+范围。
+
+其他字段包含 `input.audio`、`input.file`、`input.resource`、
+`input.audio.sources`、`input.file.sources`、`output.text`、`output.image`、
+`output.audio`、`tools`、`tools.maxCalls`、`structuredOutput.json`、
+`structuredOutput.schemaDialects`、`contextWindowTokens`、`maxOutputTokens`、
+`maxAttachments`、`fileTypes`、`parameters`、`contextCompaction` 和
+`reasoning.modes`。数字使用
+正整数上限，数组保存允许的值，`parameters` 和
+`structuredOutput.schemaConstraint` 使用同步 JSON Schema。`tools.maxCalls`
+限制单次模型响应的工具调用数量。公共 API 还提供来源、各个层级的声明、记录版本
+和时间、指定字段刷新与有数量限制的请求验证记录。全部 adapter 支持
+`unknownCapabilityPolicy`。使用 `require-known` 时，非空 provider 参数需要
+已知的 `parameters` 范围。`reasoning.modes` 保存允许的 `effort`、`budget`、
+`adaptive`、`thinking` 或 `summary` 模式。Context 校验计算输入 token 估计与
+请求的输出 token 预留量；缺少估计或预留量时报告 unknown。原生 Context
+压缩在执行前检查压缩能力和输入支持。验证记录区分 `request-accepted`、
+`response-validated` 和 `failed`，保存媒体数量、来源形式与已观测的字节范围，
+不会保存正文。
+`Model.preflight` 让 May 和 Model wrapper 在物理请求尝试和预算预留前执行请求
+校验。遭到拒绝的请求不会产生物理 attempt 记录。
+Model wrapper 的 `limits` 返回模型和连接声明中已知的最小上限。发现得到的
+限制在能力解析后可用；宿主可以在创建 ContextController 前解析能力，将结果
+用于初始预算。能力刷新不会自动修改已有的 Context 预算。profile 的输出上限
+也会作为实际输出预留量参加 preflight 校验。
+最终 JSON 或 Schema 校验失败时抛出 `ModelResponseValidationError`，其中
+`responseCompleted: true` 表示物理响应已经完成，`usage` 和 `cost` 保存接收的
+计量结果。runtime、预算和 attempt 记录保留实际用量；retry wrapper 不会重试
+这些已完成的响应。校验错误使用固定说明，不包含响应正文。
 
 初始内置 catalog 覆盖文档化的 GPT-5.6 系列和 DeepSeek V4 API model ID。
 GPT-5.6 等级来源于 [OpenAI 模型指南](https://developers.openai.com/api/docs/models/gpt)，

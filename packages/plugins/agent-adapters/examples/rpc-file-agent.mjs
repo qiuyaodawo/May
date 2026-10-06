@@ -5,6 +5,7 @@ import { createServer } from "node:net";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { AsyncStateSerializer } from "@may/application";
+import { validateTelemetryCorrelation } from "@may/core";
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node";
 
 const { values } = parseArgs({ options: { directory: { type: "string" }, workspace: { type: "string" }, socket: { type: "string" }, "no-cancel": { type: "boolean" } } });
@@ -29,9 +30,14 @@ async function exists(path) { return stat(path).then(() => true, error => { if (
 function within(path) { const result = relative(workspace, path); if (result.startsWith("..") || isAbsolute(result)) throw new Error("File is outside the configured workspace"); return path; }
 function serve(reader, writer) {
   const connection = createMessageConnection(new StreamMessageReader(reader), new StreamMessageWriter(writer));
-  connection.onRequest("gateway/initialize", ({ protocolVersion }) => {
+  let telemetryVersion;
+  connection.onRequest("gateway/initialize", request => {
+    const { protocolVersion } = request;
     if (protocolVersion !== 1) throw new Error("Unsupported protocol version");
-    return { protocolVersion: 1, capabilities: { cancel: !values["no-cancel"], steer: true, resume: true, delete: true, approvals: false, collaboration: false, media: [] }, commands: ["status", "process"] };
+    if (request.telemetryVersion !== undefined && request.telemetryVersion !== 1) throw new Error("Unsupported telemetry version");
+    telemetryVersion = request.telemetryVersion;
+    return { protocolVersion: 1, capabilities: { cancel: !values["no-cancel"], steer: true, resume: true, delete: true, approvals: false, collaboration: false, media: [] }, commands: ["status", "process"],
+      ...(telemetryVersion === undefined ? {} : { telemetryVersion }) };
   });
   connection.onRequest("conversation/create", ({ requestId }) => state.run(async () => {
     if (typeof requestId !== "string" || !requestId) throw new Error("requestId is required");
@@ -44,7 +50,11 @@ function serve(reader, writer) {
   connection.onRequest("conversation/inspectCreation", ({ requestId }) => state.run(async () => {
     const id = hash(requestId); return await exists(conversationPath(id)) ? { status: "ready", conversationId: id } : { status: "not-started" };
   }));
-  connection.onRequest("conversation/execute", async ({ conversationId, inputId, input }) => {
+  connection.onRequest("conversation/execute", async request => {
+    const { conversationId, inputId, input } = request;
+    const telemetry = request.telemetry === undefined ? undefined : validateTelemetryCorrelation(request.telemetry);
+    if (telemetry !== undefined && telemetryVersion !== 1) throw new Error("Telemetry version has not been negotiated");
+    const telemetryFields = telemetry === undefined ? {} : { telemetry };
     if (typeof inputId !== "string" || !inputId) throw new Error("inputId is required");
     const path = taskPath(conversationId, inputId), inputHash = hash(JSON.stringify(input));
     const command = JSON.parse(input.content.filter(part => part.type === "text").map(part => part.text).join("\n"));
@@ -63,7 +73,7 @@ function serve(reader, writer) {
       if (active.has(conversationId)) throw new Error("Conversation is running");
       active.set(conversationId, { inputId, controller, done });
       try {
-        await saveJsonFile(path, { inputId, inputHash, status: "running" });
+        await saveJsonFile(path, { inputId, inputHash, status: "running", ...telemetryFields });
         await updateConversation(conversationId, record => { const item = record.steering?.find(value => value.inputId === inputId); if (item) item.status = "delivered"; });
       } catch (error) { active.delete(conversationId); finish(); throw error; }
     });
@@ -79,10 +89,10 @@ function serve(reader, writer) {
       } else {
         await waitForFile(target, controller.signal); within(await realpath(target)); result = `File is available: ${command.path}`;
       }
-      await saveJson(path, { inputId, inputHash, status: "completed", text: result }); completed = true;
+      await saveJson(path, { inputId, inputHash, status: "completed", text: result, ...telemetryFields }); completed = true;
       return { text: result, runId: inputId };
     } catch (error) {
-      await saveJson(path, { inputId, inputHash, status: controller.signal.aborted ? "cancelled" : "failed", detail: error.message }); throw error;
+      await saveJson(path, { inputId, inputHash, status: controller.signal.aborted ? "cancelled" : "failed", detail: error.message, ...telemetryFields }); throw error;
     } finally {
       try {
         await changeConversation(conversationId, record => { for (const item of record.steering ?? []) if (item.status === "pending") item.status = completed ? "idle" : "cancelled"; });

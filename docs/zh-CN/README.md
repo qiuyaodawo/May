@@ -53,6 +53,7 @@ May 是一个可组合的 Agent 框架。这些文档介绍如何将各个 packa
 - [共享 Web UI](guides/web-ui.md)
 - [权限策略](guides/permission-policy.md)
 - [可观测性与 Tracing](guides/observability.md)
+- [模型能力与执行诊断](guides/model-telemetry-integration.md)
 - [MCP 工具](guides/mcp.md)
 - [MCP 认证](guides/mcp-auth.md)
 - [MCP Host 路线与验收](architecture/mcp-host-roadmap.md)

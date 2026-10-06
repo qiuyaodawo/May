@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { Model, ModelEvent, ModelStreamOptions, SerializedError } from "@may/core";
+import { ModelResponseValidationError, priceUsage, type UsageCost } from "@may/core";
 import {
   FileSharedBudget,
   type ExternalCallResult,
@@ -111,6 +112,26 @@ export class SubagentRequestLedger {
         }
         if (!concluded) await this.budget.markCallUnknown(current);
       } catch (error) {
+        if (error instanceof ModelResponseValidationError) {
+          let cost = error.cost;
+          let failure = error;
+          if (!concluded && error.usage !== undefined) {
+            try {
+              const priced = this.budget.limits.pricing !== undefined || this.budget.limits.tokenPrices !== undefined || error.usage.reportedCost !== undefined;
+              const preparedCost = priced ? cost ?? priceUsage(error.usage, this.budget.limits.pricing ?? this.budget.limits.tokenPrices) : undefined;
+              cost = preparedCost ?? cost;
+              await this.budget.settleCall(current, error.usage, preparedCost);
+              concluded = true;
+              if (priced) cost = (await this.budget.snapshot()).calls.find(call => call.id === current)?.cost;
+              failure = new ModelResponseValidationError(error.message, { cause: error, usage: error.usage, ...(cost === undefined ? {} : { cost }) });
+            } catch (accountingError) { failure = validationAccountingError(error, accountingError, cost); }
+          }
+          if (!concluded) {
+            try { await this.budget.markCallUnknown(current); }
+            catch (accountingError) { throw validationAccountingError(failure, accountingError, cost); }
+          }
+          throw failure;
+        }
         if (!concluded) await this.budget.markCallUnknown(current);
         throw error;
       }
@@ -149,6 +170,11 @@ export class SubagentRequestLedger {
     this.closed = true;
     await this.budget.close();
   }
+}
+
+function validationAccountingError(error: ModelResponseValidationError, accountingError: unknown, cost?: UsageCost): ModelResponseValidationError {
+  return new ModelResponseValidationError(error.message, { cause: new AggregateError([error, accountingError], "Model response validation and request budget accounting failed"),
+    ...(error.usage === undefined ? {} : { usage: error.usage }), ...(cost === undefined ? {} : { cost }) });
 }
 
 /**
@@ -210,7 +236,11 @@ export function withRequestBudget(
 ): Model {
   const compactor = model.contextCompactor;
   return {
-    ...(model.limits === undefined ? {} : { limits: model.limits }),
+    get limits() { return model.limits; },
+    get reportsAttempts() { return model.reportsAttempts; },
+    get capabilityVersion() { return model.capabilityVersion; },
+    get configuration() { return model.configuration; },
+    ...(model.preflight === undefined ? {} : { preflight: model.preflight.bind(model) }),
     ...(compactor === undefined ? {} : { contextCompactor: {
       name: compactor.name,
       async compact(snapshot, options) {

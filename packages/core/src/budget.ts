@@ -1,5 +1,6 @@
 import { MayError } from "./errors.js";
 import type { Usage } from "./types.js";
+import { priceUsage, resolvePriceSchedule, resolveUsageTotals, validateTokenPrices, validateUsageCost, type TokenPrices, type TokenPriceSchedule, type UsageCost, type UsagePricer } from "./pricing.js";
 
 /** Limits for one Run/continue. Token and cost limits are checked at response boundaries. */
 export interface RunBudget {
@@ -9,7 +10,9 @@ export interface RunBudget {
   readonly maxToolCalls?: number;
   readonly maxTotalTokens?: number;
   readonly maxCostUsd?: number;
-  readonly tokenPrices?: { readonly inputUsdPerMillion: number; readonly outputUsdPerMillion: number };
+  readonly tokenPrices?: TokenPrices;
+  readonly pricing?: TokenPriceSchedule;
+  readonly usagePricer?: UsagePricer;
 }
 
 export interface RunBudgetSnapshot {
@@ -20,6 +23,9 @@ export interface RunBudgetSnapshot {
   readonly totalTokens: number;
   readonly costUsd: number;
   readonly usageComplete: boolean;
+  readonly costComplete?: boolean;
+  readonly costKind?: "estimated" | "provider" | "mixed";
+  readonly latestCost?: UsageCost;
 }
 
 export class RunBudgetExceededError extends MayError {
@@ -34,26 +40,40 @@ export function resolveRunBudget(defaults?: RunBudget, override?: RunBudget): Re
     if (budget === undefined) continue;
     if (typeof budget !== "object" || budget === null || Array.isArray(budget)) throw new TypeError("runBudget must be an object");
     for (const [key, value] of Object.entries(budget)) {
-      if (key === "tokenPrices") continue;
+      if (["tokenPrices", "pricing", "usagePricer"].includes(key)) continue;
       if (!["maxDurationMs", "maxSteps", "maxModelCalls", "maxToolCalls", "maxTotalTokens", "maxCostUsd"].includes(key)) throw new TypeError(`Unknown runBudget field: ${key}`);
       if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || (key !== "maxCostUsd" && !Number.isSafeInteger(value))) throw new RangeError(`${key} must be a positive ${key === "maxCostUsd" ? "finite number" : "safe integer"}`);
       if (key === "maxDurationMs" && value > 2_147_483_647) throw new RangeError("maxDurationMs exceeds the timer limit");
     }
     if (budget.tokenPrices !== undefined) {
-      const prices = budget.tokenPrices;
-      if (typeof prices !== "object" || prices === null || Array.isArray(prices) ||
-        Object.keys(prices).some((key) => !["inputUsdPerMillion", "outputUsdPerMillion"].includes(key)) ||
-        [prices.inputUsdPerMillion, prices.outputUsdPerMillion].some((price) => typeof price !== "number" || !Number.isFinite(price) || price < 0)) throw new RangeError("tokenPrices requires finite non-negative input/output USD per million");
+      validateTokenPrices(budget.tokenPrices);
     }
+    if (budget.pricing !== undefined) resolvePriceSchedule(budget.pricing);
+    if (budget.tokenPrices !== undefined && budget.pricing !== undefined) throw new TypeError("Configure pricing or tokenPrices independently");
+    if (budget.usagePricer !== undefined && typeof budget.usagePricer !== "function") throw new TypeError("usagePricer must be a function");
   }
   const result = { ...defaults, ...override };
   for (const key of ["maxDurationMs", "maxSteps", "maxModelCalls", "maxToolCalls", "maxTotalTokens", "maxCostUsd"] as const) {
     if (defaults?.[key] !== undefined && override?.[key] !== undefined) result[key] = Math.min(defaults[key], override[key]);
   }
-  if (defaults?.tokenPrices && override?.tokenPrices && (defaults.tokenPrices.inputUsdPerMillion !== override.tokenPrices.inputUsdPerMillion || defaults.tokenPrices.outputUsdPerMillion !== override.tokenPrices.outputUsdPerMillion)) throw new Error("Per-run tokenPrices cannot override agent prices");
-  if (result.maxCostUsd !== undefined && result.tokenPrices === undefined) throw new Error("maxCostUsd requires explicit tokenPrices");
+  const defaultPrices = resolvePriceSchedule(defaults?.pricing ?? defaults?.tokenPrices);
+  const overridePrices = resolvePriceSchedule(override?.pricing ?? override?.tokenPrices);
+  if (defaultPrices !== undefined && overridePrices !== undefined && priceFingerprint(defaultPrices) !== priceFingerprint(overridePrices)) throw new Error("Per-run pricing cannot override agent prices");
+  if (defaults?.usagePricer !== undefined && override?.usagePricer !== undefined && defaults.usagePricer !== override.usagePricer) throw new Error("Per-run usagePricer cannot override agent pricing");
+  if (defaults?.pricing !== undefined && override?.tokenPrices !== undefined) delete result.tokenPrices;
+  if (defaults?.tokenPrices !== undefined && override?.pricing !== undefined) delete result.tokenPrices;
+  if (result.maxCostUsd !== undefined && result.tokenPrices === undefined && result.pricing === undefined && result.usagePricer === undefined) throw new Error("maxCostUsd requires explicit pricing, tokenPrices, or usagePricer");
+  const schedule = resolvePriceSchedule(result.pricing ?? result.tokenPrices);
+  if (result.maxCostUsd !== undefined && schedule !== undefined && schedule.currency !== "USD") throw new Error("maxCostUsd requires USD pricing");
   if (result.tokenPrices) result.tokenPrices = Object.freeze({ ...result.tokenPrices });
+  if (result.pricing) result.pricing = resolvePriceSchedule(result.pricing) as TokenPriceSchedule;
   return Object.freeze(result);
+}
+
+function priceFingerprint(pricing: Readonly<TokenPriceSchedule>): string {
+  return JSON.stringify([pricing.id, pricing.version, pricing.currency, pricing.source, pricing.effectiveAt,
+    pricing.inputPerMillion, pricing.outputPerMillion, pricing.cachedReadPerMillion, pricing.cachedWritePerMillion, pricing.reasoningPerMillion,
+    Object.entries(pricing.items ?? {}).sort(([left], [right]) => left.localeCompare(right)).map(([id, rate]) => [id, rate.unit, rate.perUnit])]);
 }
 
 export class RunBudgetMeter {
@@ -64,12 +84,17 @@ export class RunBudgetMeter {
   private totalTokens = 0;
   private costUsd = 0;
   private usageComplete = true;
+  private costComplete = true;
+  private costKind: "estimated" | "provider" | "mixed" | undefined;
+  private latestCost: UsageCost | undefined;
   constructor(readonly limits: Readonly<RunBudget>) {}
 
   snapshot(): RunBudgetSnapshot {
     return { elapsedMs: Math.max(0, Date.now() - this.startedAt), steps: this.steps,
       modelCalls: this.modelCalls, toolCalls: this.toolCalls, totalTokens: this.totalTokens,
-      costUsd: this.costUsd, usageComplete: this.usageComplete };
+      costUsd: this.costUsd, usageComplete: this.usageComplete, costComplete: this.costComplete,
+      ...(this.costKind === undefined ? {} : { costKind: this.costKind }),
+      ...(this.latestCost === undefined ? {} : { latestCost: this.latestCost }) };
   }
 
   checkTime(): void {
@@ -95,16 +120,25 @@ export class RunBudgetMeter {
     this.toolCalls += count;
   }
 
-  recordUsage(usage?: Usage): void {
-    const valid = (value: number | undefined): value is number => value !== undefined && Number.isSafeInteger(value) && value >= 0;
-    const total = valid(usage?.totalTokens) ? usage.totalTokens
-      : valid(usage?.inputTokens) && valid(usage?.outputTokens) ? usage.inputTokens + usage.outputTokens : undefined;
-    if (total === undefined) this.usageComplete = false;
-    else this.totalTokens += total;
-    const prices = this.limits.tokenPrices;
-    const priced = prices !== undefined && valid(usage?.inputTokens) && valid(usage?.outputTokens);
-    if (priced) this.costUsd += (usage.inputTokens! * prices.inputUsdPerMillion + usage.outputTokens! * prices.outputUsdPerMillion) / 1_000_000;
-    if ((this.limits.maxTotalTokens !== undefined && total === undefined) || (this.limits.maxCostUsd !== undefined && !priced)) {
+  recordUsage(usage?: Usage, preparedCost?: UsageCost): void {
+    const totals = resolveUsageTotals(usage);
+    this.usageComplete &&= totals.complete;
+    if (totals.totalTokens !== undefined) this.totalTokens += totals.totalTokens;
+    try {
+      this.latestCost = preparedCost === undefined ? priceUsage(usage, this.limits.pricing ?? this.limits.tokenPrices, this.limits.usagePricer) : validateUsageCost(preparedCost);
+    } catch (error) {
+      this.latestCost = undefined;
+      this.costComplete = false;
+      throw error;
+    }
+    const priced = this.latestCost.complete && this.latestCost.currency === "USD" && this.latestCost.amount !== undefined;
+    this.costComplete &&= priced;
+    if (priced) {
+      this.costUsd += this.latestCost.amount!;
+      this.costKind = this.costKind === undefined ? this.latestCost.kind : this.costKind === this.latestCost.kind ? this.costKind : "mixed";
+    }
+    if (!Number.isSafeInteger(this.totalTokens) || !Number.isFinite(this.costUsd)) throw new RangeError("Run budget usage exceeds the numeric range");
+    if ((this.limits.maxTotalTokens !== undefined && !totals.complete) || (this.limits.maxCostUsd !== undefined && !priced)) {
       throw new MayError("RUN_BUDGET_USAGE_UNAVAILABLE", "The model did not report the usage required to enforce this run budget");
     }
     this.check("totalTokens", this.limits.maxTotalTokens, this.totalTokens);

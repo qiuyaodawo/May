@@ -67,6 +67,7 @@ export class DeepSeekModel implements Model {
     request: ModelRequest,
     options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
+    if (request.responseFormat !== undefined) throw new TypeError("DeepSeek adapter does not support responseFormat");
     const response = await this.fetchImplementation(
       `${this.baseURL}/chat/completions`,
       {

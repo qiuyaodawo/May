@@ -76,6 +76,12 @@ May Agent 支持 `model`、`instructions`、`readDirectory`、`permissions`、`r
 和 `idleMs`。外部适配器声明创建、执行、查询、取消、补充输入、恢复、删除、审批、
 协作与媒体能力。不支持的操作返回错误。`agent check <id>` 加载适配器并显示声明
 能力；加载成功不能证明模型请求或者聊天投递已经成功。
+经过认证的 Web 命令 `agent.check` 同时显示 adapter 提供的模型能力，可以通过刷新
+操作重新查询。May adapter 的能力查询与请求验证共享 resolver。自定义 Model 插件
+或者 definition 可以提供 `MayAdapterOptions.modelCapabilities`。
+选中会话的“执行诊断”仅查询该会话已经分配的 Agent 对话，读取各 Agent 可选的
+observability service。应用释放后，其内存诊断记录也会释放。查询不会启动 Run
+或者创建新的对话。参见[模型与遥测组合](model-telemetry-integration.md)。
 Agent 状态区分 `unloaded`（尚未加载）、`loading`（正在加载）、`loaded`（已加载）、
 `unavailable`（加载失败）、`releasing`（正在释放）、`reconfiguring`（正在更新配置）
 和 `disabled`（已停用）。加载失败的状态持续显示，直到再次检查成功或者配置更新。

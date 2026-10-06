@@ -132,6 +132,7 @@ export interface AgentApplicationOptions {
   readonly providerNativeAutoCompaction?: boolean;
   readonly maxSteps?: number;
   readonly runBudget?: RunBudget;
+  readonly responseFormat?: import("@may/core").ModelResponseFormat;
   /** Add the bounded session_history tool with these optional limits. */
   readonly sessionHistory?: false | (Omit<SessionHistoryToolOptions, "source"> & {
     /** Also expose bounded content search and chunked record reads. */
@@ -369,6 +370,9 @@ export class AgentApplication implements SteerableAgentController {
     };
     const tracer: Tracer = {
       startSpan: (name, traceOptions) => sessionScope.get(applicationServices.tracer).startSpan(name, traceOptions),
+      recordMetric: record => {
+        if (sessionScope.provides(applicationServices.tracer)) sessionScope.get(applicationServices.tracer).recordMetric?.(record);
+      },
     };
     const permissions = new PermissionToolExecutor({
       ...(options.permissionRuleStore === undefined ? {} : { ruleStore: options.permissionRuleStore }),
@@ -441,7 +445,7 @@ export class AgentApplication implements SteerableAgentController {
       });
       contextController = managedContext.controller;
       const modelInfo = sessionScope.provides(applicationServices.modelInfo) ? sessionScope.get(applicationServices.modelInfo) : undefined;
-      const runtimeTraceAttributes = { ...(options.traceAttributes ?? {}) };
+      const runtimeTraceAttributes: Record<string, import("@may/core").TraceAttributeValue> = { ...(options.traceAttributes ?? {}), "may.session.id": sessionId };
       for (const key of ["may.model.provider", "may.model.name", "may.model.adapter", "may.model.profile"]) delete runtimeTraceAttributes[key];
       if (modelInfo !== undefined) {
         Object.assign(runtimeTraceAttributes, {
@@ -460,6 +464,7 @@ export class AgentApplication implements SteerableAgentController {
         hooks,
         toolExecutor: permissions,
         tracer,
+        ...(options.responseFormat === undefined ? {} : { responseFormat: options.responseFormat }),
         ...(Object.keys(runtimeTraceAttributes).length === 0
           ? {}
           : { traceAttributes: runtimeTraceAttributes }),
@@ -775,6 +780,12 @@ export class AgentApplication implements SteerableAgentController {
   getService<T>(service: ServiceToken<T>): T {
     this.throwIfClosed();
     return this.hookScope().get(service);
+  }
+
+  getOptionalService<T>(service: ServiceToken<T>): T | undefined {
+    this.throwIfClosed();
+    const scope = this.hookScope();
+    return scope.provides(service) ? scope.get(service) : undefined;
   }
 
   updatePlugins(plugins: readonly AnyPlugin[], options: PluginUpdateOptions = {}): Promise<void> {

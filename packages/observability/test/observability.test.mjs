@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -150,7 +149,9 @@ test("tracing and bounded export failures remain off the Agent failure path", as
 });
 
 test("rotates JSONL spans by local date and retains sixty calendar days", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "may-traces-"));
+  const output = join(process.cwd(), "dist", "test-output");
+  await mkdir(output, { recursive: true });
+  const directory = await mkdtemp(join(output, "may-traces-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, "traces-2026-07-05.jsonl"), "expired\n");

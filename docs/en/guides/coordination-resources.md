@@ -40,6 +40,13 @@ capacity. Settlement uses provider-reported usage and releases the unused portio
 **before** exposing `response.completed` to the Agent's tool step. Call identity is
 May's stable `modelCallId`; an already reserved id is never automatically replayed.
 
+The wrapper forwards optional `Model.preflight()` with the original Model as its
+receiver. Execution validation does not reserve budget capacity; reservations
+remain inside `stream()` when a provider request starts. The delegated request
+budget wrapper follows the same rule. Both wrappers read Model metadata through
+getters, so capability versions, configurations and limits reflect discovery and
+refresh without recreating the budget wrapper.
+
 - Put the budget wrapper at the **physical provider request boundary**, inside any
   retry wrapper, or disable hidden retries. A wrapper cannot count opaque inner
   attempts. Automatic retries using the same call identity are rejected, not free.
@@ -72,6 +79,33 @@ id must be unique per call, and a call that was already reserved is never replay
 The original per-Run budget remains independent and can further restrict each Run.
 Limits and prices must match when reopening a ledger. Stop active model calls before
 `close()`; ownership locks are never stolen automatically.
+
+`settleCall(id, usage, preparedCost?)` accepts a validated `UsageCost` already
+computed by the same pricing pipeline. It stores that receipt without invoking
+a custom pricer again. The receipt must remain consistent with the ledger's
+configured schedule and USD requirements.
+
+An invalid completed response can throw `ModelResponseValidationError` carrying
+known `usage` and `responseCompleted: true`. Both budget wrappers settle that
+usage once and keep the rejection. A priced ledger forwards its stored `cost`
+on the error for outer Run accounting; an unpriced ledger leaves the host's
+pricing available. A call already settled remains settled. Missing usage remains
+unknown, and the completed response must not be retried. If accounting also
+fails, the error's cause preserves both the response rejection and accounting
+failure.
+
+Shared budgets also accept the versioned `pricing` schedule described in
+[Run budgets](run-budgets.md). `FileSharedBudget.open(..., { usagePricer })` accepts
+the same custom pricing callback as `RunBudget`; provide it again when reopening
+or inspecting a ledger. Each settled call stores `cost`, including its amount,
+currency, estimate/provider kind, price version and completeness. `costComplete`
+is reported separately from token completeness. USD limits require complete USD
+accounting. Unknown prices keep a call unresolved, requiring host reconciliation.
+When the ledger has prices, a custom pricer or provider-reported amounts,
+`wrapModel()` forwards its stored result on `response.completed.cost`, so Run
+accounting and telemetry reuse it without calling a custom pricer again.
+`runExternal()` without provider usage charges its token/cost reservation and
+preserves an incomplete estimate. Changing price versions requires a new ledger.
 
 ## Immutable artifacts
 

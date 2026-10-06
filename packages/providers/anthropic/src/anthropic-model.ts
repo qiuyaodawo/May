@@ -91,6 +91,7 @@ export class AnthropicModel implements Model {
     request: ModelRequest,
     options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
+    if (request.responseFormat !== undefined) throw new TypeError("Anthropic adapter does not support responseFormat");
     const body = this.createRequest(request);
     const headers: Record<string, string> = {
       "anthropic-version": this.apiVersion,

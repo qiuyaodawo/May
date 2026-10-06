@@ -233,6 +233,7 @@
         "apiKey": { "$ref": "#/$defs/nonEmptyString" },
         "apiKeyEnv": { "$ref": "#/$defs/nonEmptyString" },
         "baseURL": { "$ref": "#/$defs/nonEmptyString" },
+        "capabilities": { "$ref": "#/$defs/modelCapabilities" },
         "options": {
           "type": "object",
           "description": "Adapter-specific shared options. A model profile may override them."
@@ -311,6 +312,7 @@
       "type": "object",
       "description": "Explicit model capability overrides. These take precedence over provider discovery and May's built-in catalog.",
       "properties": {
+        "fields": { "$ref": "#/$defs/capabilityFields" },
         "reasoning": {
           "oneOf": [
             { "const": false },
@@ -320,6 +322,37 @@
       },
       "additionalProperties": false
     },
+    "capabilityFields": {
+      "type": "object",
+      "propertyNames": { "enum": [
+        "input.text", "input.image", "input.audio", "input.file", "input.resource",
+        "input.image.sources", "input.audio.sources", "input.file.sources",
+        "output.text", "output.image", "output.audio", "tools", "tools.maxCalls",
+        "structuredOutput.json", "structuredOutput.jsonSchema", "structuredOutput.schemaDialects",
+        "structuredOutput.schemaConstraint", "contextWindowTokens", "maxOutputTokens", "maxImages",
+        "maxAttachments", "maxAttachmentBytes", "fileTypes", "parameters", "contextCompaction", "reasoning.modes"
+      ] },
+      "additionalProperties": { "type": "boolean" },
+      "properties": {
+        "contextWindowTokens": { "$ref": "#/$defs/capabilityLimit" },
+        "maxOutputTokens": { "$ref": "#/$defs/capabilityLimit" },
+        "maxImages": { "$ref": "#/$defs/capabilityLimit" },
+        "maxAttachments": { "$ref": "#/$defs/capabilityLimit" },
+        "maxAttachmentBytes": { "$ref": "#/$defs/capabilityLimit" },
+        "tools.maxCalls": { "$ref": "#/$defs/capabilityLimit" },
+        "input.image.sources": { "$ref": "#/$defs/capabilitySources" },
+        "input.audio.sources": { "$ref": "#/$defs/capabilitySources" },
+        "input.file.sources": { "$ref": "#/$defs/capabilitySources" },
+        "fileTypes": { "$ref": "#/$defs/capabilityStrings" },
+        "reasoning.modes": { "$ref": "#/$defs/capabilityStrings" },
+        "structuredOutput.schemaDialects": { "$ref": "#/$defs/capabilityStrings" },
+        "structuredOutput.schemaConstraint": { "oneOf": [{ "const": false }, { "type": "object" }] },
+        "parameters": { "oneOf": [{ "const": false }, { "type": "object" }] }
+      }
+    },
+    "capabilityLimit": { "oneOf": [{ "const": false }, { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }] },
+    "capabilityStrings": { "oneOf": [{ "const": false }, { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmptyString" } }] },
+    "capabilitySources": { "oneOf": [{ "const": false }, { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["url", "base64", "file"] } }] },
     "reasoningCapabilities": {
       "type": "object",
       "required": ["efforts"],
@@ -338,6 +371,8 @@
       "type": "object",
       "description": "Options are interpreted by the effective adapter. Unknown keys remain allowed for custom adapters.",
       "properties": {
+        "responseFormat": { "$ref": "#/$defs/modelResponseFormat" },
+        "unknownCapabilityPolicy": { "enum": ["allow", "require-known"] },
         "thinking": {
           "oneOf": [
             { "type": "string", "enum": ["enabled", "disabled"] },
@@ -359,6 +394,8 @@
     "openaiResponsesOptions": {
       "type": "object",
       "properties": {
+        "responseFormat": { "$ref": "#/$defs/modelResponseFormat" },
+        "unknownCapabilityPolicy": { "enum": ["allow", "require-known"] },
         "maxOutputTokens": { "$ref": "#/$defs/positiveInteger" },
         "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
         "reasoningSummary": { "type": "string", "enum": ["auto", "concise", "detailed"] },
@@ -370,6 +407,8 @@
     "openaiChatOptions": {
       "type": "object",
       "properties": {
+        "responseFormat": { "$ref": "#/$defs/modelResponseFormat" },
+        "unknownCapabilityPolicy": { "enum": ["allow", "require-known"] },
         "maxOutputTokens": { "$ref": "#/$defs/positiveInteger" },
         "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
         "store": { "type": "boolean" }
@@ -379,6 +418,7 @@
     "deepseekOptions": {
       "type": "object",
       "properties": {
+        "unknownCapabilityPolicy": { "enum": ["allow", "require-known"] },
         "thinking": { "type": "string", "enum": ["enabled", "disabled"] },
         "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
         "maxTokens": { "$ref": "#/$defs/positiveInteger" }
@@ -388,6 +428,7 @@
     "zhipuOptions": {
       "type": "object",
       "properties": {
+        "unknownCapabilityPolicy": { "enum": ["allow", "require-known"] },
         "thinking": { "type": "string", "enum": ["enabled", "disabled"] },
         "clearThinking": { "type": "boolean" },
         "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
@@ -407,6 +448,7 @@
     "kimiOptions": {
       "type": "object",
       "properties": {
+        "unknownCapabilityPolicy": { "enum": ["allow", "require-known"] },
         "thinking": { "$ref": "#/$defs/kimiThinking" },
         "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
         "maxTokens": { "$ref": "#/$defs/positiveInteger" }
@@ -445,12 +487,19 @@
     "anthropicOptions": {
       "type": "object",
       "properties": {
+        "unknownCapabilityPolicy": { "enum": ["allow", "require-known"] },
         "thinking": { "$ref": "#/$defs/anthropicThinking" },
         "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },
         "maxTokens": { "$ref": "#/$defs/positiveInteger" },
         "apiVersion": { "$ref": "#/$defs/nonEmptyString" }
       },
       "additionalProperties": false
+    },
+    "modelResponseFormat": {
+      "oneOf": [
+        { "type": "object", "properties": { "type": { "const": "json" } }, "required": ["type"], "additionalProperties": false },
+        { "type": "object", "properties": { "type": { "const": "jsonSchema" }, "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" }, "schema": { "type": "object" }, "strict": { "type": "boolean" } }, "required": ["type", "name", "schema"], "additionalProperties": false }
+      ]
     },
     "runBudget": {
       "type": "object",
@@ -466,12 +515,49 @@
           "required": ["inputUsdPerMillion", "outputUsdPerMillion"],
           "properties": {
             "inputUsdPerMillion": { "type": "number", "minimum": 0 },
-            "outputUsdPerMillion": { "type": "number", "minimum": 0 }
+            "outputUsdPerMillion": { "type": "number", "minimum": 0 },
+            "cachedReadUsdPerMillion": { "type": "number", "minimum": 0 },
+            "cachedWriteUsdPerMillion": { "type": "number", "minimum": 0 },
+            "reasoningUsdPerMillion": { "type": "number", "minimum": 0 }
           },
           "additionalProperties": false
+        },
+        "pricing": { "$ref": "#/$defs/tokenPriceSchedule" }
+      },
+      "not": { "required": ["tokenPrices", "pricing"] },
+      "if": { "required": ["maxCostUsd"] },
+      "then": {
+        "anyOf": [{ "required": ["tokenPrices"] }, { "required": ["pricing"] }],
+        "properties": { "pricing": { "properties": { "currency": { "const": "USD" } } } }
+      },
+      "additionalProperties": false
+    },
+    "tokenPriceSchedule": {
+      "type": "object",
+      "required": ["id", "version", "currency", "source", "effectiveAt", "inputPerMillion", "outputPerMillion"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "source": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "effectiveAt": { "type": "string", "format": "date-time" },
+        "inputPerMillion": { "type": "number", "minimum": 0 },
+        "outputPerMillion": { "type": "number", "minimum": 0 },
+        "cachedReadPerMillion": { "type": "number", "minimum": 0 },
+        "cachedWritePerMillion": { "type": "number", "minimum": 0 },
+        "reasoningPerMillion": { "type": "number", "minimum": 0 },
+        "items": {
+          "type": "object", "maxProperties": 64,
+          "additionalProperties": {
+            "type": "object", "required": ["unit", "perUnit"],
+            "properties": {
+              "unit": { "type": "string", "minLength": 1, "maxLength": 256 },
+              "perUnit": { "type": "number", "minimum": 0 }
+            },
+            "additionalProperties": false
+          }
         }
       },
-      "dependentRequired": { "maxCostUsd": ["tokenPrices"] },
       "additionalProperties": false
     },
     "maybecode": {

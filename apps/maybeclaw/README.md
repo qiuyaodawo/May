@@ -104,3 +104,10 @@ Current messages use `delivery retry <id> --confirm --server <url>`. The Web
 channel manager provides the same explicit confirmation. Remote Web access
 requires a configured HTTPS `server.publicOrigin` and a reverse proxy to the
 loopback listener; administrator login remains required.
+
+Web `agent.check` includes field-level model capabilities when provided by the
+adapter and offers refresh. The selected Session's diagnostic command queries
+only allocated Agent conversations. May adapters share their resolver between
+inspection and request validation, and propagate task correlation into Runs.
+See [model and telemetry integration](../../docs/en/guides/model-telemetry-integration.md)
+or [简体中文](../../docs/zh-CN/guides/model-telemetry-integration.md).

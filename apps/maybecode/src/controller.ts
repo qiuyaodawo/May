@@ -29,7 +29,7 @@ export interface MaybeCodeModelProfile {
 
 export interface MaybeCodeReasoningEffortState {
   readonly status: "known" | "unsupported" | "unknown";
-  readonly source: "user" | "provider" | "builtin" | "unknown";
+  readonly source: "user" | "provider" | "builtin" | "adapter" | "unknown";
   readonly efforts: readonly string[];
   readonly defaultEffort?: string;
   readonly effectiveEffort?: string;
@@ -142,6 +142,9 @@ export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   submitMcpResource?(serverId: string, uri: string, instruction?: string): Promise<import("./events.js").MaybeCodeRun>;
   submitMcpPrompt?(serverId: string, name: string, args?: Readonly<Record<string, string>>): Promise<import("./events.js").MaybeCodeRun>;
   listModels(): Promise<readonly MaybeCodeModelProfile[]>;
+  getModelCapabilities?(profile?: string, refresh?: boolean): Promise<import("@may/providers").ModelCapabilities>;
+  readonly modelCapabilitiesAvailable?: boolean;
+  getTelemetry?(query?: import("@may/observability").DiagnosticQuery): import("@may/observability").DiagnosticResult | undefined;
   switchModel(profile: string): Promise<MaybeCodeModelInfo>;
   /** Persist the profile used by future launches without switching models. */
   setDefaultModel(profile: string): Promise<void>;

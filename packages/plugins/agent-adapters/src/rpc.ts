@@ -3,7 +3,7 @@ import { createConnection, type Socket } from "node:net";
 import { once } from "node:events";
 import { createMessageConnection, ErrorCodes, ResponseError, StreamMessageReader, StreamMessageWriter, type MessageConnection } from "vscode-jsonrpc/node";
 import type { AgentApplicationEvent } from "@may/application";
-import { freezeToolInput, type ContentPart } from "@may/core";
+import { freezeToolInput, validateTelemetryCorrelation, type ContentPart } from "@may/core";
 import type { ApprovalDecision, PersistentApprovalOptions } from "@may/permissions";
 import type { AgentAdapterContext, AgentAdapter, AgentCapabilities, AgentTaskStatus } from "./types.js";
 
@@ -14,7 +14,7 @@ export type GatewayRpcOptions = {
 };
 interface RpcFactoryOptions { agent: { id: string }; options: Record<string, unknown> }
 interface RpcTransport { connection: MessageConnection; process?: ChildProcessWithoutNullStreams; socket?: Socket }
-interface RpcHandshake { protocolVersion: number; capabilities: AgentCapabilities; commands?: string[] }
+interface RpcHandshake { protocolVersion: number; capabilities: AgentCapabilities; commands?: string[]; telemetryVersion?: 1 }
 export class RpcOutcomeUnknownError extends Error {
   readonly outcome = "unknown";
   constructor(readonly method: string, readonly requestId?: string) { super(`RPC ${method} 的结果未能确认，请按原请求 ID 查询状态。`); }
@@ -101,13 +101,15 @@ class RpcAdapter implements AgentAdapter {
     if (!this.handshake) throw new Error("RPC handshake has not completed"); return this.handshake.capabilities;
   }
   async initialize(): Promise<void> {
-    const result = object(await this.request("gateway/initialize", { protocolVersion: 1, agentId: this.agentId }), "handshake");
+    const result = object(await this.request("gateway/initialize", { protocolVersion: 1, agentId: this.agentId, telemetryVersion: 1 }), "handshake");
     if (result.protocolVersion !== 1) throw new Error("Unsupported Gateway RPC protocol version");
+    if (result.telemetryVersion !== undefined && result.telemetryVersion !== 1) throw new Error("Unsupported Gateway RPC telemetry version");
     const capabilities = object(result.capabilities, "capabilities");
     for (const key of ["cancel", "steer", "resume", "delete", "approvals", "collaboration"] as const) if (typeof capabilities[key] !== "boolean") throw new Error(`RPC capability ${key} must be boolean`);
     if (!Array.isArray(capabilities.media) || capabilities.media.some(value => typeof value !== "string" || !["image", "audio", "file", "video"].includes(value)) || new Set(capabilities.media).size !== capabilities.media.length) throw new Error("Invalid RPC media capabilities");
     if (result.commands !== undefined && (!Array.isArray(result.commands) || result.commands.some(value => typeof value !== "string" || !value))) throw new Error("Invalid RPC commands");
-    this.handshake = { protocolVersion: 1, capabilities: Object.freeze(structuredClone(capabilities)) as unknown as AgentCapabilities, ...(result.commands ? { commands: result.commands as string[] } : {}) };
+    this.handshake = { protocolVersion: 1, capabilities: Object.freeze(structuredClone(capabilities)) as unknown as AgentCapabilities, ...(result.commands ? { commands: result.commands as string[] } : {}),
+      ...(result.telemetryVersion === undefined ? {} : { telemetryVersion: 1 }) };
   }
   async createConversation(requestId: string): Promise<string> {
     const result = object(await this.request("conversation/create", { requestId }, requestId), "created conversation"); return string(result.conversationId, "conversation ID");
@@ -120,6 +122,7 @@ class RpcAdapter implements AgentAdapter {
   }
   async execute(context: AgentAdapterContext): Promise<{ text: string; runId?: string; yielded?: boolean; content?: ContentPart[] }> {
     context.signal.throwIfAborted();
+    const telemetry = context.telemetry === undefined ? undefined : validateTelemetryCorrelation(context.telemetry);
     if (this.executions.has(context.conversationId)) throw new Error("RPC conversation is already running");
     this.cancellations.delete(context.conversationId); this.executions.set(context.conversationId, context);
     let cancellationError: unknown;
@@ -128,6 +131,7 @@ class RpcAdapter implements AgentAdapter {
     try {
       const result = object(await this.request("conversation/execute", { conversationId: context.conversationId, inputId: context.inputId, input: context.input,
         ...(context.permissionScope === undefined ? {} : { permissionScope: context.permissionScope }),
+        ...(this.handshake?.telemetryVersion !== 1 || telemetry === undefined ? {} : { telemetry }),
         tools: this.capabilities.collaboration ? context.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema })) : [] }, context.inputId, this.options.executionTimeoutMs ?? 0), "execution result");
       const cancellation = this.cancellations.get(context.conversationId); if (cancellation) await cancellation;
       if (cancellationError) throw cancellationError;

@@ -250,6 +250,17 @@ registries live in `packages/plugin-services/`; the plugin host remains in
 Existing package classes and interfaces remain available for direct integration.
 Applications retain compatible exports for extracted functionality.
 
+`@may/plugin-agent-adapters` accepts `AgentAdapterContext.telemetry` with a
+validated version 1 `TelemetryCorrelation`. Gateway RPC advertises
+`telemetryVersion: 1` in `gateway/initialize`; `conversation/execute` includes
+the separate `telemetry` envelope only when the remote confirms that version.
+Remotes omitting the response field continue receiving the original execution
+fields. Both sender and receiver validate correlation before execution, and
+business request deduplication excludes telemetry identities. The packaged
+`rpc-file-agent` example negotiates this version, saves telemetry separately
+from its input hash, and retains the original execution identity when serving
+a previously completed input.
+
 MaybeCode composes its Model, PermissionPolicy, Context, Skills, goals,
 history-memory and delegation through plugins. MCP commands, catalogs and events
 use the active Application's `mcpService`. Application-owned pools start and close

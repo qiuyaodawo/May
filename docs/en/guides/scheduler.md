@@ -146,10 +146,26 @@ The store contains plaintext task and event data. Use host access controls and
 retain backups. Execution, event deduplication and deleted-ID records are retained;
 storage retention and archival are host operational responsibilities.
 
-There is no dependency from Core, Session or Application to this component.
-The release package list for this change is `@may/scheduler`, version `0.1.0`
-with a minor feature changeset. Runtime dependencies are `cron-parser` and
-`luxon`; version preparation and publication require separate user instructions.
+Core, Session and Application do not depend on this component. Scheduler uses
+Core's optional telemetry API alongside `cron-parser` and `luxon`. Publication
+and version preparation require separate user instructions.
+
+## Execution diagnostics
+
+`Scheduler.open({ store, dispatcher, tracer, telemetry })` accepts an optional
+Core `Tracer` and a validated `TelemetryCorrelation` with `version: 1`.
+Enabling either option adds `request.telemetry.schedulerExecutionId` to each
+task submission. A tracer also creates `may.scheduler.submit` and propagates
+its parent context. The span measures task acceptance; task execution has its
+own child spans in the host. Pass the envelope into `CoordinationRuntime` or
+an Agent adapter to associate task, Session, Run and provider attempts.
+
+Each repeated submission creates a new diagnostic span. The host must compare
+task identity using the execution ID and business fields, excluding the
+`telemetry` envelope from its deduplication fingerprint. Correlation metadata
+does not change the accepted task, its payload, or its execution identity.
+The scheduler does not persist trace spans. Retention belongs to the telemetry
+component. See [model and telemetry integration](model-telemetry-integration.md).
 
 ## Verification
 

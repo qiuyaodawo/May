@@ -4,6 +4,7 @@ import type {
   ModelRequest,
   ModelStreamOptions,
 } from "@may/core";
+import { assertModelResponseFormat, validateStructuredModelResponse } from "@may/core";
 
 import {
   toOpenAICompatibleMessages,
@@ -43,6 +44,7 @@ interface OpenAIChatCompletionsRequest {
   max_completion_tokens?: number;
   reasoning_effort?: OpenAIChatCompletionsReasoningEffort;
   store?: boolean;
+  response_format?: Readonly<Record<string, unknown>>;
 }
 
 export class OpenAIChatCompletionsModel implements Model {
@@ -85,6 +87,7 @@ export class OpenAIChatCompletionsModel implements Model {
     request: ModelRequest,
     options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
+    assertModelResponseFormat(request);
     const response = await this.fetchImplementation(
       `${this.baseURL}/chat/completions`,
       {
@@ -100,7 +103,7 @@ export class OpenAIChatCompletionsModel implements Model {
 
     if (!response.ok) throw await createApiError(response);
 
-    yield* streamOpenAICompatibleResponse(response, {
+    for await (const event of streamOpenAICompatibleResponse(response, {
       signal: options.signal,
       providerName: "OpenAI-compatible chat",
       requireDone: true,
@@ -108,7 +111,10 @@ export class OpenAIChatCompletionsModel implements Model {
         new OpenAIChatCompletionsProtocolError(message, errorOptions),
       finishReasonError: (finishReason) =>
         new OpenAIChatCompletionsFinishReasonError(finishReason),
-    });
+    })) {
+      if (event.type === "response.completed") validateStructuredModelResponse(event.message, request, event);
+      yield event;
+    }
   }
 
   private createRequest(request: ModelRequest): OpenAIChatCompletionsRequest {
@@ -128,6 +134,12 @@ export class OpenAIChatCompletionsModel implements Model {
       body.reasoning_effort = this.reasoningEffort;
     }
     if (this.store !== undefined) body.store = this.store;
+    if (request.responseFormat !== undefined) {
+      const format = request.responseFormat;
+      body.response_format = format.type === "json"
+        ? { type: "json_object" }
+        : { type: "json_schema", json_schema: { name: format.name, schema: format.schema, ...(format.strict === undefined ? {} : { strict: format.strict }) } };
+    }
     return body;
   }
 }

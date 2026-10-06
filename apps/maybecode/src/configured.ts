@@ -35,6 +35,7 @@ import { services } from "@may/plugin-services";
 import { createMaybeCodeResourcePlugins, createMaybeCodeSharedPlugins } from "./plugins/resources.js";
 import {
   createModelCapabilityResolver,
+  createBuiltinProviderAdapterRegistry,
   type ModelCapabilityResolver,
   type ProviderAdapterRegistry,
   withModelRetry,
@@ -198,6 +199,7 @@ export async function openConfiguredMaybeCode(
   const runBudget = resolveRunBudget(options.runBudget ?? config.apps?.maybecode?.runBudget as RunBudget | undefined);
   const capabilityResolver = dependencies.capabilityResolver ??
     createModelCapabilityResolver();
+  const adapterRegistry = dependencies.adapterRegistry ?? createBuiltinProviderAdapterRegistry({ resolver: capabilityResolver });
   const selectionFor = (profile?: string): SelectedMaybeCodeModel =>
     selectMaybeCodeModel(config, {
       ...(profile === undefined ? {} : { model: profile }),
@@ -212,7 +214,7 @@ export async function openConfiguredMaybeCode(
       options: { ...selected.options, ...runtimeOptions },
     };
     const baseModel = dependencies.createModel === undefined
-      ? createMaybeCodeModel(selection, dependencies.adapterRegistry)
+      ? createMaybeCodeModel(selection, adapterRegistry)
       : dependencies.createModel(selection);
     const model = retry === false ? baseModel : withModelRetry(baseModel, retry);
     const contextBudget = options.contextBudget ?? createContextBudget(
@@ -364,7 +366,7 @@ export async function openConfiguredMaybeCode(
       modelProfiles,
       ...(pluginModel ? {} : {
         createModelConfiguration: (profile: string, runtimeOptions?: Readonly<Record<string, unknown>>) => configureModel(profile, runtimeOptions),
-        resolveModelCapabilities: async (profile: string) => capabilityResolver.resolve(selectionFor(profile)),
+        resolveModelCapabilities: async (profile: string, options?: { readonly refresh?: boolean }) => capabilityResolver.resolve(selectionFor(profile), options),
       }),
       ...resolveDefaultModelPersistence(config, dependencies),
       store: new FileSessionStore(join(dataDirectory, "sessions")),

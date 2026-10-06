@@ -153,13 +153,24 @@ export function parseUsage(value: unknown): Usage | undefined {
   const inputTokens = optionalTokenCount(usage.input_tokens, "input_tokens");
   const outputTokens = optionalTokenCount(usage.output_tokens, "output_tokens");
   const totalTokens = optionalTokenCount(usage.total_tokens, "total_tokens");
-  if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined) {
+  const inputDetails = optionalRecord(usage.input_tokens_details);
+  const outputDetails = optionalRecord(usage.output_tokens_details);
+  const cachedReadTokens = optionalTokenCount(inputDetails?.cached_tokens, "input_tokens_details.cached_tokens");
+  const reasoningTokens = optionalTokenCount(outputDetails?.reasoning_tokens, "output_tokens_details.reasoning_tokens");
+  if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined && cachedReadTokens === undefined && reasoningTokens === undefined) {
     return undefined;
   }
   return {
     ...(inputTokens === undefined ? {} : { inputTokens }),
     ...(outputTokens === undefined ? {} : { outputTokens }),
     ...(totalTokens === undefined ? {} : { totalTokens }),
+    ...(cachedReadTokens === undefined ? {} : { cachedReadTokens }),
+    ...(reasoningTokens === undefined ? {} : { reasoningTokens }),
+    ...(cachedReadTokens === undefined && reasoningTokens === undefined ? {} : { tokenRelations: {
+      ...(cachedReadTokens === undefined ? {} : { cachedRead: "input" as const }),
+      ...(reasoningTokens === undefined ? {} : { reasoning: "output" as const }),
+    } }),
+    ...(inputTokens === undefined || outputTokens === undefined ? { completeness: { status: "partial" as const, reason: "provider-token-components-missing" } } : {}),
   };
 }
 

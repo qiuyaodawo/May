@@ -645,6 +645,7 @@ export class AgentGateway {
             },
           }] : [];
           const result = await adapter.execute({ conversationId: binding.conversationId!, inputId, input: taskInput, signal: context.signal,
+            ...(execution.telemetry === undefined ? {} : { telemetry: execution.telemetry }),
             permissionScope: JSON.stringify(actor.kind === "operator" ? ["operator", actor.id] : ["platform", actor.account, actor.userId]),
             tools, shouldYield: () => yielded,
             report: event => { context.report(event); this.onEvent(session, task, event); } });

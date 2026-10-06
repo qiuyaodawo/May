@@ -1,5 +1,5 @@
 import type { AgentApplication } from "@may/application";
-import type { UserMessage } from "@may/core";
+import { correlationTraceAttributes, type UserMessage } from "@may/core";
 import type { SessionContinueOptions, SessionEvent, SessionSubmitOptions } from "@may/session";
 import {
   coordinationInput,
@@ -102,6 +102,10 @@ export function createAttachedApplicationAgent(
       const application = options.attach(execution);
       applications.set(sessionId, application);
       const { input: _input, inputId: _inputId, ...rest } = declared;
+      if (execution.telemetry !== undefined) {
+        if (execution.telemetry.parent !== undefined) rest.traceContext = execution.telemetry.parent;
+        rest.traceAttributes = { ...rest.traceAttributes, ...correlationTraceAttributes(execution.telemetry) };
+      }
       const signal = declared.signal === undefined
         ? context.signal
         : AbortSignal.any([declared.signal, context.signal]);

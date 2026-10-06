@@ -8,6 +8,12 @@ completion and validation is available at
 [`may-config.schema.json`](./may-config.schema.json) and is exported as
 `@may/config/schema`.
 
+Model profiles and provider connections accept `capabilities.reasoning` and
+field-level `capabilities.fields`. Profile fields describe model support;
+connection fields express restrictions. Model options support
+`unknownCapabilityPolicy` and OpenAI `responseFormat` defaults. See the
+configuration reference for field types and request validation behavior.
+
 ```json
 {
   "defaultModel": "deepseek-reasoner",

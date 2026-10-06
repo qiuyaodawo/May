@@ -47,6 +47,24 @@ const result = await run.result;
 `May` consumes and snapshots the tool iterable in its constructor. Later
 changes to the source iterable do not change an existing runtime.
 
+`MayOptions.responseFormat` supplies a provider-neutral JSON or JSON Schema
+format to each `ModelRequest`. `assertModelResponseFormat()` validates schema
+configuration before adapter execution, and `validateStructuredModelResponse()`
+validates the final response through Ajv. Intermediate tool-call responses
+allow empty bodies. Supported local schema dialects are draft-07 and 2020-12.
+`validateStructuredModelResponse(message, request, receipt)` accepts optional
+Usage/cost receipts. Invalid final JSON or schema results throw
+`ModelResponseValidationError`, whose `responseCompleted`, `usage`, and `cost`
+preserve physical completion and accounting while the response remains failed.
+Validation messages contain fixed descriptions; malformed JSON content is not
+included in the error or its cause. Retry wrappers treat these responses as
+completed attempts.
+`Model.configuration` and `capabilityVersion` optionally expose safe model
+configuration and the capability snapshot used by instrumentation.
+`Model.preflight(request, options)` optionally validates a request before May
+starts a physical attempt. Retry and budget wrappers preserve this operation;
+validation failures produce zero attempt records and reservations.
+
 ## Runtime and lifecycle Hooks
 
 `AgentRuntime` defines the runtime operations consumed by Session: `run()`,

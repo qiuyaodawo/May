@@ -98,6 +98,14 @@ the supported recovery/control contract.
 
 Further guides (English / 简体中文):
 
+`CoordinationRuntime` accepts optional `tracer` and versioned `telemetry`.
+Each dispatch propagates task, coordination and dispatch IDs plus its trace
+parent into ApplicationAgent and attached applications. Remote workers validate
+the envelope and require supplied IDs to match execution identity; business
+request fingerprints exclude telemetry. See
+[model and telemetry integration](../../docs/en/guides/model-telemetry-integration.md) /
+[模型与遥测组合](../../docs/zh-CN/guides/model-telemetry-integration.md).
+
 - [Resources](../../docs/en/guides/coordination-resources.md) / [共享资源](../../docs/zh-CN/guides/coordination-resources.md)
 - [Attempts and graph revisions](../../docs/en/guides/coordination-lifecycle.md) / [Attempt 与任务图修订](../../docs/zh-CN/guides/coordination-lifecycle.md)
 - [Remote workers](../../docs/en/guides/coordination-remote.md) / [远程 Worker](../../docs/zh-CN/guides/coordination-remote.md)

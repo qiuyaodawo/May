@@ -5,6 +5,19 @@
 MaybeCode and MaybeClaw share browser components and transport while retaining
 their own resource models. MaybeCode terminal frontends open the workbench with `/web`.
 
+The MaybeCode model panel exposes capability values, unknown or unsupported
+states, declaration sources, discovery diagnostics, and a refresh action.
+The active Session's diagnostics panel reads the optional observability plugin.
+MaybeClaw provides model inspection through `agent.check` and diagnostics for
+the selected Session through `session.diagnostics`. Authentication and Session
+ownership checks also apply to diagnostic reads.
+
+`@may/ui-client` exports `createTelemetryPanel(data)` for hosts to reuse. It
+shows individual durations, status, parent span identities, sampling selection,
+and retention coverage. Parallel span durations remain separate. The panel is
+limited to 40 records; hosts can page the diagnostics API independently. See
+[model and telemetry integration](model-telemetry-integration.md).
+
 ## Run
 
 In either MaybeCode terminal frontend, enter `/web` to open the current workspace

@@ -42,6 +42,7 @@
     "@may/plugin-coordination": "workspace:*",
     "@may/plugin-delivery": "workspace:*",
     "@may/plugin-models": "workspace:*",
+    "@may/plugin-observability": "workspace:*",
     "@may/plugin-permissions": "workspace:*",
     "@may/plugin-runtime": "workspace:*",
     "@may/plugin-services": "workspace:*",

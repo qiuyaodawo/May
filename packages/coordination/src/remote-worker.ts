@@ -3,7 +3,7 @@ import { mkdir, open, readFile, unlink, type FileHandle } from "node:fs/promises
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { AsyncStateSerializer, type AgentApplicationEvent } from "@may/application";
-import { isStreamingMayEvent } from "@may/core";
+import { isStreamingMayEvent, validateTelemetryCorrelation } from "@may/core";
 import type { ApprovalDecision } from "@may/permissions";
 import type { CoordinationAgent, TaskExecution, TaskRecovery } from "./types.js";
 import { canonical, copy, freeze, name, positive, validateOutput } from "./validation.js";
@@ -180,6 +180,12 @@ export class CoordinationWorker {
     if (!dispatch || typeof dispatch !== "object") throw new Error("Invalid dispatch");
     name(dispatch.agent, "worker agent"); const execution = dispatch.execution, task = execution?.task;
     name(execution?.coordinationId, "coordination id");
+    if (execution.telemetry !== undefined) {
+      const telemetry = validateTelemetryCorrelation(execution.telemetry);
+      for (const [key, actual] of [["taskId", task?.id], ["coordinationId", execution.coordinationId], ["dispatchId", task?.dispatchId]] as const) {
+        if (telemetry[key] !== undefined && telemetry[key] !== actual) throw new Error(`Telemetry ${key} does not match execution identity`);
+      }
+    }
     for (const key of ["id", "agent", "agentVersion", "sessionId", "dispatchId"] as const) name(task?.[key], key);
     if (typeof task.input !== "string" || !Number.isSafeInteger(task.turn ?? 0) || (task.turn ?? 0) < 0 || !Array.isArray(execution.dependencies)) throw new Error("Invalid execution");
     if (this.agents.get(dispatch.agent)?.version !== task.agentVersion) throw new Error("Remote agent version mismatch");
@@ -381,7 +387,8 @@ function dispatchId(execution: TaskExecution): string {
 }
 function fingerprint(dispatch: Dispatch): string {
   const { status: _status, detail: _detail, cancelRequested: _cancel, output: _output, ...task } = dispatch.execution.task;
-  return createHash("sha256").update(canonical({ agent: dispatch.agent, execution: { ...dispatch.execution, task } })).digest("hex");
+  const { telemetry: _telemetry, ...execution } = dispatch.execution;
+  return createHash("sha256").update(canonical({ agent: dispatch.agent, execution: { ...execution, task } })).digest("hex");
 }
 function validateOutcome(outcome: TaskRecovery): TaskRecovery {
   if (!outcome || !["not-started", "completed", "failed", "cancelled", "recovery-required"].includes(outcome.status)) throw new Error("Invalid remote outcome");

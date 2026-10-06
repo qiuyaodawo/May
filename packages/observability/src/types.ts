@@ -52,3 +52,20 @@ export interface TraceSamplingInput {
 export type TraceSampler = (input: TraceSamplingInput) => boolean;
 
 export type ObservabilityErrorHandler = (error: unknown) => void;
+
+export interface StartedTraceSpan {
+  readonly name: string;
+  readonly context: TraceContext;
+  readonly parentSpanId?: string;
+  readonly startTime: number;
+  readonly attributes: TraceAttributes;
+}
+
+export interface SpanObserver {
+  onStart(span: StartedTraceSpan): void;
+  onEnd(span: FinishedTraceSpan): void;
+}
+
+export interface MetricRecorder {
+  record(record: import("@may/core").MetricRecord): void;
+}

@@ -1,5 +1,10 @@
 # @may/application
 
+`AgentApplication.getOptionalService(token)` 查询已经提供的 plugin service，
+缺失时返回 `undefined`。`responseFormat` 配置 Core 的统一结构化输出。
+tracer 转发独立指标，并为 Run 关联 Session ID。参见
+[模型能力与执行诊断](../../docs/zh-CN/guides/model-telemetry-integration.md)。
+
 `defineAgent(options)` 保存可复用的 Agent 配置，`agent.open({ store, ... })`
 创建或恢复一个 Session。`AgentApplication.open()` 支持直接使用相同配置。
 `submit()`、`continue()`、`retry()`、`steer()` 和 `startSteeringInput()`

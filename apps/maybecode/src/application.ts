@@ -466,6 +466,7 @@ export class MaybeCodeApplication {
 
   getGoal() { return this.goals?.getGoal(); }
   getService<T>(service: ServiceToken<T>): T { return this.application.getService(service); }
+  getOptionalService<T>(service: ServiceToken<T>): T | undefined { return this.application.getOptionalService(service); }
   startGoal(objective: string, budget?: GoalBudget) { return this.requireGoals().start(objective, budget); }
   resumeGoal() { return this.requireGoals().resume(); }
   pauseGoal() { return this.requireGoals().pause(); }

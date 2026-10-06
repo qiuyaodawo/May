@@ -14,7 +14,11 @@ import type {
   TraceIdGenerator,
   TraceSampler,
   TraceSpanEventData,
+  SpanObserver,
+  MetricRecorder,
 } from "./types.js";
+import { boundedAttributes, telemetryLimits, type TelemetryLimits } from "./limits.js";
+import { SpanMetrics } from "./metrics.js";
 
 export interface BasicTracerOptions {
   readonly processor: SpanProcessor;
@@ -23,6 +27,9 @@ export interface BasicTracerOptions {
   readonly clock?: () => number;
   readonly idGenerator?: TraceIdGenerator;
   readonly onError?: ObservabilityErrorHandler;
+  readonly metrics?: MetricRecorder;
+  readonly observer?: SpanObserver;
+  readonly limits?: TelemetryLimits;
 }
 
 /**
@@ -36,6 +43,9 @@ export class BasicTracer implements Tracer {
   private readonly clock: () => number;
   private readonly idGenerator: TraceIdGenerator;
   private readonly onError: ObservabilityErrorHandler | undefined;
+  private readonly metrics: MetricRecorder | undefined;
+  private readonly observers: readonly SpanObserver[];
+  private readonly limits: Required<TelemetryLimits>;
 
   constructor(options: BasicTracerOptions) {
     if (typeof options !== "object" || options === null) {
@@ -45,6 +55,7 @@ export class BasicTracer implements Tracer {
       throw new TypeError("BasicTracer requires a SpanProcessor");
     }
     this.processor = options.processor;
+    this.limits = telemetryLimits(options.limits);
     this.resourceAttributes = snapshotAttributes(
       options.resourceAttributes ?? {},
     );
@@ -52,16 +63,21 @@ export class BasicTracer implements Tracer {
     this.clock = options.clock ?? Date.now;
     this.idGenerator = options.idGenerator ?? randomTraceIdGenerator;
     this.onError = options.onError;
+    this.metrics = options.metrics;
+    this.observers = [options.observer, options.metrics === undefined ? undefined : new SpanMetrics(options.metrics)].filter((value): value is SpanObserver => value !== undefined);
   }
+
+  recordMetric(record: import("@may/core").MetricRecord): void { this.metrics?.record(record); }
 
   startSpan(name: string, options: TraceSpanStartOptions = {}): TraceSpan {
     if (typeof name !== "string" || name.trim() === "") {
       throw new TypeError("span name must be a non-empty string");
     }
-    const attributes = snapshotAttributes({
+    if (name.length > 128) throw new RangeError("Span name exceeds limit");
+    const attributes = boundedAttributes({
       ...this.resourceAttributes,
       ...(options.attributes ?? {}),
-    });
+    }, this.limits);
     const traceId = options.parent?.traceId ?? this.idGenerator.generateTraceId();
     const spanId = this.idGenerator.generateSpanId();
     const samplingContext: TraceContext = { traceId, spanId };
@@ -86,6 +102,8 @@ export class BasicTracer implements Tracer {
       sampled,
       processor: this.processor,
       clock: this.clock,
+      observers: this.observers,
+      limits: this.limits,
       ...(this.onError === undefined ? {} : { onError: this.onError }),
     });
   }
@@ -100,6 +118,8 @@ interface BasicTraceSpanOptions {
   readonly processor: SpanProcessor;
   readonly clock: () => number;
   readonly onError?: ObservabilityErrorHandler;
+  readonly observers: readonly SpanObserver[];
+  readonly limits: Required<TelemetryLimits>;
 }
 
 class BasicTraceSpan implements TraceSpan {
@@ -115,6 +135,8 @@ class BasicTraceSpan implements TraceSpan {
   private readonly attributes: Record<string, import("@may/core").TraceAttributeValue>;
   private readonly events: TraceSpanEventData[] = [];
   private ended = false;
+  private readonly observers: readonly SpanObserver[];
+  private readonly limits: Required<TelemetryLimits>;
 
   constructor(options: BasicTraceSpanOptions) {
     this.name = options.name;
@@ -126,33 +148,39 @@ class BasicTraceSpan implements TraceSpan {
     this.onError = options.onError;
     this.startTime = options.clock();
     this.attributes = { ...options.attributes };
+    this.observers = options.observers;
+    this.limits = options.limits;
+    for (const observer of this.observers) {
+      try { observer.onStart({ name: this.name, context: this.context, startTime: this.startTime, attributes: options.attributes, ...(this.parentSpanId === undefined ? {} : { parentSpanId: this.parentSpanId }) }); }
+      catch (error) { reportError(this.onError, error); }
+    }
   }
 
   setAttributes(attributes: TraceAttributes): void {
-    if (this.ended || !this.sampled) return;
-    Object.assign(this.attributes, snapshotAttributes(attributes));
+    if (this.ended) return;
+    Object.assign(this.attributes, boundedAttributes({ ...this.attributes, ...attributes }, this.limits));
   }
 
   addEvent(name: string, attributes: TraceAttributes = {}): void {
-    if (this.ended || !this.sampled) return;
-    if (typeof name !== "string" || name.trim() === "") {
+    if (this.ended) return;
+    if (typeof name !== "string" || name.trim() === "" || name.length > 128) {
       throw new TypeError("span event name must be a non-empty string");
     }
     this.events.push(Object.freeze({
       name,
       timestamp: this.clock(),
-      attributes: snapshotAttributes(attributes),
+      attributes: boundedAttributes(attributes, this.limits),
     }));
+    if (this.events.length > this.limits.maxEvents) this.events.shift();
   }
 
   end(options: TraceSpanEndOptions = {}): void {
     if (this.ended) return;
-    this.ended = true;
-    if (!this.sampled) return;
 
     if (options.attributes !== undefined) {
-      Object.assign(this.attributes, snapshotAttributes(options.attributes));
+      Object.assign(this.attributes, boundedAttributes({ ...this.attributes, ...options.attributes }, this.limits));
     }
+    this.ended = true;
     const endTime = this.clock();
     const status = options.status ?? (options.error === undefined ? "ok" : "error");
     const span: FinishedTraceSpan = Object.freeze({
@@ -172,6 +200,10 @@ class BasicTraceSpan implements TraceSpan {
         : { error: Object.freeze({ ...options.error }) }),
     });
 
+    for (const observer of this.observers) {
+      try { observer.onEnd(span); } catch (error) { reportError(this.onError, error); }
+    }
+    if (!this.sampled) return;
     try {
       this.processor.onEnd(span);
     } catch (error) {
@@ -224,6 +256,6 @@ function reportError(
   try {
     handler?.(error);
   } catch {
-    // Observability error reporting is fail-open too.
+    // 遥测错误处理器失败时保持 Agent 执行。
   }
 }

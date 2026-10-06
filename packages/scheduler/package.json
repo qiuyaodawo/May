@@ -16,7 +16,7 @@
     "test:live": "pnpm run build && node test/live-timer.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
-  "dependencies": { "cron-parser": "^5.6.0", "luxon": "^3.7.2" },
+  "dependencies": { "@may/core": "workspace:*", "cron-parser": "^5.6.0", "luxon": "^3.7.2" },
   "devDependencies": { "@types/node": "^22.0.0", "@types/luxon": "^3.7.1" },
   "engines": { "node": ">=22.16.0" },
   "license": "MIT"

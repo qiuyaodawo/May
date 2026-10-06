@@ -1,5 +1,6 @@
 import type { AgentDefinition, AgentApplication } from "@may/application";
 import type { SessionStore } from "@may/session";
+import { correlationTraceAttributes } from "@may/core";
 import { digest } from "@may/plugin-delivery";
 import type { AgentAdapter, AgentAdapterContext } from "./types.js";
 
@@ -9,6 +10,8 @@ export interface MayAgentAdapterOptions {
   readonly definition: (tools: () => AgentAdapterContext["tools"], context: () => AgentAdapterContext | undefined) => AgentDefinition | Promise<AgentDefinition>;
   readonly media?: readonly string[];
   readonly metadata?: (conversationId: string) => Record<string, unknown>;
+  readonly diagnostics?: (application: AgentApplication, query?: { readonly limit?: number; readonly offset?: number }) => unknown;
+  readonly modelCapabilities?: AgentAdapter["modelCapabilities"];
 }
 export function createMayAgentAdapter(options: MayAgentAdapterOptions): AgentAdapter {
   const store = options.store;
@@ -38,7 +41,12 @@ export function createMayAgentAdapter(options: MayAgentAdapterOptions): AgentAda
     try { return await work; } finally { opening.delete(id); }
   }
   return {
+    ...(options.modelCapabilities === undefined ? {} : { modelCapabilities: options.modelCapabilities }),
     capabilities: { cancel: true, steer: true, resume: true, delete: store.delete !== undefined, approvals: true, collaboration: true, media: [...(options.media ?? [])] },
+    ...(options.diagnostics === undefined ? {} : { diagnostics: (id: string, query?: { readonly limit?: number; readonly offset?: number }) => {
+      const application = opened.get(id)?.app;
+      return application === undefined ? undefined : options.diagnostics!(application, query);
+    } }),
     async createConversation(requestId) {
       const id = digest({ agent: options.agentId, requestId });
       await open(id); return id;
@@ -54,7 +62,10 @@ export function createMayAgentAdapter(options: MayAgentAdapterOptions): AgentAda
       if (prior.status !== "not-started") throw new Error("该输入已经提交，请查询原执行结果。");
       record.context = context;
       try {
-        const run = await app.submit({ input: context.input, inputId: context.inputId, signal: context.signal, shouldYield: context.shouldYield });
+        const run = await app.submit({ input: context.input, inputId: context.inputId, signal: context.signal, shouldYield: context.shouldYield,
+          ...(context.telemetry?.parent === undefined ? {} : { traceContext: context.telemetry.parent }),
+          ...(context.telemetry === undefined ? {} : { traceAttributes: correlationTraceAttributes(context.telemetry) }),
+        });
         const result = await run.result;
         return { text: result.message.content.filter(part => part.type === "text").map(part => part.text).join(""),
           runId: result.runId, content: result.message.content.filter(part => part.type !== "reasoning"), ...(result.finishReason === "yielded" ? { yielded: true } : {}) };

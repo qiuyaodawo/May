@@ -113,6 +113,11 @@ export class MaybeCodeWebCommands {
       if (command.name === "permission.set") {
         commandArgs(command, ["value"]); await this.app.setPermissionMode(parsePermissionMode(command.args.value));
         return { output: { title: "Permissions", text: this.app.permissionMode === "yolo" ? "YOLO enabled" : "YOLO disabled" } };
+      } else if (command.name === "model.capabilities.refresh") {
+        commandArgs(command, []);
+        if (!this.app.getModelCapabilities || this.app.modelCapabilitiesAvailable === false) throw new UiError(400, "模型能力查询不可用。");
+        await this.app.getModelCapabilities(undefined, true);
+        this.changed();
       } else if (command.name === "model.switch") {
         commandArgs(command, ["value"]); await this.app.switchModel(command.args.value!);
       } else if (command.name === "effort.set") {

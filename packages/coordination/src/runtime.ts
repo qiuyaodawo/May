@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AsyncStateSerializer } from "@may/application";
-import { AsyncEventQueue } from "@may/core";
+import { AsyncEventQueue, correlationTraceAttributes, endTraceSpan, startTraceSpan, validateTelemetryCorrelation, type TelemetryCorrelation, type Tracer } from "@may/core";
 import type { ApprovalDecision } from "@may/permissions";
 import type {
   CoordinationAgent, CoordinationEvent, CoordinationJournal, CoordinationLimits, CoordinationPolicy,
@@ -9,6 +9,8 @@ import type {
 import { canonical, copy, freeze, limits, name, validateGraph, validateHandoff, validateMessage, validateOutput, validateSnapshot } from "./validation.js";
 
 export interface CoordinationRuntimeOptions {
+  readonly tracer?: Tracer;
+  readonly telemetry?: TelemetryCorrelation;
   readonly id: string;
   readonly store: CoordinationStore;
   readonly agents: Readonly<Record<string, CoordinationAgent>>;
@@ -40,6 +42,8 @@ export class CoordinationRuntime {
   private readonly waiters = new Set<{ resolve: (snapshot: CoordinationSnapshot) => void; reject: (error: Error) => void }>();
   private readonly agents: ReadonlyMap<string, CoordinationAgent>;
   private readonly policy: CoordinationPolicy;
+  private readonly tracer: Tracer | undefined;
+  private readonly telemetry: TelemetryCorrelation | undefined;
   private state: CoordinationSnapshot;
   private started = false;
   private closing = false;
@@ -48,6 +52,8 @@ export class CoordinationRuntime {
   private deadline: ReturnType<typeof setTimeout> | undefined;
 
   private constructor(options: CoordinationRuntimeOptions, private readonly journal: CoordinationJournal, state: CoordinationSnapshot) {
+    this.tracer = options.tracer;
+    this.telemetry = options.telemetry === undefined ? undefined : validateTelemetryCorrelation(options.telemetry);
     this.state = freeze(copy(state));
     // Snapshot callbacks as well as versions; registry mutation cannot change live authority.
     this.agents = new Map(Object.entries(options.agents).map(([key, agent]) => [key, Object.freeze({
@@ -373,7 +379,14 @@ export class CoordinationRuntime {
   private launch(task: CoordinationTask): void {
     const controller = new AbortController();
     const agent = this.agents.get(task.agent)!;
-    const execution = this.execution(task);
+    const baseExecution = this.execution(task);
+    const span = startTraceSpan(this.tracer, "may.coordination.dispatch", {
+      ...(this.telemetry?.parent === undefined ? {} : { parent: this.telemetry.parent }),
+      attributes: { ...correlationTraceAttributes(baseExecution.telemetry!), "may.task.turn": task.turn ?? 0 },
+    });
+    const execution = { ...baseExecution, telemetry: {
+      ...baseExecution.telemetry!, ...(span === undefined ? {} : { parent: span.context }),
+    } };
     const done = Promise.resolve().then(async () => {
       let outcome: TaskRecovery;
       try {
@@ -397,6 +410,8 @@ export class CoordinationRuntime {
           status: controller.signal.aborted ? "cancelled" : "failed", detail: `Execution stopped before any durable input was submitted: ${message(error)}`,
         };
       }
+      endTraceSpan(span, { status: outcome.status === "failed" || outcome.status === "recovery-required" ? "error" : outcome.status === "cancelled" ? "cancelled" : "ok",
+        attributes: { "may.task.outcome": outcome.status } });
       await this.serial.run(async () => {
         try { if (!this.fatal) await this.applyRecovery(task.id, outcome, false); }
         finally { this.active.delete(task.id); }
@@ -408,6 +423,7 @@ export class CoordinationRuntime {
 
   private execution(task: CoordinationTask): TaskExecution {
     return freeze(copy({ coordinationId: this.state.id, task,
+      telemetry: { ...this.telemetry, version: 1, taskId: task.id, coordinationId: this.state.id, dispatchId: task.dispatchId },
       dependencies: task.dependsOn.map((id) => ({ taskId: id, output: this.task(id).output! })),
       messages: (this.state.messages ?? []).filter((message) => task.inbox?.includes(message.id)),
       ...(task.wakeFrom === undefined ? {} : { wakeResults: task.wakeFrom.map((id) => {

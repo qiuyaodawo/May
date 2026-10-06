@@ -5,9 +5,18 @@ import type { FinishedTraceSpan, SpanExporter } from "./types.js";
 
 export class InMemorySpanExporter implements SpanExporter {
   private readonly spans: FinishedTraceSpan[] = [];
+  private dropped = 0;
+  constructor(private readonly maxSpans = 2_048) {
+    if (!Number.isSafeInteger(maxSpans) || maxSpans < 1) throw new RangeError("maxSpans must be positive");
+  }
+  get droppedSpans(): number { return this.dropped; }
 
   export(spans: readonly FinishedTraceSpan[]): void {
-    this.spans.push(...spans);
+    const omitted = Math.max(0, spans.length - this.maxSpans);
+    this.dropped += omitted;
+    this.spans.push(...spans.slice(omitted));
+    const excess = Math.max(0, this.spans.length - this.maxSpans);
+    if (excess > 0) { this.spans.splice(0, excess); this.dropped += excess; }
   }
 
   getFinishedSpans(): readonly FinishedTraceSpan[] {

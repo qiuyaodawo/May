@@ -253,6 +253,11 @@ older JSONL events are retained as an auditable full history.
 
 ## Current scope
 
+Continuation creates a fresh Run identity and records `may.run.resumed_from`
+from the latest observed Run. Reopening a Session reconstructs that reference
+from durable history. Trace records remain optional operational data; Session
+history continues to determine execution and recovery state.
+
 Awaited tool checkpoints and conservative interruption recovery are implemented.
 Unknown external outcomes require `listRecoveries()` / `resolveRecovery()` before
 continuation. A persistence failure requires reopening the Session. File stores

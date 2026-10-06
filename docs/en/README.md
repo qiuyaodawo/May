@@ -55,6 +55,7 @@ interfaces are intended for extension.
 - [Shared Web UI](guides/web-ui.md)
 - [Permission policy](guides/permission-policy.md)
 - [Observability and tracing](guides/observability.md)
+- [Model capabilities and execution diagnostics](guides/model-telemetry-integration.md)
 - [MCP tools](guides/mcp.md)
 - [MCP authentication](guides/mcp-auth.md)
 - [MCP Host roadmap](architecture/mcp-host-roadmap.md)

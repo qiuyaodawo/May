@@ -36,6 +36,12 @@ misfire rules, restart recovery, SQLite ownership and verification commands.
 
 Node.js >=22.16.0 is required. Public entry points are `@may/scheduler` and
 `@may/scheduler/sqlite-store`. The release package list for this component is
-explicitly `@may/scheduler`; its runtime dependencies are `cron-parser` and
-`luxon`. `pnpm test:package:scheduler` installs the packed package into a consumer
+explicitly `@may/scheduler`; its runtime dependencies are `@may/core`,
+`cron-parser` and `luxon`. `pnpm test:package:scheduler` installs the packed package into a consumer
 outside the repository and verifies those dependencies.
+
+Optional `tracer` and versioned `telemetry` options associate scheduler submission
+with host task execution. Enabled submissions carry validated correlation and
+the scheduler execution identity. Repeated submissions create fresh spans; hosts
+exclude `request.telemetry` from business deduplication fingerprints. See the
+bilingual scheduler guide for ownership and propagation.

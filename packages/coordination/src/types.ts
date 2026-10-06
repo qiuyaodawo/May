@@ -151,6 +151,7 @@ export interface CoordinationSnapshot {
 }
 
 export interface TaskExecution {
+  readonly telemetry?: import("@may/core").TelemetryCorrelation;
   readonly coordinationId: string;
   readonly task: CoordinationTask;
   readonly dependencies: readonly { readonly taskId: string; readonly output: TaskOutput }[];

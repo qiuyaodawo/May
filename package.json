@@ -21,6 +21,7 @@
     "test:package:plugin": "node scripts/test-plugin-package.mjs",
     "test:package:scheduler": "node scripts/test-scheduler-package.mjs",
     "test:integration:scheduler": "pnpm build && node scripts/test-scheduler-agent.mjs",
+    "test:integration:model-telemetry": "pnpm build && node scripts/test-model-telemetry-live.mjs",
     "may": "pnpm run build && node apps/cli/dist/bin.js",
     "maybecode": "pnpm run build && node apps/maybecode/dist/bin.js",
     "maybeclaw": "pnpm run build && node apps/maybeclaw/dist/bin.js",

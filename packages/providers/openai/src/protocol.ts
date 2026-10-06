@@ -13,4 +13,6 @@ export interface OpenAIResponsesUsage {
   readonly input_tokens?: number;
   readonly output_tokens?: number;
   readonly total_tokens?: number;
+  readonly input_tokens_details?: { readonly cached_tokens?: number };
+  readonly output_tokens_details?: { readonly reasoning_tokens?: number };
 }

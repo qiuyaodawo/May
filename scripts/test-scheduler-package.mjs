@@ -15,12 +15,14 @@ if (relative(await realpath(repository), await realpath(destination)).startsWith
 if (!relative(await realpath(repository), await realpath(consumer)).startsWith("..")) throw new Error("The consumer must be outside the repository");
 
 await runPnpm(["--filter", "@may/scheduler", "build"], repository);
-const packages = ["@may/scheduler"];
-const { version } = JSON.parse(await readFile(join(repository, "packages/scheduler/package.json"), "utf8"));
+const packages = ["@may/core", "@may/scheduler"];
+const versions = new Map();
+for (const name of packages) versions.set(name, JSON.parse(await readFile(join(repository, `packages/${name.slice(5)}/package.json`), "utf8")).version);
 for (const name of packages) await runPnpm(["--filter", name, "pack", "--pack-destination", packs], repository);
 await copyFile(join(repository, "packages/scheduler/test/consumer/package.json"), join(consumer, "package.json"));
 await copyFile(join(repository, "packages/scheduler/test/consumer/index.mjs"), join(consumer, "index.mjs"));
-await runPnpm(["add", join(packs, `may-scheduler-${version}.tgz`), "--ignore-scripts"], consumer);
+await runPnpm(["config", "set", "overrides", JSON.stringify({ "@may/core": `file:${join(packs, `may-core-${versions.get("@may/core")}.tgz`).replaceAll("\\", "/")}` }), "--json", "--location", "project"], consumer);
+await runPnpm(["add", ...packages.map(name => join(packs, `${name.replace("@", "").replace("/", "-")}-${versions.get(name)}.tgz`)), "--ignore-scripts"], consumer);
 await run(process.execPath, [join(consumer, "index.mjs")], consumer);
 console.log(`Verified ${packages.join(", ")} and its installed runtime dependencies`);
 console.log(`External consumer: ${consumer}`);

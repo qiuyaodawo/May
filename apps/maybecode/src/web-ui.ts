@@ -1,5 +1,5 @@
 import { ApplicationUiHost, type ApplicationUiOptions } from "@may/ui-client/application";
-import { UiError } from "@may/ui-client";
+import { UiError, createTelemetryPanel } from "@may/ui-client";
 import { startUiServer } from "@may/ui-client/server";
 import { webUiAssets } from "@may/web-ui/assets";
 import type { MaybeCodeController } from "./controller.js";
@@ -20,6 +20,7 @@ export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<A
     } } : {}),
     product: { id: "maybecode", title: "MaybeCode", resourceKind: "session", subtitle: "围绕你的代码工作。查看工具执行，在关键操作前确认，让每一步都有迹可循。", suggestions: ["介绍这个项目的结构", "检查当前工作区的改动", "帮我定位一个问题"] },
     commands: ["model.switch", "effort.set", "permission.set",
+      ...(app.getModelCapabilities && app.modelCapabilitiesAvailable !== false ? ["model.capabilities.refresh"] : []),
       ...(app.forkSession ? ["session.fork"] : []), ...(app.getChanges ? ["changes.view"] : []),
       ...(app.getWorktrees ? ["worktree.open", "worktree.delete"] : []),
       ...(app.previewRestore && app.restoreFiles ? ["changes.restore.preview", "changes.restore.apply"] : [])],
@@ -47,6 +48,8 @@ export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<A
     panels: async () => [
       { id: "permissions", title: "Permissions", fields: [{ label: "Mode", value: app.permissionMode === "yolo" ? "YOLO · Auto-approve" : "Default" }] },
       { id: "model", title: "模型", fields: [{ label: "当前模型", value: app.modelInfo?.model ?? "未知" }, { label: "Provider", value: app.modelInfo?.provider ?? "未知" }] },
+      ...(app.getModelCapabilities && app.modelCapabilitiesAvailable !== false ? [{ id: "model-capabilities", title: "模型能力", fields: capabilityFields(await app.getModelCapabilities()), actions: [{ label: "刷新能力信息", command: "model.capabilities.refresh", args: {} }] }] : []),
+      ...(app.getTelemetry ? [createTelemetryPanel(app.getTelemetry({ limit: 40 }))] : []),
       { id: "subagents", title: "子 Agent", ...subagentPanel(app) },      { id: "recovery", title: "恢复", fields: [{ label: "待处理项", value: String(app.listRecoveries?.().length ?? 0) }, { label: "处理方式", value: "使用 /recovery 查看证据并记录核查结果。" }] },
       ...(app.getGoal ? [{ id: "goal", title: "目标", fields: [{ label: "状态", value: formatGoal(app.getGoal()) }] }] : []),
       ...(options.terminal ? [{ id: "terminal", title: "终端", fields: [{ label: "共享会话", value: "MCP 交互可以在终端或当前页面处理。退出宿主会关闭 Web 服务。" }] }] : []),
@@ -54,6 +57,15 @@ export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<A
     execute: command => commands.execute(command),
   });
   return host;
+}
+
+function capabilityFields(capabilities: import("@may/providers").ModelCapabilities): { label: string; value: string }[] {
+  const names: Record<string, string> = { "input.text": "文本输入", "input.image": "图片输入", "input.audio": "音频输入", "input.file": "文件输入", "output.text": "文本输出", "output.image": "图片输出", "output.audio": "音频输出", tools: "工具调用", "structuredOutput.json": "JSON 输出", "structuredOutput.jsonSchema": "JSON Schema", contextCompaction: "Context 压缩" };
+  return [...Object.entries(capabilities.fields ?? {}).slice(0, 40).map(([key, field]) => ({
+    label: names[key] ?? key,
+    value: field!.status === "unknown" ? "能力未知" : field!.status === "unsupported" ? `不支持 · ${field!.source}` : `${JSON.stringify(field!.value)} · ${field!.source}`,
+  })), ...(capabilities.version === undefined ? [] : [{ label: "能力版本", value: capabilities.version }]),
+  ...(capabilities.diagnostics?.map(item => ({ label: item.discovery, value: `${item.code} · ${new Date(item.observedAt).toISOString()}` })) ?? [])];
 }
 
 /** 活动请求的子任务树，条目数量有界，适合面板布局。 */

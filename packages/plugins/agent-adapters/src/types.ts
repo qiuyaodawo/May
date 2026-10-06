@@ -8,12 +8,15 @@ export interface AgentCapabilities {
   approvals: boolean; collaboration: boolean; media: readonly string[];
 }
 export interface AgentAdapterContext {
+  readonly telemetry?: import("@may/core").TelemetryCorrelation;
   conversationId: string; inputId: string; input: UserMessage; signal: AbortSignal;
   tools: readonly Tool[]; shouldYield: () => boolean; report: (event: AgentApplicationEvent) => void;
   readonly permissionScope?: string;
 }
 export interface AgentAdapter {
   readonly capabilities: AgentCapabilities;
+  modelCapabilities?(refresh?: boolean): Promise<unknown>;
+  diagnostics?(conversationId: string, query?: { readonly limit?: number; readonly offset?: number }): unknown;
   createConversation(requestId: string): Promise<string>;
   inspectCreation?(requestId: string): Promise<{ status: "not-started" | "ready" | "unknown"; conversationId?: string }>;
   execute(context: AgentAdapterContext): Promise<{ text: string; runId?: string; yielded?: boolean; content?: ContentPart[] }>;

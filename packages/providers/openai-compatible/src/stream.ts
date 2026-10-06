@@ -56,7 +56,7 @@ export async function* streamOpenAICompatibleResponse(
       );
     }
 
-    if (chunk.usage) usage = convertUsage(chunk.usage);
+    if (chunk.usage) usage = convertUsage(chunk.usage, options);
 
     for (const choice of chunk.choices ?? []) {
       if (choice.index !== 0) continue;
@@ -224,16 +224,42 @@ function parseToolInput(input: string, options: OpenAICompatibleStreamOptions): 
 
 function convertUsage(
   usage: NonNullable<OpenAICompatibleChunk["usage"]>,
+  options: OpenAICompatibleStreamOptions,
 ): Usage {
   const converted: Usage = {};
+  const token = (value: unknown, field: string): number | undefined => {
+    if (value === undefined) return undefined;
+    if (!Number.isSafeInteger(value) || (value as number) < 0) throw options.protocolError(`${options.providerName} usage.${field} must be a non-negative safe integer`);
+    return value as number;
+  };
   if (usage.prompt_tokens !== undefined) {
-    converted.inputTokens = usage.prompt_tokens;
+    converted.inputTokens = token(usage.prompt_tokens, "prompt_tokens")!;
   }
   if (usage.completion_tokens !== undefined) {
-    converted.outputTokens = usage.completion_tokens;
+    converted.outputTokens = token(usage.completion_tokens, "completion_tokens")!;
   }
   if (usage.total_tokens !== undefined) {
-    converted.totalTokens = usage.total_tokens;
+    converted.totalTokens = token(usage.total_tokens, "total_tokens")!;
   }
+  const cachedReadTokens = token(usage.prompt_tokens_details?.cached_tokens ?? usage.prompt_cache_hit_tokens, "cached_tokens");
+  const cachedWriteTokens = token(usage.prompt_tokens_details?.cache_write_tokens, "cache_write_tokens");
+  const reasoningTokens = token(usage.completion_tokens_details?.reasoning_tokens, "reasoning_tokens");
+  if (cachedReadTokens !== undefined) converted.cachedReadTokens = cachedReadTokens;
+  if (cachedWriteTokens !== undefined) converted.cachedWriteTokens = cachedWriteTokens;
+  if (reasoningTokens !== undefined) converted.reasoningTokens = reasoningTokens;
+  if (cachedReadTokens !== undefined || cachedWriteTokens !== undefined || reasoningTokens !== undefined) converted.tokenRelations = {
+    ...(cachedReadTokens === undefined ? {} : { cachedRead: "input" }),
+    ...(cachedWriteTokens === undefined ? {} : { cachedWrite: "input" }),
+    ...(reasoningTokens === undefined ? {} : { reasoning: "output" }),
+  };
+  const items: NonNullable<Usage["items"]>[number][] = [];
+  const cachedMiss = token(usage.prompt_cache_miss_tokens, "prompt_cache_miss_tokens");
+  if (cachedMiss !== undefined && cachedReadTokens !== undefined && converted.inputTokens !== undefined && cachedReadTokens + cachedMiss !== converted.inputTokens) throw options.protocolError(`${options.providerName} cache token counts do not match prompt_tokens`);
+  for (const [id, value] of [["input-audio", usage.prompt_tokens_details?.audio_tokens], ["output-audio", usage.completion_tokens_details?.audio_tokens]] as const) {
+    const quantity = token(value, id);
+    if (quantity !== undefined && quantity > 0) items.push({ id, quantity, unit: "tokens", includedIn: id === "input-audio" ? "input" : "output" });
+  }
+  if (items.length > 0) converted.items = items;
+  if (converted.inputTokens === undefined || converted.outputTokens === undefined) converted.completeness = { status: "partial", reason: "provider-token-components-missing" };
   return converted;
 }

@@ -61,6 +61,9 @@ export async function* streamAnthropicResponse(
   let stopReason: string | undefined;
   let inputTokens: number | undefined;
   let outputTokens: number | undefined;
+  let cachedReadTokens: number | undefined;
+  let cachedWriteTokens: number | undefined;
+  const usageItems = new Map<string, NonNullable<Usage["items"]>[number]>();
 
   for await (const data of readSseData(
     response,
@@ -84,6 +87,9 @@ export async function* streamAnthropicResponse(
       const usage = optionalRecord(message.usage);
       inputTokens = optionalTokenCount(usage?.input_tokens);
       outputTokens = optionalTokenCount(usage?.output_tokens);
+      cachedReadTokens = optionalTokenCount(usage?.cache_read_input_tokens);
+      cachedWriteTokens = optionalTokenCount(usage?.cache_creation_input_tokens);
+      collectUsageItems(usage, usageItems);
       sawMessageStart = true;
       continue;
     }
@@ -174,6 +180,9 @@ export async function* streamAnthropicResponse(
       const usage = optionalRecord(event.usage);
       inputTokens = optionalTokenCount(usage?.input_tokens) ?? inputTokens;
       outputTokens = optionalTokenCount(usage?.output_tokens) ?? outputTokens;
+      cachedReadTokens = optionalTokenCount(usage?.cache_read_input_tokens) ?? cachedReadTokens;
+      cachedWriteTokens = optionalTokenCount(usage?.cache_creation_input_tokens) ?? cachedWriteTokens;
+      collectUsageItems(usage, usageItems);
       continue;
     }
 
@@ -230,7 +239,7 @@ export async function* streamAnthropicResponse(
     type: "response.completed",
     message,
   };
-  const usage = createUsage(inputTokens, outputTokens);
+  const usage = createUsage(inputTokens, outputTokens, cachedReadTokens, cachedWriteTokens, [...usageItems.values()]);
   if (usage !== undefined) completed.usage = usage;
   yield completed;
 }
@@ -443,21 +452,46 @@ function requireIndex(value: unknown): number {
 }
 
 function optionalTokenCount(value: unknown): number | undefined {
-  return Number.isSafeInteger(value) && (value as number) >= 0
-    ? value as number
-    : undefined;
+  if (value === undefined) return undefined;
+  if (!Number.isSafeInteger(value) || (value as number) < 0) throw new AnthropicProtocolError("Anthropic usage token count must be a non-negative safe integer");
+  return value as number;
 }
 
 function createUsage(
   inputTokens: number | undefined,
   outputTokens: number | undefined,
+  cachedReadTokens: number | undefined,
+  cachedWriteTokens: number | undefined,
+  items: readonly NonNullable<Usage["items"]>[number][],
 ): Usage | undefined {
-  if (inputTokens === undefined && outputTokens === undefined) return undefined;
+  if (inputTokens === undefined && outputTokens === undefined && cachedReadTokens === undefined && cachedWriteTokens === undefined) return undefined;
   const usage: Usage = {};
   if (inputTokens !== undefined) usage.inputTokens = inputTokens;
   if (outputTokens !== undefined) usage.outputTokens = outputTokens;
+  if (cachedReadTokens !== undefined) usage.cachedReadTokens = cachedReadTokens;
+  if (cachedWriteTokens !== undefined) usage.cachedWriteTokens = cachedWriteTokens;
+  if (items.length > 0) usage.items = items;
+  if (cachedReadTokens !== undefined || cachedWriteTokens !== undefined) usage.tokenRelations = {
+    ...(cachedReadTokens === undefined ? {} : { cachedRead: "total" }),
+    ...(cachedWriteTokens === undefined ? {} : { cachedWrite: "total" }),
+  };
   if (inputTokens !== undefined && outputTokens !== undefined) {
-    usage.totalTokens = inputTokens + outputTokens;
+    usage.totalTokens = inputTokens + outputTokens + (cachedReadTokens ?? 0) + (cachedWriteTokens ?? 0);
   }
+  if (inputTokens === undefined || outputTokens === undefined) usage.completeness = { status: "partial", reason: "provider-token-components-missing" };
   return usage;
+}
+
+function collectUsageItems(usage: Record<string, unknown> | undefined, items: Map<string, NonNullable<Usage["items"]>[number]>): void {
+  if (usage === undefined) return;
+  const cache = usage.cache_creation === undefined || usage.cache_creation === null ? undefined : requireRecord(usage.cache_creation, "usage.cache_creation");
+  for (const [field, id] of [["ephemeral_5m_input_tokens", "cache-write-5m"], ["ephemeral_1h_input_tokens", "cache-write-1h"]] as const) {
+    const quantity = optionalTokenCount(cache?.[field]);
+    if (quantity !== undefined) items.set(id, { id, quantity, unit: "tokens", includedIn: "cachedWrite" });
+  }
+  const server = usage.server_tool_use === undefined || usage.server_tool_use === null ? undefined : requireRecord(usage.server_tool_use, "usage.server_tool_use");
+  for (const [field, id] of [["web_search_requests", "web-search"], ["web_fetch_requests", "web-fetch"]] as const) {
+    const quantity = optionalTokenCount(server?.[field]);
+    if (quantity !== undefined) items.set(id, { id, quantity, unit: "requests", includedIn: "none" });
+  }
 }

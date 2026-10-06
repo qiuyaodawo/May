@@ -1,6 +1,7 @@
 import type { Model } from "@may/core";
 
 import { ProviderAdapterRegistryError } from "./errors.js";
+import { createCapabilityValidatedModel, type CapabilityValidatedModelOptions } from "./capability-validated-model.js";
 import type {
   ProviderAdapterFactory,
   ProviderModelSelection,
@@ -8,6 +9,8 @@ import type {
 
 export class ProviderAdapterRegistry {
   private readonly factories = new Map<string, ProviderAdapterFactory>();
+
+  constructor(private readonly validationOptions: CapabilityValidatedModelOptions & { readonly validateRequests?: boolean } = {}) {}
 
   register(name: string, factory: ProviderAdapterFactory): this {
     validateAdapterName(name);
@@ -45,7 +48,10 @@ export class ProviderAdapterRegistry {
             : `; available adapters: ${available.join(", ")}`),
       );
     }
-    return factory.create(selection);
+    const model = factory.create(selection);
+    return this.validationOptions.validateRequests === true
+      ? createCapabilityValidatedModel(model, selection, this.validationOptions)
+      : model;
   }
 }
 

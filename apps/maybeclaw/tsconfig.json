@@ -17,6 +17,7 @@
     { "path": "../../packages/plugins/coordination" },
     { "path": "../../packages/plugins/delivery" },
     { "path": "../../packages/plugins/models" },
+    { "path": "../../packages/plugins/observability" },
     { "path": "../../packages/plugins/permissions" },
     { "path": "../../packages/plugins/runtime" },
     { "path": "../../packages/plugin-services" },

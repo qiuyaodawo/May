@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { correlationTraceAttributes, validateTelemetryCorrelation, startTraceSpan, endTraceSpan, traceError, type TelemetryCorrelation, type Tracer } from "@may/core";
 
 import { latestTime, nextTime } from "./triggers.js";
 import {
@@ -46,6 +47,8 @@ class SchedulerConflictError extends Error {}
 export class Scheduler {
   private readonly store: SchedulerStore;
   private readonly dispatcher: TaskDispatcher;
+  private readonly tracer: Tracer | undefined;
+  private readonly telemetry: TelemetryCorrelation | undefined;
   private readonly maxConcurrentSubmissions: number;
   private readonly onError: ((error: unknown) => void) | undefined;
   private mutationQueue: Promise<void> = Promise.resolve();
@@ -85,6 +88,8 @@ export class Scheduler {
     this.store = options.store;
     if (activeStores.has(this.store)) throw new Error("Scheduler store is already in use");
     this.dispatcher = options.dispatcher;
+    this.tracer = options.tracer;
+    this.telemetry = options.telemetry === undefined ? undefined : validateTelemetryCorrelation(options.telemetry);
     this.maxConcurrentSubmissions = concurrency;
     this.onError = options.onError;
     this.storage(() => this.store.transaction(() => {
@@ -457,18 +462,26 @@ export class Scheduler {
       }, true);
       if (!claimed.submit) return claimed.record;
       const record = claimed.record;
+      const correlation: TelemetryCorrelation = { ...this.telemetry, version: 1, schedulerExecutionId: id };
+      const span = startTraceSpan(this.tracer, "may.scheduler.submit", {
+        ...(correlation.parent === undefined ? {} : { parent: correlation.parent }),
+        attributes: { ...correlationTraceAttributes(correlation), "may.scheduler.job_id": record.job.id, "may.scheduler.job_revision": record.job.revision },
+      });
       let taskId: string;
       try {
         const result = await this.dispatcher.submit(cloneJson({
           executionId: id,
           handler: record.job.task.handler,
           payload: record.job.task.payload,
+          ...(this.tracer === undefined && this.telemetry === undefined ? {} : { telemetry: { ...correlation, ...(span === undefined ? {} : { parent: span.context }) } }),
           ...(record.scheduledAt === undefined ? {} : { scheduledAt: record.scheduledAt }),
           ...(record.event === undefined ? {} : { event: record.event }),
         }));
         validateId(result.taskId);
         taskId = result.taskId;
+        endTraceSpan(span, { status: "ok", attributes: { "may.task.id": taskId } });
       } catch (error) {
+        endTraceSpan(span, { status: "error", error: traceError(error) });
         if (!(error instanceof TaskRejectedError)) {
           this.running = false;
           this.accepting = false;

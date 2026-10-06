@@ -125,9 +125,22 @@ SQLite adapter 使用 `node:sqlite`、数据库身份和版本验证、WAL 及 F
 文件。存储包含明文任务和事件内容，应使用宿主访问控制并保存备份。
 执行记录、事件去重记录和已经删除的 ID 持续保存，宿主管理归档与存储容量。
 
-Core、Session 和 Application 不依赖本组件。这次新增组件的发布 package 列表为
-`@may/scheduler`，初始版本 `0.1.0`，功能 Changeset 使用 minor。运行时依赖是
-`cron-parser` 和 `luxon`。版本准备和发布分别需要用户指令。
+Core、Session 和 Application 不依赖本组件。Scheduler 使用 Core 的可选遥测 API，
+并依赖 `cron-parser` 和 `luxon`。版本准备和发布分别需要用户指令。
+
+## 执行诊断
+
+`Scheduler.open({ store, dispatcher, tracer, telemetry })` 接受可选的 Core
+`Tracer` 和经过验证的 `TelemetryCorrelation`，其中 `version` 必须为 `1`。
+启用任意选项后，每次任务提交都会提供 `request.telemetry.schedulerExecutionId`。
+配置 tracer 后还会创建 `may.scheduler.submit` 并传递其父级身份。该记录测量任务
+接受过程，宿主中的任务执行使用独立子级记录。将关联信息传入 `CoordinationRuntime`
+或者 Agent adapter，可以连接任务、Session、Run 与 provider 请求尝试。
+
+重复提交每次都会创建新的诊断记录。宿主依据 execution ID 与业务字段判定相同任务，
+计算去重标识时排除 `telemetry`。关联信息不会改变已接受的任务、payload 或执行
+身份。Scheduler 不保存 trace span，保留范围由遥测组件管理。参见
+[模型与遥测组合](model-telemetry-integration.md)。
 
 ## 验证
 

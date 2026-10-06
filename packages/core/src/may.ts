@@ -6,6 +6,7 @@ import {
   HookExecutionError,
   MaxStepsExceededError,
   ModelProtocolError,
+  ModelResponseValidationError,
   RunCancelledError,
   RunCheckpointError,
   ToolNotFoundError,
@@ -21,7 +22,7 @@ import {
   type RunResult,
   type SerializedError,
 } from "./events.js";
-import type { Model, ModelRequest } from "./model.js";
+import type { Model, ModelRequest, ModelResponseFormat } from "./model.js";
 import { runtimeHooks, RUNTIME_HOOKS, type HookContext, type HookDefinition, type HookDispatcher } from "./hooks.js";
 import { DEFAULT_RUNTIME_DESCRIPTOR, type AgentRuntime } from "./runtime.js";
 import { jsonEqual } from "./json-equal.js";
@@ -38,6 +39,7 @@ import { ToolRegistry } from "./tool-registry.js";
 import {
   addTraceEvent,
   endTraceSpan,
+  setTraceAttributes,
   startTraceSpan,
   traceError,
   type TraceAttributes,
@@ -45,6 +47,8 @@ import {
   type TraceSpan,
   type Tracer,
 } from "./tracing.js";
+import { createModelAttemptObserver } from "./telemetry.js";
+import { aggregateUsage as mergeUsage, resolveUsageTotals, type UsageCost } from "./pricing.js";
 import {
   textContent,
   toolCancellationMessage,
@@ -60,6 +64,7 @@ import {
 
 export interface MayOptions {
   model: Model;
+  responseFormat?: ModelResponseFormat;
   hooks?: HookDispatcher;
   tools?: Iterable<Tool>;
   /** Additional trusted host tools, captured exactly once at each Run/continue start. */
@@ -135,6 +140,7 @@ export class May implements AgentRuntime {
   readonly supportedHooks = RUNTIME_HOOKS;
   private readonly hooks: HookDispatcher | undefined;
   private readonly model: Model;
+  private readonly responseFormat: ModelResponseFormat | undefined;
   private readonly context: Context;
   private readonly tools: ToolRegistry;
   private readonly toolSource: MayOptions["toolSource"];
@@ -163,6 +169,7 @@ export class May implements AgentRuntime {
     const tools = new ToolRegistry(options.tools);
 
     this.model = options.model;
+    this.responseFormat = options.responseFormat === undefined ? undefined : structuredClone(options.responseFormat);
     this.hooks = options.hooks;
     this.context = options.context;
     this.tools = tools;
@@ -314,11 +321,22 @@ export class May implements AgentRuntime {
         return value;
       },
       async (error: unknown) => {
+        const snapshot = budget.snapshot();
         endTraceSpan(runSpan, {
           status: controller.signal.aborted || error instanceof RunCancelledError
             ? "cancelled"
             : "error",
           error: traceError(error),
+          attributes: {
+            "may.run.model_calls": snapshot.modelCalls,
+            "may.run.tool_calls": snapshot.toolCalls,
+            "may.run.steps": snapshot.steps,
+            "may.run.total_tokens": snapshot.totalTokens,
+            "may.run.usage_complete": snapshot.usageComplete,
+            "may.run.cost_usd": snapshot.costUsd,
+            "may.run.cost_complete": snapshot.costComplete === true,
+            ...(snapshot.costKind === undefined ? {} : { "may.run.cost_kind": snapshot.costKind }),
+          },
         });
         try {
           await this.observe(runtimeHooks.runFailed, { error: serializeError(error) }, { runId, signal: controller.signal });
@@ -442,11 +460,14 @@ export class May implements AgentRuntime {
           attributes: {
             "may.step": step,
             "may.model.call_id": modelCallId,
+            ...modelConfigurationTraceAttributes(this.model),
             "may.model.message_count": request.messages.length,
             "may.model.tool_definition_count": request.tools.length,
           },
         });
-        let modelResponse: { message: AssistantMessage; usage?: Usage };
+        let modelResponse: { message: AssistantMessage; usage?: Usage; cost?: UsageCost };
+        let responseUsage: Usage | undefined;
+        let accounted = false;
         try {
           modelResponse = await this.consumeModel(
             request,
@@ -457,21 +478,54 @@ export class May implements AgentRuntime {
             emit,
             modelSpan,
           );
+          responseUsage = modelResponse.usage;
+          aggregateUsage = addUsage(aggregateUsage, responseUsage);
+          accounted = true;
+          budget.recordUsage(responseUsage, modelResponse.cost);
+          if (!budget.snapshot().usageComplete && aggregateUsage !== undefined) {
+            aggregateUsage = { ...aggregateUsage, completeness: { status: "partial", reason: "one-or-more-responses-have-incomplete-usage" } };
+          }
+          const modelCost = budget.snapshot().latestCost;
           endTraceSpan(modelSpan, {
             status: "ok",
             attributes: {
               "may.model.tool_call_count":
                 modelResponse.message.toolCalls?.length ?? 0,
               ...usageTraceAttributes(modelResponse.usage, "may.model"),
+              ...(modelCost === undefined ? {} : costTraceAttributes(modelCost)),
+              ...modelConfigurationTraceAttributes(this.model),
             },
           });
         } catch (error) {
-          endOperationSpan(modelSpan, error, signal);
-          await this.observe(runtimeHooks.modelFailed, { error: serializeError(error) }, { runId, step, signal });
-          throw error;
+          let failure = error;
+          if (!accounted && error instanceof ModelResponseValidationError) {
+            responseUsage = error.usage;
+            aggregateUsage = addUsage(aggregateUsage, responseUsage);
+            accounted = true;
+            try {
+              budget.recordUsage(responseUsage, error.cost);
+            } catch (accountingError) {
+              const latestCost = budget.snapshot().latestCost;
+              failure = new ModelResponseValidationError(error.message, {
+                ...(responseUsage === undefined ? {} : { usage: responseUsage }),
+                ...(latestCost === undefined ? {} : { cost: latestCost }),
+                cause: new AggregateError([error, accountingError], "Model validation and accounting failed", { cause: error }),
+              });
+              if (accountingError instanceof RunBudgetExceededError) emit({ type: "run.budget.exceeded", dimension: accountingError.dimension, limit: accountingError.limit, consumed: accountingError.consumed, budget: budget.snapshot() });
+            }
+          }
+          if (accounted) {
+            const snapshot = budget.snapshot();
+            setTraceAttributes(modelSpan, {
+              ...usageTraceAttributes(responseUsage, "may.model"),
+              ...(snapshot.latestCost === undefined ? { "may.model.cost_complete": false } : costTraceAttributes(snapshot.latestCost)),
+            });
+          }
+          endOperationSpan(modelSpan, failure, signal);
+          await this.observe(runtimeHooks.modelFailed, { error: serializeError(failure) }, { runId, step, signal });
+          throw failure;
         }
         const { message, usage } = modelResponse;
-        aggregateUsage = addUsage(aggregateUsage, usage);
 
         throwIfAborted(signal);
         await traceOperation(
@@ -501,7 +555,6 @@ export class May implements AgentRuntime {
         const calls = message.toolCalls ?? [];
         if (calls.length > 0) pendingTools = { step, calls, outcomes: [], executions: [] };
         await this.observe(runtimeHooks.modelAfter, { message }, { runId, step, signal });
-        budget.recordUsage(usage);
         if (calls.length === 0) {
           emit({ type: "step.completed", step });
           await this.observe(runtimeHooks.stepCompleted, { step }, { runId, step, signal });
@@ -757,6 +810,7 @@ export class May implements AgentRuntime {
     return {
       messages,
       tools: tools.definitions(),
+      ...(this.responseFormat === undefined ? {} : { responseFormat: structuredClone(this.responseFormat) }),
       ...(snapshot.metadata === undefined
         ? {}
         : { metadata: snapshot.metadata }),
@@ -771,28 +825,68 @@ export class May implements AgentRuntime {
     modelCallId: string,
     emit: (event: MayEventPayload) => void,
     modelSpan: TraceSpan | undefined,
-  ): Promise<{ message: AssistantMessage; usage?: Usage }> {
+  ): Promise<{ message: AssistantMessage; usage?: Usage; cost?: UsageCost }> {
     let completed: AssistantMessage | undefined;
     let usage: Usage | undefined;
-
-    for await (const event of this.model.stream(request, {
-      signal,
-      runId,
-      step,
+    let cost: UsageCost | undefined;
+    let responseCompleted = false;
+    const started = performance.now();
+    let content = false;
+    let text = false;
+    let attempts = 0;
+    let retryWaitMs = 0;
+    const observer = createModelAttemptObserver({
+      ...(this.tracer === undefined ? {} : { tracer: this.tracer }),
+      ...(modelSpan === undefined ? {} : { parent: modelSpan.context }),
       modelCallId,
-      ...(modelSpan === undefined
-        ? {}
-        : { traceContext: modelSpan.context }),
-    })) {
+      attributes: { ...modelConfigurationTraceAttributes(this.model), "may.run.id": runId, "may.step": step },
+      onRetryWait(durationMs) {
+        retryWaitMs += durationMs;
+        setTraceAttributes(modelSpan, { "may.model.retry_wait_ms": retryWaitMs });
+      },
+      onContent(kind) {
+        if (!content) {
+          content = true;
+          setTraceAttributes(modelSpan, { "may.model.first_content_ms": performance.now() - started });
+        }
+        if (kind === "text" && !text) {
+          text = true;
+          setTraceAttributes(modelSpan, { "may.model.first_text_ms": performance.now() - started });
+        }
+      },
+    });
+    const attemptObserver = {
+      retryWait(durationMs: number) { observer.retryWait?.(durationMs); },
+      start(attempt: number) { attempts += 1; return observer.start(attempt); },
+    };
+    let singleAttempt: ReturnType<typeof attemptObserver.start> | undefined;
+    const streamOptions = {
+      signal, runId, step, modelCallId, attemptObserver,
+      ...(modelSpan === undefined ? {} : { traceContext: modelSpan.context }),
+    };
+    try {
+      await this.model.preflight?.(request, streamOptions);
+      singleAttempt = this.model.reportsAttempts === true ? undefined : attemptObserver.start(1);
+      for await (const event of this.model.stream(request, streamOptions)) {
+      if (event.type === "response.completed") {
+        if (responseCompleted) {
+          throw new ModelProtocolError("Model emitted more than one response.completed event");
+        }
+        responseCompleted = true;
+        usage = event.usage;
+        cost = event.cost;
+      }
       throwIfAborted(signal);
       await this.observe(runtimeHooks.modelEvent, event, { runId, step, signal });
 
       if (event.type === "text.delta") {
+        if (event.delta.length > 0) singleAttempt?.content("text");
         emit({ type: "model.text.delta", step, delta: event.delta });
         continue;
       }
 
       if (event.type === "reasoning.delta") {
+        if (event.delta.length > 0) singleAttempt?.content("reasoning");
         emit({ type: "model.reasoning.delta", step, delta: event.delta });
         continue;
       }
@@ -818,14 +912,10 @@ export class May implements AgentRuntime {
         continue;
       }
 
-      if (completed) {
-        throw new ModelProtocolError(
-          "Model emitted more than one response.completed event",
-        );
-      }
-
       completed = event.message;
-      usage = event.usage;
+      if (completed.content.some((part) => part.type === "text" && part.text.length > 0)) singleAttempt?.content("text");
+      if ((completed.toolCalls?.length ?? 0) > 0) singleAttempt?.content("tool");
+      if (completed.content.some(part => part.type !== "text")) singleAttempt?.content("other");
     }
 
     if (!completed) {
@@ -833,12 +923,47 @@ export class May implements AgentRuntime {
         "Model stream ended without a response.completed event",
       );
     }
+    singleAttempt?.end({ status: "ok", completed: true, ...(usage === undefined ? {} : { usage }) });
 
-    const result: { message: AssistantMessage; usage?: Usage } = {
+    const result: { message: AssistantMessage; usage?: Usage; cost?: UsageCost } = {
       message: completed,
     };
     if (usage !== undefined) result.usage = usage;
+    if (cost !== undefined) result.cost = cost;
     return result;
+    } catch (error) {
+      let failure = error;
+      if (error instanceof ModelResponseValidationError) {
+        usage = error.usage ?? usage;
+        cost = error.cost ?? cost;
+        responseCompleted = error.responseCompleted;
+        if (error.usage !== usage || error.cost !== cost) {
+          failure = new ModelResponseValidationError(error.message, {
+            ...(usage === undefined ? {} : { usage }),
+            ...(cost === undefined ? {} : { cost }),
+            cause: error,
+          });
+        }
+      } else if (responseCompleted) {
+        failure = new ModelResponseValidationError("Model response processing failed after completion", {
+          ...(usage === undefined ? {} : { usage }),
+          ...(cost === undefined ? {} : { cost }),
+          cause: error,
+        });
+      }
+      singleAttempt?.end({ status: signal.aborted ? "cancelled" : "error", error: traceError(failure), completed: responseCompleted, ...(usage === undefined ? {} : { usage }) });
+      throw failure;
+    } finally {
+      setTraceAttributes(modelSpan, {
+        ...modelConfigurationTraceAttributes(this.model),
+        "may.model.has_content": content,
+        "may.model.has_text": text,
+        "may.model.attempts": attempts,
+        "may.model.usage_available": usage !== undefined,
+        ...usageTraceAttributes(usage, "may.model"),
+        "may.model.completed": responseCompleted,
+      });
+    }
   }
 
   private async scheduleTools(
@@ -1187,20 +1312,7 @@ function addUsage(
   aggregate: Usage | undefined,
   usage: Usage | undefined,
 ): Usage | undefined {
-  if (usage === undefined) return aggregate;
-  const result: Usage = { ...(aggregate ?? {}) };
-  addTokenField(result, "inputTokens", usage.inputTokens);
-  addTokenField(result, "outputTokens", usage.outputTokens);
-  addTokenField(result, "totalTokens", usage.totalTokens);
-  return result;
-}
-
-function addTokenField(
-  target: Usage,
-  field: keyof Usage,
-  value: number | undefined,
-): void {
-  if (value !== undefined) target[field] = (target[field] ?? 0) + value;
+  return mergeUsage(aggregate, usage);
 }
 
 async function traceOperation<T>(
@@ -1238,12 +1350,28 @@ function endOperationSpan(
   });
 }
 
+function modelConfigurationTraceAttributes(model: Model): TraceAttributes {
+  const attributes: Record<string, string | number | boolean> = {};
+  const configuration = model.configuration ?? {};
+  const fields = { provider: "provider", adapter: "adapter", model: "name", profile: "profile", reasoningEffort: "reasoning_effort", capabilityVersion: "capability_version" };
+  for (const [key, attribute] of Object.entries(fields)) {
+    const value = configuration[key];
+    if (value !== undefined) attributes[`may.model.${attribute}`] = value;
+  }
+  if (model.capabilityVersion !== undefined) attributes["may.model.capability_version"] = model.capabilityVersion;
+  return attributes;
+}
+
 function usageTraceAttributes(
   usage: Usage | undefined,
   prefix = "may.run",
 ): TraceAttributes {
-  if (usage === undefined) return {};
+  if (usage === undefined) return { [`${prefix}.usage_complete`]: false };
   return {
+    ...(usage.cachedReadTokens === undefined ? {} : { [`${prefix}.cached_read_tokens`]: usage.cachedReadTokens }),
+    ...(usage.cachedWriteTokens === undefined ? {} : { [`${prefix}.cached_write_tokens`]: usage.cachedWriteTokens }),
+    ...(usage.reasoningTokens === undefined ? {} : { [`${prefix}.reasoning_tokens`]: usage.reasoningTokens }),
+    [`${prefix}.usage_complete`]: resolveUsageTotals(usage).complete,
     ...(usage.inputTokens === undefined
       ? {}
       : { [`${prefix}.input_tokens`]: usage.inputTokens }),
@@ -1253,6 +1381,17 @@ function usageTraceAttributes(
     ...(usage.totalTokens === undefined
       ? {}
       : { [`${prefix}.total_tokens`]: usage.totalTokens }),
+  };
+}
+
+function costTraceAttributes(cost: import("./pricing.js").UsageCost): TraceAttributes {
+  return {
+    ...(cost.amount === undefined ? {} : { "may.model.cost": cost.amount }),
+    "may.model.currency": cost.currency,
+    "may.model.cost_kind": cost.kind,
+    "may.model.cost_complete": cost.complete,
+    ...(cost.pricingVersion === undefined ? {} : { "may.model.pricing_version": cost.pricingVersion }),
+    ...(cost.pricingId === undefined ? {} : { "may.model.pricing_id": cost.pricingId }),
   };
 }
 

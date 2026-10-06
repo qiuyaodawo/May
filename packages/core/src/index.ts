@@ -11,3 +11,7 @@ export * from "./tool.js";
 export * from "./tool-registry.js";
 export * from "./tracing.js";
 export * from "./types.js";
+export * from "./correlation.js";
+export * from "./telemetry.js";
+export * from "./pricing.js";
+export * from "./structured-output.js";

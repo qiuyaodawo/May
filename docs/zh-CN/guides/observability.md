@@ -3,7 +3,7 @@
 [English](../../en/guides/observability.md) | **简体中文**
 
 May tracing 用来解释一次 Agent Run 的耗时分布，以及 Core、Context、模型、工具、权限、
-Session 和 application 之间的调用关系。它是可选的运行遥测，不是持久化对话历史。
+Session 和 application 之间的调用关系。运行遥测与持久化对话历史分别管理。
 
 ## Event、历史与 Trace
 
@@ -17,7 +17,7 @@ Session 和 application 之间的调用关系。它是可选的运行遥测，�
 
 ## 配置 Tracer
 
-Core 只导出 `Tracer`、`TraceSpan`、`TraceContext`、attribute 和 fail-open helper 契约。
+Core 导出 `Tracer`、`TraceSpan`、`TraceContext`、attribute 和辅助接口。
 标准实现位于 `@may/observability`：
 
 ```ts
@@ -84,10 +84,10 @@ trace context，供 provider、远程工具或上层操作继续建立子 span�
 
 例如，一个慢工具调用可能显示为：
 
-```text
-may.tool.call                    9.72s
-|- may.permission.check          0.01s
-`- may.permission.approval_wait  8.90s
+```mermaid
+flowchart TD
+  tool["may.tool.call: 9.72 s"] --> policy["may.permission.check: 0.01 s"]
+  tool --> approval["may.permission.approval_wait: 8.90 s"]
 ```
 
 这样可以把用户审批等待与剩余的工具执行时间区分开。Model span 中的
@@ -96,7 +96,7 @@ may.tool.call                    9.72s
 ## Processor、Exporter 与采样
 
 - `InMemorySpanProcessor` 保存完成的 span，用于测试和本地检查；
-- `SimpleSpanProcessor` 在 Agent 调用栈之外串行调用 exporter；
+- `SimpleSpanProcessor` 异步串行调用 exporter；
 - `BatchSpanProcessor` 使用有界队列并暴露 `droppedSpans`，不会把 exporter backpressure
   施加给 Run；
 - 内置 `InMemorySpanExporter` 和 `ConsoleSpanExporter`；
@@ -158,5 +158,131 @@ Core 会保护被注入的 tracer/span 调用；内置 processor 会捕获 expor
 通过 `onError` 报告。因此遥测后端故障不会使 Agent 工作失败或取消。Tracing 也正因这种
 fail-open 行为而不能代替持久化 audit 或 Permission 记录。
 
-当前 package 提供 tracing 基础，而不是 metrics backend、dashboard 或厂商专用 exporter。
-自定义 processor 可以从完成的 span 派生 metrics，无需改变 runtime 契约。
+## 独立指标与本地诊断
+
+```ts
+import { BoundedMetrics, DiagnosticsStore } from "@may/observability";
+
+const metrics = new BoundedMetrics({ maxSeries: 1_024 });
+const diagnostics = new DiagnosticsStore({ maxSpans: 2_048, maxActiveSpans: 512 });
+const tracer = new BasicTracer({
+  processor, metrics, observer: diagnostics, sampler: ratioSampler(0.1),
+});
+const page = diagnostics.getDiagnostics({ sessionId, limit: 100, offset: 0 });
+const snapshot = metrics.getMetrics();
+```
+
+生命周期通知和指标包含所有本地操作，包括未采样的 span。采样决定需要导出的 span。
+正在执行的数量在开始时增加，在结束时减少一次。
+内置指标提供数量、状态、耗时、首次输出时间、重试次数、实际测量的重试等待、token 明细、
+费用、缺失数据以及 processor 的队列和导出状态。指标标签使用明确的允许列表，
+费用计数同时保留 `currency`、`cost_kind`、`cost_complete` 标签。
+Session、Run、任务、用户和 Trace ID 保存在 Trace 中。
+默认最多保存 1,024 个标签组合，`droppedSeries` 报告超过限制的数量。
+Histogram 快照包含累计区间数量、记录数量和总和。
+宿主可以通过 `Tracer.recordMetric` 添加队列指标。
+
+`DiagnosticsStore` 默认保留 2,048 个完成 span、512 个未完成 span 和一小时本地记录。
+按照 `traceId`、`taskId`、`coordinationId`、`sessionId`、`runId` 查询，每页最多 500 条。
+结果提供 `evictedSpans`、`coverage`、`total`、`hasMore`；span 包含 `ended`、`sampled`、
+父节点身份、时间、用量、费用和不含正文的错误信息，并继承本地父 span 的关联信息。
+并行操作需要分别显示耗时，任务经过的时间通过任务开始和结束时间计算。
+
+## 模型调用与请求尝试
+
+`may.model.call` 表示包含重试与等待的逻辑调用；其子 span `may.model.attempt`
+表示每次请求尝试，分别记录状态、耗时、完成情况和用量是否可用。
+已知无效请求在 `Model.preflight` 中被拒绝，逻辑调用记录错误，物理尝试数量为零。
+`modelCallId` 在重试期间保持一致，每次尝试具有独立的 `may.model.attempt_id`。
+`RetryingModel` 通过 `ModelStreamOptions.attemptObserver` 报告尝试；May 为普通
+adapter 报告一次尝试。Model wrapper 必须保留 `reportsAttempts` 并传递 observer。
+`attemptObserver.retryWait` 报告实际等待时间，取消期间已经等待的时间也会记录。
+`may.model.retry_wait_ms` 保存逻辑调用中的累计等待时间。
+
+`may.model.first_content_ms` 表示首次非空 text/reasoning delta、工具响应或完整响应中
+非文本内容出现的时间；`may.model.first_text_ms` 表示首次非空可显示文本出现的时间。
+逻辑调用的时间包含重试等待；尝试的时间从该次请求开始计算。
+没有对应输出时保持未提供状态。取消、协议错误、成功的空响应和只有工具调用的响应
+分别保留结果与 `has_content`/`has_text`。每次尝试报告用量是否可用。
+provider 没有提供失败尝试的用量时记录明确的缺失状态。
+
+调用信息包含 adapter/model 配置、能力版本、缓存/reasoning token 明细和预算使用的
+同一个计价结果。费用包含币种、估算或 provider 金额、完整性和价格身份/版本。
+读取金额时需要同时读取完整性状态。
+
+用量完整性通过 `resolveUsageTotals` 计算，与 Run 预算保持一致。
+provider 完成的响应未通过 JSON/Schema 校验时，已知 Usage 与费用继续保留；
+请求尝试和逻辑调用记录错误，并保留 `may.model.completed=true`。
+May 在保存 Context 和执行完成 Hook 之前记录一次用量与计价结果。
+final `modelEvent` Hook 失败时也会保留已收到的用量；未通过校验的响应不会追加到
+Context，也不会产生成功完成事件。失败 Run 的 span 提供预算累计 token、费用和
+完整性。预算或计价失败时，原始响应校验原因和已知 token 数量继续保留。
+Token 与费用指标仅在逻辑调用结束时记录一次。
+
+## OpenTelemetry 与 OTLP
+
+`OpenTelemetryTracer` 接入宿主管理的 OpenTelemetry API tracer，并显式传递父节点。
+`OpenTelemetryMetricRecorder` 独立于 Trace 采样记录 meter 指标并限制标签组合数量。
+以下接口使用官方 SDK 和 HTTP/JSON exporter，独立管理 provider：
+
+```ts
+import { createOtlpTelemetry } from "@may/observability";
+
+const telemetry = createOtlpTelemetry({
+  serviceName: "example-agent",
+  tracesUrl: "http://localhost:4318/v1/traces",
+  metricsUrl: "http://localhost:4318/v1/metrics",
+  timeoutMs: 5_000, maxQueueSize: 2_048, maxExportBatchSize: 256,
+  samplingRatio: 0.1, observer: diagnostics,
+});
+// Application 使用 telemetry.tracer，全部关闭后释放 SDK。
+await telemetry.forceFlush();
+console.log(telemetry.getDiagnostics());
+await telemetry.shutdown();
+```
+
+两个 HTTP endpoint 都需要明确提供。认证 `headers` 单独用于连接。
+队列数量、批次数量、导出并发、超时、指标标签组合和生命周期等待均有明确限制。
+生命周期完成前处理 Trace 和指标两类操作的结果，导出及生命周期失败通过 `onError`
+和诊断计数报告。`shutdown()` 可以重复调用。
+已有 SDK 的宿主使用直接 adapter，继续管理自己的 provider。
+
+## 任务关联与验收
+
+Core 的版本化 `TelemetryCorrelation` 验证父节点身份与任务、协调、派发、调度和恢复
+来源 Run ID。宿主与远程执行一同传递，并使用 `correlationTraceAttributes` 转换属性。
+恢复执行创建新的身份，通过 `resumedFromRunId` 关联原来的 Run。
+接收关联信息后必须在执行前验证。本地诊断保存当前进程观察到的操作。
+
+```ts
+diagnostics.recordAssessment({
+  taskId: "task-123", sessionId: "session-123", coordinationId: "coordination-123",
+  evaluator: "file-checks", evaluatorVersion: "2",
+  result: "passed", configurationVersion: "context-policy-3",
+  evidenceReferences: ["artifact:checks-123"],
+});
+```
+
+验收结果包括 `passed`、`failed`、`inconclusive`，记录验收器版本、配置版本、时间和
+证据引用。宿主负责证据的存储和访问权限。
+默认保存最多 256 条验收记录，每条记录最多包含 16 个引用，每个引用最多 256 个字符。
+
+验收范围支持 `sessionId`、`runId`、`coordinationId`、`traceId`。记录验收结果时，
+缺失字段仅根据当时保留的任务 span 中唯一的身份推断。有范围条件的查询严格匹配
+已经保存的字段；身份存在歧义的记录仅通过独立 `taskId` 查询访问。
+保存的验收范围在 span 超过保留上限之后继续有效。任务名称可能重复时，
+提供 Session 或协调任务的身份。
+
+## 数量限制与导出诊断
+
+属性接受有限数值、字符串、boolean 和有数量限制的数组。默认最多 64 项属性，
+每个字符串最多 256 个字符，每个数组最多 16 项，保留最多 64 条 event。
+内容和凭据属性名称会被拒绝，宿主负责允许属性的具体含义。
+`InMemorySpanProcessor` 和 `InMemorySpanExporter` 默认保存 2,048 个 span，
+支持配置上限并提供 `droppedSpans`。
+`SimpleSpanProcessor` 使用相同的有界处理机制，每个批次包含一个 span。
+`BatchSpanProcessor` 可以通过 `metrics` 保存队列长度、丢弃和失败数量，
+`getDiagnostics()` 提供队列长度、导出状态、丢弃数量、失败数量、超时数量和关闭状态。
+导出和关闭等待默认限制为五秒。普通失败释放该批次，后续批次继续执行；导出超时
+关闭 processor 并丢弃剩余队列，限制无法结束的导出操作数量。
+调用 `shutdown()` 释放 exporter 资源。

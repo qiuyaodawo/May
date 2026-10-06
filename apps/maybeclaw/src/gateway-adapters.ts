@@ -6,7 +6,8 @@ import { AgentDefinition, defineAgent } from "@may/application";
 import { loadMayConfig } from "@may/config";
 import { createReadTool, resolveExistingWorkspacePath, resolveWritableWorkspacePath } from "@may/coding-tools";
 import type { PermissionPolicy, PermissionRuleStore } from "@may/permissions";
-import { createBuiltinProviderModel, selectProviderModel } from "@may/providers";
+import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver, selectProviderModel, type ModelCapabilities } from "@may/providers";
+import { observabilityService } from "@may/plugin-observability";
 import { FileSessionStore } from "@may/session/file-store";
 import { loadPluginModules, parsePluginSelections, type AnyPlugin } from "@may/plugin";
 import { createMayAgentAdapter, loadAgentAdapter } from "@may/plugin-agent-adapters";
@@ -23,6 +24,7 @@ export interface MayAdapterOptions {
   agent: GatewayAgentConfig;
   permissionRuleStore?: PermissionRuleStore;
   definition?: (tools: () => GatewayAdapterContext["tools"]) => Promise<AgentDefinition> | AgentDefinition;
+  modelCapabilities?: (refresh?: boolean) => Promise<ModelCapabilities>;
 }
 
 export async function loadGatewayAdapter(options: MayAdapterOptions): Promise<GatewayAgentAdapter> {
@@ -39,7 +41,10 @@ export async function loadGatewayAdapter(options: MayAdapterOptions): Promise<Ga
 }
 
 export function createMayAdapter(options: MayAdapterOptions): GatewayAgentAdapter {
-  return createMayAgentAdapter({ agentId: options.agent.id,
+  const resolver = createModelCapabilityResolver();
+  const registry = createBuiltinProviderAdapterRegistry({ resolver });
+  const adapter = createMayAgentAdapter({ agentId: options.agent.id,
+    diagnostics: (application, query) => application.getOptionalService(observabilityService)?.diagnostics?.getDiagnostics({ ...query, sessionId: application.sessionId }),
     store: new FileSessionStore(join(options.directory, "agents", options.agent.id, "sessions")),
     ...(options.agent.media ? { media: options.agent.media } : {}),
     metadata: conversationId => ({ maybeclaw: { agentId: options.agent.id, conversationId } }),
@@ -47,7 +52,7 @@ export function createMayAdapter(options: MayAdapterOptions): GatewayAgentAdapte
       const config = await loadMayConfig({ path: options.configPath });
       const selected = options.plugins ?? await loadPluginModules(parsePluginSelections(options.agent.plugins), config.path);
       const defaults = [
-        createModelPlugin({ create: () => createBuiltinProviderModel(selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {})) }),
+        createModelPlugin({ create: () => registry.create(selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {})) }),
         createPermissionPlugin({ create: () => createGatewayPermissionPolicy(options, () => context()?.permissionScope) }),
         createToolsPlugin({ id: "maybeclaw.tools", create: () => {
           const tools = options.agent.readDirectory ? [createReadTool({ cwd: options.agent.readDirectory })] : [];
@@ -64,6 +69,16 @@ export function createMayAdapter(options: MayAdapterOptions): GatewayAgentAdapte
       });
     }),
   });
+  if (options.modelCapabilities !== undefined) return { ...adapter, modelCapabilities: options.modelCapabilities };
+  if (options.definition !== undefined || options.plugins?.some(plugin => plugin.provides?.some(service => service.id === services.model.id && service.scope === services.model.scope))) return adapter;
+  return { ...adapter, modelCapabilities: async (refresh = false) => {
+    const config = await loadMayConfig({ path: options.configPath });
+    const selected = options.plugins ?? await loadPluginModules(parsePluginSelections(options.agent.plugins), config.path);
+    if (selected.some(plugin => plugin.provides?.some(service => service.id === services.model.id))) {
+      throw new Error("自定义 Model 插件需要自行提供模型能力查询。");
+    }
+    return resolver.resolve(selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {}), { refresh });
+  } };
 }
 
 export function createGatewayPermissionPolicy(options: Pick<MayAdapterOptions, "agent" | "directory" | "permissionRuleStore">, scope: () => string | undefined): PermissionPolicy {

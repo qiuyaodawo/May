@@ -1,3 +1,5 @@
+import type { TelemetryCorrelation, Tracer } from "@may/core";
+
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 export type Trigger =
@@ -56,6 +58,7 @@ export interface ExecutionRecord {
 }
 
 export interface TaskSubmission {
+  readonly telemetry?: TelemetryCorrelation;
   readonly executionId: string;
   readonly handler: string;
   readonly payload: JsonValue;
@@ -87,6 +90,8 @@ export interface SchedulerStore {
 }
 
 export interface SchedulerOptions {
+  readonly tracer?: Tracer;
+  readonly telemetry?: TelemetryCorrelation;
   readonly store: SchedulerStore;
   readonly dispatcher: TaskDispatcher;
   readonly maxConcurrentSubmissions?: number;

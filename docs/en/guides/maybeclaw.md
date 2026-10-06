@@ -88,6 +88,15 @@ execution, inspection, cancellation, steering, recovery, deletion, approvals,
 collaboration, and media capabilities. Unsupported operations report an error.
 `agent check <id>` loads the adapter and reports its capabilities; successful
 loading does not prove a model request or chat delivery.
+The authenticated Web command `agent.check` also returns model capabilities
+when the adapter provides them. Its refresh action reruns capability discovery.
+May adapters share the same resolver between inspection and request validation.
+Custom Model plugins or definitions can supply `MayAdapterOptions.modelCapabilities`.
+In the selected Session, **Execution diagnostics** queries only its allocated
+Agent conversations. Records use each Agent's optional observability service;
+released applications have no in-memory diagnostic records. This query neither
+starts a Run nor creates another conversation. See
+[model and telemetry integration](model-telemetry-integration.md).
 Agent status reports `unloaded`, `loading`, `loaded`, `unavailable`, `releasing`,
 `reconfiguring`, or `disabled`. Loading failures remain visible until another
 check succeeds or the configuration changes. Idle release returns to `unloaded`;

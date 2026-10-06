@@ -884,3 +884,10 @@ restart. See the bilingual [Tasks guide](../../docs/en/guides/mcp-tasks.md).
 `/mcp apps` explicitly reports unsupported HTML in both terminal UIs. App-only
 tools are hidden even without a graphical Host; model-visible text fallback remains.
 Optional custom graphical integration: [Apps guide](../../docs/en/guides/mcp-apps.md).
+
+The Web model panel shows field capabilities, values, sources and discovery
+diagnostics, with an explicit refresh action. The active Session diagnostic
+panel reads optional observability services. Built-in models validate supported
+request fields and configured structured output before sending inference. See
+[model and telemetry integration](../../docs/en/guides/model-telemetry-integration.md)
+or [简体中文](../../docs/zh-CN/guides/model-telemetry-integration.md).

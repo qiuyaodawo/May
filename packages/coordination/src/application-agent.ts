@@ -1,5 +1,5 @@
 import type { AgentApplication, AgentDefinition } from "@may/application";
-import type { Tool } from "@may/core";
+import { correlationTraceAttributes, type Tool } from "@may/core";
 import type { SessionStore } from "@may/session";
 import type { CoordinationAgent, TaskExecution, TaskExecutionContext } from "./types.js";
 import { coordinationInput, inspectTaskSession, taskIdentity, taskOutputFromResult, taskTurnInputId } from "./application-session.js";
@@ -58,9 +58,10 @@ export function createApplicationAgent(options: ApplicationAgentOptions): Coordi
         options.onOpen?.(app, execution);
         context.signal.throwIfAborted();
         const run = await app.submit({ input: coordinationInput(execution), inputId: taskTurnInputId(execution), signal: context.signal,
+          ...(execution.telemetry?.parent === undefined ? {} : { traceContext: execution.telemetry.parent }),
           shouldYield: () => delegated,
           ...(execution.runBudget === undefined ? {} : { runBudget: execution.runBudget }),
-          traceAttributes: { "may.coordination.id": execution.coordinationId, "may.task.id": execution.task.id, "may.dispatch.id": execution.task.dispatchId,
+          traceAttributes: { ...(execution.telemetry === undefined ? {} : correlationTraceAttributes(execution.telemetry)), "may.coordination.id": execution.coordinationId, "may.task.id": execution.task.id, "may.dispatch.id": execution.task.dispatchId,
             "may.task.attempt": execution.task.attempt ?? 0 },
         });
         const result = await run.result;

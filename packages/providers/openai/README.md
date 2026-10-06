@@ -25,3 +25,13 @@ const model = new OpenAIResponsesModel({
 
 The adapter stores native output and encrypted compaction items in May's
 opaque `modelState`. Core and other providers never inspect that state.
+
+`ModelRequest.responseFormat` configures JSON output with `{ type: "json" }` or
+JSON Schema output with `{ type: "jsonSchema", name, schema, strict? }`. The
+adapter sends the corresponding `text.format`, validates schema configuration
+before the request, and validates final response content through Ajv. Draft-07
+and 2020-12 are supported for local validation. Provider schema restrictions
+must also be satisfied. Tool-call responses allow intermediate empty bodies.
+Invalid final output throws `ModelResponseValidationError` with the completed
+response's Usage receipt. Runtime and budget accounting retain the actual
+usage while the response remains failed, and retry wrappers do not retry it.

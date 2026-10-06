@@ -199,6 +199,12 @@ model/configuration change. Product-only mutations that do not rebuild the
 runtime can use `runStateTransition` so they share the same FIFO queue as
 session operations.
 
+`AgentApplication.getOptionalService(token)` queries a supplied plugin service
+and returns `undefined` when it is absent. `responseFormat` configures Core's
+provider-neutral structured output. Tracer delegation forwards independent
+metric records and always associates Runs with their Session ID. See
+[model capabilities and execution diagnostics](../../docs/en/guides/model-telemetry-integration.md).
+
 `@may/application/git-workspace` provides the Node.js `ProjectGitWorkspace`
 component for default project Git management, initial and complete-request file
 checkpoints, current branch status, structured diffs, reviewed restoration,

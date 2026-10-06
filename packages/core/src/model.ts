@@ -18,7 +18,12 @@ export interface ModelRequest {
   readonly messages: readonly Message[];
   readonly tools: readonly ToolDefinition[];
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly responseFormat?: ModelResponseFormat;
 }
+
+export type ModelResponseFormat =
+  | { readonly type: "json" }
+  | { readonly type: "jsonSchema"; readonly name: string; readonly schema: JsonSchema; readonly strict?: boolean };
 
 export interface ModelLimits {
   readonly contextWindowTokens?: number;
@@ -58,6 +63,7 @@ export type ModelEvent =
       type: "response.completed";
       message: AssistantMessage;
       usage?: Usage;
+      cost?: import("./pricing.js").UsageCost;
     };
 
 export interface ModelStreamOptions {
@@ -70,12 +76,17 @@ export interface ModelStreamOptions {
   readonly modelCallId?: string;
   /** Current model-call span for explicitly propagated instrumentation. */
   readonly traceContext?: TraceContext;
+  readonly attemptObserver?: import("./telemetry.js").ModelAttemptObserver;
 }
 
 export interface Model {
-  readonly limits?: ModelLimits;
+  readonly reportsAttempts?: boolean | undefined;
+  readonly capabilityVersion?: string | undefined;
+  readonly configuration?: Readonly<Record<string, string | number | boolean>> | undefined;
+  readonly limits?: ModelLimits | undefined;
   /** Optional provider-native context compaction capability. */
   readonly contextCompactor?: ModelContextCompactor;
+  preflight?(request: ModelRequest, options: ModelStreamOptions): Promise<void>;
   stream(
     request: ModelRequest,
     options: ModelStreamOptions,

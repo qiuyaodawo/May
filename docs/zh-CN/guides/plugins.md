@@ -223,6 +223,14 @@ provider、model、adapter 和 profile。仅提供 `model` 的插件将未知名
 `apps/maybecode/src/plugins/` 和 `apps/maybeclaw/src/plugins/`。
 现有 package 的类和接口继续支持直接调用，应用保留已提取功能的兼容导出。
 
+`@may/plugin-agent-adapters` 通过 `AgentAdapterContext.telemetry` 接收经过验证的
+version 1 `TelemetryCorrelation`。Gateway RPC 在 `gateway/initialize` 中声明
+`telemetryVersion: 1`，远端确认该版本后，`conversation/execute` 包含独立的
+`telemetry` envelope。省略该响应字段的远端继续接收原执行字段。发送方与接收方在
+执行前验证关联身份，业务请求的重复判断不包含遥测身份。随 package 提供的
+`rpc-file-agent` 示例支持该协商，在输入 hash 之外单独保存遥测，并在返回已完成输入
+结果时保留原执行身份。
+
 MaybeCode 通过插件组合 Model、PermissionPolicy、Context、Skills、goals、
 history-memory 和 delegation。MCP 命令、目录和事件使用活动 Application 的
 `mcpService`。Application 管理的连接池随每个 Session 启动和关闭；配置提供的

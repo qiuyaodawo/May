@@ -33,3 +33,13 @@ returns milliseconds; missing or unrecognized values return `undefined`.
 Audio, file, and generic resource parts are rejected rather than silently
 serialized. Accepting an image wire format does not imply that every model
 behind an OpenAI-compatible endpoint has vision capability.
+
+`OpenAIChatCompletionsModel` supports `ModelRequest.responseFormat` using
+`{ type: "json" }` or `{ type: "jsonSchema", name, schema, strict? }`, serialized
+as native `response_format`. Ajv checks schema configuration before sending
+and validates final response content. Local validation supports draft-07 and
+2020-12; provider-specific schema restrictions still apply. Intermediate
+tool-call responses allow empty bodies.
+Invalid final output throws `ModelResponseValidationError` with the completed
+response's Usage receipt. Runtime and budget accounting retain the actual
+usage while the response remains failed, and retry wrappers do not retry it.

@@ -37,6 +37,11 @@ await budget.close();
 **随后**才向 Agent 工具步骤暴露 `response.completed`。调用身份使用 May 的稳定
 `modelCallId`；已预留的 id 不会自动重放。
 
+包装器透传可选的 `Model.preflight()`，方法的接收对象保持为原 Model。执行验证不预留
+预算额度；预算预留仍在开始 provider 请求的 `stream()` 内完成。子 Agent 请求预算的
+包装器使用相同规则。两个包装器通过 getter 读取模型信息，能力发现与刷新之后，
+能力版本、配置和限制会立即更新，无需重新创建预算包装。
+
 - 必须在**物理 provider 请求边界**计费，即位于重试包装器内部，或关闭隐藏重试。
   外层包装器无法统计内部不透明的多次请求。同一调用身份的自动重试会被拒绝，
   不能当成免费请求。
@@ -62,6 +67,26 @@ provider 上报的 usage 结账时，`totals().usageComplete` 才为 `true`；�
 unknown。每个 id 对每次调用必须唯一，已预留的调用不会重放。原有单 Run 预算保持
 独立，可进一步限制每次 Run。重开账本时限制和价格必须一致。调用 `close()` 前
 先停止活动模型请求；组件不会自动抢占旧锁。
+
+`settleCall(id, usage, preparedCost?)` 接收同一计价流程已经计算并验证的 `UsageCost`，
+保存该结果，并且不再次执行自定义计价器。该结果需要符合账本的价格配置与 USD 要求。
+
+已完成的无效响应可以通过 `ModelResponseValidationError` 携带已知 `usage` 和
+`responseCompleted: true`。两个预算包装都会结算这些用量一次，并保留响应拒绝结果。
+具有计价配置的账本在错误中传递已保存的 `cost`，外层 Run 预算可以继续使用；未配置
+价格的账本保留宿主计价入口。已经结算的调用保持已结算状态。缺少用量时保持 unknown，
+已完成的响应禁止重试。计账同时失败时，错误的 cause 保留响应拒绝与计账失败两个原因。
+
+共享预算支持[运行预算](run-budgets.md)中的版本化 `pricing` 配置。
+`FileSharedBudget.open(..., { usagePricer })` 使用与 `RunBudget` 相同的自定义计价
+回调，重新打开或检查账本时需要再次提供。每次结算保存 `cost`，包括金额、币种、
+估算或 provider 类型、价格版本和完整性。`costComplete` 单独报告费用完整性。
+USD 上限要求完整的 USD 计价。未知价格使调用保持未结算状态，需要宿主核实。
+账本具有价格、自定义计价器或 provider 上报金额时，`wrapModel()` 在
+`response.completed.cost` 中传递已保存的计价结果，Run 预算和遥测使用同一个结果，
+自定义计价器无需再次执行。
+`runExternal()` 缺少 provider 用量时使用 token 和费用预留值，并保存不完整的估算。
+价格版本改变时需要使用新的账本。
 
 ## 不可变产物
 

@@ -8,9 +8,13 @@ import type {
 /** Deterministic processor intended for tests and local inspection. */
 export class InMemorySpanProcessor implements SpanProcessor {
   private readonly finished: FinishedTraceSpan[] = [];
+  private dropped = 0;
+  constructor(private readonly maxSpans = 2_048) { positiveInteger(maxSpans, "maxSpans"); }
+  get droppedSpans(): number { return this.dropped; }
 
   onEnd(span: FinishedTraceSpan): void {
     this.finished.push(span);
+    if (this.finished.length > this.maxSpans) { this.finished.shift(); this.dropped += 1; }
   }
 
   getFinishedSpans(): readonly FinishedTraceSpan[] {
@@ -24,38 +28,29 @@ export class InMemorySpanProcessor implements SpanProcessor {
 
 /** Serializes exports off the Agent execution path. */
 export class SimpleSpanProcessor implements SpanProcessor {
-  private tail: Promise<void> = Promise.resolve();
-  private closed = false;
+  private readonly processor: BatchSpanProcessor;
 
   constructor(
-    private readonly exporter: SpanExporter,
-    private readonly onError?: ObservabilityErrorHandler,
-  ) {}
+    exporter: SpanExporter,
+    onError?: ObservabilityErrorHandler,
+    options: Omit<BatchSpanProcessorOptions, "maxExportBatchSize" | "onError"> = {},
+  ) {
+    this.processor = new BatchSpanProcessor(exporter, { ...options, maxExportBatchSize: 1, ...(onError === undefined ? {} : { onError }) });
+  }
+
+  get droppedSpans(): number { return this.processor.droppedSpans; }
+  getDiagnostics(): ProcessorDiagnostics { return this.processor.getDiagnostics(); }
 
   onEnd(span: FinishedTraceSpan): void {
-    if (this.closed) return;
-    this.enqueue([span]);
+    this.processor.onEnd(span);
   }
 
   async forceFlush(): Promise<void> {
-    await this.tail;
+    await this.processor.forceFlush();
   }
 
   async shutdown(): Promise<void> {
-    if (this.closed) return;
-    this.closed = true;
-    await this.forceFlush();
-    await callExporterShutdown(this.exporter, this.onError);
-  }
-
-  private enqueue(spans: readonly FinishedTraceSpan[]): void {
-    this.tail = this.tail.then(async () => {
-      try {
-        await this.exporter.export(spans);
-      } catch (error) {
-        reportError(this.onError, error);
-      }
-    });
+    await this.processor.shutdown();
   }
 }
 
@@ -64,6 +59,17 @@ export interface BatchSpanProcessorOptions {
   readonly maxExportBatchSize?: number;
   readonly scheduledDelayMs?: number;
   readonly onError?: ObservabilityErrorHandler;
+  readonly exportTimeoutMs?: number;
+  readonly metrics?: import("./types.js").MetricRecorder;
+}
+
+export interface ProcessorDiagnostics {
+  readonly queueSize: number;
+  readonly exporting: boolean;
+  readonly droppedSpans: number;
+  readonly exportFailures: number;
+  readonly exportTimeouts: number;
+  readonly closed: boolean;
 }
 
 /** Bounded, non-blocking batch processor for remote or asynchronous exporters. */
@@ -76,7 +82,12 @@ export class BatchSpanProcessor implements SpanProcessor {
   private exporting: Promise<void> | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private closed = false;
+  private shutdownStarted = false;
   private dropped = 0;
+  private failures = 0;
+  private timeouts = 0;
+  private readonly exportTimeoutMs: number;
+  private readonly metrics: import("./types.js").MetricRecorder | undefined;
 
   constructor(
     private readonly exporter: SpanExporter,
@@ -97,20 +108,29 @@ export class BatchSpanProcessor implements SpanProcessor {
       options.scheduledDelayMs ?? 5_000,
       "scheduledDelayMs",
     );
+    if (this.scheduledDelayMs > 2_147_483_647) throw new RangeError("scheduledDelayMs exceeds timer range");
     this.onError = options.onError;
+    this.exportTimeoutMs = positiveInteger(options.exportTimeoutMs ?? 5_000, "exportTimeoutMs");
+    if (this.exportTimeoutMs > 2_147_483_647) throw new RangeError("exportTimeoutMs exceeds timer range");
+    this.metrics = options.metrics;
   }
 
   get droppedSpans(): number {
     return this.dropped;
   }
 
+  getDiagnostics(): ProcessorDiagnostics {
+    return { queueSize: this.queue.length, exporting: this.exporting !== undefined, droppedSpans: this.dropped, exportFailures: this.failures, exportTimeouts: this.timeouts, closed: this.closed };
+  }
+
   onEnd(span: FinishedTraceSpan): void {
-    if (this.closed) return;
+    if (this.closed) { this.drop(1); return; }
     if (this.queue.length >= this.maxQueueSize) {
-      this.dropped += 1;
+      this.drop(1);
       return;
     }
     this.queue.push(span);
+    this.queueMetric();
     if (this.queue.length >= this.maxExportBatchSize) {
       this.cancelTimer();
       this.startExport();
@@ -128,10 +148,17 @@ export class BatchSpanProcessor implements SpanProcessor {
   }
 
   async shutdown(): Promise<void> {
-    if (this.closed) return;
+    if (this.shutdownStarted) return;
+    this.shutdownStarted = true;
     this.closed = true;
     await this.forceFlush();
-    await callExporterShutdown(this.exporter, this.onError);
+    try { await boundedOperation(Promise.resolve().then(() => this.exporter.shutdown?.()), this.exportTimeoutMs); }
+    catch (error) {
+      this.failures += 1;
+      if (error instanceof ExportTimeoutError) this.timeouts += 1;
+      this.metric({ name: "may.telemetry.export_failures", kind: "counter", value: 1 });
+      reportError(this.onError, error);
+    }
   }
 
   private schedule(): void {
@@ -151,11 +178,22 @@ export class BatchSpanProcessor implements SpanProcessor {
   private startExport(): void {
     if (this.exporting !== undefined) return;
     const batch = this.queue.splice(0, this.maxExportBatchSize);
+    this.queueMetric();
     if (batch.length === 0) return;
     this.exporting = Promise.resolve().then(async () => {
       try {
-        await this.exporter.export(batch);
+        await boundedOperation(Promise.resolve().then(() => this.exporter.export(batch)), this.exportTimeoutMs);
       } catch (error) {
+        this.failures += 1;
+        this.metric({ name: "may.telemetry.export_failures", kind: "counter", value: 1 });
+        if (error instanceof ExportTimeoutError) {
+          this.timeouts += 1;
+          this.closed = true;
+          this.drop(this.queue.length);
+          this.queue.length = 0;
+          this.cancelTimer();
+          this.queueMetric();
+        }
         reportError(this.onError, error);
       } finally {
         this.exporting = undefined;
@@ -167,6 +205,23 @@ export class BatchSpanProcessor implements SpanProcessor {
       }
     });
   }
+
+  private drop(count: number): void {
+    this.dropped += count;
+    this.metric({ name: "may.telemetry.dropped_spans", kind: "counter", value: count });
+  }
+  private queueMetric(): void { this.metric({ name: "may.telemetry.queue_size", kind: "gauge", value: this.queue.length }); }
+  private metric(record: import("@may/core").MetricRecord): void {
+    try { this.metrics?.record(record); } catch (error) { reportError(this.onError, error); }
+  }
+}
+
+class ExportTimeoutError extends Error { constructor() { super("Telemetry export timed out"); this.name = "ExportTimeoutError"; } }
+
+async function boundedOperation<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { return await Promise.race([operation, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new ExportTimeoutError()), timeoutMs); })]); }
+  finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
 function positiveInteger(value: number, name: string): number {
@@ -183,17 +238,6 @@ function nonNegativeNumber(value: number, name: string): number {
   return value;
 }
 
-async function callExporterShutdown(
-  exporter: SpanExporter,
-  onError: ObservabilityErrorHandler | undefined,
-): Promise<void> {
-  try {
-    await exporter.shutdown?.();
-  } catch (error) {
-    reportError(onError, error);
-  }
-}
-
 function reportError(
   handler: ObservabilityErrorHandler | undefined,
   error: unknown,
@@ -201,6 +245,6 @@ function reportError(
   try {
     handler?.(error);
   } catch {
-    // Export failures must not become Agent failures.
+    // 导出错误与 Agent 执行保持独立。
   }
 }

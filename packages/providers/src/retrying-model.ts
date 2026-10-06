@@ -1,5 +1,8 @@
 import {
   serializeError,
+  traceError,
+  ModelProtocolError,
+  ModelResponseValidationError,
   type Model,
   type ModelContextCompactor,
   type ModelEvent,
@@ -65,7 +68,10 @@ export interface RetryingModelOptions {
  * because the model stream has no reset or retraction event.
  */
 export class RetryingModel implements Model {
-  readonly limits?: ModelLimits;
+  readonly reportsAttempts = true;
+  get capabilityVersion(): string | undefined { return this.model.capabilityVersion; }
+  get configuration(): NonNullable<Model["configuration"]> { return this.model.configuration ?? {}; }
+  get limits(): ModelLimits | undefined { return this.model.limits; }
   readonly contextCompactor?: ModelContextCompactor;
   private readonly maxAttempts: number;
   private readonly baseDelayMs: number;
@@ -79,7 +85,6 @@ export class RetryingModel implements Model {
     private readonly model: Model,
     options: RetryingModelOptions = {},
   ) {
-    if (model.limits !== undefined) this.limits = model.limits;
     if (model.contextCompactor !== undefined) {
       this.contextCompactor = model.contextCompactor;
     }
@@ -95,24 +100,51 @@ export class RetryingModel implements Model {
     this.random = options.random ?? Math.random;
   }
 
+  async preflight(request: ModelRequest, options: ModelStreamOptions): Promise<void> {
+    await this.model.preflight?.(request, options);
+  }
+
   async *stream(
     request: ModelRequest,
     options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
+    await this.preflight(request, options);
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       let completed = false;
       let emittedContent = false;
+      let usage: import("@may/core").Usage | undefined;
+      const telemetry = options.attemptObserver?.start(attempt);
       try {
-        for await (const event of this.model.stream(request, options)) {
+        for await (const event of this.model.stream(request, {
+          ...options,
+          ...(telemetry?.traceContext === undefined ? {} : { traceContext: telemetry.traceContext }),
+        })) {
           if (options.signal.aborted) throw abortReason(options.signal);
-          if (event.type === "text.delta" || event.type === "reasoning.delta") {
+          if ((event.type === "text.delta" || event.type === "reasoning.delta") && event.delta.length > 0) {
             emittedContent = true;
+            telemetry?.content(event.type === "text.delta" ? "text" : "reasoning");
+          }
+          if (event.type === "response.completed") {
+            if (completed) throw new ModelProtocolError("Model emitted more than one response.completed event");
+            completed = true;
+            usage = event.usage;
+            if (event.message.content.some((part) => part.type === "text" && part.text.length > 0)) telemetry?.content("text");
+            if ((event.message.toolCalls?.length ?? 0) > 0) telemetry?.content("tool");
+            if (event.message.content.some(part => part.type !== "text")) telemetry?.content("other");
           }
           yield event;
-          if (event.type === "response.completed") completed = true;
         }
+        if (!completed) throw new ModelProtocolError("Model stream ended without a response.completed event");
+        telemetry?.end({ status: "ok", completed, ...(usage === undefined ? {} : { usage }) });
         return;
       } catch (error) {
+        if (error instanceof ModelResponseValidationError) { completed = error.responseCompleted; usage = error.usage; }
+        telemetry?.end({
+          status: options.signal.aborted ? "cancelled" : "error",
+          error: traceError(error),
+          completed,
+          ...(usage === undefined ? {} : { usage }),
+        });
         const context: ModelRetryContext = {
           attempt,
           maxAttempts: this.maxAttempts,
@@ -136,7 +168,14 @@ export class RetryingModel implements Model {
           delayMs,
           error: serializeError(error),
         };
-        await this.sleep(delayMs, options.signal);
+        const waitStarted = performance.now();
+        try {
+          await this.sleep(delayMs, options.signal);
+        } finally {
+          options.attemptObserver?.retryWait?.(performance.now() - waitStarted);
+        }
+      } finally {
+        telemetry?.end({ status: options.signal.aborted ? "cancelled" : "error", completed, ...(usage === undefined ? {} : { usage }) });
       }
     }
   }

@@ -5,6 +5,8 @@ import { MaybeCodeUsageError } from "./errors.js";
 import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 
 import { AgentWorkspace } from "@may/application";
+import { observabilityService } from "@may/plugin-observability";
+import type { DiagnosticQuery, DiagnosticResult } from "@may/observability";
 import { GitCheckpointError, GitWorkspaceConflictError, ProjectGitWorkspace, type ProjectGitWorkspaceOptions, type GitRestorePreview } from "@may/application/git-workspace";
 import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@may/ui-client";
 import type {
@@ -80,6 +82,7 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
   ) => MaybeCodeModelConfiguration | Promise<MaybeCodeModelConfiguration>;
   readonly resolveModelCapabilities?: (
     profile: string,
+    options?: { readonly refresh?: boolean },
   ) => Promise<ModelCapabilities>;
   readonly persistDefaultModel?: (profile: string) => Promise<void>;
   /** Optional product-owned MCP status and lifecycle event source. */
@@ -946,6 +949,26 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       ...(effectiveEffort === undefined ? {} : { effectiveEffort }),
       overridden,
     };
+  }
+
+  async getModelCapabilities(profile = this.modelInfo?.profile, refresh = false): Promise<ModelCapabilities> {
+    if (profile === undefined || this.state.options.resolveModelCapabilities === undefined) {
+      throw new Error("The active workspace does not provide model capability discovery");
+    }
+    if (!(this.state.options.modelProfiles ?? []).some(model => model.name === profile)) {
+      throw new Error(`Unknown model profile: ${profile}`);
+    }
+    return this.state.options.resolveModelCapabilities(profile, { refresh });
+  }
+
+  get modelCapabilitiesAvailable(): boolean {
+    return this.modelInfo?.profile !== undefined && this.state.options.resolveModelCapabilities !== undefined;
+  }
+
+  getTelemetry(query: DiagnosticQuery = {}): DiagnosticResult | undefined {
+    const sessionId = query.sessionId ?? this.sessionId;
+    if (!this.ownsSession(sessionId)) throw new Error("Telemetry session does not belong to this workspace");
+    return this.manager.activeApplication.getOptionalService(observabilityService)?.diagnostics?.getDiagnostics({ ...query, sessionId });
   }
 
   async setReasoningEffort(

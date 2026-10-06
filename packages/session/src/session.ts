@@ -130,6 +130,7 @@ export class Session {
   private suspendedRuntime: SuspendedRuntime | undefined;
   private readonly steering: SessionSteeringQueue;
   private activeRun: RunHandle | undefined;
+  private latestRunId: string | undefined;
   private readonly submittedInputIds = new Set<string>();
   private readonly deferBranchPositions: boolean;
 
@@ -153,6 +154,7 @@ export class Session {
     this.deferBranchPositions = deferBranchPositions;
     this.steering = new SessionSteeringQueue((event) => this.record(event), history);
     for (const event of history) {
+      if ("runId" in event && typeof event.runId === "string") this.latestRunId = event.runId;
       if (event.type === "input.submitted" && event.inputId !== undefined) this.submittedInputIds.add(event.inputId);
     }
   }
@@ -666,11 +668,13 @@ export class Session {
       traceAttributes: {
         ...(options.traceAttributes ?? {}),
         "may.session.id": this.id,
+        ...(this.latestRunId === undefined ? {} : { "may.run.resumed_from": this.latestRunId }),
       },
     }));
   }
 
   private wrapRun(run: RunHandle): RunHandle {
+    this.latestRunId = run.id;
     this.activeRun = run;
     const completion = run.result.then(async (value) => {
       this.settlingRuns += 1;

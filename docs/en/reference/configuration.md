@@ -144,8 +144,8 @@ the command form `/model <profile-prefix> --default` is used.
 
 | Adapter | Options |
 | --- | --- |
-| `openai-responses` | `maxOutputTokens`, `reasoningEffort`, `reasoningSummary`, `serverCompactThreshold`, `store` |
-| `openai-chat-completions` | `maxOutputTokens`, `reasoningEffort`, `store` |
+| `openai-responses` | `maxOutputTokens`, `reasoningEffort`, `reasoningSummary`, `serverCompactThreshold`, `store`, `responseFormat` |
+| `openai-chat-completions` | `maxOutputTokens`, `reasoningEffort`, `store`, `responseFormat` |
 | `deepseek-chat` | `thinking`, `reasoningEffort`, `maxTokens` |
 | `zhipu-chat` | `thinking`, `clearThinking`, `reasoningEffort`, `maxTokens` |
 | `kimi-chat` | `thinking`, `reasoningEffort`, `maxTokens` |
@@ -153,6 +153,7 @@ the command form `/model <profile-prefix> --default` is used.
 
 Common scalar values:
 
+- All adapters accept `unknownCapabilityPolicy`: `allow` or `require-known`.
 - `reasoningEffort` is a non-empty model-specific string. The adapter only
   serializes the selected value; model capability metadata determines the
   choices shown by MaybeCode. This also lets enhanced compatible providers add
@@ -175,9 +176,9 @@ protocol-level option validation. The resolution order is:
 3. May's built-in model catalog, maintained from vendor documentation.
 4. `unknown` when no reliable source describes the model.
 
-The standard OpenAI `/v1/models` response only identifies models; May does not
-guess reasoning levels from the model name. Provider discovery failures also
-fall through to the built-in catalog or `unknown`.
+The standard OpenAI `/v1/models` response only identifies models. Capability
+snapshots include redacted discovery diagnostics and a bounded cache with
+explicit refresh; unavailable fields stay `unknown`.
 
 Override incorrect or missing metadata on a model profile:
 
@@ -205,6 +206,84 @@ Override incorrect or missing metadata on a model profile:
 
 `defaultEffort` must be one of `efforts`. An explicit override always wins,
 including over a provider's enhanced catalog.
+
+Capabilities accept independent `fields` declarations on model profiles and
+provider connections. Profile fields override model metadata; provider fields
+restrict the connection. Effective support considers model, adapter, and
+connection. `false` disables a capability, and unsupported layers reject a
+request before sending. Omitted connection fields impose no restrictions.
+
+```json
+{
+  "capabilities": {
+    "fields": {
+      "input.text": true,
+      "input.image": true,
+      "input.image.sources": ["url", "base64"],
+      "maxImages": 4,
+      "maxAttachmentBytes": 10485760,
+      "structuredOutput.jsonSchema": true,
+      "structuredOutput.schemaDialects": ["draft-07"],
+      "structuredOutput.schemaConstraint": { "type": "object" }
+    }
+  },
+  "options": {
+    "unknownCapabilityPolicy": "require-known",
+    "responseFormat": {
+      "type": "jsonSchema",
+      "name": "answer",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "properties": { "answer": { "type": "string" } },
+        "required": ["answer"],
+        "additionalProperties": false
+      }
+    }
+  }
+}
+```
+
+This object is a model-profile fragment. `unknownCapabilityPolicy` defaults to
+`allow`; `require-known` rejects unknown requirements. Input sources, sizes and
+MIME types have separate constraints; external metadata may need to be supplied
+by the host. `options.responseFormat` supplies the default format for OpenAI
+Responses and Chat Completions. Accepted formats are `json` and `jsonSchema`
+(`name`, `schema`, optional `strict`). Ajv validates draft-07 and 2020-12 schemas
+and final output. Tool-call responses allow intermediate empty bodies.
+`structuredOutput.schemaConstraint` describes provider-specific schema scope.
+
+Other fields include `input.audio`, `input.file`, `input.resource`,
+`input.audio.sources`, `input.file.sources`, `output.text`, `output.image`,
+`output.audio`, `tools`, `tools.maxCalls`, `structuredOutput.json`,
+`structuredOutput.schemaDialects`, `contextWindowTokens`, `maxOutputTokens`,
+`maxAttachments`, `fileTypes`, `parameters`, `contextCompaction`, and
+`reasoning.modes`. Numbers are
+positive safe integer ceilings, arrays contain permitted values, and
+`parameters` / `structuredOutput.schemaConstraint` are synchronous JSON Schema
+constraints. `tools.maxCalls` limits calls in a model response. The API exposes
+sources, layer declarations, snapshot versions/times, targeted refresh and
+bounded verification records. Non-empty provider parameters require known
+`parameters` constraints under `require-known`. `reasoning.modes` describes
+permitted `effort`, `budget`, `adaptive`, `thinking`, or `summary` modes.
+Context checks include the input token estimate and requested output token
+reservation; unavailable estimates or reservations remain unknown. Native
+Context compaction checks its own capability and input support. Verification
+records state `request-accepted`, `response-validated`, or `failed`, with media
+counts, source forms and observed byte ranges, without storing content.
+`Model.preflight` exposes request validation to May and model wrappers before
+physical attempts and budget reservations. Rejected requests produce zero
+physical attempt records.
+Model wrappers expose the smallest known `limits` from model and connection
+declarations. Discovery limits become available after capability resolution;
+resolve before Context controller creation to use them in its initial budget.
+Capability refresh does not reconfigure an existing Context budget. Profile
+output limits also participate in preflight as actual output reservations.
+Final JSON/schema validation failures throw `ModelResponseValidationError`
+with `responseCompleted: true` and the received Usage/cost receipt. Runtime,
+budget and attempt accounting preserve physical completion and actual usage;
+retry wrappers do not retry these completed responses. Validation messages
+contain fixed descriptions and exclude response content.
 
 The initial built-in catalog covers the documented GPT-5.6 family and the
 DeepSeek V4 API model IDs. GPT-5.6 levels come from the

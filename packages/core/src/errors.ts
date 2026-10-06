@@ -1,3 +1,6 @@
+import type { UsageCost } from "./pricing.js";
+import type { Usage } from "./types.js";
+
 export class MayError extends Error {
   readonly code: string;
 
@@ -34,8 +37,27 @@ export class ToolSchedulerError extends MayError {
 }
 
 export class ModelProtocolError extends MayError {
-  constructor(message: string) {
-    super("MODEL_PROTOCOL_ERROR", message);
+  constructor(message: string, options?: ErrorOptions) {
+    super("MODEL_PROTOCOL_ERROR", message, options);
+  }
+}
+
+export interface ModelResponseReceipt {
+  readonly usage?: Usage;
+  readonly cost?: UsageCost;
+}
+
+export interface ModelResponseValidationErrorOptions extends ErrorOptions, ModelResponseReceipt {}
+
+export class ModelResponseValidationError extends ModelProtocolError {
+  readonly responseCompleted = true;
+  readonly usage?: Usage;
+  readonly cost?: UsageCost;
+
+  constructor(message: string, options: ModelResponseValidationErrorOptions = {}) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    if (options.usage !== undefined) this.usage = structuredClone(options.usage);
+    if (options.cost !== undefined) this.cost = structuredClone(options.cost);
   }
 }
 

@@ -73,6 +73,29 @@ export interface Usage {
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
+  cachedReadTokens?: number;
+  cachedWriteTokens?: number;
+  reasoningTokens?: number;
+  /** 明确每项 token 是否已经计入基础用量；缺失关系按 unknown 处理。 */
+  tokenRelations?: {
+    cachedRead?: UsageTokenRelation;
+    cachedWrite?: UsageTokenRelation;
+    reasoning?: UsageTokenRelation;
+  };
+  items?: readonly UsageItem[];
+  completeness?: { readonly status: "complete" | "partial" | "unavailable"; readonly reason?: string };
+  reportedCost?: { readonly amount: number; readonly currency: string; readonly source: string };
+}
+
+/** total 表示仅计入 totalTokens，inputTokens 和 outputTokens 均不包含该项目。 */
+export type UsageTokenRelation = "input" | "output" | "total" | "none" | "unknown";
+
+export interface UsageItem {
+  readonly id: string;
+  readonly quantity: number;
+  readonly unit: string;
+  /** cost 表示该项目已包含在 reportedCost 中。 */
+  readonly includedIn: "input" | "output" | "cachedRead" | "cachedWrite" | "reasoning" | "cost" | "none" | "unknown";
 }
 
 export function textContent(text: string): ContentPart[] {

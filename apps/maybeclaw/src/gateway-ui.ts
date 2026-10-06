@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { quote } from "shell-quote";
-import { commandArgs, UiError, type UiAction, type UiBlock, type UiCommand, type UiFieldRequest, type UiHost, type UiPageRequest, type UiReceipt, type UiSnapshot } from "@may/ui-client";
+import { commandArgs, createTelemetryPanel, UiError, type UiTelemetryData, type UiAction, type UiBlock, type UiCommand, type UiFieldRequest, type UiHost, type UiPageRequest, type UiReceipt, type UiSnapshot } from "@may/ui-client";
 import { historyPage, readPage, fieldPage } from "@may/ui-client/reading";
 import { UiProjection } from "@may/ui-client/projection";
 import { displayParts, imageAttachment, readEmbeddedImage } from "@may/media";
@@ -36,7 +36,7 @@ export class GatewayUiHost implements UiHost {
     const resources = this.resourceList();
     const commands = ["session.new", "session.create", "session.activate", "gateway.command", "gateway.inspect", "agent.save", "agent.delete", "agent.check", "approval.resolve", "delivery.retry"];
     if (this.gateway.options.settings.persistentRules) commands.push("permission.rule.create", "permission.rule.revoke");
-    if (session) commands.push("session.rename", "session.archive", "session.restore", "session.delete", "session.default", "session.bind", "session.admins", "agent.default", "agent.allow");
+    if (session) commands.push("session.rename", "session.archive", "session.restore", "session.delete", "session.default", "session.bind", "session.admins", "agent.default", "agent.allow", "session.diagnostics");
     if (session?.status === "active") commands.push("message.submit", "run.cancel");
     return {
       version: 1, hostId: this.hostId, revision: ++this.revision,
@@ -59,6 +59,7 @@ export class GatewayUiHost implements UiHost {
           ...this.gateway.store.list<GatewayBinding>("bindings").filter(binding => binding.sessionId === session.id).map(binding => ({ label: binding.agentId, value: `${binding.status} · ${binding.conversationId ?? binding.error ?? "尚无对话 ID"}` })),
         ] }] : []),
         { id: "tasks", title: "执行", fields: tasks.map(task => ({ label: `${task.agentId} · ${task.id}`, value: `${task.status} · graph ${task.graphId} · task ${task.graphTaskId}${task.detail ? ` · ${task.detail}` : ""}` })) },
+        ...(session ? [{ id: "telemetry", title: "执行诊断", fields: [], actions: [{ label: "查询当前会话", command: "session.diagnostics", args: {} }] }] : []),
         { id: "deliveries", title: "消息投递", fields: this.gateway.store.list<GatewayDelivery>("deliveries").filter(item => item.sessionId === session?.id).map(item => ({ label: `${item.entry.account} · ${item.id}`, value: item.status })) },
         { id: "host", title: "服务状态", fields: [{ label: "Gateway", value: JSON.stringify(this.hostStatus(), null, 2) }] },
         ...(this.gateway.options.settings.persistentRules ? [{ id: "permission-rules", title: "持久权限规则", fields: [],
@@ -209,11 +210,25 @@ export class GatewayUiHost implements UiHost {
       await this.gateway.updateAgent(command.args.id!, controlActor, config); return {};
     }
     if (command.name === "agent.check") {
-      commandArgs(command, ["id"]);
+      commandArgs(command, ["id"], ["refresh"]);
+      if (command.args.refresh !== undefined && !["true", "false"].includes(command.args.refresh)) throw new UiError(400, "refresh 必须为 true 或 false。");
       const adapter = await this.gateway.adapter(command.args.id!);
-      return { output: { title: "Agent 能力", text: JSON.stringify(adapter.capabilities, null, 2) } };
+      const model = await adapter.modelCapabilities?.(command.args.refresh === "true");
+      return { output: { title: "Agent 能力", text: JSON.stringify({ agent: adapter.capabilities, ...(model === undefined ? {} : { model }) }, null, 2),
+        ...(adapter.modelCapabilities === undefined ? {} : { actions: [{ label: "刷新模型能力", command: "agent.check", args: { id: command.args.id!, refresh: "true" } }] }),
+      } };
     }
     if (!target) throw new UiError(400, "需要先选择会话。");
+    if (command.name === "session.diagnostics") {
+      commandArgs(command, []);
+      const bindings = this.gateway.store.list<GatewayBinding>("bindings").filter(binding => binding.sessionId === target.id && binding.conversationId !== undefined);
+      const data = await Promise.all(bindings.map(async binding => {
+        const adapter = await this.gateway.adapter(binding.agentId);
+        const result = adapter.diagnostics?.(binding.conversationId!, { limit: 40 }) as UiTelemetryData | undefined;
+        return { agentId: binding.agentId, panel: createTelemetryPanel(result) };
+      }));
+      return { output: { title: "当前会话执行诊断", text: data.length === 0 ? "当前会话尚无 Agent 对话。" : data.map(({ agentId, panel }) => `${agentId}\n${panel.fields.map(field => `${field.label}: ${field.value}`).join("\n")}`).join("\n\n") } };
+    }
     if (command.name === "session.rename") {
       commandArgs(command, ["name"]); await this.gateway.updateSession(target.id, controlActor, { name: command.args.name! }); return {};
     }

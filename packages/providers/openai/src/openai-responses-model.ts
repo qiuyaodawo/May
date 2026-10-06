@@ -7,6 +7,7 @@ import type {
   ModelStreamOptions,
 } from "@may/core";
 import { parseRetryAfterMs } from "@may/provider-openai-compatible/http";
+import { assertModelResponseFormat, validateStructuredModelResponse } from "@may/core";
 
 import {
   toOpenAIResponsesRequestParts,
@@ -76,6 +77,7 @@ export class OpenAIResponsesModel implements Model {
     request: ModelRequest,
     options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
+    assertModelResponseFormat(request);
     const parts = toOpenAIResponsesRequestParts(request.messages);
     const body: Record<string, unknown> = {
       model: this.model,
@@ -86,6 +88,12 @@ export class OpenAIResponsesModel implements Model {
     };
     if (parts.instructions !== undefined) body.instructions = parts.instructions;
     if (request.tools.length > 0) body.tools = toOpenAIResponsesTools(request.tools);
+    if (request.responseFormat !== undefined) {
+      const format = request.responseFormat;
+      body.text = { format: format.type === "json"
+        ? { type: "json_object" }
+        : { type: "json_schema", name: format.name, schema: format.schema, ...(format.strict === undefined ? {} : { strict: format.strict }) } };
+    }
     if (this.maxOutputTokens !== undefined) {
       body.max_output_tokens = this.maxOutputTokens;
     }
@@ -99,7 +107,10 @@ export class OpenAIResponsesModel implements Model {
     }
 
     const response = await this.fetch("/responses", body, options.signal);
-    yield* streamOpenAIResponse(response, options.signal);
+    for await (const event of streamOpenAIResponse(response, options.signal)) {
+      if (event.type === "response.completed") validateStructuredModelResponse(event.message, request, event);
+      yield event;
+    }
   }
 
   private async compact(

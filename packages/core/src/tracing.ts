@@ -48,6 +48,19 @@ export interface TraceSpan {
  */
 export interface Tracer {
   startSpan(name: string, options?: TraceSpanStartOptions): TraceSpan;
+  recordMetric?(record: MetricRecord): void;
+}
+
+export interface MetricRecord {
+  readonly name: string;
+  readonly kind: "counter" | "histogram" | "gauge" | "updown";
+  readonly value: number;
+  readonly attributes?: TraceAttributes;
+  readonly unit?: string;
+}
+
+export function recordMetric(tracer: Tracer | undefined, record: MetricRecord): void {
+  try { tracer?.recordMetric?.(record); } catch { /* 遥测失败由组件的诊断接口记录。 */ }
 }
 
 /** Start a span without allowing a third-party tracer failure to affect May. */

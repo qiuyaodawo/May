@@ -1,5 +1,10 @@
 # @may/ui-client
 
+`createTelemetryPanel(data)` creates a reusable bounded diagnostic panel using
+the public `UiTelemetryData` and `UiTelemetryRecord` DTOs. It shows independent
+span durations, outcome, parent identity, sampling selection and retention
+coverage, with at most 40 rows. Hosts authorize and page diagnostic queries.
+
 Optional `UiSnapshot.workspace`, `forkPoints`, `checkpoints` and `worktrees` fields
 carry structured workspace versions and Session ancestry. `ApplicationUiOptions`
 accepts asynchronous callbacks with these names; hosts retain Git and fork policy.
