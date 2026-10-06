@@ -1,0 +1,32 @@
+{
+  "name": "@may/eval",
+  "version": "0.1.0",
+  "description": "Repeatable Agent task execution, independent evaluation and evidence reports.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./application": { "types": "./dist/application.d.ts", "import": "./dist/application.js" },
+    "./coordination": { "types": "./dist/coordination.d.ts", "import": "./dist/coordination.js" },
+    "./file-store": { "types": "./dist/file-store.d.ts", "import": "./dist/file-store.js" }
+  },
+  "files": ["dist", "!dist/.tsbuildinfo"],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+  },
+  "dependencies": {
+    "@may/core": "workspace:*",
+    "@may/application": "workspace:*",
+    "@may/coordination": "workspace:*",
+    "@may/observability": "workspace:*",
+    "@may/permissions": "workspace:*",
+    "ajv": "^8.20.0",
+    "tree-kill": "^1.2.2"
+  },
+  "devDependencies": { "@types/node": "^22.0.0" },
+  "engines": { "node": ">=22.16.0" },
+  "license": "MIT"
+}

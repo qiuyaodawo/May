@@ -69,6 +69,9 @@ jobs:
       - name: Check MaybeClaw CLI entry point
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
         run: node apps/maybeclaw/dist/bin.js --help
+      - name: Check Eval CLI entry point
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
+        run: node apps/eval/dist/bin.js --help
 
   package:
     name: Packed package smoke tests
@@ -93,3 +96,5 @@ jobs:
         run: pnpm test:package:maybecode
       - name: Verify independently installed plugin host
         run: pnpm test:package:plugin
+      - name: Verify independently installed evaluation package
+        run: pnpm test:package:eval

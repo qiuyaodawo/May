@@ -11,4 +11,7 @@ review/
 plugin-verification/
 .pi-delegate/
 scheduler-verification/
+.eval-results/
+.eval-workspaces/
+eval-verification/
 .may/permission-rules.json*

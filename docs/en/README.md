@@ -56,6 +56,7 @@ interfaces are intended for extension.
 - [Permission policy](guides/permission-policy.md)
 - [Observability and tracing](guides/observability.md)
 - [Model capabilities and execution diagnostics](guides/model-telemetry-integration.md)
+- [Agent behavior evaluation](guides/eval.md)
 - [MCP tools](guides/mcp.md)
 - [MCP authentication](guides/mcp-auth.md)
 - [MCP Host roadmap](architecture/mcp-host-roadmap.md)

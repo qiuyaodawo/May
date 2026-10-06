@@ -1,0 +1,20 @@
+{
+  "name": "@may/eval-cli",
+  "version": "0.1.0",
+  "description": "Private command-line host for May Agent evaluation experiments.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "pnpm run build && node --test test/*.test.mjs"
+  },
+  "dependencies": { "@may/eval": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.0.0" },
+  "engines": { "node": ">=22.16.0" },
+  "license": "MIT"
+}

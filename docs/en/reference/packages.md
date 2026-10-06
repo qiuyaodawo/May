@@ -23,6 +23,7 @@ See [Image replies](../guides/images.md) for Terminal, Web UI and channel integr
 | Manage multiple sessions in one workspace | `@may/application` | A `SessionCatalog` from `@may/session/catalog` |
 | Coordinate Agent teams, resources and remote workers | `@may/coordination` | Agent definitions, durable coordination and Session stores, explicit host policies |
 | Trigger host tasks on a schedule or incoming event | `@may/scheduler` | SQLite storage and an idempotent host task dispatcher |
+| Evaluate Agent task results across configurations | `@may/eval` | Isolated resources, execution adapters, independent evaluators and durable reports |
 | Build a terminal Agent | Headless application controller | `@may/tui`, optionally `@may/keybindings` |
 | Build a browser Agent | Product `UiHost` or `ApplicationUiHost` | `@may/ui-client`, `@may/web-ui` |
 | Build a coding Agent | Headless application controller | `@may/coding-tools` and an execution isolation policy |

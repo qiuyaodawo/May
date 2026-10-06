@@ -7,6 +7,10 @@ be used independently or combined into complete agents and applications.
 start a timer loop or call `tick()`, and supply an idempotent task dispatcher.
 See [Scheduling](docs/en/guides/scheduler.md) or [持久化调度](docs/zh-CN/guides/scheduler.md).
 
+`@may/eval` runs repeated Agent tasks with independent evaluators, durable evidence,
+and configuration comparisons. See [Agent evaluation](docs/en/guides/eval.md)
+or [Agent 行为评估](docs/zh-CN/guides/eval.md).
+
 ## Workspace
 
 Reusable plugins live in `packages/plugins/`, shared service tokens and contribution

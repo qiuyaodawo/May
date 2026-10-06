@@ -21,6 +21,7 @@ Terminal、Web UI 和渠道接入方式参见[图片回复](../guides/images.md)
 | 在一个 workspace 中管理多个 Session | `@may/application` | `@may/session/catalog` 的 `SessionCatalog` |
 | 协调 Agent 团队、资源与远程 Worker | `@may/coordination` | Agent definition、持久化协作与 Session store、显式宿主策略 |
 | 按照时间或收到的事件触发宿主任务 | `@may/scheduler` | SQLite 存储和按照执行身份去重的宿主任务提交接口 |
+| 比较不同配置的 Agent 任务结果 | `@may/eval` | 独立资源、执行 adapter、独立验收程序与持久报告 |
 | 构建终端 Agent | Headless application controller | `@may/tui`，可选 `@may/keybindings` |
 | 构建浏览器 Agent | 产品 `UiHost` 或 `ApplicationUiHost` | `@may/ui-client`、`@may/web-ui` |
 | 构建编码 Agent | Headless application controller | `@may/coding-tools` 和执行隔离策略 |
