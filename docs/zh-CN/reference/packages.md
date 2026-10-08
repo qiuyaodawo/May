@@ -243,6 +243,10 @@ Chat Completions 的 chunk 出现顶层 `error` 字段时，流立即失败。�
 - `@may/coding-tools/instructions`；
 - `@may/coding-tools/change-preview`。
 
+`codingRuntimeInstructions()` 生成 workspace、操作系统、shell、Agent 角色、会话来源
+及权限字段。`shellRuntimeInstructions()` 提供对应 shell 的语法指导。项目指令包含其
+绝对来源路径。参阅 [MaybeCode 提示词组装](../guides/maybecode-instructions.md)。
+
 Shell 工具以 May 进程的宿主权限执行。需要执行隔离的应用应独立提供相关限制。参阅
 [自定义工具](../guides/custom-tool.md)。
 

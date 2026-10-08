@@ -111,6 +111,9 @@ and `onPluginHookError`. The plugin composition is snapshotted by the definition
 each application creates its own application, session, and Run scopes.
 `applicationServices` exposes typed service tokens for the model, Context factory,
 session store, permissions, tools, executor, scheduler, tracer, and Runtime factory.
+Changes to assembled instruction sources invalidate the current Context's provider
+token measurement. Subsequent inspection estimates the current content until new
+provider usage is recorded.
 Options are adapted into component plugin factories. Supplying an option and a
 plugin that both provide the same base service fails before setup.
 `getService(token)` reads an enabled service from the session scope.

@@ -75,11 +75,25 @@ workspace-root instruction documents without coupling prompt policy to a
 specific agent product:
 
 ```ts
-import { loadCodingInstructions } from "@may/coding-tools/instructions";
+import {
+  codingRuntimeInstructions,
+  loadCodingInstructions,
+} from "@may/coding-tools/instructions";
+import { createShellTool, getShellToolInfo } from "@may/coding-tools";
+
+const shell = createShellTool({ cwd: process.cwd() });
+const shellInfo = getShellToolInfo(shell);
 
 const instructions = await loadCodingInstructions({
   workspace: process.cwd(),
   defaultSystemInstructions: "You are a coding agent.",
+  runtimeInstructions: codingRuntimeInstructions({
+    workspace: process.cwd(),
+    ...(shellInfo === undefined ? {} : { shell: shellInfo }),
+    agentRole: "main agent",
+    sessionOrigin: "new session",
+    permissionMode: "ask",
+  }),
   projectInstructionsFilename: "AGENTS.md",
   sectionLabels: {
     runtime: "Runtime environment",
@@ -95,6 +109,26 @@ is used. Project instruction discovery can be disabled with
 `projectInstructionsFilename: false`. Instruction files reject symbolic links,
 reparse points, and hard links rather than risk reading outside their declared
 root.
+
+`codingRuntimeInstructions` returns runtime text without a Markdown heading.
+It resolves the workspace to an absolute path, names the current operating
+system, and includes shell metadata and syntax guidance when `shell` is supplied.
+The default Agent role is `main agent` and the default Session origin is
+`new session`. Applications can provide `sub-agent`, `resumed session`, or
+`historical branch`, along with `assignedRole`, `parentTask`, `historicalSource`,
+and `permissionMode` when applicable. Historical branches include guidance to
+read current files before relying on historical file contents.
+
+`shellRuntimeInstructions` provides syntax guidance for the configured shell.
+The tool description provides its execution purpose and host permissions;
+the shell name appears in the runtime metadata. The composed project section
+includes `Source: <absolute file path>` before the complete document contents.
+Applications can call these functions again when runtime state or instruction
+files change.
+
+`getShellToolInfo` also works with tools captured by `ToolRegistry.snapshot()`.
+It returns a copy of the shell metadata. The metadata is kept outside the
+model-facing tool definitions.
 
 ## Safety boundaries
 

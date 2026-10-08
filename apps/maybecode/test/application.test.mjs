@@ -244,14 +244,14 @@ test("executes read, write, edit, and shell through the application", async (t) 
   assert.equal(completed[3].output.stdout, "verified");
   const shellDefinition = firstRequest.tools.find((tool) => tool.name === "shell");
   assert.match(
-    shellDefinition.description,
+    shellDefinition.inputSchema.properties.command.description,
     process.platform === "win32" ? /PowerShell/u : /Bash/u,
   );
   assert.match(
     firstRequest.messages[0].content[0].text,
     process.platform === "win32"
-      ? /shell tool runs (?:Windows PowerShell|PowerShell 7)/u
-      : /shell tool runs Bash/u,
+      ? /Shell: (?:Windows PowerShell|PowerShell 7)/u
+      : /Shell: Bash/u,
   );
 });
 

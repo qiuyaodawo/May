@@ -49,14 +49,14 @@ export class SkillSession {
   instructions(): string {
     const active = this.listActive();
     return [this.registry.catalogInstructions(), ...(active.length === 0 ? [] : [
-      "Activated skill snapshots (task guidance; host/user instructions and execution permissions take precedence):\n" + JSON.stringify(active),
+      "# Active skills\n\n" + JSON.stringify(active),
     ])].filter(Boolean).join("\n\n");
   }
 
   readTool(): Tool {
     return {
       name: "skill_read",
-      description: "Activate a named skill and read its instructions, or read a referenced UTF-8 resource inside that skill. Does not execute scripts or grant tool permissions.",
+      description: "Activate a named skill and read its instructions, or read a referenced UTF-8 resource inside that skill. Resources are read without executing scripts; paths are relative to the skill directory.",
       inputSchema: { type: "object", properties: { name: { type: "string" }, path: { type: "string" } }, required: ["name"], additionalProperties: false },
       parse(input: unknown) {
         if (typeof input !== "object" || input === null || !("name" in input) || typeof input.name !== "string" ||

@@ -1,5 +1,6 @@
 import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, resolve, relative, sep } from "node:path";
+import { shellRuntimeInstructions, type ShellToolInfo } from "./shell.js";
 
 export const DEFAULT_CODING_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
 export const DEFAULT_SYSTEM_INSTRUCTIONS_FILENAME = "system.md";
@@ -32,6 +33,64 @@ export interface CodingInstructions {
   readonly runtime?: CodingInstructionDocument;
   readonly project?: CodingInstructionDocument;
   readonly effective: string;
+}
+
+export interface CodingRuntimeInstructionsOptions {
+  readonly workspace: string;
+  readonly shell?: ShellToolInfo;
+  readonly agentRole?: "main agent" | "sub-agent";
+  readonly sessionOrigin?: "new session" | "resumed session" | "historical branch";
+  readonly permissionMode?: string;
+  readonly assignedRole?: string;
+  readonly parentTask?: string;
+  readonly historicalSource?: string;
+}
+
+export function codingRuntimeInstructions(
+  options: Readonly<CodingRuntimeInstructionsOptions>,
+): string {
+  if (options.workspace.trim() === "") {
+    throw invalidOption("workspace must not be empty");
+  }
+  const operatingSystem = process.platform === "win32"
+    ? "Windows"
+    : process.platform === "darwin"
+    ? "macOS"
+    : process.platform === "linux"
+    ? "Linux"
+    : process.platform;
+  const sessionOrigin = options.sessionOrigin ?? "new session";
+  const lines = [
+    `Workspace: ${resolve(options.workspace)}`,
+    `Operating system: ${operatingSystem}`,
+    ...(options.shell === undefined ? [] : [`Shell: ${options.shell.displayName}`]),
+    `Agent role: ${options.agentRole ?? "main agent"}`,
+    `Session origin: ${sessionOrigin}`,
+  ];
+  if (options.permissionMode !== undefined) {
+    lines.push(`Permission mode: ${options.permissionMode}`);
+  }
+  if (options.assignedRole !== undefined) {
+    lines.push(`Assigned role: ${options.assignedRole}`);
+  }
+  if (options.parentTask !== undefined) {
+    lines.push(`Parent task: ${options.parentTask}`);
+  }
+  if (options.historicalSource !== undefined) {
+    lines.push(`Source session: ${options.historicalSource}`);
+  }
+  const sections = [lines.join("\n")];
+  if (sessionOrigin === "historical branch") {
+    sections.push(
+      "The conversation begins from a historical point.\n" +
+        "Workspace files may have changed since that point.\n" +
+        "Read current files before relying on historical file contents.",
+    );
+  }
+  if (options.shell !== undefined) {
+    sections.push(shellRuntimeInstructions(options.shell));
+  }
+  return sections.join("\n\n");
 }
 
 export interface LoadCodingInstructionsOptions {
@@ -143,7 +202,10 @@ export async function loadCodingInstructions(
     sections.push(`# ${settings.labels.runtime}\n\n${runtime.content}`);
   }
   if (project !== undefined) {
-    sections.push(`# ${settings.labels.project}\n\n${project.content}`);
+    const source = project.source.type === "file"
+      ? `Source: ${project.source.path}\n\n`
+      : "";
+    sections.push(`# ${settings.labels.project}\n\n${source}${project.content}`);
   }
 
   return {

@@ -37,7 +37,7 @@ test("replaces the built-in prompt and appends workspace AGENTS.md", async (t) =
   assert.equal(instructions.project.content, "project rules");
   assert.equal(
     instructions.effective,
-    "custom system\n\n# Project instructions\n\nproject rules",
+    `custom system\n\n# Project instructions\n\nSource: ${await realpath(join(workspace, "AGENTS.md"))}\n\nproject rules`,
   );
   assert.doesNotMatch(instructions.effective, /You are MaybeCode/u);
 });

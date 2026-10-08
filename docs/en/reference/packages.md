@@ -285,6 +285,11 @@ are:
 - `@may/coding-tools/instructions`;
 - `@may/coding-tools/change-preview`.
 
+`codingRuntimeInstructions()` generates workspace, operating system, shell,
+Agent role, Session origin and permission fields. `shellRuntimeInstructions()`
+supplies shell-specific syntax guidance. Loaded project instructions include
+their absolute source path. See [MaybeCode instruction composition](../guides/maybecode-instructions.md).
+
 The shell tool executes with host process permissions. Applications that require
 execution isolation must supply it separately. See [Custom tools](../guides/custom-tool.md).
 

@@ -15,7 +15,7 @@ export function createSkillsPlugin<C = unknown>(options: SkillsPluginOptions<C>)
       context.provide(services.skills, skills);
       const registration = { id: context.pluginId, pluginOrder: context.pluginOrder };
       context.defer(context.get(services.toolSources).add(() => [skills.readTool()], registration));
-      context.defer(context.get(services.instructionSources).add(() => skills.instructions(), registration));
+      context.defer(context.get(services.instructionSources).add(() => skills.instructions(), { ...registration, order: 0 }));
     },
   });
 }

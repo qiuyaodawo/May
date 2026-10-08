@@ -29,7 +29,14 @@ export interface MaybeCodePluginComposition {
 
 export function createMaybeCodePlugins(
   options: MaybeCodeApplicationOptions,
-  environment: { readonly workspace: string; readonly instructions: string; readonly contextBudget?: ContextBudget },
+  environment: {
+    readonly workspace: string;
+    readonly instructions: string;
+    readonly contextBudget?: ContextBudget;
+    readonly instructionsSource?: () => string;
+    readonly projectInstructionsSource?: () => string;
+    readonly prepareInstructions?: () => Promise<void>;
+  },
 ): MaybeCodePluginComposition {
   const { workspace, instructions, contextBudget } = environment;
   const autoMode = options.autoCompactionMode ??
@@ -93,6 +100,10 @@ export function createMaybeCodePlugins(
   }));
   if (options.subagents !== false) defaults.push(createDelegationPlugin({
     workspace, instructions,
+    ...(environment.instructionsSource === undefined ? {} : { instructionsSource: environment.instructionsSource }),
+    ...(environment.projectInstructionsSource === undefined ? {} : { projectInstructionsSource: environment.projectInstructionsSource }),
+    ...(environment.prepareInstructions === undefined ? {} : { prepareInstructions: environment.prepareInstructions }),
+    permissionModeSource: () => options.gitWorkspace?.readOnly ? "read-only" : options.permissionModeSource?.() ?? (options.permissionPolicy ? "custom" : "default"),
     ...(options.subagents ?? {}),
     ...(options.toolSource === undefined ? {} : { toolSource: options.toolSource }),
     ...(contextBudget === undefined ? {} : { contextBudget }),

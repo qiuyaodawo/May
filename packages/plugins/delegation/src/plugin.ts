@@ -40,6 +40,10 @@ export interface DelegationPluginOptions {
   readonly createRoleModel?: (role: MaybeCodeSubagentRole) => Model | undefined;
   readonly contextBudgetFor?: (role: MaybeCodeSubagentRole) => ContextBudget | undefined;
   readonly instructions: string;
+  readonly instructionsSource?: () => string;
+  readonly projectInstructionsSource?: () => string;
+  readonly prepareInstructions?: () => Promise<void>;
+  readonly permissionModeSource?: () => string;
   readonly skills?: SkillRegistry;
   readonly toolSource?: () => Iterable<Tool>;
   readonly contextBudget?: ContextBudget;
@@ -69,7 +73,7 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
         model => withRequestBudget(model, () => host?.ledger()), { id: context.pluginId, order: 20, pluginOrder: context.pluginOrder },
       ));
       context.defer(context.get(applicationServices.toolSources).add(() => host?.tools() ?? [], { id: context.pluginId, pluginOrder: context.pluginOrder }));
-      context.defer(context.get(applicationServices.instructionSources).add(() => host?.instructions() ?? "", { id: context.pluginId, pluginOrder: context.pluginOrder }));
+      context.defer(context.get(applicationServices.instructionSources).add(() => host?.instructions() ?? "", { id: context.pluginId, order: 20, pluginOrder: context.pluginOrder }));
       context.provide(delegationService, {
         get() {
           if (host === undefined) throw new Error("Delegation is unavailable before application creation");
@@ -92,6 +96,10 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
           dataDirectory: options.dataDirectory ?? (store.directory === undefined ? join(homedir(), ".may", "maybecode") : dirname(store.directory)),
           sessionId: application.sessionId, application, store, model,
           instructions: options.instructions,
+          ...(options.instructionsSource === undefined ? {} : { instructionsSource: options.instructionsSource }),
+          ...(options.projectInstructionsSource === undefined ? {} : { projectInstructionsSource: options.projectInstructionsSource }),
+          ...(options.prepareInstructions === undefined ? {} : { prepareInstructions: options.prepareInstructions }),
+          ...(options.permissionModeSource === undefined ? {} : { permissionModeSource: options.permissionModeSource }),
           permissionPolicy: context.get(applicationServices.permissionPolicy),
           fileGuard: context.get(workspaceFilesService),
           autoCompactionMode: options.autoCompactionMode ?? "prune-summary",

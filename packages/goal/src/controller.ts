@@ -3,7 +3,7 @@ import { setImmediate as nextTurn } from "node:timers/promises";
 import type { ContextFactory } from "@may/context";
 import type { Model, ModelRequest, Tool, Usage } from "@may/core";
 import { goalBudget, goalText, restoreGoal } from "./state.js";
-import type { GoalAgent, GoalBudget, GoalEvent, GoalModelOptions, GoalOptions, GoalRun, GoalState, GoalStore } from "./types.js";
+import type { GoalAgent, GoalBudget, GoalContextOptions, GoalEvent, GoalModelOptions, GoalOptions, GoalRun, GoalState, GoalStore } from "./types.js";
 
 class GoalLimitError extends Error {}
 
@@ -121,18 +121,21 @@ export class GoalController {
   instructions(): string {
     const state = this.state;
     if (!this.isRunning || state?.status !== "active") return "";
-    return `An active goal is managed by the host. Continue working across runs until it is complete.\n` +
-      `The host has started goal run ${state.usage.runs}. Treat the current run number and current goal state as authoritative. ` +
-      `At the beginning of each run, call get_goal for fresh state, then perform the next unfinished work.\n` +
-      `Report progress with update_goal. Report completed only with concrete evidence; report blocked when user input or an external prerequisite is required. ` +
-      `Completion ends execution at the next complete tool-step boundary. Use the current permissions and user instructions.\n` +
-      `Goal: ${JSON.stringify(state.objective)}\nProgress: ${JSON.stringify(state.progress)}\n` +
-      `Runs: ${state.usage.runs}/${state.budget.maxRuns ?? "unlimited"}. Tokens: ${state.usage.totalTokens}/${state.budget.maxTotalTokens ?? "unlimited"}.`;
+    return `# Active goal\n\n` +
+      `An active goal is managed by the host.\n` +
+      `At the beginning of each run, read get_goal and continue unfinished work.\n` +
+      `Report progress through update_goal.\n` +
+      `Report completion with evidence, or a blocker with the required prerequisite.\n\n` +
+      `Objective: ${JSON.stringify(state.objective)}\nProgress: ${JSON.stringify(state.progress)}\n` +
+      `Run: ${state.usage.runs}/${state.budget.maxRuns ?? "unlimited"}\n` +
+      `Token budget: ${state.usage.totalTokens}/${state.budget.maxTotalTokens ?? "unlimited"}`;
   }
 
-  wrapContextFactory(factory: ContextFactory): ContextFactory {
+  wrapContextFactory(factory: ContextFactory, wrapperOptions: GoalContextOptions = {}): ContextFactory {
     return { create: async options => {
-      const source = () => [options.instructionsSource?.() ?? options.instructions, this.instructions(), this.continuationInstructions()].filter(Boolean).join("\n\n");
+      const source = () => [options.instructionsSource?.() ?? options.instructions,
+        wrapperOptions.includeInstructions === false ? "" : this.instructions(),
+        this.continuationInstructions()].filter(Boolean).join("\n\n");
       const managed = await factory.create({ ...options, instructions: source(), instructionsSource: source });
       this.subscribe(() => managed.controller?.invalidateMeasurement?.());
       return managed;
@@ -141,8 +144,7 @@ export class GoalController {
 
   private continuationInstructions(): string {
     if (!this.isRunning || this.state?.status !== "active") return "";
-    return `Goal execution is active. Current host run: ${this.state.usage.runs}. Continue the unfinished goal now. ` +
-      `Read get_goal for current state. Report completed with evidence or blocked with the required user input through update_goal.`;
+    return "Continue the active goal from its current state.";
   }
 
   private currentRequest(request: ModelRequest): ModelRequest {

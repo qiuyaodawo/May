@@ -47,7 +47,7 @@ test("loads configurable system, runtime, and project instruction sections", asy
   assert.equal(
     instructions.effective,
     "file system\n\n# Environment\n\nnode runtime\n\n" +
-      "# Repository rules\n\nworkspace rules",
+      `# Repository rules\n\nSource: ${await realpath(join(workspace, "PROJECT.md"))}\n\nworkspace rules`,
   );
 });
 

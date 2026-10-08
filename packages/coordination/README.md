@@ -43,6 +43,11 @@ step is settled and persisted, freeing the slot. The parent wakes in a new turn
 with all child outcomes, including failures. No automatic model/tool retries are added
 by coordination; injected providers may still have their own retry policies.
 
+The `delegate_tasks` description specifies standalone briefs with the goal,
+context, file ownership, constraints, expected evidence and report format.
+Its host-provided guidance and authorized roles remain optional contributions;
+hosts provide their workspace rules and task limits through their instructions.
+
 Task limits, concurrency and the coordination deadline are host-enforced.
 `limits.runBudget` applies to each Run; it is not a shared token/cost allowance.
 Delegation requires an explicit `authorizeDelegation` policy in addition to tool

@@ -87,6 +87,11 @@ Goal Context 将动态 instructions 与当前宿主状态加入模型请求，�
 `may.goal` 下。SDK 调用方可以在打开 MaybeCode 时使用 `goals: false` 禁用组件。
 其他应用自行决定是否导入和连接这个 package。
 
+goals plugin 将活动指导注册到 `instructionSources`，使用 `order: 40`。
+独立宿主可以自行注册 `goals.instructions()`，同时使用
+`wrapContextFactory(factory, { includeInstructions: false })` 保留容量估计失效通知
+和请求最后位置的简短提醒。默认 Context wrapper 自行提供活动指导。
+
 `wrapModel(model, { includeInstructions: false })` 让子模型调用遵守同一 Goal 的
 token 计量、预算与取消信号，同时由子任务的 Context 提供任务指令。默认包装器要求
 通过 `wrapContextFactory()` 提供主 Agent 当前的 Goal 指令。delegation plugin

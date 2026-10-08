@@ -39,6 +39,7 @@ export function createHistoryMemoryPlugin(options: HistoryMemoryPluginOptions = 
       { service: applicationServices.application }, { service: applicationServices.model },
       { service: applicationServices.modelWrappers }, { service: applicationServices.contextWrappers },
       { service: applicationServices.toolSources },
+      { service: applicationServices.instructionSources },
     ],
     requiresHooks: [applicationHooks.created, applicationHooks.inputReceived, applicationHooks.beforeClose],
     state: { version: 1, initial: { notes: null } },
@@ -79,7 +80,10 @@ export function createHistoryMemoryPlugin(options: HistoryMemoryPluginOptions = 
         };
       });
       context.defer(context.get(applicationServices.contextWrappers).add(
-        factory => memory.wrap(factory), { id: context.pluginId, order: 20, pluginOrder: context.pluginOrder },
+        factory => memory.wrap(factory, { includeInstructions: false }), { id: context.pluginId, order: 20, pluginOrder: context.pluginOrder },
+      ));
+      context.defer(context.get(applicationServices.instructionSources).add(
+        () => memory.instructions(), { id: context.pluginId, order: 60, pluginOrder: context.pluginOrder },
       ));
       context.defer(context.get(applicationServices.toolSources).add(
         () => memory.tools(), { id: context.pluginId, pluginOrder: context.pluginOrder },

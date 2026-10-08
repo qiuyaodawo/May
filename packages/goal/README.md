@@ -19,5 +19,11 @@ under the same Goal budget and cancellation signal while their own Context
 retains the task's instructions. The default wrapper requires
 `wrapContextFactory()` for the main Agent's current Goal instructions.
 
+`wrapContextFactory(factory, { includeInstructions: false })` supports hosts
+that register `instructions()` in their own ordered instruction sources. It
+retains the measured continuation reminder and invalidates Context measurement
+when Goal state changes. The default composition supplies both the active Goal
+instructions and the reminder. Guidance appears only during active execution.
+
 See the [English guide](../../docs/en/guides/goals.md) and
 [简体中文指南](../../docs/zh-CN/guides/goals.md) for composition, budgets and recovery.

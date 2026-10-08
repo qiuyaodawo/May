@@ -17,10 +17,7 @@ import type {
 } from "@may/application";
 import {
   createToolChangePreview,
-  createCodingTools,
   decodeToolChangePreviewPresentation,
-  getShellToolInfo,
-  shellRuntimeInstructions,
   TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
   TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
 } from "@may/coding-tools";
@@ -72,6 +69,7 @@ import type {
 import type { MaybeCodeRun, MaybeCodeSessionEvent } from "./events.js";
 import {
   loadMaybeCodeInstructions,
+  MaybeCodeInstructionState,
   type MaybeCodeInstructions,
 } from "./instructions.js";
 import { HistoryReferenceMemory, historyMemoryService } from "@may/plugin-history-memory";
@@ -79,6 +77,7 @@ import { goalsService } from "@may/plugin-goals";
 import { delegationService } from "@may/plugin-delegation";
 import type { GoalController, GoalAgent, GoalBudget } from "@may/goal";
 import { createMaybeCodePlugins, requestRecord } from "./plugins/application.js";
+import { createMaybeCodeInstructionsPlugin } from "./plugins/instructions.js";
 import { SubagentHost, type SubagentRequestPlan } from "./subagent-host.js";
 import {
   type MaybeCodeSubagentConfiguration,
@@ -160,7 +159,7 @@ export class MaybeCodeApplication {
   readonly events: AsyncIterable<MaybeCodeSessionEvent>;
   readonly sessionId: string;
   readonly workspace: string;
-  private readonly baseInstructions: MaybeCodeInstructions;
+  private readonly instructionState: MaybeCodeInstructionState;
   readonly modelInfo: MaybeCodeModelInfo | undefined;
 
   private readonly application: AgentApplication;
@@ -193,7 +192,7 @@ export class MaybeCodeApplication {
   private constructor(
     workspace: string,
     application: AgentApplication,
-    instructions: MaybeCodeInstructions,
+    instructions: MaybeCodeInstructionState,
     manualCompactionStrategy: ContextCompactionStrategy,
     summaryTailStrategy: ContextCompactionStrategy,
     historyReferenceStrategy: ContextCompactionStrategy,
@@ -207,7 +206,7 @@ export class MaybeCodeApplication {
     this.workspace = workspace;
     this.application = application;
     this.sessionId = application.sessionId;
-    this.baseInstructions = instructions;
+    this.instructionState = instructions;
     this.manualCompactionStrategy = manualCompactionStrategy;
     this.summaryTailStrategy = summaryTailStrategy;
     this.historyReferenceStrategy = historyReferenceStrategy;
@@ -233,14 +232,10 @@ export class MaybeCodeApplication {
       options.tools ?? [],
       options.additionalTools ?? [],
     );
-    const shellInfo = [...(options.tools === undefined ? createCodingTools({ cwd: workspace }).values() : configuredTools.values())]
-      .map((tool) => getShellToolInfo(tool))
-      .find((info) => info !== undefined);
     const created = options.resume && options.sessionId && options.store.inspect ? (await options.store.inspect(options.sessionId))[0] : undefined;
     const sessionMetadata = options.sessionMetadata ?? (created?.type === "session.created" ? created.metadata : undefined);
-    const fork = sessionMetadata?.workspaceFork as { currentFiles?: boolean; sourceWorkspace?: string; sourceCommit?: string } | undefined;
-    const runtimeInstructions = [shellInfo ? shellRuntimeInstructions(shellInfo) : "",
-      fork?.currentFiles ? `This Session begins from a historical reply. The current workspace retains its current files and Git branch. Files may have changed after the historical reply${fork.sourceCommit ? ` (${fork.sourceCommit})` : ""}. Read current files before editing them.` : ""].filter(Boolean).join("\n\n");
+    const fork = sessionMetadata?.workspaceFork as { sourceWorkspace?: string } | undefined;
+    const forkOrigin = options.fork ?? (created?.type === "session.created" ? created.fork : undefined);
     const instructions = await loadMaybeCodeInstructions({
       workspace,
       ...(options.instructions === undefined
@@ -249,10 +244,12 @@ export class MaybeCodeApplication {
       ...(options.instructionsDirectory === undefined
         ? {}
         : { instructionsDirectory: options.instructionsDirectory }),
-      ...(runtimeInstructions === ""
-        ? {}
-        : { runtimeInstructions }),
     });
+    const instructionState = new MaybeCodeInstructionState(workspace, instructions);
+    const instructionPlugin = createMaybeCodeInstructionsPlugin(instructionState, {
+      workspace, options, historicalBranch: forkOrigin !== undefined || fork !== undefined,
+      ...(forkOrigin === undefined ? {} : { historicalSource: forkOrigin.sessionId }),
+    }, configuredTools);
 
     const contextBudget = withDefaultCompactionThreshold(
       options.contextBudget,
@@ -262,13 +259,19 @@ export class MaybeCodeApplication {
       ? undefined : options.modelInfo;
 
     let product: MaybeCodeApplication | undefined;
-    const composition = createMaybeCodePlugins({ ...options, onGitCheckpoint: checkpoint => {
-      options.onGitCheckpoint?.(checkpoint);
-      if (!product) throw new Error("Git checkpoint completed before the MaybeCode application was ready");
-      product.eventQueue.push({ type: "workspace.git.changed", checkpoint });
-    } }, {
+    const composition = createMaybeCodePlugins({ ...options,
+      plugins: [instructionPlugin, ...(options.plugins ?? [])],
+      onGitCheckpoint: checkpoint => {
+        options.onGitCheckpoint?.(checkpoint);
+        if (!product) throw new Error("Git checkpoint completed before the MaybeCode application was ready");
+        product.eventQueue.push({ type: "workspace.git.changed", checkpoint });
+      },
+    }, {
       workspace,
-      instructions: instructions.effective,
+      instructions: instructions.system.content,
+      instructionsSource: () => instructionState.current.system.content,
+      projectInstructionsSource: () => instructionState.projectInstructions(),
+      prepareInstructions: () => instructionState.refreshProject(),
       ...(contextBudget === undefined ? {} : { contextBudget }),
     });
     const definition = defineAgent({
@@ -279,7 +282,7 @@ export class MaybeCodeApplication {
       tools: configuredTools,
       toolScope: { workspaceId: resolve(options.workspace) },
       ...(options.permissionRuleStore === undefined ? {} : { permissionRuleStore: options.permissionRuleStore }),
-      instructions: instructions.effective,
+      instructions: instructions.system.content,
       ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
       traceAttributes: {
         ...(options.traceAttributes ?? {}),
@@ -331,7 +334,7 @@ export class MaybeCodeApplication {
     product = new MaybeCodeApplication(
       workspace,
       application,
-      instructions,
+      instructionState,
       history.manual,
       history.summary,
       history.historyReference,
@@ -364,11 +367,8 @@ export class MaybeCodeApplication {
   }
 
   get instructions(): MaybeCodeInstructions {
-    return { ...this.baseInstructions, effective: [
-      this.baseInstructions.effective,
-      this.application.skills?.instructions(),
-      this.subagents?.instructions(),
-    ].filter(Boolean).join("\n\n") };
+    return { ...this.instructionState.current,
+      effective: this.application.getService(applicationServices.instructionSources).snapshot() };
   }
 
   submit(options: SessionSubmitOptions): Promise<MaybeCodeRun> {

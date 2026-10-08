@@ -424,7 +424,16 @@ export class AgentApplication implements SteerableAgentController {
       });
       const skills = sessionScope.provides(applicationServices.skills) ? sessionScope.get(applicationServices.skills) : undefined;
       if (skills !== undefined && skills.listActive().length === 0) skills.restore(runtimeInfo.state?.[SKILL_STATE_KEY]);
-      const instructionsSource = () => sessionScope.get(applicationServices.instructionSources).snapshot();
+      let measuredInstructions: string | undefined;
+      let instructionController: ContextController | undefined;
+      const instructionsSource = () => {
+        const current = sessionScope.get(applicationServices.instructionSources).snapshot();
+        if (measuredInstructions !== undefined && current !== measuredInstructions) {
+          instructionController?.invalidateMeasurement?.();
+        }
+        measuredInstructions = current;
+        return current;
+      };
       const contextMetadata = options.contextMetadata ?? options.metadata;
       const managedContext = await contextFactory.create({
         instructions: instructionsSource(), instructionsSource,
@@ -444,6 +453,7 @@ export class AgentApplication implements SteerableAgentController {
         autoCompactionStrategies: autoCompactionStrategies.map(hookStrategy),
       });
       contextController = managedContext.controller;
+      instructionController = managedContext.controller;
       const modelInfo = sessionScope.provides(applicationServices.modelInfo) ? sessionScope.get(applicationServices.modelInfo) : undefined;
       const runtimeTraceAttributes: Record<string, import("@may/core").TraceAttributeValue> = { ...(options.traceAttributes ?? {}), "may.session.id": sessionId };
       for (const key of ["may.model.provider", "may.model.name", "may.model.adapter", "may.model.profile"]) delete runtimeTraceAttributes[key];

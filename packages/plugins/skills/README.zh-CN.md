@@ -3,6 +3,8 @@
 `createSkillsPlugin({ id?, create })` 使用 `create(context)` 返回的实际 `SkillRegistry`
 创建 `SkillSession`，提供 `services.skills`，并通过共享注册表贡献 `skill_read` 和动态指令。
 每个 Application 分别管理激活状态。
+指令贡献使用 `order: 0`。初始目录包含名称、描述及适用时的兼容要求；`skill_read`
+按需读取选定的指导和引用资源。已激活的文档持续出现在后续指令快照中。
 支持 [`PluginFactoryMetadata`](../../plugin-services/README.zh-CN.md) 中带类型的
 `config`、`configSchema`、依赖声明、`requiresHooks` 和 `version`。
 激活状态由工厂声明和管理。

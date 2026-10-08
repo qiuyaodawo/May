@@ -607,14 +607,35 @@ Relative paths are resolved from the directory containing `config.json`; `~`
 resolves to the user home directory. The configured directory must contain a
 non-empty UTF-8 `system.md`. It completely replaces the built-in system prompt.
 An optional `AGENTS.md` at the workspace root is then appended as project
-instructions. Each file has a 32 KiB limit.
+instructions with its absolute source path. Each file has a 32 KiB limit.
+Project rules are read when the application opens, when user input is accepted
+(including steering input), and before each Run. The selected base system prompt
+remains fixed for that application.
 
-MaybeCode also appends a short generated runtime section describing the actual
-shell used by the `shell` tool. This operational metadata is independent of
-`system.md`, so a custom system prompt cannot accidentally tell the model to use
-Bash syntax when the tool is running PowerShell, or vice versa.
+Instruction sources are assembled in this order: base prompt (`-100`), current
+environment (`-80`), project rules (`-60`), tool guidance (`-40`), Skills (`0`),
+delegation (`20`), active Goal (`40`), and context continuity (`60`). Sources at
+the same order use plugin composition and registration order. Plugins decide
+whether their current capability requires guidance and return empty content
+when it does not apply. Tool descriptions and schemas are sent as tool
+definitions alongside the messages.
+
+The current environment identifies the absolute workspace, operating system,
+actual shell and its syntax, Agent role, Session origin, and current permission
+mode. Shell names appear once in this section. Historical branches identify
+their source Session when available. Children receive their own role and parent
+task identity. Skills initially contribute metadata and add the instruction body
+after activation. Delegation guidance applies only while its tool is available;
+Goal guidance applies only to an active Goal. Its short continuation reminder
+occupies the final message position. Context continuity guidance applies to
+history-reference mode.
+
+Changed instruction sources invalidate previous token measurements. On reopen,
+MaybeCode estimates the current Context until the provider reports new usage.
 
 Use `/instructions` to inspect the active sources and effective instructions.
+See the [instruction composition guide](../../docs/en/guides/maybecode-instructions.md)
+or its [Chinese version](../../docs/zh-CN/guides/maybecode-instructions.md).
 
 Programmatic callers can pass a `ContextFactory` to
 `openConfiguredMaybeCode`, `MaybeCodeWorkspace.open`, or

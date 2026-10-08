@@ -9,6 +9,22 @@
 `get()` 返回实际 `SubagentHost`。Setup 注册请求预算的模型包装、动态委派工具与
 指令；created Hook 恢复请求记录并初始化 coordination，关闭时取消活动子任务。
 
+委派指令使用 `order: 20`，仅在 `delegate_tasks` 可用期间提供。工具描述说明完整任务
+说明、唯一 ID、依赖处理和主 Agent 恢复执行的流程；动态指导提供共享 workspace
+规则、角色权限和请求限制。子任务指令提供文件范围以及最终报告需要的证据和验证结果。
+
+宿主可以通过以下可选指令 callbacks 提供当前子任务上下文：
+
+- `instructionsSource()` 在每个子 Session 打开时提供基础指令；默认内容使用
+  `instructions`。
+- `projectInstructionsSource()` 在每次指令快照中提供当前 workspace 根目录的项目规则。
+- `prepareInstructions()` 在接受输入及每个子 Run 开始之前刷新指令数据。
+- `permissionModeSource()` 在生成子任务环境时提供当前权限模式。
+
+子任务指令贡献按环境（`-80`）、项目规则（`-60`）、工具指导（`-40`）、Skills（`0`）、
+任务要求（`20`）和上下文连续性（`60`）排序。环境字段提供子 Agent 角色、父任务和
+Session 来源。
+
 每个子 Agent 保留独立 Session、Run 身份、权限、Context、角色限制及共享请求账本。
 带版本的插件状态保存请求索引，同时保留 `may.subagents` 历史记录。被中断的操作
 需要核对结果，恢复时不会自动重复执行。Package 同时导出 `SubagentHost`、配置、

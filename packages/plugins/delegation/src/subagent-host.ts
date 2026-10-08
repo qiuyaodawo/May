@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
-import { defineAgent, type AgentApplication, type AgentApplicationEvent } from "@may/application";
+import { applicationHooks, applicationServices, defineAgent, type AgentApplication, type AgentApplicationEvent } from "@may/application";
+import { definePlugin } from "@may/plugin";
 import { AsyncEventQueue } from "@may/core";
 import {
   InMemoryContextFactory,
@@ -12,6 +13,7 @@ import {
 } from "@may/context";
 import {
   RunCancelledError,
+  runtimeHooks,
   resolveRunBudget,
   type Model,
   type RunBudget,
@@ -21,7 +23,7 @@ import {
   type Tracer,
   type UserMessage,
 } from "@may/core";
-import { createCodingTools } from "@may/coding-tools";
+import { codingRuntimeInstructions, createCodingTools, getShellToolInfo } from "@may/coding-tools";
 import {
   CoordinationRuntime,
   createApplicationAgent,
@@ -115,6 +117,10 @@ export interface SubagentHostOptions {
   /** 角色自有模型的上下文预算；没有配置时继承主会话。 */
   readonly contextBudgetFor?: (role: MaybeCodeSubagentRole) => ContextBudget | undefined;
   readonly instructions: string;
+  readonly instructionsSource?: () => string;
+  readonly projectInstructionsSource?: () => string;
+  readonly prepareInstructions?: () => Promise<void>;
+  readonly permissionModeSource?: () => string;
   readonly permissionPolicy: PermissionPolicy;
   /** 主任务与子任务共用的文件锁；缺省时按工作区新建一把共享锁。 */
   readonly fileGuard?: SharedWorkspaceFileGuard;
@@ -164,7 +170,7 @@ export class SubagentHost {
 
   /** 主 Agent 系统指令中的实时协作部分。 */
   instructions(): string {
-    return delegationInstructions(this.options.configuration, this.active !== undefined);
+    return delegationInstructions(this.options.configuration, this.context !== undefined && this.turn !== undefined);
   }
 
   /** 当前主 Run 的委派工具；没有活动请求时为空。 */
@@ -175,7 +181,6 @@ export class SubagentHost {
     return [createDelegationTool(context, () => turn.requestYield(), {
       agents: this.options.configuration.roles.map((role) => role.name),
       maxInputBytes: this.options.configuration.limits.maxInputBytes,
-      guidance: "Children work in the current workspace. Declare the files each child owns so writes outside them are refused.",
     })];
   }
 
@@ -531,21 +536,68 @@ export class SubagentHost {
         memories.set(execution.task.sessionId, memory);
         const summary = new SummaryTailStrategy({ summarizer: createModelContextSummarizer(childModel) });
         request.registerGuard(execution.task.id, files);
+        const childTools = [...files.tools, ...tools, ...memory.tools()];
+        const childInstructions = definePlugin({
+          id: "may.delegation.child-instructions", version: "1.0.0",
+          requires: [{ service: applicationServices.instructionSources }, { service: applicationServices.toolSources },
+            { service: applicationServices.contextWrappers }],
+          optional: [{ service: applicationServices.tools }],
+          requiresHooks: [runtimeHooks.runBefore, applicationHooks.inputReceived],
+          async setup(context) {
+            const sources = context.get(applicationServices.instructionSources);
+            const registration = { pluginOrder: context.pluginOrder };
+            const sessionOrigin = (await options.store.read(execution.task.sessionId)).length > 0 ? "resumed session" : "new session";
+            context.defer(context.get(applicationServices.contextWrappers).add(factory => ({
+              create: async current => {
+                const { measurement: _measurement, ...options } = current;
+                return factory.create(options);
+              },
+            }), { ...registration, id: context.pluginId, order: -100 }));
+            context.defer(sources.add(() => {
+              const shell = [...childTools, ...context.get(applicationServices.toolSources).snapshot(),
+                ...(context.optional(applicationServices.tools) ?? [])]
+                .map(getShellToolInfo).find(info => info !== undefined);
+              return "# Current environment\n\n" + codingRuntimeInstructions({
+                workspace: options.workspace,
+                ...(shell === undefined ? {} : { shell }),
+                agentRole: "sub-agent", assignedRole: role.name, parentTask: execution.task.parentTaskId ?? execution.task.id,
+                sessionOrigin,
+                ...(options.permissionModeSource === undefined ? {} : { permissionMode: options.permissionModeSource() }),
+              });
+            }, { ...registration, id: `${context.pluginId}.environment`, order: -80 }));
+            if (options.projectInstructionsSource !== undefined) {
+              context.defer(sources.add(options.projectInstructionsSource, {
+                ...registration, id: `${context.pluginId}.project`, order: -60,
+              }));
+            }
+            context.defer(sources.add(() => "# Tool use\n\nUse the available tools according to their descriptions and parameter schemas.", {
+              ...registration, id: `${context.pluginId}.tools`, order: -40,
+            }));
+            context.defer(sources.add(() => subagentInstructions({
+              base: "", role, workspace: options.workspace,
+              files: execution.task.files ?? [],
+              maxDepthReached: host.depthOf(execution.task) >= options.configuration.limits.maxDepth,
+            }), { ...registration, id: `${context.pluginId}.assignment`, order: 20 }));
+            context.defer(sources.add(() => memory.instructions(), {
+              ...registration, id: `${context.pluginId}.continuity`, order: 60,
+            }));
+            if (options.prepareInstructions !== undefined) {
+              context.on(runtimeHooks.runBefore, () => options.prepareInstructions!(), { order: -100 });
+              context.on(applicationHooks.inputReceived, () => options.prepareInstructions!(), { order: -100 });
+            }
+          },
+        });
         return defineAgent({
           model: childModel,
-          tools: [...files.tools, ...tools, ...memory.tools()],
+          plugins: [childInstructions],
+          tools: childTools,
           toolScope: { workspaceId: options.workspace },
           toolSource: () => [...(options.toolSource?.() ?? [])],
-          instructions: subagentInstructions({
-            base: options.instructions,
-            role,
-            workspace: options.workspace,
-            maxDepthReached: this.depthOf(execution.task) >= options.configuration.limits.maxDepth,
-          }),
+          instructions: options.instructionsSource?.() ?? options.instructions,
           ...(options.skills === undefined ? {} : { skills: options.skills }),
           permissionPolicy: options.permissionPolicy,
           sessionHistory: { retrieval: true },
-          contextFactory: memory.wrap(new InMemoryContextFactory()),
+          contextFactory: memory.wrap(new InMemoryContextFactory(), { includeInstructions: false }),
           ...(contextBudget === undefined ? {} : { contextBudget }),
           ...(options.compactionStrategy === undefined ? {} : { compactionStrategy: options.compactionStrategy }),
           autoCompactionStrategies: automaticCompactionStrategies(

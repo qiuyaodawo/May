@@ -30,7 +30,7 @@ test("shell uses the platform syntax and preserves UTF-8 output", async (t) => {
     getShellToolInfo(tool).kind,
     process.platform === "win32" ? "powershell" : "bash",
   );
-  assert.match(tool.description, process.platform === "win32" ? /PowerShell/u : /Bash/u);
+  assert.match(tool.inputSchema.properties.command.description, process.platform === "win32" ? /PowerShell/u : /Bash/u);
 });
 
 test("shell truncates captured output without stopping the command", async (t) => {

@@ -173,5 +173,5 @@ budgets remain on disk after completion.
   `listDelegationRequests()`, `getDelegationState()`, `delegationToolRecords()`
   and `resolveDelegationRecovery()`.
 - `/instructions` shows the same collaboration section that the model receives,
-  including the currently authorized roles and whether the tool is available in
-  this Run.
+  including the currently authorized roles and limits while the delegation tool
+  is available in this Run.

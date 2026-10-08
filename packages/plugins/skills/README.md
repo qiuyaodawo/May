@@ -4,6 +4,10 @@
 `SkillRegistry` returned by `create(context)`. It provides `services.skills` and
 contributes the `skill_read` tool and dynamic instructions through the shared
 registries. Each Application has an independent activation state.
+Its instruction contribution uses `order: 0`. The initial catalog contains only
+names, descriptions and optional compatibility requirements; `skill_read` loads
+selected instructions and referenced resources progressively. Active documents
+remain available in subsequent instruction snapshots.
 Typed `config`, `configSchema`, dependency declarations, `requiresHooks`, and
 `version` follow [`PluginFactoryMetadata`](../../plugin-services/README.md).
 The factory owns its activation state declaration.

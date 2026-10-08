@@ -146,5 +146,5 @@ pending 调用在重新打开账本时变成 unknown。Goal 与 steering 的 Run
 - 无头调用方接收 `delegation.started`、`delegation.updated`、`delegation.finished`
   与 `delegation.event` 事件，以及 `listDelegationRequests()`、`getDelegationState()`、
   `delegationToolRecords()` 和 `resolveDelegationRecovery()`。
-- `/instructions` 显示与模型收到的协作部分完全一致的内容，包括当前授权的角色，以及
-  本次 Run 中该工具是否可用。
+- `/instructions` 在本次 Run 的委派工具可用时显示与模型收到的协作部分相同的内容，
+  包括当前授权的角色和执行限制。

@@ -105,6 +105,12 @@ each model request. Its content is included in context estimation and its placem
 preserves the stored message count. It is regenerated after context
 compaction. Original user messages remain unchanged.
 
+The goals plugin registers active guidance in `instructionSources` at `order: 40`.
+For independent hosts using their own instruction registry,
+`wrapContextFactory(factory, { includeInstructions: false })` retains measurement
+invalidation and the concise request-end reminder while the host registers
+`goals.instructions()`. The default Context wrapper supplies the guidance itself.
+
 `wrapModel(model, { includeInstructions: false })` meters delegated model calls
 under the same Goal budget and cancellation signal while the child's Context
 keeps its task instructions. The default wrapper requires `wrapContextFactory()`

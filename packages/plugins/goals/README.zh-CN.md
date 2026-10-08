@@ -1,9 +1,15 @@
 # @may/plugin-goals
 
 `createGoalsPlugin(options?)` 提供 `goalsService`，通过组合服务注册
-`GoalController` 的模型包装、Context 包装和动态工具。插件声明 application
+`GoalController` 的模型包装、Context 包装、动态提示词和工具。插件声明 application
 访问服务与相关 registry 的依赖，在 `application.created` 中连接实际 Session，
 在 `application.beforeClose` 中停止目标调度，然后释放资源。
+
+活动 Goal 的指导通过 `instructionSources` 注册，使用 `order: 40`，包含目标、
+进度、Run 和 token 预算。Context wrapper 管理容量估计，并将简短的继续执行提醒
+放在每次模型请求的最后位置。未运行的 Goal 不提供指导。
+自定义 `PluginHost` 组合需要提供 `applicationServices.instructionSources`。
+`AgentApplication` 自动提供这个 registry。
 
 目标状态保存在带版本的插件状态中，同时保留 `may.goal` Session 记录供历史查询。
 恢复时保留已完成的目标，并暂停被中断的目标，等待用户明确继续。Token 统计使用

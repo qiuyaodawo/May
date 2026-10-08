@@ -47,6 +47,8 @@ Session 分支根据新宿主范围检查配置的规则存储。
 已有直接调用保持兼容，调用方传入的实例由调用方管理。
 
 `applicationServices` 包含 `@may/plugin-services` 的相同服务标识。
+组装的提示词内容变化时，使当前 Context 的 provider token 计量失效。后续检查使用
+更新后的内容估计，直到重新记录 provider usage。
 多个插件通过 `toolSources`、`instructionSources`、`modelWrappers` 和 `contextWrappers`
 贡献能力，并通过 `context.defer()` 管理移除和资源清理。
 组合顺序依据 `order`、`context.pluginOrder` 和注册顺序。

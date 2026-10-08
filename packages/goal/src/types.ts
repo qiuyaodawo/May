@@ -12,6 +12,10 @@ export interface GoalModelOptions {
   readonly includeInstructions?: boolean;
 }
 
+export interface GoalContextOptions {
+  readonly includeInstructions?: boolean;
+}
+
 export interface GoalCall {
   readonly id: string;
   readonly runId?: string;

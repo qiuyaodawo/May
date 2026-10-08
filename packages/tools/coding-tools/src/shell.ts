@@ -56,7 +56,7 @@ export interface ShellToolOutput {
   readonly stderrTruncated: boolean;
 }
 
-const shellToolInfo = new WeakMap<object, ShellToolInfo>();
+const shellToolInfo = Symbol("may.coding-tools.shell-info");
 
 export function createDefaultShellProfile(
   platform: NodeJS.Platform = process.platform,
@@ -134,7 +134,7 @@ export function createShellTool(options: ShellToolOptions): Tool<
 
   const tool: Tool<ShellToolInput, ShellToolOutput> = {
     name: "shell",
-    description: shellDescription(info),
+    description: "Execute a shell command in the workspace with host process permissions.",
     inputSchema: {
       type: "object",
       properties: {
@@ -186,25 +186,31 @@ export function createShellTool(options: ShellToolOptions): Tool<
       );
     },
   };
-  shellToolInfo.set(tool, info);
+  Object.defineProperty(tool, shellToolInfo, {
+    value: Object.freeze(info),
+    enumerable: true,
+    writable: false,
+    configurable: false,
+  });
   return tool;
 }
 
 export function getShellToolInfo(tool: Tool): ShellToolInfo | undefined {
-  const info = shellToolInfo.get(tool);
+  const info = (tool as Tool & { readonly [shellToolInfo]?: ShellToolInfo })[
+    shellToolInfo
+  ];
   return info === undefined ? undefined : { ...info };
 }
 
 export function shellRuntimeInstructions(info: ShellToolInfo): string {
   if (info.kind === "powershell") {
-    return `The shell tool runs ${info.displayName} on Windows. ` +
-      "Use PowerShell syntax and cmdlets; do not assume POSIX utilities such " +
+    return "Use PowerShell syntax and cmdlets; do not assume POSIX utilities such " +
       "as ls, find, or head are installed.";
   }
   if (info.kind === "bash") {
-    return `The shell tool runs ${info.displayName}. Use Bash syntax.`;
+    return "Use Bash syntax.";
   }
-  return `The shell tool runs ${info.displayName}. Follow that shell's syntax.`;
+  return "Follow the configured shell's syntax.";
 }
 
 function executeCommand(
@@ -337,16 +343,6 @@ function defaultPowerShellExecutable(): string {
     }
   }
   return "powershell.exe";
-}
-
-function shellDescription(info: ShellToolInfo): string {
-  const syntax = info.kind === "powershell"
-    ? "Use PowerShell syntax and cmdlets, not Bash syntax."
-    : info.kind === "bash"
-    ? "Use Bash syntax."
-    : `Use ${info.displayName} syntax.`;
-  return `Execute a ${info.displayName} command in the workspace. ` +
-    `${syntax} This is not a sandbox.`;
 }
 
 function validateShellProfile(profile: ShellProfile): ShellProfile {

@@ -21,6 +21,7 @@ export function createGoalsPlugin(options: GoalsPluginOptions = {}) {
       { service: applicationServices.modelWrappers },
       { service: applicationServices.contextWrappers },
       { service: applicationServices.toolSources },
+      { service: applicationServices.instructionSources },
     ],
     requiresHooks: [applicationHooks.created, applicationHooks.beforeClose],
     state: { version: 1, initial: { goal: null } },
@@ -32,7 +33,10 @@ export function createGoalsPlugin(options: GoalsPluginOptions = {}) {
         model => controller.wrapModel(model), { id: context.pluginId, order: 10, pluginOrder: context.pluginOrder },
       ));
       context.defer(context.get(applicationServices.contextWrappers).add(
-        factory => controller.wrapContextFactory(factory), { id: context.pluginId, order: 10, pluginOrder: context.pluginOrder },
+        factory => controller.wrapContextFactory(factory, { includeInstructions: false }), { id: context.pluginId, order: 10, pluginOrder: context.pluginOrder },
+      ));
+      context.defer(context.get(applicationServices.instructionSources).add(
+        () => controller.instructions(), { id: context.pluginId, order: 40, pluginOrder: context.pluginOrder },
       ));
       context.defer(context.get(applicationServices.toolSources).add(
         () => controller.tools(), { id: context.pluginId, pluginOrder: context.pluginOrder },

@@ -26,9 +26,9 @@ export function delegationTool(
     permissionVersion: "coordination-delegation-v1",
     description: [
       "Delegate independent child tasks to allowed agents, then continue after their outcomes arrive.",
-      "Use graph-unique task ids, one agent per task, and give every child a complete standalone brief: the goal, the exact files it owns, the constraints, and the report format.",
-      "After this complete tool step the parent yields its slot, children run, and the parent wakes with all child outcomes, including failures.",
-      "Do not poll, do not resubmit the same children, and never ask a child for a decision only the user can make.",
+      "Use graph-unique task ids, one agent per task, and give every child a complete standalone brief: the goal, necessary context, the exact files it owns, constraints, expected evidence, and report format. Declare file ownership in the files list.",
+      "After this complete tool step the parent yields its slot, children run, and the parent wakes with all child outcomes, including failures and cancellations. Submit dependent tasks after their prerequisites arrive.",
+      "Do not poll, cancel or approve for children, do not resubmit the same work, and never ask a child for a decision only the user can make. Do not promise an intermediate answer while children run.",
       ...(agents.length === 0 ? [] : [`Currently authorized roles: ${agents.join(", ")}.`]),
       ...(options.guidance === undefined ? [] : [options.guidance]),
     ].join(" "),
