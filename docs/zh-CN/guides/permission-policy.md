@@ -1,9 +1,12 @@
-# 权限策略
+# 配置工具权限与审批
 
 [English](../../en/guides/permission-policy.md) | **简体中文**
 
-`@may/permissions` 是包围工具执行的 headless 授权与审批层。`PermissionPolicy` 接收
-工具定义、已解析输入和 execution correlation data，然后返回：
+本文指导应用配置直接执行、需要审批以及能够跨重启保留的授权。
+将 `@may/permissions` 加入应用直接依赖，在配置策略前完成工具输入校验。
+应用与事件消费者见[构建 Agent](building-an-agent.md)。
+
+`PermissionPolicy` 接收工具定义、已解析输入和执行标识，返回值决定授权行为：
 
 - `allow` —— 立即执行；
 - `deny` —— 拒绝调用；
@@ -19,16 +22,17 @@
 
 ## 默认拒绝策略
 
-保持 allow rule 狭窄，并使用由策略定义的稳定 grant key：
+创建策略模块，明确允许的操作范围。以下示例要求已经注册 `add` 和
+`send_notification` 工具：
 
 ```ts
 import type { PermissionPolicy } from "@may/permissions";
 
 export const permissionPolicy: PermissionPolicy = ({ tool, input }) => {
-  // 对本产品安全的纯、有限操作。
+  // 允许本产品支持的有限加法操作。
   if (tool.name === "add") return "allow";
 
-  // 对一个规范化 notification channel 请求审批。
+  // 为指定通知渠道请求审批。
   if (tool.name === "send_notification") {
     const channel = stringField(input, "channel")?.trim().toLowerCase();
     if (channel === undefined || channel === "") return "deny";
@@ -59,8 +63,10 @@ Grant key 表示授权范围。授权单个文件或目录时，使用能够区�
 
 ## 审批协议
 
-`AgentApplication` 把审批请求转发为 `permission.event`。UI 选择决定，再通过
-controller 返回：
+`AgentApplication` 将审批请求转发为 `permission.event`。
+在应用现有事件消费者中加入审批处理。以下函数仅展示审批部分，宿主提供 `choose`
+和已经认证的 `createdBy` 身份。完整 UI 需要在同一消费者中处理其他事件，
+或明确分发到独立队列：
 
 ```ts
 import type { AgentApplication } from "@may/application";
@@ -109,6 +115,9 @@ epoch milliseconds。无效选择会抛出异常。未知、正在处理或已�
 必须提供明确 deny/cancel 路径；当前没有隐式审批 timeout。
 
 ## 持久授权范围与存储
+
+以下组合片段需要已经注册的 `write_documentation` 工具校验项目 Markdown 路径，
+并由宿主提供可信的 `projectDirectory`、`projectIdentity`、`userIdentity` 和 `agentIdentity`：
 
 ```ts
 import { join } from "node:path";
@@ -227,7 +236,7 @@ store。待处理审批继续使用 Session 恢复机制。
 不要捕获 policy failure 后默认 `allow`。外部 policy service 不可用时，应明确 deny 或
 让 Run 失败。
 
-## 安全边界
+## 验证持久审批
 
 MaybeCode 的真实 Provider 验证需要显式启用。运行 `pnpm build` 后设置
 `MAYBECODE_PERSISTENT_RULES_LIVE=1`，可以通过
@@ -239,7 +248,9 @@ MaybeCode 的真实 Provider 验证需要显式启用。运行 `pnpm build` 后�
 45 秒；关闭 retries、Git、MCP、Skills、Goals 和子 Agent。证据保存在被忽略的
 `review/persistent-rules` 目录；常规离线运行跳过这一测试。
 
-Permission 回答工具**是否**可以执行，不限制执行后进程**能够影响什么**：
+## 安全边界
+
+权限决定工具**是否**可以执行，进程能够影响的资源由执行环境限制：
 
 - `allow` 与已审批调用仍使用工具的 OS/network credential；
 - path grant 不会自动防御 symbolic link，工具必须自行校验 filesystem boundary；

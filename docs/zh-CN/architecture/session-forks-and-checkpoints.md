@@ -1,9 +1,12 @@
-# Session 分支与 Git checkpoint 规格
+# Session 分支与 Git checkpoint
 
-[English](../../en/architecture/session-fork-checkpoint-spec.md) | **简体中文**
+[English](../../en/architecture/session-forks-and-checkpoints.md) | **简体中文**
 
 状态：已实现。公共组件 API 参见 [Session 文档](../../../packages/session/README.md)、
 [Runtime 与 Session 架构](runtime-session.md)和 [Git 工作区指南](../guides/git-workspaces.md)。
+
+本文面向需要实现会话分支、文件版本显示与 worktree 管理的宿主和 UI 作者。
+功能使用步骤见 Git 工作区指南。
 
 ## 目标与概念
 
@@ -21,6 +24,19 @@ Session 分支关系与 Git branch 分别记录。多个 Session 可以使用同
 `ProjectGitWorkspace` 提供 Node.js 文件版本管理；MaybeCode 将这些组件接入
 TUI、WebUI 和客户端协议。
 
+```mermaid
+flowchart LR
+  Reply[完整回复] --> State[保存的会话状态]
+  Reply --> Commit[记录的项目 commit]
+  State --> Fork[新 Session]
+  Fork --> Current[当前工作区文件]
+  Fork --> Isolated[独立 worktree]
+  Commit --> Isolated
+```
+
+两种模式均恢复保存的会话状态。当前工作区模式使用当前文件，独立 worktree 从
+记录的 commit 开始。
+
 ## 产品行为
 
 - 项目工作区默认使用 Git 管理版本，允许通过显式配置关闭自动提交。
@@ -28,7 +44,7 @@ TUI、WebUI 和客户端协议。
 - 每轮修改完成后自动创建项目 commit，作为文件 checkpoint。
 - Session 分支支持当前工作区和新建 worktree 两种方式。
 - 新建 worktree 的默认根目录为用户目录中的 `.may/worktrees/`。
-- TUI 的 `/fork` 打开类似 Pi 的树形历史位置选择器，不提供 summarize 选项。
+- TUI 的 `/fork` 打开树形历史位置选择器。
 - WebUI 和客户端在完整 Agent 回复之后提供分支入口。
 - 各类 UI 固定显示当前工作区的 Git branch。
 - checkpoint 和 diff 使用项目 Git 历史，UI 将版本信息关联到会话历史。
@@ -218,17 +234,3 @@ Git 可达关系，特别是在删除 worktree branch 或用户修改历史之�
 删除检查目录与 Git 身份、关联 Session、登记的运行进程、已追踪/未追踪/忽略文件、
 branch 身份和未合并 commit。Session 创建失败时登记失败状态，保留 worktree 路径和诊断。
 checkpoint 状态目录和 worktree 根目录要求位于来源仓库之外。
-
-## 验收要求
-
-- 全新项目能够自动初始化 Git 并建立初始版本；已有项目正确识别所属仓库。
-- 一轮包含多次编辑和检查时生成一次最终提交；无变化回复关联已有 commit。
-- 正常关闭并重新打开后，分支来源、checkpoint 和 worktree 记录仍然可用。
-- TUI 树形选择器能够通过键盘完成历史选择和两种工作区分支，不请求 summarize。
-- WebUI 和客户端的回复分支入口使用相同历史位置和工作区行为。
-- 当前工作区分支保留当前文件；新 worktree 使用选定回复的文件版本。
-- 各类 UI 正确显示当前 branch、detached HEAD、初始化和失败状态。
-- diff 正确表达新增、修改、删除和二进制文件，并区分已提交与未提交变化。
-- Git 或状态保存失败时准确报告部分完成，恢复不会重复执行工具或重复提交。
-- worktree 清理保护相关会话、进程及需要保留的修改；有效 checkpoint 继续可读取。
-- 实现使用真实 Git 仓库和进程完成集成验证，包括人工修改、并发与中断情况。

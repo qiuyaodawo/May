@@ -1,14 +1,18 @@
-# 可观测性与 Tracing
+# 配置可观测性与 Tracing
 
 [English](../../en/guides/observability.md) | **简体中文**
 
-May tracing 用来解释一次 Agent Run 的耗时分布，以及 Core、Context、模型、工具、权限、
-Session 和 application 之间的调用关系。运行遥测与持久化对话历史分别管理。
+本文用于记录 Run 耗时、用量、指标和诊断。需要已有 May 应用，以及本地文件、
+控制台或 OTLP 导出目标。`@may/observability` 提供追踪与诊断实现，
+`@may/plugin-observability` 可以通过 Application 插件管理相关资源。
 
-## Event、历史与 Trace
+完整的配置式示例参阅[模型验证与执行诊断](model-telemetry-integration.md)。
+下文提供直接 tracer 配置和遥测数据参考。
+
+## 事件、历史与 Trace
 
 - `MayEvent` 和 `AgentApplicationEvent` 用于实时呈现与生命周期观察；
-- `SessionEvent` 是用于恢复和查询历史的 append-oriented 持久化事实；
+- `SessionEvent` 以追加方式保存，用于恢复和历史查询；
 - Trace 是可采样的运行数据，允许缓冲或丢弃，不能作为 Session 或权限状态的事实来源。
 
 一个 `may.run` span 表示一次 Run。Model、Context、工具批次和工具调用 span 是它的
@@ -17,8 +21,9 @@ Session 和 application 之间的调用关系。运行遥测与持久化对话�
 
 ## 配置 Tracer
 
-Core 导出 `Tracer`、`TraceSpan`、`TraceContext`、attribute 和辅助接口。
-标准实现位于 `@may/observability`：
+Core 导出 `Tracer`、`TraceSpan`、`TraceContext`、属性类型和受保护的遥测调用方法。
+在使用项目安装 `@may/application` 和 `@may/observability`。以下集成片段假设
+已经配置 `model`、`tools`、`permissionPolicy` 和 `store`。
 
 ```ts
 import { defineAgent } from "@may/application";
@@ -52,18 +57,23 @@ const definition = defineAgent({
   traceAttributes: { "may.agent.name": "example" },
 });
 
-const application = await definition.open({ store });
-const run = await application.submit({ input: "Inspect the project" });
-console.log(run.traceContext?.traceId);
-await run.result;
-await application.close();
-
-// 仅在所有共享该 processor 的 application 都关闭后调用。
-await processor.shutdown();
+try {
+  const application = await definition.open({ store });
+  try {
+    const run = await application.submit({ input: "Inspect the project" });
+    console.log(run.traceContext?.traceId);
+    await run.result;
+  } finally {
+    await application.close();
+  }
+} finally {
+  // 所有共享该 processor 的应用关闭后，释放导出资源。
+  await processor.shutdown();
+}
 ```
 
-`AgentDefinition` 把 tracer 作为 caller-owned 协作者捕获，并浅快照 `traceAttributes`。
-每次 Run 还可以增加不含内容的 attribute，或传入显式父 `traceContext`。
+`AgentDefinition` 保存调用方管理的 tracer，并复制 `traceAttributes` 的顶层字段。
+每次 Run 可以增加不含正文的属性，或提供明确父级 `traceContext`。
 `ModelStreamOptions`、`ToolExecutionContext`、`RunHandle` 和 `AgentRun` 会暴露传播后的
 trace context，供 provider、远程工具或上层操作继续建立子 span。
 
@@ -82,7 +92,7 @@ trace context，供 provider、远程工具或上层操作继续建立子 span�
 | `may.permission.approval_wait` | 等待显式审批决定 |
 | `may.context.compact` | Application 显式请求的 Context 压缩 |
 
-例如，一个慢工具调用可能显示为：
+以下示例数值说明审批等待如何计入工具耗时：
 
 ```mermaid
 flowchart TD
@@ -117,7 +127,8 @@ owner 结束时调用一次 `shutdown()`。关闭一个 application 不得关闭
 
 ## 在 MaybeCode 中启用 Tracing
 
-MaybeCode 提供了可直接使用的本地文件组合。在 May config 中加入：
+在启动 MaybeCode 使用的 May 配置中加入以下字段，随后启动工作区。首次导出
+span 时创建带日期的文件：
 
 ```json
 {
@@ -135,9 +146,9 @@ MaybeCode 提供了可直接使用的本地文件组合。在 May config 中加�
 }
 ```
 
-启用后，workspace 打开或重建的所有 application 会共享一个 tracer 和 batch processor；
-MaybeCode 只在整个 workspace 关闭后 flush。`file` 是基础路径，本地日期会插入扩展名
-之前。相对路径基于 MaybeCode data directory，因此默认文件为
+启用后，工作区打开或重建的全部应用共享 tracer 和批次 processor，整个工作区
+关闭后完成导出。`file` 是基础路径，本地日期插入扩展名之前。相对路径基于
+MaybeCode 数据目录，默认文件为
 `~/.may/maybecode/traces/traces-YYYY-MM-DD.jsonl`。
 
 除非用 `retentionDays` 覆盖，MaybeCode 默认保留包括今天在内的最近 60 个本地日历日。
@@ -149,16 +160,20 @@ MaybeCode 只在整个 workspace 关闭后 flush。`file` 是基础路径，本�
 
 ## 隐私与失败行为
 
-内置 instrumentation 只记录名称、ID、数量、耗时、状态、token usage、权限决定以及
-不含内容的错误类型/错误码。它不会捕获 prompt、message、reasoning、工具输入输出或
-credential。自定义 `traceAttributes` 属于调用方数据，不应包含 secret、大型 payload
-或无界的用户输入。
+内置追踪只记录名称、ID、数量、耗时、状态、token 用量、权限决定及不含正文的
+错误类型与错误码。提示词、消息、reasoning、工具输入输出和凭据不进入内置追踪。
+调用方提供的 `traceAttributes` 不应包含秘密、大型内容或没有长度限制的用户输入。
 
-Core 会保护被注入的 tracer/span 调用；内置 processor 会捕获 exporter failure，并可
-通过 `onError` 报告。因此遥测后端故障不会使 Agent 工作失败或取消。Tracing 也正因这种
-fail-open 行为而不能代替持久化 audit 或 Permission 记录。
+Core 保护注入的 tracer/span 调用；内置 processor 捕获 exporter 错误，并可
+通过 `onError` 报告。因此遥测后端故障不会使 Agent 工作失败或取消。Tracing 提供
+运行诊断，导出具有数量限制并支持采样。宿主独立保存审计和权限记录，明确其保留期限
+与送达要求。
 
 ## 独立指标与本地诊断
+
+将这些对象加入前面的直接 tracer 配置。以下片段需要已经导入的 `BasicTracer`、
+`ratioSampler`、现有 `processor` 和 Session 身份 `sessionId`。
+在操作完成后读取快照。
 
 ```ts
 import { BoundedMetrics, DiagnosticsStore } from "@may/observability";
@@ -225,6 +240,9 @@ Token 与费用指标仅在逻辑调用结束时记录一次。
 `OpenTelemetryMetricRecorder` 独立于 Trace 采样记录 meter 指标并限制标签组合数量。
 以下接口使用官方 SDK 和 HTTP/JSON exporter，独立管理 provider：
 
+以下片段需要两个地址上的 OTLP HTTP collector，以及前面创建的 `diagnostics`。
+应用使用 `telemetry.tracer`，全部关闭后再释放遥测资源。
+
 ```ts
 import { createOtlpTelemetry } from "@may/observability";
 
@@ -253,6 +271,9 @@ Core 的版本化 `TelemetryCorrelation` 验证父节点身份与任务、协调
 来源 Run ID。宿主与远程执行一同传递，并使用 `correlationTraceAttributes` 转换属性。
 恢复执行创建新的身份，通过 `resumedFromRunId` 关联原来的 Run。
 接收关联信息后必须在执行前验证。本地诊断保存当前进程观察到的操作。
+
+以下片段需要 `DiagnosticsStore` 和独立取得的验证证据。验收器完成后记录结果，
+将身份、版本和引用替换为实际值。
 
 ```ts
 diagnostics.recordAssessment({
@@ -286,3 +307,13 @@ diagnostics.recordAssessment({
 导出和关闭等待默认限制为五秒。普通失败释放该批次，后续批次继续执行；导出超时
 关闭 processor 并丢弃剩余队列，限制无法结束的导出操作数量。
 调用 `shutdown()` 释放 exporter 资源。
+
+## 验证
+
+启用遥测后，执行真实应用操作，检查 Run 和子节点身份、Session 查询、用量完整性
+及清理。通过 `droppedSpans`、`coverage` 和队列诊断，判断查询是否覆盖已经保留
+的全部证据。
+
+在仓库根目录执行 `pnpm --filter @may/observability test`，检查本地 processor、
+指标、诊断与 OpenTelemetry 集成。外部 collector 送达和 provider 用量需要单独
+配置对应服务。

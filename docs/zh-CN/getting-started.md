@@ -1,375 +1,160 @@
-# 快速开始
+# 运行第一个 Agent 应用
 
 [English](../en/getting-started.md) | **简体中文**
 
-MaybeCode 默认在执行命令或修改文件之前询问。使用 `maybecode --yolo` 开启工具
-自动审批，使用 `--no-yolo` 可以覆盖配置中的 YOLO 默认模式。会话中使用 `/yolo`
-或 `/yolo on` 开启模式，使用 `/yolo off` 关闭，使用 `/yolo status` 查看状态。
-切换模式前需要暂停或取消当前任务。开启期间，
-终端和 WebUI 显示 `YOLO · Auto-approve`；WebUI 也提供 Permissions 选择器。
-作用范围、重新启动时的行为和保留的限制见[权限配置](reference/configuration.md#maybecode-权限模式)。
+创建一个调用真实模型的 Agent，通过工具计算加法并保存对话历史，然后使用同一个
+内存存储重新打开 Session。需要具备基础 JavaScript 知识，以及能够访问 API 的
+DeepSeek 账户。
 
-本指南先在本地运行一个 May Agent，再把同一套模型/工具循环变为可恢复的 headless
-application，面向仓库当前 `0.1.0` 开发预览 API。
+## 准备工作目录
 
-各组件的选择方式见[构建 Agent](guides/building-an-agent.md)，运行时术语见
-[Runtime 与 Session 边界](architecture/runtime-session.md)。
-
-## 前置条件
-
-- 仓库开发需要 Node.js 22.16.0 或更高版本（推荐 Node.js 24；
-  `.node-version` 记录推荐的主版本）。离线测试使用 Node.js 22.16.0 开始提供的
-  `node:sqlite` backup API。
-- pnpm 12.4.2（仓库在 `package.json` 中固定了预期版本）
-- 本仓库的 checkout
-
-在仓库根目录安装并构建：
+使用本仓库、Node.js 22.16.0 或更新版本，以及 pnpm 12.4.2。推荐使用 Node.js 24
+进行开发。在仓库根目录执行：
 
 ```bash
 pnpm install
 pnpm build
 ```
 
-现有确定性示例无需 API key，展示一次 `Model -> Tool -> Model` Run：
+构建成功后才能运行导入 May package 的代码。仓库测试与 CI 见
+[仓库开发](guides/repository-development.md)，编码应用操作见
+[使用 MaybeCode](guides/maybecode.md)。
 
-```bash
-pnpm example
-```
+## 创建工作目录中的 package
 
-源码位于 [`examples/basic/basic.mjs`](../../examples/basic/basic.mjs)。该示例直接使用
-`@may/core`，适合一次性或嵌入式循环。本文其余部分使用 `@may/application`；需要
-Session、权限、历史或 UI-independent 生命周期的产品应从这里开始。
-
-## 在 PowerShell 中运行本地 MaybeCode 构建
-
-在 `$PROFILE.CurrentUserAllHosts` 中加入以下内容，并替换为自己的仓库路径。
-PowerShell 7 和 Windows PowerShell 使用各自的 Profile。
-
-```powershell
-. 'E:\code\May\scripts\maybecode-powershell.ps1'
-```
-
-打开新终端，或者执行 `. $PROFILE.CurrentUserAllHosts` 加载配置。修改源码后执行
-构建，再进入需要处理的项目目录启动 MaybeCode：
-
-```powershell
-pnpm --dir E:\code\May build
-Set-Location E:\code\your-project
-pnpm maybecode
-```
-
-这个 PowerShell 函数将 `pnpm maybecode` 直接转发到当前仓库的
-`apps/maybecode/dist/bin.js`，保留当前工作目录，并传递 `--continue`、`--config`、
-`--ui web` 等参数。每次启动使用最近成功构建的内容；重新构建后需要重启已有进程。
-构建入口缺失时会提示构建命令。该入口不会自动构建，也无需全局安装 MaybeCode。
-其他 pnpm 命令交给 `pnpm.cmd`。在 May 仓库内执行 `pnpm run maybecode` 仍会通过
-package script 构建并启动应用。通过 `-NoProfile` 启动的终端需要显式加载脚本。
-
-独立的 `maybecode` 命令由安装的包提供。移除已有全局开发安装的命令为
-`pnpm remove --global @may/maybecode`。
-
-## 在 MaybeCode 执行期间发送消息
-
-普通新消息会取消当前操作，等待取消完成，然后在同一个 Session 中执行新请求。
-使用 `/steer <消息>` 可以等待当前 Step 及其中的工具和审批完成，再交付补充消息。
-补充消息会保存到历史，并按接收顺序交付。空闲时使用 `/steer` 会启动 Run；
-Run 完成或者宿主让出执行权后仍有待交付消息时，会在当前操作结束后依次启动。
-
-`/stop` 和 Web 取消按钮会取消当前操作以及所有等待中的输入。终端中没有选择
-文字时，`Ctrl+C` 执行相同操作。已取消的补充消息保留在历史中，需要用户重新
-发送才会再次执行。classic TUI、retained TUI 和 WebUI 都支持这些操作。
-
-## 查看 MaybeCode 对话
-
-默认 retained TUI 支持通过鼠标滚轮查看对话。每次滚轮事件滚动三行，保留输入内容
-和键盘焦点。向上滚动后，新内容到达时保持当前阅读位置；滚动到底部后继续跟随
-新内容。鼠标滚动需要终端支持 xterm 鼠标报告。
-
-输入框中的上下方向键用于选择输入历史。按下 Tab 将焦点切换到对话区域后，
-可以使用上下方向键、PageUp、PageDown、Home 和 End 查看对话。
-
-按下 `Ctrl+G` 后按下 `R`，可以跳转到当前轮次已经完成的最终回复正文开头，
-跳过之前的思考和工具调用内容。正文开头显示在对话区域顶部，保留输入草稿和
-键盘焦点。阅读位置会保持到手动滚动为止，重复使用快捷键会回到同一处。
-恢复历史会话后也可以使用，超过通常滚动缓冲区长度的回复同样支持跳转。
-当前轮次尚未产生完整的最终回复时，状态栏显示 `No final reply yet`。
-
-鼠标拖动可以选择对话文字或输入内容。存在选择范围时，`Ctrl+C` 复制文字；没有
-选择范围时，中断任务或退出空闲界面。输入框支持 `Ctrl+A` 全选、`Ctrl+X` 剪切、
-`Ctrl+V` 粘贴，`Shift+方向键` 和 `Shift+Home/End` 扩展选择范围。
-`Home/End` 移动到当前逻辑行的开头或末尾，输入和粘贴替换选中文字。
-拖动到显示区域边缘时自动滚动；复制保留代码缩进和原有换行。
-
-`Ctrl+G D` 切换工具详情，`Ctrl+G T` 切换思考内容。按下起始按键后持续等待后续按键，
-没有时间限制，等待时保留阅读位置。Escape、切换焦点、鼠标浏览和打开弹窗会结束
-等待并清除提示。通过 `MAY_TUI_LEADER` 配置
-包含修饰键的单个起始按键，文字编辑快捷键保留给输入框。`MAY_CLIPBOARD=auto`
-默认使用本机系统剪贴板，还可以选择 `system`、`osc52` 或 `disabled`。
-通过 SSH 使用时，需要明确选择 `osc52` 并允许终端写入剪贴板，粘贴使用终端提供的
-操作。OSC 52 写入无法确认终端是否接收。终端自身占用的快捷键需要在终端设置中调整。
-
-## 持续集成
-
-[GitHub Actions 工作流](../../.github/workflows/ci.yml) 在推送代码和提交 PR 时
-自动运行。进入默认分支后，也可从 **Actions → CI → Run workflow** 手动启动。
-每次运行检查四组环境：Linux 使用 Node.js 22 和 24，Windows 和 macOS 使用
-Node.js 24。在 Actions 页面
-查看各任务日志，或从 PR 的检查结果进入日志排查失败原因。
-
-每种环境先执行 `pnpm install --frozen-lockfile`，然后运行 `pnpm build` 和一遍离线测试。
-Linux 的 Node.js 24 任务还运行 `pnpm docs:check`、WebUI 资源同步与 MCP Apps 浏览器
-隔离检查、基础示例，以及 May 和 MaybeClaw CLI 帮助检查。
-浏览器检查使用无头 Chromium，示例与 CLI 检查直接使用已构建文件。
-离线测试已包含 MaybeCode CLI 帮助检查。
-本地修改可使用 `pnpm --filter <package-name> test` 只验证受影响的包。
-独立的 Linux 和 Windows 任务使用 `.node-version` 中推荐的 Node.js 版本，
-运行 `pnpm test:package:maybecode`，
-在仓库外验证打包依赖、MCP 子路径导出及安装后的 CLI。May 包从本地 tarball 安装；
-外部依赖优先复用 pnpm 缓存，缺失的版本从包注册表下载。
-CLI 启动测试在隔离的用户目录中配置 Git 用户名称和邮箱，
-用于创建初始工作目录 checkpoint。
-
-`pnpm test` 会运行所有 workspace package 后统一报告失败。
-工具、skills、压缩与重试的单 Session 测试配置 `subagents: false`，取消测试同时覆盖
-默认委派流程。系统剪贴板检查需要桌面会话，通过
-`powershell -NoProfile -STA -File scripts/test-terminal-clipboard.ps1` 手动运行。
-MaybeClaw 真实 Provider 检查使用 `pnpm --filter @may/maybeclaw test:integration`，
-需要 `MAYBECLAW_LIVE_MODEL` 和 Provider 凭据。这些桌面与真实服务检查独立于默认离线测试。
-`pnpm test:path-alias` 使用临时目录别名（Windows junction 或 POSIX symlink）
-运行整个测试集，使默认临时目录没有别名的机器也能发现规范化路径相关的错误假设。
-手动触发时，Windows 任务用此项检查替代常规测试；自动运行时省略。
-覆盖率和打包检查也可按需在本地使用 `pnpm test:coverage` 和
-`pnpm test:package:maybecode` 运行。
-
-工作流不需要 provider API key，不运行真实 provider 集成测试，也不发布包。
-安装依赖仍需要访问包注册表。矩阵表示验证目标，实际支持情况需要成功运行后确认。
-真实终端的输入、快捷键和窗口缩放仍需人工验证。
-
-## 创建 Workspace Package
-
-创建 `examples/quickstart-agent/package.json`。根目录 `pnpm-workspace.yaml` 已包含
-`examples/` 下的每个直接子目录。
+创建 `examples/quickstart-agent/package.json`，填写以下内容。工作目录配置已经
+包含 `examples/` 的直接子目录。
 
 ```json
 {
   "name": "@may/example-quickstart-agent",
   "private": true,
   "type": "module",
-  "scripts": {
-    "start": "node agent.mjs"
-  },
+  "scripts": { "start": "node agent.mjs" },
   "dependencies": {
     "@may/application": "workspace:*",
     "@may/core": "workspace:*",
+    "@may/provider-deepseek": "workspace:*",
     "@may/session": "workspace:*"
   }
 }
 ```
 
-这些是示例的直接依赖：
+在仓库根目录执行 `pnpm install`，为新增 package 创建链接。`workspace:*` 使用
+本仓库的 package；仓库外部的使用者需要选择可用的发布版本，并使用相同的公开
+导入路径。
 
-- `@may/application` 管理 headless Agent 与 Session 生命周期；
-- `@may/core` 提供 JSDoc 类型引用的 `Model` 和 `Tool` 契约；
-- `@may/session` 提供内存 history store。
-
-在 monorepo 内开发时使用 `workspace:*`。仓库外用户应在 package 发布后使用具体版本。
-添加 package 后再次运行 `pnpm install`，让 pnpm 建立 workspace link。
-
-## 添加最小 Agent Application
+## 添加 Agent
 
 创建 `examples/quickstart-agent/agent.mjs`：
 
 ```js
 import { defineAgent } from "@may/application";
 import { ToolRegistry } from "@may/core";
+import { DeepSeekModel } from "@may/provider-deepseek";
 import { InMemorySessionStore } from "@may/session";
 
-/** @type {import("@may/core").Model} */
-const model = {
-  async *stream(request) {
-    const latest = request.messages.at(-1);
-
-    if (latest?.role === "tool") {
-      const output = latest.content.find((part) => part.type === "json")?.value;
-      const text = `The result is ${String(output)}.`;
-      yield { type: "text.delta", delta: text };
-      yield {
-        type: "response.completed",
-        message: {
-          role: "assistant",
-          content: [{ type: "text", text }],
-        },
-      };
-      return;
-    }
-
-    yield {
-      type: "response.completed",
-      message: {
-        role: "assistant",
-        content: [],
-        toolCalls: [
-          { id: "call_add", name: "add", input: { a: 20, b: 22 } },
-        ],
-      },
-    };
-  },
-};
+const apiKey = process.env.DEEPSEEK_API_KEY;
+const modelName = process.env.DEEPSEEK_MODEL;
+if (!apiKey || !modelName) {
+  throw new Error("Set DEEPSEEK_API_KEY and DEEPSEEK_MODEL");
+}
 
 /** @type {import("@may/core").Tool<{a: number, b: number}, number>} */
 const add = {
   name: "add",
-  description: "Add two numbers",
+  description: "Add two finite numbers",
   inputSchema: {
     type: "object",
-    properties: {
-      a: { type: "number" },
-      b: { type: "number" },
-    },
+    properties: { a: { type: "number" }, b: { type: "number" } },
     required: ["a", "b"],
     additionalProperties: false,
   },
   parse(input) {
     if (
       typeof input !== "object" || input === null ||
-      typeof input.a !== "number" || typeof input.b !== "number"
+      !("a" in input) || !("b" in input) ||
+      typeof input.a !== "number" || typeof input.b !== "number" ||
+      !Number.isFinite(input.a) || !Number.isFinite(input.b)
     ) {
-      throw new TypeError("a and b must be numbers");
+      throw new TypeError("a and b must be finite numbers");
     }
     return { a: input.a, b: input.b };
   },
-  async execute({ a, b }) {
+  async execute({ a, b }, context) {
+    context.signal.throwIfAborted();
     return a + b;
   },
 };
 
 const store = new InMemorySessionStore();
-const tools = new ToolRegistry().register(add);
 const agent = defineAgent({
-  model,
-  tools,
-  instructions: "Use the add tool and answer concisely.",
-  // 仅因该确定性示例中的每个工具都可信，才可这样设置。
-  permissionPolicy: () => "allow",
-  sessionHistory: false,
+  model: new DeepSeekModel({ apiKey, model: modelName }),
+  tools: new ToolRegistry([add]),
+  instructions: "Use add for arithmetic and answer with the result.",
+  permissionPolicy: ({ tool }) => tool.name === "add" ? "allow" : "deny",
+  maxSteps: 4,
 });
 
 const application = await agent.open({ store });
 const sessionId = application.sessionId;
-
 try {
-  const run = await application.submit({ input: "What is 20 + 22?" });
-  const eventsDone = consumeRunEvents(application.events, run.id);
+  const run = await application.submit({ input: "Use add to calculate 20 + 22." });
   const result = await run.result;
-  await eventsDone;
-
   const text = result.message.content
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("");
-  console.log(`\nFinal: ${text}`);
-  console.log(`Session events: ${(await application.history()).length}`);
+  console.log(`Answer: ${text}`);
+  console.log(`Session: ${sessionId}`);
+  const history = await application.history();
+  const addition = history.find(event =>
+    event.type === "tool.completed" && event.call.name === "add");
+  if (addition?.type !== "tool.completed" || addition.output !== 42) {
+    throw new Error("The Run must complete add with output 42");
+  }
+  console.log(`Tool result: ${addition.output}`);
+  console.log(`Saved events: ${history.length}`);
 } finally {
   await application.close();
 }
 
-// 只要进程和同一个 store 对象仍存在，内存 store 就能恢复。
-const resumed = await agent.open({
-  store,
-  sessionId,
-  resume: true,
-});
+const resumed = await agent.open({ store, sessionId, resume: true });
 try {
-  console.log(`Resumed session: ${resumed.sessionId}`);
+  console.log(`Resumed Session: ${resumed.sessionId}`);
   console.log(`Restored events: ${(await resumed.history()).length}`);
 } finally {
   await resumed.close();
 }
-
-async function consumeRunEvents(events, runId) {
-  for await (const applicationEvent of events) {
-    if (applicationEvent.type !== "run.event") continue;
-
-    const event = applicationEvent.event;
-    if (event.runId !== runId) continue;
-    if (event.type === "model.text.delta") process.stdout.write(event.delta);
-    if (
-      event.type === "run.completed" ||
-      event.type === "run.failed" ||
-      event.type === "run.cancelled"
-    ) {
-      return;
-    }
-  }
-}
 ```
 
-从仓库根目录运行：
+`inputSchema` 向模型描述工具，`parse()` 校验实际参数。权限策略仅允许这个加法工具，
+`maxSteps` 限制模型和工具循环的次数。`close()` 等待应用工作结束并释放应用管理的
+资源；传入的存储继续保留，可用于重新打开 Session。
 
-```bash
+## 运行与核查结果
+
+在本地环境设置 `DEEPSEEK_API_KEY`，将 `DEEPSEEK_MODEL` 设置为账户支持的模型 ID。
+凭据应保存在源文件和 Git 之外。例如，在 PowerShell 中执行：
+
+```powershell
+$env:DEEPSEEK_MODEL = 'your-supported-model-id'
 pnpm --filter @may/example-quickstart-agent start
 ```
 
-确定性 `model` 使示例无需网络也可复现。真实 Agent 应替换为 May provider adapter，
-并将该 adapter 加为直接依赖。例如
-[`examples/deepseek/deepseek.mjs`](../../examples/deepseek/deepseek.mjs) 展示了实时
-DeepSeek 接线，需要 `@may/provider-deepseek`、`DEEPSEEK_API_KEY` 和受支持的模型名。
+执行前替换 `your-supported-model-id`。程序会向 DeepSeek 发送真实请求，使用账户
+的 API 额度。
 
-## 示例构造了什么
+程序检查保存的 `add` 工具 `tool.completed` 事件，要求输出为 `42`。
+核查回答是否包含 `42`、两次 Session ID 是否相同，以及恢复后的历史是否包含已保存
+事件。模型措辞、ID 和事件数量可能变化。重新打开时读取历史，不发送新的模型请求。
+缺少环境变量时，程序在打开应用前报错。认证、网络或模型错误会使 Run 失败，需要
+根据错误信息检查账户设置。
 
-代码提供了通用生命周期本身无法替产品选择的行为与策略：
+## 跨进程重新启动时保存历史
 
-```text
-AgentDefinition
-  + Model                 模型请求如何得到回答
-  + ToolRegistry          模型可用的 capability
-  + instructions          产品行为
-  + PermissionPolicy      每个已校验工具调用是否可以执行
-  + ContextFactory        此处省略，因此使用默认内存实现
-       |
-       `- open({ store }) -> AgentApplication -> Session
-                              + SessionStore    持久化事实
-```
-
-`defineAgent()` 保存可复用的行为和策略，并在创建时快照传入的工具 iterable。即使之后
-向 `tools` registry 注册新工具，已有 definition 也不会改变。`agent.open()` 每次创建
-独立的 `AgentApplication`；它创建新 Session，除非同时提供 `resume: true` 和
-`sessionId`。打开过程会安装 permission executor、创建 Core runtime、转发事件，并
-连接 history 与 Context 管理。
-
-`ToolRegistry` 是实例级组合对象，不是进程全局表。当多个 feature 提供工具时，它能
-集中检测重名，但并非必需。简单 Agent 可以直接向 `defineAgent({ tools: [...] })` 传
-数组；Set、generator 或任何其他 `Iterable<Tool>` 也可用。
-
-Definition 会复用同一批 Tool、Model 和其他协作者对象，而不会深克隆它们。应保持
-Tool descriptor 稳定；若 Model、Context factory、自定义 executor 或 scheduler 有内部
-状态，调用方必须保证它可以在多个已打开 application 之间安全共享，或为每个
-ownership 边界创建单独的 definition。
-
-示例显式禁用可选 `session_history` 工具。需要模型查询持久化 Session history 的有界
-分页时，改为传入 `sessionHistory: {}`。
-
-## Event 与 Result 是不同接口
-
-`application.submit()` 返回 `AgentRun` 的 Promise。Run 有两个独立观察路径：
-
-- `run.result` 是权威最终 `RunResult`，失败时 reject；
-- `application.events` 是终端、图形 UI、logger 或 approval handler 使用的实时 stream。
-
-Application stream 将 Core event 包装为 `run.event`，permission event 包装为
-`permission.event`，也可报告 tool presentation 和 Context compaction。应与 Run 并发
-消费，不能等 application stream 结束后再读；它会为后续 Run 持续打开，直到
-application 关闭。Buffer 压力下 streaming delta 可能丢失，所以绝不能只靠 delta
-重建权威最终答案。
-
-若 permission policy 返回 `"ask"`（或 scoped ask），event consumer 必须处理
-`approval.requested` 并调用 `application.resolveApproval(requestId, decision)`，否则
-工具调用会按设计保持暂停。
-
-## 跨进程重启持久化
-
-`InMemorySessionStore` 适合示例和测试。需要重启后保留 history 时，替换为 Node.js
-file store：
+内存存储在当前进程与存储对象存在期间保留历史。需要写入文件时，替换
+`InMemorySessionStore` 的导入与构造代码：
 
 ```js
 import { FileSessionStore } from "@may/session/file-store";
@@ -377,31 +162,14 @@ import { FileSessionStore } from "@may/session/file-store";
 const store = new FileSessionStore(".may/sessions");
 ```
 
-Package 依赖仍是 `@may/session`；`file-store` 是其导出子路径。需要把返回的 Session id
-保存到可发现位置，或按[构建 Agent](guides/building-an-agent.md#单-session-还是-workspace)
-所述增加 `AgentWorkspace` 和 Session Catalog。
+保存 Session ID 后，可以在其他进程中重新打开。文件存储使用明文 JSONL，每个
+Session 支持一个活动写入者。存储要求见[Session 存储](guides/custom-storage.md)，
+通过 Session Catalog 发现会话的方法见[构建 Agent](guides/building-an-agent.md)。
 
-内置 file store 写明文 JSONL，并假定每个 Session 只有一个活动 writer。它是本地后端，
-不是加密多进程存储。
+## 继续完成相关任务
 
-## 始终关闭 Owner
-
-每个已打开 `AgentApplication` 都应用 `try`/`finally` 包裹。`close()` 会：
-
-- 取消活动 Run 或 Context compaction；
-- 拒绝待处理审批；
-- 等待 Run 与 permission event relay；
-- 关闭 application event stream。
-
-关闭**不会**删除 Session history。恢复后的 application 从 history 重建模型可见对话，
-同时使用当前产品版本提供的模型、工具、指令与策略。
-
-若活动 application 由 `AgentWorkspace` 拥有，应关闭 workspace；它会关闭 application，
-并等待 Catalog recording 和 event relay。
-
-## 后续阅读
-
-- 在选择持久化、权限、Context 策略或 UI 前阅读[构建 Agent](guides/building-an-agent.md)。
-- [`@may/core` README](../../packages/core/README.md)：底层 Run loop 与 tool-executor seam。
-- [`@may/application` README](../../packages/application/README.md)：单/多 Session 生命周期。
-- [`@may/session` README](../../packages/session/README.md)：文件持久化与 Catalog 限制。
+- [构建 Agent](guides/building-an-agent.md)：选择工具、权限、Context 管理、存储和 UI。
+- [理解 Session、Run 与 Step](concepts/session-run-step.md)：理解执行单位。
+- [消费应用事件](concepts/events.md)：提供进度或审批 UI。需要审批的权限策略要求
+  同时运行事件处理程序。
+- [使用 MaybeCode](guides/maybecode.md)：操作参考编码应用。

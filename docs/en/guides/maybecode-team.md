@@ -1,24 +1,55 @@
-# MaybeCode teams
+# Run MaybeCode teams
 
-[简体中文](../../zh-CN/guides/maybecode-team.md)
+**English** | [简体中文](../../zh-CN/guides/maybecode-team.md)
 
-MaybeCode's noninteractive `team` command runs bounded, persistent multi-agent work from the terminal. It reuses the May config and named model profiles. New v2 teams support configurable plans, structured evidence and acceptance, explicit recovery controls, and reviewed coding patches. The default remains **read-only**: two independent workers investigate, then a supervisor summarizes and may delegate small follow-ups.
+Use MaybeCode's noninteractive `team` command to run a persistent group of tasks
+from the terminal. The default read-only team runs two independent investigations,
+then a supervisor summarizes their reports and may delegate follow-up work.
+
+You need a working [MaybeCode configuration](maybecode.md), provider credentials
+and a source workspace. Team records must be stored outside that workspace.
+This guide covers starting a team, interpreting its outcome and managing its
+lifecycle. Plans, acceptance, recovery and coding have dedicated guides below.
 
 ## Run and configure
 
-From this repository:
+1. In the repository root, run the following command. Replace the workspace with
+   the source directory you want the team to inspect:
 
 ```powershell
 pnpm maybecode team run "Review this module for correctness risks; cite files and propose a minimal fix without changing files." --workspace C:\work\example --max-concurrent 2 --max-model-calls 16 --max-total-tokens 262144
 ```
 
-With an installed current build, replace `pnpm maybecode` with `maybecode`. Use `--config <path>` and `--model <profile>` to choose another configured connection. Credentials are resolved through existing provider configuration; they are not printed or copied into the team manifest.
+   With an installed build, replace `pnpm maybecode` with `maybecode`. The remaining
+   commands use the installed executable; repository users retain the `pnpm` prefix.
+2. Record the team ID and records directory printed by the command. Inspect the
+   task statuses, result text and acceptance status when it finishes.
+3. To inspect the same team later, run `maybecode team status <id>`. Use the
+   original `--data-directory` if you changed it at creation.
+
+Use `--config <path>` and `--model <profile>` to choose another configured
+connection. Credentials are resolved through provider configuration and kept
+outside the team manifest.
 
 `--preset supervisor|pipeline|parallel` selects orchestration, or `--plan <json-file>` supplies roles, model profiles, tool allowlists, dependencies, budgets, and exact checks. These options are mutually exclusive. Plans are validated and saved with the team; resume does not reload an external plan file. See [configurable plans](maybecode-team-plan.md).
 
-Preset defaults are two concurrent tasks, eight total tasks, two delegation levels, four turns per task, a ten-minute team deadline, 32 physical model calls, and 524,288 shared tokens. Each Run is also bounded to ten model steps/calls, 24 tool calls, and three minutes; stricter configured budgets still apply. Custom plans can select other bounded coordination limits and tighten per-role Run budgets. `--max-concurrent` accepts 1–8; an explicit CLI value overrides the plan's concurrency setting.
+Preset defaults are:
 
-The token limit must allow at least one 32,768-token model reservation. Actual usage replaces the reservation after each durable response; this is not a prepaid guarantee of provider spend. Missing or ambiguous provider usage blocks new model calls pending verified reconciliation. Team mode disables transparent provider retries and native compaction to avoid unmetered calls.
+| Scope | Default limits |
+| --- | --- |
+| Task graph | 2 concurrent tasks, 8 total tasks, delegation depth 2, 4 turns per task, 10-minute deadline |
+| Shared model allowance | 32 physical calls, 524,288 tokens, 32,768 tokens reserved per call |
+| Each Run | 10 steps/model calls, 24 tool calls, 3-minute deadline |
+
+Stricter configured budgets apply. Custom plans can select bounded graph limits
+and tighten per-role Run budgets. `--max-concurrent` accepts 1–8; an explicit CLI
+value overrides the plan's concurrency setting.
+
+The token limit must allow one 32,768-token reservation. Actual usage replaces
+the reservation after each durable response. Provider charges depend on the
+actual accepted requests. Missing or ambiguous usage blocks new calls pending
+verified reconciliation. Team mode disables transparent provider retries and
+native compaction so its ledger can account for every model call.
 
 ## Execution is not acceptance
 
@@ -80,4 +111,6 @@ Tool permissions, delegation targets, and messaging are role-scoped. The default
 
 Existing v1 teams retain their original read-only `resume`, `status`, and `cancel` behavior. They are not silently upgraded to v2 permissions or verification. Start a new team to use the new controls.
 
-The terminal composition is narrower than the reusable [coordination APIs](coordination.md): unrestricted graph mutation, handoff, and remote worker hosting remain host-level integrations, not model-granted capabilities. This release does not add distributed coordinator ownership or a global cross-host quota service.
+For host integrations, the [coordination APIs](coordination.md) also expose graph
+revision, handoff and remote workers. Teams run with one coordinator and local
+resource accounting.

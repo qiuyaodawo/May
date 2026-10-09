@@ -1,20 +1,22 @@
-# Custom Context
+# Extend Context with a factory
 
 **English** | [简体中文](../../zh-CN/guides/custom-context.md)
 
-Core's `Context` is the model-visible working set for one runtime. It is not
-the durable Session log. A Context decides which instructions, messages, and
-metadata are presented to the next model request; Session records the facts
-needed to rebuild that state later.
+Use a `ContextFactory` to choose or observe the messages sent to a model while
+retaining Session recovery. This guide adds message-count auditing to the
+built-in factory and explains the requirements for a replacement implementation.
 
 Most applications should start with `InMemoryContextFactory`. Supply a custom
 `ContextFactory` to add observation, use another working-set implementation, or
 expose different inspection and compaction behavior.
 
-## Safest extension: decorate a factory
+<a id="safest-extension-decorate-a-factory"></a>
+
+## 1. Decorate the built-in factory
 
 Decorating the built-in factory preserves its replay, budget, measurement, and
-automatic-compaction behavior:
+automatic-compaction behavior. Create `audited-context.ts` in the application
+and add `@may/core` and `@may/context` as direct dependencies:
 
 ```ts
 import type {
@@ -75,8 +77,11 @@ export class AuditedContextFactory implements ContextFactory {
 }
 ```
 
-Wire the factory into the application rather than constructing a Context once
-and sharing it across sessions:
+## 2. Open an application with the factory
+
+In the entry point, import `AgentApplication` from `@may/application` and
+`AuditedContextFactory` from `./audited-context.js`. This composition snippet
+uses the host's initialized `model`, `store`, and `permissionPolicy`:
 
 ```ts
 const application = await AgentApplication.open({
@@ -91,11 +96,20 @@ const application = await AgentApplication.open({
 the replayed messages into `create()`. A factory instance may be reused, but
 each call must return an independent managed Context.
 
+## 3. Verify independent Context instances
+
+Submit input through the application and observe count-only `snapshot` and
+`append` entries. Close the application after its work. Reopen a stored Session
+to confirm the factory receives its replayed messages; opening a new Session
+must create an independent message view. Lifecycle examples are in
+[Build an Agent](building-an-agent.md).
+
 ## Factory inputs
 
 `ContextFactoryOptions` may include:
 
-- `instructions`, replayed `messages`, and model-request `metadata`;
+- `instructions`, dynamic `instructionsSource`, replayed `messages`, and
+  model-request `metadata`;
 - a `budget` and the latest provider token `measurement`;
 - a default manual `compactionStrategy`;
 - an ordered `autoCompactionStrategies` chain.

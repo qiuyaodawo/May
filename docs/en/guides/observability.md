@@ -1,10 +1,16 @@
-# Observability and tracing
+# Configure observability and tracing
 
 **English** | [简体中文](../../zh-CN/guides/observability.md)
 
-May tracing explains where an Agent Run spent time and how Core, Context,
-models, tools, permissions, Sessions, and applications relate. It is optional
-operational telemetry, not durable conversation history.
+Use this guide to record Run timing, usage, metrics and diagnostics. You need an
+existing May application and a destination for local files, console output or
+OTLP export. `@may/observability` provides tracing and diagnostic implementations;
+`@may/plugin-observability` can own them through an Application plugin.
+
+For a complete configuration-backed example, see
+[model validation and execution diagnostics](model-telemetry-integration.md).
+The following sections describe direct tracer configuration and available
+telemetry data.
 
 ## Events, history, and traces
 
@@ -22,9 +28,10 @@ Session remain separate traces.
 
 ## Configure a tracer
 
-Core exports only the `Tracer`, `TraceSpan`, `TraceContext`, attribute, and
-fail-open helper contracts. `@may/observability` provides the standard
-implementation:
+Core exports the `Tracer`, `TraceSpan`, `TraceContext`, attribute types and
+protected telemetry-call helpers. In your consuming project, install
+`@may/application` and `@may/observability`. This integration snippet assumes
+already configured `model`, `tools`, `permissionPolicy` and `store`.
 
 ```ts
 import { defineAgent } from "@may/application";
@@ -58,14 +65,19 @@ const definition = defineAgent({
   traceAttributes: { "may.agent.name": "example" },
 });
 
-const application = await definition.open({ store });
-const run = await application.submit({ input: "Inspect the project" });
-console.log(run.traceContext?.traceId);
-await run.result;
-await application.close();
-
-// Do this only after every application sharing this processor has closed.
-await processor.shutdown();
+try {
+  const application = await definition.open({ store });
+  try {
+    const run = await application.submit({ input: "Inspect the project" });
+    console.log(run.traceContext?.traceId);
+    await run.result;
+  } finally {
+    await application.close();
+  }
+} finally {
+  // 所有共享该 processor 的应用关闭后，释放导出资源。
+  await processor.shutdown();
+}
 ```
 
 `AgentDefinition` captures the tracer as a caller-owned collaborator and
@@ -89,7 +101,8 @@ context for provider, remote-tool, and parent-operation integration.
 | `may.permission.approval_wait` | Wait for an explicit approval decision |
 | `may.context.compact` | Explicit application-requested compaction |
 
-For example, a slow tool operation may appear as:
+The following illustrative timings show how an approval wait contributes to a
+tool's duration. They are example values:
 
 ```mermaid
 flowchart TD
@@ -104,7 +117,7 @@ from Context preparation or tool latency.
 ## Processors, exporters, and sampling
 
 - `InMemorySpanProcessor` retains completed spans for tests and inspection.
-- `SimpleSpanProcessor` serializes exporter calls away from the Agent stack.
+- `SimpleSpanProcessor` serializes asynchronous exporter calls.
 - `BatchSpanProcessor` uses a bounded queue and exposes `droppedSpans`; it
   never applies exporter backpressure to a Run.
 - `InMemorySpanExporter` and `ConsoleSpanExporter` are included.
@@ -126,7 +139,8 @@ External tracing systems should be integrated through a custom
 
 ## Enable tracing in MaybeCode
 
-MaybeCode owns a ready-to-use local file composition. Add this to May's config:
+In the May configuration used to launch MaybeCode, add the following fragment,
+then start the workspace. The first exported spans create the dated file:
 
 ```json
 {
@@ -169,10 +183,15 @@ or unbounded user-controlled values in them.
 
 Core wraps injected tracer and span calls. Provided processors catch exporter
 failures and optionally report them through `onError`. A broken telemetry
-backend therefore cannot fail or cancel Agent work. This fail-open behavior is
-why tracing cannot replace a durable audit or Permission record.
+backend therefore cannot fail or cancel Agent work. Tracing provides operational
+diagnostics with bounded, sampled export. The Host independently persists audit
+and Permission records with the retention and delivery guarantees it requires.
 
 ## Independent metrics and local diagnostics
+
+Add these objects to the preceding direct tracer setup. The fragment assumes
+the imported `BasicTracer`, `ratioSampler`, existing `processor` and Session
+identity `sessionId`. Read the snapshots after an operation finishes.
 
 ```ts
 import { BoundedMetrics, DiagnosticsStore } from "@may/observability";
@@ -250,7 +269,10 @@ cost counters are recorded once at logical-call completion.
 `OpenTelemetryTracer` adapts a host-owned OpenTelemetry API tracer with explicit
 parent propagation. `OpenTelemetryMetricRecorder` adapts a meter independently
 of trace sampling and limits metric series. The convenience composition owns
-official SDK providers and HTTP/JSON exporters without registering globals:
+official SDK providers and HTTP/JSON exporters without registering globals.
+The snippet assumes a running OTLP HTTP collector at the two URLs and the
+`diagnostics` store from the preceding section. Applications use
+`telemetry.tracer`; close them before calling telemetry shutdown.
 
 ```ts
 import { createOtlpTelemetry } from "@may/observability";
@@ -262,7 +284,7 @@ const telemetry = createOtlpTelemetry({
   timeoutMs: 5_000, maxQueueSize: 2_048, maxExportBatchSize: 256,
   samplingRatio: 0.1, observer: diagnostics,
 });
-// Applications use telemetry.tracer and close before SDK shutdown.
+// Application 使用 telemetry.tracer，全部关闭后释放 SDK。
 await telemetry.forceFlush();
 console.log(telemetry.getDiagnostics());
 await telemetry.shutdown();
@@ -283,6 +305,10 @@ execution and use `correlationTraceAttributes` for span metadata. A resumed
 execution creates new identities and references its previous Run through
 `resumedFromRunId`. Received correlation must be validated before execution.
 Local diagnostics cover operations observed in the local process.
+
+The following fragment assumes a `DiagnosticsStore` and independently collected
+verification evidence. Record the assessment only after the evaluator completes;
+replace the identities, versions and reference with your actual values.
 
 ```ts
 diagnostics.recordAssessment({
@@ -319,3 +345,14 @@ Export and shutdown default to five-second timeouts. Ordinary failed batches
 release their data and later batches continue. Export timeout closes the
 processor and discards pending records to bound unfinished export operations;
 `shutdown()` releases exporter resources.
+
+## Verification
+
+After enabling telemetry, perform a real application operation and confirm Run
+and child identities, Session filtering, usage completeness and cleanup. Use
+`droppedSpans`, `coverage` and queue diagnostics when deciding whether a query
+contains all retained evidence.
+
+From the repository root, run `pnpm --filter @may/observability test` for local
+processors, metrics, diagnostics and OpenTelemetry integration. External collector
+delivery and provider usage require their own configured services.

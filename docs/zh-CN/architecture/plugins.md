@@ -1,9 +1,9 @@
-# 插件系统规格
+# 插件组合与生命周期
 
-[English](../../en/architecture/plugin-spec.md) | **简体中文**
+[English](../../en/architecture/plugins.md) | **简体中文**
 
-May 通过插件、带类型的服务和生命周期 Hooks 公开可复用能力。应用选择自己的组合，
-现有 package 的直接调用方式继续有效。
+本文解释 May 已实现的插件宿主，包括服务何时可用、嵌套范围如何管理资源，以及
+Hooks 如何参与执行。声明和加载插件参阅[插件指南](../guides/plugins.md)。
 
 ## 概念
 
@@ -25,6 +25,19 @@ Plugin 是具有配置和生命周期的功能单元。Service 是具名、带�
 
 ## 生命周期与范围
 
+```mermaid
+flowchart TD
+  host[host: 工作区共享资源] --> app[application: Agent 组合]
+  app --> session[session: 会话资源]
+  session --> run[run: 一次执行]
+  run -. 服务查询 .-> session
+  session -. 服务查询 .-> app
+  app -. 服务查询 .-> host
+```
+
+Run 插件可以使用 Session 服务和 Application 的 Model。Application 插件不能
+依赖 Run 服务，因为后者在之后创建，并且更早结束。每个子范围创建自己的实例。
+
 host、application、session 和 run 构成嵌套范围。初始化遵循依赖顺序，清理遵循依赖
 逆序。监听器、计时器、连接和后台操作具有明确管理者。初始化失败后停止后续初始化，
 清理已经创建的资源。清理继续处理剩余资源，并集中报告错误。关闭时拒绝新操作；重复
@@ -34,6 +47,18 @@ host、application、session 和 run 构成嵌套范围。初始化遵循依赖�
 使用相关资源的操作必须完成，或者取消并等待终止。等待变更期间阻止相关新操作。
 替换初始化失败后，相应范围保持不可执行，持久历史继续允许读取。Session 状态具有
 明确 schema 版本及迁移方法，恢复执行前必须验证。
+
+## 状态与替换
+
+插件状态声明数字版本、初始值及可选 schema 与迁移。读取返回副本，已经接受的
+`set()` 和 `update()` 验证数据并等待配置的保存方法完成后才报告成功。
+Application 和 Session 状态保存在 `may.plugins` 下，Run 状态仅临时保存。
+历史保留未知插件的状态记录。
+
+替换过程中，活动操作完成写入后，宿主暂停新的状态调用，并等待已经接受的调用
+结束。清理完成后初始化替换实例，新的 setup 可以更新恢复的状态。不兼容的插件
+版本或状态版本需要明确迁移。运行时替换还通过 Session 生命周期方法保存并恢复
+运行时说明和具有版本的状态。
 
 ## Hooks
 
@@ -76,7 +101,8 @@ AgentDefinition 选择插件；AgentApplication 打开相应范围并接入 Sess
 默认 May loop 由 runtime 插件通过可替换 factory 提供。MaybeCode 和 MaybeClaw
 支持产品插件选择，直接调用方式保持有效。
 
-验收使用真实服务和资源，验证初始化检查、范围隔离、清理顺序、初始化失败、超时、
-取消、变更、迁移、权限顺序、持久化结果及恢复。现有离线测试、构建和双语文档检查
-需要通过。新增公开 package 的完整依赖通过外部打包安装验证。真实 provider 验证与
-离线验证分别报告。
+`packages/plugin/test/` 覆盖组合验证、范围、Hook 顺序、清理、变更与状态迁移。
+Application 测试覆盖 Session 状态集成与运行时替换。在仓库根目录执行
+`pnpm --filter @may/plugin test` 和 `pnpm --filter @may/application test` 验证
+这些行为。`pnpm test:package:plugin` 在仓库外安装打包后的完整依赖，并执行公开
+导出接口。这些检查使用本地资源，外部 provider 集成需要单独验证。

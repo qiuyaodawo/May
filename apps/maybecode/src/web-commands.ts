@@ -27,15 +27,15 @@ export class MaybeCodeWebCommands {
   }
 
   controls(): UiControls {
-    return { inputCommand: "console.execute", responseCommand: "mcp.respond", cancelCommand: "console.cancel", busy: this.busy,
-      forms: (this.app.getMcpInteractions?.() ?? []).map(request => ({
-        id: request.id, title: `MCP · ${request.serverId} · ${request.params.mode ?? "form"}`,
-        detail: `Session: ${request.owner.sessionId}\nRequest: ${request.requestId}\n${request.params.message}`,
-        mode: request.params.mode ?? "form", editable: request.params.mode === "review" ? request.params.editable : request.params.mode !== "url",
-        value: request.params.mode === "review" ? JSON.stringify(request.params.data, null, 2) : request.params.mode === "url" ? "" : JSON.stringify(request.params.requestedSchema, null, 2),
-        ...(request.params.mode === "url" ? { url: request.params.url } : {}),
-      })),
-    };
+    const forms = (this.app.getMcpInteractions?.() ?? []).map(request => ({
+      id: request.id, title: `MCP · ${request.serverId} · ${request.params.mode ?? "form"}`,
+      detail: `Session: ${request.owner.sessionId}\nRequest: ${request.requestId}\n${request.params.message}`,
+      mode: request.params.mode ?? "form", editable: request.params.mode === "review" ? request.params.editable : request.params.mode !== "url",
+      value: request.params.mode === "review" ? JSON.stringify(request.params.data, null, 2) : request.params.mode === "url" ? "" : JSON.stringify(request.params.requestedSchema, null, 2),
+      ...(request.params.mode === "url" ? { url: request.params.url } : {}),
+    }));
+    return { inputCommand: "console.execute", responseCommand: "mcp.respond", cancelCommand: "console.cancel",
+      busy: this.busy || this.app.isRunning || forms.length > 0, forms };
   }
 
   async execute(command: UiCommand): Promise<UiReceipt> {

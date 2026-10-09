@@ -1,12 +1,21 @@
-# MCP authentication and credentials
+# Configure MCP OAuth authentication
 
 **English** | [简体中文](../../zh-CN/guides/mcp-auth.md)
 
-OAuth authentication for HTTP endpoints is separate from permission to execute a
-tool. Login never approves a tool, supplies model context, or opens an Agent.
-Local stdio credentials continue to use explicitly configured environment values.
+Use this guide to authenticate a Streamable HTTP endpoint from MaybeCode or a
+custom native Host. You need the endpoint's OAuth registration requirements,
+trusted authorization origins, browser access and a working OS keyring or secure
+credential store. Configure the endpoint first using the [MCP guide](mcp.md).
+
+OAuth establishes the remote account identity. The application separately checks
+permission to execute each tool. Stdio servers receive credentials through their
+configured environment.
 
 ## Configure a native OAuth client
+
+1. Add `auth` to the HTTP endpoint in your May configuration.
+2. Replace the example endpoint, scopes and authorization origin with the values
+   accepted by your service.
 
 ```json
 {
@@ -29,8 +38,8 @@ Local stdio credentials continue to use explicitly configured environment values
 }
 ```
 
-Omit `account` for the `default` credential profile. It is a local label, not an
-assertion about the authenticated remote subject. The endpoint URL, account,
+Omit `account` for the `default` credential profile. This local label selects a
+credential profile. Authentication establishes the remote subject. The endpoint URL, account,
 client registration configuration, and exact issuer partition credentials.
 Aliases with the same endpoint/account/registration settings share grants.
 
@@ -46,7 +55,7 @@ MCP request headers are not forwarded into OAuth requests. A static
 Registration options:
 
 - `clientId` plus `expectedIssuer`: a pre-registered **public native** client;
-  issuer comparison is exact. This is not a client-secret/machine-to-machine flow.
+  issuer comparison is exact. Secret-based machine clients require a different integration.
 - `clientMetadataUrl`: a public HTTPS Client ID Metadata Document with a document
   path. Used when the server advertises CIMD support.
 - Otherwise the SDK uses legacy Dynamic Client Registration if advertised.
@@ -58,11 +67,23 @@ Pre-registered clients/CIMD documents must allow the chosen native redirect.
 
 ## Login, refresh, and logout
 
-```sh
-maybecode mcp login remote --config /path/to/config.json
-maybecode mcp status remote --config /path/to/config.json
-maybecode mcp login remote --scope write --config /path/to/config.json
-maybecode mcp logout remote --config /path/to/config.json
+1. From the repository root, log in using the configuration file you edited.
+   For an installed CLI, replace `pnpm maybecode` with `maybecode`.
+
+```powershell
+pnpm maybecode mcp login remote --config ./may.config.json
+pnpm maybecode mcp status remote --config ./may.config.json
+```
+
+2. Open the printed authorization URL and approve the requested scopes. Successful
+   login saves credentials in the configured secure store.
+3. In an already running MaybeCode workspace, execute `/mcp reconnect remote`.
+   Check `/mcp` for the connected state, then start a new Run.
+4. To authorize an additional scope or remove local credentials, use:
+
+```powershell
+pnpm maybecode mcp login remote --scope write --config ./may.config.json
+pnpm maybecode mcp logout remote --config ./may.config.json
 ```
 
 Commands also accept `--workspace <path>`. Login prints an authorization URL;
@@ -70,7 +91,7 @@ open it in a browser. May listens only on `127.0.0.1`, validates a random,
 one-use state, and verifies the issuer before exchanging the PKCE-bound code or
 interpreting callback errors. Ctrl+C or the five-minute deadline closes the
 listener. The code verifier and discovery state are both process-lifetime;
-quitting cancels the flow rather than leaving a resumable authorization code.
+quitting cancels the flow and discards that state.
 
 Runtime requests read stored credentials and refresh on expiry or HTTP 401.
 Refreshes are serialized and rediscover the issuer; credentials from an old
@@ -81,7 +102,12 @@ returns `MCP_AUTHENTICATION_REQUIRED`, and requires an explicit login/consent.
 There is no browser prompt inside a tool execution. `/mcp` shows `auth-required`
 when applicable. After login, use `/mcp reconnect <server-id>` to discover fresh
 capabilities and create new permission identity, including for endpoints whose
-initial discovery failed. Start a new Run rather than replaying the denied call.
+initial discovery failed. Start a new Run after reconnecting.
+
+Login stamps an opaque authorization generation. New operations, resource cache
+hits and MRTR continuations validate it. Another login or logout, including from
+another process, invalidates the old connection; reconnect before starting a new
+operation. Token refresh preserves the generation.
 
 `status` reports whether tokens are stored, whether consent is pending, and an
 expiry timestamp where known; it is not remote token validation. Logout attempts
@@ -118,14 +144,14 @@ model messages, Session history or built-in traces. Login URLs are deliberately
 shown only in the authentication UI. OAuth fetches are bounded to 30 seconds
 and 1 MiB per response. Server/tool content remains untrusted.
 
-References: [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization),
-[SDK provider obligations](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/upgrade-to-v2.md).
+## Troubleshooting
 
-OAuth login now stamps an opaque authorization generation. Resource cache hits
-and new tool/capability operations validate that generation; logout or a new
-login (even from another process) rejects the old connection until reconnect.
-Normal token refresh does not change a stamped generation.
+| Symptom | Check and action |
+| --- | --- |
+| OAuth origin is rejected | Add the provider's exact trusted origin to `authorizationOrigins` |
+| Callback cannot complete | Check the registered redirect URL and selected loopback port; restart login before its five-minute deadline |
+| Credential store is unavailable | Unlock or configure the OS keyring, or inject a secure `McpCredentialStore` |
+| A vault lock remains after a crash | Verify the recorded PID has exited before deleting that specific lock file |
+| `MCP_AUTHENTICATION_REQUIRED` | Complete the explicit scope login, reconnect and start a new Run |
 
-Modern MRTR continuations recheck the original authorization generation before
-each new leg. A login/logout while a user question is open cannot reuse its
-opaque state under another principal; reconnect and start a new operation.
+Connection and ownership limits are maintained in the [MCP capability reference](../reference/mcp-capabilities.md).

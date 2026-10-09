@@ -1,14 +1,28 @@
-# Sub-agent delegation
+# Delegate work to sub-agents
 
-[简体中文](../../zh-CN/guides/subagent-delegation.md)
+**English** | [简体中文](../../zh-CN/guides/subagent-delegation.md)
 
-Ordinary MaybeCode requests can delegate work to sub-agents. The feature is on
-by default in the terminal UIs, the Web UI, the headless controller and a direct
-`MaybeCodeApplication.open`; there is no separate mode to enter. The model sees
-the `delegate_tasks` tool in its tool catalog while one of its own Runs is active,
-so the user can ask for delegation in a prompt and the model can also decide on
-its own. `delegate_tasks` lives in `@may/coordination`; the product composition
-lives in `apps/maybecode`.
+Use sub-agents to assign independent work during an ordinary MaybeCode request.
+Delegation is enabled by default in terminal UIs, the Web UI, the headless
+controller and `MaybeCodeApplication.open()`. The model can call `delegate_tasks`
+during an active Run, either following your prompt or choosing to delegate.
+
+This guide assumes a [configured MaybeCode Session](maybecode.md). It explains
+request behavior, roles, file responsibilities, budgets and recovery. The
+reusable implementation is in `@may/plugin-delegation`; MaybeCode composes that
+plugin with the `delegate_tasks` tool from `@may/coordination`.
+
+## Request delegated work
+
+1. Open MaybeCode in the workspace you want the Agents to inspect.
+2. Send a prompt with independent assignments, file responsibilities and expected
+   evidence. For example: “Delegate source inspection and test inspection to
+   separate sub-agents. Each must cite files and report verification gaps.
+   Combine their findings in the final answer.”
+3. Inspect the task tree, child approvals and usage while the request runs.
+   Use `/delegations` to inspect its durable state.
+4. Review the final answer and child outcomes. Failed children are included in
+   the wakeup data so the main Agent can handle them.
 
 ## One request, several Runs, one final answer
 
@@ -21,7 +35,8 @@ outcome, the main Session continues with a new Run that receives the child repor
 as data and produces the answer the user sees.
 
 `controller.submit(...)` returns a `MaybeCodeRun`, which is the request rather than
-a single Run:
+a single Run. The fragment assumes an opened `MaybeCodeController`, a prepared
+Session input and an active host event consumer for approvals:
 
 ```ts
 const run = await controller.submit({ input });
@@ -34,6 +49,11 @@ Goal runs and steering runs are requests too, so delegation is available in ever
 Run the host starts, and the main Session never has two writers.
 
 ## Configuration
+
+Merge `apps.maybecode.subagents` into the May configuration used by your host.
+The `reviewer.model` below is a configured model profile name; replace it with
+one present in your configuration. Its model must support the selected reasoning
+effort. These are example limits; defaults are listed after the fragment.
 
 ```jsonc
 {
@@ -80,6 +100,11 @@ Session's model and reasoning effort; a role with `model` builds its own model a
 The main request is depth 1, a delegated child is depth 2 and a grandchild is
 depth 3; `maxDepth` refuses anything deeper, and `maxTasks` bounds the tasks of one
 request including the main task.
+
+Default graph limits are 2 concurrent tasks, 24 total tasks, depth 3, 6 turns per
+task and 15 minutes per request. Task inputs are limited to 32,768 UTF-8 bytes
+and outputs to 65,536 bytes. A child Run also has a five-minute default deadline.
+`maxTotalTokens` is omitted by default; add it to enforce a request token allowance.
 
 ## Prompt, briefs and file ownership
 

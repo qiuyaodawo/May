@@ -1,9 +1,12 @@
-# Custom tools
+# Implement and register a tool
 
 **English** | [简体中文](../../zh-CN/guides/custom-tool.md)
 
-A May tool is one named capability exposed to a model. The `Tool` contract from
-`@may/core` separates three concerns:
+Use this guide to define a tool, validate its arguments, register it with an
+Agent, and handle cancellation. It assumes an application and model are already
+configured as described in [Build an Agent](building-an-agent.md).
+
+The `Tool` interface from `@may/core` has three main parts:
 
 - `inputSchema` describes the call to the model;
 - optional `parse()` validates and converts untrusted model output;
@@ -15,6 +18,10 @@ receives an `Iterable<Tool>` and snapshots its membership at the appropriate
 construction boundary.
 
 ## A complete tool
+
+Create `add-tool.ts` in your TypeScript application and add `@may/core` as a
+direct dependency. This file implements addition; its `execute()` result has
+the shape `{ value: number }`.
 
 ```ts
 import type { Tool } from "@may/core";
@@ -60,8 +67,10 @@ export const addTool: Tool<AddInput, AddOutput> = {
 };
 ```
 
-Compose it with other capabilities, then capture the composition in an Agent
-definition:
+In the application's composition module, import `addTool` from `./add-tool.js`
+and compose it with your initialized `productTools`. The following snippet
+assumes the host supplies `model`, `permissionPolicy`, and `store`;
+close the application after its work as described in the application guide:
 
 ```ts
 import { defineAgent } from "@may/application";
@@ -85,8 +94,8 @@ The permission policy receives the parsed value.
 
 ## Registry composition and lookup
 
-`ToolRegistry` implements `Iterable<Tool>` and retains insertion order. Its
-complete collection API is:
+`ToolRegistry` implements `Iterable<Tool>` and retains insertion order. The host
+provides the other tools in this API fragment:
 
 ```ts
 const registry = new ToolRegistry(baseTools);
@@ -96,11 +105,12 @@ registry.registerAll(featureTools);
 
 registry.size;
 registry.has("add");
-registry.get("add");       // Tool | undefined
-registry.require("add");   // Tool, or ToolNotFoundError
-registry.names();          // insertion-ordered string snapshot
-registry.values();         // insertion-ordered Tool snapshot
-registry.definitions();    // model-facing definitions, no execute/parse
+registry.get("add");       // 返回 Tool 或 undefined。
+registry.require("add");   // 缺少工具时抛出 ToolNotFoundError。
+registry.names();          // 按注册顺序返回名称快照。
+registry.values();         // 按注册顺序返回 Tool 快照。
+registry.definitions();    // 返回模型可见定义。
+registry.snapshot();       // 为一次 Run 冻结定义与回调。
 
 const independent = registry.clone();
 const composed = ToolRegistry.compose(baseTools, featureTools);
@@ -119,12 +129,11 @@ source registry.
 Collection snapshots preserve the original Tool object identity rather than
 cloning executable objects. This allows product metadata keyed by Tool identity
 (for example, a `WeakMap<Tool, Metadata>`) to keep working across composition.
-The Tool's `name`, `description`, and `inputSchema` fields are readonly in
-TypeScript; those fields plus `parse` and `execute` must remain stable after
-registration. When returning tools or model definitions, a registry checks the
-registered `name`, `description`, `inputSchema` reference, `parse`, and
-`execute`; changing one causes `TypeError`. The check is shallow—the schema
-object is not deep-frozen—so treat its contents as immutable too. Create new
+The Tool's `name`, `description`, `inputSchema`, `parse`, `execute`,
+`resultContent`, and `permissionVersion` fields are readonly in TypeScript and
+must remain stable after registration. When returning tools or model definitions,
+a registry checks their registered values or references; changing one causes
+`TypeError`. The check is shallow, so treat the schema contents as immutable too. Create new
 Tool objects when an application needs different per-Session descriptors or
 state.
 
@@ -138,7 +147,7 @@ a tool later affects none of those existing owners:
 const tools = new ToolRegistry([addTool]);
 const agent = defineAgent({ model, tools, permissionPolicy });
 
-tools.register(subtractTool); // available in tools, not in agent
+tools.register(subtractTool); // 之后接收该 registry 的定义可以使用此工具。
 const application = await agent.open({ store });
 ```
 
@@ -216,8 +225,11 @@ or remote execution backend.
 
 Test `parse()` and `execute()` without a model first. Use an
 `AbortController`, a fixed execution context, and capture `report()` calls.
-Then add one runtime-level test proving that the normalized output is returned
-to the model. Provider behavior does not need to be retested by every tool.
+For `{ left: 2, right: 3 }`, execution returns `{ value: 5 }`. Invalid or missing
+numbers must fail validation; an already aborted signal must stop execution.
+Then exercise the tool with your configured real model to verify its normalized
+output reaches the next request. Provider behavior does not need to be retested
+by every tool.
 
 See also [Custom model adapters](./custom-model.md) and
 [Custom UI](./custom-ui.md).
@@ -248,6 +260,8 @@ key. Equivalent schema key order does not. `revokeSessionGrant(key)` revokes all
 versions under that key; explicit policy deny still wins. Host adapters should
 include other execution-affecting fields and endpoint/account in their version.
 
+### Project model-visible results
+
 `Tool.resultContent(output)` optionally projects successful output to model-visible
 `ContentPart[]`, instead of the default JSON block. It is captured by Run snapshots.
 `tool.completed.output` retains raw output for the host; `tool.completed.content`
@@ -257,6 +271,8 @@ use saved `content`. Legacy records without it produce an explicit unavailable-c
 message; their raw output remains accessible through host Session history APIs.
 Projection errors become tool failures.
 Validate untrusted content and omit host-only metadata from the projection.
+
+### Supply trusted execution labels
 
 `MayOptions.toolScope()` optionally returns trusted host-only string labels. Core
 copies/freezes them once per Run/continue as `ToolExecutionContext.scope`, including

@@ -1,12 +1,22 @@
-# 子 Agent 委派
+# 委派子 Agent 执行任务
 
-[English](../../en/guides/subagent-delegation.md)
+[English](../../en/guides/subagent-delegation.md) | **简体中文**
 
-普通 MaybeCode 请求可以委派子 Agent。Terminal 界面、Web UI、无头控制器以及直接
-`MaybeCodeApplication.open` 默认都具备这个能力，不需要进入单独模式。模型在自己
-的 Run 期间可以在工具目录中看到 `delegate_tasks`，因此用户在提示词中要求委派
-即可，模型也可以自主判断是否使用。`delegate_tasks` 位于 `@may/coordination`，
-产品组合位于 `apps/maybecode`。
+普通 MaybeCode 请求可以将独立工作交给子 Agent。终端界面、Web UI、无头
+控制器和 `MaybeCodeApplication.open()` 默认启用委派。模型在活动 Run 中
+可以调用 `delegate_tasks`，按照用户提示委派，也可以自行选择委派。
+
+本指南要求已有[MaybeCode Session 配置](maybecode.md)，介绍请求行为、角色、
+文件分工、预算和恢复。可复用实现位于 `@may/plugin-delegation`，MaybeCode
+将该插件与 `@may/coordination` 提供的 `delegate_tasks` 工具组合。
+
+## 请求委派工作
+
+1. 在需要检查的工作区中打开 MaybeCode。
+2. 提交包含独立任务、文件分工和证据要求的提示。例如：“分别委派子 Agent
+   检查源代码和测试。每项发现引用文件并说明验证缺口，最终回答汇总两份结果。”
+3. 执行期间检查任务树、子任务审批和用量，通过 `/delegations` 查看持久状态。
+4. 阅读最终回答及子任务结果。失败子任务的状态会进入唤醒数据，由主 Agent 处理。
 
 ## 一次请求、多个 Run、一个最终回答
 
@@ -16,7 +26,9 @@
 运行，拥有自己的 Context、Skills 与压缩状态。全部子任务进入终态之后，主 Session
 继续执行新的 Run，把子任务报告作为数据收到上下文里，再生成给用户的回答。
 
-`controller.submit(...)` 返回的 `MaybeCodeRun` 表示整次请求，而不一定是一个 Run：
+`controller.submit(...)` 返回的 `MaybeCodeRun` 表示整次请求。
+以下片段要求已经打开 `MaybeCodeController`、准备 Session 输入，并由宿主
+消费审批事件：
 
 ```ts
 const run = await controller.submit({ input });
@@ -29,6 +41,10 @@ Goal 的 Run 与 steering 的 Run 同样是一次请求，因此宿主启动的�
 主 Session 不会同时存在两个写入方。
 
 ## 配置
+
+在宿主使用的 May 配置中合并 `apps.maybecode.subagents`。下文的
+`reviewer.model` 是已配置模型名称，需要替换为配置中存在的名称，并确认模型
+支持所选 reasoning effort。以下限制用于展示配置格式，实际默认值见片段之后。
 
 ```jsonc
 {
@@ -74,10 +90,15 @@ Goal 的 Run 与 steering 的 Run 同样是一次请求，因此宿主启动的�
 主请求是第 1 层，委派得到的子任务是第 2 层，孙任务是第 3 层；`maxDepth` 拒绝更深的
 委派，`maxTasks` 限制一次请求的任务总数，包含主任务。
 
+任务图默认最多并发 2 个任务、总计 24 个任务、深度 3、每个任务 6 轮、每次请求
+15 分钟。任务输入限制为 32,768 个 UTF-8 字节，输出限制为 65,536 字节。
+子 Run 默认截止时间为 5 分钟。默认省略 `maxTotalTokens`，需要限制请求 token
+额度时显式设置该字段。
+
 ## 提示词、任务说明与文件分工
 
 每个子任务说明必须自成一体：目标、约束、期望的证据与报告格式。子任务只收到这份
-说明，不会拿到父任务的对话历史，它的报告是数据而不是指令。子任务的 `files` 声明
+说明，父任务的对话历史保持独立，报告作为数据传递。子任务的 `files` 声明
 它可以修改的工作区相对文件：
 
 - 子任务可以读取工作区内的任何文件；
@@ -110,7 +131,7 @@ pending 调用在重新打开账本时变成 unknown。Goal 与 steering 的 Run
 
 上报 usage 的原生压缩按真实用量结账。没有 usage 的压缩器按预留值计账并标记为估计值，
 此时请求报告中的 token 总计会显示为不完整。token 总计由 provider 用量与估计值组成，
-它不是 provider 可能计费的绝对上限。
+provider 的实际账单仍取决于已经接受的请求。
 
 ## 审批、取消与恢复
 
@@ -124,13 +145,13 @@ pending 调用在重新打开账本时变成 unknown。Goal 与 steering 的 Run
 
 进程在请求进行中结束时，持久记录会保留下来。再次启动时该请求被报告为中断，未结束的
 任务标记为 recovery-required，并且不会重放任何工具、模型调用或子任务 Run。核对外部
-影响之后，可以在协调 runtime 保持停止的情况下，为排队中的任务以及等待子任务的父任务
+影响之后，可以在协作运行时保持停止的情况下，为排队任务和等待子任务的父任务
 记录结束结论：
 
 ```text
 /delegations
-/delegations tools <任务 id>
-/delegations resolve <任务 id> <failed|cancelled> <核对结论>
+/delegations tools <task-id>
+/delegations resolve <task-id> <failed|cancelled> <verified-finding>
 ```
 
 遗留的写入锁不会被自动接管；确认所有者进程已经结束之后，使用协调锁的恢复命令并

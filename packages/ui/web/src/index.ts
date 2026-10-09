@@ -379,8 +379,9 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
       }
       if (!snapshot?.choices.length) choices.append(element("span", "composer-mode", isTask ? "持久任务" : "本地 Agent"));
     }
-    cancel.hidden = state.snapshot?.controls ? !(state.busy || state.snapshot.controls.busy || has("run.cancel")) : !has(isTask ? "task.cancel" : "run.cancel"); cancel.disabled = !connected || (state.snapshot?.controls ? state.selecting : pending());
-    send.hidden = !cancel.hidden;
+    const controls = snapshot?.controls;
+    cancel.hidden = controls ? !(state.busy || controls.busy) || !has(controls.cancelCommand) : !has(isTask ? "task.cancel" : "run.cancel");
+    cancel.disabled = !connected || (controls ? state.selecting : pending());
     updateComposer();
     composerHint.textContent = !connected ? "需要连接本地服务 · 不会自动发送输入" : isTask && selected ? "关闭页面不会中止任务 · 执行、验证与送达分别记录" : "Enter 发送 · Shift + Enter 换行 · 请核对 Agent 的输出";
     const panelsKey = JSON.stringify([snapshot?.panels, snapshot?.notice, snapshot?.commands, pending()]);
@@ -423,7 +424,12 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     }
   }
   function updateComposer(): void {
-    send.disabled = !composer.value.trim() || pending() || state.connection !== "connected" || !(has("message.submit") || has("task.submit") && !selected || state.snapshot?.controls && has(state.snapshot.controls.inputCommand));
+    const text = composer.value.trim();
+    const controls = state.snapshot?.controls;
+    const canSubmit = controls && text.startsWith("/") ? has(controls.inputCommand)
+      : state.snapshot?.product.resourceKind === "task" ? has("task.submit") && !selected : has("message.submit");
+    send.hidden = !cancel.hidden && (!text || !canSubmit);
+    send.disabled = !text || pending() || state.connection !== "connected" || !canSubmit;
     composer.rows = Math.min(8, Math.max(2, composer.value.split("\n").length));
   }
   composer.oninput = () => { drafts.set(draftKey, composer.value); updateComposer(); };

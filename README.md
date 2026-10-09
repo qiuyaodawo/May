@@ -1,146 +1,63 @@
 # May
 
-May is a composable agent framework organized as a monorepo. Its packages can
-be used independently or combined into complete agents and applications.
+May is a composable Agent framework. Use its packages to connect models and tools,
+save conversations, handle permissions, and build terminal, browser, or Gateway
+applications. The public APIs and persistence formats are in developer preview.
 
-`@may/scheduler` provides opt-in persistent time and event triggers. Hosts explicitly
-start a timer loop or call `tick()`, and supply an idempotent task dispatcher.
-See [Scheduling](docs/en/guides/scheduler.md) or [持久化调度](docs/zh-CN/guides/scheduler.md).
+## Documentation
 
-`@may/eval` runs repeated Agent tasks with independent evaluators, durable evidence,
-and configuration comparisons. See [Agent evaluation](docs/en/guides/eval.md)
-or [Agent 行为评估](docs/zh-CN/guides/eval.md).
+- [English documentation](docs/en/README.md) / [简体中文文档](docs/zh-CN/README.md).
+- [Run your first Agent application](docs/en/getting-started.md): a real model,
+  one tool, and a resumable Session.
+- [Build an Agent](docs/en/guides/building-an-agent.md): choose the components
+  and policies for your application.
+- [Package reference](docs/en/reference/packages.md): find the public entry points.
+- [Configuration reference](docs/en/reference/configuration.md): provider
+  connections, model profiles, and application settings.
+- [Compatibility](docs/en/reference/compatibility.md): API, persistence, and
+  runtime requirements.
+
+## Applications
+
+- [MaybeCode](docs/en/guides/maybecode.md) provides a coding Agent with terminal
+  and Web interfaces, approvals, tools, instructions, and Session navigation.
+- [MaybeClaw](docs/en/guides/maybeclaw.md) connects May and external Agents to
+  Web, CLI, Telegram, and Feishu through a Gateway. It manages sessions, access,
+  approvals, collaboration, cancellation, and durable delivery using SQLite.
+- [May CLI](apps/cli/README.md) demonstrates direct Core use.
 
 ## Workspace
 
-Reusable plugins live in `packages/plugins/`, shared service tokens and contribution
-registries in `packages/plugin-services/`, and product composition in each
-application's `src/plugins/`. See the [plugin package catalog](docs/en/guides/plugins.md#reusable-plugin-packages)
-or [插件 package 目录](docs/zh-CN/guides/plugins.md#可复用插件-package).
+Reusable code lives in `packages/`; products in `apps/` select and configure those
+packages. Examples live in `examples/`. Dependencies flow from applications into
+reusable packages.
 
-```text
-packages/
-  core/       Agent loop, ToolRegistry, contracts, events, and in-memory Context
-  plugin/     Scoped services, lifecycle Hooks, plugin state and resource ownership
-  skills/     Agent Skills discovery, bounded resources, and durable activation
-  mcp/        Stdio / Streamable HTTP MCP clients and remote-tool adapters
-  observability/  Optional fail-open tracing processors and exporters
-  application/  Agent definitions plus single-session/workspace lifecycle
-  coordination/  Durable agent teams, attempts, resources and remote leaf workers
-  context/    Context factories, compaction, and model-backed summarization
-  session/    Serialized runs, durable history, and session catalogs
-  permissions/  Headless tool policies and approval requests
-  config/     Optional application configuration loading and validation
-  providers/  `@may/providers` selection, registry, and built-in composition
-    openai-compatible/  Shared Chat Completions protocol helpers
-    deepseek/   DeepSeek streaming model adapter
-    zhipu/      Zhipu GLM streaming model adapter
-    kimi/       Kimi streaming model adapter
-    anthropic/  Anthropic Messages API streaming model adapter
-    openai/     OpenAI Responses API adapter and native compaction
-  tools/
-    coding-tools/  Read, shell, edit, write, instructions, and change previews
-    session-tools/ Read-only access to bounded durable session history
-  ui/
-    client/       UI-neutral JSON protocol, client state, host adapters and transport
-    web/          Shared browser workbench and composable presentation components
-    keybindings/  Context-aware semantic keyboard mappings
-    tui/          Terminal primitives plus reusable Agent transcript components
-apps/
-  cli/        Minimal command-line interface
-  maybecode/ Terminal coding-agent application
-  maybeclaw/ Agent Gateway with sessions, CLI, Web UI, Feishu and Telegram
-examples/
-  basic/      Minimal Model → Tool → Model example
-  deepseek/   Live DeepSeek tool-call example
-  web-ui/     Offline shared Web UI example (scripted responses, no model calls)
-```
+- `@may/core` runs the model/tool loop; `@may/context` manages the model-visible view.
+- `@may/session` saves history; `@may/application` owns application and workspace lifecycle.
+- `@may/permissions` evaluates tool policy and handles approval requests.
+- `@may/providers` selects configured models; individual provider packages implement protocols.
+- `@may/plugin` and `@may/plugin-services` compose scoped services, state, and Hooks;
+  reusable plugins live in `packages/plugins/`.
+- `@may/coordination` runs durable teams and task graphs. `@may/scheduler` triggers
+  host tasks. `@may/eval` evaluates repeated tasks and compares configurations.
+- MCP, Skills, media, tracing, coding tools, and UI packages extend these components.
 
-`packages` contains the contracts and reusable components used to construct an
-Agent; `apps` contains executable products that select and configure those
-components. Dependencies point from applications into packages, never from a
-reusable package into `apps/maybecode` or another product. Packages may depend
-on lower-level packages: for example, `@may/application` composes Core,
-Context, Session, permissions, and the optional session-history tool, while
-`@may/tui` projects Core, permission, and Session events for terminal display.
-
-MaybeCode is the main reference product. It delegates generic run, approval,
-compaction-persistence, and multi-session lifecycle to `@may/application` and
-uses the Agent transcript from `@may/tui`. It retains coding-product policy:
-the prompt and instruction sources, coding tools and permission defaults,
-model profiles and reasoning effort, compaction strategy order, commands,
-theme, layout, and terminal interaction flow.
-
-Multi-agent work uses one durable coordinator with optional independent remote
-leaf workers, not a high-availability/multi-writer scheduler. MaybeCode's team CLI
-uses local agents and defaults to read-only. It combines configurable plans,
-isolated workspace copies, local shared usage reservations, immutable artifacts,
-structured verification and explicit host recovery controls. `--mode coding`
-permits role-scoped edits in private copies; source application requires a separate
-reviewed patch and exact host confirmation, never an automatic merge.
-`--allow-checks` separately authorizes configured test processes, not an OS sandbox.
-The CLI has no remote-worker switch or multi-agent TUI; the local budget is not a
-distributed global budget service. See the [task graph guide](docs/en/guides/coordination.md),
-[resources](docs/en/guides/coordination-resources.md),
-[attempts and graph revisions](docs/en/guides/coordination-lifecycle.md),
-[remote workers](docs/en/guides/coordination-remote.md), and
-[MaybeCode teams](docs/en/guides/maybecode-team.md); each guide has a Chinese mirror.
-
-The packages are currently versioned `0.1.0`; their public APIs and the
-file-backed persistence formats should be treated as developer-preview APIs,
-not as a promise of production or compatibility stability.
-
-The shared Web UI is available through `maybecode --ui web` and `maybeclaw serve`.
-It uses product adapters rather than treating tasks as sessions, and keeps tokens,
-permissions and execution in the local host. Run `pnpm example:web-ui` for an
-offline preview. See the [Web UI guide](docs/en/guides/web-ui.md) or
-[简体中文指南](docs/zh-CN/guides/web-ui.md) for setup and first-phase limitations.
-
-MaybeClaw connects May Agents and external Agent adapters to personal and group
-sessions through a Gateway. It manages session routing, dedicated Agent
-conversations, collaboration, approvals, cancellation and durable message
-delivery. Administrators configure Agents and session access through the CLI
-and Web control interface; users participate through Feishu or Telegram.
-Gateway state uses SQLite and requires Node.js 22.13 or later. See the
-[MaybeClaw guide](docs/en/guides/maybeclaw.md) or its
-[Chinese mirror](docs/zh-CN/guides/maybeclaw.md).
-
-Start with the [English documentation](docs/en/README.md) or the
-[简体中文文档](docs/zh-CN/README.md), then follow
-[Getting started](docs/en/getting-started.md). The
-[runtime architecture](docs/en/architecture/runtime-session.md) describes the
-boundaries between Agent definitions, applications, sessions, runs, and steps.
-The [configuration reference](docs/en/reference/configuration.md) documents the
-built-in provider option matrix; its editor schema lives at
-`packages/config/may-config.schema.json`.
+Read [the runtime architecture](docs/en/architecture/runtime-session.md) for
+lifecycle and resource ownership, and the [package catalog](docs/en/reference/packages.md)
+for component-specific guides and constraints.
 
 ## Development
 
-The [CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and
-manual dispatch. It runs the offline suite once per environment: Linux on
-Node.js 22 and 24, and Windows and macOS on Node.js 24. Manual dispatch also
-checks temporary path aliases on Windows. Separate Linux and Windows jobs check
-the standalone MaybeCode package on every run.
-See [CI usage and local checks](docs/en/getting-started.md#continuous-integration).
-
-Repository development requires Node.js 22.16.0 or newer and pnpm 12.4.2,
-as declared in `package.json`. The offline suite uses `node:sqlite` backup APIs
-available from Node.js 22.16.0.
-Node.js 24 is recommended and recorded in `.node-version` for version managers
-that support it. Individual packages retain their existing runtime requirements.
+Use Node.js 22.16.0 or newer and pnpm 12.4.2, as declared in `package.json`.
+Node.js 24 is recommended in `.node-version`. From the repository root:
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm build
 pnpm docs:check
 pnpm test
 ```
 
-Use `pnpm --filter <package-name> test` for a focused package check. Path-alias,
-coverage, and package checks are available separately when needed; see the CI guide.
-
-The live DeepSeek example additionally requires `DEEPSEEK_API_KEY`:
-
-```bash
-pnpm example:deepseek
-```
+See [repository development](docs/en/guides/repository-development.md) for focused
+tests, package installation checks, CI environments, and live-provider checks.
+See [MaybeCode usage](docs/en/guides/maybecode.md) to start the local coding application.

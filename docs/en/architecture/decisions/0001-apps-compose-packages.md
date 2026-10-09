@@ -7,10 +7,9 @@
 
 ## Context
 
-May is both an Agent framework and a monorepo containing executable reference
-products. Logic first implemented in MaybeCode included reusable execution,
-session and UI behavior, which made it difficult to tell what another Agent
-could consume without importing product code.
+May contains reusable Agent packages and executable products. Execution, Session
+and UI components need public package boundaries so applications can reuse them
+independently of product policy.
 
 ## Decision
 
@@ -21,14 +20,15 @@ an application.
 
 Product policy—including concrete prompts, commands, palettes, model profiles
 and default permission choices—remains in the application unless it becomes a
-genuinely reusable parameterized component.
+reusable parameterized component.
 
 ## Consequences
 
 - Another Agent can consume May packages without depending on MaybeCode.
 - Package APIs need their own documentation and focused tests.
 - MaybeCode acts as a reference composition and integration test.
-- Some compatibility adapters stay in MaybeCode even when the underlying
-  mechanism moves into a package.
+- Products own compatibility adapters that map their behavior to package APIs.
 - A package may still contain optional domain components, such as coding-tool
   renderers, but it must not import product implementation code.
+
+See the [package catalog](../../reference/packages.md) for the current package roles.

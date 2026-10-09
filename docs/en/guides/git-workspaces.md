@@ -7,7 +7,20 @@ component. It requires Git 2.36 or newer on `PATH`. Applications supply their wo
 commit authorization policy; the component supplies repository discovery,
 durable file versions, diffs, restoration previews, and registered worktrees.
 
+Use this guide when a host needs to associate complete user requests with file
+versions and Session branches. It assumes the application already owns a
+Session id and serializes workspace operations.
+
 ## Preparing a workspace
+
+1. Confirm Git is available and the host has a trusted commit-approval callback.
+2. Select `autoCommit` and `readOnly` according to the host's workflow.
+3. Open the component and prepare the Session's initial file version.
+
+With automatic management enabled, `prepare()` can commit existing changes.
+The host must obtain the required user approval through `authorizeCommit`.
+In this integration snippet, `sessionId` is the application's identity and
+`confirmProjectCommit` is the host's actual approval function:
 
 ```ts
 import { ProjectGitWorkspace } from "@may/application/git-workspace";
@@ -45,6 +58,10 @@ operations, submodules, and changed nested repositories require resolution
 before automatic commits.
 
 ## Completing a request
+
+Use `beginRound()` before accepting file changes for a request. Keep the returned
+lease until work and verification finish. The following snippet assumes the host
+implements `processCompleteUserRequest()` and `associateCheckpoint()`:
 
 ```ts
 const lease = await files.beginRound({ sessionId });
@@ -113,6 +130,13 @@ foreign-host, and invalid lock owners remain protected.
 
 ## Comparing and restoring files
 
+For restoration, perform these host actions in order:
+
+1. Select a checkpoint and explicit files.
+2. Call `previewRestore()` and display its current and target contents.
+3. Obtain the required restoration authorization.
+4. Call `restore(preview)` and report its checkpoint or partial failure.
+
 `diff({ from, to?, file? })` compares two commits, or a commit with current
 working contents when `to` is omitted. It provides unified patches, per-file
 status and patch, rename source paths, binary markers, line counts, and
@@ -176,6 +200,13 @@ rejected throughout these operations, including while Git Hooks or signing wait.
 Closing the host waits for an accepted workspace operation to finish before
 closing its application and owned resources. Failed restoration retains its
 preview for inspection and reports any failed Git checkpoint.
+
+## Verify the integration
+
+Confirm that `status()` reports the selected directory and current repository
+state, a completed request has a checkpoint, and `diff()` describes that
+request's files. Test failure and cancellation with edits preserved. Verify
+restoration through explicit previews and check worktree lifecycle associations.
 
 Run the real-Git integration suite only with authorization for commits inside
 its isolated test repositories:

@@ -2,240 +2,186 @@
 
 **English** | [简体中文](../../zh-CN/reference/compatibility.md)
 
-May is currently a developer-preview framework. All workspace packages are at
-`0.1.0`; the repository does not yet promise long-term source, binary, wire or
-persistence compatibility.
-
-This page describes the boundary callers can rely on today and the changes
-they must still plan for.
-
-## Public API boundary
-
-The new `@may/coordination` API and version-1 snapshot journal are also preview
-contracts. They cover graphs, bounded delegation, peer mailboxes, handoffs,
-explicit attempts, and edits of never-submitted future nodes. Optional resource
-journals and the remote worker protocol are also preview formats. Execution may
-use remote leaf workers, but a single durable coordinator owns scheduling: this
-is not arbitrary workflow replay, high availability, or multi-writer ownership.
-Local shared budget reservations/accounting are not a distributed global budget
-service. MaybeCode's team CLI uses local agents and defaults to read-only. New v2
-teams add persisted plans, scoped checks/reports and confirmed recovery controls;
-explicit coding mode permits private-copy edits, while source application requires
-a separately reviewed patch and exact host confirmation. There is no automatic
-merge, remote-worker CLI integration or multi-agent TUI. Authorized check processes
-are not OS-sandboxed. Existing v1 teams retain their original read-only
-resume/status/cancel behavior without a silent permission upgrade.
-
-See [Coordination](../guides/coordination.md),
-[Resources](../guides/coordination-resources.md),
-[Attempts and graph revisions](../guides/coordination-lifecycle.md),
-[Remote workers](../guides/coordination-remote.md) and
-[MaybeCode teams](../guides/maybecode-team.md) for ownership, version checks and
-recovery boundaries. Changed persisted policies/limits are not silently migrated.
-
-Only entry points declared in a package's `exports` map are public. Importing a
-file from `src/`, `dist/` or another undeclared deep path is unsupported even
-when that file happens to exist locally.
-
-Prefer type-only imports for contracts and dependency injection over reaching
-into an implementation:
-
-```ts
-import {
-  AgentApplication,
-  type AgentApplicationEvent,
-} from "@may/application";
-import type { ContextFactory } from "@may/context";
-```
-
-The current APIs may change before `1.0.0`. When an API is renamed, May should
-prefer a documented deprecated alias or an adapter when doing so is practical,
-but preview consumers must still review release notes and compile their code
-against each upgrade.
-
-### Composition objects
-
-`ToolRegistry`, `DuplicateToolNameError`, `AgentDefinition`, and
-`defineAgent()` are public through their package root exports, but remain
-developer-preview APIs under the same `0.1.0` policy.
-
-Their current ownership contract is explicit:
-
-- registries are ordinary instances, never process-global state;
-- `May` consumes and snapshots an `Iterable<Tool>` in its constructor;
-- `AgentDefinition` consumes and snapshots its tool iterable when the
-  definition is created;
-- direct `AgentApplication.open()` snapshots its iterable while opening; and
-- collection snapshots preserve original Tool identity rather than cloning
-  executable code or stateful collaborators.
-
-`Tool.name`, `Tool.description`, and `Tool.inputSchema` are readonly in
-TypeScript. A `ToolRegistry` records those values/references plus the parser
-and executor, and throws `TypeError` from operations that expose tools or
-definitions if one later changes. This is intentionally a shallow guard, not
-a deep clone or freeze of the schema object.
-
-Each `AgentDefinition.open()` creates an independent application and Session
-lifecycle. It does not clone a captured Model, Context factory, Tool executor,
-Tool scheduler, policy closure, or Tool object. Callers must therefore treat
-those objects as shared and provide isolation when opening applications
-concurrently.
-
-The framework does not currently persist or discover Agent definitions.
-Session history and metadata are not a serialized definition, and resume still
-applies the behavior and policy supplied by the current process.
-
-### Tracing contracts
-
-Core's `Tracer`, `TraceSpan`, `TraceContext`, attributes, and propagation
-fields are public preview contracts. `@may/observability` processors,
-exporters, sampling functions, completed-span shape, span names, and attribute
-names are also preview APIs and may evolve before `1.0.0`.
-
-Tracing is deliberately fail-open and non-authoritative. It may be sampled or
-dropped—even when an exporter persists spans—so callers must not use it as
-Session, permission, billing, or security audit truth. Built-in instrumentation
-excludes prompts, messages, reasoning, and tool input/output; caller-supplied
-attributes have no automatic redaction and must be bounded and non-sensitive.
-
-Tracer and processor lifetime is caller-owned. Closing an `AgentApplication`
-does not flush or shut down a shared processor; the product must do that once
-at its real ownership boundary.
-
-### MCP contracts
-
-`@may/mcp` client-pool options, error codes, namespacing, tool-output shape,
-server status, lifecycle events, and span names are developer-preview APIs. The
-current implementation supports stdio / Streamable HTTP tool clients, dynamic
-metadata catalogs, per-Run tool snapshots and explicit refresh/reconnect.
-Resource reads/templates, prompts, completion and watches are host-driven APIs;
-selected content is attached as user messages, not high-authority instructions. See the [MCP guide](../guides/mcp.md).
-
-Model-facing names currently use `mcp__<server>__<tool>` with provider-safe
-normalization and a 64-character bound. Persisted Sessions can contain these
-names in tool calls and results, so changing server ids or remote tool names can
-make old calls descriptive history rather than executable capabilities.
-
-## Events
-
-Run and permission streams are live observation channels. High-volume
-streaming deltas may be dropped from bounded queues when a consumer is too
-slow; terminal lifecycle events, returned Run results and durable Session facts
-must not depend on retaining every delta.
-
-Consumers must handle unknown future event variants defensively. Persisted
-application presentation data uses a `kind` plus numeric `version`; decoders
-should reject unsupported versions without corrupting the Session.
-
-The coding change-preview decoder intentionally reads the historical
-`maybecode.change-preview` kind. That wire name is retained for existing
-Session compatibility and should not be interpreted as a dependency from the
-framework package back to the MaybeCode application.
-
-## Session persistence
-
-The file-backed Session store uses append-oriented JSONL, and the file-backed
-Catalog is a lightweight local index. They are currently intended for local
-development and a single active writer per session, not distributed or
-multi-host coordination.
-
-The following are not yet stable storage contracts:
-
-- exact JSON field layout and optional fields;
-- on-disk directory naming;
-- migration across arbitrary future versions;
-- crash recovery guarantees beyond the behavior covered by current tests;
-- concurrent writes from multiple processes or hosts.
-
-Do not edit the files manually. Applications that require a stable external
-schema should implement a `SessionStore` and `SessionCatalog` behind the public
-interfaces and own their migration policy. See
-[Custom storage](../guides/custom-storage.md).
-
-MaybeCode's optional daily trace JSONL files are append-only local data. It
-rotates them by local calendar date and defaults to a 60-day retention window,
-but their completed-span JSON shape and attribute names remain preview
-telemetry contracts rather than Session storage or a stable audit schema.
-
-## Provider-owned state
-
-Provider adapters may attach opaque `modelState` to normalized messages so a
-later request can continue a provider-native conversation or compaction. Only
-the adapter that created that state should interpret it. Other adapters must
-fall back to normalized May messages rather than assuming a foreign wire
-format.
-
-Provider HTTP APIs and model capabilities change independently from May.
-Applications should resolve capabilities instead of guessing them from model
-names, and should treat an unknown capability as unknown.
-
-## Security boundary
-
-Permission approval controls whether an operation can run. `@may/coding-tools`
-shell execution uses the privileges of the May process. Applications processing
-untrusted instructions or commands need a separate sandbox or remote execution
-backend.
-
-Configuration and Session files may contain sensitive prompts, tool input,
-tool output and provider data. The built-in local stores do not encrypt them.
+May is a developer-preview framework. Public APIs, protocol representations and
+storage formats can change before `1.0.0`. Read release notes and compile consumers
+against each upgrade. This reference describes current compatibility boundaries.
 
 ## Supported runtime
 
-Published framework packages require Node.js 22 or newer. MaybeClaw requires Node.js
-22.13 or newer. Repository development requires Node.js 22.16.0 or newer because
-the offline suite uses `node:sqlite` backup APIs. The repository pins pnpm 12.4.2
-in `package.json`. Node.js 24 is recommended and recorded in `.node-version`.
-CI covers Linux on 22/24 and Windows/macOS
-on 24; declaring a minimum does not verify every operating-system/runtime combination.
-Package smoke tests run for push/PR on Linux and Windows.
+Published framework packages require Node.js 22 or newer. MaybeClaw requires
+Node.js 22.13 or newer. Repository development requires Node.js 22.16.0 or newer
+for the `node:sqlite` backup APIs used by the offline suite. The repository declares
+pnpm 12.4.2 in `package.json` and recommends Node.js 24 in `.node-version`.
 
-The repository uses pnpm and TypeScript project references. Provider integration tests that
-make real network requests are opt-in; the regular test suite is offline.
+CI covers Linux on Node.js 22/24 and Windows/macOS on 24. Package installation
+checks cover Linux and Windows. Check the workflow and the target package's
+`engines` when choosing a deployment environment. See
+[repository development](../guides/repository-development.md) for verification commands.
 
-## Before a stable release
+## Public API boundary
 
-Before declaring `1.0.0`, the project should explicitly version and document:
+Import only entry points declared in the package's `exports` map. Undeclared
+paths under `src/` or `dist/` are implementation details. Use type-only imports
+when importing types:
 
-1. exported TypeScript contracts;
-2. durable Session and Catalog migrations;
-3. persisted presentation kinds;
-4. event evolution rules;
-5. supported Node.js and provider-adapter versions;
-6. tracing span/attribute evolution and exporter compatibility; and
-7. deprecation and release-note policy.
+```ts
+import { AgentApplication, type AgentApplicationEvent } from "@may/application";
+import type { ContextFactory } from "@may/context";
+```
 
-## Per-Run dynamic tool catalogs
+The [package catalog](packages.md) identifies responsibilities and public entry
+points. Deprecated aliases, when available, are documented individually; preview
+consumers should check each release for migration requirements.
 
-`MayOptions.toolSource`, also forwarded by `AgentApplication`, `defineAgent()`
-and `MaybeCodeApplication`, is a trusted synchronous `() => Iterable<Tool>`.
-It adds to static `tools`; it is called exactly once at each `run()` or
-`continue()` start, not on every model step. Duplicate names fail before Context
-mutation. Fetch/discover remote catalogs outside Core and publish their latest
-in-memory snapshot through this callback.
+### Composition objects
 
-`ToolRegistry.snapshot()` captures a frozen Tool facade and a deep-copied,
-frozen schema. A Run uses the same snapshot for model definitions, scheduler,
-parser, permissions and execution. Model-facing schemas are separate copies.
-Updates affect only the next Run. Ordinary registry lookup/`clone()` still
-preserve original Tool identity, but executors receive the Run facade: attach
-host metadata as Tool fields, not only in an identity-keyed WeakMap. Captured
-callbacks retain their original `this`; this is not a sandbox or a deep clone
-of arbitrary closure state. Tool schema values must support structured cloning.
+`ToolRegistry`, `DuplicateToolNameError`, `AgentDefinition` and `defineAgent()`
+are public preview APIs. Their ownership rules are:
 
-`Tool.permissionVersion` is optional host-owned grant identity, omitted from
-model definitions. Permission session grants are now bound to canonical name,
-description, input schema and this version as well as the policy's `grantKey`.
-Changed definitions or host identity require new approval even with the same
-key. Equivalent schema key order does not. `revokeSessionGrant(key)` revokes all
-versions under that key; explicit policy deny still wins. Host adapters should
-include other execution-affecting fields and endpoint/account in their version.
+- A registry is an instance owned by its caller.
+- `May` captures static tool membership during construction.
+- `AgentDefinition` captures static tool membership when the definition is created.
+- Direct `AgentApplication.open()` captures static membership while opening.
+- Ordinary registry lookup and `clone()` preserve the original Tool objects.
+- Registry operations that expose tools or definitions check registered name,
+  description, schema reference, parser, executor, `resultContent` and
+  `permissionVersion` for replacement. Replacing
+  these fields causes `TypeError`. This check compares schema identity; mutation
+  inside that schema must be managed by the caller.
 
-Modern MRTR form/URL elicitation is opt-in through `McpInteractionBroker` and is
-enabled by the interactive MaybeCode CLI. Owner scopes, bounded whole-flow waits,
-validated user responses and pre-continuation identity checks are implemented;
-legacy interactions use explicitly isolated, single-operation channels instead
-of guessed ownership. Opt-in Roots/Sampling, modern Tasks and an isolated Apps Host and independent server export are implemented as separate opt-in surfaces. Core's optional
-`toolScope` labels remain protocol-independent. See [MCP](../guides/mcp.md).
+Each `AgentDefinition.open()` creates a separate application and Session lifecycle.
+Captured Models, Context factories, executors, schedulers, policy closures and
+stateful collaborators remain caller-owned. Provide concurrency isolation for
+shared objects. Definitions are reconstructed by the application; Session history
+and metadata do not serialize their behavior or current permission policy.
 
-Independent, authenticated tool/resource/prompt exports use `@may/mcp/server`.
-See [server authoring](../guides/mcp-server.md); no listener or Session export starts automatically.
+### Per-Run dynamic tool catalogs
+
+`MayOptions.toolSource` is a trusted synchronous `() => Iterable<Tool>`, also
+accepted by `AgentApplication`, `defineAgent()` and `MaybeCodeApplication`. It adds
+tools to the static collection once at each `run()` or `continue()` start. Discover
+or refresh remote tools outside Core, then return the latest in-memory collection.
+Duplicate names fail before Context mutation.
+
+`ToolRegistry.snapshot()` captures frozen Tool facades and deep-copied, frozen
+schemas. A Run uses one snapshot for model definitions, scheduling, parsing,
+permissions and execution. Model-facing schemas are separate copies. Catalog
+changes affect the next Run. Executors receive the Run facade, so put host metadata
+in Tool fields when execution needs it. An identity-keyed WeakMap containing only
+the original object will not identify the facade. Captured callbacks retain their
+original `this`; closure state remains shared. Schemas must support structured cloning.
+
+`Tool.permissionVersion` is optional host-owned identity excluded from model
+definitions. Session grants bind the policy's `grantKey` to canonical name,
+description, schema and this version. A changed definition or host identity needs
+new approval. Schema key order alone does not invalidate a grant.
+`revokeSessionGrant(key)` revokes every version for the key; explicit policy denial
+takes precedence. Include execution-affecting metadata, endpoint and account in
+the host's version. See [permission policies](../guides/permission-policy.md).
+
+## Events and presentation data
+
+Run and permission streams carry live observations. Bounded queues can drop
+high-frequency streaming deltas when consumers are slow. Use terminal lifecycle
+events, Run results and durable Session history for completion and saved facts.
+See [events](../concepts/events.md).
+
+Consumers must handle unknown event variants. Persisted application presentation
+data uses `kind` and numeric `version`; reject unsupported versions without
+modifying the Session. The change-preview decoder recognizes
+`maybecode.change-preview` for existing saved data. The name is a persisted format
+identifier; package dependency direction is defined by the package imports.
+
+## Session persistence
+
+The file Session store uses append-oriented JSONL and requires one active writer
+per Session. The file Catalog is a local index using atomic append-only operation
+files across local processes. Its offline `compact({ confirmHostsStopped: true })`
+requires other Catalog users to be stopped. Exact field layouts, optional fields,
+directory naming and migration across future versions remain preview formats.
+Recovery guarantees are limited to the implementation's verified behavior.
+
+Use the public storage APIs to change records. Applications that need an external
+schema must implement `SessionStore` and `SessionCatalog` and own their migration
+policy. See [custom storage](../guides/custom-storage.md) and
+[recovery](../guides/recovery.md).
+
+## Provider-owned state
+
+Adapters can attach opaque `modelState` to normalized messages to continue
+provider-native conversations or compaction. The creating adapter interprets that
+state. A different adapter uses normalized May messages. Resolve model capabilities
+through the provider catalog; an unknown capability remains unknown.
+
+Provider HTTP APIs and model capabilities evolve independently. Use the
+[configuration reference](configuration.md) for declared overrides and capability policy.
+
+## Coordination and teams
+
+`@may/coordination` APIs, version-1 snapshot journals, optional resource journals
+and the remote worker protocol are preview formats. A single durable coordinator
+owns scheduling, including remote leaf work. Local budget reservations and
+accounting apply within that coordinator. Changes to saved policies and limits
+require explicit handling during recovery.
+
+MaybeCode teams use local Agents and default to read-only work. Version 2 adds
+saved plans, scoped checks/reports and confirmed recovery. Coding mode allows
+private-copy edits; applying a patch to source requires review and exact host
+confirmation. Authorized check processes use the host operating-system privileges.
+Version 1 teams retain their read-only resume/status/cancel behavior.
+
+See [coordination](../guides/coordination.md),
+[resources](../guides/coordination-resources.md),
+[attempts and revisions](../guides/coordination-lifecycle.md),
+[remote workers](../guides/coordination-remote.md) and
+[MaybeCode teams](../guides/maybecode-team.md) for concurrency and recovery limits.
+
+## MCP
+
+`@may/mcp` pool options, errors, namespacing, output representations, status,
+lifecycle events and span names are preview APIs. Tool clients support stdio and
+Streamable HTTP, explicit refresh/reconnect and per-Run catalogs. Host-selected
+resources, templates and prompts enter the conversation as user content.
+
+Model-facing names use `mcp__<server>__<tool>`, provider-safe normalization and a
+64-character limit. Saved calls retain those names. Changing a server ID or remote
+tool name can leave historical calls without a corresponding executable tool.
+
+The interaction broker manages modern form/URL elicitation with owner scopes,
+bounded waits, response validation and identity checks before continuation. Legacy
+interactive operations use explicitly isolated connections. Roots/Sampling, Tasks,
+Apps Host and the independent `@may/mcp/server` export require their own opt-in
+configuration and services. See [MCP](../guides/mcp.md),
+[long-running tasks](../guides/mcp-tasks.md), [Apps](../guides/mcp-apps.md) and
+[server authoring](../guides/mcp-server.md) for supported protocols and host duties.
+
+## Tracing
+
+Core tracing types and `@may/observability` processors, exporters, sampling,
+completed-span shapes, names and attributes are preview APIs. Traces may be sampled
+or discarded, including when an exporter saves spans. Use Session records and
+application-owned records for permission, billing and audit decisions.
+
+Built-in instrumentation excludes prompts, messages, reasoning and tool input/output.
+Caller-supplied attributes have no automatic redaction and must be bounded and
+non-sensitive. The caller owns tracer and processor lifetime; close shared
+processors at their ownership boundary. Closing an application does not close them.
+
+MaybeCode's daily trace JSONL rotates by local calendar date and defaults to
+60 days of retention. Its span format remains preview telemetry. See
+[observability](../guides/observability.md).
+
+## Security boundary
+
+Permission approval controls whether a Tool can execute. Coding shell Tools run
+with the May process's privileges. Use a separate sandbox or remote execution
+backend when the application must contain untrusted commands.
+
+Configuration and Session records can contain sensitive prompts, Tool data and
+provider state. Built-in local Session stores do not encrypt these records.
+
+## Stable-release requirements
+
+Before declaring `1.0.0`, version and document exported APIs, Session/Catalog
+migrations, presentation kinds, event evolution, supported Node.js and adapter
+versions, tracing/exporter compatibility, and deprecation/release-note policy.

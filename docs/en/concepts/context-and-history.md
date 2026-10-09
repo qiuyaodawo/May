@@ -2,9 +2,10 @@
 
 **English** | [简体中文](../../zh-CN/concepts/context-and-history.md)
 
-May deliberately separates the messages visible to the next model call from
-the durable facts kept for a Session. This makes Context replaceable and
-compactable without destroying audit history.
+After a long conversation, an Agent may need fewer messages for its next model
+request while the application still needs the complete record for recovery.
+Context holds the current model view; Session history keeps durable conversation
+facts. Compaction replaces the view and retains the underlying history.
 
 See [Session, run, and step](./session-run-step.md) for lifecycle vocabulary,
 [Events and durability](./events.md) for event mapping, and
@@ -48,7 +49,9 @@ define an automatic-compaction trigger ratio.
 
 These values are capacity signals, not billing or exact tokenizer results.
 
-## Compaction changes Context, not history
+<a id="compaction-changes-context-not-history"></a>
+
+## Compaction checkpoints
 
 A compaction strategy receives a snapshot and returns a replacement message
 list. Built-in strategies can prune older large tool results, summarize older
@@ -69,8 +72,8 @@ When replacement succeeds, `AgentApplication` records a
 - the complete replacement message view; and
 - before/after message and estimated-token counts.
 
-The event is a durable checkpoint. It does **not** rewrite or remove preceding
-Session events. On resume, replay scans the history in order; encountering the
+The event is a durable checkpoint, and preceding Session events remain stored.
+On resume, replay scans the history in order; encountering the
 checkpoint replaces the reconstructed message list, then later durable inputs,
 assistant messages, and tool outcomes are applied normally.
 
@@ -173,11 +176,9 @@ locking, encryption, crash recovery transactions, or multiple-writer safety.
 
 ## Catalog versus history
 
-A `SessionCatalog` is a listable index of `SessionSummary` records:
-
-```text
-id + workspace + createdAt + lastUsedAt + optional title/preview/turnCount
-```
+A `SessionCatalog` is a listable index of `SessionSummary` records. Each record
+has `id`, `workspace`, `createdAt`, and `lastUsedAt`, with optional `title`,
+`preview`, and `turnCount`.
 
 It is not the Session event store and cannot resume a conversation by itself.
 Conversely, a SessionStore does not expose a built-in cross-session listing

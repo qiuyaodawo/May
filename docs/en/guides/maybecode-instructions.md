@@ -1,11 +1,32 @@
-# MaybeCode instruction composition
+# Configure and inspect MaybeCode instructions
 
-[简体中文](../../zh-CN/guides/maybecode-instructions.md)
+**English** | [简体中文](../../zh-CN/guides/maybecode-instructions.md)
 
 The built-in base prompt identifies MaybeCode, names its coding responsibilities,
 asks for the deliverable and completion conditions, and provides information
 handling and communication guidance. `instructionsDirectory/system.md` or an
 explicit `instructions` value replaces this base prompt for the application.
+
+## Configure project and base instructions
+
+Prerequisites: a configured [MaybeCode workspace](maybecode.md) and permission
+to edit that project's instruction files.
+
+1. Put shared project rules in `AGENTS.md` at the project root. Put directory-specific
+   rules in a descendant directory when MaybeCode starts from that directory or below it.
+2. To replace the rules from one directory, create a nonempty `AGENTS.override.md`
+   in that directory. Discovery selects one file per directory.
+3. To replace the base prompt, set `apps.maybecode.instructionsDirectory` to a directory
+   containing `system.md`. Relative paths resolve from the configuration file's directory.
+   Library callers can supply `instructions` directly.
+4. Reopen the application after changing the base prompt. Project rules refresh on
+   accepted input and Run startup.
+5. Run `/instructions` and inspect the source paths and ordering. Verify that each
+   selected document applies to the workspace and appears once.
+
+The display lists current contributions. The Goal continuation reminder is added
+separately when the model request is prepared. Configuration fields are listed in
+the [configuration reference](../reference/configuration.md#maybecode-settings).
 
 ## Sources and order
 

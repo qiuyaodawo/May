@@ -1,22 +1,26 @@
-# 隔离的 MCP Apps
+# 集成隔离的 MCP Apps
 
 [English](../../en/guides/mcp-apps.md) | **简体中文**
 
+本文用于为提供自包含 MCP App HTML 的服务端构建图形宿主。需要后端连接池、正常
+权限执行器、用户同意界面、经过认证的浏览器通道和独立沙箱来源。MaybeCode 终端
+显示工具文本，不执行 Apps。
+
 ## 显式启用图形 Host
 
-May 为 [MCP Apps 扩展](https://apps.extensions.modelcontextprotocol.io/) 提供后端 App
-会话、浏览器挂载适配器和独立 origin 的 sandbox 文档。UI 协议固定为 `2026-01-26`，
-与 MCP 连接协议独立。这是有意收紧的 Host，不声称支持所有可选 Apps API。
+May 为 MCP Apps 扩展 `io.modelcontextprotocol/ui` 提供后端 App 会话、浏览器
+挂载适配器和独立来源的沙箱文档。UI 协议固定为 `2026-01-26`，独立于 MCP
+连接协议。支持的操作与限制见下文。
 
-仅在图形 Host 中向 `openMcpClientPool` 传入 `apps: { executor, approve }`。
+1. 在图形宿主中向 `openMcpClientPool` 传入 `apps: { executor, approve }`。
 `executor` 必须是正常权限执行器；`approve` 必须明确审阅打开资源及后续每次资源
 读取，并遵守 signal。没有默认允许策略。这会声明 `io.modelcontextprotocol/ui`
 及 `text/html;profile=mcp-app`。用户明确操作后调用
 `pool.openApp(serverId, remoteToolName, { owner, signal })`。owner 来自可信 Host
 workspace/Session，不能取自 App 参数。
 
-返回的 `McpAppSession` 提供 `resource`、`receive(message)`、
-`notification(kind, params)`、`close()`，必须留在后端。只绑定一条经认证的渲染通道，
+2. 用户同意后，将返回的 `McpAppSession` 保存在后端。它提供 `resource`、
+   `receive(message)`、`notification(kind, params)` 和 `close()`。只绑定一条认证渲染通道，
 不要暴露池、执行器、凭据、任意 RPC 转发或 Session 历史。传入在 Session 切换、
 退出登录和 UI 销毁时中止的生命周期 signal。默认视图十分钟，最长一小时；每连接
 最多 16 个打开/打开中的视图，每视图四个并发请求、256 个唯一请求 id。重复 id
@@ -24,13 +28,17 @@ workspace/Session，不能取自 App 参数。
 
 ## 浏览器集成
 
-在**不同的独立 origin** 上提供 `mcpAppSandboxResponse(hostOrigin)`，完整保留其
-HTTP headers 和 body。该 origin 不应具有 cookie、凭据、其他应用路由或托管不可信
-内容。生产环境应使用分离的 HTTPS origin；本地测试允许字面 loopback HTTP。
-sandbox URL 是可信 Host 配置，不采用 `_meta.ui.domain`。
+在独立于应用的来源提供 `mcpAppSandboxResponse(hostOrigin)`，完整保留返回的
+HTTP headers 和正文。该来源不能保存 cookie、凭据或其他应用路由，也不能托管
+其他不可信内容。生产环境使用独立 HTTPS 来源；本地测试允许字面回环地址 HTTP。
+沙箱 URL 由可信宿主配置提供，不采用 `_meta.ui.domain`。
+
+3. 使用绑定后端会话的通道挂载浏览器视图。以下片段假设已有 DOM `container`、
+   宿主配置的 `trustedSandboxUrl`、经过同意的 `backendAppResource`、
+   `authenticatedChannel` 和视图取消信号。
 
 ```ts
-// 浏览器 bundle：此子路径不导入 Node 模块。
+// 浏览器入口不导入 Node 模块。
 import { mountMcpApp } from "@may/mcp/apps-browser";
 const view = mountMcpApp(container, trustedSandboxUrl, {
   resource: { html: backendAppResource.html },
@@ -40,12 +48,18 @@ const view = mountMcpApp(container, trustedSandboxUrl, {
 });
 ```
 
-外层代理使用独立 origin 和 iframe sandbox；内层视图为 opaque origin，只允许脚本。
-两跳均检查消息 source/origin。代理 HTTP CSP 和内层策略禁止网络 fetch、外部脚本/
-资产、嵌套 frame、表单、插件和 base 改写；允许内联脚本/样式及 data 图片/媒体。
+4. Session 切换、退出登录或 UI 清理时，触发取消信号，同时关闭浏览器视图和
+   后端会话。通道的 `close()` 需要调用后端 `app.close()`，认证传输由宿主管理。
+
+`McpAppChannel.lifetimeMs` 默认十分钟，最长一小时。后端使用更长有效期时，
+向通道提供同样经过宿主批准的有效期。
+
+外层代理使用独立来源和 iframe sandbox；内层视图具有不透明来源，只允许脚本。
+两层检查消息 source/origin。代理 HTTP CSP 和内层策略禁止网络请求、外部脚本、
+外部资源、嵌套 frame、表单、插件和 base 改写；允许内联脚本、样式及 data 媒体。
 服务端要求的 CSP 域、权限和持久 origin **不会**放宽策略。摄像头、麦克风、定位和
 剪贴板默认拒绝。依赖外部资源的 App 可能无法工作，应提供自包含 HTML 或保留文本
-fallback。浏览器仍控制视图自身导航；代理在后续导航时移除视图。不要把 CSP 视为
+显示。浏览器仍控制视图自身导航；代理在后续导航时移除视图。不要把 CSP 视为
 防止 App 泄露任意已收到秘密的通用保护，只提供用户批准向该服务端分享的数据。
 
 使用 `ui/initialize` / `ui/notifications/initialized` 握手。支持 `ping`、经正常权限
@@ -62,11 +76,11 @@ Host 工具、显示模式切换或日志转发。不支持的请求明确报错
 偷偷转发。HTML 上限 2 MiB，传入 RPC 上限 256 KiB，结果沿用 8 MiB 限制。
 销毁时同时关闭浏览器 mount 和后端 session。
 
-## 终端 fallback 与验证
+## 终端显示与验证
 
 MaybeCode 终端不启用/声明 Apps。`/mcp apps` 明确提示不能执行 HTML；正常的模型
 可见工具文本仍可用，app-only 工具隐藏，不自动获取 UI 资源。配置不能悄悄安装浏览器
-Host。普通资源附件仍是数据，而非可执行 HTML。
+Host。普通资源附件按照数据处理。
 
 `packages/mcp/test/apps.test.mjs` 检查远端执行前权限拒绝、visibility、归属路由、
 资源同意、旧视图失效及 fallback。
@@ -79,5 +93,8 @@ Host。普通资源附件仍是数据，而非可执行 HTML。
 即使自定义同意/执行器回调忽略 signal，Host 也可中止本地等待；迟到完成不会重放或
 交给已关闭视图。回调仍应遵守取消，才能停止其自身工作。
 
-浏览器侧 `McpAppChannel.lifetimeMs` 默认十分钟，最多一小时。后端会话使用更长有效期时，
-应把宿主授权的视图有效期传入 channel；取消信号仍具有最终效力。
+## 完成检查
+
+确认打开视图和资源读取需要同意、工具调用经过通常的权限执行器、导航及 Session
+切换清理视图，以及旧通道拒绝请求。使用真实的两个独立来源执行浏览器检查。
+上面的仓库浏览器命令检查来源隔离，无需外部模型账户。

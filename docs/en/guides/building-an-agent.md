@@ -1,11 +1,10 @@
-# Building an Agent
+# Build an Agent application
 
 **English** | [简体中文](../../zh-CN/guides/building-an-agent.md)
 
-May is a set of composable packages, not a single preconfigured assistant.
-An application chooses behavior and policy, while the framework supplies the
-execution and lifecycle mechanisms. This guide explains those choices using
-the APIs currently implemented in the repository.
+Use this guide to compose an Agent with a model, validated tools, permissions,
+managed Context, and Session storage. The result is a reusable definition that
+your product can open and close independently of its UI.
 
 Start with [Getting started](../getting-started.md) if you have not run an
 Agent yet. The terms Agent definition, Session, Run, and Step are defined in
@@ -19,24 +18,18 @@ May provides two reusable, instance-scoped composition objects:
 
 ## The composition model
 
-```text
-Product-owned decisions
-  defineAgent(model + instructions + tools + execution/permission/Context policy)
-                              |
-                 open(Session store + identity/metadata)
-                              |
-                              v
-                    AgentApplication
-               Session + permission executor
-                              |
-                              v
-                     May (Core runtime)
-                              |
-                Model <-> tools, by Steps
-
-Optional product shell
-  AgentWorkspace -> active AgentApplication -> Session Catalog
-  UI             -> controller methods + application/workspace events
+```mermaid
+flowchart TD
+  Product[Product model, tools, instructions, and policies] --> Definition[defineAgent]
+  Definition --> Open[open with Session storage and identity]
+  Open --> Application[AgentApplication]
+  Application --> Session
+  Session --> May[May runtime]
+  May --> Steps[Model requests and tool execution]
+  Workspace[Optional AgentWorkspace] --> Application
+  Workspace --> Catalog[SessionCatalog]
+  UI[Product UI] --> Workspace
+  UI --> Application
 ```
 
 The important dependency rule is one-way: an executable product under `apps/`
@@ -100,9 +93,10 @@ Everything else is a deliberate optional choice:
 
 ## Define behavior once, then open Sessions
 
-The following TypeScript factory creates a complete, provider-neutral Agent
-definition. Its caller supplies any object implementing Core's `Model`
-contract. Session storage and identity remain inputs to `open()`.
+Create `agent.ts` in an ESM TypeScript application configured as described in
+[Getting started](../getting-started.md). The factory below defines the Agent;
+it receives a real model adapter from its caller. The later provider and
+submission snippets show the remaining application operations.
 
 Required workspace dependencies for this file are:
 
@@ -183,7 +177,11 @@ export function createExampleAgent(model: Model): AgentDefinition {
 }
 ```
 
-Open an independent application by supplying only Session-bound state:
+In the application's entry point, import `createExampleAgent` from `./agent.js`.
+Initialize `model`, `store`, and `workspace` before using this opening snippet.
+The [provider](#model-and-provider), [storage](custom-storage.md), and
+[event-consumption](#consume-one-ordered-application-stream) sections describe
+those operations and the required shutdown:
 
 ```ts
 const agent = createExampleAgent(model);
@@ -289,7 +287,9 @@ execution collaborators. The default is sequential. Use a parallel or custom
 scheduler only when its tools and executor are concurrency-safe and it
 preserves Core's outcome-ordering and at-most-once contracts.
 
-### Permissions are not a sandbox
+<a id="permissions-are-not-a-sandbox"></a>
+
+### Permission decisions and execution limits
 
 The `PermissionPolicy` runs after tool input is parsed and before execution:
 
@@ -314,7 +314,7 @@ When the policy asks, an event handler must surface the request and call:
 
 ```ts
 await application.resolveApproval(requestId, "allow");
-// Other decisions: "allow-session" or "deny".
+// 其他决定："allow-session" 或 "deny"。
 ```
 
 Approval determines whether an operation may run. It does not constrain what
@@ -363,8 +363,8 @@ control in your product or backend.
 Session metadata should contain stable, non-secret facts needed to validate a
 resume. Use `validateSession` to reject a history that belongs to an
 incompatible workspace or product. Models, API keys, executable Tool objects,
-and permission grants are runtime configuration and are not restored from the
-Session log.
+and session permission grants are supplied at runtime. Persistent permission
+rules use a separate configured rule store; see [Permission policies](permission-policy.md).
 
 ### Tool presentation metadata
 
@@ -447,7 +447,9 @@ Only one Agent operation may be active per `AgentApplication`. `cancel()`
 cancels the active run or compaction. `retry()` is valid only when the latest
 run failed and continues without appending a duplicate user message.
 
-## Single Session or Workspace
+<a id="single-session-or-workspace"></a>
+
+## Add Session navigation
 
 Use `AgentApplication` alone if a product has one known Session at a time and
 stores its id elsewhere. Add `AgentWorkspace` when the product needs discovery
@@ -499,7 +501,8 @@ try {
 separate lightweight index for listing and selecting them; catalog entries are
 not appended to model Context. The built-in file Catalog stores a base JSON
 snapshot plus append-only operation files and does not compact those operation
-files automatically.
+files automatically. See [Configure Session storage](custom-storage.md#local-storage-maintenance)
+for maintenance steps.
 
 `AgentWorkspace` serializes submission and Session mutations, emits
 `session.changed`, and keeps catalog summaries current. A product that changes
@@ -538,7 +541,15 @@ Always close in `finally`. Start a long-lived event relay before submitting,
 close the owner, and then await the relay so it can observe stream completion.
 Do not separately close an application owned by a workspace.
 
-## A practical build checklist
+## Verify the application
+
+Run the application with a valid provider account and the selected model's
+credentials. Submit `Read the status value`. A successful tool call returns
+`{ value: "ready" }`; the model's final wording may vary. Confirm that the event
+consumer finishes after `close()`. For file-backed storage, reopen the saved
+Session id and confirm its history is available before accepting further input.
+
+### A practical build checklist
 
 Before calling an Agent product complete, verify that it has explicit answers
 for the following:

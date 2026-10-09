@@ -1,15 +1,20 @@
-# Isolated MCP Apps
+# Integrate isolated MCP Apps
 
 **English** | [简体中文](../../zh-CN/guides/mcp-apps.md)
+
+Use this guide when implementing a graphical Host for a server that supplies
+self-contained MCP App HTML. You need a backend client pool, the normal permission
+executor, a user-consent interface, an authenticated browser channel and a
+dedicated sandbox origin. MaybeCode terminals use tool text without executing Apps.
 
 ## Opt-in graphical Host
 
 May provides a backend App session, browser mounting adapter and separate-origin
-sandbox document for the [MCP Apps extension](https://apps.extensions.modelcontextprotocol.io/).
+sandbox document for the MCP Apps extension, `io.modelcontextprotocol/ui`.
 The UI protocol is pinned to `2026-01-26`, independently of the MCP connection.
-This is a deliberately restricted Host, not support for every optional Apps API.
+The supported operations and limits are listed below.
 
-Pass `apps: { executor, approve }` to `openMcpClientPool` only in a graphical Host.
+1. Pass `apps: { executor, approve }` to `openMcpClientPool` in the graphical Host.
 `executor` must be your normal permission executor. `approve` must explicitly
 review opening the resource and each subsequent resource read, and honor its
 signal. No default allow policy is supplied. This advertises
@@ -17,14 +22,15 @@ signal. No default allow policy is supplied. This advertises
 user action, call `pool.openApp(serverId, remoteToolName, { owner, signal })`.
 The owner comes from your authenticated Host workspace/Session, never App params.
 
-The returned `McpAppSession` has `resource`, `receive(message)`,
-`notification(kind, params)` and `close()`. Keep it on the backend. Connect only
+2. After consent, keep the returned `McpAppSession` on the backend. It has
+   `resource`, `receive(message)`,
+   `notification(kind, params)` and `close()`. Connect only
 one authenticated renderer channel to it; do not expose the pool, executor,
 credentials, general RPC forwarding or Session history. Pass a lifetime signal
 that aborts on Session switch, logout and UI disposal. The default view lifetime
 is ten minutes (maximum one hour), with at most 16 open/opening views per connection,
 four concurrent requests and 256 unique request ids per view. Duplicate ids close
-the view rather than replaying actions. Reconnect, invalidation, changed catalogs
+the view. Reconnect, invalidation, changed catalogs
 or authorization and pool shutdown revoke use of old views.
 
 ## Browser integration
@@ -35,8 +41,12 @@ cookies, credentials, other application routes or untrusted content hosting.
 Production hosts should use separate HTTPS origins; local testing permits literal
 loopback HTTP. The sandbox URL is trusted host configuration, not `_meta.ui.domain`.
 
+3. Mount the browser view through a channel bound to that backend session. This
+   fragment assumes a DOM `container`, host-configured `trustedSandboxUrl`, the
+   approved `backendAppResource`, an `authenticatedChannel` and a lifetime signal.
+
 ```ts
-// Browser bundle: this subpath has no Node imports.
+// 浏览器入口不导入 Node 模块。
 import { mountMcpApp } from "@may/mcp/apps-browser";
 const view = mountMcpApp(container, trustedSandboxUrl, {
   resource: { html: backendAppResource.html },
@@ -45,6 +55,13 @@ const view = mountMcpApp(container, trustedSandboxUrl, {
   signal: viewLifetimeSignal,
 });
 ```
+
+4. On Session switch, logout or UI disposal, abort the lifetime signal and close
+   both the browser mount and backend session. Connect the channel's `close()` to
+   backend `app.close()`; your host owns the authenticated transport.
+
+`McpAppChannel.lifetimeMs` defaults to ten minutes and accepts up to one hour.
+Pass the host-authorized lifetime when the backend session uses a longer value.
 
 The outer proxy uses a separate origin and an iframe sandbox; the inner view has
 an opaque origin and script-only sandbox permissions. Both hops verify message
@@ -96,6 +113,10 @@ Host callback waiting is abortable even when a custom consent/executor callback
 ignores its signal; late completion is never replayed or delivered to a closed view.
 Callbacks must still honor cancellation to stop their own work.
 
-The browser `McpAppChannel.lifetimeMs` defaults to ten minutes and accepts up to one hour.
-Pass the host-authorized view lifetime through the channel when using a longer backend
-session; its abort signal remains authoritative.
+## Completion checks
+
+Verify that opening and resource reads require consent, tool calls use the normal
+permission executor, navigation and Session changes dispose the view, and stale
+channels reject requests. Run browser checks against the real two-origin Host.
+The repository browser command above covers those isolation mechanisms without
+requiring an external model account.

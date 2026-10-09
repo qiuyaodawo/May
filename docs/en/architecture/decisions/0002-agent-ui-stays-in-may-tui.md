@@ -7,11 +7,9 @@
 
 ## Context
 
-MaybeCode originally contained retained transcript state, transcript views and
-tool renderers. These components are useful to other terminal Agents. A
-separate `@may/agent-tui` package was considered, but May itself is an Agent
-framework and the extra package would create an artificial distinction between
-terminal primitives and the Agent projections normally rendered with them.
+Terminal Agents need terminal primitives, retained transcript state, event
+projection and tool presentation. These components share terminal dependencies
+and can expose distinct module entry points within one UI package.
 
 ## Decision
 
@@ -30,10 +28,12 @@ does not depend on `@may/tui`.
 
 ## Consequences
 
-- There is no additional `@may/agent-tui` package to discover or version.
+- Terminal consumers discover these modules through one package.
 - Low-level and Agent-aware terminal APIs remain visibly separated by module
   boundaries inside one package.
 - The standard coding renderer gives `@may/tui` an optional coding-domain
   dependency; callers can replace its instance-scoped registry.
 - Product UI behavior must not be moved into the generic transcript merely to
   reduce application code.
+
+See [custom UI](../../guides/custom-ui.md) for controller and renderer integration.

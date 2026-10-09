@@ -2,50 +2,43 @@
 
 [English](../../../en/architecture/decisions/0006-mcp-adapts-to-core-tools.md) | **简体中文**
 
-- 状态：已接受
-- 日期：2026-09-03
+- **状态：** 已接受
+- **日期：** 2026-09-03
 
 ## 背景
 
-May 需要使用 Model Context Protocol server 的能力。如果直接把 MCP 行为加入 Agent
-循环，会让每个 Agent 都耦合协议 SDK、产生重复工具执行路径，并可能绕过已有的
-permission、scheduling、cancellation、Session 与 tracing 行为。
-
-MCP stdio 连接还拥有一个生命周期长于单次工具调用或 Session 的子进程。不同 server
-的工具名可能冲突；server 提供的 descriptor 也是不可信、模型可见的 input。
+May 使用 Model Context Protocol server 的能力。远程工具需要经过已有的权限、
+调度、取消、Session 与 tracing 流程。Stdio 连接还管理生命周期长于单次调用的
+子进程。不同 server 的工具名可能冲突，远程描述属于不可信的模型可见输入。
 
 ## 决策
 
-建立可选 `@may/mcp` package。它依赖 `@may/core`，把 MCP server 的工具描述与调用
-适配到 Core 既有 `Tool` 契约。Core 和 `@may/application` 都不依赖 MCP。
+可选 `@may/mcp` 依赖 `@may/core`，把远程工具描述与调用适配为 `Tool`。
+Core 与 `@may/application` 的依赖独立于 MCP。
 
-应用打开实例级 MCP client pool，通过 `ToolRegistry` 组合带 namespace 的工具快照，
-并在产品 ownership 边界关闭 pool。因此所有调用仍经过选定的 Core `ToolExecutor` 与
-`ToolScheduler`，产品继续控制 permission policy。Cancellation 和 trace context 显式
-传播。
+应用打开实例级连接池，通过 `ToolRegistry` 组合具有名称空间的工具快照，在产品
+所有权范围内关闭连接池。调用经过选定的 `ToolExecutor` 与 `ToolScheduler`，
+产品拥有权限策略，并明确传播取消信号与 trace context。
 
-首个实现支持 stdio 初始化、聚合 `tools/list` 与 `tools/call`，使用启动快照、确定性且
-provider-safe 的名称、冲突失败、有界错误细节，以及显式连接/进程关闭。Resources、
-prompts、HTTP、server 实现和动态列表刷新延后。
+Adapter 负责传输初始化、目录发现与远程调用，提供符合 Provider 要求的确定性名称、
+冲突检查、大小受限的错误信息和明确的连接关闭。刷新目录影响后续 Run。当前支持的
+传输与能力见 [MCP 能力参考](../../reference/mcp-capabilities.md)。
 
-Server 默认 required；应用可以将 server 标记为 optional，使其启动失败不影响无关
-工具。Pool 保留有界、已净化的 stderr 供诊断，并公开明确的状态快照与连接生命周期
-事件；产品应观察这些契约，而不是解析进程输出。
+Server 默认 required；应用可以标记 optional，使连接失败时其他工具继续可用。
+连接池保留大小受限且已经清理敏感信息的 stderr，并提供状态快照与连接生命周期事件。
+产品通过这些接口获取诊断信息。
 
 ## 后果
 
-- 不使用 MCP 的 Agent 不会加载其 SDK 或进程管理代码。
-- MCP 工具复用已有 permission、scheduling、event、cancellation 与 Session 行为，
-  不创建并行 runtime。
-- 应用必须拥有并关闭 pool；Session 不拥有共享 MCP 进程。
-- Optional server 失败是可见且隔离的；required server 失败仍会 fail fast。
-- 本阶段远程工具列表变化后需要重新连接或重启。
-- Server id 与远程名称成为预览版模型可见命名契约，冲突会 fail fast。
-- MCP server 仍是可信可执行依赖；把它适配为 Tool 不会提供 sandbox，也不会让其描述
-  自动变得可信。
+- 使用 MCP 的应用负责加载其 SDK 与连接管理。
+- 远程工具复用权限、调度、事件、取消和 Session 行为。
+- 应用拥有并关闭连接池，共享 MCP 进程由产品管理。
+- Optional server 故障单独记录，required server 故障直接终止启动。
+- 明确刷新或重新连接后，新目录供后续 Run 使用。
+- Server ID 与远程工具名属于预览版模型可见命名规则，冲突立即报错。
+- MCP server 以可执行依赖管理；需要单独管理执行隔离与远程描述的信任范围。
 
-## 后续实现
+## 相关接口
 
-上文延期项描述的是初始阶段。现代传输、能力目录、Host 交互、Tasks、隔离 Apps 和
-独立显式 server 导出现已在 Core 之外实现。当前边界和证据参阅
-[维护中的路线清单](../mcp-host-roadmap.md)及 [server 指南](../../guides/mcp-server.md)。
+Host 交互、Tasks、隔离 Apps 与独立 server 导出在 Core 外实现，通过应用组合启用。
+详见 [MCP 指南](../../guides/mcp.md)和 [server 指南](../../guides/mcp-server.md)。

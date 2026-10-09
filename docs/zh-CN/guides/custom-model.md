@@ -1,16 +1,20 @@
-# 自定义模型 Adapter
+# 实现模型适配器
 
 [English](../../en/guides/custom-model.md) | **简体中文**
 
-May model adapter 把某个 provider 协议转换为 `@may/core` 的 provider-neutral `Model`
-契约。它不应管理 Session、权限提示、UI 状态或产品指令。
+模型适配器将 Provider 请求和响应转换为 `@may/core` 导出的 `Model` 接口。
+接入新的 Provider 协议时，可以依据本文实现请求转换、流式响应、取消和错误处理。
+Session 与产品行为由应用管理。
 
-Provider 已被支持时优先使用 `@may/providers` 的内置 adapter。集成新协议或为测试创建
-确定性模型时再实现 `Model`。
+已经支持的 Provider 可以使用 `@may/providers` 的内置适配器。
+新协议和本地协议演示可以实现 `Model`。
 
 ## 最小实现
 
-以下 adapter 是本地且确定性的，但它是完整 `Model`，可以直接放入应用：
+以下本地文字转换器展示必需的流式协议，只执行大写转换，不调用外部模型服务。
+容量限制为示例数值。在 ESM TypeScript 应用中创建 `uppercase-model.ts`，
+将 `@may/core`、`@may/application` 和 `@may/session` 加入直接依赖。
+工作区设置见[快速开始](../getting-started.md)。
 
 ```ts
 import type {
@@ -60,11 +64,12 @@ function lastUserText(request: ModelRequest): string {
 }
 ```
 
-可直接把它提供给 headless application：
+在同一目录创建 `run.ts`，通过 `AgentApplication` 运行该协议：
 
 ```ts
 import { AgentApplication } from "@may/application";
 import { InMemorySessionStore } from "@may/session";
+import { UppercaseModel } from "./uppercase-model.js";
 
 const application = await AgentApplication.open({
   model: new UppercaseModel(),
@@ -80,51 +85,63 @@ try {
 }
 ```
 
-即使这个模型从不调用工具，`AgentApplication` 仍要求 permission policy。
+编译两个文件，再执行生成的入口：
 
-## Stream 协议
+```sh
+pnpm exec tsc --ignoreConfig --target es2022 --module nodenext --moduleResolution nodenext --outDir dist uppercase-model.ts run.ts
+node dist/run.js
+```
 
-每次 `stream()` 调用，adapter 必须：
+最终助手消息包含一个值为 `HELLO, MAY` 的文本部分。
+这项检查覆盖本地协议和应用生命周期，Provider 集成需要真实账号和对该服务的请求。
+`AgentApplication` 始终要求权限策略，包括没有工具调用的应用。
+
+<a id="stream-协议"></a>
+
+## 流式协议
+
+每次 `stream()` 调用，适配器必须：
 
 1. 发出零个或多个 `text.delta`、`reasoning.delta` 或 `retrying` 事件；
-2. 发出恰好一个 `response.completed`，其中包含完整最终 assistant message；
-3. 在 completion event 后结束 iterable。
+2. 发出恰好一个 `response.completed`，其中包含完整最终助手消息；
+3. 在完成事件后结束迭代。
 
-若没有 completion 就结束或发出两次 completion，Core 会以 `ModelProtocolError` 使
-Run 失败。Streaming delta 是实时呈现数据；`response.completed` 的完整消息才是
+若没有完成事件就结束或发出两次完成事件，Core 会以 `ModelProtocolError` 使
+Run 失败。流式增量用于实时呈现；`response.completed` 的完整消息是
 持久化结果。
 
-`ModelStreamOptions.signal` 是 Run 的取消边界。把它传给 provider SDK 或 `fetch`，
-解析长 stream 时也要检查。不能把 abort 转成成功 completion。Adapter/network 异常
-可以正常抛出；Core 会发出 `run.failed` 并 reject Run result。
+`ModelStreamOptions.signal` 是 Run 的取消边界。把它传给 Provider SDK 或 `fetch`，
+解析长事件流时也要检查。取消信号必须终止请求。适配器或网络异常
+可以正常抛出；Core 会发出 `run.failed` 并拒绝 Run `result`。
 
 可选 `runId`、`step`、`modelCallId` 是关联值，在 Run 中由 May 填充；保持可选是为了
-让 adapter 可以单独测试。
+让适配器可以单独测试。
 
 ## 映射请求与响应
 
 `ModelRequest` 包含：
 
-- 标准化 `messages`，包括由 Context instructions 合成的 system message；
-- provider-neutral 工具定义（`name`、`description`、`inputSchema`）；
-- 可选 application metadata。
+- 标准化 `messages`，包括由 Context 指令合成的 `system` 消息；
+- 与 Provider 无关的工具定义（`name`、`description`、`inputSchema`）；
+- 可选应用元数据。
 
-`ModelRequest`、它的 `messages`/`tools` collection 以及每个 `ToolDefinition` 都是
-readonly adapter 输入。Adapter 应把它们映射为新的、由 provider 层拥有的请求对象；
-不得原地修改、排序或 `splice()` May 的数组，也不得直接给 message/tool definition
-添加 provider 字段。这样同一 Context snapshot 才能被重试、记录或交给其他 wrapper，
-而不会受到 adapter 的隐藏副作用。
+`ModelRequest`、它的 `messages`/`tools` 集合以及每个 `ToolDefinition` 都是
+只读输入。适配器应把它们映射为新的、由 Provider 层拥有的请求对象；
+不得原地修改、排序或 `splice()` May 的数组，也不得直接给消息或工具定义
+添加 Provider 字段。同一 Context 快照可以用于重试、记录或其他包装器，
+各个适配器管理自己的请求对象。
 
-真实 adapter 负责校验 provider 支持的内容。无法表示某种 content part 时应明确失败
-（内置 adapter 使用 `UnsupportedContentError`），而不是静默丢弃。Provider tool call
-必须在最终 assistant message 中以标准化 `toolCalls` 返回；May 执行后在下一 Step
-提供标准化 tool message。
+实际适配器负责校验 Provider 支持的内容。无法表示某种内容部分时应明确失败
+（内置适配器使用 `UnsupportedContentError`）。Provider 工具调用
+必须在最终助手消息中以标准化 `toolCalls` 返回；May 执行后在下一 Step
+提供标准化工具消息。
 
-Provider continuation 数据可以作为 `modelState` 附加到 assistant message。它应是
-不透明、带 namespace 和 version 的值：Session 会持久化，Core 不解释，只有 owning
-adapter 在恢复后读取。
+Provider 续接数据可以作为 `modelState` 附加到助手消息。它应是
+不透明、带命名空间和版本的值：Session 会持久化，Core 不解释，由所属
+适配器在恢复后读取。
 
-Usage 是可选的；provider 提供时可在 completion 中返回：
+用量是可选的；Provider 提供时可在完成事件中返回。以下片段位于适配器的 `stream()` 中，
+`message` 和 `providerUsage` 来自该服务的实际响应：
 
 ```ts
 yield {
@@ -138,24 +155,28 @@ yield {
 };
 ```
 
-不要编造 token。只报告 provider 给出或能够可靠计算的字段。
+只报告 Provider 给出或能够可靠计算的 token 字段。
 
-## 可选 Capability
+<a id="可选-capability"></a>
 
-Adapter 可以暴露：
+## 可选能力
 
-- `limits`，应用可用 `contextBudgetFromModel()` 转为 Context budget；
-- `contextCompactor`，用于 provider 原生压缩。
+适配器可以提供：
 
-Provider-native compaction 是可选能力。`@may/context` 通过
-`ModelContextCompactionStrategy` 适配它，不应塞入普通 `stream()` 实现。
-compactor 应当在 `ModelContextCompactionResult.usage` 中报告压缩请求自身的用量，
-宿主才能按真实用量计账，而不是按预留值计账。参阅
+- `limits`，应用可用 `contextBudgetFromModel()` 转为 Context 容量预算；
+- `contextCompactor`，用于 Provider 原生压缩。
+
+Provider 原生压缩是可选能力。`@may/context` 通过
+`ModelContextCompactionStrategy` 适配独立压缩器。
+压缩器应当在 `ModelContextCompactionResult.usage` 中报告压缩请求自身的用量，
+宿主根据实际用量计算费用。参阅
 [自定义 Context](custom-context.md)。
 
-## 注册可配置 Adapter
+<a id="注册可配置-adapter"></a>
 
-使用 May model profile 的应用可以在 `@may/providers` 注册实例级 factory：
+## 注册可配置适配器
+
+使用 May 模型配置的应用可以在 `@may/providers` 注册实例级工厂：
 
 ```ts
 import { ProviderAdapterRegistry } from "@may/providers";
@@ -167,23 +188,28 @@ const registry = new ProviderAdapterRegistry().register("uppercase", {
 });
 ```
 
-配置 profile 的 `adapter` 必须为 `uppercase`。注册不是全局的；重复名称会被拒绝，
-产品决定接受哪些 registry。
+模型配置的 `adapter` 必须为 `uppercase`。注册保存在当前实例；重复名称会被拒绝，
+产品决定接受哪些注册表。
 
-## Adapter 检查清单
+## 内置协议与重试行为
 
-- 转发取消与 provider error。
-- 即使已经发出 delta，也必须发出一个完整 response。
-- 保留 tool-call ID 和所有受支持 content part。
-- Credential 只放 provider 配置，不放 message 或 `modelState`。
-- 重试行为放在明确的 adapter/wrapper 中，并在等待下一次尝试时发出 `retrying`。
-- 在 adapter 边界测试 malformed stream、取消、tool-call 转换和不支持内容。
+`RetryingModel` 保留服务端要求的 `Retry-After` 等待时间。超过 `maxDelayMs` 时，
+返回原始错误。Responses 错误分别提供 `providerType` 和 `providerCode`。
+Chat Completions 工具参数 JSON 无效时，产生协议错误。
+
+Chat Completions 出现顶层 `error` 字段时，立即终止该内容块的处理，并在错误信息中
+保留服务端的 `message`、`type` 和 `code`。流结束时继续保留此错误，
+本次调用不会发出 `response.completed`。
+
+<a id="adapter-检查清单"></a>
+
+## 适配器检查清单
+
+- 转发取消与 Provider 错误。
+- 即使已经发出增量，也必须发出一个完整响应。
+- 保留工具调用标识和所有受支持内容部分。
+- 凭据只放 Provider 配置，不放消息或 `modelState`。
+- 重试行为放在明确的适配器或包装器中，并在等待下一次尝试时发出 `retrying`。
+- 在适配器边界测试无效事件流、取消、工具调用转换和不支持内容。
 
 接下来阅读[自定义工具](custom-tool.md)和[构建 Agent](building-an-agent.md)。
-
-Retry-After 不会被截短以适应 `maxDelayMs`。服务端要求的等待超过配置退避上限时，
-RetryingModel 返回原始错误，而不是提前重试。Responses 错误分别提供 `providerType`
-和 `providerCode`；Chat Completions 工具参数 JSON 无效时产生协议错误，不作为字符串参数下传。
-Chat Completions 的流在出现顶层 `error` 字段时，该 chunk 立即失败，可见错误消息保留服务端
-的 `message`、`type` 和 `code`。流结束检查不会覆盖这个失败，本次调用也不会发出
-`response.completed`。

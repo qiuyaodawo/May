@@ -16,10 +16,8 @@ lifecycle, but products still repeated two composition patterns:
    identity, and metadata of one Session.
 
 Arrays remain a useful interchange type, and direct `AgentApplication.open()`
-must remain available. They do not, however, make the lifecycle boundary or
-duplicate-safe composition rules explicit. A process-global registry would
-introduce hidden mutable state and make tests and multiple products interfere
-with one another.
+remains available. Composition objects make ownership and duplicate-name
+validation explicit for multiple products in one process.
 
 ## Decision
 
@@ -29,27 +27,23 @@ ambiguous names with `DuplicateToolNameError`, and supports atomic grouped
 registration, lookup, snapshots, model-facing definitions, cloning,
 iteration, and composition. Registrations preserve original Tool identity while
 recording descriptor values/references so later descriptor replacement is
-detected. It is not a singleton or service locator.
+detected. Each caller owns its registry instance.
 
 `May` accepts any `Iterable<Tool>` and snapshots its membership when the
 runtime is constructed. A later mutation of the source collection cannot
 change an active runtime.
 
+Per-Run `snapshot()` creates frozen Tool facades and schema copies for execution.
+Dynamic `toolSource` collections are captured at Run start. See the
+[compatibility reference](../../reference/compatibility.md#per-run-dynamic-tool-catalogs)
+for callback identity and update behavior.
+
 The application package provides `AgentDefinition` and `defineAgent()`.
 Definitions capture reusable behavior and policy, including the Model,
 instructions, tools, permission policy, Tool executor and scheduler, Context
-policy, and application options. They exclude Session-bound storage, identity,
-resume, and metadata. Those inputs are passed to:
-
-```ts
-definition.open({
-  store,
-  sessionId,
-  resume,
-  metadata,
-  contextMetadata,
-});
-```
+policy, and application options. Session-bound storage, identity, resume and
+metadata are supplied to each `open()` call. For a complete application, follow
+the [Agent building guide](../../guides/building-an-agent.md).
 
 The definition snapshots iterable membership at creation. Every `open()` call
 creates an independent `AgentApplication` and Session lifecycle. The snapshot
@@ -70,8 +64,8 @@ deep-freezing the Tool or its JSON Schema.
 - Existing callers may continue to use `AgentApplication.open()` directly.
 - Registry changes after construction cannot silently alter a definition or
   active runtime.
-- Original Tool identity survives composition, so identity-keyed product
-  metadata remains usable without weakening descriptor stability checks.
+- Ordinary registry composition preserves Tool identity; Run execution uses
+  frozen facades. Execution metadata belongs in Tool fields.
 - Opening multiple applications does not by itself make captured collaborators
   concurrency-safe; products must select or create collaborators with the
   required ownership model.

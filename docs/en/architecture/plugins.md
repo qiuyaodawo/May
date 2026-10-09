@@ -1,10 +1,10 @@
-# Plugin system specification
+# Plugin composition and lifecycle
 
-**English** | [简体中文](../../zh-CN/architecture/plugin-spec.md)
+**English** | [简体中文](../../zh-CN/architecture/plugins.md)
 
-May exposes reusable capabilities through plugins, typed services and lifecycle
-hooks. Applications select their own composition. Existing direct package APIs
-remain available.
+This explanation describes May's implemented plugin host: how services become
+available, how nested scopes own resources, and how Hooks participate in execution.
+Use the [plugin guide](../guides/plugins.md) to declare and load a plugin.
 
 ## Definitions
 
@@ -30,6 +30,20 @@ their caller's ownership unless an explicit disposer transfers it.
 
 ## Lifecycle and scopes
 
+```mermaid
+flowchart TD
+  host[host: shared workspace resources] --> app[application: Agent composition]
+  app --> session[session: conversation resources]
+  session --> run[run: one execution]
+  run -. service lookup .-> session
+  session -. service lookup .-> app
+  app -. service lookup .-> host
+```
+
+A Run plugin can use its Session's services and the Application's Model. An
+Application plugin cannot depend on a Run service because that instance is
+created later and ends sooner. Each child scope creates its own instances.
+
 Host, application, session and run form nested scopes. Setup follows dependency
 order; cleanup follows reverse dependency order. Every listener, timer, connection
 and background operation has an owner. Setup failure stops further setup and
@@ -42,6 +56,20 @@ must finish or be cancelled and drained before a change. New operations cannot
 race a pending change. Failed replacement leaves the affected scope unavailable;
 durable history remains readable. Session state has explicit schema versions and
 migrations and must be verified before resumed execution.
+
+## State and replacement
+
+Plugin state declares a numeric state version, an initial value and optional
+schema and migration. Reads return copies. Accepted `set()` and `update()` calls
+validate their values and await the configured writer before reporting success.
+Application and Session state is saved under `may.plugins`; Run state is temporary.
+Unknown saved plugin records remain available in history.
+
+During replacement, active work completes its writes before the host pauses new
+state calls and drains accepted writes. Cleanup precedes replacement initialization.
+Replacement setup can update restored state. Incompatible plugin or state versions
+require explicit migration. Runtime replacement also saves and restores the
+runtime descriptor and versioned state through Session's runtime lifecycle methods.
 
 ## Hooks
 
@@ -95,9 +123,10 @@ Session state. The default May loop is offered by a runtime plugin through a
 replaceable runtime factory. MaybeCode and MaybeClaw accept product-specific plugin
 selection without changing direct callers.
 
-Acceptance requires real service/resource tests for startup validation, scope
-isolation, reverse cleanup, setup failure, timeout, cancellation, changes, migration,
-permission ordering, durable projections and restoration. Existing offline suites,
-build and bilingual documentation checks must pass. Published package dependency
-chains must install in an external packed-package consumer. Live provider validation
-must be reported separately from offline verification.
+`packages/plugin/test/` covers composition validation, scopes, Hook ordering,
+cleanup, changes and state migration. Application tests cover integration with
+Session state and runtime replacement. From the repository root, run
+`pnpm --filter @may/plugin test` and `pnpm --filter @may/application test` for
+those checks. `pnpm test:package:plugin` installs the packed dependency chain in
+an external consumer and exercises public exports. These checks use local
+resources; external provider integration has separate evidence.

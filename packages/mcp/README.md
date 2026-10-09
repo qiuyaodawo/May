@@ -85,7 +85,7 @@ stream resumption, general tool-call retry, or fallback to deprecated HTTP+SSE i
 
 Scoped elicitation, opt-in Roots/Sampling and isolated legacy interactions are
 implemented. Modern Tasks are opt-in; isolated Apps are optional and independent server exports are separately opt-in.
-See the [bilingual MCP guide](../../docs/en/guides/mcp.md) and [full adaptation roadmap](../../docs/en/architecture/mcp-host-roadmap.md).
+See the [bilingual MCP guide](../../docs/en/guides/mcp.md) and [MCP capability reference](../../docs/en/reference/mcp-capabilities.md).
 
 ## Dynamic catalogs and endpoint recovery
 

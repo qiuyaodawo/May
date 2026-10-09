@@ -2,28 +2,45 @@
 
 **English** | [简体中文](../../zh-CN/guides/coordination-lifecycle.md)
 
-The [coordination runtime](coordination.md) exposes two host-only lifecycle
-operations: explicit new attempts and atomic edits of never-submitted graph nodes.
-Neither operation is an automatic retry policy or an Agent tool. Both require
-separate host authorization; omitting the policy callback denies the operation.
+Use `retryTask()` to authorize another attempt after inspecting a failed task.
+Use `rewriteGraph()` to change future work before its inputs have been submitted.
+Both operations belong to the host and require an explicit policy callback.
+
+This guide assumes an existing [coordination runtime](coordination.md), its
+durable Session records and access to external task evidence. Configure the
+callbacks when creating the graph, and provide the same policy version on resume.
 
 ## Authorize a new attempt
 
+1. Include `authorizeRetry` in the policy passed to `CoordinationRuntime.create()`
+   or `resume()`. This typed policy permits retries for the `analyst` role after
+   the host has recorded a finding:
+
 ```ts
-const policy = {
+import type { CoordinationPolicy } from "@may/coordination";
+
+const policy: CoordinationPolicy = {
   version: "team-policy-v2",
   authorize: (task) => task.agent === "analyst",
   authorizeRetry: (task, finding) =>
     ["failed", "cancelled"].includes(task.status) && finding.trim().length > 0,
 };
+```
 
-// The host must actually verify this finding; this string is not verification.
+2. Inspect the task, its owned descendants and external effects. If its state is
+   `recovery-required`, call `resolveRecovery()` with verified evidence before
+   requesting a retry.
+3. Call `retryTask()` with a unique command ID and the actual finding, then
+   inspect the new attempt's status after `wait()`:
+
+```ts
 await runtime.retryTask(
   "retry-analysis-1",
   "analysis",
   "The provider rejected the request before any tool effects; a new attempt is authorized.",
 );
 const snapshot = await runtime.wait();
+console.log(snapshot.tasks.find((task) => task.id === "analysis"));
 ```
 
 `retryTask(commandId, taskId, finding)` accepts only a known `failed` or
@@ -39,8 +56,8 @@ evidence. Old Session histories are never changed or resubmitted. The new Sessio
 receives the original task, explicit dependency results, and a marked diagnostic
 summary, not the old conversation or tool approvals.
 
-The global task `turn` increases rather than resetting, so old mailbox receipts
-remain unambiguous. `maxTaskTurns` (default 16), `maxHandoffs` (default 4), total
+The global task `turn` continues increasing from its previous count, so old
+mailbox receipts retain their turn identities. `maxTaskTurns` (default 16), `maxHandoffs` (default 4), total
 tasks, messages and the coordination deadline remain lifetime limits. `maxAttempts`
 (default 3) includes the initial attempt. A new attempt does not roll back files,
 remote side effects or usage; shared budgets continue charging new calls.
@@ -72,14 +89,26 @@ but never executes the task again.
 
 ## Atomically revise future graph nodes
 
+1. Include `authorizeGraphRewrite` in the runtime policy at creation. The
+   snippet uses the `CoordinationPolicy` import from above:
+
 ```ts
-// Include this policy when creating/resuming the runtime.
-const authorizeGraphRewrite = (change, snapshot) =>
+const authorizeGraphRewrite: NonNullable<CoordinationPolicy["authorizeGraphRewrite"]> = (change, snapshot) =>
   snapshot.tasks.length < 128 &&
   [...(change.add ?? []), ...(change.update ?? [])].every(
     (task) => task.agent === "analyst",
   );
+const graphPolicy: CoordinationPolicy = { ...policy, authorizeGraphRewrite };
+```
 
+Pass `graphPolicy` as the runtime's `policy` option.
+
+2. Identify queued top-level nodes whose inputs have never been submitted.
+   This example assumes `first`, `summary` and `unused-check` already exist,
+   and `summary` and `unused-check` are still eligible for editing.
+3. Submit the complete change with a unique command ID:
+
+```ts
 await runtime.rewriteGraph("expand-plan-1", {
   add: [
     { id: "second-check", agent: "analyst", input: "Check the first result.", dependsOn: ["first"] },
@@ -111,6 +140,6 @@ graph edits nor delegated tasks may reuse them. The lifetime `maxTasks` quota co
 removed nodes as well as current ones. `maxGraphChanges` defaults to 32, with every
 edit bounded by `maxTasks`. Graph edits do not reset deadlines or budgets.
 
-These constraints intentionally exclude arbitrary rewriting of running workflows.
-Use delegation, messages or handoff for active collaboration; use new tasks for
-revised work that already has durable execution evidence.
+After the command returns, inspect `runtime.snapshot().graphChanges` and the
+new task specifications. Start or continue the scheduler to execute eligible
+queued nodes. Use new task IDs for revised work that already has execution evidence.

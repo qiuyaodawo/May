@@ -2,9 +2,10 @@
 
 **English** | [简体中文](../../../zh-CN/architecture/decisions/README.md)
 
-This directory records decisions that constrain more than one May package or
-application. An ADR explains why a boundary exists so a later refactor does
-not accidentally undo it.
+These records explain dependency direction, lifecycle ownership and optional
+integration boundaries across May packages and applications. For implementation
+details, use the [package catalog](../../reference/packages.md) and
+[runtime architecture](../runtime-session.md).
 
 ## Status values
 
@@ -25,7 +26,7 @@ not accidentally undo it.
 
 ## Adding a record
 
-Use the next four-digit number and include: context, decision, consequences and
-status. Record architectural trade-offs, not routine implementation details.
-If a decision changes, add a new ADR and mark the old one superseded rather
-than rewriting its history.
+Use the next four-digit number. Include status, date, context, decision and
+consequences. Link affected packages and guides. A changed architectural decision
+requires a new record and an explicit supersession link. Keep usage instructions
+in the corresponding guides and review the ADR's applicability when APIs evolve.

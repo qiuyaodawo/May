@@ -1,4 +1,4 @@
-# ADR 0005：Observability 实现 Core 拥有的可选 Tracing Port
+# ADR 0005：Observability 实现 Core 拥有的可选 Tracing 接口
 
 [English](../../../en/architecture/decisions/0005-observability-is-an-optional-core-port.md) | **简体中文**
 
@@ -7,36 +7,33 @@
 
 ## 背景
 
-May 需要跨 Run、模型调用、工具、权限、Context、application 和未来 MCP 调用的因果关系、
-耗时与状态数据。现有实时 event 和持久化 Session event 具有不同的可靠性与隐私语义；
-把其中任意一条 event stream 隐式当成 audit/telemetry backend 会混合这些职责。
-
-如果让 Core 依赖 exporter 或外部 tracing SDK，可选遥测会变成强制依赖，Core 的最小边界
-会被削弱；而 May 专用 processor 又需要 Core event 和执行类型，因此还可能形成循环依赖。
+May 需要观察 Run、模型调用、工具、权限、Context、应用与 MCP 调用的因果关系、
+耗时和状态。实时事件、持久化 Session 事件与遥测各自具有不同的可靠性和隐私要求。
+可选遥测需要保持独立的导出依赖与处理生命周期。
 
 ## 决策
 
-Core 拥有小型同步 `Tracer`/`TraceSpan` port，并显式传播 `TraceContext`。Runtime 的
-instrumentation 调用采用 fail-open 语义。默认只记录不含内容的标识、数量、状态、usage
-和错误类型/错误码，不记录 prompt、message、reasoning 或工具输入输出。
+Core 拥有同步的 `Tracer`/`TraceSpan` 接口，并明确传播 `TraceContext`。
+Instrumentation 使用 fail-open 语义，默认记录不包含内容的标识、数量、状态、
+usage 和错误类型/错误码；排除 prompt、message、reasoning 及工具输入输出。
 
-可选 `@may/observability` package 依赖 Core，实现采样、不可变完成 span、内存与
-串行/有界 processor，以及基础 exporter。异步导出属于 processor，不能给 Agent 执行
-增加 backpressure，也不能让 exporter failure 变成 Agent failure。
+可选 `@may/observability` 依赖 Core，实现采样、不可变的完成 span、内存处理器、
+串行有界处理器与基础 exporter。异步导出由 processor 负责，缓冲压力和导出故障
+不得影响 Agent 执行。
 
-Tracer 和 processor 生命周期由调用方拥有。`AgentDefinition` 可以捕获 tracer，但关闭
-某个 application 不会关闭仍被其他 application 共享的 tracer。产品应在真正的 ownership
-边界 flush 并 shutdown processor。
+Tracer 与 processor 的生命周期由调用方拥有。`AgentDefinition` 可以捕获 tracer，
+应用关闭后共享 tracer 继续由拥有者管理。产品在对应所有权范围内刷新并关闭 processor。
 
-Trace 是允许采样或丢弃的运行数据。Session 和 permission event 仍是持久化事实来源。
-厂商集成通过自定义 processor/exporter 完成，相关 SDK 类型不进入 Core API。
+Trace 可以被采样或丢弃。Session 与权限事件提供持久化事实。厂商集成通过自定义
+processor/exporter 完成，厂商 SDK 类型保持在适配层内。
 
 ## 后果
 
-- Core 不产生对 `@may/observability` 或厂商 SDK 的 runtime dependency；
-- Core、Session、Application、Provider 和远程工具可以无进程全局状态地显式传播同一
-  trace context；
-- tracer 或 exporter 故障不能使 Run 失败；
-- processor counter 会暴露缓冲压力，但不会阻塞 Agent；
-- 产品必须让自定义 attribute 不含敏感内容，或应用自己的隐私策略；
-- metrics、dashboard 和厂商专用 exporter 是基于完成 span 的 adapter，不属于 Agent Loop。
+- Core 不依赖 `@may/observability` 或厂商 SDK。
+- Core、Session、Application、Provider 与远程工具明确传播同一 trace context。
+- Tracer 或 exporter 故障不会使 Run 失败。
+- Processor 计数器显示缓冲压力，Agent 继续执行。
+- 产品需要管理自定义属性的隐私，保持属性不含敏感内容。
+- 指标、仪表板与厂商 exporter 基于完成 span 提供。
+
+Processor 配置与关闭步骤见[可观测性](../../guides/observability.md)。

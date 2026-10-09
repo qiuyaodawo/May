@@ -1,10 +1,14 @@
-# Agent Skills
+# 创建并激活 Agent Skills
 
-[English](../../en/guides/skills.md)
+[English](../../en/guides/skills.md) | **简体中文**
 
 `@may/skills` 为通用 agent 实现
-[Agent Skills 格式](https://agentskills.io/specification)。创建
-`.agents/skills/research/SKILL.md`：
+[Agent Skills 格式](https://agentskills.io/specification)。本文指导用户创建本地 skill、
+在 MaybeCode 中发现并为 Session 激活它。在配置的 MaybeCode 宿主使用的项目目录中操作。
+
+## 1. 创建 skill 和参考文件
+
+创建 `.agents/skills/research/SKILL.md`：
 
 ```markdown
 ---
@@ -14,12 +18,21 @@ description: 使用一手来源研究主题，并提供带引用的结论。
 阅读 references/guide.md。比较一手证据，说明不确定性。
 ```
 
+创建 `.agents/skills/research/references/guide.md`，保存引用的指导内容：
+
+```markdown
+研究软件时使用原始项目文档和源码。
+记录每项事实的来源，说明已经完成验证的结果。
+```
+
 配套文件可放在 `references/`、`scripts/`、`assets/` 或其他 skill 子目录。
 名称必须匹配目录，使用小写 ASCII 字母、数字和单个连字符，最多 64 字符；
 描述非空且最多 1024 字符。支持标准 license、compatibility、metadata 和实验性
 allowed-tools 字段。拒绝空正文、YAML 别名、重复键、未知标签及错误字段类型。
 
-## 发现和命令
+<a id="发现和命令"></a>
+
+## 2. 发现并激活 skill
 
 使用配置的 MaybeCode（含 CLI）依次扫描 `~/.agents/skills`、`~/.may/skills`、
 `<workspace>/.agents/skills` 和 `<workspace>/.may/skills`，后面的同名项覆盖前面并
@@ -33,6 +46,8 @@ allowed-tools 字段。拒绝空正文、YAML 别名、重复键、未知标签�
 无效 skill 出现在诊断中。新打开会话会重新发现目录型 skills；注入 registry 则由
 调用方管理其快照。
 
+打开新 Session 并执行 `/skills`，确认 `research` 已列出且没有诊断。
+使用 `/skills show research` 检查正文，再使用 `/skills use research` 激活。
 两个终端界面均支持：
 
 - `/skills`：列出名称、描述、位置、激活状态和诊断。
@@ -44,6 +59,12 @@ allowed-tools 字段。拒绝空正文、YAML 别名、重复键、未知标签�
 模型最初只收到目录摘要，再按任务或用户指定名称调用 `skill_read {name}`。
 配套 UTF-8 文件通过 `skill_read {name, path: "references/guide.md"}` 加载。
 返回的绝对目录可用于已有获准执行工具读取脚本／二进制资产，skill_read 本身只读文本。
+
+## 3. 验证激活状态已保存
+
+执行 `/instructions`，确认其中包含激活的 skill 指导。
+关闭并重新打开同一 Session，确认已保存版本仍然激活。
+新 Session 初始没有激活项。目录文件更新后，需要通过新打开的 Session 重新发现。
 
 ## 状态和权限
 
@@ -60,9 +81,13 @@ MaybeCode 的受限 skill_read 免审批，脚本仍经过既有 shell／MCP 权
 限制：最多 32 个根目录，每根 512 个条目，共 128 个 skill；每个 SKILL.md 64 KiB，
 每份资源 256 KiB，激活快照合计 256 KiB。拒绝绝对路径、目录穿越、备用数据流、
 符号／junction 链接和硬链接；验证 UTF-8、限制读取量并检查文件身份。
-它不是进程沙箱或远程 skill 市场，请选择适合宿主信任范围的来源。
+宿主需要选择可信来源，执行脚本时由宿主提供进程隔离。
 
 ## 通用集成
+
+将 `@may/skills` 和 `@may/application` 加入应用直接依赖。
+以下片段要求已经初始化 `model`、`tools`、`permissionPolicy` 和 `store`。
+用包含 skill 目录的实际路径替换 `/srv/agent-skills`，执行后关闭应用：
 
 ```ts
 import { SkillRegistry } from "@may/skills";
@@ -71,8 +96,12 @@ import { defineAgent } from "@may/application";
 const skills = await SkillRegistry.discover(["/srv/agent-skills"]);
 const definition = defineAgent({ model, tools, skills, permissionPolicy });
 const app = await definition.open({ store });
-await app.activateSkill("research");
-await (await app.submit({ input: "研究指定主题" })).result;
+try {
+  await app.activateSkill("research");
+  await (await app.submit({ input: "研究指定主题" })).result;
+} finally {
+  await app.close();
+}
 ```
 
 手动集成可用 SkillSession 的 `readTool()`、`instructions()`、`setSink()`、`restore()`

@@ -1,12 +1,18 @@
-# 运行预算
+# 配置运行预算
 
-[English](../../en/guides/run-budgets.md)
+[English](../../en/guides/run-budgets.md) | **简体中文**
+
+`runBudget` 限制单次 Agent 执行的时间、步骤、调用、token 或费用。
+本文介绍 MaybeCode 配置和通用代码 API。Token 与费用限制需要所选 Provider 报告用量。
+
+## 设置默认限制
 
 `May`、`AgentApplication`、`defineAgent` 和 MaybeCode 支持 `runBudget` 默认限制。
 `run()` / `submit()` / `continue()` 可以收紧但不能放宽它们。每个 Run，包括显式
 retry/continue，都获得新预算；预算范围为单个 Run。
 
-MaybeCode 支持以下配置：
+在 MaybeCode 配置文件中加入以下对象。文件位置和优先级见
+[配置参考](../reference/configuration.md)：
 
 ```json
 {
@@ -28,6 +34,19 @@ MaybeCode 支持以下配置：
 MaybeCode 的主 Run 默认为 32，子 Agent 的子 Run 默认为 24。
 整个工具批次开始执行前会预留调用额度，包括并行调度。模型计数统计获准进入的循环步骤，
 不统计 provider HTTP 重试。
+
+可用限制字段如下：
+
+| 字段 | 单位与统计边界 |
+| --- | --- |
+| `maxDurationMs` | 当前 Run 的毫秒数 |
+| `maxSteps` | 获准进入的 Agent 循环步骤 |
+| `maxModelCalls` | 获准模型调用，Provider HTTP 重试独立计算 |
+| `maxToolCalls` | 预留工具调用，包括下一个完整批次 |
+| `maxTotalTokens` | Provider 报告的 token 用量，在响应返回时检查 |
+| `maxCostUsd` | 完整 USD 费用，在响应返回时检查 |
+
+## 为费用限制配置价格
 
 成本上限使用 `maxCostUsd`，并明确配置 `pricing` 或兼容的 `tokenPrices`。
 `tokenPrices` 保留 `inputUsdPerMillion` 和 `outputUsdPerMillion`，还支持可选的
@@ -57,6 +76,8 @@ const runBudget = { maxCostUsd: 1, pricing };
 币种、`estimated` 或 `provider` 类型、完整性与缺失原因。宿主遥测可以通过
 `priceUsage()` 使用相同接口。JSON 配置支持价格配置；回调通过代码 API 提供。
 
+## 理解 Provider 用量
+
 `Usage` 支持 `cachedReadTokens`、`cachedWriteTokens`、`reasoningTokens`、其他
 `items`、`completeness` 和 provider 上报的 `reportedCost`。`tokenRelations` 说明明细
 是否包含在 `input`、`output`、`total` 中，或者独立于这些用量（`none`）。缺少关系时
@@ -71,6 +92,8 @@ OpenAI Responses 与兼容 adapter 保存缓存和 reasoning 明细，并注明�
 关系。Anthropic 缓存用量独立于 `input_tokens`，计算规范化总量时包含这些用量。
 其他 provider 计量保留项目身份、单位、数量和与上报金额的关系。未知单位或缺少费率
 使计价结果不完整。Provider 上报金额保留币种与来源，May 不进行汇率转换。
+
+## 检查结果与预算错误
 
 `RunResult.budget` 报告耗时、获准步骤／模型调用、预留工具调用、已知 token、成本、
 `usageComplete`、`costComplete`、`costKind` 和 `latestCost`。`latestCost` 保留价格
@@ -90,6 +113,12 @@ Schema 或能力验证拒绝的已完成响应仍然消耗已知的 provider 用
 `run.failed` / `RUN_BUDGET_EXCEEDED`。两个终端界面都显示原因。未执行调用会在继续前
 被关闭。时限通过 AbortSignal 传递到上下文准备、模型、审批和工具；清理会等待已开始
 工具结束，进程内接口无法强制终止不响应取消的 adapter。
+
+## 验证限制并理解适用范围
+
+通过所选真实 Provider 执行有限请求，检查 `RunResult.budget` 的计数和完整性。
+Token 或费用预算所需用量无法取得时，应报告 `RUN_BUDGET_USAGE_UNAVAILABLE`。
+任一维度耗尽时，结果和历史应报告 `RUN_BUDGET_EXCEEDED`。
 
 Token／成本在响应边界检查，因此最后一次请求可能超限；没有返回用量的 HTTP 重试也无法
 精确计费。Core 模型循环以外的辅助调用（手动摘要、压缩模型、隔离 MCP sampling、

@@ -1,47 +1,49 @@
-# 自定义 UI
+# 构建自定义 UI
 
 [English](../../en/guides/custom-ui.md) | **简体中文**
 
-浏览器界面可以从[共享 Web UI](web-ui.md)开始：`@may/ui-client` 提供 JSON 边界和
-状态同步，`@may/web-ui` 提供可组合组件与可选工作台。下文的进程内 Controller 和
-TUI 接入方式仍然可用。
+本文用于将已有 UI 接入 May 的无界面控制接口。需要已经打开的 `AgentApplication`
+或工作区 controller，以及能够同时接收异步事件、取消操作和审批响应的 UI。
 
-`mountWebUI` 接受可选的 `authentication` 对象，包含 `label`、
-`login(password): Promise<string>` 和 `logout(): Promise<void>`。产品负责验证密码，
-返回临时 UiClient 凭据，并在断开连接时撤销凭据。密码中的空格会保留，提交后清空
-输入框。`connectionHint` 提供登录说明；`authentication` 与 `initialToken` 不能同时使用。
+浏览器界面参阅[共享 Web UI](web-ui.md)：`@may/ui-client` 提供 JSON 边界和状态
+同步，`@may/web-ui` 提供可组合组件与可选工作台。本文也说明进程内 controller
+与 TUI 的接入方式。
 
-May 的 application 层是 headless 的。终端、桌面、Web 或远程 UI 应依赖
-`AgentController`（一个活动 Session）或 `AgentWorkspaceController`（多个 Session），
-调用表达用户意图的方法，并把异步 event stream 投影为 view state。
+终端、桌面、Web 或远程 UI 通过 `AgentController` 管理一个活动 Session，通过
+`AgentWorkspaceController` 管理多个 Session。UI 调用表达用户意图的方法，并将
+异步事件转换为显示状态。
 
-不要把 UI 状态作为事实来源。完整 Session event 会持久化；streaming delta 和 progress
-只是实时观察。
+完整 Session 事件提供持久历史；流式增量和进度用于实时更新。断线重连时重新读取历史。
 
-## Headless Controller 边界
+## Headless controller 边界
 
-主要 UI 操作为：
+1. 从应用宿主取得 controller。以下片段假设 `controller` 已经打开，`requestId`
+   对应当前等待中的审批。
+2. 提交输入前启动事件消费。
+3. 需要等待执行结束时，等待 `run.result`。
 
 ```ts
 const run = await controller.submit({ input: "Explain this repository" });
-run.cancel("Cancelled in UI");        // 取消此 handle
-controller.cancel("Cancelled in UI"); // 取消活动 Run 或压缩
+run.cancel("Cancelled in UI");        // 取消此 Run。
+controller.cancel("Cancelled in UI"); // 取消活动 Run 或压缩操作。
 
 await controller.resolveApproval(requestId, "allow");
 await controller.compactContext();
 const history = await controller.history();
 ```
 
-`submit()` 在 Run 启动时 resolve，不等 Run 完成。通过 `run.result` 观察完成或失败。
-`controller.isRunning` 为 true 时禁用冲突 control；application 与 workspace 方法也会
-强制执行 idle-only transition。
+`submit()` 在 Run 启动后返回。通过 `run.result` 观察完成或失败。
+`controller.isRunning` 为 `true` 时禁用冲突操作；application 和 workspace
+也会检查要求空闲状态的操作。
 
-始终调用 `close()`。关闭会取消活动工作、拒绝未处理审批、等待事件 relay，再关闭
-event stream。
+退出时调用 `close()`。关闭会取消活动工作、拒绝未处理审批、等待事件转发结束，
+随后关闭事件流。
 
-## 投影 Application Event
+## 投影 Application 事件
 
-下列 bridge 填充 `@may/tui` 的可复用 transcript，同时不让 controller 耦合终端输入：
+在使用项目中安装 `@may/application`、`@may/permissions` 和 `@may/tui`。
+以下函数需要已打开的 controller、`TranscriptStore` 和应用提供的 `askApproval`
+对话框。函数持续读取事件，直到 controller 关闭；输入和退出操作需要并发处理。
 
 ```ts
 import type {
@@ -88,24 +90,24 @@ export async function projectApplication(
         store.appendNotice("warning", event.error.message);
         break;
       case "tool.presentation":
-        // 应用拥有带 namespace/version 的显示 schema。
-        // 在这里解码已识别 kind，并更新对应 tool item。
+        // 按应用声明的 kind/version 处理展示数据。
         break;
     }
   }
 }
 ```
 
-若 approval dialog 失败，此例会 deny，而不是让 Run 永久暂停。请求已经因取消等原因
-消失时，`resolveApproval()` 返回 `false`。
+审批对话框失败时，`finally` 使用 `deny` 结束请求，随后传播对话框错误。请求因
+取消等原因已经消失时，`resolveApproval()` 返回 `false`。
 
-对 `AgentWorkspaceController` 还要处理 `session.changed`：先重置或加载新的
-`controller.history()`，再应用后续实时事件。产品 extension event 也由产品 UI bridge
-转换。
+使用 `AgentWorkspaceController` 时还需要处理 `session.changed`：加载新的
+`controller.history()` 后，应用后续实时事件。产品扩展事件由产品 UI 转换。
 
 ## Retained 终端渲染
 
-`@may/tui` 提供终端基础组件，但图形 UI 不必依赖它。最小 retained transcript：
+Retained TUI 可以使用以下显示配置调用前面的投影函数。`application` 是已经
+打开的 controller，`showApprovalDialog` 是应用提供的审批对话框。片段负责视图
+生命周期；产品还需要提供输入组件和退出处理。
 
 ```ts
 import {
@@ -133,31 +135,29 @@ try {
 }
 ```
 
-Application 必须关闭，`projectApplication()` 才会正常结束。真实产品中由 editor 或
-command component 发起 `submit()`；退出路径先调用 `application.close()`，再等待
-projection task。
+Application 关闭后，`projectApplication()` 才会正常结束。产品通过编辑器或命令
+组件调用 `submit()`；退出时调用 `application.close()`，随后等待投影任务结束。
 
-`TranscriptView` 使用默认 registry 渲染标准编码工具，未知工具使用通用 renderer。
-产品 renderer 注册在 `ToolRendererRegistry` 实例上，再通过 view option 传入；不存在
-全局 UI registry。
+`TranscriptView` 使用默认 registry 显示标准编码工具，未知工具使用通用显示组件。
+产品显示组件注册在 `ToolRendererRegistry` 实例上，通过视图 options 传入。
 
-Raw-mode retained screen 使用 `NodeTerminalDriver`；行式 prompt UI 使用
-`@may/tui/node-terminal` 的 `createNodeTerminal()`。二者拥有不同 input mode，不能同时
-控制同一个 terminal。
+Raw-mode retained TUI 使用 `NodeTerminalDriver`；逐行提示界面使用
+`@may/tui/node-terminal` 的 `createNodeTerminal()`。二者管理不同输入模式，
+同一终端只能由其中一个控制。
 
 ## 事件一致性
 
-Buffer 压力下 application queue 可以丢弃高频 streaming delta，但保留 lifecycle
-event。因此 UI 必须：
+事件缓冲压力增大时，application 队列可以丢弃高频流式增量，同时保留生命周期
+事件。UI 需要遵守以下规则：
 
-- 用完整 `model.completed` message 替换 streamed assistant text；
-- 把 tool progress 视为临时状态；
+- 使用完整的 `model.completed` 消息替换已经显示的增量文本；
+- 将工具进度作为临时状态；
 - 恢复或断线重连后重新加载 `history()`；
-- 用 `runId` 标识 Run event，用 call ID 标识 tool call，不能靠到达文本；
-- 渲染序列化错误时不假定具体 JavaScript class。
+- 使用 `runId` 标识 Run 事件，使用调用 ID 标识工具调用；
+- 显示序列化错误时不假定具体 JavaScript class。
 
-`TranscriptStore` 实现这些实时/最终投影规则。`loadHistory()` 只重建持久化事实，因此
-恢复后的屏幕可能有意忽略关机前见过的临时 progress。
+`TranscriptStore` 实现这些实时和最终投影规则。`loadHistory()` 重建持久化事实，
+恢复后的屏幕可能缺少关闭前的临时进度。
 补充输入在 `input.received` 确认交付时显示到对话中。恢复历史时组合
 `input.steering.queued` 和 `input.steering.delivered`，保留正文、顺序和记录标识。
 等待中或者已取消的输入不会显示为已交付的对话内容；从空闲输入启动的新 Run
@@ -165,18 +165,23 @@ event。因此 UI 必须：
 
 ## 安全与关闭
 
-- 对不经过 May `Text`、Markdown 或 transcript component 渲染的终端文本做清理；
+- 清理未经过 May `Text`、Markdown 或 transcript 组件处理的终端文本；
   不可信控制序列可能篡改终端。
-- 观察到 resolution event 前，不要把审批显示为已允许。
-- 不能从 disabled button 推断授权；permission policy 才是 enforcement boundary。
-- 通过 UI transport 发送工具细节、diff 和 history page 前限制大小。
+- 收到审批结果事件后，显示相应决定。
+- 权限策略负责授权检查，界面按钮负责显示可用操作。
+- 通过 UI 传输工具详情、diff 和历史页面前限制大小。
 - 在 `finally` 调用 `runtime.stop()`，恢复 raw mode 和 alternate screen。
-- UI 退出时移除 subscription，并关闭 controller。
+- UI 退出时移除订阅，并关闭 controller。
 
-参阅[权限策略](permission-policy.md)、[自定义工具](custom-tool.md)和
-[Runtime 与 Session 边界](../architecture/runtime-session.md)。
+## 浏览器认证
 
-### MCP 用户交互
+`mountWebUI` 接受可选 `authentication` 对象，包含 `label`、
+`login(password): Promise<string>` 和 `logout(): Promise<void>`。产品验证密码，
+返回临时 UiClient 凭据，断开连接时撤销凭据。密码中的空格保留，提交后清空输入。
+`connectionHint` 提供登录说明；`authentication` 与 `initialToken` 不能同时使用。
+HTTP 认证与来源检查参阅[共享 Web UI](web-ui.md)。
+
+## MCP 用户交互
 
 MaybeCode 提供临时 `mcp.interaction.requested` / `settled` 事件、
 `getMcpInteractions()` 和 `respondMcpInteraction(id, response)`。只有 UI 能在
@@ -193,7 +198,7 @@ sampling 审阅可通过 `{ action: "accept", content: { json: editedDocument } 
 拒绝/取消、settled/截止时间处理与表单相同。审阅不代表打开浏览器、提交 Session、
 记录输入历史或执行本机工具。
 
-### MCP 任务控制
+## MCP 任务控制
 
 使用 `listMcpTasks`、`getMcpTask`、`updateMcpTask`、`waitMcpTask`、`cancelMcpTask`、
 `forgetMcpTask` 显式操作当前 Session 的任务。展示本地句柄及不可信有界状态，不要
@@ -204,4 +209,13 @@ sampling 审阅可通过 `{ action: "accept", content: { json: editedDocument } 
 
 图形 Host 可使用 `pool.openApp`、`mcpAppSandboxResponse` 和浏览器专用
 `@may/mcp/apps-browser` 入口。同意、origin/CSP 要求和不支持的 API 参阅
-[隔离 Apps](./mcp-apps.md)；终端保留文本 fallback。
+[隔离 Apps](./mcp-apps.md)；终端保留文本显示。
+
+## 验证 UI 生命周期
+
+使用真实 controller 和持久化后端，确认完整响应替换部分文本、其他界面的审批
+结果使当前提示关闭、取消移除活动控件、Session 切换加载对应历史，以及退出清理
+事件订阅和终端资源。
+
+相关宿主职责参阅[权限策略](permission-policy.md)、[自定义工具](custom-tool.md)
+和[Runtime 与 Session 边界](../architecture/runtime-session.md)。

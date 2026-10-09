@@ -8,7 +8,7 @@
 ## Context
 
 May needs causal timing and status data across Runs, model calls, tools,
-permissions, Context work, applications, and future MCP calls. Existing live
+permissions, Context work, applications, and MCP calls. Existing live
 events and durable Session events have different reliability and privacy
 semantics; turning either stream into an implicit audit/telemetry backend would
 mix those responsibilities.
@@ -50,3 +50,5 @@ custom processors/exporters so their SDK types do not enter Core APIs.
   policy.
 - Metrics, dashboards, and vendor-specific exporters remain adapters built on
   completed spans rather than responsibilities of the Agent loop.
+
+See [observability](../../guides/observability.md) for processor setup and shutdown.

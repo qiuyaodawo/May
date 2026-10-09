@@ -1,12 +1,21 @@
-# 目标管理
+# 按照目标持续执行工作
 
-[English](../../en/guides/goals.md)
+[English](../../en/guides/goals.md) | **简体中文**
 
 `@may/goal` 提供独立的 `GoalController`、模型工具、Context 组合、使用量统计和保存接口。
 基础 Agent package 保持独立。MaybeCode 为每个 Session 连接组件，在两个 Terminal 界面和
-Web UI 中提供 `/goal`。
+Web UI 中提供 `/goal`。一个目标需要跨多个 Run 处理时，可以使用本文的操作。
+应用需要已经配置模型、Session 存储和正常工具权限，
+[运行预算](run-budgets.md)仍独立限制每个 Run。
 
 ## MaybeCode 命令
+
+1. 使用 `/goal start` 启动目标，根据需要明确提供预算。
+2. 后台执行期间，通过 `/goal status` 检查状态。
+3. 切换 Session 或模型之前，使用 `/goal pause` 暂停。
+4. 使用 `/goal resume` 继续能够恢复的目标，或使用 `/goal cancel` 终止目标。
+
+下面是命令参考，暂停、恢复和取消均为分别选择的用户操作：
 
 ```text
 /goal start --max-runs 8 --tokens 100000 --duration-ms 1800000 -- 检查项目并完成要求的测试
@@ -42,6 +51,10 @@ SDK 宿主可以提供独立的 `verify` 验收函数；未通过验收的说明
 
 ## 组件连接
 
+将 `@may/goal`、`@may/application` 和 `@may/context` 加入应用直接依赖。
+以下集成片段需要宿主已经初始化真实 `model`、`sessionStore`、`permissionPolicy`、
+`codingTools` 和持久化 `goalStore`，在应用异步入口中执行：
+
 ```ts
 import { GoalController } from "@may/goal";
 import { AgentApplication } from "@may/application";
@@ -56,11 +69,14 @@ const application = await AgentApplication.open({
   toolSource: () => goals.tools(),
   contextFactory: goals.wrapContextFactory(new InMemoryContextFactory()),
 });
-await goals.attach(application, goalStore);
-await goals.start("完成要求的工作", { maxRuns: 8 });
-await goals.wait();
-await goals.close();
-await application.close();
+try {
+  await goals.attach(application, goalStore);
+  await goals.start("完成要求的工作", { maxRuns: 8 });
+  await goals.wait();
+} finally {
+  await goals.close();
+  await application.close();
+}
 ```
 
 `GoalAgent` 要求 `sessionId`、`isRunning`、`submit` 和 `continue`，运行 handle 提供
@@ -99,6 +115,12 @@ token 计量、预算与取消信号，同时由子任务的 Context 提供任�
 Goal 取消以及时间或 token 预算耗尽时，controller 会取消当前执行 handle，
 包括正在执行的子任务工具。取消之后取得的 handle 会立即收到取消通知；Goal
 等待执行结果和宿主回调结束，然后停止执行。
+
+## 验证执行与保存状态
+
+Run 完成后，使用 `/goal status` 或 `getGoal()` 检查目标、状态、Run 数量和用量完整性。
+暂停并重新打开 Session，确认已保存目标和累计用量仍然可用，然后明确恢复执行。
+完成记录需要包含模型报告的证据，或者宿主 `verify` 接受的证据。
 
 ## 预算与恢复
 

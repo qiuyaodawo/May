@@ -1,4 +1,4 @@
-# Image replies
+# Display image replies
 
 **English** | [简体中文](../../zh-CN/guides/images.md)
 
@@ -7,12 +7,24 @@ OpenAI Responses converts `image_generation_call.result` into a base64 image
 part while retaining native continuation state. MaybeCode can also present
 images from stored native OpenAI output without modifying the session journal.
 
+Use this guide to display a model response that already contains supported
+image content, select a terminal protocol, or add media reading to another UI
+or channel. The selected model must support the requested image operation.
+
 ## MaybeCode
+
+1. Open an image-containing reply in the selected Session.
+2. In a terminal, use the saved attachment path or a supported graphics protocol.
+3. In the Web UI, use the original-image and download links.
+
+### Saved attachments
 
 Terminal frontends save embedded images under `~/.may/media/` and show the full
 path, MIME type, dimensions and byte count. Open the file in an image viewer,
 or use `/web` to view and download images. The readline frontend prints the
 complete ordered reply after any text that was already streamed.
+
+### Terminal graphics
 
 Both terminal frontends support Kitty, iTerm2 and Sixel graphics. Automatic
 detection uses `supports-terminal-graphics` and recognizes Windows Terminal
@@ -42,6 +54,8 @@ $env:MAY_IMAGE_PROTOCOL = "sixel"
 pnpm maybecode
 ```
 
+### Web and other image sources
+
 Web UI preserves ordered content and provides original-image and download links.
 Embedded image reads require authentication and ownership by the selected
 session or task. Snapshots contain identifiers without base64 payloads. Browser
@@ -51,6 +65,10 @@ depends on the source server. Terminal displays these URLs. Provider file IDs
 require a host-provided `MediaReader`.
 
 ## Reusable interfaces
+
+Add `@may/media` to a host that reads or converts images. Keep its reader and
+store under host ownership. The interfaces below describe the media boundary;
+UI composition is covered by [Custom UI](custom-ui.md).
 
 `@may/media` exports `DisplayPart`, `ImageAttachment`, `ImageData`, `MediaReader`,
 `MediaCapabilities`, `displayParts`, `imageAttachment`, `readEmbeddedImage`,
@@ -91,3 +109,11 @@ require the source task session to remain available.
 Additional channels implement their platform operations and capabilities while
 reusing image validation, identifiers, reading and ordered content.
 `ChannelHub` and `MaybeClawUiHost` accept a custom `MediaReader` for additional sources.
+
+## Verify display and delivery
+
+Use an actual image-containing response in the target UI. Confirm text and
+image ordering, the attachment's MIME type and dimensions, and access to the
+saved original. For terminal graphics, confirm the selected terminal reports
+the required capabilities. For channel delivery, inspect the saved delivery
+records before attempting a resend after an interruption.

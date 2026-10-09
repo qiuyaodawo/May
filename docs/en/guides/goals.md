@@ -1,13 +1,23 @@
-# Goals
+# Run work toward a goal
 
-[简体中文](../../zh-CN/guides/goals.md)
+**English** | [简体中文](../../zh-CN/guides/goals.md)
 
 `@may/goal` provides an external `GoalController`, model tools, context composition,
 usage accounting and a storage interface. Agent packages remain independent of it.
 MaybeCode connects the component to each Session and exposes `/goal` in both
-terminal frontends and the Web UI.
+terminal frontends and the Web UI. Use this guide when one objective may span
+several Runs. A configured model, Session storage, and normal tool permissions
+are required. [Run budgets](run-budgets.md) continue to apply to each individual Run.
 
 ## MaybeCode commands
+
+1. Start an objective with `/goal start`, adding only the budgets you require.
+2. Inspect `/goal status` while the background execution proceeds.
+3. Use `/goal pause` before changing Session or model configuration.
+4. Use `/goal resume` to continue a resumable goal, or `/goal cancel` to end it.
+
+The commands below are a reference; the pause, resume, and cancel commands are
+separate user actions:
 
 ```text
 /goal start --max-runs 8 --tokens 100000 --duration-ms 1800000 -- Inspect the project and complete the requested tests
@@ -53,6 +63,11 @@ records identify model-reported evidence. SDK hosts can supply an independent
 
 ## Composition
 
+Add `@may/goal`, `@may/application`, and `@may/context` as direct dependencies.
+This integration snippet assumes the host has initialized a real `model`,
+`sessionStore`, `permissionPolicy`, `codingTools`, and a durable `goalStore`.
+Run it in the application's async entry point:
+
 ```ts
 import { GoalController } from "@may/goal";
 import { AgentApplication } from "@may/application";
@@ -67,11 +82,14 @@ const application = await AgentApplication.open({
   toolSource: () => goals.tools(),
   contextFactory: goals.wrapContextFactory(new InMemoryContextFactory()),
 });
-await goals.attach(application, goalStore);
-await goals.start("Complete the requested work", { maxRuns: 8 });
-await goals.wait();
-await goals.close();
-await application.close();
+try {
+  await goals.attach(application, goalStore);
+  await goals.start("Complete the requested work", { maxRuns: 8 });
+  await goals.wait();
+} finally {
+  await goals.close();
+  await application.close();
+}
 ```
 
 `GoalAgent` requires `sessionId`, `isRunning`, `submit` and `continue`. Its run
@@ -124,6 +142,14 @@ Goal stops.
 MaybeCode stores goal records under `may.goal` using application-owned Session
 state. SDK callers can disable the component with `goals: false` when opening
 MaybeCode. Other applications choose whether to import and connect the package.
+
+## Verify execution and saved state
+
+Inspect `/goal status` or `getGoal()` after a Run to confirm the objective,
+status, Run count, and usage completeness. Pause and reopen the Session to
+confirm the saved goal and counters remain available. Resume explicitly.
+Completion must include model-reported evidence or evidence accepted by the
+host's `verify` callback.
 
 ## Budgets and recovery
 

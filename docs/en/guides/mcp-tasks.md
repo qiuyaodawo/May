@@ -1,17 +1,24 @@
-# MCP long-running tasks
+# Manage long-running MCP tasks
 
 **English** | [简体中文](../../zh-CN/guides/mcp-tasks.md)
+
+Use this guide to enable and manage remote tasks that outlive an immediate tool
+response. You need a trusted task-capable server, a secure task journal and an
+application that supplies workspace/Session ownership. Configure the base
+connection using the [MCP guide](mcp.md).
 
 ## Supported boundary
 
 `@may/mcp` and MaybeCode support opt-in task creation, inspection, reviewed input,
 waiting, cooperative cancellation and owner-bound recovery over modern stdio and
-Streamable HTTP. This targets the
-[2026-07-28 Tasks extension](https://tasks.extensions.modelcontextprotocol.io/specification/2026-07-28/tasks),
-`io.modelcontextprotocol/tasks`: flat task handles and `tasks/get`, `tasks/update`,
+Streamable HTTP. The supported extension is `io.modelcontextprotocol/tasks`,
+version `2026-07-28`: flat task handles and `tasks/get`, `tasks/update`,
 `tasks/cancel`. The incompatible 2025 experimental `tasks/list`/`tasks/result`
 protocol is not supported. Optional task subscription notifications are not
-implemented; explicit polling is supported. Independent [server export](mcp-server.md) is a separate opt-in surface, not automatic task export.
+implemented; explicit polling is supported. Independent [server exports](mcp-server.md)
+support immediate tool results.
+
+## Enable Tasks
 
 Enable `tasks: true` on an endpoint (default `false`). Both the negotiated core
 version `2026-07-28` and server Tasks extension are required; an incompatible
@@ -26,8 +33,7 @@ resource/prompt requests. Immediate tool results remain supported.
     "jobs": {
       "transport": "streamable-http",
       "url": "https://jobs.example.com/mcp",
-      "tasks": true,
-      "host": { "sampling": true }
+      "tasks": true
     }
   } } }
 }
@@ -39,19 +45,38 @@ MaybeCode supplies a separate encrypted OS-keyring-backed journal at
 
 ```ts
 import { KeyringMcpCredentialStore, McpTaskJournal } from "@may/mcp";
-const taskJournal = new McpTaskJournal(new KeyringMcpCredentialStore(taskVaultDirectory));
+const taskJournal = new McpTaskJournal(new KeyringMcpCredentialStore("./data/mcp-tasks"));
 ```
 
 An injected secure `McpCredentialStore` is supported. `InMemoryMcpCredentialStore`
 deliberately loses recovery on exit. Share one store across all Sessions requiring
 ownership isolation; independent stores cannot enforce cross-store ownership.
 
+In a custom Host, pass that `taskJournal` in the same `openMcpClientPool` options
+as `servers`. The relative vault path above is based on the process working
+directory and requires a working OS keyring. Keep this directory for restart
+recovery. Enable Roots or Sampling separately only when the server requires
+them and the Host has a concurrent interaction consumer.
+
+## Inspect and complete a task
+
+1. Approve a task-capable tool through the normal permission interface. If it
+   returns a deferred result, retain the local task handle.
+2. Run `/mcp tasks` to find the current Session's handle, then
+   `/mcp task-get <server> <local-id>` to inspect remote state.
+3. While the task is working, use `task-wait`. If it needs input, use `task-update`
+   and review the requested form, URL or compatibility operation.
+4. When the task completes, preview it with `task-get`. Use `task-attach` only
+   when you want a new Run to consume its result.
+5. To stop remote work, explicitly use `task-cancel` and check its later state.
+   Use `task-forget` when you want to remove its local record.
+
 ## User controls and Context
 
 Task creation is a normal MCP tool call through the Core permission/execution
-pipeline. A deferred result gives the model only a **local task handle**, not an
-invitation to repeat the call. Management APIs are explicit host controls, not
-implicitly exposed model tools. Both terminal UIs share these commands:
+pipeline. A deferred result gives the model a **local task handle** for later
+management. The Host explicitly controls task management APIs and their exposure
+to the model. Both terminal UIs share these commands:
 
 | Command | Effect |
 | --- | --- |
@@ -124,9 +149,9 @@ carries into each task's persistent lifetime budget: 32 host-input attempts
 with at most 4,096 per reservation. Approved sampling usage is persisted before
 the provider call; cancellation, withheld output and retry never refund it.
 
-Only routing metadata, timestamps, status, cancellation intent and hashed claims
-are persisted—not arguments, status messages, input payloads, answers, errors or
-results. Remote ids and owner labels are encrypted in the keyring vault. The
+Routing metadata, timestamps, status, cancellation intent and hashed claims
+are persisted. Arguments, status messages, input payloads, answers, errors and
+results remain outside the journal. Remote ids and owner labels are encrypted in the keyring vault. The
 cross-Session index retains at most 1,024 hashed remote-id tombstones per endpoint
 identity, even after forgetting. Reservation precedes Session binding, so partial
 writes leave restrictive tombstones. A full index requires explicit maintenance
@@ -150,3 +175,12 @@ MaybeCode's `mcp-capabilities.test.mjs` (permission gate, terminal input and exp
 attachment). These focused fixtures do not claim universal third-party conformance.
 
 Optional graphical integration and terminal fallback: [isolated Apps Host](mcp-apps.md).
+
+## Verify task recovery
+
+Use a real task-capable endpoint to confirm that restart retains the local handle,
+waiting stops on input-required or terminal state, local cancellation leaves
+remote state unchanged, and attachment requires an explicit operation. For the
+repository's local HTTP and process integration checks, run
+`pnpm --filter @may/mcp test` from the repository root. A third-party service
+requires separate account and compatibility verification.

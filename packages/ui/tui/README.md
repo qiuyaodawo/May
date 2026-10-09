@@ -139,8 +139,8 @@ Local auto uses clipboardy; SSH auto reports that explicit OSC 52 configuration
 is required. OSC 52 writes require terminal permission and cannot confirm receipt;
 its read operation reports unsupported access. Terminal paste supplies text through
 the existing bracketed paste event. User workflows are documented in
-[English](../../../docs/en/getting-started.md#browse-maybecode-conversations) and
-[中文](../../../docs/zh-CN/getting-started.md#查看-maybecode-对话).
+[English](../../../docs/en/guides/maybecode.md#browse-maybecode-conversations) and
+[中文](../../../docs/zh-CN/guides/maybecode.md#查看-maybecode-对话).
 
 Run the local smoke demo with:
 

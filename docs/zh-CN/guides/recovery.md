@@ -1,29 +1,59 @@
-# 崩溃恢复
+# 恢复中断的 Session
 
-[English](../../en/guides/recovery.md)
+[English](../../en/guides/recovery.md) | **简体中文**
 
-Session 使用 Core 的 `RunOptions.checkpoint` 等待式持久化检查点。运行开始、
-完整模型响应、工具开始和每个工具的执行结果必须落盘后，依赖它们的工作才能继续。
-串行批次中，前一个工具结果未持久化时，后一个工具不会启动。免审批工具也遵循这些
-检查点。工具开始检查点在权限判断之前，因此等待审批时发生的中断也保守视为结果未知。
+进程中断或持久化失败后，使用本文恢复会话。需要原有 Session 存储和 id，
+以及检查未完成工具所影响的外部系统的权限。接受新任务之前，宿主可能需要人工核实
+操作是否已经完成。
 
-`Session.resume()` 为未结束的运行写入原子的 `run.interrupted` 记录。已完成结果会保留；
-没有工具开始检查点的调用以 `TOOL_NOT_EXECUTED` 结束，已开始但没有结果的调用以
-`TOOL_OUTCOME_UNKNOWN` 结束。缺少检查点版本元数据的旧日志，将所有未结束调用视为未知。
-恢复过程不会重放工具，也不会调用模型。
+## 1. 重新打开 Session
 
-未知结果会阻止 submit 和 continue，并抛出 `SESSION_RECOVERY_REQUIRED`。
-`listRecoveries()` 返回原始输入，其 `id` 是原调用的稳定幂等键。宿主需要检查外部系统，
-然后调用 `resolveRecovery(id, verifiedFinding)`。核实结论会持久化并加入模型上下文；
-解决恢复项不会执行工具。重新打开会保留未解决项，不会重复写入中断记录。
+关闭中断的宿主，以 `resume: true` 打开已保存的 Session。
+宿主提供当前模型、工具、指令和权限策略。存储配置见[配置 Session 存储](custom-storage.md)。
 
-MaybeCode 的两个终端界面都支持 `/recovery` 查看未解决项，然后记录核实结论：
+`Session.resume()` 为未结束的 Run 保存 `run.interrupted`，保留已经完成的工具结果，
+并按照已保存证据处理未结束调用：
+
+| 已保存证据 | 恢复结果 |
+| --- | --- |
+| 没有工具开始检查点 | `TOOL_NOT_EXECUTED` |
+| 工具已开始，没有保存结果 | `TOOL_OUTCOME_UNKNOWN` |
+| 旧历史缺少检查点版本元数据 | 全部未结束调用均视为结果未知 |
+
+恢复重建对话状态，不执行工具，也不调用模型。未解决的未知结果阻止 `submit()` 和
+`continue()`，并产生 `SESSION_RECOVERY_REQUIRED`。
+
+## 2. 检查待处理恢复项
+
+在 MaybeCode 两个终端界面中执行 `/recovery`。自定义宿主调用 controller 的
+`listRecoveries()`。每个恢复项包含原始工具输入，其 `id` 是原调用的稳定幂等键。
+
+## 3. 核实并记录外部结果
+
+检查受影响的服务、文件或进程。服务支持结果查询时，使用原始幂等键查询。
+取得操作结果证据后记录核实结论。下面展示命令格式，恢复 id 和结论需要使用
+实际检查得到的内容：
 
 ```text
 /recovery resolve run_id:1:call_id 已检查目标系统：记录已经存在，不要重复创建。
 ```
 
-解决全部未知结果后，提交新的指令继续工作。自定义 UI 可以使用 controller 上的同名方法。
+自定义宿主调用 `resolveRecovery(id, verifiedFinding)`。
+Session 保存结论并加入模型 Context。解决恢复项仅改变恢复状态。
+
+## 4. 解决全部未知结果后继续
+
+重新检查恢复列表，确认没有未解决的未知结果，再提交新指令。
+重新打开会保留未解决项，每次中断只保存一条中断记录。
+
+## 检查点顺序
+
+Session 使用 Core 的 `RunOptions.checkpoint` 等待式持久化检查点。运行开始、
+完整模型响应、工具开始和每个工具的执行结果必须保存成功后，依赖它们的工作才能继续。
+串行批次中，前一个工具结果未持久化时，后一个工具不会启动。免审批工具也遵循这些
+检查点。工具开始检查点在权限判断之前，因此等待审批时发生的中断也保守视为结果未知。
+
+## 持久化失败与存储限制
 
 持久化失败后，必须重新打开 Session 才能继续。
 Core 将检查点失败报告为 `RUN_CHECKPOINT_FAILED`，取消并等待已启动的并行工具结束，

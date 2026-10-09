@@ -1,37 +1,52 @@
-# MCP tools
+# Connect MCP servers
 
 **English** | [简体中文](../../zh-CN/guides/mcp.md)
 
-`@may/mcp` lets a May application consume tools from a Model Context Protocol
-(MCP) server without putting protocol or process-management code in Core. The
-client supports local stdio and remote Streamable HTTP endpoints and the MCP
-tool capability.
+Use this guide to configure Model Context Protocol (MCP) servers in MaybeCode or
+an application using `@may/mcp`. You need a trusted stdio server executable or
+Streamable HTTP endpoint, its connection requirements, and any required account
+credentials. For MaybeCode, you also need an existing May configuration and model
+profile.
+
+1. Add an endpoint using [MaybeCode configuration](#maybecode-configuration) or
+   the [package API](#package-api).
+2. Start MaybeCode and run `/mcp`, or inspect `pool.status()` in your application.
+   A `connected` entry confirms setup and discovery; inspect its tool names.
+3. Approve the remote tool through the application's normal permission interface.
+4. Close the application and its pool at shutdown.
+
+For OAuth, long tasks, graphical Apps and server exports, use the dedicated
+[authentication](mcp-auth.md), [Tasks](mcp-tasks.md), [Apps](mcp-apps.md) and
+[server](mcp-server.md) guides. The sections below describe configuration and Host
+operations; the [capability reference](../reference/mcp-capabilities.md)
+describes package and protocol boundaries.
 
 ## Why this is a separate package
 
-Core already knows how to describe, authorize, schedule, cancel, execute, and
-trace a `Tool`. It should not know how an external tool is discovered or
-transported. `@may/mcp` therefore depends on Core and adapts a remote MCP tool
-to the existing `Tool` contract:
+`@may/mcp` owns discovery, transports and child processes. It adapts remote tools
+to Core's `Tool` interface, so their execution uses the existing permission,
+scheduling, cancellation, Session and tracing services.
 
-```text
-MCP server process
-  ^ stdio: initialize, tools/list, tools/call
-  |
-@may/mcp adapter -> Core Tool -> ToolRegistry
-                                  |
-Model tool call -> permission -> scheduler -> adapter -> MCP server
+```mermaid
+flowchart LR
+  server[MCP server] -->|Discovery| adapter["@may/mcp"]
+  adapter --> registry[Core ToolRegistry]
+  model[Model tool call] --> permission[Permission executor]
+  permission --> scheduler[Tool scheduler]
+  scheduler --> adapter
+  adapter -->|Remote call| server
 ```
 
-This direction keeps MCP optional. An Agent with only local tools has no MCP
-runtime dependency, while an MCP tool automatically uses the same permission,
-scheduling, event, cancellation, Session, and tracing paths as every other
-Core tool.
+Applications enable MCP by creating a pool. An application using only local
+tools does not need the MCP package.
 
 ## Package API
 
-Open a client pool, publish its tools per Run, and close the pool at
-the product ownership boundary:
+In your application project, install `@may/mcp` and `@may/application`. This
+integration snippet assumes you already created `model`, `localTools`,
+`permissionPolicy`, `tracer` and `store`. Place `mcp-server.mjs` in the process
+working directory, or supply an absolute path. If the server needs credentials,
+validate and supply them through `env` before opening the pool.
 
 ```ts
 import { defineAgent } from "@may/application";
@@ -43,32 +58,35 @@ const mcp = await openMcpClientPool({
     command: "node",
     args: ["./mcp-server.mjs"],
     cwd: process.cwd(),
-    env: { ACCESS_TOKEN: process.env.ACCESS_TOKEN! },
     required: false,
     requestTimeoutMs: 60_000,
   }],
   tracer,
 });
 
-const agent = defineAgent({
-  model,
-  tools: localTools,
-  toolSource: () => mcp.tools,
-  permissionPolicy,
-  tracer,
-});
-
-const application = await agent.open({ store });
 try {
-  // submit runs
+  const agent = defineAgent({
+    model,
+    tools: localTools,
+    toolSource: () => mcp.tools,
+    permissionPolicy,
+    tracer,
+  });
+  const application = await agent.open({ store });
+  try {
+    console.log(mcp.status());
+    const run = await application.submit({ input: "List the available project files." });
+    await run.result;
+  } finally {
+    await application.close();
+  }
 } finally {
-  await application.close();
   await mcp.close();
 }
 ```
 
-Opening negotiates the protocol (legacy initialization or modern discovery) and performs an aggregated
-`tools/list` request for each server. Servers are required by default: a
+Opening negotiates the protocol and retrieves each server's advertised capability
+catalogs. Servers are required by default: a
 required server failure closes already-opened servers and fails startup. A
 server with `required: false` instead records a failed status and lets the
 remaining servers start. `close()` is idempotent, visits every connection even
@@ -77,15 +95,15 @@ stdio transport.
 
 `requestTimeoutMs` sets the per-request inactivity timeout;
 `maxTotalTimeoutMs` can additionally bound total time even when progress keeps
-arriving. `maxBufferSize` limits one protocol message. When omitted, the MCP
-SDK defaults apply.
+arriving. `maxBufferSize` limits one stdio protocol message. Defaults are 60 seconds
+for `requestTimeoutMs` and 10 MiB for `maxBufferSize`; `maxTotalTimeoutMs` is unset.
 
 `pool.status()` returns a point-in-time view of every configured server,
 including its connection state, discovered tool names, latest diagnostic, and
 recent stderr. `pool.events` publishes connected, failed, and disconnected
 lifecycle events so products do not need to parse logs.
 
-Stdio stderr is piped instead of inherited. Its sanitized tail is retained per
+Stdio stderr is captured through a pipe. Its sanitized tail is retained per
 server for diagnostics and bounded by `stderrMaxBytes` (16 KiB by default), so
 a noisy child cannot grow memory without limit. Treat this output as sensitive:
 servers may print paths, tokens, or other secrets to stderr.
@@ -113,7 +131,10 @@ tool progress events.
 
 ## MaybeCode configuration
 
-MaybeCode reads stdio servers from `apps.maybecode.mcpServers`:
+Add this fragment to the May configuration used to launch MaybeCode. The example
+requires `tools/mcp-server.mjs` in the coding workspace and `MCP_ACCESS_TOKEN` in
+the launching process environment; adjust both to your server's requirements.
+MaybeCode reads endpoints from `apps.maybecode.mcpServers`:
 
 ```json
 {
@@ -150,7 +171,7 @@ that workspace. `required` defaults to `true`; use `false` only when the product
 can continue without that server. Arguments are passed directly without a shell.
 
 Environment values can reference the launching process with `${NAME}`. A
-missing referenced variable fails startup instead of passing an empty secret.
+missing referenced variable fails startup.
 Resolved environment values stay in memory and are not added to built-in
 traces. Prefer references over literal secrets because the configuration file
 is plaintext.
@@ -189,7 +210,8 @@ Static headers and native OAuth discovery/login/refresh are supported; see
 [MCP authentication](mcp-auth.md). Authentication does not grant tool permission.
 HTTP entries reject process-only fields (`command`, `args`, `cwd`, `env`,
 `maxBufferSize`, `stderrMaxBytes`); stdio entries reject `url`/`headers`.
-`maxBufferSize` remains a stdio message limit, not an HTTP response-size limit.
+`maxBufferSize` limits stdio messages. Configure HTTP response limits in the Host's
+network boundary.
 
 `protocolMode` accepts `legacy` or `auto`. Stdio defaults to `legacy` to preserve
 existing startup behavior. HTTP defaults to SDK `auto`: discover a modern
@@ -199,8 +221,7 @@ probe process. The installed `@modelcontextprotocol/client@2.0.0` supports this
 opt-in mode; its default remains legacy. Local integration fixtures verify
 2025-11-25 stdio/HTTP and the 2026-07-28 HTTP tools path, not full protocol
 conformance or third-party server compatibility. `/mcp` and `pool.status()`
-include the negotiated protocol version. Core stays independent of protocol eras.
-See the [SDK negotiation reference](https://ts.sdk.modelcontextprotocol.io/v2/api/@modelcontextprotocol/client/client/client.html).
+include the negotiated protocol version.
 
 Only HTTPS is accepted except for HTTP on `localhost`, `127.0.0.1`, or `[::1]`.
 URL credentials and fragments are rejected; use headers for credentials, not
@@ -208,9 +229,8 @@ URL query strings. Redirects are never followed, including same-origin ones.
 Duplicate header names (case-insensitive), invalid headers, `mcp-*`, `Host`,
 `Connection`, `Content-Length`, `Transfer-Encoding`, `Upgrade`, `Accept`,
 `Content-Type`, `Origin`, `Cookie`, and `Proxy-Authorization` overrides are
-rejected. Configured endpoints are trusted destinations, not a network sandbox;
-HTTPS does not prevent access to private networks. Apply network policy outside
-the adapter when required. Remote tools send arguments to that destination;
+rejected. Configure trusted endpoints and apply network policy outside
+the adapter when required, including private-network access. Remote tools send arguments to that destination;
 normal tool permissions still apply.
 
 HTTP SDK failures may contain secrets in URLs, response bodies, or causes.
@@ -220,8 +240,8 @@ bounded text for the caller, but HTTP error spans do not capture that text.
 No HTTP headers or URLs are added to spans. HTTP endpoints have no stderr tail.
 
 There is no automatic reconnect, stream resumption, general tool-call retry, or fallback
-to deprecated HTTP+SSE. `connected` means setup and tool discovery succeeded,
-not a continuous health check. Individual HTTP failures fail their operation;
+to deprecated HTTP+SSE. `connected` reports successful setup and discovery.
+Individual HTTP failures fail their operation;
 they do not automatically remove a discovered tool. Closing attempts DELETE
 for a negotiated legacy HTTP session (at most five seconds, or the shorter
 request timeout), then always closes local transport resources. It does not
@@ -243,24 +263,18 @@ counts, status, and duration through the tracer. Built-in instrumentation does
 not capture command arguments, environment values, request input, response
 content, prompts, or model messages.
 
-A local stdio MCP server is executable code with the host user's authority, not a sandbox.
+A local stdio MCP server executes with the host user's authority.
 It can also supply model-visible tool descriptions. Only configure trusted
 servers, review their command and package source, apply least-privilege
 environment and filesystem access, and keep the permission layer enabled.
 
 ## Current scope
 
-Tools and metadata catalogs (resources/templates/prompts) now support dynamic discovery.
-Resource reads/attachments, prompts, completion and watches are implemented below.
-Scoped elicitation, Roots/Sampling and explicit legacy interaction compatibility
-are implemented below. Opt-in Tasks are implemented; independent server export is also available;
-the removed two-endpoint HTTP+SSE transport is not enabled. Reconnect is explicit, never automatic tool replay.
-
-Track the remaining phases in the [MCP Host roadmap](../architecture/mcp-host-roadmap.md).
-
-See the [official MCP tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
-and the [TypeScript client documentation](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/client.md)
-for protocol-level details.
+The pool supports dynamic tools, resources/templates, prompts, completion,
+resource watches and scoped user interaction. Roots/Sampling compatibility,
+Tasks and Apps require explicit Host options. Independent server exports use a
+separate entry point. See the [capability reference](../reference/mcp-capabilities.md)
+for supported versions and limits.
 
 ## Dynamic catalogs and endpoint recovery
 
@@ -280,7 +294,7 @@ sent. A reconnect closes the old connection, so its snapshots cannot execute.
   and publishes only a complete candidate. Each list has a 64-page cap, repeated
   cursors/duplicate identities fail closed, and retained candidate data is capped
   at 4,096 descriptors/8 MiB across lists. The refresh deadline is 60 seconds or
-  `maxTotalTimeoutMs`. These are catalog limits, not an HTTP-body memory sandbox.
+  `maxTotalTimeoutMs`. The Host separately manages HTTP-body memory limits.
 - Advertised list-change notifications invalidate tools immediately and schedule
   one coalesced refresh. Modern endpoints use `subscriptions/listen`, legacy
   endpoints use notification handlers. Concurrent invalidations allow at most
@@ -288,7 +302,7 @@ sent. A reconnect closes the old connection, so its snapshots cannot execute.
   removes its tools from new Runs. No content is automatically read or attached.
 - `await mcp.reconnect(serverId, signal?)` replaces only that configured endpoint,
   including optional endpoints that failed startup. In-flight tool calls make
-  reconnect fail rather than interrupt/replay uncertain side effects. Old Run
+  reconnect fail. Old Run
   snapshots must be abandoned; the new connection gets new permission identity.
 - `/mcp refresh [server-id]` and `/mcp reconnect <server-id>` expose these actions
   in both terminal UIs. `/mcp` shows revision/staleness and notification coverage
@@ -307,10 +321,13 @@ a server's prior TTL. Closing cancels queued/active discovery and subscriptions.
 ## Resources, prompts, completion and attachments
 
 The pool exposes host/user-driven `readResource`, `readResourceTemplate`,
-`getPrompt`, `complete` and `subscribeResource`. They are **not** automatically
-exported as model tools. Call them only for authorized user intent or explicit
-host policy: MCP credentials do not replace application access control. They
+`getPrompt`, `complete` and `subscribeResource`. These are Host operations. Call
+them for authorized user intent or explicit host policy; the application enforces
+access control. They
 accept cancellation/trace context and share the endpoint lifecycle.
+
+The following fragment assumes an open `mcp` pool and an operation `signal`.
+Replace the URI, template and prompt names with entries from `mcp.catalog()`.
 
 ```ts
 const read = await mcp.readResource("workspace", "project:///README", { signal });
@@ -323,8 +340,8 @@ const suggestions = await mcp.complete("workspace", {
   argument: { name: "file", value: "ma" },
 }, { signal });
 const watch = await mcp.subscribeResource("workspace", read.uri, { signal });
-// watch.events contains { type: "updated", serverId, uri }, never new content.
-await watch.close(); // watch.closed also reports remote/connection termination.
+// watch.events 提供更新通知；需要内容时明确重新读取。
+await watch.close(); // watch.closed 也报告远端或连接关闭。
 ```
 
 Both terminal UIs support these commands. Enter JSON directly without shell
@@ -378,11 +395,9 @@ configurable bound and ordered notification/response delivery.
 ## Scoped user interaction (modern MRTR)
 
 Modern `tools/call`, `resources/read` and `prompts/get` can pause for form or URL
-elicitation. The host binds the continuation to the originating logical request,
-not to a server-supplied Session id or whichever Run is currently active. The SDK
-handles fresh wire ids and opaque `requestState` echoing; this is protocol
-continuation, **not** retry of an uncertain failed tool call. See the
-[MRTR specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/mrtr).
+elicitation. The host binds each continuation to the originating logical request.
+The SDK handles fresh wire ids and opaque `requestState` echoing. An uncertain
+failed tool call requires separate investigation before starting a new operation.
 
 Both MaybeCode terminal UIs enable interactions. They show the server and Session,
 accept a JSON form, allow editing, and require a separate `send` confirmation.
@@ -391,21 +406,22 @@ input history. Never enter credentials in forms. URL mode shows the HTTPS host
 and URL, requests consent, and leaves navigation to the user; `retry` explicitly
 continues after visiting. It does not fetch the URL, open a browser, forward MCP
 credentials, or claim the external workflow has completed. This is separate from
-MCP client OAuth login. See the
-[elicitation specification](https://modelcontextprotocol.io/specification/2026-07-28/client/elicitation).
+MCP client OAuth login.
 
-Library/headless use is opt-in:
+For a custom Host, create one broker per pool and consume its events concurrently.
+This fragment assumes configured `servers`, trusted `workspaceIdentity` and
+`sessionId`, and an operation `signal`. The Host implements the event consumer
+and calls `interactions.respond()` with a user-reviewed answer.
 
 ```ts
 import { McpInteractionBroker, openMcpClientPool } from "@may/mcp";
 const interactions = new McpInteractionBroker();
 const pool = await openMcpClientPool({ servers, interactions });
 const owner = { workspaceId: workspaceIdentity, sessionId };
-// Consume interactions.events concurrently; build an explicit user interface.
-// For requested events, validate the local owner and eventually call:
-// interactions.respond(request.id, request.owner, userReviewedResponse)
+// 并发消费 interactions.events，验证归属并取得用户审阅结果。
+// 使用 interactions.respond(request.id, request.owner, userReviewedResponse) 回答。
 const read = await pool.readResource("remote", "project:///README", { owner, signal });
-await pool.close(); // also closes the pool-owned broker
+await pool.close(); // 同时关闭由 pool 管理的 broker。
 ```
 
 Use one broker per pool with one UI consumer; do not share it between pools.
@@ -454,18 +470,19 @@ options, never enabled merely by installing a server. Tasks are separately opt-i
 ## Roots, Sampling and legacy compatibility
 
 Roots and Sampling are explicit compatibility features, **off by default**.
-Both are deprecated in MCP 2026-07-28; new integrations should prefer direct
-provider APIs for model access. See the official [Roots](https://modelcontextprotocol.io/specification/2026-07-28/client/roots)
-and [Sampling](https://modelcontextprotocol.io/specification/2026-07-28/client/sampling) references.
+Both are deprecated in MCP 2026-07-28. New integrations can use direct provider
+APIs for model access.
 Enabling them does not grant access to Session history or executable host tools.
 
 In a MaybeCode server entry (stdio or HTTP), opt in separately:
 
 ```json
-"host": {
-  "roots": true,
-  "sampling": true,
-  "legacyRequests": "isolated"
+{
+  "host": {
+    "roots": true,
+    "sampling": true,
+    "legacyRequests": "isolated"
+  }
 }
 ```
 
@@ -480,7 +497,7 @@ id, deadline and abort signal, not Core Context. Check ownership in custom servi
   accessible local `file:` paths, deduplicates them, and asks for read-only consent
   before sharing with the server. Decline sends an empty list; the server cannot
   nominate a path. Up to 32 roots / 64 KiB are allowed, with accessibility checked
-  again after approval. Roots are guidance, **not a sandbox or filesystem grant**.
+  again after approval. Roots provide workspace guidance; tools enforce filesystem access.
   No `roots.listChanged` capability is advertised; each request obtains fresh roots.
 - **Sampling:** the UI first reviews/edits the exact isolated request, then separately
   reviews/edits the response before disclosure. Declining the response cannot undo
@@ -496,8 +513,8 @@ id, deadline and abort signal, not Core Context. Check ownership in custom servi
   profile and overrides both `maxTokens` and `maxOutputTokens`. Optional server
   model/temperature/stop hints and request metadata are not forwarded by this
   bridge; host provider configuration wins.
-- Sampling tools are **proposals, not execution**. Only server-declared definitions
-  are sent; tool-use/result history is converted, but never invokes local tools.
+- Sampling sends server-declared tool definitions and converted tool history for
+  model output. It does not invoke local tools.
   Text, supported inline image/audio and tool history are bounded; unsupported
   output fails explicitly, and URLs/files are not fetched. Reasoning, model state
   and response `_meta` are withheld. Custom sampling services may omit `supportsTools`.
@@ -528,4 +545,15 @@ with a journal; see [long-running tasks](mcp-tasks.md) for version, UI and safet
 Optional graphical integration and terminal fallback: [isolated Apps Host](mcp-apps.md).
 
 Independent, authenticated tool/resource/prompt exports use `@may/mcp/server`.
-See [server authoring](mcp-server.md); no listener or Session export starts automatically.
+See [server authoring](mcp-server.md).
+
+## Troubleshooting
+
+| Symptom | Check and action |
+| --- | --- |
+| Startup fails before connecting | Check environment references, transport-specific fields, command path and required endpoint diagnostics |
+| Endpoint reports `auth-required` | Complete [OAuth login](mcp-auth.md), reconnect the endpoint and start a new Run |
+| `MCP_STALE_TOOL` | Refresh or reconnect the endpoint, then start a new Run with the current catalog |
+| Resource watch closes | Inspect `watch.closed` and endpoint status; explicitly refresh or reconnect before creating a new watch |
+| An interaction expires | Confirm the UI consumes broker events concurrently and the request timeout permits user review; start a new authorized operation |
+| Remote call has an unknown outcome | Verify the remote effect before creating another call; consult [recovery](recovery.md) |

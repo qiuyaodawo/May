@@ -10,6 +10,7 @@ const chineseRoot = resolve(docsRoot, "zh-CN");
 const errors = [];
 const topLevelEntries = await readdir(docsRoot, { withFileTypes: true });
 for (const entry of topLevelEntries) {
+  if (entry.isFile() && entry.name === "AGENTS.md") continue;
   if (!entry.isDirectory() || !["en", "zh-CN"].includes(entry.name)) {
     errors.push(`docs/${entry.name}: documentation must live under docs/en or docs/zh-CN`);
   }

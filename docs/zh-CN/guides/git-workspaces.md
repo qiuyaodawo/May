@@ -1,4 +1,4 @@
-# Git 工作区与文件 checkpoint
+# Git 工作区与文件检查点
 
 [English](../../en/guides/git-workspaces.md) | **简体中文**
 
@@ -6,7 +6,18 @@
 要求 `PATH` 中存在 Git 2.36 或更新版本。应用提供工作区和提交授权策略；组件提供仓库识别、
 持久化文件版本、diff、恢复预览和登记的 worktree 管理。
 
+宿主需要将完整用户请求与文件版本及 Session 分支关联时，可以使用本文的步骤。
+要求应用已经管理 Session id，并按顺序处理工作区操作。
+
 ## 准备工作区
+
+1. 确认 Git 可用，宿主具有可信的提交审批方法。
+2. 根据宿主工作流程选择 `autoCommit` 和 `readOnly`。
+3. 打开组件，为 Session 准备初始文件版本。
+
+启用自动管理时，`prepare()` 可以提交已有修改。宿主必须通过 `authorizeCommit`
+取得要求的用户授权。下面的集成片段中，`sessionId` 为应用身份，
+`confirmProjectCommit` 为宿主实际的审批函数：
 
 ```ts
 import { ProjectGitWorkspace } from "@may/application/git-workspace";
@@ -37,6 +48,9 @@ staged 与工作文件内容不同、未解决冲突、进行中的 merge/rebase
 子模块和发生变化的嵌套仓库，都需要处理完成后才能自动提交。
 
 ## 完成一次请求
+
+接受请求的文件修改之前调用 `beginRound()`，在工作和验证结束之前保留返回的 lease。
+以下片段要求宿主实现 `processCompleteUserRequest()` 和 `associateCheckpoint()`：
 
 ```ts
 const lease = await files.beginRound({ sessionId });
@@ -92,6 +106,13 @@ worktree 目录都要求位于来源仓库之外。保存的版本和比较起�
 
 ## 比较和恢复文件
 
+恢复文件时，宿主按顺序执行：
+
+1. 选择检查点和明确的文件范围。
+2. 调用 `previewRestore()`，展示当前内容和目标内容。
+3. 取得要求的恢复授权。
+4. 调用 `restore(preview)`，报告结果检查点或部分失败。
+
 `diff({ from, to?, file? })` 比较两个 commit；省略 `to` 时比较当前工作文件。
 结果包含 unified diff、每文件状态和 patch、rename 来源路径、二进制标记、
 行数统计和未追踪文件。生成 diff 时排除已配置的凭据路径。
@@ -140,6 +161,12 @@ MaybeCode 将分支准备、worktree 变更、文件恢复和会话切换标记�
 操作完成之前拒绝新输入和其他状态变更，覆盖 Git Hooks 与签名等待期间。
 关闭宿主时等待已经接受的工作区操作完成，随后关闭应用和所属资源。
 文件恢复失败时保留预览供检查，并报告 Git checkpoint 保存失败。
+
+## 验证集成
+
+确认 `status()` 返回选定目录及当前仓库状态，完成请求具有检查点，
+`diff()` 描述该请求的文件变化。验证失败和取消时修改得到保留。
+通过明确预览验证文件恢复，并检查 worktree 的生命周期关联。
 
 取得独立测试仓库内的 Git 提交授权后，运行真实 Git 集成验证：
 

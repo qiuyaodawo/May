@@ -1,11 +1,21 @@
-# 模型能力与执行诊断
+# 配置模型验证与执行诊断
 
 [English](../../en/guides/model-telemetry-integration.md) | **简体中文**
+
+本文用于在同一应用中组合模型能力验证、本地诊断和指标。需要 ESM TypeScript
+项目、具有默认模型与 provider 凭据的 `may.config.json`，以及一次推理请求的
+使用授权。项目需要安装 `@may/application`、`@may/config`、`@may/providers`
+和 `@may/session`、`@may/plugin-observability`。
 
 ## 配置经过验证的模型与本地诊断
 
 能力查询与模型创建共享 resolver。现有配置提供模型身份、provider 连接和能力声明。
 observability 插件管理 processor，并在应用关闭时完成资源清理。
+
+1. 将以下内容保存为与 `may.config.json` 同目录的 `main.ts`。
+2. 使用项目的 TypeScript 构建编译，在该目录运行生成的 JavaScript。
+   `./data` 保存 Session 日志和按日期管理的追踪文件。
+3. 检查程序打印的能力快照、按 Session 查询的诊断、指标快照和导出队列诊断。
 
 ```ts
 import { defineAgent } from "@may/application";
@@ -13,6 +23,7 @@ import { loadMayConfig } from "@may/config";
 import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver,
   selectProviderModel } from "@may/providers";
 import { createObservabilityPlugin, observabilityService } from "@may/plugin-observability";
+import { FileSessionStore } from "@may/session/file-store";
 
 const config = await loadMayConfig({ path: "./may.config.json" });
 const selection = selectProviderModel(config);
@@ -30,19 +41,28 @@ const definition = defineAgent({
     "may.budget.policy_version": "budget-policy-1",
   },
 });
-const application = await definition.open();
-const run = await application.submit({ input: "介绍当前项目。" });
-await run.result;
-const telemetry = application.getService(observabilityService);
-const result = telemetry.diagnostics!.getDiagnostics({ sessionId: application.sessionId, limit: 40 });
-const metrics = telemetry.metrics!.getMetrics();
-const delivery = telemetry.processor.getDiagnostics();
-await application.close();
+const application = await definition.open({ store: new FileSessionStore("./data/sessions") });
+try {
+  const run = await application.submit({ input: "Reply with a short greeting." });
+  await run.result;
+  const telemetry = application.getService(observabilityService);
+  if (telemetry.diagnostics === undefined || telemetry.metrics === undefined) {
+    throw new Error("The application requires local diagnostics and metrics");
+  }
+  console.log(capabilities);
+  console.log(telemetry.diagnostics.getDiagnostics({ sessionId: application.sessionId, limit: 40 }));
+  console.log(telemetry.metrics.getMetrics());
+  console.log(telemetry.processor.getDiagnostics());
+} finally {
+  await application.close();
+}
 ```
 
 示例中的版本标识对应宿主管理的不可变策略。宿主保存策略定义和 evaluator 证据。
 能力信息与验证记录分别提供。刷新 resolver 查询 metadata，不发送演示 prompt，
 不消耗模型 token。
+Trace ID、时间、provider 输出和用量取决于实际请求。`samplingRatio: 0.1` 时，
+本地诊断仍观察全部本地 span，仅选中的 trace 进入文件导出。
 
 ## 能力与请求判定
 
@@ -114,13 +134,20 @@ MaybeCode 显示模型能力与活动 Session 的诊断。MaybeClaw 通过现有
 
 ## 验证命令
 
+在仓库根目录使用 `package.json` 声明的 pnpm 版本。以下命令检查本地 package
+和文档：
+
 ```powershell
 pnpm build
 pnpm test
 pnpm docs:check
 pnpm test:package:plugin
 pnpm test:package:scheduler
-pnpm test:package:maybecode -- --directory E:\code\may-model-telemetry-smoke
+```
+
+真实 provider 检查需要已配置默认模型的凭据，并且需要授权相应用量：
+
+```powershell
 pnpm test:integration:model-telemetry
 ```
 

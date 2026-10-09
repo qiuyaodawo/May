@@ -44,7 +44,8 @@ export class GatewayUiHost implements UiHost {
       resources: resources.slice(0, 500), resourcesVersion: digest(resources), selectedId: selectedId ?? null,
       blocks: all ? blocks : page.items, historyPage: { nextCursor: page.nextCursor, total: page.total },
       reads: { resources: true, history: true, fields: true }, commands, choices: [],
-      controls: { inputCommand: "gateway.command", responseCommand: "approval.resolve", cancelCommand: "run.cancel", busy: false, forms: [] },
+      controls: { inputCommand: "gateway.command", responseCommand: "approval.resolve", cancelCommand: "run.cancel",
+        busy: tasks.some(task => ["queued", "running", "waiting", "cancelling"].includes(task.status)), forms: [] },
       interactions: approvals.filter(item => item.status === "pending" && item.expiresAt > Date.now()).map(item => ({
         id: item.id, kind: "approval", title: `${item.agentId} · ${item.kind === "tool" ? "工具审批" : "创建 Agent 对话"}`, detail: item.text,
         blockId: `approval:${item.id}`, runId: item.taskId ?? "", toolCallId: item.requestId, toolName: item.agentId,

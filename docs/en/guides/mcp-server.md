@@ -1,35 +1,44 @@
-# Independent MCP server exports
+# Export a May MCP server
 
 **English** | [简体中文](../../zh-CN/guides/mcp-server.md)
 
+Use this guide to expose an explicit set of May tools, resources or prompts to
+an MCP client. You need a trusted workspace identity, a `ToolExecutor`, and a
+launcher or HTTP framework that owns authentication and shutdown.
+
 ## Separate, opt-in surface
 
-Import `createMayMcpServer` from `@may/mcp/server`. It does not start a listener,
-discover coding tools, open a Session, call a model or read history. Supply explicit
+Import `createMayMcpServer` from `@may/mcp/server`. The application supplies explicit
 tool/resource/prompt exports, authentication, per-method/per-target authorization
 and the normal `ToolExecutor`. Missing security services are configuration errors.
 
 The official server SDK 2.0.0 provides serving and protocol validation. Default
 serving is modern `2026-07-28`. `legacy: "stateless"` explicitly allows stateless
-legacy HTTP and legacy stdio negotiation, not the retired two-endpoint SSE transport.
-These exports are bounded immediate tools, fixed resources and prompts—not automatic
+legacy HTTP and legacy stdio negotiation. The retired two-endpoint SSE transport
+is unsupported.
+These exports support bounded immediate tools, fixed resources and prompts.
 Tasks/Apps export, resource templates, completion, subscriptions, server-initiated
-Host requests, progress relay or operation replay. Client capabilities and server
-authoring capabilities are separate.
+Host requests, progress relay and operation replay are unsupported.
 
 ## Minimal stdio example
+
+In an ESM TypeScript project, install `@may/mcp` and `@may/permissions`. Save the
+following as `server.ts`, compile it using your project build, and run its emitted
+JavaScript from the MCP client command. Stdout is reserved for protocol traffic.
+The process runs until SIGINT; your production launcher should also connect its
+own shutdown signal to the same cleanup path.
 
 ```ts
 import { createMayMcpServer } from "@may/mcp/server";
 import { PermissionToolExecutor } from "@may/permissions";
 
 const workspaceId = "explicit-workspace";
-// Allow only this harmless example tool. Real apps must use their normal policy/UI.
+// 示例只导出 echo。应用需要使用自己的权限策略和审批界面。
 const executor = new PermissionToolExecutor({ policy: () => "allow" });
 const server = createMayMcpServer({
-  endpoint: "http://127.0.0.1/mcp", // This does not start a listener.
+  endpoint: "http://127.0.0.1/mcp", // HTTP 地址配置，由宿主管理监听。
   workspaceId,
-  authenticate: async () => undefined, // No HTTP access in this example.
+  authenticate: async () => undefined, // 示例拒绝 HTTP 访问。
   authorize: async ({ principal }) => principal.id === "local-launcher",
   executor,
   tools: [{
@@ -41,8 +50,17 @@ const server = createMayMcpServer({
     result: output => ({ content: [{ type: "text", text: JSON.stringify(output) }] }),
   }],
 });
-server.serveStdio({ id: "local-launcher", workspaceId });
-// On shutdown: await server.close(); await executor.close();
+const stopped = new Promise<void>(resolve => process.once("SIGINT", () => resolve()));
+try {
+  server.serveStdio({ id: "local-launcher", workspaceId });
+  await stopped;
+} finally {
+  try {
+    await server.close();
+  } finally {
+    await executor.close();
+  }
+}
 ```
 
 The stdio launcher must establish the local principal (e.g. from an authenticated
@@ -67,17 +85,16 @@ Authentication precedes body parsing and discovery. Missing credentials receive
 401; a different workspace receives 403. For provisioned opaque bearer tokens,
 `createMayMcpBearerAuthenticator(grants)` supplies `.authenticate` and `.revoke(token)`;
 it retains token digests and uses constant-time comparison. Tokens must be generated
-independent secrets of at least 32 characters, not passwords or principal ids.
-This is not an OAuth authorization server or protected-resource metadata endpoint.
-OAuth deployments supply their own verifier/issuer/metadata routing; client OAuth
-support does not imply server-side token verification.
+independent secrets of at least 32 characters. OAuth deployments supply their own
+verifier, issuer and metadata routing; the server uses the Host's authentication
+implementation to verify tokens.
 
 Each instance is fixed to **one workspace**, never a path supplied in RPC params.
 Authenticated principals are copied/frozen. Calls get host-generated Run/tool-call
-ids and a principal/workspace-bound export session label, not client Session ids.
-This is not an existing May Session and grants no history access. Exported tools
-must still enforce their actual filesystem sandbox; routing labels are not an OS
-sandbox. Resource/prompt callbacks receive the trusted principal/workspace and signal.
+ids and a principal/workspace-bound export session label. This routing label
+grants no May Session history access. Exported tools enforce filesystem isolation
+through their own sandbox. Resource/prompt callbacks receive the trusted
+principal/workspace and signal.
 
 `authorize({ principal, workspaceId, signal, method, target? })` applies to every
 request, discovery item and operation. Lists hide unauthorized entries; direct
@@ -85,13 +102,13 @@ hidden/unknown target access fails before callbacks. HTTP credentials are checke
 again after waits, immediately before tool side effects and before returning data.
 Revoking a token while permission approval is pending prevents execution.
 
-## Export contracts and limits
+## Export definitions and limits
 
 - `tools: [{ tool, result }]`: explicit Core Tool allowlist; validate input JSON
   Schema, run `parse`, use the supplied executor, then guarded `tool.execute`.
   `result` is a **mandatory public projection**: raw output/events/provider secrets
   are never automatically exported. Return valid MCP tool content. Failures use a
-  generic `isError`, not exception payloads. Reusable grants must be principal-scoped;
+  generic `isError` with sanitized content. Reusable grants must be principal-scoped;
   tool permission identity also binds workspace/principal/definition.
 - `resources: [{ definition, read }]`: fixed exact URI allowlist; `read(context)`
   returns only that URI. No implicit `file://` mapping or path traversal.
@@ -108,14 +125,23 @@ Default request deadline is 60 seconds, configurable up to five minutes. Callbac
 must honor cancellation; stopping local waiting cannot undo a side effect from a
 callback ignoring its signal. No unknown outcome is retried. HTTP responses use
 `Cache-Control: no-store`; resource results and SDK discovery defaults use zero
-TTL/private scope. Closing aborts requests/SDK handles, not the application listener
-or injected executor.
+TTL/private scope. Closing aborts requests and SDK handles. The application closes
+its listener and injected executor separately.
 
-## Evidence
+## Verify the export
+
+Connect using the [client pool](mcp.md#package-api). For the default modern stdio
+server, set the client's `protocolMode` to `"auto"`. Confirm that discovery lists
+only `echo`, calling it with `{ "text": "hello" }` returns that JSON as text, and
+an invalid input is rejected. For HTTP, also verify an unauthenticated request,
+an unauthorized workspace and revocation during approval before deployment.
+
+From the repository root, `pnpm --filter @may/mcp test` runs the focused local
+integration checks, including the serving tests described below.
 
 `packages/mcp/test/server.test.mjs` uses a real HTTP endpoint through May's MCP
 client: authentication/workspace rejection, principal-filtered discovery, normal
 permission denial, revocation during approval, public projection, input validation,
 resources/prompts, oversized input and shutdown. A real stdio child process checks
 modern/explicit legacy negotiation and launcher identity. This is focused integration
-evidence, not universal MCP certification.
+evidence for the implemented export surface.

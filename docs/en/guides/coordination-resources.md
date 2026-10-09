@@ -2,11 +2,22 @@
 
 **English** | [简体中文](../../zh-CN/guides/coordination-resources.md)
 
-The [coordination runtime](coordination.md) manages task execution. Three optional
-host-owned components manage shared accounting, explicit artifacts and isolated
-file copies. They do not add authority to an Agent or replace tool permissions.
+Use shared resources when a [coordination graph](coordination.md) needs a common
+model allowance, explicit result files or separate task workspaces. The host opens
+and owns each resource; Agent tool access still follows its configured permissions.
+
+The TypeScript fragments below show host composition with `@may/coordination`.
+They assume a configured provider `Model`, a graph ID and absolute resource
+directories outside task tool roots. Bind the opened resources to your Agent
+definitions before starting the graph, and close them after the runtime has stopped.
 
 ## Shared model budget
+
+1. Select call and token limits for the complete graph, including later turns
+   and attempts. Configure prices only when they match the selected provider.
+2. Open one ledger and wrap every participating model at its physical request
+   boundary. The fragment assumes `providerModel`, `budgetDirectory` and
+   `coordinationId` are trusted host inputs:
 
 ```ts
 import { FileSharedBudget } from "@may/coordination";
@@ -14,18 +25,21 @@ import { FileSharedBudget } from "@may/coordination";
 const budget = await FileSharedBudget.open(budgetDirectory, coordinationId, {
   maxModelCalls: 32,
   maxTotalTokens: 262_144,
-  // Optional cost accounting requires explicit prices for this provider/model.
+  // 费用统计使用该 provider 和模型的明确价格。
   maxCostUsd: 2,
   tokenPrices: { inputUsdPerMillion: 1, outputUsdPerMillion: 4 },
 });
 const meteredModel = budget.wrapModel(providerModel, {
   reservation: { totalTokens: 32_768, costUsd: 0.15 },
 });
-// Share this budget across every model used by the team's Agent definitions.
-// After all Runs have stopped:
+// 团队的 Agent definition 使用 meteredModel；所有 Run 停止后读取总计并关闭。
 console.log(await budget.totals());
 await budget.close();
 ```
+
+3. Inspect `totals()` and `snapshot()` for settled, estimated and unknown calls.
+   If new calls are blocked, verify provider receipts and reconcile the exact
+   affected call before admitting more work.
 
 `providerModel`, `budgetDirectory` and `coordinationId` are trusted host inputs.
 The example prices are illustrative, not current provider prices. A reservation
@@ -109,6 +123,11 @@ preserves an incomplete estimate. Changing price versions requires a new ledger.
 
 ## Immutable artifacts
 
+Open an artifact store with a versioned read policy. The fragment assumes
+`artifactDirectory` and `coordinationId` are host inputs and that the graph
+contains `worker` and `manager`. Bind `forTask(taskId).tools()` only to the
+corresponding task. Publication and explicit reading are shown here:
+
 ```ts
 import { FileArtifactStore } from "@may/coordination";
 
@@ -124,13 +143,13 @@ const reference = await workerArtifacts.publish("dispatch-1:turn-0:final", {
   text: "An explicit task result, without hidden reasoning or credentials.",
 });
 const result = await artifacts.forTask("manager").read(reference.id);
-// Or explicitly include workerArtifacts.tools() in the task's Agent definition.
+// 可以在 worker 的 Agent definition 中加入 workerArtifacts.tools()。
 await artifacts.close();
 ```
 
 Artifacts contain bounded UTF-8 text and immutable metadata: id, owner, name, MIME
-type, byte size and SHA-256. IDs and storage paths are host-generated; names are not
-filesystem paths. Each task can read its own artifacts. Reading another task's
+type, byte size and SHA-256. IDs and storage paths are host-generated; names are
+display metadata. Each task can read its own artifacts. Reading another task's
 artifact is denied unless the host ACL returns `true`; knowing an id is not a grant.
 
 `publish_artifact` and `read_artifact` use a task binding supplied by the host, not a
@@ -140,24 +159,29 @@ its journal record. Reads check size, file type and hash. Changed bytes or links
 rejected; a partially written/unreferenced blob is not silently replaced.
 
 Defaults: 256 artifacts, 1 MiB per artifact, 16 MiB total. Limits and ACL version must
-match on reopen. `snapshot()` exposes references to the host; it is not a model
-catalog or an ACL bypass tool. Use a distinct command id per dispatch/turn output.
+match on reopen. `snapshot()` exposes references to the host. Models use
+task-bound tools, and reads must pass the ACL. Use a distinct command id per dispatch/turn output.
 Send explicit artifact ids in task messages or answers; content is not automatically
 injected into every Agent's context. Treat artifact content as untrusted task data.
 
 ## Task workspace copies
+
+Choose a source checkout and a private resource directory with no overlap.
+The fragment assumes `userCheckout`, `privateTeamDirectory` and an existing
+`task` specification. Prepare the task copy, bind its file tools and inspect
+changes when its execution has stopped:
 
 ```ts
 import { TaskWorkspaceManager } from "@may/coordination";
 
 const workspaces = await TaskWorkspaceManager.open({
   sourceDirectory: userCheckout,
-  directory: privateTeamDirectory, // Must not overlap the checkout.
+  directory: privateTeamDirectory,
 });
 const workspace = await workspaces.prepare(task.id);
-// Bind this task's filesystem tools to workspace.directory, not userCheckout.
+// 将本任务的文件工具绑定到 workspace.directory。
 const changes = await workspaces.changes(task.id);
-// Show changes for review; applying selected patches is a separate user/host action.
+// 展示 changes 供审查；选定修改由宿主单独应用。
 await workspaces.close();
 ```
 
@@ -189,6 +213,13 @@ Keep baseline/resource storage outside task tool roots; use scoped read/write to
 explicit permissions and a real OS/container sandbox when executing untrusted code.
 
 ## Persistence and ownership
+
+Close resources in dependency order:
+
+1. Await `runtime.close()` so model calls, tool calls and state changes settle.
+2. Read the final usage, artifact references and workspace changes needed for review.
+3. Await the budget, artifact store and workspace manager's `close()` methods.
+4. Retain their journals and private copies according to the host's data policy.
 
 Each store is a single-writer local journal with synced acknowledgements. A partial
 last JSONL record can be repaired; complete corruption, changed configuration and

@@ -2,15 +2,18 @@
 
 **English** | [简体中文](../../zh-CN/concepts/session-run-step.md)
 
-May's execution vocabulary has four levels:
+An Agent can answer several user requests in the same conversation. May gives
+each part of that process a separate name:
 
-```text
-Agent definition -> Session -> Run -> Step
+```mermaid
+flowchart LR
+  Definition[AgentDefinition: reusable behavior] --> Session[Session: conversation]
+  Session --> Run[Run: one execution]
+  Run --> Step[Step: model request and tool results]
 ```
 
-An `AgentDefinition` is a reusable composition object rather than an active
-execution or conversation. `AgentApplication` and `AgentWorkspace` orchestrate
-the other levels;
+An `AgentDefinition` stores reusable behavior. `AgentApplication` manages one
+Session, and `AgentWorkspace` selects the active application;
 see [Agent definition, application, and workspace](./agent-application.md).
 For the package ownership view, see
 [Runtime and session boundaries](../architecture/runtime-session.md).
@@ -29,14 +32,14 @@ valid history whose first event is the sole `session.created` event. It replays
 model-visible messages, asks the caller to recreate the runtime, and continues
 Session sequence numbers after the last stored event.
 
-Session metadata is creation metadata, not mutable Agent configuration. Resume
-returns that metadata, but the caller remains responsible for supplying the
+Session metadata records the conditions under which the conversation was
+created. Resume returns that metadata, and the caller supplies the
 current model, tools, instructions, permissions, and Context implementation.
 
 ### Submission serialization
 
 `Session.submit()` queues behind the previous Run. Its promise resolves when
-the new Run has started, not when the Run has completed. A rejected or failed
+the new Run starts. Await the returned handle's `result` for completion. A rejected or failed
 Run does not poison the queue for later submissions.
 
 For a normal submission, Session makes `input.submitted` durable before Core
@@ -66,13 +69,15 @@ interface RunHandle {
 The Run ends when one of the following occurs:
 
 - the model returns a final assistant message with no tool calls;
-- the maximum step count is exceeded;
+- the maximum step count or a configured Run budget is exceeded;
+- the host's optional `shouldYield` callback yields at a complete Step;
 - model, Context, scheduler, persistence, or fatal tool execution fails; or
 - its abort signal or `cancel()` cancels it.
 
 `RunResult` reports the run id, completed step count, model-call count,
 tool-call count, final assistant message, and aggregate provider usage when
-available. A failed or cancelled Run rejects `result`; consumers should still
+available. A yielded Run resolves with `finishReason: "yielded"`; the host
+decides when to continue work. A failed or cancelled Run rejects `result`; consumers should still
 consume or relay its events if they require the terminal observation.
 
 Core's default is to reject overlapping Runs because one `May` instance owns a
@@ -85,14 +90,14 @@ queueing it.
 A **Step** is one model request followed by execution of every tool call in the
 returned assistant message.
 
-```text
-step.started
-  -> Context snapshot / optional automatic compaction
-  -> model.started
-  -> zero or more model deltas or retry notices
-  -> model.completed (complete assistant message)
-  -> zero or more tool executions
-  -> step.completed
+```mermaid
+flowchart TD
+  Start[step.started] --> Context[Context snapshot and configured compaction]
+  Context --> Model[model.started]
+  Model --> Deltas[Optional deltas and retry notices]
+  Deltas --> Response[model.completed: complete assistant message]
+  Response --> Tools[Execute returned tool calls]
+  Tools --> End[step.completed]
 ```
 
 If the assistant message has no tool calls, the same Step completes the Run.
@@ -147,8 +152,27 @@ is not a byte-for-byte execution trace. The relation between that durable log
 and the current Context is covered in
 [Context and durable history](./context-and-history.md).
 
+## Session branches
+
+`Session.branchPositions()` lists saved request boundaries. An available
+position has a `run.settled` event after the Run's state has been saved.
+`Session.fork()` copies history through the selected position into a new Session
+identity and records its origin in `session.created.fork`.
+
+The branch receives the selected Context, provider continuation, and Runtime
+state. Application state is copied only for explicitly selected keys. Permission
+records and pending input are omitted; delivered input remains part of the
+conversation. `session.fork.ready` marks completed initialization. A branch
+with incomplete initialization remains inspectable and cannot resume.
+
+`AgentApplication` restores Skills and selected plugin state;
+`AgentWorkspace` exposes branch navigation. See
+[Git workspaces and file checkpoints](../guides/git-workspaces.md) for the
+host-owned relationship between conversation positions and file versions.
+
 ## Current limits
 
 A Session currently has one serialized Run stream and assumes one active
-writer to a given history. Session forking, simultaneous cross-process writers,
-and distributed execution coordination are not implemented.
+writer to a given history. Concurrent writers using separate Session objects
+require coordination supplied by the host or storage backend. Core and Session
+do not provide distributed writer coordination.

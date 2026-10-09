@@ -10,7 +10,7 @@ import { gatewaySettings } from "../../dist/gateway-settings.js";
 import { startGatewayServer } from "../../dist/gateway-server.js";
 
 test("MaybeClaw 类型化管理导航、结构化信息面板与可访问性真实浏览器集成测试", { timeout: 90_000 }, async t => {
-  const base = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../review/maybeclaw-browser");
+  const base = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../review/maybeclaw-browser");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "manager-"));
   const path = join(directory, "config.json");
@@ -113,8 +113,40 @@ test("MaybeClaw 类型化管理导航、结构化信息面板与可访问性真�
   // 5. 登录管理端
   await page.locator(".connection-button").click();
   await page.getByLabel("管理员密码", { exact: true }).fill(password);
+  const initialSnapshotResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/api/ui/snapshot" && response.status() === 200);
   await page.getByRole("button", { name: "连接", exact: true }).click();
   await page.waitForFunction(() => !document.querySelector(".new-button")?.disabled);
+
+  assert.equal((await (await initialSnapshotResponse).json()).selectedId, null);
+  assert.equal(await page.locator(".resource-item.selected").count(), 0);
+  const composer = page.getByLabel("消息输入", { exact: true });
+  const sendButton = page.getByRole("button", { name: "发送消息", exact: true });
+  const cancelButton = page.locator(".stop-button");
+  await composer.fill(inputMessage);
+  assert.equal(await sendButton.isVisible(), true);
+  assert.equal(await sendButton.isDisabled(), true);
+  assert.equal(await cancelButton.isVisible(), false);
+  await composer.fill("/status");
+  await page.waitForFunction(() => document.querySelector("button[aria-label='发送消息']")?.disabled === false);
+  assert.equal(await sendButton.isEnabled(), true);
+
+  const initialTaskIds = gateway.store.list("tasks").map(task => task.id).sort();
+  const statusText = `/status ${completedTask.id}`;
+  await composer.fill(statusText);
+  const statusResponsePending = page.waitForResponse(response => new URL(response.url()).pathname === "/api/ui/commands" && response.request().method() === "POST");
+  await sendButton.click();
+  const statusResponse = await statusResponsePending;
+  assert.equal(statusResponse.status(), 200);
+  const statusCommand = statusResponse.request().postDataJSON();
+  assert.equal(statusCommand.name, "gateway.command");
+  assert.equal(statusCommand.args.text, statusText);
+  assert.equal(statusCommand.targetId, null);
+  const statusReceipt = await statusResponse.json();
+  assert.ok(statusReceipt.output.text.includes(completedTask.id));
+  assert.ok(statusReceipt.output.text.includes("completed"));
+  assert.equal(statusReceipt.selectedId, session.id);
+  assert.deepEqual(gateway.store.list("tasks").map(task => task.id).sort(), initialTaskIds);
+  await page.waitForFunction(() => document.querySelector("textarea[aria-label='消息输入']")?.value === "");
 
   // 6. 验证侧栏类型化分组导航
   const nav = page.locator(".sidebar-navigation");
@@ -152,6 +184,16 @@ test("MaybeClaw 类型化管理导航、结构化信息面板与可访问性真�
     const active = document.querySelector(".sidebar-item.selected, .sidebar-item.active, .resource-item.selected, .resource-item.active");
     return active?.textContent?.includes(sessionName);
   }, session.name);
+
+  await sendButton.waitFor({ state: "visible" });
+  assert.equal(await sendButton.isDisabled(), true);
+  assert.equal(await cancelButton.isVisible(), false);
+  await composer.fill(inputMessage);
+  await page.waitForFunction(() => document.querySelector("button[aria-label='发送消息']")?.disabled === false);
+  assert.equal(await sendButton.isVisible(), true);
+  assert.equal(await sendButton.isEnabled(), true);
+  assert.equal(await cancelButton.isVisible(), false);
+  await composer.fill("");
 
   // 8. 验证“服务设置”真实配置字段
   await page.getByRole("button", { name: "服务设置", exact: true }).click();

@@ -1,6 +1,12 @@
-# Model capabilities and execution diagnostics
+# Configure model validation and execution diagnostics
 
 **English** | [简体中文](../../zh-CN/guides/model-telemetry-integration.md)
+
+Use this guide to combine model capability validation, local diagnostics and
+metrics in one application. You need an ESM TypeScript project, an existing
+`may.config.json` with a default model and provider credentials, and permission to
+send one inference request. Install `@may/application`, `@may/config`,
+`@may/providers`, `@may/session` and `@may/plugin-observability` in that project.
 
 ## Configure a validated model and local diagnostics
 
@@ -8,12 +14,20 @@ Use the same resolver for inspection and model creation. Existing configuration
 supplies model identities, provider connections, and capability declarations.
 The observability plugin owns its processor and closes it with the application.
 
+1. Save the following as `main.ts` beside `may.config.json`.
+2. Compile it using the project's TypeScript build and run the emitted JavaScript
+   from that directory. The `./data` path stores Session journals and date-rotated
+   trace files.
+3. Check the capability snapshot, Session-filtered diagnostics, metric snapshot
+   and export queue diagnostic printed by the program.
+
 ```ts
 import { defineAgent } from "@may/application";
 import { loadMayConfig } from "@may/config";
 import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver,
   selectProviderModel } from "@may/providers";
 import { createObservabilityPlugin, observabilityService } from "@may/plugin-observability";
+import { FileSessionStore } from "@may/session/file-store";
 
 const config = await loadMayConfig({ path: "./may.config.json" });
 const selection = selectProviderModel(config);
@@ -31,20 +45,30 @@ const definition = defineAgent({
     "may.budget.policy_version": "budget-policy-1",
   },
 });
-const application = await definition.open();
-const run = await application.submit({ input: "Describe the project." });
-await run.result;
-const telemetry = application.getService(observabilityService);
-const result = telemetry.diagnostics!.getDiagnostics({ sessionId: application.sessionId, limit: 40 });
-const metrics = telemetry.metrics!.getMetrics();
-const delivery = telemetry.processor.getDiagnostics();
-await application.close();
+const application = await definition.open({ store: new FileSessionStore("./data/sessions") });
+try {
+  const run = await application.submit({ input: "Reply with a short greeting." });
+  await run.result;
+  const telemetry = application.getService(observabilityService);
+  if (telemetry.diagnostics === undefined || telemetry.metrics === undefined) {
+    throw new Error("The application requires local diagnostics and metrics");
+  }
+  console.log(capabilities);
+  console.log(telemetry.diagnostics.getDiagnostics({ sessionId: application.sessionId, limit: 40 }));
+  console.log(telemetry.metrics.getMetrics());
+  console.log(telemetry.processor.getDiagnostics());
+} finally {
+  await application.close();
+}
 ```
 
 Policy versions above identify host-owned immutable policies. Keep the actual
 policy definitions and evaluator evidence in host storage. The returned
 capability snapshot is separate from verification records. Resolver refresh
 queries metadata; it does not send a demonstration prompt or spend model tokens.
+Trace IDs, timestamps, provider output and usage depend on the actual request.
+With `samplingRatio: 0.1`, local diagnostics still observe every local span;
+only selected traces reach the file exporter.
 
 ## Capability and request decisions
 
@@ -135,13 +159,21 @@ See [Shared Web UI](web-ui.md).
 
 ## Verification commands
 
+From the repository root, use the pnpm version declared in `package.json`.
+The following commands check local packages and documentation:
+
 ```powershell
 pnpm build
 pnpm test
 pnpm docs:check
 pnpm test:package:plugin
 pnpm test:package:scheduler
-pnpm test:package:maybecode -- --directory E:\code\may-model-telemetry-smoke
+```
+
+For the real provider check, supply the default model's configured credentials
+and authorize its usage before running:
+
+```powershell
 pnpm test:integration:model-telemetry
 ```
 

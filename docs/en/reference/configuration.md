@@ -1,82 +1,12 @@
 # May configuration reference
 
-MaybeCode accepts `apps.maybecode.plugins`; MaybeClaw May Agents accept
-`apps.maybeclaw.agents[].plugins`. Each entry contains a local module or installed
-package specifier, optional export name, configuration and enabled flag. Resolution
-uses the configuration file's directory. See [Plugins](../guides/plugins.md).
-
-## MaybeCode project Git management
-
-`apps.maybecode.git` defaults to `{}` and accepts `false` to disable project Git
-management. Its object supports `autoCommit` (default `true`), `readOnly`
-(default `false`), `dataRoot`, `worktreesRoot` and `excludedPaths` (an array of
-project paths). Configuration paths use the configuration file's directory.
-Metadata and worktree roots must be outside the project repository. Existing
-repositories are reused; new projects receive a repository and initial checkpoint.
-Automatic commits happen after complete requests and retain project ignore rules.
-
-`autoCommit: false` keeps Git observation and existing-version checkpoints while
-retaining uncommitted files. `readOnly: true` prevents Git initialization and mutation
-and denies project-changing built-in tools. A headless host can enforce approval
-through `git.authorizeCommit`.
-These Git settings are independent of tool approval mode. See
-[Git workspaces and checkpoints](../guides/git-workspaces.md) for Session forks,
-worktree lifecycle, excluded files and restore previews.
-
-## MaybeCode permission mode
-
-`apps.maybecode.persistentRules` defaults to `false`. Set it to `true` to store
-file `edit` and `write` grants in the active project's
-`.may/permission-rules.json`. The persistent approval choice shows the canonical
-file path. Rules are isolated by local user, project/worktree and main Agent;
-Session or model changes preserve them. The host owns the store and its single
-writer lock until shutdown. Rule files and locks are excluded from project Git
-checkpoints. `/permissions [list|allow <id>|deny <id>|revoke <id>]` and Web UI
-manage existing ranges. An operator creates each rule; deny takes precedence.
-The headless `openConfiguredMaybeCode({ persistentRules })` option overrides
-configuration. See [Permission policies](../guides/permission-policy.md).
-
-`apps.maybecode.permissionMode` accepts `"default"` (the default) or `"yolo"`.
-YOLO auto-approves tool requests while preserving explicit policy denials. CLI
-`--yolo` and `--no-yolo` override configuration; using both is an error.
-
-`/yolo [on|off|status]` and the Web UI Permissions selector control the current
-workspace host. `/yolo` and `/yolo on` enable YOLO, `/yolo off` disables it, and
-`/yolo status` only reports the current mode. Repeating `/yolo` keeps it enabled.
-Pause or cancel active runs, goals, and MCP operations before
-changing modes. The mode follows session and model changes within that host;
-it is not restored from conversation history or written to configuration.
-Restarting resolves the current startup options again. `/goal` uses the host's
-current permissions and cannot enable YOLO itself.
-
-The terminal and Web UI show `YOLO · Auto-approve` while enabled, with English
-mode-change notifications. The shared Web UI displays optional host-provided
-`UiSnapshot.badges` in its fixed header, including while reading older sessions.
-Classic terminals use `TerminalIO.updatePrompt` to refresh the mode without
-replacing the draft or cursor position.
-Tool validation, cancellation, and execution records remain active. MCP requests
-for user input still require answers. YOLO does not provide OS isolation; shell
-commands have the host account's permissions. Team authorization is independent.
-
-`apps.maybecode.skills` accepts `false` or `{ "directories": ["./skills"] }`.
-See [Agent Skills](../guides/skills.md) for discovery precedence and path resolution.
-
-MaybeCode accepts `apps.maybecode.runBudget` for per-Run duration, step,
-model/tool-call, token and estimated cost limits. See [Run budgets](../guides/run-budgets.md).
-
-`apps.maybecode.subagents` configures sub-agent delegation, which is on by default.
-`false` or `{ "enabled": false }` turns it off. The object accepts `roles`
-(`model`, `reasoningEffort`, `instructions`, `tools`, `delegateTo`, `runBudget`),
-`defaultRole`, `limits` (`maxConcurrent`, `maxTasks`, `maxDepth`, `maxTaskTurns`,
-`maxDurationMs`, `maxInputBytes`, `maxOutputBytes`), a per-child `runBudget`, and
-the request budget `maxModelCalls`, `maxTotalTokens` and `reservationTokens`. The
-`worker` role is registered when no `roles` are given. See
-[Sub-agent delegation](../guides/subagent-delegation.md).
-
 **English** | [简体中文](../../zh-CN/reference/configuration.md)
 
 May reads `~/.may/config.json` by default. The configuration separates named
 provider connections, selectable model profiles, and application settings.
+
+Use this page to look up fields and defaults. For application startup and controls,
+see [MaybeCode](../guides/maybecode.md) or [MaybeClaw](../guides/maybeclaw.md).
 
 For editor completion and validation, associate the file with
 [`packages/config/may-config.schema.json`](../../../packages/config/may-config.schema.json).
@@ -153,7 +83,7 @@ the command form `/model <profile-prefix> --default` is used.
 
 Common scalar values:
 
-- All adapters accept `unknownCapabilityPolicy`: `allow` or `require-known`.
+- All adapters accept `unknownCapabilityPolicy`: `allow` (default) or `require-known`.
 - `reasoningEffort` is a non-empty model-specific string. The adapter only
   serializes the selected value; model capability metadata determines the
   choices shown by MaybeCode. This also lets enhanced compatible providers add
@@ -206,6 +136,8 @@ Override incorrect or missing metadata on a model profile:
 
 `defaultEffort` must be one of `efforts`. An explicit override always wins,
 including over a provider's enhanced catalog.
+
+### Capability field declarations
 
 Capabilities accept independent `fields` declarations on model profiles and
 provider connections. Profile fields override model metadata; provider fields
@@ -271,6 +203,8 @@ reservation; unavailable estimates or reservations remain unknown. Native
 Context compaction checks its own capability and input support. Verification
 records state `request-accepted`, `response-validated`, or `failed`, with media
 counts, source forms and observed byte ranges, without storing content.
+### Request and response validation
+
 `Model.preflight` exposes request validation to May and model wrappers before
 physical attempts and budget reservations. Rejected requests produce zero
 physical attempt records.
@@ -285,13 +219,17 @@ budget and attempt accounting preserve physical completion and actual usage;
 retry wrappers do not retry these completed responses. Validation messages
 contain fixed descriptions and exclude response content.
 
-The initial built-in catalog covers the documented GPT-5.6 family and the
-DeepSeek V4 API model IDs. GPT-5.6 levels come from the
-[OpenAI model guide](https://developers.openai.com/api/docs/models/gpt), and
-DeepSeek levels come from the
-[DeepSeek thinking-mode guide](https://api-docs.deepseek.com/guides/thinking_mode/).
+### Built-in reasoning catalog
+
+The built-in reasoning catalog is maintained in
+[`packages/providers/src/capabilities.ts`](../../../packages/providers/src/capabilities.ts).
+Use explicit capability overrides or endpoint discovery for a model absent from
+that catalog. Confirm the selected options against the account's supported model API.
 
 ### Thinking objects
+
+These objects belong in provider or model `options`. Select the structure for
+the adapter being used.
 
 Kimi uses an object:
 
@@ -311,9 +249,71 @@ Anthropic accepts disabled, adaptive, or explicitly budgeted thinking:
 }
 ```
 
+## Application plugins
+
+MaybeCode accepts `apps.maybecode.plugins`; MaybeClaw May Agents accept
+`apps.maybeclaw.agents[].plugins`. Each entry contains a local module or installed
+package specifier, optional export name, configuration, and enabled flag. Resolution
+uses the configuration file's directory. See [Plugins](../guides/plugins.md).
+
+## MaybeCode project Git management
+
+`apps.maybecode.git` defaults to `{}`. Set it to `false` to disable project Git
+management. Object fields are `autoCommit` (default `true`), `readOnly` (default
+`false`), `dataRoot`, `worktreesRoot`, and `excludedPaths` (project paths).
+Paths resolve from the configuration file's directory. Metadata and worktree roots
+must be outside the repository. Existing repositories are reused; new projects
+receive a repository and initial checkpoint. Complete requests can create commits
+using project ignore rules.
+
+`autoCommit: false` preserves Git observation and existing-version checkpoints
+while leaving edits uncommitted. `readOnly: true` prevents Git initialization and
+mutation and denies project-changing built-in tools. Headless hosts can require
+commit approval through `git.authorizeCommit`. Tool approval mode is a separate
+setting. See [Git workspaces](../guides/git-workspaces.md) for forks and restoration.
+
+## MaybeCode permission mode
+
+`apps.maybecode.permissionMode` accepts `"default"` (default) or `"yolo"`.
+YOLO auto-approves tool requests while retaining explicit policy denials.
+`--yolo` and `--no-yolo` override configuration; using both fails validation.
+`/yolo` and `/yolo on` enable the mode, `/yolo off` disables it, and `/yolo status`
+queries it. Pause or cancel active Runs, goals, and MCP operations before changing
+the mode. The current workspace host retains the mode through Session and model
+changes. Startup options determine it after a restart; it is not saved in history
+or configuration. `/goal` uses the current mode.
+
+The terminal and Web UI show **YOLO · Auto-approve**, with English notifications.
+Web UI uses `UiSnapshot.badges`; classic terminals update the prompt through
+`TerminalIO.updatePrompt` while preserving drafts and cursors. Tool validation,
+cancellation, and records remain active. MCP user-input requests require answers.
+Shell commands use host-account authority. Team authorization is configured separately.
+
+`apps.maybecode.persistentRules` defaults to `false`. When enabled, `edit` and
+`write` grants use `.may/permission-rules.json` in the active project and show
+the canonical file path at approval. Scope includes local user, project/worktree,
+and main Agent; changing Session or model preserves matching rules. The host holds
+the single-writer lock until shutdown. Rule and lock files are excluded from Git
+checkpoints. `/permissions [list|allow <id>|deny <id>|revoke <id>]` and Web UI manage
+existing ranges. Rules record an operator, and deny takes precedence.
+`openConfiguredMaybeCode({ persistentRules })` overrides configuration. See
+[Permission policies](../guides/permission-policy.md).
+
 ## MaybeCode settings
 
 `apps.maybecode` recognizes:
+
+- `skills`: `false` or `{ "directories": ["./skills"] }`; see
+  [Skills discovery and paths](../guides/skills.md).
+- `runBudget`: per-Run duration, Step, model/tool-call, token, and estimated cost
+  limits; see [Run budgets](../guides/run-budgets.md).
+- `subagents`: enabled by default; `false` or `{ "enabled": false }` disables it.
+  Fields include `roles` (`model`, `reasoningEffort`, `instructions`, `tools`,
+  `delegateTo`, `runBudget`), `defaultRole`, `limits` (`maxConcurrent`, `maxTasks`,
+  `maxDepth`, `maxTaskTurns`, `maxDurationMs`, `maxInputBytes`, `maxOutputBytes`),
+  child `runBudget`, and request limits `maxModelCalls`, `maxTotalTokens`,
+  `reservationTokens`. Without `roles`, the `worker` role is registered. See
+  [Subagent delegation](../guides/subagent-delegation.md).
 
 `autoCompaction.mode` selects an independent automatic mode: `prune-summary`
 (default, prune old tool results then summarize if still above threshold),
@@ -329,12 +329,17 @@ and `/compact provider-native` select independent operations without changing
 the automatic mode. Programmatic `autoCompactionMode` selects the same modes;
 `autoCompactionStrategies` overrides the mode, with `[]` disabling automation.
 
-History-reference mode now requires saved work notes, not just a history pointer.
+History-reference mode requires saved work notes.
 The model can query capacity with `get_context_remaining`, save `context_notes`,
 and request `new_context`. The host warns at 80% of the configured reset threshold;
 the threshold remains the hard boundary. Missing or stale notes block reset.
 See [Context and durable history](../concepts/context-and-history.md#history-reference-work-memory)
 for the handoff, retrieval, and failure rules.
+
+The following fragment configures instructions, compaction, delegation, retries,
+tracing and a local MCP server. Merge it into an existing configuration with
+`providers` and `models`. Create the referenced instructions and server module
+before enabling them, and provide `MCP_ACCESS_TOKEN` in the launching environment.
 
 ```json
 {
@@ -391,6 +396,8 @@ for the handoff, retrieval, and failure rules.
 Set `retry` to `false` to disable automatic retries. Relative instruction
 directories are resolved from the directory containing `config.json`.
 
+### Observability
+
 Observability is disabled when `observability` is absent, `false`, or has
 `enabled: false`. An object enables the file exporter; `enabled` defaults to
 `true`, `exporter` currently accepts only `file`, and `samplingRatio` defaults
@@ -408,6 +415,8 @@ MaybeCode flushes the processor during workspace shutdown. Each daily JSONL
 file is append-only. The files are fail-open operational telemetry rather than
 Session or audit truth; see
 [Observability and tracing](../guides/observability.md).
+
+### MCP servers
 
 MCP is disabled when `mcpServers` is absent or `false`. Each property name is
 the server id used in model-facing tool names. Entries default to the `stdio`
@@ -439,6 +448,22 @@ normal permission and scheduling path, and use a fixed snapshot per Run. Explici
 refresh/reconnect and catalog notifications update later Runs. `/mcp` reports server state, negotiated protocol version, tools, errors, and the bounded
 sanitized stderr tail. See [MCP tools](../guides/mcp.md).
 
+Both transports accept `host: { roots: true, sampling: true, legacyRequests: "isolated" }`.
+All three options require explicit enabling. Roots/Sampling also require an interaction
+UI; headless use must enable and consume `mcpInteractions`. Legacy isolation creates
+a fresh process/session per interactive tool, read or prompt operation; server session
+state is local to that operation. See
+[Host compatibility](../guides/mcp.md#roots-sampling-and-legacy-compatibility)
+for consent, budgets and custom services. The editor schema covers HTTP, OAuth and
+Host fields; runtime validation also checks endpoint and header safety.
+
+Both transports accept `tasks: true` (default `false`), requiring protocol
+2026-07-28 and the server Tasks extension. For stdio, set `protocolMode: "auto"`.
+MaybeCode uses an encrypted journal at `<dataDirectory>/mcp-tasks`; custom pool
+hosts inject `taskJournal`. Store failure prevents task creation. Host input still
+requires its corresponding services and interaction UI. See
+[long-running tasks](../guides/mcp-tasks.md) for controls and restart behavior.
+
 ## MaybeCode terminal interaction
 
 MaybeCode's retained terminal frontend reads `MAY_TUI_LEADER` (default `ctrl+g`)
@@ -447,7 +472,7 @@ with editor shortcuts. `MAY_CLIPBOARD` accepts `auto`, `system`, `osc52`, or
 `disabled`; local auto uses the system clipboard, while SSH requires explicit
 OSC 52 configuration and terminal permission. These are frontend environment
 settings and do not enter the agent's context. See
-[terminal interaction](../getting-started.md#browse-maybecode-conversations).
+[terminal interaction](../guides/maybecode.md#browse-maybecode-conversations).
 
 ## MaybeClaw settings
 
@@ -492,19 +517,3 @@ chat entrances, authentication, and execution/recovery boundaries.
 The schema and this guide are user-facing references. When adding or changing a
 built-in adapter option, update both alongside the runtime parsing in
 `packages/providers/src/builtins.ts`.
-
-
-Both transports accept `host: { roots: true, sampling: true, legacyRequests: "isolated" }`.
-All three are opt-in. Roots/Sampling also require an interaction UI; headless use
-must explicitly enable and consume `mcpInteractions`. Legacy isolation creates a
-fresh process/session per interactive tool/read/prompt operation and does not retain
-server session state between operations. See [Host compatibility](../guides/mcp.md#roots-sampling-and-legacy-compatibility)
-for consent, budgets and custom services. The bundled editor schema covers HTTP,
-OAuth and Host fields; runtime validation additionally enforces endpoint/header safety.
-
-Both transports also accept `tasks: true` (default `false`), requiring modern
-2026-07-28 plus the server Tasks extension. For stdio also set `protocolMode: "auto"`.
-MaybeCode uses an encrypted journal at `<dataDirectory>/mcp-tasks`; custom pool
-hosts must inject `taskJournal`. Store failure prevents task creation. Host input
-still requires the corresponding opt-in services and interaction UI. See
-[long-running tasks](../guides/mcp-tasks.md) for controls and restart boundaries.

@@ -1,19 +1,34 @@
-# 自定义 Session 存储
+# 配置 Session 存储
 
 [English](../../en/guides/custom-storage.md) | **简体中文**
 
 May 将持久化对话历史与 Session 发现分开：
 
-- `SessionStore` 保存有序 `SessionEvent` stream，是恢复时的事实来源。
-- `SessionCatalog` 保存轻量 summary，用于在 workspace 中列出、重命名、选择和删除
+- `SessionStore` 保存有序 `SessionEvent` 事件流，是恢复时的事实来源。
+- `SessionCatalog` 保存轻量摘要，用于在 Workspace 中列出、重命名、选择和删除
   Session。
 
-`AgentApplication` 需要 `SessionStore`；`AgentWorkspace` 还需要 `SessionCatalog`。
+`AgentApplication` 需要 `SessionStore`，`AgentWorkspace` 还需要 `SessionCatalog`。
+本文指导应用选择内置本地存储或实现数据库适配器，要求宿主已经配置模型和权限策略。
+应用组合见[构建 Agent](building-an-agent.md)。
 
-## `SessionStore` 契约
+## 选择存储后端
+
+| 要求 | 后端 |
+| --- | --- |
+| 进程内历史 | `@may/session` 的 `InMemorySessionStore` |
+| 跨重启本地历史 | `@may/session/file-store` 的 `FileSessionStore` |
+| 本地 Session 发现 | `@may/session/catalog` 的 `FileSessionCatalog` |
+| 数据库、加密或跨进程协调 | 实现本文的存储接口 |
+
+使用文件存储时可以直接阅读[内置本地存储](#内置本地存储)。
+数据库适配器必须提供持久写入和顺序一致的读取。
+
+## `SessionStore` 接口
 
 ```ts
 interface SessionStore {
+  readonly directory?: string;
   append(event: SessionEvent): Promise<void>;
   read(sessionId: string): Promise<readonly SessionEvent[]>;
   inspect?(sessionId: string): Promise<readonly SessionEvent[]>;
@@ -21,25 +36,28 @@ interface SessionStore {
 }
 ```
 
-`read()` 必须按 sequence 升序返回完整 stream。每个事件必须具有所请求的 Session ID，
+`read()` 必须按序号升序返回完整事件流。每个事件必须具有所请求的 Session 标识，
 且 `seq` 从 1 开始连续。May 会在回放前校验这些条件。
 
-`append()` 必须完整、持久地 commit 一个事件，或 reject；不能确认一个随后可能静默
-丢失的 buffered write。Session 会串行化通过单个 Session 实例发出的写入，但共享
-后端仍需跨进程原子检查 next sequence。
+`append()` 必须完整、持久地保存一个事件，或拒绝写入；不能确认一个随后可能静默
+丢失的缓冲写入。Session 会串行化通过单个 Session 实例发出的写入，共享
+后端仍需跨进程原子检查下一个序号。
 
-`inspect()` 返回已提交历史，读取过程不会修复记录、改变 writer ownership 或写入
+`inspect()` 返回已提交历史，读取过程不会修复记录、改变写入者归属或写入
 存储。Session 分支以及工作区历史和树形浏览需要这个操作。完整请求的可恢复边界
 使用 `run.settled` 保存；分支在 `session.created.fork` 中记录准确来源，并通过
 `session.fork.ready` 确认初始化完成。未完成的分支可以读取历史，恢复操作会报告错误。
-自定义 adapter 必须保留这些事件，并报告失败的写入。
-`run.settled.hostCompleted: true` 表示宿主保存最终应用状态，并确认调度 yielded 的
+自定义适配器必须保留这些事件，并报告失败的写入。
+`run.settled.hostCompleted: true` 表示宿主保存最终应用状态，并确认调度器交还控制的
 Run 已经成功完成。
 
-## 数据库 Adapter 骨架
+<a id="数据库-adapter-骨架"></a>
 
-下面把数据库细节隔离在小型 transactional port 后。
-`appendIfCurrentSequence` 必须在同一事务内检查当前最大 sequence 并插入新 row。
+## 数据库适配器框架
+
+在依赖 `@may/session` 的应用中创建适配器模块。
+下面的 `SessionEventTable` 是数据库集成接口，需要使用数据库库提供具体实现，
+才能创建存储。`appendIfCurrentSequence` 必须在同一事务中检查当前最大序号并插入记录。
 
 ```ts
 import {
@@ -87,6 +105,10 @@ export class DatabaseSessionStore implements SessionStore {
   delete(sessionId: string): Promise<boolean> {
     return this.table.deleteSession(sessionId);
   }
+
+  inspect(sessionId: string): Promise<readonly SessionEvent[]> {
+    return this.read(sessionId);
+  }
 }
 
 function decodeEvent(source: string, row: number): SessionEvent {
@@ -110,15 +132,15 @@ function decodeEvent(source: string, row: number): SessionEvent {
 }
 ```
 
-应在 `(session_id, seq)` 上建立 unique constraint，并在插入事务中锁住或比较 Session
-当前 sequence。仅靠 unique constraint 能发现重复 sequence，但无法阻止两个 writer
-因错误重试逻辑制造 gap。
+应在 `(session_id, seq)` 上建立唯一约束，并在插入事务中锁定或比较 Session
+当前序号。唯一约束能发现重复序号，两个写入者仍可能因错误重试逻辑
+制造序号缺口。
 
-上述 decoder 与内置 file store 一样，只校验公共 event envelope。若后端接收来自
-May 可信进程之外的数据，还应校验每个 discriminated event payload、限制大小，再
-cast 为 `SessionEvent`。
+上述解码器与内置文件存储一样，只校验事件公共字段。若后端接收来自
+May 可信进程之外的数据，还应按事件类型校验每个事件内容、限制大小，再
+转换为 `SessionEvent`。
 
-## `SessionCatalog` 契约
+## `SessionCatalog` 接口
 
 ```ts
 interface SessionCatalog {
@@ -129,17 +151,18 @@ interface SessionCatalog {
 }
 ```
 
-Catalog 实现应 upsert summary 但保留已有 `createdAt`，按规范化 workspace 隔离记录，
-通常先返回最近使用的 Session。`rename` 与 `remove` 可选；缺少时 workspace controller
+Catalog 实现应新增或更新摘要，并保留已有 `createdAt`，按规范化工作目录隔离记录，
+通常先返回最近使用的 Session。`rename` 与 `remove` 可选；缺少时 Workspace 控制器
 会报告不支持该操作。
 
-Catalog 是索引，不是对话事实。`AgentWorkspace` 有意容忍 Catalog record 失败，避免
-仅因最近 Session 列表未更新就丢失 Agent Run。若 Catalog 持久性很重要，应提供从
-Session history 重建的路径。
+Catalog 提供索引，Session 历史保存对话事实。普通 Run 的 Catalog 更新失败时，
+`AgentWorkspace` 继续保留运行结果。需要可靠索引的应用应提供从 Session 历史重建的路径。
 
 ## 内置本地存储
 
-本地 Node.js 产品无需自定义 adapter：
+将 `@may/application` 和 `@may/session` 加入应用直接依赖，在入口初始化
+`model`、`tools` 和 `permissionPolicy` 后使用下面的组合片段。
+路径以进程工作目录为基准：
 
 ```ts
 import { AgentApplication, AgentWorkspace } from "@may/application";
@@ -162,24 +185,39 @@ const workspace = await AgentWorkspace.open({
     ...(sessionId === undefined ? {} : { sessionId }),
   }),
 });
+
+try {
+  const run = await workspace.submit({ input: "Inspect the current state" });
+  await run.result;
+} finally {
+  await workspace.close();
+}
 ```
 
-JSONL Session store 是明文，并假定每个 Session history 只有一个活动 writer。File
-Catalog 在本地进程间使用 append-only 原子 operation file，但不自动压缩 operation
-directory。二者都不是多主机数据库或加密 secret store。
+JSONL Session 存储是明文，并假定每份 Session 历史只有一个活动写入者。文件
+Catalog 在本地多个进程间使用追加式原子操作文件，默认不自动整理操作
+目录。多主机协调和加密由自定义后端提供。停止其他 Catalog 使用者后可以调用
+`compact({ confirmHostsStopped: true })`，完整步骤见[本地存储维护](#本地存储维护)。
+
+## 验证持久化
+
+保存活动的 `workspace.sessionId`，关闭工作区，然后使用相同存储路径和该 `sessionId`
+重新打开。确认 `history()` 返回提交输入和完整响应。
+数据库后端还需要确认过期序号的写入请求被拒绝，已保存历史保持不变。
+通过 `inspect()` 检查浏览过程中没有发生写入。
 
 ## 失败与生命周期规则
 
-- 传播 storage error，绝不能把错误变成空 history。
-- 不要原地编辑或重新编号已 commit 事件。
-- Append retry 必须幂等，或能识别完全相同的事件已 commit。
-- 接受不可信记录前限制 event 与 history 大小。
-- 把 Session metadata、模型消息、工具输出、审批和 tool presentation 都视为潜在敏感数据。
-- Retention、backup、encryption 与 access control 由后端或部署实现，May 不会自动添加。
-- `AgentApplication.close()` 或 `AgentWorkspace.close()` 完成后再关闭数据库 pool。
+- 传播存储错误，绝不能把错误变成空历史。
+- 不要原地编辑或重新编号已保存事件。
+- 追加重试必须幂等，或能识别完全相同的事件已保存。
+- 接受不可信记录前限制事件与历史大小。
+- 把 Session 元数据、模型消息、工具输出、审批和工具显示信息都视为潜在敏感数据。
+- 保留策略、备份、加密与访问控制由后端或部署实现。
+- `AgentApplication.close()` 或 `AgentWorkspace.close()` 完成后再关闭数据库连接池。
 
-History 删除和 Catalog 移除是两个调用，不是跨 store 事务。两种接口使用不同系统时，
-需要为部分失败设计 reconcile 机制。
+历史删除和 Catalog 移除分别执行。两种接口使用不同系统时，
+需要提供部分失败后的状态核对与处理。
 
 Context 工作集与持久化历史的区别见[自定义 Context](custom-context.md)，完整生命周期
 见 [Runtime 与 Session 边界](../architecture/runtime-session.md)。
@@ -189,16 +227,17 @@ Context 工作集与持久化历史的区别见[自定义 Context](custom-contex
 同一个 `FileSessionStore` 实例按 Session 串行执行读取、写入与残尾修复。追加操作仅在
 文件身份、长度和时间戳一致时复用上次验证的序号；显式历史读取仍校验完整记录。
 `input.generated` 记录保存 Hook 追加的继续执行消息，以及分支继承的已交付补充输入。
-读取和只读检查会在 Session 恢复前校验 Run identity、正整数 step、user message 内容及 reason。
-每个文件仍要求单写者。POSIX 上新建会话后同步父目录；Node 没有等价的 Windows 目录 fsync。
+读取和只读检查会在 Session 恢复前校验 Run 身份、正整数 `step`、用户消息内容及 `reason`。
+每个文件仍要求单个写入者。POSIX 上新建会话后同步父目录；Node 没有等价的 Windows 目录 fsync。
 
 需要合并目录操作文件时，停止其他目录使用者，对 `FileSessionCatalog` 调用
 `await catalog.compact({ confirmHostsStopped: true })`。原子写入的版本 2 快照在清理前
 记录已吸收的精确操作文件名，因此清理中断不会重复重放。合并后不能使用旧版读取器；
 普通版本 1 目录仍可读取。
 
-本地写者锁可从 `@may/session/file-store` 导入 `recoverFileLock` 处理。必须先停止所有
+本地写入者锁可从 `@may/session/file-store` 导入 `recoverFileLock` 处理。必须先停止所有
 竞争宿主、打开和恢复操作，检查锁内容，再以 `expectedContents` 传入完整原文，并设置
 `confirmHostsStopped: true`。辅助函数拒绝存活 PID、远端宿主、危险链接和已变化的元数据。
 元数据不完整时，独立核实所有者后还需显式设置 `confirmUnknownOwner: true`。
-PID 探测不是原子的锁竞争算法，恢复不得与其他获取锁操作并发。释放锁不重放任何工作。
+PID 探测与锁获取分别执行，恢复需要在其他获取锁操作全部停止后进行。
+释放锁仅改变所属关系。

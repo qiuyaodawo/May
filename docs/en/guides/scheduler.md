@@ -1,14 +1,25 @@
-# Persistent time and event scheduling
+# Schedule persistent time and event tasks
 
 **English** | [简体中文](../../zh-CN/guides/scheduler.md)
 
-`@may/scheduler` persists trigger definitions and immutable execution records,
-then submits tasks through a host-owned `TaskDispatcher`. Importing the package
-and calling `Scheduler.open()` creates no timer and starts no Agent. Agent
-configuration, Session selection, task execution, approvals and delivery belong
-to the host. The public package remains a developer-preview API.
+Use `@may/scheduler` to submit host tasks at a chosen time, on a cron schedule or
+in response to an event. The scheduler stores trigger definitions and execution
+records, and submits work through your `TaskDispatcher`. The public API is in
+developer preview.
+
+You need Node.js 22.16 or later, `@may/scheduler`, local storage that supports
+SQLite locking, and an idempotent host task service. The host configures Agents,
+Sessions, execution, approvals and result delivery. Opening the scheduler leaves
+timers stopped until you call `start()` or `tick()`.
 
 ## Daily brief
+
+1. Implement a `TaskDispatcher` named `taskService`. Its `submit(request)` must
+   durably accept work and return `{ taskId }`. Repeated `executionId` values
+   return the same task without starting duplicate work.
+2. In your Node.js service, open a dedicated database and create the job once.
+   The following host fragment assumes `taskService` has been initialized and
+   `daily-ai-brief` does not already exist:
 
 ```ts
 import { Scheduler } from "@may/scheduler";
@@ -31,8 +42,15 @@ await scheduler.createJob({
   misfire: { policy: "latest", graceMs: 7_200_000 },
 });
 await scheduler.start();
-// The host calls scheduler.close() during orderly shutdown.
 ```
+
+3. Keep the host process running. The job becomes due at 08:00 in
+   `Asia/Shanghai`. Inspect `listExecutions({ jobId: "daily-ai-brief" })` for
+   the accepted `taskId`; inspect your task service separately for the completed
+   brief and delivery result.
+4. During orderly shutdown, await `scheduler.close()` to settle submissions and
+   release storage. Preserve the database for the next start. For an existing
+   job, read or update it with its current revision instead of creating it again.
 
 `taskService.submit(request)` must durably accept the task before returning
 `{ taskId }`. Repeated calls with the same `executionId` must return the same
@@ -94,13 +112,28 @@ task. One-shot times can be created in the past and follow the same rules.
 
 ## Events
 
+After authenticating the event publisher, create an enabled job matching its
+topic. This fragment uses the open `scheduler` from the service above and
+requires the host dispatcher to implement `issue-review`:
+
 ```ts
+await scheduler.createJob({
+  id: "review-new-issues",
+  enabled: true,
+  trigger: { type: "event", topic: "issue.opened" },
+  task: { handler: "issue-review", payload: { agent: "reviewer" } },
+  misfire: { policy: "skip", graceMs: 0 },
+});
 const records = await scheduler.publish({
   source: "github", id: "delivery-123", topic: "issue.opened",
   occurredAt: "2026-10-04T10:00:00+08:00",
   payload: { repository: "example/project", issue: 123 },
 });
 ```
+
+Inspect returned records for submission state and `taskId`. The event trigger
+uses the exact topic; its required `misfire` field applies to time triggers and
+does not delay event acceptance.
 
 An event and all matching job execution snapshots are accepted in one
 transaction. A repeated `source` and `id` returns the original matches. Different
@@ -126,7 +159,7 @@ close calls are safe. Dispatchers must settle their Promises: the scheduler
 does not infer acceptance from a timeout and does not cancel host Agent work.
 
 `maxConcurrentSubmissions` bounds dispatcher calls, not Agent execution. The
-host manages its execution concurrency, Run budgets and Session serialization.
+default is 4. The host manages Agent concurrency, Run budgets and Session serialization.
 `listExecutions({ jobId?, status?, afterSeq?, limit? })` returns stable ascending
 sequence pages, with a default limit of 100 and a maximum of 1,000.
 
@@ -146,9 +179,8 @@ The store contains plaintext task and event data. Use host access controls and
 retain backups. Execution, event deduplication and deleted-ID records are retained;
 storage retention and archival are host operational responsibilities.
 
-Core, Session and Application do not depend on this component. Scheduler uses
-Core's optional telemetry API alongside `cron-parser` and `luxon`. Publication
-and version preparation require separate user instructions.
+The package uses Core's telemetry API, `cron-parser` and `luxon`. Core, Session
+and Application can operate independently of the scheduler.
 
 ## Execution diagnostics
 

@@ -1,12 +1,19 @@
-# Run budgets
+# Configure Run budgets
 
-[简体中文](../../zh-CN/guides/run-budgets.md)
+**English** | [简体中文](../../zh-CN/guides/run-budgets.md)
+
+Use `runBudget` to limit one Agent execution by duration, steps, calls, tokens,
+or cost. This guide covers MaybeCode configuration and the shared code API.
+Cost and token limits require usage reported by the selected provider.
+
+## Set default limits
 
 `May`, `AgentApplication`, `defineAgent` and MaybeCode accept `runBudget` defaults.
 `run()` / `submit()` / `continue()` may tighten them, never relax them. Each Run,
 including explicit retry/continue, gets a fresh budget, not a Session lifetime quota.
 
-MaybeCode accepts this configuration:
+Add this object to your MaybeCode configuration file. See the
+[configuration reference](../reference/configuration.md) for locations and precedence:
 
 ```json
 {
@@ -29,6 +36,19 @@ remains an additional ceiling: `May` defaults it to 16, a MaybeCode main Run to 
 and a sub-agent child Run to 24. Tool calls are reserved for an entire
 batch before any execution, including parallel scheduling. Model-call accounting
 counts admitted loop steps, not provider HTTP retries.
+
+The available limit fields are:
+
+| Field | Unit and accounting boundary |
+| --- | --- |
+| `maxDurationMs` | Milliseconds in the current Run |
+| `maxSteps` | Admitted Agent loop steps |
+| `maxModelCalls` | Admitted model calls, excluding provider HTTP retries |
+| `maxToolCalls` | Reserved tool calls, including the complete next batch |
+| `maxTotalTokens` | Provider-reported token use checked at response boundaries |
+| `maxCostUsd` | Complete USD cost checked at response boundaries |
+
+## Configure prices for a cost limit
 
 For cost limits, set `maxCostUsd` and explicit `pricing` or legacy `tokenPrices`.
 `tokenPrices` keeps `inputUsdPerMillion` and `outputUsdPerMillion`, with optional
@@ -62,6 +82,8 @@ own pricing rules. It returns a `UsageCost` with an optional amount, currency,
 `priceUsage()` to use the same interface in host telemetry. JSON configuration
 accepts price schedules; callbacks are supplied through the code API.
 
+## Interpret provider usage
+
 `Usage` can report `cachedReadTokens`, `cachedWriteTokens`, `reasoningTokens`,
 additional `items`, `completeness`, and a provider `reportedCost`. `tokenRelations`
 states whether a detail is included in `input`, `output`, `total`, or `none` of
@@ -82,6 +104,8 @@ and are included when computing the normalized total. Additional provider units
 retain their measurement id, unit, quantity and relation to a reported amount.
 Unknown units or missing rates produce incomplete pricing. Provider-reported
 amounts retain their currency and source; May performs no currency conversion.
+
+## Inspect the result and budget failures
 
 `RunResult.budget` reports elapsed time, admitted steps/model calls, reserved tool
 calls, observed tokens, cost, `usageComplete`, `costComplete`, `costKind` and
@@ -106,6 +130,13 @@ show the reason. Proposed unexecuted calls are closed before continuation.
 Time limits propagate AbortSignal through context preparation, models, approvals
 and tools. Cleanup waits for started tools to settle; uncooperative adapters
 cannot be forcibly killed by an in-process contract.
+
+## Verify limits and understand their boundaries
+
+Run a bounded request with the selected real provider. Inspect `RunResult.budget`
+for observed counters and completeness. If usage is unavailable under a token
+or cost limit, confirm the Run reports `RUN_BUDGET_USAGE_UNAVAILABLE`.
+An exhausted dimension reports `RUN_BUDGET_EXCEEDED` in the result and history.
 
 Token and cost limits are checked at response boundaries, so the final request
 can overshoot. HTTP retries without returned usage cannot be accurately billed.

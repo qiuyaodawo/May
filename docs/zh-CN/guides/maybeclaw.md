@@ -1,13 +1,33 @@
-# MaybeClaw：Agent Gateway
+# 启动与管理 MaybeClaw
 
 [English](../../en/guides/maybeclaw.md) | **简体中文**
 
 MaybeClaw 将 Agent 连接到持久会话、Web、CLI、Telegram 和飞书，管理路由、访问权限、
 审批、执行与消息投递。
 
+## 启动本地控制台
+
+前提：完成[仓库开发](repository-development.md)的安装与构建步骤。使用 May Agent
+时，根据[配置参考](../reference/configuration.md)配置 Provider 与模型。
+Telegram 和飞书需要各自的平台账户与凭据。
+
+1. 在仓库根目录执行 `pnpm maybeclaw`，保持终端打开。
+2. 本机初始化页面打开时，设置并确认管理员密码，然后使用该密码登录控制台。
+3. 在 Agent 管理中添加 May Agent，选择已有模型配置与项目目录。创建命名会话，
+   将该 Agent 设为默认 Agent。
+4. 在该会话发送消息，处理待审批请求，然后查看任务结果和会话历史。模型请求使用
+   配置的账户。
+5. 按 Ctrl+C 关闭服务。使用相同配置与数据目录重新打开，查看保存的会话和历史。
+
+具体操作见[配置](#会话与配置)、[权限](#持久权限规则)、
+[Web 与 CLI](#启动web-与-cli)、[聊天命令](#聊天命令与打断)、
+[渠道](#渠道成员与审批)和[存储与迁移](#生命周期存储与迁移)。
+
+## 应用组合
+
 可复用渠道、投递、Agent adapter、coordination 和 HTTP 功能由
 `packages/plugins/` 提供。产品插件组合位于 `apps/maybeclaw/src/plugins/`，
-AgentGateway 和 GatewayHost 管理完整应用生命周期。配置插件可以替换默认
+`AgentGateway` 和 `GatewayHost` 管理完整应用生命周期。配置插件可以替换默认
 Model 和 PermissionPolicy 提供方。空闲 adapter 通过 registry 释放，下次使用
 时根据当前配置重新创建。关闭时开始取消 Gateway 工作，随后等待 HTTP 请求并
 释放资源。参见[插件指南](plugins.md#可复用插件-package)。
@@ -32,7 +52,7 @@ Agent 自动进入名单。个人会话绑定一个平台身份；群聊会话�
 自动删除。刷新初始化页面会清除页面中的凭据，重新打开初始化文件可以继续操作。
 初始化仅接受本机来源。已有有效配置直接启动；旧配置要求明确迁移；损坏配置会报错并
 保持原文件。同一配置文件禁止并发初始化。如果进程被强制终止，需要确认进程已经停止，
-再删除对应的 `<配置路径>.initialize.lock` 和遗留的 `*.initialize.html` 文件，重新启动。
+再删除对应的 `<config-path>.initialize.lock` 和遗留的 `*.initialize.html` 文件，重新启动。
 
 手动配置时，保留 May 已有的 `providers`、`models`，合并以下内容：
 
@@ -54,7 +74,8 @@ Agent 自动进入名单。个人会话绑定一个平台身份；群聊会话�
 
 启动 Web 控制台后，通过管理员密码登录，在 Agent 管理中添加首个 Agent，即可直接创建会话，无需重启服务。已有的 `providers` 与 `models` 配置继续保留供 May Agent 使用。
 
-已预先登记 Agent 时的完整配置如下。将 `coding-profile` 和 `review-profile` 替换为已有模型配置名称。
+以下 `apps` 片段用于在已有配置中登记 Agent。将 `coding-profile` 和 `review-profile`
+替换为已有模型配置名称。
 
 ```json
 {
@@ -65,8 +86,19 @@ Agent 自动进入名单。个人会话绑定一个平台身份；群聊会话�
         { "id": "code", "adapter": "may", "model": "coding-profile" },
         { "id": "reviewer", "adapter": "may", "model": "review-profile" }
       ],
-      "server": { "maxConcurrent": 4, "idleMs": 600000, "shutdownMs": 30000, "approvalMs": 600000, "auth": { "password": "REPLACE_WITH_YOUR_OWN_PASSWORD" } },
-      "access": { "sessionAdmins": {}, "creators": [], "deniedUsers": [], "allowedAgents": {} }
+      "server": {
+        "maxConcurrent": 4,
+        "idleMs": 600000,
+        "shutdownMs": 30000,
+        "approvalMs": 600000,
+        "auth": { "password": "REPLACE_WITH_YOUR_OWN_PASSWORD" }
+      },
+      "access": {
+        "sessionAdmins": {},
+        "creators": [],
+        "deniedUsers": [],
+        "allowedAgents": {}
+      }
     }
   }
 }
@@ -227,12 +259,26 @@ Step 继续运行，随后按接收顺序在下一次模型请求前交付。审
 
 ## 渠道、成员与审批
 
-在 `apps.maybeclaw.channels` 中增加渠道配置：
+启用渠道前，创建对应的平台应用、配置所需权限与事件、提供凭据环境变量，并收集
+允许访问的身份标识。将以下片段合并到 `apps.maybeclaw.channels`，替换应用和身份
+示例值，然后重新启动服务：
 
 ```json
 {
-  "telegram": { "enabled": true, "botTokenEnv": "MAYBECLAW_TELEGRAM_TOKEN", "allowUsers": ["123456789"], "allowGroups": ["-1001234567890"], "groupTrigger": "explicit" },
-  "feishu": { "enabled": true, "appId": "cli_replace_with_your_app_id", "appSecretEnv": "MAYBECLAW_FEISHU_SECRET", "allowUsers": ["ou_replace_with_your_open_id"], "allowGroups": ["oc_replace_with_your_chat_id"] }
+  "telegram": {
+    "enabled": true,
+    "botTokenEnv": "MAYBECLAW_TELEGRAM_TOKEN",
+    "allowUsers": ["123456789"],
+    "allowGroups": ["-1001234567890"],
+    "groupTrigger": "explicit"
+  },
+  "feishu": {
+    "enabled": true,
+    "appId": "cli_replace_with_your_app_id",
+    "appSecretEnv": "MAYBECLAW_FEISHU_SECRET",
+    "allowUsers": ["ou_replace_with_your_open_id"],
+    "allowGroups": ["oc_replace_with_your_chat_id"]
+  }
 }
 ```
 

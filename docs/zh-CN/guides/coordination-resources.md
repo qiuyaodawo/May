@@ -2,10 +2,19 @@
 
 [English](../../en/guides/coordination-resources.md) | **简体中文**
 
-[协作运行时](coordination.md) 负责调度任务。三个可选的宿主组件分别管理共享用量、
-显式产物和隔离的文件副本。它们不增加 Agent 的执行权限，也不替代工具权限控制。
+[协作任务图](coordination.md)需要统一的模型额度、显式结果文件或独立任务目录时，
+可以使用共享资源。宿主打开并管理资源，Agent 的工具访问仍然遵循已配置权限。
+
+以下 TypeScript 片段展示 `@may/coordination` 的宿主组合方式，要求已经配置
+provider `Model`、任务图 ID 和任务工具根目录之外的绝对资源目录。
+启动任务图之前，将资源接入 Agent definition；运行时停止后再关闭资源。
 
 ## 共享模型预算
+
+1. 为整个任务图设置调用和 token 上限，计算后续轮次及重新尝试需要的额度。
+   价格配置必须符合选定 provider 的实际价格。
+2. 打开统一账本，在每个参与模型的实际请求位置加入预算包装。以下片段要求
+   `providerModel`、`budgetDirectory` 和 `coordinationId` 由可信宿主提供：
 
 ```ts
 import { FileSharedBudget } from "@may/coordination";
@@ -20,15 +29,17 @@ const budget = await FileSharedBudget.open(budgetDirectory, coordinationId, {
 const meteredModel = budget.wrapModel(providerModel, {
   reservation: { totalTokens: 32_768, costUsd: 0.15 },
 });
-// 团队所有 Agent definition 使用的模型均接入同一个预算。
-// 所有 Run 停止后：
+// 团队的 Agent definition 使用 meteredModel；所有 Run 停止后读取总计并关闭。
 console.log(await budget.totals());
 await budget.close();
 ```
 
+3. 通过 `totals()` 和 `snapshot()` 检查已结算、估算和未知调用。
+   新请求被阻止时，核查 provider 凭据并核对相应调用，随后才允许继续工作。
+
 `providerModel`、`budgetDirectory` 和 `coordinationId` 由可信宿主传入。
 示例价格仅用于说明，不代表当前 provider 定价。预留值是宿主选择的用量上界估计，
-不是设置 provider token 上限的 API。应单独配置 provider 输出上限，并按最大预期
+需要另外配置 provider token 上限。应单独配置 provider 输出上限，并按最大预期
 输入加输出设置预留值。不同 provider/价格需使用独立账本，或由宿主适配器统一正确
 计费；一个账本只使用一份固定价格表。
 
@@ -53,8 +64,8 @@ await budget.close();
   超额结算，不请求 provider、不恢复工具，也不替代 Session 自身的恢复判断。
   任务失败、yield、handoff 或重试都不会自动退还已经消耗的用量。
 - 响应边界检查无法撤回 provider 已发生费用，也不能停止其他已在途请求。
-  这是持久化的准入与统计上限，**不是外部账单硬上限**；宿主仍需合理配置
-  预留和 provider 限制。
+  这些限制负责持久化准入与用量统计；外部实际费用仍取决于 provider 接受的请求。
+  宿主需要合理配置预留和 provider 限制。
 
 `snapshot()` 返回调用凭据；`totals()` 包含尚未结算的预留。只有每一次调用都按
 provider 上报的 usage 结账时，`totals().usageComplete` 才为 `true`；按预留值计账的
@@ -90,6 +101,10 @@ USD 上限要求完整的 USD 计价。未知价格使调用保持未结算状�
 
 ## 不可变产物
 
+打开产物存储时配置具有版本的读取策略。以下片段要求宿主提供
+`artifactDirectory` 和 `coordinationId`，任务图中已有 `worker` 和 `manager`。
+将 `forTask(taskId).tools()` 绑定到相应任务。示例展示发布和显式读取：
+
 ```ts
 import { FileArtifactStore } from "@may/coordination";
 
@@ -105,12 +120,12 @@ const reference = await workerArtifacts.publish("dispatch-1:turn-0:final", {
   text: "显式任务结果，不包含隐藏推理或凭据。",
 });
 const result = await artifacts.forTask("manager").read(reference.id);
-// 或者在任务 Agent definition 中显式加入 workerArtifacts.tools()。
+// 可以在 worker 的 Agent definition 中加入 workerArtifacts.tools()。
 await artifacts.close();
 ```
 
 产物包含有大小限制的 UTF-8 文本及不可变元数据：id、所属任务、名称、MIME 类型、
-字节数和 SHA-256。id 与存储路径由宿主生成，名称不是文件系统路径。任务可以读取
+字节数和 SHA-256。id 与存储路径由宿主生成，名称用于显示。任务可以读取
 自己的产物；读取其他任务产物默认拒绝，除非宿主 ACL 返回 `true`。知道 id 不等于授权。
 
 `publish_artifact` 与 `read_artifact` 使用宿主提供的任务绑定，模型不能指定所属任务。
@@ -119,23 +134,27 @@ await artifacts.close();
 未完整写入、未被日志引用的 blob 不会被静默覆盖。
 
 默认限制：256 个产物、单个 1 MiB、总计 16 MiB。重开时限制和 ACL 版本必须一致。
-`snapshot()` 向宿主返回引用，不是模型目录工具，也不是绕过 ACL 的工具。
+`snapshot()` 向宿主返回引用。模型通过任务绑定的工具访问产物，读取仍须通过 ACL。
 每个 dispatch/turn 的结果应使用不同命令 id。通过消息或答案显式传递产物 id，
 组件不会向所有 Agent 上下文自动注入内容。产物内容仍是不可信任务数据。
 
 ## 任务工作区副本
+
+选择互不重叠的源工作区和私有资源目录。以下片段要求已有 `userCheckout`、
+`privateTeamDirectory` 和任务定义 `task`。准备副本后绑定文件工具，
+任务执行停止后再检查修改：
 
 ```ts
 import { TaskWorkspaceManager } from "@may/coordination";
 
 const workspaces = await TaskWorkspaceManager.open({
   sourceDirectory: userCheckout,
-  directory: privateTeamDirectory, // 不能与用户工作区重叠。
+  directory: privateTeamDirectory,
 });
 const workspace = await workspaces.prepare(task.id);
-// 将该任务文件工具绑定到 workspace.directory，而不是 userCheckout。
+// 将本任务的文件工具绑定到 workspace.directory。
 const changes = await workspaces.changes(task.id);
-// 展示差异供审阅；应用选中的补丁是独立的用户/宿主动作。
+// 展示 changes 供审查；选定修改由宿主单独应用。
 await workspaces.close();
 ```
 
@@ -150,19 +169,25 @@ handoff 和显式重试保留其副本，不自动回滚。用户 checkout 始�
 默认限制：单份快照最多 10,000 个文件、64 MiB，最多 128 个任务副本。默认排除
 所有隐藏名称、依赖/构建/缓存/数据目录、常见凭据名称和密钥/证书文件。
 `excludeNames` 只能增加排除项，不能移除内置规则。符号链接/junction 和非普通
-文件会被跳过。这是保守的名称过滤，**不是秘密检测**；仍应检查交给 Agent 的
-普通文件是否包含敏感信息。不保留可执行权限元数据和依赖，因此不是开箱即用的
-构建环境镜像。
+文件会被跳过。名称过滤仅检查文件名称；交给 Agent 的普通文件仍需要检查敏感信息。
+副本不保留可执行权限元数据和依赖，需要构建时由宿主准备相应环境。
 
 `changes()` 返回有数量/大小限制的普通文件新增、修改、删除及哈希，供审阅。
 宿主需在其他位置显式审阅并应用选中修改；管理器不提供合并 API。中断的基线或
 任务副本保持隔离，不会被静默替换。手动清理前应检查相应私有目录。
 
-文件副本隔离**不是进程沙箱**，不能阻止 shell、网络客户端或无限制工具访问
-其他路径或凭据。基线和资源账本应放在任务工具根目录之外；执行不可信代码时，
-还需使用限定作用域的文件工具、显式权限以及真正的操作系统/容器沙箱。
+文件副本只能隔离文件修改。shell、网络客户端或无限制工具仍可能访问其他路径或
+凭据。基线和资源账本应保存在任务工具根目录之外；执行不可信代码时，需要限定
+文件工具的访问范围、明确权限，并配置操作系统或容器沙箱。
 
 ## 持久化与所有权
+
+按照资源依赖顺序关闭组件：
+
+1. 等待 `runtime.close()`，确认模型调用、工具调用和状态修改已经结束。
+2. 读取审查需要的最终用量、产物引用和工作区修改。
+3. 等待预算、产物存储和工作区管理器的 `close()`。
+4. 根据宿主数据规则保留日志和私有副本。
 
 每个存储都是单写者本地日志，确认前先同步到磁盘。可修复未结束的最后一条 JSONL
 记录；完整记录损坏、配置变化和写入结果不确定时停止继续执行。可能仍有活动

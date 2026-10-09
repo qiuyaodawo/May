@@ -1,19 +1,26 @@
-# 插件、服务与生命周期 Hooks
+# 编写和加载插件
 
 [English](../../en/guides/plugins.md) | **简体中文**
 
-`@may/plugin` 管理插件配置和资源。`@may/core` 声明带类型的 Hook 接口及
-`AgentRuntime`；`@may/application` 将它们与权限、Context 和持久 Session
-存储组合。参阅[规格](../architecture/plugin-spec.md)。
+本文用于为已有 May 应用添加服务或生命周期处理方法。需要应用组合、准备扩展的
+服务或 Hook，以及已经安装的 `@may/plugin` 和 `@may/application`。
+
+1. 按照[示例](#声明插件)声明服务和插件初始化方法。
+2. 将定义加入应用的 `plugins`，或通过[产品配置](#产品加载插件)加载模块。
+3. 获取资源时注册清理方法，选择负责管理它的范围。
+4. 验证初始化、Hook 执行、状态恢复与关闭。
+
+`@may/plugin` 管理配置与资源；Core 定义带类型的 Hooks 和 `AgentRuntime`；
+Application 将它们与权限、Context 和持久 Session 存储组合。
+[架构说明](../architecture/plugins.md)解释生命周期与依赖规则。
 
 ## 插件的定义与组成
 
 插件是由宿主管理的功能单元。它声明自己的身份、提供的能力、需要的依赖及初始化
 方法。宿主根据这些声明检查组合，按照依赖顺序初始化，并在关闭时释放资源。
 
-现有部件可以通过这些声明直接作为插件使用。插件内部可以包含类、函数和其他部件，
-例如由同一个 runtime 插件共同管理 Agent loop 和配套 Context。组件可以作为普通
-描述使用，应用通过插件声明选择和组合功能。
+一个插件可以包含多个类或函数，提供多个服务。例如由同一运行时插件共同管理
+Agent 执行循环与配套 Context。
 
 `PluginDefinition` 包含以下字段：
 
@@ -33,8 +40,7 @@
 
 ### PluginContext 与 ctx
 
-`PluginContext` 是 May 已实现的插件管理接口。PluginHost 初始化每个插件实例时
-创建对应的对象，并传给 `setup(ctx)`。`ctx` 是示例中的参数名称，可以自行命名。
+`PluginHost` 为每个插件实例创建 `PluginContext`，初始化时传给 `setup(ctx)`。
 
 | 接口 | 作用 |
 | --- | --- |
@@ -51,6 +57,9 @@ PluginContext 用于插件配置和生命周期管理。Agent 的 `Context` 接�
 提供模型可见的消息，两者分别承担这些职责。
 
 ## 声明插件
+
+在 ESM TypeScript 模块中声明以下两个插件。示例通过 `inputBeforeSubmit` 为字符串
+输入添加 `Project: `，其他输入保持原值。应用另外提供自己的 Model 和存储。
 
 ```ts
 import { definePlugin, defineService } from "@may/plugin";
@@ -109,14 +118,20 @@ Hook 以及更短生命周期服务依赖，都在插件初始化前导致验证
 继续处理单个清理失败，使用 `AggregateError` 报告全部错误。重复调用 `close()`
 使用相同完成结果。
 
-直接使用宿主：
+自定义宿主使用以下片段时，需要已经声明 `plugins`、`myHook`、服务绑定、
+`operation` 和 `cancelOperation`。操作期间保持宿主开放，即使失败也需要关闭：
 
 ```ts
+import { PluginHost } from "@may/plugin";
+
 const host = await PluginHost.create({ plugins, hooks: [myHook], services });
-const application = await host.createScope("application", { id: "app" });
-const session = await application.createScope("session", { id: "conversation" });
-await session.use(() => operation(), { cancel: () => cancelOperation() });
-await host.close();
+try {
+  const application = await host.createScope("application", { id: "app" });
+  const session = await application.createScope("session", { id: "conversation" });
+  await session.use(() => operation(), { cancel: () => cancelOperation() });
+} finally {
+  await host.close();
+}
 ```
 
 `use()` 将操作登记到全部上级范围。通过 `services` 传入的资源继续由调用方管理；
@@ -224,12 +239,9 @@ provider、model、adapter 和 profile。仅提供 `model` 的插件将未知名
 现有 package 的类和接口继续支持直接调用，应用保留已提取功能的兼容导出。
 
 `@may/plugin-agent-adapters` 通过 `AgentAdapterContext.telemetry` 接收经过验证的
-version 1 `TelemetryCorrelation`。Gateway RPC 在 `gateway/initialize` 中声明
-`telemetryVersion: 1`，远端确认该版本后，`conversation/execute` 包含独立的
-`telemetry` envelope。省略该响应字段的远端继续接收原执行字段。发送方与接收方在
-执行前验证关联身份，业务请求的重复判断不包含遥测身份。随 package 提供的
-`rpc-file-agent` 示例支持该协商，在输入 hash 之外单独保存遥测，并在返回已完成输入
-结果时保留原执行身份。
+version 1 `TelemetryCorrelation`。RPC 协商 `telemetryVersion: 1` 后发送独立
+关联信息，并在执行前验证。业务去重不包含遥测身份。关联与配置职责参阅
+[模型与执行诊断](model-telemetry-integration.md)。
 
 MaybeCode 通过插件组合 Model、PermissionPolicy、Context、Skills、goals、
 history-memory 和 delegation。MCP 命令、目录和事件使用活动 Application 的
@@ -293,7 +305,9 @@ run 范围状态为临时状态。`updatePlugins(plugins, { cancelActive })` 顺
 
 ## 产品加载插件
 
-MaybeCode 读取 `apps.maybecode.plugins`。MaybeClaw 的 May adapter 读取
+将下列 `plugins` 数组加入 May 配置的对应应用部分。示例路径相对于配置文件，
+模块需要存在并导出 `PluginDefinition`。MaybeCode 读取 `apps.maybecode.plugins`。
+MaybeClaw 的 May adapter 读取
 `apps.maybeclaw.agents[].plugins`：
 
 ```json
@@ -310,6 +324,12 @@ MaybeCode 读取 `apps.maybecode.plugins`。MaybeClaw 的 May adapter 读取
 `parsePluginSelections()`。模块具有宿主进程权限；在 `setup` 中获取资源，并通过
 `ctx.defer()` 注册清理方法。
 
-运行 `pnpm --filter @may/plugin test`、`pnpm docs:check` 和
+## 验证
+
+使用实际插件，确认初始化按照依赖顺序执行、输入 Hook 修改指定内容、资源按照
+依赖逆序关闭，以及重新打开后恢复持久状态。检查缺少依赖和不兼容状态版本在
+执行前报错。
+
+在仓库根目录运行 `pnpm --filter @may/plugin test`、`pnpm docs:check` 和
 `pnpm test:package:plugin`，分别验证宿主、文档及独立安装的 package。
 真实 provider 测试独立于离线测试。

@@ -2,8 +2,9 @@
 
 **English** | [简体中文](../../zh-CN/concepts/agent-application.md)
 
-May separates reusable Agent configuration from conversation identity and from
-the process that currently owns that conversation. For the complete package
+An application defines Agent behavior, opens a conversation, and manages its
+active work. `AgentDefinition`, `AgentApplication`, and `AgentWorkspace` give
+those responsibilities separate lifecycles. For the complete package
 boundary, see [Runtime and session boundaries](../architecture/runtime-session.md).
 The shorter lifecycle vocabulary is described in
 [Session, run, and step](./session-run-step.md). The composition-object choice
@@ -25,8 +26,12 @@ how an Agent behaves. It normally includes:
 
 `@may/application` exports both the `AgentDefinition` class and the
 `defineAgent()` convenience function. A definition deliberately excludes the
-Session-bound `store`, `sessionId`, `resume`, `metadata`, and
+Session-bound `store`, `sessionId`, `resume`, `fork`, `metadata`, and
 `contextMetadata` options. Supply those when opening an application:
+
+The following composition snippet assumes the host has initialized `model`,
+`tools`, `instructions`, `permissionPolicy`, and `store`. For a complete
+application procedure, see [Build an Agent](../guides/building-an-agent.md).
 
 ```ts
 import { defineAgent } from "@may/application";
@@ -79,14 +84,17 @@ not serialize, version, discover, or migrate Agent definitions.
 durable `Session`. `AgentApplication.open()` composes the injected product
 configuration into these runtime objects:
 
-```text
-AgentApplication
-|- Session
-|  `- May runtime
-|     |- Model
-|     |- Context
-|     `- Tools -> PermissionToolExecutor -> optional ToolExecutor
-`- application event relay
+```mermaid
+flowchart TD
+  Application[AgentApplication] --> Session
+  Application --> Relay[Application event relay]
+  Session --> May[May runtime]
+  May --> Model
+  May --> Context
+  May --> Scheduler[ToolScheduler]
+  Scheduler --> Permission[PermissionToolExecutor]
+  Permission --> Executor[Configured ToolExecutor]
+  Executor --> Tools
 ```
 
 Direct `AgentApplication.open()` requires a model, a `SessionStore`, and a
@@ -206,7 +214,9 @@ Session switching, deletion, renaming, compaction, and application replacement
 require an idle active application. `cancel()` and approval resolution are
 direct operations rather than queued state transitions.
 
-### Product transitions and definitions are not definition storage
+<a id="product-transitions-and-definitions-are-not-definition-storage"></a>
+
+### Product configuration transitions
 
 A model-profile switch is a typical use of `transitionApplication()`. The
 product creates the replacement first; if creation fails, the old application
@@ -221,7 +231,9 @@ composition object, not a serialized manifest or registry entry. Likewise,
 `AgentWorkspace` is generic over application events, extension events, and a
 product-defined compaction-selection type.
 
-## Catalog operations are projections, not transactions
+<a id="catalog-operations-are-projections-not-transactions"></a>
+
+## Catalog updates and deletion
 
 The Catalog is a lightweight projection used for discovery. It is separate
 from durable Session history. The default summary derives a title from the
@@ -270,7 +282,11 @@ For fixed pipelines, DAGs and parallel execution across independent applications
 use the separate [coordination layer](../guides/coordination.md). This does not
 make a workspace multi-active or add model-driven delegation to Application.
 
-Coordination also supports opt-in subagent delegation above Application.
+Coordination also supports opt-in subagent delegation above Application. The
+application owns its Session while coordination owns delegation lifecycles.
+
+### Host-controlled execution boundaries
+
 `submit({ input, inputId })` rejects duplicate durable input identities;
 `shouldYield` is an optional host callback checked after a complete step. A yielded
 Run resolves with `finishReason: "yielded"`, not task completion or cancellation.

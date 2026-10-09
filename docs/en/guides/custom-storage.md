@@ -1,4 +1,4 @@
-# Custom Session storage
+# Configure Session storage
 
 **English** | [简体中文](../../zh-CN/guides/custom-storage.md)
 
@@ -10,12 +10,27 @@ May separates durable conversation history from session discovery:
   and delete sessions in a workspace.
 
 `AgentApplication` requires a `SessionStore`. `AgentWorkspace` additionally
-requires a `SessionCatalog`.
+requires a `SessionCatalog`. Use this guide to select the built-in local
+storage or implement a database adapter. It assumes the host has a configured
+model and permission policy; see [Build an Agent](building-an-agent.md).
+
+## Select a backend
+
+| Requirement | Backend |
+| --- | --- |
+| Process-local history | `InMemorySessionStore` from `@may/session` |
+| Local history across restarts | `FileSessionStore` from `@may/session/file-store` |
+| Local Session discovery | `FileSessionCatalog` from `@may/session/catalog` |
+| Database, encryption, or cross-process coordination | Custom implementations of the interfaces below |
+
+For file-backed storage, jump to [Built-in local storage](#built-in-local-storage).
+Database adapters must implement durable writes and consistent ordered reads.
 
 ## `SessionStore` contract
 
 ```ts
 interface SessionStore {
+  readonly directory?: string;
   append(event: SessionEvent): Promise<void>;
   read(sessionId: string): Promise<readonly SessionEvent[]>;
   inspect?(sessionId: string): Promise<readonly SessionEvent[]>;
@@ -43,8 +58,10 @@ Run completed successfully after saving final application state.
 
 ## Database adapter skeleton
 
-The following adapter keeps database-specific code behind a small transactional
-port. `appendIfCurrentSequence` must check the current maximum sequence and
+Create the adapter module in an application that depends on `@may/session`.
+The `SessionEventTable` below is a database integration interface; supply its
+implementation using your database library before instantiating the store.
+`appendIfCurrentSequence` must check the current maximum sequence and
 insert the new row in the same transaction.
 
 ```ts
@@ -92,6 +109,10 @@ export class DatabaseSessionStore implements SessionStore {
 
   delete(sessionId: string): Promise<boolean> {
     return this.table.deleteSession(sessionId);
+  }
+
+  inspect(sessionId: string): Promise<readonly SessionEvent[]> {
+    return this.read(sessionId);
   }
 }
 
@@ -142,14 +163,16 @@ Catalog implementations should upsert summaries without replacing an existing
 recently used sessions first. `rename` and `remove` are optional; the workspace
 controller reports those operations as unsupported when they are absent.
 
-The Catalog is an index, not conversation truth. `AgentWorkspace` deliberately
-tolerates Catalog-recording failures so an agent run is not lost merely because
-the recent-session list could not be updated. Provide a rebuild path from
-Session histories if catalog durability matters.
+The Catalog provides an index; Session history stores conversation facts.
+`AgentWorkspace` tolerates ordinary Run-summary recording failures and retains
+the Run result. Provide a rebuild path from Session histories if catalog
+durability matters.
 
 ## Built-in local storage
 
-For a local Node.js product, no custom adapter is required:
+Add `@may/application` and `@may/session` as direct application dependencies.
+In the entry point, initialize `model`, `tools`, and `permissionPolicy` before
+this composition snippet. Paths are relative to the process working directory:
 
 ```ts
 import { AgentApplication, AgentWorkspace } from "@may/application";
@@ -172,12 +195,29 @@ const workspace = await AgentWorkspace.open({
     ...(sessionId === undefined ? {} : { sessionId }),
   }),
 });
+
+try {
+  const run = await workspace.submit({ input: "Inspect the current state" });
+  await run.result;
+} finally {
+  await workspace.close();
+}
 ```
 
 The JSONL Session store is plaintext and assumes one active writer per session
 history. The file Catalog uses append-only atomic operation files across local
 processes, but does not compact that operation directory automatically. Neither
 backend is a multi-host database or encrypted secret store.
+After stopping other Catalog users, call `compact({ confirmHostsStopped: true })`;
+see [Local storage maintenance](#local-storage-maintenance) for the complete procedure.
+
+## Verify persistence
+
+Save the active `workspace.sessionId`, close the workspace, and reopen it with
+that `sessionId` and the same storage paths. Confirm that `history()` returns
+the submitted input and completed response. For a database backend, also verify
+that a stale sequence append rejects and leaves committed history unchanged.
+Use `inspect()` to confirm browsing performs no writes.
 
 ## Failure and lifecycle rules
 

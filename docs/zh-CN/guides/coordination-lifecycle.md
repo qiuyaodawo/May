@@ -2,27 +2,41 @@
 
 [English](../../en/guides/coordination-lifecycle.md) | **简体中文**
 
-[协作运行时](coordination.md) 提供两个仅供宿主调用的生命周期操作：显式创建新执行尝试，
-以及原子编辑尚未提交输入的任务节点。二者都不是自动重试策略，也不会作为 Agent 工具开放。
-二者需要独立的宿主授权；未提供对应策略回调时默认拒绝。
+使用 `retryTask()`，可以在核查失败任务后授权新的执行尝试；使用 `rewriteGraph()`，
+可以修改尚未提交输入的后续任务。这两项操作由宿主调用，分别需要明确的策略回调。
+
+本指南要求已有[协作运行时](coordination.md)、持久 Session 记录，以及核查外部任务
+结果的权限。创建任务图时配置相应回调，恢复时提供相同的策略版本。
 
 ## 授权新的执行尝试
 
+1. 在传给 `CoordinationRuntime.create()` 或 `resume()` 的策略中加入
+   `authorizeRetry`。以下策略允许宿主记录核查结论后重试 `analyst` 角色：
+
 ```ts
-const policy = {
+import type { CoordinationPolicy } from "@may/coordination";
+
+const policy: CoordinationPolicy = {
   version: "team-policy-v2",
   authorize: (task) => task.agent === "analyst",
   authorizeRetry: (task, finding) =>
     ["failed", "cancelled"].includes(task.status) && finding.trim().length > 0,
 };
+```
 
-// 宿主必须真正核实该结论；填写这段文本不等于完成验证。
+2. 核查任务、任务拥有的后代和外部影响。状态为 `recovery-required` 时，
+   根据证据调用 `resolveRecovery()`，随后才可以申请重试。
+3. 使用唯一命令 ID 和实际核查结论调用 `retryTask()`，在 `wait()` 返回后
+   检查新尝试的状态：
+
+```ts
 await runtime.retryTask(
   "retry-analysis-1",
   "analysis",
   "已确认 provider 在产生任何工具副作用前拒绝了请求，允许新的执行尝试。",
 );
 const snapshot = await runtime.wait();
+console.log(snapshot.tasks.find((task) => task.id === "analysis"));
 ```
 
 `retryTask(commandId, taskId, finding)` 只接受已知 `failed` 或 `cancelled` 的任务。
@@ -35,7 +49,7 @@ const snapshot = await runtime.wait();
 旧 Session 历史既不修改，也不重新提交。新 Session 只接收原任务、显式依赖结果和标记为
 数据的诊断摘要，不继承旧对话或工具审批授权。
 
-任务全局 `turn` 递增而不重置，旧邮箱凭据不会产生歧义。`maxTaskTurns`（默认 16）、
+任务全局 `turn` 延续原来的计数并继续递增，旧邮箱凭据保持明确的轮次身份。`maxTaskTurns`（默认 16）、
 `maxHandoffs`（默认 4）、任务总数、消息总数和协作截止时间均为整个生命周期的限制。
 `maxAttempts`（默认 3）包括初始尝试。新尝试不会回滚文件、远程副作用或已使用额度；
 共享预算继续计算新的调用。
@@ -62,14 +76,26 @@ const snapshot = await runtime.wait();
 
 ## 原子修订未来的任务节点
 
+1. 创建运行时时，在策略中加入 `authorizeGraphRewrite`。以下片段使用前文
+   导入的 `CoordinationPolicy`：
+
 ```ts
-// 创建或恢复运行时时，将此回调加入 policy。
-const authorizeGraphRewrite = (change, snapshot) =>
+const authorizeGraphRewrite: NonNullable<CoordinationPolicy["authorizeGraphRewrite"]> = (change, snapshot) =>
   snapshot.tasks.length < 128 &&
   [...(change.add ?? []), ...(change.update ?? [])].every(
     (task) => task.agent === "analyst",
   );
+const graphPolicy: CoordinationPolicy = { ...policy, authorizeGraphRewrite };
+```
 
+将 `graphPolicy` 作为 runtime 的 `policy` 选项传入。
+
+2. 确认要修改的顶层任务仍在排队，且从未提交输入。以下示例要求已经存在
+   `first`、`summary` 和 `unused-check`，其中 `summary` 和 `unused-check`
+   仍然符合修改条件。
+3. 使用唯一命令 ID 提交完整修改：
+
+```ts
 await runtime.rewriteGraph("expand-plan-1", {
   add: [
     { id: "second-check", agent: "analyst", input: "核查第一次检查的结果。", dependsOn: ["first"] },
@@ -81,8 +107,8 @@ await runtime.rewriteGraph("expand-plan-1", {
 });
 ```
 
-`TaskGraphChange` 接受 `add`、`update` 和 `remove` 数组。更新项是完整的 `TaskSpec`，
-不是局部补丁。同一个任务 id 不能在一次编辑中重复出现。所有修改节点、依赖、环路、配额
+`TaskGraphChange` 接受 `add`、`update` 和 `remove` 数组。更新项必须提供完整的
+`TaskSpec`。同一个任务 id 不能在一次编辑中重复出现。所有修改节点、依赖、环路、配额
 和最终完整任务图均通过检查后，才执行一次持久化提交。新增和更新节点还必须通过通用
 任务授权，并在实际调度时再次授权。
 
@@ -96,5 +122,5 @@ await runtime.rewriteGraph("expand-plan-1", {
 整个生命周期的 `maxTasks` 配额计算当前节点和已删除节点。`maxGraphChanges` 默认 32，
 每次编辑的操作总数由 `maxTasks` 限制。编辑不会重置截止时间或预算。
 
-这些限制刻意排除了对运行中流程的任意改写。活动协作应使用委派、消息或 handoff；
-已经产生持久执行证据的工作若需调整，应创建新任务。
+命令返回后，检查 `runtime.snapshot().graphChanges` 和新的任务定义，随后启动或
+继续调度符合条件的排队任务。已经产生执行证据的工作需要调整时，使用新的任务 ID。

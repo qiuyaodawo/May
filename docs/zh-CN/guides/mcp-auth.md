@@ -1,11 +1,18 @@
-# MCP 认证与凭据
+# 配置 MCP OAuth 认证
 
 [English](../../en/guides/mcp-auth.md) | **简体中文**
 
-HTTP 端点的 OAuth 认证与工具执行权限相互独立。登录不会批准工具、向模型提供上下文，
-也不会启动 Agent。本地 stdio 凭据仍通过显式配置的环境变量传入。
+本文用于在 MaybeCode 或自定义原生宿主中认证 Streamable HTTP 端点。需要服务端的
+OAuth 注册要求、可信认证来源、浏览器，以及可用的系统钥匙串或安全凭据存储。
+按照[MCP 指南](mcp.md)配置端点。
+
+OAuth 建立远程账户身份，应用单独检查每次工具执行权限。Stdio 服务端通过配置
+的环境变量取得凭据。
 
 ## 配置原生 OAuth 客户端
+
+1. 在 May 配置的 HTTP 端点中添加 `auth`。
+2. 将示例端点、scopes 和认证来源替换为服务端接受的值。
 
 ```json
 {
@@ -28,83 +35,95 @@ HTTP 端点的 OAuth 认证与工具执行权限相互独立。登录不会批�
 }
 ```
 
-省略 `account` 时使用 `default` 凭据配置。它是本地标签，不代表已验证的远程用户身份。
-端点 URL、account、客户端注册配置以及精确 issuer 共同隔离凭据；相同端点、account
-和注册配置的别名共享授权。
+省略 `account` 使用 `default` 凭据配置。Account 是本地标签；实际远程身份由
+服务端认证。端点 URL、account、客户端注册配置和精确 issuer 共同隔离凭据。
+相同端点、account 和注册配置的别名共享授权。
 
-默认只信任 MCP 端点自身 origin 上的 OAuth 网络请求。外部身份提供方需要在
-`authorizationOrigins` 中列出**精确 origin**。发现、授权 URL、token 和撤销请求
-拒绝其他 origin、URL 凭据/fragment 及重定向；除 loopback 外必须使用 HTTPS。
-这些显式目标可以是私网地址，需要更强隔离时应施加主机网络策略。MCP 请求 header
-不会转发到 OAuth 请求中。静态 `Authorization` header 不可与 OAuth 同时配置。
+默认信任 MCP 端点来源的 OAuth 网络请求。外部身份服务需要在
+`authorizationOrigins` 中列出精确来源。发现、授权、token 和撤销请求拒绝其他
+来源、URL 凭据、fragment 和重定向。除本地回环地址外要求 HTTPS。宿主负责私有
+网络访问策略；MCP headers 不转发给 OAuth。静态 `Authorization` 与 OAuth
+不能同时配置。
 
-注册方式：
+| 注册配置 | 使用要求 |
+| --- | --- |
+| `clientId` 与 `expectedIssuer` | 预注册的公共原生客户端，issuer 精确匹配；采用客户端秘密的机器认证需要其他集成 |
+| `clientMetadataUrl` | 带文档路径的公开 HTTPS Client ID Metadata Document，服务端需要支持 CIMD |
+| 省略上述配置 | 服务端声明支持时，由 SDK 使用 Dynamic Client Registration |
 
-- `clientId` 加 `expectedIssuer`：预注册的**公共原生客户端**，issuer 必须精确匹配；
-  不是 client-secret 或 machine-to-machine 流程。
-- `clientMetadataUrl`：带文档路径的公开 HTTPS Client ID Metadata Document，
-  在 server 宣告支持 CIMD 时使用。
-- 否则由 SDK 在服务支持时使用旧 Dynamic Client Registration。
-
-两个 client ID 配置不可同时使用。`callbackPort` 可指定 loopback 端口（0–65535）；
-默认 0 由 OS 分配未占用端口。旧 DCR 注册不允许新回调 URL 时，会重新注册。
-预注册客户端/CIMD 文档必须允许所选原生回调地址。
+两种 client ID 配置不能同时使用。`callbackPort` 接受 0–65535，默认 `0` 选择
+未占用端口。已保存 DCR 注册不允许新的回调 URL 时重新注册。预注册客户端和
+CIMD 文档需要允许选定的原生回调地址。
 
 ## 登录、刷新和退出
 
-```sh
-maybecode mcp login remote --config /path/to/config.json
-maybecode mcp status remote --config /path/to/config.json
-maybecode mcp login remote --scope write --config /path/to/config.json
-maybecode mcp logout remote --config /path/to/config.json
+1. 在仓库根目录使用刚编辑的配置执行登录。使用已安装 CLI 时，将
+   `pnpm maybecode` 替换为 `maybecode`。
+
+```powershell
+pnpm maybecode mcp login remote --config ./may.config.json
+pnpm maybecode mcp status remote --config ./may.config.json
 ```
 
-这些命令也接受 `--workspace <path>`。登录会打印授权 URL，请在浏览器中打开。
-May 只监听 `127.0.0.1`，校验随机、一次性 state，并在兑换 PKCE 绑定的 code 或读取
-回调错误之前校验 issuer。Ctrl+C 或五分钟超时会关闭 listener。Code verifier 和
-discovery state 都只在当前进程内存中保存；退出即取消流程，不保留可恢复的授权码。
+2. 在浏览器打开显示的授权地址，同意所需 scopes。登录完成后，凭据保存到安全存储。
+3. 如果 MaybeCode 已经运行，执行 `/mcp reconnect remote`。通过 `/mcp` 检查连接
+   状态，随后启动新的 Run。
+4. 需要增加权限范围或删除本地凭据时，执行：
 
-运行时读取已存凭据，在过期或 HTTP 401 时刷新。刷新串行执行并重新发现 issuer，
-不会把旧 issuer 的凭据拿到新 issuer 兑换。Transport 在刷新后最多重试一次被 401
-拒绝的请求；其他工具/网络失败不会重放。HTTP 403 `insufficient_scope` 会保存已授予
-与新请求 scope 的并集，返回 `MCP_AUTHENTICATION_REQUIRED`，要求显式重新登录授权，
-不会在工具执行中打开浏览器。`/mcp` 会在适当时显示 `auth-required`。登录后执行
-`/mcp reconnect <server-id>` 重新发现能力并创建新授权身份，也适用于首次发现失败
-的端点。随后启动新 Run，不重放被拒绝的调用。
+```powershell
+pnpm maybecode mcp login remote --scope write --config ./may.config.json
+pnpm maybecode mcp logout remote --config ./may.config.json
+```
 
-`status` 只报告是否存有 token、是否等待追加同意以及已知过期时间，并不进行远程 token
-有效性验证。退出在服务宣告支持时尝试 RFC 7009 撤销，并始终清除本地授权。如果远程
-撤销不可用或失败，会明确提示；必要时应到提供方撤销访问。退出不会删除远端用户数据。
+命令也接受 `--workspace <path>`。登录只监听 `127.0.0.1`，校验随机且只能使用
+一次的 state，并在兑换 PKCE code 或处理回调错误前验证 issuer。Ctrl+C 或五分钟
+期限关闭监听器。Code verifier 和发现状态保存在当前进程，退出后取消登录。
+
+运行请求在凭据过期或 HTTP 401 时串行刷新，并重新发现 issuer。旧 issuer 凭据
+只向原 issuer 兑换。刷新后，401 拒绝的请求最多重试一次；其他网络或工具错误不
+重放。HTTP 403 `insufficient_scope` 保存已有与请求 scopes 的并集，返回
+`MCP_AUTHENTICATION_REQUIRED`，要求明确重新登录。工具执行期间不会打开浏览器。
+
+登录记录不透明授权代次。新的操作、缓存命中和 MRTR 续接校验该代次。再次登录
+或退出，包括其他进程的操作，使旧连接失效；重连后重新发起操作。Token 刷新
+保留相同代次。
+
+`status` 报告是否保存 token、是否等待追加同意及已知过期时间，不检查远程有效性。
+退出在服务端支持时尝试 RFC 7009 撤销，并始终删除本地授权。远程撤销不可用或
+失败时显示原因，必要时在服务端撤销访问。远程用户数据保持不变。
 
 ## 存储与嵌入
 
-MaybeCode 使用 `~/.may/maybecode/mcp-credentials`（程序嵌入时位于 `dataDirectory`
-之下）。记录采用 AES-256-GCM、随机 nonce、绑定记录 key 的 AAD、原子写入和限制性
-创建权限；32 字节主密钥通过可选依赖 `@napi-rs/keyring` 保存在系统钥匙串。较大的
-refresh token 不受原生 keyring 单条记录大小限制。钥匙串锁定、缺失或不支持时直接
-失败，**不会回退到明文存储**。原生 Windows backend 已做本地 smoke 验证；其他平台
-需要可用的系统 keyring/Secret Service。仅移动加密文件不会迁移其 OS 绑定主密钥。
+MaybeCode 默认使用 `~/.may/maybecode/mcp-credentials`，程序嵌入时位于
+`dataDirectory` 下。记录使用 AES-256-GCM、随机 nonce、绑定记录 key 的 AAD、
+原子写入及限制性创建权限。32 字节主密钥通过可选 `@napi-rs/keyring` 保存在
+系统钥匙串，较大的 refresh token 保存在加密文件中。
 
-凭据操作通过独占 lock 文件串行化。进程崩溃后，应读取 `.lock` 中的 PID 并确认进程
-已退出，再移除该 lock；library 不会仅凭文件年龄抢占活跃锁。无界面系统需要解锁
-系统钥匙串，或注入安全存储。
+钥匙串锁定、缺失或不可用时直接失败。Windows 原生后端具有单独的本地检查；
+其他平台需要可用的系统钥匙串或 Secret Service。迁移加密文件时还需要对应的
+系统主密钥。
 
-Library 集成创建 `new McpOAuthManager(store)`，将它作为 `oauth` 传给
-`openMcpClientPool`，或作为 `mcp.oauth` 传给 configured MaybeCode。Manager 提供
-`login`、`status`、`logout`。其他安全 backend 可实现 `McpCredentialStore`；
-`InMemoryMcpCredentialStore` 是显式选择的非持久方案，不是桌面默认 fallback。
-登录接受 `onAuthorizationUrl` callback、`signal` 和 `timeoutMs`。
+独占 `.lock` 文件管理凭据操作。崩溃后读取其中 PID，确认进程已经退出，再删除
+该文件。无界面系统需要解锁钥匙串，或提供安全存储。
 
-凭据、回调 code/state、OAuth response body 不加入模型消息、Session history 或内置
-trace。授权 URL 仅在认证 UI 中主动展示。OAuth fetch 每次最多 30 秒、响应最多
-1 MiB；server/tool 内容仍不可信。
+库集成创建 `new McpOAuthManager(store)`，将其作为 `oauth` 传给
+`openMcpClientPool`，或作为 `mcp.oauth` 传给配置式 MaybeCode。Manager 提供
+`login`、`status` 和 `logout`。其他后端实现 `McpCredentialStore`；明确选择
+`InMemoryMcpCredentialStore` 时，退出后不保留凭据。登录接受
+`onAuthorizationUrl`、`signal` 和 `timeoutMs`。
 
-参考：[MCP 认证规范](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)、
-[SDK provider 义务](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/upgrade-to-v2.md)。
+凭据、回调 code/state 和 OAuth 响应正文不进入模型消息、Session 历史或内置追踪。
+授权 URL 仅在认证 UI 显示。OAuth 请求最多 30 秒，单个响应最多 1 MiB。
+服务端及工具内容需要按不可信数据处理。
 
-OAuth 登录现在记录不透明授权代次。资源缓存命中及新的工具/能力操作都会验证代次；
-退出或再次登录（包括另一个进程）使旧连接失效，需要重连。正常 token 刷新不会
-改变已记录的授权代次。
+## 故障检查
 
-现代 MRTR 每次续接前都会重新检查原认证 generation。用户提问期间登录/退出后，
-不会在另一身份下复用旧的不透明状态；需要重连并重新发起操作。
+| 现象 | 检查与处理 |
+| --- | --- |
+| OAuth 来源被拒绝 | 在 `authorizationOrigins` 添加身份服务的精确可信来源 |
+| 回调无法完成 | 检查注册回调地址和本地端口，在五分钟期限内重新登录 |
+| 凭据存储不可用 | 解锁或配置系统钥匙串，或者提供安全 `McpCredentialStore` |
+| 崩溃后存在锁文件 | 验证其中 PID 已退出，再删除那个明确的 `.lock` 文件 |
+| `MCP_AUTHENTICATION_REQUIRED` | 完成追加 scope 的明确登录，重连后启动新 Run |
+
+连接和归属限制参阅[MCP 能力参考](../reference/mcp-capabilities.md)。

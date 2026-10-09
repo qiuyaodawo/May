@@ -2,6 +2,10 @@
 
 **English** | [简体中文](../../zh-CN/architecture/runtime-session.md)
 
+This page explains which package owns Agent execution, conversation state, and
+application resources. Use it when deciding where an extension belongs or
+reviewing dependencies between reusable packages and products.
+
 May uses four lifecycle levels:
 
 ```mermaid
@@ -9,8 +13,7 @@ flowchart LR
   Definition[Agent definition] --> Session --> Run --> Step
 ```
 
-Application orchestration sits around these lifecycle levels rather than
-adding another model-execution level. An `AgentApplication` owns one active
+Application orchestration manages these lifecycle levels. An `AgentApplication` owns one active
 Session, while an `AgentWorkspace` selects and replaces the active application
 when a product creates, resumes, or reconfigures a session.
 
@@ -18,46 +21,17 @@ Plugin resources use nested `host`, `application`, `session`, and `run` scopes.
 The owning application opens these scopes, resolves declared services, and
 dispatches lifecycle Hooks. See [Plugins and services](../guides/plugins.md).
 
-## Vocabulary
+## Lifecycle ownership
 
-### Agent definition
+Definitions and execution examples are maintained in
+[Agent definitions, Application, and Workspace](../concepts/agent-application.md)
+and [Session, Run, and Step](../concepts/session-run-step.md).
 
-An `AgentDefinition` is the reusable composition object that determines how an
-agent behaves: its model, tools, instructions, and default execution policy.
-Create it with `defineAgent()`, then call `open()` with a Session store and
-optional identity/metadata for each independent `AgentApplication`. It has no
-conversation identity or active work by itself.
-
-“Independent” describes the in-process lifecycle objects, not coordination for
-the same durable identity. `AgentDefinition.open()` does not lock or serialize
-multiple applications that use the same `sessionId`. Do not concurrently open
-the same durable Session; the current Session/storage contracts assume one
-active writer per Session identity.
-
-### Session
-
-A long-lived conversation and work identity. A session owns history and
-session-scoped state across multiple runs and may exist while no run is active.
-Persistence, resume, fork, durable context checkpoints, and session-scoped
-permission grants belong here.
-
-A session may have at most one active run. Session storage is a separate
-capability so an in-memory session does not require filesystem dependencies.
-That per-object run rule is not a distributed or cross-application lock for
-another Session object opened against the same id.
-
-### Run
-
-One execution started by user input. A run continues until the model finishes,
-the step limit is reached, it fails, or it is cancelled. `May.run()` and its
-event stream form this boundary.
-
-### Step
-
-One model request followed by execution of the tool calls in that response. A
-tool result can cause another step in the same run. Step limits therefore bound
-model/tool iterations, not the number of tools: one step may contain multiple
-tool calls.
+Each opened application owns its in-process lifecycle. A Session permits one
+active Run, and each durable Session identity requires one active writer.
+The host must coordinate applications that could access the same history.
+Session storage remains a separate capability, allowing in-memory conversations
+without filesystem dependencies.
 
 ## Package responsibilities
 
@@ -167,11 +141,14 @@ allow, deny, or suspend execution for approval. Its policy receives parsed tool
 input, and its approval events form a headless protocol: a TUI only renders a
 request and returns a decision.
 
-The permission executor supports one-time decisions and explicit scoped grants
-for its lifetime. Applications use one executor per Session so grants cannot
-leak between sessions. Its awaited event sink lets Session persist approval
-requests and decisions before related tool outcomes. Durable grants remain
-future storage work and do not belong to the UI.
+The permission executor supports one-time decisions, scoped session grants,
+and persistent rules through an injected `PermissionRuleStore`. Applications
+use one executor per Session; closing it clears session grants. Persistent rules
+remain available in their configured store and are checked against trusted
+scope, tool definition, expiry, and policy on each relevant execution.
+Its awaited event sink lets Session persist approval requests and decisions
+before related tool outcomes. See [Permission policies](../guides/permission-policy.md)
+for precedence, revocation, and storage ownership.
 
 ### `@may/observability`
 

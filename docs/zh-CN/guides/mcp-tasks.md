@@ -1,15 +1,21 @@
-# MCP 长任务
+# 管理 MCP 长任务
 
 [English](../../en/guides/mcp-tasks.md) | **简体中文**
+
+本文用于启用和管理超出即时工具响应时间的远程任务。需要可信且支持 Tasks 的
+服务端、安全任务日志，以及能够提供工作区和 Session 归属的应用。基础连接
+参阅[MCP 指南](mcp.md)。
 
 ## 支持范围
 
 `@may/mcp` 和 MaybeCode 已支持显式启用的任务创建、状态检查、经审阅输入、等待、
-协作式取消及绑定归属的恢复，适用于现代 stdio 和 Streamable HTTP。目标为
-[2026-07-28 Tasks 扩展](https://tasks.extensions.modelcontextprotocol.io/specification/2026-07-28/tasks)，
-标识 `io.modelcontextprotocol/tasks`：使用扁平任务句柄以及 `tasks/get`、
+协作式取消及绑定归属的恢复，适用于现代 stdio 和 Streamable HTTP。支持扩展
+`io.modelcontextprotocol/tasks`，版本 `2026-07-28`：使用扁平任务句柄以及 `tasks/get`、
 `tasks/update`、`tasks/cancel`。不兼容的 2025 实验版 `tasks/list`/`tasks/result`
-协议不在支持范围。尚未实现可选的任务订阅通知；支持显式轮询。[独立 server 导出](mcp-server.md) 是单独的显式入口，不会自动导出任务。
+协议不在支持范围。尚未实现可选的任务订阅通知；支持明确轮询。
+[独立服务端导出](mcp-server.md)支持即时工具结果。
+
+## 启用 Tasks
 
 在端点设置 `tasks: true`（默认 `false`）。连接必须同时协商核心版本 `2026-07-28`
 和服务端 Tasks 扩展；必需端点不满足时启动失败。stdio 默认 legacy，因此现代任务
@@ -22,29 +28,43 @@
     "jobs": {
       "transport": "streamable-http",
       "url": "https://jobs.example.com/mcp",
-      "tasks": true,
-      "host": { "sampling": true }
+      "tasks": true
     }
   } } }
 }
 ```
 
-MaybeCode 默认使用 `<dataDirectory>/mcp-tasks` 下独立的 OS keyring 加密 journal。
-自定义 Host 启用 Tasks 时必须给 `openMcpClientPool` 传入 `taskJournal`：
+MaybeCode 默认使用 `<dataDirectory>/mcp-tasks` 下由系统钥匙串加密的独立任务日志。
+自定义宿主启用 Tasks 时，需要向 `openMcpClientPool` 提供 `taskJournal`：
 
 ```ts
 import { KeyringMcpCredentialStore, McpTaskJournal } from "@may/mcp";
-const taskJournal = new McpTaskJournal(new KeyringMcpCredentialStore(taskVaultDirectory));
+const taskJournal = new McpTaskJournal(new KeyringMcpCredentialStore("./data/mcp-tasks"));
 ```
 
 也可注入安全的 `McpCredentialStore`。`InMemoryMcpCredentialStore` 退出后不保留
 恢复信息。需要相互隔离的所有 Session 应共享一个存储；独立存储无法实现跨存储归属
 约束。
 
+自定义宿主将 `taskJournal` 与 `servers` 放入同一组 `openMcpClientPool` 参数。
+上述相对路径基于进程工作目录，需要可用的系统钥匙串。保留该目录用于重启恢复。
+服务端需要 Roots 或 Sampling 时，单独启用，并提供能够并发处理事件的交互界面。
+
+## 检查和完成任务
+
+1. 通过通常的权限界面批准能够创建任务的工具。返回延迟结果时，保留本地任务句柄。
+2. 使用 `/mcp tasks` 查找当前 Session 的句柄，执行
+   `/mcp task-get <server> <local-id>` 检查远程状态。
+3. 任务运行期间使用 `task-wait`。需要输入时使用 `task-update`，审阅表单、URL
+   或兼容能力请求。
+4. 完成后使用 `task-get` 预览。需要新 Run 读取结果时，明确执行 `task-attach`。
+5. 需要停止远程工作时，明确执行 `task-cancel`，随后检查状态。需要移除本地记录
+   时执行 `task-forget`。
+
 ## 用户控制与 Context
 
 任务创建仍是经过 Core 正常权限/执行链路的 MCP 工具调用。异步结果只向模型返回
-**本地任务句柄**，不是重复调用的许可。管理 API 是显式 Host 控制，不会自动作为模型
+**本地任务句柄**。管理 API 由宿主明确调用，不会自动作为模型
 工具暴露。两个终端 UI 共用以下命令：
 
 | 命令 | 效果 |
@@ -68,7 +88,7 @@ schema）。服务端内容视为不可信数据，终端输出经过净化。�
 `forgetTask(serverId, localId, owner)`。`mcpTaskToUserMessage` 显式转换完成结果。
 MaybeCode 提供对应的 `*McpTask` controller 方法，以及 `listMcpTasks`、
 `submitMcpTask`，自行填入当前 workspace/Session 并固定状态转换。UI 必须在此队列
-之外响应交互事件，与 [Host 交互](mcp.md) 相同，避免审批死锁。
+之外响应交互事件，使等待输入的操作能够取得答案，参阅[宿主交互](mcp.md)。
 
 ## 归属、输入与取消
 
@@ -97,15 +117,15 @@ Host 配置和交互消费者。重启后保留原始 owner；任务输入不能
 
 ## 存储、预算与验证
 
-每个 Session 最多保留 64 条记录 / 512 KiB。创建阶段 MRTR 用量计入任务的持久生命
-周期预算：最多 32 次 Host 输入尝试（含重试）、四次 sampling 预留、合计 16,384 个
+每个 Session 最多保留 64 条记录、512 KiB。创建阶段 MRTR 用量计入任务整个生命
+周期的持久预算：最多 32 次宿主输入尝试（含重试）、四次 Sampling 预留、合计 16,384 个
 预留输出 token，单次最多 4,096。经批准的 sampling 用量先持久化再调用 provider；
 取消、不披露输出及重试都不会退还预算。
 
 只持久化路由元数据、时间戳、状态、取消意图和散列 claim，不存储参数、状态消息、
 输入载荷、答案、错误或结果。远端 id 和 owner 标签在 keyring vault 内加密。跨
-Session 索引为每个端点身份保留最多 1,024 条散列远端 id 墓碑，forget 后仍保留。
-先占用再绑定 Session，因此部分写入只会留下更严格的墓碑。索引满后需要审计未完成
+Session 索引为每个端点身份保留最多 1,024 条散列远端 id 记录，forget 后仍保留。
+先占用再绑定 Session，因此部分写入仍保留限制访问的记录。索引满后需要审计未完成
 句柄再显式维护，不会自动淘汰。
 
 `McpTaskJournal` 提供 `begin`、`initialUsage`、`observe`、`get`/`list`、
@@ -122,4 +142,11 @@ HTTP 管理请求携带 `Mcp-Name` 任务路由；工具请求保留支持的 `x
 及输出校验），以及 MaybeCode 的 `mcp-capabilities.test.mjs`（权限门控、终端输入、
 显式附件）。这些聚焦 fixture 不等于对所有第三方服务端的完整符合性认证。
 
-可选图形集成及终端 fallback 参阅[隔离 Apps Host](mcp-apps.md)。
+图形集成与终端文本显示参阅[隔离 Apps Host](mcp-apps.md)。
+
+## 验证任务恢复
+
+使用真实任务端点，确认重启保留本地句柄、等待在需要输入或终态时结束、本地取消
+不改变远端状态，以及结果附加需要明确操作。仓库的本地 HTTP 与进程集成测试通过
+仓库根目录的 `pnpm --filter @may/mcp test` 执行。第三方服务需要单独验证账户与
+兼容性。

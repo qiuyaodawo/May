@@ -140,8 +140,15 @@ test("真实 MCP broker：Web 表单、review、URL、失效响应和取消", { 
   const { client } = await connect(app, t);
   const initialHistory = await app.history();
   const owner = { workspaceId: app.workspace, sessionId: app.sessionId };
+  const idle = async () => {
+    await client.refresh();
+    assert.equal(client.state.snapshot.controls.busy, false);
+    assert.equal(client.state.snapshot.controls.forms.length, 0);
+  };
+  await idle();
   const pending = async () => {
     await until(async () => { await client.refresh(); return client.state.snapshot.controls.forms.length > 0; });
+    assert.equal(client.state.snapshot.controls.busy, true);
     return client.state.snapshot.controls.forms[0];
   };
   const request = broker.request("acceptance", "form", owner, { mode: "form", message: "输入验收名称", requestedSchema: {
@@ -160,16 +167,20 @@ test("真实 MCP broker：Web 表单、review、URL、失效响应和取消", { 
   await client.interact("mcp.respond", { id: form.id, action: "accept", content: '{"name":"Web acceptance"}' });
   await viewing;
   assert.equal((await request).content.name, "Web acceptance");
+  await idle();
   await assert.rejects(client.interact("mcp.respond", { id: form.id, action: "cancel" }), { status: 409 });
   const review = broker.review("acceptance", "review", owner, { mode: "review", kind: "sampling.request", message: "核查输入", editable: true, data: { maxTokens: 32 } }, new AbortController().signal, Date.now() + 30_000);
   const reviewForm = await pending();
   await client.interact("mcp.respond", { id: reviewForm.id, action: "accept", content: JSON.stringify({ json: '{"maxTokens":16}' }) });
   assert.equal(JSON.parse((await review).content.json).maxTokens, 16);
+  await idle();
   const url = broker.request("acceptance", "url", owner, { mode: "url", message: "核查网站", url: "https://example.com/" }, new AbortController().signal, Date.now() + 30_000);
   const urlForm = await pending(); assert.equal(urlForm.mode, "url");
   await client.interact("mcp.respond", { id: urlForm.id, action: "decline" }); assert.equal((await url).action, "decline");
+  await idle();
   const cancelled = broker.review("acceptance", "cancel", owner, { mode: "review", kind: "roots", message: "核查工作区", editable: false, data: [] }, new AbortController().signal, Date.now() + 30_000);
   await pending(); await client.interact("console.cancel"); assert.equal((await cancelled).action, "cancel");
+  await idle();
   assert.deepEqual(await app.history(), initialHistory);
 });
 

@@ -1,9 +1,34 @@
-# MaybeClaw: Agent Gateway
+# Run and administer MaybeClaw
 
 **English** | [简体中文](../../zh-CN/guides/maybeclaw.md)
 
 MaybeClaw connects Agents to durable sessions, Web, CLI, Telegram, and Feishu.
 It manages routing, access, approvals, execution, and message delivery.
+
+## Start a local console
+
+Prerequisites: complete the install and build steps in
+[repository development](repository-development.md). To use a May Agent, configure
+a Provider and model profile using the [configuration reference](../reference/configuration.md).
+Telegram and Feishu require separate platform accounts and credentials.
+
+1. From the repository root, run `pnpm maybeclaw`. Keep the terminal open.
+2. If local initialization opens, set and confirm an administrator password.
+   Log in to the console using that password.
+3. Add a May Agent in Agent Management, choosing an existing model profile and its
+   project directory. Create a named session with that Agent as a default.
+4. Send a message in that session. Handle any pending approvals, then inspect the
+   task result and session history. Model requests use the configured account.
+5. Stop the service with Ctrl+C. Reopen it using the same configuration and data
+   directory to inspect the saved session and history.
+
+Continue with [configuration](#sessions-and-configuration),
+[permissions](#persistent-permission-rules), [Web and CLI](#startup-web-and-cli),
+[chat commands](#chat-commands-and-interruption),
+[channels](#channels-members-and-approvals), or
+[storage and migration](#lifecycle-storage-and-migration).
+
+## Application composition
 
 Reusable channel, delivery, Agent adapter, coordination and HTTP functionality
 is provided by `packages/plugins/`. Product plugin composition lives in
@@ -64,7 +89,8 @@ For manual configuration, retain existing May `providers` and `models` and merge
 
 After starting the Web console, log in using the administrator password and add the first Agent in Agent Management. You can then create sessions immediately without restarting the service. Existing `providers` and `models` configurations are retained for May Agents.
 
-A configuration with pre-registered Agents is shown below. Replace `coding-profile` and `review-profile` with actual model profile names.
+The following `apps` fragment registers Agents in an existing configuration.
+Replace `coding-profile` and `review-profile` with actual model profile names.
 
 ```json
 {
@@ -75,8 +101,19 @@ A configuration with pre-registered Agents is shown below. Replace `coding-profi
         { "id": "code", "adapter": "may", "model": "coding-profile" },
         { "id": "reviewer", "adapter": "may", "model": "review-profile" }
       ],
-      "server": { "maxConcurrent": 4, "idleMs": 600000, "shutdownMs": 30000, "approvalMs": 600000, "auth": { "password": "REPLACE_WITH_YOUR_OWN_PASSWORD" } },
-      "access": { "sessionAdmins": {}, "creators": [], "deniedUsers": [], "allowedAgents": {} }
+      "server": {
+        "maxConcurrent": 4,
+        "idleMs": 600000,
+        "shutdownMs": 30000,
+        "approvalMs": 600000,
+        "auth": { "password": "REPLACE_WITH_YOUR_OWN_PASSWORD" }
+      },
+      "access": {
+        "sessionAdmins": {},
+        "creators": [],
+        "deniedUsers": [],
+        "allowedAgents": {}
+      }
     }
   }
 }
@@ -269,12 +306,27 @@ explicit resubmission. Unsupported capabilities return clear errors.
 
 ## Channels, members, and approvals
 
-Add channels under `apps.maybeclaw.channels`:
+Before enabling a channel, create its platform application, configure the required
+permissions and events, supply the credential environment variable, and collect the
+allowed identities. Merge the following fragment under `apps.maybeclaw.channels`,
+then restart the service. Replace the sample application and identity values:
 
 ```json
 {
-  "telegram": { "enabled": true, "botTokenEnv": "MAYBECLAW_TELEGRAM_TOKEN", "allowUsers": ["123456789"], "allowGroups": ["-1001234567890"], "groupTrigger": "explicit" },
-  "feishu": { "enabled": true, "appId": "cli_replace_with_your_app_id", "appSecretEnv": "MAYBECLAW_FEISHU_SECRET", "allowUsers": ["ou_replace_with_your_open_id"], "allowGroups": ["oc_replace_with_your_chat_id"] }
+  "telegram": {
+    "enabled": true,
+    "botTokenEnv": "MAYBECLAW_TELEGRAM_TOKEN",
+    "allowUsers": ["123456789"],
+    "allowGroups": ["-1001234567890"],
+    "groupTrigger": "explicit"
+  },
+  "feishu": {
+    "enabled": true,
+    "appId": "cli_replace_with_your_app_id",
+    "appSecretEnv": "MAYBECLAW_FEISHU_SECRET",
+    "allowUsers": ["ou_replace_with_your_open_id"],
+    "allowGroups": ["oc_replace_with_your_chat_id"]
+  }
 }
 ```
 

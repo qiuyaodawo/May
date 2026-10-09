@@ -2,8 +2,8 @@
 
 **English** | [简体中文](../../../zh-CN/architecture/decisions/0006-mcp-adapts-to-core-tools.md)
 
-- Status: Accepted
-- Date: 2026-09-03
+- **Status:** Accepted
+- **Date:** 2026-09-03
 
 ## Context
 
@@ -28,11 +28,11 @@ product ownership boundary. Therefore all calls continue through the selected
 Core `ToolExecutor` and `ToolScheduler`; products retain control of permission
 policy. Cancellation and trace context are explicitly propagated.
 
-The initial implementation supports stdio initialization, aggregated
-`tools/list`, and `tools/call`. It uses startup snapshots, deterministic
-provider-safe names, collision failure, bounded error details, and explicit
-connection/process shutdown. Resources, prompts, HTTP, server authoring, and
-dynamic list refresh are deferred.
+The adapter owns transport initialization, catalog discovery and remote calls.
+It exposes deterministic provider-safe names, detects collisions, bounds error
+details and supports explicit connection shutdown. Catalog refresh updates future
+Runs. Supported transports and capabilities are maintained in the
+[MCP capability reference](../../reference/mcp-capabilities.md).
 
 Servers are required by default, while an application may mark a server
 optional so its startup failure does not disable unrelated tools. The pool
@@ -49,15 +49,14 @@ contracts rather than parse process output.
   processes.
 - Optional-server failures are visible and isolated; required-server failures
   remain fail-fast.
-- A changed remote tool list requires reconnecting/restarting in this phase.
+- Explicit refresh or reconnect publishes a changed catalog for future Runs.
 - Server ids and remote names become part of a preview model-facing naming
   contract and collisions fail fast.
 - MCP servers remain trusted executable dependencies; adapting them to a Tool
   does not sandbox them or make their descriptions trustworthy.
 
-## Subsequent implementation
+## Related interfaces
 
-The initial-phase deferrals above are historical. Modern transports, capabilities,
-Host interactions, Tasks, isolated Apps and independent opt-in server exports are
-now implemented outside Core. See the [maintained roadmap](../mcp-host-roadmap.md)
-and [server guide](../../guides/mcp-server.md) for current boundaries and evidence.
+Host interactions, Tasks, isolated Apps and independent server exports are
+implemented outside Core and enabled through application composition. See the
+[MCP guide](../../guides/mcp.md) and [server guide](../../guides/mcp-server.md).

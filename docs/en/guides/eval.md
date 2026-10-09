@@ -1,12 +1,84 @@
-# Agent behavior evaluation
+# Evaluate Agent task results
 
 **English** | [简体中文](../../zh-CN/guides/eval.md)
 
-`@may/eval` executes versioned tasks in independent environments and verifies
-their actual results. It records successful, failed, limited and interrupted
-executions, acceptance evidence, human assistance and resource use. The runner
-can compare model, prompt, tool, permission and Context configurations using the
-same cases and acceptance rules.
+Use `@may/eval` to execute the same tasks across model, prompt, tool, permission
+or Context configurations and check their actual results. Each trial preserves
+execution status, acceptance evidence, infrastructure status, human assistance
+and resource use.
+
+This guide is for hosts with explicit acceptance requirements. It begins with
+the repository's runnable command suite, then explains how to register real
+Agent execution and evaluators. Use Node.js 22.16 or later and the pnpm version
+declared in `package.json` when running repository commands.
+
+## Running a trusted suite
+
+The private CLI loads a JavaScript suite exporting `experiment` and `registry`.
+Importing it executes code with host filesystem, process and network permissions.
+Load only trusted modules. The included suite uses actual files and Node.js
+processes and requires no model credentials.
+
+1. In the repository root, ensure dependencies are installed and built with
+   `pnpm install --frozen-lockfile` and `pnpm build`.
+2. Validate the included suite:
+
+```powershell
+pnpm eval validate --suite apps/eval/examples/suite.mjs
+```
+
+   The validation command prints `Validated file-artifact` for the unchanged
+   default suite. Validation checks configuration without starting trials.
+3. Run the experiment and inspect its report:
+
+```powershell
+pnpm eval run --suite apps/eval/examples/suite.mjs --output .eval-results
+pnpm eval report --experiment .eval-results/file-artifact
+```
+
+   The suite plans two trials, writes `result.json` containing an uppercase
+   message, and checks the file independently. Inspect execution, acceptance
+   and infrastructure outcomes for both trials. Trial IDs and timings vary.
+   Reports are saved as `report.json` and `report.md` in the experiment directory.
+4. Keep reports and evidence for review. Existing experiment IDs cannot be reused
+   for a new run; set `MAY_EVAL_EXAMPLE_ID` to a new ID before repeating the suite.
+   To continue interrupted planned work, use the [restart procedure](#restart-and-retry).
+
+`--output` is the store root; the experiment is stored in its own identity-named
+directory. Keep that root outside candidate workspaces. Reports remain available
+when trial execution or acceptance fails, and the CLI returns a nonzero status.
+SIGINT and SIGTERM request cancellation and preserve admitted trial records.
+
+The bundled file-artifact suite executes an actual command which writes a file,
+then verifies that file independently. It verifies the evaluation lifecycle and
+CLI. Data from that suite describes command execution, without measuring model
+task-solving ability. Real Agent evaluation uses the Application or Coordination
+adapter with the host's configured model and permission policy.
+
+Library hosts can run registered experiments with the following function. Its
+inputs are an `EvalExperiment`, the matching `EvalRegistry`, a host-controlled
+store directory and a cancellation signal:
+
+```ts
+import { EvalRunner, type EvalExperiment, type EvalRegistry } from "@may/eval";
+import { FileEvalStore } from "@may/eval/file-store";
+
+export async function evaluateExperiment(
+  experiment: EvalExperiment,
+  registry: EvalRegistry,
+  directory: string,
+  signal: AbortSignal,
+) {
+  const runner = new EvalRunner({
+    registry,
+    store: new FileEvalStore({ directory }),
+    signal,
+    onTrial: state => console.log(state.trial.id, state.taskVerdict),
+  });
+  runner.validate(experiment);
+  return await runner.run(experiment);
+}
+```
 
 ## Cases, variants and registries
 
@@ -36,48 +108,6 @@ The runner saves the complete trial plan and configuration fingerprints before
 executing any task. Every `case × variant × repetition` receives a unique trial
 identity. A seeded, interleaved schedule distributes variant execution order.
 The seed controls that order; provider randomness has its own configuration.
-
-## Running a trusted suite
-
-The private CLI loads an executable JavaScript module exporting `experiment` and
-`registry`. Importing a suite executes code with host filesystem, process and
-network permissions. Only load modules you trust.
-
-```powershell
-pnpm eval validate --suite apps/eval/examples/suite.mjs
-pnpm eval run --suite apps/eval/examples/suite.mjs --output .eval-results
-pnpm eval report --experiment .eval-results/file-artifact
-pnpm eval resume --suite apps/eval/examples/suite.mjs --experiment .eval-results/file-artifact
-```
-
-`--output` is the store root; the experiment is stored in its own identity-named
-directory. Keep that root outside candidate workspaces. Reports remain available
-when trial execution or acceptance fails, and the CLI returns a nonzero status.
-SIGINT and SIGTERM request cancellation and preserve admitted trial records.
-
-The bundled file-artifact suite executes an actual command which writes a file,
-then verifies that file independently. It verifies the evaluation lifecycle and
-CLI. Data from that suite describes command execution, without measuring model
-task-solving ability. Real Agent evaluation uses the Application or Coordination
-adapter with the host's configured model and permission policy.
-
-Library hosts can use the same suite directly:
-
-```ts
-import { EvalRunner } from "@may/eval";
-import { FileEvalStore } from "@may/eval/file-store";
-import { experiment, registry } from "./suite.mjs";
-
-const controller = new AbortController();
-const runner = new EvalRunner({
-  registry,
-  store: new FileEvalStore({ directory: ".eval-results" }),
-  signal: controller.signal,
-  onTrial: state => console.log(state.trial.id, state.taskVerdict),
-});
-runner.validate(experiment);
-const report = await runner.run(experiment);
-```
 
 ## Environment lifecycle
 
@@ -179,6 +209,14 @@ Telemetry evidence retains request and Session identities, request and resolutio
 timestamps, decision and status, without tool input.
 
 ## Restart and retry
+
+For the included suite, resume with its original module and experiment directory:
+
+```powershell
+pnpm eval resume --suite apps/eval/examples/suite.mjs --experiment .eval-results/file-artifact
+```
+
+Restore the same `MAY_EVAL_EXAMPLE_ID` if it was set when creating the experiment.
 
 `resume()` preserves completed trials and starts only trials which have not
 started. Previously started trials without a final state become `interrupted`.
@@ -379,5 +417,5 @@ performance conclusions require their corresponding real environment evidence.
 `test:integration:eval` reads the host's May configuration through
 `loadMayConfig()` and selects its configured provider and model. It executes real
 single-Agent and task-graph trials, model grading, permission handling and budget
-checks. Records remain under `eval-verification/live/run-*` for review; they
+checks and consumes provider quota. Records remain under `eval-verification/live/run-*` for review; they
 describe the configured tasks and model used in that execution.

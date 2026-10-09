@@ -1,10 +1,15 @@
-# Permission policies
+# Configure tool permissions and approvals
 
 **English** | [简体中文](../../zh-CN/guides/permission-policy.md)
 
-`@may/permissions` is a headless authorization and approval layer around tool
-execution. A `PermissionPolicy` receives the tool definition, its parsed input,
-and execution correlation data, then returns one of:
+Use this guide to decide which tools execute immediately, which require
+approval, and which grants survive a restart. Add `@may/permissions` to the
+application's direct dependencies and configure tool input validation before
+adding a policy. The application and its event consumer are described in
+[Build an Agent](building-an-agent.md).
+
+`PermissionPolicy` receives the tool definition, parsed input, and execution
+identifiers. Its return value selects the authorization behavior:
 
 - `allow` — execute immediately;
 - `deny` — reject the call;
@@ -22,16 +27,17 @@ under different product policies.
 
 ## Default-deny policy
 
-Keep allow rules narrow and use stable, policy-defined grant keys:
+Create a policy module and allow only the operation ranges your product
+supports. This example assumes registered `add` and `send_notification` tools:
 
 ```ts
 import type { PermissionPolicy } from "@may/permissions";
 
 export const permissionPolicy: PermissionPolicy = ({ tool, input }) => {
-  // 对本产品安全的纯、有限操作。
+  // 允许本产品支持的有限加法操作。
   if (tool.name === "add") return "allow";
 
-  // 对一个规范化 notification channel 请求审批。
+  // 为指定通知渠道请求审批。
   if (tool.name === "send_notification") {
     const channel = stringField(input, "channel")?.trim().toLowerCase();
     if (channel === undefined || channel === "") return "deny";
@@ -65,8 +71,11 @@ sensitive keys.
 
 ## Approval protocol
 
-`AgentApplication` relays approval requests as `permission.event` values. A UI
-chooses a decision and returns it through the controller:
+`AgentApplication` relays approval requests as `permission.event` values. Add
+approval handling to the application's existing event consumer. The following
+function shows only the approval part; the host supplies `choose` and its
+authenticated `createdBy` identity. A full UI must handle the other event types
+in the same consumer or explicitly distribute them to separate queues:
 
 ```ts
 import type { AgentApplication } from "@may/application";
@@ -118,6 +127,10 @@ executor/application closes. The UI should provide an explicit deny/cancel
 path; there is no implicit approval timeout.
 
 ## Persistent scope and storage
+
+This composition snippet requires a registered `write_documentation` tool that
+validates project Markdown paths, and trusted host values for `projectDirectory`,
+`projectIdentity`, `userIdentity`, and `agentIdentity`:
 
 ```ts
 import { join } from "node:path";
@@ -265,7 +278,7 @@ use Session recovery and do not become stored rules.
 Do not catch policy failures and default to `allow`. If an external policy
 service is unavailable, choose an explicit deny or fail the run.
 
-## Security boundary
+## Verify persistent approval
 
 The real-provider MaybeCode check is opt-in. After `pnpm build`, set
 `MAYBECODE_PERSISTENT_RULES_LIVE=1` and optionally
@@ -278,6 +291,8 @@ and permission evidence remaining outside model Context. Each Run permits at
 most three model calls and 45 seconds. Retries, Git, MCP, Skills, Goals and
 subagents are disabled. Saved evidence remains under the ignored
 `review/persistent-rules` directory; ordinary offline runs skip the check.
+
+## Security boundary
 
 Permissions answer **whether** a tool may execute. They do not constrain
 **what the process can affect** after it executes:

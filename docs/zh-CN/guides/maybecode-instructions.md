@@ -1,10 +1,29 @@
-# MaybeCode 提示词组装
+# 配置与查看 MaybeCode 指令
 
-[English](../../en/guides/maybecode-instructions.md)
+[English](../../en/guides/maybecode-instructions.md) | **简体中文**
 
 基础提示词提供 MaybeCode 身份、代码任务职责、交付内容及完成条件，以及信息处理和
 交流要求。`instructionsDirectory/system.md` 或显式 `instructions` 可以替换本次应用的
 基础提示词。
+
+## 配置项目与基础指令
+
+前提：已有配置完成的 [MaybeCode 工作区](maybecode.md)，并具有项目指令文件的
+编辑权限。
+
+1. 在项目根目录的 `AGENTS.md` 编写共享规则。目录专属规则写在对应子目录；
+   MaybeCode 从该目录或更深目录启动时，规则参与发现。
+2. 需要替换同一目录的规则时，在该目录创建非空 `AGENTS.override.md`。每个目录
+   只选择一份文件。
+3. 需要替换基础提示词时，将 `apps.maybecode.instructionsDirectory` 指向包含
+   `system.md` 的目录。相对路径根据配置文件所在目录解析。公共库调用方可以
+   直接提供 `instructions`。
+4. 修改基础提示词后重新打开应用。项目规则在接收输入和 Run 启动时刷新。
+5. 执行 `/instructions`，检查来源路径与顺序，确认选中文档适用于工作区，并且
+   每份文档只出现一次。
+
+显示内容包含当前指令贡献。Goal 继续执行提醒在模型请求准备时单独提供。
+字段说明见[配置参考](../reference/configuration.md#maybecode-设置)。
 
 ## 来源与顺序
 

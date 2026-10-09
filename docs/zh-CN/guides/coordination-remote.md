@@ -2,25 +2,32 @@
 
 [English](../../en/guides/coordination-remote.md) | **简体中文**
 
-`@may/coordination/remote` 支持在独立 Node.js 进程或主机中运行叶子任务。
-仍由一个协调器拥有任务图、授权、依赖、Attempt 和 Handoff；Worker
-拥有自己的 Agent 注册表、Session 和持久化派发日志。这不是多写者调度器，
-也不是高可用的所有权接管协议。
+使用 `@may/coordination/remote`，可以在独立 Node.js 进程或主机中执行叶子任务。
+协调器负责管理任务图、授权、依赖、执行尝试和任务移交；Worker 管理自己的
+Agent 注册表、Session 和持久化派发日志。
+
+本指南要求已有使用持久 Session 存储的[协作 Agent](coordination.md)。
+Worker 宿主需要自己的 provider 凭据、允许的输入和工具。两个宿主均需安装或
+链接 `@may/coordination`，跨主机连接需要配置 HTTPS。
 
 ## 嵌入 Worker
 
-宿主通过普通 `CoordinationAgent`（通常是 `createApplicationAgent()`）
-提供模型、工具与 Session 存储。不要从协调器任务输入中接收任意 Agent
-定义、工具或模型凭据。
+1. 通过 `createApplicationAgent()` 等方式，创建宿主配置的 `CoordinationAgent`，
+   使用自己的模型、工具和持久 Session 存储。以下片段将这个对象命名为 `workerAgent`。
+2. 在两个宿主环境中设置相同的 `MAY_WORKER_TOKEN`。密钥需要随机生成，至少
+   包含 24 个非空白字符，保存在版本控制和模型输入之外。
+3. 打开派发日志并监听回环地址。以下宿主片段注册 `analyst`，只接受协作
+   `review-1` 的任务：
 
 ```ts
 import { createServer } from "node:http";
 import { CoordinationWorker } from "@may/coordination/remote";
 
-// workerAgent 是宿主配置的 CoordinationAgent，使用持久化 Session 存储。
+const token = process.env.MAY_WORKER_TOKEN;
+if (!token) throw new Error("MAY_WORKER_TOKEN is required");
 const worker = await CoordinationWorker.open({
   directory: "./worker-data/dispatches",
-  token: process.env.MAY_WORKER_TOKEN!,
+  token,
   agents: { analyst: workerAgent },
   authorize: ({ agent, execution }) =>
     agent === "analyst" && execution.coordinationId === "review-1",
@@ -30,8 +37,10 @@ const worker = await CoordinationWorker.open({
 const server = createServer(worker.handle);
 server.listen(8787, "127.0.0.1");
 
-// 关闭时先停止接收请求，再 await worker.close()。
 ```
+
+服务期间保持进程运行。关闭时，通过 `server.close()` 停止接受 HTTP 请求，
+并等待 `worker.close()` 完成后释放 Worker 资源。
 
 使用随机生成、至少 24 个非空白字符的 Bearer 密钥，放在提示与版本控制之外。
 明文 HTTP 只允许回环连接；跨主机连接必须使用 HTTPS 服务。
@@ -44,16 +53,22 @@ Worker 授权独立于协调器策略，在接收与执行前分别检查。注�
 
 ## 注册远程 Agent
 
+在协调器进程中配置相同密钥、Worker 注册的 Agent 名称及其准确版本。以下片段
+假设 Worker 使用 `analysis-v1`；如果 `workerAgent.version` 不同，替换这个值。
+新任务图使用新的 ID，已有任务图调用 `resume()`。
+
 ```ts
 import { CoordinationRuntime } from "@may/coordination";
 import { FileCoordinationStore } from "@may/coordination/file-store";
 import { createRemoteAgent } from "@may/coordination/remote";
 
+const token = process.env.MAY_WORKER_TOKEN;
+if (!token) throw new Error("MAY_WORKER_TOKEN is required");
 const remote = createRemoteAgent({
   url: "http://127.0.0.1:8787",
-  token: process.env.MAY_WORKER_TOKEN!,
+  token,
   agent: "analyst",
-  version: workerAgent.version,
+  version: "analysis-v1",
 });
 const runtime = await CoordinationRuntime.create({
   id: "review-1",
@@ -71,6 +86,9 @@ try {
 }
 ```
 
+任务完成的检查条件是 `review` 状态为 `completed`，且存在持久化输出。
+状态为 `recovery-required` 时，根据下文恢复规则核查 Worker 和 Session 证据。
+
 协调器发送显式任务输入、依赖答案和提供的邮箱/唤醒数据，不发送模型推理、
 Provider 凭据或完整 Session 历史。只应向可信 Worker 主机发送这些数据。
 支持转发实时非流式事件和活跃审批决定；事件缓冲有上限，Worker 重启后不重放，
@@ -81,13 +99,13 @@ Provider 凭据或完整 Session 历史。只应向可信 Worker 主机发送这
 Worker 在调用 Agent 前 fsync 接收记录与运行状态。派发身份包含协调、任务、
 dispatch id 和 turn。同一身份的重复请求幂等，冲突输入被拒绝。
 接收响应丢失时，客户端不会盲目重发执行请求。`recover()` 检查证据；
-正在执行或已被 Worker 接收排队的任务返回 `recovery-required`，
-而不是 `not-started`。Worker 稳定后可重新打开/恢复协调器以读取持久化结果；
+正在执行或已被 Worker 接收排队的任务返回 `recovery-required`。
+Worker 完成处理后，可重新打开或恢复协调器以读取持久化结果；
 未知外部副作用仍需宿主核实。
 
 取消先持久化意图，再中止执行。完整派发取消请求可先创建取消记录，阻止迟到的
 接收请求启动任务。协调器也会向接收结果不明、已不在本地活跃的远程任务发送取消。
-网络故障仍可能留下未知结果；取消不是回滚，也不能证明副作用已停止。
+网络故障仍可能导致结果未知。取消请求确认后，仍需核查外部影响是否已经停止。
 Worker 保留 Agent 可选且幂等的 `cancel(execution)` 方法，在保存取消意图后向
 已经分离的执行发送取消。恢复查询收到 `execution.task.cancelRequested`；重新打开
 Worker、查询恢复和关闭 Worker 时，都会再次交付仍未确认的已保存取消意图。
@@ -95,7 +113,7 @@ Worker、查询恢复和关闭 Worker 时，都会再次交付仍未确认的已
 最终结果由 Agent 的持久化证据确定。
 迟到的持久化结果仍作为证据保留，不会悄悄丢弃。
 `runtime.close()` 也会在释放协调器所有权前请求取消已脱离本地执行、结果不明的
-远程工作；关闭不是转为后台继续运行的命令。
+远程工作。
 
 打开 Worker 只核对已有 Session 证据，不启动模型或工具。重启后排队工作需要
 显式匹配的接收请求才可执行。日志使用独占锁、按序 fsync 记录和大小上限
@@ -105,12 +123,16 @@ Worker、查询恢复和关闭 Worker 时，都会再次交付仍未确认的已
 
 ## 范围
 
+Worker 默认最多并发 4 个任务、保留 1,024 个任务、每个请求 1 MiB、日志总计
+64 MiB。打开 Worker 时通过 `maxConcurrent`、`maxJobs`、`maxRequestBytes`
+和 `maxJournalBytes` 配置其他正数限制。
+
 - 远程 Worker 是叶子执行器，不提供远程委派、同伴消息或 Handoff 能力 RPC；
   编排保留在协调器端。
 - 不自动传输文件、产物或工作副本。每个 Worker 宿主自行配置允许的输入、
   工具与资源策略。
-- [共享预算](coordination-resources.md) 是本地单写者账本，不是分布式全局配额
-  服务。远程部署需要明确分配宿主预算，协调器传输层本身不计量 Provider 调用。
+- [共享预算](coordination-resources.md) 使用本地单写者账本。
+  远程部署需要明确分配宿主预算，协调器传输层本身不计量 Provider 调用。
 - 不包含自动租约接管、Worker 发现、负载均衡服务、TLS 证书管理、密钥轮换
   或副作用自动回滚。
 - [MaybeCode team 命令](maybecode-team.md) 使用本地 Agent，默认只读。

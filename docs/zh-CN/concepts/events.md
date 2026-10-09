@@ -2,163 +2,168 @@
 
 [English](../../en/concepts/events.md) | **简体中文**
 
-May 具有多个事件层，因为模型 streaming、实时 application 状态和持久化 Session
-回放的要求不同。它们相关，但不能互换。
-
-宿主显式提供 `shouldYield` 时，完整模型/工具步骤可通过 `run.yielded` 结束，
-而非 `run.completed` 或 `run.cancelled`。结果携带 `finishReason: "yielded"`，
-全部工具结果确定后才确认持久化 yield checkpoint。消费者应将其视为 Run 结束，
-而非任务完成。Session 仅保存该事件一次，恢复时不会将其当作中断的 Run 修复。
-可选的 `input.submitted.inputId` 标识宿主投递，不会加入模型可见的消息内容。
+应用通过实时事件展示进度，通过持久化事件恢复对话。本文说明事件由哪个组件产生、
+何时保存，以及消费者如何处理未完整接收的增量内容。
 
 生命周期边界见 [Session、Run 与 Step](session-run-step.md)，回放见
-[Context 与持久化历史](context-and-history.md)，整体 package 设计见
+[Context 与持久化历史](context-and-history.md)，整体包结构见
 [Runtime 与 Session 边界](../architecture/runtime-session.md)。
 
 ## 事件层
 
 ### `ModelEvent`
 
-Model adapter 对一次请求产生 provider-neutral `ModelEvent`：文本和 reasoning delta、
-retry notice，以及恰好一个完整响应。这些值不包含 Session 身份。Core 校验 completion
-协议，再把它们转换成 Run event。
+模型适配器为每次请求产生与 Provider 无关的 `ModelEvent`：文本和推理增量、
+重试通知，以及恰好一个完整响应。这些值不包含 Session 身份。Core 校验响应完成
+协议，再把它们转换成 Run 事件。
 
 ### `MayEvent`
 
 `MayEvent` 是一个 Run 的实时观察流。每个事件都有 `runId`、Run 内单调递增的 `seq`
-和 timestamp，覆盖：
+和时间戳，覆盖：
 
 - Run 与 Step 开始/完成；
-- model start、delta、retry notice 和完整消息；
-- tool start、output delta、progress、完成与失败；
-- Run 完成、失败或取消。
+- 模型开始、增量、重试通知和完整消息；
+- 工具开始、输出增量、进度、完成与失败；
+- Run 完成、交还控制、失败或取消。
 
-`model.completed` 包含完整 assistant message，因此正确性不依赖此前每个 delta 都被
-保留。Tool terminal event 同样包含最终输出或序列化错误。
+`model.completed` 包含完整助手消息，因此正确性不依赖此前每个增量事件都被
+保留。工具结束事件同样包含最终输出或序列化错误。
 成功工具事件的 `output` 为宿主保留原始输出，`content` 保存模型可见内容并用于
 持久化恢复；模型历史工具提供已保存的 `content`。
 
 ### `PermissionEvent`
 
-`PermissionToolExecutor` 暴露实时 approval request、resolution 和 cancellation 事件。
-`AgentApplication` 将其转发为 `{ type: "permission.event", event }`。它的 awaited
-Session sink 按正确顺序记录对应持久化审批事实。
+`PermissionToolExecutor` 提供实时审批请求、决定和取消事件。
+`AgentApplication` 将其转发为 `{ type: "permission.event", event }`。审批事件的
+Session 接收函数等待存储完成，按正确顺序记录持久化审批事实。
 
 ### `SessionEvent`
 
-`SessionEvent` 是持久化、按 Session 排序的 log。每个事件都有 `sessionId`、连续
-`seq` 和 timestamp。Session 只映射回放、历史或审计需要的事实：
+`SessionEvent` 是持久化、按 Session 排序的日志。每个事件都有 `sessionId`、连续
+`seq` 和时间戳。Session 只映射回放、历史或审计需要的事实：
 
-- Session 创建和 input 提交；
+- Session 创建和输入提交；
 - Run 开始与终结边界；
-- 完整 assistant 消息和工具 outcome；
-- approval request、decision 与 cancellation；
-- Context 压缩 checkpoint；
-- 带版本的应用 tool presentation。
+- 完整助手消息和工具结果；
+- 审批请求、决定与取消；
+- Context 压缩检查点；
+- 带版本的应用工具显示信息。
 
-它有意忽略 Step 生命周期、model start/retry、tool start、streaming output 和临时
-progress。因此 Session history 是持久化对话 log，不是完整 telemetry trace。
+它省略 Step 生命周期、模型开始与重试、工具开始、流式输出和临时
+进度。Session 历史用于保存对话，可观测性组件记录执行追踪。
 
 ### `AgentApplicationEvent`
 
-Headless application stream 包装实时 Core 与 permission event，并增加应用事实：
+与 UI 无关的应用事件流包装实时 Core 事件与权限事件，并增加应用事实：
 
 ```ts
-type AgentApplicationEvent =
+type ApplicationEventShape =
   | { type: "run.event"; event: MayEvent }
   | { type: "permission.event"; event: PermissionEvent }
   | { type: "tool.presentation"; presentation: SessionToolPresentation }
-  | { type: "context.compacted"; /* automatic success */ }
-  | { type: "context.compaction.failed"; /* automatic failure */ };
+  | { type: "context.compacted"; /* 自动压缩成功；省略结果字段。 */ }
+  | { type: "context.compaction.failed"; /* 自动压缩失败；省略错误字段。 */ };
 ```
 
-Tool presentation 会在 application event 发出前、permission policy 开始评估前完成
-持久化。成功自动压缩也会先持久化，再发事件并继续模型调用。手动压缩向调用方返回
-结果并持久化发生变化的替换，但目前不发出相同的 application success event。
+该片段展示事件分类；完整字段通过 `@may/application` 导出的 `AgentApplicationEvent` 查询。
+
+工具显示信息会在应用事件发出前、权限策略开始评估前完成
+持久化。成功自动压缩也会先持久化，再发出事件并继续模型调用。手动压缩向调用方返回
+结果并持久化发生变化的替换，目前不发出相同的应用成功事件。
 
 ### `AgentWorkspaceEvent`
 
-Workspace 按序转发活动 application event，并增加 `session.changed`。产品可以用 typed
-extension event 扩展 union，例如 model-profile transition 后的事件。
-`session.changed` 描述活动 application 选择，本身不会追加到 Session history。
+Workspace 按序转发活动应用事件，并增加 `session.changed`。产品可以用具有类型的
+扩展事件增加联合类型成员，例如模型配置切换后的事件。
+`session.changed` 描述活动应用的选择，本身不会追加到 Session 历史。
+
+## 宿主控制的执行暂停
+
+宿主提供 `shouldYield` 时，完整模型与工具 Step 可以通过 `run.yielded` 结束，
+结果包含 `finishReason: "yielded"`。全部工具结果确定后才保存相应检查点，
+后续工作由宿主安排。Session 保存该事件一次，恢复时保留这个结束状态。
+可选的 `input.submitted.inputId` 标识宿主投递，模型可见消息不包含该标识。
 
 ## 先持久化、后观察的保证
 
-Session 观察 Core Run stream，并逐个映射持久化事件。每个被映射的事件都会先等待
-`SessionStore.append()`，再通过 Session 包装的 Run stream 转发 `MayEvent`。因此，
-当应用观察到已映射的完整或终结事件后，只要同一个 store operation 成功，就可以查询
+Session 观察 Core Run 事件流，并逐个映射持久化事件。每个被映射的事件都会先等待
+`SessionStore.append()`，再通过 Session 包装的 Run 事件流转发 `MayEvent`。因此，
+当应用观察到已映射的完整或终结事件后，只要对应存储操作成功，就可以查询
 到对应持久化事实。
 
 其他重要顺序点：
 
-- 普通 `input.submitted` 在 Core 启动 Run 前 commit；
-- approval request 在对应 assistant message 已持久化后、相关工具 outcome 前记录；
-- approval resolution/cancellation 排在其 request 之后；
-- 自动压缩在 Step 开始后、模型 snapshot 继续前记录；
-- application 和 workspace 关闭会先等待 relay，再关闭 queue。
+- 普通 `input.submitted` 在 Core 启动 Run 前完成写入；
+- 审批请求在对应助手消息已持久化后、相关工具结果前记录；
+- 审批决定与取消排在对应请求之后；
+- 自动压缩在 Step 开始后、模型快照生成前记录；
+- Application 和 Workspace 关闭会先等待事件转发，再关闭队列。
 
-Session store failure 不是无害的日志失败。Session 会取消底层 Run 并 reject 包装后的
-Run result，而不会让 history 与 Context 在不一致状态下继续。
+Session 存储失败时取消底层 Run，并使包装后的 Run `result` 拒绝，停止后续执行。
 
-Catalog summary update 不同：`AgentWorkspace` 将其中许多写入视为 best-effort 投影。
-Catalog state 不能替代 Session history 的顺序保证。
+`AgentWorkspace` 会尝试更新 Catalog 摘要，多数写入失败不会阻止对话执行。
+Catalog 状态不能替代 Session 历史的顺序保证。
 
-## 背压与可丢弃 Streaming Event
+<a id="背压与可丢弃-streaming-event"></a>
 
-Core、Session、AgentApplication 与 AgentWorkspace 使用有界 relay queue，默认目标为
-1024 个 buffered value。下列 `MayEvent` 被归类为 streaming，消费者落后时可能丢弃：
+## 背压与可丢弃流式事件
+
+Core、Session、AgentApplication 与 AgentWorkspace 使用有界事件转发队列，默认目标为
+1024 个缓冲值。下列 `MayEvent` 属于增量事件，消费者处理速度不足时可能丢弃：
 
 - `model.text.delta`；
 - `model.reasoning.delta`；
 - `tool.output.delta`；
 - `tool.progress`。
 
-Queue 不会主动丢弃 non-droppable 生命周期或终结事件。目标已满时，它先删除已缓冲的
-droppable event；如果不存在，就丢弃新 droppable event。新 non-droppable event 会
+队列不会主动丢弃不可丢弃的生命周期或终结事件。目标已满时，它先删除已缓冲的
+可丢弃事件；如果不存在，就丢弃新的可丢弃事件。新的不可丢弃事件会
 保留，即使队列暂时超过目标。
 
 对消费者的影响：
 
 - 压力下实时 Run 的 `seq` 出现缺口是预期行为，不代表缺少持久化事实；
-- delta 适合响应式展示，不适合精确 transcript 存储；
-- 完整 assistant message 和 tool terminal event 应校正任何部分 UI 状态；
-- 持久化 history 与 UI 是否消费每个实时值无关。
+- 增量内容适合响应式展示，精确对话记录应使用完整消息；
+- 完整助手消息和工具结束事件应校正任何部分 UI 状态；
+- 持久化历史与 UI 是否消费每个实时值无关。
 
-`AgentWorkspaceOptions.isDroppableEvent` 可为产品 event union 替换默认分类。自定义
-predicate 应保留所有无法重建的事件；把终结事件或产品状态迁移标记为 droppable 会
+`AgentWorkspaceOptions.isDroppableEvent` 可为产品事件联合类型替换默认分类。自定义
+判断函数应保留所有无法重建的事件；把终结事件或产品状态迁移标记为可丢弃会
 削弱默认保证。
 
-当前 `AsyncEventQueue` 是 queue，而不是可回放 broadcast bus。多个独立 reader 都需
-收到每个值时，应建立一个 owner relay 或显式 fan-out。迟到消费者只能读到仍在 buffer
-中的值和未来值；历史事实必须从 Session history 读取。
+`AsyncEventQueue` 将消息分配给消费者，多个迭代器会竞争获取消息。每位订阅者需要
+完整事件时，应建立独立队列。之后接入的消费者只能读取仍在缓冲区的值和后续值；
+历史事实从 Session 历史读取。
 
 ## 实时事件不会自动持久化
 
-新增 `MayEvent` 或产品 extension event 不会自动使其持久化。持久化需要显式 Session
-event schema 和 awaited record path。应用显示数据应使用应用自有、带 namespace 的
-`kind` 与 decoder。Session 校验非空 `kind` 和正整数 `version`，但把 `data` 视为
+新增 `MayEvent` 或产品扩展事件不会自动使其持久化。持久化需要明确的 Session
+事件结构，以及等待存储完成的记录流程。应用显示数据应使用应用自有、带命名空间的
+`kind` 与解码器。Session 校验非空 `kind` 和正整数 `version`，把 `data` 视为
 不透明内容，绝不注入 Context。
 
-扩展 May 时使用以下规则：
+根据消费者需要选择信息位置：
 
-```text
-animation/progress -> live event
-conversation/replay fact -> Session event
-fast discovery -> Catalog projection
-model-visible state -> Context (plus a durable checkpoint when replaced)
-```
+| 信息 | 保存位置 |
+| --- | --- |
+| 动画和进度 | 实时事件 |
+| 恢复需要的对话事实 | Session 事件 |
+| Session 发现 | Catalog 投影 |
+| 模型可见状态 | Context，替换时保存持久化检查点 |
 
-## 关闭与 Stream 结束
+<a id="关闭与-stream-结束"></a>
 
-Application 或 workspace event stream 在 owner 关闭 queue 后结束。正确关闭会先取消
-活动工作，等待 Run 与 permission relay，再关闭 application queue。Workspace 会先
-等待 application relay 和待处理 Catalog summary。Run 自己的 stream 则在该 Run
-settle 时自动关闭。
+## 关闭与事件流结束
 
-调用方应等待 `close()` 并让 `for await` consumer 结束，不要在请求取消后立即放弃它。
+Application 或 Workspace 事件流在所属组件关闭队列后结束。正确关闭会先取消
+活动工作，等待 Run 与权限事件转发，再关闭应用队列。Workspace 会先
+等待应用事件转发和待处理 Catalog 摘要。Run 自己的事件流在该 Run
+结束时自动关闭。
+
+调用方应等待 `close()` 并让 `for await` 消费者结束，取消请求后仍需等待清理完成。
 精确生命周期顺序见
 [Agent definition、Application 与 Workspace](agent-application.md#关闭顺序)。
 
-`AsyncEventQueue` 是消费队列而非广播器，多个迭代器会竞争分配消息。每位订阅者都需要
-完整事件时，应分别建立队列。迭代器 return 会释放自己的等待项，不关闭生产者或其他
-迭代器。Coordination/MCP 的实时队列有界，恢复依据应使用持久状态与历史。
+迭代器 `return()` 会释放自己的等待项，生产者和其他迭代器继续工作。
+Coordination 和 MCP 消费者依据持久状态与历史恢复。

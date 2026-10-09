@@ -1,33 +1,44 @@
-# MCP 工具
+# 连接 MCP 服务端
 
 [English](../../en/guides/mcp.md) | **简体中文**
 
-`@may/mcp` 使 May 应用可以使用 Model Context Protocol（MCP）服务器提供的工具，
-同时不把协议和进程管理代码放进 Core。当前支持本地 stdio、远程 Streamable HTTP client 与 MCP tool
-能力。
+本文用于在 MaybeCode 或使用 `@may/mcp` 的应用中配置 Model Context Protocol
+（MCP）服务端。需要可信的 stdio 程序或 Streamable HTTP 端点、连接要求，以及所需
+账户凭据。使用 MaybeCode 时，还需要已有的 May 配置和模型 profile。
+
+1. 按照[MaybeCode 配置](#maybecode-配置)或[Package API](#package-api)添加端点。
+2. 启动 MaybeCode 并执行 `/mcp`，或者在应用中读取 `pool.status()`。
+   `connected` 表示连接和发现完成，可以检查发现的工具名称。
+3. 通过应用通常的权限界面批准远程工具。
+4. 退出时关闭应用及其连接池。
+
+OAuth、长任务、图形 Apps 和服务端导出分别参阅[认证](mcp-auth.md)、
+[Tasks](mcp-tasks.md)、[Apps](mcp-apps.md)和[服务端](mcp-server.md)。下文提供配置与
+宿主操作参考；软件包与协议边界见[能力参考](../reference/mcp-capabilities.md)。
 
 ## 为什么使用独立 package
 
-Core 已经知道如何描述、授权、调度、取消、执行和追踪一个 `Tool`，但不应该了解外部
-工具如何发现或传输。因此 `@may/mcp` 依赖 Core，把远程 MCP tool 适配到既有 `Tool`
-契约：
+`@may/mcp` 管理目录发现、传输和子进程，将远程工具转换为 Core `Tool` 接口。
+工具执行使用已有的权限、调度、取消、Session 和追踪服务。
 
-```text
-MCP server process
-  ^ stdio: initialize, tools/list, tools/call
-  |
-@may/mcp adapter -> Core Tool -> ToolRegistry
-                                  |
-模型工具调用 -> permission -> scheduler -> adapter -> MCP server
+```mermaid
+flowchart LR
+  server[MCP 服务端] -->|目录发现| adapter["@may/mcp"]
+  adapter --> registry[Core ToolRegistry]
+  model[模型工具调用] --> permission[权限执行器]
+  permission --> scheduler[工具调度器]
+  scheduler --> adapter
+  adapter -->|远程调用| server
 ```
 
-这个方向使 MCP 保持可选：只有本地工具的 Agent 不会引入 MCP runtime dependency；
-MCP 工具则自动经过与其他 Core 工具相同的权限、调度、事件、取消、Session 和 tracing
-路径。
+应用通过创建连接池启用 MCP。仅使用本地工具的应用无需依赖 MCP package。
 
 ## Package API
 
-打开 client pool，为每次 Run 提供工具目录，并在产品 ownership 边界关闭 pool：
+在应用项目安装 `@may/mcp` 和 `@may/application`。以下集成片段假设已经创建
+`model`、`localTools`、`permissionPolicy`、`tracer` 和 `store`。将
+`mcp-server.mjs` 放在进程工作目录，或者使用绝对路径。服务端要求凭据时，
+在打开连接池前验证凭据，并通过 `env` 提供。
 
 ```ts
 import { defineAgent } from "@may/application";
@@ -39,69 +50,65 @@ const mcp = await openMcpClientPool({
     command: "node",
     args: ["./mcp-server.mjs"],
     cwd: process.cwd(),
-    env: { ACCESS_TOKEN: process.env.ACCESS_TOKEN! },
     required: false,
     requestTimeoutMs: 60_000,
   }],
   tracer,
 });
 
-const agent = defineAgent({
-  model,
-  tools: localTools,
-  toolSource: () => mcp.tools,
-  permissionPolicy,
-  tracer,
-});
-
-const application = await agent.open({ store });
 try {
-  // 提交 Run
+  const agent = defineAgent({
+    model,
+    tools: localTools,
+    toolSource: () => mcp.tools,
+    permissionPolicy,
+    tracer,
+  });
+  const application = await agent.open({ store });
+  try {
+    console.log(mcp.status());
+    const run = await application.submit({ input: "List the available project files." });
+    await run.result;
+  } finally {
+    await application.close();
+  }
 } finally {
-  await application.close();
   await mcp.close();
 }
 ```
 
-打开时对每个 server 协商协议（旧版初始化或新版发现），并执行聚合的 `tools/list` 请求。Server 默认是
-required：required server 失败时，已打开的 server 会先关闭，然后启动整体失败。配置
-`required: false` 的 server 失败时只记录失败状态，其余 server 仍可继续启动。
-`close()` 可重复调用；即使一个连接关闭失败，它仍会访问所有连接。stdio transport
-启动的子进程也由 pool 负责终止。
+打开连接池时，每个端点协商协议，并请求全部已声明的能力目录。`required` 默认
+为 `true`；必需端点启动失败时，关闭已经打开的端点并拒绝启动。`required: false`
+记录失败状态，允许其他端点继续启动。`close()` 可以重复调用，始终尝试关闭全部
+连接，也负责终止 stdio 传输创建的子进程。
 
-`requestTimeoutMs` 设置单次请求的不活动超时；即使不断收到 progress，
-`maxTotalTimeoutMs` 也可以限制总时长；`maxBufferSize` 限制单条协议消息。省略时使用
-MCP SDK 默认值。
+| 配置 | 含义和默认值 |
+| --- | --- |
+| `requestTimeoutMs` | 请求不活动超时，默认 60 秒；进度通知可以重置计时 |
+| `maxTotalTimeoutMs` | 整个请求的绝对期限，包含持续进度和交互等待；默认未设置 |
+| `maxBufferSize` | 单条 stdio 协议消息上限，默认 10 MiB |
+| `stderrMaxBytes` | 保留的 stdio stderr 末尾片段，默认 16 KiB |
 
-`pool.status()` 返回所有已配置 server 的即时视图，包括连接状态、已发现工具名、最新
-诊断和近期 stderr。`pool.events` 发布 connected、failed 与 disconnected 生命周期
-事件，产品无需解析日志即可观察连接变化。
-
-Stdio stderr 会被 pipe，而不是直接继承到终端。每个 server 只保留经净化的末尾片段，
-大小由 `stderrMaxBytes` 限制（默认 16 KiB），因此高噪声子进程不会无限占用内存。该输出
-可能包含路径、token 或其他 secret，应按敏感信息处理。
+`pool.status()` 返回即时连接状态、协议版本、工具名称、目录版本、最新诊断和近期
+stderr。`pool.events` 发布连接、目录更新、失败和断开事件。stderr 经处理后保留
+在内存中，仍可能包含路径、token 或其他秘密，需要按敏感数据管理。
 
 ## 名称与冲突
 
-远程工具以如下名称暴露给模型：
+模型可见的远程工具名称采用 `mcp__<server-id>__<remote-tool-name>`。
+服务端 `id` 只接受字母、数字、`_` 和 `-`。远程名称中的其他字符转换为 `_`；
+长名称加入确定性 hash，最终名称最多 64 个字符。任何剩余名称冲突使启动失败。
 
-```text
-mcp__<server-id>__<remote-tool-name>
-```
-
-Server id 只能包含字母、数字、`_` 和 `-`。远程名称中的其他字符会转换为 `_`；长
-名称会加入确定性 hash，并限制在 64 个字符。剩余任何冲突都会使启动失败。因此 MCP
-工具不会静默覆盖本地工具或另一个 server 的工具。
-
-Adapter 保留远程 `inputSchema`，并返回 MCP `content` 及可选
-`structuredContent`。协议或 transport 失败变为 `MCP_TOOL_CALL_FAILED`；合法结果中
-的 `isError: true` 变为 `MCP_TOOL_ERROR`，并携带有长度上限的文本细节，供模型决定
-后续动作。Core cancellation 会转发给 SDK；MCP progress notification 会变成 Core
-工具进度事件。
+适配器保留远程 `inputSchema`，返回 MCP `content` 和可选 `structuredContent`。
+协议或传输错误使用 `MCP_TOOL_CALL_FAILED`；结果中的 `isError: true` 使用
+`MCP_TOOL_ERROR`，向调用方提供有长度限制的错误文本。Core 取消信号传给 SDK；
+MCP 进度通知转换为 Core 工具进度事件。
 
 ## MaybeCode 配置
 
-MaybeCode 从 `apps.maybecode.mcpServers` 读取 stdio server：
+将以下片段加入启动 MaybeCode 时使用的 May 配置。示例需要工作区内的
+`tools/mcp-server.mjs` 和启动进程中的 `MCP_ACCESS_TOKEN`；按服务端要求调整。
+端点位于 `apps.maybecode.mcpServers`：
 
 ```json
 {
@@ -114,43 +121,35 @@ MaybeCode 从 `apps.maybecode.mcpServers` 读取 stdio server：
           "args": ["tools/mcp-server.mjs"],
           "cwd": ".",
           "required": false,
-          "env": {
-            "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}"
-          },
+          "env": { "ACCESS_TOKEN": "${MCP_ACCESS_TOKEN}" },
           "requestTimeoutMs": 60000,
           "maxTotalTimeoutMs": 300000,
           "maxBufferSize": 10485760,
           "stderrMaxBytes": 16384
         },
-        "temporarily_disabled": {
-          "enabled": false
-        }
+        "temporarily_disabled": { "enabled": false }
       }
     }
   }
 }
 ```
 
-`transport` 可省略，默认 `stdio`；`streamable-http` 用于 HTTP 端点。`mcpServers` 缺失、为 `false` 或空对象时
-禁用 MCP。相对 `cwd` 从当前编码 workspace 解析；省略 `cwd` 时也使用该 workspace。
-`required` 默认为 `true`；只有产品可在缺少该 server 时继续运行，才应设为 `false`。
-参数不经过 shell，直接传给进程。
+`transport` 默认为 `stdio`；`streamable-http` 选择 HTTP。`mcpServers` 缺失、
+为 `false` 或空对象时禁用 MCP。相对 `cwd` 从当前编码工作区解析，省略时同样
+使用该工作区。参数直接传给进程，不经过 shell。
 
-环境变量值可以用 `${NAME}` 引用启动 MaybeCode 的进程环境。引用缺失时，启动会失败，
-而不是传入空 secret。解析后的值只保存在内存，不会加入内置 trace。配置文件是明文，
-因此应优先使用引用，而不是写入 literal secret。
+环境变量可以通过 `${NAME}` 引用启动进程的环境。缺少引用的变量时启动失败。
+解析后的值保存在内存中，不进入内置 trace。配置文件使用明文，因此凭据使用
+环境引用。
 
-MaybeCode 会在打开 workspace 之前启动 MCP，把发现的工具加入普通 `ToolRegistry`，
-并在 Agent workspace 关闭后、observability flush 前关闭 MCP。默认编码权限策略会要求
-审批每一个 MCP 工具。`allow-for-session` 仍由正常的 MaybeCode Session permission
-executor 限定作用域。
-
-在任一 MaybeCode UI 中运行 `/mcp`，可查看已配置 server、连接状态、已发现工具、启动
-错误和保留的 stderr。Controller event stream 也会向其他前端与集成暴露生命周期事件。
+MaybeCode 在打开工作区前启动 MCP，将工具加入 `ToolRegistry`，在 Agent 工作区
+关闭后、遥测导出前关闭 MCP。默认编码权限策略要求审批全部 MCP 工具。
+`allow-for-session` 由 Session 权限执行器限制范围。两个终端界面的 `/mcp`
+显示状态、工具、启动错误和保留的 stderr；controller 事件也提供生命周期通知。
 
 ## Streamable HTTP 与协议模式
 
-同一个 `mcpServers` map（或 package 的 `servers` 数组，另加 `id`）接受：
+在 `mcpServers` 中添加以下端点；直接使用 package `servers` 数组时还需要 `id`：
 
 ```json
 {
@@ -166,109 +165,93 @@ executor 限定作用域。
 }
 ```
 
-Header 环境引用只由 MaybeCode 配置解析，直接调用 package API 时不会展开。
-即使 server 是 optional，缺失引用也会使启动失败。当前支持静态 header 和原生
-OAuth 发现、登录、刷新，参阅 [MCP 认证](mcp-auth.md)。认证不等于工具授权。HTTP entry 不接受进程专用字段 `command`、`args`、
-`cwd`、`env`、`maxBufferSize`、`stderrMaxBytes`；stdio entry 不接受 `url`/`headers`。
-`maxBufferSize` 仍是 stdio 消息上限，不是 HTTP 响应大小上限。
+该配置需要 `MCP_REMOTE_TOKEN` 和可用端点。Header 环境引用只在 MaybeCode 配置中
+展开，直接 package 调用需要已经解析的字符串。缺少变量时，即使端点可选也拒绝
+启动。静态 headers 与原生 OAuth 均受支持，OAuth 参阅[认证](mcp-auth.md)。工具
+权限仍由应用检查。
 
-`protocolMode` 接受 `legacy` 或 `auto`。Stdio 默认 legacy，保留原启动行为；HTTP
-默认使用 SDK auto 模式，通过 `server/discover` 发现新版 server，并在适当时回退到
-旧版 `initialize` 握手。主动启用 stdio auto 可能额外启动一个短生命周期探测进程。
-项目已安装的 `@modelcontextprotocol/client@2.0.0` 支持该可选模式，但 SDK 默认仍是
-legacy。本地集成 fixture 验证了 2025-11-25 stdio/HTTP 和 2026-07-28 HTTP tools
-链路，并不代表完整协议合规或第三方 server 兼容认证。`/mcp` 和 `pool.status()` 显示
-协商后的协议版本；Core 仍不依赖协议版本。参阅
-[SDK 协商说明](https://ts.sdk.modelcontextprotocol.io/v2/api/@modelcontextprotocol/client/client/client.html)。
+HTTP 配置拒绝 `command`、`args`、`cwd`、`env`、`maxBufferSize` 和
+`stderrMaxBytes`。Stdio 拒绝 `url` 和 `headers`。
+`maxBufferSize` 限制 stdio 消息；宿主的网络层单独配置 HTTP 响应限制。
 
-除 `localhost`、`127.0.0.1`、`[::1]` 可用 HTTP 外，只接受 HTTPS。拒绝 URL 中的
-用户名、密码和 fragment；凭据应使用 header，不要写入 URL query。任何重定向都不
-跟随，包括同源重定向。拒绝大小写不敏感的重复 header、无效 header，以及对 `mcp-*`、
-`Host`、`Connection`、`Content-Length`、`Transfer-Encoding`、`Upgrade`、`Accept`、
-`Content-Type`、`Origin`、`Cookie`、`Proxy-Authorization` 的覆盖。
-配置的端点是可信目标，并非网络沙箱；HTTPS 不会阻止私网访问，需要时应在 adapter
-之外施加网络策略。远程工具会把参数发送给该目标，仍经过正常工具权限层。
+`protocolMode` 接受 `legacy` 与 `auto`。Stdio 默认 `legacy`；HTTP 默认 `auto`，
+通过 `server/discover` 发现现代服务端，并在协议适用时使用 `initialize`。
+Stdio `auto` 可能另外启动短期探测进程。Client SDK 为 2.0.0。本地集成覆盖
+`2025-11-25` stdio/HTTP 和 `2026-07-28` HTTP 工具路径；第三方兼容性需要单独验证。
 
-HTTP SDK 错误可能在 URL、响应 body 或 cause 中带有 secret，因此公开错误、状态和
-tracing 不展示这些细节，仅在可获得时保留 HTTP status code。MCP `isError` 工具结果
-仍向调用方提供有界文本，但 HTTP error span 不记录该文本。Span 不添加 HTTP header
-或 URL，HTTP 端点也没有 stderr 末尾片段。
+只接受 HTTPS，`localhost`、`127.0.0.1` 和 `[::1]` 可以使用 HTTP。URL 拒绝用户名、
+密码和 fragment，凭据通过 headers 提供。所有重定向都会拒绝。Headers 拒绝重复
+名称、非法值、`mcp-*` 和协议保留项：`Host`、`Connection`、`Content-Length`、
+`Transfer-Encoding`、`Upgrade`、`Accept`、`Content-Type`、`Origin`、`Cookie`、
+`Proxy-Authorization`。宿主负责可信端点和私有网络访问策略。
 
-不启用自动重连、stream 恢复或通用工具调用重试，也不回退到旧 HTTP+SSE。`connected`
-表示建立和工具发现成功，不代表持续健康检查；单次 HTTP 失败只使对应操作失败，不会
-自动移除已发现工具。关闭时对协商出的旧版 HTTP session 尝试 DELETE（最多五秒，
-或更短的 request timeout），随后无论结果如何都关闭本地 transport 资源；这不会删除
-远端用户数据。新版协议不会创建远端协议 session。
+HTTP SDK 错误内容可能含有凭据，公开错误、状态和追踪只保留安全元数据及可用的
+HTTP 状态码。工具 `isError` 的有限文本仍返回调用方，HTTP 错误 span 不记录该文本。
+Span 不包含 HTTP headers 或 URL，HTTP 端点没有 stderr。
+
+连接状态描述建立与发现结果。单次 HTTP 错误使当前操作失败，已发现工具仍保留。
+没有自动重连、流恢复、通用工具重试或旧 HTTP+SSE 传输。关闭旧协议 HTTP session
+时尝试 DELETE，最多五秒或较短的请求超时，随后始终释放本地资源。远端用户数据
+保持不变；现代协议没有远端协议 session。
 
 ## Tracing 与安全
 
-注入 tracer 后，adapter 会产生：
-
 | Span | 含义 |
 | --- | --- |
-| `may.mcp.connect` | 建立 transport 并协商协议 |
-| `may.mcp.tools.list` | 首次及刷新时的能力目录发现 |
-| `may.mcp.tool.call` | 一次远程调用，parent 是 Core tool span |
-| `may.mcp.disconnect` | 关闭 client 与进程 |
+| `may.mcp.connect` | 建立传输和协商协议 |
+| `may.mcp.tools.list` | 首次及刷新能力目录 |
+| `may.mcp.tool.call` | 远程调用，父节点为 Core 工具 span |
+| `may.mcp.disconnect` | 关闭连接和子进程 |
 
-属性包括 server id、transport、公开/远程工具名、id、数量、状态，以及 tracer 计算的
-耗时。内置插桩不记录 command argument、环境值、请求 input、响应 content、prompt
-或 model message。
-
-本地 stdio MCP server 是拥有当前主机用户权限的可执行代码，不是 sandbox；它还可以提供模型可见
-的工具描述。只配置可信 server，检查其 command 与 package source，限制环境变量和
-文件系统权限，并保留 permission 层。
+内置追踪记录端点身份、传输类型、工具名称、数量、状态和耗时，不记录命令参数、
+环境值、请求输入、响应内容、提示词或模型消息。本地 stdio 程序拥有启动用户的
+权限，还会提供模型可见的工具描述。需要检查服务端来源、限制其环境和文件访问，
+并启用应用权限策略。
 
 ## 当前范围
 
-工具和元数据目录（resources/templates/prompts）现已支持动态发现。资源读取/附件、
-prompt、completion 和 watch 也已实现，详见下文。有归属的 elicitation、
-Roots/Sampling 和显式旧协议交互兼容均已实现。已实现显式启用的 Tasks；独立 server 导出也已实现；已移除的双端点 HTTP+SSE 传输不会启用。重连需要显式操作，绝不自动重放工具调用。
-
-剩余阶段参阅 [MCP Host 路线与验收](../architecture/mcp-host-roadmap.md)。
-
-协议细节参阅 [MCP tools 官方规范](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
-和 [TypeScript client 文档](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/client.md)。
+连接池支持动态工具、资源与模板、提示模板、补全、资源订阅和有归属的用户交互。
+Roots/Sampling、Tasks 和 Apps 需要明确宿主配置。独立服务端使用单独入口。
+支持版本和能力限制见[能力参考](../reference/mcp-capabilities.md)。
 
 ## 动态目录与端点恢复
 
-在 Agent definition 的静态 `tools` 之外使用 `toolSource: () => mcp.tools`；
-将 `mcp.tools` 直接传入构造器则有意固定当时的集合。配置式 MaybeCode 已自动使用
-动态来源，包括切换模型/Session 之后。新目录仅影响下一次 Run/continue，不修改
-运行中的 Run。定义变化/移除或目录失效时，旧快照抛出 `MCP_STALE_TOOL`，不发送
-远程请求。重连关闭旧连接，因此它的快照不能继续执行。
+在 Agent 配置中使用 `toolSource: () => mcp.tools`，使每个 Run 读取当前工具目录。
+直接将 `mcp.tools` 传入静态 `tools` 会固定当时的集合。MaybeCode 自动使用动态
+来源。新目录影响下一次 Run 或继续执行；当前 Run 保留自己的快照。工具定义变化、
+移除或目录失效时，旧快照通过 `MCP_STALE_TOOL` 拒绝发送请求。
 
-- `mcp.catalog()` 返回深度冻结的每端点元数据：revision、capabilities、tools、
-  resources、resourceTemplates、prompts。只查询声明的能力，也支持仅提供资源的
-  端点。元数据是不可信服务端数据，不意味着允许加载 URI 或执行 prompt。
-- `await mcp.refresh(serverId?, signal?)` 重新请求声明的列表，只有完整候选目录才
-  会发布。每列表最多 64 页；重复 cursor/身份会失败。所有列表保留的候选目录合计
-  最多 4,096 项/8 MiB。刷新期限为 60 秒或 `maxTotalTimeoutMs`。这是目录限制，
-  并非 HTTP 响应体内存沙箱。
-- 收到声明支持的列表变更通知后立即使工具失效，并合并调度一次刷新。现代协议
-  使用 `subscriptions/listen`，旧协议使用通知 handler。刷新期间继续变更最多重试
-  三次发现；失败保留旧元数据并标记 stale，新 Run 不再暴露这些工具。不会自动
-  读取内容或附加上下文。
-- `await mcp.reconnect(serverId, signal?)` 仅替换指定端点，包括启动失败的 optional
-  端点。存在运行中工具调用时重连失败，避免中断/重放结果未知的副作用。旧 Run
-  快照需要放弃；新连接取得新的权限身份。
-- 两种终端 UI 支持 `/mcp refresh [server-id]` 和 `/mcp reconnect <server-id>`。
-  `/mcp` 显示 revision/stale 和通知覆盖状态（`active`、`partial`、`unavailable`、
-  `legacy`、`not-advertised`）。现代订阅流断开会显式报告失败，不能伪装为健康订阅；
-  需要显式刷新/重连。`mcp.server.catalog-updated` 表示目录发布。
+| 操作 | 行为 |
+| --- | --- |
+| `mcp.catalog()` | 返回深度冻结的版本、能力、工具、资源、模板和提示模板元数据 |
+| `mcp.refresh(serverId?, signal?)` | 重新获取已声明目录；省略 `serverId` 时刷新全部端点 |
+| `mcp.reconnect(serverId, signal?)` | 关闭并替换一个端点，包括启动失败的可选端点 |
 
-工具授权身份包含完整远程定义（包括 output schema/annotations）、端点/账户配置
-以及连接代次，不暴露配置秘密。定义未变的刷新保留授权；重连/故障恢复产生新身份。
-显式 OAuth 登录后，先执行 `/mcp reconnect <server-id>` 再启动新 Run。每连接独享
-缓存；目录保存在 pool 内存中，显式刷新不会信任旧 TTL。关闭会取消排队/运行中的
-目录发现和订阅。
+刷新只发布完整候选目录：每个列表最多 64 页，重复游标或身份使刷新失败，全部
+列表合计最多 4,096 项、8 MiB。期限为 `maxTotalTimeoutMs`，未配置时为 60 秒。
+仅查询服务端声明的能力，也支持只提供资源的端点；目录元数据不授予内容读取权限。
+
+目录变更通知立即使工具失效，并合并执行刷新。现代协议使用 `subscriptions/listen`，
+旧协议使用通知 handler。刷新期间连续变化最多尝试三次；失败保留旧目录并标记
+过期，新 Run 不再取得其工具。存在执行中的工具调用时，重连拒绝执行。
+
+终端命令 `/mcp refresh [server-id]` 和 `/mcp reconnect <server-id>` 提供明确操作。
+`/mcp` 显示目录版本、过期状态和通知覆盖状态：`active`、`partial`、`unavailable`、
+`legacy`、`not-advertised`。订阅断开报告失败。`mcp.server.catalog-updated` 表示
+新目录已经发布。
+
+工具授权身份包含完整定义、端点与账户配置、连接代次，凭据内容保持私有。定义
+不变的刷新保留授权，重连创建新身份。OAuth 登录后执行重连，然后启动新 Run。
+目录与缓存归连接管理；关闭取消目录发现和订阅。
 
 ## 资源、提示词、补全与附件
 
-Pool 提供宿主/用户驱动的 `readResource`、`readResourceTemplate`、`getPrompt`、
-`complete` 和 `subscribeResource`，**不会自动作为模型工具导出**。仅基于已授权
-用户意图或显式宿主策略调用；MCP 凭据不替代应用访问控制。方法接受取消信号和
-trace context，复用端点生命周期。
+`readResource`、`readResourceTemplate`、`getPrompt`、`complete` 和
+`subscribeResource` 是宿主操作。应用根据已授权用户意图或明确宿主策略调用，
+检查访问权限，并传入取消信号和追踪上下文。
+
+以下片段需要已经打开的 `mcp` 和操作 `signal`。URI、模板及提示模板名称需要取自
+`mcp.catalog()`：
 
 ```ts
 const read = await mcp.readResource("workspace", "project:///README", { signal });
@@ -281,11 +264,11 @@ const suggestions = await mcp.complete("workspace", {
   argument: { name: "file", value: "ma" },
 }, { signal });
 const watch = await mcp.subscribeResource("workspace", read.uri, { signal });
-// watch.events 只有 { type: "updated", serverId, uri }，没有新内容。
-await watch.close(); // watch.closed 也报告远端/连接终止。
+// watch.events 提供更新通知；需要内容时明确重新读取。
+await watch.close(); // watch.closed 也报告远端或连接关闭。
 ```
 
-两种终端 UI 均支持以下命令。JSON 直接输入，不加 shell 引号；内部空白保留：
+两个终端界面支持以下命令。JSON 直接输入，内部空白保留，无需 shell 引号：
 
 ```text
 /mcp catalog [server-id]
@@ -299,161 +282,150 @@ await watch.close(); // watch.closed 也报告远端/连接终止。
 /mcp unwatch server-id resource-uri
 ```
 
-`read`、`template`、`prompt` 仅预览；`attach`、`use-prompt` 以 **user message** 显式
-启动 Run，准备和提交在同一 Session 状态队列内原子执行。Ctrl+C/关闭取消准备，
-不会将数据附加到随后切换的 Session。远端 prompt 的角色标签只是数据，不是实际
-assistant/system 历史。`mcpResourceToUserMessage`、`mcpPromptToUserMessage` 保留
-不可信 MCP 来源信息。Resource link 保持惰性 JSON，不触发本地文件读取或 URL
-自动下载。Watch 通知不改变模型 Context。
+`read`、`template` 和 `prompt` 提供预览；`attach` 和 `use-prompt` 明确以用户消息
+启动 Run。准备与提交使用同一 Session 状态队列，Ctrl+C 或关闭会取消准备。
+`mcpResourceToUserMessage` 和 `mcpPromptToUserMessage` 保留 MCP 来源。远端角色
+标签和资源链接作为数据呈现；不会下载链接、读取本地文件或追加任意角色历史。
+订阅通知不会改变模型 Context。
 
-每结果最多 128 块/8 MiB，验证 base64/MIME；超限失败，不静默截断结构化数据或
-二进制。终端预览最多 16,000 字符，二进制仅显示标签。媒体转换为 provider-neutral
-base64 内容；模型不支持时通过 `UnsupportedContentError` 明确失败，不偷偷转成
-文本。通用 `Tool.resultContent` hook 向模型投影多模态与 structured output，工具
-事件保留原始结果；`_meta` 仅供宿主使用。补全验证目录引用/参数名，每次最多
-100 项/64 KiB，每连接每秒最多 10 次。终端按 Enter 才请求，GUI 应对输入 debounce。
+| 项目 | 限制 |
+| --- | --- |
+| 内容结果 | 128 个内容块、8 MiB；验证 base64 和 MIME |
+| 终端预览 | 16,000 字符，二进制显示标签 |
+| 补全 | 每次 100 项、64 KiB，每连接每秒十次 |
+| 资源缓存 | 每连接 32 项、16 MiB，正 TTL 最多五分钟，缺少 TTL 不复用 |
+| 资源订阅 | 每连接 64 个 handle，每个 handle 缓冲 32 条通知 |
+| HTTP JSON 和 SSE frame | SDK 解析前限制为 10 MiB |
 
-资源 LRU 遵循正 TTL，最多五分钟；每连接最多 32 项/16 MiB，缺少 TTL 不复用。
-`cache: "refresh"` 强制读取，`"bypass"` 不读写缓存。资源/列表通知使缓存失效；
-读取期间收到更新则不写回过期数据。即使结果宣告 `public`，也不跨端点/账户/连接
-共享。命中前及读取后检查 OAuth 授权代次，另一个进程登录/退出不能暴露旧私有
-缓存；授权变化后需重连。
+超限内容拒绝返回。媒体转换为 provider 无关的 base64 内容，模型不支持时抛出
+`UnsupportedContentError`。`Tool.resultContent` 生成模型内容，原始工具事件保留
+原结果，`_meta` 仅供宿主使用。终端按 Enter 发起补全，图形界面需要控制输入请求频率。
 
-现代 watch 使用 `subscriptions/listen`，旧版使用 subscribe/unsubscribe。同 URI
-共享引用计数远端流，各 handle 独立取消并缓冲最多 32 条通知；每连接最多 64 个
-handle。流断开会完成 `closed`，不悄悄自动重连。关闭释放全部 handle。HTTP JSON
-响应和每 SSE frame 在 SDK 解析前限制 10 MiB；stdio 保留可配置限制，并保证通知/
-响应有序投递。
+`cache: "refresh"` 重新读取；`"bypass"` 不使用或写入缓存。通知使缓存失效，读取
+期间收到更新不会写入过期内容。缓存隔离端点、账户、连接以及交互操作的工作区
+和 Session。命中前与读取后检查 OAuth 授权代次，授权变化后需要重连。
+
+现代订阅使用 `subscriptions/listen`，旧协议使用 subscribe/unsubscribe。同一 URI
+共享远程流，各 handle 独立取消。流断开结束 `closed`，需要明确重新建立订阅。
+连接关闭释放全部 handle。Stdio 保留可配置消息上限及有序通知交付。
 
 ## 有作用域的用户交互（现代 MRTR）
 
-现代 `tools/call`、`resources/read`、`prompts/get` 可以暂停并请求表单或 URL
-交互。Host 将续接绑定到原始逻辑请求，而不是服务端提供的 Session id 或碰巧正在
-运行的 Run。SDK 负责新的 wire id 和原样回传不透明的 `requestState`；这是协议
-续接，**不是**重试结果不确定的工具操作。参阅
-[MRTR 规范](https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/mrtr)。
+现代 `tools/call`、`resources/read` 和 `prompts/get` 可以暂停并请求表单或 URL
+交互。宿主将续接绑定到原始逻辑请求，SDK 管理新的请求 ID 和不透明 `requestState`。
+结果未知的工具调用需要调查，随后决定是否启动新的操作。
 
-MaybeCode 的两个终端界面都会启用交互：展示服务端及 Session，输入 JSON 表单，
-允许修改，并要求单独输入 `send` 确认发送。也可以明确 `decline` 拒绝或 `cancel`
-取消。表单答案不进入输入历史；不要在表单中输入凭据。URL 模式展示 HTTPS 主机和
-完整地址，询问同意后由用户自行访问，再输入 `retry` 手动继续。客户端不抓取地址、
-不自动打开浏览器、不转发 MCP 凭据，也不会将同意解释为外部流程已经完成。这与
-MCP 客户端 OAuth 登录相互独立。参阅
-[Elicitation 规范](https://modelcontextprotocol.io/specification/2026-07-28/client/elicitation)。
+MaybeCode 两个终端界面显示服务端和 Session，允许编辑 JSON 表单，使用独立的
+`send` 确认发送，也支持 `decline` 和 `cancel`。表单答案不加入输入历史，表单中
+不得输入凭据。URL 模式显示 HTTPS 主机与完整地址，用户同意后自行访问，再通过
+`retry` 继续。客户端不会获取地址、打开浏览器或转发 MCP 凭据。外部访问是否完成
+由用户检查，客户端 OAuth 登录使用独立流程。
 
-库/headless 使用必须显式启用：
+自定义宿主为每个连接池建立一个 broker，并发消费事件。以下片段假设已经配置
+`servers`、可信 `workspaceIdentity`、`sessionId` 和操作 `signal`。宿主需要实现
+事件消费界面，并使用用户审阅后的答案调用 `interactions.respond()`：
 
 ```ts
 import { McpInteractionBroker, openMcpClientPool } from "@may/mcp";
 const interactions = new McpInteractionBroker();
 const pool = await openMcpClientPool({ servers, interactions });
 const owner = { workspaceId: workspaceIdentity, sessionId };
-// 同时消费 interactions.events，并实现明确的用户界面。
-// requested 事件需核验本地 owner，获得用户检查后的答案，再调用：
-// interactions.respond(request.id, request.owner, userReviewedResponse)
+// 并发消费 interactions.events，验证归属并取得用户审阅结果。
+// 使用 interactions.respond(request.id, request.owner, userReviewedResponse) 回答。
 const read = await pool.readResource("remote", "project:///README", { owner, signal });
-await pool.close(); // 同时关闭由 pool 拥有的 broker
+await pool.close(); // 同时关闭由 pool 管理的 broker。
 ```
 
-每个 pool 使用独立 broker 和一个 UI 消费者，不跨 pool 共享。事件流有界且是
-best-effort；可通过 `list(owner)` 恢复当前待答问题。没有 UI 时省略 broker：此时
-不声明 elicitation 能力，收到输入请求会安全失败，不会调用模型。库入口
-`openConfiguredMaybeCode` 同样默认不创建 broker；只有能够消费并回答 controller
-事件时才传入 `mcpInteractions: true`。交互式 CLI 会自动启用。
+Broker 使用一个 UI 消费者。事件流是有界的，可通过 `list(owner)` 查询当前待答项。
+没有 UI 时省略 broker；此时不声明交互能力，输入请求拒绝执行。库入口
+`openConfiguredMaybeCode` 默认没有 broker；能够消费并回答 controller 事件时，
+设置 `mcpInteractions: true`。交互 CLI 自动启用。
 
-工具调用使用 `MayOptions.toolScope()` 提供可信 Host 字符串标签；Core 每个 Run
-只快照一次，并放入 `ToolExecutionContext.scope`，而非模型参数。
-`AgentApplication` 接受 Host 的 `toolScope` 标签并覆盖为自身 `sessionId`；
-MaybeCode 将解析后的 workspace 作为 `workspaceId`。直接执行 pool 工具的调用方
-须自行提供这两个标签。MCP 适配器补充 Run/tool-call id 和随机逻辑请求 id；owner
-标签不会进入 MCP `_meta`。Host 主动操作使用 `McpOperationOptions.owner`。
-缺少可信归属时不发起交互式提问。
+`MayOptions.toolScope()` 提供可信字符串标签，Core 每次 Run 创建快照，放入
+`ToolExecutionContext.scope`。`AgentApplication` 提供自身 `sessionId`，MaybeCode
+提供已解析工作区的 `workspaceId`。直接执行连接池工具时，调用方负责这两个标签。
+适配器补充 Run、工具调用和逻辑请求 ID；归属标签保持在宿主内部。其他操作通过
+`McpOperationOptions.owner` 提供归属。缺少可信归属时无法发起交互。
 
-产品 UI 消费 `mcp.interaction.requested` / `settled`，通过
-`getMcpInteractions()` 查询、`respondMcpInteraction(id, response)` 回答。回答刻意
-绕过 Session 状态队列，避免资源准备或工具占用队列等待自身答案的死锁。读取/预览
-和附件准备在执行中固定 Session；取消会释放排队的 Session 切换。Retained 弹窗
-临时存在、可滚动查看、独立取消，不会把表单作为新的 agent turn 提交。
+产品 UI 消费 `mcp.interaction.requested` 和 `settled`，通过 `getMcpInteractions()`
+查询、`respondMcpInteraction(id, response)` 回答。答案通过 Session 队列之外的
+通道处理，使资源准备能够取得答案。操作期间固定 Session，取消后释放等待中的
+Session 变更。对话框临时保存，能够独立取消。
 
-限制：8 轮协议续接，每个逻辑流程共最多 32 个 Host 输入请求，每个 pool 最多
-32 个待答问题，每个表单最多 32 个字段，请求/响应各 64 KiB，说明文字最多 4,096
-字符。支持扁平基本类型及单选/多选枚举；不支持的 schema 关键字、外部引用、任意
-正则表达式会被拒绝。响应校验不做类型强制转换、不自动填写默认值，并拒绝额外字段。
-`requestTimeoutMs` 保持 SDK 请求超时语义，工具进度可重置计时。只有显式设置
-`maxTotalTimeoutMs` 才增加包含 UI 等待的绝对期限。每次宿主交互从到达时开始按请求超时
-计时（未配置时 60 秒），且不得超过显式绝对期限。
-取消/过期/关闭会移除待答项、取消排队弹窗，拒绝迟到、重复或归属错误的答案。
-每次续接前重新校验认证身份及目录/工具有效性；提问期间切换登录不会在新身份下发送
-旧的请求状态。资源缓存额外按照 workspace 和 Session 分区。
+交互限制为八轮续接、每个逻辑流程 32 个输入请求、每个池 32 个待答项、每个表单
+32 个字段、请求与响应各 64 KiB、说明文字 4,096 字符。表单支持基本类型和单选或
+多选枚举，拒绝不支持的 schema、外部引用及任意正则表达式。响应不强制转换类型、
+不自动填写默认值，额外字段会被拒绝。
 
-Broker 不单独持久化或追踪问题与答案，但服务端仍可能将提交的数据作为正常资源/
-工具结果返回。无归属的旧 push 请求直接拒绝；显式隔离的旧协议操作可以交互，详见下文。
-Roots/Sampling 是显式兼容选项，不会仅因安装 server 就启用。Tasks 需单独显式启用；server
-导出需另行显式启用；本功能不代表完整 MCP 一致性。
-
+`requestTimeoutMs` 保持请求超时语义，进度能够重置计时。设置 `maxTotalTimeoutMs`
+后增加绝对期限，包含 UI 等待。每次交互从到达开始计时，未配置时为 60 秒，并受
+绝对期限限制。取消、过期和关闭移除待答项，拒绝迟到、重复或归属错误的答案。
+续接前重新检查认证代次和目录有效性。Broker 不独立保存或追踪答案；服务端仍可能
+将已提交的数据作为工具或资源结果返回。
 
 ## Roots、Sampling 与旧协议兼容
 
-Roots 和 Sampling 都是**默认关闭**的显式兼容能力。MCP 2026-07-28 已将两者标记
-为 deprecated；新集成宜通过模型服务商的直接 API 获取模型能力。参阅官方
-[Roots](https://modelcontextprotocol.io/specification/2026-07-28/client/roots) 和
-[Sampling](https://modelcontextprotocol.io/specification/2026-07-28/client/sampling) 规范。
-启用不等于授权读取 Session 历史或执行宿主工具。
+Roots 与 Sampling 默认关闭。MCP `2026-07-28` 已将它们标记为 deprecated。
+新集成可以直接使用模型 provider API。启用兼容服务后，Session 历史及本地工具
+权限仍由应用管理。
 
-在 MaybeCode 的单个 stdio 或 HTTP 服务端配置中，分别显式开启：
+在 MaybeCode 服务端配置中合并以下字段：
 
 ```json
-"host": {
-  "roots": true,
-  "sampling": true,
-  "legacyRequests": "isolated"
+{
+  "host": {
+    "roots": true,
+    "sampling": true,
+    "legacyRequests": "isolated"
+  }
 }
 ```
 
-同时需要正在处理交互的 broker/UI。直接使用包 API 时，通过
-`hostServices: McpHostServices` 提供 `roots(context)` 白名单回调和/或
-`sampling.createMessage(params, context)`。有 broker 却缺少已开启的服务时配置
-失败；没有 broker 时不声明任何 Host 能力。回调只接收可信 owner、逻辑请求 id、
-截止时间和取消信号，不获得 Core Context；自定义服务必须检查归属。
+需要活动 broker 和 UI。直接 package 使用 `hostServices: McpHostServices` 提供
+`roots(context)` 和 `sampling.createMessage(params, context)`。有 broker 但缺少
+已开启的服务时配置失败；没有 broker 时不声明宿主能力。回调取得可信归属、逻辑
+请求 ID、期限和取消信号；自定义服务需要校验归属。
 
-- **Roots**：MaybeCode 仅提供当前 workspace。宿主规范化可访问的本地 `file:`
-  路径、去重，展示只读审批后才发送；拒绝则返回空列表，服务端不能指定路径。
-  上限为 32 个根 / 64 KiB，同意后再次检查可访问性。Roots 仅为提示，**不是沙箱
-  或文件访问授权**。不声明 `roots.listChanged`，每次请求重新获取候选根。
-- **Sampling**：UI 先检查/编辑确切的隔离输入，再单独检查/编辑输出后才向服务端
-  披露；拒绝输出不能撤销已产生的模型费用。输入/结果各限 48 KiB，最多 64 条消息、
-  32 个工具；每次最多 4,096 输出 token，每个逻辑流程最多四次调用 / 16,384 个
-  预留输出 token。拒绝除 `none` 外的 `includeContext`，不隐式重试或加入 Session。
-- `createMcpModelSampler(factory)` 适配宿主选择的协议无关 `Model`：每次创建单独
-  有界请求，不经过 May 执行循环或 ToolRegistry。factory 接收已批准的 `maxTokens`，
-  必须在服务商层落实；模型需声明不超过该值的正数 `limits.maxOutputTokens`。
-  MaybeCode 用当前 profile 创建独立的基础 provider 实例，并同时覆盖 `maxTokens`
-  和 `maxOutputTokens`。此桥接器不转发服务端可选的 model/temperature/stop 提示或
-  请求 metadata，由宿主 provider 配置决定。
-- Sampling 工具是**提议，不是执行**。仅发送服务端声明的工具定义；转换
-  tool-use/result 历史，但绝不调用本机工具。文本、支持的内联图片/音频及工具历史
-  均有大小限制，不支持的输出显式失败，不获取 URL/文件。隐去 reasoning、model
-  state 和响应 `_meta`。自定义 sampling 服务可不声明 `supportsTools`。
+- **Roots**：MaybeCode 提供当前工作区。宿主规范化并去重可访问的本地 `file:`
+  路径，取得只读审阅同意后发送，拒绝时返回空列表。最多 32 项、64 KiB，同意后
+  再检查可访问性。Roots 提供工作区信息，工具负责文件权限。不声明
+  `roots.listChanged`，每次重新取得候选目录。
+- **Sampling**：用户审阅输入，provider 调用完成后再次审阅输出，决定是否发送。
+  输出拒绝无法撤销已经产生的费用。请求和结果各限 48 KiB、64 条消息、32 个工具；
+  每次最多 4,096 输出 token，每个逻辑流程最多四次调用和 16,384 个预留输出 token。
+  `includeContext` 只接受 `none`。
+- `createMcpModelSampler(factory)` 创建独立的 provider 无关 `Model` 请求。
+  factory 接收已批准 `maxTokens`，需要在 provider 层执行，并声明不超过该值的
+  正数 `limits.maxOutputTokens`。MaybeCode 依据当前 profile 创建独立基础 provider，
+  同时覆盖 `maxTokens` 和 `maxOutputTokens`。模型、temperature、stop 和请求
+  metadata 采用宿主配置。
+- Sampling 发送服务端工具定义及转换后的工具历史，不执行本地工具。支持的文本、
+  内联图片和音频具有大小限制。不支持的输出拒绝返回；URL 和文件不会获取。
+  Reasoning、模型状态和结果 `_meta` 不发送。自定义 sampling 服务可以省略
+  `supportsTools`。
 
-每次披露前重新检查认证/目录状态。取消或过期会停止本地等待并移除审批；迟到的
-回调结果被丢弃。向服务端返回前会隐藏文件系统/provider 错误细节。自定义回调必须
-遵守 signal 与 provider 预算：宿主无法强制终止任意 JavaScript，也不能撤销远端
-已经处理的模型请求。
+每次披露前检查认证与目录。取消或过期停止等待，迟到回调结果被丢弃。文件系统与
+provider 错误经过处理后返回服务端。自定义回调需要响应取消及预算；任意 JavaScript
+或已经发送的远程模型请求无法通过取消本地等待强制终止。
 
-`legacyRequests: "isolated"` 使适用的旧版 `tools/call`、`resources/read` 和
-`prompts/get` **每次使用全新进程（stdio）或连接/session（HTTP）**，每个端点最多
-八个并发子连接。发送用户操作前需确认子连接协议和完整目录与父连接一致，交互期间
-继续检查父/子连接有效性。通道只有一个可信 owner，绝不复用，完成/取消/池关闭时
-销毁，不重放结果不确定的操作。命中资源缓存也可能产生子连接发现开销。
-这些操作之间**不保留进程/session 状态**，只适合支持独立会话的服务端。未启用时
-普通共享旧版工具仍可使用，但无归属/启动阶段回调不猜测 owner：elicitation 拒绝、
-roots 为空、sampling 失败。
+`legacyRequests: "isolated"` 为每次旧版工具调用、资源读取或提示模板获取创建新的
+stdio 进程或 HTTP 连接/session，每端点最多八个并发子连接。发送前检查子连接协议
+和完整目录与父连接一致，交互期间继续检查有效性。通道绑定一个可信归属，完成、
+取消或池关闭后释放。操作之间不保留进程/session 状态，需要服务端支持独立会话。
+命中资源缓存仍可能产生子连接发现请求。共享旧协议连接的无归属启动请求会拒绝
+表单交互、返回空 Roots，并拒绝 Sampling。
 
+现代 Tasks 通过 `tasks: true` 和 journal 启用，参阅[长任务](mcp-tasks.md)。
+图形集成参阅[隔离 Apps](mcp-apps.md)。独立的认证工具、资源和提示模板导出使用
+`@may/mcp/server`，参阅[服务端编写](mcp-server.md)。
 
-现代 Tasks 已支持持久句柄、显式 get/update/wait/cancel、重启恢复及用户主动附加
-完成结果。设置 `tasks: true` 并提供 journal；版本、UI 和安全边界参阅[长任务](mcp-tasks.md)。
+## 故障检查
 
-可选图形集成及终端 fallback 参阅[隔离 Apps Host](mcp-apps.md)。
-
-独立的经认证工具/资源/提示模板导出使用 `@may/mcp/server`，参阅
-[server 编写](mcp-server.md)；不会自动开启监听或导出 Session。
+| 现象 | 检查与处理 |
+| --- | --- |
+| 连接前启动失败 | 检查环境引用、传输专用字段、命令路径及必需端点诊断 |
+| `auth-required` | 完成 [OAuth 登录](mcp-auth.md)，重连后启动新 Run |
+| `MCP_STALE_TOOL` | 刷新或重连，再通过当前目录启动新 Run |
+| 资源订阅结束 | 检查 `watch.closed` 和端点状态，明确刷新或重连后创建新订阅 |
+| 交互过期 | 检查 UI 是否并发消费事件，以及请求期限是否允许用户审阅；重新发起授权操作 |
+| 远程调用结果未知 | 核查远程效果后决定是否发起新调用，参阅[恢复](recovery.md) |

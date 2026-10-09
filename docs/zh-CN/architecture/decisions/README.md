@@ -2,8 +2,8 @@
 
 [English](../../../en/architecture/decisions/README.md) | **简体中文**
 
-本目录记录会约束多个 May package 或应用的架构决策。ADR 解释某个边界为何存在，
-避免后续重构在无意中破坏它。
+这些记录说明 May 包与应用的依赖方向、生命周期所有权及可选集成范围。具体实现见
+[包目录](../../reference/packages.md)与[运行架构](../runtime-session.md)。
 
 ## 状态
 
@@ -15,14 +15,15 @@
 
 | ADR | 状态 | 决策 |
 | --- | --- | --- |
-| [0001](0001-apps-compose-packages.md) | 已接受 | 应用通过单向依赖组合可复用 package |
+| [0001](0001-apps-compose-packages.md) | 已接受 | 应用通过单向依赖组合可复用包 |
 | [0002](0002-agent-ui-stays-in-may-tui.md) | 已接受 | Agent 感知的终端组件保留在 `@may/tui` |
 | [0003](0003-headless-application-lifecycle.md) | 已接受 | 共享 Session 编排属于 `@may/application` |
 | [0004](0004-agent-definitions-and-tool-registries.md) | 已接受 | Agent definition 与工具 registry 是实例级可复用组合对象 |
 | [0005](0005-observability-is-an-optional-core-port.md) | 已接受 | Observability 实现 Core 拥有的可选 tracing port |
-| [0006](0006-mcp-adapts-to-core-tools.md) | 已接受 | MCP server 适配为 Core 工具，而不进入 runtime kernel |
+| [0006](0006-mcp-adapts-to-core-tools.md) | 已接受 | MCP server 适配为 Core 工具 |
 
 ## 添加记录
 
-使用下一个四位编号，并包含背景、决策、后果和状态。ADR 应记录架构权衡，而不是
-普通实现细节。决策发生变化时，应新增 ADR 并将旧记录标记为已取代，而不是重写历史。
+使用下一个四位编号，包含状态、日期、背景、决策和后果，并链接相关包与指南。
+架构决策变化时，新增记录并提供明确的替代关系。使用步骤放在对应指南中，API
+演进时检查 ADR 当前适用范围。

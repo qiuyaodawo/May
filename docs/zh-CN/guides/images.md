@@ -1,4 +1,4 @@
-# 图片回复
+# 展示图片回复
 
 [English](../../en/guides/images.md) | **简体中文**
 
@@ -7,12 +7,23 @@ OpenAI Responses 将 `image_generation_call.result` 转换为 base64 图片内�
 同时保留原始续接状态。MaybeCode 也能展示已有会话的 OpenAI 原始输出中的图片，
 不改写会话日志。
 
+本文指导宿主展示已经包含受支持图片内容的模型响应、选择终端协议，
+或为其他 UI 和渠道提供媒体读取。所选模型需要支持请求的图片操作。
+
 ## MaybeCode
+
+1. 在选定 Session 中打开包含图片的回复。
+2. 终端使用已保存的附件路径，或选择支持的图片协议。
+3. Web UI 使用原图和下载链接。
+
+### 保存附件
 
 Terminal 将内嵌图片保存到 `~/.may/media/`，在对话中显示完整路径、MIME 类型、
 尺寸和文件大小。可以使用图片查看器打开文件，或者通过 `/web` 查看和下载。
 Readline 界面收到图片后，会按照原始顺序打印完整图文回复；此前流式输出的文字
 仍保留在终端中。
+
+### 终端图片协议
 
 两种 Terminal 界面都支持 Kitty、iTerm2 和 Sixel 图片协议，使用
 `supports-terminal-graphics` 自动检测，通过 `WT_SESSION` 识别 Windows Terminal。
@@ -36,6 +47,8 @@ $env:MAY_IMAGE_PROTOCOL = "sixel"
 pnpm maybecode
 ```
 
+### Web 与其他图片来源
+
 Web UI 保留图文顺序，提供原图和下载链接。读取内嵌图片需要鉴权，并验证图片属于
 指定会话或任务。消息列表传递附件标识，图片数据单独读取。图片元素移除后，释放
 对应的 browser object URL。HTTP(S) 图片由浏览器直接加载，不携带宿主凭据或
@@ -43,6 +56,9 @@ referrer；图片是否继续可用取决于来源服务器。Terminal 显示这
 Provider file ID 需要宿主提供 `MediaReader`。
 
 ## 复用接口
+
+读取或转换图片的宿主需要依赖 `@may/media`，并管理读取接口和存储的生命周期。
+下面的接口说明媒体边界；UI 组合见[自定义 UI](custom-ui.md)。
 
 `@may/media` 导出 `DisplayPart`、`ImageAttachment`、`ImageData`、`MediaReader`、
 `MediaCapabilities`、`displayParts`、`imageAttachment`、`readEmbeddedImage`、
@@ -78,3 +94,9 @@ Telegram 使用 multipart `sendPhoto` 发送满足格式和尺寸要求的图片
 其他渠道提供自身的平台操作并声明支持的媒体能力，即可复用图片校验、附件标识、
 媒体读取及有序内容。
 `ChannelHub` 和 `MaybeClawUiHost` 可以接收自定义 `MediaReader`，用于读取其他来源。
+
+## 验证展示与投递
+
+在目标 UI 中使用实际包含图片的响应，确认图文顺序、附件 MIME 类型与尺寸，
+以及保存的原图能够访问。终端图片需要确认所选终端返回要求的能力信息。
+渠道投递中断后，尝试重新发送之前检查已经保存的投递记录。

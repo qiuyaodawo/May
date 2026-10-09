@@ -1,19 +1,23 @@
-# Custom model adapters
+# Implement a model adapter
 
 **English** | [简体中文](../../zh-CN/guides/custom-model.md)
 
-A May model adapter translates one provider protocol into the provider-neutral
-`Model` contract from `@may/core`. It should not own sessions, permission
-prompts, UI state, or product instructions.
+A model adapter converts provider requests and responses to the `Model`
+interface exported by `@may/core`. Use this guide when adding a provider
+protocol. The adapter handles request conversion, streaming, cancellation,
+and Provider errors; the application owns Session and product behavior.
 
 Use a built-in adapter from `@may/providers` when the provider is already
 supported. Implement `Model` when integrating a new protocol or when creating a
-deterministic model for tests.
+local protocol demonstration.
 
 ## Minimal implementation
 
-The following adapter is deliberately local and deterministic, but it is a
-complete `Model` and can be copied into an application:
+The following local text transformer demonstrates the required stream protocol.
+It performs uppercase conversion and has no external model service. Its limits
+are example values. Create `uppercase-model.ts` in an ESM TypeScript application
+with `@may/core`, `@may/application`, and `@may/session` as direct dependencies.
+See [Getting started](../getting-started.md) for workspace setup.
 
 ```ts
 import type {
@@ -63,11 +67,12 @@ function lastUserText(request: ModelRequest): string {
 }
 ```
 
-It can be supplied directly to the headless application layer:
+Create `run.ts` beside it to exercise the stream through `AgentApplication`:
 
 ```ts
 import { AgentApplication } from "@may/application";
 import { InMemorySessionStore } from "@may/session";
+import { UppercaseModel } from "./uppercase-model.js";
 
 const application = await AgentApplication.open({
   model: new UppercaseModel(),
@@ -82,6 +87,17 @@ try {
   await application.close();
 }
 ```
+
+Compile both files and execute the emitted entry point:
+
+```sh
+pnpm exec tsc --ignoreConfig --target es2022 --module nodenext --moduleResolution nodenext --outDir dist uppercase-model.ts run.ts
+node dist/run.js
+```
+
+The final assistant message contains one text part with `HELLO, MAY`. This
+checks the local protocol and application lifecycle; provider integration
+requires a real account and requests to that provider.
 
 The permission policy is still required by `AgentApplication`, even when this
 particular model never calls a tool.
@@ -136,7 +152,9 @@ Provider continuation data can be attached to an assistant message as
 persists it, Core never interprets it, and only the owning adapter should read
 it after resume.
 
-Usage is optional. When known, include it on `response.completed`:
+Usage is optional. When known, include it on `response.completed`. This fragment
+belongs in the adapter's `stream()`; `message` and `providerUsage` come from the
+service's actual response:
 
 ```ts
 yield {
@@ -187,6 +205,17 @@ The configuration profile's `adapter` must then be `uppercase`. Registration
 is not global, duplicate names are rejected, and the product decides which
 registries it accepts.
 
+## Built-in protocol and retry behavior
+
+`RetryingModel` preserves the server's `Retry-After` duration. If that duration
+exceeds `maxDelayMs`, it returns the original error. Responses errors expose
+`providerType` and `providerCode` separately. Invalid Chat Completions tool-argument
+JSON raises a protocol error.
+
+A top-level Chat Completions `error` ends processing at that chunk and retains
+the server's `message`, `type`, and `code` in the error text. The adapter preserves
+that failure through stream termination and emits no `response.completed`.
+
 ## Adapter checklist
 
 - Forward cancellation and provider errors.
@@ -201,11 +230,3 @@ registries it accepts.
 
 Next: [Custom tools](./custom-tool.md) and
 [Build an agent](./building-an-agent.md).
-
-Retry-After is never shortened to fit `maxDelayMs`. If a server requests a longer wait than
-the configured backoff limit, RetryingModel returns the original error instead of retrying
-earlier. Responses errors expose `providerType` and `providerCode` separately. Malformed
-Chat Completions tool-argument JSON is a protocol error, not a string tool input.
-A Chat Completions stream that reports a top-level `error` field fails at that chunk with the
-server `message`, `type`, and `code` kept in the visible error text. The failure is not replaced
-by the end-of-stream checks, and no `response.completed` is emitted for that call.

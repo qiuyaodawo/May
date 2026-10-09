@@ -1,11 +1,15 @@
 # Team inspection and explicit recovery
 
-[简体中文](../../zh-CN/guides/maybecode-team-recovery.md)
+**English** | [简体中文](../../zh-CN/guides/maybecode-team-recovery.md)
 
-Version 2 teams expose host-only inspection, reconciliation and retry commands.
-These commands are not Agent tools. They never ask a model to decide whether its
-own unknown effects were safe. Legacy v1 teams retain their original
-`resume`/`status`/`cancel` behavior without silently acquiring new authority.
+Use host inspection and verified evidence to resolve interrupted team work.
+Reconciliation records a finding; retry authorizes a new attempt; `resume`
+starts eligible execution. Each operation has its own command.
+
+This guide applies to version 2 teams and assumes you know the team ID and its
+original data root. Stop surviving task/check processes before recording their
+outcomes. Repository users prefix commands with `pnpm`. Legacy v1 teams retain
+their original `resume`, `status` and `cancel` operations.
 
 ## Inspect first
 
@@ -17,8 +21,8 @@ Status reads durable journals without taking over a running team. It shows task
 failures, unsuccessful dependencies, attempts and Session identities, unsettled
 tool evidence, budget call IDs and unknown check command IDs. A pending check may
 still be running. The last acceptance projection is explicitly labeled as possibly
-stale; `team verify` checks current workspace fingerprints. Monitoring across
-separate journals is not an atomic recovery snapshot.
+stale; `team verify` checks current workspace fingerprints. Monitoring reads
+separate journals; recovery requires exclusive ownership and full evidence inspection.
 
 Recovery controls acquire the same exclusive resource and coordinator ownership
 as a run. An active owner or crash-left lock blocks them. Never delete a lock
@@ -27,8 +31,10 @@ retry. Control commands do not load model credentials or construct a provider.
 
 ## Reconcile one known finding
 
-Create a UTF-8 JSON resolution file from independently verified evidence. Choose
-exactly one kind; there is no clear-all or reset-budget command.
+1. Independently verify the affected task, provider receipt or check outcome.
+2. Create a UTF-8 JSON resolution file outside the task copies, using exactly
+   one of the formats below. Replace example identities, usage and findings
+   with the evidence for this team.
 
 ```json
 {
@@ -40,7 +46,7 @@ exactly one kind; there is no clear-all or reset-budget command.
 }
 ```
 
-The numbers above are illustrative, not a fallback estimate. Supply real usage;
+The numbers above illustrate the fields. Supply real usage;
 zero requires evidence of zero usage. Reconciliation does not refund actual usage,
 raise limits, retry a request or release an old model result to tools.
 
@@ -74,7 +80,8 @@ old Session history. Budget and check records remain separate and may also need
 their own reconciliation. A passing verification record does not by itself close
 an unknown Session tool checkpoint.
 
-Preview, inspect the finding and digest, then explicitly confirm:
+3. Preview the resolution, inspect the finding and digest, then confirm that
+   exact preview:
 
 ```powershell
 maybecode team reconcile <id> --resolution resolution.json
@@ -84,9 +91,13 @@ maybecode team reconcile <id> --resolution resolution.json --confirm <digest>
 The digest binds the finding and current task, budget and verification evidence.
 Changed state or a changed file requires a new preview. Confirmation records the
 finding only; it does not run Agents, tools or tests. The host must actually verify
-the finding: a sentence in JSON is an audit assertion, not automatic proof.
+the finding; JSON records the host's already-verified conclusion.
 
 ## Review the impact before retrying
+
+1. Resolve unknown task, model-usage and check outcomes using the procedure above.
+2. Preview the selected failed or cancelled task's retry and inspect its impact.
+3. Confirm the exact digest, then call `resume` as a separate execution command:
 
 ```powershell
 maybecode team retry <id> --task implementation --finding "Verified failure; explicitly authorize a fresh attempt."
@@ -105,7 +116,7 @@ descendants, stopped/expired teams and exhausted lifetime limits. Failed
 dependants are **not** automatically retried after their upstream task succeeds;
 preview and authorize each separately. Completed tasks are not retry candidates.
 Cancellation and deadlines do not silently reset; stopped teams may require a new
-explicit team rather than a resumed attempt.
+explicit team when more work is needed.
 
 ## Cancellation and verification
 

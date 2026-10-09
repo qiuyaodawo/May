@@ -1,11 +1,21 @@
-# Plugins, services and lifecycle Hooks
+# Write and load plugins
 
 **English** | [简体中文](../../zh-CN/guides/plugins.md)
 
-`@may/plugin` manages configured plugins and their resources. `@may/core`
-declares typed Hook interfaces and the `AgentRuntime` interface;
-`@may/application` assembles these with permissions, Context and durable Session
-storage. See the [specification](../architecture/plugin-spec.md).
+Use this guide to add a service or lifecycle handler to an existing May
+application. You need an application composition, the service or Hook you want
+to extend, and installed `@may/plugin` and `@may/application` packages.
+
+1. Declare services and plugin setup using the [example](#declare-a-plugin).
+2. Add the definitions to your application's `plugins`, or
+   [load a module through product configuration](#load-plugins-in-products).
+3. Register cleanup when acquiring resources and select the scope that owns them.
+4. Verify initialization, Hook execution, state restoration and shutdown.
+
+`@may/plugin` manages configuration and resources. Core defines typed Hooks and
+`AgentRuntime`; Application integrates them with permissions, Context and durable
+Session storage. The [architecture explanation](../architecture/plugins.md)
+describes their lifecycle and dependency rules.
 
 ## Plugin definition and composition
 
@@ -14,10 +24,8 @@ provided capabilities, dependencies and setup procedure. The host validates the
 composition, initializes plugins in dependency order and releases resources at
 shutdown.
 
-Existing parts can become plugins by exposing these declarations. A plugin can
-contain classes, functions and other parts; one runtime plugin can jointly own an
-Agent loop and its matching Context. Component remains an ordinary descriptive
-term, while applications select and compose functionality through plugin declarations.
+One plugin can contain several classes or functions and provide several services.
+For example, a runtime plugin can jointly manage an Agent loop and its Context.
 
 `PluginDefinition` contains the following fields:
 
@@ -38,9 +46,8 @@ cleanup function.
 
 ### PluginContext and ctx
 
-`PluginContext` is May's implemented plugin-management interface. PluginHost
-creates an object for each plugin instance during initialization and passes it
-to `setup(ctx)`. The parameter name `ctx` is an example and may be changed.
+`PluginHost` creates a `PluginContext` for each plugin instance and passes it
+to `setup(ctx)` during initialization.
 
 | Interface | Purpose |
 | --- | --- |
@@ -57,6 +64,10 @@ PluginContext manages plugin configuration and lifecycle. The Agent's `Context`
 interface stores and supplies model-visible messages. Each serves that responsibility.
 
 ## Declare a plugin
+
+In an ESM TypeScript module, declare the following two plugins. The example adds
+`Project: ` to string input through `inputBeforeSubmit`; it keeps non-string input
+unchanged. The application supplies its own Model and storage separately.
 
 ```ts
 import { definePlugin, defineService } from "@may/plugin";
@@ -120,14 +131,21 @@ Close waits for active work, releases children before parents, continues after
 individual cleanup failures, and reports an `AggregateError`. Repeated `close()`
 calls share the same completion.
 
-For direct hosting:
+For a custom host, the following fragment assumes your plugin definitions,
+`myHook`, service bindings, `operation` and `cancelOperation` already exist.
+Keep the host alive for the operation and close it even if the operation fails:
 
 ```ts
+import { PluginHost } from "@may/plugin";
+
 const host = await PluginHost.create({ plugins, hooks: [myHook], services });
-const application = await host.createScope("application", { id: "app" });
-const session = await application.createScope("session", { id: "conversation" });
-await session.use(() => operation(), { cancel: () => cancelOperation() });
-await host.close();
+try {
+  const application = await host.createScope("application", { id: "app" });
+  const session = await application.createScope("session", { id: "conversation" });
+  await session.use(() => operation(), { cancel: () => cancelOperation() });
+} finally {
+  await host.close();
+}
 ```
 
 `use()` tracks work through all ancestors. Resources supplied through `services`
@@ -250,16 +268,12 @@ registries live in `packages/plugin-services/`; the plugin host remains in
 Existing package classes and interfaces remain available for direct integration.
 Applications retain compatible exports for extracted functionality.
 
-`@may/plugin-agent-adapters` accepts `AgentAdapterContext.telemetry` with a
-validated version 1 `TelemetryCorrelation`. Gateway RPC advertises
-`telemetryVersion: 1` in `gateway/initialize`; `conversation/execute` includes
-the separate `telemetry` envelope only when the remote confirms that version.
-Remotes omitting the response field continue receiving the original execution
-fields. Both sender and receiver validate correlation before execution, and
-business request deduplication excludes telemetry identities. The packaged
-`rpc-file-agent` example negotiates this version, saves telemetry separately
-from its input hash, and retains the original execution identity when serving
-a previously completed input.
+`@may/plugin-agent-adapters` supports validated version 1 `TelemetryCorrelation`
+through `AgentAdapterContext.telemetry`. RPC transports negotiate
+`telemetryVersion: 1` before sending the separate envelope and validate it before
+execution. Business deduplication excludes telemetry identities. See
+[model and execution diagnostics](model-telemetry-integration.md) for correlation
+and configuration responsibilities.
 
 MaybeCode composes its Model, PermissionPolicy, Context, Skills, goals,
 history-memory and delegation through plugins. MCP commands, catalogs and events
@@ -334,7 +348,10 @@ consumers are reconstructed without it. A child scope cannot modify its ancestor
 
 ## Load plugins in products
 
-MaybeCode reads `apps.maybecode.plugins`. MaybeClaw's May adapter reads
+Add the following `plugins` array to the relevant application section of your May
+configuration. The module must exist beside the configuration at the shown relative
+path and export a `PluginDefinition`. MaybeCode reads `apps.maybecode.plugins`.
+MaybeClaw's May adapter reads
 `apps.maybeclaw.agents[].plugins`:
 
 ```json
@@ -352,6 +369,13 @@ to local files are accepted. `loadPluginModules()` and `parsePluginSelections()`
 provide the same loader for custom applications. Loaded modules execute with
 the host process's permissions; register resources inside `setup` and `ctx.defer()`.
 
-Run `pnpm --filter @may/plugin test`, `pnpm docs:check`, and
+## Verification
+
+With your real plugin, confirm setup runs in dependency order, the input Hook
+changes the intended input, resources close in reverse dependency order, and
+persisted state survives reopening. Check a missing dependency and incompatible
+state version fail before execution.
+
+From the repository root, run `pnpm --filter @may/plugin test`, `pnpm docs:check`, and
 `pnpm test:package:plugin` for the host, documentation and independently installed
 package checks. Real provider tests are separate from the offline suite.

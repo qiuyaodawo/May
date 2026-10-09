@@ -1,35 +1,35 @@
-# Custom UI
+# Build a custom UI
 
 **English** | [简体中文](../../zh-CN/guides/custom-ui.md)
 
-For a browser interface, start with the [shared Web UI](web-ui.md):
+Use this guide to connect an existing UI to May's headless controllers. You need
+an open `AgentApplication` or workspace controller and a UI that can consume
+asynchronous events while accepting cancellation and approval responses.
+
+For a browser interface, use the [shared Web UI](web-ui.md):
 `@may/ui-client` supplies the JSON boundary and state synchronization;
 `@may/web-ui` supplies composable components and an optional workbench.
 The direct in-process controller and TUI patterns below remain supported.
-
-`mountWebUI` accepts an optional `authentication` object with `label`,
-`login(password): Promise<string>`, and `logout(): Promise<void>`. The product
-exchanges the password for a temporary UiClient credential and revokes it on
-disconnect. Password spaces are preserved and the input clears after submission.
-Use `connectionHint` for login instructions; `authentication` and `initialToken`
-are mutually exclusive.
 
 May's application layer is headless. A terminal, desktop, web, or remote UI
 should depend on `AgentController` (one active Session) or
 `AgentWorkspaceController` (multiple Sessions), invoke user-intent methods, and
 project the asynchronous event stream into view state.
 
-Do not make UI state the source of truth. Complete Session events are durable;
-streaming deltas and progress are live observations.
+Complete Session events provide durable history. Streaming deltas and progress
+provide live view updates; reload history when reconnecting.
 
 ## Headless controller boundary
 
-The primary UI operations are:
+1. Obtain the controller from your application host. The following snippet assumes
+   `controller` is open and `requestId` names a current approval.
+2. Start observing events before submitting input.
+3. Await `run.result` when you need the operation's completion.
 
 ```ts
 const run = await controller.submit({ input: "Explain this repository" });
-run.cancel("Cancelled in UI");       // cancel this handle
-controller.cancel("Cancelled in UI"); // cancel the active run or compaction
+run.cancel("Cancelled in UI");        // 取消此 Run。
+controller.cancel("Cancelled in UI"); // 取消活动 Run 或压缩操作。
 
 await controller.resolveApproval(requestId, "allow");
 await controller.compactContext();
@@ -46,8 +46,10 @@ waits for event relays, and then closes the event stream.
 
 ## Projecting application events
 
-This bridge fills `@may/tui`'s reusable transcript without coupling the
-controller to terminal input:
+This projection function assumes an open controller, a `TranscriptStore`, and
+an application-owned `askApproval` dialog. Install `@may/application`,
+`@may/permissions` and `@may/tui` in the consuming project. The function observes
+events until the controller closes; run input and exit handling concurrently.
 
 ```ts
 import type {
@@ -94,16 +96,15 @@ export async function projectApplication(
         store.appendNotice("warning", event.error.message);
         break;
       case "tool.presentation":
-        // The application owns this namespaced/versioned display schema.
-        // Decode recognized kinds here and update the corresponding tool item.
+        // 按应用声明的 kind/version 处理展示数据。
         break;
     }
   }
 }
 ```
 
-If an approval dialog fails, this example denies the call rather than leaving
-the run suspended. `resolveApproval()` returns `false` when the request is
+If an approval dialog fails, `finally` resolves the request as `deny` and the
+dialog error propagates. `resolveApproval()` returns `false` when the request is
 already gone, for example after cancellation.
 
 For an `AgentWorkspaceController`, also handle `session.changed`: reset or load
@@ -112,8 +113,10 @@ extension events are likewise translated in the product UI bridge.
 
 ## Retained terminal rendering
 
-`@may/tui` provides terminal primitives, but it is not required by a graphical
-UI. A minimal retained transcript is:
+For a retained terminal interface, add this rendering setup around the preceding
+projection function. `application` is the open controller and
+`showApprovalDialog` is your dialog implementation. This snippet supplies the
+view lifecycle; your product also needs an input component and an exit handler.
 
 ```ts
 import {
@@ -188,11 +191,17 @@ started from idle input contributes its ordinary `input.submitted` record.
   `runtime.stop()`.
 - Remove subscriptions and close the controller when the UI exits.
 
-See [Permission policies](./permission-policy.md),
-[Custom tools](./custom-tool.md), and
-[Runtime and session boundaries](../architecture/runtime-session.md).
+## Browser authentication
 
-### MCP user interactions
+`mountWebUI` accepts an optional `authentication` object with `label`,
+`login(password): Promise<string>`, and `logout(): Promise<void>`. The product
+exchanges the password for a temporary UiClient credential and revokes it on
+disconnect. Password spaces are preserved and the input clears after submission.
+Use `connectionHint` for login instructions; `authentication` and `initialToken`
+are mutually exclusive. HTTP authentication and origin requirements are described
+in the [shared Web UI guide](web-ui.md).
+
+## MCP user interactions
 
 MaybeCode exposes ephemeral `mcp.interaction.requested` / `settled` events,
 `getMcpInteractions()` and `respondMcpInteraction(id, response)`. Enable the broker
@@ -211,7 +220,7 @@ the displayed document. Never auto-approve either sampling stage. Decline/cancel
 and settled/deadline handling are the same as forms. No browser, Session submission,
 input-history entry or local tool execution is implied by review.
 
-### MCP task controls
+## MCP task controls
 
 Use `listMcpTasks`, `getMcpTask`, `updateMcpTask`, `waitMcpTask`, `cancelMcpTask`
 and `forgetMcpTask` for explicit current-Session controls. Show local handles and
@@ -226,3 +235,14 @@ and observed terminal state. Retrying abandoned/expired input requires explicit
 Graphical hosts can use `pool.openApp`, `mcpAppSandboxResponse` and the browser-only
 `@may/mcp/apps-browser` entry point. See [isolated Apps](./mcp-apps.md) for consent,
 origin/CSP requirements and unsupported APIs. Terminals retain text fallback.
+
+## Verify the UI lifecycle
+
+Confirm that a completed response replaces partial text, an approval resolved
+elsewhere disappears, cancellation removes active controls, a Session switch
+loads that Session's history, and exit closes event subscriptions and terminal
+resources. Use the real controller and persistence backend for these checks.
+
+See [permission policies](permission-policy.md), [custom tools](custom-tool.md)
+and [runtime and Session boundaries](../architecture/runtime-session.md) for the
+corresponding host responsibilities.

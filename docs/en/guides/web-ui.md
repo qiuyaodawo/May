@@ -1,47 +1,41 @@
-# Shared Web UI
+# Use the shared Web UI
 
 **English** | [简体中文](../../zh-CN/guides/web-ui.md)
 
-MaybeCode and MaybeClaw share browser components and transport while retaining
-their own resource models. MaybeCode terminal frontends open the workbench with `/web`.
+Use the browser workbench to send messages, inspect history, resolve approvals
+and manage product resources. MaybeCode and MaybeClaw share browser components
+and transport; their hosts retain execution, permissions and persistence.
 
-The MaybeCode model panel exposes capability values, unknown or unsupported
-states, declaration sources, discovery diagnostics, and a refresh action.
-The active Session's diagnostics panel reads the optional observability plugin.
-MaybeClaw provides model inspection through `agent.check` and diagnostics for
-the selected Session through `session.diagnostics`. Authentication and Session
-ownership checks also apply to diagnostic reads.
-
-`@may/ui-client` exports `createTelemetryPanel(data)` for hosts to reuse. It
-shows individual durations, status, parent span identities, sampling selection,
-and retention coverage. Parallel span durations remain separate. The panel is
-limited to 40 records; hosts can page the diagnostics API independently. See
-[model and telemetry integration](model-telemetry-integration.md).
+For MaybeCode, you need a configured model and an open coding workspace. For
+MaybeClaw, you need a local administrator account and an Agent configuration;
+the first-run setup can create them. Repository commands below run from the
+repository root using the pnpm version declared in `package.json`.
 
 ## Run
 
-In either MaybeCode terminal frontend, enter `/web` to open the current workspace
-and Session in the default browser. The command automatically selects an available
-loopback port and generates authentication credentials. No environment variable or
-manual token entry is needed. Repeating `/web` reuses the service and opens another
-authenticated page. After refreshing or disconnecting a page, run `/web` again.
+### Open an existing MaybeCode workspace
 
-TUI and Web receive separate copies of live events and share the same execution
-owner. Messages, approvals, model changes and Session changes use the same
-controller. An approval resolved in either frontend disappears from both.
-Closing a browser page leaves the Agent running; exiting the TUI closes the Agent
-and Web service. MCP forms and authorization interactions can be completed in
-either frontend; a resolved request disappears from both.
+1. In either MaybeCode terminal interface, enter `/web`.
+2. The command selects a loopback port and opens the current workspace and Session
+   in the default browser. The page connects automatically.
+3. After refreshing or disconnecting the page, execute `/web` again.
+4. Close a browser page to disconnect it. Exit the terminal to close both the
+   Agent and Web service.
 
-The connection link carries a one-time ticket in its URL fragment. The page
-immediately removes the fragment and exchanges the ticket for a control token.
-Tickets expire after 60 seconds, are consumed once, and are limited to eight
-pending connections. The token stays in page memory and is never printed or
-written to browser storage. Origin checks and Bearer authentication remain active.
+The terminal and Web receive their own live-event streams and share one
+controller. A message, approval, model change or Session change in either
+interface appears in both. MCP interactions can be answered from either
+interface; resolving one removes the request from all connected views.
 
-To launch a standalone Web host, use the following command.
+The launch URL contains a one-time ticket in its fragment. The page removes the
+fragment and exchanges the ticket for a control token. Tickets last 60 seconds,
+can be consumed once and have an eight-ticket pending limit. Control tokens
+remain in page memory. Authentication and Origin checks apply to every request.
 
-Use your existing May model configuration. In PowerShell:
+### Start a standalone MaybeCode Web host
+
+1. Use your existing May model configuration. In PowerShell, generate a token,
+   copy it for the connection dialog and start the host:
 
 ```powershell
 $env:MAYBECODE_CONTROL_TOKEN = node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
@@ -49,460 +43,297 @@ Set-Clipboard $env:MAYBECODE_CONTROL_TOKEN
 pnpm maybecode --ui web --port 3940
 ```
 
-Open the printed URL, choose **连接本地服务**, and paste the token. The clipboard
-command above copies a credential; clear your clipboard when finished. Tokens
-stay in page memory only. Reloading requires connecting again. `--continue` and
-`--resume` retain their existing meaning. `--port` requires `--ui web`; `0`
-requests an available port. The default TUI remains `retained`.
+2. Open the printed address, select **连接本地服务** and paste the token.
+   Clear the clipboard after connecting. A page reload requires reconnection.
+3. Stop the host with Ctrl+C. Remove the token from the launching shell when
+   finished:
 
-For MaybeClaw, run the following command. Missing configuration or administrator
-authentication opens a local password setup page. Initialization preserves existing
-May settings, saves a password hash, and opens the console at the same address.
-Log in with the password you set, add an Agent, and create a session. With `--no-open`
-or `serve`, open the local initialization HTML file printed by the terminal:
+```powershell
+Set-Clipboard -Value ""
+Remove-Item Env:\MAYBECODE_CONTROL_TOKEN
+```
+
+`--continue` and `--resume` select Session history as in the terminal.
+`--port` requires `--ui web`; `0` selects an available port. The default interface
+is `retained` TUI. Tokens are not written to browser storage or static assets.
+
+### Start MaybeClaw
 
 ```powershell
 pnpm maybeclaw
 ```
 
-This starts the service and opens the default browser. You can add your first Agent
-through **Agent 管理** -> **添加 Agent** in the Web interface and create sessions
-without restarting the service. `--no-open` and the `serve` subcommand start only the
-service; Ctrl+C stops it.
+The command starts the local service and opens the default browser. If
+configuration or administrator authentication is missing, complete the local
+password setup. It preserves existing May settings and saves a password hash.
+Log in, select **Agent 管理** → **添加 Agent**, and create a Session.
 
-The service converts the password to a salted hash at startup or after a configuration
-save. Password changes invalidate existing logins. See the [MaybeClaw guide](maybeclaw.md)
-for password configuration, login lifetime, and remote CLI authentication.
-
-`pnpm example:web-ui` starts an **offline fixture** on port 3941: scripted
-responses, memory-only sessions and a no-side-effect approval tool. Its public
-fixture token auto-connects only this example. It neither invokes a real model
-nor executes the business tasks entered into its composer.
+`--no-open` or the `serve` subcommand starts the service without opening a browser.
+When setup is required, open the local initialization HTML file printed by the
+terminal. Ctrl+C stops the service. Password changes invalidate existing logins.
+See the [MaybeClaw guide](maybeclaw.md) for password requirements, login lifetime
+and remote CLI authentication.
 
 ## MaybeCode commands and interactions
 
-The composer uses the terminal's slash-command registry, argument completion and
-execution functions. Arrow Up/Down selects a completion; Tab inserts it. Unknown
-commands and invalid arguments are reported without submitting a model message.
-Management-command output is held in page memory, separately from conversation history.
-Ordinary messages cancel active execution and wait for cancellation before
-starting the new request. `/steer <message>` saves additional input for the next
-complete Step boundary, including tools and approvals. Pending messages run in
-FIFO order; idle steering starts a Run. `/stop` and the cancel control cancel
-active work and queued input. Cancelled input needs explicit resubmission.
-Delivered steering text appears once in the conversation, including after
-reopening the Session. History search and field details read the complete saved
-text even when the snapshot preview is truncated.
+The composer shares the terminal slash-command registry. Arrow Up/Down selects a
+completion and Tab inserts it. Unknown commands and invalid arguments produce
+command errors. Management output remains in page memory outside conversation
+history.
 
-| Operation | Web entry |
+| Task | Web entry |
 | --- | --- |
-| Model and default profile | Model dropdown; `/model` selection and default actions; `/model profile --default` |
-| Reasoning effort | Effort dropdown; `/effort`; `/effort default` restores configured options |
-| Sessions | Sidebar selection and confirmed deletion; `/new`, `/resume [id]`; rename and deletion in the session selector |
-| Retry, instructions and status | `/retry`, `/instructions`, `/status`, `/context` |
-| Input during execution | Ordinary messages interrupt; `/steer <message>` waits for the Step; `/stop` cancels current and queued input |
-| Goals | `/goal start`, `/goal status`, `/goal pause`, `/goal resume`, `/goal cancel` |
-| Context management | `/compact [history-reference\|provider-native]` and the compact button |
-| Skills | `/skills`, `/skills show name`, `/skills use name [task]` |
-| MCP | `/mcp` and its catalog, resource, prompt, watch and task operations |
-| Recovery | `/recovery`, `/recovery resolve id finding` |
-| Display | `/details`, `/thinking`, transcript search, inspection and scrolling |
-| Host exit | `/quit` or `/exit`, followed by confirmation |
+| Select model/default profile | Model dropdown; `/model`; `/model profile --default` |
+| Select reasoning effort | Effort dropdown; `/effort`; `/effort default` |
+| Manage Sessions | Sidebar; `/new`, `/resume [id]`; rename and confirmed deletion |
+| Retry or inspect execution | `/retry`, `/instructions`, `/status`, `/context` |
+| Manage goals | `/goal start`, `status`, `pause`, `resume`, `cancel` |
+| Compact Context | `/compact [history-reference\|provider-native]` or compact button |
+| Use Skills | `/skills`, `/skills show name`, `/skills use name [task]` |
+| Use MCP | `/mcp` catalog, resource, prompt, watch and task commands |
+| Investigate recovery | `/recovery`, `/recovery resolve id finding` |
+| Read details | `/details`, `/thinking`, transcript search and inspector |
+| Exit the host | `/quit` or `/exit`, then confirm |
 
-MCP form and editable review windows display the request, accept JSON, preview the
-exact submitted content and require confirmation. URL requests require consent,
-manual navigation and a separate retry action. Interactions and cancellation can
-be submitted while a command is awaiting a response. The broker validates schema,
-request ownership and expiry, and responses remain outside conversation history.
-Standalone `--ui web` enables the same interaction broker as the terminal.
-The separate `team` and `mcp login` CLI subcommands keep their CLI entry points.
+An ordinary message cancels active execution, waits for cancellation and starts
+the new request. `/steer <message>` saves FIFO input for the next complete Step
+boundary, including its tools and approvals; idle steering starts a Run.
+`/stop` and the cancel control cancel active work and queued input. Cancelled
+input needs explicit resubmission. Delivered steering text appears once and
+remains available after reopening the Session.
 
-After building, set `MAYBECODE_WEB_LIVE=1` and run
-`pnpm --filter @may/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs`.
-These checks use the local model configuration, real workspace and MCP broker,
-plus a real model task for tool approval and file creation. Test data stays under
-the ignored `review` directory. The command performs model requests.
+MCP forms and editable reviews show the exact JSON submitted and require
+confirmation. URL requests require consent, manual navigation and an explicit
+retry action. Responses and cancellation remain available while a command waits.
+The broker checks schema, ownership and expiry; responses stay outside history.
+Standalone Web mode enables the same broker. `team` and `mcp login` keep their
+separate CLI entry points. See [MCP interactions](mcp.md#scoped-user-interaction-modern-mrtr).
 
 ## Session forks and file versions
 
-Hosts with a project workspace show the current Git branch in the conversation
-header. Detached HEAD shows a short commit hash; initialization and read errors
-have explicit states. Workspace information follows Session switches and external
-Git changes. Historical replies retain their recorded branch and commit.
+Workspace hosts show the current Git branch in the header; detached HEAD shows
+a short commit hash. Historical replies retain their recorded branch and commit.
+External Git changes and Session switches update current workspace information.
 
-**创建分支** after a completed reply opens the workspace-mode dialog. The current
-workspace preserves current files. A new worktree starts from the reply's recorded
-commit. Missing recoverable Session state disables forking; missing file versions
-disable worktree creation. In-progress messages are not selectable fork positions.
+After a completed reply, select **创建分支** and choose the workspace mode.
+The current workspace retains its files. A new worktree begins at the reply's
+recorded commit. Forking requires recoverable Session state; worktree creation
+also requires a recorded file version. In-progress messages cannot be selected.
 
-**本轮文件变化** displays a reply's version changes. **查看文件变化** in the header
-offers Session-wide and current-workspace comparisons. The file list identifies
-added, modified, deleted and binary files. Text diffs support scrolling, search and
-change navigation. Uncommitted content is labeled as current workspace changes.
-**预览恢复** reads the selected historical file content and displays the restoration
-diff; **确认恢复文件** applies it. Manual changes after preview prevent restoration
-and produce a conflict diagnostic.
+**本轮文件变化** shows that reply's changes. Header **查看文件变化** provides
+Session-wide and current-workspace comparisons. Added, modified, deleted and
+binary files have explicit states; text diffs support search and change navigation.
+Uncommitted changes are labeled as current workspace content.
 
-**管理 worktree** lists registered directories, branches, starting commits and
-states, with explicit open and delete actions. The host checks linked sessions,
-processes, uncommitted changes and unmerged commits before deleting a directory.
+To restore a file, select **预览恢复**, inspect the restoration diff, then select
+**确认恢复文件**. A manual change after preview causes a conflict and prevents
+restoration. **管理 worktree** provides registered paths, branches, starting
+commits and open/delete actions. The host checks linked Sessions, processes,
+uncommitted changes and unmerged commits before directory deletion.
 
-In the MaybeCode TUI, `/fork` opens the history tree: Arrow Up/Down selects,
-Left/Right expands or collapses, `/` searches, Space previews, Enter chooses the
-position and workspace mode, and Escape cancels. `/changes` opens the file list;
-Enter opens a diff, Page Up/Down scrolls, `/` searches, `N` finds the next match,
-`]` advances to the next change, and Escape returns to the file list. The footer
-displays the current branch.
-In a reply's diff, `R` previews restoration of the selected file and `Y` explicitly
-confirms it.
+The TUI exposes the same tasks through `/fork` and `/changes`. In `/fork`, use
+arrows to navigate, `/` to search, Space to preview, Enter to select and Escape
+to cancel. In a diff, Page Up/Down scrolls, `/` searches, `N` finds the next match,
+`]` selects the next change, `R` previews restoration and `Y` confirms it.
 
-Shared components receive structured state through optional `workspace`,
-`forkPoints`, `checkpoints` and `worktrees` snapshot fields. They send operations
-through `session.fork`, `changes.view`, `worktree.open` and `worktree.delete`.
-Controls remain hidden when the host does not provide the corresponding capability.
-Restoration uses `changes.restore.preview` and `changes.restore.apply`.
-`UiWorkspaceDiff.restorePreviewId` identifies the preview; the host retains the
-actual content and conflict-check information.
+Custom hosts supply optional `workspace`, `forkPoints`, `checkpoints` and
+`worktrees` snapshot fields. Operations use `session.fork`, `changes.view`,
+`worktree.open`, `worktree.delete`, `changes.restore.preview` and
+`changes.restore.apply`. `UiWorkspaceDiff.restorePreviewId` identifies a
+host-retained preview. Controls appear only for supplied capabilities.
 
-After `pnpm build`, the workspace browser checks use the configured
-`deepseek-v4-flash` profile when `MAY_LIVE_PROVIDER_UI_TESTS=1`. The Session fork
-check also requires `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`, which authorizes commits
-inside its isolated test repository and worktrees. It makes actual provider
-requests and checks reply forks, file restoration through WebUI and TUI, stale
-previews, and fork rejection during a blocked Git checkpoint. Run
-`node --test packages/ui/web/test/browser/workspace-versions.test.mjs packages/ui/web/test/browser/workspace-session-fork.test.mjs`.
-Both checks are skipped without their required environment flags.
+## Read history and details
 
-## Boundaries
+The transcript groups records by Run and shows tool counts, approvals and exceptional
+states. Expand/collapse and exception filtering affect the local view. Approval
+controls remain accessible. New output preserves the visible history position
+and offers **有新内容 / 回到最新**.
 
-`ApplicationUiHost` accepts an independent `events` stream and
-`closeApplication: false` when a terminal owns the controller. The terminal must
-distribute each event to both frontends and close the controller when it exits.
-`startUiServer({ browserLogin: true, ... })` adds a one-time connection exchange
-and returns `createLoginUrl()`. Pair it with `webUiAssets(..., { browserLogin: true })`.
-Product servers composing additional API routes can import `BrowserLogin` from
-`@may/ui-client/server` and use `issue()`, `redeem(ticket)`, and `clear()` with the
-same one-time ticket semantics and existing origin checks.
-Custom shells can provide `initialToken` and `connectionHint` to `mountWebUI`.
-With `initialToken`, the connection dialog shows the launcher instructions and
-omits manual token entry.
+**查看详情** opens a side panel for overview, input, output, errors and presentation
+fields. Read-only fields provide previous/next chunks and refresh. The host binds
+field content to its resource and version hash, rejecting mixed-version reads.
+The overview can use product renderers such as Diff; large presentation JSON is
+available as raw text chunks.
 
-`ApplicationUiHost` supports product `controls`, `complete`, `available`, `submit`,
-`concurrentCommands` and `interactionCommands` hooks. Awaiting a product command
-does not hold the snapshot queue; interaction responses have their own guarded
-path. Products must validate availability and request ownership when executing.
-`UiReceipt.output` describes transient command output/actions; `disconnect` ends
-the requesting client connection. `UiSnapshot.controls` advertises command input,
-interaction responses and cancellation. `UiClient.interact()` can respond while
-`command()` is pending. `startUiServer` accepts an `exit` callback after the exit
-receipt is flushed and exposes `closed`; without a callback it closes its host.
-`GET /api/ui/complete` is authenticated and bound to host and Session. Request
-bodies are limited to 256 KiB and argument strings to 64 Ki characters; product
-commands apply their own smaller limits where required.
+The sidebar searches all Session titles or task prompts and pages by creation
+time plus stable ID. Adding, deleting or renaming resources refreshes loaded pages
+while preserving the query and page count. `snapshot.resourcesVersion` lets a
+host invalidate pages for changes anywhere in the catalog. Without it, changes
+to snapshot resource IDs or titles trigger refresh.
 
-| Layer | Ownership |
+**搜索内容** searches committed user/assistant text, reasoning, tool inputs/results,
+diagnostics and presentations, including content beyond previews. Results are
+matching blocks and refresh when searching again. Loading old pages keeps current
+approvals and does not activate another Session.
+
+Custom hosts declare `snapshot.reads` and optional `UiHost.resources`, `history`
+and `field`. Authenticated routes `/api/ui/resources`, `/api/ui/history` and
+`/api/ui/field` require current `hostId`; history/field also require `selected`.
+Pages accept `query` and opaque `cursor`, return at most 50 records and target an
+approximately 256K-character payload. A single bounded large block can exceed
+that budget. Cursors bind host/resource/query/anchor. Deleted anchors or scope
+changes require a fresh search. Old host or selection responses are discarded.
+
+`AgentWorkspace.readSessionHistory()` validates catalog membership and calls
+`SessionStore.inspect()`. It reads without activating a runtime, updating recency
+or repairing the journal. The file store ignores incomplete trailing bytes and
+rejects malformed complete records. Custom stores must supply safe inspection.
+MaybeClaw also verifies task ownership. Existing catalogs and journals are scanned
+in memory; very large histories and many loaded pages still consume CPU and memory.
+
+## Execution evidence and approvals
+
+Tool cards show waiting, running, completed, failed, denied, not-started and unknown
+states. A started tool without a confirmed result remains unknown after cancellation.
+Explicit host recovery evidence can establish not-started. Partial assistant answers
+are labeled interrupted. Progress provides live display; durable completion is
+recorded separately.
+
+Only current `snapshot.interactions` creates decision controls. History retains
+read-only approval evidence. The host rejects expired or unavailable choices.
+Session-wide approval requires a grant key. Truncated approval inputs are deny-only.
+
+Persistent approval requires host-provided scope metadata and operator identity.
+`ApplicationUiHost.permissionActor()` supplies that identity; clients cannot supply
+it. Optional `permissionRules: { list, revoke, create? }` callbacks implement
+`permission.rules.list`, `revoke` and `create`. A create request supplies an
+existing visible rule ID and allow/deny decision; the host derives the full range
+and operator. Confirmation displays the complete range and deny precedence.
+`UiPanel.actions` enables these actions in standard or product detail panels.
+
+## Models and diagnostics
+
+MaybeCode's model panel shows known, unknown and unsupported capabilities, sources,
+discovery diagnostics and refresh. Its active Session diagnostic panel uses the
+optional observability plugin. MaybeClaw provides `agent.check` and
+`session.diagnostics`; authentication and Session ownership checks also apply.
+
+`@may/ui-client.createTelemetryPanel(data)` displays at most 40 records with
+individual durations, status, parent identities, sampling and retention coverage.
+Hosts can page diagnostics independently. See
+[model and telemetry integration](model-telemetry-integration.md).
+
+## Integrate a custom host
+
+| Package or layer | Responsibility |
 | --- | --- |
-| Agent application / product host | Execution, permissions, budgets, persistence and recovery |
-| `@may/ui-client` | JSON contracts and browser-safe connection/state logic |
-| `@may/ui-client/application` | Adapter for one single-active-session workspace |
-| `@may/ui-client/server` | Loopback HTTP, bearer authentication, origin checks, receipts and SSE invalidations |
-| `@may/web-ui` | Optional shell, transcript, composer, approvals, detail panels and safe Markdown |
-| Product extensions | Coding Diff, task lifecycle, delivery and other domain semantics |
+| Application/product host | Execution, permissions, budgets, persistence and recovery |
+| `@may/ui-client` | JSON types and browser connection/state synchronization |
+| `@may/ui-client/application` | Single-active-Session workspace adapter |
+| `@may/ui-client/server` | Loopback HTTP, authentication, Origin checks, receipts and SSE |
+| `@may/web-ui` | Workbench and reusable transcript, composer, approval and detail components |
+| Product extensions | File diffs, task lifecycle, delivery and domain-specific presentation |
 
-Packages never import `apps`. Browser modules never import Node-only adapters,
-TUI, providers, or live runtime objects. Native ES modules are served from a fixed
-asset map, not arbitrary filesystem paths. The new projection is UI-neutral; the
-existing TUI has not yet migrated to it.
+Implement `UiHost`, or connect `ApplicationUiHost` to an `AgentWorkspaceController`.
+Browser modules use browser-safe exports; Node adapters belong in the host.
+Static modules are served from a fixed asset map.
 
-Implement `UiHost` to connect another product, or use `ApplicationUiHost` with an
-`AgentWorkspaceController`. Supply a product descriptor and optional commands,
-choices and panels. Compose the exported Web components independently if the
-default session/task shell does not fit. Trusted renderer extensions receive
-client state and a command callback; unknown presentation kinds show text rather
-than loading code. The protocol and extension API are versioned previews, not a
-claim that every future agent will fit without an adapter.
+When a terminal owns execution, supply independent `events` and
+`closeApplication: false` to `ApplicationUiHost`. The terminal distributes events
+and closes the controller. Pair `startUiServer({ browserLogin: true, ... })` with
+`webUiAssets(..., { browserLogin: true })`; `createLoginUrl()` issues a connection
+ticket. Product routes can use `BrowserLogin` from `@may/ui-client/server` through
+`issue()`, `redeem()` and `clear()`. Custom shells can supply `initialToken` and
+`connectionHint` to `mountWebUI`; the launcher then supplies login instructions.
 
-Products can declare structured sidebar navigation via `WebUiOptions.navigation`
-or compose navigation elements with `createNavigation()`. Each navigation group holds typed items with an icon,
-label, optional title, optional badge, action callback, and optional disabled state. Supported icons
-include `plus`, `menu`, `send`, `stop`, `panel`, `search`, `arrow`, `code`, `task`, `trash`, `gear`, `users`,
-`message`, `check`, and `filter`. Products can also configure `WebUiOptions.onNew`
-and `newLabel` to customize the primary creation action with typed lifecycles and unified error reporting.
+Hosts that provide `snapshot.controls` set `busy` while their selected resource
+has an active operation, including pending interactions. The workbench shows
+the cancel action during that activity or a pending client command when
+`commands` includes `controls.cancelCommand`. When idle, it shows the send
+action. Enter submits and Shift+Enter adds a newline. Slash commands require
+`controls.inputCommand`; ordinary messages require `message.submit` or, for a
+new task, `task.submit`. Entering supported input during host activity also
+shows the send action alongside cancellation. A pending client command must
+finish before another composer submission. MaybeCode includes Runs,
+Context compaction and MCP interactions. MaybeClaw includes queued, running,
+waiting and cancelling tasks in the selected Session.
 
-On mobile viewports matching `max-width: 760px`, opening the
-navigation drawer activates an overlay backdrop (`.mobile-backdrop`) that blocks clicks to the main content
-without horizontal page overflow. While hidden, the mobile drawer sets `inert` and `aria-hidden="true"`.
-Pressing Escape or clicking the backdrop dismisses the drawer and restores focus
-to the invoking toggle button.
-Tab and Shift+Tab cycle through the open mobile panel's controls. Native modal
-dialogs retain their own keyboard handling.
+`ApplicationUiHost` supports `controls`, `complete`, `available`, `submit`,
+`concurrentCommands` and `interactionCommands`. Interaction responses have a
+separate checked path while commands wait. Products validate availability and
+ownership. `UiReceipt.output` is transient command output; `disconnect` closes
+the requesting page. `UiClient.interact()` can run while `command()` waits.
+The server flushes an exit receipt before invoking `exit`, exposes `closed`, and
+closes its host when no exit callback is supplied.
 
-## Protocol v1
+Trusted `WebUiExtensions` register `tools[toolName]`, `approvalDetails[toolName]`,
+`diagnostics[code]`, `presentations[kind][version]` and `panels[id]`. They return
+an HTMLElement or null and preserve standard evidence and approval controls.
+Unknown types/versions, null results and extension failures retain standard display.
+Model output cannot load extension code. Upgrade preview clients, hosts and
+product extensions together.
 
-- `GET /api/ui/snapshot?selected=<id>` returns product capabilities, resource
-  summaries, selected resource, transcript, pending interactions, choices and panels.
-- `GET /api/ui/events` is an authenticated fetch/SSE **invalidation** stream.
-  It does not stream raw provider objects or promise durable event replay.
-- `POST /api/ui/commands` accepts `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }`.
-  Arguments are bounded string fields; each adapter validates an explicit command allowlist.
+`WebUiOptions.navigation` or `createNavigation()` supplies groups of typed items
+with icons, labels, titles, badges, actions and disabled state. `onNew` and
+`newLabel` customize creation. At `max-width: 760px`, navigation uses an overlay;
+hidden panels are inert and `aria-hidden`, Escape/backdrop closes them, and focus
+returns to the toggle. Tab/Shift+Tab remains within the open panel. Themes follow
+the OS. Browser text currently uses Chinese.
 
-Clients resnapshot on attachment, invalidation and reconnect. A two-second
-heartbeat also observes changes made by CLI/channel owners. Live changes are
-coalesced for 120 ms. Slow event connections are closed instead of buffering
-unbounded data; clients reconnect with backoff. Old selection/request responses
-cannot replace newer state. This deliberately favors correctness over a
-high-throughput delta protocol.
+## Protocol v1 and limits
 
-Commands are not automatically retried. A host-local receipt cache returns the
-same result for the same request ID and content, and rejects conflicting reuse.
-At 4,096 receipts the host rejects new commands until a controlled restart; it
-does not evict a receipt and risk executing it again. Every restart changes
-`hostId`, so an uncertain old command is rejected. Inspect current state before
-issuing a fresh request. This is **not** durable exactly-once execution.
+| Route | Purpose |
+| --- | --- |
+| `GET /api/ui/snapshot?selected=<id>` | Capabilities, resources, selected transcript, interactions and panels |
+| `GET /api/ui/events` | Authenticated SSE invalidations |
+| `POST /api/ui/commands` | `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }` |
+| `GET /api/ui/complete` | Authenticated host/Session-bound completion |
 
-## Product coverage
+Clients resnapshot on connect, invalidation and reconnect. A two-second heartbeat
+observes external owners, and live changes are coalesced for 120 ms. Slow event
+connections close; clients reconnect with backoff. Old responses cannot replace
+newer state. SSE does not provide durable replay.
 
-**MaybeCode:** submit messages, see incremental model/tool output, review tool
-inputs and coding change previews, resolve tool approvals, cancel, list/new/open/
-rename/delete sessions, switch model profiles and request context compaction.
-The displayed session is the host's current session: `selectedId` equals `activeId`.
-Clicking a sidebar session activates it so the composer can continue that session.
-All connected pages follow session changes, including changes made in the TUI.
-Switching, creating and deleting sessions are disabled during a run or pending MCP
-interaction. Finish or cancel the current operation before changing sessions.
+Commands are never automatically retried. A host-local receipt binds request ID
+and content; identical reuse returns the receipt and conflicting reuse fails.
+At 4,096 receipts, new commands require a controlled restart. Restart changes
+`hostId`, so uncertain old requests fail. Inspect current state before a new
+request; receipt deduplication lasts only for the host lifetime.
 
-Inactive sidebar sessions show a trash icon on hover or keyboard focus; touch
-devices keep the icon visible. Deletion requires confirmation. The current
-session cannot be deleted, and the host rejects direct deletion requests for it.
-The list and connected pages refresh after deletion. New-session,
-activation and deletion commands carry `expectedActiveId`; stale transitions are
-rejected without automatic replay. Commands remain bound to their `targetId`.
-`UiClient.select(id)` sends `session.activate` for session hosts; snapshot reads
-always return the current session. Upgrade this preview's client and host together.
-Task hosts retain independent selection. History search and field reads remain
-read-only operations within the workspace.
+MaybeCode displays one active Session to all pages. Session creation, activation
+and deletion require idle execution without pending MCP interaction. They carry
+`expectedActiveId`; stale transitions fail. The current Session cannot be deleted.
+Task hosts permit independent browsing. MaybeClaw exposes final results, cancellation
+intent, evidence recovery, failed-dispatch retry, channels and the latest 100
+delivery records. Its live projection retains eight tasks; saved Session journals
+provide historical tool results after restart. Task, verification and delivery
+policy remain product-owned.
 
-`AgentWorkspace.readSessionHistory(id)` validates workspace catalog membership
-and uses optional `SessionStore.inspect(id)`. It never opens a runtime, changes
-catalog recency, obtains execution ownership or repairs a log. The built-in file
-store ignores incomplete trailing bytes without truncating them and still rejects
-malformed complete records. Custom stores must implement safe inspection; there
-is no fallback to a potentially repairing `read()` for workspace history browsing.
+The server binds to `127.0.0.1` for a local single operator. Keep it local.
+Request bodies allow 256 KiB and argument strings 65,536 characters. Snapshots
+show at most 50 recent blocks and approximately 64K-character previews; field
+reads return 32,768-character chunks. Provider continuation state remains private.
+Tool details are sensitive authenticated workspace data. File browsing and artifact
+downloads are unavailable.
 
-**MaybeClaw:** independent task submission, task-local browsing, live output from
-tasks executed by this host, final results, cancellation intent, evidence recovery,
-failed-dispatch retry, channels and the most recent 100 delivery records. Execution,
-verification and delivery remain separate. Queued tasks still use host-selected
-configuration and read scope; the UI cannot inject tools, paths or budgets. The
-existing `/api/tasks` and `/api/health` routes remain compatible.
+Markdown supports paragraphs, headings, lists, quotes, code, tables, bold and
+HTTP(S) links. Raw HTML, remote images, generated scripts and executable previews
+are disabled. Recovery uses the current execution owner; each Session has one
+runtime owner.
 
-## Safety and current limits
+## Verification
 
-- Local single-operator service only. Bind to `127.0.0.1`, not a public address.
-  Do not expose it through a tunnel or treat its token as multi-user authorization.
-- Tokens are never placed in URLs, browser storage or generated application assets.
-  Closing a page stops only its connection; stopping the host closes the agent.
-- Snapshot projection excludes provider continuation state. Tool inputs/results
-  remain sensitive workspace data available to the authenticated operator.
-- Snapshots return at most 50 recent blocks; older committed blocks are available
-  through read-only pagination and search. Preview fields remain bounded to roughly
-  64K characters. The inspector reads stored fields in 32,768-character chunks.
-  Oversized approval inputs remain deny-only; reading details does not expand grants.
-  File/artifact downloads are not implemented.
-- Supported Markdown is a safe subset: paragraphs, headings, lists, quotes, code
-  fences, tables, bold, inline code and HTTP(S) links. Raw HTML, remote images,
-  generated JavaScript and executable artifact previews are not enabled.
-- MaybeClaw now reads existing Session journals for historical tool calls/results,
-  including after restart. Its bounded live projection still retains eight tasks;
-  transient progress/partial token streams are not reconstructed from missing data.
-  Reading does not add persistence, acquire an execution owner or run recovery.
-- Full file browsing and artifact downloads are not provided. Recovery commands
-  use the current execution owner. Open the Web workbench with `/web` to share a
-  TUI Session; keep each Session owned by a single runtime.
-- The current browser text is Chinese. Documentation is maintained in English and
-  Chinese. Light/dark themes follow the OS; narrow screens use overlay side panels.
+After `pnpm build`, the local browser suite runs against the workspace, catalog,
+UI host and HTTP service:
 
-## Unified execution evidence
+```powershell
+pnpm --filter @may/web-ui exec playwright install chromium
+pnpm --filter @may/web-ui test:browser
+```
 
-Shared tool cards distinguish waiting for approval, running, completed, failed,
-denied, not-started and unknown outcomes. A cancelled run is not proof that tool
-side effects were rolled back: a started call without a confirmed result is
-unknown. Explicit host recovery records can report not-started. Partial assistant
-answers are labelled interrupted. Errors retain bounded messages/codes, and tool
-progress is live display data, not durable completion evidence.
+These checks include resource paging/search, additions/deletions/renames, retained
+page state and expired cursors. Browser work stays under ignored `review/`.
+Checks that require configured providers have separate prerequisites:
 
-Approval records inside tool cards are read-only. Only the host's current
-`snapshot.interactions` produces decision controls, linked to block/run/call IDs.
-Historical replay does not recreate actionable requests. Terminal or unavailable
-execution removes live controls; stale or unavailable choices fail at the host.
-A session-wide choice is shown only for requests with a grant key. Truncated
-approval input is deny-only, including server-side validation.
+| Check | Required flags and command |
+| --- | --- |
+| MaybeCode controls and shared terminal/Web | `MAYBECODE_WEB_LIVE=1`; `pnpm --filter @may/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs` |
+| Workspace file versions | `MAY_LIVE_PROVIDER_UI_TESTS=1`; `node --test packages/ui/web/test/browser/workspace-versions.test.mjs` |
+| Session fork and isolated test commits | Both `MAY_LIVE_PROVIDER_UI_TESTS=1` and `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`; `node --test packages/ui/web/test/browser/workspace-session-fork.test.mjs` |
 
-Persistent approvals display the trusted scope ID and range description and
-offer `allow-persistent` when the host provides persistent metadata and an
-operator identity. `ApplicationUiHost` obtains that identity from
-`permissionActor()` and rejects client-supplied identity fields. Historical
-approval cards retain the persistent range as read-only evidence. Optional
-`permissionRules: { list, revoke, create? }` callbacks expose `permission.rules.list`
-and `permission.rules.revoke`; list output provides explicit revoke actions.
-Callbacks must restrict rule management to the current operator and scope.
-`create(sourceId, decision)` adds `permission.rules.create` for an existing
-visible range. The callback derives trusted rule fields and operator identity;
-the client supplies only an existing rule ID and an allow or deny decision.
-The confirmation displays the complete range and deny precedence.
-`UiPanel.actions` supplies optional controls in standard and product-rendered
-detail panels. The permissions panel exposes **查看和管理规则** when the host
-provides rule management. Panel actions share command-output confirmation and
-availability checks, and product panels remain present.
-
-Trusted products can register `tools[toolName]`, `approvalDetails[toolName]`,
-`diagnostics[code]`, `presentations[kind][version]` and `panels[id]` callbacks in
-`WebUiExtensions`. Callbacks return an HTMLElement or null. Tools, approval details
-and diagnostics add content without replacing standard status labels, raw evidence
-or approval buttons. Unsupported presentation kinds/versions, null results and
-exceptions fall back safely. No module is loaded from model output. This preview
-changes presentation registration from a callback per kind to callbacks per version;
-upgrade product extensions alongside host/client packages. MaybeCode's Diff has
-been migrated; evidence-bound pre-approval Diff is still separate work.
-
-This change does not add MaybeClaw history persistence, new recovery commands,
-TUI rendering changes or multi-session concurrency. MaybeClaw consumes the shared
-tool projection; its task/verification/delivery policies remain product-owned.
-`node examples/web-ui/states.mjs` provides a read-only synthetic state/extension
-gallery on port 3944 after building. Type `stop` to shut it down. It exercises UI
-fallbacks, not actual process crash recovery.
-
-## Long conversations, inspection and history reads
-
-The shared workbench groups records by host-provided run ID, with request text as
-the heading where available. Tool counts, waiting approvals and exceptional states
-are visible without expanding every call. Expand/collapse all and exception-only
-filtering are view-local; approval controls remain outside these filters. A pinned
-approval shortcut locates the current request. When reading older content, live
-updates preserve the visible anchor and offer a new-content/back-to-latest button.
-Transcript rendering evaluates block and interaction signatures to detect changes.
-
-Tool transcripts contain labelled previews. **View details** opens an independent
-side panel with overview/product renderers, input, output, error and presentation
-fields. Long answers and diagnostics also have an inspection action. Read-only
-field tabs provide previous/next chunks and an explicit refresh; the host hashes
-field content and scope so changed data cannot be silently spliced across chunks.
-The overview reuses the existing versioned Diff extension. Large presentation JSON
-is available as raw text chunks, not a newly implemented large-Diff renderer.
-
-The sidebar searches all session titles or task prompts and pages resources by
-creation time (with a stable ID tie-breaker); the current selection may be pinned
-in addition to the page. Resource additions, deletions and title changes refresh
-the loaded sidebar pages while preserving the search query and number of loaded
-pages. Hosts can provide `snapshot.resourcesVersion` for the complete catalog's
-membership, pagination order and searchable text, including entries outside the
-recent-resource window. Hosts without this field refresh when the resource IDs or
-titles in the snapshot change. Within a resource, **Search content** searches committed
-user/assistant text, reasoning, tool input/output, diagnostics and presentation
-text, including text beyond preview limits. Results contain matching blocks, not
-a complete run, and are read-only snapshots refreshed by searching again. Clear
-search restores the recent timeline. Older pages are prepended without activating
-a session or discarding current approvals. The UI reports counts for loaded data,
-not a total count of runtime operations that were never recorded.
-
-Custom hosts opt in through `snapshot.reads` and optional `UiHost.resources`,
-`history` and `field` methods. The authenticated GET routes are `/api/ui/resources`,
-`/api/ui/history` and `/api/ui/field`; all require the current `hostId`, and the last
-two require `selected`. Page requests accept `query` and opaque `cursor`. Each page
-contains at most 50 records with an approximately 256K-character payload budget
-(one large bounded block may exceed that budget). Cursors bind host/resource/query
-and an anchor, not authorization. Deleted anchors or changed scope fail closed;
-restart the search after these errors. Metadata can change between pages. Client
-read responses from an old host/selection are discarded independently of commands.
-
-History uses safe `SessionStore.inspect`; MaybeClaw additionally validates task
-ownership and existing journal evidence. No provider continuation state, permission
-context, new tool execution or log-tail repair is exposed through reads. This
-implementation scans the existing catalog/journal in memory: transport paging is
-not a storage index, virtualized timeline or constant-memory database query. Very
-large journals and many manually loaded pages still have CPU/memory costs.
-
-After building, run `node examples/web-ui/reading.mjs` for a real shared-host,
-in-memory fixture with 520 transcript blocks and 56 sessions. Prompts containing
-`审批` produce a 90,006-character synthetic tool result; `慢速` exercises scrolling
-while streaming. It uses no provider, files or real tools. Type `stop` to close it.
-
-## Browser acceptance
-
-`pnpm --filter @may/web-ui exec playwright install chromium` installs the browser
-for `pnpm --filter @may/web-ui test:browser`. This automated test checks DOM text
-and controls against the real workspace, session catalog, UI host and HTTP service.
-It covers 520 sessions, additions, deletions outside the recent-resource window,
-renames, retained pagination, search changes and expired cursors. It makes no model
-requests and saves no screenshots. Temporary browser files stay under `review/`.
-
-Reading-workbench acceptance used 520 transcript blocks, 56 browser-visible
-sessions, and an API fixture with more than 500 catalog entries. It verified
-paging/search beyond the snapshot, all three chunks of a 90,006-character tool
-result, collapse/filter-safe approval access, the product Diff inspector and
-persisted MaybeClaw tool results after a host restart. During streamed output,
-the same visible history anchor kept its measured position; back-to-latest reached
-the bottom. Shared controls/inspection also passed a 390 px layout check without
-horizontal overflow. This was scripted offline acceptance, not a live-provider or
-large-scale storage benchmark.
-
-After `pnpm build`, run `node examples/web-ui/acceptance.mjs`. It starts both real
-product hosts on loopback ports 3942/3943 with a scripted model, disabled channels
-and newly created temporary files. Enter the printed public fixture token. Prompts
-containing `审批`, `读取`, `慢速`, `长文` or `错误` exercise approval (MaybeCode),
-reading, slow streaming, long output and simulated failure. Terminal commands
-`restart` and `stop` restart the isolated hosts or shut them down; files remain
-at the printed temporary path for inspection.
-
-Browser acceptance on 2026-09-13 covered connection, Chinese text and newline
-entry, streaming/cancellation, Markdown/code copy, sessions/models, approvals,
-task browsing, refresh/reconnect and desktop/390 px layouts. This used mock model
-responses, not live providers, actual Chinese IME composition, real mobile
-keyboards, external channel delivery or crash-recovery fault injection.
-
-Additional offline acceptance for unified states covered MaybeCode allow/deny,
-cancellation while awaiting approval, error details, read-only history, and the
-migrated Diff renderer. MaybeClaw covered completed read tools, retained partial
-answers after cancellation and failed-task diagnostics. The synthetic gallery
-covered throwing/unknown-version renderers and 390 px layout without horizontal
-overflow. No live provider or process-crash recovery was used in this check.
-
-### Live provider check
-
-The subsequent 2026-09-13 check used the existing `gpt-5.6-luna` profile through
-`openai-responses` and its configured local proxy, with isolated synthetic files
-and no channels. Browser actions verified read → approval → edit → Diff,
-continuation after cancellation, task results/cancellation, and persisted results
-after a process restart. It made 9 provider requests: 7 completed and 2 cancelled;
-completed requests reported 8,992 tokens (not a billing total). A separately
-labelled pre-request failure tested error recovery without contacting the provider.
-An empty assistant card for tool-call-only responses was fixed and rechecked
-against the saved real session.
-
-Reproduce only with explicit spending authorization:
-`node examples/web-ui/live-acceptance.mjs --live`. The ceiling is 12 requests,
-2,048 output tokens per request and 120 seconds per run; retries are disabled.
-Use the public disposable token documented in the example README, then type
-`stop` in the terminal after testing. `--resume <printed-temporary-directory>`
-retains evidence and request counters across a process restart. This check does
-not verify upstream model identity, an actual provider outage, external delivery,
-mobile keyboards or crash-recovery behavior.
-
-## Design references
-
-
-The implementation uses a restrained sidebar, readable transcript, persistent
-composer and optional detail panel. References inspected on 2026-09-13:
-
-- [ChatGPT](https://chatgpt.com/): new-chat, search and history navigation.
-- [Claude Projects and Artifacts](https://www.anthropic.com/news/projects): a
-  separate work/output surface beside conversation.
-- [Kimi](https://www.kimi.com/): conversation and task entry points.
-- [Z.ai](https://chat.z.ai/): compact navigation, model selection and focused input.
-- [Gemini Canvas](https://gemini.google/gp/overview/canvas/?hl=en): a separate
-  work surface rather than forcing all content into chat bubbles.
-- [DeepSeek](https://chat.deepseek.com/): the public entry required sign-in;
-  its authenticated interface was not inspected or reproduced.
-
-These are interaction references, not copied assets or claims that May implements
-those products' search, uploads, scheduling, canvas or model capabilities.
+The file-version check initializes the configured Model and checks Git and the
+page. Tests that submit messages use configured credentials and consume provider
+quota. Workspace checks require the configured `deepseek-v4-flash` profile. The commit flag
+authorizes commits only in the test's isolated repository/worktrees. Tests skip
+without their required flags. Report actual execution, layout, external delivery
+and recovery checks separately; a passing local test does not establish all of them.

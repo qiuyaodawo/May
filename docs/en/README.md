@@ -2,88 +2,92 @@
 
 **English** | [简体中文](../zh-CN/README.md)
 
-May is a composable Agent framework. These documents explain how to assemble
-its packages into an application, how runtime state is divided, and which
-interfaces are intended for extension.
+May provides composable packages for model/tool execution, durable conversations,
+permissions, and application lifecycle. Choose a page according to your task and
+experience. Public APIs and persistence formats are currently in developer preview.
 
-## Start here
+## Tutorials
 
-1. [Getting started](getting-started.md) — define a reusable Agent, compose its
-   tools, and open a durable `AgentApplication`.
-2. [Building an Agent](guides/building-an-agent.md) — choose models, tools,
-   instructions, Context, permissions, Session storage and UI.
-3. [Package reference](reference/packages.md) — select the smallest May layer
-   for an application.
+- [Run your first Agent application](getting-started.md): call a model, execute a
+  tool, save history, and reopen a Session.
 
-## Concepts
+## How-to guides
 
-- [Agent and Application](concepts/agent-application.md)
-- [Session, Run and Step](concepts/session-run-step.md)
-- [Context and durable history](concepts/context-and-history.md)
-- [Events](concepts/events.md)
-- [Runtime and Session architecture](architecture/runtime-session.md)
-- [Session branching and Git checkpoint specification](architecture/session-fork-checkpoint-spec.md)
+### Applications and development
 
-## Extension guides
+- [Use MaybeCode](guides/maybecode.md): start the coding Agent and use terminal controls.
+- [Use MaybeClaw](guides/maybeclaw.md): configure a Gateway, Agents, sessions, and channels.
+- [Develop and verify the repository](guides/repository-development.md): build, test,
+  inspect CI, and select environment-specific checks.
+- [Build an Agent](guides/building-an-agent.md): choose model, tools, permissions,
+  Context, storage, and UI.
+- [Configure and inspect MaybeCode instructions](guides/maybecode-instructions.md).
+- [Use Git workspaces and checkpoints](guides/git-workspaces.md).
+- [Configure the shared Web UI](guides/web-ui.md).
 
-- [Plugins, services and lifecycle Hooks](guides/plugins.md)
-- [Plugin system specification](architecture/plugin-spec.md)
-- [Multi-agent task graphs](guides/coordination.md)
-- [Shared budgets, artifacts and task workspaces](guides/coordination-resources.md)
-- [Attempts and graph revisions](guides/coordination-lifecycle.md)
-- [Remote leaf workers](guides/coordination-remote.md)
-- [MaybeCode teams](guides/maybecode-team.md)
-- [Sub-agent delegation in ordinary requests](guides/subagent-delegation.md)
-- [Configurable team plans](guides/maybecode-team-plan.md)
-- [Team reports and acceptance](guides/maybecode-team-verification.md)
-- [Controlled multi-agent coding](guides/maybecode-team-coding.md)
-- [Team recovery controls](guides/maybecode-team-recovery.md)
+### Extend and operate an Agent
 
-- [Crash recovery](guides/recovery.md)
-- [Run budgets](guides/run-budgets.md)
-- [Agent Skills](guides/skills.md)
-- [Goals](guides/goals.md)
-- [Persistent time and event scheduling](guides/scheduler.md)
-- [Image replies](guides/images.md)
+- [Compose plugins, services, and lifecycle Hooks](guides/plugins.md).
+- [Implement a model adapter](guides/custom-model.md).
+- [Implement a tool](guides/custom-tool.md).
+- [Implement Context management](guides/custom-context.md).
+- [Implement Session storage](guides/custom-storage.md).
+- [Implement a UI](guides/custom-ui.md).
+- [Configure permission policies](guides/permission-policy.md).
+- [Resolve interrupted tool results](guides/recovery.md).
+- [Set Run budgets](guides/run-budgets.md).
+- [Use Agent Skills](guides/skills.md).
+- [Manage goals](guides/goals.md).
+- [Schedule time and event triggers](guides/scheduler.md).
+- [Return images](guides/images.md).
+- [Configure tracing](guides/observability.md).
+- [Integrate model capabilities and diagnostics](guides/model-telemetry-integration.md).
+- [Evaluate Agent behavior](guides/eval.md).
 
-- [Custom model](guides/custom-model.md)
-- [Custom tool](guides/custom-tool.md)
-- [Custom Context](guides/custom-context.md)
-- [Custom Session storage](guides/custom-storage.md)
-- [Git workspaces and checkpoints](guides/git-workspaces.md)
-- [Custom UI](guides/custom-ui.md)
-- [Shared Web UI](guides/web-ui.md)
-- [Permission policy](guides/permission-policy.md)
-- [Observability and tracing](guides/observability.md)
-- [Model capabilities and execution diagnostics](guides/model-telemetry-integration.md)
-- [Agent behavior evaluation](guides/eval.md)
-- [MCP tools](guides/mcp.md)
-- [MCP authentication](guides/mcp-auth.md)
-- [MCP Host roadmap](architecture/mcp-host-roadmap.md)
+### Coordinate Agents
+
+- [Build multi-agent task graphs](guides/coordination.md).
+- [Configure shared resources and task workspaces](guides/coordination-resources.md).
+- [Manage attempts and graph revisions](guides/coordination-lifecycle.md).
+- [Connect remote leaf workers](guides/coordination-remote.md).
+- [Run MaybeCode teams](guides/maybecode-team.md).
+- [Delegate subagents during ordinary requests](guides/subagent-delegation.md).
+- [Configure team plans](guides/maybecode-team-plan.md).
+- [Read team reports and verification](guides/maybecode-team-verification.md).
+- [Authorize team coding](guides/maybecode-team-coding.md).
+- [Recover team execution](guides/maybecode-team-recovery.md).
+
+### Connect MCP services
+
+- [Connect MCP tools and host services](guides/mcp.md).
+- [Configure MCP authentication](guides/mcp-auth.md).
+- [Manage long-running MCP tasks](guides/mcp-tasks.md).
+- [Host MCP Apps](guides/mcp-apps.md).
+- [Export an MCP server](guides/mcp-server.md).
 
 ## Reference
 
-- [Packages](reference/packages.md)
-- [Configuration](reference/configuration.md)
-- [Compatibility and stability](reference/compatibility.md)
-- [Architecture decisions](architecture/decisions/README.md)
+- [Packages and public entry points](reference/packages.md).
+- [Provider, model, and application configuration](reference/configuration.md).
+- [Compatibility, stability, and runtime requirements](reference/compatibility.md).
+- [MCP capabilities and protocol compatibility](reference/mcp-capabilities.md).
 
-## Reference applications
+Package READMEs describe their individual exports. Import only entry points
+declared in package `exports`.
 
-- [MaybeClaw](guides/maybeclaw.md) connects May and external Agents to personal
-  and group sessions through a Gateway, with collaboration, approvals and durable delivery.
-- [MaybeCode](../../apps/maybecode/README.md) is the full terminal coding-Agent
-  composition.
-- [May CLI](../../apps/cli/README.md) is a smaller direct-runtime example.
+## Explanations and architecture
 
-Package-level READMEs remain the closest reference for individual exports.
-Only package entry points declared in `exports` are public; see
-[Compatibility and stability](reference/compatibility.md) for the current
-developer-preview guarantees.
+- [Agent definitions, Application, and Workspace](concepts/agent-application.md).
+- [Session, Run, and Step](concepts/session-run-step.md).
+- [Context and durable history](concepts/context-and-history.md).
+- [Events and durability](concepts/events.md).
+- [Runtime and Session architecture](architecture/runtime-session.md).
+- [Session branching and Git checkpoints](architecture/session-forks-and-checkpoints.md).
+- [Plugin architecture](architecture/plugins.md).
+- [Architecture decisions](architecture/decisions/README.md).
 
-## Languages and maintenance
+## Maintain these documents
 
-English documents live under `docs/en/`. Complete Simplified Chinese mirrors
-live under `docs/zh-CN/` with the same relative paths. Update
-both files in a pair whenever behavior changes, and run `pnpm docs:check`
-before committing documentation changes.
+English and Simplified Chinese pages have matching relative paths. Follow
+[the documentation maintenance instructions](../AGENTS.md), update both languages,
+and run `pnpm docs:check`. Check example behavior and link anchors separately.

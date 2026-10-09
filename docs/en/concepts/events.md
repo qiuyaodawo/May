@@ -2,17 +2,9 @@
 
 **English** | [简体中文](../../zh-CN/concepts/events.md)
 
-May has several event layers because model streaming, live application state,
-and durable Session replay have different requirements. They are related but
-are not interchangeable.
-
-An opt-in host `shouldYield` control ends a complete model/tool step with
-`run.yielded`, rather than `run.completed` or `run.cancelled`. Its result carries
-`finishReason: "yielded"`; all tool-call results are settled before the durable
-yield checkpoint is acknowledged. Consumers should treat it as the end of a Run,
-not the completion of a task. Session stores this event once and does not repair
-it as an interrupted Run on resume. Optional `input.submitted.inputId` identifies
-a host delivery; it is not added to model-visible message content.
+An application uses live events to display progress and durable events to
+recover a conversation. This page explains which component emits each event,
+when it is stored, and how consumers handle incomplete streaming output.
 
 See [Session, run, and step](./session-run-step.md) for lifecycle boundaries,
 [Context and durable history](./context-and-history.md) for replay, and
@@ -36,7 +28,7 @@ protocol and turns them into Run events.
 - Run and Step start/completion;
 - model start, deltas, retry notices, and completed messages;
 - tool start, output deltas, progress, completion, and failure; and
-- Run completion, failure, or cancellation.
+- Run completion, yielding, failure, or cancellation.
 
 `model.completed` contains the complete assistant message, so correctness does
 not depend on retaining every earlier delta. Tool terminal events likewise
@@ -74,13 +66,16 @@ The headless application stream wraps live Core and permission events and adds
 application-level facts:
 
 ```ts
-type AgentApplicationEvent =
+type ApplicationEventShape =
   | { type: "run.event"; event: MayEvent }
   | { type: "permission.event"; event: PermissionEvent }
   | { type: "tool.presentation"; presentation: SessionToolPresentation }
-  | { type: "context.compacted"; /* automatic success */ }
-  | { type: "context.compaction.failed"; /* automatic failure */ };
+  | { type: "context.compacted"; /* 自动压缩成功；省略结果字段。 */ }
+  | { type: "context.compaction.failed"; /* 自动压缩失败；省略错误字段。 */ };
 ```
+
+This excerpt shows the event categories; import `AgentApplicationEvent` from
+`@may/application` for the full event fields.
 
 Tool presentations are persisted before their application event is emitted
 and before permission-policy evaluation proceeds. Successful automatic
@@ -95,6 +90,15 @@ The workspace relays active-application events in order and adds
 `session.changed`. A product can widen the union with typed extension events,
 for example after a model-profile transition. `session.changed` describes the
 active application selection; it is not itself appended to Session history.
+
+## Host-controlled yielding
+
+The optional `shouldYield` callback ends a complete model/tool Step with
+`run.yielded`. Its result carries `finishReason: "yielded"`; all tool results
+settle before the durable yield checkpoint is acknowledged. The host schedules
+any further work. Session stores this event once and retains it on resume.
+Optional `input.submitted.inputId` identifies a host delivery and stays outside
+model-visible message content.
 
 ## Persistence-before-observation guarantees
 
@@ -168,14 +172,14 @@ path. Application display data should use an application-owned, namespaced
 `kind` and decoder. Session validates a non-empty `kind` and positive `version`,
 but treats `data` as opaque and never injects it into Context.
 
-Use this rule when extending May:
+Choose the destination according to the consumer:
 
-```text
-animation/progress -> live event
-conversation/replay fact -> Session event
-fast discovery -> Catalog projection
-model-visible state -> Context (plus a durable checkpoint when replaced)
-```
+| Information | Destination |
+| --- | --- |
+| Animation and progress | Live event |
+| Conversation facts needed for recovery | Session event |
+| Session discovery | Catalog projection |
+| Model-visible state | Context, with a durable checkpoint on replacement |
 
 ## Shutdown and the end of a stream
 
@@ -191,7 +195,6 @@ than abandoning it as soon as cancellation is requested. The exact lifecycle
 order is documented in
 [Agent definition, application, and workspace](./agent-application.md#shutdown-order).
 
-`AsyncEventQueue` is a consumption queue, not a broadcaster. Multiple iterators compete for
-values; give each subscriber its own queue if it needs every event. Returning an iterator
-releases its pending waits without closing producers or other iterators. Coordination/MCP
-live queues are bounded views; consult durable state/history for authoritative recovery.
+Returning an `AsyncEventQueue` iterator releases its pending waits without
+closing producers or other iterators. Coordination and MCP consumers use their
+durable state and history for recovery.

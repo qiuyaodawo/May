@@ -1,11 +1,14 @@
-# Session branching and Git checkpoint specification
+# Session branching and Git checkpoints
 
-**English** | [简体中文](../../zh-CN/architecture/session-fork-checkpoint-spec.md)
+**English** | [简体中文](../../zh-CN/architecture/session-forks-and-checkpoints.md)
 
 Status: implemented. Public component APIs are described in the
 [Session documentation](../../../packages/session/README.md),
 [Runtime and Session architecture](runtime-session.md), and
 [Git workspace guide](../guides/git-workspaces.md).
+
+This explanation is for host and UI authors implementing branching, file-version
+display and worktree ownership. To use the feature, follow the Git workspace guide.
 
 ## Goals and concepts
 
@@ -24,6 +27,19 @@ and worktree management apply to applications with project file workspaces.
 provide reusable branching. `ProjectGitWorkspace` supplies Node.js file version management.
 MaybeCode integrates both components with its TUI, WebUI, and client protocol.
 
+```mermaid
+flowchart LR
+  Reply[Completed reply] --> State[Saved conversation state]
+  Reply --> Commit[Recorded project commit]
+  State --> Fork[New Session]
+  Fork --> Current[Current workspace files]
+  Fork --> Isolated[Independent worktree]
+  Commit --> Isolated
+```
+
+Both modes restore saved conversation state. The current-workspace mode uses the
+current files; the independent worktree starts from the recorded commit.
+
 ## Product behavior
 
 - Project workspaces use Git version management by default; an explicit setting can
@@ -32,7 +48,7 @@ MaybeCode integrates both components with its TUI, WebUI, and client protocol.
 - Each completed round of modifications creates a project commit as its file checkpoint.
 - Session forks support the current workspace and a newly created worktree.
 - The default worktree root is `.may/worktrees/` under the user's home directory.
-- TUI `/fork` opens a Pi-like tree history selector without a summarize option.
+- TUI `/fork` opens a tree history selector.
 - WebUI and client applications expose a fork action after each complete Agent reply.
 - Every UI persistently displays the workspace's current Git branch.
 - Checkpoints and diffs use project Git history, with versions linked to conversation history.
@@ -258,24 +274,3 @@ Deletion verifies directory/Git identity, associated Sessions, registered runnin
 processes, tracked/untracked/ignored files, branch identity and unmerged commits.
 Failed Session creation is retained as a failed worktree with its path and diagnostic.
 Git checkpoint state and worktree roots must be outside the source repository.
-
-## Acceptance requirements
-
-- New projects initialize Git and establish an initial version; existing projects resolve
-  their owning repository correctly.
-- A round with multiple edits and checks creates one final commit; unchanged replies use an
-  existing commit.
-- Fork origins, checkpoints, and worktree records survive shutdown and reopening.
-- The TUI tree selector completes history selection and both workspace modes by keyboard,
-  without requesting summarization.
-- WebUI and client fork actions use the same positions and workspace behavior.
-- Current-workspace forks retain current files; new worktrees use the selected reply's version.
-- Every UI correctly displays branches, detached HEAD, initialization, and failures.
-- Diffs represent additions, modifications, deletions, and binary files and distinguish
-  committed changes from uncommitted changes.
-- Git and state persistence failures accurately report partial completion; recovery avoids
-  repeated historical tools and duplicate commits.
-- Worktree cleanup protects associated Sessions, processes, and required changes; valid
-  checkpoints remain readable.
-- Integration verification uses real Git repositories and processes, including human edits,
-  concurrency, and interruption scenarios.

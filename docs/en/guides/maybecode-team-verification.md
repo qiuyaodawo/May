@@ -1,12 +1,34 @@
-# Team reports and acceptance
+# Configure and inspect team acceptance
 
-[简体中文](../../zh-CN/guides/maybecode-team-verification.md)
+**English** | [简体中文](../../zh-CN/guides/maybecode-team-verification.md)
 
-MaybeCode records two independent outcomes: the coordination task may be `completed`, while its acceptance is `passed`, `failed`, or `unverified`. A model cannot set acceptance by saying that its work is verified.
+Use structured reports and host-defined checks to inspect whether a team task
+satisfies its requirements. Execution status and acceptance are recorded
+separately: a task can be `completed` while its acceptance is `unverified`.
+
+This guide assumes an existing [team plan](maybecode-team-plan.md) and checks
+whose dependencies are available in each task copy. Define required checks before
+starting the team. Command checks require `--allow-checks` at creation; review
+the executable, arguments and executed code before granting that permission.
+
+## Verify a team
+
+1. Add task-specific checks to the plan and include `submit_report` and
+   `run_check` in the relevant role's tools.
+2. Start the team with `--plan <path>`. Include `--allow-checks` if it has command
+   checks. Repository users run these commands with the `pnpm` prefix.
+3. After execution, run `maybecode team verify <id>` to execute configured checks
+   and refresh acceptance against current workspace contents.
+4. Inspect `maybecode team status <id>`, including individual report and check
+   records. Passing acceptance requires a current report and every configured
+   check for that task to pass. For `unknown` checks, follow
+   [team recovery](maybecode-team-recovery.md) before running another check.
 
 ## Structured reports
 
-The `submit_report` tool stores a summary and a bounded list of findings or proposals:
+The `submit_report` tool stores a summary and a bounded list of findings or
+proposals. This payload illustrates a finding after reading the cited line in
+the task's actual `average.mjs`; adapt paths, lines and quotes to inspected files:
 
 ```json
 {
@@ -36,6 +58,12 @@ Use the `checks` field in a [team plan](maybecode-team-plan.md). Each globally u
 ]
 ```
 
+This fragment is the value of `checks`, not a complete plan. It assumes an
+`implementation` task, `average.mjs` and `average.test.mjs` in that task's copy,
+and a native `node` executable on the host's PATH. Change them to match your
+project. Dependency directories excluded by workspace copying must be prepared
+separately.
+
 Available check types:
 
 - `file-contains`: exact UTF-8 substring predicate.
@@ -45,6 +73,11 @@ Available check types:
 The model can call `run_check` with an ID only. It cannot replace the command, arguments, timeout, output limit, or working directory. Command checks additionally require explicit `--allow-checks` authorization. This is true even for a read-only team: read-only file tools do not constrain what an authorized process can do.
 
 Commands use no shell, a fixed task workspace, a small environment allowlist without inherited API keys or `NODE_OPTIONS`, hidden Windows processes, and bounded output/time. Defaults are 30 seconds and 64 KiB; maximums are 120 seconds and 1 MiB.
+
+On Windows, use a native executable such as `node.exe` with the package manager's
+JavaScript entry point and an argument array. `.cmd` and `.bat` launchers are
+unsupported. Failure to start is recorded as `failed`. A started process with
+uncertain effects requires reconciliation.
 
 **This is not an OS sandbox.** Tests can execute arbitrary code, read files outside the workspace, find credentials in other files, use the network, write outside the copy, or launch descendants. Terminating the direct child does not prove its descendants have stopped. Authorize only reviewed commands and use an external sandbox for untrusted code. Do not put credentials in arguments or allowlisted environment values. Output and reports are persisted as private local task data.
 
@@ -69,11 +102,5 @@ Inspect the effects and stop any surviving processes before recovery. Host recon
 
 The store keeps reports and all check command identities in `verification.jsonl`, with a 16 MiB journal limit, at most 256 reports, and at most 512 checks. Read-only status inspection does not acquire the writer lock. An incomplete final line is ignored by readers and repaired by a subsequent exclusive writer; committed malformed records are rejected.
 
-## Native command checks
-
-Command checks use `shell: false`: on Windows use a native executable such as `node.exe`
-with the package manager's JavaScript entry point and argument array. `.cmd` / `.bat` files
-are not supported, and failure to start a process is recorded as `failed`, not an unknown
-executed action. Pending processes with uncertain effects still require reconciliation.
-The 512-check quota counts distinct command identities, not pending/result journal lines;
-reaching it rejects a new check without making existing status unreadable.
+The 512-check quota counts distinct command identities. Reaching it rejects new
+checks while existing status remains readable.

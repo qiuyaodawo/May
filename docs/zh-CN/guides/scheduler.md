@@ -1,13 +1,21 @@
-# 持久化时间与事件调度
+# 按时间和事件调度持久任务
 
 [English](../../en/guides/scheduler.md) | **简体中文**
 
-`@may/scheduler` 保存触发规则和独立的执行快照，通过宿主提供的 `TaskDispatcher`
-提交任务。导入 package 和调用 `Scheduler.open()` 不会创建计时器或启动 Agent。
-宿主管理 Agent 配置、Session 选择、任务执行、审批和结果投递。公共 API 当前属于
-开发预览版。
+使用 `@may/scheduler`，可以在指定时间、按照 cron 规则或收到事件时提交宿主任务。
+调度器保存触发规则和执行记录，通过宿主提供的 `TaskDispatcher` 提交工作。
+公共 API 当前属于开发预览版。
+
+执行前需要 Node.js 22.16 或更高版本、`@may/scheduler`、支持 SQLite 文件锁的
+本地存储，以及根据执行 ID 去重的宿主任务服务。宿主管理 Agent、Session、执行、
+审批和结果投递。打开调度器后，计时器保持停止，直到调用 `start()` 或 `tick()`。
 
 ## 每日简报
+
+1. 实现名为 `taskService` 的 `TaskDispatcher`。`submit(request)` 必须持久化
+   接受任务后返回 `{ taskId }`，重复的 `executionId` 返回同一个任务，保持去重。
+2. 在 Node.js 服务中打开专用数据库，只创建一次任务规则。以下宿主片段要求
+   已经初始化 `taskService`，且 `daily-ai-brief` 尚未存在：
 
 ```ts
 import { Scheduler } from "@may/scheduler";
@@ -30,8 +38,13 @@ await scheduler.createJob({
   misfire: { policy: "latest", graceMs: 7_200_000 },
 });
 await scheduler.start();
-// 宿主正常关闭时调用 scheduler.close()。
 ```
+
+3. 保持宿主进程运行。任务在 `Asia/Shanghai` 时区的 08:00 到期，通过
+   `listExecutions({ jobId: "daily-ai-brief" })` 检查已接受的 `taskId`。
+   简报完成和投递结果需要另外查询宿主任务服务。
+4. 正常关闭时等待 `scheduler.close()` 完成提交并释放存储，保留数据库供下次
+   启动。已有任务需要读取或按当前修订版本更新，不能重复创建相同任务 ID。
 
 `taskService.submit(request)` 必须在任务持久化接受后返回 `{ taskId }`。相同
 `executionId` 的重复调用必须返回相同任务身份，保持 Agent 任务执行去重。
@@ -82,13 +95,26 @@ Job ID、handler、事件 source、事件 ID 和 topic 使用 1 到 256 个字�
 
 ## 事件
 
+验证事件发布者后，创建匹配 topic 的已启用任务。以下片段使用前文已经打开的
+`scheduler`，宿主任务提交接口需要实现 `issue-review`：
+
 ```ts
+await scheduler.createJob({
+  id: "review-new-issues",
+  enabled: true,
+  trigger: { type: "event", topic: "issue.opened" },
+  task: { handler: "issue-review", payload: { agent: "reviewer" } },
+  misfire: { policy: "skip", graceMs: 0 },
+});
 const records = await scheduler.publish({
   source: "github", id: "delivery-123", topic: "issue.opened",
   occurredAt: "2026-10-04T10:00:00+08:00",
   payload: { repository: "example/project", issue: 123 },
 });
 ```
+
+检查返回记录的提交状态和 `taskId`。事件触发匹配准确的 topic，必填 `misfire`
+字段用于时间触发规则，不影响事件接受时间。
 
 事件和全部匹配任务的执行快照在同一个事务中接受。重复的 `source` 和 `id`
 返回原来的匹配结果；相同身份携带不同内容时报错。JSON 对象属性顺序不影响
@@ -108,7 +134,7 @@ const records = await scheduler.publish({
 关闭安全。提交接口必须完成自己的 Promise；组件不会根据等待超时推断任务
 是否接受，也不会取消宿主的 Agent 执行。
 
-`maxConcurrentSubmissions` 限制同时进行的提交调用。宿主管理 Agent 执行并发、
+`maxConcurrentSubmissions` 限制同时进行的提交调用，默认值为 4。宿主管理 Agent 执行并发、
 Run 预算和 Session 顺序执行。`listExecutions({ jobId?, status?, afterSeq?, limit? })`
 使用稳定递增序号分页，默认每页 100 条，最多 1,000 条。
 
@@ -125,8 +151,8 @@ SQLite adapter 使用 `node:sqlite`、数据库身份和版本验证、WAL 及 F
 文件。存储包含明文任务和事件内容，应使用宿主访问控制并保存备份。
 执行记录、事件去重记录和已经删除的 ID 持续保存，宿主管理归档与存储容量。
 
-Core、Session 和 Application 不依赖本组件。Scheduler 使用 Core 的可选遥测 API，
-并依赖 `cron-parser` 和 `luxon`。版本准备和发布分别需要用户指令。
+Scheduler 使用 Core 的遥测 API、`cron-parser` 和 `luxon`。
+Core、Session 和 Application 可以独立于调度器运行。
 
 ## 执行诊断
 

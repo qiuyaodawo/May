@@ -1,24 +1,48 @@
-# Controlled multi-agent coding
+# Review and apply team coding changes
 
-[简体中文](../../zh-CN/guides/maybecode-team-coding.md)
+**English** | [简体中文](../../zh-CN/guides/maybecode-team-coding.md)
 
-Coding teams edit **independent task copies**, not a shared source checkout. The host can bind the existing `read`, `write`, and `edit` tools to each prepared workspace. A model may propose and edit files in its copy, but it cannot authorize source application. Source changes require a separate, explicit host command with the exact digest of a reviewed patch.
+Coding teams edit independent task copies. Source application is a separate host
+operation bound to the exact digest of a reviewed patch.
+
+This guide assumes a [configured MaybeCode team](maybecode-team.md), prepared
+dependencies for any required checks, and access to review and modify the source
+workspace. Keep task executions stopped while exporting or applying their edits.
+Repository users prefix the commands below with `pnpm`.
 
 ## Review and apply
 
-Start an explicitly authorized coding run with `maybecode team run "Implement the requested change in your private copy" --mode coding --workspace <path>`. The default coding preset grants `write`/`edit` only to its worker role; the supervisor remains read-only. A custom `--plan <json>` must also list the appropriate tools for each editing role. The plan cannot turn on coding mode by itself.
-
-After the selected tasks have stopped, capture their changes:
+1. Start a coding team:
 
 ```powershell
-maybecode team diff <team-id> --tasks worker-a,worker-b
+maybecode team run "Implement the requested change in your private copy" --mode coding --workspace C:\work\example
 ```
 
-The command saves an immutable patch bundle and prints its ID, confirmation digest, task identities, and unified diff. Use the same `--data-directory` as the original team when it is non-default. Review the complete diff and any conflict markers before applying:
+   The default coding preset grants `write`/`edit` to `worker`; `supervisor`
+   remains read-only. A custom `--plan <json>` must list the editing tools.
+   The CLI's `--mode coding` authorization is required in either case.
+
+2. Record the team ID. Once the selected tasks have stopped, capture their changes.
+   The default preset contains `analysis` and `review`:
+
+```powershell
+maybecode team diff <team-id> --tasks analysis,review
+```
+
+   The command saves an immutable bundle and prints its ID, confirmation digest,
+   task identities and unified diff. Retain the original `--data-directory`.
+3. Review the complete diff, conflicts and acceptance for the selected tasks.
+   When configured checks exist, they must be current and passing. Without
+   checks, the edits retain their unverified, human-reviewed status.
+4. Apply the reviewed bundle with its exact digest:
 
 ```powershell
 maybecode team apply <team-id> --patch <patch-id> --confirm <exact-digest>
 ```
+
+5. Check the application result and changed source files. A completed application
+   reports `applied`. For `unknown`, follow the recovery procedure below before
+   creating any further application operation.
 
 The confirmation is bound to the full bundle, including the source baseline, selected task snapshots, changed paths, and before/after content hashes. A generic `yes`, a task ID, or a stale digest is not confirmation. Do not put the apply command in a model tool or have a model manufacture user approval.
 

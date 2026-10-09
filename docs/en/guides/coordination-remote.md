@@ -2,26 +2,36 @@
 
 **English** | [简体中文](../../zh-CN/guides/coordination-remote.md)
 
-`@may/coordination/remote` runs leaf tasks in independent Node.js worker
-processes or hosts. One coordinator still owns the task graph, authorization,
-dependencies, attempts and handoffs. Workers own their registered agents,
-Sessions and a separate durable dispatch journal. This is not a multi-writer
-scheduler or a high-availability ownership protocol.
+Use `@may/coordination/remote` to execute leaf tasks in a separate Node.js
+process or host. The coordinator owns the graph, authorization, dependencies,
+attempts and handoffs. Each worker owns its registered agents, Sessions and
+durable dispatch journal.
+
+This guide assumes a [configured coordination Agent](coordination.md) with
+durable Session storage. The worker host needs its own provider credentials,
+allowed inputs and tools. Install or link `@may/coordination` in both hosts,
+and arrange HTTPS for connections between machines.
 
 ## Embed a worker
 
-The host supplies the model, tools and Session store through a normal
-`CoordinationAgent`, usually `createApplicationAgent()`. Do not accept arbitrary
-agent definitions, tools or model credentials from the coordinator's task input.
+1. Create a host-configured `CoordinationAgent`, usually with
+   `createApplicationAgent()`, using its own model, tools and durable Session
+   store. The snippet assumes this object is named `workerAgent`.
+2. Set `MAY_WORKER_TOKEN` in both host environments to the same randomly generated
+   secret containing at least 24 non-whitespace characters. Keep it outside
+   source control and model inputs.
+3. Open the dispatch journal and listen on loopback. This host fragment registers
+   `analyst` and accepts only tasks for coordination `review-1`:
 
 ```ts
 import { createServer } from "node:http";
 import { CoordinationWorker } from "@may/coordination/remote";
 
-// workerAgent is a host-configured CoordinationAgent with durable Session storage.
+const token = process.env.MAY_WORKER_TOKEN;
+if (!token) throw new Error("MAY_WORKER_TOKEN is required");
 const worker = await CoordinationWorker.open({
   directory: "./worker-data/dispatches",
-  token: process.env.MAY_WORKER_TOKEN!,
+  token,
   agents: { analyst: workerAgent },
   authorize: ({ agent, execution }) =>
     agent === "analyst" && execution.coordinationId === "review-1",
@@ -31,8 +41,11 @@ const worker = await CoordinationWorker.open({
 const server = createServer(worker.handle);
 server.listen(8787, "127.0.0.1");
 
-// On shutdown: stop accepting requests, then await worker.close().
 ```
+
+Keep the process running while it serves requests. During shutdown, stop
+accepting HTTP requests with `server.close()` and await `worker.close()` before
+releasing worker resources.
 
 Use a randomly generated bearer secret of at least 24 non-whitespace characters,
 kept outside prompts and source control. Plain HTTP is accepted only on loopback;
@@ -48,16 +61,23 @@ available after execution authorization is revoked.
 
 ## Register the remote agent
 
+In the coordinator process, use the same secret, the worker's registered Agent
+name and its exact `version`. The snippet assumes the worker uses version
+`analysis-v1`; replace it if your `workerAgent.version` differs. Use a new graph
+ID, or call `resume()` for an existing graph.
+
 ```ts
 import { CoordinationRuntime } from "@may/coordination";
 import { FileCoordinationStore } from "@may/coordination/file-store";
 import { createRemoteAgent } from "@may/coordination/remote";
 
+const token = process.env.MAY_WORKER_TOKEN;
+if (!token) throw new Error("MAY_WORKER_TOKEN is required");
 const remote = createRemoteAgent({
   url: "http://127.0.0.1:8787",
-  token: process.env.MAY_WORKER_TOKEN!,
+  token,
   agent: "analyst",
-  version: workerAgent.version,
+  version: "analysis-v1",
 });
 const runtime = await CoordinationRuntime.create({
   id: "review-1",
@@ -68,12 +88,16 @@ const runtime = await CoordinationRuntime.create({
 });
 try {
   const snapshot = await runtime.wait();
-  // Inspect every task status; wait() also returns blocked states.
+  // 检查各任务状态，确认任务是否完成或需要恢复。
   console.log(snapshot.tasks.map(({ id, status }) => ({ id, status })));
 } finally {
   await runtime.close();
 }
 ```
+
+Completion requires the `review` task to be `completed` with a durable output.
+If it is `recovery-required`, inspect the worker and Session evidence using the
+recovery rules below.
 
 The coordinator sends the explicit task input, dependency answers and supplied
 mailbox/wakeup data, not model reasoning, provider credentials or full Session
@@ -115,6 +139,10 @@ stopped before manually removing its stale lock. Preserve both worker and Sessio
 storage; do not delete evidence to force a retry.
 
 ## Scope
+
+Worker defaults are 4 concurrent jobs, 1,024 retained jobs, 1 MiB per request and
+64 MiB per journal. Set `maxConcurrent`, `maxJobs`, `maxRequestBytes` and
+`maxJournalBytes` when opening the worker to change those positive limits.
 
 - Remote workers are leaf executors. No remote capability RPC for delegation,
   peer messaging or handoff is exposed; keep orchestration on the coordinator.

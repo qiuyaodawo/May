@@ -1,40 +1,35 @@
-# 共享 Web UI
+# 使用共享 Web UI
 
 [English](../../en/guides/web-ui.md) | **简体中文**
 
-MaybeCode 与 MaybeClaw 使用相同的浏览器组件和传输层，并保留各自的资源模型。
-MaybeCode 的终端界面支持通过 `/web` 打开共享工作台。
+浏览器工作台支持发送消息、阅读历史、处理审批和管理产品资源。MaybeCode 与
+MaybeClaw 共享浏览器组件和传输方式，宿主负责执行、权限和持久化。
 
-MaybeCode 的模型面板显示能力值、未知与不支持状态、声明来源、查询诊断和刷新操作。
-活动 Session 的诊断面板读取可选的 observability 插件。MaybeClaw 通过
-`agent.check` 提供模型检查，通过 `session.diagnostics` 查询选中会话的诊断。
-认证与 Session 所属范围检查同样适用于诊断查询。
-
-`@may/ui-client` 导出 `createTelemetryPanel(data)`，供宿主复用。组件显示每项
-独立耗时、状态、父级 span 身份、采样选择与保留范围，并行操作的耗时分别显示。
-面板最多显示 40 条记录，宿主可以通过 diagnostics API 独立分页。参见
-[模型与遥测组合](model-telemetry-integration.md)。
+MaybeCode 需要已经配置的模型和编码工作区。MaybeClaw 需要本地管理员账户及
+Agent 配置，首次启动流程可以创建这些内容。下文仓库命令在根目录执行，使用
+`package.json` 声明的 pnpm 版本。
 
 ## 启动
 
-在 MaybeCode 的任一种终端界面输入 `/web`，即可在默认浏览器打开当前工作区和
-Session。命令自动选择可用的本地回环端口，并生成鉴权凭据，无需设置环境变量或
-手动输入令牌。重复执行 `/web` 会复用服务并打开新的已连接页面。刷新或断开页面后，
-再次执行 `/web` 连接。
+### 打开已有 MaybeCode 工作区
 
-TUI 和 Web 分别接收实时事件，共享同一个执行所有者。消息、审批、模型切换
-和 Session 切换使用同一个 controller。在任一界面完成审批后，两端都会关闭对应
-审批提示。关闭浏览器页面后 Agent 继续运行；退出 TUI 时关闭 Agent 和 Web 服务。
-MCP 表单与授权交互可以在任一界面完成，处理完成后两端都会关闭对应提示。
+1. 在任一种 MaybeCode 终端界面输入 `/web`。
+2. 命令选择本地回环端口，在默认浏览器打开当前工作区和 Session，页面自动连接。
+3. 刷新或断开页面后，重新执行 `/web`。
+4. 关闭页面只断开连接；退出终端时同时关闭 Agent 和 Web 服务。
 
-连接链接在 URL fragment 中携带一次性凭据。页面立即清除 fragment，再用该凭据
-换取控制令牌。连接凭据有效期为 60 秒，只能兑换一次，同时最多保留八个待连接凭据。
-控制令牌仅保存在页面内存中，不打印，也不写入浏览器存储。Origin 检查和 Bearer
-鉴权保持启用。
+终端与 Web 分别接收实时事件，共享一个 controller。在任一界面发送消息、完成
+审批、切换模型或 Session，两个界面都会更新。MCP 交互可以在任一界面回答，
+完成后全部已连接界面移除对应请求。
 
-独立启动 Web 宿主时，使用以下命令。
+启动 URL 的 fragment 包含一次性连接凭据。页面移除 fragment，再兑换控制令牌。
+连接凭据有效期为 60 秒，只能使用一次，同时最多八个等待兑换的凭据。控制令牌
+仅保存在页面内存，全部请求仍经过认证和 Origin 检查。
 
-沿用现有 May 模型配置。在 PowerShell 中执行：
+### 独立启动 MaybeCode Web 宿主
+
+1. 使用已有 May 模型配置。在 PowerShell 生成令牌，复制到剪贴板用于连接，再
+   启动宿主：
 
 ```powershell
 $env:MAYBECODE_CONTROL_TOKEN = node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
@@ -42,357 +37,246 @@ Set-Clipboard $env:MAYBECODE_CONTROL_TOKEN
 pnpm maybecode --ui web --port 3940
 ```
 
-打开终端打印的地址，选择“连接本地服务”，粘贴令牌。上述剪贴板命令会复制凭据，
-使用后请清理剪贴板。令牌仅保存在页面内存中，刷新后需要重新连接。
-`--continue`、`--resume` 保持原有语义。`--port` 要求同时使用 `--ui web`；
-指定 `0` 会分配可用端口。默认界面仍为 `retained` TUI。
+2. 打开显示的地址，选择**连接本地服务**，粘贴令牌。连接后清理剪贴板。
+   页面刷新后需要重新连接。
+3. 使用 Ctrl+C 停止宿主。完成后清理启动 shell 中的令牌：
 
-对于 MaybeClaw，运行以下命令。配置或管理员认证缺失时，会打开本机密码初始化页面。
-初始化会保留已有 May 配置，保存密码哈希，并在同一地址打开控制台。使用刚设置的密码
-登录，然后添加 Agent 并创建会话。使用 `--no-open` 或 `serve` 时，打开终端显示的
-本机初始化 HTML 文件：
+```powershell
+Set-Clipboard -Value ""
+Remove-Item Env:\MAYBECODE_CONTROL_TOKEN
+```
+
+`--continue` 和 `--resume` 按照终端方式选择 Session 历史。`--port` 需要
+`--ui web`，`0` 选择可用端口。默认界面为 `retained` TUI。令牌不保存到浏览器
+存储或静态资源。
+
+### 启动 MaybeClaw
 
 ```powershell
 pnpm maybeclaw
 ```
 
-默认启动服务并打开系统浏览器。可以在 Web 控制台通过“Agent 管理”中的“添加 Agent”
-添加首个 Agent，并直接创建会话，无需重启服务。`--no-open` 和 `serve` 子命令只启动服务，
-Ctrl+C 停止服务。
+命令启动本地服务并打开默认浏览器。缺少配置或管理员认证时，完成本地密码
+初始化。该流程保留已有 May 配置，保存密码哈希。登录后选择**Agent 管理** →
+**添加 Agent**，随后创建 Session。
 
-服务启动或配置保存后自动将密码转换为带随机盐的哈希，修改密码会使已有登录失效。
-密码配置、登录有效期和远程 CLI 认证参阅 [MaybeClaw 指南](maybeclaw.md)。
-
-`pnpm example:web-ui` 会在 3941 端口启动**离线演示**：固定脚本回复、内存会话和
-无外部副作用的审批工具。公开的演示令牌只用于这个样例的自动连接。
-它不会调用真实模型，也不会执行输入框中描述的业务任务。
+`--no-open` 或 `serve` 子命令只启动服务。需要初始化时，打开终端显示的本地
+HTML 文件。Ctrl+C 停止服务，修改密码使已有登录失效。密码要求、登录有效期
+和远程 CLI 认证参阅[MaybeClaw 指南](maybeclaw.md)。
 
 ## MaybeCode 命令与交互
 
-输入框复用终端的斜杠命令注册表、参数补全和执行函数。上下方向键选择补全项，
-Tab 填入内容。未知命令和无效参数直接显示错误。管理命令的输出保存在页面内存中，
-不会作为消息发送给模型，也不会加入对话历史。
-普通消息会取消正在执行的操作，等待取消完成后启动新请求。`/steer <消息>`
-保存补充输入，等待当前 Step 及其中的工具和审批完成后交付。补充输入按照接收
-顺序执行，空闲时会启动 Run。`/stop` 和取消按钮会取消当前操作以及等待中的输入。
-已取消的输入需要用户重新发送才会再次执行。
-已交付的补充正文会在对话中显示一次，重新打开 Session 后同样保留。历史搜索和
-字段详情读取完整的已保存正文，不受快照预览长度限制。
+输入框使用终端的斜杠命令注册表。上下方向键选择补全项，Tab 填入内容。未知
+命令和无效参数显示错误。管理输出保存在页面内存中，不进入对话历史。
 
-| 操作 | Web 入口 |
+| 任务 | Web 入口 |
 | --- | --- |
-| 模型与默认配置 | 模型下拉菜单；`/model` 的切换和默认配置按钮；`/model profile --default` |
-| Reasoning effort | effort 下拉菜单；`/effort`；`/effort default` 恢复配置值 |
-| 会话管理 | 侧栏选择和确认删除；`/new`、`/resume [id]`；会话选择结果中的重命名和删除 |
-| 重试、指令与状态 | `/retry`、`/instructions`、`/status`、`/context` |
-| 执行期间的输入 | 普通消息打断当前操作；`/steer <消息>` 等待 Step 完成；`/stop` 取消当前操作和等待中的输入 |
-| 目标管理 | `/goal start`、`/goal status`、`/goal pause`、`/goal resume`、`/goal cancel` |
-| 上下文管理 | `/compact [history-reference\|provider-native]` 和压缩按钮 |
-| Skills | `/skills`、`/skills show name`、`/skills use name [task]` |
-| MCP | `/mcp` 及其目录、资源、prompt、订阅和任务操作 |
-| 恢复处置 | `/recovery`、`/recovery resolve id finding` |
-| 页面显示 | `/details`、`/thinking`、历史搜索、详情阅读和滚动 |
+| 选择模型和默认 profile | 模型下拉菜单；`/model`；`/model profile --default` |
+| 选择 reasoning effort | Effort 下拉菜单；`/effort`；`/effort default` |
+| 管理 Session | 侧栏；`/new`、`/resume [id]`；重命名和确认删除 |
+| 重试和检查执行 | `/retry`、`/instructions`、`/status`、`/context` |
+| 管理目标 | `/goal start`、`status`、`pause`、`resume`、`cancel` |
+| 压缩 Context | `/compact [history-reference\|provider-native]` 或压缩按钮 |
+| 使用 Skills | `/skills`、`/skills show name`、`/skills use name [task]` |
+| 使用 MCP | `/mcp` 的目录、资源、提示模板、订阅和任务命令 |
+| 调查恢复 | `/recovery`、`/recovery resolve id finding` |
+| 阅读详情 | `/details`、`/thinking`、历史搜索和详情面板 |
 | 退出宿主 | `/quit` 或 `/exit`，随后确认 |
 
-MCP 表单和可编辑 review 窗口显示请求，接收 JSON，预览提交内容，并要求明确确认。
-URL 请求需要同意访问、手动打开网站和单独执行重试。命令等待响应期间仍可处理交互
-或取消操作。broker 验证 schema、请求所属会话和有效期，响应内容不进入对话历史。
-独立 `--ui web` 也启用与终端相同的交互 broker。
-独立的 `team` 和 `mcp login` CLI 子命令继续使用各自的 CLI 入口。
+普通消息取消当前执行，等待取消结束，再启动新请求。`/steer <message>` 按接收
+顺序保存输入，在下一个完整 Step 边界交付，等待其中的工具和审批结束；空闲时
+启动 Run。`/stop` 和取消按钮终止当前操作及等待输入，已经取消的输入需要重新
+发送。已交付内容显示一次，重新打开 Session 后继续保留。
 
-构建后设置 `MAYBECODE_WEB_LIVE=1`，执行
-`pnpm --filter @may/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs`。
-验收使用本地模型配置、真实 Workspace 和 MCP broker，并通过真实模型任务验证
-工具审批和文件创建。测试数据保存在已忽略的 `review` 目录。此命令会发起模型请求。
+MCP 表单和可编辑审阅显示准备提交的 JSON，要求确认。URL 请求需要同意、
+手动访问和明确的重试操作。命令等待期间仍可回答交互或取消。Broker 检查 schema、
+归属及过期时间，答案不进入历史。独立 Web 同样启用 broker。`team` 和
+`mcp login` 保留独立 CLI 入口，参阅[MCP 交互](mcp.md#有作用域的用户交互现代-mrtr)。
 
 ## Session 分支与文件版本
 
-具有项目工作区的宿主在会话顶部固定显示当前 Git branch；detached HEAD 显示简短
-commit hash，初始化和读取失败分别显示状态。当前工作区信息跟随 Session 切换与
-外部 Git 变化更新。历史回复保留当时的 branch 和 commit。
+工作区宿主在顶部显示当前 Git branch，detached HEAD 显示简短 commit hash。
+历史回复保留当时 branch 和 commit，外部 Git 变化和 Session 切换更新当前信息。
 
-完整回复后的“创建分支”打开工作区选择窗口。“当前工作区”保留当前文件，
-“新建 worktree”使用该回复关联的 commit。缺少可恢复会话状态的位置无法创建
-分支；缺少文件版本的位置无法创建 worktree。运行期间的消息不会自动成为分支位置。
+在完整回复后选择**创建分支**，选择工作区模式。当前工作区保留已有文件，新建
+worktree 从回复关联的 commit 开始。创建会话分支需要可恢复的 Session 状态；
+创建 worktree 还需要文件版本。执行中的消息不能作为选择位置。
 
-“本轮文件变化”显示该回复的版本差异；顶部“查看文件变化”提供整个 Session
-及当前工作区比较。文件列表显示新增、修改、删除和二进制文件的状态，文本 diff
-支持滚动、搜索和修改位置导航。未提交内容明确显示为当前工作区变化。
-本轮文件列表中的“预览恢复”读取目标历史内容，显示恢复差异；“确认恢复文件”
-执行恢复。预览之后发生的人工修改会阻止恢复，并报告冲突。
+**本轮文件变化**显示该回复的差异，顶部**查看文件变化**提供整个 Session 和
+当前工作区比较。新增、修改、删除和二进制文件具有明确状态，文本 diff 支持搜索
+和修改位置导航。未提交内容显示为当前工作区变化。
 
-“管理 worktree”列出登记目录、branch、起点 commit 和状态，可以打开或明确
-删除目录。删除前由宿主检查关联会话、进程、未提交修改和未合并 commit。
+恢复文件时选择**预览恢复**，阅读差异，再选择**确认恢复文件**。预览之后人工
+修改文件会产生冲突并阻止恢复。**管理 worktree**提供已登记路径、branch、起点
+commit 和打开、删除操作。删除目录前检查关联 Session、进程、未提交修改和
+未合并 commit。
 
-在 MaybeCode TUI 使用 `/fork` 打开树形历史选择器：上下方向键选择，左右方向键
-展开或收起，`/` 搜索，Space 预览，Enter 选择位置与工作区，Esc 取消。`/changes`
-打开文件列表；Enter 查看 diff，PgUp/PgDn 滚动，`/` 搜索，`N` 查找下一处匹配，
-`]` 跳转下一处修改，Esc 返回文件列表。底部状态区域显示当前 branch。
-本轮 diff 中使用 `R` 打开所选文件的恢复预览，`Y` 明确确认恢复。
+TUI 通过 `/fork` 和 `/changes` 提供相同任务。`/fork` 中使用方向键导航、`/`
+搜索、Space 预览、Enter 选择、Escape 取消。Diff 中 Page Up/Down 滚动、`/`
+搜索、`N` 查找下一处、`]` 选择下一处修改、`R` 预览恢复、`Y` 确认。
 
-共享组件通过可选 `workspace`、`forkPoints`、`checkpoints` 和 `worktrees` 快照
-字段接收结构化状态，通过 `session.fork`、`changes.view`、`worktree.open` 与
-`worktree.delete` 提交操作。宿主未提供这些能力时，相应控件保持隐藏。
-文件恢复使用 `changes.restore.preview` 和 `changes.restore.apply`，预览记录通过
-`UiWorkspaceDiff.restorePreviewId` 标识，宿主保管实际内容和冲突检查信息。
+自定义宿主提供可选 `workspace`、`forkPoints`、`checkpoints` 和 `worktrees`
+快照字段。操作使用 `session.fork`、`changes.view`、`worktree.open`、
+`worktree.delete`、`changes.restore.preview` 和 `changes.restore.apply`。
+`UiWorkspaceDiff.restorePreviewId` 标识宿主保存的预览。控件只在宿主提供
+对应能力时显示。
 
-运行 `pnpm build` 后，设置 `MAY_LIVE_PROVIDER_UI_TESTS=1`，工作区浏览器测试使用
-已配置的 `deepseek-v4-flash` profile。Session 分支测试还需要
-`MAY_GIT_CHECKPOINT_TEST_COMMITS=1`，授权在独立的测试仓库和 worktrees 中提交。
-测试会调用真实 Provider，检查回复分支、WebUI 与 TUI 文件恢复、失效预览，以及
-Git checkpoint 等待期间拒绝创建分支。运行
-`node --test packages/ui/web/test/browser/workspace-versions.test.mjs packages/ui/web/test/browser/workspace-session-fork.test.mjs`。
-没有设置对应的环境变量时，这两个测试会跳过。
+## 阅读历史与详情
 
-## 分层边界
+对话按 Run 分组，显示工具数量、审批和异常状态。展开、收起和异常过滤只影响
+当前视图，审批入口保持可用。新输出保留当前历史阅读位置，并提供
+**有新内容 / 回到最新**。
 
-终端拥有 controller 时，可以向 `ApplicationUiHost` 提供独立的 `events` 事件流
-和 `closeApplication: false`。终端负责向两端分别分发每条事件，并在退出时关闭
-controller。`startUiServer({ browserLogin: true, ... })` 提供一次性连接兑换接口，
-返回 `createLoginUrl()`；配合 `webUiAssets(..., { browserLogin: true })` 使用。
-组合其他 API 的产品服务可以从 `@may/ui-client/server` 导入 `BrowserLogin`，通过
-`issue()`、`redeem(ticket)` 和 `clear()` 复用一次性凭据，并继续执行原有来源检查。
-自定义页面可向 `mountWebUI` 提供 `initialToken` 和 `connectionHint`。
-提供 `initialToken` 时，连接窗口显示启动程序的连接说明，并隐藏手动令牌输入。
+**查看详情**打开侧栏，显示概览、输入、输出、错误和展示字段。只读字段支持
+前后内容与刷新。宿主将内容绑定到资源和版本 hash，拒绝混合不同版本读取。
+概览可以使用产品 Diff 组件，超长展示 JSON 按原始文本分段读取。
 
-`ApplicationUiHost` 提供产品的 `controls`、`complete`、`available`、`submit`、
-`concurrentCommands` 和 `interactionCommands` 接口。产品命令等待期间不占用
-快照队列；交互响应通过独立校验的入口处理。产品负责执行时的可用性和请求归属校验。
-`UiReceipt.output` 描述临时命令输出和操作，`disconnect` 结束发起请求的页面连接。
-`UiSnapshot.controls` 声明命令输入、交互响应和取消操作。`UiClient.interact()`
-可以在 `command()` 等待期间响应交互。`startUiServer` 在退出响应发送完成后调用
-`exit`，并提供 `closed`；未提供回调时关闭宿主。
-`GET /api/ui/complete` 需要鉴权并绑定宿主与 Session。请求正文最多为 256 KiB，
-参数字符串最多为 65,536 个字符；产品命令根据需要继续限制长度。
+侧栏搜索全部 Session 标题或任务提示词，按照创建时间和稳定 ID 分页。资源新增、
+删除或重命名后刷新已加载页面，保留搜索条件与页数。`snapshot.resourcesVersion`
+允许宿主报告整个目录的变化；未提供时，根据快照中的资源 ID 和标题变化刷新。
 
-| 层 | 职责 |
+**搜索内容**查询已保存的用户及助手文本、reasoning、工具输入结果、诊断和展示
+内容，包括超过预览上限的部分。结果为匹配记录，再次搜索时刷新。读取旧页面
+保留当前审批，不激活其他 Session。
+
+自定义宿主声明 `snapshot.reads` 和可选 `UiHost.resources`、`history`、`field`。
+认证接口 `/api/ui/resources`、`/api/ui/history`、`/api/ui/field` 要求当前
+`hostId`，后两者还要求 `selected`。页面接受 `query` 和不透明 `cursor`，最多
+50 条记录，传输目标约 256K 字符；单条具有大小限制的大记录可能超过该目标。
+游标绑定宿主、资源、查询及位置，位置被删除或范围变化时需要重新搜索。
+旧宿主或旧选择的响应被丢弃。
+
+`AgentWorkspace.readSessionHistory()` 检查目录归属并调用 `SessionStore.inspect()`。
+读取不激活运行时、不更新最近使用时间、不修复日志。文件存储忽略未完成的尾部
+字节，拒绝损坏的完整记录。自定义存储需要提供安全检查，MaybeClaw 还验证任务
+归属。当前在内存中扫描目录及日志，大型历史和已加载页面会消耗 CPU 与内存。
+
+## 执行证据与审批
+
+工具卡片显示等待审批、运行中、完成、失败、拒绝、未执行和结果未知。已经开始
+却没有确认结果的工具在取消后仍为结果未知。宿主恢复证据可以证明未执行。
+部分助手回复标记为中断。进度用于实时显示，完成证据另外持久保存。
+
+只有当前 `snapshot.interactions` 提供审批控件。历史审批证据只读，宿主拒绝
+过期或不可用选项。本会话审批要求授权键；输入被截断时只能拒绝。
+
+持久审批需要宿主提供范围说明和操作人员身份。`ApplicationUiHost.permissionActor()`
+提供身份，客户端不能提交身份。可选 `permissionRules: { list, revoke, create? }`
+实现 `permission.rules.list`、`revoke` 和 `create`。创建请求提供已有可见规则
+ID 及允许或禁止决定，宿主生成完整范围和操作人员身份。确认显示完整范围及禁止
+优先规则。`UiPanel.actions` 支持公共或产品详情面板中的操作。
+
+## 模型与诊断
+
+MaybeCode 模型面板显示已知、未知及不支持能力、来源、发现诊断与刷新。活动
+Session 诊断使用可选 observability 插件。MaybeClaw 提供 `agent.check` 和
+`session.diagnostics`，同样检查认证与 Session 归属。
+
+`@may/ui-client.createTelemetryPanel(data)` 最多显示 40 条记录，包含每项独立
+耗时、状态、父级身份、采样及保留范围。宿主可以单独查询其他诊断页面，参阅
+[模型与遥测集成](model-telemetry-integration.md)。
+
+## 接入自定义宿主
+
+| Package 或层次 | 职责 |
 | --- | --- |
-| Agent 应用 / 产品宿主 | 执行、权限、预算、持久化、恢复 |
-| `@may/ui-client` | JSON 协议和浏览器安全的连接、状态逻辑 |
-| `@may/ui-client/application` | 单活动会话工作区适配器 |
-| `@may/ui-client/server` | 本地 HTTP、Bearer 鉴权、来源检查、命令凭据、SSE 失效通知 |
-| `@may/web-ui` | 可选工作台外壳、对话、输入、审批、详情、安全 Markdown |
-| 产品扩展 | Coding Diff、任务生命周期、投递等领域语义 |
+| Application 与产品宿主 | 执行、权限、预算、持久化、恢复 |
+| `@may/ui-client` | JSON 类型，浏览器连接与状态同步 |
+| `@may/ui-client/application` | 单活动 Session 工作区适配器 |
+| `@may/ui-client/server` | 本地 HTTP、认证、Origin 检查、操作结果记录和 SSE |
+| `@may/web-ui` | 工作台及对话、输入、审批、详情组件 |
+| 产品扩展 | 文件差异、任务生命周期、投递及产品展示 |
 
-公共包不导入 `apps`。浏览器模块不导入 Node 适配器、TUI、Provider 或运行时对象。
-原生 ES 模块由固定资源表提供，不开放任意文件路径。新的展示投影与 UI 无关；
-现有 TUI 尚未迁移到这个投影。
+实现 `UiHost`，或者将 `ApplicationUiHost` 接入 `AgentWorkspaceController`。
+浏览器使用适合浏览器的导出，Node 适配器由宿主使用。静态模块通过固定资源表提供。
 
-其它产品可以实现 `UiHost`，或者为 `AgentWorkspaceController` 使用
-`ApplicationUiHost`，提供产品描述、命令、选择器和详情面板。若默认会话/任务外壳
-不适合，可以直接组合导出的 Web 组件。可信 renderer 扩展可获得客户端状态和
-命令回调；未知展示类型回退为文本，不加载代码。协议和扩展 API 都是有版本的预览
-接口，并不承诺所有未来 Agent 都能零适配接入。
+终端管理执行时，向 `ApplicationUiHost` 提供独立 `events` 和
+`closeApplication: false`。终端负责分发事件和关闭 controller。组合
+`startUiServer({ browserLogin: true, ... })` 与
+`webUiAssets(..., { browserLogin: true })`，通过 `createLoginUrl()` 创建连接凭据。
+产品路由可以使用 `@may/ui-client/server` 的 `BrowserLogin`，调用 `issue()`、
+`redeem()` 和 `clear()`。自定义页面可向 `mountWebUI` 提供 `initialToken` 与
+`connectionHint`，由启动程序提供连接说明。
 
-产品可以通过 `WebUiOptions.navigation` 或 `createNavigation()` 声明结构化侧边栏导航分组。每个导航分组包含类型化的项目，支持图标、文本名称、可选悬浮提示、可选徽标、点击动作以及可选的禁用状态。支持的图标包括 `plus`、`menu`、`send`、`stop`、`panel`、`search`、`arrow`、`code`、`task`、`trash`、`gear`、`users`、`message`、`check` 与 `filter`。产品也可以通过 `WebUiOptions.onNew` 与 `newLabel` 定制主新建动作，具备清晰的生命周期回调与统一的错误处理。
+提供 `snapshot.controls` 的宿主，在所选资源具有活动操作或等待交互时将 `busy`
+设置为 `true`。活动操作或客户端命令等待期间，如果 `commands` 包含
+`controls.cancelCommand`，工作台显示取消按钮。空闲时显示发送按钮；Enter
+提交，Shift+Enter 换行。斜杠命令要求 `controls.inputCommand` 可用，普通消息
+要求 `message.submit` 可用，新任务要求 `task.submit` 可用。运行期间输入
+宿主支持的内容时，同时显示发送和取消按钮。当前客户端命令结束后，才能再次
+通过输入框提交。MaybeCode 包含 Run、Context 压缩和 MCP 交互；MaybeClaw
+包含所选 Session 的 queued、running、waiting 和 cancelling 任务。
 
-在适配移动端视口（`max-width: 760px`）时，展开侧边栏导航会显示无障碍遮罩层（`.mobile-backdrop`）并阻断对正文内容的误触，页面整体无横向溢出。在收起隐藏时，移动侧栏设置 `inert` 与 `aria-hidden="true"` 属性，阻止键盘焦点误入。按下 Escape 按键或者点击遮罩层能够关闭抽屉并恢复焦点至触发按钮。
+`ApplicationUiHost` 支持 `controls`、`complete`、`available`、`submit`、
+`concurrentCommands` 和 `interactionCommands`。命令等待期间，交互响应通过
+独立检查的通道处理。产品验证可用性和归属。`UiReceipt.output` 提供临时命令输出，
+`disconnect` 关闭请求页面。`UiClient.interact()` 可以在 `command()` 等待期间
+执行。服务端发送退出结果后调用 `exit`，提供 `closed`；未提供回调时关闭宿主。
 
-Tab 和 Shift+Tab 在打开的移动端面板控件之间循环移动焦点。原生模态对话框保留自身的键盘处理。
+可信 `WebUiExtensions` 注册 `tools[toolName]`、`approvalDetails[toolName]`、
+`diagnostics[code]`、`presentations[kind][version]` 和 `panels[id]`，返回
+HTMLElement 或 null，保留公共证据与审批控件。未知类型或版本、null 和扩展失败
+保留公共显示。模型输出不能加载扩展代码。预览接口的客户端、宿主和产品扩展
+需要一起升级。
 
-## 协议 v1
+`WebUiOptions.navigation` 或 `createNavigation()` 提供带类型的导航分组，支持
+图标、名称、标题、徽标、动作和禁用状态；`onNew` 与 `newLabel` 定制创建操作。
+`max-width: 760px` 时使用覆盖面板，隐藏面板具有 `inert` 与 `aria-hidden`。
+Escape 或遮罩关闭面板，焦点返回按钮；Tab/Shift+Tab 在开放面板内循环。
+主题跟随系统，当前浏览器界面使用中文。
 
-- `GET /api/ui/snapshot?selected=<id>`：返回产品能力、资源摘要、当前资源、
-  对话、待处理交互、选择器和详情。
-- `GET /api/ui/events`：带鉴权的 fetch/SSE **失效通知流**。
-  不传原始 Provider 对象，也不承诺持久事件重放。
-- `POST /api/ui/commands`：接收 `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }`。
-  参数为有长度限制的字符串字段；适配器按明确的命令白名单校验。
+## 协议 v1 与限制
 
-连接、收到失效通知和重连时重新读取权威快照。两秒心跳也会观察 CLI/渠道产生的
-变化。实时变化按 120 ms 合并；慢事件连接会关闭，由客户端退避重连，而不是无限
-缓存。旧选择或旧请求的响应不能覆盖新状态。当前优先保证语义正确，不是高吞吐增量协议。
+| 接口 | 用途 |
+| --- | --- |
+| `GET /api/ui/snapshot?selected=<id>` | 能力、资源、当前对话、交互和面板 |
+| `GET /api/ui/events` | 认证 SSE 失效通知 |
+| `POST /api/ui/commands` | `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }` |
+| `GET /api/ui/complete` | 绑定宿主和 Session 的认证补全 |
 
-命令不自动重试。同一请求 ID 和相同内容会返回宿主内缓存的结果；冲突复用会被拒绝。
-累计 4,096 份凭据后拒绝新命令，需在合适时机重启宿主，不会驱逐凭据后重新执行。
-每次启动都会更换 `hostId`，拒绝旧宿主上的不确定命令。新建请求前应先检查最新状态。
-这**不是**跨重启的 exactly-once 执行保证。
+连接、失效通知和重连时重新读取快照。两秒心跳观察其他执行者，实时变化按
+120 ms 合并。慢事件连接会关闭，客户端等待后重连。旧响应不能覆盖新状态，
+SSE 不提供持久事件重放。
 
-## 两款产品的覆盖范围
+命令不自动重试。宿主保存请求 ID 和内容，相同请求返回已有结果，内容冲突时
+拒绝。累计 4,096 条结果后需要有序重启。重启改变 `hostId`，旧的结果未知请求
+被拒绝。创建新请求前检查当前状态，去重记录仅在当前宿主生命周期内有效。
 
-**MaybeCode：**发送消息、增量模型/工具输出、查看工具输入和代码变更预览、
-审批、取消、列出/新建/打开/重命名/删除会话、切换模型配置、请求上下文压缩。
-页面显示宿主的当前会话，`selectedId` 与 `activeId` 相同。点击侧栏会话即可切换，
-随后可以继续对话。所有已连接页面同步显示会话变化，包括 TUI 发起的切换。
-执行或等待 MCP 交互期间禁止切换、新建和删除；完成或取消当前操作后可以继续。
+MaybeCode 全部页面显示一个活动 Session。新建、切换和删除要求执行空闲且没有
+待处理 MCP 交互，携带 `expectedActiveId`，拒绝旧状态操作。当前 Session 无法
+删除。任务宿主允许各页面独立浏览。MaybeClaw 提供最终结果、取消意图、证据恢复、
+派发失败重试、渠道及最近 100 条投递记录；实时投影保留八个任务，已有 Session
+日志提供重启后的历史工具结果。任务、验证和投递策略由产品负责。
 
-侧栏中其它会话的垃圾桶图标在鼠标悬停或键盘聚焦时显示，触屏设备保持显示。
-确认后删除会话及其历史。当前会话不能删除，宿主也会拒绝直接删除当前会话的
-请求。列表和已连接页面随后同步更新。
-新建、切换和删除命令携带 `expectedActiveId`，拒绝基于旧会话状态的操作，
-不自动重放。命令通过 `targetId` 指定操作对象。
-会话宿主的 `UiClient.select(id)` 发送 `session.activate`，快照读取始终返回当前
-会话。预览版客户端和宿主需要同步升级。任务宿主保留各页面独立选择；工作区内
-的历史搜索和字段读取保持只读。
+服务监听 `127.0.0.1`，用于本地单操作者，保持本地访问。请求正文最多 256 KiB，
+参数字符串最多 65,536 字符。快照最多 50 个近期记录，预览约 64K 字符，字段
+每段 32,768 字符。Provider continuation state 保持私有，工具详情属于经过认证
+的敏感工作区数据。尚无文件浏览或产物下载。
 
-`AgentWorkspace.readSessionHistory(id)` 校验会话属于当前工作区，再调用可选的
-`SessionStore.inspect(id)`。不会打开运行时、更新会话最近使用时间、获取执行所有权
-或修复日志。内置文件存储只忽略未提交的尾部字节，不截断文件；完整但损坏的记录
-仍报错。自定义存储必须实现安全的只读检查，不会回退到可能修复日志的 `read()`。
+Markdown 支持文本、标题、列表、引用、代码、表格、强调和 HTTP(S) 链接。
+原始 HTML、远程图片、生成脚本及可执行预览关闭。恢复使用当前执行所有者，
+每个 Session 由一个运行时管理。
 
-**MaybeClaw：**独立任务提交、客户端各自浏览任务、本宿主执行任务的实时输出、
-最终结果、取消意图、证据恢复、派发失败重试、渠道状态和最近 100 条投递记录。
-执行、验证、送达仍分别记录。排队任务使用宿主指定的配置和读取范围，UI 不能注入
-工具、目录或预算。原有 `/api/tasks`、`/api/health` 接口保持兼容。
+## 验证
 
-## 安全与当前限制
+`pnpm build` 后，通过实际工作区、目录、UI 宿主和 HTTP 服务执行本地浏览器测试：
 
-- 仅面向本地单操作者，监听 `127.0.0.1`。不要经隧道暴露，不要把控制令牌当成
-  多用户授权机制。
-- 令牌不放入 URL、浏览器存储或生成的应用静态资源。关闭页面只断开连接，停止
-  宿主才会关闭 Agent。
-- 展示快照不包含 Provider continuation state。工具输入/结果仍可能是敏感工作区
-  数据，只向已鉴权操作者提供。
-- 快照最多返回最近 50 个对话块，已记录的更早内容可通过只读分页和搜索读取。
-  预览字段仍限制在约 64K 字符，详情按每段最多 32,768 字符读取。
-  超长审批输入仍只能拒绝，读取详情不会扩大授权。尚未提供文件或产物下载。
-- Markdown 支持段落、标题、列表、引用、代码块、表格、粗体、行内代码和 HTTP(S)
-  链接。不支持原始 HTML、远程图片、生成脚本或可执行产物预览。
-- MaybeClaw 现在从已有 Session 日志读取历史工具调用及结果，重启后也可查看。
-  实时投影仍只保留八个任务；未记录的临时进度和部分 token 流不会凭空重建。
-  历史读取不增加持久化写入、不取得执行所有权，也不执行恢复。
-- 尚未提供完整文件浏览和产物下载。恢复命令使用当前执行所有者。
-  使用 `/web` 共享 TUI 的 Session；每个 Session 由一个运行时拥有。
-- 当前浏览器文案为中文，文档维护中英双语。明暗主题跟随系统；窄屏侧栏使用覆盖面板。
+```powershell
+pnpm --filter @may/web-ui exec playwright install chromium
+pnpm --filter @may/web-ui test:browser
+```
 
-## 统一执行证据
+这些检查包含资源分页与搜索、新增、删除、重命名、已加载页面状态及过期游标。
+浏览器工作文件保存在被忽略的 `review/`。需要已配置 Provider 的检查具有以下要求：
 
-共享工具卡片区分等待审批、运行中、已完成、失败、已拒绝、未执行和结果未知。
-取消运行不代表工具影响已回滚：已开始但没有可确认结果的调用标为“结果未知”；
-宿主明确提供恢复证据时，可以标为“未执行”。助手的部分回答标为“已中断”。
-错误保留有长度限制的消息和错误码；工具进度属于实时展示，不是持久完成证据。
+| 检查 | 必需环境与命令 |
+| --- | --- |
+| MaybeCode 控制及终端/Web 共享 | `MAYBECODE_WEB_LIVE=1`；`pnpm --filter @may/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs` |
+| 工作区文件版本 | `MAY_LIVE_PROVIDER_UI_TESTS=1`；`node --test packages/ui/web/test/browser/workspace-versions.test.mjs` |
+| Session 分支与隔离测试提交 | `MAY_LIVE_PROVIDER_UI_TESTS=1` 和 `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`；`node --test packages/ui/web/test/browser/workspace-session-fork.test.mjs` |
 
-工具卡片内的审批记录只读。只有宿主当前的 `snapshot.interactions` 能生成审批按钮，
-并通过记录、运行和工具调用 ID 关联证据。回放历史不恢复可操作审批；运行结束或
-不再可用时移除操作入口。过期请求和不可用选项由宿主拒绝。有授权范围键时才提供
-“本会话允许”；输入被截断的审批只能拒绝，服务端同样校验这一限制。
-
-持久审批展示宿主提供的范围身份和完整说明；宿主同时提供持久审批元信息与操作人员
-身份时，出现 `allow-persistent` 选项。`ApplicationUiHost` 从 `permissionActor()`
-取得身份，客户端提交的身份字段会被拒绝。历史审批卡片以只读方式保留持续授权范围。
-可选 `permissionRules: { list, revoke, create? }` 提供 `permission.rules.list` 和
-`permission.rules.revoke`，列表输出包含明确的撤销操作。宿主回调按照当前操作人员
-和权限范围限制规则管理。
-`create(sourceId, decision)` 提供 `permission.rules.create`，基于已有可见范围
-创建允许或禁止规则。宿主回调生成可信规则字段和创建者身份，客户端只提供已有规则
-ID 和决定。确认提示包含完整范围，以及禁止规则优先的说明。
-`UiPanel.actions` 在公共与产品详情面板中提供可选操作。宿主提供规则管理时，
-权限面板显示“查看和管理规则”入口。面板操作共用命令输出的确认流程和可用性
-检查，同时保留产品提供的详情面板。
-
-可信产品可在 `WebUiExtensions` 中注册 `tools[toolName]`、
-`approvalDetails[toolName]`、`diagnostics[code]`、
-`presentations[kind][version]` 和 `panels[id]` 回调，返回 HTMLElement 或 null。
-工具、审批详情和错误扩展只补充内容，不替换公共状态、原始证据和审批按钮。
-未知展示类型或版本、回调返回 null、回调抛错时安全回退；不从模型输出加载模块。
-此预览版将按类型注册展示回调改为按类型和版本注册，产品扩展需随宿主和客户端一起
-升级。MaybeCode 的 Diff 已迁移；绑定修改证据的批准前 Diff 仍是独立工作。
-
-本轮不增加 MaybeClaw 历史持久化、新恢复命令、TUI 渲染改动或多会话并发。
-MaybeClaw 使用共享工具投影，任务、验证和送达策略仍归产品负责。
-构建后运行 `node examples/web-ui/states.mjs` 可在 3944 端口查看只读合成状态与
-扩展验收页，输入 `stop` 关闭。这验证 UI 回退，不是真实进程崩溃恢复验收。
-
-本轮统一状态的补充离线验收覆盖：MaybeCode 允许/拒绝审批、等待审批时取消、
-错误详情、历史只读和迁移后的 Diff；MaybeClaw 读取工具完成、取消后保留中断的
-部分回答，以及失败任务诊断。合成验收页覆盖扩展抛错、未知版本回退和 390px
-布局，无横向溢出。本轮没有调用真实模型，也未进行真实进程崩溃恢复验收。
-
-## 长对话、独立详情与历史读取
-
-共享工作台按宿主提供的运行 ID 分组，有请求文本时用它作为标题。无需逐个展开即可
-查看工具数量、待审批和异常状态。“展开全部”“收起全部”“只看异常”只影响当前
-页面，审批区不受折叠或过滤影响；固定的审批入口可定位当前请求。阅读旧内容时，
-新输出保留可见内容的位置，并提供“有新内容 / 回到最新”按钮。渲染过程基于对话区块与审批互动项的签名比较判定内容更新。
-
-正文工具卡片显示明确标注的预览。“查看详情”打开独立侧栏，包含概览与产品扩展、
-输入、输出、错误和展示字段；长回答及诊断记录也提供详情入口。字段标签页只读，
-支持上一段、下一段和从首段刷新。宿主将内容与资源范围绑定到版本摘要，避免把变化
-前后的内容拼接起来。概览复用已有的分版本 Diff 扩展；超长展示 JSON 按原始文本
-分段读取，不声称新增了超大 Diff 专用渲染器。
-
-侧栏可搜索全部会话标题或任务提示词，按创建时间和稳定 ID 顺序分页；当前选中资源
-可能额外置顶显示。资源新增、删除或标题变化时，侧栏会重新读取已加载的页面，保留
-搜索词和已加载页数。宿主可提供 `snapshot.resourcesVersion`，标识完整目录的成员、
-分页顺序和搜索文本变化，覆盖最近资源窗口之外的记录。未提供该字段的宿主会根据
-snapshot 中的资源 ID 或标题变化刷新。资源内的“搜索内容”检索已记录的用户/助手正文、推理文本、工具
-输入输出、诊断和展示文本，包括超出预览上限的内容。结果是匹配记录而非完整运行，
-属于只读查询快照，重新搜索可刷新；清除搜索返回最近记录。加载旧页不会激活会话，
-也不会丢弃当前审批。界面统计的是已加载记录，不是从未记录过的全部运行操作。
-
-自定义宿主通过 `snapshot.reads` 和可选的 `UiHost.resources`、`history`、`field`
-方法接入。鉴权 GET 接口为 `/api/ui/resources`、`/api/ui/history`、`/api/ui/field`，
-均要求当前 `hostId`，后两者还要求 `selected`。分页接受 `query` 和不透明 `cursor`；
-每页最多 50 条，页面有约 256K 字符的传输预算（单条较大的有界记录可能略超预算）。
-游标绑定宿主、资源、搜索词和记录锚点，不构成授权。锚点被删除或范围改变会拒绝
-请求，需要重新搜索；元数据可能在翻页间变化。客户端独立丢弃旧宿主或旧浏览对象的
-读取响应，不把它们当成执行命令。
-
-历史通过安全的 `SessionStore.inspect` 读取；MaybeClaw 还校验任务归属与已有日志
-证据。读取不暴露 Provider continuation state、权限上下文，不执行工具或修复日志
-尾部。当前实现会扫描已有目录索引和日志并在内存中处理；传输分页不等于存储索引、
-虚拟列表或恒定内存的数据库查询。极大日志和手动加载大量页面仍有 CPU、内存开销。
-
-构建后运行 `node examples/web-ui/reading.mjs`，可用真实共享宿主和内存存储验收
-520 条对话记录、56 个会话。输入“审批”产生 90,006 字符的合成工具结果，“慢速”
-用于检查流式输出时的阅读位置。夹具不调用模型、不访问文件或真实工具，输入 `stop`
-关闭。
-
-## 浏览器验收
-
-运行 `pnpm --filter @may/web-ui exec playwright install chromium` 安装浏览器，
-然后运行 `pnpm --filter @may/web-ui test:browser`。自动测试通过 DOM 文本和控件
-检查真实工作区、会话目录、UI 宿主与 HTTP 服务，覆盖 520 个会话、新增、最近资源
-窗口之外的删除、重命名、已加载分页、搜索变化和失效游标。测试不会请求模型，
-不会保存截图；浏览器临时文件保存在 `review/` 目录。
-
-阅读工作台验收使用了 520 条对话记录、56 个浏览器会话条目，以及超过 500 个
-目录条目的 API 夹具。已验证快照外分页与搜索、90,006 字符工具结果的全部三段、
-折叠/筛选不遮蔽审批、产品 Diff 详情，以及宿主重启后读取 MaybeClaw 工具结果。
-流式输出期间，同一可见历史记录的位置测量值保持不变；“回到最新”可回到底部。
-共享阅读控件和详情区也通过了 390px 布局检查，没有横向溢出。这是离线脚本验收，
-不是实时 Provider 验收或大规模存储性能基准。
-
-`pnpm build` 后运行 `node examples/web-ui/acceptance.mjs`。它在本地回环端口
-3942/3943 启动两款产品的真实宿主，使用固定脚本模型、禁用的渠道和新建的临时
-文件。手动输入终端打印的公开验收令牌。包含 `审批`、`读取`、`慢速`、`长文`
-或 `错误` 的消息分别演示审批（MaybeCode）、读取、慢速生成、长文和模拟失败。
-在终端输入 `restart` 或 `stop` 可重启隔离宿主或关闭服务；临时文件保留在打印
-的路径，便于核对。
-
-2026-09-13 的浏览器验收覆盖连接、中文文本与换行、流式生成与取消、Markdown
-和代码复制、会话与模型、审批、任务浏览、刷新重连及桌面/390 px 布局。使用的
-是模拟模型响应，没有覆盖真实 Provider、中文输入法候选词组合、手机软键盘、
-外部渠道投递或崩溃恢复故障注入。
-
-### 真实 Provider 验收
-
-随后在 2026-09-13 使用现有 `gpt-5.6-luna` 配置，通过 `openai-responses` 和已配置
-的本地代理完成验收。使用隔离的虚构文件，不启用消息渠道。浏览器实际操作验证了
-读取 → 审批 → 编辑 → Diff、取消后继续对话、任务结果与取消，以及进程重启后的
-持久结果。共发出 9 次 Provider 请求：7 次完成、2 次取消；完成请求报告了 8,992
-tokens（不是计费总量）。另一次明确标注的请求前故障注入验证了报错后恢复，没有
-联系 Provider。修复了仅含工具调用的响应产生空白回答卡片的问题，并用保存的真实
-会话复验。
-
-仅在明确授权模型消费后复现：`node examples/web-ui/live-acceptance.mjs --live`。
-上限为 12 次请求、每次最多 2,048 输出 tokens、每轮运行 120 秒，不启用重试。
-使用样例 README 中的公开临时令牌，验收后在终端输入 `stop`。追加
-`--resume <打印的临时目录>` 可跨进程重启保留证据与请求计数。本次不验证上游
-模型身份、真实 Provider 故障、外部投递、手机软键盘或崩溃恢复行为。
-
-## 设计参考
-
-采用克制的侧栏、可读的对话区、常驻输入框和可选详情面板。2026-09-13 查看的参考：
-
-- [ChatGPT](https://chatgpt.com/)：新建、搜索、历史导航。
-- [Claude Projects / Artifacts](https://www.anthropic.com/news/projects)：
-  对话旁独立的工作与产物区域。
-- [Kimi](https://www.kimi.com/)：会话和任务入口。
-- [智谱 Z.ai](https://chat.z.ai/)：紧凑导航、模型选择和聚焦输入。
-- [Gemini Canvas](https://gemini.google/gp/overview/canvas/?hl=en)：
-  不把所有工作内容塞入聊天气泡。
-- [DeepSeek](https://chat.deepseek.com/)：公开入口要求登录，未查看或复刻登录后的界面。
-
-这些是交互参考，不是复制资产，也不表示 May 已具备这些产品的搜索、上传、调度、
-Canvas 或模型能力。
+工作区文件版本检查初始化配置的 Model 并检查 Git 和页面；发送消息的检查使用
+已配置凭据并消耗 Provider 配额。工作区检查要求配置
+`deepseek-v4-flash` profile。提交标志仅授权独立测试仓库与 worktree 的提交。
+缺少必需标志时测试跳过。实际执行、布局、外部投递及恢复需要分别报告，单项
+本地测试通过不代表已经验证全部行为。
