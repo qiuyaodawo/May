@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { createTestWorkspace as temporaryDirectory } from "./fixtures/workspace.mjs";
 
 import { InMemoryContext, RunCancelledError } from "@may/core";
 import { ModelContextCompactionStrategy } from "@may/context";
@@ -341,8 +341,8 @@ test("starts fresh by default and explicitly resumes workspace sessions", async 
   const resumed = await MaybeCodeWorkspace.open({ ...options, git: false, autoResume: true });
   assert.equal(resumed.sessionId, firstId);
   const inspection = await resumed.inspectContext();
-  assert.equal(inspection.measurementMethod, "measured+estimated");
-  assert.equal(inspection.measuredInputTokens, 100);
+  assert.equal(inspection.measurementMethod, "estimated");
+  assert.equal(inspection.measuredInputTokens, undefined);
   assert.ok(inspection.effectiveTokens > 100);
   assert.equal(inspection.contextWindowTokens, 10000);
   await (await resumed.submit({ input: "second" })).result;
@@ -407,7 +407,9 @@ test("creates context through an injected factory for each session", async () =>
   assert.equal(inputs.length, 3);
   assert.equal(new Set(contexts).size, 3);
   assert.deepEqual(inputs.map((input) => input.messages?.length ?? 0), [0, 0, 2]);
-  assert.equal(inputs[0].instructions, inputs[2].instructions);
+  assert.match(inputs[0].instructions, /Session origin: new session/u);
+  assert.match(inputs[2].instructions, /Session origin: resumed session/u);
+  assert.equal(inputs[0].instructions.replace("Session origin: new session", "Session origin: resumed session"), inputs[2].instructions);
   assert.deepEqual(inputs[0].metadata, { workspace: process.cwd() });
   assert.equal(await app.inspectContext(), undefined);
   await assert.rejects(
@@ -514,7 +516,8 @@ test("persists the default prune-and-summary view across resume", async () => {
   await resumed.close();
 });
 
-test("automatically compacts before a model call and persists the active view", async () => {
+test("automatically compacts before a model call and persists the active view", async (t) => {
+  const workspace = await temporaryDirectory(t);
   const store = new (await import("@may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();
   const requests = [];
@@ -533,7 +536,8 @@ test("automatically compacts before a model call and persists the active view", 
   };
   const events = [];
   const app = await MaybeCodeWorkspace.open({ git: false,
-    workspace: process.cwd(),
+    workspace,
+    instructions: "Use the available tools.",
     model,
     store,
     catalog,
@@ -581,7 +585,8 @@ test("automatically compacts before a model call and persists the active view", 
   );
 });
 
-test("persists automatic compaction after the run events it contains", async () => {
+test("persists automatic compaction after the run events it contains", async (t) => {
+  const workspace = await temporaryDirectory(t);
   const { InMemorySessionStore, Session } = await import("@may/session");
   const backing = new InMemorySessionStore();
   let releaseAssistant;
@@ -610,7 +615,8 @@ test("persists automatic compaction after the run events it contains", async () 
   });
   let modelCall = 0;
   const app = await MaybeCodeWorkspace.open({ git: false,
-    workspace: process.cwd(),
+    workspace,
+    instructions: "Use the available tools.",
     subagents: false,
     model: {
       async *stream() {
@@ -692,7 +698,8 @@ test("persists automatic compaction after the run events it contains", async () 
   await app.close();
 });
 
-test("falls back when OpenAI native compaction returns 503 and exposes the failure", async () => {
+test("falls back when OpenAI native compaction returns 503 and exposes the failure", async (t) => {
+  const workspace = await temporaryDirectory(t);
   const urls = [];
   const model = new OpenAIResponsesModel({
     apiKey: "test-key",
@@ -711,7 +718,8 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
   const store = new (await import("@may/session")).InMemorySessionStore();
   const events = [];
   const app = await MaybeCodeWorkspace.open({ git: false,
-    workspace: process.cwd(),
+    workspace,
+    instructions: "Use the available tools.",
     model,
     store,
     catalog: new InMemorySessionCatalog(),
@@ -891,10 +899,4 @@ async function collectEvents(app, target, approvalDecision) {
       await app.resolveApproval(event.event.request.id, approvalDecision);
     }
   }
-}
-
-async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "maybecode-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return directory;
 }

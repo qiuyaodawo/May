@@ -462,7 +462,7 @@ test("a service-mode event communication error stops timers until explicit recov
   });
   t.after(() => scheduler.close());
   await scheduler.createJob(job("event-error", { type: "event", topic: "tasks" }));
-  await scheduler.createJob(job("timer-after-error", { type: "at", time: new Date(Date.now() + 130).toISOString() }));
+  await scheduler.createJob(job("timer-after-error", { type: "at", time: new Date(Date.now() + 60_000).toISOString() }));
   await scheduler.start();
   await assert.rejects(scheduler.publish(event("service-timeout")), { name: "TimeoutError" });
   assert.equal(reported.length, 1);
@@ -470,6 +470,7 @@ test("a service-mode event communication error stops timers until explicit recov
   const acceptedId = host.tasks()[0].execution_id;
   const acceptedTaskId = host.tasks()[0].task_id;
   await assert.rejects(async () => scheduler.publish(event("service-stopped")));
+  await scheduler.updateJob("timer-after-error", { trigger: { type: "at", time: new Date().toISOString() } }, 1);
   await delay(160);
   assert.equal(host.tasks().length, 1);
   assert.equal((await scheduler.listExecutions()).records.length, 1);

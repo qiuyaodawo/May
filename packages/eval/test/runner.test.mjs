@@ -97,7 +97,7 @@ test("resume preserves an interrupted execution until its host confirms terminat
   const context = await setup("interrupted"); context.experiment.variants[0].execution.options = { mode: "hang" };
   context.experiment.cases[0].evaluators = [{ id: "files", version: "1", required: true }]; context.experiment.cases[0].limits.executionTimeoutMs = 60_000;
   delete context.experiment.variants[0].execution.options;
-  const child = spawn(process.execPath, [fileURLToPath(new URL("./fixtures/interrupted-runner.mjs", import.meta.url)), context.directory, sourceDirectory], { stdio: ["ignore", "pipe", "pipe"] }); let errorOutput = ""; child.stderr.on("data", value => { errorOutput += value; }); let processId; let environmentId;
+  const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", fileURLToPath(new URL("./fixtures/interrupted-runner.mjs", import.meta.url)), context.directory, sourceDirectory], { stdio: ["ignore", "pipe", "pipe"] }); let errorOutput = ""; child.stderr.on("data", value => { errorOutput += value; }); let processId; let environmentId;
   try {
     await waitFor(async () => { const state = await context.store.readTrial("interrupted", "trial-1"); if (state?.environmentId === undefined) return false; environmentId = state.environmentId; try { processId = JSON.parse(await readFile(join(environmentId, "workspace", "process.json"), "utf8")).pid; return true; } catch (error) { if (error.code !== "ENOENT") throw error; return false; } });
     const ended = new Promise(resolvePromise => child.once("exit", resolvePromise)); child.kill(); await ended;

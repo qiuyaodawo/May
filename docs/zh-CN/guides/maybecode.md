@@ -6,6 +6,9 @@
 准备仓库，并依据[配置参考](../reference/configuration.md)设置 Provider 和模型配置。
 应用使用所选模型的 API，并在启动目录中执行工作。
 
+通过 `MaybeCodeApplicationOptions.tools` 提供的自定义工具注册到应用工具目录。
+运行指令使用同一个目录描述当前环境。
+
 ## 启动应用
 
 在 May 仓库根目录执行：

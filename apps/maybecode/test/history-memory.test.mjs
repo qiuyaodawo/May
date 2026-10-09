@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { InMemorySessionStore } from "@may/session";
 import { MaybeCodeApplication } from "../dist/index.js";
+import { createTestWorkspace } from "./fixtures/workspace.mjs";
 
 const notes = { goal: "Fix the parser", constraints: "Keep existing APIs", progress: "Found the failing input", nextSteps: "Add a regression test" };
 const assistant = (text) => ({ role: "assistant", content: [{ type: "text", text }] });
@@ -14,6 +15,7 @@ const options = (model, store = new InMemorySessionStore()) => ({
 });
 
 test("queries budget, warns early, saves notes and resets within one user turn; memory survives resume", async (t) => {
+  const workspace = await createTestWorkspace(t);
   const requests = [];
   const store = new InMemorySessionStore();
   const model = { async *stream(request) {
@@ -25,7 +27,7 @@ test("queries budget, warns early, saves notes and resets within one user turn; 
       : step === 4 ? call("new_context") : assistant("continuing from notes");
     yield { type: "response.completed", message };
   } };
-  const app = await MaybeCodeApplication.open({ ...options(model, store), tools: [{
+  const app = await MaybeCodeApplication.open({ ...options(model, store), workspace, tools: [{
     name: "large", description: "Read input", inputSchema: { type: "object" },
     async execute() { return "x".repeat(26000); },
   }], permissionPolicy: () => "allow" });
@@ -58,7 +60,7 @@ test("queries budget, warns early, saves notes and resets within one user turn; 
       assert.equal(result.readyForReset, false, "new input requires refreshed notes");
     }
     yield { type: "response.completed", message: resumedCalls === 1 ? call("context_notes", { action: "read" }) : assistant("resumed") };
-  } }, store), sessionId: app.sessionId, resume: true });
+  } }, store), workspace, sessionId: app.sessionId, resume: true });
   t.after(() => resumed.close());
   await (await resumed.submit({ input: "Continue" })).result;
 });

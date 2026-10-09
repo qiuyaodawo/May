@@ -7,6 +7,10 @@ repository with [the development guide](repository-development.md), and configur
 a provider and model profile using [the configuration reference](../reference/configuration.md).
 The application uses the selected model's API and operates in its starting directory.
 
+Applications that provide custom tools through `MaybeCodeApplicationOptions.tools`
+register those tools in the application catalog. Runtime instructions use the same
+catalog to describe the current environment.
+
 ## Start the application
 
 From the May repository root, run:

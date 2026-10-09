@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, writeFile, access } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { setTimeout as delay } from "node:timers/promises";
+import { promisify } from "node:util";
 import treeKill from "tree-kill";
 import { createLocalDirectoryEnvironment, readFileManifest, startEvalProcess, nodeEvalCommand, createCommandExecutionAdapter } from "../dist/index.js";
 
@@ -75,13 +78,13 @@ test("cancellation stops a real child process tree", async () => {
   const { root } = await setup();
   const controller = new AbortController();
   const running = startEvalProcess({ executable: process.execPath, args: [workload, "tree"], cwd: root }, controller.signal);
-  await new Promise(accept => setTimeout(accept, 350));
+  const pids = await waitForTree(root);
   controller.abort();
   assert.equal(await running.cancel(), true);
   const result = await running.result;
   assert.equal(result.processTerminationConfirmed, true);
-  const pids = JSON.parse(result.stdout.trim());
-  for (const pid of [pids.parent, pids.child]) assert.throws(() => process.kill(pid, 0));
+  assert.deepEqual(JSON.parse(result.stdout.trim()), pids);
+  for (const pid of [pids.parent, pids.child]) await waitForProcessTermination(pid);
 });
 
 test("Node execution permissions refuse child processes and runtime overrides", async () => {
@@ -109,5 +112,32 @@ test("a completed parent cannot confirm a detached child without host supervisio
   } finally {
     await new Promise((accept, reject) => treeKill(child, "SIGKILL", error => error ? reject(error) : accept()));
   }
-  assert.throws(() => process.kill(child, 0));
+  await waitForProcessTermination(child);
 });
+
+async function waitForTree(root) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    try { return JSON.parse(await readFile(join(root, "tree.json"), "utf8")); }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+    await delay(25);
+  }
+  throw new Error("Timed out waiting for the process tree to start");
+}
+
+async function waitForProcessTermination(pid) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    try { process.kill(pid, 0); }
+    catch (error) { if (error.code === "ESRCH") return; throw error; }
+    if (process.platform !== "win32") {
+      let status;
+      try { status = (await promisify(execFile)("ps", ["-o", "stat=", "-p", String(pid)])).stdout.trim(); }
+      catch (error) { if (error.code === 1 && error.stdout.trim() === "") return; throw error; }
+      // 已终止的进程可能仍等待系统清理其 PID。
+      if (status.startsWith("Z")) return;
+    }
+    await delay(25);
+  }
+  throw new Error(`Process ${pid} remained active after termination`);
+}

@@ -1,5 +1,5 @@
 import { applicationHooks, applicationServices } from "@may/application";
-import { runtimeHooks, ToolRegistry, type Tool } from "@may/core";
+import { runtimeHooks, ToolRegistry } from "@may/core";
 import { definePlugin } from "@may/plugin";
 import { MaybeCodeInstructionState } from "../instructions.js";
 import { maybeCodeRuntimeInstructions, type MaybeCodeRuntimeEnvironment } from "../runtime-instructions.js";
@@ -7,9 +7,7 @@ import { maybeCodeRuntimeInstructions, type MaybeCodeRuntimeEnvironment } from "
 export function createMaybeCodeInstructionsPlugin(
   state: MaybeCodeInstructionState,
   environment: MaybeCodeRuntimeEnvironment,
-  tools: Iterable<Tool>,
 ) {
-  const configured = new ToolRegistry(tools);
   return definePlugin({
     id: "maybecode.instructions", version: "1.0.0", scope: "application",
     requires: [{ service: applicationServices.instructionSources }, { service: applicationServices.toolSources },
@@ -27,7 +25,7 @@ export function createMaybeCodeInstructionsPlugin(
         },
       }), { ...registration, id: context.pluginId, order: -100 }));
       state.runtimeInstructions = () => maybeCodeRuntimeInstructions(environment,
-        ToolRegistry.compose(configured, catalog.snapshot(), context.optional(applicationServices.tools) ?? []));
+        ToolRegistry.compose(catalog.snapshot(), context.optional(applicationServices.tools) ?? []));
       context.defer(() => { state.runtimeInstructions = undefined; });
       context.defer(sources.add(() => "# Current environment\n\n" + state.runtimeInstructions!(), {
         ...registration, id: `${context.pluginId}.environment`, order: -80,

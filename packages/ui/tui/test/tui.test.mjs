@@ -50,7 +50,7 @@ test("navigates editor history and handles word edits and multiline paste", () =
   assert.equal(editor.value, "one\n中文beta");
 });
 
-test("decodes bracketed paste as one terminal input operation", async () => {
+test("decodes bracketed paste as one terminal input operation", async (t) => {
   const input = new PassThrough();
   input.isTTY = true;
   input.isRaw = false;
@@ -66,6 +66,7 @@ test("decodes bracketed paste as one terminal input operation", async () => {
   output.on("data", (chunk) => terminalOutput += chunk.toString());
 
   const driver = new NodeTerminalDriver({ input, output });
+  t.after(() => driver.close());
   const strokes = [];
   driver.onKey((stroke) => strokes.push(stroke));
   driver.start();
@@ -82,8 +83,17 @@ test("decodes bracketed paste as one terminal input operation", async () => {
       { key: "x", text: "x" },
     ],
   );
-  input.write("\x1b");
-  await new Promise((resolve) => setTimeout(resolve, 150));
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Escape input was not delivered")), 5_000);
+    const unsubscribe = driver.onKey((stroke) => {
+      if (stroke.key === "escape") {
+        clearTimeout(timeout);
+        unsubscribe();
+        resolve();
+      }
+    });
+    input.write("\x1b");
+  });
   assert.equal(strokes.at(-1).key, "escape");
   driver.close();
   assert.match(terminalOutput, /\x1b\[\?2004h/u);

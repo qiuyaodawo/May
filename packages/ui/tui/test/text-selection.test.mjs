@@ -169,16 +169,18 @@ test("图片链接按原有顺序加入文字选择并保留自动换行前的�
   assert.equal(view.selectedText, "before\n\n图片链接：https://example.com/long-image.png\n\nafter");
 });
 
-test("a held pointer extends selection while scrolling and stops on release", async () => {
+test("a held pointer extends selection while scrolling and stops on release", async (t) => {
   const store = new TranscriptStore();
   store.appendUser(Array.from({ length: 15 }, (_, index) => `line${index}`).join("\n"));
   const view = new TranscriptView(store);
   const size = { width: 30, height: 5 };
   const scroll = new ScrollView(view, { onInvalidate: () => { scroll.render(size); } });
+  t.after(() => scroll.dispose());
   scroll.render(size);
   scroll.handlePointer(pointer("down", 2, 1));
   scroll.handlePointer(pointer("move", 20, 4));
-  await delay(155);
+  const deadline = Date.now() + 5_000;
+  while (scroll.scrollOffset < 2 && Date.now() < deadline) await delay(25);
   assert.ok(scroll.scrollOffset >= 2);
   assert.match(view.selectedText, /^line0\nline1\nline2\nline3\nline4\nline5/u);
   scroll.handlePointer(pointer("up", 20, 4));

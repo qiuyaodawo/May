@@ -249,7 +249,7 @@ export class MaybeCodeApplication {
     const instructionPlugin = createMaybeCodeInstructionsPlugin(instructionState, {
       workspace, options, historicalBranch: forkOrigin !== undefined || fork !== undefined,
       ...(forkOrigin === undefined ? {} : { historicalSource: forkOrigin.sessionId }),
-    }, configuredTools);
+    });
 
     const contextBudget = withDefaultCompactionThreshold(
       options.contextBudget,

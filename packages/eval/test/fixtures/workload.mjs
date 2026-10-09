@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
@@ -14,7 +14,10 @@ if (mode === "write") {
   await new Promise(accept => setTimeout(accept, Number(process.argv[3] ?? 30000)));
 } else if (mode === "tree") {
   const child = spawn(process.execPath, [import.meta.filename, "delay", "30000"], { stdio: "inherit", windowsHide: true });
-  console.log(JSON.stringify({ parent: process.pid, child: child.pid }));
+  const identity = JSON.stringify({ parent: process.pid, child: child.pid });
+  console.log(identity);
+  await writeFile("tree.json.pending", identity);
+  await rename("tree.json.pending", "tree.json");
   await new Promise(accept => setTimeout(accept, 30000));
 } else if (mode === "orphan") {
   const child = spawn(process.execPath, [import.meta.filename, "orphan-child"], { stdio: "ignore", detached: true, windowsHide: true, cwd: process.cwd() });
