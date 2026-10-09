@@ -71,7 +71,7 @@ compatible with MaybeCode sessions created before this component was extracted.
 ## Coding instructions
 
 Applications can compose bounded, strict UTF-8 system, runtime, and
-workspace-root instruction documents without coupling prompt policy to a
+directory-scoped project instruction documents without coupling prompt policy to a
 specific agent product:
 
 ```ts
@@ -95,6 +95,8 @@ const instructions = await loadCodingInstructions({
     permissionMode: "ask",
   }),
   projectInstructionsFilename: "AGENTS.md",
+  projectInstructionsFallbackFilenames: [],
+  projectRootMarkers: [".git"],
   sectionLabels: {
     runtime: "Runtime environment",
     project: "Project instructions",
@@ -105,10 +107,38 @@ const instructions = await loadCodingInstructions({
 
 An explicit `systemInstructions` value takes precedence over a `system.md`
 loaded from `instructionsDirectory`; otherwise the application-provided default
-is used. Project instruction discovery can be disabled with
-`projectInstructionsFilename: false`. Instruction files reject symbolic links,
-reparse points, and hard links rather than risk reading outside their declared
-root.
+is used.
+
+`workspace` is the application's starting or current directory. Project
+discovery walks upward to the nearest directory containing a
+`projectRootMarkers` entry; the default is `[".git"]`. Marker files and
+directories are both recognized, including a worktree's `.git` file. Without
+a marker, or with `projectRootMarkers: []`, only `workspace` is searched.
+Discovery then visits each directory from that project root through
+`workspace`, without scanning sibling or descendant directories or searching
+above the project root.
+
+Each directory contributes at most one nonempty document, selected in this
+order: `AGENTS.override.md`, `projectInstructionsFilename` (default
+`AGENTS.md`), then `projectInstructionsFallbackFilenames` in their configured
+order (default `[]`). Missing and empty candidates are skipped. Parent
+documents precede child documents; instructions specify that deeper-directory
+rules take priority when project rules conflict. Each selected document is
+preceded by `Source: <absolute file path>` in the composed project section.
+Multiple documents also include their directory scope. Use
+`formatCodingProjectInstructions(projects, label?)` to produce this section
+independently. `projectInstructionsFilename: false` disables the entire
+project discovery chain, including overrides and fallback files.
+
+`CodingInstructions.projects` contains all selected documents in parent-to-child
+order. `project` retains the document from the closest selected directory for
+existing callers. Use `projects` or `effective` to consume the complete rule
+chain. The default `maxBytes` is 32 KiB: each instruction document and the
+combined project document bodies, including separating blank lines, must fit
+that limit. Oversized content raises an error. Strict UTF-8 validation and the
+rejection of symbolic links, reparse points, and hard links apply to every
+selected instruction file. Loading ancestor instructions does not expand
+filesystem-tool workspace boundaries.
 
 `codingRuntimeInstructions` returns runtime text without a Markdown heading.
 It resolves the workspace to an absolute path, names the current operating
@@ -121,8 +151,7 @@ read current files before relying on historical file contents.
 
 `shellRuntimeInstructions` provides syntax guidance for the configured shell.
 The tool description provides its execution purpose and host permissions;
-the shell name appears in the runtime metadata. The composed project section
-includes `Source: <absolute file path>` before the complete document contents.
+the shell name appears in the runtime metadata.
 Applications can call these functions again when runtime state or instruction
 files change.
 

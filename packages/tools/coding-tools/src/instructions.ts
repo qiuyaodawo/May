@@ -1,5 +1,5 @@
 import { lstat, readFile, realpath, stat } from "node:fs/promises";
-import { isAbsolute, resolve, relative, sep } from "node:path";
+import { dirname, isAbsolute, resolve, relative, sep } from "node:path";
 import { shellRuntimeInstructions, type ShellToolInfo } from "./shell.js";
 
 export const DEFAULT_CODING_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
@@ -31,6 +31,9 @@ export interface CodingInstructionDocument {
 export interface CodingInstructions {
   readonly system: CodingInstructionDocument;
   readonly runtime?: CodingInstructionDocument;
+  /** 按项目根目录到 workspace 排列的完整规则列表。 */
+  readonly projects: readonly CodingInstructionDocument[];
+  /** 最近目录的一份规则；完整组合使用 projects 或 effective。 */
   readonly project?: CodingInstructionDocument;
   readonly effective: string;
 }
@@ -94,7 +97,7 @@ export function codingRuntimeInstructions(
 }
 
 export interface LoadCodingInstructionsOptions {
-  /** Workspace whose root may contain the project instruction file. */
+  /** 启动目录，也是项目规则搜索的终点。 */
   readonly workspace: string;
   /** Application-owned fallback system instructions. */
   readonly defaultSystemInstructions: string;
@@ -106,14 +109,15 @@ export interface LoadCodingInstructionsOptions {
   readonly runtimeInstructions?: string;
   /** File read from `instructionsDirectory`. */
   readonly systemInstructionsFilename?: string;
-  /**
-   * Optional file read from the workspace root. Pass `false` to disable
-   * project instruction discovery.
-   */
+  /** 各目录中的规则文件名；false 禁用整条项目规则链。 */
   readonly projectInstructionsFilename?: string | false;
+  /** 在规则文件缺失或为空时继续检查的文件名。 */
+  readonly projectInstructionsFallbackFilenames?: readonly string[];
+  /** 项目根目录标记，默认 [".git"]；空列表只检查 workspace。 */
+  readonly projectRootMarkers?: readonly string[];
   /** Markdown section labels used to assemble `effective`. */
   readonly sectionLabels?: Partial<CodingInstructionSectionLabels>;
-  /** Maximum UTF-8 byte size of each instruction document. */
+  /** 单文档及项目规则正文组合的 UTF-8 字节上限。 */
   readonly maxBytes?: number;
   /** Optional cancellation signal for filesystem reads. */
   readonly signal?: AbortSignal;
@@ -145,11 +149,8 @@ export class CodingInstructionsError extends Error {
 }
 
 /**
- * Load and combine system, runtime, and workspace-root instructions.
- *
- * Prompt content and filenames remain application policy. Instruction files
- * are bounded strict UTF-8 text; symbolic/reparse points and hard links are
- * rejected so an apparently local file cannot disclose external contents.
+ * 组合 system、runtime 和项目根目录到 workspace 的规则。
+ * 文件使用有大小限制的 strict UTF-8，并拒绝不安全链接。
  */
 export async function loadCodingInstructions(
   options: Readonly<LoadCodingInstructionsOptions>,
@@ -188,38 +189,56 @@ export async function loadCodingInstructions(
         "Runtime instructions",
         settings.maxBytes,
       );
-  const project = settings.projectFilename === false
-    ? undefined
-    : await loadOptionalProjectFile(
-        workspace,
-        settings.projectFilename,
-        settings.maxBytes,
-        options.signal,
-      );
+  const projects = settings.projectFilename === false
+    ? []
+    : await loadProjectInstructions(workspace, settings, options.signal);
+  const project = projects.at(-1);
 
   const sections = [system.content];
   if (runtime !== undefined) {
     sections.push(`# ${settings.labels.runtime}\n\n${runtime.content}`);
   }
-  if (project !== undefined) {
-    const source = project.source.type === "file"
-      ? `Source: ${project.source.path}\n\n`
-      : "";
-    sections.push(`# ${settings.labels.project}\n\n${source}${project.content}`);
-  }
+  const projectSection = formatCodingProjectInstructions(projects, settings.labels.project);
+  if (projectSection !== "") sections.push(projectSection);
 
   return {
     system,
+    projects,
     ...(runtime === undefined ? {} : { runtime }),
     ...(project === undefined ? {} : { project }),
     effective: sections.join("\n\n"),
   };
 }
 
+export function formatCodingProjectInstructions(
+  projects: readonly CodingInstructionDocument[],
+  label = DEFAULT_CODING_INSTRUCTION_SECTION_LABELS.project,
+): string {
+  sectionLabel(label, "label");
+  if (projects.length === 0) return "";
+  const sections = [`# ${label}`];
+  if (projects.length > 1) {
+    sections.push(
+      "Each document applies to its directory and descendants.\n" +
+        "For conflicting rules, the document in the deeper directory takes precedence.",
+    );
+  }
+  for (const project of projects) {
+    const source = project.source.type === "file"
+      ? `Source: ${project.source.path}\n` +
+        (projects.length > 1 ? `Scope: ${dirname(project.source.path)}\n` : "") + "\n"
+      : "";
+    sections.push(`${source}${project.content}`);
+  }
+  return sections.join("\n\n");
+}
+
 interface ValidatedOptions {
   readonly maxBytes: number;
   readonly systemFilename: string;
   readonly projectFilename: string | false;
+  readonly projectFallbackFilenames: readonly string[];
+  readonly projectRootMarkers: readonly string[];
   readonly labels: CodingInstructionSectionLabels;
 }
 
@@ -257,7 +276,23 @@ function validateOptions(
       "sectionLabels.project",
     ),
   };
-  return { maxBytes, systemFilename, projectFilename, labels };
+  const projectFallbackFilenames = instructionFilenames(
+    options.projectInstructionsFallbackFilenames ?? [],
+    "projectInstructionsFallbackFilenames",
+  );
+  const projectRootMarkers = instructionFilenames(
+    options.projectRootMarkers ?? [".git"],
+    "projectRootMarkers",
+  );
+  return { maxBytes, systemFilename, projectFilename, projectFallbackFilenames, projectRootMarkers, labels };
+}
+
+function instructionFilenames(values: readonly string[], option: string): readonly string[] {
+  if (!Array.isArray(values)) throw invalidOption(`${option} must be an array of filenames`);
+  return [...new Set(values.map(value => {
+    if (typeof value !== "string") throw invalidOption(`${option} must contain filenames`);
+    return instructionFilename(value, option);
+  }))];
 }
 
 function instructionFilename(value: string, option: string): string {
@@ -345,6 +380,66 @@ async function loadRequiredFile(
     );
   }
   return loadSafeFile(root, filename, label, maxBytes, signal);
+}
+
+async function loadProjectInstructions(
+  workspace: string,
+  settings: ValidatedOptions,
+  signal: AbortSignal | undefined,
+): Promise<readonly CodingInstructionDocument[]> {
+  const directories = [workspace];
+  if (settings.projectRootMarkers.length > 0) {
+    let current = workspace;
+    while (!await hasProjectRootMarker(current, settings.projectRootMarkers, signal)) {
+      const parent = dirname(current);
+      if (parent === current) {
+        directories.splice(1);
+        break;
+      }
+      directories.push(parent);
+      current = parent;
+    }
+  }
+  const filenames = [...new Set([
+    "AGENTS.override.md",
+    ...(settings.projectFilename === false ? [] : [settings.projectFilename]),
+    ...settings.projectFallbackFilenames,
+  ])];
+  const documents: CodingInstructionDocument[] = [];
+  let bytes = 0;
+  for (const directory of directories.reverse()) {
+    for (const filename of filenames) {
+      const document = await loadOptionalProjectFile(directory, filename, settings.maxBytes, signal);
+      if (document === undefined) continue;
+      bytes += Buffer.byteLength(document.content, "utf8") + (documents.length === 0 ? 0 : 2);
+      assertSize(bytes, "Combined project instructions", settings.maxBytes);
+      documents.push(document);
+      break;
+    }
+  }
+  return documents;
+}
+
+async function hasProjectRootMarker(
+  directory: string,
+  markers: readonly string[],
+  signal: AbortSignal | undefined,
+): Promise<boolean> {
+  for (const marker of markers) {
+    throwIfAborted(signal);
+    try {
+      await lstat(resolve(directory, marker));
+      return true;
+    } catch (error) {
+      if (isMissingPathError(error)) continue;
+      throw new CodingInstructionsError(
+        "CODING_INSTRUCTIONS_READ_FAILED",
+        `Unable to inspect project root marker: ${resolve(directory, marker)}`,
+        { cause: error },
+      );
+    }
+  }
+  return false;
 }
 
 async function loadOptionalProjectFile(

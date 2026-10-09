@@ -606,11 +606,23 @@ instruction directory:
 Relative paths are resolved from the directory containing `config.json`; `~`
 resolves to the user home directory. The configured directory must contain a
 non-empty UTF-8 `system.md`. It completely replaces the built-in system prompt.
-An optional `AGENTS.md` at the workspace root is then appended as project
-instructions with its absolute source path. Each file has a 32 KiB limit.
-Project rules are read when the application opens, when user input is accepted
-(including steering input), and before each Run. The selected base system prompt
-remains fixed for that application.
+Project instructions are discovered from the nearest ancestor containing a
+`.git` file or directory through the application's workspace. Without a project
+marker, only the workspace directory is searched. Each directory contributes
+the first nonempty document from `AGENTS.override.md`, then `AGENTS.md`.
+Documents are appended in parent-to-child order, with each absolute source
+path; deeper-directory rules take priority when project rules conflict.
+Multiple documents also include their directory scope. Sibling directories,
+descendants of the workspace, and ancestors above the project root are excluded
+from discovery.
+
+Each file has a 32 KiB limit, and the combined project document bodies,
+including separating blank lines, share a 32 KiB limit. Invalid UTF-8, unsafe
+linked files, and oversized content cause loading to fail. Project discovery
+does not expand the coding tools' workspace access or permissions.
+The complete rule chain is refreshed when the application opens, when user
+input is accepted (including steering input), and before each Run. The selected
+base system prompt remains fixed for that application.
 
 Instruction sources are assembled in this order: base prompt (`-100`), current
 environment (`-80`), project rules (`-60`), tool guidance (`-40`), Skills (`0`),

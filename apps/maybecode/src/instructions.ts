@@ -6,6 +6,7 @@ import {
   DEFAULT_CODING_INSTRUCTIONS_MAX_BYTES,
   DEFAULT_PROJECT_INSTRUCTIONS_FILENAME,
   DEFAULT_SYSTEM_INSTRUCTIONS_FILENAME,
+  formatCodingProjectInstructions,
   loadCodingInstructions,
   type CodingInstructionDocument,
   type CodingInstructions,
@@ -152,10 +153,7 @@ export class MaybeCodeInstructionState {
   }
 
   projectInstructions(): string {
-    const project = this.value.project;
-    if (project === undefined) return "";
-    const source = project.source.type === "file" ? `Source: ${project.source.path}\n\n` : "";
-    return `# Project instructions\n\n${source}${project.content}`;
+    return formatCodingProjectInstructions(this.value.projects);
   }
 
 }

@@ -1160,13 +1160,13 @@ function describeApplicationEvent(event: AgentApplicationEvent): string {
 function renderInstructionSources(app: MaybeCodeController): string {
   const system = app.instructions.system.source;
   const runtime = app.instructions.runtime?.source;
-  const project = app.instructions.project?.source;
+  const projects = app.instructions.projects;
   return `Instructions:\n  system: ${instructionSourceLabel(system)}\n` +
     `  runtime: ${
       runtime === undefined ? "none" : instructionSourceLabel(runtime)
     }\n` +
     `  project: ${
-      project === undefined ? "none" : instructionSourceLabel(project)
+      projects.length === 0 ? "none" : projects.map(project => instructionSourceLabel(project.source)).join("\n    ")
     }\n`;
 }
 

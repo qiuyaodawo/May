@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -23,6 +23,55 @@ async function workspaceFor(t) {
 async function configuredModel() {
   return createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" }));
 }
+
+test("startup ancestor rules reach the actual request and refresh after input", { timeout: 30_000 }, async t => {
+  const repository = await workspaceFor(t);
+  const workspace = join(repository, "packages", "web");
+  await mkdir(join(repository, ".git"));
+  await mkdir(workspace, { recursive: true });
+  await writeFile(join(repository, "AGENTS.md"), "Repository startup guidance.");
+  await writeFile(join(repository, "packages", "AGENTS.md"), "Package startup guidance.");
+  await writeFile(join(workspace, "AGENTS.md"), "Web startup guidance.");
+  let application;
+  const requests = [];
+  application = await MaybeCodeApplication.open({
+    workspace, model: await configuredModel(), store: new InMemorySessionStore(),
+    goals: false, subagents: false, skills: false,
+    plugins: [definePlugin({
+      id: "verification.startup-rules", version: "1.0.0",
+      requiresHooks: [runtimeHooks.modelBefore],
+      setup(context) {
+        context.on(runtimeHooks.modelBefore, request => {
+          requests.push(request);
+          application.cancel("Startup rule verification before provider dispatch");
+          return request;
+        });
+      },
+    })],
+  });
+  t.after(() => application.close());
+  assert.equal(application.workspace, workspace);
+  assert.equal(application.instructions.projects.length, 3);
+  await assert.rejects((await application.submit({ input: "Read the project guidance." })).result, RunCancelledError);
+  const first = requests[0].messages[0].content[0].text;
+  assert.ok(first.includes(`Workspace: ${workspace}`));
+  assert.ok(first.indexOf("Repository startup guidance.") < first.indexOf("Package startup guidance."));
+  assert.ok(first.indexOf("Package startup guidance.") < first.indexOf("Web startup guidance."));
+  for (const directory of [repository, join(repository, "packages"), workspace]) {
+    assert.ok(first.includes(`Source: ${await realpath(join(directory, "AGENTS.md"))}`));
+  }
+  assert.equal(application.instructions.effective, first);
+
+  await writeFile(join(repository, "AGENTS.override.md"), "Updated repository guidance.");
+  await rm(join(repository, "packages", "AGENTS.md"));
+  await assert.rejects((await application.submit({ input: "Continue reading the guidance." })).result, RunCancelledError);
+  const second = requests[1].messages[0].content[0].text;
+  assert.match(second, /Updated repository guidance/u);
+  assert.doesNotMatch(second, /Repository startup guidance|Package startup guidance/u);
+  assert.match(second, /Web startup guidance/u);
+  assert.equal(application.instructions.projects.length, 2);
+  assert.equal(application.instructions.effective, second);
+});
 
 test("MaybeCode assembles actual tool metadata and refreshes project and permission instructions", { timeout: 30_000 }, async t => {
   const workspace = await workspaceFor(t);

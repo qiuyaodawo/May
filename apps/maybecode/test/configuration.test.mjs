@@ -135,12 +135,13 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   );
   assert.match(
     request.messages[0].content[0].text,
-    /^custom system\n\n# Runtime environment\n\n/u,
+    /^custom system\n\n# Current environment\n\n/u,
   );
   assert.match(
     request.messages[0].content[0].text,
-    /\n\n# Project instructions\n\nproject rules$/u,
+    /\n\n# Project instructions\n\nSource: [^\n]+\n\nproject rules\n\n# Tool use\n\n/u,
   );
+  assert.ok(request.messages[0].content[0].text.includes(`Source: ${await realpath(join(directory, "AGENTS.md"))}`));
   assert.equal(app.instructions.system.source.type, "file");
   assert.equal(app.instructions.runtime.source.type, "runtime");
   assert.equal(app.instructions.project.source.type, "file");

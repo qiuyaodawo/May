@@ -86,7 +86,7 @@ test("terminal UI renders streams and drives tool approval", async (t) => {
   );
   assert.match(terminal.output, /estimated tokens: ~\d+ \(utf8-bytes\/4\)/u);
   assert.match(terminal.output, /effective usage: ~[\d,]+ \/ 10,000 \([\d.]+%\)/u);
-  assert.match(terminal.output, /measurement: 160 measured \+ ~\d+ estimated tail/u);
+  assert.match(terminal.output, /measurement: estimated only/u);
   assert.match(terminal.output, /remaining: [\d,]+ tokens/u);
   assert.match(terminal.output, /input budget: 9,000 tokens \(1,000 reserved\)/u);
   assert.match(terminal.output, /compaction threshold: 9,000 tokens \(not reached\)/u);
@@ -241,6 +241,7 @@ test("terminal UI accepts multiline input and renders status", async () => {
     autoResume: false,
   });
 
+  terminal.application = app;
   await runTerminalUI(app, { terminal });
 
   const user = request.messages.find((message) => message.role === "user");
