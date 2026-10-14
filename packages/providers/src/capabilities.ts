@@ -249,6 +249,14 @@ function intersectCapability(field: ModelCapabilityKey, values: readonly (Capabi
   return { status: "known", source, value };
 }
 export function builtinAdapterCapabilities(adapter: string): ModelCapabilityFields {
+  if (adapter === "google-gemini") return Object.fromEntries(Object.entries({
+    "input.text": true, "input.image": true, "input.audio": true, "input.file": true, "input.resource": false,
+    "input.image.sources": ["url", "base64"], "input.audio.sources": ["url", "base64"], "input.file.sources": ["url", "base64"],
+    "output.text": true, "output.image": true, "output.audio": true, tools: true,
+    "structuredOutput.json": true, "structuredOutput.jsonSchema": true,
+    "structuredOutput.schemaDialects": ["draft-07", "2020-12"], contextCompaction: false,
+    "reasoning.modes": ["effort", "budget"],
+  }).map(([field, value]) => [field, known(value, "adapter")]));
   if (!["openai-responses", "openai-chat-completions", "deepseek-chat", "kimi-chat", "zhipu-chat", "anthropic-messages"].includes(adapter)) return {};
   const responses = adapter === "openai-responses";
   const anthropic = adapter === "anthropic-messages";

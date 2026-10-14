@@ -26,6 +26,7 @@ import {
   type ZhipuModelOptions,
 } from "@may/provider-zhipu";
 import type { Model } from "@may/core";
+import { GeminiModel, type GeminiModelOptions } from "@may/provider-gemini";
 
 import { ProviderConfigurationError } from "./errors.js";
 import {
@@ -76,6 +77,7 @@ export function createBuiltinProviderAdapterRegistry(
   });
   const zhipu = factory((selection) => createZhipuModel(selection, options));
   registry
+    .register("google-gemini", factory((selection) => createGeminiModel(selection, options)))
     .register("deepseek-chat", factory((selection) =>
       createDeepSeekModel(selection, options)
     ))
@@ -100,6 +102,25 @@ export function createBuiltinProviderModel(
   options: BuiltinProviderAdapterRegistryOptions = {},
 ): Model {
   return createBuiltinProviderAdapterRegistry(options).create(selection);
+}
+
+function createGeminiModel(selection: ProviderModelSelection, dependencies: BuiltinProviderAdapterRegistryOptions): Model {
+  const maxOutputTokens = optionalPositiveInteger(modelOption(selection, "maxOutputTokens"), optionField(selection, "maxOutputTokens")) ?? selection.limits?.maxOutputTokens;
+  const reasoningEffort = optionalString(tuningOption(selection, "reasoningEffort"), optionField(selection, "reasoningEffort"));
+  const includeThoughts = optionalBoolean(tuningOption(selection, "includeThoughts"), optionField(selection, "includeThoughts"));
+  const thinkingBudget = tuningOption(selection, "thinkingBudget");
+  if (thinkingBudget !== undefined && (typeof thinkingBudget !== "number" || !Number.isSafeInteger(thinkingBudget) || thinkingBudget < -1)) throw new ProviderConfigurationError(`${optionField(selection, "thinkingBudget")} must be an integer greater than or equal to -1`);
+  const baseURL = providerBaseURL(selection);
+  const options: GeminiModelOptions = {
+    ...credentials(selection),
+    ...(baseURL === undefined ? {} : { baseURL }),
+    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+    ...(includeThoughts === undefined ? {} : { includeThoughts }),
+    ...(thinkingBudget === undefined ? {} : { thinkingBudget }),
+    ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
+  };
+  return attachModelLimits(new GeminiModel(options), selection.limits, maxOutputTokens);
 }
 
 function createDeepSeekModel(

@@ -35,6 +35,7 @@
     { "path": "./packages/providers" },
     { "path": "./packages/providers/openai-compatible" },
     { "path": "./packages/providers/deepseek" },
+    { "path": "./packages/providers/gemini" },
     { "path": "./packages/providers/zhipu" },
     { "path": "./packages/providers/kimi" },
     { "path": "./packages/providers/anthropic" },

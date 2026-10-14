@@ -269,6 +269,14 @@ MaybeCode 配置。第三方应用自行校验它们的应用配置区段。参�
 | `@may/provider-deepseek` | DeepSeek Chat |
 | `@may/provider-zhipu` | 智谱 GLM Chat |
 | `@may/provider-kimi` | Kimi Chat |
+| `@may/provider-gemini` | Google Gemini 原生流式 GenerateContent |
+
+`google-gemini` 使用 `@may/provider-gemini` 的 `GeminiModel`，支持 system
+指令、媒体输入、工具调用及结果、结构化输出。原生响应 parts 按顺序保存在 assistant
+的 `modelState` 中，包含用于继续请求的 `thoughtSignature`。输入用量包含缓存
+token，输出用量包含推理 token，服务端未报告的明细字段保持缺失。
+JSON/schema 响应需要通过校验，不符合要求的服务端输出会产生错误并保留用量记录。
+选项、媒体来源、错误和真实服务检查见[包参考](../../../packages/providers/gemini/README.md)。
 
 `@may/provider-openai-compatible/http` 导出 `readSseData` 和 `parseRetryAfterMs`。
 SSE 解码使用 `eventsource-parser`，支持 LF、CRLF 和 CR，并接受 EOF 之前没有

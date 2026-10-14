@@ -23,6 +23,7 @@
     "@may/core": "workspace:*",
     "@may/provider-anthropic": "workspace:*",
     "@may/provider-deepseek": "workspace:*",
+    "@may/provider-gemini": "workspace:*",
     "@may/provider-kimi": "workspace:*",
     "@may/provider-openai": "workspace:*",
     "@may/provider-openai-compatible": "workspace:*",

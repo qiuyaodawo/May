@@ -14,3 +14,4 @@ export * from "@may/provider-kimi";
 export * from "@may/provider-openai";
 export * from "@may/provider-openai-compatible";
 export * from "@may/provider-zhipu";
+export * from "@may/provider-gemini";

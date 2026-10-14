@@ -12,6 +12,7 @@
     { "path": "../core" },
     { "path": "./anthropic" },
     { "path": "./deepseek" },
+    { "path": "./gemini" },
     { "path": "./kimi" },
     { "path": "./openai" },
     { "path": "./openai-compatible" },

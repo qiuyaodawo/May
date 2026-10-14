@@ -77,6 +77,16 @@ MaybeCode 的模型选择器可以持久化新的 `defaultModel`。它会重新�
 | `zhipu-chat` | `thinking`、`clearThinking`、`reasoningEffort`、`maxTokens` |
 | `kimi-chat` | `thinking`、`reasoningEffort`、`maxTokens` |
 | `anthropic-messages` | `thinking`、`reasoningEffort`、`maxTokens`、`apiVersion` |
+| `google-gemini` | `maxOutputTokens`、`reasoningEffort`、`thinkingBudget`、`includeThoughts`、`responseFormat` |
+
+`google-gemini` 的 `baseURL` 包含 API 版本，默认使用
+`https://generativelanguage.googleapis.com/v1beta`。兼容服务可以使用
+`http://localhost:7861/antigravity/v1`。请求通过 `x-goog-api-key` 认证，路径追加
+`/models/{model}:streamGenerateContent?alt=sse`。`reasoningEffort` 对应
+`thinkingConfig.thinkingLevel`；`thinkingBudget` 接受大于等于 `-1` 的整数。
+effort 与 budget 互斥。`includeThoughts` 为可选布尔值，省略思考选项时使用服务端及
+模型的默认行为。通过模型名称选择 effort 的服务可以使用 `gemini-3.8-flash-high`
+等名称，无需另外配置 effort。参阅 [Gemini adapter](../../../packages/providers/gemini/README.md)。
 
 常见标量：
 

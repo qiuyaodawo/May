@@ -1006,6 +1006,9 @@ importers:
       '@may/provider-deepseek':
         specifier: workspace:*
         version: link:deepseek
+      '@may/provider-gemini':
+        specifier: workspace:*
+        version: link:gemini
       '@may/provider-kimi':
         specifier: workspace:*
         version: link:kimi
@@ -1048,6 +1051,22 @@ importers:
       '@may/config':
         specifier: workspace:*
         version: link:../../config
+
+  packages/providers/gemini:
+    dependencies:
+      '@may/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@may/provider-openai-compatible':
+        specifier: workspace:*
+        version: link:../openai-compatible
+    devDependencies:
+      '@may/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
 
   packages/providers/kimi:
     dependencies:

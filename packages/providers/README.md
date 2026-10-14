@@ -13,6 +13,7 @@ not add provider-specific behavior to `@may/core` or provider knowledge to
 - `anthropic-messages` → `@may/provider-anthropic`
 - `openai-responses` → `@may/provider-openai`
 - `openai-chat-completions` → `@may/provider-openai-compatible`
+- `google-gemini` → `@may/provider-gemini`
 
 ```ts
 import {

@@ -80,6 +80,17 @@ the command form `/model <profile-prefix> --default` is used.
 | `zhipu-chat` | `thinking`, `clearThinking`, `reasoningEffort`, `maxTokens` |
 | `kimi-chat` | `thinking`, `reasoningEffort`, `maxTokens` |
 | `anthropic-messages` | `thinking`, `reasoningEffort`, `maxTokens`, `apiVersion` |
+| `google-gemini` | `maxOutputTokens`, `reasoningEffort`, `thinkingBudget`, `includeThoughts`, `responseFormat` |
+
+For `google-gemini`, `baseURL` includes the API version and defaults to
+`https://generativelanguage.googleapis.com/v1beta`. A compatible gateway can use
+`http://localhost:7861/antigravity/v1`. Requests use `x-goog-api-key` and append
+`/models/{model}:streamGenerateContent?alt=sse`. `reasoningEffort` maps to
+`thinkingConfig.thinkingLevel`; `thinkingBudget` accepts integers from `-1`
+upward. Configure either effort or budget. `includeThoughts` is optional; omitted
+thinking options use the server/model behavior. A provider that selects effort
+through model names can use a name such as `gemini-3.8-flash-high` without an
+additional effort option. See [Gemini adapter](../../../packages/providers/gemini/README.md).
 
 Common scalar values:
 

@@ -297,6 +297,16 @@ are also independently consumable:
 | `@may/provider-deepseek` | DeepSeek Chat |
 | `@may/provider-zhipu` | Zhipu GLM Chat |
 | `@may/provider-kimi` | Kimi Chat |
+| `@may/provider-gemini` | Native Google Gemini streaming GenerateContent |
+
+`google-gemini` uses `GeminiModel` from `@may/provider-gemini`. It supports
+system instructions, media inputs, tool calls/results and structured output.
+Ordered native response parts, including `thoughtSignature`, are persisted in
+assistant `modelState` for continuation. Input usage includes cached tokens;
+output usage includes reasoning tokens. Missing detail fields stay absent.
+JSON/schema responses are validated and incompatible server output fails with
+the response usage receipt. See the [package reference](../../../packages/providers/gemini/README.md)
+for options, source forms, errors and real service checks.
 
 `@may/provider-openai-compatible/http` exports `readSseData` and
 `parseRetryAfterMs`. SSE decoding uses `eventsource-parser`, supports LF, CRLF and
