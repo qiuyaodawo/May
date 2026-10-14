@@ -29,6 +29,12 @@ load when an image needs processing; `/web` loads the Web server and browser
 assets when opened. Startup prepares the Session and initial Git checkpoint
 before displaying the terminal interface.
 
+Each launch creates a new Session by default. On normal exit, MaybeCode deletes
+Sessions created during that launch that have no submitted messages, queued
+messages, or Runs. These Sessions no longer appear in `/resume` after restarting.
+Unsubmitted editor drafts do not retain a Session. Resumed Sessions and Sessions
+created through `/fork` are preserved.
+
 Git management is enabled by default. It can initialize a project repository and
 create checkpoints. Configure `apps.maybecode.git` and any required commit approval
 before working in a project; see [Git configuration](../reference/configuration.md#maybecode-project-git-management).

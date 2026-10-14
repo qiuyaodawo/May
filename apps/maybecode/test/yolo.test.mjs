@@ -9,8 +9,8 @@ import { createWriteTool, createShellTool } from "@may/coding-tools";
 import { PermissionToolExecutor } from "@may/permissions";
 import { InMemorySessionStore } from "@may/session";
 import { InMemorySessionCatalog, createCodingPermissionPolicy, parseMaybeCodeArgs, executeMaybeCodeSlashCommand,
-  openConfiguredMaybeCode, MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
-import { yoloDirectory, yoloWorkspace } from "./yolo-support.mjs";
+  openConfiguredMaybeCode, MaybeCodeApplication, MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
+import { localModel, yoloDirectory, yoloWorkspace } from "./yolo-support.mjs";
 
 function context(signal = new AbortController().signal) {
   return { runId: "permissions", step: 1, toolCallId: "write", idempotencyKey: "permissions:1:write", signal,
@@ -74,7 +74,10 @@ test("真实工具在默认模式等待审批，在 YOLO 中自动执行并保�
 
 test("YOLO workspace 状态用于命令和固定状态栏，会话切换后保持，恢复历史不自动启用", async t => {
   const store = new InMemorySessionStore(), catalog = new InMemorySessionCatalog();
-  const app = await yoloWorkspace({ store, catalog }); t.after(() => app.close());
+  const workspace = await yoloDirectory();
+  const historical = await MaybeCodeApplication.open({ workspace, store, model: localModel(), skills: false });
+  await historical.close();
+  const app = await yoloWorkspace({ workspace, store, catalog, sessionId: historical.sessionId }); t.after(() => app.close());
   assert.equal(app.permissionMode, "default");
   const view = new MaybeCodePrototypeView({ store: new TranscriptStore(), workspace: app.workspace,
     permissionMode: () => app.permissionMode, onSubmit: () => {} });

@@ -24,6 +24,11 @@ pnpm maybecode
 CLI 按需加载选中的命令和界面。图片需要处理时加载图片编码模块，打开 `/web` 时
 加载 Web 服务和浏览器资源。启动过程在显示终端界面前准备 Session 和初始 Git checkpoint。
 
+每次启动默认创建新的 Session。正常退出时，MaybeCode 删除本次运行创建且没有提交消息、
+排队消息或 Run 的 Session；重新启动后，这些 Session 不再出现在 `/resume` 中。
+输入框中尚未提交的内容不会保留 Session。恢复的 Session 和通过 `/fork` 创建的 Session
+会继续保留。
+
 Git 管理默认启用，可能初始化项目仓库并创建 checkpoint。在项目中执行工作前，
 配置 `apps.maybecode.git` 及需要的提交审批，参阅
 [Git 配置](../reference/configuration.md#maybecode-项目-git-管理)。

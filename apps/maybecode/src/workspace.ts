@@ -106,6 +106,7 @@ interface WorkspaceState {
   options: ActiveWorkspaceOptions;
   readonly rootWorkspace: string;
   readonly git: Map<string, ProjectGitWorkspace>;
+  readonly createdSessions: Map<string, string>;
 }
 
 type BaseWorkspace = AgentWorkspace<
@@ -162,6 +163,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     const state: WorkspaceState = {
       rootWorkspace: resolve(options.workspace),
       git: new Map(),
+      createdSessions: new Map(),
       options: withoutSelection({
         ...options,
         permissionMode: parsePermissionMode(options.permissionMode ?? "default"),
@@ -227,6 +229,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
           catch (error) { await app.close(); throw error; }
         }
         state.options = nextOptions;
+        if (!selection.resume && !selection.fork) state.createdSessions.set(app.sessionId, workspace);
         return app;
       },
       ...(options.sessionId === undefined
@@ -1086,6 +1089,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     const failures: unknown[] = [];
     try {
       await this.manager.close();
+      await this.removeEmptySessions();
     } catch (error) {
       failures.push(error);
     }
@@ -1110,6 +1114,19 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     failures.push(...this.mcpRelayErrors);
     if (failures.length > 0) {
       throw new AggregateError(failures, "MaybeCode workspace failed to close");
+    }
+  }
+
+  private async removeEmptySessions(): Promise<void> {
+    const { store, catalog } = this.state.options;
+    for (const [sessionId, workspace] of this.state.createdSessions) {
+      const history = await store.read(sessionId);
+      if (history.some(event => event.type === "input.submitted" ||
+          event.type === "input.steering.queued" || event.type === "run.started" ||
+          event.type === "assistant.completed" || event.type === "session.created" && event.fork !== undefined)) continue;
+      if (!store.delete || !catalog.remove) throw new Error("Empty Session cleanup requires store and catalog deletion support");
+      await store.delete(sessionId);
+      await catalog.remove(sessionId, workspace);
     }
   }
 
