@@ -273,9 +273,11 @@ uses the configuration file's directory. See [Plugins](../guides/plugins.md).
 management. Object fields are `autoCommit` (default `true`), `readOnly` (default
 `false`), `dataRoot`, `worktreesRoot`, and `excludedPaths` (project paths).
 Paths resolve from the configuration file's directory. Metadata and worktree roots
-must be outside the repository. Existing repositories are reused; new projects
-receive a repository and initial checkpoint. Complete requests can create commits
-using project ignore rules.
+must be outside the repository. Existing repositories are reused. Immediately before
+the first approved workspace-changing tool, new projects receive a repository and
+the request's existing files are checkpointed. Complete requests can create commits
+using project ignore rules. Startup and read-only requests create no checkpoints.
+Project directories and filesystem roots follow the same process.
 
 `autoCommit: false` preserves Git observation and existing-version checkpoints
 while leaving edits uncommitted. `readOnly: true` prevents Git initialization and

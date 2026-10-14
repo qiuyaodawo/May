@@ -208,6 +208,12 @@ provider-neutral structured output. Tracer delegation forwards independent
 metric records and always associates Runs with their Session ID. See
 [model capabilities and execution diagnostics](../../docs/en/guides/model-telemetry-integration.md).
 
+`AgentApplicationOptions.beforeToolExecute(execution)` runs after permission
+approval and before the selected tool executor. It can await host preparation
+without replacing an executor supplied by a plugin. Throw `FatalToolExecutionError`
+when a failed check must terminate the Run. Cancellation is checked again before
+execution. Delegated applications require the same callback when sharing preparation.
+
 `@may/application/git-workspace` provides the Node.js `ProjectGitWorkspace`
 component for default project Git management, initial and complete-request file
 checkpoints, current branch status, structured diffs, reviewed restoration,

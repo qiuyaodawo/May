@@ -75,6 +75,7 @@ export function createSessionHistoryTool(
 
   return {
     name: "session_history",
+    workspaceEffect: "read",
     description:
       "Read a bounded page of durable events from the current session. " +
       "Use this after context compaction when details from earlier work are needed.",

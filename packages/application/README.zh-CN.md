@@ -96,6 +96,11 @@ Model、permissions、Context/Runtime/tools 和 Skills 的插件工厂分别由
 `pnpm --filter @may/application test`，真实 provider 集成验证使用
 `pnpm --filter @may/application test:integration`。
 
+`AgentApplicationOptions.beforeToolExecute(execution)` 在权限批准后、选定的工具
+executor 执行前运行，可以等待宿主准备过程，并保留插件提供的 executor。
+检查失败需要终止 Run 时抛出 `FatalToolExecutionError`；执行前还会检查取消状态。
+子应用共享准备过程时需要传入相同的 callback。
+
 `@may/application/git-workspace` 提供 Node.js `ProjectGitWorkspace`，默认初始化项目
 Git 管理并保存初始文件 checkpoint。每次完整请求通过 `beginRound()`、
 `lease.complete()` 保存最终文件版本；组件提供当前 branch、结构化 diff、

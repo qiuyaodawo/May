@@ -126,7 +126,7 @@ function navigation(key: string): "up" | "down" | "page-up" | "page-down" | "hom
 
 export function workspaceGitLabel(workspace: { readonly status: string; readonly branch?: string; readonly detached?: boolean; readonly commit?: string; readonly autoCommit?: boolean; readonly error?: string }): string {
   if (workspace.status === "error") return `Git 错误${workspace.error ? `：${sanitizeTerminalText(workspace.error)}` : ""}`;
-  if (workspace.status === "initializing") return "Git 初始化中";
+  if (workspace.status === "initializing") return "Git 尚未准备";
   const version = workspace.detached ? `detached HEAD · ${workspace.commit?.slice(0, 12) ?? "无 commit"}` : workspace.branch ?? "Git 尚无 commit";
   return sanitizeTerminalText(`${version}${workspace.autoCommit === false ? " · 自动提交关闭" : ""}`);
 }

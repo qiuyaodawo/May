@@ -109,6 +109,8 @@ export interface AgentApplicationOptions {
   /** Trusted host routing labels. The application supplies its own sessionId. */
   readonly toolScope?: Readonly<Record<string, string>>;
   readonly toolExecutor?: ToolExecutor;
+  /** 权限批准之后、执行工具之前运行的宿主检查。 */
+  readonly beforeToolExecute?: (execution: Parameters<ToolExecutor["execute"]>[0]) => Promise<void>;
   readonly toolScheduler?: ToolScheduler;
   readonly tracer?: Tracer;
   /** Content-free attributes attached to every Run opened by this application. */
@@ -386,8 +388,12 @@ export class AgentApplication implements SteerableAgentController {
         }
       },
       policy: (check) => sessionScope.get(applicationServices.permissionPolicy)(check),
-      executor: { execute: (execution) => (sessionScope.provides(applicationServices.toolExecutor)
-        ? sessionScope.get(applicationServices.toolExecutor) : directToolExecutor).execute(execution) },
+      executor: { execute: async (execution) => {
+        await options.beforeToolExecute?.(execution);
+        execution.context.signal.throwIfAborted();
+        return (sessionScope.provides(applicationServices.toolExecutor)
+          ? sessionScope.get(applicationServices.toolExecutor) : directToolExecutor).execute(execution);
+      } },
       tracer,
     });
     cleanupPermissions = permissions;

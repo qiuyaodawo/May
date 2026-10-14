@@ -9,6 +9,9 @@
 `get()` 返回实际 `SubagentHost`。Setup 注册请求预算的模型包装、动态委派工具与
 指令；created Hook 恢复请求记录并初始化 coordination，关闭时取消活动子任务。
 
+`beforeToolExecute(execution)` 传递给每个子应用，在工具权限批准后、执行前运行，
+让主 Agent 和子 Agent 共享请求准备过程及其失败状态。
+
 委派指令使用 `order: 20`，仅在 `delegate_tasks` 可用期间提供。工具描述说明完整任务
 说明、唯一 ID、依赖处理和主 Agent 恢复执行的流程；动态指导提供共享 workspace
 规则、角色权限和请求限制。子任务指令提供文件范围以及最终报告需要的证据和验证结果。

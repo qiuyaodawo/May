@@ -5,6 +5,7 @@ import type { HandoffSpec, TaskExecutionContext } from "./types.js";
 export function handoffTool(context: TaskExecutionContext, yielded: () => void): Tool {
   return {
     name: "handoff_task",
+    workspaceEffect: "read",
     permissionVersion: "coordination-handoff-v1",
     description: "Transfer this logical task to another allowed agent with an explicit context summary. After this complete tool step safely yields, the target starts in a fresh Session and supplies the task's final result; this controller does not automatically resume. Do not combine with delegation or message waits. Receive pending mail first. History, approvals and tools are not transferred.",
     inputSchema: { type: "object", additionalProperties: false, required: ["agent", "input"],

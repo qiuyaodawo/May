@@ -17,7 +17,7 @@ import { SkillRegistry } from "@may/skills";
 import type { MaybeCodeApplicationOptions } from "../application.js";
 import { createCodingPermissionPolicy } from "../policy.js";
 import { defaultMaybeCodeSkillDirectories } from "../skills.js";
-import { requestMainRunIds, startGitGoalRequest } from "../git-request.js";
+import { type GitRequestController, gitRequestService, requestMainRunIds, startGitGoalRequest } from "../git-request.js";
 
 export interface MaybeCodePluginComposition {
   readonly plugins: readonly AnyPlugin[];
@@ -31,6 +31,7 @@ export function createMaybeCodePlugins(
   options: MaybeCodeApplicationOptions,
   environment: {
     readonly workspace: string;
+    readonly gitRequest: GitRequestController;
     readonly instructions: string;
     readonly contextBudget?: ContextBudget;
     readonly instructionsSource?: () => string;
@@ -85,12 +86,12 @@ export function createMaybeCodePlugins(
       return {
         sessionId: application.sessionId,
         get isRunning() { return application.isRunning || host?.isRunning === true; },
-        submit: plan => startGitGoalRequest(options.gitWorkspace, application.sessionId,
+        submit: plan => startGitGoalRequest(environment.gitRequest, application.sessionId,
           () => host ? host.start({ ...plan, record: requestRecord(plan.input) }, "submit") : application.submit(plan), completed,
           runId => application.saveBranchPosition(runId, { allowYielded: true }),
           async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
           async firstRunId => requestMainRunIds(await application.history(), firstRunId)),
-        continue: plan => startGitGoalRequest(options.gitWorkspace, application.sessionId,
+        continue: plan => startGitGoalRequest(environment.gitRequest, application.sessionId,
           () => host ? host.start({ ...plan, input: "", record: "Continue the active goal" }, "continue") : application.continue(plan), completed,
           runId => application.saveBranchPosition(runId, { allowYielded: true }),
           async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
@@ -105,6 +106,7 @@ export function createMaybeCodePlugins(
     ...(environment.prepareInstructions === undefined ? {} : { prepareInstructions: environment.prepareInstructions }),
     permissionModeSource: () => options.gitWorkspace?.readOnly ? "read-only" : options.permissionModeSource?.() ?? (options.permissionPolicy ? "custom" : "default"),
     ...(options.subagents ?? {}),
+    beforeToolExecute: environment.gitRequest.beforeToolExecute,
     ...(options.toolSource === undefined ? {} : { toolSource: options.toolSource }),
     ...(contextBudget === undefined ? {} : { contextBudget }),
     ...(options.compactionStrategy === undefined ? {} : { compactionStrategy: options.compactionStrategy }),
@@ -117,6 +119,7 @@ export function createMaybeCodePlugins(
   hasDelegation = plugins.some(plugin => plugin.provides?.some(service => service.id === delegationService.id && service.scope === delegationService.scope));
   plugins.push({
     id: "maybecode.product", version: "1.0.0", scope: "application",
+    provides: [gitRequestService],
     requires: [
       { service: historyMemoryService },
       ...(hasGoals ? [{ service: goalsService }] : []),
@@ -125,6 +128,7 @@ export function createMaybeCodePlugins(
     optional: [{ service: services.modelInfo }, { service: mcpService }],
     requiresHooks: [applicationHooks.created],
     setup(context) {
+      context.provide(gitRequestService, environment.gitRequest);
       context.on(applicationHooks.created, () => {
         modelInfo = context.optional(services.modelInfo);
         mcp = context.optional(mcpService);

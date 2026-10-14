@@ -394,9 +394,11 @@ export class GoalController {
 export function createGoalTools(goal: GoalController): readonly Tool[] {
   return [
     { name: "get_goal", description: "Read the active goal, progress and remaining budget.",
+      workspaceEffect: "read",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       async execute() { return modelGoal(goal.getGoal()); } },
     { name: "update_goal", description: "Report progress, completion with evidence, or a blocker requiring user input. Only the host can resume or cancel a goal or change its budget.",
+      workspaceEffect: "read",
       inputSchema: { type: "object", properties: { status: { type: "string", enum: ["active", "completed", "blocked"] }, evidence: { type: "string" } }, required: ["status", "evidence"], additionalProperties: false },
       async execute(input, context) {
         context.signal.throwIfAborted();

@@ -171,7 +171,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       }),
     };
     if (state.options.git !== false) state.git.set(state.rootWorkspace, await ProjectGitWorkspace.open({
-      ...state.options.git, workspace: state.rootWorkspace,
+      ...state.options.git, workspace: state.rootWorkspace, deferInitialization: true,
       excludedPaths: [...(state.options.git?.excludedPaths ?? []), ...workspaceStoragePaths(state.options, state.rootWorkspace)],
     }));
     const manager = await AgentWorkspace.open<
@@ -194,7 +194,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
         const configured = await state.options.configureWorkspace?.(workspace);
         let gitWorkspace = state.git.get(workspace);
         if (state.options.git !== false && !gitWorkspace) {
-          gitWorkspace = await ProjectGitWorkspace.open({ ...state.options.git, workspace,
+          gitWorkspace = await ProjectGitWorkspace.open({ ...state.options.git, workspace, deferInitialization: true,
             excludedPaths: [...(state.options.git?.excludedPaths ?? []), ...workspaceStoragePaths(state.options, workspace)] });
           state.git.set(workspace, gitWorkspace);
         }
@@ -222,12 +222,6 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
           ...(selection.fork ? { fork: selection.fork } : {}),
           ...(selection.metadata ? { sessionMetadata: selection.metadata } : {}),
           ...(selection.sessionId ? { sessionId: selection.sessionId } : {}), resume: selection.resume });
-        if (gitWorkspace && !gitWorkspace.readOnly &&
-            (gitWorkspace.repository !== undefined || (await gitWorkspace.status()).state !== "unmanaged") &&
-            !(await gitWorkspace.checkpoints(app.sessionId)).some(checkpoint => checkpoint.status !== "failed")) {
-          try { await gitWorkspace.prepare(app.sessionId); }
-          catch (error) { await app.close(); throw error; }
-        }
         state.options = nextOptions;
         if (!selection.resume && !selection.fork) state.createdSessions.set(app.sessionId, workspace);
         return app;
@@ -255,8 +249,8 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   async getWorkspaceGit(): Promise<UiWorkspaceGit> {
     if (!this.git) return { path: this.workspace, status: "disabled", autoCommit: false };
     try {
-      const status = await this.git.status();
-      return { path: this.workspace, status: status.state === "unborn" ? "initializing" : status.state === "unmanaged" ? "disabled" : "ready",
+      const status = await this.git.summary();
+      return { path: this.workspace, status: status.state === "unborn" || status.state === "unmanaged" && status.autoCommit && !status.readOnly ? "initializing" : status.state === "unmanaged" ? "disabled" : "ready",
         autoCommit: status.autoCommit && !status.readOnly, detached: status.detached,
         ...(status.branch ? { branch: status.branch } : {}), ...(status.commit ? { commit: status.commit } : {}) };
     } catch (error) {

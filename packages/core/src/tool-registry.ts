@@ -21,6 +21,7 @@ interface RegisteredTool {
   readonly execute: Tool["execute"];
   readonly resultContent: Tool["resultContent"];
   readonly permissionVersion: Tool["permissionVersion"];
+  readonly workspaceEffect: Tool["workspaceEffect"];
 }
 
 /**
@@ -118,6 +119,7 @@ export class ToolRegistry implements Iterable<Tool> {
         name: tool.name,
         description: tool.description,
         ...(tool.permissionVersion === undefined ? {} : { permissionVersion: tool.permissionVersion }),
+        ...(tool.workspaceEffect === undefined ? {} : { workspaceEffect: tool.workspaceEffect }),
         inputSchema: freezeTree(structuredClone(tool.inputSchema)),
         ...(parse === undefined ? {} : { parse: (input: unknown) => parse.call(tool, input) }),
         ...(resultContent === undefined ? {} : { resultContent: (output: unknown) => resultContent.call(tool, output) }),
@@ -155,6 +157,9 @@ function validateTool(tool: Tool): void {
   if (typeof tool.description !== "string") {
     throw new TypeError("tool description must be a string");
   }
+  if (tool.workspaceEffect !== undefined && tool.workspaceEffect !== "read" && tool.workspaceEffect !== "write") {
+    throw new TypeError("tool workspaceEffect must be read or write");
+  }
   if (
     typeof tool.inputSchema !== "object" ||
     tool.inputSchema === null ||
@@ -187,6 +192,7 @@ function createRegistration(tool: Tool): RegisteredTool {
     execute: tool.execute,
     resultContent: tool.resultContent,
     permissionVersion: tool.permissionVersion,
+    workspaceEffect: tool.workspaceEffect,
   };
 }
 
@@ -199,7 +205,8 @@ function assertRegistrationUnchanged(registration: RegisteredTool): void {
     tool.parse !== registration.parse ||
     tool.execute !== registration.execute ||
     tool.resultContent !== registration.resultContent ||
-    tool.permissionVersion !== registration.permissionVersion
+    tool.permissionVersion !== registration.permissionVersion ||
+    tool.workspaceEffect !== registration.workspaceEffect
   ) {
     throw new TypeError(
       `Tool "${registration.name}" changed after it was registered`,

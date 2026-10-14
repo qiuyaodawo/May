@@ -45,7 +45,7 @@ are public preview APIs. Their ownership rules are:
 - Ordinary registry lookup and `clone()` preserve the original Tool objects.
 - Registry operations that expose tools or definitions check registered name,
   description, schema reference, parser, executor, `resultContent` and
-  `permissionVersion` for replacement. Replacing
+  `permissionVersion` and `workspaceEffect` for replacement. Replacing
   these fields causes `TypeError`. This check compares schema identity; mutation
   inside that schema must be managed by the caller.
 

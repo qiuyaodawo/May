@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { ProjectGitWorkspace } from "@may/application/git-workspace";
-import { requestMainRunIds, startGitGoalRequest, startGitRequest } from "./git-request.js";
+import { GitRequestController, requestMainRunIds, startGitGoalRequest, startGitRequest } from "./git-request.js";
 import { mediaHistory } from "./media-history.js";
 import type { SkillRegistry } from "@may/skills";
 
@@ -180,7 +180,7 @@ export class MaybeCodeApplication {
   private inputTail: Promise<void> = Promise.resolve();
   private inputOperations = 0;
   private currentRun: MaybeCodeRun | undefined;
-  private gitWorkspace: ProjectGitWorkspace | undefined;
+  private gitRequest!: GitRequestController;
   private permissionScopeId: string | undefined;
   private compaction: Promise<ContextCompactionResult> | undefined;
   private inputEpoch = 0;
@@ -259,6 +259,7 @@ export class MaybeCodeApplication {
       ? undefined : options.modelInfo;
 
     let product: MaybeCodeApplication | undefined;
+    const gitRequest = new GitRequestController(options.gitWorkspace);
     const composition = createMaybeCodePlugins({ ...options,
       plugins: [instructionPlugin, ...(options.plugins ?? [])],
       onGitCheckpoint: checkpoint => {
@@ -268,6 +269,7 @@ export class MaybeCodeApplication {
       },
     }, {
       workspace,
+      gitRequest,
       instructions: instructions.system.content,
       instructionsSource: () => instructionState.current.system.content,
       projectInstructionsSource: () => instructionState.projectInstructions(),
@@ -281,6 +283,7 @@ export class MaybeCodeApplication {
       forkStateTransform: (key, value) => migrateForkSkillState(key, value, fork?.sourceWorkspace, workspace),
       tools: configuredTools,
       toolScope: { workspaceId: resolve(options.workspace) },
+      beforeToolExecute: gitRequest.beforeToolExecute,
       ...(options.permissionRuleStore === undefined ? {} : { permissionRuleStore: options.permissionRuleStore }),
       instructions: instructions.system.content,
       ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
@@ -345,7 +348,7 @@ export class MaybeCodeApplication {
       composition.hasDelegation ? application.getService(delegationService).get() : undefined,
       composition.mcp,
     );
-    product.gitWorkspace = options.gitWorkspace;
+    product.gitRequest = gitRequest;
     product.permissionScopeId = options.permissionRuleStore === undefined ? undefined
       : options.permissionScopeId ?? `maybecode:${workspace}:main`;
     if (composition.modelInfo !== undefined) {
@@ -494,7 +497,7 @@ export class MaybeCodeApplication {
     options?: SessionSubmitOptions,
     inputId?: string,
   ): Promise<MaybeCodeRun> {
-    return startGitRequest(this.gitWorkspace, this.sessionId,
+    return startGitRequest(this.gitRequest, this.sessionId,
       () => this.startRequestRun(plan, options, inputId),
       checkpoint => this.eventQueue.push({ type: "workspace.git.changed", checkpoint }),
       async runId => (await this.application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
@@ -550,7 +553,7 @@ export class MaybeCodeApplication {
       get isRunning(): boolean {
         return owner.application.isRunning || owner.subagents?.isRunning === true;
       },
-      submit: (options) => startGitGoalRequest(owner.gitWorkspace, owner.sessionId, () => owner.startRequestRun({
+      submit: (options) => startGitGoalRequest(owner.gitRequest, owner.sessionId, () => owner.startRequestRun({
         mode: "submit",
         input: options.input,
         record: requestRecord(options.input),
@@ -562,7 +565,7 @@ export class MaybeCodeApplication {
         runId => owner.application.saveBranchPosition(runId, { allowYielded: true }),
         async runId => (await owner.application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
         async firstRunId => requestMainRunIds(await owner.application.history(), firstRunId)),
-      continue: (options) => startGitGoalRequest(owner.gitWorkspace, owner.sessionId, () => owner.subagents ? owner.startRequestRun({
+      continue: (options) => startGitGoalRequest(owner.gitRequest, owner.sessionId, () => owner.subagents ? owner.startRequestRun({
         mode: "continue",
         input: "",
         record: "Continue the active goal",

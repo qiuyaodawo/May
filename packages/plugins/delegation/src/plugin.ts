@@ -43,6 +43,7 @@ export interface DelegationPluginOptions {
   readonly instructionsSource?: () => string;
   readonly projectInstructionsSource?: () => string;
   readonly prepareInstructions?: () => Promise<void>;
+  readonly beforeToolExecute?: import("@may/application").AgentApplicationOptions["beforeToolExecute"];
   readonly permissionModeSource?: () => string;
   readonly skills?: SkillRegistry;
   readonly toolSource?: () => Iterable<Tool>;
@@ -102,6 +103,7 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
           ...(options.permissionModeSource === undefined ? {} : { permissionModeSource: options.permissionModeSource }),
           permissionPolicy: context.get(applicationServices.permissionPolicy),
           fileGuard: context.get(workspaceFilesService),
+          ...(options.beforeToolExecute === undefined ? {} : { beforeToolExecute: options.beforeToolExecute }),
           autoCompactionMode: options.autoCompactionMode ?? "prune-summary",
           ...(options.createRoleModel === undefined ? {} : { createRoleModel: (role: MaybeCodeSubagentRole) => {
             const selected = options.createRoleModel!(role);

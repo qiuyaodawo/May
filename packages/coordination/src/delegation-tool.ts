@@ -23,6 +23,7 @@ export function delegationTool(
   const agents = options.agents ?? [];
   return {
     name: "delegate_tasks",
+    workspaceEffect: "read",
     permissionVersion: "coordination-delegation-v1",
     description: [
       "Delegate independent child tasks to allowed agents, then continue after their outcomes arrive.",

@@ -85,7 +85,7 @@ test("diff viewer browses text and binary files, searches and advances between c
 test("Git labels represent branch, detached HEAD, initialization, disabled commits and errors", () => {
   assert.equal(workspaceGitLabel({ status: "ready", branch: "main" }), "main");
   assert.equal(workspaceGitLabel({ status: "ready", detached: true, commit: "abcdef123456789" }), "detached HEAD · abcdef123456");
-  assert.equal(workspaceGitLabel({ status: "initializing" }), "Git 初始化中");
+  assert.equal(workspaceGitLabel({ status: "initializing" }), "Git 尚未准备");
   assert.equal(workspaceGitLabel({ status: "ready", branch: "main", autoCommit: false }), "main · 自动提交关闭");
   assert.equal(workspaceGitLabel({ status: "error", error: "Missing Git" }), "Git 错误：Missing Git");
 });

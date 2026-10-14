@@ -39,7 +39,7 @@ import type { ContextFactory } from "@may/context";
 - 直接使用 `AgentApplication.open()` 时，在打开期间保存静态成员。
 - 普通查询与 `clone()` 保留原始 Tool 对象。
 - 返回工具或模型定义的 Registry 操作检查注册时的名称、描述、schema 引用、parser、
-  executor、`resultContent` 和 `permissionVersion`。替换这些字段会导致 `TypeError`。
+  executor、`resultContent`、`permissionVersion` 和 `workspaceEffect`。替换这些字段会导致 `TypeError`。
   Schema 检查比较对象身份，调用方
   需要自行管理 schema 内部的修改。
 

@@ -56,6 +56,7 @@ export class SkillSession {
   readTool(): Tool {
     return {
       name: "skill_read",
+      workspaceEffect: "read",
       description: "Activate a named skill and read its instructions, or read a referenced UTF-8 resource inside that skill. Resources are read without executing scripts; paths are relative to the skill directory.",
       inputSchema: { type: "object", properties: { name: { type: "string" }, path: { type: "string" } }, required: ["name"], additionalProperties: false },
       parse(input: unknown) {

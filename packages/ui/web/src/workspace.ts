@@ -139,7 +139,7 @@ export function createWorkspaceUI(client: UiClient) {
       }
       const workspace = state.snapshot?.workspace;
       status.hidden = !workspace;
-      status.textContent = !workspace ? "" : workspace.status === "error" ? "Git 状态读取失败" : workspace.status === "initializing" ? "Git 初始化中" : workspace.detached ? `detached HEAD · ${workspace.commit?.slice(0, 12) ?? "无 commit"}` : workspace.branch ?? "Git 尚无 commit";
+      status.textContent = !workspace ? "" : workspace.status === "error" ? "Git 状态读取失败" : workspace.status === "initializing" ? "Git 尚未准备" : workspace.detached ? `detached HEAD · ${workspace.commit?.slice(0, 12) ?? "无 commit"}` : workspace.branch ?? "Git 尚无 commit";
       status.title = workspace?.error ?? workspace?.path ?? "";
       status.dataset.status = workspace?.status ?? "";
       actions.hidden = !workspace;

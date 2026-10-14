@@ -22,7 +22,9 @@ pnpm maybecode
 提交任务前核查显示的工作目录和模型。
 
 CLI 按需加载选中的命令和界面。图片需要处理时加载图片编码模块，打开 `/web` 时
-加载 Web 服务和浏览器资源。启动过程在显示终端界面前准备 Session 和初始 Git checkpoint。
+加载 Web 服务和浏览器资源。启动过程打开 Session 并识别仓库。首次可能修改工作区文件的
+工具获得权限后，在执行之前初始化 Git 并准备 checkpoint。只读请求不创建 checkpoint。
+尚未建立 Git 版本的工作区显示“Git 尚未准备”。
 
 每次启动默认创建新的 Session。正常退出时，MaybeCode 删除本次运行创建且没有提交消息、
 排队消息或 Run 的 Session；重新启动后，这些 Session 不再出现在 `/resume` 中。

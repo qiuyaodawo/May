@@ -120,6 +120,7 @@ export interface SubagentHostOptions {
   readonly instructionsSource?: () => string;
   readonly projectInstructionsSource?: () => string;
   readonly prepareInstructions?: () => Promise<void>;
+  readonly beforeToolExecute?: import("@may/application").AgentApplicationOptions["beforeToolExecute"];
   readonly permissionModeSource?: () => string;
   readonly permissionPolicy: PermissionPolicy;
   /** 主任务与子任务共用的文件锁；缺省时按工作区新建一把共享锁。 */
@@ -592,6 +593,7 @@ export class SubagentHost {
           plugins: [childInstructions],
           tools: childTools,
           toolScope: { workspaceId: options.workspace },
+          ...(options.beforeToolExecute === undefined ? {} : { beforeToolExecute: options.beforeToolExecute }),
           toolSource: () => [...(options.toolSource?.() ?? [])],
           instructions: options.instructionsSource?.() ?? options.instructions,
           ...(options.skills === undefined ? {} : { skills: options.skills }),

@@ -242,12 +242,16 @@ test("failed and cancelled rounds and disabled autoCommit preserve uncommitted e
   const failed = await manager.beginRound({ sessionId: "session", runId: "failed" });
   await writeFile(join(workspace, "source.ts"), "failed changes\n");
   assert.equal((await failed.complete({ outcome: "failed" })).status, "uncommitted");
+  assert.equal((await git.log()).total, 1);
   const cancelled = await manager.beginRound({ sessionId: "session", runId: "cancelled" });
-  assert.equal((await cancelled.complete({ outcome: "cancelled" })).commit, initial.commit);
+  assert.notEqual(cancelled.fromCommit, initial.commit);
+  assert.equal(await git.show([`${cancelled.fromCommit}:source.ts`]), "failed changes\n");
+  await writeFile(join(workspace, "source.ts"), "cancelled changes\n");
+  assert.equal((await cancelled.complete({ outcome: "cancelled" })).commit, cancelled.fromCommit);
   const disabled = await ProjectGitWorkspace.open({ ...options, autoCommit: false });
   assert.equal((await disabled.prepare("disabled-session")).status, "uncommitted");
-  assert.equal((await git.log()).total, 1);
-  assert.equal(await readFile(join(workspace, "source.ts"), "utf8"), "failed changes\n");
+  assert.equal((await git.log()).total, 2);
+  assert.equal(await readFile(join(workspace, "source.ts"), "utf8"), "cancelled changes\n");
 });
 
 test("file restoration can save its resulting checkpoint under the same lease", commitTests, async t => {

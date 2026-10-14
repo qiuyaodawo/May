@@ -139,6 +139,7 @@ export class HistoryReferenceMemory {
     const tools: Tool[] = [
       {
         name: "get_context_remaining",
+        workspaceEffect: "read",
         description: "Query approximate context use and remaining space before compaction/reset. Use before long phases or large reads; there is no need to query every step. This is context capacity, not billing or an account quota.",
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
         parse: empty,
@@ -158,6 +159,7 @@ export class HistoryReferenceMemory {
       },
       {
         name: "context_notes",
+        workspaceEffect: "read",
         description: "Read or save the current session's durable work notes. Save replaces the note; it does not summarize history automatically. Required fields: goal, constraints, progress, nextSteps. Optional historyRefs are session event sequence numbers. Save by itself after other tools finish, before requesting a reset. Notes survive resume but must be refreshed after new work or a reset.",
         inputSchema: {
           type: "object", properties: {
@@ -203,6 +205,7 @@ export class HistoryReferenceMemory {
     ];
     if (this.active) tools.push({
       name: "new_context",
+      workspaceEffect: "read",
       description: "Request a fresh context at the next model step. Call by itself after saving current context_notes. The host checks freshness and fit again after tool completion; it keeps the current request and notes and preserves complete history for retrieval.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       parse: empty,

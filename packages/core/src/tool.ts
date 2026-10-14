@@ -34,6 +34,8 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
   readonly inputSchema: JsonSchema;
   /** Host-owned identity/version for grants, never sent to the model. */
   readonly permissionVersion?: string;
+  /** 宿主声明工具是否可能修改工作区；省略时按可能修改处理。 */
+  readonly workspaceEffect?: "read" | "write";
 
   /** Optional runtime validation/coercion hook. Throw to reject the input. */
   parse?(input: unknown): TInput;

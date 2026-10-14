@@ -3,9 +3,11 @@
 ### Session forks and project versions
 
 Project workspaces use Git by default. Existing repositories retain their branch;
-new projects are initialized. The initial project state is saved before execution,
-and a complete user request saves at most one additional commit after its edits,
-checks and delegated tasks. Requests without changes reuse the existing commit.
+new projects are initialized immediately before the first approved tool that may
+modify workspace files. Each modifying request saves the existing file state before
+tool execution and at most one additional commit after its edits, checks and delegated
+tasks. Startup and read-only requests create no checkpoints. Project directories and
+filesystem roots follow the same process. UI polling reads repository identity and HEAD.
 Failed and cancelled requests retain their uncommitted files. Git identity must
 already be configured. Checkpoint commits are protected by `refs/may/` references.
 

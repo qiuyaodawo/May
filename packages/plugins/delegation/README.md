@@ -12,6 +12,10 @@ model, store, permission, and composition services. It provides
 delegation tools, and instructions. The created Hook restores request records
 and initializes coordination; closing cancels active children before cleanup.
 
+`beforeToolExecute(execution)` is forwarded to every child application. It runs
+after tool permission approval and before execution, allowing main and child
+Agents to share request preparation and its failures.
+
 Delegation instructions use `order: 20` and are included only while
 `delegate_tasks` is available. The tool description explains complete task briefs,
 unique IDs, dependency timing and parent wakeup; dynamic guidance supplies shared

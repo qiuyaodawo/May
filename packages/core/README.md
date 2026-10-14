@@ -293,6 +293,12 @@ host metadata as Tool fields, not only in an identity-keyed WeakMap. Captured
 callbacks retain their original `this`; this is not a sandbox or a deep clone
 of arbitrary closure state. Tool schema values must support structured cloning.
 
+`Tool.workspaceEffect` is optional trusted host metadata, omitted from model
+definitions and captured in Run snapshots. `"read"` declares that execution
+preserves workspace files. `"write"` and omission require preparation in hosts
+that manage workspace checkpoints. Tool authors must include all subprocess and
+external-tool effects when making this declaration.
+
 `Tool.permissionVersion` is optional host-owned grant identity, omitted from
 model definitions. Permission session grants are now bound to canonical name,
 description, input schema and this version as well as the policy's `grantKey`.

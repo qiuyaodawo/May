@@ -55,6 +55,7 @@ export function createReadTool(options: ReadToolOptions): Tool<
 
   return {
     name: "read",
+    workspaceEffect: "read",
     description: "Read a UTF-8 text file inside the workspace.",
     inputSchema: {
       type: "object",

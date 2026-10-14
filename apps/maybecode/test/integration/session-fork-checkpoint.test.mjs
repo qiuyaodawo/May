@@ -18,7 +18,7 @@ import { GoalController } from "@may/goal";
 import { InMemoryContextFactory } from "@may/context";
 import { runtimeHooks } from "@may/core";
 import { MaybeCodeApplication, MaybeCodeWorkspace } from "../../dist/index.js";
-import { startGitGoalRequest } from "../../dist/git-request.js";
+import { gitRequestService, startGitGoalRequest } from "../../dist/git-request.js";
 
 const execute = promisify(execFile);
 const artifacts = fileURLToPath(new URL("../../../../review/maybecode-fork-verification/", import.meta.url));
@@ -59,7 +59,7 @@ test("real coding requests preserve Git checkpoints, current files and historica
     await rm(target, { recursive: true, force: true });
   });
   assert.equal((await app.getWorkspaceGit()).branch, "main");
-  assert.equal(await git("rev-list", "--count", "HEAD"), "1");
+  assert.equal((await app.getWorkspaceGit()).commit, undefined);
   await app.activateSkill("git-fork-guide");
   const first = await app.submit({ input: "Change value.txt to exactly FIRST_VERSION followed by a newline. Then create extra.txt containing exactly FIRST_EXTRA followed by a newline." });
   await first.result;
@@ -81,7 +81,7 @@ test("real coding requests preserve Git checkpoints, current files and historica
   assert.equal(await readFile(join(workspace, "value.txt"), "utf8"), "LATER_VERSION\n");
   assert.equal(app.workspace, workspace);
   assert.equal((await app.history()).some((event) => event.type === "input.submitted" && event.message.content.some((part) => part.text?.includes("LATER_VERSION"))), false);
-  assert.match(app.instructions.effective, /Files may have changed after the historical reply/u);
+  assert.match(app.instructions.effective, /Workspace files may have changed since that point/u);
   const inherited = (await app.getForkPoints(currentId)).find((point) => point.runId === first.id);
   assert.equal(inherited.commit, firstPoint.commit);
   assert.equal(inherited.worktreeAvailable, true);
@@ -107,7 +107,7 @@ test("real coding requests preserve Git checkpoints, current files and historica
   assert.equal(app.workspace, workspace);
   assert.equal(await readFile(join(workspace, "value.txt"), "utf8"), "LATER_VERSION\n");
   await app.resumeSession(currentId);
-  assert.match(app.instructions.effective, /Files may have changed after the historical reply/u);
+  assert.match(app.instructions.effective, /Workspace files may have changed since that point/u);
 });
 
 test("real completed Goal saves its final files and a recoverable yielded position", {
@@ -144,18 +144,18 @@ test("real Goal verification owns the Git lease and saves files after accepted v
   const plugin = createGoalsPlugin({
     async verify() {
       checks++;
-      assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "1");
-      await assert.rejects(competitor.submit({ input: "Reply with COMPETING_VERIFICATION." }), /Git workspace is already in use/u);
+      assert.equal(await fixture.git("rev-list", "--count", "HEAD"), String(checks));
+      await assert.rejects(fixture.gitWorkspace.beginRound({ sessionId: competitor.sessionId }), /Git workspace is already in use/u);
       const contents = await readFile(join(fixture.workspace, "goal.txt"), "utf8");
       return { completed: contents === "VERIFIED_GOAL\n", evidence: "goal.txt must contain exactly VERIFIED_GOAL followed by a newline. Use write to correct it and request completion again." };
     },
     createAgent: application => ({
       sessionId: application.sessionId,
       get isRunning() { return application.isRunning; },
-      submit: options => startGitGoalRequest(fixture.gitWorkspace, application.sessionId, () => application.submit(options), () => {},
+      submit: options => startGitGoalRequest(application.getService(gitRequestService), application.sessionId, () => application.submit(options), () => {},
         runId => application.saveBranchPosition(runId, { allowYielded: true }),
         async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq),
-      continue: options => startGitGoalRequest(fixture.gitWorkspace, application.sessionId, () => application.continue(options), () => {},
+      continue: options => startGitGoalRequest(application.getService(gitRequestService), application.sessionId, () => application.continue(options), () => {},
         runId => application.saveBranchPosition(runId, { allowYielded: true }),
         async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq),
     }),
@@ -168,7 +168,7 @@ test("real Goal verification owns the Git lease and saves files after accepted v
   assert.equal(app.getGoal().status, "completed", JSON.stringify(app.getGoal()));
   assert.equal(app.getGoal().completion.source, "verifier");
   assert.equal(checks, 2);
-  assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "2");
+  assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "3");
   const yielded = (await app.history()).filter(event => event.type === "run.yielded");
   assert.equal(yielded.length, 2);
   const points = await app.getForkPoints(app.sessionId);
@@ -238,10 +238,10 @@ test("real verification failure and cancellation release the Goal lease with unc
     createAgent: application => ({
       sessionId: application.sessionId,
       get isRunning() { return application.isRunning; },
-      submit: options => startGitGoalRequest(fixture.gitWorkspace, application.sessionId, () => application.submit(options), () => {},
+      submit: options => startGitGoalRequest(application.getService(gitRequestService), application.sessionId, () => application.submit(options), () => {},
         runId => application.saveBranchPosition(runId, { allowYielded: true }),
         async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq),
-      continue: options => startGitGoalRequest(fixture.gitWorkspace, application.sessionId, () => application.continue(options), () => {},
+      continue: options => startGitGoalRequest(application.getService(gitRequestService), application.sessionId, () => application.continue(options), () => {},
         runId => application.saveBranchPosition(runId, { allowYielded: true }),
         async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq),
     }),
@@ -258,12 +258,12 @@ test("real verification failure and cancellation release the Goal lease with unc
   assert.equal((await app.getForkPoints(app.sessionId)).some(point => point.available), false);
   const afterFailure = await competitor.submit({ input: "Reply exactly FAILURE_LEASE_RELEASED without tools." });
   assert.match(JSON.stringify((await afterFailure.result).message), /FAILURE_LEASE_RELEASED/u);
-  assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "2");
+  assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "1");
   await app.cancelGoal();
   verification = "wait-for-cancellation";
   await app.startGoal("Use write to create cancelled.txt containing exactly CANCELLED_GOAL followed by a newline, then update_goal completed. Do not create any other files. Do not use shell.");
   await verificationStarted;
-  await assert.rejects(competitor.submit({ input: "Reply exactly COMPETING_CANCELLED_VERIFICATION." }), /Git workspace is already in use/u);
+  await assert.rejects(fixture.gitWorkspace.beginRound({ sessionId: competitor.sessionId }), /Git workspace is already in use/u);
   assert.equal((await app.pauseGoal()).status, "paused");
   assert.equal(app.isRunning, false);
   assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "2");
@@ -271,7 +271,7 @@ test("real verification failure and cancellation release the Goal lease with unc
   assert.equal((await app.getForkPoints(app.sessionId)).some(point => point.available), false);
   const afterCancellation = await competitor.submit({ input: "Reply exactly CANCELLATION_LEASE_RELEASED without tools." });
   assert.match(JSON.stringify((await afterCancellation.result).message), /CANCELLATION_LEASE_RELEASED/u);
-  assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "3");
+  assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "2");
 });
 
 async function goalGitFixture(prefix) {
@@ -443,14 +443,13 @@ test("real delegated requests keep the Git lease through child tasks and the fin
     assert.ok(target.startsWith(`${resolve(artifacts)}${sep}`));
     await rm(target, { recursive: true, force: true });
   });
-  assert.equal(await git("rev-list", "--count", "HEAD"), "1");
+  assert.equal((await app.getWorkspaceGit()).commit, undefined);
   const request = await app.submit({ input: "Call delegate_tasks exactly once with two independent worker tasks. Task child-a owns only child-a.txt and must create it with exactly CHILD_A followed by a newline. Task child-b owns only child-b.txt and must create it with exactly CHILD_B followed by a newline. Give each task a standalone brief and the exact files array. After both tasks finish, use read to inspect both files, then report their two markers. Do not create or edit these files yourself. Do not use shell." });
   await Promise.race([childrenRunning, request.result.then(() => { throw new Error("The request finished before a child task ran"); })]);
-  assert.equal(await git("rev-list", "--count", "HEAD"), "1");
-  await assert.rejects(competitor.submit({ input: "Reply exactly COMPETING_REQUEST." }), /Git workspace is already in use/u);
   await Promise.race([finalRun, request.result.then(() => { throw new Error("The request finished without a second main Run"); })]);
   assert.equal(await git("rev-list", "--count", "HEAD"), "1");
-  await assert.rejects(competitor.submit({ input: "Reply exactly COMPETING_FINAL_RUN." }), /Git workspace is already in use/u);
+  const workspaceFiles = await ProjectGitWorkspace.open({ ...options.git, workspace });
+  await assert.rejects(workspaceFiles.beginRound({ sessionId: competitor.sessionId }), /Git workspace is already in use/u);
   const result = await request.result;
   const runs = await request.runs();
   assert.equal(runs.length, 2);
@@ -523,7 +522,7 @@ for (const mode of ["request", "Goal"]) {
       }
       const lastRunId = await reportRun;
       if (outcome === "cancellation") {
-        await assert.rejects(competitor.submit({ input: "Reply COMPETING_CANCELLED_REPORT." }), /Git workspace is already in use/u);
+        await assert.rejects(fixture.gitWorkspace.beginRound({ sessionId: competitor.sessionId }), /Git workspace is already in use/u);
         if (mode === "request") request.cancel("Cancel the delegated report Run");
         else assert.equal((await app.cancelGoal()).status, "cancelled");
       }
@@ -549,7 +548,7 @@ for (const mode of ["request", "Goal"]) {
       assert.equal((await app.getForkPoints(app.sessionId)).some(point => point.available), false);
       const released = await competitor.submit({ input: "Reply exactly REPORT_LEASE_RELEASED without tools." });
       assert.match(JSON.stringify((await released.result).message), /REPORT_LEASE_RELEASED/u);
-      assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "2");
+      assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "1");
     });
   }
 }
@@ -639,7 +638,7 @@ test("real delegated Goal duration stops its child process and releases the Git 
   t.after(async () => { await app.close(); await competitor.close(); await fixture.cleanup(); });
   await app.startGoal("Call delegate_tasks exactly once with one independent worker task. The worker owns only duration.txt and must first use write to create it with exactly DURATION_GOAL followed by a newline, then call wait_for_goal_timeout exactly once and wait for that required verification process. Include its exact files array and a standalone brief with both operations. Do not perform the worker's operations yourself. Do not use shell.", { maxRuns: 2, maxDurationMs: 30_000 });
   const pid = await Promise.race([started, waitForGoal(app).then(() => { throw new Error(`The Goal stopped before its child process started: ${JSON.stringify(app.getGoal())}`); })]);
-  await assert.rejects(competitor.submit({ input: "Reply COMPETING_DURATION_PROCESS." }), /Git workspace is already in use/u);
+  await assert.rejects(fixture.gitWorkspace.beginRound({ sessionId: competitor.sessionId }), /Git workspace is already in use/u);
   await waitForGoal(app);
   assert.equal(app.getGoal().status, "budget_exhausted", JSON.stringify(app.getGoal()));
   await exited;
@@ -652,5 +651,5 @@ test("real delegated Goal duration stops its child process and releases the Git 
   assert.deepEqual(checkpoint.runIds, runIds);
   const released = await competitor.submit({ input: "Reply exactly DURATION_LEASE_RELEASED without tools." });
   assert.match(JSON.stringify((await released.result).message), /DURATION_LEASE_RELEASED/u);
-  assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "2");
+  assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "1");
 });

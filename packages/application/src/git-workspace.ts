@@ -14,6 +14,8 @@ export interface ProjectGitWorkspaceOptions {
   readonly worktreesRoot?: string;
   readonly excludedPaths?: readonly string[];
   readonly authorizeCommit?: (request: GitCommitRequest) => boolean | Promise<boolean>;
+  /** 延迟到 beginRound 才初始化仓库和 checkpoint 存储。 */
+  readonly deferInitialization?: boolean;
 }
 
 export interface GitCommitRequest {
@@ -162,25 +164,28 @@ export class GitWorkspaceConflictError extends Error {
 /** 项目文件版本、checkpoint 和登记的 worktree 使用相同的 Git 仓库。 */
 export class ProjectGitWorkspace {
   readonly workspace: string;
-  readonly repository: string | undefined;
-  readonly projectId: string;
+  private repositoryPath: string | undefined;
+  private projectIdentity: string;
+  get repository(): string | undefined { return this.repositoryPath; }
+  get projectId(): string { return this.projectIdentity; }
   readonly autoCommit: boolean;
   readonly readOnly: boolean;
-  private readonly git: SimpleGit;
-  private readonly reader: SimpleGit;
-  private readonly directory: string;
+  private git: SimpleGit;
+  private reader: SimpleGit;
+  private directory: string;
   private readonly worktreesRoot: string;
   private readonly options: ProjectGitWorkspaceOptions;
-  private readonly commonDirectory: string;
+  private commonDirectory: string;
+  private initialization: Promise<void> | undefined;
 
   private constructor(options: ProjectGitWorkspaceOptions, workspace: string, repository: string | undefined, commonDirectory: string) {
     this.options = options;
     this.commonDirectory = commonDirectory;
     this.workspace = workspace;
-    this.repository = repository;
+    this.repositoryPath = repository;
     this.autoCommit = options.autoCommit !== false;
     this.readOnly = options.readOnly === true;
-    this.projectId = digest(commonDirectory);
+    this.projectIdentity = digest(commonDirectory);
     this.git = simpleGit({ baseDir: repository ?? workspace, maxConcurrentProcesses: 1, trimmed: true,
       config: ["core.quotepath=false"], allowEnvironment: ["GIT_CEILING_DIRECTORIES"] });
     this.reader = simpleGit({ baseDir: repository ?? workspace, binary: ["git", "--no-optional-locks"],
@@ -200,7 +205,7 @@ export class ProjectGitWorkspace {
     if (!version.installed) throw new Error("Git is unavailable");
     if (version.major < 2 || (version.major === 2 && version.minor < 36)) throw new Error("Git 2.36 or newer is required");
     let managed = await git.checkIsRepo();
-    if (!managed && options.autoCommit !== false && options.readOnly !== true) {
+    if (!managed && options.autoCommit !== false && options.readOnly !== true && !options.deferInitialization) {
       await git.init();
       managed = true;
     }
@@ -208,12 +213,44 @@ export class ProjectGitWorkspace {
     const repository = identity?.repository;
     const commonDirectory = identity?.commonDirectory ?? workspace;
     const value = new ProjectGitWorkspace(options, workspace, repository, commonDirectory);
-    if (!value.readOnly) await mkdir(value.directory, { recursive: true });
+    if (!value.readOnly && !options.deferInitialization) await mkdir(value.directory, { recursive: true });
     return value;
   }
 
   async status(): Promise<GitWorkspaceStatus> {
     return (await this.inspectStatus()).state;
+  }
+
+  /** 只读取仓库身份与 HEAD，供界面定时刷新使用。 */
+  async summary(): Promise<Omit<GitWorkspaceStatus, "dirty">> {
+    const base = { workspace: this.workspace, projectId: this.projectId, autoCommit: this.autoCommit, readOnly: this.readOnly };
+    if (!this.repository) {
+      if (await this.reader.checkIsRepo()) throw new Error("Workspace Git repository identity changed; reopen the workspace");
+      return { ...base, state: "unmanaged", detached: false };
+    }
+    await this.assertIdentity();
+    const head = await this.reader.raw(["rev-parse", "--revs-only", "HEAD"]);
+    const branch = (await this.reader.raw(["branch", "--show-current"])).trim();
+    return { ...base, repository: this.repository, state: head.trim() ? "ready" : "unborn", detached: !branch,
+      ...(branch ? { branch } : {}), ...(head.trim() ? { commit: head.trim() } : {}) };
+  }
+
+  private initialize(): Promise<void> {
+    if (this.initialization) return this.initialization;
+    const operation = (async () => {
+      if (!this.options.deferInitialization) return;
+      if (this.repository) await this.assertIdentity();
+      const initialized = await ProjectGitWorkspace.open({ ...this.options, deferInitialization: false });
+      this.repositoryPath = initialized.repository;
+      this.projectIdentity = initialized.projectId;
+      this.commonDirectory = initialized.commonDirectory;
+      this.directory = initialized.directory;
+      this.git = initialized.git;
+      this.reader = initialized.reader;
+    })();
+    this.initialization = operation;
+    void operation.catch(() => { if (this.initialization === operation) this.initialization = undefined; });
+    return operation;
   }
 
   private async inspectStatus(): Promise<{ readonly state: GitWorkspaceStatus; readonly files?: StatusResult }> {
@@ -232,6 +269,7 @@ export class ProjectGitWorkspace {
   }
 
   async prepare(sessionId: string): Promise<GitCheckpoint> {
+    await this.initialize();
     this.requireRepository();
     const lock = await this.acquireLock();
     try {
@@ -241,6 +279,7 @@ export class ProjectGitWorkspace {
   }
 
   async beginRound(options: GitRoundOptions): Promise<GitRoundLease> {
+    await this.initialize();
     this.requireRepository();
     const lock = await this.acquireLock();
     try {
@@ -250,7 +289,7 @@ export class ProjectGitWorkspace {
       const hasInitialVersion = checkpoints.some(value => value.workspace === this.workspace &&
         ((value.commit !== undefined && (value.status === "committed" || value.status === "unchanged")) ||
           (!this.autoCommit && value.status === "uncommitted")));
-      if (!hasInitialVersion) {
+      if (!hasInitialVersion || this.autoCommit) {
         await this.saveCheckpoint({ sessionId: options.sessionId }, undefined, "Save initial workspace checkpoint", true, "completed");
       }
       const fromCommit = (await this.status()).commit;

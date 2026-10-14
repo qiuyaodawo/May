@@ -46,6 +46,20 @@ repository nor creates versions or state files. A host can use `status()` to
 handle an unmanaged read-only workspace. Git's `GIT_CEILING_DIRECTORIES`
 discovery boundary is respected.
 
+`deferInitialization: true` makes `open()` discover the repository without creating
+a repository or metadata directory. `prepare()` or `beginRound()` performs deferred
+initialization. `summary()` reads repository identity and HEAD without enumerating
+working files; use it for status displays that do not need dirty-file information.
+
+MaybeCode uses deferred initialization in project directories and filesystem roots.
+Startup and read-only requests leave Git files unchanged. A tool's trusted
+`workspaceEffect: "read"` declaration identifies operations that leave workspace
+files unchanged. Omitted declarations and `"write"` require preparation; shell and
+unclassified external tools therefore require it. Permission denial does not prepare
+Git. The main Agent and delegated Agents await one shared preparation promise after
+permission approval and before executing a modifying tool. Preparation failure stops
+execution and remains failed for that request.
+
 The containing repository is the commit scope. Configured `excludedPaths` are
 repository-relative paths or absolute paths inside that repository. Git ignored
 files are omitted. Automatic management excludes `.env`, `.env.*` except
@@ -83,7 +97,9 @@ try {
 A lease covers all file changes and checks in one complete user request. It
 uses an exclusive filesystem lock for the repository working directory,
 including across processes. Independent linked worktrees have separate locks.
-The first round of a Session prepares its initial version if needed.
+With automatic commits enabled, each round saves existing changes before accepting
+new tool writes. This includes user edits made between requests in the same Session.
+Without automatic commits, the first round records the initial state if needed.
 `complete()` releases the lock, and `close()` is idempotent. Hosts call
 `complete({ outcome: "failed" })` or `complete({ outcome: "cancelled" })` to
 record incomplete work and preserve its edits.

@@ -39,6 +39,16 @@ Hooks、忽略规则、attributes 和签名配置，组件保留这些配置。�
 `readOnly: true` 保留现有仓库和文件状态，不创建版本或状态文件。宿主通过 `status()`
 处理尚未使用 Git 的只读工作区。Git 的 `GIT_CEILING_DIRECTORIES` 仓库查找边界继续生效。
 
+`deferInitialization: true` 使 `open()` 只识别仓库，保留现有仓库和记录目录状态。
+`prepare()` 或 `beginRound()` 执行延迟初始化。`summary()` 读取仓库身份与 HEAD，
+不遍历工作文件，适合不需要文件修改信息的状态界面。
+
+MaybeCode 在项目目录与磁盘根目录中使用相同的延迟初始化流程。启动和只读请求保留
+Git 文件状态。工具通过可信的 `workspaceEffect: "read"` 声明其操作保留工作区文件。
+省略声明或声明 `"write"` 的工具需要准备 checkpoint，因此 shell 和未分类的外部工具
+都会触发准备。权限拒绝不会准备 Git。主 Agent 和子 Agent 在权限批准之后、执行修改
+工具之前等待同一个准备 Promise。准备失败会终止执行，并在当前请求期间保持失败状态。
+
 提交范围为所属仓库。`excludedPaths` 接受仓库内的绝对路径或相对于仓库根目录的路径。
 Git 忽略的文件保持排除。自动管理排除 `.env`、`.env.*`，保留 `.env.example`；
 也排除 `credentials.json`、常见私钥文件、`secrets.json`、`secrets.yaml`、
@@ -70,8 +80,9 @@ try {
 ```
 
 lease 覆盖一次完整用户请求中的文件修改与检查，通过文件互斥保护当前仓库工作目录，
-支持跨进程保护。独立 worktree 使用独立的互斥文件。Session 的首次处理会根据需要
-准备初始版本。`complete()` 释放互斥文件，`close()` 可以重复调用。
+支持跨进程保护。独立 worktree 使用独立的互斥文件。启用自动提交时，每次处理在接受
+工具写入之前保存已有修改，包括同一个 Session 的请求之间产生的用户修改。
+关闭自动提交时，首次处理按需记录初始状态。`complete()` 释放互斥文件，`close()` 可以重复调用。
 宿主调用 `complete({ outcome: "failed" })` 或
 `complete({ outcome: "cancelled" })`，记录未完成状态并保留修改。
 MaybeCode 的失败和取消 checkpoint 关联该请求的全部主 Run 身份，并以最后一个主 Run

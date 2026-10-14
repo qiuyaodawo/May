@@ -258,8 +258,10 @@ MaybeCode 接受 `apps.maybecode.plugins`，MaybeClaw 的 May Agent 接受
 `apps.maybecode.git` 默认值为 `{}`，设置 `false` 关闭项目 Git 管理。对象字段包括
 `autoCommit`（默认 `true`）、`readOnly`（默认 `false`）、`dataRoot`、`worktreesRoot`
 和 `excludedPaths`（项目路径）。路径按照配置文件所在目录解析。记录目录和 worktree
-根目录必须位于仓库之外。已有仓库继续使用，新项目建立仓库和初始 checkpoint。
-完整请求结束后可以创建提交，遵循项目忽略规则。
+根目录必须位于仓库之外。已有仓库继续使用。首次修改工作区的工具获得权限后，在执行
+之前为新项目建立仓库，并保存请求开始修改之前的文件 checkpoint。
+完整请求结束后可以创建提交，遵循项目忽略规则。启动和只读请求不创建 checkpoint。
+项目目录与磁盘根目录使用相同流程。
 
 `autoCommit: false` 保留 Git 观察和已有版本的 checkpoint，编辑保持未提交。
 `readOnly: true` 禁止 Git 初始化和修改，并拒绝改变项目的内置工具操作。无界面宿主

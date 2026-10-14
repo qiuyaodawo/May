@@ -26,8 +26,10 @@ Check the displayed workspace and model before submitting a task.
 
 The CLI loads the selected command and UI implementation on demand. Image codecs
 load when an image needs processing; `/web` loads the Web server and browser
-assets when opened. Startup prepares the Session and initial Git checkpoint
-before displaying the terminal interface.
+assets when opened. Startup opens the Session and discovers the repository.
+Git initialization and checkpoint preparation occur immediately before the first
+approved tool that may modify workspace files. Read-only requests create no checkpoint.
+A workspace without a Git version displays “Git 尚未准备”.
 
 Each launch creates a new Session by default. On normal exit, MaybeCode deletes
 Sessions created during that launch that have no submitted messages, queued
