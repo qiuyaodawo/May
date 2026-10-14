@@ -24,6 +24,11 @@ This package script builds before starting. For a browser interface, follow the
 `MAYBECODE_CONTROL_TOKEN` and start `pnpm maybecode --ui web`.
 Check the displayed workspace and model before submitting a task.
 
+The CLI loads the selected command and UI implementation on demand. Image codecs
+load when an image needs processing; `/web` loads the Web server and browser
+assets when opened. Startup prepares the Session and initial Git checkpoint
+before displaying the terminal interface.
+
 Git management is enabled by default. It can initialize a project repository and
 create checkpoints. Configure `apps.maybecode.git` and any required commit approval
 before working in a project; see [Git configuration](../reference/configuration.md#maybecode-project-git-management).

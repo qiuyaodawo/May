@@ -6,7 +6,7 @@
     "node": ">=22.16.0"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && node scripts/build-maybecode.mjs",
     "clean": "tsc -b --clean",
     "docs:check": "node scripts/check-docs.mjs",
     "test": "pnpm -r --no-bail --if-present run test",
@@ -33,6 +33,7 @@
     "example:web-ui": "pnpm run build && pnpm --filter @may/example-web-ui start"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   }
 }

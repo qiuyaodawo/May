@@ -18,6 +18,12 @@ Installation uses the locked dependency versions and needs registry access for
 packages missing from the local store. When intentionally changing dependencies,
 use `pnpm install` and review the resulting lockfile changes.
 
+The root build type-checks and compiles the workspace, then bundles the MaybeCode
+CLI with esbuild. `pnpm --filter @may/maybecode build` also creates this CLI bundle.
+Keep `dist/bin.js` and its `dist/cli/` chunks together. The package's library
+exports continue to use the TypeScript-generated modules. CLI commands load their
+implementation when selected; image codecs and Web server assets load when used.
+
 ## Choose the relevant checks
 
 - `pnpm docs:check` checks bilingual document pairing, language links, local
@@ -36,6 +42,10 @@ use `pnpm install` and review the resulting lockfile changes.
 Confirm successful exit codes and review reported failures. A documentation check
 does not execute its examples. A package test does not establish live-provider
 compatibility.
+
+Set `MAY_GIT_CHECKPOINT_TEST_COMMITS=0` when running `pnpm test:package:maybecode`
+to verify startup with automatic Git commits disabled. The default package smoke
+configuration enables them.
 
 ## Continuous integration
 

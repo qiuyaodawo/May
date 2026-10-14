@@ -1,9 +1,6 @@
 import { ApplicationUiHost, type ApplicationUiOptions } from "@may/ui-client/application";
 import { UiError, createTelemetryPanel } from "@may/ui-client";
-import { startUiServer } from "@may/ui-client/server";
-import { webUiAssets } from "@may/web-ui/assets";
 import type { MaybeCodeController } from "./controller.js";
-import { readFile } from "node:fs/promises";
 import { MaybeCodeWebCommands } from "./web-commands.js";
 import { formatGoal } from "./goal-commands.js";
 import { userInfo } from "node:os";
@@ -108,14 +105,9 @@ function subagentPanel(app: MaybeCodeController): { readonly fields: readonly { 
 
 export async function startMaybeCodeWebServer(host: ApplicationUiHost, options: { token: string; port?: number; browserLogin?: boolean; exit?: () => void }) {
   try {
-    const extensionModule = await readFile(new URL("./web-extension.js", import.meta.url), "utf8");
-    const diffBundle = await readFile(new URL("./dist/diff.js", import.meta.resolve("diff/package.json")), "utf8");
-    const diffEsm = `${diffBundle}\nexport const { parsePatch } = globalThis.Diff;\n`;
-    const assets = new Map(await webUiAssets("MaybeCode", "session", { extensionModule, ...(options.browserLogin === undefined ? {} : { browserLogin: options.browserLogin }) }));
-    assets.set("/vendor-diff.js", { type: "text/javascript; charset=utf-8", body: diffEsm });
-    return await startUiServer({ host, assets, ...options, close: () => host.close() });
-  }
-  catch (error) { await host.close(); throw error; }
+    const { startMaybeCodeWebServer: startServer } = await import("./web-server.js");
+    return await startServer(host, options);
+  } catch (error) { await host.close(); throw error; }
 }
 
 export async function startMaybeCodeWebUI(app: MaybeCodeController, options: { token: string; port?: number }) {

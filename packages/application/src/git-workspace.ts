@@ -204,28 +204,31 @@ export class ProjectGitWorkspace {
       await git.init();
       managed = true;
     }
-    const repository = managed ? await realpath((await git.revparse(["--show-toplevel"])).trim()) : undefined;
-    const commonDirectory = managed
-      ? await realpath(resolve(workspace, (await git.revparse(["--git-common-dir"])).trim()))
-      : workspace;
+    const identity = managed ? await repositoryIdentity(git, workspace) : undefined;
+    const repository = identity?.repository;
+    const commonDirectory = identity?.commonDirectory ?? workspace;
     const value = new ProjectGitWorkspace(options, workspace, repository, commonDirectory);
     if (!value.readOnly) await mkdir(value.directory, { recursive: true });
     return value;
   }
 
   async status(): Promise<GitWorkspaceStatus> {
+    return (await this.inspectStatus()).state;
+  }
+
+  private async inspectStatus(): Promise<{ readonly state: GitWorkspaceStatus; readonly files?: StatusResult }> {
     if (this.repository === undefined) {
       if (await this.reader.checkIsRepo()) throw new Error("Workspace Git repository identity changed; reopen the workspace");
-      return { workspace: this.workspace, projectId: this.projectId, autoCommit: this.autoCommit,
-        readOnly: this.readOnly, state: "unmanaged", detached: false, dirty: false };
+      return { state: { workspace: this.workspace, projectId: this.projectId, autoCommit: this.autoCommit,
+        readOnly: this.readOnly, state: "unmanaged", detached: false, dirty: false } };
     }
     await this.assertIdentity();
     const status = await this.reader.status(["--untracked-files=all"]);
     const commit = await this.head(status);
-    return { workspace: this.workspace, repository: this.repository, projectId: this.projectId,
+    return { files: status, state: { workspace: this.workspace, repository: this.repository, projectId: this.projectId,
       autoCommit: this.autoCommit, readOnly: this.readOnly, state: commit === undefined ? "unborn" : "ready",
       ...(status.detached || !status.current ? {} : { branch: status.current }),
-      ...(commit === undefined ? {} : { commit }), detached: status.detached, dirty: !status.isClean() };
+      ...(commit === undefined ? {} : { commit }), detached: status.detached, dirty: !status.isClean() } };
   }
 
   async prepare(sessionId: string): Promise<GitCheckpoint> {
@@ -516,20 +519,20 @@ export class ProjectGitWorkspace {
   private async saveCheckpoint(options: { sessionId: string; runId?: string; runIds?: readonly string[]; historyPosition?: number | string }, fromCommit: string | undefined,
     message: string, initial: boolean, outcome: GitRoundCompletion["outcome"]): Promise<GitCheckpoint> {
     const id = randomUUID();
-    const state = await this.status();
+    const { state, files: status } = await this.inspectStatus();
+    if (!status) throw new Error("Git checkpoint requires a managed repository");
     const base: GitCheckpoint = { id, ...options, workspace: this.workspace, repository: this.repository!,
       ...(fromCommit === undefined ? state.commit === undefined ? {} : { fromCommit: state.commit } : { fromCommit }),
       ...(state.branch === undefined ? {} : { branch: state.branch }), createdAt: Date.now(), status: "unchanged" };
     let appliedCommit: string | undefined;
     try {
-      const status = await this.git.status(["--untracked-files=all"]);
       if (outcome !== "completed" || !this.autoCommit || this.readOnly) {
         const value: GitCheckpoint = { ...base, status: state.commit === undefined || !status.isClean() ? "uncommitted" : "unchanged",
           ...(state.commit === undefined ? {} : { commit: state.commit }) };
         if (!this.readOnly) await this.saveProtectedCheckpoint(value);
         return value;
       }
-      await this.assertOperational();
+      await this.assertOperational(status);
       const paths = await this.commitPaths(status);
       const commitNeeded = state.commit === undefined || paths.length > 0;
       if (!commitNeeded) {
@@ -607,12 +610,14 @@ export class ProjectGitWorkspace {
     });
   }
 
-  private async assertOperational(): Promise<void> {
+  private async assertOperational(knownStatus?: StatusResult): Promise<void> {
     await this.assertIdentity();
-    const status = await this.git.status();
+    const status = knownStatus ?? await this.git.status();
     if (status.conflicted.length > 0) throw new Error("Git repository contains unresolved conflicts");
-    for (const name of ["MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer"]) {
-      const path = (await this.git.revparse(["--git-path", name])).trim();
+    const names = ["MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer"];
+    const paths = (await this.git.revparse(names.flatMap(name => ["--git-path", name]))).trim().split("\n");
+    if (paths.length !== names.length) throw new Error("Git returned an invalid operation path list");
+    for (const path of paths) {
       if (await exists(resolve(this.repository!, path))) throw new Error("Git history operation is still active");
     }
     if ((await this.git.subModule(["status"])).trim() !== "") throw new Error("Git submodules require separate checkpoint management");
@@ -620,9 +625,8 @@ export class ProjectGitWorkspace {
 
   private async assertIdentity(): Promise<void> {
     this.requireRepository();
-    const root = await realpath((await this.reader.revparse(["--show-toplevel"])).trim());
-    const common = await realpath(resolve(this.repository!, (await this.reader.revparse(["--git-common-dir"])).trim()));
-    if (root !== this.repository || common !== this.commonDirectory) throw new Error("Workspace Git repository identity changed; reopen the workspace");
+    const identity = await repositoryIdentity(this.reader, this.repository!);
+    if (identity.repository !== this.repository || identity.commonDirectory !== this.commonDirectory) throw new Error("Workspace Git repository identity changed; reopen the workspace");
   }
 
   private async recoverIntent(): Promise<void> {
@@ -774,6 +778,12 @@ export class ProjectGitWorkspace {
 }
 
 function digest(value: string): string { return createHash("sha256").update(value).digest("hex").slice(0, 24); }
+async function repositoryIdentity(git: SimpleGit, workspace: string): Promise<{ repository: string; commonDirectory: string }> {
+  const paths = (await git.revparse(["--show-toplevel", "--git-common-dir"])).trim().split("\n");
+  if (paths.length !== 2 || !paths[0] || !paths[1]) throw new Error("Git returned an invalid repository identity");
+  return { repository: await realpath(paths[0]), commonDirectory: await realpath(resolve(workspace, paths[1])) };
+}
+
 function validateId(value: string): void { if (!/^[a-zA-Z0-9_-]+$/u.test(value)) throw new Error("Git record ID is invalid"); }
 function literalPath(value: string): string { return `:(literal)${value}`; }
 function diffStatus(value: unknown): GitDiffFile["status"] {

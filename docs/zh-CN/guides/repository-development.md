@@ -16,6 +16,12 @@ pnpm build
 安装使用 lockfile 中的依赖版本。本地存储缺少依赖时需要访问 registry。明确修改
 依赖时使用 `pnpm install`，并检查 lockfile 的变化。
 
+根目录构建会检查类型并编译工作目录，随后使用 esbuild 打包 MaybeCode CLI。
+`pnpm --filter @may/maybecode build` 同样生成 CLI 打包文件。
+`dist/bin.js` 必须与 `dist/cli/` 中的文件一起使用。package 的 library exports
+继续使用 TypeScript 编译的模块。CLI 根据选中的命令加载对应功能，图片编码模块和
+Web 服务资源在使用时加载。
+
 ## 选择相关检查
 
 - `pnpm docs:check`：检查双语文件配对、语言链接、本地目标文件和代码围栏配对。
@@ -31,6 +37,9 @@ pnpm build
 
 核查退出状态并阅读失败信息。文档检查不会执行示例；package 测试无法单独证明
 真实 Provider 的兼容性。
+
+执行 `pnpm test:package:maybecode` 时，设置 `MAY_GIT_CHECKPOINT_TEST_COMMITS=0`
+可以验证关闭自动 Git 提交的启动过程。默认打包检查配置启用自动 Git 提交。
 
 ## 持续集成
 

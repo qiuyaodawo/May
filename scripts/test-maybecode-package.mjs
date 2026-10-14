@@ -56,6 +56,7 @@ const application = packed.find((entry) => entry.name === "@may/maybecode");
 assert.ok(application, "@may/maybecode was not packed");
 const applicationPaths = application.files.map((file) => file.path);
 assert.ok(applicationPaths.includes("dist/bin.js"), "packed bin is missing");
+assert.ok(applicationPaths.some(path => path.startsWith("dist/cli/") && path.endsWith(".js")), "packed CLI chunks are missing");
 assert.ok(applicationPaths.includes("dist/index.js"), "packed entry point is missing");
 const retiredModules = [
   "dist/ui/tool-renderers",
@@ -113,6 +114,7 @@ await writeFile(
   "utf8",
 );
 await writeFile(join(consumerDirectory, "config.json"), JSON.stringify({
+  apps: { maybecode: { git: { autoCommit: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "0" } } },
   defaultModel: "deepseek",
   providers: {
     deepseek: {

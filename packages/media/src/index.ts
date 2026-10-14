@@ -2,7 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, rename, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ContentPart, MediaSource } from "@may/core";
-import sharp from "sharp";
 
 export interface ImageAttachment {
   readonly id: string;
@@ -48,6 +47,7 @@ export function displayParts(content: readonly ContentPart[]): DisplayPart[] {
 
 export async function inspectImage(data: Uint8Array): Promise<ImageData> {
   if (!data.byteLength || data.byteLength > MAX_IMAGE_BYTES) throw new Error("Image size must be between 1 byte and 32 MiB");
+  const { default: sharp } = await import("sharp");
   const decoder = sharp(data, { limitInputPixels: 40_000_000, failOn: "error" });
   const metadata = await decoder.metadata();
   const formats: Record<string, string> = { png: "image/png", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", avif: "image/avif" };
@@ -87,5 +87,6 @@ export class FileMediaStore {
 }
 
 export async function imagePng(image: ImageData): Promise<Buffer> {
+  const { default: sharp } = await import("sharp");
   return sharp(image.data, { limitInputPixels: 40_000_000, failOn: "error" }).rotate().png().toBuffer();
 }

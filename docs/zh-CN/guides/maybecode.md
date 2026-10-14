@@ -21,6 +21,9 @@ pnpm maybecode
 `MAYBECODE_CONTROL_TOKEN`，然后执行 `pnpm maybecode --ui web`。
 提交任务前核查显示的工作目录和模型。
 
+CLI 按需加载选中的命令和界面。图片需要处理时加载图片编码模块，打开 `/web` 时
+加载 Web 服务和浏览器资源。启动过程在显示终端界面前准备 Session 和初始 Git checkpoint。
+
 Git 管理默认启用，可能初始化项目仓库并创建 checkpoint。在项目中执行工作前，
 配置 `apps.maybecode.git` 及需要的提交审批，参阅
 [Git 配置](../reference/configuration.md#maybecode-项目-git-管理)。

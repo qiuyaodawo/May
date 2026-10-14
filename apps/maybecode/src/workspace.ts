@@ -220,7 +220,8 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
           ...(selection.fork ? { fork: selection.fork } : {}),
           ...(selection.metadata ? { sessionMetadata: selection.metadata } : {}),
           ...(selection.sessionId ? { sessionId: selection.sessionId } : {}), resume: selection.resume });
-        if (gitWorkspace && !gitWorkspace.readOnly && (await gitWorkspace.status()).state !== "unmanaged" &&
+        if (gitWorkspace && !gitWorkspace.readOnly &&
+            (gitWorkspace.repository !== undefined || (await gitWorkspace.status()).state !== "unmanaged") &&
             !(await gitWorkspace.checkpoints(app.sessionId)).some(checkpoint => checkpoint.status !== "failed")) {
           try { await gitWorkspace.prepare(app.sessionId); }
           catch (error) { await app.close(); throw error; }

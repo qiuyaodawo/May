@@ -2,9 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ContentPart, MediaSource } from "@may/core";
 import { FileMediaStore, imageAttachment, imagePng, readEmbeddedImage, type SavedImage } from "@may/media";
-import { Jimp } from "jimp";
-import { FINALIZER, introducer, sixelEncode } from "sixel";
-import { applyPaletteSync, buildPaletteSync, utils } from "image-q";
+import type { Jimp } from "jimp";
 import { terminalImageProtocol, type ImageProtocol, type TerminalCellSize } from "./image-support.js";
 import type { Component, ImagePlacement, RenderResult, RenderSize } from "./component.js";
 import { Text, sanitizeTerminalText } from "./text.js";
@@ -19,6 +17,7 @@ type PreparedImage = SavedImage & { png: string; raster?: Awaited<ReturnType<typ
 
 export class TerminalImages {
   private readonly values = new Map<string, PreparedImage>();
+  private sixel: typeof import("./sixel.js") | undefined;
   private version = 0;
   constructor(readonly store = new FileMediaStore(join(homedir(), ".may", "media")), readonly protocol: ImageProtocol = terminalImageProtocol(), private readonly options: TerminalImagesOptions = {}) {}
   get revision(): string {
@@ -31,7 +30,8 @@ export class TerminalImages {
       if (this.values.has(id)) continue;
       const image = await this.store.save(part.source);
       const png = this.protocol === "none" ? Buffer.alloc(0) : await imagePng(image);
-      const raster = this.protocol === "sixel" ? await Jimp.read(png) : undefined;
+      if (this.protocol === "sixel") this.sixel ??= await import("./sixel.js");
+      const raster = this.protocol === "sixel" ? await this.sixel!.Jimp.read(png) : undefined;
       if (raster && (raster.width > 1280 || raster.height > 768)) raster.scaleToFit({ w: 1280, h: 768 });
       this.values.set(id, { ...image, png: png.toString("base64"), ...(raster ? { raster } : {}) });
       this.version++;
@@ -58,6 +58,8 @@ export class TerminalImages {
     if (![cell.width, cell.height].every(value => Number.isInteger(value) && value > 0)) throw new RangeError("Terminal cell dimensions must be positive integers");
     const raster = image.raster;
     if (!raster) throw new Error("Sixel image was not prepared");
+    if (!this.sixel) throw new Error("Sixel encoder was not loaded");
+    const { Jimp, FINALIZER, introducer, sixelEncode, applyPaletteSync, buildPaletteSync, utils } = this.sixel;
     const maxWidth = Math.min(1280, Math.min(80, size.width) * cell.width);
     const maxHeight = Math.floor(Math.min(768, 12 * cell.height) / 6) * 6;
     const scale = Math.min(1, maxWidth / raster.width, maxHeight / raster.height);
