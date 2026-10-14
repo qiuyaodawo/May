@@ -38,7 +38,7 @@ import type {
   MaybeCodeModelProfile,
   MaybeCodeReasoningEffortState,
 } from "../controller.js";
-import { createMaybeCodeKeymap, type MaybeCodeKeymapOptions } from "../keymap.js";
+import { createMaybeCodeKeymap, MAYBECODE_EDITOR_KEYBINDINGS, type MaybeCodeKeymapOptions } from "../keymap.js";
 import { MAYBECODE_DARK_THEME } from "./theme.js";
 import { MaybeCodeUiActionRegistry } from "./actions.js";
 
@@ -238,8 +238,9 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     await this.editor.waitForPendingClipboard();
   }
 
-  private editorOptions(): Pick<EditorOptions, "clipboard" | "onInvalidate" | "onError"> {
+  private editorOptions(): Pick<EditorOptions, "clipboard" | "onInvalidate" | "onError" | "keybindings"> {
     return {
+      keybindings: MAYBECODE_EDITOR_KEYBINDINGS,
       ...(this.options.clipboard === undefined ? {} : { clipboard: this.options.clipboard }),
       onInvalidate: () => this.options.onInvalidate?.(),
       onError: error => this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`),
@@ -1041,7 +1042,7 @@ class SessionPrompt implements InteractiveComponent {
     private readonly currentSessionId: string,
     private readonly theme: TuiTheme,
     private readonly complete: (action: SessionDialogAction | undefined) => void,
-    editorOptions: Pick<EditorOptions, "clipboard" | "onInvalidate" | "onError">,
+    editorOptions: Pick<EditorOptions, "clipboard" | "onInvalidate" | "onError" | "keybindings">,
     keymapOptions: MaybeCodeKeymapOptions = {},
   ) {
     this.keymap = createMaybeCodeKeymap(keymapOptions);
@@ -1308,7 +1309,7 @@ class McpInputPrompt implements InteractiveComponent {
   private readonly keymap: Keymap;
   private reviewPageSize = 1;
   constructor(prompt: string, private readonly complete: (value?: string) => void,
-    editorOptions: Pick<EditorOptions, "clipboard" | "onInvalidate" | "onError">,
+    editorOptions: Pick<EditorOptions, "clipboard" | "onInvalidate" | "onError" | "keybindings">,
     keymapOptions: MaybeCodeKeymapOptions = {}) {
     this.keymap = createMaybeCodeKeymap(keymapOptions);
     this.body = new ScrollView(new Text(sanitizeTerminalText(prompt)));

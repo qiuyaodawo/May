@@ -98,6 +98,7 @@ The default retained TUI supports mouse-wheel scrolling in terminals with xterm
 mouse reporting. Each event scrolls three rows and preserves the draft and focus.
 Scrolling up preserves the reading position; returning to the bottom follows new output.
 
+`Ctrl+J` inserts a newline in the retained input editor; `Enter` submits the input.
 Up/Down in the input editor selects input history. Press Tab to focus the conversation,
 then use Up/Down, PageUp/PageDown, Home, or End to browse.
 

@@ -40,6 +40,10 @@ export const MAYBECODE_KEY_ACTIONS = [
 
 export type MaybeCodeKeyAction = typeof MAYBECODE_KEY_ACTIONS[number];
 
+export const MAYBECODE_EDITOR_KEYBINDINGS: readonly KeyBindingDefinition[] = [
+  { context: "editor", keys: "ctrl+j", action: "editor.newline" },
+];
+
 export const MAYBECODE_DEFAULT_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   { context: "global", keys: "ctrl+c", action: "app.interrupt" },
   { context: "dialog", keys: "ctrl+c", action: "app.interrupt" },
@@ -106,7 +110,7 @@ export function createMaybeCodeKeymap(options: MaybeCodeKeymapOptions = {}): Key
     throw new Error("MaybeCode leader must be one modified key, for example ctrl+g");
   }
   const leaderKey = formatKeySequence(sequence);
-  if (DEFAULT_EDITOR_KEYBINDINGS.some(binding =>
+  if (mergeKeyBindings(DEFAULT_EDITOR_KEYBINDINGS, MAYBECODE_EDITOR_KEYBINDINGS).some(binding =>
     formatKeySequence(parseKeySequence(binding.keys)) === leaderKey)) {
     throw new Error("MaybeCode leader conflicts with a text editing shortcut");
   }

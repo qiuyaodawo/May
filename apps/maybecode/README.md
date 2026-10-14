@@ -746,7 +746,7 @@ The retained editor keeps submitted prompts and commands in bounded in-process
 history. At the first or last logical line, `Up`/`Down` navigates that history;
 inside multiline input it moves between lines. `Ctrl+W`, `Ctrl+Backspace`, or
 `Alt+Backspace` deletes the previous word, and modified Left/Right moves by
-word. `Shift+Enter` inserts a newline when the terminal reports that modifier.
+word. `Ctrl+J` inserts a newline; `Enter` submits the input.
 Bracketed multiline paste is inserted as text and cannot accidentally execute
 embedded lines one at a time.
 

@@ -83,6 +83,7 @@ retained TUI 和 WebUI 均支持这些操作。
 默认 retained TUI 在支持 xterm 鼠标报告的终端中提供滚轮浏览。每次事件滚动三行，
 保留输入与焦点。向上滚动后保留阅读位置；返回底部后继续跟随新输出。
 
+retained TUI 输入框使用 `Ctrl+J` 插入换行，使用 `Enter` 提交输入。
 输入框中的上下方向键选择输入历史。按下 Tab 切换至对话区域，使用上下方向键、
 PageUp、PageDown、Home 和 End 浏览内容。
 

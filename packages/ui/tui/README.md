@@ -74,6 +74,7 @@ The first milestone provides:
   exposed through `@may/tui/tool-renderers`.
 
 Use `NodeTerminalDriver` when an application owns a retained, raw-mode screen.
+The driver reports a standalone LF byte as `Ctrl+J` and CR as `Enter`.
 Use `createNodeTerminal` when it needs line-oriented questions and occasional
 temporary full-screen views. The latter is also available through the
 `@may/tui/node-terminal` subpath.

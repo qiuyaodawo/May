@@ -213,6 +213,7 @@ interface NodeKey {
 }
 
 function toKeyStroke(value: string | undefined, key: NodeKey): KeyStroke {
+  if (value === "\n") return keyStroke("j", { ctrl: true });
   const name = key.name ?? value ?? "unknown";
   const printable = value !== undefined && value.length > 0 &&
     key.ctrl !== true && key.meta !== true;
