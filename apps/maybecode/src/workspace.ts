@@ -216,8 +216,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
             }
           }
         }
-        const app = await MaybeCodeApplication.open({ ...applicationOptions(nextOptions),
-          permissionModeSource: () => state.options.permissionMode ?? "default",
+        const app = await MaybeCodeApplication.open({ ...applicationOptions(nextOptions, state),
           ...(gitWorkspace ? { gitWorkspace } : {}),
           ...(selection.fork ? { fork: selection.fork } : {}),
           ...(selection.metadata ? { sessionMetadata: selection.metadata } : {}),
@@ -833,22 +832,12 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     );
     if (selected === undefined) throw new Error(`Unknown model profile "${profile}"`);
 
-    if (this.modelInfo?.profile === profile) {
-      return this.manager.runStateTransition((application) => {
-        const model = application.modelInfo;
-        if (model === undefined) {
-          throw new Error("The active application does not expose model information");
-        }
-        this.manager.emit({ type: "model.changed", model });
-        return model;
-      }, {
-        activeOperationMessage:
-          "Cannot switch models while an operation is active",
-      });
-    }
-
-    let result: MaybeCodeModelInfo | undefined;
-    await this.manager.transitionApplication(async (current) => {
+    const result = await this.manager.runStateTransition(async (current) => {
+      if (current.modelInfo?.profile === profile && !current.modelUpdateFailed) {
+        this.manager.emit({ type: "model.changed", model: current.modelInfo });
+        return current.modelInfo;
+      }
+      this.assertModelChangeAllowed();
       const create = this.state.options.createModelConfiguration;
       if (create === undefined) {
         throw new Error("The active MaybeCode workspace cannot switch models");
@@ -868,23 +857,25 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
         configuration,
         this.modelOptionOverrides.get(profile),
       );
-      const next = await MaybeCodeApplication.open({
-        ...applicationOptions(nextOptions),
-        ...(this.git ? { gitWorkspace: this.git } : {}),
-        sessionId: current.sessionId,
-        resume: true,
+      this.assertModelChangeAllowed();
+      await current.updateModel({
+        ...configuration,
+        ...(nextOptions.modelRuntimeOptions === undefined ? {} : { modelRuntimeOptions: nextOptions.modelRuntimeOptions }),
       });
       this.state.options = nextOptions;
-      result = configuration.modelInfo;
-      return next;
+      this.manager.emit({ type: "model.changed", model: current.modelInfo! });
+      return current.modelInfo!;
     }, {
-      createEvent: (application) => ({
-        type: "model.changed",
-        model: application.modelInfo!,
-      }),
+      activeOperationMessage: "Cannot switch models while an operation is active",
     });
     this.connectMcpEvents();
-    return result!;
+    return result;
+  }
+
+  private assertModelChangeAllowed(): void {
+    if (this.mcpOperationController !== undefined || this.getMcpInteractions().length > 0) {
+      throw new Error("Finish the MCP operation before changing the model");
+    }
   }
 
   setDefaultModel(profile: string): Promise<void> {
@@ -974,7 +965,8 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   ): Promise<MaybeCodeReasoningEffortState> {
     this.assertNoWorkspaceOperation();
     this.throwIfClosed();
-    await this.manager.transitionApplication(async (current) => {
+    await this.manager.runStateTransition(async (current) => {
+      this.assertModelChangeAllowed();
       const profile = current.modelInfo?.profile;
       if (profile === undefined) {
         throw new Error("The active model has no configurable profile");
@@ -1012,16 +1004,15 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
         configuration,
         effort === undefined ? undefined : { reasoningEffort: effort },
       );
-      const next = await MaybeCodeApplication.open({
-        ...applicationOptions(nextOptions),
-        ...(this.git ? { gitWorkspace: this.git } : {}),
-        sessionId: current.sessionId,
-        resume: true,
+      this.assertModelChangeAllowed();
+      await current.updateModel({
+        ...configuration,
+        ...(nextOptions.modelRuntimeOptions === undefined ? {} : { modelRuntimeOptions: nextOptions.modelRuntimeOptions }),
       });
       this.state.options = nextOptions;
       if (effort === undefined) this.modelOptionOverrides.delete(profile);
       else this.modelOptionOverrides.set(profile, { reasoningEffort: effort });
-      return next;
+      this.manager.emit({ type: "model.changed", model: current.modelInfo! });
     });
     this.connectMcpEvents();
     return this.getReasoningEffort();
@@ -1201,6 +1192,7 @@ function workspaceStoragePaths(options: ActiveWorkspaceOptions, workspace: strin
 
 function applicationOptions(
   options: ActiveWorkspaceOptions,
+  state: WorkspaceState,
 ): MaybeCodeApplicationOptions {
   const {
     permissionMode: _permissionMode,
@@ -1215,7 +1207,7 @@ function applicationOptions(
     configureWorkspace: _configureWorkspace,
     ...application
   } = options;
-  return application;
+  return { ...application, permissionModeSource: () => state.options.permissionMode ?? "default" };
 }
 
 function unknownReasoningEffort(): MaybeCodeReasoningEffortState {

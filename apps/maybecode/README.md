@@ -1,5 +1,21 @@
 # MaybeCode
 
+### Model updates
+
+Model selection and reasoning effort changes use `AgentApplication.updatePlugins()`
+within the existing application and Session. Updates require idle execution and no
+active Goal or pending MCP interaction. Plugin resources and the runtime are
+recreated; MaybeCode refreshes its service references and event subscriptions.
+Conversation history, paused Goals, active Skills, durable notes and the current
+permission mode remain available. Shared MCP connections remain open.
+
+Headless hosts can call `MaybeCodeApplication.updateModel()` with a Model,
+`modelInfo`, and optional `modelRuntimeOptions` and `contextBudget`. A configured
+Model plugin retains ownership of model selection. `modelUpdateFailed` reports an
+unsuccessful update; new input remains unavailable until an update succeeds.
+The workspace permits retrying either the previous or the requested profile.
+Closing waits for an in-progress update before releasing application resources.
+
 ### Session forks and project versions
 
 Project workspaces use Git by default. Existing repositories retain their branch;

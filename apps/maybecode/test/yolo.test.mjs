@@ -7,6 +7,7 @@ import { PassThrough } from "node:stream";
 import { createNodeTerminal } from "@may/tui/node-terminal";
 import { createWriteTool, createShellTool } from "@may/coding-tools";
 import { PermissionToolExecutor } from "@may/permissions";
+import { services } from "@may/plugin-services";
 import { InMemorySessionStore } from "@may/session";
 import { InMemorySessionCatalog, createCodingPermissionPolicy, parseMaybeCodeArgs, executeMaybeCodeSlashCommand,
   openConfiguredMaybeCode, MaybeCodeApplication, MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
@@ -127,4 +128,75 @@ test("真实配置文件与启动选项确定 YOLO，运行时切换不写入配
   t.after(() => overridden.close()); assert.equal(overridden.permissionMode, "default"); await overridden.close();
   await writeFile(configPath, configuration.replace('"permissionMode":"yolo"', '"permissionMode":"invalid"'));
   await assert.rejects(openConfiguredMaybeCode({ ...options, git: false }), /permissionMode/);
+});
+
+test("模型更新与 Session 切换后 shell 使用当前 YOLO 状态", async t => {
+  const workspace = await yoloDirectory(), configPath = join(workspace, "may.json");
+  await writeFile(configPath, JSON.stringify({
+    providers: { local: { adapter: "openai-responses", apiKey: "unused-without-model-requests", baseURL: "http://127.0.0.1:1/v1" } },
+    defaultModel: "first",
+    models: {
+      first: { provider: "local", model: "o3" },
+      second: { provider: "local", model: "o3-mini", capabilities: {
+        reasoning: { efforts: ["low", "medium", "high"], defaultEffort: "medium" },
+      } },
+    },
+    apps: { maybecode: { permissionMode: "yolo" } },
+  }));
+  const policies = [];
+  const app = await openConfiguredMaybeCode({
+    workspace, configPath, dataDirectory: join(workspace, "data"),
+    git: false, skills: false, mcp: false, observability: false,
+    plugins: [{ id: "test.inspect-permissions", version: "1.0.0", requires: [{ service: services.permissionPolicy }],
+      setup(plugin) { policies.push(plugin.get(services.permissionPolicy)); } }],
+  });
+  t.after(() => app.close());
+  const shell = createShellTool({ cwd: workspace });
+  const command = process.platform === "win32" ? "Write-Output 'application-yolo'" : "printf 'application-yolo'";
+  const input = shell.parse({ command });
+  async function verifyPermissions() {
+    const policy = policies.at(-1);
+    const check = { tool: shell, input, context: context() };
+    assert.equal((await policy(check)).decision, "allow");
+    const executor = new PermissionToolExecutor({ policy });
+    try {
+      const automatic = await executor.execute(check);
+      assert.equal(automatic.exitCode, 0);
+      assert.match(automatic.stdout, /application-yolo/);
+      await app.setPermissionMode("default");
+      assert.equal((await policy(check)).decision, "ask");
+      const events = executor.events[Symbol.asyncIterator]();
+      const pending = executor.execute({ ...check, context: context() });
+      const event = (await events.next()).value;
+      assert.equal(event.type, "approval.requested");
+      await executor.resolve(event.request.id, "allow");
+      assert.equal((await pending).exitCode, 0);
+      await app.setPermissionMode("yolo");
+      assert.equal((await policy(check)).decision, "allow");
+    } finally {
+      await executor.close();
+    }
+  }
+  await verifyPermissions();
+  const sessionId = app.sessionId;
+  await app.switchModel("second");
+  assert.equal(app.sessionId, sessionId);
+  assert.equal(policies.length, 2);
+  await verifyPermissions();
+  await app.setReasoningEffort("low");
+  assert.equal(app.sessionId, sessionId);
+  assert.equal(policies.length, 3);
+  await verifyPermissions();
+  await app.setReasoningEffort();
+  assert.equal(app.sessionId, sessionId);
+  assert.equal(policies.length, 4);
+  await verifyPermissions();
+  await app.newSession();
+  assert.notEqual(app.sessionId, sessionId);
+  assert.equal(policies.length, 5);
+  await verifyPermissions();
+  await app.resumeSession(sessionId);
+  assert.equal(app.sessionId, sessionId);
+  assert.equal(policies.length, 6);
+  await verifyPermissions();
 });

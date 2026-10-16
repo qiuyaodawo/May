@@ -293,8 +293,17 @@ YOLO auto-approves tool requests while retaining explicit policy denials.
 `/yolo` and `/yolo on` enable the mode, `/yolo off` disables it, and `/yolo status`
 queries it. Pause or cancel active Runs, goals, and MCP operations before changing
 the mode. The current workspace host retains the mode through Session and model
-changes. Startup options determine it after a restart; it is not saved in history
-or configuration. `/goal` uses the current mode.
+changes, including reasoning effort changes. Tool approvals continue to use the
+current mode after these changes. Startup options determine it after a restart;
+it is not saved in history or configuration. `/goal` uses the current mode.
+
+Model and reasoning effort changes update plugins within the existing application
+and Session. Pause or finish active work and resolve MCP interactions before
+changing models. The update preserves conversation history, paused Goals, active
+Skills and durable notes, refreshes model-dependent services and their event
+subscriptions, and retains shared MCP connections. An update failure stops new
+input until a model-update retry succeeds. You can retry the previous or requested
+profile. Successful changes are recorded in Session history for historical forks.
 
 The terminal and Web UI show **YOLO · Auto-approve**, with English notifications.
 Web UI uses `UiSnapshot.badges`; classic terminals update the prompt through

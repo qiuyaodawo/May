@@ -72,11 +72,12 @@ import {
   MaybeCodeInstructionState,
   type MaybeCodeInstructions,
 } from "./instructions.js";
-import { HistoryReferenceMemory, historyMemoryService } from "@may/plugin-history-memory";
+import { historyMemoryService, type HistoryMemoryService } from "@may/plugin-history-memory";
 import { goalsService } from "@may/plugin-goals";
 import { delegationService } from "@may/plugin-delegation";
+import { mcpService } from "@may/plugin-mcp";
 import type { GoalController, GoalAgent, GoalBudget } from "@may/goal";
-import { createMaybeCodePlugins, requestRecord } from "./plugins/application.js";
+import { createMaybeCodePlugins, requestRecord, type MaybeCodePluginComposition } from "./plugins/application.js";
 import { createMaybeCodeInstructionsPlugin } from "./plugins/instructions.js";
 import { SubagentHost, type SubagentRequestPlan } from "./subagent-host.js";
 import {
@@ -89,6 +90,21 @@ export { composeMaybeCodePlugins, createMaybeCodePlugins } from "./plugins/appli
 
 /** MaybeCode 主 Run 的默认步数上限；显式 maxSteps 覆盖该值。 */
 const MAYBECODE_MAX_STEPS = 32;
+
+export interface MaybeCodeModelUpdate {
+  readonly model: Model;
+  readonly modelInfo: MaybeCodeModelInfo;
+  readonly modelRuntimeOptions?: Readonly<Record<string, unknown>>;
+  readonly contextBudget?: ContextBudget;
+}
+
+interface MaybeCodeApplicationServices {
+  readonly history: HistoryMemoryService;
+  readonly modelInfo: MaybeCodeModelInfo | undefined;
+  readonly goals: GoalController | undefined;
+  readonly subagents: SubagentHost | undefined;
+  readonly mcp: McpClientPool | undefined;
+}
 
 /** 子 Agent 默认启用；宿主可以显式关闭或替换角色与限制。 */
 export interface MaybeCodeSubagentOptions {
@@ -160,21 +176,18 @@ export class MaybeCodeApplication {
   readonly sessionId: string;
   readonly workspace: string;
   private readonly instructionState: MaybeCodeInstructionState;
-  readonly modelInfo: MaybeCodeModelInfo | undefined;
-
   private readonly application: AgentApplication;
-  private readonly manualCompactionStrategy: ContextCompactionStrategy;
-  private readonly summaryTailStrategy: ContextCompactionStrategy;
-  private readonly historyReferenceStrategy: ContextCompactionStrategy;
-  private readonly nativeCompactionStrategy: ContextCompactionStrategy | undefined;
-  private readonly historyMemory: HistoryReferenceMemory;
+  private serviceReferences: MaybeCodeApplicationServices;
+  private updatingModel = false;
+  private modelUpdate: Promise<void> | undefined;
+  private modelUpdateFailure: unknown;
   private readonly eventQueue = new AsyncEventQueue<MaybeCodeSessionEvent>({
     maxBufferedValues: 1024,
     isDroppable: (value) =>
       value.type === "run.event" && isStreamingMayEvent(value.event),
   });
   private readonly eventRelay: Promise<void>;
-  private readonly subagentRelay: Promise<void> | undefined;
+  private subagentRelay: Promise<void> | undefined;
   private closed = false;
   private closing: Promise<void> | undefined;
   private inputTail: Promise<void> = Promise.resolve();
@@ -185,43 +198,22 @@ export class MaybeCodeApplication {
   private compaction: Promise<ContextCompactionResult> | undefined;
   private inputEpoch = 0;
   private steeringCancellation: Promise<void> = Promise.resolve();
-  readonly goals: GoalController | undefined;
-  readonly subagents: SubagentHost | undefined;
-  private readonly removeGoalListener: (() => void) | undefined;
+  private removeGoalListener: (() => void) | undefined;
 
   private constructor(
     workspace: string,
     application: AgentApplication,
     instructions: MaybeCodeInstructionState,
-    manualCompactionStrategy: ContextCompactionStrategy,
-    summaryTailStrategy: ContextCompactionStrategy,
-    historyReferenceStrategy: ContextCompactionStrategy,
-    nativeCompactionStrategy: ContextCompactionStrategy | undefined,
-    historyMemory: HistoryReferenceMemory,
-    modelInfo: MaybeCodeModelInfo | undefined,
-    goals: GoalController | undefined,
-    subagents: SubagentHost | undefined,
-    readonly mcp: McpClientPool | undefined,
+    private readonly createModelPlugins: (update: MaybeCodeModelUpdate) => MaybeCodePluginComposition,
   ) {
     this.workspace = workspace;
     this.application = application;
     this.sessionId = application.sessionId;
     this.instructionState = instructions;
-    this.manualCompactionStrategy = manualCompactionStrategy;
-    this.summaryTailStrategy = summaryTailStrategy;
-    this.historyReferenceStrategy = historyReferenceStrategy;
-    this.nativeCompactionStrategy = nativeCompactionStrategy;
-    this.historyMemory = historyMemory;
-    this.modelInfo = modelInfo === undefined ? undefined : { ...modelInfo };
-    this.goals = goals;
-    this.subagents = subagents;
-    this.removeGoalListener = goals?.subscribe(event => {
-      this.eventQueue.push(event);
-      if (!goals.isRunning) void this.resumeSteering();
-    });
+    this.serviceReferences = this.readServices();
     this.events = this.eventQueue;
     this.eventRelay = this.relayEvents(application.events);
-    this.subagentRelay = subagents === undefined ? undefined : this.relaySubagentEvents(subagents.events);
+    this.connectServiceEvents();
   }
 
   static async open(
@@ -246,22 +238,17 @@ export class MaybeCodeApplication {
         : { instructionsDirectory: options.instructionsDirectory }),
     });
     const instructionState = new MaybeCodeInstructionState(workspace, instructions);
-    const instructionPlugin = createMaybeCodeInstructionsPlugin(instructionState, {
-      workspace, options, historicalBranch: forkOrigin !== undefined || fork !== undefined,
-      ...(forkOrigin === undefined ? {} : { historicalSource: forkOrigin.sessionId }),
-    });
-
-    const contextBudget = withDefaultCompactionThreshold(
-      options.contextBudget,
-    );
     const initialModelInfo = options.plugins?.some(plugin => plugin.provides?.some(service =>
       service.id === applicationServices.model.id && service.scope === applicationServices.model.scope))
       ? undefined : options.modelInfo;
 
     let product: MaybeCodeApplication | undefined;
     const gitRequest = new GitRequestController(options.gitWorkspace);
-    const composition = createMaybeCodePlugins({ ...options,
-      plugins: [instructionPlugin, ...(options.plugins ?? [])],
+    const createPlugins = (current: MaybeCodeApplicationOptions) => createMaybeCodePlugins({ ...current,
+      plugins: [createMaybeCodeInstructionsPlugin(instructionState, {
+        workspace, options: current, historicalBranch: forkOrigin !== undefined || fork !== undefined,
+        ...(forkOrigin === undefined ? {} : { historicalSource: forkOrigin.sessionId }),
+      }), ...(current.plugins ?? [])],
       onGitCheckpoint: checkpoint => {
         options.onGitCheckpoint?.(checkpoint);
         if (!product) throw new Error("Git checkpoint completed before the MaybeCode application was ready");
@@ -274,8 +261,9 @@ export class MaybeCodeApplication {
       instructionsSource: () => instructionState.current.system.content,
       projectInstructionsSource: () => instructionState.projectInstructions(),
       prepareInstructions: () => instructionState.refreshProject(),
-      ...(contextBudget === undefined ? {} : { contextBudget }),
+      ...(current.contextBudget === undefined ? {} : { contextBudget: withDefaultCompactionThreshold(current.contextBudget)! }),
     });
+    const composition = createPlugins(options);
     const definition = defineAgent({
       plugins: composition.plugins,
       forkStateKeys: ["maybecode.context-notes", "maybecode.model"],
@@ -333,39 +321,104 @@ export class MaybeCodeApplication {
       ...(options.resume === undefined ? {} : { resume: options.resume }),
       ...(options.fork === undefined ? {} : { fork: options.fork }),
     });
-    const history = application.getService(historyMemoryService);
     product = new MaybeCodeApplication(
       workspace,
       application,
       instructionState,
-      history.manual,
-      history.summary,
-      history.historyReference,
-      history.native,
-      history.memory,
-      composition.modelInfo,
-      composition.hasGoals ? application.getService(goalsService) : undefined,
-      composition.hasDelegation ? application.getService(delegationService).get() : undefined,
-      composition.mcp,
+      update => {
+        if (options.plugins?.some(plugin => plugin.provides?.some(service =>
+          service.id === applicationServices.model.id && service.scope === applicationServices.model.scope))) {
+          throw new Error("The configured Model plugin owns model selection");
+        }
+        const { model: _model, modelInfo: _modelInfo, modelRuntimeOptions: _modelRuntimeOptions,
+          contextBudget: _contextBudget, ...base } = options;
+        return createPlugins({ ...base, ...update });
+      },
     );
     product.gitRequest = gitRequest;
     product.permissionScopeId = options.permissionRuleStore === undefined ? undefined
       : options.permissionScopeId ?? `maybecode:${workspace}:main`;
-    if (composition.modelInfo !== undefined) {
-      try { await application.recordState("maybecode.model", {
-        provider: composition.modelInfo.provider, model: composition.modelInfo.model,
-        ...(composition.modelInfo.adapter === undefined ? {} : { adapter: composition.modelInfo.adapter }),
-        ...(composition.modelInfo.profile === undefined ? {} : { profile: composition.modelInfo.profile }),
-        runtimeOptions: typeof options.modelRuntimeOptions?.reasoningEffort === "string"
-          ? { reasoningEffort: options.modelRuntimeOptions.reasoningEffort } : {},
-      }); }
-      catch (error) { await product.close(); throw error; }
-    }
+    try { await product.recordModel(options.modelRuntimeOptions); }
+    catch (error) { await product.close(); throw error; }
     return product;
   }
 
+  private readServices(): MaybeCodeApplicationServices {
+    return {
+      history: this.application.getService(historyMemoryService),
+      modelInfo: this.application.getOptionalService(applicationServices.modelInfo),
+      goals: this.application.getOptionalService(goalsService),
+      subagents: this.application.getOptionalService(delegationService)?.get(),
+      mcp: this.application.getOptionalService(mcpService),
+    };
+  }
+
+  get modelInfo() { return this.serviceReferences.modelInfo; }
+  get goals() { return this.serviceReferences.goals; }
+  get subagents() { return this.serviceReferences.subagents; }
+  get mcp() { return this.serviceReferences.mcp; }
+  get modelUpdateFailed(): boolean { return this.modelUpdateFailure !== undefined; }
+  private get historyMemory() { return this.serviceReferences.history.memory; }
+
+  private connectServiceEvents(): void {
+    const { goals, subagents } = this.serviceReferences;
+    this.removeGoalListener = goals?.subscribe(event => {
+      this.eventQueue.push(event);
+      if (!this.updatingModel && !goals.isRunning) void this.resumeSteering();
+    });
+    this.subagentRelay = subagents === undefined ? undefined : this.relaySubagentEvents(subagents.events);
+  }
+
+  private async recordModel(runtimeOptions?: Readonly<Record<string, unknown>>): Promise<void> {
+    const info = this.modelInfo;
+    if (info === undefined) return;
+    await this.application.recordState("maybecode.model", {
+      provider: info.provider, model: info.model,
+      ...(info.adapter === undefined ? {} : { adapter: info.adapter }),
+      ...(info.profile === undefined ? {} : { profile: info.profile }),
+      runtimeOptions: typeof runtimeOptions?.reasoningEffort === "string"
+        ? { reasoningEffort: runtimeOptions.reasoningEffort } : {},
+    });
+  }
+
+  async updateModel(update: MaybeCodeModelUpdate): Promise<void> {
+    if (this.closed) throw new Error("MaybeCode application is closed");
+    if (this.isRunning || this.compaction || this.getGoal()?.status === "active") {
+      throw new Error("Finish the active operation before changing the model");
+    }
+    if ([this.sessionId, ...this.ownedDelegatedSessions()].some(sessionId =>
+      this.mcp?.interactions?.list({ workspaceId: this.workspace, sessionId }).length)) {
+      throw new Error("Finish the MCP interaction before changing the model");
+    }
+    const composition = this.createModelPlugins(update);
+    this.updatingModel = true;
+    const operation = this.replaceModelPlugins(composition, update);
+    this.modelUpdate = operation;
+    try {
+      await operation;
+    } finally {
+      this.updatingModel = false;
+      this.modelUpdate = undefined;
+    }
+  }
+
+  private async replaceModelPlugins(composition: MaybeCodePluginComposition, update: MaybeCodeModelUpdate): Promise<void> {
+    try {
+      await this.application.updatePlugins(composition.plugins);
+      this.removeGoalListener?.();
+      await this.subagentRelay;
+      this.serviceReferences = this.readServices();
+      this.connectServiceEvents();
+      await this.recordModel(update.modelRuntimeOptions);
+      this.modelUpdateFailure = undefined;
+    } catch (error) {
+      this.modelUpdateFailure = error;
+      throw error;
+    }
+  }
+
   get isRunning(): boolean {
-    return this.inputOperations > 0 || this.currentRun !== undefined || this.application.isRunning ||
+    return this.updatingModel || this.inputOperations > 0 || this.currentRun !== undefined || this.application.isRunning ||
       this.goals?.isRunning === true || this.subagents?.isRunning === true;
   }
 
@@ -431,6 +484,8 @@ export class MaybeCodeApplication {
     this.inputOperations++;
     const result = this.inputTail.then(() => {
       if (this.closed && !allowClosed) throw new Error("MaybeCode is closed");
+      if (this.updatingModel) throw new Error("Finish the model update before submitting input");
+      if (this.modelUpdateFailure !== undefined) throw new Error("Model update failed; retry the model update before continuing", { cause: this.modelUpdateFailure });
       return operation();
     });
     this.inputTail = result.then(() => { this.inputOperations--; }, () => { this.inputOperations--; });
@@ -448,7 +503,7 @@ export class MaybeCodeApplication {
   }
 
   private async resumeSteering(): Promise<void> {
-    if (this.closed || !this.application.listSteeringInputs().some(input => input.status === "idle")) return;
+    if (this.closed || this.updatingModel || this.modelUpdateFailure !== undefined || !this.application.listSteeringInputs().some(input => input.status === "idle")) return;
     const epoch = this.inputEpoch;
     await this.serializeInput(async () => {
       if (this.closed || epoch !== this.inputEpoch || this.application.isRunning ||
@@ -475,6 +530,8 @@ export class MaybeCodeApplication {
   pauseGoal() { return this.requireGoals().pause(); }
   cancelGoal() { return this.requireGoals().cancel(); }
   private requireGoals(): GoalController {
+    if (this.updatingModel) throw new Error("Finish the model update before changing the goal");
+    if (this.modelUpdateFailure !== undefined) throw new Error("Model update failed; retry the model update before continuing", { cause: this.modelUpdateFailure });
     if (!this.goals) throw new Error("Goals are disabled in this application");
     return this.goals;
   }
@@ -675,15 +732,17 @@ export class MaybeCodeApplication {
   }
 
   inspectContext(): Promise<ContextInspection | undefined> {
+    if (this.modelUpdateFailure !== undefined) throw new Error("Model update failed; retry the model update before continuing", { cause: this.modelUpdateFailure });
     return this.application.inspectContext();
   }
 
   compactContext(
     selection?: MaybeCodeCompactionSelection,
   ): Promise<ContextCompactionResult> {
-    if (this.subagents?.isRunning === true || this.goals?.isRunning === true) {
+    if (this.updatingModel || this.subagents?.isRunning === true || this.goals?.isRunning === true) {
       throw new Error("Cannot compact context while a request or goal is active");
     }
+    if (this.modelUpdateFailure !== undefined) throw new Error("Model update failed; retry the model update before continuing", { cause: this.modelUpdateFailure });
     const result = this.application.compactContext(
       this.resolveCompactionStrategy(selection),
     );
@@ -700,6 +759,7 @@ export class MaybeCodeApplication {
   private async closeOnce(): Promise<void> {
     this.closed = true;
     try {
+      if (this.modelUpdate) await Promise.allSettled([this.modelUpdate]);
       await this.steeringCancellation;
       await this.application.close();
       await this.inputTail;
@@ -745,13 +805,13 @@ export class MaybeCodeApplication {
   private resolveCompactionStrategy(
     selection: MaybeCodeCompactionSelection | undefined,
   ): ContextCompactionStrategy {
-    if (selection === undefined) return this.manualCompactionStrategy;
+    if (selection === undefined) return this.serviceReferences.history.manual;
     if (selection === "prune-old-tool-results") {
       return new PruneOldToolResultsStrategy();
     }
-    if (selection === "summary-tail") return this.summaryTailStrategy;
-    if (selection === "history-reference") return this.historyReferenceStrategy;
-    if (selection === "provider-native") return requireNativeCompaction(this.nativeCompactionStrategy);
+    if (selection === "summary-tail") return this.serviceReferences.history.summary;
+    if (selection === "history-reference") return this.serviceReferences.history.historyReference;
+    if (selection === "provider-native") return requireNativeCompaction(this.serviceReferences.history.native);
     if (typeof selection === "object") return selection;
     throw new Error(`Unknown context compaction strategy: ${String(selection)}`);
   }

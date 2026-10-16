@@ -274,8 +274,15 @@ MaybeCode 接受 `apps.maybecode.plugins`，MaybeClaw 的 May Agent 接受
 批准工具请求，权限策略明确禁止的操作继续生效。`--yolo` 和 `--no-yolo` 覆盖配置，
 同时使用会校验失败。`/yolo` 和 `/yolo on` 开启模式，`/yolo off` 关闭模式，
 `/yolo status` 查询状态。切换前暂停或取消活动 Run、目标和 MCP 操作。当前工作区宿主
-在切换 Session 和模型时保留模式。重新启动后根据启动选项确定，不保存到历史或配置。
+在切换 Session、模型以及调整 reasoning effort 时保留模式，工具审批继续使用当前模式。
+重新启动后根据启动选项确定，不保存到历史或配置。
 `/goal` 使用当前模式。
+
+切换模型和调整 reasoning effort 会在现有 application 和 Session 内更新插件。
+切换前需要暂停或完成活动工作，并处理 MCP 交互。更新保留对话历史、已暂停的 Goal、
+已启用的 Skill 和持久 notes，刷新模型相关服务及其事件订阅，并保留共享 MCP 连接。
+更新失败后暂停接受新的输入，模型更新重试成功后恢复。可以重新选择原来的模型配置
+或请求切换的模型配置。成功的更改会记录到 Session 历史，供历史 fork 使用。
 
 终端和 WebUI 显示 **YOLO · Auto-approve**，模式通知使用英文。WebUI 使用
 `UiSnapshot.badges`；classic 终端通过 `TerminalIO.updatePrompt` 更新，保留输入和
