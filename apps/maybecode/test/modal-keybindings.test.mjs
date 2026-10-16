@@ -145,7 +145,7 @@ test("MCP 输入弹窗保留文字选择和多行操作并准确匹配取消按�
   paste(view, "first");
   key(view, "a", { ctrl: true });
   paste(view, "中文🙂");
-  key(view, "enter", { shift: true });
+  assert.equal(key(view, "j", { ctrl: true }), true);
   paste(view, "second");
   key(view, "enter");
   assert.equal(await result, "中文🙂\nsecond");
