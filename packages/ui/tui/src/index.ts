@@ -10,6 +10,7 @@ export * from "./list-selection.js";
 export * from "./session-fork.js";
 export * from "./workspace-diff.js";
 export * from "./markdown.js";
+export * from "./markdown-excerpt.js";
 export * from "./node-terminal.js";
 export * from "./overlay.js";
 export * from "./renderer.js";

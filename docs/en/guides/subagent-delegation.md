@@ -189,6 +189,14 @@ budgets remain on disk after completion.
 
 ## Surfaces
 
+Task and request completion notices, and `/delegations`, display each `result:`
+as an indented plain-text Markdown excerpt: up to 400 graphemes and 6 logical
+lines, including blank lines. Truncation adds `…` within the character limit.
+Headings retain their text; lists, code indentation and link destinations remain
+readable. Tables become one record per row with column labels. Empty results
+omit the result section. Terminal-width wrapping can produce additional display
+lines. The saved task output retains the complete Markdown response.
+
 - TUI and retained TUI print the request lifecycle, task tree with parent ids,
   statuses, child tool output prefixed with the task id, and child approvals.
 - The Web UI adds a 子 Agent panel with the task tree, per-request usage and the

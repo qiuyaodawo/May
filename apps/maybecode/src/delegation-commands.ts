@@ -1,4 +1,5 @@
 import type { MaybeCodeController } from "./controller.js";
+import { renderMarkdownExcerpt } from "@may/tui";
 import type {
   MaybeCodeDelegationRequest,
   MaybeCodeDelegationState,
@@ -105,7 +106,8 @@ export function renderDelegationTask(task: MaybeCodeDelegationTask): string {
   if (task.usage?.totalTokens !== undefined) parts.push(`${task.usage.totalTokens} tokens`);
   if (task.detail !== undefined) parts.push(`- ${task.detail}`);
   if (task.output !== undefined) {
-    parts.push(`\n${indent}    result: ${task.output.replace(/\s+/gu, " ").slice(0, 400)}`);
+    const excerpt = renderMarkdownExcerpt(task.output);
+    if (excerpt !== "") parts.push(`\n${indent}    result:\n${excerpt.split("\n").map(line => `${indent}      ${line}`).join("\n")}`);
   }
   return parts.join(" ");
 }

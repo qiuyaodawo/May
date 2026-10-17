@@ -1,5 +1,17 @@
 # `@may/tui`
 
+`renderMarkdownExcerpt(source, options?)` is exported from `@may/tui`. It parses
+complete GFM with Marked and returns a plain-text excerpt. `maxCharacters`
+defaults to 400 graphemes (including the truncation ellipsis, excluding newlines);
+`maxLines` defaults to 6 logical lines, including blank lines. Both options must
+be positive safe integers or the function throws `RangeError`.
+Headings retain their text; lists retain their markers; code retains indentation
+and punctuation; links retain labels and destinations. Table rows become
+`column: value` records. Consecutive blank lines collapse to one. HTML remains
+literal text, and terminal controls are neutralized. Empty content returns an
+empty string. Truncated excerpts end with `…`; terminal wrapping is independent
+of the logical-line limit.
+
 `SessionForkTree` models history positions and Session ancestry. `SessionForkPicker`
 provides keyboard tree navigation, search, reply previews and current-workspace or
 new-worktree selection. `WorkspaceDiffViewer` provides file selection, colored

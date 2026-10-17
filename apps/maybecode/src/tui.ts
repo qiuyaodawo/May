@@ -35,6 +35,7 @@ import { runForkPicker, runChangesPicker } from "./fork-picker.js";
 import { presentMcpInteraction } from "./mcp-interaction-ui.js";
 import { MaybeCodeTerminalWeb } from "./terminal-web.js";
 import { formatGoal } from "./goal-commands.js";
+import { renderDelegationTask } from "./delegation-commands.js";
 
 type UIQuestion = (
   prompt: string,
@@ -1136,14 +1137,6 @@ function delegationOrder(
   tasks: readonly MaybeCodeDelegationTask[],
 ): readonly MaybeCodeDelegationTask[] {
   return [...tasks].sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id));
-}
-
-function renderDelegationTask(task: MaybeCodeDelegationTask): string {
-  const indent = "  ".repeat(Math.max(0, task.depth - 1));
-  const parts = [`${indent}${task.role}/${task.id}: ${task.status}`];
-  if (task.detail !== undefined) parts.push(`(${task.detail})`);
-  else if (task.output !== undefined) parts.push(`(${task.output.replace(/\s+/gu, " ").slice(0, 160)})`);
-  return parts.join(" ");
 }
 
 function describeApplicationEvent(event: AgentApplicationEvent): string {
