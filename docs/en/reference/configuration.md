@@ -285,6 +285,14 @@ mutation and denies project-changing built-in tools. Headless hosts can require
 commit approval through `git.authorizeCommit`. Tool approval mode is a separate
 setting. See [Git workspaces](../guides/git-workspaces.md) for forks and restoration.
 
+## MaybeCode delegation notifications
+
+Automatic delegation status notices use `apps.maybecode.delegationNotifications`
+(boolean, default `false`). `/delegations notifications on|off|status` changes or
+queries the current process setting immediately, including during a run and
+across Session switches. It does not write configuration. See
+[sub-agent delegation](../guides/subagent-delegation.md#surfaces).
+
 ## MaybeCode permission mode
 
 `apps.maybecode.permissionMode` accepts `"default"` (default) or `"yolo"`.

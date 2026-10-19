@@ -1,9 +1,11 @@
 # MaybeCode
 
-Task result notices and `/delegations` display plain-text Markdown excerpts of
-up to 400 graphemes and 6 logical lines. Excerpts preserve list items, code
-indentation and links; table rows use column labels. Truncated excerpts end in
-`…`. See [sub-agent delegation](../../docs/en/guides/subagent-delegation.md)
+Automatic request and task status notices are disabled by default. Use
+`/delegations notifications on|off|status` to change or inspect the current
+process setting, including during a run. Set `apps.maybecode.delegationNotifications`
+to `true` in configuration to enable notices at startup. Notices and `/delegations`
+show status fields; complete task output remains in the saved records.
+See [sub-agent delegation](../../docs/en/guides/subagent-delegation.md)
 and [子 Agent 委派](../../docs/zh-CN/guides/subagent-delegation.md).
 
 ### Model updates

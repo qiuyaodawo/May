@@ -101,7 +101,7 @@ export class MaybeCodeWebCommands {
           const parsed = parseMaybeCodeSlashCommand(command.args.text!);
           const arguments_ = parsed.type === "command" ? parsed.arguments : [];
           const allowed = parsed.type === "command" && (parsed.definition.name === "/help" || parsed.definition.name === "/status" ||
-            parsed.definition.name === "/steer" || parsed.definition.name === "/stop" || parsed.definition.name === "/delegations" && (arguments_.length === 0 || arguments_[0] === "show" || arguments_[0] === "tools") ||
+            parsed.definition.name === "/steer" || parsed.definition.name === "/stop" || parsed.definition.name === "/delegations" && (arguments_.length === 0 || ["show", "tools", "notifications"].includes(arguments_[0]!)) ||
             parsed.definition.name === "/yolo" && parsed.arguments[0] === "status" ||
             parsed.definition.name === "/goal" && ["status", "pause", "cancel"].includes(parsed.arguments[0] ?? "status"));
           if (!allowed) throw new UiError(409, "请暂停当前运行后执行此命令。");

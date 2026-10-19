@@ -1,5 +1,4 @@
 import type { MaybeCodeController } from "./controller.js";
-import { renderMarkdownExcerpt } from "@may/tui";
 import type {
   MaybeCodeDelegationRequest,
   MaybeCodeDelegationState,
@@ -7,7 +6,7 @@ import type {
 } from "./delegation.js";
 
 export const DELEGATION_COMMAND_USAGE =
-  "/delegations [show|tools <task-id>|resolve <task-id> <failed|cancelled> <finding>]";
+  "/delegations [show|notifications <on|off|status>|tools <task-id>|resolve <task-id> <failed|cancelled> <finding>]";
 
 /** 按时间倒序列出本工作区的子 Agent 请求。 */
 export function formatDelegationRequests(
@@ -55,6 +54,17 @@ export async function executeDelegationCommand(
   arguments_: readonly string[],
   controller: MaybeCodeController,
 ): Promise<string> {
+  if (arguments_[0] === "notifications") {
+    const mode = arguments_[1];
+    if (arguments_.length !== 2 || !["on", "off", "status"].includes(mode ?? "")) {
+      throw new Error(DELEGATION_COMMAND_USAGE);
+    }
+    if (mode !== "status") {
+      if (controller.setDelegationNotifications === undefined) throw new Error("Delegation notifications are unavailable");
+      controller.setDelegationNotifications(mode === "on");
+    }
+    return `Delegation notifications: ${controller.delegationNotifications === true ? "on" : "off"}`;
+  }
   if (controller.listDelegationRequests === undefined) {
     return "Sub-agents are disabled in this workspace.";
   }
@@ -93,7 +103,7 @@ export function delegationOrder(
   return [...tasks].sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id));
 }
 
-/** 一行任务状态，包含父子关系、文件、Run 与结果摘要。 */
+/** 一行任务状态，包含父子关系、文件与 Run。 */
 export function renderDelegationTask(task: MaybeCodeDelegationTask): string {
   const indent = "  ".repeat(Math.max(0, task.depth - 1));
   const parts = [`${indent}${task.id} [${task.role}] ${task.status}`];
@@ -105,10 +115,6 @@ export function renderDelegationTask(task: MaybeCodeDelegationTask): string {
   if (task.runId !== undefined) parts.push(`run ${task.runId}`);
   if (task.usage?.totalTokens !== undefined) parts.push(`${task.usage.totalTokens} tokens`);
   if (task.detail !== undefined) parts.push(`- ${task.detail}`);
-  if (task.output !== undefined) {
-    const excerpt = renderMarkdownExcerpt(task.output);
-    if (excerpt !== "") parts.push(`\n${indent}    result:\n${excerpt.split("\n").map(line => `${indent}      ${line}`).join("\n")}`);
-  }
   return parts.join(" ");
 }
 

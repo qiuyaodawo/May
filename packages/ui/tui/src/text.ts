@@ -5,6 +5,8 @@ import { styleText, type TextStyle } from "./theme.js";
 
 export interface TextOptions {
   readonly wrap?: boolean;
+  /** 续行的最少缩进列数，同时保留逻辑行已有的缩进。 */
+  readonly continuationIndent?: number;
   readonly style?: TextStyle;
   readonly sourceId?: string;
   /** 按逻辑行指定可复制的文字范围，索引使用 UTF-16。 */

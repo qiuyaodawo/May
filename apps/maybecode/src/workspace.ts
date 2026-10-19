@@ -71,6 +71,7 @@ export interface MaybeCodeWorkspaceOptions extends Omit<
   readonly git?: false | Omit<ProjectGitWorkspaceOptions, "workspace">;
   readonly configureWorkspace?: (workspace: string) => Partial<MaybeCodeApplicationOptions> | Promise<Partial<MaybeCodeApplicationOptions>>;
   readonly permissionMode?: MaybeCodePermissionMode;
+  readonly delegationNotifications?: boolean;
   readonly catalog: SessionCatalog;
   readonly sessionId?: string;
   /** Resume the latest workspace session when no sessionId is given. Defaults to false. */
@@ -160,6 +161,9 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   static async open(
     options: MaybeCodeWorkspaceOptions,
   ): Promise<MaybeCodeWorkspace> {
+    if (options.delegationNotifications !== undefined && typeof options.delegationNotifications !== "boolean") {
+      throw new TypeError("delegationNotifications must be boolean");
+    }
     const state: WorkspaceState = {
       rootWorkspace: resolve(options.workspace),
       git: new Map(),
@@ -506,6 +510,16 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   get permissionMode(): MaybeCodePermissionMode {
     return this.state.options.permissionMode ?? "default";
+  }
+
+  get delegationNotifications(): boolean {
+    return this.state.options.delegationNotifications ?? false;
+  }
+
+  setDelegationNotifications(enabled: boolean): void {
+    this.throwIfClosed();
+    if (typeof enabled !== "boolean") throw new TypeError("delegationNotifications must be boolean");
+    this.state.options = { ...this.state.options, delegationNotifications: enabled };
   }
 
   async setPermissionMode(mode: MaybeCodePermissionMode): Promise<void> {
@@ -1196,6 +1210,7 @@ function applicationOptions(
 ): MaybeCodeApplicationOptions {
   const {
     permissionMode: _permissionMode,
+    delegationNotifications: _delegationNotifications,
     catalog: _catalog,
     modelProfiles: _modelProfiles,
     createModelConfiguration: _createModelConfiguration,

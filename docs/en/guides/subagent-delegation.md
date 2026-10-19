@@ -189,16 +189,19 @@ budgets remain on disk after completion.
 
 ## Surfaces
 
-Task and request completion notices, and `/delegations`, display each `result:`
-as an indented plain-text Markdown excerpt: up to 400 graphemes and 6 logical
-lines, including blank lines. Truncation adds `…` within the character limit.
-Headings retain their text; lists, code indentation and link destinations remain
-readable. Tables become one record per row with column labels. Empty results
-omit the result section. Terminal-width wrapping can produce additional display
-lines. The saved task output retains the complete Markdown response.
+Automatic request and task status notices are disabled by default. Use
+`/delegations notifications on`, `off`, or `status` to change or inspect the
+setting immediately, including during a run. The setting survives Session
+switches in the current process. At startup, `apps.maybecode.delegationNotifications`
+sets the initial value and defaults to `false`; it must be a boolean. Commands
+do not write the configuration file. Enabling notices displays subsequent status
+changes. Notices and `/delegations` display task status, parent ids, files, Run
+ids and usage. Saved task output retains the complete Markdown response.
+Wrapped notice lines preserve colors and indentation, and selection copies the
+original text without layout spaces or automatic line breaks.
 
-- TUI and retained TUI print the request lifecycle, task tree with parent ids,
-  statuses, child tool output prefixed with the task id, and child approvals.
+- TUI and retained TUI print request and task status notices when enabled. Child
+  tool output, approvals, and errors remain available independently of this setting.
 - The Web UI adds a 子 Agent panel with the task tree, per-request usage and the
   commands above; `/delegations` also works in its console.
 - Headless callers receive `delegation.started`, `delegation.updated`,

@@ -36,8 +36,11 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 export function renderTextDocument(
   document: readonly TextDocumentLine[],
   size: RenderSize,
-  options: { readonly sourceId?: string; readonly wrap?: boolean } = {},
+  options: { readonly sourceId?: string; readonly wrap?: boolean; readonly continuationIndent?: number } = {},
 ): RenderResult {
+  if (options.continuationIndent !== undefined && (!Number.isSafeInteger(options.continuationIndent) || options.continuationIndent < 0)) {
+    throw new RangeError("continuationIndent must be a non-negative safe integer");
+  }
   const source = options.sourceId === undefined ? "" : document.filter(line => line.copy !== undefined)
     .map(line => stripVTControlCharacters(line.value).slice(line.copy!.start, line.copy!.end))
     .join("\n");
@@ -46,13 +49,18 @@ export function renderTextDocument(
   let sourceOffset = 0;
   for (const line of document) {
     const expanded = expandTabs(line.value);
+    const indent = options.continuationIndent === undefined || options.wrap === false ? 0 : Math.min(
+      Math.max(0, size.width - 2),
+      Math.max(options.continuationIndent, /^ */u.exec(stripVTControlCharacters(expanded.value))![0].length),
+    );
     const wrapped = options.wrap === false
       ? [sliceAnsi(expanded.value, 0, size.width)]
-      : wrapAnsi(expanded.value, size.width, { hard: true, trim: false, wordWrap: true }).split("\n");
+      : wrapAnsi(expanded.value, Math.max(1, size.width - indent), { hard: true, trim: false, wordWrap: true }).split("\n");
     let displayOffset = 0;
-    for (const value of wrapped) {
+    for (const [rowIndex, value] of wrapped.entries()) {
       if (lines.length >= size.height) break;
-      lines.push(value);
+      const rowIndent = rowIndex === 0 ? 0 : indent;
+      lines.push(" ".repeat(rowIndent) + value);
       const plain = stripVTControlCharacters(value);
       if (line.copy === undefined || options.sourceId === undefined) {
         textRows.push(undefined);
@@ -67,7 +75,7 @@ export function renderTextDocument(
           get spans() {
             if (spans !== undefined) return spans;
             const values: TextSpan[] = [];
-            let x = 0;
+            let x = rowIndent;
             for (const part of segmenter.segment(plain)) {
               const displayStart = rowDisplayOffset + part.index;
               const displayEnd = displayStart + part.segment.length;

@@ -73,7 +73,7 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   { name: "/web", usage: "/web", description: "Open the current workspace and session in a browser" },
   { name: "/skills", usage: "/skills [show <name>|use <name> [task]]", description: "List skills, preview instructions, or activate a skill" },
   { name: "/recovery", usage: "/recovery [resolve <id> <verified finding>]", description: "Inspect interrupted tools or record verified recovery findings" },
-  { name: "/delegations", usage: DELEGATION_COMMAND_USAGE, description: "Inspect sub-agent requests, child tasks and their tool records" },
+  { name: "/delegations", usage: DELEGATION_COMMAND_USAGE, description: "Inspect sub-agent requests and tools, and control status notifications" },
   {
     name: "/new",
     usage: "/new",
@@ -288,6 +288,13 @@ export function createMaybeCodeSlashCommandSuggester(
 
   return maybeCodeSlashCommands.createSuggester(async (argumentInput) => {
     const { definition, invokedAs: command, argumentPrefix } = argumentInput;
+    if (definition?.name === "/delegations") {
+      const match = /^notifications\s+(\S*)$/u.exec(argumentPrefix);
+      if (match) return ["on", "off", "status"].filter(value => value.startsWith(match[1]!))
+        .map(value => ({ value: `${command} notifications ${value}`, label: value }));
+      return ["show", "notifications", "tools", "resolve"].filter(value => value.startsWith(argumentPrefix))
+        .map(value => ({ value: `${command} ${value}`, label: value }));
+    }
     if (definition?.name === "/yolo") {
       return ["on", "off", "status"].filter(value => value.startsWith(argumentPrefix))
         .map(value => ({ value: `${command} ${value}`, label: value, description: "Permission mode" }));

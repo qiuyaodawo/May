@@ -268,6 +268,13 @@ MaybeCode 接受 `apps.maybecode.plugins`，MaybeClaw 的 May Agent 接受
 可以通过 `git.authorizeCommit` 要求提交审批。工具审批模式独立配置。分支和文件恢复
 见[Git 工作区](../guides/git-workspaces.md)。
 
+## MaybeCode 委派通知
+
+`apps.maybecode.delegationNotifications` 控制子 Agent 自动状态通知，类型为 boolean，
+默认值为 `false`。`/delegations notifications on|off|status` 立即修改或查询当前进程
+的设置，运行期间同样有效，并在 Session 切换后保留。命令不会修改配置文件。参见
+[子 Agent 委派](../guides/subagent-delegation.md#界面)。
+
 ## MaybeCode 权限模式
 
 `apps.maybecode.permissionMode` 支持 `"default"`（默认）和 `"yolo"`。YOLO 自动

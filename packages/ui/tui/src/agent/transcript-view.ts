@@ -527,6 +527,7 @@ export class TranscriptItemView implements Component {
         return new Text(renderApproval(this.item, options.theme), { sourceId: `${this.item.id}:approval` }).render(size);
       case "notice":
         return new Text(renderNotice(this.item, options.theme), {
+          continuationIndent: 2,
           sourceId: `${this.item.id}:notice`,
           copyRanges: sanitizeTerminalText(this.item.text).split("\n").map((line, index) => ({ start: index === 0 ? 2 : 0, end: line.length + (index === 0 ? 2 : 0) })),
         }).render(size);

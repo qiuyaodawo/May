@@ -71,6 +71,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly git?: false | Omit<ProjectGitWorkspaceOptions, "workspace">;
   readonly plugins?: readonly AnyPlugin[];
   readonly permissionMode?: MaybeCodePermissionMode;
+  readonly delegationNotifications?: boolean;
   readonly persistentRules?: boolean;
   /** Enable only when a UI consumes interaction events and answers the controller. */
   readonly mcpInteractions?: boolean;
@@ -189,6 +190,10 @@ export async function openConfiguredMaybeCode(
     plugin.provides?.some(candidate => candidate.id === service.id && candidate.scope === service.scope));
   const pluginModel = provided(services.model);
   const configuredPermissionMode = config.apps?.maybecode?.permissionMode;
+  const configuredDelegationNotifications = options.delegationNotifications === undefined
+    ? config.apps?.maybecode?.delegationNotifications : options.delegationNotifications;
+  const delegationNotifications = configuredDelegationNotifications === undefined ? false : configuredDelegationNotifications;
+  if (typeof delegationNotifications !== "boolean") throw new MaybeCodeConfigError("apps.maybecode.delegationNotifications must be boolean");
   const git = options.git ?? resolveMaybeCodeGit(config);
   const permissionMode = options.permissionMode === undefined
     ? configuredPermissionMode === undefined ? "default" : parsePermissionMode(configuredPermissionMode)
@@ -361,6 +366,7 @@ export async function openConfiguredMaybeCode(
         return { plugins: configuredPlugins, ...await permissionsFor(nextWorkspace), ...(directories === false ? { skills: false } : { skillDirectories: directories }) };
       },
       permissionMode,
+      delegationNotifications,
       workspace,
       ...(initialModel === undefined ? {} : { model: initialModel.model, modelInfo: initialModel.modelInfo }),
       modelProfiles,

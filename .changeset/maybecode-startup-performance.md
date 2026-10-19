@@ -1,4 +1,5 @@
 ---
+"@may/maybecode": patch
 "@may/application": patch
 "@may/tui": patch
 "@may/media": patch

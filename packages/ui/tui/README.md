@@ -1,5 +1,13 @@
 # `@may/tui`
 
+`Text` accepts `continuationIndent`, a non-negative safe integer specifying the
+minimum indentation of wrapped continuation lines. Existing logical-line
+indentation is preserved when larger. Wrapping reserves this space on each row;
+narrow widths reduce the indentation to leave at least two content columns.
+The option has no effect with `wrap: false`. Layout indentation is excluded from
+copied text. Transcript notices use a minimum of two columns. Wrapped text keeps
+RGB colors and combined ANSI styles across rows.
+
 `renderMarkdownExcerpt(source, options?)` is exported from `@may/tui`. It parses
 complete GFM with Marked and returns a plain-text excerpt. `maxCharacters`
 defaults to 400 graphemes (including the truncation ellipsis, excluding newlines);

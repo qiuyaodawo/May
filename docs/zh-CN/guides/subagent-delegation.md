@@ -160,14 +160,16 @@ provider 的实际账单仍取决于已经接受的请求。
 
 ## 界面
 
-任务和请求完成通知，以及 `/delegations` 查询，将每个 `result:` 显示为带缩进的
-Markdown 纯文本节选：最多 400 个 grapheme 和 6 个逻辑行，空行计入行数。
-截断时添加 `…`，并将省略号计入字符限制。标题保留文字，列表、代码缩进和链接地址
-保持可读；表格每行转换为带列名的一条记录。空结果省略结果部分。终端按照窗口宽度
-自动换行时，显示行数可以超过逻辑行数。保存的任务结果保留完整 Markdown 回答。
+请求和任务的自动状态通知默认关闭。使用 `/delegations notifications on`、`off`
+或 `status` 开启、关闭或查询设置，运行期间同样立即生效。设置在当前进程内跨 Session
+切换保留。启动时读取 `apps.maybecode.delegationNotifications`，默认值为 `false`，
+必须使用 boolean。命令不会修改配置文件。开启之后显示后续状态变化。
+通知和 `/delegations` 显示任务状态、父任务 id、文件、Run id 和用量；保存的任务结果
+保留完整 Markdown 回答。通知自动换行之后保留颜色和缩进，选择复制得到原文，
+其中不包含排版添加的空格与换行。
 
-- TUI 与 retained TUI 打印请求开始与结束、带父任务标识的任务树、任务状态，以及以
-  任务 id 为前缀的子任务工具输出与子任务审批。
+- TUI 与 retained TUI 在开启通知时显示请求和任务状态。子任务工具输出、审批和错误
+  独立于这个设置，继续正常显示。
 - Web UI 增加“子 Agent”面板，显示任务树、本次请求的用量以及上面的命令；控制台同样
   可以执行 `/delegations`。
 - 无头调用方接收 `delegation.started`、`delegation.updated`、`delegation.finished`

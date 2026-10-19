@@ -264,7 +264,7 @@ async function consumeEvents(
       event.type === "delegation.started" ||
       event.type === "delegation.finished"
     ) {
-      renderer.delegationLifecycle(event);
+      renderer.delegationLifecycle(event, app.delegationNotifications === true);
     } else if (event.type === "delegation.event") {
       const inner = event.event;
       if (inner.type === "permission.event") {
@@ -281,7 +281,7 @@ async function consumeEvents(
         await renderer.delegationEvent(event);
       }
     } else if (event.type === "delegation.updated") {
-      renderer.delegationState(event.state);
+      renderer.delegationState(event.state, app.delegationNotifications === true);
     } else if (
       event.type === "mcp.resource.updated" ||
       event.type === "mcp.resource.watch-closed" ||
@@ -921,7 +921,13 @@ class TerminalRenderer {
   /** 子 Agent 请求的开始与结束，包含整棵任务树。 */
   delegationLifecycle(
     event: Extract<MaybeCodeEvent, { type: "delegation.started" | "delegation.finished" }>,
+    enabled: boolean,
   ): void {
+    if (event.type === "delegation.started") {
+      this.delegationStatus.clear();
+      this.lastDelegationKey = "";
+    }
+    if (!enabled) return;
     this.write(
       `\n${event.type === "delegation.started" ? "Sub-agent request" : "Sub-agent request finished"} ` +
       `${sanitizeTerminalText(event.state.requestId)}\n`,
@@ -932,14 +938,14 @@ class TerminalRenderer {
   }
 
   /** 子任务运行期间的状态变化；状态未变化时不重复显示。 */
-  delegationState(state: MaybeCodeDelegationState): void {
+  delegationState(state: MaybeCodeDelegationState, enabled: boolean): void {
     const key = `${state.tasks.map((task) => `${task.id}:${task.status}`).join("|")}#${state.status}`;
     if (key === this.lastDelegationKey) return;
     this.lastDelegationKey = key;
     for (const task of delegationOrder(state.tasks)) {
       if (this.delegationStatus.get(task.id) === task.status) continue;
       this.delegationStatus.set(task.id, task.status);
-      this.write(`${sanitizeTerminalText(renderDelegationTask(task))}\n`);
+      if (enabled) this.write(`${sanitizeTerminalText(renderDelegationTask(task))}\n`);
     }
   }
 

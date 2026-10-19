@@ -222,16 +222,17 @@ async function consumeEvents(
       }
     }
     if (event.type === "delegation.started" || event.type === "delegation.finished") {
+      if (event.type === "delegation.started") delegationStatus.clear();
       const label = event.type === "delegation.started" ? "Sub-agent request" : "Sub-agent request finished";
-      store.appendNotice("info", `${label}\n${formatDelegationTree(event.state)}`);
+      if (app.delegationNotifications === true) store.appendNotice("info", `${label}\n${formatDelegationTree(event.state)}`);
       view.setStatus(event.type === "delegation.started" ? "Delegating" : "Ready");
     } else if (event.type === "delegation.updated") {
-      // 只有任务进入终态时才写入记录，运行中的重复状态不显示。
+      // 同一任务的重复状态不显示。
       for (const task of delegationOrder(event.state.tasks)) {
         const previous = delegationStatus.get(task.id);
         delegationStatus.set(task.id, task.status);
-        if (previous === task.status || !["completed", "failed", "cancelled", "recovery-required"].includes(task.status)) continue;
-        store.appendNotice(task.status === "completed" ? "info" : "warning", renderDelegationTask(task));
+        if (app.delegationNotifications !== true || previous === task.status) continue;
+        store.appendNotice(["failed", "cancelled", "recovery-required"].includes(task.status) ? "warning" : "info", renderDelegationTask(task));
       }
     }
     applyMaybeCodeEvent(store, event);
