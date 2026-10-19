@@ -35,8 +35,18 @@ test("decodes fragmented and consecutive mouse reports without inserting them as
   input.write(`\x1b[200~${pasted}\x1b[201~`);
   const unicode = Buffer.from("中文");
   for (const byte of unicode) input.write(Buffer.from([byte]));
+  const escaped = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Escape input did not produce an escape event")), 5_000);
+    const unsubscribe = driver.onKey((stroke) => {
+      if (stroke.key !== "escape") return;
+      clearTimeout(timer);
+      unsubscribe();
+      resolve();
+    });
+    t.after(() => { clearTimeout(timer); unsubscribe(); });
+  });
   input.write("\x1b");
-  await new Promise((resolve) => setTimeout(resolve, 150));
+  await escaped;
   assert.deepEqual(strokes.map(({ key, text }) => ({ key, text })), [
     { key: "paste", text: pasted },
     { key: "中", text: "中" },
