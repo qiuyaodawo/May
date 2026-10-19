@@ -1,4 +1,4 @@
-# @may/plugin-observability
+# @sortedyuan/plugin-observability
 
 `createObservabilityPlugin(options)` provides `observabilityService` and
 `services.tracer`. Setup creates a JSONL exporter, batch processor, and tracer;

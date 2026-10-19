@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../../zh-CN/guides/coordination.md)
 
-Use `@may/coordination` to run related tasks through independent Agent
+Use `@sortedyuan/coordination` to run related tasks through independent Agent
 applications. A task graph declares which tasks can run together and which
 require earlier results. One coordinator owns scheduling, authorization and
 durable graph state. Each task has its own Session.
@@ -15,7 +15,7 @@ inspecting outcomes and recovering interrupted work. For terminal use, see
 
 ## Create and run a graph
 
-1. Make `@may/application`, `@may/core`, `@may/coordination` and `@may/session`
+1. Make `@sortedyuan/application`, `@sortedyuan/core`, `@sortedyuan/coordination` and `@sortedyuan/session`
    available to your TypeScript host. Use the repository's Node.js and pnpm
    requirements when working in this checkout.
 2. Configure a real provider `Model` with its required credentials. See
@@ -28,15 +28,15 @@ inspecting outcomes and recovering interrupted work. For terminal use, see
    after verifying that the result task completed.
 
 ```ts
-import { defineAgent } from "@may/application";
-import type { Model } from "@may/core";
+import { defineAgent } from "@sortedyuan/application";
+import type { Model } from "@sortedyuan/core";
 import {
   CoordinationRuntime,
   createApplicationAgent,
   parallelTasks,
-} from "@may/coordination";
-import { FileCoordinationStore } from "@may/coordination/file-store";
-import { FileSessionStore } from "@may/session/file-store";
+} from "@sortedyuan/coordination";
+import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 
 export async function compareApproaches(
   model: Model,

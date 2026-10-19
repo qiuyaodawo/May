@@ -1,5 +1,5 @@
-import type { AgentApplicationEvent } from "@may/application";
-import { priceUsage, resolveUsageTotals, validateUsageCost, type RunBudget, type Usage, type UsageCost, type TraceAttributes } from "@may/core";
+import type { AgentApplicationEvent } from "@sortedyuan/application";
+import { priceUsage, resolveUsageTotals, validateUsageCost, type RunBudget, type Usage, type UsageCost, type TraceAttributes } from "@sortedyuan/core";
 import {
   BasicTracer,
   type FinishedTraceSpan,
@@ -7,7 +7,7 @@ import {
   type SpanProcessor,
   type StartedTraceSpan,
   type TaskAssessment,
-} from "@may/observability";
+} from "@sortedyuan/observability";
 import type { EvalExecutionEvent, EvalIdentities, EvalMetrics, MeasuredValue } from "./types.js";
 
 export interface EvalAgentMetrics {

@@ -1,7 +1,7 @@
 import type {
   OpenAICompatibleMessage,
   OpenAICompatibleToolDefinition,
-} from "@may/provider-openai-compatible";
+} from "@sortedyuan/provider-openai-compatible";
 
 export interface DeepSeekChatRequest {
   model: string;

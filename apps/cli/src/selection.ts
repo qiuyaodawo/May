@@ -1,13 +1,13 @@
 import type {
   MayConfig,
   ResolveProviderOptions,
-} from "@may/config";
+} from "@sortedyuan/config";
 import {
   ProviderConfigurationError,
   selectProviderModel,
   type ProviderModelSelection,
   type ModelProfileSelector,
-} from "@may/providers";
+} from "@sortedyuan/providers";
 
 import { CliConfigError } from "./errors.js";
 

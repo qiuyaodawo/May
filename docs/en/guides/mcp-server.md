@@ -8,7 +8,7 @@ launcher or HTTP framework that owns authentication and shutdown.
 
 ## Separate, opt-in surface
 
-Import `createMayMcpServer` from `@may/mcp/server`. The application supplies explicit
+Import `createMayMcpServer` from `@sortedyuan/mcp/server`. The application supplies explicit
 tool/resource/prompt exports, authentication, per-method/per-target authorization
 and the normal `ToolExecutor`. Missing security services are configuration errors.
 
@@ -22,15 +22,15 @@ Host requests, progress relay and operation replay are unsupported.
 
 ## Minimal stdio example
 
-In an ESM TypeScript project, install `@may/mcp` and `@may/permissions`. Save the
+In an ESM TypeScript project, install `@sortedyuan/mcp` and `@sortedyuan/permissions`. Save the
 following as `server.ts`, compile it using your project build, and run its emitted
 JavaScript from the MCP client command. Stdout is reserved for protocol traffic.
 The process runs until SIGINT; your production launcher should also connect its
 own shutdown signal to the same cleanup path.
 
 ```ts
-import { createMayMcpServer } from "@may/mcp/server";
-import { PermissionToolExecutor } from "@may/permissions";
+import { createMayMcpServer } from "@sortedyuan/mcp/server";
+import { PermissionToolExecutor } from "@sortedyuan/permissions";
 
 const workspaceId = "explicit-workspace";
 // 示例只导出 echo。应用需要使用自己的权限策略和审批界面。
@@ -136,7 +136,7 @@ only `echo`, calling it with `{ "text": "hello" }` returns that JSON as text, an
 an invalid input is rejected. For HTTP, also verify an unauthenticated request,
 an unauthorized workspace and revocation during approval before deployment.
 
-From the repository root, `pnpm --filter @may/mcp test` runs the focused local
+From the repository root, `pnpm --filter @sortedyuan/mcp test` runs the focused local
 integration checks, including the serving tests described below.
 
 `packages/mcp/test/server.test.mjs` uses a real HTTP endpoint through May's MCP

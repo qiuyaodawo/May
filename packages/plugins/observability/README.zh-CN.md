@@ -1,4 +1,4 @@
-# @may/plugin-observability
+# @sortedyuan/plugin-observability
 
 `createObservabilityPlugin(options)` 提供 `observabilityService` 和 `services.tracer`。
 Setup 创建 JSONL exporter、batch processor 与 tracer，插件清理时写入尚未导出的

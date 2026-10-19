@@ -1,4 +1,6 @@
-# `@may/plugin-channel-telegram`
+# `@sortedyuan/plugin-channel-telegram`
+
+本包为 workspace 私有包，供仓库中的渠道宿主使用。
 
 `createTelegramChannelPlugin({ settings, token, id? })` 创建 `host` scope 插件，
 要求 `deliveryServices.registry`，提供 `telegramChannelService`。插件 setup 创建

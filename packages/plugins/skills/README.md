@@ -1,4 +1,4 @@
-# @may/plugin-skills
+# @sortedyuan/plugin-skills
 
 `createSkillsPlugin({ id?, create })` creates a `SkillSession` from the real
 `SkillRegistry` returned by `create(context)`. It provides `services.skills` and
@@ -23,4 +23,4 @@ Closing the plugin removes its tool and instruction contributions. The registry 
 an immutable discovery snapshot with no resource disposal API.
 
 Tests discover, activate and restore actual `SKILL.md` files in the ignored
-`plugin-verification` directory: `pnpm --filter @may/plugin-skills test`.
+`plugin-verification` directory: `pnpm --filter @sortedyuan/plugin-skills test`.

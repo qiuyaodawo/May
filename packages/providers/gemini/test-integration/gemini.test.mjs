@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadMayConfig, resolveModelProfile } from "@may/config";
+import { loadMayConfig, resolveModelProfile } from "@sortedyuan/config";
 import { GeminiModel, GEMINI_MODEL_STATE_TYPE, toGeminiRequestParts } from "../dist/index.js";
 
 async function readOptions() {

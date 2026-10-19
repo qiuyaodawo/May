@@ -67,7 +67,7 @@ use `pnpm.cmd`; `pnpm run maybecode` in the checkout uses the package script.
 Terminals started with `-NoProfile` must load the script explicitly.
 
 An installed package supplies the standalone `maybecode` command. To remove an
-existing global development installation, use `pnpm remove --global @may/maybecode`.
+existing global development installation, use `pnpm remove --global @sortedyuan/maybecode`.
 
 ## Control tool approval
 

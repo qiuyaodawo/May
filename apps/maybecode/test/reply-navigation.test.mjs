@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 import test from "node:test";
-import { NodeTerminalDriver } from "@may/tui";
+import { NodeTerminalDriver } from "@sortedyuan/tui";
 import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
 
 function openView(t, store) {

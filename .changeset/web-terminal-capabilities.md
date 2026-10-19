@@ -1,7 +1,7 @@
 ---
-"@may/maybecode": minor
-"@may/ui-client": minor
-"@may/web-ui": minor
+"@sortedyuan/maybecode": minor
+"@sortedyuan/ui-client": minor
+"@sortedyuan/web-ui": minor
 ---
 
 MaybeCode Web UI 支持共享斜杠命令及补全、effort、默认模型、会话管理、

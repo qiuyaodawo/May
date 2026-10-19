@@ -1,5 +1,5 @@
 ---
-"@may/tui": patch
+"@sortedyuan/tui": patch
 ---
 
 `NodeTerminalDriver` 将独立 LF 输入识别为 `Ctrl+J`，支持应用绑定换行操作。

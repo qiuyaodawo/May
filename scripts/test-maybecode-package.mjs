@@ -40,7 +40,7 @@ await rm(join(repository, "apps", "maybecode", "dist"), {
 await runPnpm(["run", "build"], { cwd: repository, inherit: true });
 const packedOutput = await runPnpm([
   "--filter",
-  "@may/maybecode...",
+  "@sortedyuan/maybecode...",
   "pack",
   "--pack-destination",
   packsDirectory,
@@ -52,8 +52,8 @@ assert.equal(
   false,
   "TypeScript build metadata leaked into a package",
 );
-const application = packed.find((entry) => entry.name === "@may/maybecode");
-assert.ok(application, "@may/maybecode was not packed");
+const application = packed.find((entry) => entry.name === "@sortedyuan/maybecode");
+assert.ok(application, "@sortedyuan/maybecode was not packed");
 const applicationPaths = application.files.map((file) => file.path);
 assert.ok(applicationPaths.includes("dist/bin.js"), "packed bin is missing");
 assert.ok(applicationPaths.some(path => path.startsWith("dist/cli/") && path.endsWith(".js")), "packed CLI chunks are missing");
@@ -76,12 +76,12 @@ assert.equal(
   "source or test files leaked into the MaybeCode package",
 );
 
-const packages = await reachableWorkspacePackages("@may/maybecode");
+const packages = await reachableWorkspacePackages("@sortedyuan/maybecode");
 assert.equal(packages.length, packed.length, "the packed dependency graph is incomplete");
 assert.equal(
   packages.filter((pkg) => pkg.private === true).map((pkg) => pkg.name).join(","),
-  "@may/maybecode",
-  "only the locally packed MaybeCode application may be private",
+  "",
+  "all packed runtime dependencies must be public",
 );
 await mkdir(workspaceDirectory, { recursive: true });
 await mkdir(homeDirectory, { recursive: true });
@@ -102,8 +102,8 @@ await writeFile(join(consumerDirectory, "package.json"), JSON.stringify({
   private: true,
   type: "module",
   dependencies: {
-    "@may/maybecode": localTarballs["@may/maybecode"],
-    "@may/mcp": localTarballs["@may/mcp"],
+    "@sortedyuan/maybecode": localTarballs["@sortedyuan/maybecode"],
+    "@sortedyuan/mcp": localTarballs["@sortedyuan/mcp"],
   },
 }, null, 2) + "\n", "utf8");
 await writeFile(
@@ -159,8 +159,8 @@ assert.match(help.stdout, /Usage:\s+maybecode/u);
 // Verify both optional MCP entry points from the installed tarballs, not workspace dist.
 await writeFile(join(consumerDirectory, "mcp-subpaths.mjs"), `
 import assert from "node:assert/strict";
-const server = await import("@may/mcp/server");
-const browser = await import("@may/mcp/apps-browser");
+const server = await import("@sortedyuan/mcp/server");
+const browser = await import("@sortedyuan/mcp/apps-browser");
 assert.equal(typeof server.createMayMcpServer, "function");
 assert.equal(typeof server.createMayMcpBearerAuthenticator, "function");
 assert.equal(typeof browser.mountMcpApp, "function");
@@ -183,6 +183,7 @@ const launched = await runPnpm([
     USERPROFILE: homeDirectory,
     APPDATA: join(homeDirectory, "AppData", "Roaming"),
     LOCALAPPDATA: join(homeDirectory, "AppData", "Local"),
+    GIT_CEILING_DIRECTORIES: consumerDirectory,
   },
   input: "/quit\n",
   inputAfter: /Type \/help/u,

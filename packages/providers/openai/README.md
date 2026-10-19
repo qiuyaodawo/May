@@ -1,4 +1,4 @@
-# `@may/provider-openai`
+# `@sortedyuan/provider-openai`
 
 Generated image output is represented as ordered `ContentPart` image entries.
 `openAIResponseContent(message)` reads presentation content from native output
@@ -13,7 +13,7 @@ file id. Unsupported audio and generic resource parts fail explicitly instead
 of being stringified.
 
 ```ts
-import { OpenAIResponsesModel } from "@may/provider-openai";
+import { OpenAIResponsesModel } from "@sortedyuan/provider-openai";
 
 const model = new OpenAIResponsesModel({
   apiKey: process.env.OPENAI_API_KEY!,

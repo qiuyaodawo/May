@@ -19,6 +19,8 @@ experience. Public APIs and persistence formats are currently in developer previ
 - [Use MaybeClaw](guides/maybeclaw.md): configure a Gateway, Agents, sessions, and channels.
 - [Develop and verify the repository](guides/repository-development.md): build, test,
   inspect CI, and select environment-specific checks.
+- [Prepare and verify npm releases](guides/npm-release.md): package scope,
+  Changesets, external installation checks and publication controls.
 - [Build an Agent](guides/building-an-agent.md): choose model, tools, permissions,
   Context, storage, and UI.
 - [Configure and inspect MaybeCode instructions](guides/maybecode-instructions.md).

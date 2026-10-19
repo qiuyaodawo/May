@@ -1,1 +1,1 @@
-export { createModelContextSummarizer } from "@may/plugin-history-memory";
+export { createModelContextSummarizer } from "@sortedyuan/plugin-history-memory";

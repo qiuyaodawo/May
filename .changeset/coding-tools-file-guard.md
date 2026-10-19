@@ -1,5 +1,5 @@
 ---
-"@may/coding-tools": minor
+"@sortedyuan/coding-tools": minor
 ---
 
 `read`、`edit` 与 `write` 工具新增可选的 `guard` 选项。守卫收到已经过工作区路径保护

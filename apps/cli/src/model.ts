@@ -1,9 +1,9 @@
-import type { Model } from "@may/core";
+import type { Model } from "@sortedyuan/core";
 import {
   createBuiltinProviderModel,
   type ProviderAdapterRegistry,
   ProviderAdapterRegistryError,
-} from "@may/providers";
+} from "@sortedyuan/providers";
 
 import { CliConfigError } from "./errors.js";
 import type { SelectedModelConfig } from "./selection.js";

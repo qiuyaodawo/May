@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { loadMayConfig, resolveModelProfile } from "@may/config";
-import { InMemoryContext, May } from "@may/core";
+import { loadMayConfig, resolveModelProfile } from "@sortedyuan/config";
+import { InMemoryContext, May } from "@sortedyuan/core";
 import { ZhipuModel } from "../dist/index.js";
 
 test("completes a real preserved-thinking tool loop", { timeout: 120_000 }, async () => {

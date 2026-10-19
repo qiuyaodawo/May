@@ -1,10 +1,10 @@
-# `@may/provider-kimi`
+# `@sortedyuan/provider-kimi`
 
 Kimi model adapter for May.
 
 ```ts
-import { InMemoryContext, May } from "@may/core";
-import { KimiModel } from "@may/provider-kimi";
+import { InMemoryContext, May } from "@sortedyuan/core";
+import { KimiModel } from "@sortedyuan/provider-kimi";
 
 const may = new May({
   model: new KimiModel({

@@ -1,4 +1,4 @@
-import type { ChannelAttachment, ChannelInput } from "@may/plugin-delivery";
+import type { ChannelAttachment, ChannelInput } from "@sortedyuan/plugin-delivery";
 
 export interface FeishuEvent {
   event_id?: string; sender?: { sender_type?: string; sender_id?: { open_id?: string } };

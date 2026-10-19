@@ -1,7 +1,7 @@
 ---
-"@may/goal": minor
-"@may/plugin-goals": minor
-"@may/plugin-history-memory": minor
+"@sortedyuan/goal": minor
+"@sortedyuan/plugin-goals": minor
+"@sortedyuan/plugin-history-memory": minor
 ---
 
 Compose active Goal and history-reference guidance through ordered instruction

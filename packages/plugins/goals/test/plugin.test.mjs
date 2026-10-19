@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PluginHost, definePlugin } from "@may/plugin";
-import { APPLICATION_HOOKS, AgentApplication, applicationServices } from "@may/application";
+import { PluginHost, definePlugin } from "@sortedyuan/plugin";
+import { APPLICATION_HOOKS, AgentApplication, applicationServices } from "@sortedyuan/application";
 import { createGoalsPlugin, goalsService } from "../dist/index.js";
 import { runtimeHooks } from "../../../core/dist/index.js";
 import { DeepSeekModel } from "../../../providers/deepseek/dist/index.js";

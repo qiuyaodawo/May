@@ -1,5 +1,5 @@
 {
-  "name": "@may/coordination",
+  "name": "@sortedyuan/coordination",
   "version": "0.1.0",
   "description": "Durable, single-host task graphs above May Agent applications.",
   "type": "module",
@@ -18,10 +18,10 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/application": "workspace:*",
-    "@may/core": "workspace:*",
-    "@may/permissions": "workspace:*",
-    "@may/session": "workspace:*"
+    "@sortedyuan/application": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/permissions": "workspace:*",
+    "@sortedyuan/session": "workspace:*"
   },
   "devDependencies": { "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },

@@ -7,7 +7,7 @@
 
 ## 独立、显式启用的入口
 
-从 `@may/mcp/server` 导入 `createMayMcpServer`。应用明确提供工具、资源、提示模板、认证、按方法/
+从 `@sortedyuan/mcp/server` 导入 `createMayMcpServer`。应用明确提供工具、资源、提示模板、认证、按方法/
 目标授权及正常 `ToolExecutor`，缺少安全服务属于配置错误。
 
 官方 server SDK 2.0.0 负责 serving 和协议校验。默认只服务现代 `2026-07-28`；
@@ -17,14 +17,14 @@ SSE。导出支持有大小限制的即时工具、固定资源和提示模板�
 
 ## 最小 stdio 示例
 
-在 ESM TypeScript 项目安装 `@may/mcp` 和 `@may/permissions`，将以下内容保存为
+在 ESM TypeScript 项目安装 `@sortedyuan/mcp` 和 `@sortedyuan/permissions`，将以下内容保存为
 `server.ts`，通过项目构建编译，再将生成的 JavaScript 作为 MCP 客户端启动命令。
 Stdout 专供协议使用。示例收到 SIGINT 后清理；产品启动程序还需要将自身关闭
 信号连接到同一清理流程。
 
 ```ts
-import { createMayMcpServer } from "@may/mcp/server";
-import { PermissionToolExecutor } from "@may/permissions";
+import { createMayMcpServer } from "@sortedyuan/mcp/server";
+import { PermissionToolExecutor } from "@sortedyuan/permissions";
 
 const workspaceId = "explicit-workspace";
 // 示例只导出 echo。应用需要使用自己的权限策略和审批界面。
@@ -114,7 +114,7 @@ SDK 句柄，不关闭应用监听器或注入执行器。
 `{ "text": "hello" }` 返回对应 JSON 文本，以及无效输入被拒绝。HTTP 部署前还
 需要检查缺少认证、未授权工作区及审批期间撤销凭据的行为。
 
-在仓库根目录执行 `pnpm --filter @may/mcp test`，运行本地集成检查，其中包含
+在仓库根目录执行 `pnpm --filter @sortedyuan/mcp test`，运行本地集成检查，其中包含
 下述服务端测试。
 
 `packages/mcp/test/server.test.mjs` 通过 May MCP 客户端连接真实 HTTP 端点，检查

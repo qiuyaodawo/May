@@ -1,5 +1,5 @@
 {
-  "name": "@may/plugin-delegation",
+  "name": "@sortedyuan/plugin-delegation",
   "version": "0.1.0",
   "description": "Durable delegated agent lifecycle, budgets and shared workspace file coordination plugin.",
   "type": "module",
@@ -16,7 +16,7 @@
   },
   "files": ["dist", "!dist/.tsbuildinfo"],
   "scripts": { "build": "tsc -b", "test": "pnpm run build && node --test test/*.test.mjs" },
-  "dependencies": { "@may/application": "workspace:*", "@may/coding-tools": "workspace:*", "@may/config": "workspace:*", "@may/context": "workspace:*", "@may/coordination": "workspace:*", "@may/core": "workspace:*", "@may/permissions": "workspace:*", "@may/session": "workspace:*", "@may/skills": "workspace:*", "@may/plugin": "workspace:*", "@may/plugin-services": "workspace:*", "@may/plugin-history-memory": "workspace:*", "@may/plugin-goals": "workspace:*", "@may/plugin-mcp": "workspace:*" },
+  "dependencies": { "@sortedyuan/application": "workspace:*", "@sortedyuan/coding-tools": "workspace:*", "@sortedyuan/config": "workspace:*", "@sortedyuan/context": "workspace:*", "@sortedyuan/coordination": "workspace:*", "@sortedyuan/core": "workspace:*", "@sortedyuan/permissions": "workspace:*", "@sortedyuan/session": "workspace:*", "@sortedyuan/skills": "workspace:*", "@sortedyuan/plugin": "workspace:*", "@sortedyuan/plugin-services": "workspace:*", "@sortedyuan/plugin-history-memory": "workspace:*", "@sortedyuan/plugin-goals": "workspace:*", "@sortedyuan/plugin-mcp": "workspace:*" },
   "devDependencies": { "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"

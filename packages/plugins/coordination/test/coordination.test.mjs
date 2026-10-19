@@ -4,8 +4,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { InMemoryCoordinationStore } from "@may/coordination";
-import { PluginHost } from "@may/plugin";
+import { InMemoryCoordinationStore } from "@sortedyuan/coordination";
+import { PluginHost } from "@sortedyuan/plugin";
 import { createCoordinationPlugin, coordinationService } from "../dist/index.js";
 
 test("coordination plugin executes real file hashes and releases writer ownership across repeated cleanup", async t => {

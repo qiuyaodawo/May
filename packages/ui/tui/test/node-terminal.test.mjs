@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import test from "node:test";
 
-import { createNodeTerminal } from "@may/tui/node-terminal";
+import { createNodeTerminal } from "@sortedyuan/tui/node-terminal";
 
 test("completes suggestions and redraws an active prompt around output", async () => {
   const { terminal, input, output } = createTestTerminal();

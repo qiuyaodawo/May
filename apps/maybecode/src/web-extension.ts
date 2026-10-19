@@ -1,5 +1,5 @@
 import { parsePatch } from "./vendor-diff.js";
-import type { WebUiExtensions } from "@may/web-ui";
+import type { WebUiExtensions } from "@sortedyuan/web-ui";
 
 /** Trusted browser-only product extension. No filesystem or runtime objects reach this module. */
 export const extensions: WebUiExtensions = {

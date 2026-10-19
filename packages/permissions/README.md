@@ -1,14 +1,14 @@
-# `@may/permissions`
+# `@sortedyuan/permissions`
 
-`@may/permissions` provides a headless permission layer for May tools. It
+`@sortedyuan/permissions` provides a headless permission layer for May tools. It
 implements Core's `ToolExecutor` contract and leaves all terminal or graphical
 interaction to the application.
 
 ## Usage
 
 ```ts
-import { May } from "@may/core";
-import { PermissionToolExecutor } from "@may/permissions";
+import { May } from "@sortedyuan/core";
+import { PermissionToolExecutor } from "@sortedyuan/permissions";
 
 const permissions = new PermissionToolExecutor({
   policy({ tool, input }) {
@@ -88,14 +88,14 @@ the policy input is not captured. `AgentApplication` wires this automatically.
 ## Persistent rules
 
 The host chooses storage, scope identities, and the trusted approving user. The
-Node.js file store is exported from `@may/permissions/file-store`; the default entry
+Node.js file store is exported from `@sortedyuan/permissions/file-store`; the default entry
 contains the executor, public types, and `InMemoryPermissionRuleStore` without
 Node.js filesystem imports.
 
 ```ts
 import { join } from "node:path";
-import { PermissionToolExecutor } from "@may/permissions";
-import { FilePermissionRuleStore } from "@may/permissions/file-store";
+import { PermissionToolExecutor } from "@sortedyuan/permissions";
+import { FilePermissionRuleStore } from "@sortedyuan/permissions/file-store";
 
 const ruleStore = await FilePermissionRuleStore.open({
   path: join(projectDirectory, ".may", "permission-rules.json"),
@@ -199,7 +199,7 @@ cleanup; the store does not automatically remove an existing lock.
 Local hosts can use `<project>/.may/permission-rules.json`; add this private
 authorization data to `.gitignore`. Long-running hosts can use
 `<data-directory>/permission-rules.json` and include their user/project/agent
-identities in `scopeId`. `@may/permissions` has no global storage path.
+identities in `scopeId`. `@sortedyuan/permissions` has no global storage path.
 
 Alongside approval events, `PermissionEvent` emits `rule.created { rule }`,
 `rule.revoked { ruleId, scopeId }`, and

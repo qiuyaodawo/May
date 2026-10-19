@@ -6,7 +6,7 @@ import test from "node:test";
 import AnsiParser from "node-ansiparser";
 import { Decoder } from "sixel";
 import { Jimp } from "jimp";
-import { FileMediaStore } from "@may/media";
+import { FileMediaStore } from "@sortedyuan/media";
 import { imageSource } from "../../../media/test/fixture.mjs";
 import { multicolorImage } from "./fixtures/multicolor-image.mjs";
 import { TerminalImages, encodeImage, Stack, ScrollView, Text, TranscriptStore, TranscriptView } from "../dist/index.js";

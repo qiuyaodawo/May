@@ -1,4 +1,4 @@
-import type { Tool } from "@may/core";
+import type { Tool } from "@sortedyuan/core";
 import {
   SESSION_EVENT_TYPES,
   sessionToolResultContent,
@@ -6,7 +6,7 @@ import {
   type SessionEventType,
   type SessionHistoryPage,
   type SessionHistoryQuery,
-} from "@may/session";
+} from "@sortedyuan/session";
 
 export const DEFAULT_SESSION_HISTORY_MAX_EVENTS = 50;
 export const DEFAULT_SESSION_HISTORY_MAX_OUTPUT_BYTES = 32 * 1024;

@@ -2,9 +2,9 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createConnection, type Socket } from "node:net";
 import { once } from "node:events";
 import { createMessageConnection, ErrorCodes, ResponseError, StreamMessageReader, StreamMessageWriter, type MessageConnection } from "vscode-jsonrpc/node";
-import type { AgentApplicationEvent } from "@may/application";
-import { freezeToolInput, validateTelemetryCorrelation, type ContentPart } from "@may/core";
-import type { ApprovalDecision, PersistentApprovalOptions } from "@may/permissions";
+import type { AgentApplicationEvent } from "@sortedyuan/application";
+import { freezeToolInput, validateTelemetryCorrelation, type ContentPart } from "@sortedyuan/core";
+import type { ApprovalDecision, PersistentApprovalOptions } from "@sortedyuan/permissions";
 import type { AgentAdapterContext, AgentAdapter, AgentCapabilities, AgentTaskStatus } from "./types.js";
 
 export type GatewayRpcOptions = {

@@ -58,7 +58,7 @@ pnpm maybecode
 通过 `-NoProfile` 启动的终端需要明确加载脚本。
 
 安装 package 后可以使用独立的 `maybecode` 命令。需要移除已有的全局开发安装时，
-执行 `pnpm remove --global @may/maybecode`。
+执行 `pnpm remove --global @sortedyuan/maybecode`。
 
 ## 控制工具审批
 

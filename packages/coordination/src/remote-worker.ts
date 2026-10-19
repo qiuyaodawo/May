@@ -2,9 +2,9 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { mkdir, open, readFile, unlink, type FileHandle } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
-import { AsyncStateSerializer, type AgentApplicationEvent } from "@may/application";
-import { isStreamingMayEvent, validateTelemetryCorrelation } from "@may/core";
-import type { ApprovalDecision } from "@may/permissions";
+import { AsyncStateSerializer, type AgentApplicationEvent } from "@sortedyuan/application";
+import { isStreamingMayEvent, validateTelemetryCorrelation } from "@sortedyuan/core";
+import type { ApprovalDecision } from "@sortedyuan/permissions";
 import type { CoordinationAgent, TaskExecution, TaskRecovery } from "./types.js";
 import { canonical, copy, freeze, name, positive, validateOutput } from "./validation.js";
 

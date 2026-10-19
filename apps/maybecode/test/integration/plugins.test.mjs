@@ -3,14 +3,14 @@ import test from "node:test";
 import { mkdir, mkdtemp, readFile, writeFile, readdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join, resolve, sep } from "node:path";
-import { loadMayConfig } from "@may/config";
-import { createBuiltinProviderModel, selectProviderModel } from "@may/providers";
-import { FileSessionStore } from "@may/session/file-store";
-import { goalsService } from "@may/plugin-goals";
-import { delegationService, defaultSubagentConfiguration } from "@may/plugin-delegation";
-import { historyMemoryService } from "@may/plugin-history-memory";
-import { createMcpPlugin } from "@may/plugin-mcp";
-import { openMcpClientPool } from "@may/mcp";
+import { loadMayConfig } from "@sortedyuan/config";
+import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { goalsService } from "@sortedyuan/plugin-goals";
+import { delegationService, defaultSubagentConfiguration } from "@sortedyuan/plugin-delegation";
+import { historyMemoryService } from "@sortedyuan/plugin-history-memory";
+import { createMcpPlugin } from "@sortedyuan/plugin-mcp";
+import { openMcpClientPool } from "@sortedyuan/mcp";
 import { MaybeCodeApplication, openConfiguredMaybeCode } from "../../dist/index.js";
 
 async function workspaceFor(t, label) {

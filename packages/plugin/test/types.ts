@@ -1,5 +1,5 @@
 import { definePlugin, defineService, type PluginDefinition } from "../dist/index.js";
-import { defineHook } from "@may/core";
+import { defineHook } from "@sortedyuan/core";
 
 const service = defineService<{ read(): number }>({ id: "typed", version: "1.0.0", scope: "application" });
 const hook = defineHook<{ count: number }>({ name: "typed", kind: "transform", validate(value) {

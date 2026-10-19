@@ -1,5 +1,5 @@
 ---
-"@may/tui": minor
+"@sortedyuan/tui": minor
 ---
 
 Support Sixel image previews in retained and readline terminals, including

@@ -1,4 +1,4 @@
-import type { KeyStroke } from "@may/keybindings";
+import type { KeyStroke } from "@sortedyuan/keybindings";
 import type { TextRow } from "./text-selection.js";
 
 export interface RenderSize {

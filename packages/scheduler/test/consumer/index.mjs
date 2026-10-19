@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { writeFile, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { Scheduler } from "@may/scheduler";
-import { SqliteSchedulerStore } from "@may/scheduler/sqlite-store";
+import { Scheduler } from "@sortedyuan/scheduler";
+import { SqliteSchedulerStore } from "@sortedyuan/scheduler/sqlite-store";
 
 const host = new DatabaseSync("tasks.sqlite");
 host.exec("CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, artifact TEXT NOT NULL) STRICT");

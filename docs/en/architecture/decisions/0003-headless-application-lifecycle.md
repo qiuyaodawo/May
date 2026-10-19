@@ -1,4 +1,4 @@
-# ADR 0003: Shared lifecycle belongs in `@may/application`
+# ADR 0003: Shared lifecycle belongs in `@sortedyuan/application`
 
 **English** | [简体中文](../../../zh-CN/architecture/decisions/0003-headless-application-lifecycle.md)
 

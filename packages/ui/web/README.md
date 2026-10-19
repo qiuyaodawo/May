@@ -1,4 +1,4 @@
-# @may/web-ui
+# @sortedyuan/web-ui
 
 `createWorkspaceUI(client)` provides a fixed Git status region, completed-reply
 fork dialogs, structured file-diff browsing and registered-worktree management.
@@ -35,8 +35,8 @@ The browser entry exports `mountWebUI`, `transcriptBlock`, `approvalCard`,
 `detailPanel`, `markdown`, `createNavigation`, and the trusted extension interfaces.
 
 ```ts
-import { UiClient } from "@may/ui-client";
-import { mountWebUI, type WebUiNavigation } from "@may/web-ui";
+import { UiClient } from "@sortedyuan/ui-client";
+import { mountWebUI, type WebUiNavigation } from "@sortedyuan/web-ui";
 
 const navigation: WebUiNavigation = {
   groups: [
@@ -65,9 +65,9 @@ await client.connect(controlToken);
 // dispose() disconnects this view, not the agent host.
 ```
 
-Use your bundler for imports above, or `webUiAssets()` from `@may/web-ui/assets`
+Use your bundler for imports above, or `webUiAssets()` from `@sortedyuan/web-ui/assets`
 to serve the bundled native-ES-module shell and CSS through the loopback host.
-Import `@may/web-ui/styles.css` when composing components outside that shell.
+Import `@sortedyuan/web-ui/styles.css` when composing components outside that shell.
 
 `webUiAssets(..., { browserLogin: true })` supports the loopback server's one-time
 connection links. The page removes the ticket fragment before exchange and keeps
@@ -199,8 +199,8 @@ Search results are query snapshots, not live replacement approvals. Hosts withou
 read capabilities retain their basic snapshot UI; field tabs stay disabled.
 Run `node examples/web-ui/reading.mjs` after building for a large offline fixture.
 
-Run `pnpm --filter @may/web-ui exec playwright install chromium`, then
-`pnpm --filter @may/web-ui test:browser` for Chromium DOM checks against the real
+Run `pnpm --filter @sortedyuan/web-ui exec playwright install chromium`, then
+`pnpm --filter @sortedyuan/web-ui test:browser` for Chromium DOM checks against the real
 workspace, catalog, UI host and HTTP service. The test creates 520 sessions and
 checks additions, deletions, renames, pagination and search. It makes no model
 requests and saves no screenshots. Temporary browser files stay under `review/`.

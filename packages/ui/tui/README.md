@@ -1,4 +1,7 @@
-# `@may/tui`
+# `@sortedyuan/tui`
+
+The package includes the PNG declarations required by its image dependency.
+Consumers can check installed declarations with TypeScript `skipLibCheck: false`.
 
 `Text` accepts `continuationIndent`, a non-negative safe integer specifying the
 minimum indentation of wrapped continuation lines. Existing logical-line
@@ -8,7 +11,7 @@ The option has no effect with `wrap: false`. Layout indentation is excluded from
 copied text. Transcript notices use a minimum of two columns. Wrapped text keeps
 RGB colors and combined ANSI styles across rows.
 
-`renderMarkdownExcerpt(source, options?)` is exported from `@may/tui`. It parses
+`renderMarkdownExcerpt(source, options?)` is exported from `@sortedyuan/tui`. It parses
 complete GFM with Marked and returns a plain-text excerpt. `maxCharacters`
 defaults to 400 graphemes (including the truncation ellipsis, excluding newlines);
 `maxLines` defaults to 6 logical lines, including blank lines. Both options must
@@ -25,7 +28,7 @@ provides keyboard tree navigation, search, reply previews and current-workspace 
 new-worktree selection. `WorkspaceDiffViewer` provides file selection, colored
 unified diff, scrolling, search and change navigation. `workspaceGitLabel` formats
 branch, detached HEAD, initialization and failure states for a fixed status region.
-All are exported from `@may/tui`; the components consume structured host state and
+All are exported from `@sortedyuan/tui`; the components consume structured host state and
 perform no Git or model operations. See [Web UI](../../../docs/en/guides/web-ui.md)
 / [共享 Web UI](../../../docs/zh-CN/guides/web-ui.md).
 
@@ -56,8 +59,8 @@ Sixel rendering requires these metrics; pending or unsupported terminals show
 the saved attachment information. `TerminalImages.revision` includes changes
 to prepared images and cell metrics so transcript caches can refresh.
 
-Run `pnpm --filter @may/tui test` for component and codec tests. Run
-`pnpm --filter @may/tui test:sixel` for real xterm browser-terminal tests; this
+Run `pnpm --filter @sortedyuan/tui test` for component and codec tests. Run
+`pnpm --filter @sortedyuan/tui test:sixel` for real xterm browser-terminal tests; this
 requires the Playwright Chromium installation. These tests inspect decoded
 pixels and terminal state without screenshots.
 
@@ -71,8 +74,7 @@ their clipboard contents. Ordinary tests do not modify the system clipboard.
 Terminal UI components for May agents. The low-level primitives remain usable
 without a provider or product application, while the agent transcript layer
 projects May runtime, permission, and session events into a retained view.
-Both layers intentionally remain in `@may/tui`; May does not introduce a
-separate `@may/agent-tui` package for the Agent-aware components.
+Both layers are provided by `@sortedyuan/tui`.
 
 The first milestone provides:
 
@@ -83,21 +85,21 @@ The first milestone provides:
 - semantic theme tokens and ANSI style helpers;
 - explicit focus management and a batched TUI runtime;
 - a retained screen buffer and differential full-screen renderer;
-- a Node terminal driver that emits `@may/keybindings` key strokes and treats
+- a Node terminal driver that emits `@sortedyuan/keybindings` key strokes and treats
   bracketed paste as one safe multiline input operation;
 - a readline-backed `TerminalIO` adapter for prompt-driven applications, with
   history, live suggestions, prompt-safe asynchronous output, and normalized
   one-key reads;
 - a reusable `TranscriptStore` and `TranscriptView` for live and restored agent
-  runs, exposed through `@may/tui/transcript`;
+  runs, exposed through `@sortedyuan/tui/transcript`;
 - an instance-scoped tool-renderer registry and standard coding-tool renderers,
-  exposed through `@may/tui/tool-renderers`.
+  exposed through `@sortedyuan/tui/tool-renderers`.
 
 Use `NodeTerminalDriver` when an application owns a retained, raw-mode screen.
 The driver reports a standalone LF byte as `Ctrl+J` and CR as `Enter`.
 Use `createNodeTerminal` when it needs line-oriented questions and occasional
 temporary full-screen views. The latter is also available through the
-`@may/tui/node-terminal` subpath.
+`@sortedyuan/tui/node-terminal` subpath.
 
 `NodeTerminalDriver` enables SGR mouse reporting while the alternate screen is
 active and disables it on exit. Mouse input is decoded with `tty-events`;
@@ -124,7 +126,7 @@ history navigation at the first/last logical line, `Ctrl+W` or modified
 Backspace for backward word deletion, and modified Left/Right for word
 movement. Applications decide whether to provide and persist history.
 
-Editor, ScrollView and SelectList use `@may/keybindings` semantic actions.
+Editor, ScrollView and SelectList use `@sortedyuan/keybindings` semantic actions.
 Editor accepts `keybindings` overrides and an injected `Clipboard` with async
 `readText`/`writeText`. It supports mouse selection, Shift navigation, Ctrl+A,
 Ctrl+C/X/V and replacement of selected text. Home/End target logical lines.
@@ -166,13 +168,13 @@ the existing bracketed paste event. User workflows are documented in
 Run the local smoke demo with:
 
 ```sh
-pnpm --filter @may/tui demo
+pnpm --filter @sortedyuan/tui demo
 ```
 
 Use `Tab` to move between the editor and selection list, resize the terminal to
 exercise reflow, and press `Ctrl+C` to exit.
 
-`@may/tui` is the implementation used by May's bundled terminal applications,
+`@sortedyuan/tui` is the implementation used by May's bundled terminal applications,
 not the custom-UI boundary. Alternative UIs should consume the application's
 headless controller and events directly.
 

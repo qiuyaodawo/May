@@ -18,7 +18,7 @@ import {
   type ToolCall,
   type UserMessage,
   userMessage,
-} from "@may/core";
+} from "@sortedyuan/core";
 
 import type {
   RecordablePermissionEvent,

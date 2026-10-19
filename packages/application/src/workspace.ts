@@ -2,12 +2,12 @@ import type {
   ContextCompactionResult,
   ContextCompactionStrategy,
   ContextInspection,
-} from "@may/context";
+} from "@sortedyuan/context";
 import {
   AsyncEventQueue,
   isStreamingMayEvent,
-} from "@may/core";
-import type { ApprovalDecision, ApprovalResolveOptions, CreatePermissionRuleOptions, PermissionCheck, PersistentPermissionRule } from "@may/permissions";
+} from "@sortedyuan/core";
+import type { ApprovalDecision, ApprovalResolveOptions, CreatePermissionRuleOptions, PermissionCheck, PersistentPermissionRule } from "@sortedyuan/permissions";
 import type {
   SessionEvent,
   SessionHistoryPage,
@@ -16,13 +16,13 @@ import type {
   SessionSubmitOptions,
   SessionBranchNode,
   SessionBranchPosition,
-} from "@may/session";
-import { readSessionBranchNode, readSessionBranchPositions } from "@may/session";
+} from "@sortedyuan/session";
+import { readSessionBranchNode, readSessionBranchPositions } from "@sortedyuan/session";
 import {
   latestSession,
   type SessionCatalog,
   type SessionSummary,
-} from "@may/session/catalog";
+} from "@sortedyuan/session/catalog";
 
 import type {
   AgentController,
@@ -673,5 +673,5 @@ function isDroppableWorkspaceEvent<ApplicationEvent, ExtensionEvent>(
   return candidate.type === "run.event" &&
     typeof candidate.event === "object" &&
     candidate.event !== null &&
-    isStreamingMayEvent(candidate.event as import("@may/core").MayEvent);
+    isStreamingMayEvent(candidate.event as import("@sortedyuan/core").MayEvent);
 }

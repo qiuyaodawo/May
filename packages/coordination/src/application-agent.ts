@@ -1,6 +1,6 @@
-import type { AgentApplication, AgentDefinition } from "@may/application";
-import { correlationTraceAttributes, type Tool } from "@may/core";
-import type { SessionStore } from "@may/session";
+import type { AgentApplication, AgentDefinition } from "@sortedyuan/application";
+import { correlationTraceAttributes, type Tool } from "@sortedyuan/core";
+import type { SessionStore } from "@sortedyuan/session";
 import type { CoordinationAgent, TaskExecution, TaskExecutionContext } from "./types.js";
 import { coordinationInput, inspectTaskSession, taskIdentity, taskOutputFromResult, taskTurnInputId } from "./application-session.js";
 import { name } from "./validation.js";

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { MODEL_CAPABILITY_KEYS, parseMayConfig, type ModelCapabilityDeclaration, type ModelCapabilitiesOverride, type ModelCapabilityKey } from "@may/config";
-import type { ModelRequest } from "@may/core";
+import { MODEL_CAPABILITY_KEYS, parseMayConfig, type ModelCapabilityDeclaration, type ModelCapabilitiesOverride, type ModelCapabilityKey } from "@sortedyuan/config";
+import type { ModelRequest } from "@sortedyuan/core";
 import type { ProviderModelSelection } from "./types.js";
 
 export { MODEL_CAPABILITY_KEYS };

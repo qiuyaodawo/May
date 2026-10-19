@@ -1,9 +1,9 @@
-import type { Model, RuntimeFactory, Tool, ToolExecutor, ToolScheduler, Tracer } from "@may/core";
-import type { ContextBudget, ContextCompactionStrategy, ContextFactory } from "@may/context";
-import type { PermissionPolicy } from "@may/permissions";
-import { defineService } from "@may/plugin";
-import type { SessionStore } from "@may/session";
-import type { SkillSession } from "@may/skills";
+import type { Model, RuntimeFactory, Tool, ToolExecutor, ToolScheduler, Tracer } from "@sortedyuan/core";
+import type { ContextBudget, ContextCompactionStrategy, ContextFactory } from "@sortedyuan/context";
+import type { PermissionPolicy } from "@sortedyuan/permissions";
+import { defineService } from "@sortedyuan/plugin";
+import type { SessionStore } from "@sortedyuan/session";
+import type { SkillSession } from "@sortedyuan/skills";
 import { ContextWrappers, InstructionSources, ModelWrappers, ToolSources } from "./registries.js";
 
 export interface ContextOptions {

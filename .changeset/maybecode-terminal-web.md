@@ -1,7 +1,7 @@
 ---
-"@may/maybecode": minor
-"@may/ui-client": minor
-"@may/web-ui": minor
+"@sortedyuan/maybecode": minor
+"@sortedyuan/ui-client": minor
+"@sortedyuan/web-ui": minor
 ---
 
 MaybeCode 的两个终端界面支持 `/web`，自动打开浏览器并连接当前工作区与 Session。

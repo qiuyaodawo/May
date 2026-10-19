@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { EvalRegistry, EvalRunner, createLocalDirectoryEnvironment, createNodeCommandExecutionAdapter, createJsonSchemaEvaluator } from "@may/eval";
-import { FileEvalStore } from "@may/eval/file-store";
-import * as application from "@may/eval/application";
-import * as coordination from "@may/eval/coordination";
+import { EvalRegistry, EvalRunner, createLocalDirectoryEnvironment, createNodeCommandExecutionAdapter, createJsonSchemaEvaluator } from "@sortedyuan/eval";
+import { FileEvalStore } from "@sortedyuan/eval/file-store";
+import * as application from "@sortedyuan/eval/application";
+import * as coordination from "@sortedyuan/eval/coordination";
 
 assert.ok(Object.keys(application).length);
 assert.ok(Object.keys(coordination).length);

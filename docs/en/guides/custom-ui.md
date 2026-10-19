@@ -7,8 +7,8 @@ an open `AgentApplication` or workspace controller and a UI that can consume
 asynchronous events while accepting cancellation and approval responses.
 
 For a browser interface, use the [shared Web UI](web-ui.md):
-`@may/ui-client` supplies the JSON boundary and state synchronization;
-`@may/web-ui` supplies composable components and an optional workbench.
+`@sortedyuan/ui-client` supplies the JSON boundary and state synchronization;
+`@sortedyuan/web-ui` supplies composable components and an optional workbench.
 The direct in-process controller and TUI patterns below remain supported.
 
 May's application layer is headless. A terminal, desktop, web, or remote UI
@@ -47,20 +47,20 @@ waits for event relays, and then closes the event stream.
 ## Projecting application events
 
 This projection function assumes an open controller, a `TranscriptStore`, and
-an application-owned `askApproval` dialog. Install `@may/application`,
-`@may/permissions` and `@may/tui` in the consuming project. The function observes
+an application-owned `askApproval` dialog. Install `@sortedyuan/application`,
+`@sortedyuan/permissions` and `@sortedyuan/tui` in the consuming project. The function observes
 events until the controller closes; run input and exit handling concurrently.
 
 ```ts
 import type {
   AgentApplicationEvent,
   AgentController,
-} from "@may/application";
+} from "@sortedyuan/application";
 import type {
   ApprovalDecision,
   ApprovalRequest,
-} from "@may/permissions";
-import { TranscriptStore } from "@may/tui/transcript";
+} from "@sortedyuan/permissions";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
 
 type AskApproval = (
   request: ApprovalRequest,
@@ -123,8 +123,8 @@ import {
   FullscreenRenderer,
   NodeTerminalDriver,
   TuiRuntime,
-} from "@may/tui";
-import { TranscriptStore, TranscriptView } from "@may/tui/transcript";
+} from "@sortedyuan/tui";
+import { TranscriptStore, TranscriptView } from "@sortedyuan/tui/transcript";
 
 const store = new TranscriptStore();
 const view = new TranscriptView(store, { assistantLabel: "My Agent" });
@@ -154,7 +154,7 @@ unknown tools with a generic renderer. Register product renderers on a
 global UI registry.
 
 Use `NodeTerminalDriver` for a raw-mode retained screen. Use
-`createNodeTerminal()` from `@may/tui/node-terminal` for a line-oriented prompt
+`createNodeTerminal()` from `@sortedyuan/tui/node-terminal` for a line-oriented prompt
 UI. They own different input modes and should not control the same terminal at
 the same time.
 
@@ -233,7 +233,7 @@ and observed terminal state. Retrying abandoned/expired input requires explicit
 [tasks](./mcp-tasks.md) for budgets, commands and recovery restrictions.
 
 Graphical hosts can use `pool.openApp`, `mcpAppSandboxResponse` and the browser-only
-`@may/mcp/apps-browser` entry point. See [isolated Apps](./mcp-apps.md) for consent,
+`@sortedyuan/mcp/apps-browser` entry point. See [isolated Apps](./mcp-apps.md) for consent,
 origin/CSP requirements and unsupported APIs. Terminals retain text fallback.
 
 ## Verify the UI lifecycle

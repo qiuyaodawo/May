@@ -1,4 +1,4 @@
-import type { UiBlock, UiClient, UiClientState, UiField, UiFieldPage, UiForkPoint } from "@may/ui-client";
+import type { UiBlock, UiClient, UiClientState, UiField, UiFieldPage, UiForkPoint } from "@sortedyuan/ui-client";
 import { approvalCard, button, element, statusLabel, transcriptBlock, type WebUiExtensions } from "./components.js";
 
 const preview = (text: string, limit: number) => text.length > limit ? text.slice(0, limit) + "\n…（预览已截断，完整内容见详情）" : text;

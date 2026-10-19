@@ -1,4 +1,4 @@
-import { resolveRunBudget } from "@may/core";
+import { resolveRunBudget } from "@sortedyuan/core";
 import type { CoordinationLimits, CoordinationSnapshot, CoordinationTask, HandoffSpec, TaskController, TaskMessageSpec, TaskOutput, TaskSpec } from "./types.js";
 
 export function copy<T>(value: T): T {

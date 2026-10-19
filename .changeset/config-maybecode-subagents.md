@@ -1,5 +1,5 @@
 ---
-"@may/config": minor
+"@sortedyuan/config": minor
 ---
 
 `may-config.schema.json` 增加 `apps.maybecode.subagents`：委派开关、角色（模型、

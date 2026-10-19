@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { quote } from "shell-quote";
-import { commandArgs, createTelemetryPanel, UiError, type UiTelemetryData, type UiAction, type UiBlock, type UiCommand, type UiFieldRequest, type UiHost, type UiPageRequest, type UiReceipt, type UiSnapshot } from "@may/ui-client";
-import { historyPage, readPage, fieldPage } from "@may/ui-client/reading";
-import { UiProjection } from "@may/ui-client/projection";
-import { displayParts, imageAttachment, readEmbeddedImage } from "@may/media";
-import type { AgentApplicationEvent } from "@may/application";
-import type { ApprovalDecision } from "@may/permissions";
+import { commandArgs, createTelemetryPanel, UiError, type UiTelemetryData, type UiAction, type UiBlock, type UiCommand, type UiFieldRequest, type UiHost, type UiPageRequest, type UiReceipt, type UiSnapshot } from "@sortedyuan/ui-client";
+import { historyPage, readPage, fieldPage } from "@sortedyuan/ui-client/reading";
+import { UiProjection } from "@sortedyuan/ui-client/projection";
+import { displayParts, imageAttachment, readEmbeddedImage } from "@sortedyuan/media";
+import type { AgentApplicationEvent } from "@sortedyuan/application";
+import type { ApprovalDecision } from "@sortedyuan/permissions";
 import type { AgentGateway } from "./gateway.js";
 import type { GatewayActor, GatewayAgentConfig, GatewayApproval, GatewayBinding, GatewayDelivery, GatewayEntry, GatewaySession, GatewayTask } from "./gateway-types.js";
 import { actorKey } from "./gateway-types.js";

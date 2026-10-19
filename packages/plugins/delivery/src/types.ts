@@ -1,5 +1,5 @@
-import type { ImageData, MediaCapabilities } from "@may/media";
-import type { Disposer } from "@may/plugin";
+import type { ImageData, MediaCapabilities } from "@sortedyuan/media";
+import type { Disposer } from "@sortedyuan/plugin";
 import type { ChannelStore, ChannelInput, ChannelAttachment, ChannelDeliveryReceipt, DeliveryRecord } from "./store.js";
 
 export type GroupTrigger = "explicit" | "all";

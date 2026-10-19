@@ -1,5 +1,5 @@
 {
-  "name": "@may/application",
+  "name": "@sortedyuan/application",
   "version": "0.1.0",
   "description": "Reusable Agent definitions and headless application/workspace lifecycle for May agents.",
   "type": "module",
@@ -30,21 +30,21 @@
   "dependencies": {
     "diff": "9.0.0",
     "simple-git": "^4.0.2",
-    "@may/skills": "workspace:*",
-    "@may/context": "workspace:*",
-    "@may/core": "workspace:*",
-    "@may/permissions": "workspace:*",
-    "@may/plugin": "workspace:*",
-    "@may/plugin-services": "workspace:*",
-    "@may/plugin-models": "workspace:*",
-    "@may/plugin-runtime": "workspace:*",
-    "@may/plugin-permissions": "workspace:*",
-    "@may/plugin-skills": "workspace:*",
-    "@may/session": "workspace:*",
-    "@may/session-tools": "workspace:*"
+    "@sortedyuan/skills": "workspace:*",
+    "@sortedyuan/context": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/permissions": "workspace:*",
+    "@sortedyuan/plugin": "workspace:*",
+    "@sortedyuan/plugin-services": "workspace:*",
+    "@sortedyuan/plugin-models": "workspace:*",
+    "@sortedyuan/plugin-runtime": "workspace:*",
+    "@sortedyuan/plugin-permissions": "workspace:*",
+    "@sortedyuan/plugin-skills": "workspace:*",
+    "@sortedyuan/session": "workspace:*",
+    "@sortedyuan/session-tools": "workspace:*"
   },
   "devDependencies": {
-    "@may/provider-openai": "workspace:*",
+    "@sortedyuan/provider-openai": "workspace:*",
     "@types/node": "^22.0.0"
   },
   "engines": {

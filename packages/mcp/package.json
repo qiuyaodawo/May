@@ -1,5 +1,5 @@
 {
-  "name": "@may/mcp",
+  "name": "@sortedyuan/mcp",
   "version": "0.1.0",
   "description": "Model Context Protocol clients, isolated Apps host and opt-in server exports for May.",
   "type": "module",
@@ -31,7 +31,7 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
     "@modelcontextprotocol/client": "^2.0.0",
     "@modelcontextprotocol/server": "2.0.0"
   },

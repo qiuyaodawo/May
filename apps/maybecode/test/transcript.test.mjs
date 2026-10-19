@@ -5,7 +5,7 @@ import {
   TranscriptStore,
   TranscriptView,
 } from "../dist/index.js";
-import { ScrollView } from "@may/tui";
+import { ScrollView } from "@sortedyuan/tui";
 
 test("keeps the newest transcript rows after the scroll buffer limit", () => {
   const store = new TranscriptStore();

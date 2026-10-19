@@ -4,7 +4,7 @@
 
 Use this guide to add a service or lifecycle handler to an existing May
 application. You need an application composition, the service or Hook you want
-to extend, and installed `@may/plugin` and `@may/application` packages.
+to extend, and installed `@sortedyuan/plugin` and `@sortedyuan/application` packages.
 
 1. Declare services and plugin setup using the [example](#declare-a-plugin).
 2. Add the definitions to your application's `plugins`, or
@@ -12,7 +12,7 @@ to extend, and installed `@may/plugin` and `@may/application` packages.
 3. Register cleanup when acquiring resources and select the scope that owns them.
 4. Verify initialization, Hook execution, state restoration and shutdown.
 
-`@may/plugin` manages configuration and resources. Core defines typed Hooks and
+`@sortedyuan/plugin` manages configuration and resources. Core defines typed Hooks and
 `AgentRuntime`; Application integrates them with permissions, Context and durable
 Session storage. The [architecture explanation](../architecture/plugins.md)
 describes their lifecycle and dependency rules.
@@ -70,8 +70,8 @@ In an ESM TypeScript module, declare the following two plugins. The example adds
 unchanged. The application supplies its own Model and storage separately.
 
 ```ts
-import { definePlugin, defineService } from "@may/plugin";
-import { applicationHooks } from "@may/application";
+import { definePlugin, defineService } from "@sortedyuan/plugin";
+import { applicationHooks } from "@sortedyuan/application";
 
 const labels = defineService<{ prefix: string }>({
   id: "example.labels", version: "1.0.0", scope: "application",
@@ -136,7 +136,7 @@ For a custom host, the following fragment assumes your plugin definitions,
 Keep the host alive for the operation and close it even if the operation fails:
 
 ```ts
-import { PluginHost } from "@may/plugin";
+import { PluginHost } from "@sortedyuan/plugin";
 
 const host = await PluginHost.create({ plugins, hooks: [myHook], services });
 try {
@@ -204,7 +204,7 @@ that their own fields do not expose.
 
 ## Runtime and application services
 
-`@may/plugin-services` defines the shared typed tokens. `applicationServices`
+`@sortedyuan/plugin-services` defines the shared typed tokens. `applicationServices`
 reexports them and adds `application`, whose `get()` returns the active
 AgentApplication after creation. Tokens cover `model`, `modelInfo`, `contextFactory`,
 `contextOptions`, `sessionStore`, `permissionPolicy`, `toolExecutor`,
@@ -245,21 +245,21 @@ The reusable plugin package list is explicit:
 
 | Package | Factories and responsibility |
 | --- | --- |
-| `@may/plugin-runtime` | `createRuntimePlugin`, `createContextPlugin`, `createToolsPlugin`, `createContextWrapperPlugin`; runtime, Context and tool composition |
-| `@may/plugin-models` | `createModelPlugin`, `createModelWrapperPlugin`; Model instances and wrappers |
-| `@may/plugin-permissions` | `createPermissionPlugin`; PermissionPolicy |
-| `@may/plugin-skills` | `createSkillsPlugin`; discovery, activation, instructions, tools and saved state |
-| `@may/plugin-goals` | `createGoalsPlugin`; persistent goals, budgets and continuation |
-| `@may/plugin-history-memory` | `createHistoryMemoryPlugin`; historical context notes, retrieval and compaction |
-| `@may/plugin-delegation` | `createDelegationPlugin`, `createWorkspaceFilesPlugin`; child Agents, shared budgets and workspace file access |
-| `@may/plugin-mcp` | `createMcpPlugin`, `createMcpHostPlugin`, `createSharedMcpPlugin`; connections, catalogs, authentication, interactions and task journals |
-| `@may/plugin-observability` | application, host and shared observability factories; tracing and exporter shutdown |
-| `@may/plugin-delivery` | `createDeliveryPlugin`; durable channel records, registered receivers and single-attempt delivery outcomes |
-| `@may/plugin-channel-telegram` | `createTelegramChannelPlugin`; Telegram receiver, routing and attachments |
-| `@may/plugin-channel-feishu` | `createFeishuChannelPlugin`; Feishu receiver, routing and attachments |
-| `@may/plugin-agent-adapters` | `createAgentAdaptersPlugin`, `createMayAgentAdapter`, `loadAgentAdapter`, RPC adapters; conversation and adapter resource management |
-| `@may/plugin-coordination` | `createCoordinationPlugin`; task graph creation, restoration and release |
-| `@may/plugin-web-api` | `createWebApiPlugin`; HTTP listener, active requests and connections |
+| `@sortedyuan/plugin-runtime` | `createRuntimePlugin`, `createContextPlugin`, `createToolsPlugin`, `createContextWrapperPlugin`; runtime, Context and tool composition |
+| `@sortedyuan/plugin-models` | `createModelPlugin`, `createModelWrapperPlugin`; Model instances and wrappers |
+| `@sortedyuan/plugin-permissions` | `createPermissionPlugin`; PermissionPolicy |
+| `@sortedyuan/plugin-skills` | `createSkillsPlugin`; discovery, activation, instructions, tools and saved state |
+| `@sortedyuan/plugin-goals` | `createGoalsPlugin`; persistent goals, budgets and continuation |
+| `@sortedyuan/plugin-history-memory` | `createHistoryMemoryPlugin`; historical context notes, retrieval and compaction |
+| `@sortedyuan/plugin-delegation` | `createDelegationPlugin`, `createWorkspaceFilesPlugin`; child Agents, shared budgets and workspace file access |
+| `@sortedyuan/plugin-mcp` | `createMcpPlugin`, `createMcpHostPlugin`, `createSharedMcpPlugin`; connections, catalogs, authentication, interactions and task journals |
+| `@sortedyuan/plugin-observability` | application, host and shared observability factories; tracing and exporter shutdown |
+| `@sortedyuan/plugin-delivery` | `createDeliveryPlugin`; durable channel records, registered receivers and single-attempt delivery outcomes |
+| `@sortedyuan/plugin-channel-telegram` (private) | `createTelegramChannelPlugin`; Telegram receiver, routing and attachments |
+| `@sortedyuan/plugin-channel-feishu` (private) | `createFeishuChannelPlugin`; Feishu receiver, routing and attachments |
+| `@sortedyuan/plugin-agent-adapters` | `createAgentAdaptersPlugin`, `createMayAgentAdapter`, `loadAgentAdapter`, RPC adapters; conversation and adapter resource management |
+| `@sortedyuan/plugin-coordination` | `createCoordinationPlugin`; task graph creation, restoration and release |
+| `@sortedyuan/plugin-web-api` | `createWebApiPlugin`; HTTP listener, active requests and connections |
 
 Implementations live in `packages/plugins/<name>/`. Shared tokens and ordered
 registries live in `packages/plugin-services/`; the plugin host remains in
@@ -268,7 +268,7 @@ registries live in `packages/plugin-services/`; the plugin host remains in
 Existing package classes and interfaces remain available for direct integration.
 Applications retain compatible exports for extracted functionality.
 
-`@may/plugin-agent-adapters` supports validated version 1 `TelemetryCorrelation`
+`@sortedyuan/plugin-agent-adapters` supports validated version 1 `TelemetryCorrelation`
 through `AgentAdapterContext.telemetry`. RPC transports negotiate
 `telemetryVersion: 1` before sending the separate envelope and validate it before
 execution. Business deduplication excludes telemetry identities. See
@@ -376,6 +376,6 @@ changes the intended input, resources close in reverse dependency order, and
 persisted state survives reopening. Check a missing dependency and incompatible
 state version fail before execution.
 
-From the repository root, run `pnpm --filter @may/plugin test`, `pnpm docs:check`, and
+From the repository root, run `pnpm --filter @sortedyuan/plugin test`, `pnpm docs:check`, and
 `pnpm test:package:plugin` for the host, documentation and independently installed
 package checks. Real provider tests are separate from the offline suite.

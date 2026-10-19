@@ -1,4 +1,4 @@
-import type { HookContext, HookDefinition, HookDispatcher } from "@may/core";
+import type { HookContext, HookDefinition, HookDispatcher } from "@sortedyuan/core";
 import { satisfies } from "semver";
 import { asError, handlerContext, HookRegistry, immutable, orderHandlers, withDeadline } from "./hooks.js";
 import { StateStore } from "./state.js";

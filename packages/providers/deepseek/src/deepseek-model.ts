@@ -3,13 +3,13 @@ import type {
   ModelEvent,
   ModelRequest,
   ModelStreamOptions,
-} from "@may/core";
+} from "@sortedyuan/core";
 import {
   streamOpenAICompatibleResponse,
   toOpenAICompatibleMessages,
   toOpenAICompatibleTools,
-} from "@may/provider-openai-compatible";
-import { parseRetryAfterMs } from "@may/provider-openai-compatible/http";
+} from "@sortedyuan/provider-openai-compatible";
+import { parseRetryAfterMs } from "@sortedyuan/provider-openai-compatible/http";
 import {
   DeepSeekApiError,
   DeepSeekFinishReasonError,

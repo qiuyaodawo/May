@@ -8,9 +8,9 @@ import {
   InMemoryContext,
   May,
   RunCancelledError,
-} from "@may/core";
-import { PermissionToolExecutor } from "@may/permissions";
-import { FileSessionStore } from "@may/session/file-store";
+} from "@sortedyuan/core";
+import { PermissionToolExecutor } from "@sortedyuan/permissions";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 import {
   InMemorySessionStore,
   Session,

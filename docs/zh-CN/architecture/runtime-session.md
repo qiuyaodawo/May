@@ -38,16 +38,16 @@ Session 存储保持独立，内存对话无需引入文件系统依赖。
 
 ```mermaid
 flowchart LR
-  Apps[apps] --> Application["@may/application"]
-  Application --> Plugin["@may/plugin"]
+  Apps[apps] --> Application["@sortedyuan/application"]
+  Application --> Plugin["@sortedyuan/plugin"]
   Application --> Components[context / session / permissions / session-tools]
-  Plugin --> Core["@may/core"]
+  Plugin --> Core["@sortedyuan/core"]
   Components --> Core
-  Apps --> Observability["@may/observability"]
+  Apps --> Observability["@sortedyuan/observability"]
   Observability --> Core
-  Apps --> MCP["@may/mcp"]
+  Apps --> MCP["@sortedyuan/mcp"]
   MCP --> Core
-  Apps --> TUI["@may/tui"]
+  Apps --> TUI["@sortedyuan/tui"]
   TUI --> Terminal[coding-tools / keybindings / session / permissions / core]
   Apps --> Products[provider / tool / config packages]
 ```
@@ -55,7 +55,7 @@ flowchart LR
 图中显示依赖方向，各个包的完整依赖以其 `package.json` 为准。可复用
 包不导入应用，任何包都不导入 `apps/maybecode`。
 
-### `@may/core`
+### `@sortedyuan/core`
 
 Core 负责活动执行：
 
@@ -74,7 +74,7 @@ Core 不负责 Session 发现、持久化、恢复、分支、UI 状态或某种
 支持临时的一次性 Run。Core 只拥有为自身执行插桩所需的小型
 `Tracer`/`TraceSpan` 接口与显式 `TraceContext` 传播，不导入具体遥测实现或厂商 SDK。
 
-### `@may/context`
+### `@sortedyuan/context`
 
 Context 包提供工厂和 Core 最小 `Context` 接口的可复用实现。应用可以
 通过工厂替换模型可见历史的保存或选择方式。它不拥有 Session 身份
@@ -84,14 +84,14 @@ Context 包提供工厂和 Core 最小 `Context` 接口的可复用实现。应�
 压缩。Core 在请求快照时传递 Run 元数据和取消信号；策略选择和持久化替换由应用管理。
 
 模型适配器可以提供 Provider 原生 Context 压缩器。Core 只定义不透明
-能力边界；`@may/context` 将其适配进自动策略链，Provider 自行通过
+能力边界；`@sortedyuan/context` 将其适配进自动策略链，Provider 自行通过
 `modelState` 序列化和恢复原生续接状态。
 
-### `@may/session`
+### `@sortedyuan/session`
 
 Session 包把 Core 组合成长生命周期身份。它负责 Session 标识、元数据、串行
 提交、Context 连续性、Session 事件和存储接口，也提供可复用的内存及文件 Catalog。
-它可以依赖 `@may/core`，但 Core 不得依赖它。
+它可以依赖 `@sortedyuan/core`，但 Core 不得依赖它。
 
 Session 通过 `AgentRuntime` 执行。默认实现为 `May`；自定义运行时工厂
 可以共同管理 Context 和其他资源。Session 保存运行时身份及具有版本的状态。
@@ -107,13 +107,13 @@ Session 通过 `AgentRuntime` 执行。默认实现为 `May`；自定义运行�
 初始化失败时保留部分历史，拒绝恢复和分支。`AgentWorkspace` 在关闭或替换来源之前
 保存新 Session 的 Catalog 记录；Catalog 失败时保留新历史，来源 Application 继续活动。
 
-### `@may/plugin`
+### `@sortedyuan/plugin`
 
 Plugin 包负责组合验证、带类型和版本的服务、范围初始化、配置与状态验证、
 生命周期 Hooks、串行变更以及资源清理。它依赖 Core 的 Hook 接口。
 Application 提供运行时和 Context 服务，并通过 Session 存储保存插件状态。
 
-### `@may/permissions`
+### `@sortedyuan/permissions`
 
 工具定义能力，终端交互由产品提供。Core 提供通用 `ToolExecutor` 接口；权限
 包实现该接口，用于允许、拒绝或暂停执行并等待审批。策略接收已解析的工具
@@ -125,18 +125,18 @@ Application 提供运行时和 Context 服务，并通过 Session 存储保存�
 执行器等待事件保存，使 Session 能在工具结果之前保存审批请求和决定。
 优先级、撤销和资源管理见[权限策略](../guides/permission-policy.md)。
 
-### `@may/observability`
+### `@sortedyuan/observability`
 
 Observability 包是 Core 追踪接口的可选实现，提供采样、不可变的已完成 Span、
-内存及串行或有界处理器和基础导出器。依赖方向从 `@may/observability` 指向
-`@may/core`：Core 定义自己所需的能力，外层可选包实现它，再由产品注入。
+内存及串行或有界处理器和基础导出器。依赖方向从 `@sortedyuan/observability` 指向
+`@sortedyuan/core`：Core 定义自己所需的能力，外层可选包实现它，再由产品注入。
 
 追踪失败不阻止 Agent 执行，追踪数据允许采样、缓冲或丢弃，不能代替 Session 历史或
 权限记录。内置 Span 不记录提示内容、消息、推理和工具输入输出。
 Tracer 与处理器生命周期由调用方管理，可以在多个 Application
 之间共享遥测资源。
 
-### `@may/mcp`
+### `@sortedyuan/mcp`
 
 MCP 包是位于工具边界的可选适配器。它依赖 Core 的 `Tool` 与追踪接口，
 Core 不依赖 MCP 或其 SDK。客户端池拥有 stdio 子进程与 Streamable HTTP 传输，通过
@@ -154,7 +154,7 @@ Core 不依赖 MCP 或其 SDK。客户端池拥有 stdio 子进程与 Streamable
 先经过配置的 `ToolExecutor`（包括权限检查）和 `ToolScheduler`，再开始进程
 I/O。运行时取消会传播到远程请求。打开客户端池的产品管理它及其进程的生命周期。
 
-### `@may/application`
+### `@sortedyuan/application`
 
 Application 包提供位于 Session 与 Core 之上的独立于 UI 的编排。
 `AgentDefinition` 保存可跨 Session 复用的模型、工具、指令、权限、Context、工具执行
@@ -179,7 +179,7 @@ Definition 会保存工具集合快照，不会克隆调用方拥有的模型、
 都有独立的进程内 Session 对象，这些有状态协作者仍会共享。当前 JSONL Session 存储
 和追加式文件 Catalog 是轻量本地后端，不提供崩溃恢复事务或多主机写入协调。
 
-### `@may/tui`
+### `@sortedyuan/tui`
 
 TUI 包是 May 的终端组件包，支持 Agent 概念。它在一个包
 内保留两个层级：
@@ -189,14 +189,14 @@ TUI 包是 May 的终端组件包，支持 Agent 概念。它在一个包
 - `TranscriptStore`、`TranscriptView` 和实例级 `ToolRendererRegistry` 等 Agent 投影。
 
 Agent 层消费 Core、权限与 Session 事件并构建保留式对话视图，通过
-`@may/tui/transcript` 和 `@may/tui/tool-renderers` 暴露。产品标签、提示、布局、命令
+`@sortedyuan/tui/transcript` 和 `@sortedyuan/tui/tool-renderers` 暴露。产品标签、提示、布局、命令
 和控制器调用仍由应用提供。图形或远程 UI 可以直接消费与 UI 无关的控制器。
 
 ### `apps/maybecode`
 
 MaybeCode 负责产品组合。它选择和配置可复用包，使用
 `ToolRegistry` 组合编码工具，通过 `defineAgent()` 捕获通用行为，把单 Session 和
-Workspace 生命周期交给 `@may/application`，使用 `@may/tui` 的 Agent 对话视图，并
+Workspace 生命周期交给 `@sortedyuan/application`，使用 `@sortedyuan/tui` 的 Agent 对话视图，并
 形成终端编码 Agent 产品。任何可复用包都不依赖 MaybeCode。
 
 应用只保留产品策略和兼容适配：

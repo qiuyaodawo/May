@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemoryContextFactory } from "@may/context";
-import { InMemorySessionStore } from "@may/session";
+import { InMemoryContextFactory } from "@sortedyuan/context";
+import { InMemorySessionStore } from "@sortedyuan/session";
 import { MaybeCodeApplication, createMaybeCodeSlashCommandSuggester, executeMaybeCodeSlashCommand } from "../dist/index.js";
 
 const message = (role, text) => ({ role, content: [{ type: "text", text }] });

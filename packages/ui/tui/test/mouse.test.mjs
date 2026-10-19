@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import test from "node:test";
 import { NodeTerminalDriver, ScrollView, Text } from "../dist/index.js";
-import { keyStroke } from "@may/keybindings";
+import { keyStroke } from "@sortedyuan/keybindings";
 
 test("decodes fragmented and consecutive mouse reports without inserting them as text", async (t) => {
   const input = new PassThrough();

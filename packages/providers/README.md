@@ -1,25 +1,25 @@
-# `@may/providers`
+# `@sortedyuan/providers`
 
 Unified provider composition for May. This package owns model-profile
 selection, adapter registration, built-in adapter configuration, and model construction. It does
-not add provider-specific behavior to `@may/core` or provider knowledge to
-`@may/config`.
+not add provider-specific behavior to `@sortedyuan/core` or provider knowledge to
+`@sortedyuan/config`.
 
 ## Built-in adapters
 
-- `deepseek-chat` → `@may/provider-deepseek`
-- `zhipu-chat` → `@may/provider-zhipu`
-- `kimi-chat` → `@may/provider-kimi`
-- `anthropic-messages` → `@may/provider-anthropic`
-- `openai-responses` → `@may/provider-openai`
-- `openai-chat-completions` → `@may/provider-openai-compatible`
-- `google-gemini` → `@may/provider-gemini`
+- `deepseek-chat` → `@sortedyuan/provider-deepseek`
+- `zhipu-chat` → `@sortedyuan/provider-zhipu`
+- `kimi-chat` → `@sortedyuan/provider-kimi`
+- `anthropic-messages` → `@sortedyuan/provider-anthropic`
+- `openai-responses` → `@sortedyuan/provider-openai`
+- `openai-chat-completions` → `@sortedyuan/provider-openai-compatible`
+- `google-gemini` → `@sortedyuan/provider-gemini`
 
 ```ts
 import {
   createBuiltinProviderAdapterRegistry,
   selectProviderModel,
-} from "@may/providers";
+} from "@sortedyuan/providers";
 
 const selection = selectProviderModel(config, { model: "reasoner" });
 const model = createBuiltinProviderAdapterRegistry().create(selection);
@@ -38,7 +38,7 @@ discovery understands CLIProxyAPI's enriched Codex response from
 contain enough information and are ignored.
 
 ```ts
-import { createModelCapabilityResolver } from "@may/providers";
+import { createModelCapabilityResolver } from "@sortedyuan/providers";
 
 const capabilities = await createModelCapabilityResolver().resolve(selection);
 if (capabilities.reasoningEffort.status === "known") {
@@ -144,7 +144,7 @@ A model profile may override the provider's default adapter.
 Registries are ordinary instances; there is no process-global registry.
 
 ```ts
-import { ProviderAdapterRegistry } from "@may/providers";
+import { ProviderAdapterRegistry } from "@sortedyuan/providers";
 
 const registry = new ProviderAdapterRegistry();
 registry.register("custom-protocol", {

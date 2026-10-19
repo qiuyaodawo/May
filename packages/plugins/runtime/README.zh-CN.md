@@ -1,4 +1,4 @@
-# @may/plugin-runtime
+# @sortedyuan/plugin-runtime
 
 `createRuntimePlugin(factory?, id?)` 提供 `services.runtimeFactory`。
 默认工厂创建 Core 的实际 `May` Runtime。Application 管理返回的 Runtime，
@@ -23,4 +23,4 @@
 setup 之前验证配置，并自动声明需要的注册表依赖。
 
 测试使用实际文件资源、Core Runtime 工厂和独立 Context 实例。
-执行 `pnpm --filter @may/plugin-runtime test`。
+执行 `pnpm --filter @sortedyuan/plugin-runtime test`。

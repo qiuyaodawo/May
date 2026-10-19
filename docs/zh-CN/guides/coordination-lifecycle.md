@@ -14,7 +14,7 @@
    `authorizeRetry`。以下策略允许宿主记录核查结论后重试 `analyst` 角色：
 
 ```ts
-import type { CoordinationPolicy } from "@may/coordination";
+import type { CoordinationPolicy } from "@sortedyuan/coordination";
 
 const policy: CoordinationPolicy = {
   version: "team-policy-v2",

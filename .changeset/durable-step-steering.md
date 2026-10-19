@@ -1,8 +1,8 @@
 ---
-"@may/core": minor
-"@may/session": minor
-"@may/application": minor
-"@may/goal": patch
+"@sortedyuan/core": minor
+"@sortedyuan/session": minor
+"@sortedyuan/application": minor
+"@sortedyuan/goal": patch
 ---
 
 Add durable FIFO steering input at complete Step boundaries. AgentApplication and

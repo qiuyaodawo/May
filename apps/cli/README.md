@@ -1,7 +1,7 @@
 # May CLI
 
-The first May composition application. It loads `@may/config`, creates a model
-through `@may/providers`, runs `@may/core`, and streams the result to the
+The first May composition application. It loads `@sortedyuan/config`, creates a model
+through `@sortedyuan/providers`, runs `@sortedyuan/core`, and streams the result to the
 terminal.
 The default config path is `~/.may/config.json`.
 

@@ -28,15 +28,15 @@ already includes direct children of `examples/`.
 
 ```json
 {
-  "name": "@may/example-quickstart-agent",
+  "name": "@sortedyuan/example-quickstart-agent",
   "private": true,
   "type": "module",
   "scripts": { "start": "node agent.mjs" },
   "dependencies": {
-    "@may/application": "workspace:*",
-    "@may/core": "workspace:*",
-    "@may/provider-deepseek": "workspace:*",
-    "@may/session": "workspace:*"
+    "@sortedyuan/application": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/provider-deepseek": "workspace:*",
+    "@sortedyuan/session": "workspace:*"
   }
 }
 ```
@@ -50,10 +50,10 @@ use available published versions and the same public import paths.
 Create `examples/quickstart-agent/agent.mjs`:
 
 ```js
-import { defineAgent } from "@may/application";
-import { ToolRegistry } from "@may/core";
-import { DeepSeekModel } from "@may/provider-deepseek";
-import { InMemorySessionStore } from "@may/session";
+import { defineAgent } from "@sortedyuan/application";
+import { ToolRegistry } from "@sortedyuan/core";
+import { DeepSeekModel } from "@sortedyuan/provider-deepseek";
+import { InMemorySessionStore } from "@sortedyuan/session";
 
 const apiKey = process.env.DEEPSEEK_API_KEY;
 const modelName = process.env.DEEPSEEK_MODEL;
@@ -61,7 +61,7 @@ if (!apiKey || !modelName) {
   throw new Error("Set DEEPSEEK_API_KEY and DEEPSEEK_MODEL");
 }
 
-/** @type {import("@may/core").Tool<{a: number, b: number}, number>} */
+/** @type {import("@sortedyuan/core").Tool<{a: number, b: number}, number>} */
 const add = {
   name: "add",
   description: "Add two finite numbers",
@@ -142,7 +142,7 @@ For example, in PowerShell:
 
 ```powershell
 $env:DEEPSEEK_MODEL = 'your-supported-model-id'
-pnpm --filter @may/example-quickstart-agent start
+pnpm --filter @sortedyuan/example-quickstart-agent start
 ```
 
 Replace `your-supported-model-id` before running. The program sends live requests
@@ -161,7 +161,7 @@ The in-memory store retains history while this process and store object exist.
 To save it on disk, replace the `InMemorySessionStore` import and construction:
 
 ```js
-import { FileSessionStore } from "@may/session/file-store";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 
 const store = new FileSessionStore(".may/sessions");
 ```

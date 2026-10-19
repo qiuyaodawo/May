@@ -5,7 +5,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { createServer } from "node:http";
-import { loadMayConfig } from "@may/config";
+import { loadMayConfig } from "@sortedyuan/config";
 import { inspectGatewaySetup, startGatewaySetup } from "../dist/gateway-setup.js";
 import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";

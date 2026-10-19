@@ -1,6 +1,6 @@
-import { directToolExecutor } from "@may/core";
-import { createMayMcpServer } from "@may/mcp/server";
-import { createReadTool } from "@may/coding-tools";
+import { directToolExecutor } from "@sortedyuan/core";
+import { createMayMcpServer } from "@sortedyuan/mcp/server";
+import { createReadTool } from "@sortedyuan/coding-tools";
 
 const workspace = process.cwd();
 const server = createMayMcpServer({

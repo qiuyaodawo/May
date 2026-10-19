@@ -62,7 +62,7 @@ workspace 的子目录，或者最近项目根目录之上的目录。
 无效 UTF-8、超出大小限制，以及不安全的 symbolic links、reparse points 或 hard links
 会使加载失败。读取祖先目录的规则不会改变代码工具使用的 workspace 或权限策略。
 
-使用 `@may/coding-tools/instructions` 的宿主可以配置 `projectRootMarkers`
+使用 `@sortedyuan/coding-tools/instructions` 的宿主可以配置 `projectRootMarkers`
 （默认 `[".git"]`）、`projectInstructionsFilename`（默认 `AGENTS.md`）和
 `projectInstructionsFallbackFilenames`（默认 `[]`）。`projectRootMarkers: []`
 只检查 workspace。`projectInstructionsFilename: false` 禁用完整项目规则链。

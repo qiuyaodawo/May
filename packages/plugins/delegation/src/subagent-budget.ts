@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import type { Model, ModelEvent, ModelStreamOptions, SerializedError } from "@may/core";
-import { ModelResponseValidationError, priceUsage, type UsageCost } from "@may/core";
+import type { Model, ModelEvent, ModelStreamOptions, SerializedError } from "@sortedyuan/core";
+import { ModelResponseValidationError, priceUsage, type UsageCost } from "@sortedyuan/core";
 import {
   FileSharedBudget,
   type ExternalCallResult,
   type SharedBudgetLimits,
   type SharedBudgetSnapshot,
   type SharedBudgetTotals,
-} from "@may/coordination";
+} from "@sortedyuan/coordination";
 
 export interface SubagentBudgetLimits extends SharedBudgetLimits {
   /**

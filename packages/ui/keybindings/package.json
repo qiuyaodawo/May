@@ -1,5 +1,5 @@
 {
-  "name": "@may/keybindings",
+  "name": "@sortedyuan/keybindings",
   "version": "0.1.0",
   "description": "Context-aware semantic keybindings for May user interfaces.",
   "type": "module",

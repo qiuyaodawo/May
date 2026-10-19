@@ -12,9 +12,9 @@ const consumer = resolve(repository, "..", "eval-package-consumers", `consumer-$
 await mkdir(packs, { recursive: true });
 await mkdir(consumer, { recursive: true });
 if (!relative(await realpath(repository), await realpath(consumer)).startsWith("..")) throw new Error("Consumer must be outside repository");
-const releaseNames = ["@may/core", "@may/context", "@may/session", "@may/session-tools", "@may/permissions", "@may/skills", "@may/plugin",
-  "@may/plugin-services", "@may/plugin-models", "@may/plugin-runtime", "@may/plugin-permissions", "@may/plugin-skills",
-  "@may/application", "@may/coordination", "@may/observability", "@may/eval"];
+const releaseNames = ["@sortedyuan/core", "@sortedyuan/context", "@sortedyuan/session", "@sortedyuan/session-tools", "@sortedyuan/permissions", "@sortedyuan/skills", "@sortedyuan/plugin",
+  "@sortedyuan/plugin-services", "@sortedyuan/plugin-models", "@sortedyuan/plugin-runtime", "@sortedyuan/plugin-permissions", "@sortedyuan/plugin-skills",
+  "@sortedyuan/application", "@sortedyuan/coordination", "@sortedyuan/observability", "@sortedyuan/eval"];
 const manifests = new Map();
 async function discover(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -32,11 +32,11 @@ function visit(name) {
   const value = manifests.get(name);
   if (!value || value.manifest.private) throw new Error(`Missing publishable dependency: ${name}`);
   visited.add(name);
-  for (const dependency of Object.keys(value.manifest.dependencies ?? {})) if (dependency.startsWith("@may/")) visit(dependency);
+  for (const dependency of Object.keys(value.manifest.dependencies ?? {})) if (dependency.startsWith("@sortedyuan/")) visit(dependency);
 }
-visit("@may/eval");
+visit("@sortedyuan/eval");
 if (visited.size !== releaseNames.length || releaseNames.some(name => !visited.has(name))) throw new Error("Eval runtime dependencies differ from the explicit package list");
-await runPnpm(["--filter", "@may/eval", "build"], repository);
+await runPnpm(["--filter", "@sortedyuan/eval", "build"], repository);
 const overrides = {};
 for (const name of releaseNames) {
   const value = manifests.get(name);
@@ -46,7 +46,7 @@ for (const name of releaseNames) {
 await copyFile(join(repository, "packages/eval/test/consumer/package.json"), join(consumer, "package.json"));
 await copyFile(join(repository, "packages/eval/test/consumer/index.mjs"), join(consumer, "index.mjs"));
 await runPnpm(["config", "set", "overrides", JSON.stringify(overrides), "--json", "--location", "project"], consumer);
-await runPnpm(["add", overrides["@may/eval"], "--ignore-scripts"], consumer);
+await runPnpm(["add", overrides["@sortedyuan/eval"], "--ignore-scripts"], consumer);
 await run(process.execPath, [join(consumer, "index.mjs")], consumer);
 console.log(`Verified ${releaseNames.length} explicit packed runtime packages; consumer ${consumer}`);
 function runPnpm(args, cwd) { return /\.[cm]?js$/iu.test(pnpm) ? run(process.execPath, [pnpm, ...args], cwd) : run(pnpm, args, cwd); }

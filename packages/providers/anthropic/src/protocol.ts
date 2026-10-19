@@ -1,4 +1,4 @@
-import type { JsonSchema } from "@may/core";
+import type { JsonSchema } from "@sortedyuan/core";
 
 export const ANTHROPIC_MODEL_STATE_TYPE =
   "@may/provider-anthropic/message-v1";

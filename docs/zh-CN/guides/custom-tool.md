@@ -5,23 +5,23 @@
 本文指导应用定义工具、校验参数、注册工具并处理取消。
 需要已经按照[构建 Agent](building-an-agent.md)配置应用和模型。
 
-`@may/core` 的 `Tool` 接口包含三个主要部分：
+`@sortedyuan/core` 的 `Tool` 接口包含三个主要部分：
 
 - `inputSchema` 向模型描述调用；
 - 可选 `parse()` 校验并转换不可信的模型输出；
 - `execute()` 执行操作。
 
-`@may/core` 提供实例级 `ToolRegistry`，用于组合和查询工具。
+`@sortedyuan/core` 提供实例级 `ToolRegistry`，用于组合和查询工具。
 `May`、`AgentApplication` 和 `AgentDefinition` 都接受
 `Iterable<Tool>`，所以可以传注册表、数组或其他可迭代对象。
 
 ## 完整工具示例
 
-在 TypeScript 应用中创建 `add-tool.ts`，并将 `@may/core` 加入直接依赖。
+在 TypeScript 应用中创建 `add-tool.ts`，并将 `@sortedyuan/core` 加入直接依赖。
 该文件实现加法，`execute()` 返回 `{ value: number }`。
 
 ```ts
-import type { Tool } from "@may/core";
+import type { Tool } from "@sortedyuan/core";
 
 interface AddInput {
   readonly left: number;
@@ -69,8 +69,8 @@ export const addTool: Tool<AddInput, AddOutput> = {
 构建指南关闭应用：
 
 ```ts
-import { defineAgent } from "@may/application";
-import { ToolRegistry } from "@may/core";
+import { defineAgent } from "@sortedyuan/application";
+import { ToolRegistry } from "@sortedyuan/core";
 
 const tools = new ToolRegistry([addTool]);
 tools.registerAll(productTools);
@@ -95,7 +95,7 @@ const application = await agent.open({ store });
 import {
   DuplicateToolNameError,
   ToolRegistry,
-} from "@may/core";
+} from "@sortedyuan/core";
 
 const tools = new ToolRegistry([addTool]);
 tools.register(subtractTool);
@@ -216,7 +216,7 @@ Core 默认串行调度。只有同一模型响应选择的每个工具都可安
 审批控制能力是否可以运行，批准后进程的访问范围由执行后端限制。参阅
 [权限策略](permission-policy.md)。
 
-需要限制在工作目录内的文件和 shell 实现时，优先使用 `@may/coding-tools` 工厂。
+需要限制在工作目录内的文件和 shell 实现时，优先使用 `@sortedyuan/coding-tools` 工厂。
 其 shell 工具以 May 进程权限执行。需要执行隔离的应用应提供独立的沙盒
 或远程执行后端。
 

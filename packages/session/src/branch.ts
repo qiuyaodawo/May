@@ -1,4 +1,4 @@
-import type { Message } from "@may/core";
+import type { Message } from "@sortedyuan/core";
 import type { SessionEvent, SessionForkOrigin } from "./events.js";
 
 export interface SessionBranchPosition {

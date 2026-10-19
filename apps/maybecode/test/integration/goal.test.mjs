@@ -8,10 +8,10 @@ import { PassThrough } from "node:stream";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { stripVTControlCharacters } from "node:util";
-import { NodeTerminalDriver } from "@may/tui";
-import { loadMayConfig } from "@may/config";
-import { FileSessionStore } from "@may/session/file-store";
-import { FileSessionCatalog } from "@may/session/catalog";
+import { NodeTerminalDriver } from "@sortedyuan/tui";
+import { loadMayConfig } from "@sortedyuan/config";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { FileSessionCatalog } from "@sortedyuan/session/catalog";
 import { openConfiguredMaybeCode, executeMaybeCodeSlashCommand, createMaybeCodeWebHost, runRetainedTerminalUI, runTerminalUI, createNodeTerminal, MaybeCodeWorkspace, createMaybeCodeModel, selectMaybeCodeModel, createCodingPermissionPolicy } from "../../dist/index.js";
 
 const workspace = fileURLToPath(new URL("../../../..", import.meta.url));

@@ -1,13 +1,13 @@
-import { acquireFileLock, releaseFileLock } from "@may/session/file-store";
+import { acquireFileLock, releaseFileLock } from "@sortedyuan/session/file-store";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, type FileHandle } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { AsyncStateSerializer } from "@may/application";
-import type { TaskExecution } from "@may/coordination";
-import type { Tool } from "@may/core";
+import { AsyncStateSerializer } from "@sortedyuan/application";
+import type { TaskExecution } from "@sortedyuan/coordination";
+import type { Tool } from "@sortedyuan/core";
 
 export type TeamCheckSpec =
   | { readonly id: string; readonly taskId: string; readonly type: "file-contains"; readonly path: string; readonly text: string }

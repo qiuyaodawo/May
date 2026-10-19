@@ -1,4 +1,4 @@
-import type { DisplayPart, ImageData } from "@may/media";
+import type { DisplayPart, ImageData } from "@sortedyuan/media";
 /** JSON-only presentation contract. Host policy, not this manifest, grants authority. */
 export interface UiProduct {
   readonly id: string;

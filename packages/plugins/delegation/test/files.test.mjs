@@ -4,8 +4,8 @@ import { mkdir, mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join, resolve, sep } from "node:path";
 import { SharedWorkspaceFileGuard, createWorkspaceFilesPlugin, workspaceFilesService } from "../dist/index.js";
-import { PluginHost } from "@may/plugin";
-import { services, ToolSources } from "@may/plugin-services";
+import { PluginHost } from "@sortedyuan/plugin";
+import { services, ToolSources } from "@sortedyuan/plugin-services";
 
 test("workspace files plugin creates real tools and removes its catalog contribution on close", async () => {
   const sources = new ToolSources();

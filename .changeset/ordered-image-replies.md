@@ -1,10 +1,10 @@
 ---
-"@may/media": minor
-"@may/provider-openai": minor
-"@may/providers": patch
-"@may/tui": minor
-"@may/ui-client": minor
-"@may/web-ui": minor
+"@sortedyuan/media": minor
+"@sortedyuan/provider-openai": minor
+"@sortedyuan/providers": patch
+"@sortedyuan/tui": minor
+"@sortedyuan/ui-client": minor
+"@sortedyuan/web-ui": minor
 ---
 
 Preserve ordered image replies from OpenAI Responses and expose reusable raster

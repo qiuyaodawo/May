@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
-import { AgentWorkspace, defineAgent } from "@may/application";
-import { InMemorySessionStore } from "@may/session";
-import { InMemorySessionCatalog } from "@may/session/catalog";
+import { AgentWorkspace, defineAgent } from "@sortedyuan/application";
+import { InMemorySessionStore } from "@sortedyuan/session";
+import { InMemorySessionCatalog } from "@sortedyuan/session/catalog";
 import { ApplicationUiHost } from "../dist/application.js";
 import { startUiServer } from "../dist/server.js";
 import { UiClient } from "../dist/index.js";

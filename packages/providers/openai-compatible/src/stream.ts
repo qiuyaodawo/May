@@ -3,7 +3,7 @@ import type {
   ModelEvent,
   ToolCall,
   Usage,
-} from "@may/core";
+} from "@sortedyuan/core";
 import type {
   OpenAICompatibleChunk,
   OpenAICompatibleToolCallDelta,

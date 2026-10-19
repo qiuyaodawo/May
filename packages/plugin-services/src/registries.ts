@@ -1,6 +1,6 @@
-import { ToolRegistry, type Model, type Tool } from "@may/core";
-import type { ContextFactory } from "@may/context";
-import type { Disposer } from "@may/plugin";
+import { ToolRegistry, type Model, type Tool } from "@sortedyuan/core";
+import type { ContextFactory } from "@sortedyuan/context";
+import type { Disposer } from "@sortedyuan/plugin";
 
 export interface ContributionOptions {
   readonly id: string;

@@ -40,16 +40,16 @@ under `apps`. The dependency rule is:
 
 ```mermaid
 flowchart LR
-  Apps[apps] --> Application["@may/application"]
-  Application --> Plugin["@may/plugin"]
+  Apps[apps] --> Application["@sortedyuan/application"]
+  Application --> Plugin["@sortedyuan/plugin"]
   Application --> Components[context / session / permissions / session-tools]
-  Plugin --> Core["@may/core"]
+  Plugin --> Core["@sortedyuan/core"]
   Components --> Core
-  Apps --> Observability["@may/observability"]
+  Apps --> Observability["@sortedyuan/observability"]
   Observability --> Core
-  Apps --> MCP["@may/mcp"]
+  Apps --> MCP["@sortedyuan/mcp"]
   MCP --> Core
-  Apps --> TUI["@may/tui"]
+  Apps --> TUI["@sortedyuan/tui"]
   TUI --> Terminal[coding-tools / keybindings / session / permissions / core]
   Apps --> Products[provider / tool / config packages]
 ```
@@ -58,7 +58,7 @@ This is a layering sketch, not a requirement that every package depend on
 every package to its right. The invariant is that reusable packages do not
 import an application. In particular, no package imports `apps/maybecode`.
 
-### `@may/core`
+### `@sortedyuan/core`
 
 Core owns active execution:
 
@@ -80,7 +80,7 @@ one-shot run. Core owns only the small `Tracer`/`TraceSpan` port and explicit
 `TraceContext` propagation needed to instrument its own execution; it does not
 import a concrete telemetry implementation or vendor SDK.
 
-### `@may/context`
+### `@sortedyuan/context`
 
 The context package provides factories and reusable implementations of Core's
 minimal `Context` contract. Applications can replace how model-visible history
@@ -92,16 +92,16 @@ snapshot; strategy selection and durable replacement events remain outside
 Core's minimal execution contract.
 
 A model adapter may optionally expose a provider-native context compactor.
-Core defines only the opaque capability boundary. `@may/context` adapts it into
+Core defines only the opaque capability boundary. `@sortedyuan/context` adapts it into
 the automatic strategy chain, while the owning provider serializes and
 restores native continuation state through `modelState`.
 
-### `@may/session`
+### `@sortedyuan/session`
 
 The session package composes Core into a long-lived identity. It owns a session
 id, metadata, serialized submission, context continuity, session events, and a
 storage seam. It also provides reusable in-memory and file-backed session
-Catalog implementations. It may depend on `@may/core`; Core must not depend on
+Catalog implementations. It may depend on `@sortedyuan/core`; Core must not depend on
 it.
 
 Session executes through `AgentRuntime`. The default implementation is `May`;
@@ -125,7 +125,7 @@ partial history unavailable for resume and branching. `AgentWorkspace` persists
 the candidate's Catalog entry before closing or replacing the source; a Catalog
 failure preserves candidate history and leaves the source Application active.
 
-### `@may/plugin`
+### `@sortedyuan/plugin`
 
 The plugin package owns composition validation, typed versioned services,
 scoped initialization, configuration and state validation, lifecycle Hooks,
@@ -133,7 +133,7 @@ serialized changes, and resource cleanup. It depends on Core's Hook interfaces.
 Application supplies runtime and Context services and connects plugin state to
 durable Session storage.
 
-### `@may/permissions`
+### `@sortedyuan/permissions`
 
 Raw tools contain capabilities, not terminal interaction. Core exposes a
 general tool-executor seam. The permissions package implements that seam to
@@ -150,12 +150,12 @@ Its awaited event sink lets Session persist approval requests and decisions
 before related tool outcomes. See [Permission policies](../guides/permission-policy.md)
 for precedence, revocation, and storage ownership.
 
-### `@may/observability`
+### `@sortedyuan/observability`
 
 The observability package is an optional implementation of Core's tracing
 port. It provides sampling, immutable completed spans, in-memory and
 serialized/bounded processors, and basic exporters. The dependency points
-from `@may/observability` to `@may/core`: Core defines the capability it needs,
+from `@sortedyuan/observability` to `@sortedyuan/core`: Core defines the capability it needs,
 while the optional outer package implements it and is injected by a product.
 
 Tracing is fail-open operational data. It may be sampled, buffered, or dropped
@@ -164,7 +164,7 @@ prompts, messages, reasoning, and tool input/output. Tracer and processor
 lifecycle is caller-owned so one application cannot shut down telemetry shared
 by another.
 
-### `@may/mcp`
+### `@sortedyuan/mcp`
 
 The MCP package is an optional adapter at the tool boundary. It depends on
 Core's `Tool` and tracing contracts, while Core remains independent of MCP and
@@ -190,7 +190,7 @@ process I/O begins. Runtime cancellation propagates to the remote request.
 Pool/process lifetime belongs to the product that opened the pool, not Core or
 an individual Session.
 
-### `@may/application`
+### `@sortedyuan/application`
 
 The application package provides headless orchestration above Session and
 Core. `AgentDefinition` captures reusable behavior and policy without Session
@@ -221,7 +221,7 @@ or scheduler unless the caller provides an isolation layer. The current JSONL
 Session store and append-only file Catalog remain lightweight local backends
 rather than a claim of crash-proof, multi-host production storage.
 
-### `@may/tui`
+### `@sortedyuan/tui`
 
 The TUI package is May's terminal component package and is intentionally
 Agent-aware. It contains two internal levels without splitting them into
@@ -233,17 +233,17 @@ another package:
   instance-scoped `ToolRendererRegistry`.
 
 The Agent layer consumes Core, permission, and Session events and builds a
-retained transcript. It is exposed through `@may/tui/transcript` and
-`@may/tui/tool-renderers`. Product labels, notices, layouts, commands, and
+retained transcript. It is exposed through `@sortedyuan/tui/transcript` and
+`@sortedyuan/tui/tool-renderers`. Product labels, notices, layouts, commands, and
 controller calls are still supplied by the application. A graphical or remote
-UI can ignore `@may/tui` and consume a headless controller directly.
+UI can consume a headless controller directly.
 
 ### `apps/maybecode`
 
 MaybeCode is an application composition layer, not another runtime. It selects
 and configures reusable packages, composes coding tools with `ToolRegistry`,
 captures generic behavior with `defineAgent()`, delegates one-session and
-workspace lifecycle to `@may/application`, uses `@may/tui`'s Agent transcript,
+workspace lifecycle to `@sortedyuan/application`, uses `@sortedyuan/tui`'s Agent transcript,
 and exposes a terminal coding-agent product. No reusable package depends on
 MaybeCode.
 

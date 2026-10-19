@@ -208,7 +208,7 @@ discovery diagnostics and refresh. Its active Session diagnostic panel uses the
 optional observability plugin. MaybeClaw provides `agent.check` and
 `session.diagnostics`; authentication and Session ownership checks also apply.
 
-`@may/ui-client.createTelemetryPanel(data)` displays at most 40 records with
+`@sortedyuan/ui-client.createTelemetryPanel(data)` displays at most 40 records with
 individual durations, status, parent identities, sampling and retention coverage.
 Hosts can page diagnostics independently. See
 [model and telemetry integration](model-telemetry-integration.md).
@@ -218,10 +218,10 @@ Hosts can page diagnostics independently. See
 | Package or layer | Responsibility |
 | --- | --- |
 | Application/product host | Execution, permissions, budgets, persistence and recovery |
-| `@may/ui-client` | JSON types and browser connection/state synchronization |
-| `@may/ui-client/application` | Single-active-Session workspace adapter |
-| `@may/ui-client/server` | Loopback HTTP, authentication, Origin checks, receipts and SSE |
-| `@may/web-ui` | Workbench and reusable transcript, composer, approval and detail components |
+| `@sortedyuan/ui-client` | JSON types and browser connection/state synchronization |
+| `@sortedyuan/ui-client/application` | Single-active-Session workspace adapter |
+| `@sortedyuan/ui-client/server` | Loopback HTTP, authentication, Origin checks, receipts and SSE |
+| `@sortedyuan/web-ui` | Workbench and reusable transcript, composer, approval and detail components |
 | Product extensions | File diffs, task lifecycle, delivery and domain-specific presentation |
 
 Implement `UiHost`, or connect `ApplicationUiHost` to an `AgentWorkspaceController`.
@@ -232,7 +232,7 @@ When a terminal owns execution, supply independent `events` and
 `closeApplication: false` to `ApplicationUiHost`. The terminal distributes events
 and closes the controller. Pair `startUiServer({ browserLogin: true, ... })` with
 `webUiAssets(..., { browserLogin: true })`; `createLoginUrl()` issues a connection
-ticket. Product routes can use `BrowserLogin` from `@may/ui-client/server` through
+ticket. Product routes can use `BrowserLogin` from `@sortedyuan/ui-client/server` through
 `issue()`, `redeem()` and `clear()`. Custom shells can supply `initialToken` and
 `connectionHint` to `mountWebUI`; the launcher then supplies login instructions.
 
@@ -317,8 +317,8 @@ After `pnpm build`, the local browser suite runs against the workspace, catalog,
 UI host and HTTP service:
 
 ```powershell
-pnpm --filter @may/web-ui exec playwright install chromium
-pnpm --filter @may/web-ui test:browser
+pnpm --filter @sortedyuan/web-ui exec playwright install chromium
+pnpm --filter @sortedyuan/web-ui test:browser
 ```
 
 These checks include resource paging/search, additions/deletions/renames, retained
@@ -327,7 +327,7 @@ Checks that require configured providers have separate prerequisites:
 
 | Check | Required flags and command |
 | --- | --- |
-| MaybeCode controls and shared terminal/Web | `MAYBECODE_WEB_LIVE=1`; `pnpm --filter @may/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs` |
+| MaybeCode controls and shared terminal/Web | `MAYBECODE_WEB_LIVE=1`; `pnpm --filter @sortedyuan/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs` |
 | Workspace file versions | `MAY_LIVE_PROVIDER_UI_TESTS=1`; `node --test packages/ui/web/test/browser/workspace-versions.test.mjs` |
 | Session fork and isolated test commits | Both `MAY_LIVE_PROVIDER_UI_TESTS=1` and `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`; `node --test packages/ui/web/test/browser/workspace-session-fork.test.mjs` |
 

@@ -1,11 +1,11 @@
-# @may/plugin
+# @sortedyuan/plugin
 
-为 May 插件提供带类型的服务、依赖管理、生命周期清理和 Hooks。这个 package 可以独立使用；`@may/application` 将其连接到 Agent 执行过程和 Session 历史。
+为 May 插件提供带类型的服务、依赖管理、生命周期清理和 Hooks。这个 package 可以独立使用；`@sortedyuan/application` 将其连接到 Agent 执行过程和 Session 历史。
 
 ## 服务与插件
 
 ```ts
-import { definePlugin, defineService, PluginHost } from "@may/plugin";
+import { definePlugin, defineService, PluginHost } from "@sortedyuan/plugin";
 
 interface Counter {
   read(): number;
@@ -79,11 +79,11 @@ requires: [{ service: counter, version: "^1.0.0", capabilities: ["increment"] }]
 
 ## Hooks
 
-`@may/core` 导出 `defineHook`、`HookDefinition`、`HookContext`、`HookDispatcher`、`runtimeHooks` 和 `RUNTIME_HOOKS`。Application 接入提供支持的 Hooks；独立宿主明确传入 Hook 列表。
+`@sortedyuan/core` 导出 `defineHook`、`HookDefinition`、`HookContext`、`HookDispatcher`、`runtimeHooks` 和 `RUNTIME_HOOKS`。Application 接入提供支持的 Hooks；独立宿主明确传入 Hook 列表。
 
 ```ts
-import { runtimeHooks, RUNTIME_HOOKS } from "@may/core";
-import { definePlugin, PluginHost } from "@may/plugin";
+import { runtimeHooks, RUNTIME_HOOKS } from "@sortedyuan/core";
+import { definePlugin, PluginHost } from "@sortedyuan/plugin";
 
 const instructions = definePlugin({
   id: "example.instructions",
@@ -113,7 +113,7 @@ handler 按照 `order` 从小到大执行，随后使用配置中的插件顺序
 
 通过 `createScope({ state, onStateChange })` 传入历史状态。恢复和迁移在 `setup` 前完成。状态格式版本保持相同时，历史插件版本还必须满足 `state.compatibleVersions`，默认要求当前插件版本完全匹配。不兼容状态需要明确的 `state.migrate(previous)`。迁移结果通过验证并保存后才能使用。已移除插件的记录继续保存在 snapshot 中，支持检查历史状态和后续迁移。
 
-`@may/application` 将 Session 范围的 snapshot 保存在 Session 历史中。独立宿主通过 `onStateChange` 连接持久存储。Host、Application 和 Run 状态也可以连接调用方提供的存储接口。
+`@sortedyuan/application` 将 Session 范围的 snapshot 保存在 Session 历史中。独立宿主通过 `onStateChange` 连接持久存储。Host、Application 和 Run 状态也可以连接调用方提供的存储接口。
 
 ## 配置与组合变更
 
@@ -131,4 +131,4 @@ handler 按照 `order` 从小到大执行，随后使用配置中的插件顺序
 
 ## 验证
 
-`pnpm --filter @may/plugin test` 构建 package，并通过真实宿主、文件句柄、Session snapshot、事件监听器和可取消计时器运行 Node 测试。验证覆盖完整依赖图、兼容服务版本、资源归属、范围状态、迁移、不可修改的 Hook 输入、超时、错误报告、组合变更和 ESM 模块加载。这些测试验证宿主行为；真实模型 provider 的运行表现需要相应的集成验证。
+`pnpm --filter @sortedyuan/plugin test` 构建 package，并通过真实宿主、文件句柄、Session snapshot、事件监听器和可取消计时器运行 Node 测试。验证覆盖完整依赖图、兼容服务版本、资源归属、范围状态、迁移、不可修改的 Hook 输入、超时、错误报告、组合变更和 ESM 模块加载。这些测试验证宿主行为；真实模型 provider 的运行表现需要相应的集成验证。

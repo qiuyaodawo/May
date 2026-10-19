@@ -1,19 +1,19 @@
 ---
-"@may/permissions": minor
-"@may/application": minor
-"@may/session": minor
-"@may/ui-client": minor
-"@may/tui": minor
-"@may/web-ui": minor
-"@may/config": minor
-"@may/coding-tools": minor
-"@may/plugin-agent-adapters": minor
+"@sortedyuan/permissions": minor
+"@sortedyuan/application": minor
+"@sortedyuan/session": minor
+"@sortedyuan/ui-client": minor
+"@sortedyuan/tui": minor
+"@sortedyuan/web-ui": minor
+"@sortedyuan/config": minor
+"@sortedyuan/coding-tools": minor
+"@sortedyuan/plugin-agent-adapters": minor
 ---
 
 Add opt-in persistent allow and deny rules with trusted scope, tool-definition
 binding, creator identity, expiry and revocation. Provide a versioned file store
 with atomic replacement and a single writer lock through
-`@may/permissions/file-store`. Rule storage and event persistence failures stop
+`@sortedyuan/permissions/file-store`. Rule storage and event persistence failures stop
 tool execution. Explicit denials take precedence, and `requireApproval` requests
 always require a fresh decision.
 

@@ -4,11 +4,11 @@ import { readFile, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { PassThrough } from "node:stream";
-import { createNodeTerminal } from "@may/tui/node-terminal";
-import { createWriteTool, createShellTool } from "@may/coding-tools";
-import { PermissionToolExecutor } from "@may/permissions";
-import { services } from "@may/plugin-services";
-import { InMemorySessionStore } from "@may/session";
+import { createNodeTerminal } from "@sortedyuan/tui/node-terminal";
+import { createWriteTool, createShellTool } from "@sortedyuan/coding-tools";
+import { PermissionToolExecutor } from "@sortedyuan/permissions";
+import { services } from "@sortedyuan/plugin-services";
+import { InMemorySessionStore } from "@sortedyuan/session";
 import { InMemorySessionCatalog, createCodingPermissionPolicy, parseMaybeCodeArgs, executeMaybeCodeSlashCommand,
   openConfiguredMaybeCode, MaybeCodeApplication, MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
 import { localModel, yoloDirectory, yoloWorkspace } from "./yolo-support.mjs";

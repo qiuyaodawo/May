@@ -1,4 +1,4 @@
-# @may/application
+# @sortedyuan/application
 
 `AgentApplication.getOptionalService(token)` 查询已经提供的 plugin service，
 缺失时返回 `undefined`。`responseFormat` 配置 Core 的统一结构化输出。
@@ -46,7 +46,7 @@ Session 分支根据新宿主范围检查配置的规则存储。
 配置通过组件插件工厂提供；相同基础服务具有一个提供方，重复提供方在 setup 之前报错。
 已有直接调用保持兼容，调用方传入的实例由调用方管理。
 
-`applicationServices` 包含 `@may/plugin-services` 的相同服务标识。
+`applicationServices` 包含 `@sortedyuan/plugin-services` 的相同服务标识。
 组装的提示词内容变化时，使当前 Context 的 provider token 计量失效。后续检查使用
 更新后的内容估计，直到重新记录 provider usage。
 多个插件通过 `toolSources`、`instructionSources`、`modelWrappers` 和 `contextWrappers`
@@ -81,8 +81,8 @@ Context；完成 Hook 失败时继续传递错误，并保留已经保存的消�
 并在释放插件资源之前关闭 Runtime。
 
 Model、permissions、Context/Runtime/tools 和 Skills 的插件工厂分别由
-`@may/plugin-models`、`@may/plugin-permissions`、`@may/plugin-runtime` 和
-`@may/plugin-skills` 提供。Skills 的激活内容使用带版本的插件状态保存，
+`@sortedyuan/plugin-models`、`@sortedyuan/plugin-permissions`、`@sortedyuan/plugin-runtime` 和
+`@sortedyuan/plugin-skills` 提供。Skills 的激活内容使用带版本的插件状态保存，
 恢复 Session 时兼容已有的 `may.skills.active.v1` 记录。
 
 `getService(token)` 取得当前启用的服务；`recordState(key, value)` 保存 Application 状态。
@@ -93,15 +93,15 @@ Model、permissions、Context/Runtime/tools 和 Skills 的插件工厂分别由
 插件状态在恢复时验证版本并进行声明的迁移。
 
 详见[插件指南](../../docs/zh-CN/guides/plugins.md)。离线验证使用
-`pnpm --filter @may/application test`，真实 provider 集成验证使用
-`pnpm --filter @may/application test:integration`。
+`pnpm --filter @sortedyuan/application test`，真实 provider 集成验证使用
+`pnpm --filter @sortedyuan/application test:integration`。
 
 `AgentApplicationOptions.beforeToolExecute(execution)` 在权限批准后、选定的工具
 executor 执行前运行，可以等待宿主准备过程，并保留插件提供的 executor。
 检查失败需要终止 Run 时抛出 `FatalToolExecutionError`；执行前还会检查取消状态。
 子应用共享准备过程时需要传入相同的 callback。
 
-`@may/application/git-workspace` 提供 Node.js `ProjectGitWorkspace`，默认初始化项目
+`@sortedyuan/application/git-workspace` 提供 Node.js `ProjectGitWorkspace`，默认初始化项目
 Git 管理并保存初始文件 checkpoint。每次完整请求通过 `beginRound()`、
 `lease.complete()` 保存最终文件版本；组件提供当前 branch、结构化 diff、
 文件恢复预览和持久化 worktree 管理。

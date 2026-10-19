@@ -1,1 +1,1 @@
-export { HistoryReferenceMemory } from "@may/plugin-history-memory";
+export { HistoryReferenceMemory } from "@sortedyuan/plugin-history-memory";

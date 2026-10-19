@@ -1,5 +1,5 @@
 ---
-"@may/config": minor
+"@sortedyuan/config": minor
 ---
 
 Extend the published configuration schema with MaybeClaw Gateway version 2,

@@ -1,4 +1,4 @@
-import type { UiAction, UiClient, UiClientState, UiCompletion, UiForm } from "@may/ui-client";
+import type { UiAction, UiClient, UiClientState, UiCompletion, UiForm } from "@sortedyuan/ui-client";
 import { button, element } from "./components.js";
 
 export function createCommandUI(client: UiClient, composer: HTMLTextAreaElement, local: (command: string) => boolean) {

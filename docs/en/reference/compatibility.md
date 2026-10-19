@@ -8,6 +8,9 @@ against each upgrade. This reference describes current compatibility boundaries.
 
 ## Supported runtime
 
+Package names use the `@sortedyuan` scope. For dependency, import and configuration
+migration, see [the release guide](../guides/npm-release.md#package-name-migration).
+
 Published framework packages require Node.js 22 or newer. MaybeClaw requires
 Node.js 22.13 or newer. Repository development requires Node.js 22.16.0 or newer
 for the `node:sqlite` backup APIs used by the offline suite. The repository declares
@@ -25,8 +28,8 @@ paths under `src/` or `dist/` are implementation details. Use type-only imports
 when importing types:
 
 ```ts
-import { AgentApplication, type AgentApplicationEvent } from "@may/application";
-import type { ContextFactory } from "@may/context";
+import { AgentApplication, type AgentApplicationEvent } from "@sortedyuan/application";
+import type { ContextFactory } from "@sortedyuan/context";
 ```
 
 The [package catalog](packages.md) identifies responsibilities and public entry
@@ -118,7 +121,7 @@ Provider HTTP APIs and model capabilities evolve independently. Use the
 
 ## Coordination and teams
 
-`@may/coordination` APIs, version-1 snapshot journals, optional resource journals
+`@sortedyuan/coordination` APIs, version-1 snapshot journals, optional resource journals
 and the remote worker protocol are preview formats. A single durable coordinator
 owns scheduling, including remote leaf work. Local budget reservations and
 accounting apply within that coordinator. Changes to saved policies and limits
@@ -138,7 +141,7 @@ See [coordination](../guides/coordination.md),
 
 ## MCP
 
-`@may/mcp` pool options, errors, namespacing, output representations, status,
+`@sortedyuan/mcp` pool options, errors, namespacing, output representations, status,
 lifecycle events and span names are preview APIs. Tool clients support stdio and
 Streamable HTTP, explicit refresh/reconnect and per-Run catalogs. Host-selected
 resources, templates and prompts enter the conversation as user content.
@@ -150,14 +153,14 @@ tool name can leave historical calls without a corresponding executable tool.
 The interaction broker manages modern form/URL elicitation with owner scopes,
 bounded waits, response validation and identity checks before continuation. Legacy
 interactive operations use explicitly isolated connections. Roots/Sampling, Tasks,
-Apps Host and the independent `@may/mcp/server` export require their own opt-in
+Apps Host and the independent `@sortedyuan/mcp/server` export require their own opt-in
 configuration and services. See [MCP](../guides/mcp.md),
 [long-running tasks](../guides/mcp-tasks.md), [Apps](../guides/mcp-apps.md) and
 [server authoring](../guides/mcp-server.md) for supported protocols and host duties.
 
 ## Tracing
 
-Core tracing types and `@may/observability` processors, exporters, sampling,
+Core tracing types and `@sortedyuan/observability` processors, exporters, sampling,
 completed-span shapes, names and attributes are preview APIs. Traces may be sampled
 or discarded, including when an exporter saves spans. Use Session records and
 application-owned records for permission, billing and audit decisions.

@@ -1,4 +1,4 @@
-# `@may/core`
+# `@sortedyuan/core`
 
 The model- and tool-agnostic runtime at the heart of May agents.
 
@@ -21,11 +21,11 @@ and emits `input.received`; it never interrupts the Step's tools or approvals.
 `shouldYield` takes precedence. A final assistant response followed by new input
 continues within the same Run, subject to its existing budget. If cancellation
 arrives after the host commits input, Core updates Context before stopping, so
-live Context agrees with durable history. `@may/session` owns this source when
+live Context agrees with durable history. `@sortedyuan/session` owns this source when
 composing a runtime and exposes its durable `steer()` queue.
 
 ```ts
-import { InMemoryContext, May } from "@may/core";
+import { InMemoryContext, May } from "@sortedyuan/core";
 
 const may = new May({
   model,
@@ -112,7 +112,7 @@ implements `Iterable<Tool>`, so it can be passed anywhere May accepts tools;
 there is no process-global registry.
 
 ```ts
-import { ToolRegistry } from "@may/core";
+import { ToolRegistry } from "@sortedyuan/core";
 
 const tools = new ToolRegistry([readTool])
   .register(writeTool)
@@ -158,7 +158,7 @@ The default `directToolExecutor` calls the tool directly. Applications can
 supply another executor to add cross-cutting behavior without changing tools:
 
 ```ts
-import { directToolExecutor, May } from "@may/core";
+import { directToolExecutor, May } from "@sortedyuan/core";
 
 const toolExecutor = {
   async execute(execution) {
@@ -237,7 +237,7 @@ returned `RunHandle` exposes the created context. Built-in instrumentation
 creates Run, Context, model, tool-batch, and tool-call spans. Calls into an
 injected tracer are protected so telemetry failure never becomes a Run
 failure. Sampling, buffering, and exporters live in optional
-`@may/observability`; see the
+`@sortedyuan/observability`; see the
 [tracing guide](../../docs/en/guides/observability.md).
 
 Live event queues retain at most `maxBufferedEvents` high-volume streaming
@@ -263,7 +263,7 @@ const message = {
   role: "assistant",
   content: [],
   modelState: {
-    type: "@may/provider-example/response-v1",
+    type: "example-provider/response-v1",
     data: { responseId: "response_123" },
   },
 };

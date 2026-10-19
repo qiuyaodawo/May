@@ -1,5 +1,5 @@
 ---
-"@may/tui": minor
+"@sortedyuan/tui": minor
 ---
 
 增加 TranscriptStore.latestReply、TranscriptView.revealLatestReply、

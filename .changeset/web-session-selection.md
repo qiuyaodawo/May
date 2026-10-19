@@ -1,7 +1,7 @@
 ---
-"@may/maybecode": minor
-"@may/ui-client": minor
-"@may/web-ui": minor
+"@sortedyuan/maybecode": minor
+"@sortedyuan/ui-client": minor
+"@sortedyuan/web-ui": minor
 ---
 
 WebUI 侧栏支持确认删除其它会话。垃圾桶图标在鼠标悬停或键盘聚焦时显示，

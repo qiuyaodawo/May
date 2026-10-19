@@ -5,7 +5,7 @@
 [协作任务图](coordination.md)需要统一的模型额度、显式结果文件或独立任务目录时，
 可以使用共享资源。宿主打开并管理资源，Agent 的工具访问仍然遵循已配置权限。
 
-以下 TypeScript 片段展示 `@may/coordination` 的宿主组合方式，要求已经配置
+以下 TypeScript 片段展示 `@sortedyuan/coordination` 的宿主组合方式，要求已经配置
 provider `Model`、任务图 ID 和任务工具根目录之外的绝对资源目录。
 启动任务图之前，将资源接入 Agent definition；运行时停止后再关闭资源。
 
@@ -17,7 +17,7 @@ provider `Model`、任务图 ID 和任务工具根目录之外的绝对资源目
    `providerModel`、`budgetDirectory` 和 `coordinationId` 由可信宿主提供：
 
 ```ts
-import { FileSharedBudget } from "@may/coordination";
+import { FileSharedBudget } from "@sortedyuan/coordination";
 
 const budget = await FileSharedBudget.open(budgetDirectory, coordinationId, {
   maxModelCalls: 32,
@@ -106,7 +106,7 @@ USD 上限要求完整的 USD 计价。未知价格使调用保持未结算状�
 将 `forTask(taskId).tools()` 绑定到相应任务。示例展示发布和显式读取：
 
 ```ts
-import { FileArtifactStore } from "@may/coordination";
+import { FileArtifactStore } from "@sortedyuan/coordination";
 
 const artifacts = await FileArtifactStore.open(artifactDirectory, coordinationId, {
   policyVersion: "review-team-v1",
@@ -145,7 +145,7 @@ await artifacts.close();
 任务执行停止后再检查修改：
 
 ```ts
-import { TaskWorkspaceManager } from "@may/coordination";
+import { TaskWorkspaceManager } from "@sortedyuan/coordination";
 
 const workspaces = await TaskWorkspaceManager.open({
   sourceDirectory: userCheckout,

@@ -5,7 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { InMemoryContext, May, createModelAttemptObserver, priceUsage } from "@may/core";
+import { InMemoryContext, May, createModelAttemptObserver, priceUsage } from "@sortedyuan/core";
 import {
   BasicTracer, BoundedMetrics, DiagnosticsStore, InMemorySpanProcessor,
   BatchSpanProcessor, JsonlFileSpanExporter, alwaysOffSampler, createOtlpTelemetry,

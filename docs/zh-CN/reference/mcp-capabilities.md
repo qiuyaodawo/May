@@ -10,18 +10,18 @@
 
 ```mermaid
 flowchart LR
-  host[应用宿主] --> client["@may/mcp 连接池"]
+  host[应用宿主] --> client["@sortedyuan/mcp 连接池"]
   client --> remote[MCP 端点]
   client --> tool[Core Tool]
   tool --> executor[权限执行器与调度器]
-  host --> server["@may/mcp/server"]
+  host --> server["@sortedyuan/mcp/server"]
   server --> executor
-  host --> browser["@may/mcp/apps-browser"]
+  host --> browser["@sortedyuan/mcp/apps-browser"]
   browser --> view[隔离 App 视图]
 ```
 
 宿主选择端点、凭据、交互服务和导出能力。客户端工具经过通常的 Core 执行器，
-独立服务端通过参数取得执行器。Core 和 `@may/application` 不依赖 MCP，浏览器
+独立服务端通过参数取得执行器。Core 和 `@sortedyuan/application` 不依赖 MCP，浏览器
 入口不依赖 Node。
 
 ## 已实现能力
@@ -86,9 +86,9 @@ HTTP+SSE 传输不受支持。
 在仓库根目录使用 `package.json` 声明的 pnpm 版本执行：
 
 ```powershell
-pnpm --filter @may/mcp test
-pnpm --filter @may/mcp exec playwright install chromium
-pnpm --filter @may/mcp test:browser
+pnpm --filter @sortedyuan/mcp test
+pnpm --filter @sortedyuan/mcp exec playwright install chromium
+pnpm --filter @sortedyuan/mcp test:browser
 pnpm docs:check
 ```
 

@@ -1,5 +1,5 @@
 {
-  "name": "@may/cli",
+  "name": "@sortedyuan/cli",
   "version": "0.1.0",
   "description": "Minimal command-line interface for May.",
   "private": true,
@@ -23,9 +23,9 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/config": "workspace:*",
-    "@may/core": "workspace:*",
-    "@may/providers": "workspace:*"
+    "@sortedyuan/config": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/providers": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

@@ -1,6 +1,6 @@
 import { waitForHost } from "./host-wait.js";
 import { randomUUID } from "node:crypto";
-import type { ToolExecutor } from "@may/core";
+import type { ToolExecutor } from "@sortedyuan/core";
 import type { Tool, ReadResourceResult } from "@modelcontextprotocol/client";
 import { McpCapabilityError } from "./errors.js";
 import { assertMcpContentSize } from "./content.js";

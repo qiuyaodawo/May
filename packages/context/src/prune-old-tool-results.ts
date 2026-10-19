@@ -1,4 +1,4 @@
-import type { ContextSnapshot, Message, ToolMessage } from "@may/core";
+import type { ContextSnapshot, Message, ToolMessage } from "@sortedyuan/core";
 
 import type { ContextCompactionStrategy } from "./compaction.js";
 

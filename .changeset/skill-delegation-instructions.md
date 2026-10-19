@@ -1,8 +1,8 @@
 ---
-"@may/skills": patch
-"@may/plugin-skills": patch
-"@may/plugin-delegation": minor
-"@may/coordination": patch
+"@sortedyuan/skills": patch
+"@sortedyuan/plugin-skills": patch
+"@sortedyuan/plugin-delegation": minor
+"@sortedyuan/coordination": patch
 ---
 
 Skills 初始提供名称、描述及兼容要求，通过 `skill_read` 按需读取正文与资源；

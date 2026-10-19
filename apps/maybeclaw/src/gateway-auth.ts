@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Algorithm, Version, hash, parseOptions, verify } from "@node-rs/argon2";
-import { UiError } from "@may/ui-client";
+import { UiError } from "@sortedyuan/ui-client";
 import { withGatewayConfiguration } from "./gateway-config.js";
 
 const parameters = { algorithm: Algorithm.Argon2id, version: Version.V0x13, memoryCost: 19456, timeCost: 2, parallelism: 1, outputLen: 32 };

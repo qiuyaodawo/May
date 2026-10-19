@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import { ChannelStore, inboxId, validateChannelInput, type ChannelAttachment, type ChannelInput, type ChannelRecord, type DeliveryRecord } from "./channel-store.js";
 import type { ChannelAdapter, ChannelAttachmentData, ChannelState } from "./channels.js";
-import type { ContentPart } from "@may/core";
-import { inspectImage, readEmbeddedImage, type ImageData } from "@may/media";
-import { UiProjection } from "@may/ui-client/projection";
+import type { ContentPart } from "@sortedyuan/core";
+import { inspectImage, readEmbeddedImage, type ImageData } from "@sortedyuan/media";
+import { UiProjection } from "@sortedyuan/ui-client/projection";
 import type { LegacyTaskRecord } from "./gateway-migration.js";
 import { channelTextPages } from "./channel-text.js";
 export { channelTextPages } from "./channel-text.js";
@@ -11,8 +11,8 @@ import { AgentGateway } from "./gateway.js";
 import { gatewayInput } from "./gateway-input.js";
 import { actorKey, entryKey, type GatewayActor, type GatewayCapabilities, type GatewayDelivery, type GatewayEntry, type GatewayMessage, type GatewaySession } from "./gateway-types.js";
 import { digest } from "./types.js";
-import { PluginHost, definePlugin, defineService, type AnyPlugin } from "@may/plugin";
-import { createDeliveryPlugin, deliveryServices, type DeliveryService } from "@may/plugin-delivery";
+import { PluginHost, definePlugin, defineService, type AnyPlugin } from "@sortedyuan/plugin";
+import { createDeliveryPlugin, deliveryServices, type DeliveryService } from "@sortedyuan/plugin-delivery";
 import { gatewayPluginServices } from "./plugins/services.js";
 
 interface PendingInput { id: string; input: ChannelInput; fingerprint?: string; sessionId?: string; state: "pending" | "processing" | "done" | "failed" | "deleted"; error?: string }

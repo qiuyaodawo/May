@@ -1,10 +1,10 @@
 import { mkdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
-import { defineAgent, type AgentApplication, type AgentApplicationEvent } from "@may/application";
-import { createReadTool } from "@may/coding-tools";
-import type { Model } from "@may/core";
-import { type SessionEvent, validateSessionHistory } from "@may/session";
-import { FileSessionStore } from "@may/session/file-store";
+import { defineAgent, type AgentApplication, type AgentApplicationEvent } from "@sortedyuan/application";
+import { createReadTool } from "@sortedyuan/coding-tools";
+import type { Model } from "@sortedyuan/core";
+import { type SessionEvent, validateSessionHistory } from "@sortedyuan/session";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 import { FileTaskStore, TaskLockedError, type TaskJournal } from "./store.js";
 import { digest, isTerminal, taskId, validateSpec, type TaskSnapshot, type TaskSpec, type TaskStatus } from "./types.js";
 

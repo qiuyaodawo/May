@@ -1,7 +1,7 @@
 ---
-"@may/core": minor
-"@may/context": minor
-"@may/provider-openai": minor
+"@sortedyuan/core": minor
+"@sortedyuan/context": minor
+"@sortedyuan/provider-openai": minor
 ---
 
 `ModelContextCompactionResult` 新增 `usage`：provider 原生压缩据此上报压缩请求自身的

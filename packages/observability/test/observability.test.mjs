@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { InMemoryContext, May } from "@may/core";
+import { InMemoryContext, May } from "@sortedyuan/core";
 import {
   BasicTracer,
   BatchSpanProcessor,

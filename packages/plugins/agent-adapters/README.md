@@ -1,4 +1,4 @@
-# `@may/plugin-agent-adapters`
+# `@sortedyuan/plugin-agent-adapters`
 
 `createAgentAdaptersPlugin({ factories, id? })` 创建 `host` scope 插件，提供
 `agentAdapterRegistryService`。`factories` 是 `Record<id, factory>` 或返回这些 factory
@@ -42,7 +42,7 @@ version 1 身份与父 span。RPC 在 `gateway/initialize` 请求中声明 `tele
 字段的远端继续接收原执行字段。未知版本、未知字段和非法身份在发送前导致验证失败。
 远端需要在开始执行前验证 envelope，业务输入的重复请求判断不包含遥测身份。
 
-`@may/plugin-agent-adapters/examples/rpc-file-agent` 提供实际文件计算服务，支持
+`@sortedyuan/plugin-agent-adapters/examples/rpc-file-agent` 提供实际文件计算服务，支持
 SHA-256、等待文件、取消、对话记录、输入状态查询、补充输入和删除。状态读取、
 写入和更新通过 `AsyncStateSerializer` 顺序执行；文件等待与取消执行使用独立流程。
 示例协商 version 1 遥测，并在任务记录中独立保存 `telemetry`；`inputHash` 仅描述业务

@@ -6,7 +6,7 @@ import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { chromium } from "playwright";
-import { FileMediaStore } from "@may/media";
+import { FileMediaStore } from "@sortedyuan/media";
 import TerminalEvents from "tty-events";
 import { imageSource } from "../../../../media/test/fixture.mjs";
 import { multicolorImage } from "../fixtures/multicolor-image.mjs";

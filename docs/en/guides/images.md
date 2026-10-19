@@ -66,14 +66,14 @@ require a host-provided `MediaReader`.
 
 ## Reusable interfaces
 
-Add `@may/media` to a host that reads or converts images. Keep its reader and
+Add `@sortedyuan/media` to a host that reads or converts images. Keep its reader and
 store under host ownership. The interfaces below describe the media boundary;
 UI composition is covered by [Custom UI](custom-ui.md).
 
-`@may/media` exports `DisplayPart`, `ImageAttachment`, `ImageData`, `MediaReader`,
+`@sortedyuan/media` exports `DisplayPart`, `ImageAttachment`, `ImageData`, `MediaReader`,
 `MediaCapabilities`, `displayParts`, `imageAttachment`, `readEmbeddedImage`,
 `inspectImage`, `imagePng` and `FileMediaStore`. Its runtime dependencies are
-`@may/core` and `sharp`; the Agent loop does not depend on it.
+`@sortedyuan/core` and `sharp`; the Agent loop does not depend on it.
 
 Validation supports PNG, JPEG, WebP, GIF and AVIF, with limits of 32 MiB and
 40 million pixels. Unsupported formats and MIME mismatches produce errors.

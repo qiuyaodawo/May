@@ -2,7 +2,7 @@
 
 [English](../../en/guides/eval.md) | **简体中文**
 
-使用 `@may/eval`，可以让不同模型、提示词、工具、权限或 Context 配置执行相同
+使用 `@sortedyuan/eval`，可以让不同模型、提示词、工具、权限或 Context 配置执行相同
 任务，并检查实际结果。每次执行分别保存执行状态、验收证据、基础设施状态、
 人工协助和资源用量。
 
@@ -51,8 +51,8 @@ SIGINT 和 SIGTERM 请求取消，并保留已经开始的执行记录。
 `EvalRegistry`、宿主管理的存储目录和取消信号：
 
 ```ts
-import { EvalRunner, type EvalExperiment, type EvalRegistry } from "@may/eval";
-import { FileEvalStore } from "@may/eval/file-store";
+import { EvalRunner, type EvalExperiment, type EvalRegistry } from "@sortedyuan/eval";
+import { FileEvalStore } from "@sortedyuan/eval/file-store";
 
 export async function evaluateExperiment(
   experiment: EvalExperiment,
@@ -151,7 +151,7 @@ Application 适配器消费事件并保存 Session、Run ID；Coordination 适�
 权限由宿主提供，固定策略审批和真实人工审批都会记录。交互入口不可用时以
 明确结果终止，人工审批等待时间单独计量。
 
-`@may/eval/application` 导出
+`@sortedyuan/eval/application` 导出
 `createApplicationExecutionAdapter({ version, open, input?, approvals?,
 continueAfterYield?, maxContinuations? })`。`open({ context, tracer, budget })`
 返回新的 `AgentApplication`。向 Application 提供 `tracer`，模型使用
@@ -161,7 +161,7 @@ continueAfterYield?, maxContinuations? })`。`open({ context, tracer, budget })`
 默认最多继续执行 32 次。输出通过 `text` 保存最终文本，通过 `json` 数组保存
 结构化数据，没有对应内容时省略字段。
 
-`@may/eval/coordination` 导出
+`@sortedyuan/eval/coordination` 导出
 `createCoordinationExecutionAdapter({ version, create, outputTaskId?, approvals? })`。
 `create({ context, tracer, budget })` 创建新的 `CoordinationRuntime`，所有模型
 及工具都使用同一个预算包装，限制覆盖完整任务图。未绑定预算时拒绝执行。
@@ -334,13 +334,13 @@ pnpm eval compare --baseline .eval-results/baseline --candidate .eval-results/ca
 
 ## 包范围与验证
 
-公共 package 为 `@may/eval`，`@may/eval-cli` 和可执行案例保持 private。
+公共 package 为 `@sortedyuan/eval`，`@sortedyuan/eval-cli` 和可执行案例保持 private。
 运行时依赖包含 Core、Application、Coordination、Observability、Permissions，
 以及 schema 验证和进程取消使用的第三方库。打包安装检查覆盖仓库之外的使用。
 
 ```powershell
-pnpm --filter @may/eval test
-pnpm --filter @may/eval-cli test
+pnpm --filter @sortedyuan/eval test
+pnpm --filter @sortedyuan/eval-cli test
 pnpm test:package:eval
 pnpm test:integration:eval
 pnpm docs:check

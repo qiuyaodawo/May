@@ -4,11 +4,11 @@ import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import * as rootApi from "@may/application";
-import { GitCheckpointError, GitWorkspaceConflictError, ProjectGitWorkspace } from "@may/application/git-workspace";
+import * as rootApi from "@sortedyuan/application";
+import { GitCheckpointError, GitWorkspaceConflictError, ProjectGitWorkspace } from "@sortedyuan/application/git-workspace";
 
 const directory = dirname(fileURLToPath(import.meta.url));
-assert.ok((await realpath(fileURLToPath(import.meta.resolve("@may/application/git-workspace")))).startsWith(join(directory, "node_modules")));
+assert.ok((await realpath(fileURLToPath(import.meta.resolve("@sortedyuan/application/git-workspace")))).startsWith(join(directory, "node_modules")));
 assert.equal("ProjectGitWorkspace" in rootApi, false);
 assert.equal(typeof GitCheckpointError, "function");
 assert.equal(typeof GitWorkspaceConflictError, "function");

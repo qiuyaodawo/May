@@ -1,13 +1,13 @@
-import type { AgentApplicationEvent } from "@may/application";
+import type { AgentApplicationEvent } from "@sortedyuan/application";
 import type { MaybeCodeModelInfo } from "./controller.js";
-import type { ToolChangePreview } from "@may/coding-tools/change-preview";
-import type { McpClientEvent, McpInteractionEvent } from "@may/mcp";
+import type { ToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
+import type { McpClientEvent, McpInteractionEvent } from "@sortedyuan/mcp";
 import type { MaybeCodeDelegationEvent } from "./delegation.js";
 export type { MaybeCodeRun } from "./delegation.js";
 
 export type MaybeCodeSessionEvent =
-  | { type: "workspace.git.changed"; checkpoint: import("@may/application/git-workspace").GitCheckpoint }
-  | import("@may/goal").GoalEvent
+  | { type: "workspace.git.changed"; checkpoint: import("@sortedyuan/application/git-workspace").GitCheckpoint }
+  | import("@sortedyuan/goal").GoalEvent
   | MaybeCodeDelegationEvent
   | Exclude<AgentApplicationEvent, { type: "tool.presentation" }>
   | {
@@ -18,7 +18,7 @@ export type MaybeCodeSessionEvent =
       preview: ToolChangePreview;
     };
 export type MaybeCodeEvent =
-  | import("@may/application").AgentSessionForkedEvent
+  | import("@sortedyuan/application").AgentSessionForkedEvent
   | { type: "permission-mode.changed"; mode: import("./policy.js").MaybeCodePermissionMode }
   | MaybeCodeSessionEvent
   | McpClientEvent

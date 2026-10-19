@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { waitForTerminalRun } from "./terminal-readiness.mjs";
 
-import { InMemorySessionStore } from "@may/session";
+import { InMemorySessionStore } from "@sortedyuan/session";
 import {
   InMemorySessionCatalog,
   MaybeCodeWorkspace,

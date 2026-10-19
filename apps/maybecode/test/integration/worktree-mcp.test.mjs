@@ -5,7 +5,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
-import { ProjectGitWorkspace } from "@may/application/git-workspace";
+import { ProjectGitWorkspace } from "@sortedyuan/application/git-workspace";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
 const execute = promisify(execFile);

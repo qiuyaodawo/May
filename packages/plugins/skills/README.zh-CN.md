@@ -1,4 +1,4 @@
-# @may/plugin-skills
+# @sortedyuan/plugin-skills
 
 `createSkillsPlugin({ id?, create })` 使用 `create(context)` 返回的实际 `SkillRegistry`
 创建 `SkillSession`，提供 `services.skills`，并通过共享注册表贡献 `skill_read` 和动态指令。
@@ -17,4 +17,4 @@ Application 保存和状态迁移使用 PluginHost；恢复已有 Session 时也
 插件关闭时移除工具和指令贡献。SkillRegistry 是不可变的发现快照，没有资源关闭接口。
 
 测试在被忽略的 `plugin-verification` 目录中发现、激活和恢复实际 `SKILL.md` 文件。
-执行 `pnpm --filter @may/plugin-skills test`。
+执行 `pnpm --filter @sortedyuan/plugin-skills test`。

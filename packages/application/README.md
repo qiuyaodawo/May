@@ -1,4 +1,4 @@
-# @may/application
+# @sortedyuan/application
 
 `AgentApplication.continue(options)` continues the current context with the same
 run lifecycle and persistence as `submit()`, without adding a user message.
@@ -79,7 +79,7 @@ and branch operations. Resume passes the saved workspace to the application
 factory; `workspace` reflects the active application.
 
 ```ts
-import { defineAgent } from "@may/application";
+import { defineAgent } from "@sortedyuan/application";
 
 const agent = defineAgent({
   model,
@@ -118,7 +118,7 @@ Options are adapted into component plugin factories. Supplying an option and a
 plugin that both provide the same base service fails before setup.
 `getService(token)` reads an enabled service from the session scope.
 
-`@may/plugin-services` exports the same base tokens and ordered contribution
+`@sortedyuan/plugin-services` exports the same base tokens and ordered contribution
 registries. Multiple plugins register tool and instruction sources, Model wrappers,
 and Context wrappers, with explicit `order` and `context.pluginOrder`. Each
 Application has independent registries; Models and Context factories are wrapped
@@ -136,8 +136,8 @@ actual Application from `application.created` handlers; accessing it during setu
 fails immediately. Plugins can use its controller and state APIs and register owned
 resources with `context.defer()`. The Application reference stays outside cloned
 Hook payloads. Builtin Model, permissions, Context/Runtime/tools and Skills factories
-live in `@may/plugin-models`, `@may/plugin-permissions`, `@may/plugin-runtime`, and
-`@may/plugin-skills`. Existing direct options retain their caller ownership semantics.
+live in `@sortedyuan/plugin-models`, `@sortedyuan/plugin-permissions`, `@sortedyuan/plugin-runtime`, and
+`@sortedyuan/plugin-skills`. Existing direct options retain their caller ownership semantics.
 
 `applicationHooks` covers application creation and closing, durable input,
 compaction, approval, and recovery. Creation and closing events include Session
@@ -193,7 +193,7 @@ content-free `traceAttributes`. The tracer is forwarded to Core and the
 permission executor; Run handles expose their `traceContext`, and Sessions add
 their id as an attribute. A tracer is a caller-owned shared collaborator:
 closing an application does not flush or shut it down. Standard processors and
-exporters live in `@may/observability`.
+exporters live in `@sortedyuan/observability`.
 
 `AgentWorkspace` adds a session catalog, auto-resume, session switching and a
 serialized application-transition primitive. Products retain their own model
@@ -214,7 +214,7 @@ without replacing an executor supplied by a plugin. Throw `FatalToolExecutionErr
 when a failed check must terminate the Run. Cancellation is checked again before
 execution. Delegated applications require the same callback when sharing preparation.
 
-`@may/application/git-workspace` provides the Node.js `ProjectGitWorkspace`
+`@sortedyuan/application/git-workspace` provides the Node.js `ProjectGitWorkspace`
 component for default project Git management, initial and complete-request file
 checkpoints, current branch status, structured diffs, reviewed restoration,
 and durable worktree management. Hosts supply project commit authorization
@@ -225,7 +225,7 @@ prompt, tools, permissions, Context strategies, model/provider configuration,
 and UI. Its current `0.1.0` surface is a developer-preview API.
 
 ```ts
-import { AgentWorkspace } from "@may/application";
+import { AgentWorkspace } from "@sortedyuan/application";
 
 const workspace = await AgentWorkspace.open({
   workspace: process.cwd(),

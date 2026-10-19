@@ -1,4 +1,4 @@
-import type { HookContext, HookDefinition } from "@may/core";
+import type { HookContext, HookDefinition } from "@sortedyuan/core";
 import type { Disposer, HookHandler, HookHandlerOptions } from "./types.js";
 
 export interface HookRegistration {

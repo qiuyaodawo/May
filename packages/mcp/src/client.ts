@@ -18,7 +18,7 @@ import {
   type ToolExecutionContext,
   type TraceAttributes,
   type Tracer,
-} from "@may/core";
+} from "@sortedyuan/core";
 
 import {
   McpClientPoolClosedError,

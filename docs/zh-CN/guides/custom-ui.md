@@ -5,8 +5,8 @@
 本文用于将已有 UI 接入 May 的无界面控制接口。需要已经打开的 `AgentApplication`
 或工作区 controller，以及能够同时接收异步事件、取消操作和审批响应的 UI。
 
-浏览器界面参阅[共享 Web UI](web-ui.md)：`@may/ui-client` 提供 JSON 边界和状态
-同步，`@may/web-ui` 提供可组合组件与可选工作台。本文也说明进程内 controller
+浏览器界面参阅[共享 Web UI](web-ui.md)：`@sortedyuan/ui-client` 提供 JSON 边界和状态
+同步，`@sortedyuan/web-ui` 提供可组合组件与可选工作台。本文也说明进程内 controller
 与 TUI 的接入方式。
 
 终端、桌面、Web 或远程 UI 通过 `AgentController` 管理一个活动 Session，通过
@@ -41,7 +41,7 @@ const history = await controller.history();
 
 ## 投影 Application 事件
 
-在使用项目中安装 `@may/application`、`@may/permissions` 和 `@may/tui`。
+在使用项目中安装 `@sortedyuan/application`、`@sortedyuan/permissions` 和 `@sortedyuan/tui`。
 以下函数需要已打开的 controller、`TranscriptStore` 和应用提供的 `askApproval`
 对话框。函数持续读取事件，直到 controller 关闭；输入和退出操作需要并发处理。
 
@@ -49,12 +49,12 @@ const history = await controller.history();
 import type {
   AgentApplicationEvent,
   AgentController,
-} from "@may/application";
+} from "@sortedyuan/application";
 import type {
   ApprovalDecision,
   ApprovalRequest,
-} from "@may/permissions";
-import { TranscriptStore } from "@may/tui/transcript";
+} from "@sortedyuan/permissions";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
 
 type AskApproval = (
   request: ApprovalRequest,
@@ -114,8 +114,8 @@ import {
   FullscreenRenderer,
   NodeTerminalDriver,
   TuiRuntime,
-} from "@may/tui";
-import { TranscriptStore, TranscriptView } from "@may/tui/transcript";
+} from "@sortedyuan/tui";
+import { TranscriptStore, TranscriptView } from "@sortedyuan/tui/transcript";
 
 const store = new TranscriptStore();
 const view = new TranscriptView(store, { assistantLabel: "My Agent" });
@@ -142,7 +142,7 @@ Application 关闭后，`projectApplication()` 才会正常结束。产品通过
 产品显示组件注册在 `ToolRendererRegistry` 实例上，通过视图 options 传入。
 
 Raw-mode retained TUI 使用 `NodeTerminalDriver`；逐行提示界面使用
-`@may/tui/node-terminal` 的 `createNodeTerminal()`。二者管理不同输入模式，
+`@sortedyuan/tui/node-terminal` 的 `createNodeTerminal()`。二者管理不同输入模式，
 同一终端只能由其中一个控制。
 
 ## 事件一致性
@@ -208,7 +208,7 @@ sampling 审阅可通过 `{ action: "accept", content: { json: editedDocument } 
 和新审阅，不能自动重发。预算、命令和恢复限制参阅[任务](./mcp-tasks.md)。
 
 图形 Host 可使用 `pool.openApp`、`mcpAppSandboxResponse` 和浏览器专用
-`@may/mcp/apps-browser` 入口。同意、origin/CSP 要求和不支持的 API 参阅
+`@sortedyuan/mcp/apps-browser` 入口。同意、origin/CSP 要求和不支持的 API 参阅
 [隔离 Apps](./mcp-apps.md)；终端保留文本显示。
 
 ## 验证 UI 生命周期

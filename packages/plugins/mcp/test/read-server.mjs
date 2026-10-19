@@ -1,6 +1,6 @@
 import { createMayMcpServer } from "../../../mcp/dist/server.js";
 import { createReadTool } from "../../../tools/coding-tools/dist/index.js";
-import { directToolExecutor } from "@may/core";
+import { directToolExecutor } from "@sortedyuan/core";
 
 const workspace = process.argv[2];
 const server = createMayMcpServer({

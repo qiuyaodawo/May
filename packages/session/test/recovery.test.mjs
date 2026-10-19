@@ -4,7 +4,7 @@ import { mkdtemp, appendFile, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileSessionStore } from "../dist/file-store.js";
-import { May, InMemoryContext } from "@may/core";
+import { May, InMemoryContext } from "@sortedyuan/core";
 import { Session, InMemorySessionStore } from "../dist/index.js";
 
 const call = (id) => ({ id, name: "write", input: { id } });

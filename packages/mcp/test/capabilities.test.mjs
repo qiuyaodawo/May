@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { May, InMemoryContext } from "@may/core";
+import { May, InMemoryContext } from "@sortedyuan/core";
 import { openMcpClientPool, mcpResourceToUserMessage, mcpPromptToUserMessage, mcpToolResultContent, previewMcpMessage } from "../dist/index.js";
 import { startCatalogFixture } from "./fixtures/catalog-server.mjs";
 

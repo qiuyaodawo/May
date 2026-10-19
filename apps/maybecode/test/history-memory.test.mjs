@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemorySessionStore } from "@may/session";
+import { InMemorySessionStore } from "@sortedyuan/session";
 import { MaybeCodeApplication } from "../dist/index.js";
 import { createTestWorkspace } from "./fixtures/workspace.mjs";
 

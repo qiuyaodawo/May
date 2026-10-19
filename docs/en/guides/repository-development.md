@@ -19,7 +19,7 @@ packages missing from the local store. When intentionally changing dependencies,
 use `pnpm install` and review the resulting lockfile changes.
 
 The root build type-checks and compiles the workspace, then bundles the MaybeCode
-CLI with esbuild. `pnpm --filter @may/maybecode build` also creates this CLI bundle.
+CLI with esbuild. `pnpm --filter @sortedyuan/maybecode build` also creates this CLI bundle.
 Keep `dist/bin.js` and its `dist/cli/` chunks together. The package's library
 exports continue to use the TypeScript-generated modules. CLI commands load their
 implementation when selected; image codecs and Web server assets load when used.
@@ -75,7 +75,7 @@ credentials. For example, MaybeClaw requires `MAYBECLAW_LIVE_MODEL` and provider
 credentials:
 
 ```bash
-pnpm --filter @may/maybeclaw test:integration
+pnpm --filter @sortedyuan/maybeclaw test:integration
 ```
 
 System clipboard checks require a Windows desktop session:

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
-import { priceUsage, resolveUsageTotals } from "@may/core";
+import { priceUsage, resolveUsageTotals } from "@sortedyuan/core";
 import { streamAnthropicResponse } from "../dist/stream.js";
 
 test("Anthropic HTTP streams account for separate cache usage, cache TTLs and server tool requests", async t => {

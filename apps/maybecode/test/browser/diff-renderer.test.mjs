@@ -4,8 +4,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright";
-import { createToolChangePreview } from "@may/coding-tools/change-preview";
-import { InMemorySessionStore } from "@may/session";
+import { createToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
+import { InMemorySessionStore } from "@sortedyuan/session";
 import { InMemorySessionCatalog, createMaybeCodeWebHost, startMaybeCodeWebServer } from "../../dist/index.js";
 import { yoloWorkspace } from "../yolo-support.mjs";
 

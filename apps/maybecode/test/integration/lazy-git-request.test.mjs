@@ -8,11 +8,11 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { FileSessionStore } from "@may/session/file-store";
-import { FileSessionCatalog } from "@may/session/catalog";
-import { loadMayConfig } from "@may/config";
-import { createBuiltinProviderModel, selectProviderModel } from "@may/providers";
-import { ProjectGitWorkspace } from "@may/application/git-workspace";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { loadMayConfig } from "@sortedyuan/config";
+import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
+import { ProjectGitWorkspace } from "@sortedyuan/application/git-workspace";
 import { MaybeCodeWorkspace } from "../../dist/index.js";
 
 const artifacts = fileURLToPath(new URL("../../../../review/lazy-git-live/", import.meta.url));

@@ -8,8 +8,8 @@ import { connect, createServer as createTcpServer } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
-import { CoordinationWorker, createRemoteAgent } from "@may/coordination/remote";
-import { createGatewayRpcAdapter } from "@may/plugin-agent-adapters/rpc";
+import { CoordinationWorker, createRemoteAgent } from "@sortedyuan/coordination/remote";
+import { createGatewayRpcAdapter } from "@sortedyuan/plugin-agent-adapters/rpc";
 
 const parent = fileURLToPath(new URL("../../../../review/worker-cancellation/", import.meta.url));
 const example = fileURLToPath(new URL("../../../../packages/plugins/agent-adapters/examples/rpc-file-agent.mjs", import.meta.url));

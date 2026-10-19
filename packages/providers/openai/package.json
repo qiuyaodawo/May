@@ -1,5 +1,5 @@
 {
-  "name": "@may/provider-openai",
+  "name": "@sortedyuan/provider-openai",
   "version": "0.1.0",
   "description": "OpenAI Responses API model adapter for May.",
   "type": "module",
@@ -19,8 +19,8 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*",
-    "@may/provider-openai-compatible": "workspace:*"
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/provider-openai-compatible": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

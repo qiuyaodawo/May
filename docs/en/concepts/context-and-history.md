@@ -24,12 +24,12 @@ package ownership.
 | Owns Session identity | No | Yes |
 | Recreates tools/model/policy | No | No |
 
-The minimal `@may/core` `Context` contract has no persistence dependency. Core
+The minimal `@sortedyuan/core` `Context` interface has no persistence dependency. Core
 asks for a snapshot before each model call and appends user, assistant, and tool
 messages as execution proceeds. Instructions become a system message in the
 model request; Context metadata becomes request metadata.
 
-`@may/context` adds `ContextFactory` and optional management through a
+`@sortedyuan/context` adds `ContextFactory` and optional management through a
 `ContextController`. The built-in `InMemoryContextFactory` returns an in-memory
 model view plus a controller for inspection and replacement. A custom factory
 may omit the controller, so applications must handle inspection or compaction

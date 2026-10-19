@@ -1,5 +1,5 @@
 {
-  "name": "@may/skills",
+  "name": "@sortedyuan/skills",
   "version": "0.1.0",
   "description": "Agent Skills discovery, bounded resource loading and session activation for May.",
   "type": "module",
@@ -13,7 +13,7 @@
     "test": "pnpm run build && node --test test/*.test.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
-  "dependencies": { "@may/core": "workspace:*", "yaml": "^2.9.0" },
+  "dependencies": { "@sortedyuan/core": "workspace:*", "yaml": "^2.9.0" },
   "devDependencies": { "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"

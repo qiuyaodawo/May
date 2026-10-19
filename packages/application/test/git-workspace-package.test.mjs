@@ -13,7 +13,7 @@ test("packed Git workspace subpath installs and runs in an independent consumer"
   timeout: 120_000,
 }, async t => {
   const pnpm = process.env.npm_execpath;
-  assert.ok(pnpm, "Run this check through pnpm --filter @may/application test:package");
+  assert.ok(pnpm, "Run this check through pnpm --filter @sortedyuan/application test:package");
   assert.equal((await runPnpm(pnpm, ["--version"], repository)).trim(), "12.4.2");
   await mkdir(artifacts, { recursive: true });
   const directory = await mkdtemp(join(artifacts, "consumer-"));
@@ -22,16 +22,16 @@ test("packed Git workspace subpath installs and runs in an independent consumer"
   const consumer = join(directory, "consumer");
   await mkdir(packs);
   await mkdir(consumer);
-  const packed = JSON.parse(await runPnpm(pnpm, ["--filter", "@may/application...", "pack", "--pack-destination", packs, "--json"], repository));
+  const packed = JSON.parse(await runPnpm(pnpm, ["--filter", "@sortedyuan/application...", "pack", "--pack-destination", packs, "--json"], repository));
   assert.ok(Array.isArray(packed));
-  const application = packed.find(entry => entry.name === "@may/application");
+  const application = packed.find(entry => entry.name === "@sortedyuan/application");
   assert.ok(application.files.some(file => file.path === "dist/git-workspace.js"));
   assert.ok(application.files.some(file => file.path === "dist/git-workspace.d.ts"));
   assert.ok(application.files.every(file => !file.path.startsWith("test/") && !file.path.endsWith(".tsbuildinfo")));
   const overrides = Object.fromEntries(packed.map(entry => [entry.name,
     `file:${relative(consumer, join(packs, `${entry.name.replace(/^@/u, "").replaceAll("/", "-")}-${entry.version}.tgz`)).replaceAll("\\", "/")}`]));
   await writeFile(join(consumer, "package.json"), `${JSON.stringify({ name: "git-workspace-package-consumer", private: true,
-    type: "module", dependencies: { "@may/application": overrides["@may/application"] } }, null, 2)}\n`);
+    type: "module", dependencies: { "@sortedyuan/application": overrides["@sortedyuan/application"] } }, null, 2)}\n`);
   await writeFile(join(consumer, "pnpm-workspace.yaml"), `packages:\n  - "."\noverrides:\n${Object.entries(overrides)
     .map(([name, path]) => `  ${JSON.stringify(name)}: ${JSON.stringify(path)}`).join("\n")}\n`);
   const store = (await runPnpm(pnpm, ["store", "path"], repository)).trim();

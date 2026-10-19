@@ -1,7 +1,7 @@
-import { May, type RuntimeFactory } from "@may/core";
-import { InMemoryContextFactory, type ContextFactory } from "@may/context";
-import { definePlugin, type PluginContext, type PluginDefinition, type Disposer } from "@may/plugin";
-import { services, factoryMetadata, type PluginFactoryMetadata, type ContextOptionsSource, type ContextWrapper, type ContributionOptions, type ToolSource } from "@may/plugin-services";
+import { May, type RuntimeFactory } from "@sortedyuan/core";
+import { InMemoryContextFactory, type ContextFactory } from "@sortedyuan/context";
+import { definePlugin, type PluginContext, type PluginDefinition, type Disposer } from "@sortedyuan/plugin";
+import { services, factoryMetadata, type PluginFactoryMetadata, type ContextOptionsSource, type ContextWrapper, type ContributionOptions, type ToolSource } from "@sortedyuan/plugin-services";
 
 export interface RuntimePluginOptions<C = unknown> extends PluginFactoryMetadata<C> {
   readonly id?: string;

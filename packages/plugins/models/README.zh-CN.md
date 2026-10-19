@@ -1,4 +1,4 @@
-# @may/plugin-models
+# @sortedyuan/plugin-models
 
 `createModelPlugin({ id?, create, info?, dispose? })` 提供 `services.model`。
 传入 `info` 时，工厂同时提供 `services.modelInfo`，记录实际的 `provider`、

@@ -1,12 +1,12 @@
-# `@may/scheduler`
+# `@sortedyuan/scheduler`
 
 Opt-in durable time and event triggers for host-owned tasks. `Scheduler.open()`
 opens a host-provided store without starting timers or Agents. Hosts call `start()`
 for a resident timer loop or `tick()` for an external system scheduler.
 
 ```ts
-import { Scheduler } from "@may/scheduler";
-import { SqliteSchedulerStore } from "@may/scheduler/sqlite-store";
+import { Scheduler } from "@sortedyuan/scheduler";
+import { SqliteSchedulerStore } from "@sortedyuan/scheduler/sqlite-store";
 
 const scheduler = Scheduler.open({
   store: SqliteSchedulerStore.open("./data/scheduler.sqlite"),
@@ -34,9 +34,9 @@ Read the [English guide](../../docs/en/guides/scheduler.md) or
 [简体中文指南](../../docs/zh-CN/guides/scheduler.md) for lifecycle, event deduplication,
 misfire rules, restart recovery, SQLite ownership and verification commands.
 
-Node.js >=22.16.0 is required. Public entry points are `@may/scheduler` and
-`@may/scheduler/sqlite-store`. The release package list for this component is
-explicitly `@may/scheduler`; its runtime dependencies are `@may/core`,
+Node.js >=22.16.0 is required. Public entry points are `@sortedyuan/scheduler` and
+`@sortedyuan/scheduler/sqlite-store`. The release package list for this component is
+explicitly `@sortedyuan/scheduler`; its runtime dependencies are `@sortedyuan/core`,
 `cron-parser` and `luxon`. `pnpm test:package:scheduler` installs the packed package into a consumer
 outside the repository and verifies those dependencies.
 

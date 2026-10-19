@@ -8,10 +8,10 @@ export * from "./retrying-model.js";
 export * from "./selection.js";
 export * from "./types.js";
 
-export * from "@may/provider-anthropic";
-export * from "@may/provider-deepseek";
-export * from "@may/provider-kimi";
-export * from "@may/provider-openai";
-export * from "@may/provider-openai-compatible";
-export * from "@may/provider-zhipu";
-export * from "@may/provider-gemini";
+export * from "@sortedyuan/provider-anthropic";
+export * from "@sortedyuan/provider-deepseek";
+export * from "@sortedyuan/provider-kimi";
+export * from "@sortedyuan/provider-openai";
+export * from "@sortedyuan/provider-openai-compatible";
+export * from "@sortedyuan/provider-zhipu";
+export * from "@sortedyuan/provider-gemini";

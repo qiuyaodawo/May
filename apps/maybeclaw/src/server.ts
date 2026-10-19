@@ -2,8 +2,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 import type { MaybeClawHost } from "./host.js";
 import { validateId } from "./types.js";
-import { webUiAssets } from "@may/web-ui/assets";
-import { authorized, createUiRouter, secureHeaders, sendJson as json, trustedRequest, validateToken } from "@may/ui-client/server";
+import { webUiAssets } from "@sortedyuan/web-ui/assets";
+import { authorized, createUiRouter, secureHeaders, sendJson as json, trustedRequest, validateToken } from "@sortedyuan/ui-client/server";
 import { MaybeClawUiHost } from "./ui-host.js";
 
 export interface ServerOptions { host: MaybeClawHost; token: string; port?: number }

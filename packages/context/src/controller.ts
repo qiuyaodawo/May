@@ -1,5 +1,5 @@
-import { HookExecutionError, jsonEqual } from "@may/core";
-import type { Context, ContextSnapshot, Message, Usage } from "@may/core";
+import { HookExecutionError, jsonEqual } from "@sortedyuan/core";
+import type { Context, ContextSnapshot, Message, Usage } from "@sortedyuan/core";
 
 import type {
   ContextCompactionDetails,

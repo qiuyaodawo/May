@@ -1,4 +1,6 @@
-# `@may/plugin-channel-feishu`
+# `@sortedyuan/plugin-channel-feishu`
+
+本包为 workspace 私有包，供仓库中的渠道宿主使用。
 
 `createFeishuChannelPlugin({ settings, secret, id? })` 创建 `host` scope 插件，
 要求 `deliveryServices.registry`，提供 `feishuChannelService`。插件 setup 创建

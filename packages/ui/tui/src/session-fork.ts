@@ -1,4 +1,4 @@
-import { Keymap, type KeyStroke } from "@may/keybindings";
+import { Keymap, type KeyStroke } from "@sortedyuan/keybindings";
 import type { InteractiveComponent, RenderResult, RenderSize } from "./component.js";
 import { ListSelectionModel, printableKeyText } from "./list-selection.js";
 import { Text, sanitizeTerminalText } from "./text.js";

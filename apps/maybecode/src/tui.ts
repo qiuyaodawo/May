@@ -1,12 +1,12 @@
-import type { ContentPart, MayEvent, UserMessage } from "@may/core";
+import type { ContentPart, MayEvent, UserMessage } from "@sortedyuan/core";
 import { userInfo } from "node:os";
-import type { AgentApplicationEvent } from "@may/application";
-import type { ContextInspection } from "@may/context";
-import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
-import type { SessionEvent } from "@may/session";
-import { sanitizeTerminalText, TerminalImages, encodeImage, workspaceGitLabel } from "@may/tui";
+import type { AgentApplicationEvent } from "@sortedyuan/application";
+import type { ContextInspection } from "@sortedyuan/context";
+import type { ApprovalRequest, PermissionEvent } from "@sortedyuan/permissions";
+import type { SessionEvent } from "@sortedyuan/session";
+import { sanitizeTerminalText, TerminalImages, encodeImage, workspaceGitLabel } from "@sortedyuan/tui";
 
-import type { FileChangeKind, ToolChangePreview } from "@may/coding-tools/change-preview";
+import type { FileChangeKind, ToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
 import type {
   MaybeCodeDelegationState,
   MaybeCodeDelegationTask,
@@ -23,8 +23,8 @@ import {
 import type {
   TerminalIO,
   TerminalQuestionOptions,
-} from "@may/tui/node-terminal";
-import { createNodeTerminal } from "@may/tui/node-terminal";
+} from "@sortedyuan/tui/node-terminal";
+import { createNodeTerminal } from "@sortedyuan/tui/node-terminal";
 import type {
   MaybeCodeController,
   MaybeCodeReasoningEffortState,

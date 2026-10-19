@@ -2,12 +2,12 @@
 
 **English** | [简体中文](../../zh-CN/guides/scheduler.md)
 
-Use `@may/scheduler` to submit host tasks at a chosen time, on a cron schedule or
+Use `@sortedyuan/scheduler` to submit host tasks at a chosen time, on a cron schedule or
 in response to an event. The scheduler stores trigger definitions and execution
 records, and submits work through your `TaskDispatcher`. The public API is in
 developer preview.
 
-You need Node.js 22.16 or later, `@may/scheduler`, local storage that supports
+You need Node.js 22.16 or later, `@sortedyuan/scheduler`, local storage that supports
 SQLite locking, and an idempotent host task service. The host configures Agents,
 Sessions, execution, approvals and result delivery. Opening the scheduler leaves
 timers stopped until you call `start()` or `tick()`.
@@ -22,8 +22,8 @@ timers stopped until you call `start()` or `tick()`.
    `daily-ai-brief` does not already exist:
 
 ```ts
-import { Scheduler } from "@may/scheduler";
-import { SqliteSchedulerStore } from "@may/scheduler/sqlite-store";
+import { Scheduler } from "@sortedyuan/scheduler";
+import { SqliteSchedulerStore } from "@sortedyuan/scheduler/sqlite-store";
 
 const scheduler = Scheduler.open({
   store: SqliteSchedulerStore.open("./data/scheduler.sqlite"),
@@ -202,8 +202,8 @@ component. See [model and telemetry integration](model-telemetry-integration.md)
 ## Verification
 
 ```powershell
-pnpm --filter @may/scheduler test
-pnpm --filter @may/scheduler test:live
+pnpm --filter @sortedyuan/scheduler test
+pnpm --filter @sortedyuan/scheduler test:live
 pnpm test:package:scheduler
 pnpm test:integration:scheduler
 pnpm docs:check

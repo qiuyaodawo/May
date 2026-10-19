@@ -1,8 +1,8 @@
 ---
-"@may/ui-client": minor
-"@may/web-ui": minor
-"@may/config": minor
-"@may/tui": minor
+"@sortedyuan/ui-client": minor
+"@sortedyuan/web-ui": minor
+"@sortedyuan/config": minor
+"@sortedyuan/tui": minor
 ---
 
 Expose optional host status badges in UI snapshots and render them in the fixed

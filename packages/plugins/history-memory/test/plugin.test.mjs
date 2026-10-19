@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemoryContextFactory, PruneOldToolResultsStrategy } from "@may/context";
+import { InMemoryContextFactory, PruneOldToolResultsStrategy } from "@sortedyuan/context";
 import { HistoryReferenceMemory, createHistoryMemoryPlugin, historyMemoryService } from "../dist/index.js";
-import { PluginHost } from "@may/plugin";
-import { APPLICATION_HOOKS, AgentApplication, applicationServices } from "@may/application";
+import { PluginHost } from "@sortedyuan/plugin";
+import { APPLICATION_HOOKS, AgentApplication, applicationServices } from "@sortedyuan/application";
 import { DeepSeekModel } from "../../../providers/deepseek/dist/index.js";
 import { InMemorySessionStore } from "../../../session/dist/index.js";
 

@@ -1,6 +1,6 @@
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { definePlugin, defineService, type PluginDefinition } from "@may/plugin";
+import { definePlugin, defineService, type PluginDefinition } from "@sortedyuan/plugin";
 import type { AgentAdapter, AgentAdapterConfig, AgentAdapterRegistry } from "./types.js";
 export * from "./types.js";
 export * from "./may.js";

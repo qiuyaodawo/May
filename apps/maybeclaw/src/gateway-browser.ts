@@ -1,5 +1,5 @@
-import type { UiClient } from "@may/ui-client";
-import type { WebUiNavigation } from "@may/web-ui";
+import type { UiClient } from "@sortedyuan/ui-client";
+import type { WebUiNavigation } from "@sortedyuan/web-ui";
 import type { GatewaySettings, GatewayTask } from "./gateway-types.js";
 
 export function gatewayAuthentication() {

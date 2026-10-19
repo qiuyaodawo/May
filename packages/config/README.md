@@ -1,4 +1,4 @@
-# `@may/config`
+# `@sortedyuan/config`
 
 Optional configuration loading and validation for May applications.
 
@@ -6,7 +6,7 @@ The complete user-facing reference is in
 [`docs/en/reference/configuration.md`](../../docs/en/reference/configuration.md) ([简体中文](../../docs/zh-CN/reference/configuration.md)). A JSON Schema for editor
 completion and validation is available at
 [`may-config.schema.json`](./may-config.schema.json) and is exported as
-`@may/config/schema`.
+`@sortedyuan/config/schema`.
 
 Model profiles and provider connections accept `capabilities.reasoning` and
 field-level `capabilities.fields`. Profile fields describe model support;
@@ -84,7 +84,7 @@ import {
   resolveModelProfile,
   resolveProviderConfig,
   updateDefaultMayModel,
-} from "@may/config";
+} from "@sortedyuan/config";
 
 const config = await loadMayConfig();
 const deepseek = resolveProviderConfig(config, "deepseek-official");
@@ -110,8 +110,8 @@ validates that each entry is an object but leaves fields such as
 
 `apiKeyEnv` is resolved only when `resolveProviderConfig()` or
 `resolveModelProfile()` selects that provider. The package does not instantiate
-models, log configuration, or become a dependency of `@may/core`.
-`@may/providers` can consume the resolved selection and interpret the
+models, log configuration, or become a dependency of `@sortedyuan/core`.
+`@sortedyuan/providers` can consume the resolved selection and interpret the
 provider-specific options; custom applications may use a different registry.
 
 `updateDefaultMayModel(path, profile)` rereads and validates the file before

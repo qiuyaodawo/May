@@ -4,7 +4,7 @@ import {
 } from "./args.js";
 import type { OpenConfiguredMaybeCodeOptions } from "./configured.js";
 import { MaybeCodeUsageError } from "./errors.js";
-import { createNodeTerminal, type TerminalIO } from "@may/tui/node-terminal";
+import { createNodeTerminal, type TerminalIO } from "@sortedyuan/tui/node-terminal";
 import type { MaybeCodeController } from "./controller.js";
 import type { runMaybeCodeMcpCommand } from "./mcp-auth.js";
 import type { runMaybeCodeTeamCommand } from "./team.js";

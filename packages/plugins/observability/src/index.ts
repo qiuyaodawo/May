@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
-import { services } from "@may/plugin-services";
-import { definePlugin, defineService } from "@may/plugin";
+import { services } from "@sortedyuan/plugin-services";
+import { definePlugin, defineService } from "@sortedyuan/plugin";
 import {
   BasicTracer, BatchSpanProcessor, JsonlFileSpanExporter, ratioSampler,
   BoundedMetrics, DiagnosticsStore,
-} from "@may/observability";
-import type { TraceAttributes } from "@may/core";
+} from "@sortedyuan/observability";
+import type { TraceAttributes } from "@sortedyuan/core";
 
 export interface ObservabilityPluginOptions {
   readonly dataDirectory: string;

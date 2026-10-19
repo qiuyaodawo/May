@@ -18,6 +18,7 @@ May 提供可组合的软件包，用于模型和工具执行、持久对话、�
 - [使用 MaybeClaw](guides/maybeclaw.md)：配置 Gateway、Agent、会话和渠道。
 - [开发和验证仓库](guides/repository-development.md)：构建、测试、检查 CI，以及
   选择需要额外环境的检查。
+- [准备和验证 npm 发布](guides/npm-release.md)：发布范围、Changesets、外部安装验证与发布操作。
 - [构建 Agent](guides/building-an-agent.md)：选择模型、工具、权限、Context、存储和 UI。
 - [配置与查看 MaybeCode 指令](guides/maybecode-instructions.md)。
 - [使用 Git 工作区与 checkpoint](guides/git-workspaces.md)。

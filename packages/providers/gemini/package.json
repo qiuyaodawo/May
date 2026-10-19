@@ -1,5 +1,5 @@
 {
-  "name": "@may/provider-gemini",
+  "name": "@sortedyuan/provider-gemini",
   "version": "0.1.0",
   "description": "Google Gemini native API model adapter for May.",
   "type": "module",
@@ -13,13 +13,13 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "test": "pnpm run build && node --test test/*.test.mjs",
-    "test:integration": "pnpm --filter @may/config run build && pnpm run build && node --test test-integration/*.test.mjs"
+    "test:integration": "pnpm --filter @sortedyuan/config run build && pnpm run build && node --test test-integration/*.test.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*",
-    "@may/provider-openai-compatible": "workspace:*"
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/provider-openai-compatible": "workspace:*"
   },
-  "devDependencies": { "@may/config": "workspace:*", "@types/node": "^22.0.0" },
+  "devDependencies": { "@sortedyuan/config": "workspace:*", "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"
 }

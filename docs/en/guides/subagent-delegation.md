@@ -9,8 +9,8 @@ during an active Run, either following your prompt or choosing to delegate.
 
 This guide assumes a [configured MaybeCode Session](maybecode.md). It explains
 request behavior, roles, file responsibilities, budgets and recovery. The
-reusable implementation is in `@may/plugin-delegation`; MaybeCode composes that
-plugin with the `delegate_tasks` tool from `@may/coordination`.
+reusable implementation is in `@sortedyuan/plugin-delegation`; MaybeCode composes that
+plugin with the `delegate_tasks` tool from `@sortedyuan/coordination`.
 
 ## Request delegated work
 

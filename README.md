@@ -32,14 +32,14 @@ Reusable code lives in `packages/`; products in `apps/` select and configure tho
 packages. Examples live in `examples/`. Dependencies flow from applications into
 reusable packages.
 
-- `@may/core` runs the model/tool loop; `@may/context` manages the model-visible view.
-- `@may/session` saves history; `@may/application` owns application and workspace lifecycle.
-- `@may/permissions` evaluates tool policy and handles approval requests.
-- `@may/providers` selects configured models; individual provider packages implement protocols.
-- `@may/plugin` and `@may/plugin-services` compose scoped services, state, and Hooks;
+- `@sortedyuan/core` runs the model/tool loop; `@sortedyuan/context` manages the model-visible view.
+- `@sortedyuan/session` saves history; `@sortedyuan/application` owns application and workspace lifecycle.
+- `@sortedyuan/permissions` evaluates tool policy and handles approval requests.
+- `@sortedyuan/providers` selects configured models; individual provider packages implement protocols.
+- `@sortedyuan/plugin` and `@sortedyuan/plugin-services` compose scoped services, state, and Hooks;
   reusable plugins live in `packages/plugins/`.
-- `@may/coordination` runs durable teams and task graphs. `@may/scheduler` triggers
-  host tasks. `@may/eval` evaluates repeated tasks and compares configurations.
+- `@sortedyuan/coordination` runs durable teams and task graphs. `@sortedyuan/scheduler` triggers
+  host tasks. `@sortedyuan/eval` evaluates repeated tasks and compares configurations.
 - MCP, Skills, media, tracing, coding tools, and UI packages extend these components.
 
 Read [the runtime architecture](docs/en/architecture/runtime-session.md) for

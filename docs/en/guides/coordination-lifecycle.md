@@ -17,7 +17,7 @@ callbacks when creating the graph, and provide the same policy version on resume
    the host has recorded a finding:
 
 ```ts
-import type { CoordinationPolicy } from "@may/coordination";
+import type { CoordinationPolicy } from "@sortedyuan/coordination";
 
 const policy: CoordinationPolicy = {
   version: "team-policy-v2",

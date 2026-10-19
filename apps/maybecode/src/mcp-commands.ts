@@ -1,4 +1,4 @@
-import { mcpPromptToUserMessage, mcpResourceToUserMessage, previewMcpMessage } from "@may/mcp";
+import { mcpPromptToUserMessage, mcpResourceToUserMessage, previewMcpMessage } from "@sortedyuan/mcp";
 import type { MaybeCodeController } from "./controller.js";
 import type { MaybeCodeSlashCommandResult } from "./slash-commands.js";
 

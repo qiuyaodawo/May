@@ -1,7 +1,7 @@
-# `@may/plugin-coordination`
+# `@sortedyuan/plugin-coordination`
 
 `createCoordinationPlugin({ id? })` 创建 `host` scope 插件，提供 `coordinationService`。
-服务的 `create(options)` 和 `resume(options)` 接收 `@may/coordination` 的完整参数，
+服务的 `create(options)` 和 `resume(options)` 接收 `@sortedyuan/coordination` 的完整参数，
 返回原来的 `CoordinationRuntime`。宿主提供 Agent、访问策略与存储，实现任务路由。
 
 `release(runtime)` 关闭 Runtime 并删除管理记录。宿主完成一个任务图后调用该方法，

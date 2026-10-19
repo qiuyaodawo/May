@@ -1,4 +1,4 @@
-import { createHumanEvaluator } from "@may/eval";
+import { createHumanEvaluator } from "@sortedyuan/eval";
 import { registry, experiment as original } from "../../examples/suite.mjs";
 
 registry.registerEvaluator(createHumanEvaluator("artifact-review", "1"));

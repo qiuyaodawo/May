@@ -1,4 +1,4 @@
-import type { Context, Message } from "@may/core";
+import type { Context, Message } from "@sortedyuan/core";
 
 import type {
   ContextBudget,

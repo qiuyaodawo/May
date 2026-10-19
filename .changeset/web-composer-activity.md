@@ -1,5 +1,5 @@
 ---
-"@may/web-ui": patch
+"@sortedyuan/web-ui": patch
 ---
 
 Show the message composer send action while a host with explicit UI controls is

@@ -1,4 +1,4 @@
-import type { TraceAttributes } from "@may/core";
+import type { TraceAttributes } from "@sortedyuan/core";
 import type { FinishedTraceSpan, SpanObserver, SpanProcessor, StartedTraceSpan } from "./types.js";
 import { boundedAttributes } from "./limits.js";
 

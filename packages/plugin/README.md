@@ -1,11 +1,11 @@
-# @may/plugin
+# @sortedyuan/plugin
 
-Typed services, scoped dependency management, lifecycle cleanup, and Hooks for May plugins. The package can be used independently; `@may/application` connects it to Agent execution and Session history.
+Typed services, scoped dependency management, lifecycle cleanup, and Hooks for May plugins. The package can be used independently; `@sortedyuan/application` connects it to Agent execution and Session history.
 
 ## Services and plugins
 
 ```ts
-import { definePlugin, defineService, PluginHost } from "@may/plugin";
+import { definePlugin, defineService, PluginHost } from "@sortedyuan/plugin";
 
 interface Counter {
   read(): number;
@@ -79,11 +79,11 @@ Setup and handler deadlines provide an `AbortSignal`. Plugin code must honor can
 
 ## Hooks
 
-`@may/core` exports `defineHook`, `HookDefinition`, `HookContext`, `HookDispatcher`, `runtimeHooks`, and `RUNTIME_HOOKS`. Application integration supplies its supported Hooks; independent hosts provide them explicitly.
+`@sortedyuan/core` exports `defineHook`, `HookDefinition`, `HookContext`, `HookDispatcher`, `runtimeHooks`, and `RUNTIME_HOOKS`. Application integration supplies its supported Hooks; independent hosts provide them explicitly.
 
 ```ts
-import { runtimeHooks, RUNTIME_HOOKS } from "@may/core";
-import { definePlugin, PluginHost } from "@may/plugin";
+import { runtimeHooks, RUNTIME_HOOKS } from "@sortedyuan/core";
+import { definePlugin, PluginHost } from "@sortedyuan/plugin";
 
 const instructions = definePlugin({
   id: "example.instructions",
@@ -113,7 +113,7 @@ State values contain JSON data. `ctx.state.get()` returns a copy. `set()` and `u
 
 Pass prior records through `createScope({ state, onStateChange })`. State restoration and migration finish before setup. An unchanged state version also requires the stored plugin version to match `state.compatibleVersions`, which defaults to the exact current plugin version. Incompatible state requires an explicit `state.migrate(previous)` implementation. Migrated state is validated and saved before use. Records for removed plugins remain in the snapshot so historical state can be inspected or migrated later.
 
-`@may/application` persists Session scope snapshots in Session history. The independent host requires an `onStateChange` adapter for durable storage. Host, Application, and Run snapshots can also use caller supplied adapters.
+`@sortedyuan/application` persists Session scope snapshots in Session history. The independent host requires an `onStateChange` adapter for durable storage. Host, Application, and Run snapshots can also use caller supplied adapters.
 
 ## Configuration and composition changes
 
@@ -133,4 +133,4 @@ state saves before resource cleanup.
 
 ## Verification
 
-`pnpm --filter @may/plugin test` builds the package and runs Node tests against real hosts, filesystem handles, Session snapshots, event listeners, and cancellable timers. The tests cover full graph validation, compatible service versions, resource ownership, scoped state, migration, immutable Hooks, deadlines, failure reporting, composition changes, and ESM module loading. These tests verify host behavior without proving live model provider behavior.
+`pnpm --filter @sortedyuan/plugin test` builds the package and runs Node tests against real hosts, filesystem handles, Session snapshots, event listeners, and cancellable timers. The tests cover full graph validation, compatible service versions, resource ownership, scoped state, migration, immutable Hooks, deadlines, failure reporting, composition changes, and ESM module loading. These tests verify host behavior without proving live model provider behavior.

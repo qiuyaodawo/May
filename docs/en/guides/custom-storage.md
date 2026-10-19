@@ -18,9 +18,9 @@ model and permission policy; see [Build an Agent](building-an-agent.md).
 
 | Requirement | Backend |
 | --- | --- |
-| Process-local history | `InMemorySessionStore` from `@may/session` |
-| Local history across restarts | `FileSessionStore` from `@may/session/file-store` |
-| Local Session discovery | `FileSessionCatalog` from `@may/session/catalog` |
+| Process-local history | `InMemorySessionStore` from `@sortedyuan/session` |
+| Local history across restarts | `FileSessionStore` from `@sortedyuan/session/file-store` |
+| Local Session discovery | `FileSessionCatalog` from `@sortedyuan/session/catalog` |
 | Database, encryption, or cross-process coordination | Custom implementations of the interfaces below |
 
 For file-backed storage, jump to [Built-in local storage](#built-in-local-storage).
@@ -58,7 +58,7 @@ Run completed successfully after saving final application state.
 
 ## Database adapter skeleton
 
-Create the adapter module in an application that depends on `@may/session`.
+Create the adapter module in an application that depends on `@sortedyuan/session`.
 The `SessionEventTable` below is a database integration interface; supply its
 implementation using your database library before instantiating the store.
 `appendIfCurrentSequence` must check the current maximum sequence and
@@ -69,7 +69,7 @@ import {
   validateSessionHistory,
   type SessionEvent,
   type SessionStore,
-} from "@may/session";
+} from "@sortedyuan/session";
 
 export interface SessionEventTable {
   appendIfCurrentSequence(input: {
@@ -170,14 +170,14 @@ durability matters.
 
 ## Built-in local storage
 
-Add `@may/application` and `@may/session` as direct application dependencies.
+Add `@sortedyuan/application` and `@sortedyuan/session` as direct application dependencies.
 In the entry point, initialize `model`, `tools`, and `permissionPolicy` before
 this composition snippet. Paths are relative to the process working directory:
 
 ```ts
-import { AgentApplication, AgentWorkspace } from "@may/application";
-import { FileSessionCatalog } from "@may/session/catalog";
-import { FileSessionStore } from "@may/session/file-store";
+import { AgentApplication, AgentWorkspace } from "@sortedyuan/application";
+import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 
 const store = new FileSessionStore(".may/sessions");
 const catalog = new FileSessionCatalog(".may/catalog.json");
@@ -258,7 +258,7 @@ The atomic version-2 catalog snapshot records exact absorbed operation names bef
 so interruption during deletion cannot replay already absorbed operations. Do not use older
 readers after compacting; ordinary version-1 catalogs remain readable.
 
-For local writer locks, import `recoverFileLock` from `@may/session/file-store`. Stop all
+For local writer locks, import `recoverFileLock` from `@sortedyuan/session/file-store`. Stop all
 competing hosts/open/recovery operations, read and inspect the lock, then pass its exact
 text as `expectedContents` with `confirmHostsStopped: true`. The helper rejects live PIDs,
 remote-host ownership, unsafe links and changed metadata. Incomplete metadata additionally

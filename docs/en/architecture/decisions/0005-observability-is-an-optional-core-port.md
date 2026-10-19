@@ -24,7 +24,7 @@ Core owns a small synchronous `Tracer`/`TraceSpan` port plus explicit
 record content-free identifiers, counts, status, usage, and error type/code by
 default, not prompts, messages, reasoning, or tool input/output.
 
-The optional `@may/observability` package depends on Core and implements the
+The optional `@sortedyuan/observability` package depends on Core and implements the
 port with sampling, immutable finished spans, in-memory and serialized/bounded
 processors, and basic exporters. Asynchronous export belongs to processors and
 must not add backpressure or exporter failures to Agent execution.
@@ -40,7 +40,7 @@ custom processors/exporters so their SDK types do not enter Core APIs.
 
 ## Consequences
 
-- Core has no runtime dependency on `@may/observability` or a vendor SDK.
+- Core has no runtime dependency on `@sortedyuan/observability` or a vendor SDK.
 - Direct Core, Session, Application, Provider, and remote-tool users can
   propagate the same trace context explicitly without process-global state.
 - A broken tracer or exporter cannot fail a Run.

@@ -1,4 +1,4 @@
-import type { ContinueOptions, RunOptions, RunResult } from "@may/core";
+import type { ContinueOptions, RunOptions, RunResult } from "@sortedyuan/core";
 
 export type GoalStatus = "active" | "paused" | "blocked" | "completed" | "cancelled" | "failed" | "budget_exhausted";
 

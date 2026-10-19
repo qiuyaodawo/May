@@ -1,4 +1,4 @@
-# @may/plugin-permissions
+# @sortedyuan/plugin-permissions
 
 `createPermissionPlugin({ id?, create, dispose? })` 提供 `services.permissionPolicy`。
 `create(context)` 为一个 Application 返回实际 permission policy。
@@ -12,4 +12,4 @@ Application 管理审批请求、权限事件保存和 `PermissionToolExecutor`�
 每次判定权限时取得当前服务。每种 policy 服务具有一个提供方，重复提供方在 setup 之前报错。
 
 测试使用实际文件资源判定权限，并验证不同作用域分别关闭资源。
-执行 `pnpm --filter @may/plugin-permissions test`。
+执行 `pnpm --filter @sortedyuan/plugin-permissions test`。

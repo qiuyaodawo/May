@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
-import type { RunResult, UserMessage } from "@may/core";
-import { validateSessionHistory, type SessionEvent } from "@may/session";
+import type { RunResult, UserMessage } from "@sortedyuan/core";
+import { validateSessionHistory, type SessionEvent } from "@sortedyuan/session";
 import type { TaskExecution, TaskOutput, TaskRecovery } from "./types.js";
 
 /** coordination agent 在自己的 Session 元数据中记录的持久身份。 */

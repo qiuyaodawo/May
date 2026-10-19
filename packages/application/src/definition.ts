@@ -1,5 +1,5 @@
-import { ToolRegistry, resolveRunBudget, type Tool } from "@may/core";
-import type { SessionStore } from "@may/session";
+import { ToolRegistry, resolveRunBudget, type Tool } from "@sortedyuan/core";
+import type { SessionStore } from "@sortedyuan/session";
 
 import {
   AgentApplication,

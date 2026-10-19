@@ -1,5 +1,5 @@
 import { UriTemplate, type Client, type ReadResourceResult, type RequestOptions, type McpSubscription } from "@modelcontextprotocol/client";
-import { AsyncEventQueue } from "@may/core";
+import { AsyncEventQueue } from "@sortedyuan/core";
 import { McpCapabilityError } from "./errors.js";
 import { assertMcpContentSize, mcpPromptToUserMessage, mcpResourceToUserMessage } from "./content.js";
 import type {

@@ -1,4 +1,4 @@
-# @may/plugin-permissions
+# @sortedyuan/plugin-permissions
 
 `createPermissionPlugin({ id?, create, dispose? })` provides
 `services.permissionPolicy`. `create(context)` returns the actual permission policy
@@ -14,4 +14,4 @@ Application keeps approval requests, durable permission events and its
 One plugin supplies the policy. Duplicate providers fail before setup.
 
 Tests evaluate policies against real file resources and verify independent scope
-cleanup: `pnpm --filter @may/plugin-permissions test`.
+cleanup: `pnpm --filter @sortedyuan/plugin-permissions test`.

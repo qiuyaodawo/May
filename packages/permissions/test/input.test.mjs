@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { FatalToolExecutionError } from "@may/core";
+import { FatalToolExecutionError } from "@sortedyuan/core";
 import { PermissionToolExecutor } from "../dist/index.js";
 
 class ReadInput {
@@ -63,7 +63,7 @@ test("permission policies and actual file readers receive immutable arguments", 
   });
   try {
     const content = await permissions.execute(readExecution(input, progress));
-    assert.ok(content.startsWith("# `@may/permissions`"));
+    assert.ok(content.startsWith("# `@sortedyuan/permissions`"));
     assert.equal(policyCalls, 1);
     assert.equal(progress.length, 1);
     assert.equal(input.options.encoding, "utf8");

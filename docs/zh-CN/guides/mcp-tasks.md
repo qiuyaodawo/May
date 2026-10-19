@@ -8,7 +8,7 @@
 
 ## 支持范围
 
-`@may/mcp` 和 MaybeCode 已支持显式启用的任务创建、状态检查、经审阅输入、等待、
+`@sortedyuan/mcp` 和 MaybeCode 已支持显式启用的任务创建、状态检查、经审阅输入、等待、
 协作式取消及绑定归属的恢复，适用于现代 stdio 和 Streamable HTTP。支持扩展
 `io.modelcontextprotocol/tasks`，版本 `2026-07-28`：使用扁平任务句柄以及 `tasks/get`、
 `tasks/update`、`tasks/cancel`。不兼容的 2025 实验版 `tasks/list`/`tasks/result`
@@ -38,7 +38,7 @@ MaybeCode 默认使用 `<dataDirectory>/mcp-tasks` 下由系统钥匙串加密�
 自定义宿主启用 Tasks 时，需要向 `openMcpClientPool` 提供 `taskJournal`：
 
 ```ts
-import { KeyringMcpCredentialStore, McpTaskJournal } from "@may/mcp";
+import { KeyringMcpCredentialStore, McpTaskJournal } from "@sortedyuan/mcp";
 const taskJournal = new McpTaskJournal(new KeyringMcpCredentialStore("./data/mcp-tasks"));
 ```
 
@@ -148,5 +148,5 @@ HTTP 管理请求携带 `Mcp-Name` 任务路由；工具请求保留支持的 `x
 
 使用真实任务端点，确认重启保留本地句柄、等待在需要输入或终态时结束、本地取消
 不改变远端状态，以及结果附加需要明确操作。仓库的本地 HTTP 与进程集成测试通过
-仓库根目录的 `pnpm --filter @may/mcp test` 执行。第三方服务需要单独验证账户与
+仓库根目录的 `pnpm --filter @sortedyuan/mcp test` 执行。第三方服务需要单独验证账户与
 兼容性。

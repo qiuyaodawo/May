@@ -5,7 +5,7 @@ import {
   type Message,
   type Model,
   type ModelStreamOptions,
-} from "@may/core";
+} from "@sortedyuan/core";
 
 import type { ContextSummarizer } from "./summary-tail.js";
 

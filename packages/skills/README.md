@@ -1,4 +1,4 @@
-# `@may/skills`
+# `@sortedyuan/skills`
 
 Reusable Agent Skills support for any May agent. `SkillRegistry.discover(roots)`
 parses SKILL.md frontmatter and exposes immutable metadata, diagnostics,

@@ -1,4 +1,4 @@
-import { replaceJournalFile } from "@may/session/file-store";
+import { replaceJournalFile } from "@sortedyuan/session/file-store";
 import { access, open, readFile, type FileHandle } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { digest, validateId } from "./identity.js";

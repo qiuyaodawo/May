@@ -12,19 +12,19 @@ tool execution, permissions, scheduling and cancellation as defined by
 
 ```mermaid
 flowchart LR
-  host[Application host] --> client["@may/mcp client pool"]
+  host[Application host] --> client["@sortedyuan/mcp client pool"]
   client --> remote[MCP endpoint]
   client --> tool[Core Tool]
   tool --> executor[Permission executor and scheduler]
-  host --> server["@may/mcp/server"]
+  host --> server["@sortedyuan/mcp/server"]
   server --> executor
-  host --> browser["@may/mcp/apps-browser"]
+  host --> browser["@sortedyuan/mcp/apps-browser"]
   browser --> view[Isolated App view]
 ```
 
 The host chooses endpoints, credentials, interaction services and exported
 capabilities. Client tools use the normal Core executor. Independent server
-exports receive that executor explicitly. Core and `@may/application` have no
+exports receive that executor explicitly. Core and `@sortedyuan/application` have no
 MCP dependency. The browser entry point has no Node dependencies.
 
 ## Implemented capabilities
@@ -98,9 +98,9 @@ server-initiated Host requests are outside that serving surface.
 From the repository root, use the pnpm version in `package.json`:
 
 ```powershell
-pnpm --filter @may/mcp test
-pnpm --filter @may/mcp exec playwright install chromium
-pnpm --filter @may/mcp test:browser
+pnpm --filter @sortedyuan/mcp test
+pnpm --filter @sortedyuan/mcp exec playwright install chromium
+pnpm --filter @sortedyuan/mcp test:browser
 pnpm docs:check
 ```
 

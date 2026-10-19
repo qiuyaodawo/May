@@ -1,4 +1,4 @@
-import type { ContextSnapshot, Message, SystemMessage } from "@may/core";
+import type { ContextSnapshot, Message, SystemMessage } from "@sortedyuan/core";
 
 import type {
   ContextCompactionOptions,

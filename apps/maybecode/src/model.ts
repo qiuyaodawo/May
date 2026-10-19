@@ -1,5 +1,5 @@
-import type { MayConfig } from "@may/config";
-import type { Model } from "@may/core";
+import type { MayConfig } from "@sortedyuan/config";
+import type { Model } from "@sortedyuan/core";
 import {
   createBuiltinProviderAdapterRegistry,
   createBuiltinProviderModel,
@@ -9,7 +9,7 @@ import {
   selectProviderModel,
   type ProviderModelSelection,
   type ModelProfileSelector,
-} from "@may/providers";
+} from "@sortedyuan/providers";
 
 import { MaybeCodeConfigError } from "./errors.js";
 

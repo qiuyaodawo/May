@@ -2,7 +2,7 @@ import {
   Keymap,
   mergeKeyBindings,
   type KeyBindingDefinition,
-} from "@may/keybindings";
+} from "@sortedyuan/keybindings";
 
 export const EDITOR_ACTIONS = {
   left: "editor.left",

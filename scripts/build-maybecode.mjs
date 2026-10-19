@@ -22,7 +22,7 @@ await build({
   keepNames: true,
   // Core 和 Plugin 与外部插件共享模块身份；原生绑定和资源文件保留独立加载。
   external: [
-    "@may/core", "@may/plugin", "@may/plugin-services", "@may/web-ui", "@may/media",
+    "@sortedyuan/core", "@sortedyuan/plugin", "@sortedyuan/plugin-services", "@sortedyuan/web-ui", "@sortedyuan/media",
     "@napi-rs/keyring", "open", "clipboardy",
   ],
   banner: { js: 'import { createRequire as __createRequire } from "node:module"; const require = __createRequire(import.meta.url);' },

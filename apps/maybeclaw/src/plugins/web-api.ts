@@ -1,13 +1,13 @@
 import { type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { PluginHost, definePlugin } from "@may/plugin";
-import { createWebApiPlugin, webApiService } from "@may/plugin-web-api";
+import { PluginHost, definePlugin } from "@sortedyuan/plugin";
+import { createWebApiPlugin, webApiService } from "@sortedyuan/plugin-web-api";
 import { gatewayPluginServices } from "./services.js";
-import { webUiAssets } from "@may/web-ui/assets";
-import { createUiRouter, secureHeaders, sendJson, trustedRequest } from "@may/ui-client/server";
+import { webUiAssets } from "@sortedyuan/web-ui/assets";
+import { createUiRouter, secureHeaders, sendJson, trustedRequest } from "@sortedyuan/ui-client/server";
 import { GatewayAuth } from "../gateway-auth.js";
-import { UiError, type UiCommand } from "@may/ui-client";
+import { UiError, type UiCommand } from "@sortedyuan/ui-client";
 import { GatewayUiHost, controlActor } from "../gateway-ui.js";
 import type { AgentGateway } from "../gateway.js";
 import type { GatewayApproval, GatewayTask } from "../gateway-types.js";

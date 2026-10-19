@@ -8,7 +8,7 @@ import { May, userMessage } from "../../core/dist/index.js";
 import { PruneOldToolResultsStrategy } from "../../context/dist/index.js";
 import { definePlugin } from "../../plugin/dist/index.js";
 import { createRuntimePlugin } from "../../plugins/runtime/dist/index.js";
-import { OpenAIResponsesModel } from "@may/provider-openai";
+import { OpenAIResponsesModel } from "@sortedyuan/provider-openai";
 import { FileSessionStore } from "../../session/dist/file-store.js";
 
 const output = fileURLToPath(new URL("../.test-output/", import.meta.url));

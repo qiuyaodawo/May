@@ -1,11 +1,11 @@
 import { EventDispatcher, WSClient } from "@larksuiteoapi/node-sdk";
-import { imagePng, type ImageData } from "@may/media";
-import { definePlugin, defineService, type PluginDefinition } from "@may/plugin";
+import { imagePng, type ImageData } from "@sortedyuan/media";
+import { definePlugin, defineService, type PluginDefinition } from "@sortedyuan/plugin";
 import {
   boundedJson, boundedBytes, channelAccepts, channelTrigger, checkAttachment, deliveryServices,
   type ChannelAccessSettings, type ChannelAdapter, type ChannelAttachment, type ChannelAttachmentData,
   type ChannelCapabilities, type ChannelDeliveryReceipt, type ChannelInput, type ChannelState, type DeliveryRecord, type GroupTrigger,
-} from "@may/plugin-delivery";
+} from "@sortedyuan/plugin-delivery";
 import { feishuInput, feishuMemberInputs, feishuRecallInput } from "./input.js";
 export * from "./input.js";
 

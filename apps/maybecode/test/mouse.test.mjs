@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 import test from "node:test";
-import { EditorHistory, NodeTerminalDriver } from "@may/tui";
+import { EditorHistory, NodeTerminalDriver } from "@sortedyuan/tui";
 import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
 
 test("mouse input scrolls the transcript while preserving the editor and reading position", (t) => {

@@ -6,13 +6,13 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
-import { loadMayConfig } from "@may/config";
-import { McpInteractionBroker, openMcpClientPool } from "@may/mcp";
-import { FileSessionStore } from "@may/session/file-store";
-import { FileSessionCatalog } from "@may/session/catalog";
-import { UiClient } from "@may/ui-client";
-import { ApplicationUiHost } from "@may/ui-client/application";
-import { AgentWorkspace } from "@may/application";
+import { loadMayConfig } from "@sortedyuan/config";
+import { McpInteractionBroker, openMcpClientPool } from "@sortedyuan/mcp";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { UiClient } from "@sortedyuan/ui-client";
+import { ApplicationUiHost } from "@sortedyuan/ui-client/application";
+import { AgentWorkspace } from "@sortedyuan/application";
 import { openConfiguredMaybeCode, startMaybeCodeWebUI, MaybeCodeWorkspace, MaybeCodeApplication, createMaybeCodeModel, selectMaybeCodeModel } from "../../dist/index.js";
 
 async function directory() {

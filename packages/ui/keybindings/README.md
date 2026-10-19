@@ -1,11 +1,11 @@
-# `@may/keybindings`
+# `@sortedyuan/keybindings`
 
-`@may/keybindings` is a UI-independent, context-aware keymap resolver. It turns
+`@sortedyuan/keybindings` is a UI-independent, context-aware keymap resolver. It turns
 normalized key strokes and an active context stack into semantic actions. It
 does not depend on May Core, MaybeCode, readline, or a renderer.
 
 ```ts
-import { Keymap, keyStroke } from "@may/keybindings";
+import { Keymap, keyStroke } from "@sortedyuan/keybindings";
 
 const keymap = new Keymap([
   { context: "global", keys: "<leader> l", action: "session.open" },

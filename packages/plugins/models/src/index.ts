@@ -1,6 +1,6 @@
-import type { Model } from "@may/core";
-import { definePlugin, type Disposer, type PluginContext, type PluginDefinition } from "@may/plugin";
-import { services, factoryMetadata, type ModelInfo, type ModelWrapper, type ContributionOptions, type PluginFactoryMetadata } from "@may/plugin-services";
+import type { Model } from "@sortedyuan/core";
+import { definePlugin, type Disposer, type PluginContext, type PluginDefinition } from "@sortedyuan/plugin";
+import { services, factoryMetadata, type ModelInfo, type ModelWrapper, type ContributionOptions, type PluginFactoryMetadata } from "@sortedyuan/plugin-services";
 
 export interface ModelPluginOptions<C = unknown> extends PluginFactoryMetadata<C> {
   readonly id?: string;

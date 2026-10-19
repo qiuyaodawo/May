@@ -1,4 +1,4 @@
-import type { HookContext, HookDefinition, JsonSchema } from "@may/core";
+import type { HookContext, HookDefinition, JsonSchema } from "@sortedyuan/core";
 
 export type PluginScope = "host" | "application" | "session" | "run";
 export type Disposer = () => void | Promise<void>;

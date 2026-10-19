@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
-import { priceUsage } from "@may/core";
+import { priceUsage } from "@sortedyuan/core";
 import { streamOpenAIResponse } from "../dist/stream.js";
 
 test("Responses HTTP streams preserve cache and reasoning subsets for pricing", async t => {

@@ -12,8 +12,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { InMemoryContext } from "@may/core";
-import { InMemoryContextFactory } from "@may/context";
+import { InMemoryContext } from "@sortedyuan/core";
+import { InMemoryContextFactory } from "@sortedyuan/context";
 
 import { createMaybeCodeSlashCommandSuggester, createCodingPermissionPolicy, executeMaybeCodeSlashCommand, formatMaybeCodeMcpStatus, openConfiguredMaybeCode, parseMaybeCodeArgs, resolveMaybeCodeMcp, runMaybeCode, runMaybeCodeMcpCommand, resolveMaybeCodeObservability, resolveMaybeCodeRetry } from "../dist/index.js";
 

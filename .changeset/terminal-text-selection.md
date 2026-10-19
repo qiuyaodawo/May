@@ -1,6 +1,6 @@
 ---
-"@may/tui": minor
-"@may/keybindings": minor
+"@sortedyuan/tui": minor
+"@sortedyuan/keybindings": minor
 ---
 
 Add reusable mouse text selection, clipboard adapters, semantic component

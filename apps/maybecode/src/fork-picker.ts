@@ -1,6 +1,6 @@
-import type { UiForkPoint, UiWorkspaceDiff } from "@may/ui-client";
-import { SessionForkPicker, WorkspaceDiffViewer, sanitizeTerminalText, type InteractiveComponent, type SessionForkSelection } from "@may/tui";
-import type { TerminalIO } from "@may/tui/node-terminal";
+import type { UiForkPoint, UiWorkspaceDiff } from "@sortedyuan/ui-client";
+import { SessionForkPicker, WorkspaceDiffViewer, sanitizeTerminalText, type InteractiveComponent, type SessionForkSelection } from "@sortedyuan/tui";
+import type { TerminalIO } from "@sortedyuan/tui/node-terminal";
 import type { MaybeCodeController } from "./controller.js";
 
 export async function runForkPicker(options: { readonly points: readonly UiForkPoint[]; readonly currentSessionId: string; readonly terminal: TerminalIO; readonly question: (prompt: string) => Promise<string> }): Promise<SessionForkSelection | undefined> {

@@ -1,5 +1,5 @@
 {
-  "name": "@may/config",
+  "name": "@sortedyuan/config",
   "version": "0.1.0",
   "description": "Configuration loading and validation for May applications.",
   "type": "module",

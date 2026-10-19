@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Ajv } from "ajv";
-import { resolveRunBudget } from "@may/core";
+import { resolveRunBudget } from "@sortedyuan/core";
 import type { EvalRegistry } from "./registry.js";
 import type { EvalExperiment, EvalFingerprints, EvalPlan, EvalTrial, EvidencePolicy, JsonValue } from "./types.js";
 

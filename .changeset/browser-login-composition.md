@@ -1,5 +1,5 @@
 ---
-"@may/ui-client": minor
+"@sortedyuan/ui-client": minor
 ---
 
 Export BrowserLogin from the server entry point so product servers can share

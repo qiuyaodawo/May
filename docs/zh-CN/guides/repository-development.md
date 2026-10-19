@@ -17,7 +17,7 @@ pnpm build
 依赖时使用 `pnpm install`，并检查 lockfile 的变化。
 
 根目录构建会检查类型并编译工作目录，随后使用 esbuild 打包 MaybeCode CLI。
-`pnpm --filter @may/maybecode build` 同样生成 CLI 打包文件。
+`pnpm --filter @sortedyuan/maybecode build` 同样生成 CLI 打包文件。
 `dist/bin.js` 必须与 `dist/cli/` 中的文件一起使用。package 的 library exports
 继续使用 TypeScript 编译的模块。CLI 根据选中的命令加载对应功能，图片编码模块和
 Web 服务资源在使用时加载。
@@ -64,7 +64,7 @@ Web 服务资源在使用时加载。
 MaybeClaw 需要 `MAYBECLAW_LIVE_MODEL` 及 Provider 凭据：
 
 ```bash
-pnpm --filter @may/maybeclaw test:integration
+pnpm --filter @sortedyuan/maybeclaw test:integration
 ```
 
 系统剪贴板检查需要 Windows 桌面会话：

@@ -1,4 +1,4 @@
-# ADR 0002：Agent 终端 UI 保留在 `@may/tui`
+# ADR 0002：Agent 终端 UI 保留在 `@sortedyuan/tui`
 
 [English](../../../en/architecture/decisions/0002-agent-ui-stays-in-may-tui.md) | **简体中文**
 
@@ -12,15 +12,15 @@
 
 ## 决策
 
-终端基础组件与 Agent 呈现组件保留在 `@may/tui`，通过明确的子路径导出：
+终端基础组件与 Agent 呈现组件保留在 `@sortedyuan/tui`，通过明确的子路径导出：
 
-- `@may/tui`：终端基础组件。
-- `@may/tui/transcript`：Agent 事件投影与保留的对话记录。
-- `@may/tui/tool-renderers`：实例级工具呈现。
-- `@may/tui/slash-commands` 与 `@may/tui/list-selection`：可复用输入状态。
+- `@sortedyuan/tui`：终端基础组件。
+- `@sortedyuan/tui/transcript`：Agent 事件投影与保留的对话记录。
+- `@sortedyuan/tui/tool-renderers`：实例级工具呈现。
+- `@sortedyuan/tui/slash-commands` 与 `@sortedyuan/tui/list-selection`：可复用输入状态。
 
 应用注入产品标签、主题、命令、布局与额外事件提示。非终端 UI 直接使用
-headless controller，其依赖独立于 `@may/tui`。
+headless controller，其依赖独立于 `@sortedyuan/tui`。
 
 ## 后果
 

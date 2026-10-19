@@ -1,22 +1,20 @@
 ---
-"@may/plugin": minor
-"@may/application": minor
-"@may/plugin-services": minor
-"@may/plugin-runtime": minor
-"@may/plugin-models": minor
-"@may/plugin-permissions": minor
-"@may/plugin-skills": minor
-"@may/plugin-goals": minor
-"@may/plugin-history-memory": minor
-"@may/plugin-delegation": minor
-"@may/plugin-mcp": minor
-"@may/plugin-observability": minor
-"@may/plugin-delivery": minor
-"@may/plugin-channel-telegram": minor
-"@may/plugin-channel-feishu": minor
-"@may/plugin-agent-adapters": minor
-"@may/plugin-coordination": minor
-"@may/plugin-web-api": minor
+"@sortedyuan/plugin": minor
+"@sortedyuan/application": minor
+"@sortedyuan/plugin-services": minor
+"@sortedyuan/plugin-runtime": minor
+"@sortedyuan/plugin-models": minor
+"@sortedyuan/plugin-permissions": minor
+"@sortedyuan/plugin-skills": minor
+"@sortedyuan/plugin-goals": minor
+"@sortedyuan/plugin-history-memory": minor
+"@sortedyuan/plugin-delegation": minor
+"@sortedyuan/plugin-mcp": minor
+"@sortedyuan/plugin-observability": minor
+"@sortedyuan/plugin-delivery": minor
+"@sortedyuan/plugin-agent-adapters": minor
+"@sortedyuan/plugin-coordination": minor
+"@sortedyuan/plugin-web-api": minor
 ---
 
 Expose existing Agent functionality as reusable plugins with declared services,
@@ -26,7 +24,7 @@ direct options compose through plugin factories, and replacement services receiv
 creation notifications for the active Application.
 
 Add plugin factories for runtime, Model, permissions, Skills, goals, historical
-Context, delegation, MCP, observability, durable delivery, Telegram, Feishu, Agent
+Context, delegation, MCP, observability, durable delivery, Agent
 adapters, task coordination and HTTP listeners. MaybeCode and MaybeClaw use these
 factories for their application and workspace lifecycles. Existing direct APIs and
 application exports remain available. Configuration-selected providers replace
@@ -52,4 +50,4 @@ concurrent steering and cancellation, and preserves saved inputs after restart.
 
 Skills state is saved through versioned plugin state while existing Session
 activation records remain readable. Goals and history-memory retain their existing
-durable state records for migration. Applications remain private.
+durable state records for migration.

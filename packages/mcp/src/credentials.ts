@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID }
 import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { MayError } from "@may/core";
+import { MayError } from "@sortedyuan/core";
 
 /** Secrets are opaque to the host. Implementations must not log their values. */
 export interface McpCredentialStore {

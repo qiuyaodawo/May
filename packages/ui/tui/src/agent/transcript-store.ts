@@ -4,17 +4,17 @@ import type {
   MayEvent,
   ToolCall,
   UserMessage,
-} from "@may/core";
+} from "@sortedyuan/core";
 import type {
   ApprovalDecision,
   ApprovalRequest,
   PermissionEvent,
-} from "@may/permissions";
-import type { SessionEvent } from "@may/session";
+} from "@sortedyuan/permissions";
+import type { SessionEvent } from "@sortedyuan/session";
 import {
   decodeToolChangePreviewPresentation,
   type ToolChangePreview,
-} from "@may/coding-tools/change-preview";
+} from "@sortedyuan/coding-tools/change-preview";
 
 export type TranscriptItem =
   | UserTranscriptItem

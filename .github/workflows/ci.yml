@@ -47,13 +47,13 @@ jobs:
         run: pnpm docs:check
       - name: Install Chromium for browser tests
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
-        run: pnpm --filter @may/web-ui exec playwright install --with-deps chromium
+        run: pnpm --filter @sortedyuan/web-ui exec playwright install --with-deps chromium
       - name: Run browser resource synchronization tests
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
-        run: pnpm --filter @may/web-ui test:browser
+        run: pnpm --filter @sortedyuan/web-ui test:browser
       - name: Run MCP Apps browser isolation tests
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
-        run: pnpm --filter @may/mcp test:browser
+        run: pnpm --filter @sortedyuan/mcp test:browser
       - name: Run offline tests
         if: ${{ github.event_name != 'workflow_dispatch' || matrix.os != 'windows-latest' }}
         run: pnpm test
@@ -94,7 +94,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify packed dependencies and installed CLI
         run: pnpm test:package:maybecode
+      - name: Verify every release package and its declarations
+        run: pnpm test:package:release -- --directory ../release-package-consumers
       - name: Verify independently installed plugin host
         run: pnpm test:package:plugin
       - name: Verify independently installed evaluation package
         run: pnpm test:package:eval
+      - name: Verify independently installed scheduler package
+        run: pnpm test:package:scheduler

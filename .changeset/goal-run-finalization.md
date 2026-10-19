@@ -1,7 +1,7 @@
 ---
-"@may/goal": minor
-"@may/plugin-delegation": patch
-"@may/plugin-goals": patch
+"@sortedyuan/goal": minor
+"@sortedyuan/plugin-delegation": patch
+"@sortedyuan/plugin-goals": patch
 ---
 
 Allow Goal Run handles to finalize host resources after verification and durable goal-state updates. Finalization receives completed, continued, failed or cancelled outcomes and finishes before another Run begins, enabling final file checkpoints and workspace leases that remain active during verification.

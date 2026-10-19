@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
-import { applicationHooks, applicationServices, defineAgent, type AgentApplication, type AgentApplicationEvent } from "@may/application";
-import { definePlugin } from "@may/plugin";
-import { AsyncEventQueue } from "@may/core";
+import { applicationHooks, applicationServices, defineAgent, type AgentApplication, type AgentApplicationEvent } from "@sortedyuan/application";
+import { definePlugin } from "@sortedyuan/plugin";
+import { AsyncEventQueue } from "@sortedyuan/core";
 import {
   InMemoryContextFactory,
   ModelContextCompactionStrategy,
@@ -10,7 +10,7 @@ import {
   SummaryTailStrategy,
   type ContextBudget,
   type ContextCompactionStrategy,
-} from "@may/context";
+} from "@sortedyuan/context";
 import {
   RunCancelledError,
   runtimeHooks,
@@ -22,8 +22,8 @@ import {
   type TraceAttributes,
   type Tracer,
   type UserMessage,
-} from "@may/core";
-import { codingRuntimeInstructions, createCodingTools, getShellToolInfo } from "@may/coding-tools";
+} from "@sortedyuan/core";
+import { codingRuntimeInstructions, createCodingTools, getShellToolInfo } from "@sortedyuan/coding-tools";
 import {
   CoordinationRuntime,
   createApplicationAgent,
@@ -36,12 +36,12 @@ import {
   type TaskExecution,
   type TaskExecutionContext,
   type TaskOutput,
-} from "@may/coordination";
-import { taskTurnInputId } from "@may/coordination";
-import { FileCoordinationStore } from "@may/coordination/file-store";
-import type { ApprovalDecision, PermissionPolicy } from "@may/permissions";
-import type { SessionEvent, SessionStore, SessionSubmitOptions } from "@may/session";
-import type { SkillRegistry } from "@may/skills";
+} from "@sortedyuan/coordination";
+import { taskTurnInputId } from "@sortedyuan/coordination";
+import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
+import type { ApprovalDecision, PermissionPolicy } from "@sortedyuan/permissions";
+import type { SessionEvent, SessionStore, SessionSubmitOptions } from "@sortedyuan/session";
+import type { SkillRegistry } from "@sortedyuan/skills";
 import type {
   MaybeCodeDelegationEvent,
   MaybeCodeDelegationRequest,
@@ -51,13 +51,13 @@ import type {
   MaybeCodeDelegationToolRecords,
   MaybeCodeRequestRun,
 } from "./delegation.js";
-import type { AutoCompactionMode as MaybeCodeAutoCompactionMode } from "@may/plugin-history-memory";
+import type { AutoCompactionMode as MaybeCodeAutoCompactionMode } from "@sortedyuan/plugin-history-memory";
 import type { MaybeCodeRun } from "./delegation.js";
 import { delegationInstructions, subagentInstructions } from "./subagent-instructions.js";
 import { SharedWorkspaceFileGuard, type SubagentFileGuard } from "./subagent-files.js";
 import { SubagentRequestLedger, withRequestBudget } from "./subagent-budget.js";
-import { HistoryReferenceMemory, createModelContextSummarizer } from "@may/plugin-history-memory";
-import type { SharedBudgetTotals as SubagentBudgetTotals } from "@may/coordination";
+import { HistoryReferenceMemory, createModelContextSummarizer } from "@sortedyuan/plugin-history-memory";
+import type { SharedBudgetTotals as SubagentBudgetTotals } from "@sortedyuan/coordination";
 import type {
   MaybeCodeSubagentConfiguration,
   MaybeCodeSubagentRole,
@@ -120,7 +120,7 @@ export interface SubagentHostOptions {
   readonly instructionsSource?: () => string;
   readonly projectInstructionsSource?: () => string;
   readonly prepareInstructions?: () => Promise<void>;
-  readonly beforeToolExecute?: import("@may/application").AgentApplicationOptions["beforeToolExecute"];
+  readonly beforeToolExecute?: import("@sortedyuan/application").AgentApplicationOptions["beforeToolExecute"];
   readonly permissionModeSource?: () => string;
   readonly permissionPolicy: PermissionPolicy;
   /** 主任务与子任务共用的文件锁；缺省时按工作区新建一把共享锁。 */

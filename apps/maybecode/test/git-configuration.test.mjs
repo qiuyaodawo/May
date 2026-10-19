@@ -4,7 +4,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { homedir } from "node:os";
-import { loadMayConfig } from "@may/config";
+import { loadMayConfig } from "@sortedyuan/config";
 import { resolveMaybeCodeGit } from "../dist/index.js";
 
 const artifacts = fileURLToPath(new URL("../../../review/git-configuration/", import.meta.url));

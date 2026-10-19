@@ -1,6 +1,6 @@
-import type { TaskStatus } from "@may/coordination";
-import type { AgentApplicationEvent, AgentRun } from "@may/application";
-import type { RunResult, Usage } from "@may/core";
+import type { TaskStatus } from "@sortedyuan/coordination";
+import type { AgentApplicationEvent, AgentRun } from "@sortedyuan/application";
+import type { RunResult, Usage } from "@sortedyuan/core";
 
 /** 各个 MaybeCode 界面看到的委派任务。 */
 export interface MaybeCodeDelegationTask {

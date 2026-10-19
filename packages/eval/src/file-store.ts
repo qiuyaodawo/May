@@ -3,7 +3,7 @@ import { open, mkdir, readFile, rename, unlink, stat, lstat } from "node:fs/prom
 import { resolve, join, relative, isAbsolute } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Ajv } from "ajv";
-import { validateUsageCost } from "@may/core";
+import { validateUsageCost } from "@sortedyuan/core";
 import type { EvalStore, EvalPlan, TrialState, EvalExecutionEvent, EvidenceReference, EvalTrial, EvalFingerprints } from "./types.js";
 import { assertJson, validateIdentifier } from "./validation.js";
 

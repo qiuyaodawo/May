@@ -47,7 +47,7 @@ loopback HTTP. The sandbox URL is trusted host configuration, not `_meta.ui.doma
 
 ```ts
 // 浏览器入口不导入 Node 模块。
-import { mountMcpApp } from "@may/mcp/apps-browser";
+import { mountMcpApp } from "@sortedyuan/mcp/apps-browser";
 const view = mountMcpApp(container, trustedSandboxUrl, {
   resource: { html: backendAppResource.html },
   receive: message => authenticatedChannel.request(message),
@@ -105,8 +105,8 @@ not executable HTML.
 visibility, owner routing, resource consent, stale views and fallback.
 `packages/mcp/test/browser/apps.test.mjs` uses Chromium to verify double-iframe
 origin isolation, CSP-blocked fetch, source spoof rejection and teardown. Run
-`pnpm --filter @may/mcp exec playwright install chromium`, then
-`pnpm --filter @may/mcp test:browser`. CI runs this browser check only on Linux
+`pnpm --filter @sortedyuan/mcp exec playwright install chromium`, then
+`pnpm --filter @sortedyuan/mcp test:browser`. CI runs this browser check only on Linux
 with Node.js 24. The default offline suite does not launch browsers.
 
 Host callback waiting is abortable even when a custom consent/executor callback

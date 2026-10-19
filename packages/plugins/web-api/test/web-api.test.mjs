@@ -3,7 +3,7 @@ import { once } from "node:events";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import test from "node:test";
-import { PluginHost, defineService } from "@may/plugin";
+import { PluginHost, defineService } from "@sortedyuan/plugin";
 import { createWebApiPlugin, webApiService } from "../dist/index.js";
 
 test("HTTP plugin serves actual files and releases streaming connections and its port", async t => {
@@ -19,7 +19,7 @@ test("HTTP plugin serves actual files and releases streaming connections and its
   } }] });
   t.after(() => host.close());
   const service = host.get(webApiService), port = service.server.address().port;
-  assert.equal((await (await fetch(service.url)).json()).name, "@may/plugin-web-api");
+  assert.equal((await (await fetch(service.url)).json()).name, "@sortedyuan/plugin-web-api");
   const stream = await fetch(service.url + "/stream");
   const reader = stream.body.getReader();
   assert.match(new TextDecoder().decode((await reader.read()).value), /Document notifications/);

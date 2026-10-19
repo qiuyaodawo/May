@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { createReadTool, createShellTool, createWriteTool } from "@may/coding-tools";
-import { PermissionDeniedError, PermissionToolExecutor } from "@may/permissions";
-import { FilePermissionRuleStore } from "@may/permissions/file-store";
+import { createReadTool, createShellTool, createWriteTool } from "@sortedyuan/coding-tools";
+import { PermissionDeniedError, PermissionToolExecutor } from "@sortedyuan/permissions";
+import { FilePermissionRuleStore } from "@sortedyuan/permissions/file-store";
 import { createCodingPermissionPolicy, executeMaybeCodeSlashCommand, openConfiguredMaybeCode } from "../dist/index.js";
 import { createMaybeCodeWebHost } from "../dist/web-ui.js";
 

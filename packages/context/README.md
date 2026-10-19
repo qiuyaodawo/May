@@ -1,4 +1,4 @@
-# `@may/context`
+# `@sortedyuan/context`
 
 Replaceable Context factories and reusable implementations for May agents.
 
@@ -8,7 +8,7 @@ Call `invalidateMeasurement()` when instructions change. Custom factories and
 controllers must honor these contracts for skill activation.
 
 ```ts
-import { InMemoryContextFactory } from "@may/context";
+import { InMemoryContextFactory } from "@sortedyuan/context";
 
 const factory = new InMemoryContextFactory();
 const managed = await factory.create({
@@ -29,7 +29,7 @@ const inspection = await managed.controller?.inspect();
 ```
 
 `InMemoryContextFactory` creates an in-memory implementation of the
-`@may/core` `Context` contract.
+`@sortedyuan/core` `Context` interface.
 Applications can accept the `ContextFactory` interface to let callers replace
 context storage and model-view selection without changing the Core agent loop.
 Factories return a `ManagedContext`: Core receives its `context`, while an
@@ -58,7 +58,7 @@ placeholders. It preserves message order and tool-call identifiers.
 import {
   InMemoryContextFactory,
   PruneOldToolResultsStrategy,
-} from "@may/context";
+} from "@sortedyuan/context";
 
 const managed = await new InMemoryContextFactory().create({
   messages,
@@ -99,7 +99,7 @@ rejected, and a summary that would increase serialized context size is not
 applied.
 
 ```ts
-import { SummaryTailStrategy } from "@may/context";
+import { SummaryTailStrategy } from "@sortedyuan/context";
 
 const strategy = new SummaryTailStrategy({
   keepRecentTurns: 2,
@@ -115,7 +115,7 @@ For a tool-free summarizer backed by any May `Model`, use the reusable adapter
 and keep prompt policy in the application:
 
 ```ts
-import { createModelContextSummarizer } from "@may/context/model-summarizer";
+import { createModelContextSummarizer } from "@sortedyuan/context/model-summarizer";
 
 const summarizer = createModelContextSummarizer(model, {
   instructions: "Return a concise continuation summary.",

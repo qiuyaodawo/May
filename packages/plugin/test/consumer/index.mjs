@@ -5,13 +5,13 @@ import { once } from "node:events";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineService, PluginHost } from "@may/plugin";
-import { compileModelSchema, defineHook, priceUsage } from "@may/core";
-import { alwaysOffSampler, BasicTracer, BoundedMetrics, DiagnosticsStore, InMemorySpanProcessor, createOtlpTelemetry } from "@may/observability";
-import { services } from "@may/plugin-services";
-import { createRuntimePlugin, createContextPlugin } from "@may/plugin-runtime";
-import { createPermissionPlugin } from "@may/plugin-permissions";
-import { createGatewayRpcAdapter } from "@may/plugin-agent-adapters";
+import { defineService, PluginHost } from "@sortedyuan/plugin";
+import { compileModelSchema, defineHook, priceUsage } from "@sortedyuan/core";
+import { alwaysOffSampler, BasicTracer, BoundedMetrics, DiagnosticsStore, InMemorySpanProcessor, createOtlpTelemetry } from "@sortedyuan/observability";
+import { services } from "@sortedyuan/plugin-services";
+import { createRuntimePlugin, createContextPlugin } from "@sortedyuan/plugin-runtime";
+import { createPermissionPlugin } from "@sortedyuan/plugin-permissions";
+import { createGatewayRpcAdapter } from "@sortedyuan/plugin-agent-adapters";
 
 const service = defineService({ id: "consumer.counter", version: "1.0.0", scope: "application" });
 const hook = defineHook({
@@ -35,8 +35,8 @@ const host = await PluginHost.create({ hooks: [hook], plugins: [
 const application = await host.createScope("application", { id: "external" });
 assert.equal(await application.transform(hook, 5, { signal: new AbortController().signal }), 7);
 await host.close();
-for (const name of ["models", "skills", "goals", "history-memory", "delegation", "mcp", "observability", "delivery", "channel-telegram", "channel-feishu", "agent-adapters", "coordination", "web-api"]) {
-  const module = await import(`@may/plugin-${name}`);
+for (const name of ["models", "skills", "goals", "history-memory", "delegation", "mcp", "observability", "delivery", "agent-adapters", "coordination", "web-api"]) {
+  const module = await import(`@sortedyuan/plugin-${name}`);
   assert.ok(Object.keys(module).length > 0, `${name} exports its plugin API`);
 }
 const foundations = await PluginHost.create({ plugins: [createRuntimePlugin(), createContextPlugin(), createPermissionPlugin({ create: () => () => "allow" })] });
@@ -50,7 +50,7 @@ await mkdir(directory, { recursive: true });
 const text = "Independent plugin installation";
 await writeFile(join(directory, "document.txt"), text);
 const rpcOptions = { transport: "stdio", command: process.execPath, args: [
-  fileURLToPath(import.meta.resolve("@may/plugin-agent-adapters/examples/rpc-file-agent")),
+  fileURLToPath(import.meta.resolve("@sortedyuan/plugin-agent-adapters/examples/rpc-file-agent")),
   "--directory", join(directory, "state"), "--workspace", directory,
 ] };
 let adapter = await createGatewayRpcAdapter("files", rpcOptions);

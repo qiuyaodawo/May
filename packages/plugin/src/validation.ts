@@ -1,7 +1,7 @@
 import { Ajv, type ValidateFunction } from "ajv";
 import { satisfies, valid, validRange } from "semver";
 import { isDeepStrictEqual } from "node:util";
-import type { HookDefinition, JsonSchema } from "@may/core";
+import type { HookDefinition, JsonSchema } from "@sortedyuan/core";
 import type { AnyPlugin, PluginDefinition, PluginScope, ServiceBinding, ServiceToken } from "./types.js";
 import { immutable } from "./hooks.js";
 

@@ -2,7 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { Server, createMcpHandler, specTypeSchemas, type CallToolResult, type Resource, type Prompt, type ReadResourceResult, type GetPromptResult } from "@modelcontextprotocol/server";
 import { serveStdio, StdioServerTransport, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
-import type { Tool, ToolExecutor, ToolExecutionContext } from "@may/core";
+import type { Tool, ToolExecutor, ToolExecutionContext } from "@sortedyuan/core";
 import { assertMcpContentSize, mcpToolResultContent, mcpResourceToUserMessage, mcpPromptToUserMessage } from "./content.js";
 import { freezeTree, object } from "./tasks.js";
 

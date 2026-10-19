@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { ModelResponseValidationError, priceUsage, resolveRunBudget, RunBudgetMeter } from "@may/core";
+import { ModelResponseValidationError, priceUsage, resolveRunBudget, RunBudgetMeter } from "@sortedyuan/core";
 import { OpenAIChatCompletionsModel, createCapabilityValidatedModel, createModelCapabilityResolver } from "../../../providers/dist/index.js";
 import { FileSharedBudget } from "../../../coordination/dist/index.js";
 import { SubagentRequestLedger, withRequestBudget } from "../dist/subagent-budget.js";

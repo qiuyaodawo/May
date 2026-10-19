@@ -1,4 +1,4 @@
-import { createObservabilityPlugin } from "@may/plugin-observability";
+import { createObservabilityPlugin } from "@sortedyuan/plugin-observability";
 
 const definition = createObservabilityPlugin({ dataDirectory: process.cwd() });
 export default {

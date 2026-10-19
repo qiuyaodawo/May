@@ -172,7 +172,7 @@ MaybeCode 模型面板显示已知、未知及不支持能力、来源、发现�
 Session 诊断使用可选 observability 插件。MaybeClaw 提供 `agent.check` 和
 `session.diagnostics`，同样检查认证与 Session 归属。
 
-`@may/ui-client.createTelemetryPanel(data)` 最多显示 40 条记录，包含每项独立
+`@sortedyuan/ui-client.createTelemetryPanel(data)` 最多显示 40 条记录，包含每项独立
 耗时、状态、父级身份、采样及保留范围。宿主可以单独查询其他诊断页面，参阅
 [模型与遥测集成](model-telemetry-integration.md)。
 
@@ -181,10 +181,10 @@ Session 诊断使用可选 observability 插件。MaybeClaw 提供 `agent.check`
 | Package 或层次 | 职责 |
 | --- | --- |
 | Application 与产品宿主 | 执行、权限、预算、持久化、恢复 |
-| `@may/ui-client` | JSON 类型，浏览器连接与状态同步 |
-| `@may/ui-client/application` | 单活动 Session 工作区适配器 |
-| `@may/ui-client/server` | 本地 HTTP、认证、Origin 检查、操作结果记录和 SSE |
-| `@may/web-ui` | 工作台及对话、输入、审批、详情组件 |
+| `@sortedyuan/ui-client` | JSON 类型，浏览器连接与状态同步 |
+| `@sortedyuan/ui-client/application` | 单活动 Session 工作区适配器 |
+| `@sortedyuan/ui-client/server` | 本地 HTTP、认证、Origin 检查、操作结果记录和 SSE |
+| `@sortedyuan/web-ui` | 工作台及对话、输入、审批、详情组件 |
 | 产品扩展 | 文件差异、任务生命周期、投递及产品展示 |
 
 实现 `UiHost`，或者将 `ApplicationUiHost` 接入 `AgentWorkspaceController`。
@@ -194,7 +194,7 @@ Session 诊断使用可选 observability 插件。MaybeClaw 提供 `agent.check`
 `closeApplication: false`。终端负责分发事件和关闭 controller。组合
 `startUiServer({ browserLogin: true, ... })` 与
 `webUiAssets(..., { browserLogin: true })`，通过 `createLoginUrl()` 创建连接凭据。
-产品路由可以使用 `@may/ui-client/server` 的 `BrowserLogin`，调用 `issue()`、
+产品路由可以使用 `@sortedyuan/ui-client/server` 的 `BrowserLogin`，调用 `issue()`、
 `redeem()` 和 `clear()`。自定义页面可向 `mountWebUI` 提供 `initialToken` 与
 `connectionHint`，由启动程序提供连接说明。
 
@@ -262,8 +262,8 @@ Markdown 支持文本、标题、列表、引用、代码、表格、强调和 H
 `pnpm build` 后，通过实际工作区、目录、UI 宿主和 HTTP 服务执行本地浏览器测试：
 
 ```powershell
-pnpm --filter @may/web-ui exec playwright install chromium
-pnpm --filter @may/web-ui test:browser
+pnpm --filter @sortedyuan/web-ui exec playwright install chromium
+pnpm --filter @sortedyuan/web-ui test:browser
 ```
 
 这些检查包含资源分页与搜索、新增、删除、重命名、已加载页面状态及过期游标。
@@ -271,7 +271,7 @@ pnpm --filter @may/web-ui test:browser
 
 | 检查 | 必需环境与命令 |
 | --- | --- |
-| MaybeCode 控制及终端/Web 共享 | `MAYBECODE_WEB_LIVE=1`；`pnpm --filter @may/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs` |
+| MaybeCode 控制及终端/Web 共享 | `MAYBECODE_WEB_LIVE=1`；`pnpm --filter @sortedyuan/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs` |
 | 工作区文件版本 | `MAY_LIVE_PROVIDER_UI_TESTS=1`；`node --test packages/ui/web/test/browser/workspace-versions.test.mjs` |
 | Session 分支与隔离测试提交 | `MAY_LIVE_PROVIDER_UI_TESTS=1` 和 `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`；`node --test packages/ui/web/test/browser/workspace-session-fork.test.mjs` |
 

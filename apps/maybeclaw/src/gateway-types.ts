@@ -1,7 +1,7 @@
-import type { ContentPart, RunBudget } from "@may/core";
-import type { ApprovalDecision, ApprovalRequest } from "@may/permissions";
-import type { PluginModuleSelection } from "@may/plugin";
-import type { AgentAdapter as GatewayAgentAdapter, AgentAdapterContext as GatewayAdapterContext, AgentCapabilities as GatewayCapabilities, AgentTaskStatus as GatewayTaskStatus } from "@may/plugin-agent-adapters";
+import type { ContentPart, RunBudget } from "@sortedyuan/core";
+import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/permissions";
+import type { PluginModuleSelection } from "@sortedyuan/plugin";
+import type { AgentAdapter as GatewayAgentAdapter, AgentAdapterContext as GatewayAdapterContext, AgentCapabilities as GatewayCapabilities, AgentTaskStatus as GatewayTaskStatus } from "@sortedyuan/plugin-agent-adapters";
 export type { GatewayAgentAdapter, GatewayAdapterContext, GatewayCapabilities, GatewayTaskStatus };
 
 export type GatewayActor = { kind: "operator"; id: string } | {

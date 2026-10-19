@@ -1,5 +1,5 @@
 {
-  "name": "@may/eval",
+  "name": "@sortedyuan/eval",
   "version": "0.1.0",
   "description": "Repeatable Agent task execution, independent evaluation and evidence reports.",
   "type": "module",
@@ -18,11 +18,11 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*",
-    "@may/application": "workspace:*",
-    "@may/coordination": "workspace:*",
-    "@may/observability": "workspace:*",
-    "@may/permissions": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/application": "workspace:*",
+    "@sortedyuan/coordination": "workspace:*",
+    "@sortedyuan/observability": "workspace:*",
+    "@sortedyuan/permissions": "workspace:*",
     "ajv": "^8.20.0",
     "tree-kill": "^1.2.2"
   },

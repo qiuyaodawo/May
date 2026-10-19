@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseMayConfig } from "@may/config";
-import { loadPluginModules, PluginHost } from "@may/plugin";
+import { parseMayConfig } from "@sortedyuan/config";
+import { loadPluginModules, PluginHost } from "@sortedyuan/plugin";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 
 function configuration(agents) {

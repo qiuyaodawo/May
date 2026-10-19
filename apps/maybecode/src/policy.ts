@@ -2,8 +2,8 @@ import type {
   PermissionCheck,
   PermissionDecision,
   PermissionPolicy,
-} from "@may/permissions";
-import { resolveWritableWorkspacePath } from "@may/coding-tools";
+} from "@sortedyuan/permissions";
+import { resolveWritableWorkspacePath } from "@sortedyuan/coding-tools";
 import { realpath } from "node:fs/promises";
 import { relative } from "node:path";
 

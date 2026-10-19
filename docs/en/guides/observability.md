@@ -4,8 +4,8 @@
 
 Use this guide to record Run timing, usage, metrics and diagnostics. You need an
 existing May application and a destination for local files, console output or
-OTLP export. `@may/observability` provides tracing and diagnostic implementations;
-`@may/plugin-observability` can own them through an Application plugin.
+OTLP export. `@sortedyuan/observability` provides tracing and diagnostic implementations;
+`@sortedyuan/plugin-observability` can own them through an Application plugin.
 
 For a complete configuration-backed example, see
 [model validation and execution diagnostics](model-telemetry-integration.md).
@@ -30,17 +30,17 @@ Session remain separate traces.
 
 Core exports the `Tracer`, `TraceSpan`, `TraceContext`, attribute types and
 protected telemetry-call helpers. In your consuming project, install
-`@may/application` and `@may/observability`. This integration snippet assumes
+`@sortedyuan/application` and `@sortedyuan/observability`. This integration snippet assumes
 already configured `model`, `tools`, `permissionPolicy` and `store`.
 
 ```ts
-import { defineAgent } from "@may/application";
+import { defineAgent } from "@sortedyuan/application";
 import {
   BasicTracer,
   BatchSpanProcessor,
   ConsoleSpanExporter,
   ratioSampler,
-} from "@may/observability";
+} from "@sortedyuan/observability";
 
 const processor = new BatchSpanProcessor(
   new ConsoleSpanExporter(),
@@ -194,7 +194,7 @@ the imported `BasicTracer`, `ratioSampler`, existing `processor` and Session
 identity `sessionId`. Read the snapshots after an operation finishes.
 
 ```ts
-import { BoundedMetrics, DiagnosticsStore } from "@may/observability";
+import { BoundedMetrics, DiagnosticsStore } from "@sortedyuan/observability";
 
 const metrics = new BoundedMetrics({ maxSeries: 1_024 });
 const diagnostics = new DiagnosticsStore({ maxSpans: 2_048, maxActiveSpans: 512 });
@@ -275,7 +275,7 @@ The snippet assumes a running OTLP HTTP collector at the two URLs and the
 `telemetry.tracer`; close them before calling telemetry shutdown.
 
 ```ts
-import { createOtlpTelemetry } from "@may/observability";
+import { createOtlpTelemetry } from "@sortedyuan/observability";
 
 const telemetry = createOtlpTelemetry({
   serviceName: "example-agent",
@@ -353,6 +353,6 @@ and child identities, Session filtering, usage completeness and cleanup. Use
 `droppedSpans`, `coverage` and queue diagnostics when deciding whether a query
 contains all retained evidence.
 
-From the repository root, run `pnpm --filter @may/observability test` for local
+From the repository root, run `pnpm --filter @sortedyuan/observability test` for local
 processors, metrics, diagnostics and OpenTelemetry integration. External collector
 delivery and provider usage require their own configured services.

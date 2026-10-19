@@ -2,11 +2,11 @@
 
 [English](../../en/guides/scheduler.md) | **简体中文**
 
-使用 `@may/scheduler`，可以在指定时间、按照 cron 规则或收到事件时提交宿主任务。
+使用 `@sortedyuan/scheduler`，可以在指定时间、按照 cron 规则或收到事件时提交宿主任务。
 调度器保存触发规则和执行记录，通过宿主提供的 `TaskDispatcher` 提交工作。
 公共 API 当前属于开发预览版。
 
-执行前需要 Node.js 22.16 或更高版本、`@may/scheduler`、支持 SQLite 文件锁的
+执行前需要 Node.js 22.16 或更高版本、`@sortedyuan/scheduler`、支持 SQLite 文件锁的
 本地存储，以及根据执行 ID 去重的宿主任务服务。宿主管理 Agent、Session、执行、
 审批和结果投递。打开调度器后，计时器保持停止，直到调用 `start()` 或 `tick()`。
 
@@ -18,8 +18,8 @@
    已经初始化 `taskService`，且 `daily-ai-brief` 尚未存在：
 
 ```ts
-import { Scheduler } from "@may/scheduler";
-import { SqliteSchedulerStore } from "@may/scheduler/sqlite-store";
+import { Scheduler } from "@sortedyuan/scheduler";
+import { SqliteSchedulerStore } from "@sortedyuan/scheduler/sqlite-store";
 
 const scheduler = Scheduler.open({
   store: SqliteSchedulerStore.open("./data/scheduler.sqlite"),
@@ -171,8 +171,8 @@ Core、Session 和 Application 可以独立于调度器运行。
 ## 验证
 
 ```powershell
-pnpm --filter @may/scheduler test
-pnpm --filter @may/scheduler test:live
+pnpm --filter @sortedyuan/scheduler test
+pnpm --filter @sortedyuan/scheduler test:live
 pnpm test:package:scheduler
 pnpm test:integration:scheduler
 pnpm docs:check

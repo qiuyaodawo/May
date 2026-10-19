@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { PluginHost } from "@may/plugin";
+import { PluginHost } from "@sortedyuan/plugin";
 import { createMcpHostPlugin, mcpHostService } from "../dist/index.js";
 
 test("MCP plugin connects an actual filesystem server and closes its owned transport", async () => {

@@ -3,8 +3,8 @@ import type {
   ModelEvent,
   ToolCall,
   Usage,
-} from "@may/core";
-import { readSseData } from "@may/provider-openai-compatible/http";
+} from "@sortedyuan/core";
+import { readSseData } from "@sortedyuan/provider-openai-compatible/http";
 import {
   AnthropicFinishReasonError,
   AnthropicProtocolError,

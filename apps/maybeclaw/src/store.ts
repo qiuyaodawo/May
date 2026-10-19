@@ -1,4 +1,4 @@
-import { replaceJournalFile } from "@may/session/file-store";
+import { replaceJournalFile } from "@sortedyuan/session/file-store";
 import { mkdir, open, readdir, unlink, type FileHandle } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join, resolve } from "node:path";

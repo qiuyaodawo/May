@@ -211,7 +211,7 @@ export class BatchSpanProcessor implements SpanProcessor {
     this.metric({ name: "may.telemetry.dropped_spans", kind: "counter", value: count });
   }
   private queueMetric(): void { this.metric({ name: "may.telemetry.queue_size", kind: "gauge", value: this.queue.length }); }
-  private metric(record: import("@may/core").MetricRecord): void {
+  private metric(record: import("@sortedyuan/core").MetricRecord): void {
     try { this.metrics?.record(record); } catch (error) { reportError(this.onError, error); }
   }
 }

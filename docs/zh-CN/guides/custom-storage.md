@@ -16,9 +16,9 @@ May 将持久化对话历史与 Session 发现分开：
 
 | 要求 | 后端 |
 | --- | --- |
-| 进程内历史 | `@may/session` 的 `InMemorySessionStore` |
-| 跨重启本地历史 | `@may/session/file-store` 的 `FileSessionStore` |
-| 本地 Session 发现 | `@may/session/catalog` 的 `FileSessionCatalog` |
+| 进程内历史 | `@sortedyuan/session` 的 `InMemorySessionStore` |
+| 跨重启本地历史 | `@sortedyuan/session/file-store` 的 `FileSessionStore` |
+| 本地 Session 发现 | `@sortedyuan/session/catalog` 的 `FileSessionCatalog` |
 | 数据库、加密或跨进程协调 | 实现本文的存储接口 |
 
 使用文件存储时可以直接阅读[内置本地存储](#内置本地存储)。
@@ -55,7 +55,7 @@ Run 已经成功完成。
 
 ## 数据库适配器框架
 
-在依赖 `@may/session` 的应用中创建适配器模块。
+在依赖 `@sortedyuan/session` 的应用中创建适配器模块。
 下面的 `SessionEventTable` 是数据库集成接口，需要使用数据库库提供具体实现，
 才能创建存储。`appendIfCurrentSequence` 必须在同一事务中检查当前最大序号并插入记录。
 
@@ -64,7 +64,7 @@ import {
   validateSessionHistory,
   type SessionEvent,
   type SessionStore,
-} from "@may/session";
+} from "@sortedyuan/session";
 
 export interface SessionEventTable {
   appendIfCurrentSequence(input: {
@@ -160,14 +160,14 @@ Catalog 提供索引，Session 历史保存对话事实。普通 Run 的 Catalog
 
 ## 内置本地存储
 
-将 `@may/application` 和 `@may/session` 加入应用直接依赖，在入口初始化
+将 `@sortedyuan/application` 和 `@sortedyuan/session` 加入应用直接依赖，在入口初始化
 `model`、`tools` 和 `permissionPolicy` 后使用下面的组合片段。
 路径以进程工作目录为基准：
 
 ```ts
-import { AgentApplication, AgentWorkspace } from "@may/application";
-import { FileSessionCatalog } from "@may/session/catalog";
-import { FileSessionStore } from "@may/session/file-store";
+import { AgentApplication, AgentWorkspace } from "@sortedyuan/application";
+import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 
 const store = new FileSessionStore(".may/sessions");
 const catalog = new FileSessionCatalog(".may/catalog.json");
@@ -235,7 +235,7 @@ Context 工作集与持久化历史的区别见[自定义 Context](custom-contex
 记录已吸收的精确操作文件名，因此清理中断不会重复重放。合并后不能使用旧版读取器；
 普通版本 1 目录仍可读取。
 
-本地写入者锁可从 `@may/session/file-store` 导入 `recoverFileLock` 处理。必须先停止所有
+本地写入者锁可从 `@sortedyuan/session/file-store` 导入 `recoverFileLock` 处理。必须先停止所有
 竞争宿主、打开和恢复操作，检查锁内容，再以 `expectedContents` 传入完整原文，并设置
 `confirmHostsStopped: true`。辅助函数拒绝存活 PID、远端宿主、危险链接和已变化的元数据。
 元数据不完整时，独立核实所有者后还需显式设置 `confirmUnknownOwner: true`。

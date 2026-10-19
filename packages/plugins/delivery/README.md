@@ -1,4 +1,4 @@
-# `@may/plugin-delivery`
+# `@sortedyuan/plugin-delivery`
 
 `createDeliveryPlugin({ ingress, id? })` 创建 `host` scope 插件，要求宿主提供
 `ServiceToken<ChannelIngress>`。`ChannelIngress` 包含 `store`、`receive(input)`、

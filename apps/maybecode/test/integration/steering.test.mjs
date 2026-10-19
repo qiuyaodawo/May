@@ -4,11 +4,11 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { loadMayConfig } from "@may/config";
-import { AgentApplication } from "@may/application";
-import { InMemoryContext, May } from "@may/core";
-import { Session } from "@may/session";
-import { FileSessionStore } from "@may/session/file-store";
+import { loadMayConfig } from "@sortedyuan/config";
+import { AgentApplication } from "@sortedyuan/application";
+import { InMemoryContext, May } from "@sortedyuan/core";
+import { Session } from "@sortedyuan/session";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 import { createMaybeCodeModel, selectMaybeCodeModel, openConfiguredMaybeCode, startMaybeCodeWebUI } from "../../dist/index.js";
 
 test("real Session and AgentApplication reject custom input sources without changing history and remain usable", {

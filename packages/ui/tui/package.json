@@ -1,5 +1,5 @@
 {
-  "name": "@may/tui",
+  "name": "@sortedyuan/tui",
   "version": "0.1.0",
   "description": "May-owned retained terminal UI primitives and renderer.",
   "type": "module",
@@ -44,14 +44,15 @@
     "test:sixel": "pnpm run build && node --test test/terminal/*.test.mjs"
   },
   "dependencies": {
+    "@types/pngjs": "6.0.5",
     "diff": "9.0.0",
-    "@may/coding-tools": "workspace:*",
-    "@may/core": "workspace:*",
-    "@may/media": "workspace:*",
+    "@sortedyuan/coding-tools": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/media": "workspace:*",
     "supports-terminal-graphics": "0.1.0",
-    "@may/keybindings": "workspace:*",
-    "@may/permissions": "workspace:*",
-    "@may/session": "workspace:*",
+    "@sortedyuan/keybindings": "workspace:*",
+    "@sortedyuan/permissions": "workspace:*",
+    "@sortedyuan/session": "workspace:*",
     "clipboardy": "5.3.2",
     "marked": "18.0.11",
     "jimp": "1.6.1",

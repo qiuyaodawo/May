@@ -1,5 +1,5 @@
 ---
-"@may/coding-tools": minor
+"@sortedyuan/coding-tools": minor
 ---
 
 Discover project instructions from the nearest project root through the startup workspace. Each directory selects a non-empty `AGENTS.override.md`, configured project filename, or fallback filename in that order. Preserve parent-to-child ordering and source paths while keeping the tool workspace unchanged.

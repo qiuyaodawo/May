@@ -9,7 +9,7 @@ connection using the [MCP guide](mcp.md).
 
 ## Supported boundary
 
-`@may/mcp` and MaybeCode support opt-in task creation, inspection, reviewed input,
+`@sortedyuan/mcp` and MaybeCode support opt-in task creation, inspection, reviewed input,
 waiting, cooperative cancellation and owner-bound recovery over modern stdio and
 Streamable HTTP. The supported extension is `io.modelcontextprotocol/tasks`,
 version `2026-07-28`: flat task handles and `tasks/get`, `tasks/update`,
@@ -44,7 +44,7 @@ MaybeCode supplies a separate encrypted OS-keyring-backed journal at
 `openMcpClientPool` when enabling Tasks:
 
 ```ts
-import { KeyringMcpCredentialStore, McpTaskJournal } from "@may/mcp";
+import { KeyringMcpCredentialStore, McpTaskJournal } from "@sortedyuan/mcp";
 const taskJournal = new McpTaskJournal(new KeyringMcpCredentialStore("./data/mcp-tasks"));
 ```
 
@@ -182,5 +182,5 @@ Use a real task-capable endpoint to confirm that restart retains the local handl
 waiting stops on input-required or terminal state, local cancellation leaves
 remote state unchanged, and attachment requires an explicit operation. For the
 repository's local HTTP and process integration checks, run
-`pnpm --filter @may/mcp test` from the repository root. A third-party service
+`pnpm --filter @sortedyuan/mcp test` from the repository root. A third-party service
 requires separate account and compatibility verification.

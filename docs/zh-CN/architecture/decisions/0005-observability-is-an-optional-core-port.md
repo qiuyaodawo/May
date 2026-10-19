@@ -17,7 +17,7 @@ Core 拥有同步的 `Tracer`/`TraceSpan` 接口，并明确传播 `TraceContext
 Instrumentation 使用 fail-open 语义，默认记录不包含内容的标识、数量、状态、
 usage 和错误类型/错误码；排除 prompt、message、reasoning 及工具输入输出。
 
-可选 `@may/observability` 依赖 Core，实现采样、不可变的完成 span、内存处理器、
+可选 `@sortedyuan/observability` 依赖 Core，实现采样、不可变的完成 span、内存处理器、
 串行有界处理器与基础 exporter。异步导出由 processor 负责，缓冲压力和导出故障
 不得影响 Agent 执行。
 
@@ -29,7 +29,7 @@ processor/exporter 完成，厂商 SDK 类型保持在适配层内。
 
 ## 后果
 
-- Core 不依赖 `@may/observability` 或厂商 SDK。
+- Core 不依赖 `@sortedyuan/observability` 或厂商 SDK。
 - Core、Session、Application、Provider 与远程工具明确传播同一 trace context。
 - Tracer 或 exporter 故障不会使 Run 失败。
 - Processor 计数器显示缓冲压力，Agent 继续执行。

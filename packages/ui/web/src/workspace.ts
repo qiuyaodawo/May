@@ -1,4 +1,4 @@
-import type { UiClient, UiClientState, UiForkPoint, UiWorkspaceDiff } from "@may/ui-client";
+import type { UiClient, UiClientState, UiForkPoint, UiWorkspaceDiff } from "@sortedyuan/ui-client";
 import { button, element } from "./components.js";
 
 /** 工作区版本信息和分支入口使用宿主提供的结构化状态。 */

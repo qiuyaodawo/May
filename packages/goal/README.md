@@ -1,7 +1,7 @@
-# @may/goal
+# @sortedyuan/goal
 
 Independent, durable goal execution composed through public Agent interfaces.
-The package depends on `@may/core` and `@may/context`. Base Agent packages do not
+The package depends on `@sortedyuan/core` and `@sortedyuan/context`. Base Agent packages do not
 import it. Importing the package starts no execution.
 `GoalAgent` uses submission and continuation options without `stepInputSource`;
 the attached Agent owns any additional input and its persistence.

@@ -57,12 +57,12 @@ Provider file ID 需要宿主提供 `MediaReader`。
 
 ## 复用接口
 
-读取或转换图片的宿主需要依赖 `@may/media`，并管理读取接口和存储的生命周期。
+读取或转换图片的宿主需要依赖 `@sortedyuan/media`，并管理读取接口和存储的生命周期。
 下面的接口说明媒体边界；UI 组合见[自定义 UI](custom-ui.md)。
 
-`@may/media` 导出 `DisplayPart`、`ImageAttachment`、`ImageData`、`MediaReader`、
+`@sortedyuan/media` 导出 `DisplayPart`、`ImageAttachment`、`ImageData`、`MediaReader`、
 `MediaCapabilities`、`displayParts`、`imageAttachment`、`readEmbeddedImage`、
-`inspectImage`、`imagePng`、`FileMediaStore`。运行时依赖为 `@may/core` 和
+`inspectImage`、`imagePng`、`FileMediaStore`。运行时依赖为 `@sortedyuan/core` 和
 `sharp`，Agent 运行循环无需依赖它。
 
 图片校验支持 PNG、JPEG、WebP、GIF、AVIF，限制为 32 MiB 和 4000 万像素。

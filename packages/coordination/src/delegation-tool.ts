@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Tool } from "@may/core";
+import type { Tool } from "@sortedyuan/core";
 import type { TaskExecutionContext, TaskSpec } from "./types.js";
 import { validateTaskFiles } from "./validation.js";
 

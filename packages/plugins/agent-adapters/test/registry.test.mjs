@@ -5,7 +5,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setImmediate, setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { PluginHost } from "@may/plugin";
+import { PluginHost } from "@sortedyuan/plugin";
 import { createAgentAdaptersPlugin, agentAdapterRegistryService, createGatewayRpcAdapter } from "../dist/index.js";
 
 const example = fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url));

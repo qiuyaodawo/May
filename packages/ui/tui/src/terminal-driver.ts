@@ -1,7 +1,7 @@
 import { emitKeypressEvents } from "node:readline";
 import { PassThrough, type Writable } from "node:stream";
 import TerminalEvents from "tty-events";
-import { keyStroke, type KeyStroke } from "@may/keybindings";
+import { keyStroke, type KeyStroke } from "@sortedyuan/keybindings";
 import type { PointerEvent, RenderSize } from "./component.js";
 import type { TerminalWriter } from "./renderer.js";
 import { TerminalImageSupport } from "./image-support.js";

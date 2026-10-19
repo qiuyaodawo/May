@@ -1,8 +1,8 @@
 import type {
   ModelCapabilitiesOverride,
   ProviderConfig,
-} from "@may/config";
-import type { Model, ModelLimits } from "@may/core";
+} from "@sortedyuan/config";
+import type { Model, ModelLimits } from "@sortedyuan/core";
 
 export interface ModelProfileSelector {
   readonly model?: string;

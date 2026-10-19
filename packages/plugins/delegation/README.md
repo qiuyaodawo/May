@@ -1,4 +1,4 @@
-# @may/plugin-delegation
+# @sortedyuan/plugin-delegation
 
 `createWorkspaceFilesPlugin({ workspace, defaultTools? })` provides
 `workspaceFilesService` and registers the default coding tools when requested.

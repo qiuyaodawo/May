@@ -1,9 +1,9 @@
-import { defineService, type PluginContext, type PluginDefinition, type PluginStateSnapshot } from "@may/plugin";
-import { services, ToolSources, InstructionSources, ModelWrappers, ContextWrappers } from "@may/plugin-services";
-import { createRuntimePlugin } from "@may/plugin-runtime";
+import { defineService, type PluginContext, type PluginDefinition, type PluginStateSnapshot } from "@sortedyuan/plugin";
+import { services, ToolSources, InstructionSources, ModelWrappers, ContextWrappers } from "@sortedyuan/plugin-services";
+import { createRuntimePlugin } from "@sortedyuan/plugin-runtime";
 import type { AgentApplication } from "./application.js";
 
-export type { RuntimeFactory } from "@may/core";
+export type { RuntimeFactory } from "@sortedyuan/core";
 
 export interface ApplicationAccess { get(): AgentApplication; }
 
@@ -15,7 +15,7 @@ export const applicationServices = Object.freeze({
 export const defaultRuntimePlugin: PluginDefinition = createRuntimePlugin();
 
 export function createCompositionPlugin(existing: readonly PluginDefinition[]): PluginDefinition {
-  const factory = <T>(service: import("@may/plugin").ServiceToken<T>, create: () => T) => ({
+  const factory = <T>(service: import("@sortedyuan/plugin").ServiceToken<T>, create: () => T) => ({
     service, provide(context: PluginContext) { context.provide(service, create()); },
   });
   const factories = [

@@ -3,7 +3,7 @@
 **English** | [简体中文](../../zh-CN/guides/mcp.md)
 
 Use this guide to configure Model Context Protocol (MCP) servers in MaybeCode or
-an application using `@may/mcp`. You need a trusted stdio server executable or
+an application using `@sortedyuan/mcp`. You need a trusted stdio server executable or
 Streamable HTTP endpoint, its connection requirements, and any required account
 credentials. For MaybeCode, you also need an existing May configuration and model
 profile.
@@ -23,13 +23,13 @@ describes package and protocol boundaries.
 
 ## Why this is a separate package
 
-`@may/mcp` owns discovery, transports and child processes. It adapts remote tools
+`@sortedyuan/mcp` owns discovery, transports and child processes. It adapts remote tools
 to Core's `Tool` interface, so their execution uses the existing permission,
 scheduling, cancellation, Session and tracing services.
 
 ```mermaid
 flowchart LR
-  server[MCP server] -->|Discovery| adapter["@may/mcp"]
+  server[MCP server] -->|Discovery| adapter["@sortedyuan/mcp"]
   adapter --> registry[Core ToolRegistry]
   model[Model tool call] --> permission[Permission executor]
   permission --> scheduler[Tool scheduler]
@@ -42,15 +42,15 @@ tools does not need the MCP package.
 
 ## Package API
 
-In your application project, install `@may/mcp` and `@may/application`. This
+In your application project, install `@sortedyuan/mcp` and `@sortedyuan/application`. This
 integration snippet assumes you already created `model`, `localTools`,
 `permissionPolicy`, `tracer` and `store`. Place `mcp-server.mjs` in the process
 working directory, or supply an absolute path. If the server needs credentials,
 validate and supply them through `env` before opening the pool.
 
 ```ts
-import { defineAgent } from "@may/application";
-import { openMcpClientPool } from "@may/mcp";
+import { defineAgent } from "@sortedyuan/application";
+import { openMcpClientPool } from "@sortedyuan/mcp";
 
 const mcp = await openMcpClientPool({
   servers: [{
@@ -414,7 +414,7 @@ This fragment assumes configured `servers`, trusted `workspaceIdentity` and
 and calls `interactions.respond()` with a user-reviewed answer.
 
 ```ts
-import { McpInteractionBroker, openMcpClientPool } from "@may/mcp";
+import { McpInteractionBroker, openMcpClientPool } from "@sortedyuan/mcp";
 const interactions = new McpInteractionBroker();
 const pool = await openMcpClientPool({ servers, interactions });
 const owner = { workspaceId: workspaceIdentity, sessionId };
@@ -544,7 +544,7 @@ with a journal; see [long-running tasks](mcp-tasks.md) for version, UI and safet
 
 Optional graphical integration and terminal fallback: [isolated Apps Host](mcp-apps.md).
 
-Independent, authenticated tool/resource/prompt exports use `@may/mcp/server`.
+Independent, authenticated tool/resource/prompt exports use `@sortedyuan/mcp/server`.
 See [server authoring](mcp-server.md).
 
 ## Troubleshooting

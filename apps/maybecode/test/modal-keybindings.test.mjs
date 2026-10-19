@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { stripVTControlCharacters } from "node:util";
-import { keyStroke } from "@may/keybindings";
+import { keyStroke } from "@sortedyuan/keybindings";
 import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
 import { createMaybeCodeKeymap } from "../dist/keymap.js";
 

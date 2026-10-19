@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ModelProtocolError, RunCancelledError } from "@may/core";
+import { ModelProtocolError, RunCancelledError } from "@sortedyuan/core";
 import {
   createModelContextSummarizer,
-} from "@may/context/model-summarizer";
+} from "@sortedyuan/context/model-summarizer";
 
 const options = {
   instructions: "Summarize facts for a later request.",

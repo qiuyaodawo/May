@@ -1,12 +1,12 @@
 {
-  "name": "@may/example-deepseek",
+  "name": "@sortedyuan/example-deepseek",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node deepseek.mjs"
   },
   "dependencies": {
-    "@may/core": "workspace:*",
-    "@may/provider-deepseek": "workspace:*"
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/provider-deepseek": "workspace:*"
   }
 }

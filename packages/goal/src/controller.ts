@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { setImmediate as nextTurn } from "node:timers/promises";
-import type { ContextFactory } from "@may/context";
-import type { Model, ModelRequest, Tool, Usage } from "@may/core";
+import type { ContextFactory } from "@sortedyuan/context";
+import type { Model, ModelRequest, Tool, Usage } from "@sortedyuan/core";
 import { goalBudget, goalText, restoreGoal } from "./state.js";
 import type { GoalAgent, GoalBudget, GoalContextOptions, GoalEvent, GoalModelOptions, GoalOptions, GoalRun, GoalState, GoalStore } from "./types.js";
 

@@ -1,10 +1,10 @@
-# `@may/provider-deepseek`
+# `@sortedyuan/provider-deepseek`
 
 DeepSeek model adapter for May.
 
 ```ts
-import { May, InMemoryContext } from "@may/core";
-import { DeepSeekModel } from "@may/provider-deepseek";
+import { May, InMemoryContext } from "@sortedyuan/core";
+import { DeepSeekModel } from "@sortedyuan/provider-deepseek";
 
 const may = new May({
   model: new DeepSeekModel({

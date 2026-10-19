@@ -1,10 +1,10 @@
 ---
-"@may/session": patch
-"@may/plugin": patch
-"@may/context": minor
-"@may/application": patch
-"@may/coordination": patch
-"@may/coding-tools": patch
+"@sortedyuan/session": patch
+"@sortedyuan/plugin": patch
+"@sortedyuan/context": minor
+"@sortedyuan/application": patch
+"@sortedyuan/coordination": patch
+"@sortedyuan/coding-tools": patch
 ---
 
 修复 Session 文件对 `input.generated` 的读取校验，使 Hook 追加的继续执行消息和分支继承的已交付补充输入能够恢复。

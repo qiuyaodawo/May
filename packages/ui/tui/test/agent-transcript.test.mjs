@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   TranscriptStore,
   TranscriptView,
-} from "@may/tui/transcript";
+} from "@sortedyuan/tui/transcript";
 
 test("projects live May and permission events into a terminal-safe transcript", () => {
   const store = new TranscriptStore();

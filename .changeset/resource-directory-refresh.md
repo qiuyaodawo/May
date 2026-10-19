@@ -1,6 +1,6 @@
 ---
-"@may/ui-client": minor
-"@may/web-ui": patch
+"@sortedyuan/ui-client": minor
+"@sortedyuan/web-ui": patch
 ---
 
 `UiSnapshot` 增加可选的 `resourcesVersion`。资源成员、分页顺序或搜索文本变化时，

@@ -6,7 +6,7 @@ import test from "node:test";
 import {
   parseRetryAfterMs,
   readSseData,
-} from "@may/provider-openai-compatible/http";
+} from "@sortedyuan/provider-openai-compatible/http";
 
 test("readSseData 解析按字节分段的 UTF-8 与 SSE 事件", async (t) => {
   const url = await startServer(t, (_request, response) => {

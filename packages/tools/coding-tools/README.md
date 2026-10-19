@@ -1,4 +1,4 @@
-# `@may/coding-tools`
+# `@sortedyuan/coding-tools`
 
 Basic filesystem and shell tools for May coding agents:
 
@@ -14,8 +14,8 @@ inside the workspace. Trusted applications may opt in per tool with
 `allowHardLinks: true`.
 
 ```ts
-import { InMemoryContext, May } from "@may/core";
-import { createCodingTools } from "@may/coding-tools";
+import { InMemoryContext, May } from "@sortedyuan/core";
+import { createCodingTools } from "@sortedyuan/coding-tools";
 
 const tools = createCodingTools({ cwd: process.cwd() });
 
@@ -43,7 +43,7 @@ import {
   createReadTool,
   createShellTool,
   createWriteTool,
-} from "@may/coding-tools";
+} from "@sortedyuan/coding-tools";
 
 const read = createReadTool({ cwd: process.cwd(), maxBytes: 2_000_000 });
 ```
@@ -53,7 +53,7 @@ const read = createReadTool({ cwd: process.cwd(), maxBytes: 2_000_000 });
 Approval UIs can preview an `edit` or `write` call without performing it:
 
 ```ts
-import { createToolChangePreview } from "@may/coding-tools/change-preview";
+import { createToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
 
 const preview = await createToolChangePreview(process.cwd(), "edit", {
   path: "src/index.ts",
@@ -78,8 +78,8 @@ specific agent product:
 import {
   codingRuntimeInstructions,
   loadCodingInstructions,
-} from "@may/coding-tools/instructions";
-import { createShellTool, getShellToolInfo } from "@may/coding-tools";
+} from "@sortedyuan/coding-tools/instructions";
+import { createShellTool, getShellToolInfo } from "@sortedyuan/coding-tools";
 
 const shell = createShellTool({ cwd: process.cwd() });
 const shellInfo = getShellToolInfo(shell);

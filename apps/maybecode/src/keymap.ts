@@ -1,5 +1,5 @@
-import { Keymap, formatKeySequence, mergeKeyBindings, parseKeySequence, type KeyBindingDefinition } from "@may/keybindings";
-import { DEFAULT_EDITOR_KEYBINDINGS } from "@may/tui";
+import { Keymap, formatKeySequence, mergeKeyBindings, parseKeySequence, type KeyBindingDefinition } from "@sortedyuan/keybindings";
+import { DEFAULT_EDITOR_KEYBINDINGS } from "@sortedyuan/tui";
 
 export const MAYBECODE_KEY_ACTIONS = [
   "app.interrupt",

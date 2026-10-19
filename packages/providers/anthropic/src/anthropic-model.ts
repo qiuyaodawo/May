@@ -4,8 +4,8 @@ import type {
   ModelEvent,
   ModelRequest,
   ModelStreamOptions,
-} from "@may/core";
-import { parseRetryAfterMs } from "@may/provider-openai-compatible/http";
+} from "@sortedyuan/core";
+import { parseRetryAfterMs } from "@sortedyuan/provider-openai-compatible/http";
 import {
   toAnthropicRequestParts,
   toAnthropicThinking,

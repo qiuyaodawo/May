@@ -4,7 +4,7 @@ import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import type { MetricRecord, TraceAttributes, TraceSpan, TraceSpanStartOptions, Tracer } from "@may/core";
+import type { MetricRecord, TraceAttributes, TraceSpan, TraceSpanStartOptions, Tracer } from "@sortedyuan/core";
 import { boundedAttributes, telemetryLimits, type TelemetryLimits } from "./limits.js";
 import { metricAttributes, SpanMetrics } from "./metrics.js";
 import type { FinishedTraceSpan, MetricRecorder, ObservabilityErrorHandler, SpanObserver, TraceSpanEventData } from "./types.js";
@@ -181,8 +181,8 @@ export function createOtlpTelemetry(options: OtlpTelemetryOptions): {
   const metricExporter = new ReportingMetricExporter({ url: options.metricsUrl, ...(options.headers === undefined ? {} : { headers: options.headers }), timeoutMillis: timeoutMs, concurrencyLimit: 1 }, error => { metricFailures += 1; report(error); });
   const traceProvider = new BasicTracerProvider({ resource, sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(ratio) }), spanProcessors: [new OtelBatchSpanProcessor(traceExporter, { maxQueueSize, maxExportBatchSize, exportTimeoutMillis: timeoutMs })] });
   const metricProvider = new MeterProvider({ resource, readers: [new PeriodicExportingMetricReader({ exporter: metricExporter, exportIntervalMillis: positive(options.exportIntervalMs ?? 60_000), exportTimeoutMillis: timeoutMs })] });
-  const metrics = new OpenTelemetryMetricRecorder(metricProvider.getMeter("@may/observability"), options.maxMetricSeries ?? 1_024);
-  const tracer = new OpenTelemetryTracer({ tracer: traceProvider.getTracer("@may/observability"), metrics, ...(options.observer === undefined ? {} : { observer: options.observer }), ...(options.onError === undefined ? {} : { onError: options.onError }) });
+  const metrics = new OpenTelemetryMetricRecorder(metricProvider.getMeter("@sortedyuan/observability"), options.maxMetricSeries ?? 1_024);
+  const tracer = new OpenTelemetryTracer({ tracer: traceProvider.getTracer("@sortedyuan/observability"), metrics, ...(options.observer === undefined ? {} : { observer: options.observer }), ...(options.onError === undefined ? {} : { onError: options.onError }) });
   let closed = false;
   const lifecycle = async (action: () => Promise<unknown>): Promise<void> => {
     try { await withTimeout(action(), Math.min(timeoutMs * 2, 2_147_483_647)); } catch (error) { lifecycleFailures += 1; report(error); }

@@ -1,7 +1,7 @@
 import stringWidth from "string-width";
 import { clearLine, cursorTo, moveCursor } from "node:readline";
 import { createInterface } from "node:readline/promises";
-import { keyStroke, type KeyStroke } from "@may/keybindings";
+import { keyStroke, type KeyStroke } from "@sortedyuan/keybindings";
 import { PassThrough, type Readable, type Writable } from "node:stream";
 import TerminalEvents from "tty-events";
 import { TerminalImageSupport } from "./image-support.js";

@@ -1,1 +1,1 @@
-export * from "@may/plugin-delegation/budget";
+export * from "@sortedyuan/plugin-delegation/budget";

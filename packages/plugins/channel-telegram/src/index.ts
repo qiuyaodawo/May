@@ -1,11 +1,11 @@
 import { setTimeout as delay } from "node:timers/promises";
-import type { ImageData } from "@may/media";
-import { definePlugin, defineService, type PluginDefinition } from "@may/plugin";
+import type { ImageData } from "@sortedyuan/media";
+import { definePlugin, defineService, type PluginDefinition } from "@sortedyuan/plugin";
 import {
   boundedJson, boundedBytes, channelAccepts, channelTrigger, checkAttachment, cursorId, deliveryServices,
   type ChannelAccessSettings, type ChannelAdapter, type ChannelAttachment, type ChannelAttachmentData,
   type ChannelCapabilities, type ChannelDeliveryReceipt, type ChannelInput, type ChannelState, type DeliveryRecord, type GroupTrigger,
-} from "@may/plugin-delivery";
+} from "@sortedyuan/plugin-delivery";
 import { telegramInput, telegramMemberInput, type TelegramUpdate } from "./input.js";
 export * from "./input.js";
 

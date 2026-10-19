@@ -1,6 +1,6 @@
-# @may/plugin-services
+# @sortedyuan/plugin-services
 
-Typed service tokens and ordered contribution registries used by `@may/application`
+Typed service tokens and ordered contribution registries used by `@sortedyuan/application`
 and component plugins. All exported `services` tokens have application scope and
 version `1.0.0`; each token has one provider. `applicationServices` reexports these
 same tokens and adds access to the actual Application.
@@ -52,4 +52,4 @@ registries are added automatically; an explicit declaration for the same service
 can specify its version range and capabilities. Skills owns its activation state format.
 
 Tests use real file handles and independent in-memory Context instances. Run
-`pnpm --filter @may/plugin-services test`.
+`pnpm --filter @sortedyuan/plugin-services test`.

@@ -39,7 +39,7 @@ HTTP headers 和正文。该来源不能保存 cookie、凭据或其他应用路
 
 ```ts
 // 浏览器入口不导入 Node 模块。
-import { mountMcpApp } from "@may/mcp/apps-browser";
+import { mountMcpApp } from "@sortedyuan/mcp/apps-browser";
 const view = mountMcpApp(container, trustedSandboxUrl, {
   resource: { html: backendAppResource.html },
   receive: message => authenticatedChannel.request(message),
@@ -86,8 +86,8 @@ Host。普通资源附件按照数据处理。
 资源同意、旧视图失效及 fallback。
 `packages/mcp/test/browser/apps.test.mjs` 使用 Chromium 验证双 iframe origin
 隔离、CSP 阻止 fetch、伪造来源拒绝和销毁。执行
-`pnpm --filter @may/mcp exec playwright install chromium`，然后执行
-`pnpm --filter @may/mcp test:browser`。CI 仅在 Linux 的 Node.js 24 环境运行这项
+`pnpm --filter @sortedyuan/mcp exec playwright install chromium`，然后执行
+`pnpm --filter @sortedyuan/mcp test:browser`。CI 仅在 Linux 的 Node.js 24 环境运行这项
 浏览器检查，默认离线测试不启动浏览器。
 
 即使自定义同意/执行器回调忽略 signal，Host 也可中止本地等待；迟到完成不会重放或

@@ -1,6 +1,6 @@
-# @may/coordination
+# @sortedyuan/coordination
 
-Developer-preview coordination above `@may/application`. One durable coordinator
+Developer-preview coordination above `@sortedyuan/application`. One durable coordinator
 owns pipelines, DAGs, parallel reduction, delegation, peer messaging and handoffs.
 Execution can use local agents or independent remote leaf workers; this is not a
 high-availability or multi-writer scheduler.
@@ -21,7 +21,7 @@ Root exports:
 - `FileArtifactStore`: immutable, scoped UTF-8 artifacts;
 - `TaskWorkspaceManager`: filtered per-task file copies and read-only change manifests.
 
-`FileCoordinationStore` is exported through `@may/coordination/file-store`.
+`FileCoordinationStore` is exported through `@sortedyuan/coordination/file-store`.
 
 Hosts that own persistent Agent conversations can implement `CoordinationAgent`
 with `coordinationInput(execution)` and
@@ -31,7 +31,7 @@ messaging, and handoff tools. The host must serialize each conversation, pass
 the yield signal to its Agent runtime, and inspect durable outcomes in `recover`.
 Cancelling a pending permission request establishes that its tool did not start;
 other interrupted tool effects still require durable evidence.
-`CoordinationWorker` and `createRemoteAgent` use `@may/coordination/remote`.
+`CoordinationWorker` and `createRemoteAgent` use `@sortedyuan/coordination/remote`.
 
 Opening does not execute agents. `wait()` starts scheduling and resolves when no
 execution remains active, **including recovery-blocked graphs**. Always inspect

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemorySessionStore, SessionHistoryReader } from "@may/session";
+import { InMemorySessionStore, SessionHistoryReader } from "@sortedyuan/session";
 import { createSessionHistoryRetrievalTools, createSessionHistoryTool } from "../dist/index.js";
 
 test("history tools expose saved model content and withhold raw and legacy tool output", async () => {

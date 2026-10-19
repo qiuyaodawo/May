@@ -2,7 +2,7 @@
 
 [English](../../en/guides/git-workspaces.md) | **简体中文**
 
-`@may/application/git-workspace` 提供 Node.js 组件 `ProjectGitWorkspace`，
+`@sortedyuan/application/git-workspace` 提供 Node.js 组件 `ProjectGitWorkspace`，
 要求 `PATH` 中存在 Git 2.36 或更新版本。应用提供工作区和提交授权策略；组件提供仓库识别、
 持久化文件版本、diff、恢复预览和登记的 worktree 管理。
 
@@ -20,7 +20,7 @@
 `confirmProjectCommit` 为宿主实际的审批函数：
 
 ```ts
-import { ProjectGitWorkspace } from "@may/application/git-workspace";
+import { ProjectGitWorkspace } from "@sortedyuan/application/git-workspace";
 
 const files = await ProjectGitWorkspace.open({
   workspace: process.cwd(),
@@ -183,7 +183,7 @@ MaybeCode 将分支准备、worktree 变更、文件恢复和会话切换标记�
 
 ```powershell
 $env:MAY_GIT_CHECKPOINT_TEST_COMMITS = '1'
-pnpm --filter @may/application build
+pnpm --filter @sortedyuan/application build
 node --test packages/application/test/git-workspace*.test.mjs
 ```
 
@@ -196,5 +196,5 @@ node --test packages/application/test/git-workspace*.test.mjs
 ```powershell
 $env:MAY_GIT_PACKAGE_TEST = '1'
 $env:MAY_GIT_CHECKPOINT_TEST_COMMITS = '1'
-pnpm --filter @may/application test:package
+pnpm --filter @sortedyuan/application test:package
 ```

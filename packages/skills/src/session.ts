@@ -1,4 +1,4 @@
-import { FatalToolExecutionError, type Tool } from "@may/core";
+import { FatalToolExecutionError, type Tool } from "@sortedyuan/core";
 import { MAX_SKILL_BYTES, SkillRegistry, type SkillDocument } from "./registry.js";
 
 export const SKILL_STATE_KEY = "may.skills.active.v1";

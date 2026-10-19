@@ -6,7 +6,7 @@ Use this guide to define a tool, validate its arguments, register it with an
 Agent, and handle cancellation. It assumes an application and model are already
 configured as described in [Build an Agent](building-an-agent.md).
 
-The `Tool` interface from `@may/core` has three main parts:
+The `Tool` interface from `@sortedyuan/core` has three main parts:
 
 - `inputSchema` describes the call to the model;
 - optional `parse()` validates and converts untrusted model output;
@@ -19,12 +19,12 @@ construction boundary.
 
 ## A complete tool
 
-Create `add-tool.ts` in your TypeScript application and add `@may/core` as a
+Create `add-tool.ts` in your TypeScript application and add `@sortedyuan/core` as a
 direct dependency. This file implements addition; its `execute()` result has
 the shape `{ value: number }`.
 
 ```ts
-import type { Tool } from "@may/core";
+import type { Tool } from "@sortedyuan/core";
 
 interface AddInput {
   readonly left: number;
@@ -73,8 +73,8 @@ assumes the host supplies `model`, `permissionPolicy`, and `store`;
 close the application after its work as described in the application guide:
 
 ```ts
-import { defineAgent } from "@may/application";
-import { ToolRegistry } from "@may/core";
+import { defineAgent } from "@sortedyuan/application";
+import { ToolRegistry } from "@sortedyuan/core";
 
 const tools = new ToolRegistry([addTool]);
 tools.registerAll(productTools);
@@ -217,7 +217,7 @@ process can access after approval. See
 [Permission policies](./permission-policy.md).
 
 For workspace-safe file and shell implementations, prefer the factories in
-`@may/coding-tools`. Its shell tool executes with the May process's privileges.
+`@sortedyuan/coding-tools`. Its shell tool executes with the May process's privileges.
 Applications that require execution isolation must provide a separate sandbox
 or remote execution backend.
 

@@ -1,5 +1,5 @@
-import type { KeyStroke, Keymap } from "@may/keybindings";
-import type { ApprovalDecision, ApprovalRequest } from "@may/permissions";
+import type { KeyStroke, Keymap } from "@sortedyuan/keybindings";
+import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/permissions";
 import {
   Column,
   Dialog,
@@ -25,15 +25,15 @@ import {
   WorkspaceDiffViewer,
   workspaceGitLabel,
   type SessionForkSelection,
-} from "@may/tui";
-import type { UiForkPoint, UiWorkspaceDiff, UiWorkspaceGit } from "@may/ui-client";
+} from "@sortedyuan/tui";
+import type { UiForkPoint, UiWorkspaceDiff, UiWorkspaceGit } from "@sortedyuan/ui-client";
 import {
   TranscriptStore,
   TranscriptView,
-} from "@may/tui/transcript";
-import type { ToolRendererRegistry } from "@may/tui/tool-renderers";
+} from "@sortedyuan/tui/transcript";
+import type { ToolRendererRegistry } from "@sortedyuan/tui/tool-renderers";
 import type { MaybeCodeSlashCommandSuggestion } from "../slash-commands.js";
-import type { SessionSummary } from "@may/session/catalog";
+import type { SessionSummary } from "@sortedyuan/session/catalog";
 import type {
   MaybeCodeModelProfile,
   MaybeCodeReasoningEffortState,

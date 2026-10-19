@@ -1,4 +1,4 @@
-import { FatalToolExecutionError, MayError } from "@may/core";
+import { FatalToolExecutionError, MayError } from "@sortedyuan/core";
 
 export class PermissionDeniedError extends MayError {
   readonly toolName: string;

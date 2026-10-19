@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
-import { definePlugin, defineService, type PluginDefinition, type ServiceToken } from "@may/plugin";
+import { definePlugin, defineService, type PluginDefinition, type ServiceToken } from "@sortedyuan/plugin";
 
 export interface WebApiRequestContext { readonly origin: string; readonly signal: AbortSignal }
 export type WebApiHandler = (request: IncomingMessage, response: ServerResponse, context: WebApiRequestContext) => void | Promise<void>;

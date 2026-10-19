@@ -8,7 +8,7 @@ import {
   type ContextFactory,
   type ContextInspection,
   ModelContextCompactionStrategy,
-} from "@may/context";
+} from "@sortedyuan/context";
 import {
   AsyncEventQueue,
   directToolExecutor,
@@ -33,14 +33,14 @@ import {
   type HookContext,
   type HookDispatcher,
   type MayOptions,
-} from "@may/core";
+} from "@sortedyuan/core";
 import { randomUUID } from "node:crypto";
-import { PluginHost, type AnyPlugin, type PluginHostOptions, type ServiceToken } from "@may/plugin";
-import { services, type ContextOptions } from "@may/plugin-services";
-import { createModelPlugin } from "@may/plugin-models";
-import { createContextPlugin, createToolsPlugin } from "@may/plugin-runtime";
-import { createPermissionPlugin } from "@may/plugin-permissions";
-import { createSkillsPlugin } from "@may/plugin-skills";
+import { PluginHost, type AnyPlugin, type PluginHostOptions, type ServiceToken } from "@sortedyuan/plugin";
+import { services, type ContextOptions } from "@sortedyuan/plugin-services";
+import { createModelPlugin } from "@sortedyuan/plugin-models";
+import { createContextPlugin, createToolsPlugin } from "@sortedyuan/plugin-runtime";
+import { createPermissionPlugin } from "@sortedyuan/plugin-permissions";
+import { createSkillsPlugin } from "@sortedyuan/plugin-skills";
 import {
   PermissionToolExecutor,
   type ApprovalDecision,
@@ -50,7 +50,7 @@ import {
   type PermissionPolicy,
   type PermissionRuleStore,
   type PersistentPermissionRule,
-} from "@may/permissions";
+} from "@sortedyuan/permissions";
 import {
   Session,
   createSessionId,
@@ -65,15 +65,15 @@ import {
   type SessionStore,
   type SessionSubmitOptions,
   type SessionToolPresentation,
-} from "@may/session";
+} from "@sortedyuan/session";
 import {
   createSessionHistoryTool,
   createSessionHistoryRetrievalTools,
   type SessionHistoryToolOptions,
-} from "@may/session-tools";
+} from "@sortedyuan/session-tools";
 
 import type { SteerableAgentController } from "./controller.js";
-import { SkillRegistry, SkillSession, SKILL_STATE_KEY } from "@may/skills";
+import { SkillRegistry, SkillSession, SKILL_STATE_KEY } from "@sortedyuan/skills";
 import type { AgentApplicationEvent, AgentRun } from "./events.js";
 import { APPLICATION_HOOKS, applicationHooks, type InputHook } from "./hooks.js";
 import {
@@ -134,7 +134,7 @@ export interface AgentApplicationOptions {
   readonly providerNativeAutoCompaction?: boolean;
   readonly maxSteps?: number;
   readonly runBudget?: RunBudget;
-  readonly responseFormat?: import("@may/core").ModelResponseFormat;
+  readonly responseFormat?: import("@sortedyuan/core").ModelResponseFormat;
   /** Add the bounded session_history tool with these optional limits. */
   readonly sessionHistory?: false | (Omit<SessionHistoryToolOptions, "source"> & {
     /** Also expose bounded content search and chunked record reads. */
@@ -461,7 +461,7 @@ export class AgentApplication implements SteerableAgentController {
       contextController = managedContext.controller;
       instructionController = managedContext.controller;
       const modelInfo = sessionScope.provides(applicationServices.modelInfo) ? sessionScope.get(applicationServices.modelInfo) : undefined;
-      const runtimeTraceAttributes: Record<string, import("@may/core").TraceAttributeValue> = { ...(options.traceAttributes ?? {}), "may.session.id": sessionId };
+      const runtimeTraceAttributes: Record<string, import("@sortedyuan/core").TraceAttributeValue> = { ...(options.traceAttributes ?? {}), "may.session.id": sessionId };
       for (const key of ["may.model.provider", "may.model.name", "may.model.adapter", "may.model.profile"]) delete runtimeTraceAttributes[key];
       if (modelInfo !== undefined) {
         Object.assign(runtimeTraceAttributes, {
@@ -922,7 +922,7 @@ export class AgentApplication implements SteerableAgentController {
     return this.session.branchPositions();
   }
 
-  async saveBranchPosition(runId: string, options: import("@may/session").SessionBranchCompletionOptions = {}): Promise<void> {
+  async saveBranchPosition(runId: string, options: import("@sortedyuan/session").SessionBranchCompletionOptions = {}): Promise<void> {
     if (this.isRunning) throw new Error("Branch positions require a settled application Run");
     await Promise.all(this.pendingStateWrites);
     await this.session.saveBranchPosition(runId, options);
@@ -1123,7 +1123,7 @@ export class AgentApplication implements SteerableAgentController {
     if (errors.length > 0) throw new AggregateError(errors, "Agent application cleanup failed");
   }
 
-  private async relayRunEvents(events: AsyncIterable<import("@may/core").MayEvent>) {
+  private async relayRunEvents(events: AsyncIterable<import("@sortedyuan/core").MayEvent>) {
     for await (const event of events) {
       if (event.type === "model.completed" && event.usage !== undefined) {
         this.contextController?.recordModelUsage?.(

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inspectImage } from "@may/media";
+import { inspectImage } from "@sortedyuan/media";
 import { telegramInput, telegramMemberInput, telegramDeliveryRouting, telegramImageRequest, TelegramAdapter } from "../dist/index.js";
 
 test("Telegram message conversion retains platform routing and strips addressed mentions", () => {

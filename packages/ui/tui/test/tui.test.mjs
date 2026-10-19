@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import test from "node:test";
 import { Column, Dialog, Editor, EditorHistory, FocusManager, Markdown, NodeTerminalDriver, ScreenBuffer, ScrollView, SelectList, Text, sanitizeTerminalText } from "../dist/index.js";
-import { keyStroke } from "@may/keybindings";
+import { keyStroke } from "@sortedyuan/keybindings";
 
 test("neutralizes 7-bit and 8-bit terminal control sequences", () => {
   const safe = sanitizeTerminalText("a\x1b[2Jb\u009b2Jc\u009d0;title\u0007d");

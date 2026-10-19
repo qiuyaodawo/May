@@ -1,9 +1,9 @@
-# `@may/session-tools`
+# `@sortedyuan/session-tools`
 
 Read-only tools that expose bounded durable session history to a May agent.
 
 ```ts
-import { createSessionHistoryTool } from "@may/session-tools";
+import { createSessionHistoryTool } from "@sortedyuan/session-tools";
 
 const tool = createSessionHistoryTool({ source: session });
 ```

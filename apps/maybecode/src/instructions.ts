@@ -11,8 +11,8 @@ import {
   type CodingInstructionDocument,
   type CodingInstructions,
   type CodingInstructionSource,
-} from "@may/coding-tools/instructions";
-import type { MayConfig } from "@may/config";
+} from "@sortedyuan/coding-tools/instructions";
+import type { MayConfig } from "@sortedyuan/config";
 
 import { MaybeCodeConfigError } from "./errors.js";
 

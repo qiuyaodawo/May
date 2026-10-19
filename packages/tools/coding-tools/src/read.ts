@@ -1,4 +1,4 @@
-import type { Tool } from "@may/core";
+import type { Tool } from "@sortedyuan/core";
 import { CodingToolError } from "./errors.js";
 import {
   optionalPositiveInteger,

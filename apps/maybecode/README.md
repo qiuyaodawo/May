@@ -234,9 +234,9 @@ An application-owned MCP plugin creates and closes its connection for each
 Session; configured shared MCP providers retain their workspace-owned connection
 across Session changes. Custom MCP providers replace configured MCP resources.
 
-Reusable implementations live in `@may/plugin-goals`,
-`@may/plugin-history-memory`, `@may/plugin-delegation`, `@may/plugin-mcp`, and
-`@may/plugin-observability`. Model, Permission, Skills, and Runtime factories live
+Reusable implementations live in `@sortedyuan/plugin-goals`,
+`@sortedyuan/plugin-history-memory`, `@sortedyuan/plugin-delegation`, `@sortedyuan/plugin-mcp`, and
+`@sortedyuan/plugin-observability`. Model, Permission, Skills, and Runtime factories live
 in the corresponding plugin packages. The previous MaybeCode module paths
 continue to re-export history-memory and delegation interfaces.
 
@@ -245,16 +245,16 @@ continue to re-export history-memory and delegation interfaces.
 MaybeCode is a product composition layer. Generic lifecycle does not live in
 the app:
 
-- `@may/core`'s instance-scoped `ToolRegistry` composes the coding tools;
-- `@may/application`'s `defineAgent()` captures reusable behavior, while its
+- `@sortedyuan/core`'s instance-scoped `ToolRegistry` composes the coding tools;
+- `@sortedyuan/application`'s `defineAgent()` captures reusable behavior, while its
   application/workspace layer owns run/retry/cancel, approval relaying,
   Session history, Context compaction persistence, closing, session switching,
   and Catalog summaries;
-- `@may/tui/transcript` projects live and restored Agent events, and
-  `@may/tui/tool-renderers` supplies an instance-scoped renderer registry;
-- `@may/coding-tools/instructions` loads bounded, path-safe instruction files;
+- `@sortedyuan/tui/transcript` projects live and restored Agent events, and
+  `@sortedyuan/tui/tool-renderers` supplies an instance-scoped renderer registry;
+- `@sortedyuan/coding-tools/instructions` loads bounded, path-safe instruction files;
 - the generic list-selection and Slash-command state models also live in
-  `@may/tui`.
+  `@sortedyuan/tui`.
 
 The app retains the decisions that define the MaybeCode product: its prompt and
 instruction composition, default coding tools and permission policy, coding
@@ -311,7 +311,7 @@ or remote UI sends user actions through its methods and renders its
 import {
   openConfiguredMaybeCode,
   type MaybeCodeController,
-} from "@may/maybecode";
+} from "@sortedyuan/maybecode";
 
 const controller: MaybeCodeController = await openConfiguredMaybeCode();
 
@@ -356,7 +356,7 @@ send the message again. These rules apply to both terminal frontends, Web UI,
 and `MaybeCodeWorkspace.submit()` / `steer()`. General `AgentApplication.submit()`
 continues to require that the application has no active operation.
 
-The bundled SessionPicker uses the optional `@may/keybindings` package to map
+The bundled SessionPicker uses the optional `@sortedyuan/keybindings` package to map
 context-specific key sequences to semantic actions. Custom UIs may reuse that
 resolver or provide their own keyboard and interaction system.
 
@@ -418,7 +418,7 @@ most recent session for the workspace, or `--resume <id>` to select a specific
 session. Starting a new session does not delete or overwrite older sessions;
 they remain available through `/resume`.
 
-The private package exposes a `maybecode` executable for local packaging. Its
+The public `@sortedyuan/maybecode` package exposes the `maybecode` executable. Its
 complete package graph can be packed, installed in a fresh consumer project, and
 launched outside this repository with:
 
@@ -441,7 +441,7 @@ pnpm maybecode /e/code/project
 pnpm maybecode 'E:\code\project'
 ```
 
-MaybeCode creates configured models through `@may/providers`. Provider names
+MaybeCode creates configured models through `@sortedyuan/providers`. Provider names
 identify configured connections; adapters identify protocols. Its built-in
 adapter registry supports `deepseek-chat`, `zhipu-chat`, `kimi-chat`,
 `anthropic-messages`, `openai-responses`, and `openai-chat-completions`.
@@ -678,7 +678,7 @@ or its [Chinese version](../../docs/zh-CN/guides/maybecode-instructions.md).
 Programmatic callers can pass a `ContextFactory` to
 `openConfiguredMaybeCode`, `MaybeCodeWorkspace.open`, or
 `MaybeCodeApplication.open`. When omitted, MaybeCode uses
-`InMemoryContextFactory` from `@may/context`. Factories return the Core context
+`InMemoryContextFactory` from `@sortedyuan/context`. Factories return the Core context
 and may also return a `ContextController` for application-level inspection.
 
 ## Commands
@@ -895,7 +895,7 @@ writer per session.
 The regular suite is offline:
 
 ```sh
-pnpm --filter @may/maybecode test
+pnpm --filter @sortedyuan/maybecode test
 ```
 
 The opt-in DeepSeek test reads `~/.may/config.json`, performs a real tool call,

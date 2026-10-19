@@ -1,6 +1,6 @@
-import type { ContextFactory } from "@may/context";
-import { May, type Model, type Tool } from "@may/core";
-import type { PluginContext } from "@may/plugin";
+import type { ContextFactory } from "@sortedyuan/context";
+import { May, type Model, type Tool } from "@sortedyuan/core";
+import type { PluginContext } from "@sortedyuan/plugin";
 import { ModelWrappers, ContextWrappers, ToolSources, InstructionSources, services, type ContextOptions } from "../dist/index.js";
 import { createModelPlugin, createModelWrapperPlugin } from "../../plugins/models/dist/index.js";
 import { createPermissionPlugin } from "../../plugins/permissions/dist/index.js";

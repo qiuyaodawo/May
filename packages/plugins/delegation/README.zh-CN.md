@@ -1,4 +1,4 @@
-# @may/plugin-delegation
+# @sortedyuan/plugin-delegation
 
 `createWorkspaceFilesPlugin({ workspace, defaultTools? })` 提供
 `workspaceFilesService`，根据选项注册默认编码工具。共享文件守卫串行执行文件访问，

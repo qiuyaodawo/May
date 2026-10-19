@@ -1,10 +1,10 @@
 ---
-"@may/core": minor
-"@may/coordination": minor
-"@may/provider-openai": minor
-"@may/provider-openai-compatible": minor
-"@may/provider-anthropic": minor
-"@may/config": minor
+"@sortedyuan/core": minor
+"@sortedyuan/coordination": minor
+"@sortedyuan/provider-openai": minor
+"@sortedyuan/provider-openai-compatible": minor
+"@sortedyuan/provider-anthropic": minor
+"@sortedyuan/config": minor
 ---
 
 扩展 Usage 的缓存、reasoning、其他计量、包含关系、完整性与 provider 金额；提供版本化

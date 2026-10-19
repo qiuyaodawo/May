@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { keyStroke } from "@may/keybindings";
+import { keyStroke } from "@sortedyuan/keybindings";
 import { Editor, FullscreenRenderer, NodeTerminalDriver, TuiRuntime } from "../dist/index.js";
 
 test("Runtime 释放旧组件并在停止后拒绝再次启动", async () => {

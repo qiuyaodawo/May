@@ -1,11 +1,11 @@
-import { applicationHooks, applicationServices } from "@may/application";
+import { applicationHooks, applicationServices } from "@sortedyuan/application";
 import {
   ModelContextCompactionStrategy, PruneOldToolResultsStrategy, SummaryTailStrategy,
   type ContextBudget, type ContextCompactionOptions, type ContextCompactionOutput,
   type ContextCompactionStrategy, type ContextSummarizer,
-} from "@may/context";
-import type { ContextSnapshot, Model } from "@may/core";
-import { definePlugin, defineService } from "@may/plugin";
+} from "@sortedyuan/context";
+import type { ContextSnapshot, Model } from "@sortedyuan/core";
+import { definePlugin, defineService } from "@sortedyuan/plugin";
 import { HistoryReferenceMemory, type SavedNotes } from "./history-memory.js";
 import { createModelContextSummarizer } from "./summarizer.js";
 import type { AutoCompactionMode } from "./index.js";

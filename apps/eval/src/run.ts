@@ -16,8 +16,8 @@ import {
   type EvalExperiment,
   type EvalReport,
   type EvaluationResult,
-} from "@may/eval";
-import { FileEvalStore } from "@may/eval/file-store";
+} from "@sortedyuan/eval";
+import { FileEvalStore } from "@sortedyuan/eval/file-store";
 import { CLI_USAGE, parseCliArgs } from "./args.js";
 import { formatCliError } from "./errors.js";
 

@@ -5,9 +5,9 @@ import {
   type SerializedError,
   type UserMessage,
   type ToolExecutionContext,
-} from "@may/core";
-import type { ApprovalRequest, PermissionEvent } from "@may/permissions";
-import type { ContextCompactionResult } from "@may/context";
+} from "@sortedyuan/core";
+import type { ApprovalRequest, PermissionEvent } from "@sortedyuan/permissions";
+import type { ContextCompactionResult } from "@sortedyuan/context";
 
 export interface ApplicationOpeningHook {
   readonly sessionId: string;

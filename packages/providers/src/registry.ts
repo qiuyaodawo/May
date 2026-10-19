@@ -1,4 +1,4 @@
-import type { Model } from "@may/core";
+import type { Model } from "@sortedyuan/core";
 
 import { ProviderAdapterRegistryError } from "./errors.js";
 import { createCapabilityValidatedModel, type CapabilityValidatedModelOptions } from "./capability-validated-model.js";

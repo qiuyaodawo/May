@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join, resolve, sep } from "node:path";
-import { PluginHost } from "@may/plugin";
+import { PluginHost } from "@sortedyuan/plugin";
 import { createObservabilityHostPlugin, observabilityHostService } from "../dist/index.js";
 
 test("host plugin flushes an actual trace export during owned resource shutdown", async (t) => {

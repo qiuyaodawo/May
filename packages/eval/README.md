@@ -1,4 +1,4 @@
-# `@may/eval`
+# `@sortedyuan/eval`
 
 **English** | [简体中文](README.zh-CN.md)
 
@@ -7,8 +7,8 @@ compare versioned configurations. A case supplies the input, execution limits,
 environment and acceptance criteria. An experiment fixes cases, variants,
 repetitions, concurrency and scheduling seed before executing any trial.
 
-Public entry points are `@may/eval`, `@may/eval/application`,
-`@may/eval/coordination` and `@may/eval/file-store`. The main entry includes the
+Public entry points are `@sortedyuan/eval`, `@sortedyuan/eval/application`,
+`@sortedyuan/eval/coordination` and `@sortedyuan/eval/file-store`. The main entry includes the
 runner, component registry, types, built-in environments and evaluators, and
 report comparison functions. The file store requires Node.js >=22.16.0.
 
@@ -29,5 +29,5 @@ with the required capabilities.
 Read the [English guide](../../docs/en/guides/eval.md) or
 [简体中文指南](../../docs/zh-CN/guides/eval.md) for the public interfaces,
 lifecycle, restart behavior, grading, evidence controls, metrics and verification.
-The release package scope is explicitly `@may/eval`; `@may/eval-cli` is private.
+The release package scope is explicitly `@sortedyuan/eval`; `@sortedyuan/eval-cli` is private.
 Its complete runtime dependency chain is checked by packed-consumer verification.

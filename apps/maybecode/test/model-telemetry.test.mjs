@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { InMemorySessionStore } from "@may/session";
-import { createObservabilityPlugin } from "@may/plugin-observability";
-import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver } from "@may/providers";
+import { InMemorySessionStore } from "@sortedyuan/session";
+import { createObservabilityPlugin } from "@sortedyuan/plugin-observability";
+import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver } from "@sortedyuan/providers";
 import { InMemorySessionCatalog, MaybeCodeWorkspace, startMaybeCodeWebUI } from "../dist/index.js";
 import { startLocalTelemetryService, localTelemetrySelection } from "../../../packages/providers/test/fixtures/local-telemetry-service.mjs";
 

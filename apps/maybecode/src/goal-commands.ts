@@ -1,4 +1,4 @@
-import type { GoalBudget, GoalState } from "@may/goal";
+import type { GoalBudget, GoalState } from "@sortedyuan/goal";
 import type { MaybeCodeController } from "./controller.js";
 
 export const GOAL_COMMAND_USAGE = "/goal [status|start [--max-runs N] [--tokens N] [--duration-ms N] -- <objective>|pause|resume|cancel]";

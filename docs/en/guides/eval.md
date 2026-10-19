@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../../zh-CN/guides/eval.md)
 
-Use `@may/eval` to execute the same tasks across model, prompt, tool, permission
+Use `@sortedyuan/eval` to execute the same tasks across model, prompt, tool, permission
 or Context configurations and check their actual results. Each trial preserves
 execution status, acceptance evidence, infrastructure status, human assistance
 and resource use.
@@ -60,8 +60,8 @@ inputs are an `EvalExperiment`, the matching `EvalRegistry`, a host-controlled
 store directory and a cancellation signal:
 
 ```ts
-import { EvalRunner, type EvalExperiment, type EvalRegistry } from "@may/eval";
-import { FileEvalStore } from "@may/eval/file-store";
+import { EvalRunner, type EvalExperiment, type EvalRegistry } from "@sortedyuan/eval";
+import { FileEvalStore } from "@sortedyuan/eval/file-store";
 
 export async function evaluateExperiment(
   experiment: EvalExperiment,
@@ -184,7 +184,7 @@ approvals and real human approvals are recorded, and unavailable interaction
 terminates with an explicit result. Human waiting time is accounted separately.
 
 `createApplicationExecutionAdapter({ version, open, input?, approvals?,
-continueAfterYield?, maxContinuations? })` is exported by `@may/eval/application`.
+continueAfterYield?, maxContinuations? })` is exported by `@sortedyuan/eval/application`.
 Its `open({ context, tracer, budget })` callback must return a fresh
 `AgentApplication`. Supply `tracer` to that Application and use
 `budget.wrapModel(realModel)` with either `budget.wrapTools(realTools)` or
@@ -195,7 +195,7 @@ Its output preserves final text as `text` and structured values as a `json`
 array; absent content is omitted.
 
 `createCoordinationExecutionAdapter({ version, create, outputTaskId?, approvals? })`
-is exported by `@may/eval/coordination`. Its `create({ context, tracer, budget })`
+is exported by `@sortedyuan/eval/coordination`. Its `create({ context, tracer, budget })`
 callback creates a fresh `CoordinationRuntime`, and all model and tool routes use
 the same supplied budget wrappers. Limits apply across the complete task graph.
 An unbound budget is rejected. `outputTaskId` selects a task's final text; without
@@ -394,15 +394,15 @@ unknown, so they cannot satisfy a complete-cost comparison gate.
 
 ## Package scope and verification
 
-The release package scope for this feature is `@may/eval`.
-`@may/eval-cli` and executable suites remain private. Public runtime dependencies
+The release package scope for this feature is `@sortedyuan/eval`.
+`@sortedyuan/eval-cli` and executable suites remain private. Public runtime dependencies
 include Core, Application, Coordination, Observability and Permissions as well as
 the libraries used for schema validation and process cancellation. Packed-consumer
 verification checks installation and execution outside the repository.
 
 ```powershell
-pnpm --filter @may/eval test
-pnpm --filter @may/eval-cli test
+pnpm --filter @sortedyuan/eval test
+pnpm --filter @sortedyuan/eval-cli test
 pnpm test:package:eval
 pnpm test:integration:eval
 pnpm docs:check

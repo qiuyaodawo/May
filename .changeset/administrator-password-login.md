@@ -1,6 +1,6 @@
 ---
-"@may/config": minor
-"@may/web-ui": minor
+"@sortedyuan/config": minor
+"@sortedyuan/web-ui": minor
 ---
 
 Add MaybeClaw administrator password configuration with automatic salted hash storage

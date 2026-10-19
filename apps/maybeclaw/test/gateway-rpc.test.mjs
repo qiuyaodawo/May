@@ -26,7 +26,7 @@ async function until(probe) { for (let attempt = 0; attempt < 100; attempt++) { 
 function fileGateway(path) {
   const configPath = join(path, "config.json");
   const settings = gatewaySettings({ path: configPath, providers: {}, models: {}, apps: { maybeclaw: { version: 2,
-    agents: [{ id: "files", adapter: "module", module: "@may/plugin-agent-adapters/rpc", options: {
+    agents: [{ id: "files", adapter: "module", module: "@sortedyuan/plugin-agent-adapters/rpc", options: {
       transport: "stdio", command: process.execPath, args: [example, "--directory", join(path, "state"), "--workspace", path],
     } }],
   } } });

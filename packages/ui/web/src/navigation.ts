@@ -1,4 +1,4 @@
-import type { UiClientState } from "@may/ui-client";
+import type { UiClientState } from "@sortedyuan/ui-client";
 import { button, element, icon, type WebUiContext } from "./components.js";
 
 export interface WebUiNavigationItem {

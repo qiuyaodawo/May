@@ -3,10 +3,10 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { applicationHooks, applicationServices } from "@may/application";
-import { runtimeHooks } from "@may/core";
-import { historyMemoryService } from "@may/plugin-history-memory";
-import { goalsService } from "@may/plugin-goals";
+import { applicationHooks, applicationServices } from "@sortedyuan/application";
+import { runtimeHooks } from "@sortedyuan/core";
+import { historyMemoryService } from "@sortedyuan/plugin-history-memory";
+import { goalsService } from "@sortedyuan/plugin-goals";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
 test("真实模型更新后 shell、权限、notes、压缩和委派目标继续运行", { timeout: 240000 }, async t => {

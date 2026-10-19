@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { readEmbeddedImage, type MediaReader } from "@may/media";
-import { commandArgs, UiError, type UiCommand, type UiHost, type UiReceipt, type UiSnapshot, type UiBlock, type UiPageRequest, type UiFieldRequest } from "@may/ui-client";
-import { UiProjection, displayValue } from "@may/ui-client/projection";
-import { historyPage, readPage, recordedField, fieldPage, searchHistory } from "@may/ui-client/reading";
+import { readEmbeddedImage, type MediaReader } from "@sortedyuan/media";
+import { commandArgs, UiError, type UiCommand, type UiHost, type UiReceipt, type UiSnapshot, type UiBlock, type UiPageRequest, type UiFieldRequest } from "@sortedyuan/ui-client";
+import { UiProjection, displayValue } from "@sortedyuan/ui-client/projection";
+import { historyPage, readPage, recordedField, fieldPage, searchHistory } from "@sortedyuan/ui-client/reading";
 import type { MaybeClawHost } from "./host.js";
 import { digest, isTerminal } from "./types.js";
 

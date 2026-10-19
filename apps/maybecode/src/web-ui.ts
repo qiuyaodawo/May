@@ -1,5 +1,5 @@
-import { ApplicationUiHost, type ApplicationUiOptions } from "@may/ui-client/application";
-import { UiError, createTelemetryPanel } from "@may/ui-client";
+import { ApplicationUiHost, type ApplicationUiOptions } from "@sortedyuan/ui-client/application";
+import { UiError, createTelemetryPanel } from "@sortedyuan/ui-client";
 import type { MaybeCodeController } from "./controller.js";
 import { MaybeCodeWebCommands } from "./web-commands.js";
 import { formatGoal } from "./goal-commands.js";
@@ -56,7 +56,7 @@ export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<A
   return host;
 }
 
-function capabilityFields(capabilities: import("@may/providers").ModelCapabilities): { label: string; value: string }[] {
+function capabilityFields(capabilities: import("@sortedyuan/providers").ModelCapabilities): { label: string; value: string }[] {
   const names: Record<string, string> = { "input.text": "文本输入", "input.image": "图片输入", "input.audio": "音频输入", "input.file": "文件输入", "output.text": "文本输出", "output.image": "图片输出", "output.audio": "音频输出", tools: "工具调用", "structuredOutput.json": "JSON 输出", "structuredOutput.jsonSchema": "JSON Schema", contextCompaction: "Context 压缩" };
   return [...Object.entries(capabilities.fields ?? {}).slice(0, 40).map(([key, field]) => ({
     label: names[key] ?? key,

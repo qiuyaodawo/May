@@ -18,9 +18,9 @@ server-provided descriptors are untrusted model-visible input.
 
 ## Decision
 
-Create the optional `@may/mcp` package. It depends on `@may/core` and adapts an
+Create the optional `@sortedyuan/mcp` package. It depends on `@sortedyuan/core` and adapts an
 MCP server's tool descriptors and calls to Core's existing `Tool` contract.
-Core and `@may/application` do not depend on MCP.
+Core and `@sortedyuan/application` do not depend on MCP.
 
 An application opens an instance-scoped MCP client pool, composes its
 namespaced tool snapshot through `ToolRegistry`, and closes the pool at the

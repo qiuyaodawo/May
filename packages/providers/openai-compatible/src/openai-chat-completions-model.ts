@@ -3,8 +3,8 @@ import type {
   ModelEvent,
   ModelRequest,
   ModelStreamOptions,
-} from "@may/core";
-import { assertModelResponseFormat, validateStructuredModelResponse } from "@may/core";
+} from "@sortedyuan/core";
+import { assertModelResponseFormat, validateStructuredModelResponse } from "@sortedyuan/core";
 
 import {
   toOpenAICompatibleMessages,

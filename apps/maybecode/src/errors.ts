@@ -5,4 +5,4 @@ export class MaybeCodeUsageError extends Error {
   }
 }
 
-export { MaybeCodeConfigError } from "@may/plugin-delegation";
+export { MaybeCodeConfigError } from "@sortedyuan/plugin-delegation";

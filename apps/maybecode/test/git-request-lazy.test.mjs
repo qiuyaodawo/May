@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { directToolExecutor, FatalToolExecutionError, ToolRegistry } from "@may/core";
-import { PermissionToolExecutor } from "@may/permissions";
-import { ProjectGitWorkspace } from "@may/application/git-workspace";
-import { createCodingTools } from "@may/coding-tools";
+import { directToolExecutor, FatalToolExecutionError, ToolRegistry } from "@sortedyuan/core";
+import { PermissionToolExecutor } from "@sortedyuan/permissions";
+import { ProjectGitWorkspace } from "@sortedyuan/application/git-workspace";
+import { createCodingTools } from "@sortedyuan/coding-tools";
 import { GitRequestController } from "../dist/git-request.js";
 
 const artifacts = fileURLToPath(new URL("../../../review/lazy-git-tests/", import.meta.url));

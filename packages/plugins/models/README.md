@@ -1,4 +1,4 @@
-# @may/plugin-models
+# @sortedyuan/plugin-models
 
 `createModelPlugin({ id?, create, info?, dispose? })` provides `services.model`.
 When `info` is present, the factory also provides `services.modelInfo` with the

@@ -3,8 +3,8 @@
 [English](../../en/guides/observability.md) | **简体中文**
 
 本文用于记录 Run 耗时、用量、指标和诊断。需要已有 May 应用，以及本地文件、
-控制台或 OTLP 导出目标。`@may/observability` 提供追踪与诊断实现，
-`@may/plugin-observability` 可以通过 Application 插件管理相关资源。
+控制台或 OTLP 导出目标。`@sortedyuan/observability` 提供追踪与诊断实现，
+`@sortedyuan/plugin-observability` 可以通过 Application 插件管理相关资源。
 
 完整的配置式示例参阅[模型验证与执行诊断](model-telemetry-integration.md)。
 下文提供直接 tracer 配置和遥测数据参考。
@@ -22,17 +22,17 @@
 ## 配置 Tracer
 
 Core 导出 `Tracer`、`TraceSpan`、`TraceContext`、属性类型和受保护的遥测调用方法。
-在使用项目安装 `@may/application` 和 `@may/observability`。以下集成片段假设
+在使用项目安装 `@sortedyuan/application` 和 `@sortedyuan/observability`。以下集成片段假设
 已经配置 `model`、`tools`、`permissionPolicy` 和 `store`。
 
 ```ts
-import { defineAgent } from "@may/application";
+import { defineAgent } from "@sortedyuan/application";
 import {
   BasicTracer,
   BatchSpanProcessor,
   ConsoleSpanExporter,
   ratioSampler,
-} from "@may/observability";
+} from "@sortedyuan/observability";
 
 const processor = new BatchSpanProcessor(
   new ConsoleSpanExporter(),
@@ -176,7 +176,7 @@ Core 保护注入的 tracer/span 调用；内置 processor 捕获 exporter 错�
 在操作完成后读取快照。
 
 ```ts
-import { BoundedMetrics, DiagnosticsStore } from "@may/observability";
+import { BoundedMetrics, DiagnosticsStore } from "@sortedyuan/observability";
 
 const metrics = new BoundedMetrics({ maxSeries: 1_024 });
 const diagnostics = new DiagnosticsStore({ maxSpans: 2_048, maxActiveSpans: 512 });
@@ -244,7 +244,7 @@ Token 与费用指标仅在逻辑调用结束时记录一次。
 应用使用 `telemetry.tracer`，全部关闭后再释放遥测资源。
 
 ```ts
-import { createOtlpTelemetry } from "@may/observability";
+import { createOtlpTelemetry } from "@sortedyuan/observability";
 
 const telemetry = createOtlpTelemetry({
   serviceName: "example-agent",
@@ -314,6 +314,6 @@ diagnostics.recordAssessment({
 及清理。通过 `droppedSpans`、`coverage` 和队列诊断，判断查询是否覆盖已经保留
 的全部证据。
 
-在仓库根目录执行 `pnpm --filter @may/observability test`，检查本地 processor、
+在仓库根目录执行 `pnpm --filter @sortedyuan/observability test`，检查本地 processor、
 指标、诊断与 OpenTelemetry 集成。外部 collector 送达和 provider 用量需要单独
 配置对应服务。

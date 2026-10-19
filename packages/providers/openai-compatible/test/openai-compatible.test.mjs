@@ -7,7 +7,7 @@ import {
   toOpenAICompatibleMessages,
   toOpenAICompatibleTools,
 } from "../dist/index.js";
-import { serializeError } from "@may/core";
+import { serializeError } from "@sortedyuan/core";
 
 async function collect(iterable) {
   const values = [];

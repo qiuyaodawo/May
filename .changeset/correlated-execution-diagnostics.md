@@ -1,12 +1,12 @@
 ---
-"@may/application": minor
-"@may/session": minor
-"@may/coordination": minor
-"@may/scheduler": minor
-"@may/ui-client": minor
-"@may/plugin-agent-adapters": minor
-"@may/plugin-observability": minor
-"@may/plugin-delegation": patch
+"@sortedyuan/application": minor
+"@sortedyuan/session": minor
+"@sortedyuan/coordination": minor
+"@sortedyuan/scheduler": minor
+"@sortedyuan/ui-client": minor
+"@sortedyuan/plugin-agent-adapters": minor
+"@sortedyuan/plugin-observability": minor
+"@sortedyuan/plugin-delegation": patch
 ---
 
 增加经过验证的版本化执行关联信息，连接 scheduler、coordination、Agent adapter、

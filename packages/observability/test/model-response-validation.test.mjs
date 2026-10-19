@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import test from "node:test";
-import { ModelResponseValidationError, createModelAttemptObserver } from "@may/core";
+import { ModelResponseValidationError, createModelAttemptObserver } from "@sortedyuan/core";
 import { BasicTracer, InMemorySpanProcessor } from "../dist/index.js";
 import { OpenAIChatCompletionsModel, OpenAIResponsesModel, RetryingModel, createBuiltinProviderAdapterRegistry, createModelCapabilityResolver } from "../../providers/dist/index.js";
 

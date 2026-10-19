@@ -1,7 +1,7 @@
 ---
-"@may/core": minor
-"@may/providers": minor
-"@may/observability": minor
+"@sortedyuan/core": minor
+"@sortedyuan/providers": minor
+"@sortedyuan/observability": minor
 ---
 
 Add physical model-attempt and first-output telemetry, independently sampled metrics, bounded diagnostics and acceptance records, and official OpenTelemetry/OTLP adapters. Model wrappers can forward attempt observation and safe configuration identity; model-call telemetry shares detailed usage and pricing results with budgets. Bound memory retention, exporter queues, attributes, and lifecycle waits; expose missing data, export failures, and overflow counters.

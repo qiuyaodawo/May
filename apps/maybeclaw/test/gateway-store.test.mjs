@@ -5,7 +5,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { FileSessionStore } from "@may/session/file-store";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 import { ChannelStore, cursorId, inboxId } from "../dist/channel-store.js";
 import { checkLegacy, migrateLegacy } from "../dist/gateway-migration.js";
 import { GatewayStore } from "../dist/gateway-store.js";

@@ -1,6 +1,6 @@
-import { applicationHooks, applicationServices, type AgentApplication } from "@may/application";
-import { GoalController, type GoalAgent, type GoalOptions, type GoalState } from "@may/goal";
-import { definePlugin, defineService } from "@may/plugin";
+import { applicationHooks, applicationServices, type AgentApplication } from "@sortedyuan/application";
+import { GoalController, type GoalAgent, type GoalOptions, type GoalState } from "@sortedyuan/goal";
+import { definePlugin, defineService } from "@sortedyuan/plugin";
 
 export const goalsService = defineService<GoalController>({
   id: "may.goals", version: "1.0.0", scope: "application",

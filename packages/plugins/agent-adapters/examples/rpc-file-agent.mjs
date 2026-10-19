@@ -4,8 +4,8 @@ import { mkdir, readFile, readdir, realpath, rename, stat, unlink, writeFile } f
 import { createServer } from "node:net";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { AsyncStateSerializer } from "@may/application";
-import { validateTelemetryCorrelation } from "@may/core";
+import { AsyncStateSerializer } from "@sortedyuan/application";
+import { validateTelemetryCorrelation } from "@sortedyuan/core";
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node";
 
 const { values } = parseArgs({ options: { directory: { type: "string" }, workspace: { type: "string" }, socket: { type: "string" }, "no-cancel": { type: "boolean" } } });

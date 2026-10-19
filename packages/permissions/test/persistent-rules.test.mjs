@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { FatalToolExecutionError, RunCancelledError } from "@may/core";
+import { FatalToolExecutionError, RunCancelledError } from "@sortedyuan/core";
 import {
   InMemoryPermissionRuleStore,
   PermissionDeniedError,

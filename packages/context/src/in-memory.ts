@@ -1,10 +1,10 @@
-import { jsonEqual } from "@may/core";
+import { jsonEqual } from "@sortedyuan/core";
 import type {
   Context,
   ContextSnapshot,
   Message,
   SnapshotOptions,
-} from "@may/core";
+} from "@sortedyuan/core";
 
 import { SnapshotContextController } from "./controller.js";
 import { PruneOldToolResultsStrategy } from "./prune-old-tool-results.js";

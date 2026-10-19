@@ -1,7 +1,7 @@
 export * from "./application.js";
 export * from "./args.js";
-export * from "@may/session/catalog";
-export * from "@may/coding-tools/change-preview";
+export * from "@sortedyuan/session/catalog";
+export * from "@sortedyuan/coding-tools/change-preview";
 export * from "./configured.js";
 export * from "./controller.js";
 export * from "./errors.js";
@@ -20,19 +20,19 @@ export * from "./delegation.js";
 export * from "./session-picker.js";
 export * from "./fork-picker.js";
 export * from "./summarizer.js";
-export * from "@may/tui/node-terminal";
-export type { TerminalIO as MaybeCodeTerminal } from "@may/tui/node-terminal";
+export * from "@sortedyuan/tui/node-terminal";
+export type { TerminalIO as MaybeCodeTerminal } from "@sortedyuan/tui/node-terminal";
 export * from "./tui.js";
 export * from "./web-ui.js";
 export * from "./ui/prototype-view.js";
 export * from "./ui/actions.js";
 export * from "./ui/retained-tui.js";
-export * from "@may/tui/transcript";
+export * from "@sortedyuan/tui/transcript";
 export * from "./ui/theme.js";
-export * from "@may/tui/tool-renderers";
+export * from "@sortedyuan/tui/tool-renderers";
 export {
   createCodingToolRendererRegistry as createMaybeCodeToolRendererRegistry,
-} from "@may/tui/tool-renderers";
+} from "@sortedyuan/tui/tool-renderers";
 export * from "./workspace.js";
 export * from "./mcp-auth.js";
 export * from "./team.js";

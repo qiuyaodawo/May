@@ -3,7 +3,7 @@ import test from "node:test";
 import { PassThrough } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import { stripVTControlCharacters } from "node:util";
-import { NodeTerminalDriver } from "@may/tui";
+import { NodeTerminalDriver } from "@sortedyuan/tui";
 import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
 
 function open(t, width = 80) {

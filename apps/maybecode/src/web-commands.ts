@@ -1,5 +1,5 @@
-import { commandArgs, UiError, type UiAction, type UiCommand, type UiControls, type UiReceipt } from "@may/ui-client";
-import { GitCheckpointError, GitWorkspaceConflictError } from "@may/application/git-workspace";
+import { commandArgs, UiError, type UiAction, type UiCommand, type UiControls, type UiReceipt } from "@sortedyuan/ui-client";
+import { GitCheckpointError, GitWorkspaceConflictError } from "@sortedyuan/application/git-workspace";
 import { MaybeCodeUsageError } from "./errors.js";
 import type { MaybeCodeController } from "./controller.js";
 import { parsePermissionMode } from "./policy.js";

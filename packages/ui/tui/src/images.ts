@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { ContentPart, MediaSource } from "@may/core";
-import { FileMediaStore, imageAttachment, imagePng, readEmbeddedImage, type SavedImage } from "@may/media";
+import type { ContentPart, MediaSource } from "@sortedyuan/core";
+import { FileMediaStore, imageAttachment, imagePng, readEmbeddedImage, type SavedImage } from "@sortedyuan/media";
 import type { Jimp } from "jimp";
 import { terminalImageProtocol, type ImageProtocol, type TerminalCellSize } from "./image-support.js";
 import type { Component, ImagePlacement, RenderResult, RenderSize } from "./component.js";

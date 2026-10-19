@@ -6,7 +6,7 @@ Use shared resources when a [coordination graph](coordination.md) needs a common
 model allowance, explicit result files or separate task workspaces. The host opens
 and owns each resource; Agent tool access still follows its configured permissions.
 
-The TypeScript fragments below show host composition with `@may/coordination`.
+The TypeScript fragments below show host composition with `@sortedyuan/coordination`.
 They assume a configured provider `Model`, a graph ID and absolute resource
 directories outside task tool roots. Bind the opened resources to your Agent
 definitions before starting the graph, and close them after the runtime has stopped.
@@ -20,7 +20,7 @@ definitions before starting the graph, and close them after the runtime has stop
    `coordinationId` are trusted host inputs:
 
 ```ts
-import { FileSharedBudget } from "@may/coordination";
+import { FileSharedBudget } from "@sortedyuan/coordination";
 
 const budget = await FileSharedBudget.open(budgetDirectory, coordinationId, {
   maxModelCalls: 32,
@@ -129,7 +129,7 @@ contains `worker` and `manager`. Bind `forTask(taskId).tools()` only to the
 corresponding task. Publication and explicit reading are shown here:
 
 ```ts
-import { FileArtifactStore } from "@may/coordination";
+import { FileArtifactStore } from "@sortedyuan/coordination";
 
 const artifacts = await FileArtifactStore.open(artifactDirectory, coordinationId, {
   policyVersion: "review-team-v1",
@@ -172,7 +172,7 @@ The fragment assumes `userCheckout`, `privateTeamDirectory` and an existing
 changes when its execution has stopped:
 
 ```ts
-import { TaskWorkspaceManager } from "@may/coordination";
+import { TaskWorkspaceManager } from "@sortedyuan/coordination";
 
 const workspaces = await TaskWorkspaceManager.open({
   sourceDirectory: userCheckout,

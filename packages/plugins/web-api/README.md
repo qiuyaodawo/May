@@ -1,4 +1,4 @@
-# `@may/plugin-web-api`
+# `@sortedyuan/plugin-web-api`
 
 `createWebApiPlugin({ handler, port?, host?, server?, id? })` 创建 `host` scope 插件。
 `handler` 是宿主提供的 `ServiceToken<WebApiHandler>`，处理

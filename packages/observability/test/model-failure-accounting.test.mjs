@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { HookExecutionError, InMemoryContext, May, ModelResponseValidationError, RUNTIME_HOOKS, runtimeHooks } from "@may/core";
+import { HookExecutionError, InMemoryContext, May, ModelResponseValidationError, RUNTIME_HOOKS, runtimeHooks } from "@sortedyuan/core";
 import { PluginHost } from "../../plugin/dist/index.js";
 import { FileSharedBudget } from "../../coordination/dist/index.js";
 import { RetryingModel, createBuiltinProviderAdapterRegistry, createModelCapabilityResolver } from "../../providers/dist/index.js";

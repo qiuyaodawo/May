@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import { PassThrough } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { NodeTerminalDriver } from "@may/tui";
-import { loadMayConfig } from "@may/config";
+import { NodeTerminalDriver } from "@sortedyuan/tui";
+import { loadMayConfig } from "@sortedyuan/config";
 import { createNodeTerminal, openConfiguredMaybeCode, runRetainedTerminalUI, runTerminalUI } from "../../dist/index.js";
 
 const base = fileURLToPath(new URL("../../../../.zcode/tmp/maybecode-steering-terminal/", import.meta.url));

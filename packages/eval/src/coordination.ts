@@ -1,5 +1,5 @@
-import type { CoordinationRuntime, CoordinationSnapshot } from "@may/coordination";
-import type { Tracer } from "@may/core";
+import type { CoordinationRuntime, CoordinationSnapshot } from "@sortedyuan/coordination";
+import type { Tracer } from "@sortedyuan/core";
 import type { EvalExecutionAdapter, EvalExecutionResult, ExecutionCreateContext } from "./types.js";
 import { type EvalApprovalHandler, errorCode, waitWithSignal } from "./application.js";
 import { EvalTelemetryCollector, evalIdentities, evalMetrics } from "./telemetry.js";

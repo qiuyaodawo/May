@@ -1,4 +1,4 @@
-import { Keymap, mergeKeyBindings, type KeyBindingDefinition, type KeyStroke } from "@may/keybindings";
+import { Keymap, mergeKeyBindings, type KeyBindingDefinition, type KeyStroke } from "@sortedyuan/keybindings";
 import type {
   Component,
   FocusTarget,

@@ -4,8 +4,8 @@ import type {
   Message,
   ModelState,
   ToolDefinition,
-} from "@may/core";
-import { UnsupportedContentError } from "@may/core";
+} from "@sortedyuan/core";
+import { UnsupportedContentError } from "@sortedyuan/core";
 import { AnthropicProtocolError } from "./errors.js";
 import {
   ANTHROPIC_MODEL_STATE_TYPE,

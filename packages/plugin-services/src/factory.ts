@@ -1,4 +1,4 @@
-import type { PluginDefinition, ServiceDependency } from "@may/plugin";
+import type { PluginDefinition, ServiceDependency } from "@sortedyuan/plugin";
 
 export type PluginFactoryMetadata<C = unknown> = Pick<PluginDefinition<C>,
   "config" | "configSchema" | "requires" | "optional" | "requiresHooks" | "state"

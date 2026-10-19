@@ -34,11 +34,11 @@ MaybeCode 展示了一个产品如何组合这些包。
 
 | 从这里开始 | 适用场景 | 需要自行负责 |
 | --- | --- | --- |
-| `@may/core` 的 `May` | 一次性、临时或深度嵌入式执行 | Run 上层的 Context 连续性、持久化、权限与关闭 |
-| `@may/session` 的 `Session` | 需要持久化对话身份，并自行组装生命周期 | 运行时重建、权限事件持久化、发现和 UI 事件转发 |
-| `@may/application` 的 `AgentDefinition` | 多个 Session 要复用同一套行为与策略 | 每次打开时提供存储、身份与元数据 |
-| `@may/application` 的 `AgentApplication` | 独立于 UI 的产品需要一个活动、可恢复 Session | 产品模型、工具、指令、策略、存储和事件处理 |
-| `@may/application` 的 `AgentWorkspace` | 用户需要创建、列出、恢复、重命名或删除 Session | Application 工厂、`SessionCatalog` 和产品配置迁移 |
+| `@sortedyuan/core` 的 `May` | 一次性、临时或深度嵌入式执行 | Run 上层的 Context 连续性、持久化、权限与关闭 |
+| `@sortedyuan/session` 的 `Session` | 需要持久化对话身份，并自行组装生命周期 | 运行时重建、权限事件持久化、发现和 UI 事件转发 |
+| `@sortedyuan/application` 的 `AgentDefinition` | 多个 Session 要复用同一套行为与策略 | 每次打开时提供存储、身份与元数据 |
+| `@sortedyuan/application` 的 `AgentApplication` | 独立于 UI 的产品需要一个活动、可恢复 Session | 产品模型、工具、指令、策略、存储和事件处理 |
+| `@sortedyuan/application` 的 `AgentWorkspace` | 用户需要创建、列出、恢复、重命名或删除 Session | Application 工厂、`SessionCatalog` 和产品配置迁移 |
 
 多数交互产品用 `defineAgent()` 定义行为，再从中打开 Application。一次性或动态组合
 可以直接调用 `AgentApplication.open()`。只需要执行循环时可以直接使用 Core。
@@ -91,18 +91,18 @@ Session。Skills 激活状态来自选定位置。Definition 通过 `forkStateKe
 ```json
 {
   "dependencies": {
-    "@may/application": "workspace:*",
-    "@may/context": "workspace:*",
-    "@may/core": "workspace:*",
-    "@may/session": "workspace:*"
+    "@sortedyuan/application": "workspace:*",
+    "@sortedyuan/context": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/session": "workspace:*"
   }
 }
 ```
 
 ```ts
-import { defineAgent, type AgentDefinition } from "@may/application";
-import { InMemoryContextFactory, PruneOldToolResultsStrategy } from "@may/context";
-import { ToolRegistry, type Model, type Tool } from "@may/core";
+import { defineAgent, type AgentDefinition } from "@sortedyuan/application";
+import { InMemoryContextFactory, PruneOldToolResultsStrategy } from "@sortedyuan/context";
+import { ToolRegistry, type Model, type Tool } from "@sortedyuan/core";
 
 const lookup: Tool<{ key: string }, { value: string | null }> = {
   name: "lookup",
@@ -200,7 +200,7 @@ Core 依赖与 Provider 无关的 `Model`。在产品边界选择一个具体适
 例如，DeepSeek 入口构造模型后调用工厂：
 
 ```ts
-import { DeepSeekModel } from "@may/provider-deepseek";
+import { DeepSeekModel } from "@sortedyuan/provider-deepseek";
 
 const apiKey = process.env.DEEPSEEK_API_KEY;
 const modelName = process.env.DEEPSEEK_MODEL;
@@ -211,7 +211,7 @@ if (!apiKey || !modelName) {
 const model = new DeepSeekModel({ apiKey, model: modelName });
 ```
 
-这还需要 `"@may/provider-deepseek": "workspace:*"`。其他内置 Provider 包见
+这还需要 `"@sortedyuan/provider-deepseek": "workspace:*"`。其他内置 Provider 包见
 [配置参考](../reference/configuration.md)。适配器将输出标准化为 Core 事件，并
 负责 Provider 请求格式、支持的内容、重试和原生续接状态。
 
@@ -220,7 +220,7 @@ const model = new DeepSeekModel({ apiKey, model: modelName });
 指令是产品策略，应描述 Agent 角色、边界、可用工作流程与输出要求，不能嵌入
 凭据。
 
-编码产品可用 `@may/coding-tools/instructions` 安全组合默认系统提示内容与有边界的
+编码产品可用 `@sortedyuan/coding-tools/instructions` 安全组合默认系统提示内容与有边界的
 运行时及工作目录指令文件。通用产品可以自行加载或生成字符串。Session 恢复
 时，应用使用**当前**产品配置提供的指令，历史保存此前的对话事实。
 
@@ -294,7 +294,7 @@ await application.resolveApproval(requestId, "allow");
 
 审批只决定操作是否运行，不限制被允许的进程、网络请求或文件操作能影响什么。执行
 不可信内容时，除权限之外还要在 Tool 或 `ToolExecutor` 边界提供受限执行后端。
-`@may/coding-tools` 的 shell 使用宿主进程权限执行。
+`@sortedyuan/coding-tools` 的 shell 使用宿主进程权限执行。
 
 ### Context 与压缩
 
@@ -319,7 +319,7 @@ Context 提供当前模型可见视图，Session 保存持久化历史。默认 
 按部署边界选择：
 
 - `InMemorySessionStore`：确定性测试、演示或进程本地工作；
-- `@may/session/file-store` 的 `FileSessionStore`：跨重启本地明文 JSONL；
+- `@sortedyuan/session/file-store` 的 `FileSessionStore`：跨重启本地明文 JSONL；
 - 产品实现的 `SessionStore`：数据库、加密、远程存储或更强并发要求。
 
 内置文件存储假定每个 Session 一个活动写入者。没有在产品或后端增加控制时，不能
@@ -338,11 +338,11 @@ Session 授权在运行时提供。持久权限规则使用独立配置的规则
 它并实时发出 `tool.presentation`，Session 有意不把它加入模型可见对话。
 
 产品定义 `kind`、`version` 和数据结构，应验证后解码持久化数据。编码产品可以复用
-`@may/coding-tools/change-preview`。
+`@sortedyuan/coding-tools/change-preview`。
 
 ### Observability 与 Tracing
 
-可以直接提供 Core `Tracer`，也可以使用可选 `@may/observability` 包的
+可以直接提供 Core `Tracer`，也可以使用可选 `@sortedyuan/observability` 包的
 `BasicTracer`。Core 随后会创建不含内容的 Run、模型、Context、工具和权限
 Span，并把 `TraceContext` 传播给模型及工具适配器。自定义属性必须保持有界，
 不能放入提示内容、工具数据、凭据或其他敏感内容。
@@ -389,7 +389,7 @@ try {
 }
 ```
 
-这些渲染和处理函数由产品及 UI 实现。终端产品可以使用 `@may/tui`
+这些渲染和处理函数由产品及 UI 实现。终端产品可以使用 `@sortedyuan/tui`
 Agent 对话视图，图形或远程客户端可以直接消费同一应用事件流。
 
 处理实时事件时：
@@ -410,13 +410,13 @@ Agent 对话视图，图形或远程客户端可以直接消费同一应用事�
 产品一次只处理一个已知 Session 且在其他地方保存标识时，使用 `AgentApplication`。
 需要发现与切换时加入 `AgentWorkspace`。
 
-下列本地组合使用相同应用依赖，以及 `@may/session/catalog` 和
-`@may/session/file-store` 导出路径：
+下列本地组合使用相同应用依赖，以及 `@sortedyuan/session/catalog` 和
+`@sortedyuan/session/file-store` 导出路径：
 
 ```ts
-import { AgentWorkspace } from "@may/application";
-import { FileSessionCatalog } from "@may/session/catalog";
-import { FileSessionStore } from "@may/session/file-store";
+import { AgentWorkspace } from "@sortedyuan/application";
+import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 import { join } from "node:path";
 
 const stateDirectory = join(process.cwd(), ".may");
@@ -521,16 +521,16 @@ UI 对话视图是投影，应从持久化历史重建，再应用实时事件�
 
 ## 相关包文档
 
-- [`@may/core`](../../../packages/core/README.md)：执行循环、Tool/Model 接口、实时事件和
+- [`@sortedyuan/core`](../../../packages/core/README.md)：执行循环、Tool/Model 接口、实时事件和
   执行器与调度器接口
-- [`@may/application`](../../../packages/application/README.md)：独立于 UI 的单 Session 与
+- [`@sortedyuan/application`](../../../packages/application/README.md)：独立于 UI 的单 Session 与
   Workspace 生命周期
-- [`@may/context`](../../../packages/context/README.md)：检查、容量预算与压缩策略
-- [`@may/session`](../../../packages/session/README.md)：持久化历史、恢复、文件存储
+- [`@sortedyuan/context`](../../../packages/context/README.md)：检查、容量预算与压缩策略
+- [`@sortedyuan/session`](../../../packages/session/README.md)：持久化历史、恢复、文件存储
   与 Catalog
-- [`@may/permissions`](../../../packages/permissions/README.md)：独立于 UI 的策略与审批协议
-- [`@may/observability`](../../../packages/observability/README.md)：追踪、采样、
+- [`@sortedyuan/permissions`](../../../packages/permissions/README.md)：独立于 UI 的策略与审批协议
+- [`@sortedyuan/observability`](../../../packages/observability/README.md)：追踪、采样、
   处理器与导出器
-- [`@may/mcp`](../../../packages/mcp/README.md)：stdio / Streamable HTTP MCP 客户端与远程工具适配器
-- [`@may/coding-tools`](../../../packages/tools/coding-tools/README.md)：有界编码能力、
+- [`@sortedyuan/mcp`](../../../packages/mcp/README.md)：stdio / Streamable HTTP MCP 客户端与远程工具适配器
+- [`@sortedyuan/coding-tools`](../../../packages/tools/coding-tools/README.md)：有界编码能力、
   指令、预览与 shell 安全边界

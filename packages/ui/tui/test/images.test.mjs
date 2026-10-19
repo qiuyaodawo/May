@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { FileMediaStore } from "@may/media";
+import { FileMediaStore } from "@sortedyuan/media";
 import { imageSource } from "../../../media/test/fixture.mjs";
 import { TerminalImages, FullscreenRenderer, Stack, ScrollView, Text, TranscriptStore, TranscriptView } from "../dist/index.js";
 

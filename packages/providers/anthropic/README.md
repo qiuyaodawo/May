@@ -1,10 +1,10 @@
-# `@may/provider-anthropic`
+# `@sortedyuan/provider-anthropic`
 
 Anthropic Messages API adapter for May.
 
 ```ts
-import { InMemoryContext, May } from "@may/core";
-import { AnthropicModel } from "@may/provider-anthropic";
+import { InMemoryContext, May } from "@sortedyuan/core";
+import { AnthropicModel } from "@sortedyuan/provider-anthropic";
 
 const model = new AnthropicModel({
   apiKey: process.env.ANTHROPIC_API_KEY!,

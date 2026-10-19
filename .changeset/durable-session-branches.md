@@ -1,6 +1,6 @@
 ---
-"@may/session": minor
-"@may/application": minor
+"@sortedyuan/session": minor
+"@sortedyuan/application": minor
 ---
 
 Add durable Session branches at complete request boundaries, preserving the selected Context, runtime state and explicitly transferable application state. Expose branch history trees and workspace-family lifecycle APIs while creating independent permissions and input queues for each branch.

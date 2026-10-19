@@ -1,5 +1,5 @@
 ---
-"@may/application": patch
+"@sortedyuan/application": patch
 ---
 
 组装的动态提示词发生变化时，使对应 Context 的 provider token 计量失效，后续检查

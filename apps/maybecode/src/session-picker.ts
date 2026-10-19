@@ -1,17 +1,17 @@
-import type { KeyStroke } from "@may/keybindings";
-import { sanitizeTerminalText } from "@may/tui";
+import type { KeyStroke } from "@sortedyuan/keybindings";
+import { sanitizeTerminalText } from "@sortedyuan/tui";
 import {
   ListSelectionModel,
   printableKeyText,
   removeLastCodePoint,
   resolveListInput,
   type ListNavigationAction,
-} from "@may/tui/list-selection";
+} from "@sortedyuan/tui/list-selection";
 
-import type { SessionSummary } from "@may/session/catalog";
+import type { SessionSummary } from "@sortedyuan/session/catalog";
 import type { MaybeCodeController } from "./controller.js";
 import { createMaybeCodeKeymap, type MaybeCodeKeyAction } from "./keymap.js";
-import type { TerminalIO } from "@may/tui/node-terminal";
+import type { TerminalIO } from "@sortedyuan/tui/node-terminal";
 
 type PickerMode = "browse" | "search" | "rename" | "delete";
 

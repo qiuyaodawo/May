@@ -132,7 +132,7 @@ test("HTTP shutdown cancels actual RPC file work while an Agent configuration re
   gateway.options.settings.shutdownMs = 0;
   const actor = { kind: "operator", id: "test" };
   const example = fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url));
-  const agent = { id: "files", adapter: "module", module: "@may/plugin-agent-adapters/rpc",
+  const agent = { id: "files", adapter: "module", module: "@sortedyuan/plugin-agent-adapters/rpc",
     options: { transport: "stdio", command: process.execPath, args: [example, "--directory", join(directory, "state"), "--workspace", directory] } };
   await gateway.updateAgent(agent.id, actor, agent);
   const session = gateway.createSession(actor, "file wait", [agent.id]);

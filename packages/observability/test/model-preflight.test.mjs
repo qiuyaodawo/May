@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import test from "node:test";
-import { InMemoryContext, May } from "@may/core";
+import { InMemoryContext, May } from "@sortedyuan/core";
 import { BasicTracer, InMemorySpanProcessor } from "../dist/index.js";
 import { RetryingModel, createBuiltinProviderAdapterRegistry, createModelCapabilityResolver } from "../../providers/dist/index.js";
 

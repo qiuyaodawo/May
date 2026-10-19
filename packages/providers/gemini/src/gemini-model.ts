@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { assertModelResponseFormat, validateStructuredModelResponse, type AssistantMessage, type Model, type ModelEvent, type ModelRequest, type ModelStreamOptions, type ToolCall } from "@may/core";
-import { parseRetryAfterMs, readSseData } from "@may/provider-openai-compatible/http";
+import { assertModelResponseFormat, validateStructuredModelResponse, type AssistantMessage, type Model, type ModelEvent, type ModelRequest, type ModelStreamOptions, type ToolCall } from "@sortedyuan/core";
+import { parseRetryAfterMs, readSseData } from "@sortedyuan/provider-openai-compatible/http";
 import { convertGeminiUsage, isRecord, toGeminiRequestParts } from "./convert.js";
 import { GeminiApiError, GeminiFinishReasonError, GeminiProtocolError } from "./errors.js";
 import { GEMINI_MODEL_STATE_TYPE, type GeminiGenerateContentRequest, type GeminiPart, type GeminiUsageMetadata } from "./protocol.js";

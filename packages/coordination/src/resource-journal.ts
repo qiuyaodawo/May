@@ -1,8 +1,8 @@
-import { acquireFileLock, releaseFileLock, replaceJournalFile } from "@may/session/file-store";
+import { acquireFileLock, releaseFileLock, replaceJournalFile } from "@sortedyuan/session/file-store";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, type FileHandle } from "node:fs/promises";
 import { dirname } from "node:path";
-import { AsyncStateSerializer } from "@may/application";
+import { AsyncStateSerializer } from "@sortedyuan/application";
 
 interface Revision { readonly format: 1; readonly revision: number }
 

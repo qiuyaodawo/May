@@ -1,6 +1,6 @@
-# `@may/session`
+# `@sortedyuan/session`
 
-`@may/session` composes a configured `@may/core` runtime into a long-lived
+`@sortedyuan/session` composes a configured `@sortedyuan/core` runtime into a long-lived
 conversation identity. It serializes runs and records durable session facts
 without making Core depend on persistence or UI policy.
 
@@ -81,8 +81,8 @@ the existing `input.submitted` identity, keeping retries and restarts deduplicat
 ## Usage
 
 ```ts
-import { InMemoryContext, May } from "@may/core";
-import { InMemorySessionStore, Session } from "@may/session";
+import { InMemoryContext, May } from "@sortedyuan/core";
+import { InMemorySessionStore, Session } from "@sortedyuan/session";
 
 const runtime = new May({ model, tools, context: new InMemoryContext() });
 const store = new InMemorySessionStore();
@@ -101,9 +101,9 @@ const history = await session.history();
 For local persistence, use the Node.js JSONL store:
 
 ```ts
-import { InMemoryContext, May, type Message } from "@may/core";
-import { Session } from "@may/session";
-import { FileSessionStore } from "@may/session/file-store";
+import { InMemoryContext, May, type Message } from "@sortedyuan/core";
+import { Session } from "@sortedyuan/session";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 
 const store = new FileSessionStore(".may/sessions");
 const session = await Session.resume({
@@ -137,7 +137,7 @@ is the separate, lightweight index an application can use to list, resume,
 rename, and remove sessions without replaying every history file:
 
 ```ts
-import { FileSessionCatalog } from "@may/session/catalog";
+import { FileSessionCatalog } from "@sortedyuan/session/catalog";
 
 const catalog = new FileSessionCatalog(".may/catalog.json");
 await catalog.record({
@@ -159,7 +159,7 @@ overwriting each other's updates. Applications with long-lived catalogs should
 plan periodic snapshotting or use a database-backed implementation, because
 the built-in operation directory is not compacted automatically.
 
-When using `@may/permissions`, connect its durable event sink before submitting
+When using `@sortedyuan/permissions`, connect its durable event sink before submitting
 a run:
 
 ```ts

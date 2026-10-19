@@ -1,13 +1,13 @@
 ---
-"@may/core": minor
-"@may/config": minor
-"@may/providers": minor
-"@may/provider-openai": minor
-"@may/provider-openai-compatible": minor
-"@may/provider-anthropic": patch
-"@may/provider-deepseek": patch
-"@may/provider-kimi": patch
-"@may/provider-zhipu": patch
+"@sortedyuan/core": minor
+"@sortedyuan/config": minor
+"@sortedyuan/providers": minor
+"@sortedyuan/provider-openai": minor
+"@sortedyuan/provider-openai-compatible": minor
+"@sortedyuan/provider-anthropic": patch
+"@sortedyuan/provider-deepseek": patch
+"@sortedyuan/provider-kimi": patch
+"@sortedyuan/provider-zhipu": patch
 ---
 
 Add field-level model, adapter and connection capabilities with refreshable bounded discovery, redacted diagnostics and independent verification records. Built-in model composition validates request capabilities, reasoning parameters and declared resource/schema constraints before execution, with an optional policy requiring known support. Optional Model preflight validates requests before physical attempt records and budget reservations begin.

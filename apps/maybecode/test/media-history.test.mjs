@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { imageSource } from "../../../packages/media/test/fixture.mjs";
 import { mediaHistory } from "../dist/media-history.js";
-import { TranscriptStore } from "@may/tui";
+import { TranscriptStore } from "@sortedyuan/tui";
 
 test("原始图片在 assistant 和 Run 历史中保持一致", async () => {
   const source = await imageSource();

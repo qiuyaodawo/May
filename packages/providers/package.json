@@ -1,5 +1,5 @@
 {
-  "name": "@may/providers",
+  "name": "@sortedyuan/providers",
   "version": "0.1.0",
   "description": "Provider selection, registration, and built-in model composition for May.",
   "type": "module",
@@ -19,15 +19,15 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@may/config": "workspace:*",
-    "@may/core": "workspace:*",
-    "@may/provider-anthropic": "workspace:*",
-    "@may/provider-deepseek": "workspace:*",
-    "@may/provider-gemini": "workspace:*",
-    "@may/provider-kimi": "workspace:*",
-    "@may/provider-openai": "workspace:*",
-    "@may/provider-openai-compatible": "workspace:*",
-    "@may/provider-zhipu": "workspace:*"
+    "@sortedyuan/config": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/provider-anthropic": "workspace:*",
+    "@sortedyuan/provider-deepseek": "workspace:*",
+    "@sortedyuan/provider-gemini": "workspace:*",
+    "@sortedyuan/provider-kimi": "workspace:*",
+    "@sortedyuan/provider-openai": "workspace:*",
+    "@sortedyuan/provider-openai-compatible": "workspace:*",
+    "@sortedyuan/provider-zhipu": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

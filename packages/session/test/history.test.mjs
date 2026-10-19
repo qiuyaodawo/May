@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { FileSessionStore } from "@may/session/file-store";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 import {
   InMemorySessionStore,
   SessionHistoryReader,

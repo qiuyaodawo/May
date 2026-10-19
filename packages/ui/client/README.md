@@ -1,4 +1,4 @@
-# @may/ui-client
+# @sortedyuan/ui-client
 
 `createTelemetryPanel(data)` creates a reusable bounded diagnostic panel using
 the public `UiTelemetryData` and `UiTelemetryRecord` DTOs. It shows independent
@@ -32,11 +32,11 @@ UI-neutral developer-preview contracts and a browser-safe client. This package
 does not depend on TUI rendering or a product. The root entry exports JSON DTOs,
 `UiHost`, `UiClient`, `UiError`, and command validation helpers.
 
-- `@may/ui-client/application`: `ApplicationUiHost`, adapting one
+- `@sortedyuan/ui-client/application`: `ApplicationUiHost`, adapting one
   `AgentWorkspaceController` with one current session shared by all connected clients.
-- `@may/ui-client/projection`: bounded runtime/history presentation without
+- `@sortedyuan/ui-client/projection`: bounded runtime/history presentation without
   provider continuation state or terminal components.
-- `@may/ui-client/server`: authenticated loopback server and mountable UI router.
+- `@sortedyuan/ui-client/server`: authenticated loopback server and mountable UI router.
   A custom server **must authenticate and validate origins before calling the router**.
 
 `ApplicationUiHost` accepts `events` and `closeApplication: false` for an
@@ -44,7 +44,7 @@ independent view of a controller owned by a terminal. The owner distributes even
 to each view and closes the application. `startUiServer` can opt into `browserLogin`
 and return `createLoginUrl()` for a 60-second, single-use browser connection ticket.
 The exchange keeps the control token out of URLs and preserves API authentication.
-Custom product servers can import `BrowserLogin` from `@may/ui-client/server`
+Custom product servers can import `BrowserLogin` from `@sortedyuan/ui-client/server`
 and mount `issue()`, `redeem(ticket)`, and `clear()` alongside authenticated
 product routes. Tickets retain the same single-use and expiry rules.
 
@@ -132,7 +132,7 @@ it for entries outside the snapshot's recent-resource window as well. The shared
 Web shell refreshes its loaded resource pages when this value changes and retains
 the current search query and page count.
 
-`@may/ui-client/reading` provides shared host-side pagination, safe field extraction
+`@sortedyuan/ui-client/reading` provides shared host-side pagination, safe field extraction
 and chunk versioning. Pages contain at most 50 records with a soft 256K-character
 budget. Search can inspect full persisted display fields beyond preview truncation;
 provider continuation objects and permission execution contexts are excluded.

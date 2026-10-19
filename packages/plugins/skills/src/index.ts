@@ -1,6 +1,6 @@
-import { SkillSession, type SkillRegistry } from "@may/skills";
-import { definePlugin, type PluginDefinition, type PluginContext } from "@may/plugin";
-import { services, factoryMetadata, type PluginFactoryMetadata } from "@may/plugin-services";
+import { SkillSession, type SkillRegistry } from "@sortedyuan/skills";
+import { definePlugin, type PluginDefinition, type PluginContext } from "@sortedyuan/plugin";
+import { services, factoryMetadata, type PluginFactoryMetadata } from "@sortedyuan/plugin-services";
 
 export interface SkillsPluginOptions<C = unknown> extends Omit<PluginFactoryMetadata<C>, "state"> {
   readonly id?: string;

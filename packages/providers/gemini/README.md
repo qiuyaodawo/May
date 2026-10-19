@@ -1,11 +1,11 @@
-# `@may/provider-gemini`
+# `@sortedyuan/provider-gemini`
 
 Native Google Gemini `streamGenerateContent` adapter for May. The built-in
 adapter ID is `google-gemini`. This package is independently consumable and is
-also re-exported by `@may/providers`.
+also re-exported by `@sortedyuan/providers`.
 
 ```ts
-import { GeminiModel } from "@may/provider-gemini";
+import { GeminiModel } from "@sortedyuan/provider-gemini";
 
 const model = new GeminiModel({
   apiKey: process.env.GEMINI_API_KEY!,
@@ -56,8 +56,8 @@ as included in input; reasoning is included in output. `totalTokenCount` is
 preserved. Unreported detail fields remain absent. Tool-use prompt counts have
 an explicit unknown inclusion relation and make usage partial.
 
-Run focused checks with `pnpm --filter @may/provider-gemini test`. Real service
-checks use `pnpm --filter @may/provider-gemini test:integration`; configure a
+Run focused checks with `pnpm --filter @sortedyuan/provider-gemini test`. Real service
+checks use `pnpm --filter @sortedyuan/provider-gemini test:integration`; configure a
 `google-gemini` profile in `~/.may/config.json` and optionally select it through
 `MAY_GEMINI_MODEL_PROFILE`. They cover signed tool continuation, structured
 output and cancellation without a simulated service.

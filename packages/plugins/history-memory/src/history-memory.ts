@@ -1,11 +1,11 @@
-import type { AgentApplication } from "@may/application";
+import type { AgentApplication } from "@sortedyuan/application";
 import {
   inspectContextSnapshot,
   type ContextBudget, type ContextController, type ContextFactory,
   type ContextCompactionStrategy,
-} from "@may/context";
-import type { Message, Tool, ToolExecutionContext } from "@may/core";
-import type { SessionEvent } from "@may/session";
+} from "@sortedyuan/context";
+import type { Message, Tool, ToolExecutionContext } from "@sortedyuan/core";
+import type { SessionEvent } from "@sortedyuan/session";
 
 const STATE_KEY = "maybecode.context-notes";
 const HANDOFF_PREFIX = "# Saved work state\n\nReference data:\n";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { keyStroke } from "@may/keybindings";
+import { keyStroke } from "@sortedyuan/keybindings";
 import { Editor } from "../../dist/editor.js";
 import { SystemClipboard } from "../../dist/clipboard.js";
 

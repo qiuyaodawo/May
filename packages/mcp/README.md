@@ -1,13 +1,13 @@
-# `@may/mcp`
+# `@sortedyuan/mcp`
 
 Model Context Protocol client adapters for May agents. The client
 connects to local stdio and remote Streamable HTTP servers, snapshots `tools/list`, and exposes every
 remote tool as a normal Core `Tool`.
 
 ```ts
-import { defineAgent } from "@may/application";
-import { ToolRegistry } from "@may/core";
-import { openMcpClientPool } from "@may/mcp";
+import { defineAgent } from "@sortedyuan/application";
+import { ToolRegistry } from "@sortedyuan/core";
+import { openMcpClientPool } from "@sortedyuan/mcp";
 
 const mcp = await openMcpClientPool({
   servers: [{
@@ -147,11 +147,11 @@ on user request. See [long-running tasks](../../docs/en/guides/mcp-tasks.md) for
 restart recovery, reviewed input, persistent budgets and cancellation boundaries.
 
 Optional graphical hosts use `apps: { executor, approve }`, `pool.openApp`,
-`mcpAppSandboxResponse` and `@may/mcp/apps-browser`. See the bilingual
+`mcpAppSandboxResponse` and `@sortedyuan/mcp/apps-browser`. See the bilingual
 [Apps guide](../../docs/en/guides/mcp-apps.md) for the mandatory dedicated-origin
 sandbox and the deliberately restricted API/network policy.
 
-`@may/mcp/server` exports `createMayMcpServer` and a provisioned bearer authenticator.
+`@sortedyuan/mcp/server` exports `createMayMcpServer` and a provisioned bearer authenticator.
 Explicit tool/resource/prompt allowlists, principal/workspace authorization and the
 normal permission executor are required. No auto listener, history export or model
 invocation. See the bilingual [server guide](../../docs/en/guides/mcp-server.md).

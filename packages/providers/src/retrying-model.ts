@@ -9,7 +9,7 @@ import {
   type ModelLimits,
   type ModelRequest,
   type ModelStreamOptions,
-} from "@may/core";
+} from "@sortedyuan/core";
 
 const RETRYABLE_STATUSES = new Set([408, 409, 429]);
 const RETRYABLE_CODES = new Set([
@@ -112,7 +112,7 @@ export class RetryingModel implements Model {
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       let completed = false;
       let emittedContent = false;
-      let usage: import("@may/core").Usage | undefined;
+      let usage: import("@sortedyuan/core").Usage | undefined;
       const telemetry = options.attemptObserver?.start(attempt);
       try {
         for await (const event of this.model.stream(request, {

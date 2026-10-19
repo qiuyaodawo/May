@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { imageSource } from "../../../packages/media/test/fixture.mjs";
-import { readEmbeddedImage } from "@may/media";
+import { readEmbeddedImage } from "@sortedyuan/media";
 import { channelAttachmentContent, readChannelContent, channelTextPages, channelEntry } from "../dist/gateway-host.js";
 import { createMayAdapter } from "../dist/gateway-adapters.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";

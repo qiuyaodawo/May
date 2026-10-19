@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inspectImage } from "@may/media";
+import { inspectImage } from "@sortedyuan/media";
 import { feishuInput, feishuMemberInputs, feishuRecallInput, feishuDeliveryRequest, feishuImageRequest, FeishuAdapter } from "../dist/index.js";
 
 test("Feishu message, recall and membership conversion retain original identities", () => {

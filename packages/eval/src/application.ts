@@ -1,6 +1,6 @@
-import type { AgentApplication, AgentRun } from "@may/application";
-import type { ApprovalDecision, ApprovalRequest } from "@may/permissions";
-import type { RunResult, Tracer, UserMessage } from "@may/core";
+import type { AgentApplication, AgentRun } from "@sortedyuan/application";
+import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/permissions";
+import type { RunResult, Tracer, UserMessage } from "@sortedyuan/core";
 import type { EvalExecutionAdapter, EvalExecutionResult, ExecutionCreateContext, JsonValue } from "./types.js";
 import { assertJson } from "./validation.js";
 import { EvalTelemetryCollector, evalIdentities, evalMetrics } from "./telemetry.js";

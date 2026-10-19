@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../../zh-CN/guides/goals.md)
 
-`@may/goal` provides an external `GoalController`, model tools, context composition,
+`@sortedyuan/goal` provides an external `GoalController`, model tools, context composition,
 usage accounting and a storage interface. Agent packages remain independent of it.
 MaybeCode connects the component to each Session and exposes `/goal` in both
 terminal frontends and the Web UI. Use this guide when one objective may span
@@ -63,15 +63,15 @@ records identify model-reported evidence. SDK hosts can supply an independent
 
 ## Composition
 
-Add `@may/goal`, `@may/application`, and `@may/context` as direct dependencies.
+Add `@sortedyuan/goal`, `@sortedyuan/application`, and `@sortedyuan/context` as direct dependencies.
 This integration snippet assumes the host has initialized a real `model`,
 `sessionStore`, `permissionPolicy`, `codingTools`, and a durable `goalStore`.
 Run it in the application's async entry point:
 
 ```ts
-import { GoalController } from "@may/goal";
-import { AgentApplication } from "@may/application";
-import { InMemoryContextFactory } from "@may/context";
+import { GoalController } from "@sortedyuan/goal";
+import { AgentApplication } from "@sortedyuan/application";
+import { InMemoryContextFactory } from "@sortedyuan/context";
 
 const goals = new GoalController();
 const application = await AgentApplication.open({

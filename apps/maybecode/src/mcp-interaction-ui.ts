@@ -1,5 +1,5 @@
-import { sanitizeTerminalText } from "@may/tui";
-import type { McpInteractionRequest } from "@may/mcp";
+import { sanitizeTerminalText } from "@sortedyuan/tui";
+import type { McpInteractionRequest } from "@sortedyuan/mcp";
 import type { MaybeCodeController } from "./controller.js";
 
 /** Shared ephemeral UI flow: no history, default acceptance, navigation, or model calls. */

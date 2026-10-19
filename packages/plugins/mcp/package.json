@@ -1,5 +1,5 @@
 {
-  "name": "@may/plugin-mcp",
+  "name": "@sortedyuan/plugin-mcp",
   "version": "0.1.0",
   "description": "MCP connection, authentication and tool catalog lifecycle plugin for May agents.",
   "type": "module",
@@ -8,7 +8,7 @@
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist", "!dist/.tsbuildinfo"],
   "scripts": { "build": "tsc -b", "test": "pnpm run build && node --test test/*.test.mjs" },
-  "dependencies": { "@may/application": "workspace:*", "@may/core": "workspace:*", "@may/mcp": "workspace:*", "@may/plugin": "workspace:*", "@may/plugin-services": "workspace:*", "@may/plugin-observability": "workspace:*" },
+  "dependencies": { "@sortedyuan/application": "workspace:*", "@sortedyuan/core": "workspace:*", "@sortedyuan/mcp": "workspace:*", "@sortedyuan/plugin": "workspace:*", "@sortedyuan/plugin-services": "workspace:*", "@sortedyuan/plugin-observability": "workspace:*" },
   "devDependencies": { "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"

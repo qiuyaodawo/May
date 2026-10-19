@@ -4,9 +4,9 @@ import { DELEGATION_COMMAND_USAGE, executeDelegationCommand } from "./delegation
 import type {
   ContextCompactionResult,
   ContextInspection,
-} from "@may/context";
-import type { SessionSummary } from "@may/session/catalog";
-import type { McpServerStatus } from "@may/mcp";
+} from "@sortedyuan/context";
+import type { SessionSummary } from "@sortedyuan/session/catalog";
+import type { McpServerStatus } from "@sortedyuan/mcp";
 import {
   SlashCommandRegistry,
   type SlashCommandDefinition,
@@ -14,7 +14,7 @@ import {
   type SlashCommandParseResult,
   type SlashCommandSuggester,
   type SlashCommandSuggestion,
-} from "@may/tui/slash-commands";
+} from "@sortedyuan/tui/slash-commands";
 import type {
   MaybeCodeCompactionStrategyName,
   MaybeCodeController,
@@ -24,7 +24,7 @@ import type {
 } from "./controller.js";
 import type { MaybeCodeRun } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
-import type { UiForkPoint, UiWorkspaceDiff, UiWorktree } from "@may/ui-client";
+import type { UiForkPoint, UiWorkspaceDiff, UiWorktree } from "@sortedyuan/ui-client";
 import { userInfo } from "node:os";
 
 export type MaybeCodeSlashCommandName =

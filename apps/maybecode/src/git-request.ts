@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { FatalToolExecutionError, RunCancelledError, type ToolExecution } from "@may/core";
-import { GitCheckpointError, type GitCheckpoint, type GitRoundLease, type ProjectGitWorkspace } from "@may/application/git-workspace";
-import type { AgentRun } from "@may/application";
-import type { GoalRun, GoalRunOutcome } from "@may/goal";
-import type { SessionEvent } from "@may/session";
-import { defineService } from "@may/plugin";
+import { FatalToolExecutionError, RunCancelledError, type ToolExecution } from "@sortedyuan/core";
+import { GitCheckpointError, type GitCheckpoint, type GitRoundLease, type ProjectGitWorkspace } from "@sortedyuan/application/git-workspace";
+import type { AgentRun } from "@sortedyuan/application";
+import type { GoalRun, GoalRunOutcome } from "@sortedyuan/goal";
+import type { SessionEvent } from "@sortedyuan/session";
+import { defineService } from "@sortedyuan/plugin";
 
 export const gitRequestService = defineService<GitRequestController>({
   id: "maybecode.git-request", version: "1.0.0", scope: "application",

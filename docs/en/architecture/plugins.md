@@ -95,7 +95,7 @@ take precedence over continuation requests. Resume never replays historical tool
 ## Built-in plugin composition
 
 Shared service tokens and ordered contribution registries belong to
-`@may/plugin-services`. Runtime, Context, Model, permissions, Skills, goals,
+`@sortedyuan/plugin-services`. Runtime, Context, Model, permissions, Skills, goals,
 history-memory, delegation, MCP, observability, delivery, channels, Agent adapters,
 coordination and Web/API are supplied by reusable factories under
 `packages/plugins/`. Product configuration and combinations belong to the
@@ -126,7 +126,7 @@ selection without changing direct callers.
 `packages/plugin/test/` covers composition validation, scopes, Hook ordering,
 cleanup, changes and state migration. Application tests cover integration with
 Session state and runtime replacement. From the repository root, run
-`pnpm --filter @may/plugin test` and `pnpm --filter @may/application test` for
+`pnpm --filter @sortedyuan/plugin test` and `pnpm --filter @sortedyuan/application test` for
 those checks. `pnpm test:package:plugin` installs the packed dependency chain in
 an external consumer and exercises public exports. These checks use local
 resources; external provider integration has separate evidence.

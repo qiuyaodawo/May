@@ -1,4 +1,4 @@
-# `@may/provider-openai-compatible`
+# `@sortedyuan/provider-openai-compatible`
 
 An OpenAI-compatible Chat Completions model adapter and shared protocol helpers.
 
@@ -22,7 +22,7 @@ stay visible, but the stream never emits `response.completed`, and a following
 Provider-specific packages reuse the conversion and streaming helpers while
 retaining their own request extensions and error handling.
 
-The `@may/provider-openai-compatible/http` subpath exports `readSseData` and
+The `@sortedyuan/provider-openai-compatible/http` subpath exports `readSseData` and
 `parseRetryAfterMs`, shared by the Anthropic, OpenAI Responses, and Chat
 Completions adapters. SSE parsing uses `eventsource-parser` and accepts LF,
 CRLF, and CR line endings, including a final event without a blank line at EOF.

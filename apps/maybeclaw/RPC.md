@@ -1,12 +1,12 @@
 # External Agent RPC adapter
 
-MaybeClaw exports `@may/maybeclaw/rpc`. Configure an Agent with `adapter: "module"`, `module: "@may/maybeclaw/rpc"`, and `options` describing a stdio or socket connection. The module exports `createAdapter`.
+MaybeClaw exports `@sortedyuan/maybeclaw/rpc`. Configure an Agent with `adapter: "module"`, `module: "@sortedyuan/maybeclaw/rpc"`, and `options` describing a stdio or socket connection. The module exports `createAdapter`.
 
 ```json
 {
   "id": "external",
   "adapter": "module",
-  "module": "@may/maybeclaw/rpc",
+  "module": "@sortedyuan/maybeclaw/rpc",
   "options": {
     "transport": "stdio",
     "command": "node",

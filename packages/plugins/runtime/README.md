@@ -1,4 +1,4 @@
-# @may/plugin-runtime
+# @sortedyuan/plugin-runtime
 
 `createRuntimePlugin(factory?, id?)` supplies `services.runtimeFactory`. Its default
 factory creates the real Core `May` runtime. Application owns each returned Runtime,
@@ -28,4 +28,4 @@ Factories accept typed `config`, `configSchema`, dependencies, `requiresHooks`,
 validated before setup, and required registries are declared automatically.
 
 Tests use actual file handles, the Core Runtime factory and independent Context
-instances: `pnpm --filter @may/plugin-runtime test`.
+instances: `pnpm --filter @sortedyuan/plugin-runtime test`.

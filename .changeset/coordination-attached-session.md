@@ -1,5 +1,5 @@
 ---
-"@may/coordination": minor
+"@sortedyuan/coordination": minor
 ---
 
 新增宿主已经持有 Session 的任务适配器 `createAttachedApplicationAgent`：

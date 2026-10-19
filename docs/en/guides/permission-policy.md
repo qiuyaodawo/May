@@ -3,7 +3,7 @@
 **English** | [简体中文](../../zh-CN/guides/permission-policy.md)
 
 Use this guide to decide which tools execute immediately, which require
-approval, and which grants survive a restart. Add `@may/permissions` to the
+approval, and which grants survive a restart. Add `@sortedyuan/permissions` to the
 application's direct dependencies and configure tool input validation before
 adding a policy. The application and its event consumer are described in
 [Build an Agent](building-an-agent.md).
@@ -31,7 +31,7 @@ Create a policy module and allow only the operation ranges your product
 supports. This example assumes registered `add` and `send_notification` tools:
 
 ```ts
-import type { PermissionPolicy } from "@may/permissions";
+import type { PermissionPolicy } from "@sortedyuan/permissions";
 
 export const permissionPolicy: PermissionPolicy = ({ tool, input }) => {
   // 允许本产品支持的有限加法操作。
@@ -78,11 +78,11 @@ authenticated `createdBy` identity. A full UI must handle the other event types
 in the same consumer or explicitly distribute them to separate queues:
 
 ```ts
-import type { AgentApplication } from "@may/application";
+import type { AgentApplication } from "@sortedyuan/application";
 import type {
   ApprovalDecision,
   ApprovalRequest,
-} from "@may/permissions";
+} from "@sortedyuan/permissions";
 
 type Choose = (request: ApprovalRequest) => Promise<ApprovalDecision>;
 
@@ -134,8 +134,8 @@ validates project Markdown paths, and trusted host values for `projectDirectory`
 
 ```ts
 import { join } from "node:path";
-import { PermissionToolExecutor } from "@may/permissions";
-import { FilePermissionRuleStore } from "@may/permissions/file-store";
+import { PermissionToolExecutor } from "@sortedyuan/permissions";
+import { FilePermissionRuleStore } from "@sortedyuan/permissions/file-store";
 
 const ruleStore = await FilePermissionRuleStore.open({
   path: join(projectDirectory, ".may", "permission-rules.json"),

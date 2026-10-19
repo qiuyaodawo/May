@@ -11,7 +11,7 @@ import type {
   UserMessage,
   RunBudgetSnapshot,
   RuntimeDescriptor,
-} from "@may/core";
+} from "@sortedyuan/core";
 import type { SessionSteeringInput } from "./steering.js";
 
 export interface SessionRecovery {

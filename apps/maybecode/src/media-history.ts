@@ -1,5 +1,5 @@
-import { openAIResponseContent } from "@may/providers";
-import type { SessionEvent } from "@may/session";
+import { openAIResponseContent } from "@sortedyuan/providers";
+import type { SessionEvent } from "@sortedyuan/session";
 
 export function mediaHistory(events: readonly SessionEvent[]): SessionEvent[] {
   return events.map(event => event.type === "assistant.completed"

@@ -1,5 +1,5 @@
 ---
-"@may/session": minor
+"@sortedyuan/session": minor
 ---
 
 `SessionStore` 新增可选的 `directory` 字段。持久化存储返回自己的目录，内存存储为

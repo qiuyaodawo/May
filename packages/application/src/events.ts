@@ -1,12 +1,12 @@
-import type { ContextInspection } from "@may/context";
+import type { ContextInspection } from "@sortedyuan/context";
 import type {
   MayEvent,
   RunResult,
   SerializedError,
   TraceContext,
-} from "@may/core";
-import type { PermissionEvent } from "@may/permissions";
-import type { SessionToolPresentation } from "@may/session";
+} from "@sortedyuan/core";
+import type { PermissionEvent } from "@sortedyuan/permissions";
+import type { SessionToolPresentation } from "@sortedyuan/session";
 
 /** Events shared by headless May applications, regardless of their UI. */
 export type AgentApplicationEvent =

@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { InMemorySessionStore } from "@may/session";
+import { InMemorySessionStore } from "@sortedyuan/session";
 import { InMemorySessionCatalog, MaybeCodeWorkspace, parseMaybeCodeArgs, startMaybeCodeWebUI } from "../dist/index.js";
 
 test("MaybeCode web entry serves browser-only modules and preserves session guards", async t => {

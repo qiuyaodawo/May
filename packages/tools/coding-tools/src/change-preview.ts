@@ -38,7 +38,7 @@ export type ToolChangePreview =
  *
  * The wire value intentionally retains its original identifier so sessions
  * created by earlier MaybeCode versions remain replayable after this component
- * moved into `@may/coding-tools`.
+ * moved into `@sortedyuan/coding-tools`.
  */
 export const TOOL_CHANGE_PREVIEW_PRESENTATION_KIND = "maybecode.change-preview";
 export const TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION = 1;

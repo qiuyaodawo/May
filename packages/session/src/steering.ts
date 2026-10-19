@@ -1,4 +1,4 @@
-import { userMessage, type UserMessage } from "@may/core";
+import { userMessage, type UserMessage } from "@sortedyuan/core";
 import type { SessionEvent, SessionEventPayload } from "./events.js";
 
 export interface SessionSteerOptions {

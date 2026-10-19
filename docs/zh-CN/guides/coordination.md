@@ -2,7 +2,7 @@
 
 [English](../../en/guides/coordination.md) | **简体中文**
 
-使用 `@may/coordination`，可以让独立的 Agent 应用执行相互关联的任务。
+使用 `@sortedyuan/coordination`，可以让独立的 Agent 应用执行相互关联的任务。
 任务图声明哪些任务可以同时运行，哪些任务需要先取得前面的结果。
 一个协调器负责调度、授权和保存任务图状态，每个任务拥有独立 Session。
 
@@ -13,8 +13,8 @@
 
 ## 创建并运行任务图
 
-1. 在 TypeScript 宿主中提供 `@may/application`、`@may/core`、`@may/coordination`
-   和 `@may/session`。在本仓库开发时，使用仓库声明的 Node.js 和 pnpm 版本。
+1. 在 TypeScript 宿主中提供 `@sortedyuan/application`、`@sortedyuan/core`、`@sortedyuan/coordination`
+   和 `@sortedyuan/session`。在本仓库开发时，使用仓库声明的 Node.js 和 pnpm 版本。
 2. 配置真实 provider 的 `Model` 及其凭据。Application 配置参见
    [构建 Agent](building-an-agent.md)。
 3. 为协作记录和 Session 记录分别选择绝对目录，并提供新的任务图 `id`。
@@ -23,15 +23,15 @@
    检查结果任务已经完成后返回比较文本。
 
 ```ts
-import { defineAgent } from "@may/application";
-import type { Model } from "@may/core";
+import { defineAgent } from "@sortedyuan/application";
+import type { Model } from "@sortedyuan/core";
 import {
   CoordinationRuntime,
   createApplicationAgent,
   parallelTasks,
-} from "@may/coordination";
-import { FileCoordinationStore } from "@may/coordination/file-store";
-import { FileSessionStore } from "@may/session/file-store";
+} from "@sortedyuan/coordination";
+import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 
 export async function compareApproaches(
   model: Model,

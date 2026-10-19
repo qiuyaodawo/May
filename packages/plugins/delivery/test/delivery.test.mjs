@@ -3,7 +3,7 @@ import { appendFile, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { PluginHost, defineService } from "@may/plugin";
+import { PluginHost, defineService } from "@sortedyuan/plugin";
 import { ChannelStore, createDeliveryPlugin, deliveryServices, digest, inboxId, channelTextPages, boundedBytes } from "../dist/index.js";
 
 test("channel journals retain inbox, cursor and uncertain delivery evidence after reopen", async t => {

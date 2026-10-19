@@ -1,6 +1,6 @@
 ---
-"@may/goal": minor
-"@may/application": minor
+"@sortedyuan/goal": minor
+"@sortedyuan/application": minor
 ---
 
 Add independently composed durable goal execution, continuation with optional budgets, model tools,

@@ -4,13 +4,13 @@ import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises"
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { loadMayConfig } from "@may/config";
-import { userMessage } from "@may/core";
-import { definePlugin, defineService } from "@may/plugin";
-import { createModelPlugin } from "@may/plugin-models";
-import { createPermissionPlugin } from "@may/plugin-permissions";
-import { services } from "@may/plugin-services";
-import { createBuiltinProviderModel, selectProviderModel } from "@may/providers";
+import { loadMayConfig } from "@sortedyuan/config";
+import { userMessage } from "@sortedyuan/core";
+import { definePlugin, defineService } from "@sortedyuan/plugin";
+import { createModelPlugin } from "@sortedyuan/plugin-models";
+import { createPermissionPlugin } from "@sortedyuan/plugin-permissions";
+import { services } from "@sortedyuan/plugin-services";
+import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
 import { loadGatewayAdapter } from "../../dist/gateway-adapters.js";
 
 const base = fileURLToPath(new URL("../../../../plugin-verification/maybeclaw-plugin-live/", import.meta.url));

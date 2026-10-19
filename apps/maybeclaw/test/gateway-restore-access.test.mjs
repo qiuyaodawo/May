@@ -6,7 +6,7 @@ import { backup, DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { CoordinationRuntime } from "@may/coordination";
+import { CoordinationRuntime } from "@sortedyuan/coordination";
 import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { actorKey } from "../dist/gateway-types.js";

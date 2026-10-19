@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { InMemoryContext, May } from "@may/core";
+import { InMemoryContext, May } from "@sortedyuan/core";
 import {
   DeepSeekApiError,
   DeepSeekFinishReasonError,

@@ -2,8 +2,8 @@ import type {
   ContextCompactionResult,
   ContextCompactionStrategy,
   ContextInspection,
-} from "@may/context";
-import type { ApprovalDecision, ApprovalResolveOptions, CreatePermissionRuleOptions, PermissionCheck, PersistentPermissionRule } from "@may/permissions";
+} from "@sortedyuan/context";
+import type { ApprovalDecision, ApprovalResolveOptions, CreatePermissionRuleOptions, PermissionCheck, PersistentPermissionRule } from "@sortedyuan/permissions";
 import type {
   SessionEvent,
   SessionContinueOptions,
@@ -15,9 +15,9 @@ import type {
   SessionSteeringInput,
   SessionBranchPosition,
   SessionBranchNode,
-} from "@may/session";
-import type { SessionSummary } from "@may/session/catalog";
-import type { AnyPlugin } from "@may/plugin";
+} from "@sortedyuan/session";
+import type { SessionSummary } from "@sortedyuan/session/catalog";
+import type { AnyPlugin } from "@sortedyuan/plugin";
 import type { PluginUpdateOptions } from "./plugins.js";
 
 import type {

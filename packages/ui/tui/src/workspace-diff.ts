@@ -1,4 +1,4 @@
-import type { KeyStroke } from "@may/keybindings";
+import type { KeyStroke } from "@sortedyuan/keybindings";
 import type { InteractiveComponent, RenderResult, RenderSize } from "./component.js";
 import { renderDiff } from "./agent/tool-renderers.js";
 import { ListSelectionModel, printableKeyText, removeLastCodePoint } from "./list-selection.js";

@@ -1,4 +1,4 @@
-# ADR 0003：共享生命周期属于 `@may/application`
+# ADR 0003：共享生命周期属于 `@sortedyuan/application`
 
 [English](../../../en/architecture/decisions/0003-headless-application-lifecycle.md) | **简体中文**
 

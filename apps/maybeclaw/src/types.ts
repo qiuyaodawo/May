@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { isAbsolute } from "node:path";
-import { resolveRunBudget, type RunBudget } from "@may/core";
+import { resolveRunBudget, type RunBudget } from "@sortedyuan/core";
 
 export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "blocked";
 

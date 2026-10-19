@@ -1,7 +1,7 @@
 import type {
   ToolDefinition,
   ToolExecutionContext,
-} from "@may/core";
+} from "@sortedyuan/core";
 import type { PersistentPermissionRule } from "./rules.js";
 
 export interface ScopedPermissionDecision {

@@ -2,31 +2,31 @@ import {
   AnthropicModel,
   type AnthropicModelOptions,
   type AnthropicThinkingConfig,
-} from "@may/provider-anthropic";
+} from "@sortedyuan/provider-anthropic";
 import {
   DeepSeekModel,
   type DeepSeekModelOptions,
-} from "@may/provider-deepseek";
+} from "@sortedyuan/provider-deepseek";
 import {
   KimiModel,
   type KimiModelOptions,
   type KimiThinkingConfig,
-} from "@may/provider-kimi";
+} from "@sortedyuan/provider-kimi";
 import {
   OpenAIResponsesModel,
   type OpenAIReasoningSummary,
   type OpenAIResponsesModelOptions,
-} from "@may/provider-openai";
+} from "@sortedyuan/provider-openai";
 import {
   OpenAIChatCompletionsModel,
   type OpenAIChatCompletionsModelOptions,
-} from "@may/provider-openai-compatible";
+} from "@sortedyuan/provider-openai-compatible";
 import {
   ZhipuModel,
   type ZhipuModelOptions,
-} from "@may/provider-zhipu";
-import type { Model } from "@may/core";
-import { GeminiModel, type GeminiModelOptions } from "@may/provider-gemini";
+} from "@sortedyuan/provider-zhipu";
+import type { Model } from "@sortedyuan/core";
+import { GeminiModel, type GeminiModelOptions } from "@sortedyuan/provider-gemini";
 
 import { ProviderConfigurationError } from "./errors.js";
 import {

@@ -1,4 +1,4 @@
-# @may/plugin-history-memory
+# @sortedyuan/plugin-history-memory
 
 `budget` 接受 Context 预算，或者接受使用有效 Model 计算预算的 callback。
 callback 在 Model wrappers 应用之后执行，可以使用 provider 插件提供的容量。

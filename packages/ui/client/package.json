@@ -1,5 +1,5 @@
 {
-  "name": "@may/ui-client",
+  "name": "@sortedyuan/ui-client",
   "version": "0.1.0",
   "description": "UI-neutral May client contract, state synchronization and host adapters.",
   "type": "module",
@@ -14,7 +14,7 @@
   },
   "files": ["dist", "!dist/.tsbuildinfo"],
   "scripts": { "build": "tsc -b", "clean": "tsc -b --clean", "test": "pnpm run build && node --test test/*.test.mjs" },
-  "dependencies": { "@may/application": "workspace:*", "@may/core": "workspace:*", "@may/media": "workspace:*", "@may/permissions": "workspace:*", "@may/session": "workspace:*" },
+  "dependencies": { "@sortedyuan/application": "workspace:*", "@sortedyuan/core": "workspace:*", "@sortedyuan/media": "workspace:*", "@sortedyuan/permissions": "workspace:*", "@sortedyuan/session": "workspace:*" },
   "devDependencies": { "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"

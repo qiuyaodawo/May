@@ -1,11 +1,11 @@
-# @may/plugin-mcp
+# @sortedyuan/plugin-mcp
 
 `createMcpPlugin(options)` provides `mcpService`, opens an actual MCP pool during
 setup, registers its dynamic tool catalog, and owns transport cleanup. It accepts
 `OpenMcpClientPoolOptions` plus `dataDirectory`, `enableInteractions`, and an
 optional `open` factory. With a data directory, task journals and OAuth credential
 stores are created when the configured servers require them. Session ownership,
-approval, cancellation, catalog revisions, and reconnect behavior follow `@may/mcp`.
+approval, cancellation, catalog revisions, and reconnect behavior follow `@sortedyuan/mcp`.
 
 `createMcpHostPlugin(options)` provides `mcpHostService` at host scope and optionally
 uses `observabilityHostService`. It keeps connections across application/Session

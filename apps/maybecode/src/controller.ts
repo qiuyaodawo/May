@@ -1,12 +1,12 @@
-import type { AgentWorkspaceController } from "@may/application";
-import type { GoalBudget, GoalState } from "@may/goal";
-import type { ContextCompactionStrategy } from "@may/context";
-import type { McpClientPool, McpServerStatus, McpResourceSubscription, McpInteractionBroker } from "@may/mcp";
+import type { AgentWorkspaceController } from "@sortedyuan/application";
+import type { GoalBudget, GoalState } from "@sortedyuan/goal";
+import type { ContextCompactionStrategy } from "@sortedyuan/context";
+import type { McpClientPool, McpServerStatus, McpResourceSubscription, McpInteractionBroker } from "@sortedyuan/mcp";
 import type { MaybeCodeEvent, MaybeCodeRun, MaybeCodeSessionEvent } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
-import type { SkillDescriptor, SkillDiagnostic, SkillDocument } from "@may/skills";
+import type { SkillDescriptor, SkillDiagnostic, SkillDocument } from "@sortedyuan/skills";
 import type { MaybeCodePermissionMode } from "./policy.js";
-import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@may/ui-client";
+import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@sortedyuan/ui-client";
 
 export interface MaybeCodeSkillInfo extends SkillDescriptor { readonly active: boolean }
 
@@ -79,8 +79,8 @@ export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   MaybeCodeCompactionSelection,
   MaybeCodeRun
 >, "forkSession"> {
-  steer?(options: import("@may/session").SessionSteerOptions): Promise<import("@may/session").SessionSteeringInput>;
-  listSteeringInputs?(): readonly import("@may/session").SessionSteeringInput[];
+  steer?(options: import("@sortedyuan/session").SessionSteerOptions): Promise<import("@sortedyuan/session").SessionSteeringInput>;
+  listSteeringInputs?(): readonly import("@sortedyuan/session").SessionSteeringInput[];
   getForkPoints?(sessionId?: string): Promise<readonly UiForkPoint[]>;
   forkSession?(pointId: string, mode: "current" | "worktree"): Promise<string>;
   getWorkspaceGit?(): Promise<UiWorkspaceGit>;
@@ -144,9 +144,9 @@ export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   submitMcpResource?(serverId: string, uri: string, instruction?: string): Promise<import("./events.js").MaybeCodeRun>;
   submitMcpPrompt?(serverId: string, name: string, args?: Readonly<Record<string, string>>): Promise<import("./events.js").MaybeCodeRun>;
   listModels(): Promise<readonly MaybeCodeModelProfile[]>;
-  getModelCapabilities?(profile?: string, refresh?: boolean): Promise<import("@may/providers").ModelCapabilities>;
+  getModelCapabilities?(profile?: string, refresh?: boolean): Promise<import("@sortedyuan/providers").ModelCapabilities>;
   readonly modelCapabilitiesAvailable?: boolean;
-  getTelemetry?(query?: import("@may/observability").DiagnosticQuery): import("@may/observability").DiagnosticResult | undefined;
+  getTelemetry?(query?: import("@sortedyuan/observability").DiagnosticQuery): import("@sortedyuan/observability").DiagnosticResult | undefined;
   switchModel(profile: string): Promise<MaybeCodeModelInfo>;
   /** Persist the profile used by future launches without switching models. */
   setDefaultModel(profile: string): Promise<void>;

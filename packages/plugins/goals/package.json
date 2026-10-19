@@ -1,5 +1,5 @@
 {
-  "name": "@may/plugin-goals",
+  "name": "@sortedyuan/plugin-goals",
   "version": "0.1.0",
   "description": "Goal lifecycle and durable state plugin for May agents.",
   "type": "module",
@@ -8,7 +8,7 @@
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist", "!dist/.tsbuildinfo"],
   "scripts": { "build": "tsc -b", "test": "pnpm run build && node --test test/*.test.mjs" },
-  "dependencies": { "@may/application": "workspace:*", "@may/core": "workspace:*", "@may/goal": "workspace:*", "@may/plugin": "workspace:*", "@may/plugin-services": "workspace:*" },
+  "dependencies": { "@sortedyuan/application": "workspace:*", "@sortedyuan/core": "workspace:*", "@sortedyuan/goal": "workspace:*", "@sortedyuan/plugin": "workspace:*", "@sortedyuan/plugin-services": "workspace:*" },
   "devDependencies": { "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"

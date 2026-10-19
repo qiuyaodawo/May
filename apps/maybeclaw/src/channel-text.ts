@@ -1,1 +1,1 @@
-export { channelTextPages } from "@may/plugin-delivery";
+export { channelTextPages } from "@sortedyuan/plugin-delivery";

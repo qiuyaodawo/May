@@ -1,15 +1,15 @@
 ---
-"@may/core": minor
-"@may/application": minor
-"@may/plugin-delegation": minor
-"@may/coding-tools": patch
-"@may/session-tools": patch
-"@may/coordination": patch
-"@may/goal": patch
-"@may/skills": patch
-"@may/plugin-history-memory": patch
-"@may/tui": patch
-"@may/web-ui": patch
+"@sortedyuan/core": minor
+"@sortedyuan/application": minor
+"@sortedyuan/plugin-delegation": minor
+"@sortedyuan/coding-tools": patch
+"@sortedyuan/session-tools": patch
+"@sortedyuan/coordination": patch
+"@sortedyuan/goal": patch
+"@sortedyuan/skills": patch
+"@sortedyuan/plugin-history-memory": patch
+"@sortedyuan/tui": patch
+"@sortedyuan/web-ui": patch
 ---
 
 Add trusted Tool.workspaceEffect metadata, an approved-tool execution check, deferred

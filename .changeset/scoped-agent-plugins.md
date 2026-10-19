@@ -1,11 +1,11 @@
 ---
-"@may/plugin": minor
-"@may/core": minor
-"@may/session": minor
-"@may/application": minor
-"@may/context": minor
-"@may/permissions": minor
-"@may/config": minor
+"@sortedyuan/plugin": minor
+"@sortedyuan/core": minor
+"@sortedyuan/session": minor
+"@sortedyuan/application": minor
+"@sortedyuan/context": minor
+"@sortedyuan/permissions": minor
+"@sortedyuan/config": minor
 ---
 
 Add scoped plugin composition with typed versioned services, validated dependencies,

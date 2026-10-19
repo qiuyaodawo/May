@@ -13,8 +13,8 @@ May 使用 Model Context Protocol server 的能力。远程工具需要经过已
 
 ## 决策
 
-可选 `@may/mcp` 依赖 `@may/core`，把远程工具描述与调用适配为 `Tool`。
-Core 与 `@may/application` 的依赖独立于 MCP。
+可选 `@sortedyuan/mcp` 依赖 `@sortedyuan/core`，把远程工具描述与调用适配为 `Tool`。
+Core 与 `@sortedyuan/application` 的依赖独立于 MCP。
 
 应用打开实例级连接池，通过 `ToolRegistry` 组合具有名称空间的工具快照，在产品
 所有权范围内关闭连接池。调用经过选定的 `ToolExecutor` 与 `ToolScheduler`，

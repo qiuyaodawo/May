@@ -24,7 +24,7 @@ how an Agent behaves. It normally includes:
 - application choices such as maximum steps and whether to expose session
   history as a tool.
 
-`@may/application` exports both the `AgentDefinition` class and the
+`@sortedyuan/application` exports both the `AgentDefinition` class and the
 `defineAgent()` convenience function. A definition deliberately excludes the
 Session-bound `store`, `sessionId`, `resume`, `fork`, `metadata`, and
 `contextMetadata` options. Supply those when opening an application:
@@ -34,7 +34,7 @@ The following composition snippet assumes the host has initialized `model`,
 application procedure, see [Build an Agent](../guides/building-an-agent.md).
 
 ```ts
-import { defineAgent } from "@may/application";
+import { defineAgent } from "@sortedyuan/application";
 
 const agent = defineAgent({
   model,
@@ -72,7 +72,7 @@ caller-owned and is intentionally shared when captured by one definition. The
 caller must provide any concurrency safety or per-open factory behavior those
 collaborators require.
 
-The definition/application distinction matters during resume: `@may/session` restores durable
+The definition/application distinction matters during resume: `@sortedyuan/session` restores durable
 conversation facts, but it does not recreate the model, tools, prompt, or
 permission policy. Calling `definition.open()` supplies those parts again.
 Session metadata can identify or validate product configuration, but May does
@@ -273,7 +273,7 @@ lifecycle.
 
 ## Current limits
 
-`@may/application` is a developer-preview API. It currently does not provide
+`@sortedyuan/application` is a developer-preview API. It currently does not provide
 an Agent-definition discovery/persistence registry, multiple simultaneously
 active Sessions in one workspace object, multi-Agent delegation, distributed
 locking, or transactional coordination between history and Catalog storage.

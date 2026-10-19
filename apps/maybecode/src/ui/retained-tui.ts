@@ -7,11 +7,11 @@ import {
   type Clipboard,
   type RuntimeRenderer,
   type RuntimeTerminal,
-} from "@may/tui";
-import { TranscriptStore } from "@may/tui/transcript";
-import type { ApprovalRequest } from "@may/permissions";
+} from "@sortedyuan/tui";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import type { ApprovalRequest } from "@sortedyuan/permissions";
 import { userInfo } from "node:os";
-import type { SessionSummary } from "@may/session/catalog";
+import type { SessionSummary } from "@sortedyuan/session/catalog";
 import type {
   MaybeCodeController,
   MaybeCodeModelProfile,

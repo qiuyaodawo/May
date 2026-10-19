@@ -1,5 +1,5 @@
-import type { ContentPart, Message, Usage } from "@may/core";
-import { UnsupportedContentError } from "@may/core";
+import type { ContentPart, Message, Usage } from "@sortedyuan/core";
+import { UnsupportedContentError } from "@sortedyuan/core";
 import { GeminiProtocolError } from "./errors.js";
 import { GEMINI_MODEL_STATE_TYPE, type GeminiContent, type GeminiGenerateContentRequest, type GeminiModelStateData, type GeminiPart, type GeminiUsageMetadata } from "./protocol.js";
 

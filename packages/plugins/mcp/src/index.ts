@@ -1,12 +1,12 @@
 import { join } from "node:path";
-import { definePlugin, defineService } from "@may/plugin";
-import { services } from "@may/plugin-services";
-import { observabilityHostService } from "@may/plugin-observability";
+import { definePlugin, defineService } from "@sortedyuan/plugin";
+import { services } from "@sortedyuan/plugin-services";
+import { observabilityHostService } from "@sortedyuan/plugin-observability";
 import {
   openMcpClientPool, KeyringMcpCredentialStore, McpOAuthManager,
   McpTaskJournal, McpInteractionBroker,
   type McpClientPool, type OpenMcpClientPoolOptions,
-} from "@may/mcp";
+} from "@sortedyuan/mcp";
 
 export const mcpService = defineService<McpClientPool>({ id: "may.mcp", version: "1.0.0", scope: "application" });
 export const mcpHostService = defineService<McpClientPool>({ id: "may.workspace-mcp", version: "1.0.0", scope: "host" });

@@ -4,7 +4,7 @@ import { EventEmitter } from "node:events";
 import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
-import { defineHook } from "@may/core";
+import { defineHook } from "@sortedyuan/core";
 import { definePlugin, defineService, PluginHost } from "../dist/index.js";
 
 const testRoot = fileURLToPath(new URL("../.test-output/", import.meta.url));

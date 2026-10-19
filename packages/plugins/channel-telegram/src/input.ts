@@ -1,4 +1,4 @@
-import type { ChannelAttachment, ChannelInput } from "@may/plugin-delivery";
+import type { ChannelAttachment, ChannelInput } from "@sortedyuan/plugin-delivery";
 
 interface TelegramFile { file_id: string; file_unique_id?: string; file_size?: number; file_name?: string; mime_type?: string }
 interface TelegramEntity { type: string; offset: number; length: number; user?: { id?: number } }

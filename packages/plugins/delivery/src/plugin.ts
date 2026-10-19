@@ -1,4 +1,4 @@
-import { definePlugin, defineService, type Disposer, type PluginDefinition, type ServiceToken } from "@may/plugin";
+import { definePlugin, defineService, type Disposer, type PluginDefinition, type ServiceToken } from "@sortedyuan/plugin";
 import type { ChannelAdapter, ChannelIngress, ChannelRegistry, DeliveryService } from "./types.js";
 import { validateChannelInput } from "./store.js";
 

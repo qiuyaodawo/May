@@ -1,6 +1,6 @@
-# @may/plugin-services
+# @sortedyuan/plugin-services
 
-为 `@may/application` 和组件插件提供带类型的服务标识以及有序组合注册表。
+为 `@sortedyuan/application` 和组件插件提供带类型的服务标识以及有序组合注册表。
 `services` 中的全部服务使用 application 作用域和 `1.0.0` 版本，每种服务具有一个提供方。
 `applicationServices` 导出相同的服务标识，并增加实际 Application 的访问服务。
 
@@ -46,4 +46,4 @@ setup 之前验证配置，`create(context)` 中保留配置类型。
 相同服务的明确声明可以指定版本范围和能力要求。Skills 工厂管理激活状态的格式。
 
 测试使用真实文件资源和独立的 InMemory Context 实例。
-执行 `pnpm --filter @may/plugin-services test`。
+执行 `pnpm --filter @sortedyuan/plugin-services test`。

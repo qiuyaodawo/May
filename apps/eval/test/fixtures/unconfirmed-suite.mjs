@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { createCommandExecutionAdapter } from "@may/eval";
+import { createCommandExecutionAdapter } from "@sortedyuan/eval";
 import { registry, experiment as original } from "../../examples/suite.mjs";
 
 registry.registerExecution(createCommandExecutionAdapter({

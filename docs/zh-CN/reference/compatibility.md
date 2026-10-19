@@ -7,6 +7,9 @@ May 当前处于开发预览阶段。公共 API、协议表示和存储格式在
 
 ## 支持的运行环境
 
+包名使用 `@sortedyuan` scope。依赖、导入与配置迁移见
+[发布指南](../guides/npm-release.md#包名迁移)。
+
 发布的框架包要求 Node.js 22 或更高版本。MaybeClaw 要求 Node.js 22.13 或更高版本。
 仓库开发要求 Node.js 22.16.0 或更高版本，离线测试使用该版本提供的 `node:sqlite`
 backup API。仓库在 `package.json` 声明 pnpm 12.4.2，在 `.node-version` 推荐 Node.js 24。
@@ -21,8 +24,8 @@ Linux 与 Windows。选择部署环境时，查看工作流与目标包的 `engi
 导入类型时使用 type-only import：
 
 ```ts
-import { AgentApplication, type AgentApplicationEvent } from "@may/application";
-import type { ContextFactory } from "@may/context";
+import { AgentApplication, type AgentApplicationEvent } from "@sortedyuan/application";
+import type { ContextFactory } from "@sortedyuan/context";
 ```
 
 [包目录](packages.md)列出包职责与公共入口。提供弃用别名的 API 会单独记录说明；
@@ -100,7 +103,7 @@ Provider HTTP API 与模型能力独立变化。能力覆盖与处理策略见
 
 ## 协作与团队
 
-`@may/coordination` API、版本 1 快照日志、可选资源日志和远程 Worker 协议属于
+`@sortedyuan/coordination` API、版本 1 快照日志、可选资源日志和远程 Worker 协议属于
 预览格式。单个持久化 coordinator 拥有调度权，包括远程叶子任务。本地预算预留与
 计账适用于该 coordinator。恢复时需要明确处理已保存的策略和限制变化。
 
@@ -117,7 +120,7 @@ MaybeCode 团队使用本地 Agent，默认执行只读工作。版本 2 提供�
 
 ## MCP
 
-`@may/mcp` 连接池选项、错误、名称空间、输出表示、状态、生命周期事件与 span 名称
+`@sortedyuan/mcp` 连接池选项、错误、名称空间、输出表示、状态、生命周期事件与 span 名称
 属于预览 API。工具客户端支持 stdio、Streamable HTTP、明确的刷新与重新连接，以及
 每次 Run 的目录。宿主选择的资源、模板和 prompt 作为用户内容进入对话。
 
@@ -127,14 +130,14 @@ MaybeCode 团队使用本地 Agent，默认执行只读工作。版本 2 提供�
 
 交互 broker 管理现代协议的表单与 URL elicitation，提供所有者范围、等待限制、
 答案校验及继续执行前的身份检查。旧协议交互操作使用明确隔离的连接。
-Roots/Sampling、Tasks、Apps Host 和独立 `@may/mcp/server` 导出需要分别启用并
+Roots/Sampling、Tasks、Apps Host 和独立 `@sortedyuan/mcp/server` 导出需要分别启用并
 配置服务。支持的协议与宿主职责见 [MCP](../guides/mcp.md)、
 [长时间任务](../guides/mcp-tasks.md)、[Apps](../guides/mcp-apps.md)及
 [编写 server](../guides/mcp-server.md)。
 
 ## Tracing
 
-Core tracing 类型与 `@may/observability` 的 processor、exporter、采样、完成 span
+Core tracing 类型与 `@sortedyuan/observability` 的 processor、exporter、采样、完成 span
 结构、名称和属性属于预览 API。Trace 可能被采样或丢弃，包括 exporter 保存 span
 的情况。权限、计费和审计决定应使用 Session 记录与应用自行维护的记录。
 

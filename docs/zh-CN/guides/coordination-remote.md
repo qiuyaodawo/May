@@ -2,13 +2,13 @@
 
 [English](../../en/guides/coordination-remote.md) | **简体中文**
 
-使用 `@may/coordination/remote`，可以在独立 Node.js 进程或主机中执行叶子任务。
+使用 `@sortedyuan/coordination/remote`，可以在独立 Node.js 进程或主机中执行叶子任务。
 协调器负责管理任务图、授权、依赖、执行尝试和任务移交；Worker 管理自己的
 Agent 注册表、Session 和持久化派发日志。
 
 本指南要求已有使用持久 Session 存储的[协作 Agent](coordination.md)。
 Worker 宿主需要自己的 provider 凭据、允许的输入和工具。两个宿主均需安装或
-链接 `@may/coordination`，跨主机连接需要配置 HTTPS。
+链接 `@sortedyuan/coordination`，跨主机连接需要配置 HTTPS。
 
 ## 嵌入 Worker
 
@@ -21,7 +21,7 @@ Worker 宿主需要自己的 provider 凭据、允许的输入和工具。两个
 
 ```ts
 import { createServer } from "node:http";
-import { CoordinationWorker } from "@may/coordination/remote";
+import { CoordinationWorker } from "@sortedyuan/coordination/remote";
 
 const token = process.env.MAY_WORKER_TOKEN;
 if (!token) throw new Error("MAY_WORKER_TOKEN is required");
@@ -58,9 +58,9 @@ Worker 授权独立于协调器策略，在接收与执行前分别检查。注�
 新任务图使用新的 ID，已有任务图调用 `resume()`。
 
 ```ts
-import { CoordinationRuntime } from "@may/coordination";
-import { FileCoordinationStore } from "@may/coordination/file-store";
-import { createRemoteAgent } from "@may/coordination/remote";
+import { CoordinationRuntime } from "@sortedyuan/coordination";
+import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
+import { createRemoteAgent } from "@sortedyuan/coordination/remote";
 
 const token = process.env.MAY_WORKER_TOKEN;
 if (!token) throw new Error("MAY_WORKER_TOKEN is required");

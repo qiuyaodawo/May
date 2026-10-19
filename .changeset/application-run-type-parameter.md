@@ -1,5 +1,5 @@
 ---
-"@may/application": minor
+"@sortedyuan/application": minor
 ---
 
 `AgentController` 与 `AgentWorkspaceController` 新增可选的 `Run` 类型参数，

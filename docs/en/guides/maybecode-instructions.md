@@ -74,7 +74,7 @@ symbolic links, reparse points, or hard links stop loading. Ancestor rule
 discovery does not change the workspace used by coding tools or their
 permission policy.
 
-Library hosts using `@may/coding-tools/instructions` can configure
+Library hosts using `@sortedyuan/coding-tools/instructions` can configure
 `projectRootMarkers` (default `[".git"]`), `projectInstructionsFilename`
 (default `AGENTS.md`), and `projectInstructionsFallbackFilenames` (default
 `[]`). `projectRootMarkers: []` searches only the workspace.

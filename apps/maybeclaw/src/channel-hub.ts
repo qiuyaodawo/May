@@ -2,8 +2,8 @@ import { ChannelStore, inboxId, type ChannelInput, type DeliveryRecord, type Inb
 import type { ChannelAdapter } from "./channels.js";
 import type { MaybeClaw } from "./service.js";
 import { digest, isTerminal, taskId, type TaskSnapshot } from "./types.js";
-import { imageAttachment, readEmbeddedImage, type MediaReader } from "@may/media";
-import { UiProjection } from "@may/ui-client/projection";
+import { imageAttachment, readEmbeddedImage, type MediaReader } from "@sortedyuan/media";
+import { UiProjection } from "@sortedyuan/ui-client/projection";
 
 export type SubmitTask = (prompt: string, requestId: string) => Promise<{ task: TaskSnapshot; created: boolean }>;
 const HELP = "MaybeClaw：发送文本创建独立任务（无跨消息记忆）。\n/status <完整任务 ID>\n/result <完整任务 ID>\n/cancel <完整任务 ID>\n仅能操作由你在当前私聊创建的任务。";

@@ -1,4 +1,4 @@
-# `@may/observability`
+# `@sortedyuan/observability`
 
 Fail-open tracing processors and exporters for May agents.
 
@@ -6,13 +6,13 @@ Core owns the small `Tracer`/`TraceSpan` port. This package depends on Core to
 implement that port without making telemetry a required Core dependency.
 
 ```ts
-import { defineAgent } from "@may/application";
+import { defineAgent } from "@sortedyuan/application";
 import {
   BasicTracer,
   BatchSpanProcessor,
   ConsoleSpanExporter,
   ratioSampler,
-} from "@may/observability";
+} from "@sortedyuan/observability";
 
 const processor = new BatchSpanProcessor(
   new ConsoleSpanExporter(),
@@ -56,7 +56,7 @@ provided. `BasicTracer` accepts a `MetricRecorder` and `SpanObserver` that recei
 every operation independently of trace sampling.
 
 ```ts
-import { BoundedMetrics, DiagnosticsStore } from "@may/observability";
+import { BoundedMetrics, DiagnosticsStore } from "@sortedyuan/observability";
 
 const metrics = new BoundedMetrics();
 const diagnostics = new DiagnosticsStore();

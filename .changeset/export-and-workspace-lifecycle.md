@@ -1,6 +1,6 @@
 ---
-"@may/observability": patch
-"@may/coordination": patch
+"@sortedyuan/observability": patch
+"@sortedyuan/coordination": patch
 ---
 
 `BatchSpanProcessor` 在 exporter 同步抛出错误后能够完成 `forceFlush()` 和 `shutdown()`，

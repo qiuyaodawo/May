@@ -40,11 +40,11 @@ MaybeCode is a reference composition, not a required superclass or runtime.
 
 | Start with | Use it when | You must own |
 | --- | --- | --- |
-| `May` from `@may/core` | One-shot, ephemeral, or deeply embedded execution | Context continuity, persistence, permissions, and shutdown above the run |
-| `Session` from `@may/session` | You need a durable conversation identity but want to assemble lifecycle pieces manually | Runtime reconstruction, permission event persistence, discovery, and UI relays |
-| `AgentDefinition` from `@may/application` | Reusable behavior should open one or more independent resumable Sessions | Collaborator lifecycle/concurrency, Session storage, metadata, and event handling |
-| `AgentApplication` from `@may/application` | A headless product needs one active resumable Session without a reusable definition | Product model, tools, instructions, policies, storage, and event handling |
-| `AgentWorkspace` from `@may/application` | A product lets users create, list, resume, rename, or delete Sessions | An application factory, a `SessionCatalog`, and product-specific configuration transitions |
+| `May` from `@sortedyuan/core` | One-shot, ephemeral, or deeply embedded execution | Context continuity, persistence, permissions, and shutdown above the run |
+| `Session` from `@sortedyuan/session` | You need a durable conversation identity but want to assemble lifecycle pieces manually | Runtime reconstruction, permission event persistence, discovery, and UI relays |
+| `AgentDefinition` from `@sortedyuan/application` | Reusable behavior should open one or more independent resumable Sessions | Collaborator lifecycle/concurrency, Session storage, metadata, and event handling |
+| `AgentApplication` from `@sortedyuan/application` | A headless product needs one active resumable Session without a reusable definition | Product model, tools, instructions, policies, storage, and event handling |
+| `AgentWorkspace` from `@sortedyuan/application` | A product lets users create, list, resume, rename, or delete Sessions | An application factory, a `SessionCatalog`, and product-specific configuration transitions |
 
 Most interactive products should define behavior with `defineAgent()` and open
 applications from it. Call `AgentApplication.open()` directly when there is no
@@ -103,18 +103,18 @@ Required workspace dependencies for this file are:
 ```json
 {
   "dependencies": {
-    "@may/application": "workspace:*",
-    "@may/context": "workspace:*",
-    "@may/core": "workspace:*",
-    "@may/session": "workspace:*"
+    "@sortedyuan/application": "workspace:*",
+    "@sortedyuan/context": "workspace:*",
+    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/session": "workspace:*"
   }
 }
 ```
 
 ```ts
-import { defineAgent, type AgentDefinition } from "@may/application";
-import { InMemoryContextFactory, PruneOldToolResultsStrategy } from "@may/context";
-import { ToolRegistry, type Model, type Tool } from "@may/core";
+import { defineAgent, type AgentDefinition } from "@sortedyuan/application";
+import { InMemoryContextFactory, PruneOldToolResultsStrategy } from "@sortedyuan/context";
+import { ToolRegistry, type Model, type Tool } from "@sortedyuan/core";
 
 const lookup: Tool<{ key: string }, { value: string | null }> = {
   name: "lookup",
@@ -215,7 +215,7 @@ For example, a DeepSeek entry point can construct the model before calling the
 factory:
 
 ```ts
-import { DeepSeekModel } from "@may/provider-deepseek";
+import { DeepSeekModel } from "@sortedyuan/provider-deepseek";
 
 const apiKey = process.env.DEEPSEEK_API_KEY;
 const modelName = process.env.DEEPSEEK_MODEL;
@@ -227,7 +227,7 @@ const model = new DeepSeekModel({ apiKey, model: modelName });
 ```
 
 This snippet additionally requires
-`"@may/provider-deepseek": "workspace:*"`. Other built-in provider packages
+`"@sortedyuan/provider-deepseek": "workspace:*"`. Other built-in provider packages
 are listed in the [configuration reference](../reference/configuration.md). Provider
 adapters normalize output into Core events but retain responsibility for
 provider request formats, supported content, retries, and native continuation
@@ -239,7 +239,7 @@ Instructions are product policy. They should describe the Agent's role,
 boundaries, available workflow, and required output behavior without embedding
 secrets.
 
-For a coding product, `@may/coding-tools/instructions` can safely compose a
+For a coding product, `@sortedyuan/coding-tools/instructions` can safely compose a
 default system prompt with bounded runtime and workspace instruction files.
 Generic products can load or generate their own string. On Session resume,
 the application uses the instructions supplied by the **current** product
@@ -321,7 +321,7 @@ Approval determines whether an operation may run. It does not constrain what
 an allowed process, network request, or filesystem operation can affect. For
 untrusted execution, supply a restricted execution backend at the tool or
 `ToolExecutor` boundary in addition to permissions. In particular,
-`@may/coding-tools` documents that its shell tool is not a sandbox.
+`@sortedyuan/coding-tools` documents that its shell tool is not a sandbox.
 
 ### Context and compaction
 
@@ -351,7 +351,7 @@ that compaction removed from the model view, enable the bounded
 Select storage by deployment boundary:
 
 - `InMemorySessionStore`: deterministic tests, demos, or process-local work;
-- `FileSessionStore` from `@may/session/file-store`: local plaintext JSONL
+- `FileSessionStore` from `@sortedyuan/session/file-store`: local plaintext JSONL
   across restarts;
 - a product implementation of `SessionStore`: databases, encryption, remote
   storage, or stronger concurrency requirements.
@@ -376,12 +376,12 @@ model-visible conversation.
 
 The product owns the `kind`, `version`, and data schema. Decode persisted data
 defensively. Coding products can reuse change-preview helpers from
-`@may/coding-tools/change-preview` rather than inventing another format.
+`@sortedyuan/coding-tools/change-preview`.
 
 ### Observability and tracing
 
 Supply a Core `Tracer` directly or use `BasicTracer` from the optional
-`@may/observability` package. Core then creates content-free Run, model,
+`@sortedyuan/observability` package. Core then creates content-free Run, model,
 Context, tool, and permission spans and propagates `TraceContext` to model and
 tool adapters. Keep custom attributes bounded and free of prompts, tool data,
 credentials, or other sensitive content.
@@ -430,7 +430,7 @@ try {
 
 `renderRunEvent`, `handlePermissionEvent`, and the other functions above are
 intentionally product/UI functions; May does not prescribe them. A terminal
-product can use the Agent transcript from `@may/tui`, while a graphical or
+product can use the Agent transcript from `@sortedyuan/tui`, while a graphical or
 remote client can consume the same headless stream directly.
 
 Treat the stream as live observation:
@@ -456,13 +456,13 @@ stores its id elsewhere. Add `AgentWorkspace` when the product needs discovery
 and switching.
 
 The following local composition requires the same application dependencies as
-the factory above and uses the `@may/session/catalog` and
-`@may/session/file-store` export paths:
+the factory above and uses the `@sortedyuan/session/catalog` and
+`@sortedyuan/session/file-store` export paths:
 
 ```ts
-import { AgentWorkspace } from "@may/application";
-import { FileSessionCatalog } from "@may/session/catalog";
-import { FileSessionStore } from "@may/session/file-store";
+import { AgentWorkspace } from "@sortedyuan/application";
+import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 import { join } from "node:path";
 
 const stateDirectory = join(process.cwd(), ".may");
@@ -585,19 +585,19 @@ for the following:
 
 ## Related package documentation
 
-- [`@may/core`](../../../packages/core/README.md): execution loop, Tool and Model
+- [`@sortedyuan/core`](../../../packages/core/README.md): execution loop, Tool and Model
   contracts, live events, and executor/scheduler seams
-- [`@may/application`](../../../packages/application/README.md): headless
+- [`@sortedyuan/application`](../../../packages/application/README.md): headless
   single-Session and workspace lifecycle
-- [`@may/context`](../../../packages/context/README.md): inspection, budgets, and
+- [`@sortedyuan/context`](../../../packages/context/README.md): inspection, budgets, and
   compaction strategies
-- [`@may/session`](../../../packages/session/README.md): durable history, resume,
+- [`@sortedyuan/session`](../../../packages/session/README.md): durable history, resume,
   local file store, and catalogs
-- [`@may/permissions`](../../../packages/permissions/README.md): headless policy
+- [`@sortedyuan/permissions`](../../../packages/permissions/README.md): headless policy
   and approval protocol
-- [`@may/observability`](../../../packages/observability/README.md): fail-open
+- [`@sortedyuan/observability`](../../../packages/observability/README.md): fail-open
   tracing, sampling, processors, and exporters
-- [`@may/mcp`](../../../packages/mcp/README.md): stdio / Streamable HTTP MCP clients and remote
+- [`@sortedyuan/mcp`](../../../packages/mcp/README.md): stdio / Streamable HTTP MCP clients and remote
   tool adapters
-- [`@may/coding-tools`](../../../packages/tools/coding-tools/README.md): bounded
+- [`@sortedyuan/coding-tools`](../../../packages/tools/coding-tools/README.md): bounded
   coding capabilities, instructions, previews, and shell safety boundary

@@ -2,14 +2,14 @@
 
 **English** | [简体中文](../../zh-CN/guides/coordination-remote.md)
 
-Use `@may/coordination/remote` to execute leaf tasks in a separate Node.js
+Use `@sortedyuan/coordination/remote` to execute leaf tasks in a separate Node.js
 process or host. The coordinator owns the graph, authorization, dependencies,
 attempts and handoffs. Each worker owns its registered agents, Sessions and
 durable dispatch journal.
 
 This guide assumes a [configured coordination Agent](coordination.md) with
 durable Session storage. The worker host needs its own provider credentials,
-allowed inputs and tools. Install or link `@may/coordination` in both hosts,
+allowed inputs and tools. Install or link `@sortedyuan/coordination` in both hosts,
 and arrange HTTPS for connections between machines.
 
 ## Embed a worker
@@ -25,7 +25,7 @@ and arrange HTTPS for connections between machines.
 
 ```ts
 import { createServer } from "node:http";
-import { CoordinationWorker } from "@may/coordination/remote";
+import { CoordinationWorker } from "@sortedyuan/coordination/remote";
 
 const token = process.env.MAY_WORKER_TOKEN;
 if (!token) throw new Error("MAY_WORKER_TOKEN is required");
@@ -67,9 +67,9 @@ name and its exact `version`. The snippet assumes the worker uses version
 ID, or call `resume()` for an existing graph.
 
 ```ts
-import { CoordinationRuntime } from "@may/coordination";
-import { FileCoordinationStore } from "@may/coordination/file-store";
-import { createRemoteAgent } from "@may/coordination/remote";
+import { CoordinationRuntime } from "@sortedyuan/coordination";
+import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
+import { createRemoteAgent } from "@sortedyuan/coordination/remote";
 
 const token = process.env.MAY_WORKER_TOKEN;
 if (!token) throw new Error("MAY_WORKER_TOKEN is required");

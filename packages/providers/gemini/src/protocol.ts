@@ -1,4 +1,4 @@
-import type { JsonSchema } from "@may/core";
+import type { JsonSchema } from "@sortedyuan/core";
 
 export const GEMINI_MODEL_STATE_TYPE = "google-gemini.content.v1";
 

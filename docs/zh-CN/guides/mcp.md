@@ -2,7 +2,7 @@
 
 [English](../../en/guides/mcp.md) | **简体中文**
 
-本文用于在 MaybeCode 或使用 `@may/mcp` 的应用中配置 Model Context Protocol
+本文用于在 MaybeCode 或使用 `@sortedyuan/mcp` 的应用中配置 Model Context Protocol
 （MCP）服务端。需要可信的 stdio 程序或 Streamable HTTP 端点、连接要求，以及所需
 账户凭据。使用 MaybeCode 时，还需要已有的 May 配置和模型 profile。
 
@@ -18,12 +18,12 @@ OAuth、长任务、图形 Apps 和服务端导出分别参阅[认证](mcp-auth.
 
 ## 为什么使用独立 package
 
-`@may/mcp` 管理目录发现、传输和子进程，将远程工具转换为 Core `Tool` 接口。
+`@sortedyuan/mcp` 管理目录发现、传输和子进程，将远程工具转换为 Core `Tool` 接口。
 工具执行使用已有的权限、调度、取消、Session 和追踪服务。
 
 ```mermaid
 flowchart LR
-  server[MCP 服务端] -->|目录发现| adapter["@may/mcp"]
+  server[MCP 服务端] -->|目录发现| adapter["@sortedyuan/mcp"]
   adapter --> registry[Core ToolRegistry]
   model[模型工具调用] --> permission[权限执行器]
   permission --> scheduler[工具调度器]
@@ -35,14 +35,14 @@ flowchart LR
 
 ## Package API
 
-在应用项目安装 `@may/mcp` 和 `@may/application`。以下集成片段假设已经创建
+在应用项目安装 `@sortedyuan/mcp` 和 `@sortedyuan/application`。以下集成片段假设已经创建
 `model`、`localTools`、`permissionPolicy`、`tracer` 和 `store`。将
 `mcp-server.mjs` 放在进程工作目录，或者使用绝对路径。服务端要求凭据时，
 在打开连接池前验证凭据，并通过 `env` 提供。
 
 ```ts
-import { defineAgent } from "@may/application";
-import { openMcpClientPool } from "@may/mcp";
+import { defineAgent } from "@sortedyuan/application";
+import { openMcpClientPool } from "@sortedyuan/mcp";
 
 const mcp = await openMcpClientPool({
   servers: [{
@@ -326,7 +326,7 @@ MaybeCode 两个终端界面显示服务端和 Session，允许编辑 JSON 表�
 事件消费界面，并使用用户审阅后的答案调用 `interactions.respond()`：
 
 ```ts
-import { McpInteractionBroker, openMcpClientPool } from "@may/mcp";
+import { McpInteractionBroker, openMcpClientPool } from "@sortedyuan/mcp";
 const interactions = new McpInteractionBroker();
 const pool = await openMcpClientPool({ servers, interactions });
 const owner = { workspaceId: workspaceIdentity, sessionId };
@@ -417,7 +417,7 @@ stdio 进程或 HTTP 连接/session，每端点最多八个并发子连接。发
 
 现代 Tasks 通过 `tasks: true` 和 journal 启用，参阅[长任务](mcp-tasks.md)。
 图形集成参阅[隔离 Apps](mcp-apps.md)。独立的认证工具、资源和提示模板导出使用
-`@may/mcp/server`，参阅[服务端编写](mcp-server.md)。
+`@sortedyuan/mcp/server`，参阅[服务端编写](mcp-server.md)。
 
 ## 故障检查
 

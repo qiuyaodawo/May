@@ -1,5 +1,5 @@
 ---
-"@may/web-ui": minor
+"@sortedyuan/web-ui": minor
 ---
 
 Add typed sidebar navigation groups and lifecycle interfaces (`WebUiNavigationItem`, `WebUiNavigationGroup`, `WebUiNavigationLifecycle`, `WebUiNavigation`, `createNavigation`) to `WebUiOptions`, supporting custom icons, titles, badges, disabled predicates, and actions without direct DOM manipulation. Add `onNew` and `newLabel` callback hooks with typed context to customize the primary session/task creation action.

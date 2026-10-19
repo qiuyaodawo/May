@@ -1,6 +1,6 @@
-import type { AgentApplicationEvent } from "@may/application";
-import type { RunBudget, RunBudgetSnapshot, Usage } from "@may/core";
-import type { ApprovalDecision } from "@may/permissions";
+import type { AgentApplicationEvent } from "@sortedyuan/application";
+import type { RunBudget, RunBudgetSnapshot, Usage } from "@sortedyuan/core";
+import type { ApprovalDecision } from "@sortedyuan/permissions";
 
 export type TaskStatus = "queued" | "running" | "waiting" | "cancelling" | "completed" | "failed" | "cancelled" | "recovery-required";
 
@@ -151,7 +151,7 @@ export interface CoordinationSnapshot {
 }
 
 export interface TaskExecution {
-  readonly telemetry?: import("@may/core").TelemetryCorrelation;
+  readonly telemetry?: import("@sortedyuan/core").TelemetryCorrelation;
   readonly coordinationId: string;
   readonly task: CoordinationTask;
   readonly dependencies: readonly { readonly taskId: string; readonly output: TaskOutput }[];

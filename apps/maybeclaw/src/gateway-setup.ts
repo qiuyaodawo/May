@@ -3,9 +3,9 @@ import { createServer, type Server } from "node:http";
 import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { AddressInfo } from "node:net";
-import { parseMayConfig } from "@may/config";
-import { UiError } from "@may/ui-client";
-import { authorized, secureHeaders, sendJson, trustedRequest } from "@may/ui-client/server";
+import { parseMayConfig } from "@sortedyuan/config";
+import { UiError } from "@sortedyuan/ui-client";
+import { authorized, secureHeaders, sendJson, trustedRequest } from "@sortedyuan/ui-client/server";
 import { gatewaySettings } from "./gateway-settings.js";
 import { hashAdministratorPassword } from "./gateway-auth.js";
 

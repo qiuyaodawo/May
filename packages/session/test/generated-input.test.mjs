@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import test from "node:test";
 
-import { InMemoryContext, May, userMessage } from "@may/core";
-import { OpenAIResponsesModel } from "@may/provider-openai";
+import { InMemoryContext, May, userMessage } from "@sortedyuan/core";
+import { OpenAIResponsesModel } from "@sortedyuan/provider-openai";
 import { FileSessionStore } from "../dist/file-store.js";
 import { Session, SessionHistoryReader } from "../dist/index.js";
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseMayConfig } from "@may/config";
+import { parseMayConfig } from "@sortedyuan/config";
 import { parseCliArgs, runCli } from "../dist/index.js";
 
 test("parses the run command and options", () => {

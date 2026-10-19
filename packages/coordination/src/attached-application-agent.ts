@@ -1,6 +1,6 @@
-import type { AgentApplication } from "@may/application";
-import { correlationTraceAttributes, type UserMessage } from "@may/core";
-import type { SessionContinueOptions, SessionEvent, SessionSubmitOptions } from "@may/session";
+import type { AgentApplication } from "@sortedyuan/application";
+import { correlationTraceAttributes, type UserMessage } from "@sortedyuan/core";
+import type { SessionContinueOptions, SessionEvent, SessionSubmitOptions } from "@sortedyuan/session";
 import {
   coordinationInput,
   inspectAttachedTaskSession,

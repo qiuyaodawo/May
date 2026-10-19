@@ -1,8 +1,8 @@
-import type { Model } from "@may/core";
-import type { ContextSummarizer } from "@may/context";
+import type { Model } from "@sortedyuan/core";
+import type { ContextSummarizer } from "@sortedyuan/context";
 import {
   createModelContextSummarizer as createReusableModelContextSummarizer,
-} from "@may/context/model-summarizer";
+} from "@sortedyuan/context/model-summarizer";
 
 const SUMMARY_INSTRUCTIONS = `Summarize the preceding coding-agent conversation for continuation.
 Return only a concise, factual working-state summary. Preserve the user's goals

@@ -1,4 +1,4 @@
-import type { UiClient, UiClientState, UiResource } from "@may/ui-client";
+import type { UiClient, UiClientState, UiResource } from "@sortedyuan/ui-client";
 import { button, detailPanel, extensionContent, element, icon, statusLabel, type WebUiExtensions, type WebUiContext } from "./components.js";
 export { approvalCard, detailPanel, transcriptBlock, type WebUiExtensions, type WebUiContext, type WebUiRenderer } from "./components.js";
 import { createInspector, createTranscriptReader } from "./reading.js";

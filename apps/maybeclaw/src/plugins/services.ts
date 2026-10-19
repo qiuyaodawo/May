@@ -1,6 +1,6 @@
-import { defineService } from "@may/plugin";
-import type { ChannelIngress } from "@may/plugin-delivery";
-import type { WebApiHandler } from "@may/plugin-web-api";
+import { defineService } from "@sortedyuan/plugin";
+import type { ChannelIngress } from "@sortedyuan/plugin-delivery";
+import type { WebApiHandler } from "@sortedyuan/plugin-web-api";
 import type { GatewayHost } from "../gateway-host.js";
 
 export const gatewayPluginServices = {

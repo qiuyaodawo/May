@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 import { executeDelegationCommand, formatDelegationRequests, formatDelegationTree, renderDelegationTask } from "../../dist/delegation-commands.js";
-import { TranscriptStore, TranscriptView } from "@may/tui";
+import { TranscriptStore, TranscriptView } from "@sortedyuan/tui";
 import { MAYBECODE_DARK_THEME } from "../../dist/ui/theme.js";
 
 test("真实 provider 的两个只读子任务保留输出并支持运行期间切换状态通知", { timeout: 240000 }, async t => {

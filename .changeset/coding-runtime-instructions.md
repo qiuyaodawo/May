@@ -1,5 +1,5 @@
 ---
-"@may/coding-tools": minor
+"@sortedyuan/coding-tools": minor
 ---
 
 Add `codingRuntimeInstructions` to generate workspace, operating system, shell syntax, session role and origin, and optional permission and assignment information. Shell runtime guidance now contains syntax instructions, and composed project instructions include their source file path.

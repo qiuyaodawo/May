@@ -1,6 +1,6 @@
-import type { AgentApplicationEvent } from "@may/application";
-import type { ContentPart, Tool, UserMessage } from "@may/core";
-import type { ApprovalDecision, PersistentApprovalOptions } from "@may/permissions";
+import type { AgentApplicationEvent } from "@sortedyuan/application";
+import type { ContentPart, Tool, UserMessage } from "@sortedyuan/core";
+import type { ApprovalDecision, PersistentApprovalOptions } from "@sortedyuan/permissions";
 
 export type AgentTaskStatus = "queued" | "running" | "waiting" | "cancelling" | "completed" | "failed" | "cancelled" | "recovery-required";
 export interface AgentCapabilities {
@@ -8,7 +8,7 @@ export interface AgentCapabilities {
   approvals: boolean; collaboration: boolean; media: readonly string[];
 }
 export interface AgentAdapterContext {
-  readonly telemetry?: import("@may/core").TelemetryCorrelation;
+  readonly telemetry?: import("@sortedyuan/core").TelemetryCorrelation;
   conversationId: string; inputId: string; input: UserMessage; signal: AbortSignal;
   tools: readonly Tool[]; shouldYield: () => boolean; report: (event: AgentApplicationEvent) => void;
   readonly permissionScope?: string;

@@ -4,7 +4,7 @@ import { mkdir, mkdtemp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { imageSource } from "../../../packages/media/test/fixture.mjs";
-import { readEmbeddedImage } from "@may/media";
+import { readEmbeddedImage } from "@sortedyuan/media";
 import { telegramImageRequest, feishuImageRequest } from "../dist/channels.js";
 import { ChannelStore } from "../dist/channel-store.js";
 import { digest } from "../dist/types.js";

@@ -15,9 +15,9 @@ const actual = await realpath(destination);
 if (relative(await realpath(repository), actual).startsWith("..")) throw new Error("Package verification path must stay in the worktree");
 if (!relative(await realpath(repository), await realpath(consumer)).startsWith("..")) throw new Error("The packaged consumer must be outside the repository");
 await runPnpm(["build"], repository);
-const targets = ["@may/plugin", "@may/plugin-services", "@may/plugin-runtime", "@may/plugin-models", "@may/plugin-permissions", "@may/plugin-skills",
-  "@may/plugin-goals", "@may/plugin-history-memory", "@may/plugin-delegation", "@may/plugin-mcp", "@may/plugin-observability",
-  "@may/plugin-delivery", "@may/plugin-channel-telegram", "@may/plugin-channel-feishu", "@may/plugin-agent-adapters", "@may/plugin-coordination", "@may/plugin-web-api"];
+const targets = ["@sortedyuan/plugin", "@sortedyuan/plugin-services", "@sortedyuan/plugin-runtime", "@sortedyuan/plugin-models", "@sortedyuan/plugin-permissions", "@sortedyuan/plugin-skills",
+  "@sortedyuan/plugin-goals", "@sortedyuan/plugin-history-memory", "@sortedyuan/plugin-delegation", "@sortedyuan/plugin-mcp", "@sortedyuan/plugin-observability",
+  "@sortedyuan/plugin-delivery", "@sortedyuan/plugin-agent-adapters", "@sortedyuan/plugin-coordination", "@sortedyuan/plugin-web-api"];
 const manifests = new Map();
 for (const group of ["packages", "packages/providers", "packages/tools", "packages/ui", "packages/plugins"]) {
   for (const entry of await readdir(join(repository, group), { withFileTypes: true })) {
@@ -35,7 +35,7 @@ function include(name) {
   if (!manifest || manifest.private) throw new Error(`Runtime dependency is not a public package: ${name}`);
   required.add(name);
   for (const dependency of Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies, ...manifest.peerDependencies })) {
-    if (dependency.startsWith("@may/")) include(dependency);
+    if (dependency.startsWith("@sortedyuan/")) include(dependency);
   }
 }
 targets.forEach(include);

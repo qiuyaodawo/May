@@ -19,13 +19,13 @@
 - `ContextFactory`、Context 容量预算和压缩策略；
 - 最大 Step 数、是否提供 Session 历史工具等应用选择。
 
-`@may/application` 导出 `AgentDefinition` 类和便捷函数 `defineAgent()`。
+`@sortedyuan/application` 导出 `AgentDefinition` 类和便捷函数 `defineAgent()`。
 对话相关的 `store`、`sessionId`、`resume`、`fork`、`metadata` 和 `contextMetadata`
 在 `open()` 时提供。下面的组合片段假定宿主已经初始化模型、工具、指令、权限策略
 和存储；完整应用步骤见[构建 Agent](../guides/building-an-agent.md)。
 
 ```ts
-import { defineAgent } from "@may/application";
+import { defineAgent } from "@sortedyuan/application";
 
 const agent = defineAgent({
   model,
@@ -58,7 +58,7 @@ Session 历史选项也会被浅复制并冻结。单个 `Tool` 对象、`Model`
 策略等协作者不会被复制；它们仍由调用方拥有，并会被同一 Definition 打开的
 多个 Application 共享。需要隔离这些对象时，应为每个 Definition 构造独立实例。
 
-这一区分在恢复时很重要：`@may/session` 恢复持久化的对话事实，但不会重建模型、
+这一区分在恢复时很重要：`@sortedyuan/session` 恢复持久化的对话事实，但不会重建模型、
 工具、提示内容或权限策略。应用必须再次提供这些组件。Session 元数据可以标识或
 校验产品配置，May 尚不会版本化或迁移任意 Agent definition。
 
@@ -217,7 +217,7 @@ SessionCatalog 的可选删除操作，拒绝删除活动 Session，并且不构
 
 ## 当前限制
 
-`@may/application` 仍是开发预览 API。目前提供 `AgentDefinition` 组合对象。尚未提供
+`@sortedyuan/application` 仍是开发预览 API。目前提供 `AgentDefinition` 组合对象。尚未提供
 进程级 Agent-definition 注册表、Definition 序列化或迁移、在同一 Workspace 对象中
 同时活动的多个 Session、Application 内置多 Agent 委派、分布式锁，以及历史与 Catalog 存储
 之间的事务协调。

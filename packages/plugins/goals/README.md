@@ -1,4 +1,4 @@
-# @may/plugin-goals
+# @sortedyuan/plugin-goals
 
 `createGoalsPlugin(options?)` provides `goalsService`, a `GoalController`, and
 registers its model wrapper, Context wrapper, dynamic instructions, and tools through the
@@ -16,7 +16,7 @@ Custom `PluginHost` compositions must provide `applicationServices.instructionSo
 Goal state is versioned in plugin state and preserves the existing `may.goal`
 Session record for history consumers. Resume retains completed goals and pauses
 interrupted goals for explicit user continuation. Token accounting uses actual
-provider usage. `validateBudget` and `verify` retain their `@may/goal` meanings.
+provider usage. `validateBudget` and `verify` retain their `@sortedyuan/goal` meanings.
 `createAgent(application)` can route goal Runs through an owned delegation host.
 The controller exposed by `goalsService` supports
 `wrapModel(model, { includeInstructions: false })` for delegated token accounting,

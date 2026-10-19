@@ -1,11 +1,11 @@
-import { acquireFileLock, releaseFileLock } from "@may/session/file-store";
+import { acquireFileLock, releaseFileLock } from "@sortedyuan/session/file-store";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath, rename, unlink, type FileHandle } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import type { TaskWorkspaceManager, WorkspacePatchChange, WorkspacePatchSnapshot } from "@may/coordination";
+import type { TaskWorkspaceManager, WorkspacePatchChange, WorkspacePatchSnapshot } from "@sortedyuan/coordination";
 
 const MAX_BUNDLE_BYTES = 16_777_216;
 const MAX_FILE_BYTES = 262_144;

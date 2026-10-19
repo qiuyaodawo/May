@@ -8,7 +8,7 @@ import {
   createFileChangesEvaluator,
   createJsonSchemaEvaluator,
   createLocalDirectoryEnvironment,
-} from "@may/eval";
+} from "@sortedyuan/eval";
 
 const fixtureDirectory = fileURLToPath(new URL("./fixture", import.meta.url));
 const writerPath = fileURLToPath(new URL("./write-artifact.mjs", import.meta.url));

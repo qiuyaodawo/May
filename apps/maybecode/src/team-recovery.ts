@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
-import { FileSharedBudget, sharedBudgetTotals, type CoordinationSnapshot, type SharedBudgetLimits, type SharedBudgetSnapshot } from "@may/coordination";
-import { FileCoordinationStore } from "@may/coordination/file-store";
-import type { Usage } from "@may/core";
-import { FileSessionStore } from "@may/session/file-store";
+import { FileSharedBudget, sharedBudgetTotals, type CoordinationSnapshot, type SharedBudgetLimits, type SharedBudgetSnapshot } from "@sortedyuan/coordination";
+import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
+import type { Usage } from "@sortedyuan/core";
+import { FileSessionStore } from "@sortedyuan/session/file-store";
 import { TeamVerificationStore } from "./team-verification.js";
 
 export type TeamResolution =

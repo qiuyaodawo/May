@@ -5,7 +5,7 @@ import {
   InMemoryContext,
   May,
   RunCancelledError,
-} from "@may/core";
+} from "@sortedyuan/core";
 import {
   PermissionDeniedError,
   PermissionExecutorClosedError,

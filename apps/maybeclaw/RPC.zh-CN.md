@@ -1,12 +1,12 @@
 # 外部 Agent RPC 适配器
 
-MaybeClaw 导出 `@may/maybeclaw/rpc`。Agent 配置使用 `adapter: "module"`、`module: "@may/maybeclaw/rpc"`，通过 `options` 指定 stdio 或 socket 连接。模块导出 `createAdapter`。
+MaybeClaw 导出 `@sortedyuan/maybeclaw/rpc`。Agent 配置使用 `adapter: "module"`、`module: "@sortedyuan/maybeclaw/rpc"`，通过 `options` 指定 stdio 或 socket 连接。模块导出 `createAdapter`。
 
 ```json
 {
   "id": "external",
   "adapter": "module",
-  "module": "@may/maybeclaw/rpc",
+  "module": "@sortedyuan/maybeclaw/rpc",
   "options": {
     "transport": "stdio",
     "command": "node",

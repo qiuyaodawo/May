@@ -1,7 +1,7 @@
 // Read-only component gallery: synthetic evidence, no runtime, provider, or external effects.
 import { randomUUID } from "node:crypto";
-import { startUiServer } from "@may/ui-client/server";
-import { webUiAssets } from "@may/web-ui/assets";
+import { startUiServer } from "@sortedyuan/ui-client/server";
+import { webUiAssets } from "@sortedyuan/web-ui/assets";
 
 const token = "public-ui-states-fixture-not-a-secret";
 const hostId = randomUUID();

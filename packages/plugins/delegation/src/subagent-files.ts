@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import type { Tool } from "@may/core";
+import type { Tool } from "@sortedyuan/core";
 import {
   createCodingTool,
   workspaceFileKey,
   type CodingToolName,
   type WorkspaceFileOperation,
-} from "@may/coding-tools";
+} from "@sortedyuan/coding-tools";
 import type { SubagentToolName } from "./subagents.js";
 
 export interface SubagentFileGuard {

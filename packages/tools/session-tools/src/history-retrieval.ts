@@ -1,4 +1,4 @@
-import type { Tool } from "@may/core";
+import type { Tool } from "@sortedyuan/core";
 import { sessionHistoryEventContent, type SessionHistorySource } from "./session-history.js";
 
 /** Search bounded batches of complete events, then read matching records in chunks. */

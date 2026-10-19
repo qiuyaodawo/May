@@ -1,6 +1,6 @@
 ---
-"@may/tui": minor
-"@may/ui-client": minor
+"@sortedyuan/tui": minor
+"@sortedyuan/ui-client": minor
 ---
 
 Display delivered steering messages consistently in live transcripts and restored

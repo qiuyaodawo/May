@@ -1,8 +1,8 @@
-import type { ContentPart, MediaSource, MayEvent, SerializedError, UserMessage } from "@may/core";
-import { displayParts, imageAttachment } from "@may/media";
-import type { AgentApplicationEvent } from "@may/application";
-import type { PermissionEvent } from "@may/permissions";
-import type { SessionEvent } from "@may/session";
+import type { ContentPart, MediaSource, MayEvent, SerializedError, UserMessage } from "@sortedyuan/core";
+import { displayParts, imageAttachment } from "@sortedyuan/media";
+import type { AgentApplicationEvent } from "@sortedyuan/application";
+import type { PermissionEvent } from "@sortedyuan/permissions";
+import type { SessionEvent } from "@sortedyuan/session";
 import type { UiBlock, UiBlockStatus, UiDiagnostic, UiInteraction } from "./protocol.js";
 
 const LIMIT = 65_536;

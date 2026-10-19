@@ -2,7 +2,7 @@ import type {
   ContextSnapshot,
   Message,
   ModelContextCompactor,
-} from "@may/core";
+} from "@sortedyuan/core";
 
 import type { ContextInspection } from "./controller.js";
 

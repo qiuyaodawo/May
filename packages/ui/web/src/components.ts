@@ -1,4 +1,4 @@
-import type { UiBlock, UiInteraction, UiPanel, UiClient, UiClientState, UiDiagnostic } from "@may/ui-client";
+import type { UiBlock, UiInteraction, UiPanel, UiClient, UiClientState, UiDiagnostic } from "@sortedyuan/ui-client";
 import { markdown } from "./markdown.js";
 
 export function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text?: string): HTMLElementTagNameMap[K] {

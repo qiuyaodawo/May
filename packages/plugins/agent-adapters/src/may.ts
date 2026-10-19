@@ -1,7 +1,7 @@
-import type { AgentDefinition, AgentApplication } from "@may/application";
-import type { SessionStore } from "@may/session";
-import { correlationTraceAttributes } from "@may/core";
-import { digest } from "@may/plugin-delivery";
+import type { AgentDefinition, AgentApplication } from "@sortedyuan/application";
+import type { SessionStore } from "@sortedyuan/session";
+import { correlationTraceAttributes } from "@sortedyuan/core";
+import { digest } from "@sortedyuan/plugin-delivery";
 import type { AgentAdapter, AgentAdapterContext } from "./types.js";
 
 export interface MayAgentAdapterOptions {

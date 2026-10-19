@@ -11,7 +11,7 @@ import {
   type ToolExecutor,
   type TraceSpan,
   type Tracer,
-} from "@may/core";
+} from "@sortedyuan/core";
 
 import {
   PermissionDeniedError,

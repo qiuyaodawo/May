@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { AsyncStateSerializer } from "@may/application";
-import { AsyncEventQueue, correlationTraceAttributes, endTraceSpan, startTraceSpan, validateTelemetryCorrelation, type TelemetryCorrelation, type Tracer } from "@may/core";
-import type { ApprovalDecision } from "@may/permissions";
+import { AsyncStateSerializer } from "@sortedyuan/application";
+import { AsyncEventQueue, correlationTraceAttributes, endTraceSpan, startTraceSpan, validateTelemetryCorrelation, type TelemetryCorrelation, type Tracer } from "@sortedyuan/core";
+import type { ApprovalDecision } from "@sortedyuan/permissions";
 import type {
   CoordinationAgent, CoordinationEvent, CoordinationJournal, CoordinationLimits, CoordinationPolicy,
   CoordinationSnapshot, CoordinationStore, CoordinationTask, HandoffSpec, TaskController, TaskExecution, TaskGraphChange, TaskMessageSpec, TaskOutput, TaskRecovery, TaskSpec,

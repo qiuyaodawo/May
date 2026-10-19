@@ -9,7 +9,7 @@ import { InMemorySessionStore } from "../../session/dist/index.js";
 import { FileSessionStore } from "../../session/dist/file-store.js";
 import { CoordinationRuntime, InMemoryCoordinationStore, createApplicationAgent, pipeline, parallelTasks } from "../dist/index.js";
 import { FileCoordinationStore } from "../dist/file-store.js";
-import { recoverFileLock } from "@may/session/file-store";
+import { recoverFileLock } from "@sortedyuan/session/file-store";
 import { spawnSync } from "node:child_process";
 
 const policy = { version: "v1", authorize: () => true };

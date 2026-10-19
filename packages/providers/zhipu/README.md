@@ -1,10 +1,10 @@
-# `@may/provider-zhipu`
+# `@sortedyuan/provider-zhipu`
 
 Zhipu GLM model adapter for May.
 
 ```ts
-import { InMemoryContext, May } from "@may/core";
-import { ZhipuModel } from "@may/provider-zhipu";
+import { InMemoryContext, May } from "@sortedyuan/core";
+import { ZhipuModel } from "@sortedyuan/provider-zhipu";
 
 const may = new May({
   model: new ZhipuModel({

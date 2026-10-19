@@ -1,5 +1,5 @@
-import { resolveRunBudget, type RunBudget } from "@may/core";
-import type { MayConfig } from "@may/config";
+import { resolveRunBudget, type RunBudget } from "@sortedyuan/core";
+import type { MayConfig } from "@sortedyuan/config";
 import { MaybeCodeConfigError } from "./errors.js";
 
 /** 子 Agent 角色在共享工作区里可以使用的编码工具。 */

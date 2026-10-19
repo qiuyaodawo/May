@@ -1,4 +1,4 @@
-# @may/plugin-history-memory
+# @sortedyuan/plugin-history-memory
 
 `budget` accepts a Context budget or a callback receiving the effective Model.
 The callback runs after Model wrappers have been applied, so provider plugins can
