@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/coding-tools",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Read, bash, edit, and write tools for May coding agents.",
   "type": "module",
   "main": "./dist/index.js",

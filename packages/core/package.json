@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The model- and tool-agnostic runtime at the heart of May agents.",
   "type": "module",
   "main": "./dist/index.js",

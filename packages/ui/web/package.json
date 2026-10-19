@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/web-ui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Composable browser workbench for May agents, independent of product policy.",
   "type": "module",
   "main": "./dist/index.js",

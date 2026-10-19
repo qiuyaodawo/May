@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Typed services, dependency lifecycle, scoped plugin hosts and hooks for May agents.",
   "type": "module",
   "main": "./dist/index.js",

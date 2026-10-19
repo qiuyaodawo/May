@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/plugin-history-memory",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "History reference memory and context compaction plugin for May agents.",
   "type": "module",
   "main": "./dist/index.js",

@@ -7,7 +7,7 @@ configuring it. Reusable framework code lives in `packages/`; executable product
 live in `apps/`. Applications depend on packages, and packages keep their imports
 within the reusable layer.
 
-The packages in this checkout are versioned `0.1.0`. The repository requires
+The public packages in this checkout are versioned `0.2.0`. The repository requires
 Node.js `>=22.16.0` and pnpm `12.4.2`. Read
 [Compatibility and stability](compatibility.md) for public API and persistence
 format stability. An import path listed here is a package export; installation

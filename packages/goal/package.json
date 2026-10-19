@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/goal",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Composable durable goal execution for May agents.",
   "type": "module",
   "main": "./dist/index.js",

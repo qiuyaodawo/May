@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/provider-anthropic",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Anthropic model adapter for May.",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/scheduler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Opt-in durable time and event scheduling for host-owned tasks.",
   "type": "module",
   "main": "./dist/index.js",

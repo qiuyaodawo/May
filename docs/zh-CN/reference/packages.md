@@ -6,7 +6,7 @@
 `packages/`，可执行产品位于 `apps/`。应用依赖 package，package 的导入保持在
 可复用代码范围内。
 
-当前 checkout 中的 package 版本均为 `0.1.0`。仓库要求 Node.js `>=22.16.0` 和
+当前 checkout 中的公开包版本均为 `0.2.0`。仓库要求 Node.js `>=22.16.0` 和
 pnpm `12.4.2`。公开 API 和持久化格式的稳定性见
 [兼容性与稳定性](compatibility.md)。本页列出的导入路径属于 package exports；
 安装和发布范围由仓库的发布配置管理。

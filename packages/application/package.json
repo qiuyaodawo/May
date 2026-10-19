@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/application",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Reusable Agent definitions and headless application/workspace lifecycle for May agents.",
   "type": "module",
   "main": "./dist/index.js",
