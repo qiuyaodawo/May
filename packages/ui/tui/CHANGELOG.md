@@ -1,5 +1,12 @@
 # @sortedyuan/tui
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [92fc3b9]
+  - @sortedyuan/permissions@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

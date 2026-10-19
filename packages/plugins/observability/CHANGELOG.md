@@ -1,5 +1,14 @@
 # @sortedyuan/plugin-observability
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [92fc3b9]
+  - @sortedyuan/observability@0.2.1
+  - @sortedyuan/application@0.2.1
+  - @sortedyuan/plugin-services@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

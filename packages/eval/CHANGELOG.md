@@ -1,5 +1,21 @@
 # @sortedyuan/eval
 
+## 0.3.0
+
+### Minor Changes
+
+- 92fc3b9: Coordinate JSON record reads and atomic replacements across processes with short SQLite transactions, preventing Windows sharing violations during live experiment observation.
+
+  BREAKING: FileEvalStore readers require write access to record directories for the automatically created record-access.sqlite databases. Stop all readers and writers before upgrading them together, grant directory write access, and retain these databases while the store is in use. Existing JSON records retain their format. Lock acquisition is bounded to five seconds.
+
+### Patch Changes
+
+- Updated dependencies [92fc3b9]
+  - @sortedyuan/permissions@0.2.1
+  - @sortedyuan/observability@0.2.1
+  - @sortedyuan/application@0.2.1
+  - @sortedyuan/coordination@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

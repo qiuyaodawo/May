@@ -1,5 +1,28 @@
 # @sortedyuan/maybecode
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [92fc3b9]
+  - @sortedyuan/permissions@0.2.1
+  - @sortedyuan/observability@0.2.1
+  - @sortedyuan/application@0.2.1
+  - @sortedyuan/coordination@0.2.1
+  - @sortedyuan/plugin-services@0.2.1
+  - @sortedyuan/plugin-delegation@0.2.1
+  - @sortedyuan/plugin-permissions@0.2.1
+  - @sortedyuan/ui-client@0.2.1
+  - @sortedyuan/tui@0.2.1
+  - @sortedyuan/plugin-observability@0.2.1
+  - @sortedyuan/plugin-goals@0.2.1
+  - @sortedyuan/plugin-history-memory@0.2.1
+  - @sortedyuan/plugin-mcp@0.2.1
+  - @sortedyuan/web-ui@0.2.1
+  - @sortedyuan/plugin-models@0.2.1
+  - @sortedyuan/plugin-runtime@0.2.1
+  - @sortedyuan/plugin-skills@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

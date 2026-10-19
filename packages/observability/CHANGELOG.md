@@ -1,5 +1,13 @@
 # @sortedyuan/observability
 
+## 0.2.1
+
+### Patch Changes
+
+- 92fc3b9: Wait for active OTLP HTTP exports and their diagnostic updates during forceFlush, within the lifecycle timeout.
+
+  Count unfinished exports as failed at the lifecycle deadline and prevent delayed callbacks from counting the same failure twice.
+
 ## 0.2.0
 
 ### Minor Changes

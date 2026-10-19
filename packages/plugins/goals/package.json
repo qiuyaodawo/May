@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/plugin-goals",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Goal lifecycle and durable state plugin for May agents.",
   "type": "module",
   "main": "./dist/index.js",
