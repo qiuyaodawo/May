@@ -9,6 +9,8 @@ import { verify } from "@node-rs/argon2";
 import { AgentGateway } from "../dist/gateway.js";
 import { startGatewayServer } from "../dist/gateway-server.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
+import { GatewayAuth } from "../dist/gateway-auth.js";
+import { withGatewayConfiguration } from "../dist/gateway-config.js";
 
 const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-auth-tests/", import.meta.url));
 async function fixture(t, sessionMs) {
@@ -70,6 +72,21 @@ test("logout, expiry, and invalid configuration revoke authentication", async t 
   const third = await credential(login), saved = await readFile(path, "utf8");
   await writeFile(path, "{"); assert.equal((await get(third)).status, 503);
   await writeFile(path, saved); assert.equal((await get(third)).status, 401); assert.equal((await login()).status, 200);
+});
+
+test("每次认证刷新读取前序配置写入的结果", async t => {
+  const { path } = await fixture(t);
+  const auth = await GatewayAuth.open(path);
+  t.after(() => auth.close());
+  const first = auth.refresh();
+  const update = withGatewayConfiguration(path, async (raw, save) => {
+    raw.server.auth.passwordHash = "invalid";
+    await save();
+  });
+  const rejected = assert.rejects(auth.refresh(), /管理员认证配置不可用/);
+  await first;
+  await update;
+  await rejected;
 });
 
 test("failed login attempts are bounded and invalid stored hashes fail immediately", async t => {

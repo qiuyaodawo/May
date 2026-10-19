@@ -48,7 +48,7 @@ export class GatewayAuth {
   }
   refresh(): Promise<void> {
     if (this.closed) return Promise.reject(new UiError(503, "认证服务已关闭。"));
-    return this.refreshWork ??= withGatewayConfiguration(this.path, async (raw, save) => {
+    const work = withGatewayConfiguration(this.path, async (raw, save) => {
       const settings = authSettings(raw.server?.auth);
       if (settings.password !== undefined || settings.passwordHash !== this.passwordHash || settings.sessionMs !== this.sessionMs) {
         this.clear(); this.passwordHash = "";
@@ -62,7 +62,9 @@ export class GatewayAuth {
     }).catch(() => {
       this.clear(); this.passwordHash = "";
       throw new UiError(503, "管理员认证配置不可用，请检查 server.auth 和配置文件的读写权限。");
-    }).finally(() => { this.refreshWork = undefined; });
+    }).finally(() => { if (this.refreshWork === work) this.refreshWork = undefined; });
+    this.refreshWork = work;
+    return work;
   }
   async login(password: unknown): Promise<{ token: string; expiresAt: number }> {
     await this.refresh();

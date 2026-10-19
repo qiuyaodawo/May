@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { pbkdf2Sync } from "node:crypto";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
@@ -270,6 +271,48 @@ test("OTLP exporter failure and timeout are observable and bounded", async (t) =
   assert.ok(performance.now() - started < 1_000);
   assert.ok(timeout.getDiagnostics().traceExportFailures >= 1);
   await timeout.shutdown();
+});
+
+test("forceFlush 等待超时导出回调完成并记录诊断", async t => {
+  const server = createServer(async (request, response) => {
+    for await (const _chunk of request) { /* 接收真实 OTLP 请求。 */ }
+    if (request.url === "/metrics") { response.end("{}"); return; }
+    const timer = setTimeout(() => response.end("{}"), 300);
+    response.on("close", () => clearTimeout(timer));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const endpoint = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const telemetry = createOtlpTelemetry({ serviceName: "trace-timeout", tracesUrl: `${endpoint}/traces`, metricsUrl: `${endpoint}/metrics`, timeoutMs: 40 });
+  t.after(() => telemetry.shutdown());
+  telemetry.tracer.startSpan("may.run").end();
+  const started = performance.now();
+  await telemetry.forceFlush();
+  assert.ok(performance.now() - started < 1_000);
+  assert.equal(telemetry.getDiagnostics().traceExportFailures, 1);
+});
+
+test("CPU 高负载达到生命周期超时时记录未完成导出且不重复计数", async t => {
+  const server = createServer(async (request, response) => {
+    for await (const _chunk of request) { /* 接收真实 OTLP 请求。 */ }
+    if (request.url === "/metrics") { response.end("{}"); return; }
+    pbkdf2Sync("telemetry-load", "test-salt", 4_000_000, 32, "sha256");
+    const timer = setTimeout(() => response.end("{}"), 300);
+    response.on("close", () => clearTimeout(timer));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const endpoint = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const telemetry = createOtlpTelemetry({ serviceName: "cpu-load", tracesUrl: `${endpoint}/traces`, metricsUrl: `${endpoint}/metrics`, timeoutMs: 40 });
+  t.after(() => telemetry.shutdown());
+  telemetry.tracer.startSpan("may.run").end();
+  await telemetry.forceFlush();
+  assert.equal(telemetry.getDiagnostics().traceExportFailures, 1);
+  assert.equal(telemetry.getDiagnostics().lifecycleFailures, 1);
+  await telemetry.shutdown();
+  assert.equal(telemetry.getDiagnostics().traceExportFailures, 1);
 });
 
 test("actual tool-only response records first content with absent first text", async (t) => {

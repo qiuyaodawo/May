@@ -45,7 +45,10 @@ test("post-commit Hook edits are reported as a partial checkpoint and survive re
   const reopened = await ProjectGitWorkspace.open(options);
   const continued = await reopened.beginRound({ sessionId: "session", runId: "continued" });
   assert.equal((await reopened.checkpoint(failed.id)).status, "failed");
+  assert.notEqual(continued.fromCommit, failed.commit);
+  assert.equal(await git.show([`${continued.fromCommit}:source.txt`]), "Hook-written version\n");
+  assert.equal((await git.revparse([`${continued.fromCommit}^`])).trim(), failed.commit);
   await continued.complete({ outcome: "cancelled" });
-  assert.equal((await git.log()).total, 2);
+  assert.equal((await git.log()).total, 3);
   assert.equal(await readFile(join(workspace, "source.txt"), "utf8"), "Hook-written version\n");
 });

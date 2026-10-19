@@ -79,8 +79,8 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
     return this.closing ??= (async () => {
       await this.tail;
       try {
-        const current = await lstat(`${this.path}.lock`);
-        const owned = await this.lock.stat();
+        const current = await lstat(`${this.path}.lock`, { bigint: true });
+        const owned = await this.lock.stat({ bigint: true });
         if (!current.isFile() || current.isSymbolicLink() || current.ino !== owned.ino || current.dev !== owned.dev) {
           throw new Error("Permission rule writer lock ownership changed");
         }
@@ -108,19 +108,19 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
   private async readNow(): Promise<readonly PersistentPermissionRule[]> {
     try {
       await this.checkOwnership();
-      const before = await lstat(this.path);
-      if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) {
+      const before = await lstat(this.path, { bigint: true });
+      if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n) {
         throw new Error("Permission rule store must be a regular file with one link");
       }
       const file = await open(this.path, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
       try {
-        const info = await file.stat();
+        const info = await file.stat({ bigint: true });
         if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev) {
           throw new Error("Permission rule file changed while opening");
         }
         const contents = await file.readFile("utf8");
-        const after = await file.stat();
-        if (after.size !== info.size || after.mtimeMs !== info.mtimeMs || after.ctimeMs !== info.ctimeMs) {
+        const after = await file.stat({ bigint: true });
+        if (after.size !== info.size || after.mtimeNs !== info.mtimeNs || after.ctimeNs !== info.ctimeNs) {
           throw new Error("Permission rule file changed while reading");
         }
         return parseRules(JSON.parse(contents));
@@ -160,8 +160,8 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
   }
 
   private async checkOwnership(): Promise<void> {
-    const current = await lstat(`${this.path}.lock`);
-    const owned = await this.lock.stat();
+    const current = await lstat(`${this.path}.lock`, { bigint: true });
+    const owned = await this.lock.stat({ bigint: true });
     if (!current.isFile() || current.isSymbolicLink() || current.ino !== owned.ino || current.dev !== owned.dev) {
       throw new Error("Permission rule writer lock ownership changed");
     }

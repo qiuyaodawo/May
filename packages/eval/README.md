@@ -12,6 +12,11 @@ Public entry points are `@sortedyuan/eval`, `@sortedyuan/eval/application`,
 runner, component registry, types, built-in environments and evaluators, and
 report comparison functions. The file store requires Node.js >=22.16.0.
 
+File-store readers and writers coordinate JSON access through `record-access.sqlite`
+in each record directory, with a five-second lock acquisition limit. Readers need
+directory write access. Stop all store users before upgrading them together;
+access databases are created automatically and existing JSON formats are preserved.
+
 The private CLI and executable examples live in `apps/eval`. From the repository:
 
 ```powershell

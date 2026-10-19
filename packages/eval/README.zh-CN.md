@@ -10,6 +10,10 @@
 与 `@sortedyuan/eval/file-store`。主入口提供 runner、组件 registry、类型、内置环境
 与 evaluator，以及报告比较函数。文件存储需要 Node.js >=22.16.0。
 
+文件存储的读取者与写入者通过各记录目录中的 `record-access.sqlite` 协调 JSON
+访问，获取锁最多等待五秒。读取者需要目录写入权限。升级时停止全部使用该
+store 的进程并统一更新；访问协调数据库自动创建，已有 JSON 格式保持不变。
+
 private CLI 与可执行示例位于 `apps/eval`。在仓库目录执行：
 
 ```powershell

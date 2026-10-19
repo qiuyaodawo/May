@@ -95,6 +95,11 @@ and HTTP/JSON trace/metric exporters with explicit endpoints, bounded queues,
 concurrency, timeout, series, and lifecycle waits. Providers stay local to the
 composition. `getDiagnostics()` reports export and lifecycle failures;
 `forceFlush()` and idempotent `shutdown()` manage delivery and resources.
+Within the lifecycle timeout, `forceFlush()` waits for active HTTP exports and
+their diagnostic updates after the providers finish.
+At the lifecycle deadline, unfinished exports are counted as failed before the
+call returns. Later callbacks do not count those exports again; the official
+exporter continues HTTP cleanup.
 
 Attributes default to 64 entries, 256 characters per string, 16 array elements,
 and 64 retained span events. Finite values are required; content/credential keys

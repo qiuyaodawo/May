@@ -293,6 +293,11 @@ await telemetry.shutdown();
 Both HTTP endpoints are explicit. Optional `headers` stay outside telemetry.
 Queue size, batch size, export concurrency, timeout, metric series, and lifecycle
 waits have limits. Lifecycle completion waits for trace and metric operations.
+Within the lifecycle timeout, `forceFlush()` waits for active HTTP exports after
+the providers finish, including their failure callbacks and diagnostic updates.
+If the lifecycle deadline expires, each unfinished export is counted as failed
+before the lifecycle call returns. Later exporter callbacks do not count that
+export again. HTTP cleanup continues through the official exporter.
 Export and lifecycle failures reach `onError` and diagnostic counters.
 `shutdown()` is idempotent. Hosts with existing SDKs use the direct adapter and
 continue to own their providers.

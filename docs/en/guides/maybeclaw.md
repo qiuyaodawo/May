@@ -213,6 +213,7 @@ plaintext field and invalidates existing logins and event streams. A stopped
 service performs the conversion at its next startup. File conversion does not
 remove plaintext from editor history or backups; protect those separately.
 Invalid authentication configuration rejects authenticated access until corrected.
+Each authentication refresh reads configuration after previously queued configuration writes finish.
 The server prints its URL and channel status without credentials.
 The default data directory is `~/.may/maybeclaw`; `--data-directory` overrides it.
 

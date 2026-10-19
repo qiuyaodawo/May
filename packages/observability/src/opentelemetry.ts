@@ -137,24 +137,37 @@ export interface OtlpDiagnostics {
   readonly closed: boolean;
 }
 
+class ExportFailureTracker {
+  private readonly pending = new Set<(error: Error) => void>();
+  constructor(private readonly report: (error: unknown) => void) {}
+  track(callback: Parameters<OTLPTraceExporter["export"]>[1]): Parameters<OTLPTraceExporter["export"]>[1] {
+    const fail = (error: Error) => { if (this.pending.delete(fail)) this.report(error); };
+    this.pending.add(fail);
+    return result => {
+      if (result.code !== 0) fail(result.error ?? new Error("OTLP export failed"));
+      else this.pending.delete(fail);
+      callback(result);
+    };
+  }
+  expire(error: Error): void { for (const fail of this.pending) fail(error); }
+}
+
 class ReportingTraceExporter extends OTLPTraceExporter {
+  private readonly failures = new ExportFailureTracker(error => this.report(error));
   constructor(config: ConstructorParameters<typeof OTLPTraceExporter>[0], private readonly report: (error: unknown) => void) { super(config); }
   override export(spans: Parameters<OTLPTraceExporter["export"]>[0], callback: Parameters<OTLPTraceExporter["export"]>[1]): void {
-    super.export(spans, result => {
-      if (result.code !== 0) this.report(result.error ?? new Error("OTLP trace export failed"));
-      callback(result);
-    });
+    super.export(spans, this.failures.track(callback));
   }
+  expire(error: Error): void { this.failures.expire(error); }
 }
 
 class ReportingMetricExporter extends OTLPMetricExporter {
+  private readonly failures = new ExportFailureTracker(error => this.report(error));
   constructor(config: ConstructorParameters<typeof OTLPMetricExporter>[0], private readonly report: (error: unknown) => void) { super(config); }
   override export(metrics: Parameters<OTLPMetricExporter["export"]>[0], callback: Parameters<OTLPMetricExporter["export"]>[1]): void {
-    super.export(metrics, result => {
-      if (result.code !== 0) this.report(result.error ?? new Error("OTLP metric export failed"));
-      callback(result);
-    });
+    super.export(metrics, this.failures.track(callback));
   }
+  expire(error: Error): void { this.failures.expire(error); }
 }
 
 export function createOtlpTelemetry(options: OtlpTelemetryOptions): {
@@ -185,12 +198,21 @@ export function createOtlpTelemetry(options: OtlpTelemetryOptions): {
   const tracer = new OpenTelemetryTracer({ tracer: traceProvider.getTracer("@sortedyuan/observability"), metrics, ...(options.observer === undefined ? {} : { observer: options.observer }), ...(options.onError === undefined ? {} : { onError: options.onError }) });
   let closed = false;
   const lifecycle = async (action: () => Promise<unknown>): Promise<void> => {
-    try { await withTimeout(action(), Math.min(timeoutMs * 2, 2_147_483_647)); } catch (error) { lifecycleFailures += 1; report(error); }
+    try {
+      await withTimeout(action(), Math.min(timeoutMs * 2, 2_147_483_647), error => {
+        traceExporter.expire(error);
+        metricExporter.expire(error);
+      });
+    } catch (error) { lifecycleFailures += 1; report(error); }
   };
   return {
     tracer, metrics,
     getDiagnostics: () => ({ traceExportFailures: traceFailures, metricExportFailures: metricFailures, lifecycleFailures, droppedMetricSeries: metrics.droppedSeries, closed }),
-    forceFlush: () => lifecycle(() => settleOperations([traceProvider.forceFlush(), metricProvider.forceFlush()])),
+    forceFlush: () => lifecycle(async () => {
+      const providers = await Promise.allSettled([traceProvider.forceFlush(), metricProvider.forceFlush()]);
+      const exporters = await Promise.allSettled([traceExporter.forceFlush(), metricExporter.forceFlush()]);
+      throwRejectedOperations([...providers, ...exporters]);
+    }),
     shutdown: async () => {
       if (closed) return;
       closed = true;
@@ -204,14 +226,26 @@ function positive(value: number): number {
   return value;
 }
 
-async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, onTimeout: (error: Error) => void): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  try { return await Promise.race([operation, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("Telemetry lifecycle timed out")), timeoutMs); })]); }
+  try {
+    return await Promise.race([operation, new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        const error = new Error("Telemetry lifecycle timed out");
+        onTimeout(error);
+        reject(error);
+      }, timeoutMs);
+    })]);
+  }
   finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
 async function settleOperations(operations: readonly Promise<unknown>[]): Promise<void> {
   const settled = await Promise.allSettled(operations);
+  throwRejectedOperations(settled);
+}
+
+function throwRejectedOperations(settled: readonly PromiseSettledResult<unknown>[]): void {
   const errors = settled.filter((value): value is PromiseRejectedResult => value.status === "rejected").map(value => value.reason);
   if (errors.length > 0) throw new AggregateError(errors, "Telemetry lifecycle failed");
 }

@@ -222,6 +222,8 @@ temporary file before atomically replacing the rule file. Parent-directory
 flush is performed where supported by Node.js. Unsupported formats, symbolic
 links, and files with multiple links fail validation. Read or write failure
 prevents further access through that store instance.
+File and lock identity checks use full-precision file identifiers, including on
+Windows. A replaced lock prevents access and is preserved during close.
 
 One file store owns each path. Share that instance among local executors that
 use the same file. Close all owning executors before `await ruleStore.close()`;

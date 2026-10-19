@@ -188,6 +188,8 @@ operations, and replaces files atomically after flushing the temporary file.
 The parent directory is also flushed where Node.js supports it. Invalid data,
 unsupported versions, symbolic links, and multiple file links are rejected.
 A failed file read or write prevents subsequent storage access.
+File and lock identity checks use full-precision file identifiers on all
+platforms. A replaced lock prevents access and is preserved during close.
 
 One file store owns each path at a time. Applications may share that store
 among executors for the same local process. The owner must close its executors

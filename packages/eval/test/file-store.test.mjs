@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { once } from "node:events";
 import { test } from "node:test";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -34,6 +35,39 @@ test("JSON record validation rejects corrupted plans and trial states", async ()
     await assert.rejects(store.writeTrial("records", { trial: { id: "other", experimentId: "records" } }), /Invalid trial state/);
     assert.equal(await store.readTrial("records", "absent"), undefined);
   } finally { await release(); await rm(root, { recursive: true, force: true }); }
+});
+
+test("跨进程读取与原子更新共享完整的 JSON 记录", async () => {
+  const root = await directory();
+  const store = new FileEvalStore({ directory: root });
+  const release = await store.acquire("concurrent");
+  const initial = plan("concurrent");
+  let child;
+  let ended;
+  let errors = "";
+  try {
+    await store.createPlan(initial);
+    child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", fileURLToPath(new URL("./fixtures/record-reader.mjs", import.meta.url)), root], { windowsHide: true, stdio: ["ignore", "ignore", "pipe", "ipc"] });
+    child.stderr.on("data", data => { errors += data; });
+    ended = once(child, "exit");
+    const prematureExit = ended.then(([code]) => { throw new Error(`Reader exited before completion: ${code}; ${errors}`); });
+    assert.equal((await Promise.race([once(child, "message"), prematureExit]))[0], "ready");
+    for (let index = 1; index <= 100; index++) {
+      await store.appendTrial("concurrent", { ...initial.trials[0], id: `trial-${index + 1}`, ordinal: index }, initial.fingerprints[initial.trials[0].id]);
+    }
+    const completed = once(child, "message");
+    child.send("stop");
+    const [result] = await Promise.race([completed, prematureExit]);
+    assert.ok(result.reads > 0);
+    assert.equal(result.trials, 101);
+    assert.equal((await ended)[0], 0);
+    assert.equal(errors, "");
+  } finally {
+    if (child !== undefined && child.exitCode === null && child.signalCode === null) child.kill();
+    await ended;
+    await release();
+    await rm(root, { recursive: true, force: true });
+  }
 });
 test("evidence filenames hash bounded identifiers and telemetry uses bounded JSON records", async () => {
   const root = await directory(); const store = new FileEvalStore({ directory: root }); const release = await store.acquire("evidence");

@@ -36,7 +36,7 @@ test("packed Git workspace subpath installs and runs in an independent consumer"
     .map(([name, path]) => `  ${JSON.stringify(name)}: ${JSON.stringify(path)}`).join("\n")}\n`);
   const store = (await runPnpm(pnpm, ["store", "path"], repository)).trim();
   await runPnpm(pnpm, ["install", "--offline", "--ignore-scripts", "--store-dir", store], consumer);
-  const installed = JSON.parse(await readFile(join(consumer, "node_modules", "@may", "application", "package.json"), "utf8"));
+  const installed = JSON.parse(await readFile(join(consumer, "node_modules", "@sortedyuan", "application", "package.json"), "utf8"));
   assert.equal(installed.dependencies["simple-git"], "^4.0.2");
   assert.equal(installed.dependencies.diff, "9.0.0");
   assert.ok(Object.values(installed.dependencies).every(value => !value.startsWith("workspace:")));

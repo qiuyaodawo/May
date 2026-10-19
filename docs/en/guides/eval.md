@@ -328,6 +328,15 @@ ownership after process termination. State replacement is atomic; the store
 validates identities and schema before reading or writing. Keep the ownership
 database in place while any process uses the experiment.
 
+Each JSON record directory also contains `record-access.sqlite`. Short SQLite
+transactions coordinate record reads, initial plan creation, and atomic replacement
+across processes. Lock acquisition waits for at most five seconds; record reads
+and replacements execute synchronously while holding the lock. Readers need write
+access to these directories. Keep access databases in place while processes use
+the store. To upgrade an existing store, stop its readers and writers, update all
+of them together, and ensure the directories are writable. Access databases are
+created automatically; existing JSON records keep their format.
+
 Default events include allowlisted accounting and identity fields. The evidence
 policy limits item bytes, trial bytes and item count. Content retention requires
 `retainContent: true`. A host `redact` function removes project-specific secrets

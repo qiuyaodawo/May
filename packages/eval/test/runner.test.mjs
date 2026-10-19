@@ -68,11 +68,20 @@ test("run budget duration and cancellation stop real executions", async () => {
   const limited = await setup("budget-time"); limited.experiment.variants[0].execution.options = { mode: "hang" }; limited.experiment.cases[0].limits.runBudget = { maxDurationMs: 700 };
   const cancelled = await setup("cancelled"); cancelled.experiment.variants[0].execution.options = { mode: "hang" };
   const controller = new AbortController(); const runner = new EvalRunner({ registry: cancelled.registry, store: cancelled.store, signal: controller.signal });
+  let running;
   try {
     const report = await limited.runner.run(limited.experiment); assert.equal(report.trials[0].executionStatus, "limited"); assert.ok(report.trials[0].metrics.durationMs.value < 3_000);
-    const running = runner.run(cancelled.experiment); await waitFor(async () => { const state = await cancelled.store.readTrial("cancelled", "trial-1"); if (state?.environmentId === undefined) return false; try { await access(join(state.environmentId, "workspace", "process.json")); return true; } catch (error) { if (error.code !== "ENOENT") throw error; return false; } }); controller.abort(new Error("User cancelled evaluation"));
+    running = runner.run(cancelled.experiment);
+    await waitFor(async () => {
+      const state = await cancelled.store.readTrial("cancelled", "trial-1");
+      if (state?.endedAt !== undefined) throw new Error(`Execution ended before cancellation: ${JSON.stringify(state)}`);
+      if (state?.environmentId === undefined) return false;
+      try { await access(join(state.environmentId, "workspace", "process.json")); return true; }
+      catch (error) { if (error.code !== "ENOENT") throw error; return false; }
+    });
+    controller.abort(new Error("User cancelled evaluation"));
     const result = await running; assert.equal(result.trials[0].executionStatus, "cancelled"); assert.equal(result.trials[0].taskVerdict, "not-evaluated"); await assert.rejects(access(join(result.trials[0].environmentId, "workspace")));
-  } finally { controller.abort(); await rm(limited.directory, { recursive: true, force: true }); await rm(cancelled.directory, { recursive: true, force: true }); }
+  } finally { controller.abort(); await running; await rm(limited.directory, { recursive: true, force: true }); await rm(cancelled.directory, { recursive: true, force: true }); }
 });
 test("retained output and evidence share the registered redactor", async () => {
   const context = await setup("redacted"); context.experiment.variants[0].execution.options = { mode: "private-output" }; context.experiment.evidencePolicy = { maxItems: 64, maxItemBytes: 65_536, maxTrialBytes: 1_048_576, retainContent: true, redactorId: "project-text", redactorVersion: "1", redact: value => value.replaceAll("private-candidate-value", "[redacted]") };
@@ -99,7 +108,15 @@ test("resume preserves an interrupted execution until its host confirms terminat
   delete context.experiment.variants[0].execution.options;
   const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", fileURLToPath(new URL("./fixtures/interrupted-runner.mjs", import.meta.url)), context.directory, sourceDirectory], { stdio: ["ignore", "pipe", "pipe"] }); let errorOutput = ""; child.stderr.on("data", value => { errorOutput += value; }); let processId; let environmentId;
   try {
-    await waitFor(async () => { const state = await context.store.readTrial("interrupted", "trial-1"); if (state?.environmentId === undefined) return false; environmentId = state.environmentId; try { processId = JSON.parse(await readFile(join(environmentId, "workspace", "process.json"), "utf8")).pid; return true; } catch (error) { if (error.code !== "ENOENT") throw error; return false; } });
+    await waitFor(async () => {
+      const state = await context.store.readTrial("interrupted", "trial-1");
+      if (state?.endedAt !== undefined) throw new Error(`Execution ended before interruption: ${JSON.stringify(state)}`);
+      if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Runner exited before readiness: ${child.exitCode ?? child.signalCode}; ${errorOutput}`);
+      if (state?.environmentId === undefined) return false;
+      environmentId = state.environmentId;
+      try { processId = JSON.parse(await readFile(join(environmentId, "workspace", "process.json"), "utf8")).pid; return true; }
+      catch (error) { if (error.code !== "ENOENT") throw error; return false; }
+    });
     const ended = new Promise(resolvePromise => child.once("exit", resolvePromise)); child.kill(); await ended;
     const report = await context.runner.resume("interrupted"); assert.equal(report.trials[0].executionStatus, "interrupted"); assert.ok(report.trials[0].errors.some(value => value.code === "termination-unconfirmed")); assert.equal(report.recorded, 1); await access(join(environmentId, "workspace", "result.txt"));
   } finally { if (child.exitCode === null && child.signalCode === null) child.kill(); if (processId !== undefined) await new Promise(resolvePromise => treeKill(processId, "SIGKILL", () => resolvePromise())); await rm(context.directory, { recursive: true, force: true }); }

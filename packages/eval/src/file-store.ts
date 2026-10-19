@@ -1,6 +1,7 @@
 import { randomUUID, createHash } from "node:crypto";
-import { open, mkdir, readFile, rename, unlink, stat, lstat } from "node:fs/promises";
-import { resolve, join, relative, isAbsolute } from "node:path";
+import { closeSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { open, mkdir, unlink, stat, lstat } from "node:fs/promises";
+import { resolve, join, relative, isAbsolute, dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Ajv } from "ajv";
 import { validateUsageCost } from "@sortedyuan/core";
@@ -38,8 +39,11 @@ export class FileEvalStore implements EvalStore {
     this.requireWriter(plan.experiment.id);
     if (!validatePlan(plan)) throw new TypeError(`Invalid experiment plan: ${JSON.stringify(validatePlan.errors)}`);
     const encoded = this.encode(plan);
-    const handle = await open(join(this.experimentPath(plan.experiment.id), "plan.json"), "wx");
-    try { await handle.writeFile(encoded); await handle.sync(); } finally { await handle.close(); }
+    const path = join(this.experimentPath(plan.experiment.id), "plan.json");
+    this.withRecordAccess(path, () => {
+      const handle = openSync(path, "wx");
+      try { writeFileSync(handle, encoded); fsyncSync(handle); } finally { closeSync(handle); }
+    });
   }
   async readPlan(experimentId: string): Promise<EvalPlan> {
     const value = await this.readJson(join(this.experimentPath(experimentId), "plan.json")) as EvalPlan;
@@ -138,13 +142,36 @@ export class FileEvalStore implements EvalStore {
     }
   }
   private encode(value: unknown): string { assertJson(value); const encoded = JSON.stringify(value, null, 2); if (Buffer.byteLength(encoded) > 33_554_432) throw new RangeError("Eval record exceeds 32 MiB"); return encoded; }
-  private async readJson(path: string): Promise<unknown> { if ((await stat(path)).size > 33_554_432) throw new RangeError("Eval record exceeds 32 MiB"); const value: unknown = JSON.parse(await readFile(path, "utf8")); assertJson(value); return value; }
+  private async readJson(path: string): Promise<unknown> {
+    await this.checkDirectory(dirname(path));
+    const contents = this.withRecordAccess(path, () => {
+      if (statSync(path).size > 33_554_432) throw new RangeError("Eval record exceeds 32 MiB");
+      return readFileSync(path, "utf8");
+    });
+    const value: unknown = JSON.parse(contents); assertJson(value); return value;
+  }
+  private withRecordAccess<T>(path: string, operation: () => T): T {
+    const directory = dirname(path);
+    if (!lstatSync(directory).isDirectory()) throw new Error("Eval record directory must be a regular directory");
+    const lockPath = join(directory, "record-access.sqlite");
+    try {
+      const metadata = lstatSync(lockPath);
+      if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Record access requires a regular SQLite file");
+    } catch (error) { if (!hasCode(error, "ENOENT")) throw error; }
+    const lock = new DatabaseSync(lockPath, { timeout: 5_000 });
+    try {
+      lock.exec("BEGIN IMMEDIATE");
+      const result = operation();
+      lock.exec("COMMIT");
+      return result;
+    } finally { lock.close(); }
+  }
   private async atomicWrite(path: string, value: unknown): Promise<void> {
     const encoded = this.encode(value);
     const temporary = `${path}.${randomUUID()}.writing`;
     const handle = await open(temporary, "wx");
     try { await handle.writeFile(encoded); await handle.sync(); } finally { await handle.close(); }
-    try { await rename(temporary, path); } catch (error) { await unlink(temporary); throw error; }
+    try { this.withRecordAccess(path, () => renameSync(temporary, path)); } catch (error) { await unlink(temporary); throw error; }
   }
 }
 function hasCode(value: unknown, code: string): boolean { return typeof value === "object" && value !== null && "code" in value && value.code === code; }
