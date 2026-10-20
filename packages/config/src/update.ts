@@ -9,6 +9,7 @@ import type { Stats } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
 import { withFileAccess } from "@sortedyuan/session/file-access";
+import { acquireFileLock, releaseFileLock } from "@sortedyuan/session/file-store";
 
 import {
   MayConfigFileError,
@@ -25,12 +26,12 @@ export async function updateDefaultMayModel(
 ): Promise<MayConfig> {
   const path = resolve(configPath);
   let lock;
-  try { lock = await open(`${path}.lock`, "wx", 0o600); }
+  try { lock = await acquireFileLock(`${path}.lock`); }
   catch (error) { throw new MayConfigWriteError(path, `configuration is locked: ${path}.lock; stop competing writers before recovering a stale lock`, { cause: error }); }
   try {
     await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
     return await withFileAccess(path, "exclusive", () => updateLocked(path, profile));
-  } finally { try { await lock.close(); } finally { await rm(`${path}.lock`); } }
+  } finally { await releaseFileLock(lock, `${path}.lock`); }
 }
 
 async function updateLocked(path: string, profile: string): Promise<MayConfig> {

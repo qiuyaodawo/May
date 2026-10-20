@@ -1,6 +1,6 @@
-import { replaceJournalFile } from "@sortedyuan/session/file-store";
+import { acquireFileLock, releaseFileLock, replaceJournalFile } from "@sortedyuan/session/file-store";
 import { withFileAccess } from "@sortedyuan/session/file-access";
-import { access, mkdir, open, readdir, unlink, type FileHandle } from "node:fs/promises";
+import { access, mkdir, open, readdir, type FileHandle } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 import { digest, validateId, validateSnapshot, type TaskSnapshot } from "./types.js";
@@ -76,7 +76,7 @@ export class FileTaskStore {
     await mkdir(join(this.directory, "tasks"), { recursive: true, mode: 0o700 });
     const lockPath = this.path(id, "lock");
     let lock: FileHandle;
-    try { lock = await open(lockPath, "wx", 0o600); }
+    try { lock = await acquireFileLock(lockPath); }
     catch (error) {
       if (isCode(error, "EEXIST")) throw new TaskLockedError(`Task is locked. Inspect status; never remove a live owner's lock: ${lockPath}`);
       throw error;
@@ -128,11 +128,11 @@ export class FileTaskStore {
         close: () => closing ??= (async () => {
           closed = true; await tail;
           try { await handle.close(); }
-          finally { await lock.close(); await unlink(lockPath); }
+          finally { await releaseFileLock(lock, lockPath); }
         })(),
       };
     } catch (error) {
-      await file?.close(); await lock.close(); await unlink(lockPath); throw error;
+      await file?.close(); await releaseFileLock(lock, lockPath); throw error;
     }
   }
 

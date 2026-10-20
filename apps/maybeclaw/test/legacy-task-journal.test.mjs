@@ -63,6 +63,7 @@ test("legacy task checkpoints remain readable while another process inspects the
   assert.equal(report.revision, current.revision);
   assert.equal(errors, "");
   await journal.close();
+  const beforeInspection = (await readdir(join(directory, "tasks"))).sort();
   const path = store.path(id, "jsonl");
   const bytes = await readFile(path);
   assert.ok(bytes.length <= 8 * 1024 * 1024);
@@ -70,7 +71,7 @@ test("legacy task checkpoints remain readable while another process inspects the
   await unlink(`${path}.access`);
   await unlink(`${path}.access.gate`);
   assert.deepEqual(await store.inspect(id), current);
-  assert.equal((await readdir(join(directory, "tasks"))).filter(name => name.endsWith(".access") || name.endsWith(".access.gate")).length, 2);
+  assert.deepEqual((await readdir(join(directory, "tasks"))).sort(), beforeInspection);
   await appendFile(path, '{"version":');
   assert.deepEqual(await store.inspect(id), current);
   journal = await store.acquire(id);

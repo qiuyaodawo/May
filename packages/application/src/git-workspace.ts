@@ -752,30 +752,34 @@ export class ProjectGitWorkspace {
     if (this.readOnly) return { close: async () => {} };
     await mkdir(this.directory, { recursive: true });
     const path = join(this.directory, `${scope}.lock`);
-    let handle: FileHandle;
-    try { handle = await open(path, "wx", 0o600); }
-    catch (error) {
-      if (!isFsError(error, "EEXIST")) throw error;
-      const owner = await readJson<{ pid: number; hostname: string }>(path);
-      if (!owner || owner.hostname !== hostname() || processAlive(owner.pid)) throw new GitWorkspaceConflictError("Git workspace is already in use by another process", { cause: error });
-      const reclaimPath = `${path}.reclaim`;
-      const reclaim = await open(reclaimPath, "wx", 0o600);
-      try {
-        const latest = await readJson<{ pid: number; hostname: string }>(path);
-        if (!latest || latest.hostname !== hostname() || processAlive(latest.pid)) throw new GitWorkspaceConflictError("Git workspace lock changed during recovery");
-        await rm(path);
-        handle = await open(path, "wx", 0o600);
-      } finally { await reclaim.close(); await rm(reclaimPath); }
-    }
-    await handle.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname() }));
-    await handle.sync();
-    let closed = false;
-    return { close: async () => {
-      if (closed) return;
-      closed = true;
-      await handle.close();
-      await rm(path);
-    } };
+    return withFileAccess(path, "exclusive", async () => {
+      let handle: FileHandle;
+      try { handle = await open(path, "wx", 0o600); }
+      catch (error) {
+        if (!isFsError(error, "EEXIST")) throw error;
+        const owner = await readLockOwner(path);
+        if (owner.hostname !== hostname() || processAlive(owner.pid)) throw new GitWorkspaceConflictError("Git workspace is already in use by another process", { cause: error });
+        const reclaimPath = `${path}.reclaim`;
+        const reclaim = await open(reclaimPath, "wx", 0o600);
+        try {
+          const latest = await readLockOwner(path);
+          if (latest.hostname !== hostname() || processAlive(latest.pid)) throw new GitWorkspaceConflictError("Git workspace lock changed during recovery");
+          await rm(path);
+          handle = await open(path, "wx", 0o600);
+        } finally { await reclaim.close(); await rm(reclaimPath); }
+      }
+      await handle.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname() }));
+      await handle.sync();
+      let closing: Promise<void> | undefined;
+      return { close: () => closing ??= (async () => {
+        try {
+          await withFileAccess(path, "exclusive", async () => {
+            try { await handle.close(); }
+            finally { await rm(path); }
+          });
+        } finally { await handle.close(); }
+      })() };
+    });
   }
 
   private async updateWorktree(id: string, update: (record: ManagedGitWorktree) => ManagedGitWorktree): Promise<ManagedGitWorktree> {
@@ -848,6 +852,21 @@ function isWithin(root: string, path: string): boolean {
 }
 function isFsError(error: unknown, code: string): boolean { return typeof error === "object" && error !== null && "code" in error && error.code === code; }
 function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }
+async function readLockOwner(path: string): Promise<{ pid: number; hostname: string }> {
+  let owner: unknown;
+  try { owner = JSON.parse(await readFile(path, "utf8")); }
+  catch (error) {
+    if (error instanceof SyntaxError || isFsError(error, "ENOENT")) {
+      throw new GitWorkspaceConflictError("Git workspace lock metadata is incomplete or changed; verify its owner before recovery", { cause: error });
+    }
+    throw error;
+  }
+  if (owner === null || typeof owner !== "object" || !("pid" in owner) || !("hostname" in owner) ||
+      !Number.isSafeInteger(owner.pid) || (owner.pid as number) <= 0 || typeof owner.hostname !== "string") {
+    throw new GitWorkspaceConflictError("Git workspace lock metadata is incomplete; verify its owner before recovery");
+  }
+  return owner as { pid: number; hostname: string };
+}
 function processAlive(pid: number): boolean {
   if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error("Git lock contains an invalid PID");
   try { process.kill(pid, 0); return true; }

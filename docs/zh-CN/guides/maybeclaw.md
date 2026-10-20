@@ -342,6 +342,9 @@ Provider 继续验证其实际输入能力。
 `gateway.sqlite` 通过事务保存会话、对话关联、消息、任务、审批、默认值、请求凭据
 和投递记录。May 历史继续使用 Session 存储。`host.lock` 阻止其他进程同时写入。
 处理遗留文件前需要核对其中记录的所有者已经停止。
+历史任务锁和配置初始化锁保留 `.lock.access` 与 `.lock.access.gate` 文件，
+用于协调创建与删除。目录使用和恢复期间保留这些文件，具体要求参阅
+[本地存储维护](custom-storage.md#本地存储维护)。
 
 历史 JSONL 任务与渠道日志在不同进程之间协调查询、追加记录、修复末尾记录和检查点
 替换。每个日志保留 `<journal-path>.access` 和 `<journal-path>.access.gate` 文件。

@@ -236,8 +236,11 @@ console.log(state.revision);
 首次调用会使用 `0600` 模式创建两个空文件：`<path>.access` 和
 `<path>.access.gate`。存储使用期间需要保留这两个文件；删除或替换它们之前，
 需要停止全部使用者。写入者等待已有读取者结束时会持有 gate，后续读取请求随之等待。
-获取访问锁时每隔 10 ms 检查一次，等待 30 秒后以 `ETIMEDOUT` 拒绝请求。
-回调自身没有时间限制。
+获取访问锁时每隔 10 ms 检查一次，默认等待 30 秒后以 `ETIMEDOUT` 拒绝请求。
+`timeoutMs` 接受正的有限数字，单位为毫秒，用于设置获取访问锁的等待期限。
+通过 `signal` 传入 `AbortSignal` 可以取消等待；调用前已经取消时，不会创建标记文件。
+超时和取消都会释放已经获取的 gate 并关闭句柄。回调开始后，即使收到取消信号，
+也会保留访问锁直到回调完成。回调自身没有时间限制，需要自行处理执行期间的取消。
 
 只读进程需要提前使用目录写入权限初始化两个标记文件，然后传入
 `{ initialize: false }`。这个选项不会创建标记文件；缺少任何一个标记文件都会报告
@@ -283,6 +286,13 @@ Context 工作集与持久化历史的区别见[自定义 Context](custom-contex
 `await catalog.compact({ confirmHostsStopped: true })`。原子写入的版本 2 快照在清理前
 记录已吸收的精确操作文件名，因此清理中断不会重复重放。合并后不能使用旧版读取器；
 普通版本 1 目录仍可读取。
+
+`@sortedyuan/session/file-store` 的 `acquireFileLock(path)` 和
+`releaseFileLock(file, path)` 通过永久保留的 `<path>.access` 和
+`<path>.access.gate` 文件协调锁文件的创建与删除。并发创建或删除最多等待
+30 秒；已有所有者时，获取锁仍以 `EEXIST` 拒绝。再次使用存储前需要等待释放完成。
+使用和恢复期间保留两个访问协调文件，并同时升级全部参与进程。这些规则同样适用于
+Coordination 日志、资源日志、远程 Worker、Team 验证、Team patch 应用和默认模型配置更新。
 
 本地写入者锁可从 `@sortedyuan/session/file-store` 导入 `recoverFileLock` 处理。必须先停止所有
 竞争宿主、打开和恢复操作，检查锁内容，再以 `expectedContents` 传入完整原文，并设置

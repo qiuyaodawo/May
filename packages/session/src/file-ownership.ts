@@ -7,7 +7,7 @@ import { withFileAccess } from "./file-access.js";
 
 /** Local cooperative ownership. Recovery requires an explicitly quiescent host. */
 export async function acquireFileLock(path: string): Promise<FileHandle> {
-  try { return await open(path, "wx", 0o600); }
+  try { return await withFileAccess(path, "exclusive", () => open(path, "wx", 0o600)); }
   catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
     throw Object.assign(new Error(`Writer lock exists: ${path}. Stop all hosts using this data, inspect the owner, then use recoverFileLock with the exact lock contents. Never remove a live owner's lock.`, { cause: error }), { code: "EEXIST" });
@@ -44,7 +44,11 @@ export async function recoverFileLock(path: string, options: {
 }
 
 export async function releaseFileLock(file: FileHandle, path: string): Promise<void> {
-  try { await file.close(); } finally { await unlink(path); }
+  try {
+    await withFileAccess(path, "exclusive", async () => {
+      try { await file.close(); } finally { await unlink(path); }
+    });
+  } finally { await file.close(); }
 }
 
 export async function syncDirectory(path: string): Promise<void> {

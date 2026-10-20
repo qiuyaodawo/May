@@ -479,6 +479,11 @@ repaired automatically; complete malformed records fail closed. This is a local
 filesystem contract, not a network/distributed lock or a power-loss guarantee for
 every filesystem's directory metadata.
 
+Creation and release of the owner file are coordinated through permanent
+`<lock-path>.access` and `<lock-path>.access.gate` files. Keep these files during
+recovery and upgrade all processes sharing the directory together. See
+[local storage maintenance](custom-storage.md#local-storage-maintenance).
+
 ## Integrate a custom conversation host
 
 For a host that manages persistent conversations, implement `CoordinationAgent`

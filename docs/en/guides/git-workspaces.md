@@ -108,6 +108,11 @@ try {
 A lease covers all file changes and checks in one complete user request. It
 uses an exclusive filesystem lock for the repository working directory,
 including across processes. Independent linked worktrees have separate locks.
+Permanent `.lock.access` and `.lock.access.gate` files coordinate owner metadata
+publication, recovery and release. Keep these files while any process uses the
+workspace and upgrade participating processes together. An incomplete owner
+record rejects acquisition with `GitWorkspaceConflictError` and requires owner
+verification. Concurrent `close()` calls wait for the same release to finish.
 With automatic commits enabled, each round saves existing changes before accepting
 new tool writes. This includes user edits made between requests in the same Session.
 Without automatic commits, the first round records the initial state if needed.

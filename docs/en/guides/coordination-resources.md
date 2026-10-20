@@ -227,6 +227,11 @@ ambiguous writes fail closed. Do not remove locks while an owner may still be li
 These files do not implement distributed locking or automatic stale-lock recovery.
 Close the coordination runtime and await its active work before closing resources.
 
+Creation and release of each owner file use permanent `<lock-path>.access` and
+`<lock-path>.access.gate` files. Preserve them during recovery and upgrade all
+processes sharing the directory together, following
+[local storage maintenance](custom-storage.md#local-storage-maintenance).
+
 Resource journal inspection coordinates with appends, repair and checkpoint
 replacement through permanent `.access` and `.access.gate` files beside each journal.
 Their first creation requires directory write permission; subsequent inspection uses

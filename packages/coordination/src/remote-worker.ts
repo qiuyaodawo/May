@@ -1,8 +1,9 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { mkdir, open, readFile, unlink, type FileHandle } from "node:fs/promises";
+import { mkdir, open, readFile, type FileHandle } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { AsyncStateSerializer, type AgentApplicationEvent } from "@sortedyuan/application";
+import { acquireFileLock, releaseFileLock } from "@sortedyuan/session/file-store";
 import { isStreamingMayEvent, validateTelemetryCorrelation } from "@sortedyuan/core";
 import type { ApprovalDecision } from "@sortedyuan/permissions";
 import type { CoordinationAgent, TaskExecution, TaskRecovery } from "./types.js";
@@ -74,7 +75,7 @@ export class CoordinationWorker {
     validateToken(options.token);
     const directory = resolve(options.directory); await mkdir(directory, { recursive: true });
     const lockPath = join(directory, "worker.lock"), path = join(directory, "worker.jsonl");
-    const lock = await open(lockPath, "wx"); let file: FileHandle | undefined;
+    const lock = await acquireFileLock(lockPath); let file: FileHandle | undefined;
     try {
       await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
       file = await open(path, "a+");
@@ -95,7 +96,7 @@ export class CoordinationWorker {
         await worker.recordRecovery(job, await worker.inspect(job));
       }
       return worker;
-    } catch (error) { await file?.close(); await lock.close(); await unlink(lockPath); throw error; }
+    } catch (error) { await file?.close(); await releaseFileLock(lock, lockPath); throw error; }
   }
 
   /** Pass to an HTTPS server, or an HTTP server bound to loopback. No CORS/browser API. */
@@ -306,7 +307,7 @@ export class CoordinationWorker {
             await this.recordRecovery(job, await this.inspect(job));
           }
         });
-      } finally { await this.serial.close(); await this.file.close(); await this.lock.close(); await unlink(this.lockPath); }
+      } finally { await this.serial.close(); await this.file.close(); await releaseFileLock(this.lock, this.lockPath); }
     })();
   }
 }

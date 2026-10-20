@@ -129,8 +129,12 @@ move their OS-bound master key.
 
 Credential operations use exclusive lock files. If a process crashes, inspect
 the PID in its `.lock` file and verify it has exited before removing that lock;
-the library does not steal a live lock based on age. Unlock the OS keyring or
-inject a secure store on headless systems.
+the library does not steal a live lock based on age. Permanent `.lock.access`
+and `.lock.access.gate` files coordinate the complete creation, use and deletion
+of each `.lock`, including the Windows pending-delete interval. Acquisition waits
+up to 10 seconds and accepts cancellation. Once work starts, both locks remain held
+until it finishes. Preserve the permanent access files during manual recovery.
+Unlock the OS keyring or inject a secure store on headless systems.
 
 Encrypted record reads, replacements and deletions also coordinate across
 processes using permanent `<record-path>.access` and `<record-path>.access.gate`

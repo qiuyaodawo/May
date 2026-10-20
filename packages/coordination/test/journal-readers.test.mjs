@@ -70,6 +70,7 @@ for (const kind of ["coordination", "resource"]) {
     assert.equal(report.revision, 65);
     assert.equal(errors, "");
     await journal.close();
+    const beforeInspection = (await readdir(directory)).sort();
     const path = join(directory, kind === "coordination" ? `${Buffer.from("reading").toString("base64url")}.jsonl` : "resource.jsonl");
     await unlink(`${path}.access`);
     await unlink(`${path}.access.gate`);
@@ -77,8 +78,7 @@ for (const kind of ["coordination", "resource"]) {
       ? await new FileCoordinationStore(directory, maxBytes).inspect("reading")
       : await ResourceJournal.inspect(path, validateResource, maxBytes);
     assert.equal(inspected.revision, 65);
-    const entries = await readdir(directory);
-    assert.equal(entries.filter(name => name.endsWith(".access") || name.endsWith(".access.gate")).length, 2);
+    assert.deepEqual((await readdir(directory)).sort(), beforeInspection);
   });
 }
 

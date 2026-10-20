@@ -411,6 +411,10 @@ before releasing the data directory.
 request receipts, and delivery records transactionally. May histories remain in
 Session stores. `host.lock` protects against concurrent writers; check a recorded
 owner has stopped before handling an abandoned lock.
+Legacy task locks and configuration initialization locks retain `.lock.access`
+and `.lock.access.gate` files to coordinate creation and deletion. Preserve these
+files while the directory is in use, including during recovery; see
+[Local storage maintenance](custom-storage.md#local-storage-maintenance).
 
 Legacy JSONL task and channel journals coordinate inspection with appends, tail
 repair and checkpoint replacement across processes. Each journal retains

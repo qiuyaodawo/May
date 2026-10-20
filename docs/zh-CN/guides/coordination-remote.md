@@ -120,6 +120,9 @@ Worker、查询恢复和关闭 Worker 时，都会再次交付仍未确认的已
 （默认 64 MiB）。只修复未完成的末尾记录，完整记录损坏时拒绝继续。
 崩溃后必须确认旧进程停止，才可人工移除遗留锁。保留 Worker 与 Session
 两份存储，不能删除证据来强行重试。
+日志使用期间保留 `worker.lock.access` 和 `worker.lock.access.gate`；
+它们协调 `worker.lock` 的创建与删除。共享目录的全部进程需要同时升级，
+具体要求参阅[本地存储维护](custom-storage.md#本地存储维护)。
 
 ## 范围
 

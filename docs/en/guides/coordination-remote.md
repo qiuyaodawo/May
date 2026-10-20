@@ -137,6 +137,10 @@ and bounded sizes (64 MiB by default). Only an incomplete final record is repair
 corrupt complete records fail closed. After a crash, verify the old process has
 stopped before manually removing its stale lock. Preserve both worker and Session
 storage; do not delete evidence to force a retry.
+Keep `worker.lock.access` and `worker.lock.access.gate` alongside the journal
+while it is in use. They coordinate creation and deletion of `worker.lock`;
+upgrade every process sharing the directory together. See
+[Local storage maintenance](custom-storage.md#local-storage-maintenance).
 
 ## Scope
 

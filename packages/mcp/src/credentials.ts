@@ -117,27 +117,38 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
   }
 
   async exclusive<T>(key: string, work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    signal?.throwIfAborted();
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
     const path = join(this.directory, `${digest(key)}.lock`);
-    const deadline = Date.now() + 10_000;
-    let file;
-    while (file === undefined) {
-      signal?.throwIfAborted();
-      try { file = await open(path, "wx", 0o600); }
-      catch (error) {
-        if (!hasCode(error, "EEXIST")) throw new McpCredentialStoreError();
-        if (Date.now() >= deadline) {
-          throw new McpCredentialStoreError("MCP credentials are locked by another operation; if it crashed, verify its PID has exited before removing the vault .lock file");
-        }
-        await delay(50, undefined, signal === undefined ? {} : { signal });
-      }
-    }
+    const deadline = performance.now() + 10_000;
+    let entered = false;
     try {
-      await file.writeFile(JSON.stringify({ pid: process.pid, createdAt: Date.now() }));
-      return await work();
-    } finally {
-      await file.close();
-      await unlink(path);
+      return await withFileAccess(path, "exclusive", async () => {
+        entered = true;
+        let file;
+        while (file === undefined) {
+          signal?.throwIfAborted();
+          try { file = await open(path, "wx", 0o600); }
+          catch (error) {
+            if (!hasCode(error, "EEXIST")) throw new McpCredentialStoreError();
+            if (performance.now() >= deadline) {
+              throw new McpCredentialStoreError("MCP credentials are locked by another operation; if it crashed, verify its PID has exited before removing the vault .lock file");
+            }
+            await delay(50, undefined, signal === undefined ? {} : { signal });
+          }
+        }
+        try {
+          await file.writeFile(JSON.stringify({ pid: process.pid, createdAt: Date.now() }));
+          signal?.throwIfAborted();
+          return await work();
+        } finally {
+          try { await file.close(); }
+          finally { await unlink(path); }
+        }
+      }, { timeoutMs: 10_000, ...(signal === undefined ? {} : { signal }) });
+    } catch (error) {
+      if (entered || signal?.aborted) throw error;
+      throw new McpCredentialStoreError(undefined, hasCode(error, "ETIMEDOUT") ? "lock-timeout" : "storage-unavailable");
     }
   }
 

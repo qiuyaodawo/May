@@ -32,7 +32,12 @@ implementation when selected; image codecs and Web server assets load when used.
 - `pnpm --filter <package-name> test` checks one package; replace the placeholder
   with its `package.json` name.
 - `pnpm test` runs the offline workspace suite and continues through packages
-  before reporting failures.
+  before reporting failures. Successful package tests are followed by the file-lock checks.
+- `pnpm test:locks`, after `pnpm build`, checks lock ownership, process termination,
+  failed initialization and release through actual package and application APIs.
+  Windows also runs controlled pending-delete tests using PowerShell and the
+  Windows file API. Test data resides under the ignored `review/file-lock-matrix/`;
+  Team patch checks remove the temporary source's application lock files after use.
 - `pnpm test:coverage` runs the available coverage checks.
 - `pnpm test:path-alias` runs the suite with a Windows junction or POSIX symlink
   for temporary paths to detect canonical-path assumptions.

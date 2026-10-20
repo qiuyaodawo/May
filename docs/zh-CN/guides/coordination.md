@@ -421,6 +421,10 @@ await runtime.resolveRecovery(
 未以换行结束的 JSONL 记录会被自动修复；完整但损坏的记录会阻止打开。这是本地
 文件系统的所有权机制；它仅保护本地写入，目录元数据的断电安全由具体文件系统决定。
 
+创建和释放所有权文件时，通过永久保留的 `<lock-path>.access` 和
+`<lock-path>.access.gate` 文件协调访问。恢复时保留这些文件，共用目录的全部进程
+需要一起升级。参阅[本地存储维护](custom-storage.md#本地存储维护)。
+
 ## 接入自定义对话宿主
 
 管理持久对话的宿主可以实现 `CoordinationAgent`，使用

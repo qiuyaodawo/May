@@ -28,7 +28,12 @@ Web 服务资源在使用时加载。
   锚点、表达及示例需要另外检查。
 - `pnpm --filter <package-name> test`：检查一个 package，使用其 `package.json` 中
   的名称替换参数。
-- `pnpm test`：执行工作目录中的离线测试，继续检查各个 package 后报告失败。
+- `pnpm test`：执行工作目录中的离线测试，继续检查各个 package 后报告失败；
+  package 测试全部通过后执行文件锁检查。
+- `pnpm test:locks`：在 `pnpm build` 后运行，通过实际 package 与应用 API 检查
+  锁所有权、进程终止、初始化失败和释放。Windows 还通过 PowerShell 与 Windows
+  文件 API 控制待删除状态，验证竞争时序。测试数据位于忽略的
+  `review/file-lock-matrix/`；Team patch 检查结束后清理临时来源目录对应的应用锁文件。
 - `pnpm test:coverage`：执行各个 package 提供的覆盖率检查。
 - `pnpm test:path-alias`：通过 Windows junction 或 POSIX symlink 使用临时目录，
   检查代码对规范路径的假设。

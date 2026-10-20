@@ -148,3 +148,54 @@ test("a timed-out writer releases the entrance gate for later access", { timeout
   assert.deepEqual(await reader.closed, [0, null]);
   await withFileAccess(path, "exclusive", async () => {});
 });
+
+test("custom timeout and cancellation release the entrance gate", { timeout: 10_000 }, async t => {
+  const { path, start } = await setup(t);
+  const reader = start("hold", path, "shared");
+  await reader.first;
+  let actions = 0;
+  const started = performance.now();
+  await assert.rejects(withFileAccess(path, "exclusive", async () => { actions += 1; }, { timeoutMs: 80 }), { code: "ETIMEDOUT" });
+  assert.ok(performance.now() - started >= 80);
+  await withFileAccess(path, "shared", async () => {}, { timeoutMs: 500 });
+  const controller = new AbortController();
+  const waiting = withFileAccess(path, "exclusive", async () => { actions += 1; }, { signal: controller.signal });
+  const rejected = assert.rejects(waiting, { name: "AbortError" });
+  await delay(100);
+  controller.abort();
+  await rejected;
+  await withFileAccess(path, "shared", async () => {}, { timeoutMs: 500 });
+  assert.equal(actions, 0);
+  reader.child.send("release");
+  assert.deepEqual(await reader.closed, [0, null]);
+  await withFileAccess(path, "exclusive", async () => {}, { timeoutMs: 500 });
+});
+
+test("cancellation during an action retains ownership until the action settles", async t => {
+  const { path } = await setup(t);
+  const controller = new AbortController();
+  const entered = Promise.withResolvers();
+  const released = Promise.withResolvers();
+  const owner = withFileAccess(path, "exclusive", async () => {
+    entered.resolve();
+    await released.promise;
+    return 42;
+  }, { signal: controller.signal });
+  try {
+    await entered.promise;
+    controller.abort();
+    await assert.rejects(withFileAccess(path, "exclusive", async () => {}, { timeoutMs: 80 }), { code: "ETIMEDOUT" });
+  } finally { released.resolve(); }
+  assert.equal(await owner, 42);
+  await withFileAccess(path, "exclusive", async () => {});
+});
+
+test("invalid options and pre-aborted signals fail before creating markers", async t => {
+  const { path, directory } = await setup(t);
+  for (const timeoutMs of [0, -1, NaN, Infinity, "100"]) {
+    await assert.rejects(withFileAccess(path, "exclusive", async () => {}, { timeoutMs }), TypeError);
+  }
+  const failure = new Error("cancel before acquisition");
+  await assert.rejects(withFileAccess(path, "exclusive", async () => {}, { signal: AbortSignal.abort(failure) }), error => error === failure);
+  assert.deepEqual(await readdir(directory), []);
+});

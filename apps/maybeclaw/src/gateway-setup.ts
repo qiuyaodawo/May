@@ -1,10 +1,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { AddressInfo } from "node:net";
 import { parseMayConfig } from "@sortedyuan/config";
 import { withFileAccess } from "@sortedyuan/session/file-access";
+import { acquireFileLock, releaseFileLock } from "@sortedyuan/session/file-store";
 import { UiError } from "@sortedyuan/ui-client";
 import { authorized, secureHeaders, sendJson, trustedRequest } from "@sortedyuan/ui-client/server";
 import { gatewaySettings } from "./gateway-settings.js";
@@ -40,7 +41,7 @@ function parseGatewaySetup(path: string, original: string | undefined) {
 export async function startGatewaySetup(options: { path: string; port?: number; activate: (server: Server) => Promise<void> }) {
   const path = resolve(options.path), lockPath = `${path}.initialize.lock`;
   await mkdir(dirname(path), { recursive: true });
-  const lock = await open(lockPath, "wx", 0o600);
+  const lock = await acquireFileLock(lockPath);
   const launchPath = `${path}.${randomUUID()}.initialize.html`;
   const token = randomBytes(32).toString("base64url");
   let busy = false, consumed = false, transferred = false, released = false, closing: Promise<void> | undefined;
@@ -99,7 +100,7 @@ export async function startGatewaySetup(options: { path: string; port?: number; 
     requests.add(work);
   });
   server.requestTimeout = 15000; server.headersTimeout = 10000; server.maxConnections = 16;
-  async function release() { if (released) return; released = true; await rm(launchPath, { force: true }); await lock.close(); await rm(lockPath, { force: true }); }
+  async function release() { if (released) return; released = true; await rm(launchPath, { force: true }); await releaseFileLock(lock, lockPath); }
   try {
     if (!(await inspectGatewaySetup(path)).needsSetup) throw new Error("管理员密码已经配置，请直接启动控制台。");
     await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(options.port ?? 3939, "127.0.0.1", () => { server.removeListener("error", reject); resolve(); }); });

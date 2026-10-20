@@ -251,7 +251,12 @@ The first call creates empty `<path>.access` and `<path>.access.gate` files with
 mode `0600`. Keep both files while the store is in use; removing or replacing
 them requires all users to stop. A writer holds the gate while existing readers
 finish, so incoming reads wait. Access acquisition checks every 10 ms and rejects
-with `ETIMEDOUT` after 30 seconds. The callback itself has no time limit.
+with `ETIMEDOUT` after 30 seconds by default. Set `timeoutMs` to a positive finite
+number of milliseconds to change the acquisition limit. Pass an `AbortSignal` as
+`signal` to cancel acquisition; a pre-aborted signal creates no markers. Timeout
+and cancellation release any acquired gate and handles. Once the callback starts,
+it retains access until it settles, including when the signal is aborted. The
+callback itself has no time limit and handles its own cancellation.
 
 For a read-only process, initialize both markers once with directory write
 permission, then pass `{ initialize: false }`. This option creates no markers and
@@ -312,6 +317,15 @@ To collapse catalog operation files, stop all other catalog users and call
 The atomic version-2 catalog snapshot records exact absorbed operation names before cleanup,
 so interruption during deletion cannot replay already absorbed operations. Do not use older
 readers after compacting; ordinary version-1 catalogs remain readable.
+
+`acquireFileLock(path)` and `releaseFileLock(file, path)` from
+`@sortedyuan/session/file-store` coordinate lock creation and deletion through
+permanent `<path>.access` and `<path>.access.gate` files. Concurrent transitions
+wait up to 30 seconds; an existing owner still rejects acquisition with `EEXIST`.
+Always await release before reusing the storage. Preserve both access files during
+use and recovery, and upgrade all participating processes together. These rules
+also apply to Coordination journals, resource journals, remote workers, Team
+verification, Team patch application, and default-model configuration updates.
 
 For local writer locks, import `recoverFileLock` from `@sortedyuan/session/file-store`. Stop all
 competing hosts/open/recovery operations, read and inspect the lock, then pass its exact
