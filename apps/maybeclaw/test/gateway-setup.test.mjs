@@ -5,7 +5,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { createServer } from "node:http";
-import { loadMayConfig } from "@sortedyuan/config";
+import { loadMayConfig, updateDefaultMayModel } from "@sortedyuan/config";
 import { inspectGatewaySetup, startGatewaySetup } from "../dist/gateway-setup.js";
 import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
@@ -101,4 +101,58 @@ test("初始化端口占用时释放配置锁和初始化文件", async t => {
   await assert.rejects(startGatewaySetup({ path, port: occupied.address().port, activate }), { code: "EADDRINUSE" });
   await assert.rejects(access(`${path}.initialize.lock`), { code: "ENOENT" });
   await assert.rejects(access(path), { code: "ENOENT" });
+});
+
+test("初始化检查在配置父目录缺失时保持目录不存在", async t => {
+  const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-setup-tests/", import.meta.url));
+  await mkdir(base, { recursive: true });
+  const directory = await mkdtemp(join(base, "missing-"));
+  t.after(async () => {
+    assert.ok(resolve(directory).startsWith(resolve(base) + sep));
+    await rm(directory, { recursive: true, force: true });
+  });
+  const parent = join(directory, "missing"), path = join(parent, "config.json");
+  const inspected = await inspectGatewaySetup(path);
+  assert.equal(inspected.needsSetup, true);
+  assert.equal(inspected.original, undefined);
+  await assert.rejects(access(parent), { code: "ENOENT" });
+});
+
+test("HTTP 初始化与配置读取及模型更新并发完成并保留各自修改", { timeout: 30_000 }, async t => {
+  const config = {
+    providers: { local: { adapter: "openai-responses", options: { payload: "x".repeat(64 * 1024) } } },
+    models: { first: { provider: "local", model: "first" }, second: { provider: "local", model: "second" } },
+    defaultModel: "first",
+    apps: { other: { label: "保留" }, maybeclaw: { version: 2, agents: [], server: { maxConcurrent: 2 } } },
+  };
+  const { setup, path, submit } = await fixture(t, config);
+  const readers = Array.from({ length: 8 }, async () => {
+    for (let index = 0; index < 64; index += 1) {
+      const inspected = await inspectGatewaySetup(path);
+      assert.equal(inspected.config.providers.local.options.payload, config.providers.local.options.payload);
+      const loaded = await loadMayConfig({ path });
+      assert.ok(["first", "second"].includes(loaded.defaultModel));
+    }
+  });
+  const updates = (async () => {
+    for (let index = 0; index < 32; index += 1) {
+      const profile = index % 2 === 0 ? "second" : "first";
+      assert.equal((await updateDefaultMayModel(path, profile)).defaultModel, profile);
+    }
+  })();
+  const initialize = (async () => {
+    const response = await submit();
+    const body = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(body));
+    await setup.completed;
+  })();
+  const results = await Promise.allSettled([...readers, updates, initialize]);
+  for (const result of results) assert.equal(result.status, "fulfilled", result.reason?.stack);
+  const saved = await loadMayConfig({ path });
+  assert.equal(saved.defaultModel, "first");
+  assert.equal(saved.providers.local.options.payload, config.providers.local.options.payload);
+  assert.deepEqual(saved.apps.other, config.apps.other);
+  assert.equal(saved.apps.maybeclaw.server.maxConcurrent, 2);
+  assert.match(saved.apps.maybeclaw.server.auth.passwordHash, /^\$argon2id\$/);
+  assert.equal((await inspectGatewaySetup(path)).needsSetup, false);
 });

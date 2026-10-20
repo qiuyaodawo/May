@@ -73,7 +73,14 @@ UI composition is covered by [Custom UI](custom-ui.md).
 `@sortedyuan/media` exports `DisplayPart`, `ImageAttachment`, `ImageData`, `MediaReader`,
 `MediaCapabilities`, `displayParts`, `imageAttachment`, `readEmbeddedImage`,
 `inspectImage`, `imagePng` and `FileMediaStore`. Its runtime dependencies are
-`@sortedyuan/core` and `sharp`; the Agent loop does not depend on it.
+`@sortedyuan/core`, `@sortedyuan/session` and `sharp`; the Agent loop does not depend on it.
+
+`FileMediaStore.save()` and `verify()` coordinate reads and replacements across
+local processes through empty `<image-path>.access` and `<image-path>.access.gate`
+files. Keep both files beside the image. First access to an older saved image needs directory write permission;
+call `verify(saved)` once with that permission before making the directory
+read-only. Later verification only needs read permission on all three files. Upgrade
+all processes sharing the directory together.
 
 Validation supports PNG, JPEG, WebP, GIF and AVIF, with limits of 32 MiB and
 40 million pixels. Unsupported formats and MIME mismatches produce errors.

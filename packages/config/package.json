@@ -23,6 +23,9 @@
     "test": "pnpm run build && node --test test/*.test.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
+  "dependencies": {
+    "@sortedyuan/session": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0"
   },

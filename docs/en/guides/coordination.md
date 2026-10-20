@@ -534,6 +534,17 @@ Before accumulated snapshots exceed the journal cap, the exclusive writer atomic
 replaces them with a checkpoint of the complete next state. Revision, command receipts,
 retry findings and recovery state are retained; the cap still applies to a single snapshot.
 Resource journals use the same mechanism. Checkpoint files require the current reader;
-older readers must not reopen them. Reads do not steal locks or repair a live writer.
+older readers must not reopen them. Inspection holds shared file access while reading;
+appends, tail repair and checkpoint replacement hold exclusive file access. These
+short operations coordinate readers and the existing single writer across processes.
+
+Each journal keeps permanent `<journal-path>.access` and `<journal-path>.access.gate`
+files. The first open or inspection creates them and requires directory write permission;
+later inspections open them read-only and preserve the journal contents. For an existing storage
+directory, stop its hosts and run an inspection with directory write permission
+before assigning read-only access to monitoring processes. Preserve the access
+files and grant monitors read permission on them. Upgrade all processes sharing the
+directory together; older versions do not participate in file access coordination.
+Do not delete or replace an access file while any reader or writer is active.
 See [local storage maintenance](custom-storage.md#local-storage-maintenance) for explicit
 stopped-host lock recovery.

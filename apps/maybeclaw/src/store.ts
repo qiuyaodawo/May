@@ -1,5 +1,6 @@
 import { replaceJournalFile } from "@sortedyuan/session/file-store";
-import { mkdir, open, readdir, unlink, type FileHandle } from "node:fs/promises";
+import { withFileAccess } from "@sortedyuan/session/file-access";
+import { access, mkdir, open, readdir, unlink, type FileHandle } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 import { digest, validateId, validateSnapshot, type TaskSnapshot } from "./types.js";
@@ -26,11 +27,15 @@ export class FileTaskStore {
   }
 
   async inspect(id: string): Promise<TaskSnapshot | undefined> {
-    let file: FileHandle;
-    try { file = await open(this.path(id, "jsonl"), "r"); }
-    catch (error) { if (isMissing(error)) return undefined; throw error; }
-    try { return parse(await boundedRead(file), id).current; }
-    finally { await file.close(); }
+    const path = this.path(id, "jsonl");
+    try {
+      await access(path);
+      return await withFileAccess(path, "shared", async () => {
+        const file = await open(path, "r");
+        try { return parse(await boundedRead(file), id).current; }
+        finally { await file.close(); }
+      });
+    } catch (error) { if (isMissing(error)) return undefined; throw error; }
   }
 
   async list(): Promise<readonly TaskSnapshot[]> {
@@ -81,15 +86,18 @@ export class FileTaskStore {
       await this.requireLegacyFormat();
       await lock.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: Date.now() }));
       await lock.sync();
-      file = await open(this.path(id, "jsonl"), "a+", 0o600);
-      const bytes = await boundedRead(file);
-      let { current, length } = parse(bytes, id);
-      if (length !== bytes.length) {
-        const repair = await open(this.path(id, "jsonl"), "r+");
-        try { await repair.truncate(length); await repair.sync(); }
-        finally { await repair.close(); }
-      }
-      let handle = file;
+      const path = this.path(id, "jsonl");
+      let { current, length, handle } = await withFileAccess(path, "exclusive", async () => {
+        file = await open(path, "a+", 0o600);
+        const bytes = await boundedRead(file);
+        const parsed = parse(bytes, id);
+        if (parsed.length !== bytes.length) {
+          const repair = await open(path, "r+");
+          try { await repair.truncate(parsed.length); await repair.sync(); }
+          finally { await repair.close(); }
+        }
+        return { ...parsed, handle: file };
+      });
       let closed = false;
       let failed = false;
       let tail: Promise<void> = Promise.resolve();
@@ -108,8 +116,8 @@ export class FileTaskStore {
             const checkpoint = `${JSON.stringify({ checkpoint: snapshot })}\n`;
             if (Buffer.byteLength(checkpoint) > MAX_JOURNAL_BYTES) throw new Error("Task snapshot size limit exceeded");
             try {
-              if (compact) { const previous = handle; await previous.close(); handle = await replaceJournalFile(this.path(id, "jsonl"), checkpoint); }
-              else { await handle.writeFile(record); await handle.sync(); }
+              if (compact) { const previous = handle; await previous.close(); handle = await replaceJournalFile(path, checkpoint); }
+              else { await withFileAccess(path, "exclusive", async () => { await handle.writeFile(record); await handle.sync(); }); }
             }
             catch (error) { failed = true; throw error; }
             current = snapshot; length = compact ? Buffer.byteLength(checkpoint) : length + Buffer.byteLength(record);

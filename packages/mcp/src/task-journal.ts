@@ -68,11 +68,11 @@ export class McpTaskJournal {
 
   /** Local recovery inventory only, never tasks/list against a remote server. */
   async list(owner: SessionOwner): Promise<readonly McpTaskRecord[]> {
-    return freezeTree((await this.load(owner)).records);
+    return this.store.exclusive(partition(owner), async () => freezeTree((await this.load(owner)).records));
   }
 
   async get(id: string, owner: SessionOwner, binding: McpTaskBinding): Promise<McpTaskRecord> {
-    return freezeTree(this.find(await this.load(owner), id, binding));
+    return this.store.exclusive(partition(owner), async () => freezeTree(this.find(await this.load(owner), id, binding)));
   }
 
   /** Record a durably created remote handle, or a subsequently observed state. */

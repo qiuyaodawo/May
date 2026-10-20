@@ -125,10 +125,39 @@ contains the most recent provider-reported input-token count and the number of
 messages it measured when available. Old session logs without it remain
 compatible. The file store uses one JSONL file
 per session. Files are plaintext and require a single active writer per session;
-encryption and cross-process locking are outside the current scope.
+the storage host owns writer lifecycle and encryption.
 Both built-in stores implement optional history deletion through
 `SessionStore.delete(sessionId)`; applications decide which sessions users may
 delete.
+
+## Shared file access
+
+`withFileAccess` from `@sortedyuan/session/file-access` coordinates cooperating
+processes accessing one local file. Use `"shared"` for reads and `"exclusive"`
+for complete write, replacement, or deletion operations. Its async callback must
+await every file operation and close opened handles before returning. The helper
+returns the callback's result and releases access on completion or failure;
+the operating system also releases it when the process exits.
+
+The helper uses native locks from `fs-native-extensions`. It creates empty,
+persistent `<path>.access` and `<path>.access.gate` files next to the resolved
+target path. Keep both files while any process can access the store. A writer
+holds the gate while waiting for current readers, so incoming reads wait for that
+writer. Waiting checks every 10 ms and rejects with `ETIMEDOUT` after 30 seconds.
+The timeout covers acquiring access; the callback runs until its promise settles.
+
+The optional fourth argument `{ initialize: false }` requires existing access
+files and rejects with `FILE_ACCESS_NOT_INITIALIZED` if either is missing.
+Initialize once with directory write permission before opening read-only storage.
+Shared access opens existing markers with read permission; exclusive access
+requires write permission. The helper rejects symbolic links, non-regular access
+files, and changes to their identity. Recursive access to the same file from its
+callback rejects with `FILE_ACCESS_REENTRANT`.
+
+Every participating reader and writer must use the helper with the same path.
+Use local filesystems supported by the native module; multi-host coordination
+requires a storage backend with that capability. See the executable example in
+[Configure Session storage](../../docs/en/guides/custom-storage.md#coordinate-local-file-access).
 
 ## Session catalogs
 

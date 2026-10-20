@@ -12,6 +12,7 @@ import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
 import type { Model, Tool } from "@sortedyuan/core";
 import { resolveRunBudget } from "@sortedyuan/core";
 import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 import type { MaybeCodeTeamCommand } from "./args.js";
 import { getDefaultMaybeCodeDataDirectory } from "./configured.js";
 import { MaybeCodeUsageError } from "./errors.js";
@@ -46,7 +47,7 @@ export async function runMaybeCodeTeamCommand(command: MaybeCodeTeamCommand, dep
   if (command.action === "run") return (await import("./team-v2.js")).runTeamV2Command(command, dependencies);
   if (!/^[A-Za-z0-9_-]{1,128}$/u.test(command.value)) throw new MaybeCodeUsageError("Invalid team id");
   const path = join(resolve(command.dataDirectory ?? getDefaultMaybeCodeDataDirectory()), "teams", command.value, "manifest.json");
-  const manifest = JSON.parse(await readFile(path, "utf8")) as { version?: string };
+  const manifest = await withFileAccess(path, "shared", async () => JSON.parse(await readFile(path, "utf8")) as { version?: string });
   if (manifest.version === "maybecode-team-v2") return (await import("./team-v2.js")).runTeamV2Command(command, dependencies);
   const action = command.action;
   if (action !== "resume" && action !== "status" && action !== "cancel") throw new MaybeCodeUsageError("Legacy v1 teams retain read-only resume/status/cancel. New controls require a new v2 team; authority is never silently upgraded.");
@@ -68,7 +69,8 @@ async function runLegacyMaybeCodeTeamCommand(command: LegacyTeamCommand, depende
   const write = (text: string) => dependencies.write(terminalSafe(text));
   if (command.action === "status") {
     write(`Team ${id}\nWorkspace: ${manifest.workspace}\nModel profile: ${manifest.model}\n`);
-    try { write(`${await readFile(join(directory, "status.txt"), "utf8")}\n`); }
+    const path = join(directory, "status.txt");
+    try { write(`${await withFileAccess(path, "shared", () => readFile(path, "utf8"))}\n`); }
     catch (error) { if (!isMissing(error)) throw error; write("No execution snapshot yet.\n"); }
     write(`Records: ${directory}\n`);
     return 0;
@@ -170,7 +172,8 @@ async function runLegacyMaybeCodeTeamCommand(command: LegacyTeamCommand, depende
     })();
     void relay.catch(cancel);
     const checkCancellation = async () => {
-      try { await stat(join(directory, "cancel.request.json")); cancel(); }
+      const path = join(directory, "cancel.request.json");
+      try { await withFileAccess(path, "shared", () => stat(path)); cancel(); }
       catch (error) { if (!isMissing(error)) { cancel(); throw error; } }
     };
     dependencies.signal?.addEventListener("abort", cancel, { once: true });
@@ -235,24 +238,28 @@ function fingerprint(selection: SelectedMaybeCodeModel): string {
 }
 
 async function readManifest(path: string, id: string): Promise<TeamManifest> {
-  const value = JSON.parse(await readFile(path, "utf8")) as TeamManifest;
+  const value = await withFileAccess(path, "shared", async () => JSON.parse(await readFile(path, "utf8")) as TeamManifest);
   if (value.format !== 1 || value.version !== VERSION || value.id !== id || !isAbsolute(value.workspace) || !isAbsolute(value.configPath) || typeof value.model !== "string" || typeof value.prompt !== "string" || !/^[0-9a-f]{64}$/u.test(value.modelFingerprint) || ![value.maxModelCalls, value.maxTotalTokens, value.maxConcurrent].every((n) => Number.isSafeInteger(n) && n > 0)) throw new Error("Invalid or incompatible team manifest");
   return value;
 }
 
 async function writeDurable(path: string, value: unknown): Promise<void> {
-  const file = await open(path, "w", 0o600);
-  try { await file.writeFile(`${JSON.stringify(value, null, 2)}\n`); await file.sync(); }
-  finally { await file.close(); }
+  await withFileAccess(path, "exclusive", async () => {
+    const file = await open(path, "w", 0o600);
+    try { await file.writeFile(`${JSON.stringify(value, null, 2)}\n`); await file.sync(); }
+    finally { await file.close(); }
+  });
 }
 
 async function writeStatus(directory: string, snapshot: CoordinationSnapshot): Promise<void> {
   const path = join(directory, "status.txt");
-  const temporary = `${path}.${randomUUID()}.tmp`;
-  const file = await open(temporary, "wx", 0o600);
-  try { await file.writeFile(`Revision ${snapshot.revision}\n${snapshot.tasks.map((task) => `${task.id}: ${task.status}`).join("\n")}\n`); }
-  finally { await file.close(); }
-  await rename(temporary, path);
+  await withFileAccess(path, "exclusive", async () => {
+    const temporary = `${path}.${randomUUID()}.tmp`;
+    const file = await open(temporary, "wx", 0o600);
+    try { await file.writeFile(`Revision ${snapshot.revision}\n${snapshot.tasks.map((task) => `${task.id}: ${task.status}`).join("\n")}\n`); }
+    finally { await file.close(); }
+    await rename(temporary, path);
+  });
 }
 
 function inside(root: string, path: string): boolean {

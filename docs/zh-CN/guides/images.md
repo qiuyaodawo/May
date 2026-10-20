@@ -62,8 +62,14 @@ Provider file ID 需要宿主提供 `MediaReader`。
 
 `@sortedyuan/media` 导出 `DisplayPart`、`ImageAttachment`、`ImageData`、`MediaReader`、
 `MediaCapabilities`、`displayParts`、`imageAttachment`、`readEmbeddedImage`、
-`inspectImage`、`imagePng`、`FileMediaStore`。运行时依赖为 `@sortedyuan/core` 和
-`sharp`，Agent 运行循环无需依赖它。
+`inspectImage`、`imagePng`、`FileMediaStore`。运行时依赖为 `@sortedyuan/core`、
+`@sortedyuan/session` 和 `sharp`，Agent 运行循环无需依赖它。
+
+`FileMediaStore.save()` 与 `verify()` 通过 `<image-path>.access` 和
+`<image-path>.access.gate` 空文件，协调本机不同进程的读取与替换。请将它们与图片
+一起保留。首次访问已有图片需要目录
+写入权限；在将目录设置为只读之前，使用具有这一权限的进程调用一次 `verify(saved)`。
+后续校验只需要图片与 access 文件的读取权限。共享目录的所有进程需要一起升级。
 
 图片校验支持 PNG、JPEG、WebP、GIF、AVIF，限制为 32 MiB 和 4000 万像素。
 不支持的格式和 MIME 类型不一致都会产生错误。Terminal 和渠道转换格式时使用

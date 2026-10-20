@@ -106,6 +106,12 @@ MaybeCode 默认使用 `~/.may/maybecode/mcp-credentials`，程序嵌入时位�
 独占 `.lock` 文件管理凭据操作。崩溃后读取其中 PID，确认进程已经退出，再删除
 该文件。无界面系统需要解锁钥匙串，或提供安全存储。
 
+加密记录的读取、替换和删除通过永久保留的 `<record-path>.access` 和
+`<record-path>.access.gate` 文件协调不同进程的访问。存储以限制性权限创建这些文件，
+使状态查询和 token 读取能够与同一记录
+的更新共同进行。共享凭据目录的全部进程需要同时升级；有进程使用该目录期间，保留
+其中的访问协调文件。
+
 库集成创建 `new McpOAuthManager(store)`，将其作为 `oauth` 传给
 `openMcpClientPool`，或作为 `mcp.oauth` 传给配置式 MaybeCode。Manager 提供
 `login`、`status` 和 `logout`。其他后端实现 `McpCredentialStore`；明确选择

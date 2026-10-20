@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, rename, readFile } from "node:fs/promises";
+import { mkdir, open, rename, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { ContentPart, MediaSource } from "@sortedyuan/core";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 
 export interface ImageAttachment {
   readonly id: string;
@@ -80,10 +81,13 @@ export class FileMediaStore {
     const temporary = join(this.directory, `${id}.${randomUUID()}.partial`);
     const file = await open(temporary, "wx", 0o600);
     try { await file.writeFile(image.data); await file.sync(); } finally { await file.close(); }
-    await rename(temporary, path);
+    try { await withFileAccess(path, "exclusive", () => rename(temporary, path)); }
+    finally { await rm(temporary, { force: true }); }
     return { ...image, id, path };
   }
-  async verify(saved: SavedImage): Promise<ImageData> { return inspectImage(await readFile(saved.path)); }
+  async verify(saved: SavedImage): Promise<ImageData> {
+    return inspectImage(await withFileAccess(saved.path, "shared", () => readFile(saved.path)));
+  }
 }
 
 export async function imagePng(image: ImageData): Promise<Buffer> {

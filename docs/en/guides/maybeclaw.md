@@ -58,6 +58,10 @@ page asks you to set and confirm a password of 10–1024 characters. It writes
 `version: 2`, `agents: []`, and an Argon2id `passwordHash`, preserving existing
 configuration. It then opens the console at the same address; log in, add an Agent,
 and create a session. New files also contain an empty `providers` object.
+Setup inspection, initialization writes, and default-model updates coordinate
+access to the same configuration file. Initialization preserves completed model
+updates and enables the console after releasing file access. Inspecting a missing
+configuration directory reports that setup is needed and leaves the directory absent.
 
 Initialization requires a one-time credential automatically supplied to the browser.
 With `--no-open` or `serve`, open the local initialization HTML file printed by the
@@ -407,6 +411,15 @@ before releasing the data directory.
 request receipts, and delivery records transactionally. May histories remain in
 Session stores. `host.lock` protects against concurrent writers; check a recorded
 owner has stopped before handling an abandoned lock.
+
+Legacy JSONL task and channel journals coordinate inspection with appends, tail
+repair and checkpoint replacement across processes. Each journal retains
+`<journal-path>.access` and `<journal-path>.access.gate` files. The first status
+query, migration check or writer creates these files and needs directory write
+permission; later inspections use read-only handles and preserve journal data.
+For read-only monitoring of existing data, initialize the access files with a
+write-capable account before restricting permissions. Upgrade every process sharing
+the directory together, and preserve access files while any reader or writer is active.
 
 ```powershell
 pnpm maybeclaw migrate check --data-directory <directory>

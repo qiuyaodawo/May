@@ -4,6 +4,7 @@ import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { AddressInfo } from "node:net";
 import { parseMayConfig } from "@sortedyuan/config";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 import { UiError } from "@sortedyuan/ui-client";
 import { authorized, secureHeaders, sendJson, trustedRequest } from "@sortedyuan/ui-client/server";
 import { gatewaySettings } from "./gateway-settings.js";
@@ -15,7 +16,13 @@ async function source(path: string): Promise<string | undefined> {
 }
 
 export async function inspectGatewaySetup(path: string) {
-  const original = await source(path);
+  let original: string | undefined;
+  try { original = await withFileAccess(path, "shared", () => source(path)); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  return parseGatewaySetup(path, original);
+}
+
+function parseGatewaySetup(path: string, original: string | undefined) {
   let config: Record<string, any> = { providers: {} };
   if (original !== undefined) {
     try { config = JSON.parse(original); }
@@ -63,17 +70,20 @@ export async function startGatewaySetup(options: { path: string; port?: number; 
         if (!data || Object.keys(data).some(key => !["password", "confirmation"].includes(key)) || data.password !== data.confirmation) throw new UiError(400, "两次输入的密码需要一致。");
         const passwordHash = await hashAdministratorPassword(data.password);
         if (closing) throw new UiError(503, "初始化服务正在关闭。");
-        const current = await inspectGatewaySetup(path);
-        if (!current.needsSetup) throw new UiError(409, "管理员密码已经配置，禁止重复初始化。");
-        const config = current.config;
-        config.apps = { ...config.apps, maybeclaw: { ...current.candidate, server: { ...current.candidate.server as object, auth: { passwordHash } } } };
-        gatewaySettings(parseMayConfig(config, path));
-        const temporary = `${path}.${randomUUID()}.pending`;
-        try {
-          await writeFile(temporary, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600 });
-          if (await source(path) !== current.original) throw new UiError(409, "配置已被其他操作修改，请重试。");
-          await rename(temporary, path);
-        } finally { await rm(temporary, { force: true }); }
+        await withFileAccess(path, "exclusive", async () => {
+          if (closing) throw new UiError(503, "初始化服务正在关闭。");
+          const current = parseGatewaySetup(path, await source(path));
+          if (!current.needsSetup) throw new UiError(409, "管理员密码已经配置，禁止重复初始化。");
+          const config = current.config;
+          config.apps = { ...config.apps, maybeclaw: { ...current.candidate, server: { ...current.candidate.server as object, auth: { passwordHash } } } };
+          gatewaySettings(parseMayConfig(config, path));
+          const temporary = `${path}.${randomUUID()}.pending`;
+          try {
+            await writeFile(temporary, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+            if (await source(path) !== current.original) throw new UiError(409, "配置已被其他操作修改，请重试。");
+            await rename(temporary, path);
+          } finally { await rm(temporary, { force: true }); }
+        });
         consumed = true;
         try { await options.activate(server); transferred = true; }
         catch (error) { fail(error); throw error; }

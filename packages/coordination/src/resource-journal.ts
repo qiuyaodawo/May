@@ -1,4 +1,5 @@
 import { acquireFileLock, releaseFileLock, replaceJournalFile } from "@sortedyuan/session/file-store";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, type FileHandle } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -15,25 +16,28 @@ export class ResourceJournal<T extends Revision> {
     private readonly lockPath: string, private current: T, private size: number,
     private readonly validate: (value: T) => void, private readonly maxBytes: number) {}
 
-  /** Read-only monitoring. Ignore an in-flight tail, never repair or acquire writer ownership. */
+  /** 查询保持日志内容不变；首次访问会创建协调文件，读取时持有共享访问锁。 */
   static async inspect<T extends Revision>(path: string, validate: (value: T) => void, maxBytes = 67_108_864): Promise<T | undefined> {
-    if ((await lstat(path)).isSymbolicLink()) throw new Error("Resource journal must not be a symbolic link");
-    const file = await open(path, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
-    try {
-      const stat = await file.stat();
-      if (!stat.isFile() || stat.size > maxBytes) throw new Error("Resource journal exceeds its byte limit or is not a file");
-      const bytes = await file.readFile();
-      if (bytes.length > maxBytes) throw new Error("Resource journal exceeds its byte limit");
-      const end = bytes.lastIndexOf(10) + 1;
-      let state: T | undefined;
-      for (const line of bytes.subarray(0, end).toString("utf8").split("\n").slice(0, -1)) {
-        const record = JSON.parse(line) as T | { checkpoint: T };
-        const next = "checkpoint" in record ? record.checkpoint : record; validate(next);
-        if (!(state === undefined && "checkpoint" in record) && next.revision !== (state?.revision ?? 0) + 1) throw new Error("Invalid resource journal sequence");
-        state = next;
-      }
-      return state;
-    } finally { await file.close(); }
+    await lstat(path);
+    return withFileAccess(path, "shared", async () => {
+      if ((await lstat(path)).isSymbolicLink()) throw new Error("Resource journal must not be a symbolic link");
+      const file = await open(path, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
+      try {
+        const stat = await file.stat();
+        if (!stat.isFile() || stat.size > maxBytes) throw new Error("Resource journal exceeds its byte limit or is not a file");
+        const bytes = await file.readFile();
+        if (bytes.length > maxBytes) throw new Error("Resource journal exceeds its byte limit");
+        const end = bytes.lastIndexOf(10) + 1;
+        let state: T | undefined;
+        for (const line of bytes.subarray(0, end).toString("utf8").split("\n").slice(0, -1)) {
+          const record = JSON.parse(line) as T | { checkpoint: T };
+          const next = "checkpoint" in record ? record.checkpoint : record; validate(next);
+          if (!(state === undefined && "checkpoint" in record) && next.revision !== (state?.revision ?? 0) + 1) throw new Error("Invalid resource journal sequence");
+          state = next;
+        }
+        return state;
+      } finally { await file.close(); }
+    });
   }
 
   static async open<T extends Revision>(path: string, initial: T, validate: (value: T) => void,
@@ -44,28 +48,30 @@ export class ResourceJournal<T extends Revision> {
     let file: FileHandle | undefined;
     try {
       await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
-      try { if ((await lstat(path)).isSymbolicLink()) throw new Error("Resource journal must not be a symbolic link"); }
-      catch (error) { if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error; }
-      file = await open(path, constants.O_CREAT | constants.O_APPEND | constants.O_RDWR | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW), 0o600);
-      const stat = await file.stat();
-      if (!stat.isFile() || stat.size > maxBytes) throw new Error("Resource journal exceeds its byte limit or is not a file");
-      const bytes = await file.readFile();
-      const committed = bytes.length === 0 || bytes.at(-1) === 10 ? bytes.length : bytes.lastIndexOf(10) + 1;
-      let current = initial;
-      validate(current);
-      for (const line of bytes.subarray(0, committed).toString("utf8").split("\n").slice(0, -1)) {
-        const record = JSON.parse(line) as T | { checkpoint: T };
-        const next = "checkpoint" in record ? record.checkpoint : record;
-        validate(next);
-        if (!(current === initial && "checkpoint" in record) && next.revision !== current.revision + 1) throw new Error("Invalid resource journal sequence");
-        current = next;
-      }
-      if (committed !== bytes.length) {
-        const repair = await open(path, "r+");
-        try { await repair.truncate(committed); await repair.sync(); } finally { await repair.close(); }
-      }
-      const journal = new ResourceJournal(file, path, lock, lockPath, current, committed, validate, maxBytes);
-      if (committed === 0) await journal.transact((state) => ({ ...state }));
+      const journal = await withFileAccess(path, "exclusive", async () => {
+        try { if ((await lstat(path)).isSymbolicLink()) throw new Error("Resource journal must not be a symbolic link"); }
+        catch (error) { if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error; }
+        file = await open(path, constants.O_CREAT | constants.O_APPEND | constants.O_RDWR | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW), 0o600);
+        const stat = await file.stat();
+        if (!stat.isFile() || stat.size > maxBytes) throw new Error("Resource journal exceeds its byte limit or is not a file");
+        const bytes = await file.readFile();
+        const committed = bytes.length === 0 || bytes.at(-1) === 10 ? bytes.length : bytes.lastIndexOf(10) + 1;
+        let current = initial;
+        validate(current);
+        for (const line of bytes.subarray(0, committed).toString("utf8").split("\n").slice(0, -1)) {
+          const record = JSON.parse(line) as T | { checkpoint: T };
+          const next = "checkpoint" in record ? record.checkpoint : record;
+          validate(next);
+          if (!(current === initial && "checkpoint" in record) && next.revision !== current.revision + 1) throw new Error("Invalid resource journal sequence");
+          current = next;
+        }
+        if (committed !== bytes.length) {
+          const repair = await open(path, "r+");
+          try { await repair.truncate(committed); await repair.sync(); } finally { await repair.close(); }
+        }
+        return new ResourceJournal(file, path, lock, lockPath, current, committed, validate, maxBytes);
+      });
+      if (journal.size === 0) await journal.transact((state) => ({ ...state }));
       return journal;
     } catch (error) {
       await file?.close().catch(() => undefined); await releaseFileLock(lock, lockPath); throw error;
@@ -93,7 +99,9 @@ export class ResourceJournal<T extends Revision> {
           const previous = this.file;
           await previous.close();
           this.file = await replaceJournalFile(this.path, checkpoint);
-        } else { await this.file.writeFile(line, "utf8"); await this.file.sync(); }
+        } else {
+          await withFileAccess(this.path, "exclusive", async () => { await this.file.writeFile(line, "utf8"); await this.file.sync(); });
+        }
       }
       catch (error) { this.failed = true; throw error; }
       this.current = next; this.size = compact ? Buffer.byteLength(checkpoint) : this.size + size;

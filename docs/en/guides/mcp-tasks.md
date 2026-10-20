@@ -160,7 +160,10 @@ after auditing outstanding handles; it is not silently evicted.
 `McpTaskJournal` supplies `begin`, `initialUsage`, `observe`, `get`/`list`,
 `uncertain`, `claimInput`, `reserveSampling`, `markInput`, `abandonInput`,
 `cancelIntent` and `forget`. The journal itself sends no RPC and grants no
-permission. `parseMcpTask` validates bounded native frames; the runtime additionally
+permission. Reads and writes for one workspace/Session use the credential store's
+same exclusive lock. `get` and `list` wait for an active update to finish, including
+updates from another process when using `KeyringMcpCredentialStore`.
+`parseMcpTask` validates bounded native frames; the runtime additionally
 validates completed tool content/schema. Corruption or an unavailable keyring
 fails closed. If a crash leaves a vault `.lock`, verify its recorded PID has exited
 before removing that specific stale lock; never reset the vault to justify replay.

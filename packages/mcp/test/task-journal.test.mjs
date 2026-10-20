@@ -3,6 +3,7 @@ import test from "node:test";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 import { InMemoryMcpCredentialStore, KeyringMcpCredentialStore, McpTaskJournal, parseMcpTask } from "../dist/index.js";
 
 const owner = { workspaceId: "workspace-A", sessionId: "session-A", runId: "run-A", toolCallId: "call-A" };
@@ -85,17 +86,39 @@ test("task journal binds ownership across restart, claims inputs exactly once an
   assert.equal(renewed.record.inputAttempts, 2); assert.equal(renewed.record.samplingCalls, 1);
 });
 
+test("task journal reads wait for accepted updates across journal instances", async () => {
+  const store = new InMemoryMcpCredentialStore();
+  const writer = new McpTaskJournal(store);
+  const reader = new McpTaskJournal(store);
+  const record = await writer.begin(owner, binding);
+  const updated = writer.uncertain(record.id, owner, binding);
+  const [, listed, selected] = await Promise.all([updated, reader.list(owner), reader.get(record.id, owner, binding)]);
+  assert.equal(listed[0].status, "uncertain");
+  assert.equal(selected.status, "uncertain");
+  assert.ok(Object.isFrozen(listed));
+  assert.ok(Object.isFrozen(selected));
+});
+
 test("task journal uses encrypted atomic storage, fails closed on partial writes/corruption and bounds retained handles", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "may-task-journal-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   let password;
-  const keyring = { getPassword: async () => password, setPassword: async (value) => { password = value; } };
+  const keyring = process.env.MAY_TEST_OS_KEYRING === "1"
+    ? new (await import("@napi-rs/keyring")).AsyncEntry("may.mcp.test", randomUUID())
+    : { getPassword: async () => password, setPassword: async (value) => { password = value; } };
+  if ("deleteCredential" in keyring) t.after(() => keyring.deleteCredential());
   const store = new KeyringMcpCredentialStore(directory, keyring);
   const journal = new McpTaskJournal(store);
   const record = await journal.begin(owner, binding);
   await journal.observe(record.id, owner, binding, seed, "created");
   const reopened = new McpTaskJournal(new KeyringMcpCredentialStore(directory, keyring));
   assert.equal((await reopened.get(record.id, owner, binding)).remote.taskId, seed.taskId);
+  for (let iteration = 0; iteration < 12; iteration++) {
+    const observed = journal.observe(record.id, owner, binding, { ...seed, resultType: "complete" }, "state");
+    const results = await Promise.all([observed, ...Array.from({ length: 8 }, () => reopened.get(record.id, owner, binding)), reopened.list(owner)]);
+    for (const selected of results.slice(1, -1)) assert.equal(selected.remote.taskId, seed.taskId);
+    assert.equal(results.at(-1)[0].remote.taskId, seed.taskId);
+  }
   const files = await readdir(directory);
   for (const name of files) {
     const raw = await readFile(join(directory, name), "utf8");

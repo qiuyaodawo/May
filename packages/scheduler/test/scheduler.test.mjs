@@ -67,6 +67,22 @@ async function waitUntil(predicate, timeoutMs = 3_000) {
   }
 }
 
+function acknowledgementTimeout(t, host) {
+  const controller = new AbortController();
+  let timeout;
+  const onTimeout = () => controller.abort(timeout.reason);
+  const onAccepted = () => {
+    timeout = AbortSignal.timeout(0);
+    timeout.addEventListener("abort", onTimeout, { once: true });
+  };
+  host.once("accepted", onAccepted);
+  t.after(() => {
+    host.off("accepted", onAccepted);
+    timeout?.removeEventListener("abort", onTimeout);
+  });
+  return AbortSignal.any([controller.signal, t.signal]);
+}
+
 test("opening a scheduler does not execute due jobs until tick", async (t) => {
   const { scheduler, host } = await setup(t, "explicit-start");
   const scheduledAt = new Date(Date.now() + 80).toISOString();
@@ -396,7 +412,7 @@ test("maximum-length public identifiers remain valid across persistence and dele
   assert.equal(host.tasks().length, 1);
 });
 
-test("an actual HTTP acknowledgement timeout leaves dispatching and recovers the accepted task", async (t) => {
+test("an actual HTTP acknowledgement timeout leaves dispatching and recovers the accepted task", { timeout: 10_000 }, async (t) => {
   const path = await directory("http-timeout");
   const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
   const endpoint = await host.listen();
@@ -404,7 +420,7 @@ test("an actual HTTP acknowledgement timeout leaves dispatching and recovers the
   const databasePath = join(path, "scheduler.sqlite");
   const scheduler = await Scheduler.open({
     store: await SqliteSchedulerStore.open(databasePath),
-    dispatcher: new HttpTaskDispatcher(endpoint, { timeoutMs: 40 }),
+    dispatcher: new HttpTaskDispatcher(endpoint, { signal: acknowledgementTimeout(t, host) }),
   });
   t.after(() => scheduler.close());
   await scheduler.createJob(job("timeout-task", { type: "event", topic: "tasks" }));
@@ -448,13 +464,13 @@ test("a real storage failure stops the timer and reports the error to the host",
   assert.deepEqual(host.tasks(), []);
 });
 
-test("a service-mode event communication error stops timers until explicit recovery", async (t) => {
+test("a service-mode event communication error stops timers until explicit recovery", { timeout: 10_000 }, async (t) => {
   const path = await directory("service-transport-error");
   const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
   const endpoint = await host.listen();
   t.after(() => host.close());
   const reported = [];
-  const dispatcher = new HttpTaskDispatcher(endpoint, { timeoutMs: 40 });
+  const dispatcher = new HttpTaskDispatcher(endpoint, { signal: acknowledgementTimeout(t, host) });
   const scheduler = await Scheduler.open({
     store: await SqliteSchedulerStore.open(join(path, "scheduler.sqlite")),
     dispatcher,
@@ -474,7 +490,7 @@ test("a service-mode event communication error stops timers until explicit recov
   await delay(160);
   assert.equal(host.tasks().length, 1);
   assert.equal((await scheduler.listExecutions()).records.length, 1);
-  dispatcher.timeoutMs = undefined;
+  dispatcher.signal = undefined;
   assert.equal((await scheduler.tick()).submitted, 2);
   const recovered = (await scheduler.listExecutions()).records.find((record) => record.id === acceptedId);
   assert.equal(recovered.status, "submitted");

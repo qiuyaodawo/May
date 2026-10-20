@@ -7,6 +7,29 @@ import sharp from "sharp";
 import { FileMediaStore, displayParts, readEmbeddedImage, imageAttachment } from "../dist/index.js";
 import { imageSource } from "./fixture.mjs";
 
+test("concurrent image verification and saving keep the image readable", async () => {
+  const source = await imageSource();
+  const base = fileURLToPath(new URL("../../../review/media-tests/", import.meta.url));
+  await mkdir(base, { recursive: true });
+  const directory = await mkdtemp(join(base, "concurrent-"));
+  const writer = new FileMediaStore(directory);
+  const reader = new FileMediaStore(directory);
+  const saved = await writer.save(source);
+  const reads = Array.from({ length: 8 }, async () => {
+    for (let index = 0; index < 32; index++) {
+      const image = await reader.verify(saved);
+      assert.equal(image.width, 64);
+      assert.equal(image.height, 32);
+    }
+  });
+  const writes = (async () => {
+    for (let index = 0; index < 16; index++) assert.equal((await writer.save(source)).path, saved.path);
+  })();
+  const results = await Promise.allSettled([...reads, writes]);
+  for (const result of results) assert.equal(result.status, "fulfilled", result.reason?.stack);
+  assert.deepEqual(await readFile(saved.path), Buffer.from(source.data, "base64"));
+});
+
 test("图片校验、稳定附件标识和文件保存", async () => {
   const source = await imageSource();
   const image = await readEmbeddedImage(source);

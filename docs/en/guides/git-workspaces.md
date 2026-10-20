@@ -46,6 +46,17 @@ repository nor creates versions or state files. A host can use `status()` to
 handle an unmanaged read-only workspace. Git's `GIT_CEILING_DIRECTORIES`
 discovery boundary is respected.
 
+Checkpoint and worktree metadata reads coordinate with updates across local
+processes using persistent `<record-path>.access` and `<record-path>.access.gate`
+files. Writers create these
+empty files automatically. For existing metadata, open a manager with
+`autoCommit: false` and `readOnly: false`, then call `checkpoints()` and
+`listWorktrees()` once with directory write permission before using a strictly
+read-only manager. These queries initialize access files without changing
+checkpoints or creating commits. A read-only manager requires the access files
+to exist and opens them with read permission. Keep them with the metadata, and
+upgrade all processes that share the data together.
+
 `deferInitialization: true` makes `open()` discover the repository without creating
 a repository or metadata directory. `prepare()` or `beginRound()` performs deferred
 initialization. `summary()` reads repository identity and HEAD without enumerating

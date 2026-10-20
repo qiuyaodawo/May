@@ -74,6 +74,16 @@ maybecode team verify <id>
 
 `status` inspects execution, failed dependencies, unresolved tool evidence, shared usage, and verification records without taking over an active owner. Its cross-journal view and last acceptance projection may be stale. `verify` takes ownership and evaluates configured checks; it is not another model run.
 
+Team records coordinate readers and writers across processes. A status read waits
+for the current write to finish, and a replacement waits for active readers to
+close the file. This also covers legacy status files and cancellation requests.
+Each coordinated file uses empty `<path>.access` and `<path>.access.gate` files.
+Its first access needs permission to create both files in the containing
+directory; later readers open the existing coordination files read-only. Run
+`team status <id>` once with directory write permission before restricting an
+existing team's records to read-only, and retain both coordination files while
+those records are in use. `status` leaves the team records unchanged.
+
 `cancel` writes a request consumed by the running owner or by the next `resume`. Ctrl+C also cancels the active team. Cancellation cannot undo an already completed provider request or tool effect, and killing a direct check process does not prove its descendants stopped.
 
 `resume` uses the saved plan, authority mode, model bindings/fingerprints, and resource limits. It does not repeat completed inputs. Configuration drift, unknown effects, unknown usage, and stale writer locks fail closed. Records include private prompts, source excerpts, workspaces, Sessions, budget journals, verification evidence, and artifacts; secret-file filtering does not make these records public data.

@@ -1,4 +1,5 @@
 import { replaceJournalFile } from "@sortedyuan/session/file-store";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 import { access, open, readFile, type FileHandle } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { digest, validateId } from "./identity.js";
@@ -33,7 +34,8 @@ export class ChannelStore {
   private closing: Promise<void> | undefined;
   private constructor(private file: FileHandle, private readonly path: string) {}
   static async inspect(path: string): Promise<ChannelRecord[]> {
-    const bytes = await readFile(path);
+    await access(path);
+    const bytes = await withFileAccess(path, "shared", () => readFile(path));
     if (bytes.length > 32 * 1024 * 1024) throw new Error("Channel journal exceeds size limit");
     const records = new Map<string, ChannelRecord>();
     const end = bytes.lastIndexOf(10) + 1;
@@ -53,25 +55,29 @@ export class ChannelStore {
         if (migrated) throw new Error("Legacy channel storage is read-only after Gateway migration");
       }
     }
-    const file = await open(path, "a+", 0o600);
-    const store = new ChannelStore(file, path);
+    let file: FileHandle | undefined;
     try {
-      if ((await file.stat()).size > 32 * 1024 * 1024) throw new Error("Channel journal exceeds size limit");
-      const bytes = await file.readFile();
-      if (bytes.length > 32 * 1024 * 1024) throw new Error("Channel journal is full; archive stopped host data before continuing");
-      const end = bytes.lastIndexOf(10) + 1;
-      for (const line of bytes.subarray(0, end).toString("utf8").split("\n").filter(Boolean)) {
-        const record = JSON.parse(line) as ChannelRecord;
-        validateRecord(record); store.records.set(record.id, record);
-      }
-      if (end !== bytes.length) {
-        const repair = await open(path, "r+");
-        try { await repair.truncate(end); await repair.sync(); } finally { await repair.close(); }
-      }
-      store.size = end;
+      const store = await withFileAccess(path, "exclusive", async () => {
+        file = await open(path, "a+", 0o600);
+        const opened = new ChannelStore(file, path);
+        if ((await file.stat()).size > 32 * 1024 * 1024) throw new Error("Channel journal exceeds size limit");
+        const bytes = await file.readFile();
+        if (bytes.length > 32 * 1024 * 1024) throw new Error("Channel journal is full; archive stopped host data before continuing");
+        const end = bytes.lastIndexOf(10) + 1;
+        for (const line of bytes.subarray(0, end).toString("utf8").split("\n").filter(Boolean)) {
+          const record = JSON.parse(line) as ChannelRecord;
+          validateRecord(record); opened.records.set(record.id, record);
+        }
+        if (end !== bytes.length) {
+          const repair = await open(path, "r+");
+          try { await repair.truncate(end); await repair.sync(); } finally { await repair.close(); }
+        }
+        opened.size = end;
+        return opened;
+      });
       for (const record of store.values()) if (record.kind === "delivery" && record.status === "sending") await store.put({ ...record, status: "unknown" });
       return store;
-    } catch (error) { await file.close(); throw error; }
+    } catch (error) { await file?.close(); throw error; }
   }
   get(id: string): ChannelRecord | undefined { const value = this.records.get(id); return value && structuredClone(value); }
   values(): ChannelRecord[] { return [...this.records.values()].map(value => structuredClone(value)); }
@@ -87,7 +93,10 @@ export class ChannelStore {
         if (Buffer.byteLength(checkpoint) > 32 * 1024 * 1024) throw new Error("Channel state limit reached; archive stopped host data");
         await this.file.close(); this.file = await replaceJournalFile(this.path, checkpoint);
         this.size = Buffer.byteLength(checkpoint);
-      } else { await this.file.writeFile(line); await this.file.sync(); this.size += length; }
+      } else {
+        await withFileAccess(this.path, "exclusive", async () => { await this.file.writeFile(line); await this.file.sync(); });
+        this.size += length;
+      }
       this.records.set(copy.id, copy);
     });
     this.tail = operation; return operation;

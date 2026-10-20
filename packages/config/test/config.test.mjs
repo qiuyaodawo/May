@@ -277,6 +277,34 @@ test("distinguishes file and JSON parsing failures", async (t) => {
   );
 });
 
+test("configuration readers and default model updates share file access", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "may-config-concurrent-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, "config.json");
+  await writeFile(path, JSON.stringify({
+    providers: { local: { adapter: "openai-responses", options: { payload: "x".repeat(64 * 1024) } } },
+    models: { first: { provider: "local", model: "first" }, second: { provider: "local", model: "second" } },
+    defaultModel: "first",
+  }));
+  await loadMayConfig({ path });
+  const readers = Array.from({ length: 8 }, async () => {
+    for (let index = 0; index < 64; index++) {
+      const value = await loadMayConfig({ path });
+      assert.ok(["first", "second"].includes(value.defaultModel));
+      assert.equal(value.providers.local.options.payload.length, 64 * 1024);
+    }
+  });
+  const updates = (async () => {
+    for (let index = 0; index < 32; index++) {
+      const profile = index % 2 === 0 ? "second" : "first";
+      assert.equal((await updateDefaultMayModel(path, profile)).defaultModel, profile);
+    }
+  })();
+  const results = await Promise.allSettled([...readers, updates]);
+  for (const result of results) assert.equal(result.status, "fulfilled", result.reason?.stack);
+  assert.equal((await loadMayConfig({ path })).defaultModel, "first");
+});
+
 test("parses maybeclaw configuration with empty or omitted agents", () => {
   const emptyAgents = parseMayConfig({
     providers: {},

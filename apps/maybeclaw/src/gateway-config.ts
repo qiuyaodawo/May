@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 
 const writes = new Map<string, Promise<unknown>>();
 
 export function withGatewayConfiguration<T>(path: string, action: (raw: Record<string, any>, save: () => Promise<void>) => Promise<T>): Promise<T> {
   const key = resolve(path);
-  const job = (writes.get(key) ?? Promise.resolve()).then(async () => {
+  const job = (writes.get(key) ?? Promise.resolve()).then(() => withFileAccess(key, "exclusive", async () => {
     const original = await readFile(key, "utf8");
     let config: Record<string, any>;
     try { config = JSON.parse(original); }
@@ -20,7 +21,7 @@ export function withGatewayConfiguration<T>(path: string, action: (raw: Record<s
         await rename(temporary, key);
       } finally { await rm(temporary, { force: true }); }
     });
-  });
+  }));
   const settled = job.then(() => {}, () => {});
   writes.set(key, settled);
   void settled.then(() => { if (writes.get(key) === settled) writes.delete(key); });

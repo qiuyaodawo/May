@@ -5,6 +5,15 @@
 May reads `~/.may/config.json` by default. The configuration separates named
 provider connections, selectable model profiles, and application settings.
 
+Configuration loads, default-model updates, and MaybeClaw authentication updates
+coordinate across local processes using `<config-path>.access` and
+`<config-path>.access.gate`. First access creates these empty files and requires
+directory write permission. Keep them beside
+the configuration. Before serving configuration from a read-only directory,
+call `loadMayConfig({ path })` once with directory write permission; later loads
+only need read permission on the configuration and its access files. Upgrade all
+processes that share a configuration together.
+
 Use this page to look up fields and defaults. For application startup and controls,
 see [MaybeCode](../guides/maybecode.md) or [MaybeClaw](../guides/maybeclaw.md).
 

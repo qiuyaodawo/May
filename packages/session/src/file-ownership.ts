@@ -3,6 +3,7 @@ import { lstat, open, readFile, rename, rm, unlink, type FileHandle } from "node
 import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 import { hostname } from "node:os";
+import { withFileAccess } from "./file-access.js";
 
 /** Local cooperative ownership. Recovery requires an explicitly quiescent host. */
 export async function acquireFileLock(path: string): Promise<FileHandle> {
@@ -59,7 +60,7 @@ export async function replaceJournalFile(path: string, contents: string): Promis
   try {
     const file = await open(temporary, "wx", 0o600);
     try { await file.writeFile(contents); await file.sync(); } finally { await file.close(); }
-    await rename(temporary, path);
+    await withFileAccess(path, "exclusive", () => rename(temporary, path));
     await syncDirectory(dirname(path));
     return await open(path, "a+", 0o600);
   } finally { await rm(temporary, { force: true }); }

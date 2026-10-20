@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 import {
   MayConfigFileError,
   MayConfigParseError,
@@ -21,7 +22,7 @@ export async function loadMayConfig(
   let source: string;
 
   try {
-    source = await readFile(path, "utf8");
+    source = await withFileAccess(path, "shared", () => readFile(path, "utf8"));
   } catch (error) {
     throw new MayConfigFileError(path, { cause: error });
   }

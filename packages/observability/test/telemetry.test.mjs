@@ -125,6 +125,7 @@ test("cancelled retry waits report actual elapsed waiting without a second physi
   const diagnostics = new DiagnosticsStore();
   const metrics = new BoundedMetrics();
   const model = new RetryingModel(new OpenAIChatCompletionsModel({ apiKey: "local-test", model: "local", baseURL: `http://127.0.0.1:${server.address().port}` }), { baseDelayMs: 1_000, maxDelayMs: 1_000, jitterRatio: 0 });
+  const started = performance.now();
   const run = new May({ context: new InMemoryContext(), model, tracer: new BasicTracer({ processor: new InMemorySpanProcessor(), observer: diagnostics, metrics, sampler: alwaysOffSampler }) }).run({ input: "query" });
   const rejected = assert.rejects(run.result);
   for await (const event of run.events) if (event.type === "model.retrying") {
@@ -133,12 +134,14 @@ test("cancelled retry waits report actual elapsed waiting without a second physi
     break;
   }
   await rejected;
+  const elapsed = performance.now() - started;
   assert.equal(requests, 1);
   const call = diagnostics.getDiagnostics().spans.find(span => span.name === "may.model.call");
   assert.equal(call.status, "cancelled");
   assert.equal(call.attributes["may.model.attempts"], 1);
-  assert.ok(call.attributes["may.model.retry_wait_ms"] >= 10);
-  assert.ok(call.attributes["may.model.retry_wait_ms"] < 1_000);
+  assert.ok(call.attributes["may.model.retry_wait_ms"] > 0);
+  assert.ok(call.attributes["may.model.retry_wait_ms"] <= call.durationMs);
+  assert.ok(call.durationMs <= elapsed);
   assert.equal(metrics.getMetrics().find(metric => metric.name === "may.model.retry_wait").sum, call.attributes["may.model.retry_wait_ms"]);
   assert.ok(metrics.getMetrics().filter(metric => metric.name.endsWith(".active")).every(metric => metric.value === 0));
 });

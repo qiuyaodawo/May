@@ -199,6 +199,55 @@ Catalog 在本地多个进程间使用追加式原子操作文件，默认不自
 目录。多主机协调和加密由自定义后端提供。停止其他 Catalog 使用者后可以调用
 `compact({ confirmHostsStopped: true })`，完整步骤见[本地存储维护](#本地存储维护)。
 
+## 协调本地文件访问
+
+应用自己的本地文件由多个进程共同访问时，使用
+`@sortedyuan/session/file-access` 导出的 `withFileAccess`。将
+`@sortedyuan/session` 加入直接依赖，把下面的示例保存为 `shared-state.mjs`，
+在应用目录运行 `node shared-state.mjs`。示例写入完整 JSON 内容，通过相同的
+访问函数读取内容，然后输出 `1`。
+
+```js
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { withFileAccess } from "@sortedyuan/session/file-access";
+
+await mkdir(".may", { recursive: true });
+const path = resolve(".may/shared-state.json");
+await withFileAccess(path, "exclusive", async () => {
+  const temporary = `${path}.${process.pid}.tmp`;
+  await writeFile(temporary, JSON.stringify({ revision: 1 }));
+  await rename(temporary, path);
+});
+const state = await withFileAccess(
+  path,
+  "shared",
+  async () => JSON.parse(await readFile(path, "utf8")),
+  { initialize: false },
+);
+console.log(state.revision);
+```
+
+读取使用 `"shared"`；完整的写入、替换或删除过程使用 `"exclusive"`。所有进程
+都需要通过相同路径调用这个函数。回调需要等待所有文件操作结束，并关闭打开的句柄。
+返回的 Promise 保留回调结果或错误。回调完成或进程退出时，访问锁自动释放。
+这个函数通过 `fs-native-extensions` 协调本地文件；多主机存储需要自己的协调后端。
+
+首次调用会使用 `0600` 模式创建两个空文件：`<path>.access` 和
+`<path>.access.gate`。存储使用期间需要保留这两个文件；删除或替换它们之前，
+需要停止全部使用者。写入者等待已有读取者结束时会持有 gate，后续读取请求随之等待。
+获取访问锁时每隔 10 ms 检查一次，等待 30 秒后以 `ETIMEDOUT` 拒绝请求。
+回调自身没有时间限制。
+
+只读进程需要提前使用目录写入权限初始化两个标记文件，然后传入
+`{ initialize: false }`。这个选项不会创建标记文件；缺少任何一个标记文件都会报告
+`FILE_ACCESS_NOT_INITIALIZED`。共享访问只需要读取已有标记文件的权限；独占访问
+需要写入权限。函数拒绝符号链接、普通文件以外的标记文件，以及文件身份发生变化的标记。
+在回调内部递归获取相同文件的访问锁，会立即报告 `FILE_ACCESS_REENTRANT`。
+
+示例保留 JSON 文件和两个标记文件供后续使用。删除存储时，等待全部参与进程停止，
+然后删除数据文件和两个标记文件。Session 历史仍然需要存储宿主管理单个活动写入者的生命周期。
+
 ## 验证持久化
 
 保存活动的 `workspace.sessionId`，关闭工作区，然后使用相同存储路径和该 `sessionId`

@@ -17,6 +17,10 @@
     "./file-store": {
       "types": "./dist/file-store.d.ts",
       "import": "./dist/file-store.js"
+    },
+    "./file-access": {
+      "types": "./dist/file-access.d.ts",
+      "import": "./dist/file-access.js"
     }
   },
   "files": [
@@ -30,7 +34,8 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/core": "workspace:*"
+    "@sortedyuan/core": "workspace:*",
+    "fs-native-extensions": "1.5.1"
   },
   "devDependencies": {
     "@sortedyuan/permissions": "workspace:*",

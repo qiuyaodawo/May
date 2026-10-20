@@ -119,6 +119,13 @@ atomically updating only `defaultModel`. It preserves the existing indentation,
 line endings, trailing newline, and file mode, and refuses to replace a file
 that changed during the operation.
 
+Configuration reads and updates coordinate across local processes through
+`<config-path>.access` and `<config-path>.access.gate`. First access creates these
+empty files and requires write permission on the containing directory. Keep them
+beside the configuration; subsequent loads only need read permission on all three files. Initialize access once
+with `loadMayConfig({ path })` before making a configuration directory read-only.
+All processes that update the same configuration must use this protocol.
+
 
 The bundled editor schema also describes MaybeCode MCP stdio/Streamable HTTP,
 OAuth, opt-in `host` compatibility fields and the default-off `tasks` flag. Endpoint/header safety and

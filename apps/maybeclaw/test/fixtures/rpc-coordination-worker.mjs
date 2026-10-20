@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -41,11 +41,12 @@ export async function fixture(t, { disconnectOnAbort = false, cancelSupported = 
     }
     client.pipe(backend); backend.pipe(client);
   });
-  let rpc, worker, server, port;
+  let rpc, observer, worker, server, port;
   t.after(async () => {
     await worker?.close();
     if (server?.listening) { server.closeAllConnections(); await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
     await rpc?.close();
+    await observer?.close();
     disconnect();
     if (proxy.listening) await new Promise((resolve, reject) => proxy.close(error => error ? reject(error) : resolve()));
     if (child.exitCode === null) child.kill();
@@ -66,6 +67,7 @@ export async function fixture(t, { disconnectOnAbort = false, cancelSupported = 
   }
   await startProxy();
   rpc = await createGatewayRpcAdapter("files", { transport: "socket", host: "127.0.0.1", port, timeoutMs: 500 });
+  observer = await createGatewayRpcAdapter("observer", { transport: "socket", path: pipe, timeoutMs: 500 });
   const token = randomBytes(32).toString("hex");
   const controlPath = join(directory, "controls.jsonl");
   const bridge = {
@@ -109,11 +111,9 @@ export async function fixture(t, { disconnectOnAbort = false, cancelSupported = 
       input: JSON.stringify({ operation: "waitForFile", path: `${sessionId}.txt` }), dependsOn: [], turn: 0, status: "running",
     } };
   }
-  function taskFile(execution) {
-    return join(stateDirectory, `${execution.task.sessionId}-${createHash("sha256").update(inputId(execution)).digest("hex")}.json`);
-  }
   async function taskRecord(execution) {
-    return readFile(taskFile(execution), "utf8").then(JSON.parse, error => { if (error.code === "ENOENT") return undefined; throw error; });
+    const record = await observer.inspect(execution.task.sessionId, inputId(execution));
+    return record.status === "not-started" ? undefined : record;
   }
   async function journal() {
     const records = (await readFile(join(directory, "worker", "worker.jsonl"), "utf8")).trim().split("\n").map(JSON.parse);

@@ -115,17 +115,19 @@ export class DurableTaskHost extends EventEmitter {
 }
 
 export class HttpTaskDispatcher {
-  constructor(endpoint, { timeoutMs } = {}) {
+  constructor(endpoint, { timeoutMs, signal } = {}) {
     this.endpoint = endpoint;
     this.timeoutMs = timeoutMs;
+    this.signal = signal;
   }
 
   async submit(request) {
+    const signal = this.signal ?? (this.timeoutMs === undefined ? undefined : AbortSignal.timeout(this.timeoutMs));
     const response = await fetch(this.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
-      ...(this.timeoutMs === undefined ? {} : { signal: AbortSignal.timeout(this.timeoutMs) }),
+      ...(signal === undefined ? {} : { signal }),
     });
     const result = await response.json();
     if (response.status === 422) throw new TaskRejectedError(result.message);

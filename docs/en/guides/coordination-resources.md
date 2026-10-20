@@ -226,3 +226,9 @@ last JSONL record can be repaired; complete corruption, changed configuration an
 ambiguous writes fail closed. Do not remove locks while an owner may still be live.
 These files do not implement distributed locking or automatic stale-lock recovery.
 Close the coordination runtime and await its active work before closing resources.
+
+Resource journal inspection coordinates with appends, repair and checkpoint
+replacement through permanent `.access` and `.access.gate` files beside each journal.
+Their first creation requires directory write permission; subsequent inspection uses
+read-only handles. Follow the [journal upgrade and access instructions](coordination.md#storage-bounds-and-checkpoints)
+when upgrading existing data or granting read-only monitoring access.

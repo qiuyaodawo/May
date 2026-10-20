@@ -56,6 +56,10 @@ MaybeClaw writes `version: 2`, `agents: []`, and an Argon2id `passwordHash`, pre
 existing May configuration, then serves the console at the same address. Log in and
 add an Agent. Existing valid configuration starts normally; old configuration and
 legacy data require explicit migration. Invalid configuration is reported without changes.
+Setup inspection and initialization writes coordinate configuration access with
+default-model updates. Initialization preserves completed updates and releases
+file access before activating the console. Inspecting a missing configuration
+directory leaves it absent until setup starts.
 
 With `--no-open` or `serve`, open the local initialization HTML file printed by the
 terminal. This file contains a one-time credential and is removed after initialization
@@ -96,6 +100,12 @@ default session is an explicit operation.
 configuration. While the server owns the data directory, use `--server` for CLI
 management. Existing task data requires `migrate check` and `migrate run` before
 Gateway startup. This application remains private.
+
+Legacy task and channel journal inspection coordinates with writes through
+permanent `.access` and `.access.gate` files. The first query requires directory
+write permission to initialize them; later inspection uses read-only handles.
+Upgrade all processes sharing the data together and preserve the access files
+while readers or writers are active.
 
 `channel status --server <url>` includes migrated delivery evidence. After
 checking an unknown outcome, `delivery retry-legacy <id> --confirm --server <url>`

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
@@ -23,7 +23,10 @@ async function fixture(t, sessionMs) {
   t.after(async () => { await server.close(); assert.ok(resolve(directory).startsWith(resolve(base) + sep)); await rm(directory, { recursive: true, force: true }); });
   const login = (value = password, headers = {}) => fetch(`${server.url}/api/auth/login`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ password: value }) });
   const get = (token, path = "/api/v2/sessions") => fetch(`${server.url}${path}`, { headers: { authorization: `Bearer ${token}` } });
-  const save = async change => { const data = JSON.parse(await readFile(path, "utf8")); change(data.apps.maybeclaw); await writeFile(`${path}.edit`, JSON.stringify(data)); await rename(`${path}.edit`, path); };
+  const save = change => withGatewayConfiguration(path, async (raw, persist) => {
+    change(raw);
+    await persist();
+  });
   return { password, path, gateway, server, login, get, save };
 }
 async function credential(login) { const response = await login(); assert.equal(response.status, 200); return (await response.json()).token; }
@@ -51,7 +54,7 @@ test("saved password is converted without requests, revokes streams and keeps co
   const completed = (async () => { for await (const chunk of stream.body) assert.ok(chunk.length); })();
   const password = randomBytes(32).toString("base64url");
   await save(raw => { raw.server.auth.password = password; raw.agents[0].name = "保存的名称"; });
-  await until(async () => !Object.hasOwn(JSON.parse(await readFile(path, "utf8")).apps.maybeclaw.server.auth, "password"));
+  await until(() => withGatewayConfiguration(path, async raw => !Object.hasOwn(raw.server.auth, "password")));
   await Promise.race([completed, delay(5000).then(() => { throw new Error("SSE did not close"); })]);
   assert.equal((await get(token)).status, 401); assert.equal((await login()).status, 401);
   const next = await credential(() => login(password)); assert.equal((await get(next)).status, 200);

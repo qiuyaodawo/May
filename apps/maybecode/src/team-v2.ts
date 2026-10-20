@@ -9,6 +9,7 @@ import { CoordinationRuntime, createApplicationAgent, FileArtifactStore, FileSha
 import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
 import { resolveRunBudget, type Model, type RunBudget, type Tool } from "@sortedyuan/core";
 import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 import type { MaybeCodeTeamCommand } from "./args.js";
 import { getDefaultMaybeCodeDataDirectory } from "./configured.js";
 import { createMaybeCodeModel, selectMaybeCodeModel, type SelectedMaybeCodeModel } from "./model.js";
@@ -69,7 +70,8 @@ export async function runTeamV2Command(command: MaybeCodeTeamCommand, dependenci
     write(`Team ${id}\nMode: ${manifest.mode}\nRecords: ${directory}\n`);
     write(await inspectTeam(directory, id, budgetLimits));
     // This projection is deliberately labeled: verify rechecks fingerprints under ownership.
-    try { write(`Last acceptance projection (may be stale): ${await readFile(join(directory, "acceptance.json"), "utf8")}\n`); }
+    const path = join(directory, "acceptance.json");
+    try { write(`Last acceptance projection (may be stale): ${await withFileAccess(path, "shared", () => readFile(path, "utf8"))}\n`); }
     catch (error) { if (!isMissing(error)) throw error; }
     return 0;
   }
@@ -268,7 +270,8 @@ export async function runTeamV2Command(command: MaybeCodeTeamCommand, dependenci
       const controller = new AbortController();
       const signal = AbortSignal.any([controller.signal, ...(dependencies.signal ? [dependencies.signal] : [])]);
       const observeCancellation = async () => {
-        try { await stat(join(directory, "cancel.request.json")); controller.abort("Team verification cancelled"); }
+        const path = join(directory, "cancel.request.json");
+        try { await withFileAccess(path, "shared", () => stat(path)); controller.abort("Team verification cancelled"); }
         catch (error) { if (!isMissing(error)) { controller.abort("Cannot establish cancellation state"); throw error; } }
       };
       await observeCancellation();
@@ -287,7 +290,8 @@ export async function runTeamV2Command(command: MaybeCodeTeamCommand, dependenci
     }
 
     const checkCancellation = async () => {
-      try { await stat(join(directory, "cancel.request.json")); cancel(); }
+      const path = join(directory, "cancel.request.json");
+      try { await withFileAccess(path, "shared", () => stat(path)); cancel(); }
       catch (error) { if (!isMissing(error)) { cancel(); throw error; } }
     };
     dependencies.signal?.addEventListener("abort", cancel, { once: true });
@@ -344,8 +348,11 @@ function modelFingerprint(selection: SelectedMaybeCodeModel): string {
 }
 
 async function readManifest(directory: string, id: string): Promise<Manifest> {
-  const path = join(directory, "manifest.json"); if ((await stat(path)).size > 2_097_152) throw new Error("Team manifest exceeds limit");
-  const value = JSON.parse(await readFile(path, "utf8")) as Manifest; validateManifest(value, id); return value;
+  const path = join(directory, "manifest.json");
+  return withFileAccess(path, "shared", async () => {
+    if ((await stat(path)).size > 2_097_152) throw new Error("Team manifest exceeds limit");
+    const value = JSON.parse(await readFile(path, "utf8")) as Manifest; validateManifest(value, id); return value;
+  });
 }
 function validateManifest(value: Manifest, id: string): void {
   if (!value || value.format !== 1 || value.version !== VERSION || value.id !== id || !isAbsolute(value.workspace) || !isAbsolute(value.configPath) || typeof value.prompt !== "string" || typeof value.model !== "string" || !["coding", "read-only"].includes(value.mode) || typeof value.allowChecks !== "boolean") throw new Error("Invalid v2 team manifest");
@@ -360,11 +367,13 @@ function validateManifest(value: Manifest, id: string): void {
 }
 
 async function writeJson(path: string, value: unknown, exclusive = false): Promise<void> {
-  const target = exclusive ? path : `${path}.${randomUUID()}.tmp`;
-  const file = await open(target, "wx", 0o600);
-  try { await file.writeFile(`${JSON.stringify(value, null, 2)}\n`); await file.sync(); }
-  finally { await file.close(); }
-  if (!exclusive) await rename(target, path);
+  await withFileAccess(path, "exclusive", async () => {
+    const target = exclusive ? path : `${path}.${randomUUID()}.tmp`;
+    const file = await open(target, "wx", 0o600);
+    try { await file.writeFile(`${JSON.stringify(value, null, 2)}\n`); await file.sync(); }
+    finally { await file.close(); }
+    if (!exclusive) await rename(target, path);
+  });
 }
 function inside(root: string, path: string): boolean { const child = relative(root, path); return child === "" || (!isAbsolute(child) && child !== ".." && !child.startsWith(`..${sep}`)); }
 async function canonicalPotentialPath(path: string): Promise<string> {

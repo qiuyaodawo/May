@@ -3,6 +3,7 @@ import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { MayError } from "@sortedyuan/core";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 
 /** Secrets are opaque to the host. Implementations must not log their values. */
 export interface McpCredentialStore {
@@ -58,9 +59,12 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
   async get<T>(key: string): Promise<T | undefined> {
     const path = this.path(key);
     try {
-      const info = await stat(path);
-      if (info.size > 2 * 1024 * 1024) throw new McpCredentialStoreError();
-      const record = JSON.parse(await readFile(path, "utf8")) as {
+      const source = await withFileAccess(path, "shared", async () => {
+        const info = await stat(path);
+        if (info.size > 2 * 1024 * 1024) throw new McpCredentialStoreError();
+        return readFile(path, "utf8");
+      });
+      const record = JSON.parse(source) as {
         version: number; nonce: string; tag: string; ciphertext: string;
       };
       if (record.version !== 1) throw new McpCredentialStoreError();
@@ -79,6 +83,7 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
   }
 
   async set(key: string, value: unknown): Promise<void> {
+    const path = this.path(key);
     let temporary: string | undefined;
     try {
       const plain = Buffer.from(JSON.stringify(value));
@@ -90,8 +95,9 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
       try { ciphertext = Buffer.concat([cipher.update(plain), cipher.final()]); }
       finally { plain.fill(0); }
       await mkdir(this.directory, { recursive: true, mode: 0o700 });
-      temporary = `${this.path(key)}.${randomUUID()}.tmp`;
-      const file = await open(temporary, "wx", 0o600);
+      const staged = `${path}.${randomUUID()}.tmp`;
+      temporary = staged;
+      const file = await open(staged, "wx", 0o600);
       try {
         await file.writeFile(JSON.stringify({
           version: 1, nonce: nonce.toString("base64"),
@@ -99,13 +105,14 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
         }));
         await file.sync();
       } finally { await file.close(); }
-      await rename(temporary, this.path(key));
+      await withFileAccess(path, "exclusive", () => rename(staged, path));
     } catch { throw new McpCredentialStoreError(); }
     finally { if (temporary !== undefined) await unlink(temporary).catch(() => {}); }
   }
 
   async delete(key: string): Promise<void> {
-    try { await unlink(this.path(key)); }
+    const path = this.path(key);
+    try { await withFileAccess(path, "exclusive", () => unlink(path)); }
     catch (error) { if (!hasCode(error, "ENOENT")) throw new McpCredentialStoreError(); }
   }
 

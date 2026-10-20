@@ -132,6 +132,13 @@ the PID in its `.lock` file and verify it has exited before removing that lock;
 the library does not steal a live lock based on age. Unlock the OS keyring or
 inject a secure store on headless systems.
 
+Encrypted record reads, replacements and deletions also coordinate across
+processes using permanent `<record-path>.access` and `<record-path>.access.gate`
+files. The store creates them
+with restricted permissions. This protects status checks and token reads while
+another operation updates the same record. Upgrade all processes sharing a vault
+together, and preserve its access files while any process is using the vault.
+
 Library integrations create `new McpOAuthManager(store)` and pass it as `oauth`
 to `openMcpClientPool`, or as `mcp.oauth` to configured MaybeCode. The manager
 exposes `login`, `status`, and `logout`. Implement `McpCredentialStore` for other

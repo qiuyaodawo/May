@@ -39,6 +39,15 @@ Hooks、忽略规则、attributes 和签名配置，组件保留这些配置。�
 `readOnly: true` 保留现有仓库和文件状态，不创建版本或状态文件。宿主通过 `status()`
 处理尚未使用 Git 的只读工作区。Git 的 `GIT_CEILING_DIRECTORIES` 仓库查找边界继续生效。
 
+Checkpoint 和 worktree 记录通过持久保留的 `<record-path>.access` 与
+`<record-path>.access.gate` 空文件，
+协调本机不同进程的读取与更新。写入操作自动创建这些文件。对于已有记录，
+使用 `autoCommit: false`、`readOnly: false` 打开 manager，在具有目录写入权限时
+调用一次 `checkpoints()` 和 `listWorktrees()`，完成只读访问所需的初始化。
+这些查询保留 checkpoint 内容，不创建 Git commit。只读 manager 要求 access 文件
+已经存在，并使用读取权限打开它们。请将 access 文件与记录一起保留，共享数据的
+所有进程需要一起升级。
+
 `deferInitialization: true` 使 `open()` 只识别仓库，保留现有仓库和记录目录状态。
 `prepare()` 或 `beginRound()` 执行延迟初始化。`summary()` 读取仓库身份与 HEAD，
 不遍历工作文件，适合不需要文件修改信息的状态界面。

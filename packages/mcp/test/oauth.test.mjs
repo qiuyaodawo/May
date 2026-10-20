@@ -120,7 +120,13 @@ test("credential vault encrypts large grants, detects tampering, and serializes 
   const store = new KeyringMcpCredentialStore(directory, keyring);
   const value = { refresh_token: `secret-${"x".repeat(8_000)}`, issuer: "https://issuer.test" };
   await store.set("grant", value);
-  assert.deepEqual(await new KeyringMcpCredentialStore(directory, keyring).get("grant"), value);
+  const reader = new KeyringMcpCredentialStore(directory, keyring);
+  assert.deepEqual(await reader.get("grant"), value);
+  for (let revision = 0; revision < 16; revision++) {
+    const [, ...records] = await Promise.all([store.set("grant", { ...value, revision }), ...Array.from({ length: 8 }, () => reader.get("grant"))]);
+    assert.ok(records.every(record => record.refresh_token === value.refresh_token && record.issuer === value.issuer));
+  }
+  assert.deepEqual(await reader.get("grant"), { ...value, revision: 15 });
   const path = join(directory, (await readdir(directory)).find((name) => name.endsWith(".json")));
   const bytes = await readFile(path, "utf8");
   assert.doesNotMatch(bytes, /secret-|issuer\.test/u);

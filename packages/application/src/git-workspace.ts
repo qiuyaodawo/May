@@ -5,6 +5,7 @@ import type { FileHandle } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { simpleGit, type SimpleGit, type StatusResult } from "simple-git";
 import { createPatch, diffLines } from "diff";
+import { withFileAccess } from "@sortedyuan/session/file-access";
 
 export interface ProjectGitWorkspaceOptions {
   readonly workspace: string;
@@ -332,7 +333,7 @@ export class ProjectGitWorkspace {
 
   async checkpoint(id: string): Promise<GitCheckpoint> {
     validateId(id);
-    const value = await readJson<GitCheckpoint>(join(this.directory, "checkpoints", `${id}.json`));
+    const value = await readJson<GitCheckpoint>(join(this.directory, "checkpoints", `${id}.json`), !this.readOnly);
     if (!value || value.id !== id) throw new Error("Git checkpoint does not belong to this project");
     return value;
   }
@@ -669,6 +670,7 @@ export class ProjectGitWorkspace {
   }
 
   private async recoverIntent(): Promise<void> {
+    if (this.readOnly) return;
     const intent = await readJson<CommitIntent>(this.intentPath());
     if (intent === undefined) return;
     const state = await this.status();
@@ -790,7 +792,7 @@ export class ProjectGitWorkspace {
 
   private async worktree(id: string): Promise<ManagedGitWorktree> {
     validateId(id);
-    const value = await readJson<ManagedGitWorktree>(join(this.directory, "worktrees", `${id}.json`));
+    const value = await readJson<ManagedGitWorktree>(join(this.directory, "worktrees", `${id}.json`), !this.readOnly);
     if (!value || value.projectId !== this.projectId || value.id !== id) throw new Error("Worktree is not registered for this project");
     return value;
   }
@@ -800,7 +802,11 @@ export class ProjectGitWorkspace {
     if (!await exists(directory)) return [];
     const values: T[] = [];
     for (const name of await readdir(directory)) {
-      if (name.endsWith(".json")) values.push(JSON.parse(await readFile(join(directory, name), "utf8")) as T);
+      if (name.endsWith(".json")) {
+        const path = join(directory, name);
+        values.push(await withFileAccess(path, "shared", async () => JSON.parse(await readFile(path, "utf8")) as T,
+          { initialize: !this.readOnly }));
+      }
     }
     return values;
   }
@@ -851,8 +857,11 @@ async function exists(path: string): Promise<boolean> {
   try { await access(path); return true; }
   catch (error) { if (isFsError(error, "ENOENT")) return false; throw error; }
 }
-async function readJson<T>(path: string): Promise<T | undefined> {
-  try { return JSON.parse(await readFile(path, "utf8")) as T; }
+async function readJson<T>(path: string, initialize = true): Promise<T | undefined> {
+  try {
+    if (!initialize) await access(path);
+    return await withFileAccess(path, "shared", async () => JSON.parse(await readFile(path, "utf8")) as T, { initialize });
+  }
   catch (error) { if (isFsError(error, "ENOENT")) return undefined; throw error; }
 }
 async function writeJson(path: string, value: unknown): Promise<void> {
@@ -861,7 +870,7 @@ async function writeJson(path: string, value: unknown): Promise<void> {
   const file = await open(temporary, "wx", 0o600);
   try { await file.writeFile(`${JSON.stringify(value)}\n`); await file.sync(); }
   finally { await file.close(); }
-  await rename(temporary, path);
+  await withFileAccess(path, "exclusive", () => rename(temporary, path));
 }
 function fingerprint(content: Buffer, mode: string): string { return createHash("sha256").update(mode).update(content).digest("hex"); }
 async function regularFile(path: string): Promise<{ content: Buffer; mode: string } | undefined> {

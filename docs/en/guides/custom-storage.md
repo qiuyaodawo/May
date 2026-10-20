@@ -211,6 +211,61 @@ backend is a multi-host database or encrypted secret store.
 After stopping other Catalog users, call `compact({ confirmHostsStopped: true })`;
 see [Local storage maintenance](#local-storage-maintenance) for the complete procedure.
 
+## Coordinate local file access
+
+For an application-owned local file shared by several processes, use
+`withFileAccess` from `@sortedyuan/session/file-access`. Add `@sortedyuan/session`
+as a direct dependency, save this example as `shared-state.mjs`, and run
+`node shared-state.mjs` from the application directory. It writes one complete
+JSON value and prints `1` after reading it through the same access helper.
+
+```js
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { withFileAccess } from "@sortedyuan/session/file-access";
+
+await mkdir(".may", { recursive: true });
+const path = resolve(".may/shared-state.json");
+await withFileAccess(path, "exclusive", async () => {
+  const temporary = `${path}.${process.pid}.tmp`;
+  await writeFile(temporary, JSON.stringify({ revision: 1 }));
+  await rename(temporary, path);
+});
+const state = await withFileAccess(
+  path,
+  "shared",
+  async () => JSON.parse(await readFile(path, "utf8")),
+  { initialize: false },
+);
+console.log(state.revision);
+```
+
+Use `"shared"` for reading and `"exclusive"` for the whole write, replacement, or
+deletion operation. Every process must use the helper with the same path. Await
+all file operations and close handles inside the callback. The returned promise
+preserves its result or error. Access is released when the callback settles or
+the owning process exits. The helper coordinates local files using
+`fs-native-extensions`; multi-host storage needs its own coordination backend.
+
+The first call creates empty `<path>.access` and `<path>.access.gate` files with
+mode `0600`. Keep both files while the store is in use; removing or replacing
+them requires all users to stop. A writer holds the gate while existing readers
+finish, so incoming reads wait. Access acquisition checks every 10 ms and rejects
+with `ETIMEDOUT` after 30 seconds. The callback itself has no time limit.
+
+For a read-only process, initialize both markers once with directory write
+permission, then pass `{ initialize: false }`. This option creates no markers and
+reports `FILE_ACCESS_NOT_INITIALIZED` if either marker is absent. Shared access
+requires only read permission on existing markers; exclusive access requires
+write permission. Symbolic links, non-regular markers and changed marker identity
+are rejected. Calling the helper recursively for the same file from its callback
+rejects immediately with `FILE_ACCESS_REENTRANT`.
+
+The example retains the JSON value and both markers for reuse. After every
+participating process has stopped, remove the value and both markers when deleting
+the store. Session history still requires its storage host to own the lifetime
+of its single active writer.
+
 ## Verify persistence
 
 Save the active `workspace.sessionId`, close the workspace, and reopen it with

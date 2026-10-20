@@ -22,6 +22,11 @@ Root exports:
 - `TaskWorkspaceManager`: filtered per-task file copies and read-only change manifests.
 
 `FileCoordinationStore` is exported through `@sortedyuan/coordination/file-store`.
+Journal inspection and writes coordinate across processes through permanent
+`.access` and `.access.gate` files beside their journals. Their first creation requires directory
+write permission; later inspections use read-only handles. Upgrade all sharing
+processes together and initialize access files before granting read-only monitoring
+access, as described in the [storage guide](../../docs/en/guides/coordination.md#storage-bounds-and-checkpoints).
 
 Hosts that own persistent Agent conversations can implement `CoordinationAgent`
 with `coordinationInput(execution)` and

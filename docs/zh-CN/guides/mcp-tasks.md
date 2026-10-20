@@ -130,7 +130,10 @@ Session 索引为每个端点身份保留最多 1,024 条散列远端 id 记录�
 
 `McpTaskJournal` 提供 `begin`、`initialUsage`、`observe`、`get`/`list`、
 `uncertain`、`claimInput`、`reserveSampling`、`markInput`、`abandonInput`、
-`cancelIntent`、`forget`，自身不发送 RPC 或授予权限。`parseMcpTask` 校验有界原生
+`cancelIntent`、`forget`，自身不发送 RPC 或授予权限。同一 workspace/Session 的读取
+和更新使用凭据存储中的同一个独占锁。`get` 和 `list` 等待正在进行的更新完成；
+使用 `KeyringMcpCredentialStore` 时，也会等待其他进程的更新。
+`parseMcpTask` 校验有界原生
 帧；运行时进一步校验工具结果内容/schema。数据损坏或 keyring 不可用时拒绝操作。
 若崩溃遗留 vault `.lock`，先验证其中 PID 已退出，再删除那个明确的陈旧锁；绝不能
 重置 vault 来将未知结果解释为可安全重放。
