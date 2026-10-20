@@ -1,5 +1,16 @@
 # @sortedyuan/plugin-agent-adapters
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [749fadc]
+- Updated dependencies [749fadc]
+- Updated dependencies [749fadc]
+  - @sortedyuan/application@0.3.0
+  - @sortedyuan/plugin-delivery@0.3.0
+  - @sortedyuan/session@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes

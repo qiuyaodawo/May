@@ -1,5 +1,12 @@
 # @sortedyuan/plugin-coordination
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [749fadc]
+  - @sortedyuan/coordination@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes

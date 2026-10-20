@@ -1,5 +1,14 @@
 # @sortedyuan/eval
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [749fadc]
+- Updated dependencies [749fadc]
+  - @sortedyuan/application@0.3.0
+  - @sortedyuan/coordination@0.3.0
+
 ## 0.3.0
 
 ### Minor Changes

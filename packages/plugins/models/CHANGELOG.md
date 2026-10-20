@@ -1,5 +1,11 @@
 # @sortedyuan/plugin-models
 
+## 0.2.2
+
+### Patch Changes
+
+- @sortedyuan/plugin-services@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

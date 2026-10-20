@@ -1,5 +1,40 @@
 # @sortedyuan/maybecode
 
+## 0.3.0
+
+### Minor Changes
+
+- 749fadc: Coordinate team manifest, status, acceptance, and cancellation file access across processes so concurrent status queries can coexist with team command updates on Windows.
+
+  Breaking change: initial access creates empty `.access` and `.access.gate` coordination files and needs directory write permission. Subsequent readers open both files read-only. To migrate existing records, run `team status <id>` once with directory write permission before granting read-only directory access, and retain both coordination files while the records are in use.
+
+### Patch Changes
+
+- Updated dependencies [749fadc]
+- Updated dependencies [749fadc]
+- Updated dependencies [749fadc]
+- Updated dependencies [749fadc]
+  - @sortedyuan/config@0.3.0
+  - @sortedyuan/application@0.3.0
+  - @sortedyuan/media@0.3.0
+  - @sortedyuan/mcp@0.2.1
+  - @sortedyuan/coordination@0.3.0
+  - @sortedyuan/session@0.3.0
+  - @sortedyuan/plugin-delegation@0.2.2
+  - @sortedyuan/providers@0.2.1
+  - @sortedyuan/plugin-goals@0.2.2
+  - @sortedyuan/plugin-history-memory@0.2.2
+  - @sortedyuan/plugin-mcp@0.2.2
+  - @sortedyuan/plugin-observability@0.2.2
+  - @sortedyuan/ui-client@0.2.2
+  - @sortedyuan/web-ui@0.2.2
+  - @sortedyuan/tui@0.2.2
+  - @sortedyuan/plugin-services@0.2.2
+  - @sortedyuan/plugin-models@0.2.2
+  - @sortedyuan/plugin-permissions@0.2.2
+  - @sortedyuan/plugin-runtime@0.2.2
+  - @sortedyuan/plugin-skills@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

@@ -1,5 +1,17 @@
 # @sortedyuan/providers
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [749fadc]
+  - @sortedyuan/config@0.3.0
+  - @sortedyuan/provider-anthropic@0.2.0
+  - @sortedyuan/provider-deepseek@0.2.0
+  - @sortedyuan/provider-gemini@0.2.0
+  - @sortedyuan/provider-kimi@0.2.0
+  - @sortedyuan/provider-zhipu@0.2.0
+
 ## 0.2.0
 
 ### Minor Changes

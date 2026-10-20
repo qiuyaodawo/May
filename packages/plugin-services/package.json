@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/plugin-services",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Typed agent services and ordered plugin contribution registries.",
   "type": "module",
   "main": "./dist/index.js",

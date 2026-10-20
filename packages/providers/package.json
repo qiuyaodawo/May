@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/providers",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Provider selection, registration, and built-in model composition for May.",
   "type": "module",
   "main": "./dist/index.js",

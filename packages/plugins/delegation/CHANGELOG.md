@@ -1,5 +1,21 @@
 # @sortedyuan/plugin-delegation
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [749fadc]
+- Updated dependencies [749fadc]
+- Updated dependencies [749fadc]
+  - @sortedyuan/config@0.3.0
+  - @sortedyuan/application@0.3.0
+  - @sortedyuan/coordination@0.3.0
+  - @sortedyuan/session@0.3.0
+  - @sortedyuan/plugin-goals@0.2.2
+  - @sortedyuan/plugin-history-memory@0.2.2
+  - @sortedyuan/plugin-mcp@0.2.2
+  - @sortedyuan/plugin-services@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/maybecode",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Terminal coding agent built from May packages.",
   "private": false,
   "type": "module",

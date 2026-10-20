@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/ui-client",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "UI-neutral May client contract, state synchronization and host adapters.",
   "type": "module",
   "main": "./dist/index.js",
