@@ -1,5 +1,15 @@
 # @sortedyuan/session
 
+## 0.4.0
+
+### Minor Changes
+
+- 941b411: Add configurable acquisition timeouts and AbortSignal cancellation to `withFileAccess`, with ownership retained until an active callback settles.
+
+### Patch Changes
+
+- 941b411: Coordinate writer-lock creation and deletion with permanent access markers across processes, covering coordination journals, resource journals, remote workers, configuration updates, Team verification and patch application. Preserve owner files after process termination and close owned handles when release cannot obtain file access. Upgrade all processes sharing a data directory together and retain the access markers during recovery.
+
 ## 0.3.0
 
 ### Minor Changes

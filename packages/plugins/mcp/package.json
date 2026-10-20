@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/plugin-mcp",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "MCP connection, authentication and tool catalog lifecycle plugin for May agents.",
   "type": "module",
   "main": "./dist/index.js",

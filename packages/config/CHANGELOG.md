@@ -1,5 +1,13 @@
 # @sortedyuan/config
 
+## 0.3.1
+
+### Patch Changes
+
+- 941b411: Coordinate writer-lock creation and deletion for default-model updates across processes. Preserve the owner file after process termination. Upgrade all processes updating the same configuration together and retain `.lock.access` and `.lock.access.gate` during use and recovery.
+- Updated dependencies [941b411]
+  - @sortedyuan/session@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

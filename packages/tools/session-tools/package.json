@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/session-tools",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Read-only session history tools for May agents.",
   "type": "module",
   "main": "./dist/index.js",

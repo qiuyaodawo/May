@@ -1,5 +1,13 @@
 # @sortedyuan/eval
 
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies [941b411]
+  - @sortedyuan/application@0.3.1
+  - @sortedyuan/coordination@0.3.1
+
 ## 0.3.1
 
 ### Patch Changes

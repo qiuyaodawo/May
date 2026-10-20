@@ -1,5 +1,32 @@
 # @sortedyuan/maybecode
 
+## 0.3.1
+
+### Patch Changes
+
+- 941b411: Coordinate writer-lock creation and deletion for Team verification and patch application across processes. Include coordinated MCP credential, configuration and Git workspace lock lifecycles. Upgrade all processes sharing data together and retain `.lock.access` and `.lock.access.gate` during use and recovery.
+- Updated dependencies [941b411]
+  - @sortedyuan/session@0.4.0
+  - @sortedyuan/mcp@0.2.2
+  - @sortedyuan/application@0.3.1
+  - @sortedyuan/config@0.3.1
+  - @sortedyuan/coordination@0.3.1
+  - @sortedyuan/media@0.3.1
+  - @sortedyuan/plugin-services@0.2.3
+  - @sortedyuan/plugin-delegation@0.2.3
+  - @sortedyuan/plugin-history-memory@0.2.3
+  - @sortedyuan/ui-client@0.2.3
+  - @sortedyuan/tui@0.2.3
+  - @sortedyuan/web-ui@0.2.3
+  - @sortedyuan/plugin-mcp@0.2.3
+  - @sortedyuan/plugin-goals@0.2.3
+  - @sortedyuan/plugin-observability@0.2.3
+  - @sortedyuan/providers@0.2.2
+  - @sortedyuan/plugin-models@0.2.3
+  - @sortedyuan/plugin-permissions@0.2.3
+  - @sortedyuan/plugin-runtime@0.2.3
+  - @sortedyuan/plugin-skills@0.2.3
+
 ## 0.3.0
 
 ### Minor Changes

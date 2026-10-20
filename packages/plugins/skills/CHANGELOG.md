@@ -1,5 +1,11 @@
 # @sortedyuan/plugin-skills
 
+## 0.2.3
+
+### Patch Changes
+
+- Update the `@sortedyuan/plugin-services` dependency to `0.2.3`.
+
 ## 0.2.2
 
 ### Patch Changes

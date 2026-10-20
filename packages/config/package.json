@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/config",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Configuration loading and validation for May applications.",
   "type": "module",
   "main": "./dist/index.js",

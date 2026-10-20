@@ -1,5 +1,12 @@
 # @sortedyuan/providers
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [941b411]
+  - @sortedyuan/config@0.3.1
+
 ## 0.2.1
 
 ### Patch Changes

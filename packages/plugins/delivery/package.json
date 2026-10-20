@@ -1,5 +1,5 @@
 {
-  "name": "@sortedyuan/plugin-delivery", "version": "0.3.0", "description": "Channel services and durable delivery plugin for May hosts.",
+  "name": "@sortedyuan/plugin-delivery", "version": "0.3.1", "description": "Channel services and durable delivery plugin for May hosts.",
   "type": "module", "main": "./dist/index.js", "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist", "!dist/.tsbuildinfo"],

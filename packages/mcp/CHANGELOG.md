@@ -1,5 +1,13 @@
 # @sortedyuan/mcp
 
+## 0.2.2
+
+### Patch Changes
+
+- 941b411: Coordinate the complete credential lock lifecycle across processes so Windows pending-delete handles cannot interrupt concurrent credential operations. Preserve the existing lock recovery procedure and ten-second acquisition limit.
+- Updated dependencies [941b411]
+  - @sortedyuan/session@0.4.0
+
 ## 0.2.1
 
 ### Patch Changes

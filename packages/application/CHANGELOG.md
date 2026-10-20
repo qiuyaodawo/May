@@ -1,5 +1,19 @@
 # @sortedyuan/application
 
+## 0.3.1
+
+### Patch Changes
+
+- 941b411: Serialize Git workspace lock metadata publication, recovery and release. Report incomplete owner metadata as `GitWorkspaceConflictError` and let concurrent `close()` calls await the same release. Upgrade all processes sharing a workspace together and retain `.lock.access` and `.lock.access.gate` during use and recovery.
+- Updated dependencies [941b411]
+  - @sortedyuan/session@0.4.0
+  - @sortedyuan/plugin-services@0.2.3
+  - @sortedyuan/session-tools@0.2.2
+  - @sortedyuan/plugin-models@0.2.3
+  - @sortedyuan/plugin-permissions@0.2.3
+  - @sortedyuan/plugin-runtime@0.2.3
+  - @sortedyuan/plugin-skills@0.2.3
+
 ## 0.3.0
 
 ### Minor Changes

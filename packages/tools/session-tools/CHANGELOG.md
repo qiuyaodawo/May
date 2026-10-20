@@ -1,5 +1,12 @@
 # @sortedyuan/session-tools
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [941b411]
+  - @sortedyuan/session@0.4.0
+
 ## 0.2.1
 
 ### Patch Changes

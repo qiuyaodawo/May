@@ -1,5 +1,14 @@
 # @sortedyuan/coordination
 
+## 0.3.1
+
+### Patch Changes
+
+- 941b411: Coordinate writer-lock creation and deletion for coordination journals, resource journals and remote workers across processes. Preserve owner files after process termination. Upgrade all processes sharing a data directory together and retain `.lock.access` and `.lock.access.gate` during use and recovery.
+- Updated dependencies [941b411]
+  - @sortedyuan/session@0.4.0
+  - @sortedyuan/application@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

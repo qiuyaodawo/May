@@ -1,5 +1,12 @@
 # @sortedyuan/media
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [941b411]
+  - @sortedyuan/session@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

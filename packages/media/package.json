@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/media",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Reusable image attachments and file storage for May applications.",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
