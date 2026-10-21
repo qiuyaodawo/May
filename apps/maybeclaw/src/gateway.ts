@@ -12,7 +12,7 @@ import { FilePermissionRuleStore } from "@sortedyuan/permissions/file-store";
 import type { ContentPart, Tool } from "@sortedyuan/core";
 import { PluginHost } from "@sortedyuan/plugin";
 import { agentAdapterRegistryService } from "@sortedyuan/plugin-agent-adapters";
-import { coordinationService } from "@sortedyuan/plugin-coordination";
+import { coordinationService } from "@sortedyuan/coordination/plugin";
 import { createGatewayAgentPlugins } from "./plugins/agents.js";
 import { GatewayStore } from "./gateway-store.js";
 import { gatewayEntry } from "./gateway-settings.js";

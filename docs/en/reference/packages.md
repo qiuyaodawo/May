@@ -7,7 +7,7 @@ configuring it. Reusable framework code lives in `packages/`; executable product
 live in `apps/`. Applications depend on packages, and packages keep their imports
 within the reusable layer.
 
-The public packages in this checkout are versioned `0.2.0`. The repository requires
+Each package declares its current version in `package.json`. The repository requires
 Node.js `>=22.16.0` and pnpm `12.4.2`. Read
 [Compatibility and stability](compatibility.md) for public API and persistence
 format stability. An import path listed here is a package export; installation
@@ -30,7 +30,7 @@ and release scope are governed by the repository's release configuration.
 | Build a browser Agent | `UiHost` or `ApplicationUiHost` | `@sortedyuan/ui-client` and `@sortedyuan/web-ui` |
 | Build a coding Agent | An application controller | `@sortedyuan/coding-tools` and an execution isolation policy |
 | Select models from configuration | `@sortedyuan/config` | `@sortedyuan/providers` |
-| Read durable history through a tool | `@sortedyuan/session-tools` | An active `Session` or `AgentApplication` |
+| Read durable history through a tool | `@sortedyuan/session/tools` | An active `Session` or `AgentApplication` |
 | Validate and store image replies | `@sortedyuan/media` | A host `MediaReader` for URL or file sources |
 | Trace execution and inspect diagnostics | Core's `Tracer` interface | `@sortedyuan/observability` |
 | Consume or expose MCP capabilities | `@sortedyuan/mcp` | Permissions and reviewed host services |
@@ -183,8 +183,9 @@ Shared service tokens and ordered registries describe tool, instruction, Model
 and Context contributions. Application reexports tokens through
 `applicationServices` and composes direct options through plugin factories.
 
-The 15 reusable `@sortedyuan/plugin-*` packages in `packages/plugins/` are listed with
-their factory APIs in the [plugin package catalog](../guides/plugins.md#reusable-plugin-packages).
+The [plugin catalog](../guides/plugins.md#reusable-plugin-packages) lists eight public
+feature plugin packages, the four factory subpaths in `@sortedyuan/plugin-services`,
+and `@sortedyuan/coordination/plugin` with their factory APIs.
 The Telegram and Feishu channel packages are private workspace packages.
 `@sortedyuan/plugin-agent-adapters/rpc` and
 `@sortedyuan/plugin-agent-adapters/examples/rpc-file-agent` provide the RPC adapter and
@@ -344,7 +345,7 @@ returns `N`. Earlier non-terminating errors remain in `stderr` when a later comm
 succeeds. See [Custom tools](../guides/custom-tool.md) for permission and isolation
 requirements.
 
-### `@sortedyuan/session-tools`
+### `@sortedyuan/session/tools`
 
 The bounded, read-only `session_history` tool queries durable Session history.
 `AgentApplication` can install it automatically; lower-level hosts can construct
@@ -398,7 +399,7 @@ terminal rendering and product commands.
 
 ## Reference products
 
-MaybeCode is included in the [44-package release list](../../../scripts/release-packages.json).
+MaybeCode is included in the [38-package release list](../../../scripts/release-packages.json).
 MaybeClaw, CLI and Eval CLI remain private workspace packages. See the
 [release guide](../guides/npm-release.md) for verification and publication steps.
 

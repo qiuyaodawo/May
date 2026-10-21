@@ -1,6 +1,6 @@
 import { defineService, type PluginContext, type PluginDefinition, type PluginStateSnapshot } from "@sortedyuan/plugin";
 import { services, ToolSources, InstructionSources, ModelWrappers, ContextWrappers } from "@sortedyuan/plugin-services";
-import { createRuntimePlugin } from "@sortedyuan/plugin-runtime";
+import { createRuntimePlugin } from "@sortedyuan/plugin-services/runtime";
 import type { AgentApplication } from "./application.js";
 
 export type { RuntimeFactory } from "@sortedyuan/core";

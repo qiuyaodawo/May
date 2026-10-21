@@ -8,7 +8,7 @@
 ## 发布范围
 
 [明确的发布清单](../../../scripts/release-packages.json)包含 `@sortedyuan` 下的
-44 个包：43 个库和 MaybeCode。`pnpm release:check` 检查清单与 workspace
+38 个包：37 个库和 MaybeCode。`pnpm release:check` 检查清单与 workspace
 公开包完全一致，并检查它们完整的运行时依赖均可发布。
 
 MaybeClaw、CLI、Eval CLI、Telegram 和 Feishu 渠道插件以及示例保持私有。
@@ -20,6 +20,8 @@ changeset，新功能和破坏性更改使用 minor changeset。1.0 起，破坏
 major changeset。每项破坏性更改必须提供使用方迁移说明。
 
 ## 包名迁移
+
+组件工厂和历史工具的导入更新见[公开子路径迁移指南](package-subpaths.md)。
 
 将依赖名称、源码导入、`pnpm --filter` 选择器以及加载包模块的配置值中的
 `@may/` 更新为 `@sortedyuan/`。保留包名后半部分与导出子路径，例如

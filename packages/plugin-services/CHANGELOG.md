@@ -1,5 +1,32 @@
 # @sortedyuan/plugin-services
 
+## 0.3.0
+
+### Minor Changes
+
+- 将组件插件工厂、Coordination 插件和 Session 历史工具集中到所属包的公开子路径。
+  Application 与 MaybeCode 使用新的导入及运行时依赖。公开发布范围为 38 个包。
+
+  这是包路径的破坏性变更。使用方需要更新依赖声明、源码导入及加载这些模块的配置：
+
+  | 原包 | 公开子路径 | 需要安装的包 |
+  | --- | --- | --- |
+  | `@sortedyuan/plugin-models` | `@sortedyuan/plugin-services/models` | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-runtime` | `@sortedyuan/plugin-services/runtime` | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-permissions` | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-skills` | `@sortedyuan/plugin-services/skills` | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin` | `@sortedyuan/coordination` |
+  | `@sortedyuan/session-tools` | `@sortedyuan/session/tools` | `@sortedyuan/session` |
+
+  选择包含这些子路径的发布版本，重新安装依赖并编译使用方。六个原包从本仓库的发布清单移除。
+  插件 ID、ServiceToken ID、持久状态格式、函数名称及生命周期行为保持不变。
+  迁移说明见 `docs/zh-CN/guides/package-subpaths.md` 和 `docs/en/guides/package-subpaths.md`。
+
+### Patch Changes
+
+- Updated dependencies
+  - @sortedyuan/session@0.5.0
+
 ## 0.2.3
 
 ### Patch Changes

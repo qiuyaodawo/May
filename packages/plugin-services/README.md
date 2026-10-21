@@ -1,5 +1,17 @@
 # @sortedyuan/plugin-services
 
+**English** | [简体中文](README.zh-CN.md)
+
+The root entry exports service tokens, registries and factory metadata. Component
+factories are available through separate public subpaths:
+
+| Import path | Factory reference |
+| --- | --- |
+| `@sortedyuan/plugin-services/models` | [Model instances and wrappers](docs/models.md) |
+| `@sortedyuan/plugin-services/runtime` | [Runtime, Context and tools](docs/runtime.md) |
+| `@sortedyuan/plugin-services/permissions` | [Permission policies](docs/permissions.md) |
+| `@sortedyuan/plugin-services/skills` | [Skill activation and persisted state](docs/skills.md) |
+
 Typed service tokens and ordered contribution registries used by `@sortedyuan/application`
 and component plugins. All exported `services` tokens have application scope and
 version `1.0.0`; each token has one provider. `applicationServices` reexports these

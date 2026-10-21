@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/plugin-observability",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Owned tracing processor and exporter lifecycle plugin for May agents.",
   "type": "module",
   "main": "./dist/index.js",

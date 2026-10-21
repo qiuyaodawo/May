@@ -81,8 +81,9 @@ Context；完成 Hook 失败时继续传递错误，并保留已经保存的消�
 并在释放插件资源之前关闭 Runtime。
 
 Model、permissions、Context/Runtime/tools 和 Skills 的插件工厂分别由
-`@sortedyuan/plugin-models`、`@sortedyuan/plugin-permissions`、`@sortedyuan/plugin-runtime` 和
-`@sortedyuan/plugin-skills` 提供。Skills 的激活内容使用带版本的插件状态保存，
+`@sortedyuan/plugin-services/models`、`@sortedyuan/plugin-services/permissions`、
+`@sortedyuan/plugin-services/runtime` 和 `@sortedyuan/plugin-services/skills` 提供。
+Skills 的激活内容使用带版本的插件状态保存，
 恢复 Session 时兼容已有的 `may.skills.active.v1` 记录。
 
 `getService(token)` 取得当前启用的服务；`recordState(key, value)` 保存 Application 状态。

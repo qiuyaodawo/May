@@ -11,6 +11,7 @@
   "references": [
     { "path": "../application" },
     { "path": "../core" },
+    { "path": "../plugin" },
     { "path": "../permissions" },
     { "path": "../session" }
   ]

@@ -1,5 +1,5 @@
 {
-  "name": "@sortedyuan/plugin-agent-adapters", "version": "0.2.3", "description": "Managed May and RPC Agent adapters for May plugin hosts.",
+  "name": "@sortedyuan/plugin-agent-adapters", "version": "0.2.4", "description": "Managed May and RPC Agent adapters for May plugin hosts.",
   "type": "module", "main": "./dist/index.js", "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }, "./rpc": { "types": "./dist/rpc.d.ts", "import": "./dist/rpc.js" }, "./examples/rpc-file-agent": "./examples/rpc-file-agent.mjs" },
   "files": ["dist", "examples", "!dist/.tsbuildinfo"],

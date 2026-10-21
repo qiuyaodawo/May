@@ -5,6 +5,10 @@ owns pipelines, DAGs, parallel reduction, delegation, peer messaging and handoff
 Execution can use local agents or independent remote leaf workers; this is not a
 high-availability or multi-writer scheduler.
 
+`@sortedyuan/coordination/plugin` exports `createCoordinationPlugin` and
+`coordinationService` for host-owned runtime creation, restoration and cleanup.
+See the [plugin reference](docs/plugin.md).
+
 Root exports:
 
 - `CoordinationRuntime.create()` / `.resume()`: exclusively open a coordination;

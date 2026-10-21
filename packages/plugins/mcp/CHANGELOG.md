@@ -1,5 +1,15 @@
 # @sortedyuan/plugin-mcp
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies
+  - @sortedyuan/plugin-services@0.3.0
+  - @sortedyuan/application@0.3.2
+  - @sortedyuan/plugin-observability@0.2.4
+  - @sortedyuan/mcp@0.2.3
+
 ## 0.2.3
 
 ### Patch Changes

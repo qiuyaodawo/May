@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/tui",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "May-owned retained terminal UI primitives and renderer.",
   "type": "module",
   "main": "./dist/index.js",

@@ -136,8 +136,9 @@ actual Application from `application.created` handlers; accessing it during setu
 fails immediately. Plugins can use its controller and state APIs and register owned
 resources with `context.defer()`. The Application reference stays outside cloned
 Hook payloads. Builtin Model, permissions, Context/Runtime/tools and Skills factories
-live in `@sortedyuan/plugin-models`, `@sortedyuan/plugin-permissions`, `@sortedyuan/plugin-runtime`, and
-`@sortedyuan/plugin-skills`. Existing direct options retain their caller ownership semantics.
+live in `@sortedyuan/plugin-services/models`, `@sortedyuan/plugin-services/permissions`,
+`@sortedyuan/plugin-services/runtime`, and `@sortedyuan/plugin-services/skills`.
+Direct options retain their caller ownership semantics.
 
 `applicationHooks` covers application creation and closing, durable input,
 compaction, approval, and recovery. Creation and closing events include Session

@@ -11,9 +11,9 @@ import { observabilityService } from "@sortedyuan/plugin-observability";
 import { FileSessionStore } from "@sortedyuan/session/file-store";
 import { loadPluginModules, parsePluginSelections, type AnyPlugin } from "@sortedyuan/plugin";
 import { createMayAgentAdapter, loadAgentAdapter } from "@sortedyuan/plugin-agent-adapters";
-import { createModelPlugin } from "@sortedyuan/plugin-models";
-import { createPermissionPlugin } from "@sortedyuan/plugin-permissions";
-import { createToolsPlugin } from "@sortedyuan/plugin-runtime";
+import { createModelPlugin } from "@sortedyuan/plugin-services/models";
+import { createPermissionPlugin } from "@sortedyuan/plugin-services/permissions";
+import { createToolsPlugin } from "@sortedyuan/plugin-services/runtime";
 import { services } from "@sortedyuan/plugin-services";
 import type { GatewayAgentAdapter, GatewayAgentConfig, GatewayAdapterContext } from "./gateway-types.js";
 

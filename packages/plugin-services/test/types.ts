@@ -2,9 +2,9 @@ import type { ContextFactory } from "@sortedyuan/context";
 import { May, type Model, type Tool } from "@sortedyuan/core";
 import type { PluginContext } from "@sortedyuan/plugin";
 import { ModelWrappers, ContextWrappers, ToolSources, InstructionSources, services, type ContextOptions } from "../dist/index.js";
-import { createModelPlugin, createModelWrapperPlugin } from "../../plugins/models/dist/index.js";
-import { createPermissionPlugin } from "../../plugins/permissions/dist/index.js";
-import { createRuntimePlugin, createContextPlugin, createToolsPlugin } from "../../plugins/runtime/dist/index.js";
+import { createModelPlugin, createModelWrapperPlugin } from "@sortedyuan/plugin-services/models";
+import { createPermissionPlugin } from "@sortedyuan/plugin-services/permissions";
+import { createRuntimePlugin, createContextPlugin, createToolsPlugin } from "@sortedyuan/plugin-services/runtime";
 import { applicationServices, type AgentApplication } from "../../application/dist/index.js";
 
 declare const model: Model;

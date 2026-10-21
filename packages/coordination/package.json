@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/coordination",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Durable, single-host task graphs above May Agent applications.",
   "type": "module",
   "main": "./dist/index.js",
@@ -8,9 +8,10 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./file-store": { "types": "./dist/file-store.d.ts", "import": "./dist/file-store.js" },
-    "./remote": { "types": "./dist/remote-worker.d.ts", "import": "./dist/remote-worker.js" }
+    "./remote": { "types": "./dist/remote-worker.d.ts", "import": "./dist/remote-worker.js" },
+    "./plugin": { "types": "./dist/plugin.d.ts", "import": "./dist/plugin.js" }
   },
-  "files": ["dist", "!dist/.tsbuildinfo"],
+  "files": ["dist", "!dist/.tsbuildinfo", "docs"],
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
@@ -20,6 +21,7 @@
   "dependencies": {
     "@sortedyuan/application": "workspace:*",
     "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/plugin": "workspace:*",
     "@sortedyuan/permissions": "workspace:*",
     "@sortedyuan/session": "workspace:*"
   },

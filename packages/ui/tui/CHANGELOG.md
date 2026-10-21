@@ -1,5 +1,13 @@
 # @sortedyuan/tui
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies
+  - @sortedyuan/session@0.5.0
+  - @sortedyuan/media@0.3.2
+
 ## 0.2.3
 
 ### Patch Changes

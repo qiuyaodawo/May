@@ -7,8 +7,8 @@ pnpm version declared in `package.json` (currently 12.4.2).
 
 ## Release scope
 
-The explicit [release list](../../../scripts/release-packages.json) contains 44
-packages under `@sortedyuan`: 43 libraries and MaybeCode. `pnpm release:check`
+The explicit [release list](../../../scripts/release-packages.json) contains 38
+packages under `@sortedyuan`: 37 libraries and MaybeCode. `pnpm release:check`
 checks that this list exactly matches public workspace packages and that their
 complete runtime dependency chains contain only publishable packages.
 
@@ -23,6 +23,9 @@ changes use minor changesets. From 1.0, breaking changes use major changesets.
 Each breaking change must include consumer migration instructions.
 
 ## Package-name migration
+
+Component factory and history-tool imports use the
+[public subpath migration guide](package-subpaths.md).
 
 Replace `@may/` with `@sortedyuan/` in dependency names, source imports,
 `pnpm --filter` selectors and configuration values that load a package module.

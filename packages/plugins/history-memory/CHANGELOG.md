@@ -1,5 +1,14 @@
 # @sortedyuan/plugin-history-memory
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies
+  - @sortedyuan/plugin-services@0.3.0
+  - @sortedyuan/session@0.5.0
+  - @sortedyuan/application@0.3.2
+
 ## 0.2.3
 
 ### Patch Changes

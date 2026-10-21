@@ -1,5 +1,16 @@
 # @sortedyuan/plugin-services
 
+[English](README.md) | **简体中文**
+
+主入口导出服务标识、注册表和工厂元数据。组件工厂通过独立的公开子路径导入：
+
+| 导入路径 | 工厂参考 |
+| --- | --- |
+| `@sortedyuan/plugin-services/models` | [Model 实例与包装](docs/models.zh-CN.md) |
+| `@sortedyuan/plugin-services/runtime` | [Runtime、Context 和工具](docs/runtime.zh-CN.md) |
+| `@sortedyuan/plugin-services/permissions` | [权限策略](docs/permissions.zh-CN.md) |
+| `@sortedyuan/plugin-services/skills` | [Skill 激活与持久状态](docs/skills.zh-CN.md) |
+
 为 `@sortedyuan/application` 和组件插件提供带类型的服务标识以及有序组合注册表。
 `services` 中的全部服务使用 application 作用域和 `1.0.0` 版本，每种服务具有一个提供方。
 `applicationServices` 导出相同的服务标识，并增加实际 Application 的访问服务。

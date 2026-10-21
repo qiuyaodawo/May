@@ -7,7 +7,7 @@ import { AgentApplication, applicationHooks } from "../dist/index.js";
 import { May, userMessage } from "../../core/dist/index.js";
 import { PruneOldToolResultsStrategy } from "../../context/dist/index.js";
 import { definePlugin } from "../../plugin/dist/index.js";
-import { createRuntimePlugin } from "../../plugins/runtime/dist/index.js";
+import { createRuntimePlugin } from "@sortedyuan/plugin-services/runtime";
 import { OpenAIResponsesModel } from "@sortedyuan/provider-openai";
 import { FileSessionStore } from "../../session/dist/file-store.js";
 

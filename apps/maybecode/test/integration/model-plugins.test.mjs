@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { loadMayConfig } from "@sortedyuan/config";
 import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
-import { createModelPlugin } from "@sortedyuan/plugin-models";
+import { createModelPlugin } from "@sortedyuan/plugin-services/models";
 import { createObservabilityPlugin } from "@sortedyuan/plugin-observability";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 

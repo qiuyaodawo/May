@@ -15,9 +15,9 @@ const actual = await realpath(destination);
 if (relative(await realpath(repository), actual).startsWith("..")) throw new Error("Package verification path must stay in the worktree");
 if (!relative(await realpath(repository), await realpath(consumer)).startsWith("..")) throw new Error("The packaged consumer must be outside the repository");
 await runPnpm(["build"], repository);
-const targets = ["@sortedyuan/plugin", "@sortedyuan/plugin-services", "@sortedyuan/plugin-runtime", "@sortedyuan/plugin-models", "@sortedyuan/plugin-permissions", "@sortedyuan/plugin-skills",
+const targets = ["@sortedyuan/plugin", "@sortedyuan/plugin-services", "@sortedyuan/session", "@sortedyuan/coordination",
   "@sortedyuan/plugin-goals", "@sortedyuan/plugin-history-memory", "@sortedyuan/plugin-delegation", "@sortedyuan/plugin-mcp", "@sortedyuan/plugin-observability",
-  "@sortedyuan/plugin-delivery", "@sortedyuan/plugin-agent-adapters", "@sortedyuan/plugin-coordination", "@sortedyuan/plugin-web-api"];
+  "@sortedyuan/plugin-delivery", "@sortedyuan/plugin-agent-adapters", "@sortedyuan/plugin-web-api"];
 const manifests = new Map();
 for (const group of ["packages", "packages/providers", "packages/tools", "packages/ui", "packages/plugins"]) {
   for (const entry of await readdir(join(repository, group), { withFileTypes: true })) {
@@ -55,6 +55,24 @@ await runPnpm(["--dir", consumer, "config", "set", "overrides", JSON.stringify(o
 await runPnpm(["--dir", consumer, "add", ...tarballs, "--ignore-scripts"], consumer);
 await copyFile(join(repository, "packages/plugin/test/consumer/index.mjs"), join(consumer, "index.mjs"));
 await run(process.execPath, [join(consumer, "index.mjs")], consumer);
+await copyFile(join(repository, "README.md"), join(consumer, "README.md"));
+const subpathTests = [
+  "packages/plugin-services/test/models.test.mjs",
+  "packages/plugin-services/test/runtime.test.mjs",
+  "packages/plugin-services/test/permissions.test.mjs",
+  "packages/plugin-services/test/skills.test.mjs",
+  "packages/coordination/test/plugin.test.mjs",
+  "packages/session/test/history-retrieval-tools.test.mjs",
+];
+for (const path of subpathTests) {
+  await mkdir(dirname(join(consumer, path)), { recursive: true });
+  await copyFile(join(repository, path), join(consumer, path));
+}
+await run(process.execPath, ["--test", ...subpathTests.map(path => join(consumer, path))], consumer);
+await copyFile(join(repository, "packages/plugin/test/consumer/subpaths.ts"), join(consumer, "subpaths.ts"));
+await run(process.execPath, [join(repository, "node_modules/typescript/bin/tsc"),
+  "--ignoreConfig", "--noEmit", "--strict", "--module", "NodeNext", "--moduleResolution", "NodeNext",
+  "--target", "ES2022", "--types", "node", join(consumer, "subpaths.ts")], consumer);
 console.log(`Verified ${targets.length} plugin packages and their ${required.size} packaged runtime dependencies`);
 console.log(`External consumer: ${consumer}`);
 

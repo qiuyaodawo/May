@@ -19,7 +19,7 @@ export function runPnpm(args, cwd = repository, inherit = false) {
 }
 
 export async function checkRelease() {
-  assert.equal(releaseNames.length, 44, "Review the explicit release scope before changing its size");
+  assert.equal(releaseNames.length, 38, "Review the explicit release scope before changing its size");
   assert.equal(new Set(releaseNames).size, releaseNames.length, "Duplicate release package");
   const root = JSON.parse(await readFile(join(repository, "package.json"), "utf8"));
   assert.equal(`pnpm@${runPnpm(["--version"]).trim()}`, root.packageManager);

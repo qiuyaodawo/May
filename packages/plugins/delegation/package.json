@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/plugin-delegation",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Durable delegated agent lifecycle, budgets and shared workspace file coordination plugin.",
   "type": "module",
   "main": "./dist/index.js",

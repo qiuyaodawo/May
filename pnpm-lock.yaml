@@ -252,24 +252,12 @@ importers:
       '@sortedyuan/plugin-channel-telegram':
         specifier: workspace:*
         version: link:../../packages/plugins/channel-telegram
-      '@sortedyuan/plugin-coordination':
-        specifier: workspace:*
-        version: link:../../packages/plugins/coordination
       '@sortedyuan/plugin-delivery':
         specifier: workspace:*
         version: link:../../packages/plugins/delivery
-      '@sortedyuan/plugin-models':
-        specifier: workspace:*
-        version: link:../../packages/plugins/models
       '@sortedyuan/plugin-observability':
         specifier: workspace:*
         version: link:../../packages/plugins/observability
-      '@sortedyuan/plugin-permissions':
-        specifier: workspace:*
-        version: link:../../packages/plugins/permissions
-      '@sortedyuan/plugin-runtime':
-        specifier: workspace:*
-        version: link:../../packages/plugins/runtime
       '@sortedyuan/plugin-services':
         specifier: workspace:*
         version: link:../../packages/plugin-services
@@ -361,24 +349,12 @@ importers:
       '@sortedyuan/plugin-mcp':
         specifier: workspace:*
         version: link:../../packages/plugins/mcp
-      '@sortedyuan/plugin-models':
-        specifier: workspace:*
-        version: link:../../packages/plugins/models
       '@sortedyuan/plugin-observability':
         specifier: workspace:*
         version: link:../../packages/plugins/observability
-      '@sortedyuan/plugin-permissions':
-        specifier: workspace:*
-        version: link:../../packages/plugins/permissions
-      '@sortedyuan/plugin-runtime':
-        specifier: workspace:*
-        version: link:../../packages/plugins/runtime
       '@sortedyuan/plugin-services':
         specifier: workspace:*
         version: link:../../packages/plugin-services
-      '@sortedyuan/plugin-skills':
-        specifier: workspace:*
-        version: link:../../packages/plugins/skills
       '@sortedyuan/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -462,27 +438,12 @@ importers:
       '@sortedyuan/plugin':
         specifier: workspace:*
         version: link:../plugin
-      '@sortedyuan/plugin-models':
-        specifier: workspace:*
-        version: link:../plugins/models
-      '@sortedyuan/plugin-permissions':
-        specifier: workspace:*
-        version: link:../plugins/permissions
-      '@sortedyuan/plugin-runtime':
-        specifier: workspace:*
-        version: link:../plugins/runtime
       '@sortedyuan/plugin-services':
         specifier: workspace:*
         version: link:../plugin-services
-      '@sortedyuan/plugin-skills':
-        specifier: workspace:*
-        version: link:../plugins/skills
       '@sortedyuan/session':
         specifier: workspace:*
         version: link:../session
-      '@sortedyuan/session-tools':
-        specifier: workspace:*
-        version: link:../tools/session-tools
       '@sortedyuan/skills':
         specifier: workspace:*
         version: link:../skills
@@ -527,6 +488,9 @@ importers:
       '@sortedyuan/permissions':
         specifier: workspace:*
         version: link:../permissions
+      '@sortedyuan/plugin':
+        specifier: workspace:*
+        version: link:../plugin
       '@sortedyuan/session':
         specifier: workspace:*
         version: link:../session
@@ -775,19 +739,6 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
-  packages/plugins/coordination:
-    dependencies:
-      '@sortedyuan/coordination':
-        specifier: workspace:*
-        version: link:../../coordination
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
   packages/plugins/delegation:
     dependencies:
       '@sortedyuan/application':
@@ -925,22 +876,6 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
-  packages/plugins/models:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../plugin-services
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
   packages/plugins/observability:
     dependencies:
       '@sortedyuan/application':
@@ -958,57 +893,6 @@ importers:
       '@sortedyuan/plugin-services':
         specifier: workspace:*
         version: link:../../plugin-services
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/permissions:
-    dependencies:
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../../permissions
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../plugin-services
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/runtime:
-    dependencies:
-      '@sortedyuan/context':
-        specifier: workspace:*
-        version: link:../../context
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../plugin-services
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/skills:
-    dependencies:
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../plugin-services
-      '@sortedyuan/skills':
-        specifier: workspace:*
-        version: link:../../skills
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -1204,19 +1088,6 @@ importers:
       '@sortedyuan/core':
         specifier: workspace:*
         version: link:../../core
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/tools/session-tools:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../session
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

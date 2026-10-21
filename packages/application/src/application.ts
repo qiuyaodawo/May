@@ -37,10 +37,10 @@ import {
 import { randomUUID } from "node:crypto";
 import { PluginHost, type AnyPlugin, type PluginHostOptions, type ServiceToken } from "@sortedyuan/plugin";
 import { services, type ContextOptions } from "@sortedyuan/plugin-services";
-import { createModelPlugin } from "@sortedyuan/plugin-models";
-import { createContextPlugin, createToolsPlugin } from "@sortedyuan/plugin-runtime";
-import { createPermissionPlugin } from "@sortedyuan/plugin-permissions";
-import { createSkillsPlugin } from "@sortedyuan/plugin-skills";
+import { createModelPlugin } from "@sortedyuan/plugin-services/models";
+import { createContextPlugin, createToolsPlugin } from "@sortedyuan/plugin-services/runtime";
+import { createPermissionPlugin } from "@sortedyuan/plugin-services/permissions";
+import { createSkillsPlugin } from "@sortedyuan/plugin-services/skills";
 import {
   PermissionToolExecutor,
   type ApprovalDecision,
@@ -70,7 +70,7 @@ import {
   createSessionHistoryTool,
   createSessionHistoryRetrievalTools,
   type SessionHistoryToolOptions,
-} from "@sortedyuan/session-tools";
+} from "@sortedyuan/session/tools";
 
 import type { SteerableAgentController } from "./controller.js";
 import { SkillRegistry, SkillSession, SKILL_STATE_KEY } from "@sortedyuan/skills";

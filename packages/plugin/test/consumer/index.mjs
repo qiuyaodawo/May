@@ -2,16 +2,28 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, writeFile, realpath } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineService, PluginHost } from "@sortedyuan/plugin";
 import { compileModelSchema, defineHook, priceUsage } from "@sortedyuan/core";
 import { alwaysOffSampler, BasicTracer, BoundedMetrics, DiagnosticsStore, InMemorySpanProcessor, createOtlpTelemetry } from "@sortedyuan/observability";
 import { services } from "@sortedyuan/plugin-services";
-import { createRuntimePlugin, createContextPlugin } from "@sortedyuan/plugin-runtime";
-import { createPermissionPlugin } from "@sortedyuan/plugin-permissions";
+import { createRuntimePlugin, createContextPlugin } from "@sortedyuan/plugin-services/runtime";
+import { createPermissionPlugin } from "@sortedyuan/plugin-services/permissions";
 import { createGatewayRpcAdapter } from "@sortedyuan/plugin-agent-adapters";
+
+const consumerRoot = await realpath(dirname(fileURLToPath(import.meta.url)));
+for (const specifier of [
+  "@sortedyuan/plugin-services/models", "@sortedyuan/plugin-services/runtime",
+  "@sortedyuan/plugin-services/permissions", "@sortedyuan/plugin-services/skills",
+  "@sortedyuan/coordination/plugin", "@sortedyuan/session/tools",
+]) {
+  const resolved = await realpath(fileURLToPath(import.meta.resolve(specifier)));
+  const local = relative(consumerRoot, resolved);
+  assert.ok(!isAbsolute(local) && !local.startsWith(".."), `${specifier} resolved outside the consumer`);
+  assert.ok(Object.keys(await import(specifier)).length > 0);
+}
 
 const service = defineService({ id: "consumer.counter", version: "1.0.0", scope: "application" });
 const hook = defineHook({
@@ -35,7 +47,7 @@ const host = await PluginHost.create({ hooks: [hook], plugins: [
 const application = await host.createScope("application", { id: "external" });
 assert.equal(await application.transform(hook, 5, { signal: new AbortController().signal }), 7);
 await host.close();
-for (const name of ["models", "skills", "goals", "history-memory", "delegation", "mcp", "observability", "delivery", "agent-adapters", "coordination", "web-api"]) {
+for (const name of ["goals", "history-memory", "delegation", "mcp", "observability", "delivery", "agent-adapters", "web-api"]) {
   const module = await import(`@sortedyuan/plugin-${name}`);
   assert.ok(Object.keys(module).length > 0, `${name} exports its plugin API`);
 }

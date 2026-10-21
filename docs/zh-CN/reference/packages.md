@@ -6,7 +6,7 @@
 `packages/`，可执行产品位于 `apps/`。应用依赖 package，package 的导入保持在
 可复用代码范围内。
 
-当前 checkout 中的公开包版本均为 `0.2.0`。仓库要求 Node.js `>=22.16.0` 和
+各包通过自己的 `package.json` 声明当前版本。仓库要求 Node.js `>=22.16.0` 和
 pnpm `12.4.2`。公开 API 和持久化格式的稳定性见
 [兼容性与稳定性](compatibility.md)。本页列出的导入路径属于 package exports；
 安装和发布范围由仓库的发布配置管理。
@@ -28,7 +28,7 @@ pnpm `12.4.2`。公开 API 和持久化格式的稳定性见
 | 构建浏览器 Agent | `UiHost` 或 `ApplicationUiHost` | `@sortedyuan/ui-client` 和 `@sortedyuan/web-ui` |
 | 构建编码 Agent | Application controller | `@sortedyuan/coding-tools` 和执行隔离策略 |
 | 根据配置选择模型 | `@sortedyuan/config` | `@sortedyuan/providers` |
-| 通过工具读取持久化历史 | `@sortedyuan/session-tools` | 活动 `Session` 或 `AgentApplication` |
+| 通过工具读取持久化历史 | `@sortedyuan/session/tools` | 活动 `Session` 或 `AgentApplication` |
 | 校验并保存图片回复 | `@sortedyuan/media` | 读取 URL 或文件来源的宿主 `MediaReader` |
 | 追踪执行过程和查看诊断 | Core 的 `Tracer` 接口 | `@sortedyuan/observability` |
 | 使用或导出 MCP 能力 | `@sortedyuan/mcp` | 权限和经过审查的宿主服务 |
@@ -167,8 +167,9 @@ Agent definition、runtime factory 和持久化 Session 集成。参阅
 贡献。Application 通过 `applicationServices` 重新导出 token，并通过 plugin
 factory 组合直接传入的配置。
 
-`packages/plugins/` 中的 15 个可复用 `@sortedyuan/plugin-*` package 及其 factory API
-列在[插件 package 目录](../guides/plugins.md#可复用插件-package)。
+[插件目录](../guides/plugins.md#可复用插件-package)列出八个公开功能插件包、
+`@sortedyuan/plugin-services` 的四个工厂子路径以及 `@sortedyuan/coordination/plugin`
+的 factory API。
 Telegram 和 Feishu 渠道包为 workspace 私有包。
 `@sortedyuan/plugin-agent-adapters/rpc` 和
 `@sortedyuan/plugin-agent-adapters/examples/rpc-file-agent` 分别提供 RPC adapter 和示例。
@@ -309,7 +310,7 @@ Shell 命令以宿主进程权限执行。PowerShell 最后一条命令成功时
 返回 `1`。`exit N` 返回 `N`。后续命令成功时，之前的 non-terminating error
 仍保留在 `stderr` 中。权限和隔离要求见[自定义工具](../guides/custom-tool.md)。
 
-### `@sortedyuan/session-tools`
+### `@sortedyuan/session/tools`
 
 有界、只读 `session_history` 工具查询持久化 Session 历史。
 `AgentApplication` 可以自动安装，底层宿主也可以直接构造。
@@ -359,7 +360,7 @@ server 支持。`@sortedyuan/web-ui` 提供浏览器 workbench 组件，`/styles
 
 ## 参考产品
 
-MaybeCode 包含在 [44 个包的发布清单](../../../scripts/release-packages.json)中。
+MaybeCode 包含在 [38 个包的发布清单](../../../scripts/release-packages.json)中。
 MaybeClaw、CLI 和 Eval CLI 保持 workspace 私有包。验证与发布步骤见
 [发布指南](../guides/npm-release.md)。
 

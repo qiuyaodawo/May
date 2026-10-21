@@ -1,5 +1,9 @@
 # `@sortedyuan/session`
 
+`@sortedyuan/session/tools` exports `createSessionHistoryTool` and
+`createSessionHistoryRetrievalTools` for bounded model-visible history access.
+See the [history tool reference](docs/tools.md).
+
 `@sortedyuan/session` composes a configured `@sortedyuan/core` runtime into a long-lived
 conversation identity. It serializes runs and records durable session facts
 without making Core depend on persistence or UI policy.

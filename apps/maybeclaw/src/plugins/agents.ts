@@ -1,5 +1,5 @@
 import { createAgentAdaptersPlugin } from "@sortedyuan/plugin-agent-adapters";
-import { createCoordinationPlugin } from "@sortedyuan/plugin-coordination";
+import { createCoordinationPlugin } from "@sortedyuan/coordination/plugin";
 import { loadGatewayAdapter } from "../gateway-adapters.js";
 import type { GatewaySettings } from "../gateway-types.js";
 import type { PermissionRuleStore } from "@sortedyuan/permissions";

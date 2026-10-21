@@ -40,7 +40,7 @@ Session 存储保持独立，内存对话无需引入文件系统依赖。
 flowchart LR
   Apps[apps] --> Application["@sortedyuan/application"]
   Application --> Plugin["@sortedyuan/plugin"]
-  Application --> Components[context / session / permissions / session-tools]
+  Application --> Components[context / session / permissions]
   Plugin --> Core["@sortedyuan/core"]
   Components --> Core
   Apps --> Observability["@sortedyuan/observability"]

@@ -42,7 +42,7 @@ under `apps`. The dependency rule is:
 flowchart LR
   Apps[apps] --> Application["@sortedyuan/application"]
   Application --> Plugin["@sortedyuan/plugin"]
-  Application --> Components[context / session / permissions / session-tools]
+  Application --> Components[context / session / permissions]
   Plugin --> Core["@sortedyuan/core"]
   Components --> Core
   Apps --> Observability["@sortedyuan/observability"]

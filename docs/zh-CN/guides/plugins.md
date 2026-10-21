@@ -213,14 +213,15 @@ provider、model、adapter 和 profile。仅提供 `model` 的插件将未知名
 
 ## 可复用插件 package
 
-公开的可复用插件 package 列表如下：
+目录列出插件的包名和子路径导入。升级已有导入时参阅
+[公开子路径迁移](package-subpaths.md)。
 
-| Package | 工厂及职责 |
+| 导入路径 | 工厂及职责 |
 | --- | --- |
-| `@sortedyuan/plugin-runtime` | `createRuntimePlugin`、`createContextPlugin`、`createToolsPlugin`、`createContextWrapperPlugin`；组合 runtime、Context 和工具 |
-| `@sortedyuan/plugin-models` | `createModelPlugin`、`createModelWrapperPlugin`；Model 实例及包装 |
-| `@sortedyuan/plugin-permissions` | `createPermissionPlugin`；PermissionPolicy |
-| `@sortedyuan/plugin-skills` | `createSkillsPlugin`；发现、激活、指令、工具及状态保存 |
+| `@sortedyuan/plugin-services/runtime` | `createRuntimePlugin`、`createContextPlugin`、`createToolsPlugin`、`createContextWrapperPlugin`；组合 runtime、Context 和工具 |
+| `@sortedyuan/plugin-services/models` | `createModelPlugin`、`createModelWrapperPlugin`；Model 实例及包装 |
+| `@sortedyuan/plugin-services/permissions` | `createPermissionPlugin`；PermissionPolicy |
+| `@sortedyuan/plugin-services/skills` | `createSkillsPlugin`；发现、激活、指令、工具及状态保存 |
 | `@sortedyuan/plugin-goals` | `createGoalsPlugin`；持久目标、预算及继续执行 |
 | `@sortedyuan/plugin-history-memory` | `createHistoryMemoryPlugin`；历史 Context 笔记、查询和压缩 |
 | `@sortedyuan/plugin-delegation` | `createDelegationPlugin`、`createWorkspaceFilesPlugin`；子 Agent、共享预算及工作区文件访问 |
@@ -230,11 +231,12 @@ provider、model、adapter 和 profile。仅提供 `model` 的插件将未知名
 | `@sortedyuan/plugin-channel-telegram`（private） | `createTelegramChannelPlugin`；Telegram 接收、路由及附件 |
 | `@sortedyuan/plugin-channel-feishu`（private） | `createFeishuChannelPlugin`；Feishu 接收、路由及附件 |
 | `@sortedyuan/plugin-agent-adapters` | `createAgentAdaptersPlugin`、`createMayAgentAdapter`、`loadAgentAdapter` 和 RPC adapters；对话及 adapter 资源管理 |
-| `@sortedyuan/plugin-coordination` | `createCoordinationPlugin`；任务图创建、恢复和释放 |
+| `@sortedyuan/coordination/plugin` | `createCoordinationPlugin`；任务图创建、恢复和释放 |
 | `@sortedyuan/plugin-web-api` | `createWebApiPlugin`；HTTP 监听、活动请求及连接 |
 
-可复用实现位于 `packages/plugins/<name>/`。共享服务标识和有序贡献登记位于
-`packages/plugin-services/`，插件宿主位于 `packages/plugin/`。产品组合位于
+功能插件位于 `packages/plugins/<name>/`。共享服务标识、有序贡献登记和组件工厂子路径
+位于 `packages/plugin-services/`，Coordination 工厂位于
+`packages/coordination/src/plugin.ts`，插件宿主位于 `packages/plugin/`。产品组合位于
 `apps/maybecode/src/plugins/` 和 `apps/maybeclaw/src/plugins/`。
 现有 package 的类和接口继续支持直接调用，应用保留已提取功能的兼容导出。
 
@@ -256,9 +258,9 @@ history-memory 和 delegation。MCP 命令、目录和事件使用活动 Applica
 后台处理和自动投递。暂停期间，`tick()` 处理已保存的输入并创建回复记录；
 `deliver()` 明确发送待投递消息。
 
-`pnpm test:package:plugin` 打包宿主、共享服务、全部 15 个可复用插件 package
+`pnpm test:package:plugin` 打包宿主、共享服务、Session、Coordination、八个公开功能插件包
 及其完整 May 运行时依赖，在仓库外的 consumer 目录安装 tarball 并执行导出 API。
-应用继续保持 private。新增公开 package 需要通过相同检查。
+MaybeCode 公开发布；MaybeClaw 和示例应用保持 private。新增公开 package 需要通过相同检查。
 
 ## Runtime factory
 

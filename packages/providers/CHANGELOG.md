@@ -1,5 +1,16 @@
 # @sortedyuan/providers
 
+## 0.2.3
+
+### Patch Changes
+
+- @sortedyuan/config@0.3.2
+  - @sortedyuan/provider-anthropic@0.2.0
+  - @sortedyuan/provider-deepseek@0.2.0
+  - @sortedyuan/provider-gemini@0.2.0
+  - @sortedyuan/provider-kimi@0.2.0
+  - @sortedyuan/provider-zhipu@0.2.0
+
 ## 0.2.2
 
 ### Patch Changes

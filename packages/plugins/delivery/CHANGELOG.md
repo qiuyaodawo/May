@@ -1,5 +1,13 @@
 # @sortedyuan/plugin-delivery
 
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @sortedyuan/session@0.5.0
+  - @sortedyuan/media@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes

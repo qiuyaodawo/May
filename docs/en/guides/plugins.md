@@ -241,14 +241,15 @@ replacement services to the existing Application.
 
 ## Reusable plugin packages
 
-The reusable plugin package list is explicit:
+The catalog lists package and subpath imports. See
+[package import migration](package-subpaths.md) when upgrading existing imports.
 
-| Package | Factories and responsibility |
+| Import path | Factories and responsibility |
 | --- | --- |
-| `@sortedyuan/plugin-runtime` | `createRuntimePlugin`, `createContextPlugin`, `createToolsPlugin`, `createContextWrapperPlugin`; runtime, Context and tool composition |
-| `@sortedyuan/plugin-models` | `createModelPlugin`, `createModelWrapperPlugin`; Model instances and wrappers |
-| `@sortedyuan/plugin-permissions` | `createPermissionPlugin`; PermissionPolicy |
-| `@sortedyuan/plugin-skills` | `createSkillsPlugin`; discovery, activation, instructions, tools and saved state |
+| `@sortedyuan/plugin-services/runtime` | `createRuntimePlugin`, `createContextPlugin`, `createToolsPlugin`, `createContextWrapperPlugin`; runtime, Context and tool composition |
+| `@sortedyuan/plugin-services/models` | `createModelPlugin`, `createModelWrapperPlugin`; Model instances and wrappers |
+| `@sortedyuan/plugin-services/permissions` | `createPermissionPlugin`; PermissionPolicy |
+| `@sortedyuan/plugin-services/skills` | `createSkillsPlugin`; discovery, activation, instructions, tools and saved state |
 | `@sortedyuan/plugin-goals` | `createGoalsPlugin`; persistent goals, budgets and continuation |
 | `@sortedyuan/plugin-history-memory` | `createHistoryMemoryPlugin`; historical context notes, retrieval and compaction |
 | `@sortedyuan/plugin-delegation` | `createDelegationPlugin`, `createWorkspaceFilesPlugin`; child Agents, shared budgets and workspace file access |
@@ -258,12 +259,13 @@ The reusable plugin package list is explicit:
 | `@sortedyuan/plugin-channel-telegram` (private) | `createTelegramChannelPlugin`; Telegram receiver, routing and attachments |
 | `@sortedyuan/plugin-channel-feishu` (private) | `createFeishuChannelPlugin`; Feishu receiver, routing and attachments |
 | `@sortedyuan/plugin-agent-adapters` | `createAgentAdaptersPlugin`, `createMayAgentAdapter`, `loadAgentAdapter`, RPC adapters; conversation and adapter resource management |
-| `@sortedyuan/plugin-coordination` | `createCoordinationPlugin`; task graph creation, restoration and release |
+| `@sortedyuan/coordination/plugin` | `createCoordinationPlugin`; task graph creation, restoration and release |
 | `@sortedyuan/plugin-web-api` | `createWebApiPlugin`; HTTP listener, active requests and connections |
 
-Implementations live in `packages/plugins/<name>/`. Shared tokens and ordered
-registries live in `packages/plugin-services/`; the plugin host remains in
-`packages/plugin/`. Product composition lives in
+Feature plugins live in `packages/plugins/<name>/`. Shared tokens, ordered
+registries and component factory subpaths live in `packages/plugin-services/`.
+The Coordination factory lives in `packages/coordination/src/plugin.ts`;
+the plugin host lives in `packages/plugin/`. Product composition lives in
 `apps/maybecode/src/plugins/` and `apps/maybeclaw/src/plugins/`.
 Existing package classes and interfaces remain available for direct integration.
 Applications retain compatible exports for extracted functionality.
@@ -292,10 +294,11 @@ services; `startLoops()` starts receiving, background processing, and automatic
 delivery. While paused, `tick()` processes stored inputs and queues replies;
 `deliver()` explicitly sends pending messages.
 
-`pnpm test:package:plugin` packs the host, shared services, all 15 reusable plugin
-packages and their complete May runtime dependency chains. It installs the
+`pnpm test:package:plugin` packs the host, shared services, Session, Coordination,
+the eight public feature plugin packages and their complete May runtime dependency chains. It installs the
 tarballs in a consumer directory outside the repository and executes their exported APIs.
-Applications remain private. Public package additions require the same check.
+MaybeCode is public; MaybeClaw and the example applications remain private.
+Public package additions require the same check.
 
 ## Runtime factory
 
