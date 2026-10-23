@@ -346,6 +346,9 @@ URL 和 file-ID 来源的字节需要宿主提供 `MediaReader`。
 都需要连接 TTY。密码问题隔离并恢复输入历史，隐藏输入字符，并拒绝 `suggestions`。
 返回字符串为输入值。通过 `signal` 取消输入，完成后调用 `close()`。
 `password` 默认值为 `false`。
+在交互终端中，`question(prompt, { onEscape, signal })` 在当前问题接收到 Esc 时
+调用 `onEscape`。回调可以取消对应 controller，使问题以 `AbortError` 结束。
+普通输入和密码输入都支持该回调；省略时保持 readline 的默认行为。
 
 宿主应用定义产品命令、标签、布局和 controller 调用。参阅
 [自定义 UI](../guides/custom-ui.md)。

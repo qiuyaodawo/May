@@ -51,8 +51,11 @@ files with read, JSON, or validation errors report the error and stop.
    available as one complete file, then normal startup reads it and opens the
    selected interface. The new profile becomes `defaultModel`.
 
-Use **Back** or enter `:back` to return; `Ctrl+C` cancels setup with exit code 130.
-Menus use Up/Down and Enter; Esc cancels setup. Password input displays no
+After the opening confirmation, every question supports returning to the previous
+question: press Esc in menus, text inputs, or password inputs. Menus also offer
+**Back**. Completed values remain available when revisiting a question.
+The wizard uses one terminal screen throughout setup. `Ctrl+C` cancels setup with exit code 130.
+Menus use Up/Down and Enter; Esc cancels setup on the opening confirmation. Password input displays no
 characters and is excluded from input history.
 Input stays in memory until saving. Cancellation leaves the configuration absent.
 Saving creates parent directories and coordinates with other configuration users.

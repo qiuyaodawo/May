@@ -3,6 +3,7 @@ import { clearLine, cursorTo, moveCursor } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import { keyStroke, type KeyStroke } from "@sortedyuan/keybindings";
 import { PassThrough, type Readable, Writable } from "node:stream";
+import { setImmediate as waitImmediate } from "node:timers/promises";
 import TerminalEvents from "tty-events";
 import { TerminalImageSupport } from "./image-support.js";
 import type { TerminalInput } from "./terminal-driver.js";
@@ -22,6 +23,8 @@ export type TerminalSuggestionProvider = (
 
 export interface TerminalQuestionOptions {
   readonly signal?: AbortSignal;
+  /** 在交互终端中按 Esc 时调用；调用方可以通过 signal 取消当前问题。 */
+  readonly onEscape?: () => void;
   /** 隐藏输入字符，隔离输入历史；需要交互终端，禁止使用 suggestions。 */
   readonly password?: boolean;
   /** Keep this answer in interactive input history. */
@@ -113,13 +116,18 @@ export function createNodeTerminal(
     .on("close", onReadlineClose);
   let readline = createReadline(historySize);
   let history = (readline as unknown as { readonly history: string[] }).history;
-  const replaceReadline = (size: number) => {
+  const replaceReadline = async (size: number) => {
     readline.removeListener("close", onReadlineClose);
+    // 等待输入完成暂停，再恢复读取和终端模式。
+    input.pause();
+    await waitImmediate();
     readline.close();
+    if (closed || lifetime.signal.aborted) return;
     readline = createReadline(size);
     history = (readline as unknown as { readonly history: string[] }).history;
   };
   let activePrompt: string | undefined;
+  let activeEscape: (() => void) | undefined;
   let activeSuggestionProvider: TerminalSuggestionProvider | undefined;
   let activeSuggestions: readonly TerminalSuggestion[] = [];
   let renderedSuggestionCount = 0;
@@ -240,7 +248,7 @@ export function createNodeTerminal(
       read.resolve(toKeyStroke(value, key));
       wakeInputWaiters();
       queueMicrotask(() => {
-        if (!closed && activePrompt === undefined) {
+        if (!closed && !questionReserved && activePrompt === undefined) {
           readline.write(undefined, { ctrl: true, name: "u" });
         }
         keyInputActive = activeKeyRead !== undefined;
@@ -248,6 +256,10 @@ export function createNodeTerminal(
       return;
     }
     if (activePrompt === undefined) return;
+    if (key.name === "escape" && activeEscape !== undefined) {
+      activeEscape();
+      return;
+    }
     if (key.name === "tab" && activeSuggestionProvider !== undefined) {
       const line = readline.line;
       const completed = completeActiveSuggestion(line);
@@ -307,10 +319,12 @@ export function createNodeTerminal(
       passwordActive = questionOptions.password === true;
       if (passwordActive) {
         // 密码使用独立 readline，输入历史和删除缓冲区随问题结束清除。
-        replaceReadline(0);
+        questionReserved = true;
+        await replaceReadline(0);
         output.write(prompt);
       }
       activePrompt = prompt;
+      activeEscape = questionOptions.onEscape;
       questionReserved = false;
       activeSuggestionProvider = questionOptions.suggestions;
       activeSuggestions = [];
@@ -321,7 +335,7 @@ export function createNodeTerminal(
         return await readline.question(prompt, { signal });
       } finally {
         if (passwordActive) {
-          if (!closed && !lifetime.signal.aborted) replaceReadline(historySize);
+          if (!closed && !lifetime.signal.aborted) await replaceReadline(historySize);
           output.write("\n");
           passwordActive = false;
         }
@@ -331,6 +345,7 @@ export function createNodeTerminal(
         activeSuggestions = [];
         activeSuggestionInput = undefined;
         activePrompt = undefined;
+        activeEscape = undefined;
         wakeInputWaiters();
         if (previousHistory !== undefined) {
           history.splice(0, history.length, ...previousHistory);
@@ -353,7 +368,7 @@ export function createNodeTerminal(
           new Error("Key input requires an interactive terminal"),
         );
       }
-      if (activePrompt !== undefined || activeKeyRead !== undefined) {
+      if (activePrompt !== undefined || activeKeyRead !== undefined || questionReserved) {
         return Promise.reject(new Error("The terminal input is already active"));
       }
       if (signal?.aborted) return Promise.reject(abortError(signal.reason));

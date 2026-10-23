@@ -384,6 +384,10 @@ and output must be TTYs. Password questions isolate and restore input history,
 never display entered characters, and reject `suggestions`. The returned string
 is the entered value. Abort through `signal`; call `close()` when finished.
 The `password` option defaults to `false`.
+In interactive terminals, `question(prompt, { onEscape, signal })` calls
+`onEscape` when Esc is pressed while that question is active. The callback can
+abort its controller to end the question with an `AbortError`. It works with
+both ordinary and password input; omitting it preserves normal readline behavior.
 
 The host application defines product commands, labels, layout and controller
 calls. See [Custom UI](../guides/custom-ui.md).

@@ -19,7 +19,6 @@ class Back extends Error {}
 class Cancel extends Error {}
 const back = { name: "Back", value: "back" };
 const cancel = { name: "Cancel setup", value: "cancel" };
-const write = (text: string) => process.stdout.write(`${text}\n`);
 
 interface Draft {
   provider: number;
@@ -93,10 +92,27 @@ export async function runMaybeCodeOnboarding(path: string, command: MaybeCodeSta
     profile: command.model ?? "default", model: "", contextWindowTokens: "", maxOutputTokens: "", options: "" };
   let saved = false;
   let verified = false;
+  let completion: string | undefined;
+  let screen = "";
+  const write = (message: string) => {
+    screen += `${message}\n`;
+    terminal.write(`${message}\n`);
+  };
   const text = async (message: string, value: string, validate: (value: string) => boolean | string = required, clearable = false, password = false): Promise<string> => {
+    write(`Enter: continue | Esc: back | Ctrl+C: cancel${clearable ? " | :clear: remove this setting" : ""}`);
     while (true) {
-      const answer = (await terminal.question(`${message}${value && !password ? ` [${value}]` : ""}: `, { ...context, history: false, password })).trim();
-      if (answer === ":back") throw new Back();
+      const question = new AbortController();
+      let answer: string;
+      try {
+        answer = (await terminal.question(`${message}${value && !password ? ` [${value}]` : ""}: `, {
+          signal: AbortSignal.any([controller.signal, question.signal]), history: false, password,
+          onEscape: () => question.abort(new Back()),
+        })).trim();
+      } catch (error) {
+        controller.signal.throwIfAborted();
+        if (question.signal.aborted) throw question.signal.reason;
+        throw error;
+      }
       if (clearable && answer === ":clear") return "";
       const result = answer || value;
       const valid = validate(result);
@@ -104,97 +120,113 @@ export async function runMaybeCodeOnboarding(path: string, command: MaybeCodeSta
       write(typeof valid === "string" ? valid : "Enter a valid value.");
     }
   };
-  const choose = async (message: string, choices: { name: string; value: string }[], value?: string) => {
+  const choose = async (message: string, choices: { name: string; value: string }[], value?: string, escapeValue = "back") => {
     let result: string | undefined;
     const list = new SelectList(choices.map(choice => ({ label: choice.name, value: choice.value })), {
       selectedIndex: Math.max(0, choices.findIndex(choice => choice.value === value)),
       onSelect: item => { result = item.value; },
-      onCancel: () => { result = "cancel"; },
+      onCancel: () => { result = escapeValue; },
       keybindings: [
         { context: "select", keys: "escape", action: "list.cancel" },
-        { context: "select", keys: "ctrl+c", action: "list.cancel" },
       ],
     });
     list.setFocused(true);
-    try {
-      while (result === undefined) {
-        const lines = list.render({ width: Math.max(1, (process.stdout.columns || 80) - 1), height: Math.max(1, Math.min(12, (process.stdout.rows || 24) - 4)) }).lines;
-        terminal.renderView!(`${message}\n\n${lines.join("\n")}\n\nUp/Down: select | Enter: confirm | Esc/Ctrl+C: cancel`);
-        list.handleKey(await terminal.readKey!(context));
-      }
-    } finally {
-      terminal.closeView!();
+    while (result === undefined) {
+      const lines = list.render({ width: Math.max(1, (process.stdout.columns || 80) - 1), height: Math.max(1, Math.min(12, (process.stdout.rows || 24) - 4)) }).lines;
+      terminal.write(`\x1b[2J\x1b[H${screen}${message}\n\n${lines.join("\n")}\n\nUp/Down: select | Enter: confirm | Esc: ${escapeValue === "cancel" ? "cancel" : "back"} | Ctrl+C: cancel`);
+      const key = await terminal.readKey!(context);
+      if (key.ctrl && key.key === "c") throw new Cancel();
+      list.handleKey(key);
     }
+    terminal.write(`\x1b[2J\x1b[H${screen}`);
     if (result === "back") throw new Back();
     if (result === "cancel") throw new Cancel();
     write(`${message}: ${choices.find(choice => choice.value === result)!.name}`);
     return result;
   };
   try {
-    write(`\nWelcome to MaybeCode\nCreate configuration at: ${path}\nUse Back or type :back to return. Press Ctrl+C to cancel.`);
-    await choose(command.configPath === undefined ? "Start configuration?" : "Create a new configuration at this path?", [
-      { name: "Start configuration", value: "start" }, cancel,
-    ]);
+    terminal.write("\x1b[?1049h");
     let step = 0;
+    const previous: number[] = [];
+    const advance = (next: number) => { previous.push(step); step = next; };
+    const selectProvider = (selected: string) => {
+      if (Number(selected) === draft.provider) return;
+      draft.provider = Number(selected);
+      draft.baseURL = providers[draft.provider]!.url;
+      draft.apiKeyEnv = providers[draft.provider]!.env;
+      draft.options = "";
+    };
     while (true) {
+      screen = `Welcome to MaybeCode\nConfiguration: ${path}\n\n`;
+      terminal.write(`\x1b[2J\x1b[H${screen}`);
       try {
         if (step === 0) {
+          await choose(command.configPath === undefined ? "Start configuration?" : "Create a new configuration at this path?", [{ name: "Start configuration", value: "start" }, cancel], undefined, "cancel");
+          advance(1);
+        } else if (step === 1) {
           verified = false;
           const choice = await choose("Provider", [
             ...providers.map((provider, index) => ({ name: provider.name, value: String(index) })),
-            { name: "Custom compatible service", value: "custom" }, cancel,
+            { name: "Custom compatible service", value: "custom" }, back, cancel,
           ], draft.custom ? "custom" : String(draft.provider));
           draft.custom = choice === "custom";
-          const selected = draft.custom ? await choose("API protocol", [...providers.map((provider, index) => ({ name: provider.adapter, value: String(index) })), back, cancel], String(draft.provider)) : choice;
-          if (Number(selected) !== draft.provider) {
-            draft.provider = Number(selected);
-            draft.baseURL = providers[draft.provider]!.url;
-            draft.apiKeyEnv = providers[draft.provider]!.env;
-            draft.options = "";
-          }
+          if (!draft.custom) selectProvider(choice);
+          advance(draft.custom ? 2 : 3);
+        } else if (step === 2) {
+          selectProvider(await choose("API protocol", [...providers.map((provider, index) => ({ name: provider.adapter, value: String(index) })), back, cancel], String(draft.provider)));
+          advance(3);
+        } else if (step === 3) {
           write(`The adapter appends ${providers[draft.provider]!.suffix} to the base URL. Include any API version prefix required by your service.`);
           draft.baseURL = await text("Base URL", draft.baseURL, validURL);
-          step = 1;
-        } else if (step === 1) {
+          advance(4);
+        } else if (step === 4) {
           verified = false;
           draft.credential = await choose("Credentials", [
             { name: "Use an environment variable", value: "env" },
             { name: "Enter an API key (saved as plain text in the config file)", value: "key" }, back, cancel,
           ], draft.credential) as "env" | "key";
+          advance(5);
+        } else if (step === 5) {
           if (draft.credential === "env") {
             draft.apiKeyEnv = await text("Environment variable name", draft.apiKeyEnv, value => {
               if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(value)) return "Enter a valid environment variable name.";
-              return process.env[value]?.trim() ? true : "This variable is empty or unavailable in this process. Type :back to choose another credential method.";
+              return process.env[value]?.trim() ? true : "This variable is empty or unavailable in this process. Press Esc to choose another credential method.";
             });
           } else {
             draft.apiKey = await text(draft.apiKey ? "API key (input hidden; leave empty to keep the current key)" : "API key (input hidden)", draft.apiKey, required, false, true);
           }
-          step = 2;
-        } else if (step === 2) {
+          advance(6);
+        } else if (step === 6) {
           verified = false;
           draft.model = await text("Model ID", draft.model);
-          draft.profile = await text("Model profile name", draft.profile);
-          if (command.model !== undefined && draft.profile !== command.model) {
-            write(`This launch uses --model ${command.model}. Use that profile name to continue.`);
-            continue;
-          }
+          advance(7);
+        } else if (step === 7) {
+          draft.profile = await text("Model profile name", draft.profile, value =>
+            command.model !== undefined && value !== command.model
+              ? `This launch uses --model ${command.model}. Use that profile name to continue.` : required(value));
+          advance(8);
+        } else if (step === 8) {
           const advanced = await choose("Model settings", [{ name: "Continue", value: "continue" }, { name: "Edit advanced settings", value: "advanced" }, back, cancel]);
-          if (advanced === "advanced") {
-            write("Enter keeps the displayed value. Type :clear to remove an advanced setting and use existing defaults.");
-            draft.contextWindowTokens = await text("Context window tokens (optional)", draft.contextWindowTokens, optionalInteger, true);
-            draft.maxOutputTokens = await text("Maximum output tokens (optional)", draft.maxOutputTokens, optionalInteger, true);
-            const keys = [...providers[draft.provider]!.options, "unknownCapabilityPolicy"];
-            write(`Adapter options: ${keys.join(", ")}`);
-            draft.options = await text("Adapter options as a JSON object (optional)", draft.options, value => {
-              if (!value) return true;
-              let options: unknown;
-              try { options = JSON.parse(value); } catch { return "Enter a valid JSON object."; }
-              if (options === null || typeof options !== "object" || Array.isArray(options)) return "Enter a JSON object.";
-              return Object.keys(options).every(key => keys.includes(key)) || "Use only the listed adapter option names.";
-            }, true);
-          }
-          step = 3;
-        } else if (step === 3) {
+          advance(advanced === "advanced" ? 9 : 12);
+        } else if (step === 9) {
+          write("Enter keeps the displayed value. Type :clear to remove an advanced setting and use existing defaults.");
+          draft.contextWindowTokens = await text("Context window tokens (optional)", draft.contextWindowTokens, optionalInteger, true);
+          advance(10);
+        } else if (step === 10) {
+          draft.maxOutputTokens = await text("Maximum output tokens (optional)", draft.maxOutputTokens, optionalInteger, true);
+          advance(11);
+        } else if (step === 11) {
+          const keys = [...providers[draft.provider]!.options, "unknownCapabilityPolicy"];
+          write(`Adapter options: ${keys.join(", ")}`);
+          draft.options = await text("Adapter options as a JSON object (optional)", draft.options, value => {
+            if (!value) return true;
+            let options: unknown;
+            try { options = JSON.parse(value); } catch { return "Enter a valid JSON object."; }
+            if (options === null || typeof options !== "object" || Array.isArray(options)) return "Enter a JSON object.";
+            return Object.keys(options).every(key => keys.includes(key)) || "Use only the listed adapter option names.";
+          }, true);
+          advance(12);
+        } else if (step === 12) {
           let config: MayConfig;
           try {
             config = configuration(draft, path);
@@ -205,8 +237,8 @@ export async function runMaybeCodeOnboarding(path: string, command: MaybeCodeSta
             const secret = draft.credential === "key" ? draft.apiKey : process.env[draft.apiKeyEnv];
             const message = secret ? error.message.replaceAll(secret, "[hidden]") : error.message;
             write(`Configuration needs attention: ${message.replace(/[\x00-\x1f\x7f]/gu, " ")}`);
-            const target = await choose("Edit configuration", [{ name: "Provider", value: "0" }, { name: "Credentials", value: "1" }, { name: "Model and advanced settings", value: "2" }, cancel]);
-            step = Number(target);
+            const target = await choose("Edit configuration", [{ name: "Provider", value: "1" }, { name: "Credentials", value: "4" }, { name: "Model and advanced settings", value: "6" }, back, cancel]);
+            advance(Number(target));
             continue;
           }
           write("Local configuration checks passed.");
@@ -221,11 +253,11 @@ export async function runMaybeCodeOnboarding(path: string, command: MaybeCodeSta
             catch (error) {
               controller.signal.throwIfAborted();
               write(`Connection check failed. ${connectionProblem(error)}`);
-              const next = await choose("Next action", [{ name: "Retry", value: "retry" }, { name: "Edit provider", value: "0" }, { name: "Edit credentials", value: "1" }, { name: "Edit model and advanced settings", value: "2" }, { name: "Skip connection check", value: "skip" }, cancel]);
-              if (next !== "skip") { step = next === "retry" ? 3 : Number(next); continue; }
+              const next = await choose("Next action", [{ name: "Retry", value: "retry" }, { name: "Edit provider", value: "1" }, { name: "Edit credentials", value: "4" }, { name: "Edit model and advanced settings", value: "6" }, { name: "Skip connection check", value: "skip" }, { name: "Back", value: "retry" }, cancel], undefined, "retry");
+              if (next !== "skip") { if (next !== "retry") advance(Number(next)); continue; }
             }
           }
-          step = 4;
+          advance(13);
         } else {
           write(`\nReview configuration\nPath: ${path}\nProvider: ${draft.custom ? "Custom compatible service" : providers[draft.provider]!.name}\nProtocol: ${providers[draft.provider]!.adapter}\nBase URL: ${draft.baseURL}\nModel: ${draft.model}\nDefault profile: ${draft.profile}\nCredentials: ${draft.credential === "env" ? `Environment variable ${draft.apiKeyEnv}` : "API key stored as plain text (hidden)"}\nContext window tokens: ${draft.contextWindowTokens || "Default"}\nMaximum output tokens: ${draft.maxOutputTokens || "Default"}\nAdvanced options: ${draft.options || "Default"}\nConnection: ${verified ? "Verified" : "Not verified"}`);
           await choose("Save configuration?", [{ name: "Save and start", value: "save" }, back, cancel]);
@@ -233,18 +265,18 @@ export async function runMaybeCodeOnboarding(path: string, command: MaybeCodeSta
           createBuiltinProviderModel(selectProviderModel(config));
           await createMayConfig(path, { providers: config.providers, models: config.models, defaultModel: config.defaultModel }, context);
           saved = true;
-          write(`Configuration saved to ${path}. Starting MaybeCode.`);
+          completion = `Configuration saved to ${path}. Starting MaybeCode.`;
           return true;
         }
       } catch (error) {
         if (!(error instanceof Back)) throw error;
-        step = Math.max(0, step - 1);
+        step = previous.pop() ?? 0;
         verified = false;
       }
     }
   } catch (error) {
     if (error instanceof Cancel || controller.signal.aborted) {
-      write(saved ? `Setup cancelled. Configuration is saved at ${path}.` : "Setup cancelled. Configuration was not saved.");
+      completion = saved ? `Setup cancelled. Configuration is saved at ${path}.` : "Setup cancelled. Configuration was not saved.";
       return false;
     }
     throw error;
@@ -254,6 +286,8 @@ export async function runMaybeCodeOnboarding(path: string, command: MaybeCodeSta
     await setImmediate();
     removeInterrupt();
     terminal.close();
+    process.stdout.write("\x1b[?1049l");
+    if (completion !== undefined) process.stdout.write(`${completion}\n`);
     process.removeListener("SIGINT", interrupt);
     process.stdin.removeListener("end", interrupt);
   }
