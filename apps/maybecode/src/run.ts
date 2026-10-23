@@ -80,6 +80,17 @@ export async function runMaybeCode(
       outputTerminal().close();
       return 0;
     }
+    if (dependencies.open === undefined) {
+      const { missingMaybeCodeConfig } = await import("./onboarding-check.js");
+      const path = await missingMaybeCodeConfig(command);
+      if (path !== undefined) {
+        const { runMaybeCodeOnboarding } = await import("./onboarding.js");
+        if (!await runMaybeCodeOnboarding(path, command)) {
+          terminal?.close();
+          return 130;
+        }
+      }
+    }
     const open = dependencies.open ?? (await import("./configured.js")).openConfiguredMaybeCode;
     const runWebUI = command.ui === "web"
       ? dependencies.runWebUI ?? (await import("./web-ui.js")).runMaybeCodeWebUI : undefined;

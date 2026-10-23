@@ -378,6 +378,13 @@ Terminal primitives and Agent-aware projections use these import paths:
 | `@sortedyuan/tui/slash-commands` | Command parsing and completion state |
 | `@sortedyuan/tui/list-selection` | Filtered list and picker state |
 
+`createNodeTerminal()` from `@sortedyuan/tui/node-terminal` returns a `TerminalIO`.
+Call `question(prompt, { password: true, signal })` to read hidden input. Both input
+and output must be TTYs. Password questions isolate and restore input history,
+never display entered characters, and reject `suggestions`. The returned string
+is the entered value. Abort through `signal`; call `close()` when finished.
+The `password` option defaults to `false`.
+
 The host application defines product commands, labels, layout and controller
 calls. See [Custom UI](../guides/custom-ui.md).
 

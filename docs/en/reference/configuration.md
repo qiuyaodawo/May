@@ -14,6 +14,14 @@ call `loadMayConfig({ path })` once with directory write permission; later loads
 only need read permission on the configuration and its access files. Upgrade all
 processes that share a configuration together.
 
+`createMayConfig(path, value, { signal? })` validates and creates a new configuration,
+including missing parent directories. It uses exclusive file access and publishes
+a synchronized temporary file through a hard link; the destination must be absent.
+Existing files and symbolic links remain unchanged. Temporary files are removed
+after success or failure. An aborted signal before publication leaves the target
+absent; a completed publication remains saved. Storage must support hard links.
+MaybeCode uses this operation during [first-run setup](../guides/maybecode.md#first-run-setup).
+
 Use this page to look up fields and defaults. For application startup and controls,
 see [MaybeCode](../guides/maybecode.md) or [MaybeClaw](../guides/maybeclaw.md).
 

@@ -10,6 +10,12 @@ May 默认读取 `~/.may/config.json`，分别保存命名 Provider 连接、模
 配置文件及两个 access 文件的读取权限。
 共享同一个配置的所有进程需要一起升级。
 
+`createMayConfig(path, value, { signal? })` 校验并创建新配置，同时创建缺失的父目录。
+它使用独占文件访问，将已经同步写入的临时文件通过 hard link 发布到尚未存在的目标。
+已有文件和符号链接保持原状，成功或失败后清理临时文件。发布前收到取消信号时，目标
+保持不存在；已经发布完成的配置继续保留。存储位置需要支持 hard link。
+MaybeCode 在[首次启动配置](../guides/maybecode.md#首次启动配置)中使用该操作。
+
 本文用于查询字段与默认值。应用启动及操作见[MaybeCode](../guides/maybecode.md)和
 [MaybeClaw](../guides/maybeclaw.md)。
 

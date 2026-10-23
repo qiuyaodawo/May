@@ -341,6 +341,12 @@ URL 和 file-ID 来源的字节需要宿主提供 `MediaReader`。
 | `@sortedyuan/tui/slash-commands` | 命令解析和补全状态 |
 | `@sortedyuan/tui/list-selection` | 带过滤的列表和选择器状态 |
 
+`@sortedyuan/tui/node-terminal` 的 `createNodeTerminal()` 返回 `TerminalIO`。
+调用 `question(prompt, { password: true, signal })` 可以读取隐藏输入。输入和输出
+都需要连接 TTY。密码问题隔离并恢复输入历史，隐藏输入字符，并拒绝 `suggestions`。
+返回字符串为输入值。通过 `signal` 取消输入，完成后调用 `close()`。
+`password` 默认值为 `false`。
+
 宿主应用定义产品命令、标签、布局和 controller 调用。参阅
 [自定义 UI](../guides/custom-ui.md)。
 

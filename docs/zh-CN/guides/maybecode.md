@@ -3,13 +3,16 @@
 [English](../../en/guides/maybecode.md) | **简体中文**
 
 通过终端或浏览器使用编码 Agent。按照[仓库开发指南](repository-development.md)
-准备仓库，并依据[配置参考](../reference/configuration.md)设置 Provider 和模型配置。
+准备仓库。首次启动引导可以创建 Provider 和模型配置，更多设置见
+[配置参考](../reference/configuration.md)。
 应用使用所选模型的 API，并在启动目录中执行工作。
 
 通过 `MaybeCodeApplicationOptions.tools` 提供的自定义工具注册到应用工具目录。
 运行指令使用同一个目录描述当前环境。
 
 ## 启动应用
+
+MaybeCode 要求 Node.js 22 或更新版本。
 
 在 May 仓库根目录执行：
 
@@ -20,6 +23,38 @@ pnpm maybecode
 该命令构建后启动应用。浏览器界面按照 [WebUI 步骤](web-ui.md)生成
 `MAYBECODE_CONTROL_TOKEN`，然后执行 `pnpm maybecode --ui web`。
 提交任务前核查显示的工作目录和模型。
+
+## 首次启动配置
+
+当 `~/.may/config.json` 不存在时，交互式终端会显示英文配置向导。
+标准输入和标准输出都需要连接终端。指定 `--config <path>` 时，向导会询问是否在该
+位置创建文件。已有文件出现读取、JSON 或字段校验错误时，应用显示错误并结束。
+
+1. 确认显示的完整配置路径。
+2. 选择 Provider，或选择 **Custom compatible service** 并指定 API 协议。
+   输入 base URL；提示会说明 Adapter 在地址后追加的请求路径。
+3. 选择当前进程能够读取的环境变量，或通过隐藏输入填写 API Key。
+   直接输入的 API Key 以明文保存在配置文件中；环境变量方式只保存变量名称。
+4. 输入模型 ID 和配置名称。启动参数包含 `--model` 时，使用对应名称。
+   高级设置支持 token 限制，以及使用 JSON 填写提示中列出的 Adapter 选项。
+   按 Enter 保留显示的值，输入 `:clear` 删除对应的高级设置。
+5. 按需执行连接检查。检查通过实际 Adapter 发送 **Reply with OK.**，超时为
+   30 秒，可能产生 API 费用。请求只包含检查文字。失败后保留输入，允许修改并重试。
+   跳过检查时显示 **Connection: Not verified**。
+6. 检查配置并选择 **Save and start**。配置以完整文件发布后，由正常启动流程重新
+   读取，并打开所选界面。此次创建的模型配置成为 `defaultModel`。
+
+选择 **Back** 或输入 `:back` 可以返回；`Ctrl+C` 取消配置并以退出码 130 结束。
+菜单通过上下方向键选择，按 Enter 确认，按 Esc 取消配置。密码输入隐藏所有字符，
+并且不会保存到输入历史。
+保存前输入保存在内存中，取消后配置文件仍然不存在。保存时创建父目录，并与其他配置
+使用者协调文件访问。如果其他进程已经创建该文件，向导终止保存并保留已有文件。
+存储位置需要支持 hard link，以便发布完整文件。后续应用启动失败时保留已保存的配置。
+
+retained、classic 和 Web 模式共用终端向导。Web 模式在进入向导前检查
+`MAYBECODE_CONTROL_TOKEN`。工作目录、会话恢复、权限和端口参数继续交给正常启动流程。
+非交互环境缺少配置时，应用输出操作说明并以退出码 1 结束。
+help、MCP 和 team 命令保持各自的启动行为。
 
 CLI 按需加载选中的命令和界面。图片需要处理时加载图片编码模块，打开 `/web` 时
 加载 Web 服务和浏览器资源。启动过程打开 Session 并识别仓库。首次可能修改工作区文件的

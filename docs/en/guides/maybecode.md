@@ -3,8 +3,9 @@
 **English** | [简体中文](../../zh-CN/guides/maybecode.md)
 
 Use MaybeCode to work with a coding Agent in a terminal or browser. Prepare the
-repository with [the development guide](repository-development.md), and configure
-a provider and model profile using [the configuration reference](../reference/configuration.md).
+repository with [the development guide](repository-development.md). First-run setup
+creates a provider and model profile; additional settings are described in
+[the configuration reference](../reference/configuration.md).
 The application uses the selected model's API and operates in its starting directory.
 
 Applications that provide custom tools through `MaybeCodeApplicationOptions.tools`
@@ -12,6 +13,8 @@ register those tools in the application catalog. Runtime instructions use the sa
 catalog to describe the current environment.
 
 ## Start the application
+
+MaybeCode requires Node.js 22 or newer.
 
 From the May repository root, run:
 
@@ -23,6 +26,45 @@ This package script builds before starting. For a browser interface, follow the
 [Web UI procedure](web-ui.md#start-a-standalone-maybecode-web-host) to generate
 `MAYBECODE_CONTROL_TOKEN` and start `pnpm maybecode --ui web`.
 Check the displayed workspace and model before submitting a task.
+
+## First-run setup
+
+When `~/.may/config.json` is missing, an interactive terminal opens an English
+setup wizard. Both standard input and standard output must be terminals.
+`--config <path>` asks for confirmation before creating that file. Existing
+files with read, JSON, or validation errors report the error and stop.
+
+1. Confirm the displayed configuration path.
+2. Select a provider, or choose **Custom compatible service** and its API protocol.
+   Enter the base URL; the prompt explains which request path the adapter appends.
+3. Select an environment variable available in the current process, or enter an
+   API key through the hidden input. Direct API keys are stored as plain text in
+   the configuration; environment-variable references store only the variable name.
+4. Enter the model ID and profile name. With `--model`, use that profile name.
+   Advanced settings accept token limits and the listed adapter options as JSON.
+   Enter keeps a displayed value; `:clear` removes an advanced setting.
+5. Run the optional connection check. It sends **Reply with OK.** using the actual
+   adapter, has a 30-second timeout, and may incur API charges. It contains no
+   workspace files or conversation history. Failures retain your input for editing
+   and retrying. Skipping displays **Connection: Not verified**.
+6. Review the settings and select **Save and start**. The configuration becomes
+   available as one complete file, then normal startup reads it and opens the
+   selected interface. The new profile becomes `defaultModel`.
+
+Use **Back** or enter `:back` to return; `Ctrl+C` cancels setup with exit code 130.
+Menus use Up/Down and Enter; Esc cancels setup. Password input displays no
+characters and is excluded from input history.
+Input stays in memory until saving. Cancellation leaves the configuration absent.
+Saving creates parent directories and coordinates with other configuration users.
+If another process creates the file first, setup stops without replacing it.
+Storage must support hard links for publishing the complete file. A later
+application startup error preserves the saved configuration.
+
+The same terminal wizard serves retained, classic, and Web modes. Web mode checks
+`MAYBECODE_CONTROL_TOKEN` before setup. Workspace, resume, permission, and port
+arguments continue into normal startup. Noninteractive startup with missing
+configuration exits with instructions and code 1. Help, MCP, and team commands
+keep their own startup behavior.
 
 The CLI loads the selected command and UI implementation on demand. Image codecs
 load when an image needs processing; `/web` loads the Web server and browser

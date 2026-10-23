@@ -2,9 +2,10 @@ import stringWidth from "string-width";
 import { clearLine, cursorTo, moveCursor } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import { keyStroke, type KeyStroke } from "@sortedyuan/keybindings";
-import { PassThrough, type Readable, type Writable } from "node:stream";
+import { PassThrough, type Readable, Writable } from "node:stream";
 import TerminalEvents from "tty-events";
 import { TerminalImageSupport } from "./image-support.js";
+import type { TerminalInput } from "./terminal-driver.js";
 
 export interface TerminalSuggestion {
   /** Full input value represented by the suggestion. */
@@ -21,6 +22,8 @@ export type TerminalSuggestionProvider = (
 
 export interface TerminalQuestionOptions {
   readonly signal?: AbortSignal;
+  /** 隐藏输入字符，隔离输入历史；需要交互终端，禁止使用 suggestions。 */
+  readonly password?: boolean;
   /** Keep this answer in interactive input history. */
   readonly history?: boolean;
   /** Live suggestions displayed while editing this answer in an interactive TTY. */
@@ -65,7 +68,8 @@ export interface NodeTerminalOptions {
 export function createNodeTerminal(
   options: NodeTerminalOptions = {},
 ): TerminalIO {
-  const source: NodeJS.ReadableStream = options.input ?? process.stdin;
+  const source: TerminalInput = options.input ?? process.stdin;
+  source.ref?.();
   const output = options.output ?? process.stdout;
   const interactive = output.isTTY === true;
   const imageSupport = new TerminalImageSupport(output);
@@ -82,15 +86,39 @@ export function createNodeTerminal(
     source.on("end", endFilteredInput);
   }
   const historySize = 200;
-  const readline = createInterface({
+  let passwordActive = false;
+  let viewActive = false;
+  let keyInputActive = false;
+  const readlineOutput = new Writable({
+    write(chunk, encoding, callback) {
+      if (!passwordActive && !viewActive && !keyInputActive) output.write(chunk, encoding);
+      callback();
+    },
+  });
+  Object.defineProperties(readlineOutput, {
+    isTTY: { get: () => output.isTTY },
+    columns: { get: () => output.columns },
+  });
+  const lifetime = new AbortController();
+  const interruptListeners = new Set<() => void>();
+  const onReadlineClose = () => lifetime.abort(new Error("Terminal closed"));
+  const createReadline = (size: number) => createInterface({
     input,
-    output,
+    output: readlineOutput,
     terminal: interactive,
-    historySize,
+    historySize: size,
     removeHistoryDuplicates: true,
     escapeCodeTimeout: 100,
-  });
-  const history = (readline as unknown as { readonly history: string[] }).history;
+  }).on("SIGINT", () => { for (const listener of interruptListeners) listener(); })
+    .on("close", onReadlineClose);
+  let readline = createReadline(historySize);
+  let history = (readline as unknown as { readonly history: string[] }).history;
+  const replaceReadline = (size: number) => {
+    readline.removeListener("close", onReadlineClose);
+    readline.close();
+    readline = createReadline(size);
+    history = (readline as unknown as { readonly history: string[] }).history;
+  };
   let activePrompt: string | undefined;
   let activeSuggestionProvider: TerminalSuggestionProvider | undefined;
   let activeSuggestions: readonly TerminalSuggestion[] = [];
@@ -98,7 +126,6 @@ export function createNodeTerminal(
   let suggestionVersion = 0;
   let activeSuggestionInput: string | undefined;
   let activeKeyRead: KeyRead | undefined;
-  let viewActive = false;
   let suppressInterrupt = false;
   let closed = false;
   let questionReserved = false;
@@ -216,6 +243,7 @@ export function createNodeTerminal(
         if (!closed && activePrompt === undefined) {
           readline.write(undefined, { ctrl: true, name: "u" });
         }
+        keyInputActive = activeKeyRead !== undefined;
       });
       return;
     }
@@ -253,7 +281,7 @@ export function createNodeTerminal(
     queueMicrotask(() => void refreshSuggestions());
   };
   if (interactive) input.prependListener("keypress", onKeypress);
-  const updateImageSize = () => imageSupport.query();
+  const updateImageSize = () => { imageSupport.query(); readlineOutput.emit("resize"); };
   output.on("resize", updateImageSize);
 
   return {
@@ -261,14 +289,27 @@ export function createNodeTerminal(
     colors: options.colors ?? interactive,
     interactive,
     async question(prompt, questionOptions = {}) {
-      if (activePrompt !== undefined || activeKeyRead !== undefined || viewActive || questionReserved) await waitForInput(questionOptions.signal);
+      const signal = questionOptions.signal === undefined ? lifetime.signal : AbortSignal.any([lifetime.signal, questionOptions.signal]);
+      if (activePrompt !== undefined || activeKeyRead !== undefined || viewActive || questionReserved) await waitForInput(signal);
       try {
         if (closed) throw new Error("Terminal closed");
-        questionOptions.signal?.throwIfAborted();
+        signal.throwIfAborted();
+        if (questionOptions.password && (!interactive || (source as NodeJS.ReadStream).isTTY !== true)) {
+          throw new Error("Password input requires an interactive terminal");
+        }
+        if (questionOptions.password && questionOptions.suggestions !== undefined) {
+          throw new Error("Password input does not support suggestions");
+        }
       } catch (error) { questionReserved = false; wakeInputWaiters(); throw error; }
-      const previousHistory = questionOptions.history === false
+      const previousHistory = interactive && (questionOptions.history === false || questionOptions.password)
         ? [...history]
         : undefined;
+      passwordActive = questionOptions.password === true;
+      if (passwordActive) {
+        // 密码使用独立 readline，输入历史和删除缓冲区随问题结束清除。
+        replaceReadline(0);
+        output.write(prompt);
+      }
       activePrompt = prompt;
       questionReserved = false;
       activeSuggestionProvider = questionOptions.suggestions;
@@ -277,10 +318,13 @@ export function createNodeTerminal(
       renderedSuggestionCount = 0;
       suggestionVersion += 1;
       try {
-        return await (questionOptions.signal === undefined
-          ? readline.question(prompt)
-          : readline.question(prompt, { signal: questionOptions.signal }));
+        return await readline.question(prompt, { signal });
       } finally {
+        if (passwordActive) {
+          if (!closed && !lifetime.signal.aborted) replaceReadline(historySize);
+          output.write("\n");
+          passwordActive = false;
+        }
         suggestionVersion += 1;
         eraseSuggestionRows();
         activeSuggestionProvider = undefined;
@@ -299,9 +343,11 @@ export function createNodeTerminal(
       activePrompt = prompt;
       readline.setPrompt(prompt.replace(/^\r?\n/u, ""));
       if (interactive) readline.prompt(true);
+      if (passwordActive) { clearLine(output, 0); cursorTo(output, 0); output.write(prompt); }
       drawSuggestionRows();
     },
     readKey({ signal } = {}) {
+      signal = signal === undefined ? lifetime.signal : AbortSignal.any([lifetime.signal, signal]);
       if (!interactive) {
         return Promise.reject(
           new Error("Key input requires an interactive terminal"),
@@ -315,6 +361,7 @@ export function createNodeTerminal(
         const onAbort = () => {
           if (activeKeyRead !== read) return;
           activeKeyRead = undefined;
+          keyInputActive = false;
           read.cleanup();
           reject(abortError(signal?.reason));
           wakeInputWaiters();
@@ -325,6 +372,7 @@ export function createNodeTerminal(
           cleanup: () => signal?.removeEventListener("abort", onAbort),
         };
         activeKeyRead = read;
+        keyInputActive = true;
         signal?.addEventListener("abort", onAbort, { once: true });
       });
     },
@@ -363,8 +411,8 @@ export function createNodeTerminal(
       }
 
       eraseSuggestionRows();
-      const line = readline.line;
-      const position = readline.cursor;
+      const line = passwordActive ? "" : readline.line;
+      const position = passwordActive ? 0 : readline.cursor;
       clearLine(output, 0);
       cursorTo(output, 0);
       const update = text.replace(/^\r?\n/u, "");
@@ -383,11 +431,12 @@ export function createNodeTerminal(
         }
         listener();
       };
-      readline.on("SIGINT", wrapped);
-      return () => readline.off("SIGINT", wrapped);
+      interruptListeners.add(wrapped);
+      return () => { interruptListeners.delete(wrapped); };
     },
     close() {
       closed = true;
+      lifetime.abort(new Error("Terminal closed"));
       wakeInputWaiters();
       activeKeyRead?.reject(new Error("Terminal closed"));
       activeKeyRead?.cleanup();
@@ -395,11 +444,13 @@ export function createNodeTerminal(
       if (viewActive) output.write("\x1b[?1049l");
       if (interactive) input.removeListener("keypress", onKeypress);
       readline.close();
+      interruptListeners.clear();
       output.removeListener("resize", updateImageSize);
       reports?.pause();
       reports?.removeAllListeners();
       source.removeListener("end", endFilteredInput);
       filtered?.destroy();
+      source.unref?.();
     },
   };
 }
