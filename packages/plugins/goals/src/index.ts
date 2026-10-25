@@ -1,4 +1,4 @@
-import { applicationHooks, applicationServices, type AgentApplication } from "@sortedyuan/application";
+import { applicationHooks, applicationServices, type ApplicationFacade } from "@sortedyuan/application";
 import { GoalController, type GoalAgent, type GoalOptions, type GoalState } from "@sortedyuan/goal";
 import { definePlugin, defineService } from "@sortedyuan/plugin";
 
@@ -7,7 +7,7 @@ export const goalsService = defineService<GoalController>({
 });
 
 export interface GoalsPluginOptions extends GoalOptions {
-  readonly createAgent?: (application: AgentApplication) => GoalAgent;
+  readonly createAgent?: (application: ApplicationFacade) => GoalAgent;
 }
 
 interface GoalsState { readonly goal: GoalState | null }
@@ -17,7 +17,10 @@ export function createGoalsPlugin(options: GoalsPluginOptions = {}) {
     id: "may.goals", version: "1.0.0", scope: "application",
     provides: [goalsService],
     requires: [
-      { service: applicationServices.application },
+      ...(options.createAgent === undefined ? [] : [{ service: applicationServices.application }]),
+      { service: applicationServices.execution },
+      { service: applicationServices.history },
+      { service: applicationServices.state },
       { service: applicationServices.modelWrappers },
       { service: applicationServices.contextWrappers },
       { service: applicationServices.toolSources },
@@ -42,20 +45,22 @@ export function createGoalsPlugin(options: GoalsPluginOptions = {}) {
         () => controller.tools(), { id: context.pluginId, pluginOrder: context.pluginOrder },
       ));
       context.on(applicationHooks.created, async () => {
-        const application = context.get(applicationServices.application).get();
-        const agent = options.createAgent?.(application) ?? application;
+        const history = context.get(applicationServices.history).get();
+        const state = context.get(applicationServices.state).get();
+        const agent = options.createAgent === undefined ? context.get(applicationServices.execution).get() :
+          options.createAgent(context.get(applicationServices.application).get());
         await controller.attach(agent, {
           read: async () => {
             const saved = context.state.get<GoalsState>().goal;
             if (saved !== null) return saved;
-            const event = [...await application.history()].reverse().find(
+            const event = [...await history.history()].reverse().find(
               item => item.type === "state.updated" && item.key === "may.goal",
             );
             return event?.type === "state.updated" ? event.value as GoalState : undefined;
           },
           write: async goal => {
             await context.state.set({ goal });
-            await application.recordState("may.goal", goal);
+            await state.recordState("may.goal", goal);
           },
         });
       }, { order: 20 });

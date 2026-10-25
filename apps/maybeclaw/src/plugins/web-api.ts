@@ -9,11 +9,9 @@ import { createUiRouter, secureHeaders, sendJson, trustedRequest } from "@sorted
 import { GatewayAuth } from "../gateway-auth.js";
 import { UiError, type UiCommand } from "@sortedyuan/ui-client";
 import { GatewayUiHost, controlActor } from "../gateway-ui.js";
-import type { AgentGateway } from "../gateway.js";
-import type { GatewayApproval, GatewayTask } from "../gateway-types.js";
-import type { LegacyTaskRecord } from "../gateway-migration.js";
+import type { GatewayServerController } from "../gateway-api.js";
 
-export async function startGatewayServer(options: { gateway: AgentGateway; port?: number; server?: Server; status?: () => unknown; close?: () => Promise<void>; retryLegacyDelivery?: (id: string, confirmUnknown: boolean) => unknown }) {
+export async function startGatewayServer(options: { gateway: GatewayServerController; port?: number; server?: Server; status?: () => unknown; close?: () => Promise<void>; retryLegacyDelivery?: (id: string, confirmUnknown: boolean) => unknown }) {
   const publicOrigin = options.gateway.options.settings.publicOrigin;
   const port = options.port ?? 3939;
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
@@ -61,10 +59,10 @@ export async function startGatewayServer(options: { gateway: AgentGateway; port?
     if (req.method === "GET") {
       if (path === "/api/health") { sendJson(res, 200, options.status?.() ?? options.gateway.status()); return; }
       if (path === "/api/sessions") { sendJson(res, 200, options.gateway.sessions(controlActor)); return; }
-      if (path === "/api/agents") { sendJson(res, 200, options.gateway.options.settings.agents); return; }
-      if (path === "/api/approvals") { sendJson(res, 200, options.gateway.store.list<GatewayApproval>("approvals")); return; }
+      if (path === "/api/agents") { sendJson(res, 200, options.gateway.configuration(controlActor).agents); return; }
+      if (path === "/api/approvals") { sendJson(res, 200, options.gateway.approvals(controlActor)); return; }
       if (path === "/api/permission-rules") { sendJson(res, 200, await options.gateway.listPermissionRules(controlActor)); return; }
-      if (path === "/api/tasks") { sendJson(res, 200, { tasks: options.gateway.store.list<GatewayTask>("tasks"), legacy: options.gateway.store.list<LegacyTaskRecord>("legacy-tasks") }); return; }
+      if (path === "/api/tasks") { sendJson(res, 200, { tasks: options.gateway.tasks(controlActor), legacy: options.gateway.legacyTasks(controlActor) }); return; }
       const sessionMatch = /^\/api\/sessions\/([^/]+)(?:\/(messages))?$/u.exec(path);
       if (sessionMatch) {
         const session = options.gateway.session(decodeURIComponent(sessionMatch[1]!), controlActor);
@@ -73,7 +71,7 @@ export async function startGatewayServer(options: { gateway: AgentGateway; port?
       const taskMatch = /^\/api\/tasks\/([^/]+)$/u.exec(path);
       if (taskMatch) {
         const id = decodeURIComponent(taskMatch[1]!);
-        const task = options.gateway.store.get<GatewayTask>("tasks", id), legacy = options.gateway.store.get<LegacyTaskRecord>("legacy-tasks", id);
+        const task = options.gateway.task(id, controlActor), legacy = options.gateway.legacyTask(id, controlActor);
         if (!task && !legacy) throw new UiError(404, "Task not found");
         sendJson(res, 200, task ? { task } : { legacy }); return;
       }
@@ -100,12 +98,12 @@ export async function startGatewayServer(options: { gateway: AgentGateway; port?
       }
       const taskMatch = /^\/api\/tasks\/([^/]+)\/(cancel|recover|dispatch)$/u.exec(path);
       if (taskMatch) {
-        const task = options.gateway.store.get<GatewayTask>("tasks", decodeURIComponent(taskMatch[1]!));
+        const task = options.gateway.task(decodeURIComponent(taskMatch[1]!), controlActor);
         if (!task) throw new UiError(404, "Gateway task not found; legacy work requires explicit assignment to a session");
         if (taskMatch[2] === "cancel") await options.gateway.stop(options.gateway.session(task.sessionId, controlActor), controlActor, undefined, task.id);
         else if (taskMatch[2] === "recover") await options.gateway.recoverTask(task.id, controlActor);
         else await options.gateway.dispatchTask(task.id, controlActor);
-        sendJson(res, 200, { task: options.gateway.store.get("tasks", task.id) }); return;
+        sendJson(res, 200, { task: options.gateway.task(task.id, controlActor) }); return;
       }
       const legacyDelivery = /^\/api\/legacy-deliveries\/([^/]+)\/retry$/u.exec(path);
       if (legacyDelivery) {
@@ -117,8 +115,7 @@ export async function startGatewayServer(options: { gateway: AgentGateway; port?
       if (delivery) {
         if (data.confirmUnknown !== undefined && typeof data.confirmUnknown !== "boolean") throw new UiError(400, "confirmUnknown must be a boolean");
         const id = decodeURIComponent(delivery[1]!);
-        options.gateway.retryDelivery(id, controlActor, data.confirmUnknown === true);
-        sendJson(res, 200, { delivery: options.gateway.store.get("deliveries", id) ?? options.gateway.store.get("channel-replies", id) }); return;
+        sendJson(res, 200, { delivery: options.gateway.retryDelivery(id, controlActor, data.confirmUnknown === true) }); return;
       }
       if (path === "/api/agents") {
         if (typeof data.id !== "string") throw new UiError(400, "Agent id is required");

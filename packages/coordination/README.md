@@ -40,6 +40,16 @@ messaging, and handoff tools. The host must serialize each conversation, pass
 the yield signal to its Agent runtime, and inspect durable outcomes in `recover`.
 Cancelling a pending permission request establishes that its tool did not start;
 other interrupted tool effects still require durable evidence.
+
+`createAttachedApplicationAgent({ mode: "continue", ... })` assigns the first
+continuation its stable dispatch/turn identity. Session persists that identity
+before execution; subsequent turns use identified inputs. The adapter obtains
+Run outcomes through `inspectSessionRunOutcome()` from `@sortedyuan/session`.
+Its `recoveryVersion: 1` is saved with each dispatch. Old dispatched continuations
+without a durable identity require a verified recovery finding. Previously queued
+tasks adopt the current recovery protocol when dispatched. Hosts wrapping an
+adapter must preserve its `recoveryVersion` alongside its execution methods.
+
 `CoordinationWorker` and `createRemoteAgent` use `@sortedyuan/coordination/remote`.
 
 Opening does not execute agents. `wait()` starts scheduling and resolves when no

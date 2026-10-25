@@ -97,6 +97,14 @@ Session 通过 `AgentRuntime` 执行。默认实现为 `May`；自定义运行�
 可以共同管理 Context 和其他资源。Session 保存运行时身份及具有版本的状态。
 替换期间，在插件服务仍然可用时保存状态并关闭旧运行时，恢复新运行时后允许执行。
 
+Session 统一解释持久化的 Run 结果。`Session.inspectRun()` 和
+`inspectSessionRunOutcome(history, selector)` 支持按 `runId`、`inputId`、
+`inputSeq` 或 `continuationId` 查询，同时考虑工具的未知影响和经过核实的恢复结论。
+调度适配器通过这些公共结果恢复工作。`Session.continue({ continuationId })`
+在运行时开始执行前保存宿主身份，并将它与 `run.started` 关联。重新打开 Session
+后仍然拒绝重复身份；已经提交但缺少完整持久结果的 continuation 需要核实恢复。
+Session 分支保留选定的对话与执行历史，同时移除继承的输入及 continuation 身份。
+
 完整请求通过 `run.settled` 保存状态边界后，可以作为分支位置。`Session.fork()`
 将选定位置的历史复制到独立身份，并持久记录来源位置。Context、Provider 续接
 和运行时状态使用该边界；应用状态通过声明选择。审批授权和未消费输入保持独立。

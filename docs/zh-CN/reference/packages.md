@@ -38,6 +38,13 @@ pnpm `12.4.2`。公开 API 和持久化格式的稳定性见
 
 ## Runtime 与 Application
 
+### `@sortedyuan/file-storage`
+
+独立的本地文件协调接口导出 `withFileAccess`、`acquireFileLock`、`recoverFileLock`、
+`releaseFileLock`、`replaceJournalFile` 和 `syncDirectory`。Session、配置、媒体、
+MCP 凭据与投递存储共同使用这个 package。Session 文件子路径保留兼容导出，并共享
+文件锁状态。参阅[协调本地文件访问](../guides/custom-storage.md#协调本地文件访问)。
+
 ### `@sortedyuan/core`
 
 与 provider 无关的执行内核，导出 `May`、`Model`、`Tool`、`Context`、
@@ -369,7 +376,7 @@ server 支持。`@sortedyuan/web-ui` 提供浏览器 workbench 组件，`/styles
 
 ## 参考产品
 
-MaybeCode 包含在 [38 个包的发布清单](../../../scripts/release-packages.json)中。
+MaybeCode 包含在 [39 个包的发布清单](../../../scripts/release-packages.json)中。
 MaybeClaw、CLI 和 Eval CLI 保持 workspace 私有包。验证与发布步骤见
 [发布指南](../guides/npm-release.md)。
 

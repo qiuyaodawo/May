@@ -75,6 +75,7 @@ import {
 import type { SteerableAgentController } from "./controller.js";
 import { SkillRegistry, SkillSession, SKILL_STATE_KEY } from "@sortedyuan/skills";
 import type { AgentApplicationEvent, AgentRun } from "./events.js";
+import { createApplicationAccess } from "./plugin-access.js";
 import { APPLICATION_HOOKS, applicationHooks, type InputHook } from "./hooks.js";
 import {
   applicationServices,
@@ -291,10 +292,11 @@ export class AgentApplication implements SteerableAgentController {
       pluginStateTail = operation.catch(() => undefined);
       return operation;
     };
-    const access = { get() {
+    const access = createApplicationAccess(() => {
       if (application === undefined) throw new Error("AgentApplication is unavailable before application.created");
+      if (application.stateRecordingClosed) throw new Error("Agent application is closed");
       return application;
-    } };
+    });
     const composePlugins = (plugins: readonly AnyPlugin[]) => composeApplicationPlugins(plugins, options, access, () => options.instructions ?? "");
     let configuredPlugins = composePlugins(options.plugins ?? []);
     const pluginHost = await PluginHost.create({
@@ -1171,7 +1173,7 @@ async function resumeSession(
 function composeApplicationPlugins(
   plugins: readonly AnyPlugin[],
   options: AgentApplicationOptions,
-  access: { get(): AgentApplication },
+  access: ReturnType<typeof createApplicationAccess>,
   instructions: () => string,
 ): readonly AnyPlugin[] {
   const composition: AnyPlugin[] = [...plugins];
@@ -1181,7 +1183,10 @@ function composeApplicationPlugins(
     setup(context) { context.provide(service, value); },
   });
   composition.push(valuePlugin(applicationServices.sessionStore, options.store));
-  composition.push(valuePlugin(applicationServices.application, access));
+  composition.push(valuePlugin(applicationServices.application, access.application));
+  composition.push(valuePlugin(applicationServices.execution, access.execution));
+  composition.push(valuePlugin(applicationServices.history, access.history));
+  composition.push(valuePlugin(applicationServices.state, access.state));
   if (options.model !== undefined) composition.push(createModelPlugin({ create: () => options.model! }));
   if (options.permissionPolicy !== undefined) composition.push(createPermissionPlugin({ create: () => options.permissionPolicy! }));
   else if (!provided(applicationServices.permissionPolicy)) composition.push(createPermissionPlugin({ create: () => () => { throw new TypeError("permissionPolicy is required for tool execution"); } }));

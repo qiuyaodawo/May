@@ -105,9 +105,11 @@ export class FeishuAdapter implements ChannelAdapter {
   }
   async readAttachment(input: ChannelInput, attachment: ChannelAttachment, signal: AbortSignal): Promise<ChannelAttachmentData> {
     checkAttachment(this, input, attachment);
-    if (attachment.source.messageId !== input.messageId) throw new Error("Attachment does not belong to this message");
+    const fileId = attachment.source.fileId;
+    if (typeof fileId !== "string" || !fileId || fileId.length > 256) throw new Error("Invalid Feishu attachment file ID");
+    if (!input.messageId || attachment.source.messageId !== input.messageId) throw new Error("Attachment does not belong to this message");
     const token = await this.authenticate(signal);
-    const path = `/im/v1/messages/${encodeURIComponent(input.messageId!)}/resources/${encodeURIComponent(attachment.source.fileId)}?type=${attachment.kind === "image" ? "image" : "file"}`;
+    const path = `/im/v1/messages/${encodeURIComponent(input.messageId)}/resources/${encodeURIComponent(fileId)}?type=${attachment.kind === "image" ? "image" : "file"}`;
     const response = await this.request(`https://open.feishu.cn/open-apis${path}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]), redirect: "error" });
     if (!response.ok || response.headers.get("content-type")?.includes("application/json")) throw new Error("Feishu attachment download failed");
     const mediaType = attachment.mediaType ?? response.headers.get("content-type")?.split(";")[0];

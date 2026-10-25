@@ -8,6 +8,26 @@ export interface ContributionOptions {
   readonly pluginOrder?: number;
 }
 
+export interface ContributionRegistry<T> {
+  add(value: T, options: ContributionOptions): Disposer;
+}
+
+export interface ToolSourceRegistry extends ContributionRegistry<ToolSource> {
+  snapshot(): Iterable<Tool>;
+}
+
+export interface InstructionSourceRegistry extends ContributionRegistry<InstructionSource> {
+  snapshot(): string;
+}
+
+export interface ModelWrapperRegistry extends ContributionRegistry<ModelWrapper> {
+  apply(model: Model): Model;
+}
+
+export interface ContextWrapperRegistry extends ContributionRegistry<ContextWrapper> {
+  apply(factory: ContextFactory): ContextFactory;
+}
+
 interface Entry<T> {
   readonly value: T;
   readonly options: ContributionOptions;
@@ -37,7 +57,7 @@ class Contributions<T> {
 }
 
 export type ToolSource = () => Iterable<Tool>;
-export class ToolSources extends Contributions<ToolSource> {
+export class ToolSources extends Contributions<ToolSource> implements ToolSourceRegistry {
   snapshot(): ToolRegistry {
     const catalog = new ToolRegistry();
     for (const source of this.values()) catalog.registerAll(source());
@@ -46,7 +66,7 @@ export class ToolSources extends Contributions<ToolSource> {
 }
 
 export type InstructionSource = () => string;
-export class InstructionSources extends Contributions<InstructionSource> {
+export class InstructionSources extends Contributions<InstructionSource> implements InstructionSourceRegistry {
   snapshot(): string {
     return this.values().map((source) => {
       const instructions = source();
@@ -57,7 +77,7 @@ export class InstructionSources extends Contributions<InstructionSource> {
 }
 
 export type ModelWrapper = (model: Model) => Model;
-export class ModelWrappers extends Contributions<ModelWrapper> {
+export class ModelWrappers extends Contributions<ModelWrapper> implements ModelWrapperRegistry {
   apply(model: Model): Model {
     for (const wrapper of this.values()) {
       model = wrapper(model);
@@ -68,7 +88,7 @@ export class ModelWrappers extends Contributions<ModelWrapper> {
 }
 
 export type ContextWrapper = (factory: ContextFactory) => ContextFactory;
-export class ContextWrappers extends Contributions<ContextWrapper> {
+export class ContextWrappers extends Contributions<ContextWrapper> implements ContextWrapperRegistry {
   apply(factory: ContextFactory): ContextFactory {
     for (const wrapper of this.values()) {
       factory = wrapper(factory);

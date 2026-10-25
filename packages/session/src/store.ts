@@ -15,6 +15,8 @@ export function validateSessionHistory(
   sessionId: string,
   events: readonly SessionEvent[],
 ): void {
+  const continuations = new Set<string>();
+  const startedContinuations = new Set<string>();
   for (const [index, event] of events.entries()) {
     if (event.sessionId !== sessionId) {
       throw new Error(
@@ -27,6 +29,18 @@ export function validateSessionHistory(
       throw new Error(
         `Expected session event sequence ${expectedSeq}, received ${event.seq}`,
       );
+    }
+    if (event.type === "continuation.submitted") {
+      if (typeof event.continuationId !== "string" || event.continuationId.trim() === "" || event.continuationId.length > 256 || continuations.has(event.continuationId)) {
+        throw new Error("Invalid or duplicate continuation identity");
+      }
+      continuations.add(event.continuationId);
+    }
+    if (event.type === "run.started" && event.continuationId !== undefined) {
+      if (event.continuation !== true || !continuations.has(event.continuationId) || startedContinuations.has(event.continuationId)) {
+        throw new Error("Run has no unique submitted continuation identity");
+      }
+      startedContinuations.add(event.continuationId);
     }
   }
 }

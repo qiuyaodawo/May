@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { withFileAccess } from "@sortedyuan/file-storage";
 import {
   MayConfigFileError,
   MayConfigParseError,

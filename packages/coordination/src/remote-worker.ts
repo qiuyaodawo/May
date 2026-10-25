@@ -3,7 +3,7 @@ import { mkdir, open, readFile, type FileHandle } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
 import { AsyncStateSerializer, type AgentApplicationEvent } from "@sortedyuan/application";
-import { acquireFileLock, releaseFileLock } from "@sortedyuan/session/file-store";
+import { acquireFileLock, releaseFileLock } from "@sortedyuan/file-storage";
 import { isStreamingMayEvent, validateTelemetryCorrelation } from "@sortedyuan/core";
 import type { ApprovalDecision } from "@sortedyuan/permissions";
 import type { CoordinationAgent, TaskExecution, TaskRecovery } from "./types.js";

@@ -7,6 +7,8 @@ determine Context capacity during setup.
 `createHistoryMemoryPlugin(options?)` provides `historyMemoryService` and
 `services.contextOptions`. It registers capacity inspection and work-note tools,
 wraps the Context factory, and attaches memory in `application.created`.
+It consumes `applicationServices.history` and `.state`. `HistoryReferenceMemory.attach()`
+accepts `HistoryMemoryApplication`: `history()`, `listRecoveries()` and `recordState()`.
 `mode` selects `prune-summary`, `history-reference`, or `provider-native`;
 explicit automatic strategies override the selected mode. The options also
 accept a budget, summarizer, and manual compaction strategy.

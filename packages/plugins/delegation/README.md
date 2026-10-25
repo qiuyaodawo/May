@@ -5,8 +5,8 @@
 Its shared file guard serializes file access, enforces child file assignments,
 requires reads before changing existing child files, and detects external changes.
 
-`createDelegationPlugin(options)` requires that file service plus application,
-model, store, permission, and composition services. It provides
+`createDelegationPlugin(options)` requires that file service plus Application
+execution, history and state, model, store, permission, and composition services. It provides
 `delegationService`, whose `get()` returns the actual `SubagentHost` after
 `application.created`. Setup registers request-budget model wrapping, dynamic
 delegation tools, and instructions. The created Hook restores request records

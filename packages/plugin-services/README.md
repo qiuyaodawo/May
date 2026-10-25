@@ -15,7 +15,7 @@ factories are available through separate public subpaths:
 Typed service tokens and ordered contribution registries used by `@sortedyuan/application`
 and component plugins. All exported `services` tokens have application scope and
 version `1.0.0`; each token has one provider. `applicationServices` reexports these
-same tokens and adds access to the actual Application.
+same tokens and adds structural Application service interfaces.
 
 `model`, `modelInfo`, `contextFactory`, `permissionPolicy`, `runtimeFactory`, `sessionStore`,
 `skills`, `toolExecutor`, `toolScheduler`, and `tracer` describe component instances.
@@ -31,6 +31,14 @@ Each registry exposes `add(value, { id, order?, pluginOrder? }): Disposer`. Entr
 execute by increasing `order`, then plugin declaration order, then registration
 sequence. Duplicate contribution ids fail immediately. Register the returned
 disposer with `context.defer()` to remove the contribution when its plugin closes.
+
+Service tokens accept `ToolSourceRegistry`, `InstructionSourceRegistry`,
+`ModelWrapperRegistry` and `ContextWrapperRegistry`. Implement these interfaces
+with plain objects or independent classes. `ToolSourceRegistry.snapshot()` returns
+`Iterable<Tool>`; Application validates names and captures definitions for each Run.
+The default `ToolSources`, `InstructionSources`, `ModelWrappers` and
+`ContextWrappers` classes implement these interfaces. Custom providers preserve
+ordering, contribution removal and independent state for each Application.
 
 ```ts
 context.defer(context.get(services.toolSources).add(

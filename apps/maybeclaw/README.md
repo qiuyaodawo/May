@@ -10,11 +10,19 @@ Agent adapters, coordination and HTTP listeners. Product composition lives in
 `src/plugins/`. GatewayHost and AgentGateway own plugin hosts and release their
 resources when closing. Configured Model and PermissionPolicy plugins replace
 product defaults by service declaration.
+Web, CLI and HTTP consumers use `GatewayQueries` and `GatewayController` for
+authorized snapshots and commands. `GatewayHost` uses `GatewayChannelRepository`
+for inputs and deliveries. `GatewayStore` is private to the Gateway implementation;
+related input, receipt, platform-message and session-cleanup changes share SQLite transactions.
 
 可复用投递、Telegram、Feishu、Agent adapter、coordination 和 HTTP 功能位于
 `packages/plugins/`，产品组合位于 `src/plugins/`。GatewayHost 和 AgentGateway
 管理插件宿主及资源关闭。配置插件可以通过服务声明替换默认 Model 和
 PermissionPolicy。
+Web、CLI 和 HTTP 通过 `GatewayQueries`、`GatewayController` 获取经过权限检查的
+快照并执行命令。`GatewayHost` 通过 `GatewayChannelRepository` 处理输入与投递。
+`GatewayStore` 由 Gateway 内部使用；输入、回执、平台消息关联及会话清理的关联修改
+使用 SQLite 事务。
 
 A session can use several Agents. Each allocated Agent conversation belongs to
 one MaybeClaw session. Personal sessions bind one platform identity; group

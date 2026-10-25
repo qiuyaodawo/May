@@ -214,7 +214,7 @@ see [Local storage maintenance](#local-storage-maintenance) for the complete pro
 ## Coordinate local file access
 
 For an application-owned local file shared by several processes, use
-`withFileAccess` from `@sortedyuan/session/file-access`. Add `@sortedyuan/session`
+`withFileAccess` from `@sortedyuan/file-storage`. Add `@sortedyuan/file-storage`
 as a direct dependency, save this example as `shared-state.mjs`, and run
 `node shared-state.mjs` from the application directory. It writes one complete
 JSON value and prints `1` after reading it through the same access helper.
@@ -222,7 +222,7 @@ JSON value and prints `1` after reading it through the same access helper.
 ```js
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { withFileAccess } from "@sortedyuan/file-storage";
 
 await mkdir(".may", { recursive: true });
 const path = resolve(".may/shared-state.json");

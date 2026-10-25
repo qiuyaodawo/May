@@ -33,6 +33,7 @@
     "@sortedyuan/config": "workspace:*",
     "@sortedyuan/coordination": "workspace:*",
     "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/file-storage": "workspace:*",
     "@sortedyuan/media": "workspace:*",
     "@sortedyuan/permissions": "workspace:*",
     "@sortedyuan/plugin": "workspace:*",

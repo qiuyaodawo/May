@@ -124,6 +124,7 @@ export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "input.generated",
   "state.updated",
   "input.submitted",
+  "continuation.submitted",
   "input.steering.queued",
   "input.steering.delivered",
   "input.steering.finished",

@@ -10,6 +10,6 @@
   "include": ["src/**/*.ts"],
   "references": [
     { "path": "../core" },
-    { "path": "../session" }
+    { "path": "../file-storage" }
   ]
 }

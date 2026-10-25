@@ -13,6 +13,16 @@ inspecting outcomes and recovering interrupted work. For terminal use, see
 [MaybeCode teams](maybecode-team.md). For ordinary MaybeCode requests, see
 [sub-agent delegation](subagent-delegation.md).
 
+Hosts with an existing Application can use `createAttachedApplicationAgent()`.
+With `mode: "continue"`, its first Run receives a durable `continuationId` derived
+from the dispatch and turn; later turns receive identified inputs. Session's public
+`inspectSessionRunOutcome()` supplies terminal results and tool-recovery status.
+The adapter declares `recoveryVersion: 1`, which the coordinator saves before
+dispatch. Preserve this property when wrapping an adapter. Dispatched histories
+without a continuation identity require a verified recovery finding; queued tasks
+use the current protocol when they start. A saved identity prevents replay across
+the interval between Session completion and coordination outcome persistence.
+
 ## Create and run a graph
 
 1. Make `@sortedyuan/application`, `@sortedyuan/core`, `@sortedyuan/coordination` and `@sortedyuan/session`

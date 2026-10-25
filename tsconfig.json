@@ -1,6 +1,7 @@
 {
   "files": [],
   "references": [
+    { "path": "./packages/file-storage" },
     { "path": "./packages/plugin" },
     { "path": "./packages/plugin-services" },
     { "path": "./packages/plugins/goals" },

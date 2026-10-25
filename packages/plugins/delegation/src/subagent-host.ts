@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
-import { applicationHooks, applicationServices, defineAgent, type AgentApplication, type AgentApplicationEvent } from "@sortedyuan/application";
+import { applicationHooks, applicationServices, defineAgent, type ApplicationExecution, type AgentApplicationEvent } from "@sortedyuan/application";
 import { definePlugin } from "@sortedyuan/plugin";
 import { AsyncEventQueue } from "@sortedyuan/core";
 import {
@@ -109,7 +109,7 @@ export interface SubagentHostOptions {
   /** 每次请求一个持久目录的根目录。 */
   readonly dataDirectory: string;
   readonly sessionId: string;
-  readonly application: AgentApplication;
+  readonly application: Pick<ApplicationExecution, "submit" | "continue" | "resolveApproval">;
   readonly store: SessionStore;
   readonly model: Model;
   /** 声明了自己 model profile 的角色使用的宿主模型工厂。 */

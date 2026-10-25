@@ -1,15 +1,18 @@
 import { defineService, type PluginContext, type PluginDefinition, type PluginStateSnapshot } from "@sortedyuan/plugin";
 import { services, ToolSources, InstructionSources, ModelWrappers, ContextWrappers } from "@sortedyuan/plugin-services";
 import { createRuntimePlugin } from "@sortedyuan/plugin-services/runtime";
-import type { AgentApplication } from "./application.js";
+import type { ApplicationAccess, ApplicationExecution, ApplicationHistory, ApplicationServiceAccess, ApplicationState } from "./plugin-access.js";
 
 export type { RuntimeFactory } from "@sortedyuan/core";
 
-export interface ApplicationAccess { get(): AgentApplication; }
+export type { ApplicationAccess } from "./plugin-access.js";
 
 export const applicationServices = Object.freeze({
   ...services,
   application: defineService<ApplicationAccess>({ id: "may.application-access", version: "1.0.0", scope: "application" }),
+  execution: defineService<ApplicationServiceAccess<ApplicationExecution>>({ id: "may.application-execution", version: "1.0.0", scope: "application" }),
+  history: defineService<ApplicationServiceAccess<ApplicationHistory>>({ id: "may.application-history", version: "1.0.0", scope: "application" }),
+  state: defineService<ApplicationServiceAccess<ApplicationState>>({ id: "may.application-state", version: "1.0.0", scope: "application" }),
 });
 
 export const defaultRuntimePlugin: PluginDefinition = createRuntimePlugin();

@@ -35,6 +35,7 @@
     "@sortedyuan/context": "workspace:*",
     "@sortedyuan/coordination": "workspace:*",
     "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/file-storage": "workspace:*",
     "@sortedyuan/goal": "workspace:*",
     "@sortedyuan/keybindings": "workspace:*",
     "@sortedyuan/mcp": "workspace:*",

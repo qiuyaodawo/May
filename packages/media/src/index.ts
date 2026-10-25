@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, rename, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { ContentPart, MediaSource } from "@sortedyuan/core";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { withFileAccess } from "@sortedyuan/file-storage";
 
 export interface ImageAttachment {
   readonly id: string;

@@ -84,6 +84,8 @@ export interface TaskGraphRevision {
 }
 
 export interface CoordinationTask extends TaskSpec {
+  /** 本轮执行前保存的 adapter 恢复协议版本；旧记录可以省略。 */
+  readonly recoveryVersion?: number;
   /** Zero-based attempt; absent in older journals means zero. */
   readonly attempt?: number;
   readonly attemptStartTurn?: number;
@@ -183,6 +185,8 @@ export type TaskRecovery =
 /** Trusted host adapter. recover must inspect durable evidence, never execute work. */
 export interface CoordinationAgent {
   readonly version: string;
+  /** adapter 的持久请求身份协议，由 Runtime 在 dispatch 前保存。 */
+  readonly recoveryVersion?: number;
   execute(execution: TaskExecution, context: TaskExecutionContext): Promise<TaskOutput | TaskYield>;
   recover(execution: TaskExecution): Promise<TaskRecovery>;
   /** Idempotent control delivery for detached work; acceptance is not an outcome proof. */

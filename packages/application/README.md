@@ -131,11 +131,19 @@ trace attributes. Model factories provide this service alongside their actual in
 The standard `may.model` labels use this service. Missing metadata keeps these
 labels absent, including after plugin replacement; other trace attributes are preserved.
 
-`applicationServices.application` provides `ApplicationAccess.get()`. It returns the
-actual Application from `application.created` handlers; accessing it during setup
-fails immediately. Plugins can use its controller and state APIs and register owned
-resources with `context.defer()`. The Application reference stays outside cloned
-Hook payloads. Builtin Model, permissions, Context/Runtime/tools and Skills factories
+`applicationServices.execution`, `.history` and `.state` provide typed `get()`
+accessors for `ApplicationExecution`, `ApplicationHistory` and `ApplicationState`.
+Execution exposes Session identity, running status, submit/continue and approval
+resolution. History exposes queries, recoveries and branch positions; state exposes
+acknowledged `recordState()` writes. `applicationServices.application` provides an
+`ApplicationFacade` combining these interfaces with scoped service lookup.
+Views are frozen and use the current Application on every call, including after
+plugin replacement. Access before Application creation and after closure fails
+immediately. History and state remain available during close Hooks and resource
+cleanup; new execution is rejected as soon as closing starts. The host owns
+closing, plugin updates and skill activation. Plugins
+declare the services they use and register resources with `context.defer()`.
+Builtin Model, permissions, Context/Runtime/tools and Skills factories
 live in `@sortedyuan/plugin-services/models`, `@sortedyuan/plugin-services/permissions`,
 `@sortedyuan/plugin-services/runtime`, and `@sortedyuan/plugin-services/skills`.
 Direct options retain their caller ownership semantics.

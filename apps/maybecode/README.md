@@ -697,6 +697,12 @@ their original input; `/recovery resolve <id> <verified finding>` records the
 result of checking external effects. No tool is replayed by recovery. See
 [Crash recovery](../../docs/en/guides/recovery.md).
 
+The retained TUI and Web history display saved recovery findings as user messages.
+Web history search and full-field reads include their complete text. Both views
+preserve denied, not-started, and unknown tool outcomes and interrupted partial
+assistant replies. Web commands validate current execution and Session ownership
+independently from presentation reads such as workspace details and fork points.
+
 In an interactive terminal, suggestions are shown as the first input line is
 edited. For example, `/re` shows `/resume` and `/retry`; `/compact ` offers
 `history-reference` and `provider-native`; `/resume ` filters known session IDs;

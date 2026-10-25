@@ -11,6 +11,7 @@
   "references": [
     { "path": "../skills" },
     { "path": "../core" },
+    { "path": "../file-storage" },
     { "path": "../context" },
     { "path": "../permissions" },
     { "path": "../plugin" },

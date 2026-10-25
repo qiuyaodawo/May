@@ -9,7 +9,7 @@ import { CoordinationRuntime, createApplicationAgent, FileArtifactStore, FileSha
 import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
 import { resolveRunBudget, type Model, type RunBudget, type Tool } from "@sortedyuan/core";
 import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { withFileAccess } from "@sortedyuan/file-storage";
 import type { MaybeCodeTeamCommand } from "./args.js";
 import { getDefaultMaybeCodeDataDirectory } from "./configured.js";
 import { createMaybeCodeModel, selectMaybeCodeModel, type SelectedMaybeCodeModel } from "./model.js";

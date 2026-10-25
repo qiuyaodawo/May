@@ -32,6 +32,13 @@ Model 和 PermissionPolicy 提供方。空闲 adapter 通过 registry 释放，�
 时根据当前配置重新创建。关闭时开始取消 Gateway 工作，随后等待 HTTP 请求并
 释放资源。参见[插件指南](plugins.md#可复用插件-package)。
 
+Web、CLI 和 HTTP 使用 `GatewayQueries`、`GatewayController` 接口。
+查询根据调用者身份与会话访问权限返回独立快照。`GatewayHost` 通过
+`GatewayChannelRepository` 接收输入、处理消息变更并完成投递。repository
+管理渠道记录及其关联关系；输入完成与回复记录、投递回执与平台消息关联、
+会话清理分别使用 SQLite 事务。`GatewayStore` 由内部实现使用。
+MaybeClaw 的 `ChannelStore` 包装负责应用迁移标记检查。
+
 ## 会话与配置
 
 `pnpm maybeclaw --help` 和 `pnpm maybeclaw -h` 输出帮助内容并成功退出。

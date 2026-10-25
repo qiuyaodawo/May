@@ -58,6 +58,7 @@ export class CoordinationRuntime {
     // Snapshot callbacks as well as versions; registry mutation cannot change live authority.
     this.agents = new Map(Object.entries(options.agents).map(([key, agent]) => [key, Object.freeze({
       version: agent.version, execute: agent.execute.bind(agent), recover: agent.recover.bind(agent),
+      ...(agent.recoveryVersion === undefined ? {} : { recoveryVersion: agent.recoveryVersion }),
       ...(agent.cancel === undefined ? {} : { cancel: agent.cancel.bind(agent) }),
       ...(agent.resolveApproval === undefined ? {} : { resolveApproval: agent.resolveApproval.bind(agent) }),
     })]));
@@ -368,7 +369,10 @@ export class CoordinationRuntime {
       }
       // This acknowledged record is the dispatch intent. execute starts only afterwards.
       const inbox = task.inbox ?? this.pendingMessages(task.id).map((message) => message.id);
-      const running = { ...task, inbox, status: "running" as const };
+      const { recoveryVersion: _previousRecoveryVersion, ...pending } = task;
+      const recoveryVersion = this.agents.get(task.agent)!.recoveryVersion;
+      const running = { ...pending, inbox, status: "running" as const,
+        ...(recoveryVersion === undefined ? {} : { recoveryVersion }) };
       await this.save({ ...this.replace(running), messages: (this.state.messages ?? []).map((message) =>
         inbox.includes(message.id) ? { ...message, deliveredTurn: task.turn ?? 0 } : message) });
       this.launch(running);
@@ -749,7 +753,11 @@ function captureOptions<T extends CoordinationRuntimeOptions>(options: T): T {
   name(options.id, "coordination id"); name(options.policy.version, "policy version");
   const agents = Object.fromEntries(Object.entries(options.agents).map(([key, agent]) => {
     name(key, "agent name"); name(agent.version, "agent version");
+    if (agent.recoveryVersion !== undefined && (!Number.isSafeInteger(agent.recoveryVersion) || agent.recoveryVersion < 1)) {
+      throw new TypeError("Agent recoveryVersion must be a positive safe integer");
+    }
     return [key, Object.freeze({ version: agent.version, execute: agent.execute.bind(agent), recover: agent.recover.bind(agent),
+      ...(agent.recoveryVersion === undefined ? {} : { recoveryVersion: agent.recoveryVersion }),
       ...(agent.cancel === undefined ? {} : { cancel: agent.cancel.bind(agent) }),
       ...(agent.resolveApproval === undefined ? {} : { resolveApproval: agent.resolveApproval.bind(agent) }),
     })];

@@ -28,6 +28,14 @@ Consumers use declared dependencies. A plugin may own several services and hooks
 including a runtime and its associated Context. External shared instances retain
 their caller's ownership unless an explicit disposer transfers it.
 
+Application plugins consume structural execution, history and state interfaces.
+Frozen forwarding views preserve the Application identity across runtime and
+plugin replacement; their lifecycle checks reject access before creation and
+after closure. The host owns application shutdown and composition changes.
+Contribution registry tokens also use structural interfaces, allowing independent
+providers to own their entries, ordering and cleanup. Default registries remain
+available as reusable implementations.
+
 ## Lifecycle and scopes
 
 ```mermaid

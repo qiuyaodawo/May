@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@sortedyuan/core": "workspace:*",
-    "fs-native-extensions": "1.5.1"
+    "@sortedyuan/file-storage": "workspace:*"
   },
   "devDependencies": {
     "@sortedyuan/permissions": "workspace:*",

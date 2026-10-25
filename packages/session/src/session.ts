@@ -33,6 +33,7 @@ import type {
 import { sessionToolResultContent } from "./events.js";
 import { readSessionBranchPositions, type SessionBranchPosition } from "./branch.js";
 import { SessionSteeringQueue, type SessionSteerOptions, type SessionSteeringInput } from "./steering.js";
+import { inspectSessionRunOutcome, type SessionRunOutcome, type SessionRunSelector } from "./outcome.js";
 import {
   SessionHistoryReader,
   type SessionHistoryQuery,
@@ -99,6 +100,8 @@ export interface SessionSubmitOptions extends Omit<RunOptions, "stepInputSource"
 /** Session 的补充输入统一通过 steer() 保存和交付。 */
 export interface SessionContinueOptions extends Omit<ContinueOptions, "stepInputSource"> {
   readonly stepInputSource?: never;
+  /** 宿主提供的持久执行身份，同一个 Session 内只能提交一次。 */
+  readonly continuationId?: string;
 }
 
 export class Session {
@@ -310,6 +313,11 @@ export class Session {
         continue;
       }
       if (event.type === "input.submitted") { append({ type: "input.submitted", message: event.message }, event.timestamp); continue; }
+      if (event.type === "continuation.submitted") { append({ type: "history.omitted", reason: "execution-identity" }, event.timestamp); continue; }
+      if (event.type === "run.started" && event.continuationId !== undefined) {
+        const { continuationId: _identity, ...started } = event;
+        append(started, event.timestamp); continue;
+      }
       append(event, event.timestamp);
     }
     const replay = replaySession(history);
@@ -427,6 +435,10 @@ export class Session {
   async history(): Promise<readonly SessionEvent[]> {
     await this.recordTail;
     return this.historyReader.readAll(this.id);
+  }
+
+  async inspectRun(selector: SessionRunSelector): Promise<SessionRunOutcome> {
+    return inspectSessionRunOutcome(await this.history(), selector);
   }
 
   async getRuntimeInfo(): Promise<{ readonly messages: Message[]; readonly info: SessionRuntimeInfo }> {
@@ -659,21 +671,31 @@ export class Session {
     return run;
   }
 
-  private startContinuation(options: SessionContinueOptions): RunHandle {
+  private async startContinuation(options: SessionContinueOptions): Promise<RunHandle> {
     this.assertRecovered();
+    const { continuationId, ...runtimeOptions } = options;
+    if (continuationId !== undefined) {
+      if (typeof continuationId !== "string" || continuationId.trim() === "" || continuationId.length > 256) {
+        throw new TypeError("continuationId must be a nonempty string of at most 256 characters");
+      }
+      if ((await this.history()).some(event => event.type === "continuation.submitted" && event.continuationId === continuationId)) {
+        throw new Error(`Continuation already submitted: ${continuationId}`);
+      }
+      await this.record({ type: "continuation.submitted", continuationId });
+    }
     return this.wrapRun(this.runtime.continue({
-      ...options,
-      checkpoint: (event) => this.checkpoint(event, options.checkpoint),
+      ...runtimeOptions,
+      checkpoint: (event) => this.checkpoint(event, options.checkpoint, continuationId),
       stepInputSource: ({ runId, step, signal }) => this.steering.deliver(runId, step, signal),
       traceAttributes: {
         ...(options.traceAttributes ?? {}),
         "may.session.id": this.id,
         ...(this.latestRunId === undefined ? {} : { "may.run.resumed_from": this.latestRunId }),
       },
-    }));
+    }), continuationId);
   }
 
-  private wrapRun(run: RunHandle): RunHandle {
+  private wrapRun(run: RunHandle, continuationId?: string): RunHandle {
     this.latestRunId = run.id;
     this.activeRun = run;
     const completion = run.result.then(async (value) => {
@@ -704,7 +726,7 @@ export class Session {
     });
     this.finishedRunObservationErrors.clear();
     this.activeRunObservations.add(run.id);
-    const observation = this.observeRun(run, events);
+    const observation = this.observeRun(run, events, continuationId);
     const result = (async () => {
       try {
         await observation;
@@ -733,12 +755,15 @@ export class Session {
   private async observeRun(
     run: RunHandle,
     events: AsyncEventQueue<MayEvent>,
+    continuationId?: string,
   ): Promise<void> {
     let observationError: unknown;
     try {
       for await (const event of run.events) {
         if (event.type === "run.failed" && event.error.code === "RUN_CHECKPOINT_FAILED") this.persistenceFailed = true;
-        const payload = toSessionEvent(event);
+        const recorded = toSessionEvent(event);
+        const payload = recorded?.type === "run.started" && continuationId !== undefined
+          ? { ...recorded, continuationId } : recorded;
         if (payload !== undefined && !this.checkpointed.delete(checkpointKey(event))) {
           await this.record(payload, event.timestamp);
         }
@@ -907,10 +932,10 @@ export class Session {
     if (this.recoveries.size > 0) throw new SessionRecoveryRequiredError(this.listRecoveries());
   }
 
-  private async checkpoint(event: RunCheckpointEvent, extra?: (event: RunCheckpointEvent) => Promise<void>): Promise<void> {
+  private async checkpoint(event: RunCheckpointEvent, extra?: (event: RunCheckpointEvent) => Promise<void>, continuationId?: string): Promise<void> {
     const live = { ...event, timestamp: Date.now(), seq: 0 };
     const payload = event.type === "run.started"
-      ? { ...event, checkpointVersion: 1 as const }
+      ? { ...event, checkpointVersion: 1 as const, ...(continuationId === undefined ? {} : { continuationId }) }
       : toSessionEvent(live);
     if (payload !== undefined) {
       await this.record(payload, live.timestamp);

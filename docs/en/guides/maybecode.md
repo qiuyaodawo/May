@@ -141,6 +141,11 @@ and Web UI provide these controls.
 
 ## Browse MaybeCode conversations
 
+The retained TUI and Web history display saved recovery findings as user messages.
+Web search and full-field reads include their complete text. Both views preserve
+denied, not-started, and unknown tool outcomes; partial replies remain interrupted
+when their Run ends before completion.
+
 The default retained TUI supports mouse-wheel scrolling in terminals with xterm
 mouse reporting. Each event scrolls three rows and preserves the draft and focus.
 Scrolling up preserves the reading position; returning to the bottom follows new output.

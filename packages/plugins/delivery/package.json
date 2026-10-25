@@ -4,6 +4,6 @@
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist", "!dist/.tsbuildinfo"],
   "scripts": { "build": "tsc -b", "clean": "tsc -b --clean", "test": "pnpm run build && node --test test/*.test.mjs" },
-  "dependencies": { "@sortedyuan/media": "workspace:*", "@sortedyuan/plugin": "workspace:*", "@sortedyuan/session": "workspace:*" },
+  "dependencies": { "@sortedyuan/media": "workspace:*", "@sortedyuan/plugin": "workspace:*", "@sortedyuan/file-storage": "workspace:*" },
   "devDependencies": { "@types/node": "^22.0.0" }, "engines": { "node": ">=22" }, "license": "MIT"
 }

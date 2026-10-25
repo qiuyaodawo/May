@@ -56,6 +56,21 @@ a synthetic Run handle. Input ids are not inserted into model message content.
 checkpoint closes a Run without completing the surrounding task; later identified
 inputs can continue the same Session after its caller's wait condition is met.
 
+`Session.continue({ continuationId })` and `AgentApplication.continue()` accept
+an optional host identity of 1–256 characters. Session saves
+`continuation.submitted` before invoking the runtime and associates `run.started`
+with that identity. Reusing it is rejected after cancellation and across restarts.
+The identity never enters model messages. A fork retains the selected execution
+history and removes inherited submission identities.
+
+`Session.inspectRun(selector)` and the pure
+`inspectSessionRunOutcome(history, selector)` read durable outcomes by `runId`,
+`inputId`, `inputSeq`, or `continuationId`. Results distinguish `not-started`,
+`completed`, `yielded`, `failed`, `cancelled`, and `recovery-required`. A committed
+submission without a unique Run outcome requires reconciliation. Tool effects,
+cancelled approvals, and later verified recovery findings participate in that
+decision. The query starts no execution and returns a copied successful result.
+
 `Session.steer({ input, inputId?, runId? })` durably accepts FIFO input for the
 current Run. Its returned `SessionSteeringInput` has `pending`, `delivered`,
 `idle`, or `cancelled` status; `listSteeringInputs()` returns current snapshots.
@@ -81,6 +96,17 @@ Session input; direct `May.run()` and `May.continue()` retain custom input sourc
 Queued, delivered, and finished steering records survive `Session.resume()`.
 Only delivered records enter reconstructed Context. Starting idle input uses
 the existing `input.submitted` identity, keeping retries and restarts deduplicated.
+
+`SessionTranscriptReader.read(event)` consumes one Session's records in order.
+It returns `SessionTranscriptEntry` values: ordinary user input, recovery findings,
+and delivered steering become `user-message` entries with stable IDs and source
+metadata; other records retain their event type. Queued and cancelled steering
+remain outside conversation content. Call `reset()` before reading another Session.
+`readSessionTranscript(events)` provides the same conversion for complete history.
+Both the retained TUI and Web history, search, and full-field reads use this reader.
+`SessionToolStatus` and `sessionToolFailureStatus(error, approvalCancelled?)`
+preserve failed, denied, not-started, and unknown tool outcomes. Approval cancellation
+establishes not-started; a cancelled execution without a confirmed result is unknown.
 
 ## Usage
 
@@ -136,7 +162,10 @@ delete.
 
 ## Shared file access
 
-`withFileAccess` from `@sortedyuan/session/file-access` coordinates cooperating
+`withFileAccess` from `@sortedyuan/session/file-access` reexports the independent
+`@sortedyuan/file-storage` implementation. Both paths share lock state. New local
+storage integrations can depend directly on `@sortedyuan/file-storage`.
+The helper coordinates cooperating
 processes accessing one local file. Use `"shared"` for reads and `"exclusive"`
 for complete write, replacement, or deletion operations. Its async callback must
 await every file operation and close opened handles before returning. The helper

@@ -29,7 +29,7 @@ async function fixture(t, name) {
     ...target, directory,
     start(operation = "owner") {
       const worker = operation === "guard"
-        ? new URL("../packages/session/test/fixtures/file-access-worker.mjs", import.meta.url)
+        ? new URL("../packages/file-storage/test/fixtures/file-access-worker.mjs", import.meta.url)
         : new URL("./test-fixtures/file-lock-worker.mjs", import.meta.url);
       const args = operation === "guard" ? ["hold", target.lockPath, "exclusive"] : [name, directory];
       const process = fork(worker, args, {

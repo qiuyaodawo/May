@@ -78,6 +78,7 @@ export function createAttachedApplicationAgent(
   const applications = new Map<string, Pick<AgentApplication, "submit" | "continue" | "resolveApproval">>();
   return {
     version: options.version,
+    recoveryVersion: 1,
     async execute(execution, context) {
       context.signal.throwIfAborted();
       const { sessionId } = execution.task;
@@ -85,7 +86,7 @@ export function createAttachedApplicationAgent(
       if (inspectAttachedTaskSession(
         await options.read(sessionId),
         execution,
-        inspect(execution),
+        { ...inspect(execution), allowUnsubmittedContinuation: true },
       ).status !== "not-started") {
         throw new Error("Task already submitted; recover its durable outcome instead");
       }
@@ -113,7 +114,7 @@ export function createAttachedApplicationAgent(
         // 宿主的让出边界与委派让出共用同一个 Run 边界。
         const shouldYield = () => delegated || declared.shouldYield?.() === true;
         const run = turn.first && (options.mode ?? "submit") === "continue"
-          ? await application.continue({ ...rest, shouldYield, signal } as SessionContinueOptions)
+          ? await application.continue({ ...rest, continuationId: taskTurnInputId(execution), shouldYield, signal } as SessionContinueOptions)
           : await application.submit({
               ...rest,
               input: turn.first ? (declared.input as string | UserMessage) : turn.input,

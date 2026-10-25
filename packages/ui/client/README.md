@@ -23,6 +23,10 @@ Run; pending or cancelled input does not appear as delivered conversation conten
 History search and field reads include the full saved steering text beyond the
 bounded snapshot preview.
 
+Saved `recovery.resolved` findings appear as user messages and participate in history
+search and full-field reads. These paths consume `SessionTranscriptReader` from
+`@sortedyuan/session`, including its shared input and steering delivery semantics.
+
 `UiBlock.content` preserves ordered text and image attachments. `UiHost.media`
 and `UiClient.readMedia` provide authenticated, resource-scoped image access.
 See [Image replies](../../../docs/en/guides/images.md) /
@@ -53,6 +57,12 @@ Product hosts can provide `controls`, `complete`, `available`, `submit`,
 Concurrent product commands do not hold the snapshot queue. Interaction commands
 validate the host, active Session and product availability before dispatch, allowing
 responses during an awaited command. Products validate the live request owner.
+Command validation reads the current host identity, active Session, execution state,
+interactions, and product availability directly. Presentation callbacks run during
+snapshot reads and do not gate commands. Snapshot reads wait for preceding ordinary
+commands; independent presentation work does not occupy the command queue. Closing
+the host rejects new or queued commands, settles accepted work, and closes its owned
+application once. Repeated `close()` calls share the same completion and failure.
 `UiClient.complete()` reads authenticated Session-scoped suggestions;
 `interact()` sends an advertised response/cancellation without the ordinary busy
 restriction. `UiReceipt.output` supplies page-local text and actions, while

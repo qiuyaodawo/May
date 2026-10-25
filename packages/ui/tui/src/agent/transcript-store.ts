@@ -10,7 +10,8 @@ import type {
   ApprovalRequest,
   PermissionEvent,
 } from "@sortedyuan/permissions";
-import type { SessionEvent } from "@sortedyuan/session";
+import { isSessionRunTerminalEvent, SessionTranscriptReader, sessionToolFailureStatus,
+  type SessionEvent, type SessionToolStatus, type SessionTranscriptEntry } from "@sortedyuan/session";
 import {
   decodeToolChangePreviewPresentation,
   type ToolChangePreview,
@@ -38,7 +39,7 @@ export interface AssistantTranscriptItem {
   readonly step: number;
   readonly text: string;
   readonly reasoning: string;
-  readonly status: "streaming" | "completed";
+  readonly status: "streaming" | "completed" | "interrupted";
   readonly timestamp: number;
 }
 
@@ -49,7 +50,7 @@ export interface ToolTranscriptItem {
   readonly runId: string;
   readonly step: number;
   readonly call: ToolCall;
-  readonly status: "running" | "completed" | "failed";
+  readonly status: SessionToolStatus;
   readonly streamedOutput: string;
   readonly progress: readonly string[];
   readonly output?: unknown;
@@ -95,7 +96,9 @@ export class TranscriptStore {
   private localSequence = 0;
   private currentSessionId: string | undefined;
   private latestReplyId: string | undefined;
-  private readonly steeringInputs = new Map<string, UserMessage>();
+  private readonly transcriptReader = new SessionTranscriptReader();
+  private readonly approvalTools = new Map<string, string>();
+  private readonly cancelledApprovals = new Set<string>();
 
   /** 当前轮次完成后可供阅读的最终正文。 */
   get latestReply(): AssistantTranscriptItem | undefined {
@@ -119,7 +122,9 @@ export class TranscriptStore {
   reset(sessionId?: string): void {
     this.values = [];
     this.latestReplyId = undefined;
-    this.steeringInputs.clear();
+    this.transcriptReader.reset();
+    this.approvalTools.clear();
+    this.cancelledApprovals.clear();
     this.currentSessionId = sessionId;
     this.changed();
   }
@@ -167,7 +172,9 @@ export class TranscriptStore {
   loadHistory(events: readonly SessionEvent[]): void {
     this.values = [];
     this.latestReplyId = undefined;
-    this.steeringInputs.clear();
+    this.transcriptReader.reset();
+    this.approvalTools.clear();
+    this.cancelledApprovals.clear();
     this.currentSessionId = events[0]?.sessionId ?? this.currentSessionId;
     for (const event of events) this.projectSessionEvent(event);
     this.changed();
@@ -258,9 +265,10 @@ export class TranscriptStore {
       case "tool.failed":
         this.updateTool(event.runId, event.call.id, (item) => ({
           ...item,
-          status: "failed",
+          status: sessionToolFailureStatus(event.error, this.cancelledApprovals.has(item.id)),
           error: event.error.message,
         }), event.step, event.call, event.timestamp);
+        this.cancelledApprovals.delete(toolId(event.runId, event.call.id));
         break;
       case "run.failed":
         this.appendNoticeItem(
@@ -283,14 +291,17 @@ export class TranscriptStore {
       case "run.yielded":
         break;
     }
+    if (isSessionRunTerminalEvent(event)) this.settle(event.runId);
   }
 
   private projectPermissionEvent(event: PermissionEvent): void {
     if (event.type === "approval.requested") {
+      this.approvalTools.set(event.request.id, toolId(event.request.context.runId, event.request.context.toolCallId));
       this.append(approvalItem(event.request, event.timestamp));
       return;
     }
     if (event.type !== "approval.resolved" && event.type !== "approval.cancelled") return;
+    this.settleApproval(event);
     this.replace(`approval:${event.requestId}`, (item) => {
       if (item.kind !== "approval") return item;
       return event.type === "approval.resolved"
@@ -328,6 +339,16 @@ export class TranscriptStore {
   }
 
   private projectSessionEvent(event: SessionEvent): void {
+    for (const entry of this.transcriptReader.read(event)) {
+      if (entry.type === "user-message") {
+        this.latestReplyId = undefined;
+        this.append({ id: entry.source === "steering" ? entry.id : `history:${entry.seq}`, kind: "user",
+          text: contentText(entry.message.content, "text"), timestamp: entry.timestamp });
+      } else this.projectRecordedEvent(entry.event);
+    }
+  }
+
+  private projectRecordedEvent(event: Extract<SessionTranscriptEntry, { type: "event" }>["event"]): void {
     switch (event.type) {
       case "run.started":
         this.latestReplyId = undefined;
@@ -336,38 +357,12 @@ export class TranscriptStore {
         this.completeReply(event);
         break;
       case "run.interrupted":
+        this.settle(event.runId);
         for (const item of event.recoveries) {
           this.appendHistoryTool(historyTool({ ...event, type: "tool.failed", step: item.step, call: item.call,
-            error: { name: "InterruptedToolError", message: item.status === "unknown" ? "Outcome unknown; inspect /recovery before continuing" : "Not executed before interruption" } }, "failed"));
+            error: { name: "InterruptedToolError", message: item.status === "unknown" ? "Outcome unknown; inspect /recovery before continuing" : "Not executed before interruption" } }, item.status));
         }
         this.appendNoticeItem(`history:${event.seq}`, "warning", "Run interrupted. Inspect /recovery for unresolved tool outcomes.", event.timestamp);
-        break;
-      case "recovery.resolved":
-      case "input.submitted":
-        if (event.type === "input.submitted" && event.inputId !== undefined) this.steeringInputs.delete(event.inputId);
-        this.latestReplyId = undefined;
-        this.append({
-          id: `history:${event.seq}`,
-          kind: "user",
-          text: contentText(event.message.content, "text"),
-          timestamp: event.timestamp,
-        });
-        break;
-      case "input.steering.queued":
-        this.steeringInputs.set(event.input.inputId, event.input.message);
-        break;
-      case "input.steering.delivered": {
-        const messages = event.inputIds.map(inputId => {
-          const message = this.steeringInputs.get(inputId);
-          if (message === undefined) throw new Error(`Missing steering input in transcript history: ${inputId}`);
-          this.steeringInputs.delete(inputId);
-          return message;
-        });
-        this.appendSteering(event.runId, event.step, messages, event.timestamp);
-        break;
-      }
-      case "input.steering.finished":
-        if (event.status === "cancelled") for (const inputId of event.inputIds) this.steeringInputs.delete(inputId);
         break;
       case "assistant.completed": {
         const content = assistantContent(event.message);
@@ -384,11 +379,15 @@ export class TranscriptStore {
         });
         break;
       }
+      case "tool.started":
+        this.ensureTool(event.runId, event.step, event.call, event.timestamp);
+        break;
       case "tool.completed":
         this.appendHistoryTool(historyTool(event, "completed"));
         break;
       case "tool.failed":
-        this.appendHistoryTool(historyTool(event, "failed"));
+        this.appendHistoryTool(historyTool(event, sessionToolFailureStatus(event.error, this.cancelledApprovals.has(toolId(event.runId, event.call.id)))));
+        this.cancelledApprovals.delete(toolId(event.runId, event.call.id));
         break;
       case "tool.presentation": {
         const preview = decodeToolChangePreviewPresentation(
@@ -408,6 +407,7 @@ export class TranscriptStore {
         break;
       }
       case "approval.requested":
+        this.approvalTools.set(event.request.id, toolId(event.request.runId, event.request.toolCallId));
         this.append({
           id: `approval:${event.request.id}`,
           kind: "approval",
@@ -452,11 +452,28 @@ export class TranscriptStore {
       case "run.yielded":
         break;
     }
+    if (isSessionRunTerminalEvent(event) && "runId" in event) this.settle(event.runId);
+  }
+
+  private settle(runId: string): void {
+    this.values = this.values.flatMap(item => {
+      if ((item.kind !== "tool" && item.kind !== "assistant") || item.runId !== runId) return [item];
+      if (item.kind === "tool") return [item.status === "running" ? { ...item, status: "unknown" as const } : item];
+      if (item.status !== "streaming") return [item];
+      return item.text === "" && item.reasoning === "" ? [] : [{ ...item, status: "interrupted" as const }];
+    });
+  }
+
+  private settleApproval(event: { type: "approval.resolved" | "approval.cancelled"; requestId: string }): void {
+    const id = this.approvalTools.get(event.requestId);
+    if (id !== undefined && event.type === "approval.cancelled") this.cancelledApprovals.add(id);
+    this.approvalTools.delete(event.requestId);
   }
 
   private applyHistoryApproval(
     event: Extract<SessionEvent, { type: "approval.resolved" | "approval.cancelled" }>,
   ): void {
+    this.settleApproval(event);
     this.replace(`approval:${event.requestId}`, (item) => {
       if (item.kind !== "approval") return item;
       return event.type === "approval.resolved"
@@ -603,7 +620,7 @@ function approvalItem(request: ApprovalRequest, timestamp: number): ApprovalTran
 
 function historyTool(
   event: Extract<SessionEvent, { type: "tool.completed" | "tool.failed" }>,
-  status: "completed" | "failed",
+  status: SessionToolStatus,
 ): ToolTranscriptItem {
   return {
     id: toolId(event.runId, event.call.id),

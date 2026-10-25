@@ -25,6 +25,7 @@
     { "path": "../../packages/application" },
     { "path": "../../packages/goal" },
     { "path": "../../packages/core" },
+    { "path": "../../packages/file-storage" },
     { "path": "../../packages/ui/keybindings" },
     { "path": "../../packages/ui/tui" },
     { "path": "../../packages/config" },

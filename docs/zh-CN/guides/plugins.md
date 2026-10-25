@@ -183,7 +183,8 @@ try {
 ## Runtime 和应用服务
 
 `@sortedyuan/plugin-services` 定义共享的带类型服务标识。`applicationServices` 导出相同
-标识，并增加 `application`；其 `get()` 在创建阶段完成后返回活动 AgentApplication。
+标识，并增加 `execution`、`history`、`state` 和 `application` 访问服务。
+它们的 `get()` 在创建阶段完成后返回冻结的结构化接口。
 服务包括 `model`、`modelInfo`、`contextFactory`、`contextOptions`、`sessionStore`、
 `permissionPolicy`、`toolExecutor`、`toolScheduler`、`tracer`、`tools`、`skills`、
 `runtimeFactory`、`toolSources`、`instructionSources`、`modelWrappers` 和
@@ -191,6 +192,21 @@ try {
 需要保证提供方唯一。一个插件可以共同提供 runtime factory 和相应 Context factory。
 通过 `open({ store })` 传入的 Session 存储是由调用方管理的入口服务，恢复过程也
 使用该实例；同一个 Session 保持相同存储实例。
+
+通过 `applicationServices.execution` 访问 `sessionId`、`isRunning`、`submit()`、
+`continue()` 和 `resolveApproval()`；通过 `.history` 访问 `history()`、
+`queryHistory()`、`listRecoveries()`、`branchPositions()` 和 `saveBranchPosition()`；
+通过 `.state` 调用 `recordState()`。每次调用都转发到当前 Application，插件替换后
+接口继续有效。创建前和关闭后访问会立即报错。关闭 Hooks 和清理函数可以读取历史、
+保存最终状态；开始关闭时立即拒绝新的执行。宿主管理 `close()`、`updatePlugins()`
+和 skill 激活。`applicationServices.application` 通过 `ApplicationFacade` 组合这些
+能力和范围内的服务查询。将插件回调中的 `AgentApplication` 类型改为所需能力接口；
+`GoalsPluginOptions.createAgent` 接受 `ApplicationFacade`。
+
+贡献服务使用 `ToolSourceRegistry`、`InstructionSourceRegistry`、`ModelWrapperRegistry`
+和 `ContextWrapperRegistry` 接口。独立实现提供 `add()` 以及 `snapshot()` 或 `apply()`，
+保持顺序，并通过返回的清理函数移除条目。工具快照返回 `Iterable<Tool>`；Application
+检查名称并为每次 Run 保存定义。
 
 `createModelPlugin({ create, info })` 可以同时提供 `modelInfo`，描述实际实例的
 provider、model、adapter 和 profile。仅提供 `model` 的插件将未知名称保持为

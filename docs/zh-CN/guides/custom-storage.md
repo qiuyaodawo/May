@@ -202,15 +202,15 @@ Catalog 在本地多个进程间使用追加式原子操作文件，默认不自
 ## 协调本地文件访问
 
 应用自己的本地文件由多个进程共同访问时，使用
-`@sortedyuan/session/file-access` 导出的 `withFileAccess`。将
-`@sortedyuan/session` 加入直接依赖，把下面的示例保存为 `shared-state.mjs`，
+`@sortedyuan/file-storage` 导出的 `withFileAccess`。将
+`@sortedyuan/file-storage` 加入直接依赖，把下面的示例保存为 `shared-state.mjs`，
 在应用目录运行 `node shared-state.mjs`。示例写入完整 JSON 内容，通过相同的
 访问函数读取内容，然后输出 `1`。
 
 ```js
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { withFileAccess } from "@sortedyuan/file-storage";
 
 await mkdir(".may", { recursive: true });
 const path = resolve(".may/shared-state.json");

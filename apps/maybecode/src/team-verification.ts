@@ -1,4 +1,4 @@
-import { acquireFileLock, releaseFileLock } from "@sortedyuan/session/file-store";
+import { acquireFileLock, releaseFileLock } from "@sortedyuan/file-storage";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";

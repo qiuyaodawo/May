@@ -4,7 +4,7 @@ import type { PermissionPolicy } from "@sortedyuan/permissions";
 import { defineService } from "@sortedyuan/plugin";
 import type { SessionStore } from "@sortedyuan/session";
 import type { SkillSession } from "@sortedyuan/skills";
-import { ContextWrappers, InstructionSources, ModelWrappers, ToolSources } from "./registries.js";
+import type { ContextWrapperRegistry, InstructionSourceRegistry, ModelWrapperRegistry, ToolSourceRegistry } from "./registries.js";
 
 export interface ContextOptions {
   readonly budget?: ContextBudget;
@@ -34,9 +34,9 @@ export const services = Object.freeze({
   tracer: token<Tracer>("may.tracer"),
   tools: token<Iterable<Tool>>("may.tools"),
   skills: token<SkillSession>("may.skills"),
-  toolSources: token<ToolSources>("may.tool-sources"),
-  instructionSources: token<InstructionSources>("may.instruction-sources"),
-  modelWrappers: token<ModelWrappers>("may.model-wrappers"),
-  contextWrappers: token<ContextWrappers>("may.context-wrappers"),
+  toolSources: token<ToolSourceRegistry>("may.tool-sources"),
+  instructionSources: token<InstructionSourceRegistry>("may.instruction-sources"),
+  modelWrappers: token<ModelWrapperRegistry>("may.model-wrappers"),
+  contextWrappers: token<ContextWrapperRegistry>("may.context-wrappers"),
   runtimeFactory: token<RuntimeFactory>("may.runtime-factory"),
 });

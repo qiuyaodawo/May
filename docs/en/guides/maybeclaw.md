@@ -39,6 +39,15 @@ and recreated from current configuration when needed. Shutdown starts cancelling
 Gateway work before waiting for HTTP requests and releasing resources. See the
 [plugin guide](plugins.md#reusable-plugin-packages).
 
+Web, CLI and HTTP consumers use the `GatewayQueries` and `GatewayController`
+interfaces. Queries apply actor and session access checks and return independent
+snapshots. `GatewayHost` uses `GatewayChannelRepository` to accept inputs, update
+message changes and complete deliveries. The repository owns channel records and
+their relationships; input completion with its replies, delivery receipts with
+platform-message associations, and session cleanup use SQLite transactions.
+`GatewayStore` is an internal implementation dependency. MaybeClaw's `ChannelStore`
+wrapper owns checks for application migration markers.
+
 ## Sessions and configuration
 
 `pnpm maybeclaw --help` and `pnpm maybeclaw -h` print help and exit successfully.

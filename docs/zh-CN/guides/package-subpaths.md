@@ -38,7 +38,7 @@ const historyTool = createSessionHistoryTool({ source: session });
 及持久状态格式保持不变。已有 Session 和 Skill 状态无需转换；保留应用配置中明确
 指定的插件 ID。
 
-[发布清单](../../../scripts/release-packages.json)包含 38 个包，六个原包已经移出该清单。
+[发布清单](../../../scripts/release-packages.json)包含 39 个包，六个原包已经移出该清单。
 仓库通过 `pnpm release:check`、指定外部目录的 `pnpm test:package:release` 和
 `pnpm test:package:plugin` 验证。这些安装检查在仓库外安装 tarball，插件检查运行
 公开子路径测试。命令见[发布验证指南](npm-release.md)。

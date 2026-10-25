@@ -7,8 +7,8 @@ pnpm version declared in `package.json` (currently 12.4.2).
 
 ## Release scope
 
-The explicit [release list](../../../scripts/release-packages.json) contains 38
-packages under `@sortedyuan`: 37 libraries and MaybeCode. `pnpm release:check`
+The explicit [release list](../../../scripts/release-packages.json) contains 39
+packages under `@sortedyuan`: 38 libraries and MaybeCode. `pnpm release:check`
 checks that this list exactly matches public workspace packages and that their
 complete runtime dependency chains contain only publishable packages.
 

@@ -234,6 +234,9 @@ importers:
       '@sortedyuan/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@sortedyuan/file-storage':
+        specifier: workspace:*
+        version: link:../../packages/file-storage
       '@sortedyuan/media':
         specifier: workspace:*
         version: link:../../packages/media
@@ -316,6 +319,9 @@ importers:
       '@sortedyuan/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@sortedyuan/file-storage':
+        specifier: workspace:*
+        version: link:../../packages/file-storage
       '@sortedyuan/goal':
         specifier: workspace:*
         version: link:../../packages/goal
@@ -432,6 +438,9 @@ importers:
       '@sortedyuan/core':
         specifier: workspace:*
         version: link:../core
+      '@sortedyuan/file-storage':
+        specifier: workspace:*
+        version: link:../file-storage
       '@sortedyuan/permissions':
         specifier: workspace:*
         version: link:../permissions
@@ -463,9 +472,9 @@ importers:
 
   packages/config:
     dependencies:
-      '@sortedyuan/session':
+      '@sortedyuan/file-storage':
         specifier: workspace:*
-        version: link:../session
+        version: link:../file-storage
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -485,6 +494,9 @@ importers:
       '@sortedyuan/core':
         specifier: workspace:*
         version: link:../core
+      '@sortedyuan/file-storage':
+        specifier: workspace:*
+        version: link:../file-storage
       '@sortedyuan/permissions':
         specifier: workspace:*
         version: link:../permissions
@@ -536,6 +548,16 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
+  packages/file-storage:
+    dependencies:
+      fs-native-extensions:
+        specifier: 1.5.1
+        version: 1.5.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+
   packages/goal:
     dependencies:
       '@sortedyuan/context':
@@ -560,9 +582,9 @@ importers:
       '@sortedyuan/core':
         specifier: workspace:*
         version: link:../core
-      '@sortedyuan/session':
+      '@sortedyuan/file-storage':
         specifier: workspace:*
-        version: link:../session
+        version: link:../file-storage
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -580,9 +602,9 @@ importers:
       '@sortedyuan/core':
         specifier: workspace:*
         version: link:../core
-      '@sortedyuan/session':
+      '@sortedyuan/file-storage':
         specifier: workspace:*
-        version: link:../session
+        version: link:../file-storage
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -790,15 +812,15 @@ importers:
 
   packages/plugins/delivery:
     dependencies:
+      '@sortedyuan/file-storage':
+        specifier: workspace:*
+        version: link:../../file-storage
       '@sortedyuan/media':
         specifier: workspace:*
         version: link:../../media
       '@sortedyuan/plugin':
         specifier: workspace:*
         version: link:../../plugin
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../session
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -1056,9 +1078,9 @@ importers:
       '@sortedyuan/core':
         specifier: workspace:*
         version: link:../core
-      fs-native-extensions:
-        specifier: 1.5.1
-        version: 1.5.1
+      '@sortedyuan/file-storage':
+        specifier: workspace:*
+        version: link:../file-storage
     devDependencies:
       '@sortedyuan/permissions':
         specifier: workspace:*

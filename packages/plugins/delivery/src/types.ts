@@ -14,7 +14,7 @@ export interface ChannelAttachmentData { data: Uint8Array; name?: string; mediaT
 export type ChannelState = Pick<ChannelStore, "get" | "put" | "values">;
 export interface ChannelAdapter {
   readonly media?: MediaCapabilities;
-  readonly name: "telegram" | "feishu";
+  readonly name: string;
   readonly account: string;
   readonly allowUsers: readonly string[];
   readonly allowGroups?: readonly string[];

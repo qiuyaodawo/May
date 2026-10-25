@@ -189,6 +189,10 @@ Explicit host recovery evidence can establish not-started. Partial assistant ans
 are labeled interrupted. Progress provides live display; durable completion is
 recorded separately.
 
+Saved recovery findings appear as user messages. History search and full-field
+reads include their complete text. Web and retained TUI history share
+`SessionTranscriptReader`, which also handles ordinary input and delivered steering.
+
 Only current `snapshot.interactions` creates decision controls. History retains
 read-only approval evidence. The host rejects expired or unavailable choices.
 Session-wide approval requires a grant key. Truncated approval inputs are deny-only.
@@ -227,6 +231,13 @@ Hosts can page diagnostics independently. See
 Implement `UiHost`, or connect `ApplicationUiHost` to an `AgentWorkspaceController`.
 Browser modules use browser-safe exports; Node adapters belong in the host.
 Static modules are served from a fixed asset map.
+
+`ApplicationUiHost` validates commands against current host identity, active Session,
+execution state, interactions, and product availability. Presentation callbacks for
+panels, choices, workspace, fork points, checkpoints, and worktrees run during snapshot
+reads. Snapshot reads wait for preceding ordinary commands; presentation reads leave
+the command queue available. Closing rejects new or queued commands and waits for
+accepted work and owned application cleanup. Repeated `close()` calls share completion.
 
 When a terminal owns execution, supply independent `events` and
 `closeApplication: false` to `ApplicationUiHost`. The terminal distributes events

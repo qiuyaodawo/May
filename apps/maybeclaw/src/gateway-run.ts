@@ -18,7 +18,7 @@ import { GatewayUiHost, controlActor } from "./gateway-ui.js";
 import { startGatewayServer } from "./gateway-server.js";
 import { hostSettings } from "./settings.js";
 import { createGatewayChannelPlugins } from "./plugins/channels.js";
-import type { GatewayApproval, GatewayTask } from "./gateway-types.js";
+import type { GatewayTask } from "./gateway-types.js";
 import type { MaybeClawDependencies } from "./run.js";
 
 import { GATEWAY_USAGE } from "./usage.js";
@@ -97,9 +97,9 @@ export async function runGatewayCommand(args: readonly string[], deps: MaybeClaw
       if (command.object === "agent" && command.action === "list") { print(gateway.status().agents); return 0; }
       if (command.object === "channel") { print({ configuredEntries: gateway.sessions(controlActor).filter(session => session.entry).map(session => ({ sessionId: session.id, entry: session.entry })), gateway: gateway.status() }); return 0; }
       if (command.object === "task" && command.action !== "submit") {
-        if (command.action === "list") { print({ tasks: gateway.store.list("tasks"), legacy: gateway.store.list("legacy-tasks") }); return 0; }
-        const task = gateway.store.get<GatewayTask>("tasks", command.value!);
-        if (!task) { const legacyTask = gateway.store.get("legacy-tasks", command.value!); if (legacyTask && ["status", "result"].includes(command.action)) { print({ legacy: legacyTask }); return 0; } throw new Error("Task not found or legacy work requires explicit assignment to a session"); }
+        if (command.action === "list") { print({ tasks: gateway.tasks(controlActor), legacy: gateway.legacyTasks(controlActor) }); return 0; }
+        const task = gateway.task(command.value!, controlActor);
+        if (!task) { const legacyTask = gateway.legacyTask(command.value!, controlActor); if (legacyTask && ["status", "result"].includes(command.action)) { print({ legacy: legacyTask }); return 0; } throw new Error("Task not found or legacy work requires explicit assignment to a session"); }
         if (command.action === "cancel") await gateway.stop(gateway.session(task.sessionId, controlActor), controlActor, undefined, task.id);
         else if (command.action === "run") {
           await gateway.dispatchTask(task.id, controlActor);
@@ -107,7 +107,7 @@ export async function runGatewayCommand(args: readonly string[], deps: MaybeClaw
           return tasks.some(item => item.status !== "completed") ? 1 : 0;
         }
         else if (command.action === "recover") await gateway.recoverTask(task.id, controlActor);
-        const current = gateway.store.get<GatewayTask>("tasks", task.id)!;
+        const current = gateway.task(task.id, controlActor)!;
         if (command.action === "result" && current.status !== "completed") throw new Error(`Result unavailable: ${current.status}`);
         print(current); return 0;
       }
@@ -126,18 +126,18 @@ export async function runGatewayCommand(args: readonly string[], deps: MaybeClaw
 }
 
 async function waitForTasks(gateway: AgentGateway, taskIds: readonly string[], deps: MaybeClawDependencies): Promise<GatewayTask[]> {
-  const graphIds = new Set(taskIds.map(id => gateway.store.get<GatewayTask>("tasks", id)?.graphId));
-  const current = () => gateway.store.list<GatewayTask>("tasks").filter(task => graphIds.has(task.graphId));
+  const graphIds = new Set(taskIds.map(id => gateway.task(id, controlActor)?.graphId));
+  const current = () => gateway.tasks(controlActor).filter(task => graphIds.has(task.graphId));
   let tasks = current();
   while (tasks.some(task => ["queued", "running", "waiting", "cancelling"].includes(task.status))) {
     if (deps.signal?.aborted) {
       for (const id of taskIds) {
-        const task = gateway.store.get<GatewayTask>("tasks", id)!;
+        const task = gateway.task(id, controlActor)!;
         await gateway.stop(gateway.session(task.sessionId, controlActor), controlActor, undefined, id);
       }
       return current();
     }
-    const approval = gateway.store.list<GatewayApproval>("approvals").find(item => item.status === "pending" && tasks.some(task => task.id === item.taskId));
+    const approval = gateway.approvals(controlActor).find(item => item.status === "pending" && tasks.some(task => task.id === item.taskId));
     if (approval) {
       if (!process.stdin.isTTY) {
         await gateway.resolveApproval(approval.id, controlActor, "deny");

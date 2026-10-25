@@ -40,6 +40,14 @@ and shutdown, start with [Building an Agent](../guides/building-an-agent.md).
 
 ## Runtime and application
 
+### `@sortedyuan/file-storage`
+
+Independent local file coordination exports `withFileAccess`, `acquireFileLock`,
+`recoverFileLock`, `releaseFileLock`, `replaceJournalFile` and `syncDirectory`.
+Session, configuration, media, MCP credentials and delivery reuse this package.
+Session's file subpaths retain compatible exports with shared lock state.
+See [Coordinate local file access](../guides/custom-storage.md#coordinate-local-file-access).
+
 ### `@sortedyuan/core`
 
 The provider-neutral execution kernel exports `May`, `Model`, `Tool`, `Context`,
@@ -410,7 +418,7 @@ terminal rendering and product commands.
 
 ## Reference products
 
-MaybeCode is included in the [38-package release list](../../../scripts/release-packages.json).
+MaybeCode is included in the [39-package release list](../../../scripts/release-packages.json).
 MaybeClaw, CLI and Eval CLI remain private workspace packages. See the
 [release guide](../guides/npm-release.md) for verification and publication steps.
 

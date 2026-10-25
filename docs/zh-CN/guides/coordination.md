@@ -11,6 +11,15 @@
 [MaybeCode 团队](maybecode-team.md)；普通 MaybeCode 请求参见
 [子 Agent 委派](subagent-delegation.md)。
 
+持有现有 Application 的宿主可以使用 `createAttachedApplicationAgent()`。
+使用 `mode: "continue"` 时，第一轮 Run 获得由 dispatch 与轮次确定的持久
+`continuationId`，后续轮次使用带身份的输入。Session 的公共
+`inspectSessionRunOutcome()` 提供终态结果和工具恢复状态。适配器声明
+`recoveryVersion: 1`，协调器在分配执行前保存该版本。包装适配器时需要保留此属性。
+已经执行但缺少 continuation 身份的历史需要经过核实的恢复结论；排队任务在开始时
+使用当前协议。Session 已经结束、协调结果尚未保存期间发生中断时，持久身份可以
+阻止重复执行。
+
 ## 创建并运行任务图
 
 1. 在 TypeScript 宿主中提供 `@sortedyuan/application`、`@sortedyuan/core`、`@sortedyuan/coordination`

@@ -116,15 +116,16 @@ export type SessionEventPayload =
   | { type: "run.budget.exceeded"; runId: string; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
   | { type: "session.created"; metadata?: Record<string, unknown>; runtime?: RuntimeDescriptor; fork?: SessionForkOrigin }
   | { type: "session.fork.ready" }
-  | { type: "history.omitted"; reason: "permission" | "unconsumed-input" | "application-state" | "fork-initialization" }
+  | { type: "history.omitted"; reason: "permission" | "unconsumed-input" | "application-state" | "fork-initialization" | "execution-identity" }
   | { type: "runtime.state.saved"; runtime: RuntimeDescriptor; state: unknown }
   | { type: "runtime.changed"; runtime: RuntimeDescriptor; state?: unknown }
   | { type: "input.generated"; runId: string; step: number; messages: readonly UserMessage[]; reason: string }
   | { type: "input.submitted"; message: UserMessage; inputId?: string }
+  | { type: "continuation.submitted"; continuationId: string }
   | { type: "input.steering.queued"; input: SessionSteeringInput }
   | { type: "input.steering.delivered"; runId: string; step: number; inputIds: readonly string[] }
   | { type: "input.steering.finished"; inputIds: readonly string[]; status: "idle" | "cancelled"; reason: string }
-  | { type: "run.started"; runId: string; continuation?: boolean; checkpointVersion?: 1 }
+  | { type: "run.started"; runId: string; continuation?: boolean; continuationId?: string; checkpointVersion?: 1 }
   | { type: "run.settled"; runId: string; hostCompleted?: true }
   | { type: "tool.started"; runId: string; step: number; call: ToolCall; input?: unknown }
   | { type: "run.interrupted"; runId: string; recoveries: readonly SessionRecovery[] }

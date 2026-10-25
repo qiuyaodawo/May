@@ -8,6 +8,11 @@ Web UI 中提供 `/goal`。一个目标需要跨多个 Run 处理时，可以使
 应用需要已经配置模型、Session 存储和正常工具权限，
 [运行预算](run-budgets.md)仍独立限制每个 Run。
 
+`GoalController.wrapModel()` 保留 Model 的 preflight 接口和动态能力，包括调用尝试
+统计、配置身份、使用限制和原生 Context 压缩。Preflight 在 Goal 保存调用记录前
+检查实际请求。本地拒绝的请求具有已知的零模型用量，并且不会产生实际调用尝试记录。
+Goal 空闲时也保持这些行为。
+
 ## MaybeCode 命令
 
 1. 使用 `/goal start` 启动目标，根据需要明确提供预算。

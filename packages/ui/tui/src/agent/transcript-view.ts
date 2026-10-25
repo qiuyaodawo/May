@@ -581,6 +581,7 @@ function renderAssistantView(
       }
     } else children.push(new Markdown(value, { theme: options.theme.markdown, sourceId: `${item.id}:text:0` }));
   }
+  if (item.status === "interrupted") children.push(new Text("Reply interrupted", { style: options.theme.warning }));
   return new Stack(children).render(size);
 }
 

@@ -60,10 +60,16 @@ Model 工厂共同提供实际实例及这一服务。
 标准 `may.model` 标签使用这一服务。元信息缺失时保持这些标签缺失，插件替换后
 继续依据当前元信息生成标签；其他 trace attributes 继续保留。
 
-`applicationServices.application` 提供 `ApplicationAccess.get()`。
-在 `application.created` handler 中能够取得实际 `AgentApplication` 并调用其控制和状态接口。
-在 setup 期间过早访问会立即报错。Application 引用保存在访问服务中，Hook payload
-使用可以复制和验证的数据。`applicationHooks` 支持创建、关闭、输入、压缩、审批和恢复，
+`applicationServices.execution`、`.history` 和 `.state` 的 `get()` 分别提供
+`ApplicationExecution`、`ApplicationHistory` 和 `ApplicationState`。
+执行接口包含 Session 身份、运行状态、submit/continue 和审批处理；历史接口包含查询、
+恢复记录和分支位置；状态接口提供等待保存完成的 `recordState()`。
+`applicationServices.application` 通过 `ApplicationFacade` 组合这些能力和范围内的服务查询。
+接口对象经过冻结，每次调用访问当前 Application，插件替换后继续有效。
+创建前和关闭完成后访问会立即报错；关闭 Hooks 和资源清理期间可以读取历史、保存最终状态。
+开始关闭时立即拒绝新的执行。宿主管理关闭、插件更新和 skill 激活。
+插件声明使用的服务，并通过 `context.defer()` 注册资源清理。
+`applicationHooks` 支持创建、关闭、输入、压缩、审批和恢复，
 创建和关闭通知同时传递给 Session 插件以及上级 handler，并保持声明的执行顺序。
 `application.beforeCreate` 执行之前准备 Session 状态和服务。
 Core `runtimeHooks` 支持 Run、Step、Context、Model 和工具执行。

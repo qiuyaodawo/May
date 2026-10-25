@@ -5,7 +5,7 @@ import type { FileHandle } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { simpleGit, type SimpleGit, type StatusResult } from "simple-git";
 import { createPatch, diffLines } from "diff";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { withFileAccess } from "@sortedyuan/file-storage";
 
 export interface ProjectGitWorkspaceOptions {
   readonly workspace: string;

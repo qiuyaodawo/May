@@ -12,7 +12,7 @@ import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
 import type { Model, Tool } from "@sortedyuan/core";
 import { resolveRunBudget } from "@sortedyuan/core";
 import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { withFileAccess } from "@sortedyuan/file-storage";
 import type { MaybeCodeTeamCommand } from "./args.js";
 import { getDefaultMaybeCodeDataDirectory } from "./configured.js";
 import { MaybeCodeUsageError } from "./errors.js";

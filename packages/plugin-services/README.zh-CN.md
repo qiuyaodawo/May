@@ -13,7 +13,7 @@
 
 为 `@sortedyuan/application` 和组件插件提供带类型的服务标识以及有序组合注册表。
 `services` 中的全部服务使用 application 作用域和 `1.0.0` 版本，每种服务具有一个提供方。
-`applicationServices` 导出相同的服务标识，并增加实际 Application 的访问服务。
+`applicationServices` 导出相同的服务标识，并增加结构化的 Application 服务接口。
 
 `model`、`modelInfo`、`contextFactory`、`permissionPolicy`、`runtimeFactory`、`sessionStore`、
 `skills`、`toolExecutor`、`toolScheduler` 和 `tracer` 描述组件实例。
@@ -27,6 +27,13 @@ Model 工厂共同提供实例及对应的元信息。
 注册表提供 `add(value, { id, order?, pluginOrder? }): Disposer`。
 组合顺序依次依据 `order`、插件声明顺序和注册序号，数值较小的条目优先执行。
 重复的贡献标识立即报错。通过 `context.defer()` 注册返回的清理函数，插件关闭时移除条目。
+
+服务标识接受 `ToolSourceRegistry`、`InstructionSourceRegistry`、
+`ModelWrapperRegistry` 和 `ContextWrapperRegistry`。普通对象和独立类都可以实现
+这些接口。`ToolSourceRegistry.snapshot()` 返回 `Iterable<Tool>`，Application
+检查名称并为每次 Run 保存定义。默认的 `ToolSources`、`InstructionSources`、
+`ModelWrappers` 和 `ContextWrappers` 实现这些接口。自定义提供方负责保持顺序、
+贡献移除行为以及每个 Application 的独立状态。
 
 ```ts
 context.defer(context.get(services.toolSources).add(

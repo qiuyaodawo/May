@@ -110,6 +110,16 @@ Runtime identity and versioned state are persisted. At a replacement boundary,
 Session saves state and closes the old runtime while its plugin services are
 available, then restores the replacement before allowing execution.
 
+Session also owns durable Run outcome interpretation. `Session.inspectRun()` and
+`inspectSessionRunOutcome(history, selector)` query by `runId`, `inputId`,
+`inputSeq`, or `continuationId`, including tool uncertainty and verified recovery
+findings. Scheduling adapters use these public results when recovering work.
+`Session.continue({ continuationId })` saves the host identity before runtime
+execution and associates it with `run.started`. Duplicate identities are rejected
+after restart; a submitted continuation without a complete durable outcome requires
+reconciliation. Forks remove inherited input and continuation identities while
+retaining the selected conversation and execution history.
+
 Successful request positions become selectable after `run.settled` saves their
 complete state boundary. `Session.fork()` copies exactly the selected history
 into an independent identity and records the source position durably. Context,

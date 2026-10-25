@@ -6,6 +6,7 @@
   "@sortedyuan/coordination",
   "@sortedyuan/core",
   "@sortedyuan/eval",
+  "@sortedyuan/file-storage",
   "@sortedyuan/goal",
   "@sortedyuan/keybindings",
   "@sortedyuan/maybecode",

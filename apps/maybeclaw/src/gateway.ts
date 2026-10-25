@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import { realpath } from "node:fs/promises";
 import { channelTextPages } from "./channel-text.js";
-import { inboxId, type ChannelInput } from "./channel-store.js";
+import type { ChannelInput } from "./channel-store.js";
 import { gatewayInput } from "./gateway-input.js";
 import { withGatewayConfiguration } from "./gateway-config.js";
 import { CoordinationRuntime, coordinationInput, createCoordinationTools, validateCoordinationSnapshot, type CoordinationAgent, type CoordinationStore, type CoordinationSnapshot, type TaskExecution } from "@sortedyuan/coordination";
@@ -15,6 +15,7 @@ import { agentAdapterRegistryService } from "@sortedyuan/plugin-agent-adapters";
 import { coordinationService } from "@sortedyuan/coordination/plugin";
 import { createGatewayAgentPlugins } from "./plugins/agents.js";
 import { GatewayStore } from "./gateway-store.js";
+import { GatewayRepository, type GatewayChannelRepository, type GatewayEventRecord, type PendingInput } from "./gateway-repository.js";
 import { gatewayEntry } from "./gateway-settings.js";
 import { digest } from "./types.js";
 import type { LegacyTaskRecord } from "./gateway-migration.js";
@@ -37,7 +38,10 @@ const unknownOutcome = (error: unknown): boolean => typeof error === "object" &&
 class CancellationUnsupportedError extends Error {}
 
 export class AgentGateway {
-  readonly store: GatewayStore;
+  private readonly store: GatewayStore;
+  private readonly repository: GatewayRepository;
+  readonly channels: GatewayChannelRepository;
+  readonly options: { directory: string; configPath: string; settings: GatewaySettings };
   private readonly adapters = new Map<string, Promise<GatewayAgentAdapter>>();
   private readonly adapterStates = new Map<string, "loading" | "loaded" | "unavailable">();
   private readonly adapterClosings = new Map<string, Promise<void>>();
@@ -64,15 +68,43 @@ export class AgentGateway {
   private error: string | undefined;
   private plugins: Promise<PluginHost> | undefined;
   private permissionStore: Promise<FilePermissionRuleStore> | undefined;
-  constructor(readonly options: { directory: string; configPath: string; settings: GatewaySettings; store?: GatewayStore }) {
+  constructor(options: { directory: string; configPath: string; settings: GatewaySettings; store?: GatewayStore }) {
+    this.options = { directory: options.directory, configPath: options.configPath, settings: options.settings };
     this.store = options.store ?? GatewayStore.open(options.directory);
-    for (const delivery of this.store.list<GatewayDelivery>("deliveries")) if (delivery.status === "sending") this.store.put("deliveries", delivery.id, { ...delivery, status: "unknown" });
+    this.repository = new GatewayRepository(this.store);
+    this.channels = this.repository;
+    this.repository.recoverDeliveries();
     for (const approval of this.store.list<GatewayApproval>("approvals")) {
       if (approval.status === "pending") this.store.put("approvals", approval.id, { ...approval, status: "cancelled" });
       else if (approval.status === "resolving") this.store.put("approvals", approval.id, { ...approval, status: "unknown" });
     }
   }
   observe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+  tasks(actor: GatewayActor, sessionId?: string): GatewayTask[] { return this.visibleRecords("tasks", actor, sessionId); }
+  task(id: string, actor: GatewayActor): GatewayTask | undefined {
+    const task = this.store.get<GatewayTask>("tasks", id);
+    if (task) this.session(task.sessionId, actor);
+    return task;
+  }
+  approvals(actor: GatewayActor, sessionId?: string): GatewayApproval[] { return this.visibleRecords("approvals", actor, sessionId); }
+  bindings(actor: GatewayActor, sessionId?: string): GatewayBinding[] { return this.visibleRecords("bindings", actor, sessionId); }
+  deliveries(actor: GatewayActor, sessionId?: string): GatewayDelivery[] { return this.visibleRecords("deliveries", actor, sessionId); }
+  delivery(id: string, actor: GatewayActor) {
+    this.requireOperator(actor);
+    return this.repository.delivery(id) ?? this.repository.reply(id);
+  }
+  events(sessionId: string, actor: GatewayActor): GatewayEventRecord[] { return this.visibleRecords("events", actor, sessionId); }
+  legacyTasks(actor: GatewayActor): LegacyTaskRecord[] { this.requireOperator(actor); return this.store.list("legacy-tasks"); }
+  legacyTask(id: string, actor: GatewayActor): LegacyTaskRecord | undefined { this.requireOperator(actor); return this.repository.legacyTask(id); }
+  coordinationSnapshots(actor: GatewayActor): CoordinationSnapshot[] { this.requireOperator(actor); return this.store.list("coordination"); }
+  entryDefaults(actor: GatewayActor): { sessionId: string }[] { this.requireOperator(actor); return this.store.list("defaults"); }
+  configuration(actor: GatewayActor): GatewaySettings { this.requireOperator(actor); return structuredClone(this.options.settings); }
+  private requireOperator(actor: GatewayActor): void { if (actor.kind !== "operator") throw new Error("此操作需要服务管理员权限。"); }
+  private visibleRecords<T extends { sessionId: string }>(collection: string, actor: GatewayActor, sessionId?: string): T[] {
+    if (sessionId !== undefined) this.session(sessionId, actor);
+    const allowed = new Set(this.sessions(actor).map(session => session.id));
+    return this.store.list<T>(collection).filter(record => allowed.has(record.sessionId) && (sessionId === undefined || record.sessionId === sessionId));
+  }
   private pluginHost(): Promise<PluginHost> { return this.plugins ??= PluginHost.create({ plugins: createGatewayAgentPlugins({ ...this.options, permissionRuleStore: () => this.ruleStore() }) }); }
   private ruleStore(): Promise<FilePermissionRuleStore> {
     if (this.closing) return Promise.reject(new Error("Gateway 正在关闭。"));
@@ -221,7 +253,7 @@ export class AgentGateway {
     const parsed = gatewayInput(text), words = [...parsed.words];
     let selected = input.sessionId;
     if (words[0] === "/session") { words.shift(); selected = this.session(words.shift() ?? "", actor).id; }
-    const reply = input.entry && input.replyTo ? this.store.get<{ sessionId: string; agentId?: string }>("platform-messages", `${entryKey(input.entry)}:${input.replyTo}`) : undefined;
+    const reply = input.entry && input.replyTo ? this.repository.platformMessage(input.entry, input.replyTo) : undefined;
     selected ??= reply?.sessionId ?? (input.entry ? this.store.get<{ sessionId: string }>("defaults", entryKey(input.entry))?.sessionId : undefined);
     if (!selected) throw new Error("请先创建并选择会话。");
     const session = this.session(selected, actor);
@@ -359,33 +391,24 @@ export class AgentGateway {
           const id = digest({ message: message.id, part: index });
           const delivery: GatewayDelivery = { id, sessionId: session.id, messageId: message.id, entry: session.entry,
             text: `${title}\n${page}`, status: "pending", ...(after ? { after } : {}), ...(original?.sourceMessageId ? { replyTo: original.sourceMessageId } : {}) };
-          this.store.put("deliveries", id, delivery); after = id;
+          this.repository.enqueueDelivery(delivery); after = id;
         }
         for (const [index, part] of (data.content ?? []).entries()) if (part.type === "image") {
           const id = digest({ message: message.id, image: index });
-          this.store.put("deliveries", id, { id, sessionId: session.id, messageId: message.id, entry: session.entry, text: title, image: part, status: "pending", ...(after ? { after } : {}), ...(original?.sourceMessageId ? { replyTo: original.sourceMessageId } : {}) } satisfies GatewayDelivery); after = id;
+          this.repository.enqueueDelivery({ id, sessionId: session.id, messageId: message.id, entry: session.entry, text: title, image: part, status: "pending", ...(after ? { after } : {}), ...(original?.sourceMessageId ? { replyTo: original.sourceMessageId } : {}) }); after = id;
         }
       }
       this.store.put("sessions", session.id, { ...session, updatedAt: message.createdAt }); this.changed(); return message;
     });
   }
-  recordChannelChange(input: ChannelInput, originalState: string, sessionId?: string): void {
+  recordChannelChange(input: ChannelInput, originalState: PendingInput["state"], sessionId?: string): void {
     if (input.eventType !== "edit" && input.eventType !== "delete" || !input.messageId) throw new Error("平台消息变更需要有效的类型和原消息 ID。");
-    this.store.transaction(() => {
-      const id = `${inboxId(input)}:change`;
-      const existing = this.store.get<{ id: string; input: ChannelInput; originalState: string; sessionId?: string; noticeId?: string }>("message-changes", id);
-      if (existing && digest(existing.input) !== digest(input)) throw new Error("平台消息变更事件 ID 内容冲突。");
-      if (existing?.sessionId && sessionId && existing.sessionId !== sessionId) throw new Error("平台消息变更的会话关联发生冲突。");
-      if (existing?.noticeId) return;
-      const change = { ...existing, id, input, originalState: existing?.originalState ?? originalState, ...(sessionId ? { sessionId } : {}) };
-      const session = change.sessionId ? this.store.get<GatewaySession>("sessions", change.sessionId) : undefined;
-      if (session && !["pending", "deleted"].includes(change.originalState)) {
+    this.repository.recordMessageChange(input, originalState, sessionId, session => {
         const actor: GatewayActor = { kind: "platform", account: input.account, conversation: input.conversation, userId: input.sender, ...(input.threadId ? { threadId: input.threadId } : {}) };
         const text = input.eventType === "delete" ? `${actorKey(actor)} 已撤回平台消息 ${input.messageId}。原执行输入继续保存在历史中。`
           : `${actorKey(actor)} 已编辑平台消息 ${input.messageId}。\n最新正文：\n${input.text}`;
         const notice = this.record(session, { kind: "notice", text, actor, sourceMessageId: input.messageId!, sourceEntry: entryKey(input) }, false);
-        this.store.put("message-changes", id, { ...change, noticeId: notice.id });
-      } else this.store.put("message-changes", id, change);
+        return notice.id;
     });
     this.changed();
   }
@@ -428,7 +451,7 @@ export class AgentGateway {
       if (!parsed.literalSession && target === "select") {
         const session = this.session(words.shift() ?? "", actor); this.requireAdmin(session, actor);
         const active = this.store.list<GatewayTask>("tasks").filter(task => task.sessionId === session.id && !terminal(task.status)).length;
-        const deliveries = this.store.list<GatewayDelivery>("deliveries").filter(item => item.sessionId === session.id);
+        const deliveries = this.repository.deliveries().filter(item => item.sessionId === session.id);
         const pending = new Set(deliveries.filter(item => ["pending", "sending", "failed"].includes(item.status)).map(item => item.messageId)).size;
         const unknown = new Set(deliveries.filter(item => item.status === "unknown").map(item => item.messageId)).size;
         const progress = `\n进行中的任务：${active}\n未发送消息：${pending}${unknown ? `\n投递结果未确认：${unknown}` : ""}`;
@@ -457,7 +480,7 @@ export class AgentGateway {
       }
       selected ??= this.store.get<GatewayTask>("tasks", words[1])?.sessionId;
     }
-    const reply = input.entry && input.replyTo ? this.store.get<{ sessionId: string; agentId?: string }>("platform-messages", `${entryKey(input.entry)}:${input.replyTo}`) : undefined;
+    const reply = input.entry && input.replyTo ? this.repository.platformMessage(input.entry, input.replyTo) : undefined;
     selected ??= reply?.sessionId ?? (input.entry ? this.store.get<{ sessionId: string }>("defaults", entryKey(input.entry))?.sessionId : undefined);
     if (!selected) throw new Error("请先创建并选择会话：/session create <名称> --agent <Agent>，然后 /session select <会话>。");
     const session = this.session(selected, actor);
@@ -563,7 +586,7 @@ export class AgentGateway {
     const steering = input.steeringInputId ? this.store.get<{ messageId: string }>("steering", input.steeringInputId) : undefined;
     const priorSteer = steering ? this.store.get<GatewayMessage>("messages", steering.messageId) : undefined;
     const message = priorSteer ?? this.record(session, { kind: "user", text: body, actor, ...(input.content ? { content: input.content } : {}), ...(input.messageId ? { sourceMessageId: input.messageId } : {}), ...(input.entry ? { sourceEntry: entryKey(input.entry) } : {}) }, actor.kind === "operator");
-    if (input.entry && input.messageId) { const id = `${entryKey(input.entry)}:${input.messageId}`; this.store.put("platform-messages", id, { id, sessionId: session.id }); }
+    if (input.entry && input.messageId) this.repository.registerPlatformMessage(input.entry, input.messageId, { sessionId: session.id });
     const graphId = digest({ requestId: input.requestId, actor: actorKey(actor) });
     this.store.put("graphs", graphId, { id: graphId, sessionId: session.id, actor, messageId: message.id, ...(input.content ? { content: input.content } : {}), ...(input.steeringInputId ? { rootInputId: input.steeringInputId } : {}) } satisfies GraphRecord);
     if (this.closing) throw new Error("Gateway 正在关闭。");
@@ -729,14 +752,10 @@ export class AgentGateway {
     const updated: GatewayTask = { ...task, status: outcome.status, ...(outcome.text ? { result: outcome.text } : {}), ...(outcome.detail ? { detail: outcome.detail } : {}), updatedAt: Date.now() };
     this.store.put("tasks", taskId, updated); this.changed(); return updated;
   }
-  retryDelivery(id: string, actor: GatewayActor, confirmUnknown = false): void {
+  retryDelivery(id: string, actor: GatewayActor, confirmUnknown = false) {
     if (actor.kind !== "operator") throw new Error("重新发送消息需要服务管理员权限。");
-    const collection = this.store.get("deliveries", id) ? "deliveries" : "channel-replies";
-    const delivery = this.store.get<{ id: string; status: string } & Record<string, unknown>>(collection, id);
-    if (!delivery) throw new Error("消息投递记录不存在。");
-    if (delivery.status === "sent" || delivery.status === "sending") throw new Error("该消息正在发送或已经发送。");
-    if (delivery.status === "unknown" && !confirmUnknown) throw new Error("发送结果未知，确认可能重复后才能重新发送。");
-    this.store.put(collection, id, { ...delivery, status: "pending" }); this.changed();
+    const pending = this.repository.retryDelivery(id, confirmUnknown);
+    this.changed(); return pending;
   }
   async dispatchTask(taskId: string, actor: GatewayActor): Promise<GatewayTask> {
     const task = this.store.get<GatewayTask>("tasks", taskId);
@@ -918,29 +937,7 @@ export class AgentGateway {
         if (!adapter.capabilities.delete || !adapter.deleteConversation || !binding.conversationId) throw new Error(`Agent ${binding.agentId} 对话清理尚未完成。`);
         await adapter.deleteConversation(binding.conversationId); this.store.delete("bindings", binding.id);
       }
-      this.store.transaction(() => {
-        const inputs = new Set<string>();
-        const receipts = this.store.entries<{ fingerprint: string; sessionId?: string; result?: GatewayReceipt }>("receipts");
-        const receiptIds = new Set(receipts.filter(({ value }) => value.sessionId === session.id || value.result?.sessionId === session.id).map(({ id }) => id));
-        for (const { id, value } of this.store.entries<{ sessionId?: string; input: ChannelInput }>("inbox")) {
-          const input = value.input;
-          const receiptId = digest({ actor: actorKey({ kind: "platform", account: input.account, conversation: input.conversation, userId: input.sender }), requestId: `channel:${id}` });
-          const associated = input.messageId && this.store.get<{ sessionId: string }>("platform-messages", `${entryKey(input)}:${input.messageId}`);
-          if (value.sessionId === session.id || receiptIds.has(receiptId) || associated && associated.sessionId === session.id) inputs.add(id);
-        }
-        for (const collection of ["inbox", "channel-replies", "message-changes"]) {
-          for (const { id, value } of this.store.entries<{ sessionId?: string; input: ChannelInput }>(collection)) {
-            if (value.sessionId === session.id || inputs.has(inboxId(value.input))) this.store.delete(collection, id);
-          }
-        }
-        for (const { id, value } of receipts) if (receiptIds.has(id)) this.store.put("receipts", id, { id, fingerprint: value.fingerprint, error: "原请求所属会话已删除。" });
-        for (const graph of this.store.list<GraphRecord>("graphs")) if (graph.sessionId === session.id) this.store.delete("coordination", graph.id);
-        for (const collection of ["messages", "tasks", "deliveries", "approvals", "events", "graphs", "platform-messages", "steering", "defaults"]) {
-          for (const { id, value } of this.store.entries<{ sessionId: string }>(collection)) if (value.sessionId === session.id) this.store.delete(collection, id);
-        }
-        this.store.delete("sequences", session.id);
-        this.store.delete("sessions", session.id);
-      });
+      this.repository.deleteSession(session.id);
     } else this.store.put("sessions", session.id, { ...session, status: action === "restore" ? "active" : "archived", updatedAt: Date.now() });
     this.changed();
   }

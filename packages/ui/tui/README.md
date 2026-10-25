@@ -42,6 +42,13 @@ Both paths retain delivery order and stable row identities. Queued or cancelled
 input does not appear as delivered conversation content; idle follow-up Runs use
 their ordinary `input.submitted` history record.
 
+Saved history uses `SessionTranscriptReader` from `@sortedyuan/session`, including
+ordinary input and `recovery.resolved` findings. Tool items use `SessionToolStatus`:
+running, completed, failed, denied, not-started, or unknown. Terminal Run events mark
+unfinished tools unknown and partial assistant replies interrupted. Recovery records
+preserve their explicit not-started or unknown outcome. Custom tool renderers must
+handle the expanded status union; custom assistant views must handle interrupted.
+
 `TerminalImages` prepares saved attachments for Kitty/iTerm2/Sixel rendering or text
 display. Graphics travel separately through `RenderResult.images`; the renderer
 clears placements when the viewport changes. See

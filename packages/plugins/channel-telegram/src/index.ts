@@ -94,7 +94,9 @@ export class TelegramAdapter implements ChannelAdapter {
   }
   async readAttachment(input: ChannelInput, attachment: ChannelAttachment, signal: AbortSignal): Promise<ChannelAttachmentData> {
     checkAttachment(this, input, attachment);
-    const file = await this.call("getFile", { file_id: attachment.source.fileId }, signal) as { file_path?: string; file_size?: number };
+    const fileId = attachment.source.fileId;
+    if (typeof fileId !== "string" || !fileId || fileId.length > 256) throw new Error("Invalid Telegram attachment file ID");
+    const file = await this.call("getFile", { file_id: fileId }, signal) as { file_path?: string; file_size?: number };
     if (!file.file_path || !/^[A-Za-z0-9_./-]+$/.test(file.file_path) || file.file_path.split("/").includes("..") || (file.file_size !== undefined && file.file_size > this.capabilities.maxAttachmentBytes)) throw new Error("Invalid Telegram attachment download");
     const response = await this.request(`https://api.telegram.org/file/bot${this.token}/${file.file_path}`, { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]), redirect: "error" });
     if (!response.ok) throw new Error("Telegram attachment download failed");

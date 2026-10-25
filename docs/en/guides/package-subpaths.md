@@ -44,7 +44,7 @@ configuration, activation and replacement behavior. Function names, ServiceToken
 plugin IDs and saved state formats remain unchanged. Existing Session and Skill state
 requires no data conversion; retain any explicit plugin IDs in application configuration.
 
-The [release list](../../../scripts/release-packages.json) contains 38 packages.
+The [release list](../../../scripts/release-packages.json) contains 39 packages.
 The six previous packages are outside that list. Repository verification includes
 `pnpm release:check`, `pnpm test:package:release` with an external directory, and
 `pnpm test:package:plugin`, which installs tarballs outside the repository and runs

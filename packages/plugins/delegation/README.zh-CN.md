@@ -4,7 +4,7 @@
 `workspaceFilesService`，根据选项注册默认编码工具。共享文件守卫串行执行文件访问，
 检查子任务的文件范围，要求子任务修改已有文件前完成读取，并检测其他进程的修改。
 
-`createDelegationPlugin(options)` 声明文件服务、application、model、store、permission
+`createDelegationPlugin(options)` 声明文件服务、Application 执行、历史、状态、model、store、permission
 和组合服务的依赖，提供 `delegationService`。在 `application.created` 完成后，
 `get()` 返回实际 `SubagentHost`。Setup 注册请求预算的模型包装、动态委派工具与
 指令；created Hook 恢复请求记录并初始化 coordination，关闭时取消活动子任务。

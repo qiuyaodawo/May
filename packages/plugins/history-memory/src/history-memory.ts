@@ -1,4 +1,4 @@
-import type { AgentApplication } from "@sortedyuan/application";
+import type { ApplicationHistory, ApplicationState } from "@sortedyuan/application";
 import {
   inspectContextSnapshot,
   type ContextBudget, type ContextController, type ContextFactory,
@@ -37,10 +37,11 @@ interface WorkNotes {
 }
 export interface SavedNotes { version: 1; notes: WorkNotes; coveredWorkSeq: number }
 export interface HistoryMemoryContextOptions { readonly includeInstructions?: boolean }
+export interface HistoryMemoryApplication extends Pick<ApplicationHistory, "history" | "listRecoveries">, ApplicationState {}
 
 /** 每个 application 拥有独立实例，持久状态归属于 Session。 */
 export class HistoryReferenceMemory {
-  private application: AgentApplication | undefined;
+  private application: HistoryMemoryApplication | undefined;
   private controller: ContextController | undefined;
   private budget: ContextBudget | undefined;
   private warned = false;
@@ -49,7 +50,7 @@ export class HistoryReferenceMemory {
 
   constructor(private readonly active: boolean) {}
 
-  attach(application: AgentApplication, persistNotes?: (notes: SavedNotes) => Promise<void>): void {
+  attach(application: HistoryMemoryApplication, persistNotes?: (notes: SavedNotes) => Promise<void>): void {
     this.application = application;
     this.persistNotes = persistNotes;
   }
@@ -221,7 +222,7 @@ export class HistoryReferenceMemory {
     return tools;
   }
 
-  private app(): AgentApplication {
+  private app(): HistoryMemoryApplication {
     if (this.application === undefined) throw new Error("Session memory is not attached");
     return this.application;
   }

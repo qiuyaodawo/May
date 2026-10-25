@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, open, link, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { withFileAccess } from "@sortedyuan/file-storage";
 import { MayConfigWriteError } from "./errors.js";
 import { parseMayConfig } from "./parse.js";
 import type { MayConfig } from "./types.js";

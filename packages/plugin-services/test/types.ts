@@ -5,7 +5,7 @@ import { ModelWrappers, ContextWrappers, ToolSources, InstructionSources, servic
 import { createModelPlugin, createModelWrapperPlugin } from "@sortedyuan/plugin-services/models";
 import { createPermissionPlugin } from "@sortedyuan/plugin-services/permissions";
 import { createRuntimePlugin, createContextPlugin, createToolsPlugin } from "@sortedyuan/plugin-services/runtime";
-import { applicationServices, type AgentApplication } from "../../application/dist/index.js";
+import { applicationServices, type ApplicationFacade, type ApplicationExecution, type ApplicationHistory, type ApplicationState } from "../../application/dist/index.js";
 
 declare const model: Model;
 declare const factory: ContextFactory;
@@ -19,7 +19,11 @@ new InstructionSources().add(() => "instructions", { id: "typed" });
 context.provide(services.model, model);
 context.provide(services.contextFactory, factory);
 context.provide(services.contextOptions, effectiveModel => ({ budget: { contextWindowTokens: effectiveModel.limits?.contextWindowTokens ?? 4096 } } satisfies ContextOptions));
-const application: AgentApplication = context.get(applicationServices.application).get();
+const application: ApplicationFacade = context.get(applicationServices.application).get();
+const execution: ApplicationExecution = context.get(applicationServices.execution).get();
+const history: ApplicationHistory = context.get(applicationServices.history).get();
+const state: ApplicationState = context.get(applicationServices.state).get();
+void execution; void history; void state;
 void application;
 createModelPlugin({ create: () => model });
 createModelPlugin({ info: { provider: "configured", model: "active", profile: "default" }, create: () => model });

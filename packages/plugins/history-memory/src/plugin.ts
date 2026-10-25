@@ -36,7 +36,7 @@ export function createHistoryMemoryPlugin(options: HistoryMemoryPluginOptions = 
     id: "may.history-memory", version: "1.0.0", scope: "application",
     provides: [historyMemoryService, applicationServices.contextOptions],
     requires: [
-      { service: applicationServices.application }, { service: applicationServices.model },
+      { service: applicationServices.history }, { service: applicationServices.state }, { service: applicationServices.model },
       { service: applicationServices.modelWrappers }, { service: applicationServices.contextWrappers },
       { service: applicationServices.toolSources },
       { service: applicationServices.instructionSources },
@@ -89,11 +89,12 @@ export function createHistoryMemoryPlugin(options: HistoryMemoryPluginOptions = 
         () => memory.tools(), { id: context.pluginId, pluginOrder: context.pluginOrder },
       ));
       context.on(applicationHooks.created, async () => {
-        const application = context.get(applicationServices.application).get();
+        const history = context.get(applicationServices.history).get();
+        const state = context.get(applicationServices.state).get();
         const saved = context.state.get<{ notes: SavedNotes | null }>().notes;
-        const event = [...await application.history()].reverse().find(item => item.type === "state.updated" && item.key === "maybecode.context-notes");
-        if (event === undefined && saved !== null) await application.recordState("maybecode.context-notes", saved);
-        memory.attach(application, notes => context.state.set({ notes }));
+        const event = [...await history.history()].reverse().find(item => item.type === "state.updated" && item.key === "maybecode.context-notes");
+        if (event === undefined && saved !== null) await state.recordState("maybecode.context-notes", saved);
+        memory.attach({ history: () => history.history(), listRecoveries: () => history.listRecoveries(), recordState: (key, value) => state.recordState(key, value) }, notes => context.state.set({ notes }));
       }, { order: 0 });
       context.on(applicationHooks.inputReceived, () => memory.cancelRequest());
       context.on(applicationHooks.beforeClose, () => memory.cancelRequest());

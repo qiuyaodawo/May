@@ -16,6 +16,8 @@ Adapter 检查 Bot 身份和 webhook 状态，公开连接状态与平台限流�
 `telegramDeliveryRouting()` 保留回复与 topic 身份；`telegramImageRequest()`
 根据图片格式和大小选择 `sendPhoto` 或 `sendDocument`。附件读取检查来源和访问条件，
 发送方法每次调用执行一次平台请求。
+`readAttachment()` 要求 `source.platform` 为 `telegram`，并校验非空且最长
+256 个字符的 `source.fileId`，随后调用平台下载接口。
 
 离线测试覆盖事件转换、topic/reply 参数和实际 PNG 内容。平台身份、接收、发送和
 附件下载需要有效 Telegram Bot 凭据及授权会话验证。

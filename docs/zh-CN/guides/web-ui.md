@@ -157,6 +157,10 @@ TUI 通过 `/fork` 和 `/changes` 提供相同任务。`/fork` 中使用方向�
 却没有确认结果的工具在取消后仍为结果未知。宿主恢复证据可以证明未执行。
 部分助手回复标记为中断。进度用于实时显示，完成证据另外持久保存。
 
+保存的恢复核查结论作为用户消息显示，历史搜索和完整字段读取包含全部内容。
+Web 与 retained TUI 历史共用 `SessionTranscriptReader`，同时处理普通输入和
+已经交付的 steering。
+
 只有当前 `snapshot.interactions` 提供审批控件。历史审批证据只读，宿主拒绝
 过期或不可用选项。本会话审批要求授权键；输入被截断时只能拒绝。
 
@@ -189,6 +193,12 @@ Session 诊断使用可选 observability 插件。MaybeClaw 提供 `agent.check`
 
 实现 `UiHost`，或者将 `ApplicationUiHost` 接入 `AgentWorkspaceController`。
 浏览器使用适合浏览器的导出，Node 适配器由宿主使用。静态模块通过固定资源表提供。
+
+`ApplicationUiHost` 根据当前宿主身份、活动 Session、执行状态、交互及产品可用性
+验证命令。面板、选项、工作区、分支位置、检查点及 worktree 的展示回调在读取快照时
+执行。快照等待此前的普通命令完成，展示读取期间命令队列保持可用。关闭宿主时拒绝
+新增或尚未执行的命令，等待已经接受的操作和所拥有的 application 完成清理。
+重复调用 `close()` 等待同一次关闭过程。
 
 终端管理执行时，向 `ApplicationUiHost` 提供独立 `events` 和
 `closeApplication: false`。终端负责分发事件和关闭 controller。组合

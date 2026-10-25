@@ -1,6 +1,5 @@
 import { constants } from "node:fs";
-import { acquireFileLock, releaseFileLock, replaceJournalFile } from "@sortedyuan/session/file-store";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { acquireFileLock, releaseFileLock, replaceJournalFile, withFileAccess } from "@sortedyuan/file-storage";
 import { lstat, mkdir, open, readFile, type FileHandle } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { AsyncStateSerializer } from "@sortedyuan/application";

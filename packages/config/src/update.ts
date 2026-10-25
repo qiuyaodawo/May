@@ -8,8 +8,7 @@ import {
 import type { Stats } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
-import { withFileAccess } from "@sortedyuan/session/file-access";
-import { acquireFileLock, releaseFileLock } from "@sortedyuan/session/file-store";
+import { withFileAccess, acquireFileLock, releaseFileLock } from "@sortedyuan/file-storage";
 
 import {
   MayConfigFileError,

@@ -22,6 +22,16 @@
 末尾记录，将未确认的 `sending` 记录保存为 `unknown`。调用方必须在整个使用期间
 持有自己的独占资源；`close()` 支持重复调用。
 
+`ChannelAdapter.name` 与 `ChannelAttachmentSource.platform` 使用渠道自定义的名称。
+附件 `source` 保存该渠道读取附件需要的字符串字段，例如
+`{ platform: "local-files", documentId: "report.txt" }`。公共验证检查字段数量、
+名称和字符串长度；adapter 的 `readAttachment()` 校验自身字段以及附件访问权限。
+一个 `source` 最多包含 32 个字段，字段名称与 `platform` 最长 128 个字符，
+字段值最长 4096 个字符，全部字段均为非空字符串。
+
+升级附件处理代码时，在所属 adapter 中校验并读取 `source.fileId`、
+`source.messageId` 等字段。`ChannelStore` 负责渠道记录；应用迁移检查由宿主提供。
+
 `ChannelStore.inspect()` 与写入操作通过 `<journal-path>.access` 和
 `<journal-path>.access.gate` 文件协调不同
 进程的读取、追加、修复和检查点替换。查询保持日志内容不变；首次访问创建协调文件，

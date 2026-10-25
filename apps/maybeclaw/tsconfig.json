@@ -23,6 +23,7 @@
     { "path": "../../packages/config" },
     { "path": "../../packages/coordination" },
     { "path": "../../packages/core" },
+    { "path": "../../packages/file-storage" },
     { "path": "../../packages/media" },
     { "path": "../../packages/providers" },
     { "path": "../../packages/permissions" },

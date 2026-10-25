@@ -9,6 +9,12 @@ terminal frontends and the Web UI. Use this guide when one objective may span
 several Runs. A configured model, Session storage, and normal tool permissions
 are required. [Run budgets](run-budgets.md) continue to apply to each individual Run.
 
+`GoalController.wrapModel()` preserves the Model preflight interface and dynamic
+capabilities, including attempt reporting, configuration identity, limits and native
+Context compaction. Preflight checks the effective request before Goal accounting
+reserves a call. Requests rejected locally have known zero model usage and create
+no physical-attempt record, including when the Goal is idle.
+
 ## MaybeCode commands
 
 1. Start an objective with `/goal start`, adding only the budgets you require.

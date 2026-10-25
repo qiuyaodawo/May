@@ -6,6 +6,9 @@ callback 在 Model wrappers 应用之后执行，可以使用 provider 插件提
 `createHistoryMemoryPlugin(options?)` 提供 `historyMemoryService` 和
 `services.contextOptions`，注册 Context 容量查询与工作笔记工具，包装 Context
 factory，并在 `application.created` 中连接实际 application。
+插件使用 `applicationServices.history` 和 `.state`。
+`HistoryReferenceMemory.attach()` 接受 `HistoryMemoryApplication`，包含 `history()`、
+`listRecoveries()` 和 `recordState()`。
 `mode` 可以选择 `prune-summary`、`history-reference` 或 `provider-native`。
 显式指定的自动压缩策略覆盖模式配置；选项还接受预算、summarizer 和手动压缩策略。
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import type { ContextFactory } from "@sortedyuan/context";
-import type { Model, ModelRequest, Tool, Usage } from "@sortedyuan/core";
+import type { Model, ModelRequest, ModelStreamOptions, Tool, Usage } from "@sortedyuan/core";
 import { goalBudget, goalText, restoreGoal } from "./state.js";
 import type { GoalAgent, GoalBudget, GoalContextOptions, GoalEvent, GoalModelOptions, GoalOptions, GoalRun, GoalState, GoalStore } from "./types.js";
 
@@ -183,24 +183,46 @@ export class GoalController {
 
   wrapModel(model: Model, wrapperOptions: GoalModelOptions = {}): Model {
     const goal = this;
+    const prepare = (request: ModelRequest, options: ModelStreamOptions) => {
+      if (!goal.isRunning) return { request, options };
+      const signal = AbortSignal.any([options.signal, goal.controller!.signal]);
+      signal.throwIfAborted();
+      return {
+        request: options.runId === undefined || wrapperOptions.includeInstructions === false ? request : goal.currentRequest(request),
+        options: { ...options, signal },
+      };
+    };
     return {
-      ...(model.limits === undefined ? {} : { limits: model.limits }),
-      ...(model.contextCompactor === undefined ? {} : { contextCompactor: {
-        name: model.contextCompactor.name,
-        async compact(snapshot, options) {
-          if (goal.isRunning && goal.state?.budget.maxTotalTokens !== undefined) {
-            const error = new Error("Native context compaction does not report token usage for goal accounting");
-            goal.controller!.abort(error);
-            throw error;
-          }
-          return model.contextCompactor!.compact(snapshot, options);
-        },
-      } }),
+      get limits() { return model.limits; },
+      get reportsAttempts() { return model.reportsAttempts; },
+      get configuration() { return model.configuration; },
+      get capabilityVersion() { return model.capabilityVersion; },
+      get contextCompactor(): Model["contextCompactor"] {
+        const compactor = model.contextCompactor;
+        if (compactor === undefined) return undefined;
+        return {
+          name: compactor.name,
+          async compact(snapshot, options) {
+            if (goal.isRunning && goal.state?.budget.maxTotalTokens !== undefined) {
+              const error = new Error("Native context compaction does not report token usage for goal accounting");
+              goal.controller!.abort(error);
+              throw error;
+            }
+            return compactor.compact(snapshot, options);
+          },
+        };
+      },
+      async preflight(request, options) {
+        const prepared = prepare(request, options);
+        await model.preflight?.(prepared.request, prepared.options);
+        prepared.options.signal.throwIfAborted();
+      },
       async *stream(request, options) {
         if (!goal.isRunning) { yield* model.stream(request, options); return; }
-        const signal = AbortSignal.any([options.signal, goal.controller!.signal]);
+        const prepared = prepare(request, options);
+        const { signal } = prepared.options;
+        await model.preflight?.(prepared.request, prepared.options);
         signal.throwIfAborted();
-        const currentRequest = options.runId === undefined || wrapperOptions.includeInstructions === false ? request : goal.currentRequest(request);
         const id = randomUUID();
         await goal.change(state => {
           goal.checkLimits(state, false);
@@ -210,7 +232,7 @@ export class GoalController {
         let settled = false;
         try {
           signal.throwIfAborted();
-          for await (const event of model.stream(currentRequest, { ...options, signal })) {
+          for await (const event of model.stream(prepared.request, prepared.options)) {
             if (event.type === "retrying") {
               await goal.change(state => ({ ...state,
                 calls: [...state.calls, { id: `${id}:retry:${event.attempt}`, status: "unknown" }],

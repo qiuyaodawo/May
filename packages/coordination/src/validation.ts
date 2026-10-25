@@ -131,6 +131,7 @@ export function validateSnapshot(snapshot: CoordinationSnapshot, id: string): vo
   const dispatches = new Set<string>();
   validateGraphHistory(snapshot, sessions, dispatches);
   for (const task of snapshot.tasks) {
+    if (task.recoveryVersion !== undefined) positive(task.recoveryVersion, "recoveryVersion");
     if (!Array.isArray(task.dependsOn)) throw new Error("Missing persisted dependencies");
     if (task.cancelRequested !== undefined && typeof task.cancelRequested !== "boolean") throw new Error("Invalid cancellation intent");
     name(task.agentVersion, "agent version"); name(task.sessionId, "session id"); name(task.dispatchId, "dispatch id");
@@ -217,6 +218,7 @@ function validateAttempts(task: CoordinationTask, snapshot: CoordinationSnapshot
   for (const [index, attempt] of attempts.entries()) {
     name(attempt.commandId, "retry command id");
     const old = attempt.task;
+    if (old?.recoveryVersion !== undefined) positive(old.recoveryVersion, "recoveryVersion");
     if (!old || Object.hasOwn(old, "attempts") || old.id !== task.id || (old.attempt ?? 0) !== index || (old.attemptStartTurn ?? 0) !== previousTurn + 1 || !["failed", "cancelled"].includes(old.status) || !Number.isSafeInteger(old.turn ?? 0) || (old.turn ?? 0) < (old.attemptStartTurn ?? 0)) throw new Error("Invalid previous attempt");
     if (typeof attempt.finding !== "string" || !attempt.finding.trim() || Buffer.byteLength(attempt.finding, "utf8") > snapshot.limits.maxOutputBytes || snapshot.commands[attempt.commandId] !== canonical({ type: "retry", taskId: task.id, finding: attempt.finding })) throw new Error("Attempt has no matching retry finding/receipt");
     if (old.input !== task.input || canonical(old.dependsOn) !== canonical(task.dependsOn) || old.parentTaskId !== task.parentTaskId || old.createdByCommand !== task.createdByCommand) throw new Error("Retry changed task specification or ownership");
@@ -248,6 +250,7 @@ function validateGraphHistory(snapshot: CoordinationSnapshot, sessions: Set<stri
     if (!all.length || all.length > snapshot.limits.maxTasks || new Set(all).size !== all.length || canonical([...touched].sort()) !== canonical(revision.previous.map((task: CoordinationTask) => task.id).sort())) throw new Error("Invalid graph rewrite identities");
     for (const id of all) { name(id, "graph rewrite task id"); if (removed.has(id)) throw new Error("Removed task id was reused"); }
     for (const old of revision.previous) {
+      if (old.recoveryVersion !== undefined) positive(old.recoveryVersion, "recoveryVersion");
       if (old.status !== "queued" || old.parentTaskId !== undefined || old.createdByCommand !== undefined || (old.turn ?? 0) !== 0 || old.inbox !== undefined || old.cancelRequested || old.output || old.waitFor || old.waitForMessages || old.pendingHandoff || old.handoffs?.length || old.attempts?.length) throw new Error("Graph rewrite discarded submitted history");
       for (const [value, ids] of [[old.sessionId, sessions], [old.dispatchId, dispatches]] as const) {
         name(value, "previous graph identity"); if (ids.has(value)) throw new Error("Duplicate previous graph identity"); ids.add(value);

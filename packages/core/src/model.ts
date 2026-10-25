@@ -85,7 +85,7 @@ export interface Model {
   readonly configuration?: Readonly<Record<string, string | number | boolean>> | undefined;
   readonly limits?: ModelLimits | undefined;
   /** Optional provider-native context compaction capability. */
-  readonly contextCompactor?: ModelContextCompactor;
+  readonly contextCompactor?: ModelContextCompactor | undefined;
   preflight?(request: ModelRequest, options: ModelStreamOptions): Promise<void>;
   stream(
     request: ModelRequest,

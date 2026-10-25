@@ -205,8 +205,9 @@ that their own fields do not expose.
 ## Runtime and application services
 
 `@sortedyuan/plugin-services` defines the shared typed tokens. `applicationServices`
-reexports them and adds `application`, whose `get()` returns the active
-AgentApplication after creation. Tokens cover `model`, `modelInfo`, `contextFactory`,
+reexports them and adds `execution`, `history`, `state` and `application` accessors.
+Their `get()` methods return frozen structural interfaces after creation.
+Tokens cover `model`, `modelInfo`, `contextFactory`,
 `contextOptions`, `sessionStore`, `permissionPolicy`, `toolExecutor`,
 `toolScheduler`, `tracer`, `tools`, `skills`, `runtimeFactory`, `toolSources`,
 `instructionSources`, `modelWrappers` and `contextWrappers`.
@@ -215,6 +216,25 @@ Service providers supplied through plugins must have a unique provider. A plugin
 can jointly provide a runtime factory and its Context factory.
 The Session store supplied through `open({ store })` is a caller-owned entry
 service used during restoration and remains the same for that Session.
+
+Declare `applicationServices.execution` for `sessionId`, `isRunning`, `submit()`,
+`continue()` and `resolveApproval()`. Declare `.history` for `history()`,
+`queryHistory()`, `listRecoveries()`, `branchPositions()` and `saveBranchPosition()`;
+declare `.state` for `recordState()`. Their views forward each call to the current
+Application and remain valid through plugin replacement. Access before creation
+or after closure fails. Close Hooks and disposers can read history and save final
+state; closing rejects new execution immediately. The host owns `close()`,
+`updatePlugins()` and skill activation.
+`applicationServices.application` combines these capabilities and scoped service
+lookup as `ApplicationFacade`. Migrate plugin callbacks typed as `AgentApplication`
+to the capability interface they need. `GoalsPluginOptions.createAgent` receives
+`ApplicationFacade`.
+
+Contribution service tokens use `ToolSourceRegistry`, `InstructionSourceRegistry`,
+`ModelWrapperRegistry` and `ContextWrapperRegistry`. Independent implementations
+provide `add()` plus `snapshot()` or `apply()`, retain ordering, and remove entries
+through the returned disposer. Tool snapshots return an `Iterable<Tool>`;
+Application validates names and captures definitions for each Run.
 
 `createModelPlugin({ create, info })` may also provide `modelInfo`, describing the
 actual instance's provider, model, adapter and profile. A plugin that provides

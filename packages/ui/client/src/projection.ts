@@ -2,7 +2,7 @@ import type { ContentPart, MediaSource, MayEvent, SerializedError, UserMessage }
 import { displayParts, imageAttachment } from "@sortedyuan/media";
 import type { AgentApplicationEvent } from "@sortedyuan/application";
 import type { PermissionEvent } from "@sortedyuan/permissions";
-import type { SessionEvent } from "@sortedyuan/session";
+import { isSessionRunTerminalEvent, readSessionTranscript, sessionToolFailureStatus, type SessionEvent } from "@sortedyuan/session";
 import type { UiBlock, UiBlockStatus, UiDiagnostic, UiInteraction } from "./protocol.js";
 
 const LIMIT = 65_536;
@@ -47,20 +47,15 @@ export class UiProjection {
   }
   history(events: readonly SessionEvent[]): void {
     let inputId: string | undefined;
-    const steering = new Map<string, UserMessage>();
-    for (const event of events) {
-      if (event.type === "input.submitted") { if (event.inputId !== undefined) steering.delete(event.inputId); inputId = `input:${event.seq}`; this.set({ id: inputId, kind: "user", text: contentText(event.message.content), content: this.content(event.message.content) }); }
-      else if (event.type === "input.steering.queued") steering.set(event.input.inputId, event.input.message);
-      else if (event.type === "input.steering.delivered") {
-        this.steered(event.runId, event.step, event.inputIds.map(id => {
-          const message = steering.get(id);
-          if (message === undefined) throw new Error(`Missing steering input in UI history: ${id}`);
-          steering.delete(id);
-          return message;
-        }));
+    for (const entry of readSessionTranscript(events)) {
+      if (entry.type === "user-message") {
+        if (entry.source !== "steering") inputId = entry.id;
+        this.set({ id: entry.id, kind: "user", text: contentText(entry.message.content), content: this.content(entry.message.content),
+          ...(entry.runId === undefined ? {} : { runId: entry.runId }) });
+        continue;
       }
-      else if (event.type === "input.steering.finished" && event.status === "cancelled") for (const id of event.inputIds) steering.delete(id);
-      else if (event.type === "run.started" && inputId) { const input = this.blocks.get(inputId); if (input) this.set({ ...input, runId: event.runId }); inputId = undefined; }
+      const event = entry.event;
+      if (event.type === "run.started" && inputId) { const input = this.blocks.get(inputId); if (input) this.set({ ...input, runId: event.runId }); inputId = undefined; }
       else if (event.type === "assistant.completed") this.assistantCompleted(event.runId, event.step, event.message.content);
       else if (event.type === "tool.presentation") this.presentation(event);
       else if (event.type.startsWith("approval.")) this.permission(event as ApprovalEvent, false);
@@ -138,7 +133,7 @@ export class UiProjection {
     if ("call" in event) {
       const id = `tool:${event.runId}:${event.call.id}`, previous = this.blocks.get(id);
       let status: UiBlockStatus = event.type === "tool.completed" ? "completed" : "running";
-      if (event.type === "tool.failed") status = event.error.code === "PERMISSION_DENIED" ? "denied" : event.error.code === "TOOL_SKIPPED" ? "not-started" : event.error.code === "RUN_CANCELLED" ? previous?.approval?.status === "cancelled" ? "not-started" : "unknown" : "failed";
+      if (event.type === "tool.failed") status = sessionToolFailureStatus(event.error, previous?.approval?.status === "cancelled");
       const text = event.type === "tool.completed" ? displayValue(event.output) : event.type === "tool.output.delta" ? ((previous?.text ?? "") + event.delta).slice(-LIMIT) : previous?.text ?? "";
       this.set({ ...previous, id, kind: "tool", runId: event.runId, toolCallId: event.call.id, title: event.call.name, input: displayValue(event.call.input), text, status,
         ...(event.type === "tool.completed" && event.content ? { content: this.content(event.content) } : {}),
@@ -148,6 +143,6 @@ export class UiProjection {
     if (event.type === "run.failed" || event.type === "run.cancelled") this.set({ id: `run:${event.runId}`, kind: "notice", runId: event.runId,
       text: event.type === "run.failed" ? "运行失败" : displayValue(event.reason ?? "运行已取消。"),
       ...(event.type === "run.failed" ? { diagnostic: diagnostic(event.error) } : {}), status: event.type === "run.failed" ? "failed" : "cancelled" });
-    if (["run.completed", "run.failed", "run.cancelled", "run.yielded"].includes(event.type)) this.settle(event.runId);
+    if (isSessionRunTerminalEvent(event)) this.settle(event.runId);
   }
 }

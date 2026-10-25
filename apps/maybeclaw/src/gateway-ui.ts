@@ -4,10 +4,9 @@ import { commandArgs, createTelemetryPanel, UiError, type UiTelemetryData, type 
 import { historyPage, readPage, fieldPage } from "@sortedyuan/ui-client/reading";
 import { UiProjection } from "@sortedyuan/ui-client/projection";
 import { displayParts, imageAttachment, readEmbeddedImage } from "@sortedyuan/media";
-import type { AgentApplicationEvent } from "@sortedyuan/application";
 import type { ApprovalDecision } from "@sortedyuan/permissions";
-import type { AgentGateway } from "./gateway.js";
-import type { GatewayActor, GatewayAgentConfig, GatewayApproval, GatewayBinding, GatewayDelivery, GatewayEntry, GatewaySession, GatewayTask } from "./gateway-types.js";
+import type { GatewayController } from "./gateway-api.js";
+import type { GatewayActor, GatewayAgentConfig, GatewayEntry, GatewaySession } from "./gateway-types.js";
 import { actorKey } from "./gateway-types.js";
 import type { LegacyTaskRecord } from "./gateway-migration.js";
 import { digest } from "./types.js";
@@ -19,23 +18,24 @@ export class GatewayUiHost implements UiHost {
   private revision = 0;
   private readonly listeners = new Set<() => void>();
   private readonly unsubscribe: () => void;
-  constructor(readonly gateway: AgentGateway, private readonly hostStatus: () => unknown = () => gateway.status(), private readonly retryLegacyDelivery?: (id: string, confirmUnknown: boolean) => unknown) {
+  constructor(readonly gateway: GatewayController, private readonly hostStatus: () => unknown = () => gateway.status(), private readonly retryLegacyDelivery?: (id: string, confirmUnknown: boolean) => unknown) {
     this.unsubscribe = gateway.observe(() => { this.revision++; for (const listener of this.listeners) listener(); });
   }
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
   close(): void { this.unsubscribe(); this.listeners.clear(); }
 
   async snapshot(selectedId?: string, all = false): Promise<UiSnapshot> {
-    const legacy = selectedId?.startsWith("legacy:") ? this.gateway.store.get<LegacyTaskRecord>("legacy-tasks", selectedId.slice(7)) : undefined;
+    const legacy = selectedId?.startsWith("legacy:") ? this.gateway.legacyTask(selectedId.slice(7), controlActor) : undefined;
     if (selectedId?.startsWith("legacy:") && !legacy) throw new UiError(404, "历史任务不存在。");
     const session = selectedId && !legacy ? this.gateway.session(selectedId, controlActor) : undefined;
-    const tasks = this.gateway.store.list<GatewayTask>("tasks").filter(task => task.sessionId === session?.id);
-    const approvals = this.gateway.store.list<GatewayApproval>("approvals").filter(item => item.sessionId === session?.id);
+    const persistentRules = this.gateway.configuration(controlActor).persistentRules;
+    const tasks = session ? this.gateway.tasks(controlActor, session.id) : [];
+    const approvals = session ? this.gateway.approvals(controlActor, session.id) : [];
     const blocks = legacy ? this.legacyBlocks(legacy) : session ? this.blocks(session) : [];
     const page = historyPage(this.hostId, selectedId ?? "", blocks);
     const resources = this.resourceList();
     const commands = ["session.new", "session.create", "session.activate", "gateway.command", "gateway.inspect", "agent.save", "agent.delete", "agent.check", "approval.resolve", "delivery.retry"];
-    if (this.gateway.options.settings.persistentRules) commands.push("permission.rule.create", "permission.rule.revoke");
+    if (persistentRules) commands.push("permission.rule.create", "permission.rule.revoke");
     if (session) commands.push("session.rename", "session.archive", "session.restore", "session.delete", "session.default", "session.bind", "session.admins", "agent.default", "agent.allow", "session.diagnostics");
     if (session?.status === "active") commands.push("message.submit", "run.cancel");
     return {
@@ -49,7 +49,7 @@ export class GatewayUiHost implements UiHost {
       interactions: approvals.filter(item => item.status === "pending" && item.expiresAt > Date.now()).map(item => ({
         id: item.id, kind: "approval", title: `${item.agentId} · ${item.kind === "tool" ? "工具审批" : "创建 Agent 对话"}`, detail: item.text,
         blockId: `approval:${item.id}`, runId: item.taskId ?? "", toolCallId: item.requestId, toolName: item.agentId,
-        choices: [{ value: "allow", label: "允许本次" }, ...(item.grantKey ? [{ value: "allow-session", label: "允许该 Agent 对话中的同类操作" }] : []), ...(item.persistent && this.gateway.options.settings.persistentRules ? [{ value: "allow-persistent", label: "保存持久允许规则" }] : []), { value: "deny", label: "拒绝" }],
+        choices: [{ value: "allow", label: "允许本次" }, ...(item.grantKey ? [{ value: "allow-session", label: "允许该 Agent 对话中的同类操作" }] : []), ...(item.persistent && persistentRules ? [{ value: "allow-persistent", label: "保存持久允许规则" }] : []), { value: "deny", label: "拒绝" }],
       })),
       panels: [
         { id: "agents", title: "已配置 Agent", fields: this.gateway.status().agents.map(agent => ({ label: agent.id, value: `${agent.name} · ${agent.status}` })) },
@@ -57,13 +57,13 @@ export class GatewayUiHost implements UiHost {
           { label: "会话 ID", value: session.id }, { label: "状态", value: session.status },
           { label: "默认 Agent", value: session.defaultAgents.join(", ") }, { label: "可用 Agent", value: session.allowedAgents.join(", ") },
           { label: "聊天入口", value: session.entry ? JSON.stringify(session.entry) : "控制端会话" },
-          ...this.gateway.store.list<GatewayBinding>("bindings").filter(binding => binding.sessionId === session.id).map(binding => ({ label: binding.agentId, value: `${binding.status} · ${binding.conversationId ?? binding.error ?? "尚无对话 ID"}` })),
+          ...this.gateway.bindings(controlActor, session.id).map(binding => ({ label: binding.agentId, value: `${binding.status} · ${binding.conversationId ?? binding.error ?? "尚无对话 ID"}` })),
         ] }] : []),
         { id: "tasks", title: "执行", fields: tasks.map(task => ({ label: `${task.agentId} · ${task.id}`, value: `${task.status} · graph ${task.graphId} · task ${task.graphTaskId}${task.detail ? ` · ${task.detail}` : ""}` })) },
         ...(session ? [{ id: "telemetry", title: "执行诊断", fields: [], actions: [{ label: "查询当前会话", command: "session.diagnostics", args: {} }] }] : []),
-        { id: "deliveries", title: "消息投递", fields: this.gateway.store.list<GatewayDelivery>("deliveries").filter(item => item.sessionId === session?.id).map(item => ({ label: `${item.entry.account} · ${item.id}`, value: item.status })) },
+        { id: "deliveries", title: "消息投递", fields: (session ? this.gateway.deliveries(controlActor, session.id) : []).map(item => ({ label: `${item.entry.account} · ${item.id}`, value: item.status })) },
         { id: "host", title: "服务状态", fields: [{ label: "Gateway", value: JSON.stringify(this.hostStatus(), null, 2) }] },
-        ...(this.gateway.options.settings.persistentRules ? [{ id: "permission-rules", title: "持久权限规则", fields: [],
+        ...(persistentRules ? [{ id: "permission-rules", title: "持久权限规则", fields: [],
           actions: [{ label: "查看和管理规则", command: "gateway.inspect", args: { kind: "permission-rules" } }] }] : []),
       ],
       notice: "浏览页面只改变当前窗口。入口默认会话通过会话管理中的明确操作修改。",
@@ -73,7 +73,7 @@ export class GatewayUiHost implements UiHost {
   private resourceList() {
     return [
       ...this.gateway.sessions(controlActor).map(session => ({ id: session.id, kind: "session" as const, title: session.name, status: session.status, updatedAt: session.updatedAt })),
-      ...this.gateway.store.list<LegacyTaskRecord>("legacy-tasks").map(task => ({ id: `legacy:${task.id}`, kind: "task" as const, title: `历史任务 · ${task.snapshot.spec.prompt.slice(0, 64)}`, status: task.status, updatedAt: task.snapshot.updatedAt })),
+      ...this.gateway.legacyTasks(controlActor).map(task => ({ id: `legacy:${task.id}`, kind: "task" as const, title: `历史任务 · ${task.snapshot.spec.prompt.slice(0, 64)}`, status: task.status, updatedAt: task.snapshot.updatedAt })),
     ].sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
   }
   private blocks(session: GatewaySession): UiBlock[] {
@@ -86,30 +86,30 @@ export class GatewayUiHost implements UiHost {
     }));
     for (const message of this.gateway.messages(session.id, controlActor)) times.set(message.id, message.createdAt);
     const projection = new UiProjection(Infinity);
-    for (const item of this.gateway.store.list<{ sessionId: string; event: AgentApplicationEvent; at: number }>("events")) if (item.sessionId === session.id) {
+    for (const item of this.gateway.events(session.id, controlActor)) {
       projection.event(item.event);
       if (item.event.type === "run.event" && "call" in item.event.event) {
         const id = `tool:${item.event.event.runId}:${item.event.event.call.id}`; if (!times.has(id)) times.set(id, item.at);
       }
     }
     messages.push(...[...projection.blocks.values()].filter(block => block.kind === "tool"));
-    for (const approval of this.gateway.store.list<GatewayApproval>("approvals").filter(item => item.sessionId === session.id)) messages.push({
+    for (const approval of this.gateway.approvals(controlActor, session.id)) messages.push({
       id: `approval:${approval.id}`, kind: "notice", text: approval.text, title: `${approval.agentId} · 审批`,
       approval: { id: approval.id, status: ["expired", "unknown", "resolving"].includes(approval.status) ? "cancelled" : approval.status as "pending" | "allowed" | "denied" | "cancelled" },
     });
-    for (const approval of this.gateway.store.list<GatewayApproval>("approvals")) times.set(`approval:${approval.id}`, approval.createdAt);
+    for (const approval of this.gateway.approvals(controlActor, session.id)) times.set(`approval:${approval.id}`, approval.createdAt);
     return messages.sort((a, b) => (times.get(a.id) ?? 0) - (times.get(b.id) ?? 0));
   }
   async media(selectedId: string, id: string) {
     const projection = new UiProjection(Infinity);
     if (selectedId.startsWith("legacy:")) {
-      const legacy = this.gateway.store.get<LegacyTaskRecord>("legacy-tasks", selectedId.slice(7));
+      const legacy = this.gateway.legacyTask(selectedId.slice(7), controlActor);
       if (!legacy) throw new UiError(404, "历史任务不存在。"); projection.history(legacy.history);
     } else {
       for (const message of this.gateway.messages(selectedId, controlActor)) for (const part of message.content ?? []) {
         if (part.type === "image" && imageAttachment(part.source).id === id) return readEmbeddedImage(part.source);
       }
-      for (const item of this.gateway.store.list<{ sessionId: string; event: AgentApplicationEvent }>("events")) if (item.sessionId === selectedId) projection.event(item.event);
+      for (const item of this.gateway.events(selectedId, controlActor)) projection.event(item.event);
     }
     const source = projection.mediaSources.get(id); if (!source) throw new UiError(404, "图片不属于当前会话。");
     return readEmbeddedImage(source);
@@ -148,15 +148,15 @@ export class GatewayUiHost implements UiHost {
     }
     if (command.name === "gateway.inspect") {
       commandArgs(command, ["kind"]);
-      const data = command.args.kind === "agents" ? this.gateway.options.settings.agents
+      const data = command.args.kind === "agents" ? this.gateway.configuration(controlActor).agents
         : command.args.kind === "agent-status" ? this.gateway.status().agents
-        : command.args.kind === "settings" ? this.gateway.options.settings
+        : command.args.kind === "settings" ? this.gateway.configuration(controlActor)
         : command.args.kind === "sessions" ? this.gateway.sessions(controlActor)
-        : command.args.kind === "bindings" ? this.gateway.store.list<GatewayBinding>("bindings")
-        : command.args.kind === "tasks" ? { tasks: this.gateway.store.list<GatewayTask>("tasks"), graphs: this.gateway.store.list("coordination") }
-        : command.args.kind === "approvals" ? this.gateway.store.list<GatewayApproval>("approvals")
+        : command.args.kind === "bindings" ? this.gateway.bindings(controlActor)
+        : command.args.kind === "tasks" ? { tasks: this.gateway.tasks(controlActor), graphs: this.gateway.coordinationSnapshots(controlActor) }
+        : command.args.kind === "approvals" ? this.gateway.approvals(controlActor)
         : command.args.kind === "permission-rules" ? await this.gateway.listPermissionRules(controlActor)
-        : command.args.kind === "channels" ? { host: this.hostStatus(), defaults: this.gateway.store.list("defaults"), entries: this.gateway.sessions(controlActor).filter(item => item.entry).map(item => ({ sessionId: item.id, name: item.name, entry: item.entry })) }
+        : command.args.kind === "channels" ? { host: this.hostStatus(), defaults: this.gateway.entryDefaults(controlActor), entries: this.gateway.sessions(controlActor).filter(item => item.entry).map(item => ({ sessionId: item.id, name: item.name, entry: item.entry })) }
         : undefined;
       if (data === undefined) throw new UiError(400, "未知管理页面。");
       if (command.args.kind === "permission-rules") {
@@ -222,7 +222,7 @@ export class GatewayUiHost implements UiHost {
     if (!target) throw new UiError(400, "需要先选择会话。");
     if (command.name === "session.diagnostics") {
       commandArgs(command, []);
-      const bindings = this.gateway.store.list<GatewayBinding>("bindings").filter(binding => binding.sessionId === target.id && binding.conversationId !== undefined);
+      const bindings = this.gateway.bindings(controlActor, target.id).filter(binding => binding.conversationId !== undefined);
       const data = await Promise.all(bindings.map(async binding => {
         const adapter = await this.gateway.adapter(binding.agentId);
         const result = adapter.diagnostics?.(binding.conversationId!, { limit: 40 }) as UiTelemetryData | undefined;

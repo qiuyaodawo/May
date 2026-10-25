@@ -19,6 +19,13 @@ under the same Goal budget and cancellation signal while their own Context
 retains the task's instructions. The default wrapper requires
 `wrapContextFactory()` for the main Agent's current Goal instructions.
 
+The wrapper preserves `Model.preflight`, `reportsAttempts`, `configuration`,
+`capabilityVersion`, `limits`, and `contextCompactor`. Dynamic capabilities remain
+visible after discovery or refresh. Preflight validates the effective Goal request
+before a model-call accounting entry is reserved; locally rejected requests leave
+token usage known and create no physical-attempt record. The same behavior applies
+when the Goal is idle.
+
 `wrapContextFactory(factory, { includeInstructions: false })` supports hosts
 that register `instructions()` in their own ordered instruction sources. It
 retains the measured continuation reminder and invalidates Context measurement

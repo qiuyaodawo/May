@@ -15,6 +15,8 @@ Adapter 确认 Bot 身份并通过官方 SDK 管理 WebSocket；宿主接收函�
 包内导出 `feishuInput()`、`feishuMemberInputs()`、`feishuRecallInput()`、
 `feishuDeliveryRequest()` 与 `feishuImageRequest()`。图片上传使用真实图片解码与
 PNG 转换；附件下载检查原始消息、授权条件和大小限制。
+`readAttachment()` 要求 `source.platform` 为 `feishu`，`source.fileId` 为非空且
+最长 256 个字符的字符串，`source.messageId` 与当前输入的 `messageId` 相同。
 
 离线测试覆盖消息、撤回、成员事件、回复参数和实际 PNG 转换。平台身份、WebSocket
 接收、投递和附件下载需要有效 Feishu 应用凭据及授权会话验证。

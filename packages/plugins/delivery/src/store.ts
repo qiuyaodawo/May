@@ -1,7 +1,5 @@
-import { replaceJournalFile } from "@sortedyuan/session/file-store";
-import { withFileAccess } from "@sortedyuan/session/file-access";
+import { replaceJournalFile, withFileAccess } from "@sortedyuan/file-storage";
 import { access, open, readFile, type FileHandle } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
 import { digest, validateId } from "./identity.js";
 
 export interface ChannelInput {
@@ -14,8 +12,9 @@ export interface ChannelInput {
 export interface ChannelAttachment {
   id: string; kind: "image" | "file" | "audio" | "video" | "unsupported";
   name?: string; mediaType?: string; size?: number;
-  source: { platform: "telegram" | "feishu"; fileId: string; messageId?: string };
+  source: ChannelAttachmentSource;
 }
+export interface ChannelAttachmentSource { platform: string; [key: string]: string }
 export interface ChannelDeliveryReceipt { messageId: string; threadId?: string }
 export interface InboxRecord { kind: "inbox"; id: string; input: ChannelInput; processed: boolean; taskId?: string; terminalNotified?: boolean }
 export interface DeliveryRecord {
@@ -46,15 +45,6 @@ export class ChannelStore {
     return [...records.values()];
   }
   static async open(path: string): Promise<ChannelStore> {
-    if (basename(path) === "channels.jsonl") {
-      for (const marker of ["gateway.format.json", "gateway.sqlite"]) {
-        const migrated = await access(join(dirname(path), marker)).then(() => true, error => {
-          if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-          throw error;
-        });
-        if (migrated) throw new Error("Legacy channel storage is read-only after Gateway migration");
-      }
-    }
     let file: FileHandle | undefined;
     try {
       const store = await withFileAccess(path, "exclusive", async () => {
@@ -156,8 +146,10 @@ export function validateChannelInput(input: ChannelInput): void {
       if (typeof attachment.id !== "string" || !attachment.id || attachment.id.length > 256) throw new Error("Invalid attachment ID");
       optionalString(attachment.name, "attachment name", 1024); optionalString(attachment.mediaType, "attachment media type");
       if (attachment.size !== undefined && (!Number.isSafeInteger(attachment.size) || attachment.size < 0)) throw new Error("Invalid attachment size");
-      if (!attachment.source || !["telegram", "feishu"].includes(attachment.source.platform) || typeof attachment.source.fileId !== "string" || !attachment.source.fileId || attachment.source.fileId.length > 256) throw new Error("Invalid attachment source");
-      optionalString(attachment.source.messageId, "attachment message ID");
+      if (!attachment.source || typeof attachment.source !== "object" || Array.isArray(attachment.source)
+        || typeof attachment.source.platform !== "string" || !attachment.source.platform.trim() || attachment.source.platform.length > 128) throw new Error("Invalid attachment source");
+      const references = Object.entries(attachment.source);
+      if (references.length > 32 || references.some(([key, value]) => !key || key.length > 128 || typeof value !== "string" || !value || value.length > 4096)) throw new Error("Invalid attachment source reference");
     }
   }
 }

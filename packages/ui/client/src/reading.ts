@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { SessionEvent } from "@sortedyuan/session";
+import { readSessionTranscript, type SessionEvent } from "@sortedyuan/session";
 import { UiError, type UiBlock, type UiField, type UiFieldPage, type UiFieldRequest, type UiPage, type UiPageRequest } from "./protocol.js";
 
 const PAGE_SIZE = 50, PAGE_CHARACTERS = 262_144;
@@ -46,26 +46,16 @@ function eventFields(event: SessionEvent): { id: string; fields: Partial<Record<
     text: event.message.content.filter(part => part.type === "text").map(part => part.text).join(""),
     reasoning: event.message.content.filter(part => part.type === "reasoning").map(part => part.text).join(""),
   } };
-  if (event.type === "input.submitted") return { id: `input:${event.seq}`, fields: { text: event.message.content.filter(part => part.type === "text").map(part => part.text).join("") } };
   if (event.type === "run.failed") return { id: `run:${event.runId}`, fields: { diagnostic: event.error.message } };
   return undefined;
 }
 function* historyFields(events: readonly SessionEvent[]): Iterable<{ id: string; fields: Partial<Record<UiField, string>> }> {
-  const steering = new Map<string, string>();
-  for (const event of events) {
-    if (event.type === "input.steering.queued") steering.set(event.input.inputId, event.input.message.content.filter(part => part.type === "text").map(part => part.text).join(""));
-    else if (event.type === "input.steering.delivered") {
-      for (const [index, inputId] of event.inputIds.entries()) {
-        const text = steering.get(inputId);
-        if (text === undefined) throw new Error(`Missing steering input in UI history: ${inputId}`);
-        steering.delete(inputId);
-        yield { id: `steering:${event.runId}:${event.step}:${index}`, fields: { text } };
-      }
+  for (const entry of readSessionTranscript(events)) {
+    if (entry.type === "user-message") {
+      yield { id: entry.id, fields: { text: entry.message.content.filter(part => part.type === "text").map(part => part.text).join("") } };
     } else {
-      if (event.type === "input.submitted" && event.inputId !== undefined) steering.delete(event.inputId);
-      if (event.type === "input.steering.finished" && event.status === "cancelled") for (const inputId of event.inputIds) steering.delete(inputId);
-      const entry = eventFields(event);
-      if (entry) yield entry;
+      const fields = eventFields(entry.event);
+      if (fields) yield fields;
     }
   }
 }

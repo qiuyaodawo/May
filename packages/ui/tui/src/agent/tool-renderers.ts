@@ -167,12 +167,12 @@ function header(
   options: ToolTranscriptRenderOptions,
   detail: string,
 ): TextDocumentLine {
-  const marker = item.status === "completed" ? "✓" : item.status === "failed" ? "✗" : "●";
+  const marker = item.status === "completed" ? "✓" : item.status === "failed" || item.status === "denied" ? "✗" : item.status === "unknown" ? "?" : item.status === "not-started" ? "○" : "●";
   const markerStyle = item.status === "completed"
     ? options.theme.toolSuccess
-    : item.status === "failed"
+    : item.status === "failed" || item.status === "denied"
     ? options.theme.toolError
-    : options.theme.toolPending;
+    : item.status === "unknown" || item.status === "not-started" ? options.theme.warning : options.theme.toolPending;
   const safeDetail = sanitizeTerminalText(detail).replace(/\s+/gu, " ").trim();
   const selection = options.selected === true
     ? styleText("▸", options.theme.accent)
@@ -225,8 +225,10 @@ function appendFailure(
   item: ToolTranscriptItem,
   options: ToolTranscriptRenderOptions,
 ): void {
-  if (item.status === "failed" && item.error !== undefined) {
-    lines.push(copyLine(styleText(`  ${sanitizeTerminalText(item.error)}`, options.theme.error), 2));
+  const status = item.status === "unknown" ? "Outcome unknown" : item.status === "not-started" ? "Not executed" : item.status === "denied" ? "Permission denied" : undefined;
+  if (status !== undefined) lines.push(copyLine(styleText(`  ${status}`, options.theme.warning), 2));
+  if (item.status !== "completed" && item.status !== "running" && item.error !== undefined) {
+    lines.push(copyLine(styleText(`  ${sanitizeTerminalText(item.error)}`, item.status === "failed" ? options.theme.error : options.theme.warning), 2));
   }
 }
 

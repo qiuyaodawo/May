@@ -60,12 +60,13 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
   return definePlugin({
     id: "may.delegation", version: "1.0.0", scope: "application", provides: [delegationService],
     requires: [
-      { service: applicationServices.application }, { service: applicationServices.model },
+      { service: applicationServices.execution }, { service: applicationServices.history },
+      { service: applicationServices.state }, { service: applicationServices.model },
       { service: applicationServices.sessionStore }, { service: applicationServices.permissionPolicy },
       { service: applicationServices.toolSources }, { service: applicationServices.instructionSources },
       { service: applicationServices.modelWrappers }, { service: workspaceFilesService },
     ],
-    optional: [{ service: goalsService }, { service: applicationServices.tracer }, { service: mcpService }],
+    optional: [{ service: goalsService }, { service: applicationServices.tracer }, { service: applicationServices.skills }, { service: mcpService }],
     requiresHooks: [applicationHooks.created, applicationHooks.beforeClose],
     state: { version: 1, initial: { requests: [] } },
     setup(context) {
@@ -83,7 +84,10 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
       });
       context.defer(async () => { await host?.close(); });
       context.on(applicationHooks.created, async () => {
-        const application = context.get(applicationServices.application).get();
+        const application = context.get(applicationServices.execution).get();
+        const history = context.get(applicationServices.history).get();
+        const state = context.get(applicationServices.state).get();
+        const skills = options.skills ?? context.optional(applicationServices.skills)?.registry;
         const store = context.get(applicationServices.sessionStore);
         const rawModel = context.get(applicationServices.model);
         const goals = context.optional(goalsService);
@@ -110,7 +114,7 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
             return selected === undefined ? undefined : wrapChildModel(selected);
           } }),
           ...(options.contextBudgetFor === undefined ? {} : { contextBudgetFor: options.contextBudgetFor }),
-          ...(options.skills === undefined && application.skills === undefined ? {} : { skills: options.skills ?? application.skills!.registry }),
+          ...(skills === undefined ? {} : { skills }),
           ...(options.toolSource === undefined && mcp === undefined ? {} : {
             toolSource: () => [...(options.toolSource?.() ?? []), ...(mcp?.tools ?? [])],
           }),
@@ -122,7 +126,7 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
           loadRequests: async () => {
             const saved = context.state.get<RequestState>().requests;
             if (saved.length > 0) return saved;
-            const event = [...await application.history()].reverse().find(item => item.type === "state.updated" && item.key === "may.subagents");
+            const event = [...await history.history()].reverse().find(item => item.type === "state.updated" && item.key === "may.subagents");
             if (event?.type !== "state.updated") return [];
             const value = event.value as { version?: unknown; requests?: unknown };
             if (value.version !== 1 || !Array.isArray(value.requests)) throw new TypeError("Unsupported delegation request state");
@@ -131,7 +135,7 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
           saveRequests: async requests => {
             const saved = requests.slice(0, 16);
             await context.state.set({ requests: saved });
-            await application.recordState("may.subagents", { version: 1, requests: saved });
+            await state.recordState("may.subagents", { version: 1, requests: saved });
           },
         });
         await host.initialize();
