@@ -99,8 +99,10 @@ export async function fixture(t, { disconnectOnAbort = false, cancelSupported = 
     server = createHttpServer(worker.handle); server.listen(0, "127.0.0.1"); await once(server, "listening");
     return createRemoteAgent({ url: `http://127.0.0.1:${server.address().port}`, token, agent: "files", version: "1", pollIntervalMs: 10 });
   }
-  async function closeWorker() {
-    await worker.close(); server.closeAllConnections();
+  async function closeWorker({ keepServer = false } = {}) {
+    await worker.close();
+    if (keepServer) return;
+    server.closeAllConnections();
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
   const remote = await openWorker();

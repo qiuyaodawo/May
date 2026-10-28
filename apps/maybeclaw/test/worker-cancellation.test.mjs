@@ -125,7 +125,7 @@ test("Worker 关闭 active 执行时发送持久化取消，并保存外部终�
   const execution = await f.task();
   const rejected = assert.rejects(f.remote.execute(execution, context()), /rejected request \(503\)|outcome reconciliation/u);
   await until(async () => (await f.taskRecord(execution))?.status === "running");
-  await f.closeWorker();
+  await f.closeWorker({ keepServer: true });
   await rejected;
   assert.equal((await f.taskRecord(execution)).status, "cancelled");
   assert.equal((await f.journal()).outcome.status, "cancelled");
