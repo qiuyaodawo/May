@@ -7,7 +7,7 @@ import { simpleGit } from "simple-git";
 import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 
 test("真实仓库与 linked worktree 的初始化保留已有版本和仓库身份", async t => {
-const repository = await realpath(fileURLToPath(new URL("../../../../", import.meta.url)));
+  const repository = await realpath(fileURLToPath(new URL("../../../../", import.meta.url)));
   const parent = join(repository, "review", "git-workspace-startup");
   await mkdir(parent, { recursive: true });
   const root = await realpath(await mkdtemp(join(parent, "startup-")));
@@ -23,7 +23,7 @@ const repository = await realpath(fileURLToPath(new URL("../../../../", import.m
   const originalHead = (await git.revparse(["HEAD"])).trim();
   const originalIndex = await git.raw(["ls-files", "--stage"]);
   const options = { dataRoot: join(root, "records"), worktreesRoot: join(root, "worktrees"), authorizeCommit: () => false };
-  const nested = await ProjectGitWorkspace.open({ ...options, workspace: join(project, "packages", "application") });
+  const nested = await ProjectGitWorkspace.open({ ...options, workspace: join(project, "packages", "may") });
   assert.equal((await nested.status()).commit, originalHead);
   const initial = await nested.prepare("initial");
   assert.equal(initial.status, "unchanged");
