@@ -4,9 +4,13 @@ Model Context Protocol client adapters for May agents. The client
 connects to local stdio and remote Streamable HTTP servers, snapshots `tools/list`, and exposes every
 remote tool as a normal Core `Tool`.
 
+`@sortedyuan/mcp/plugin` connects MCP resources to Application scopes. See the
+[plugin reference](docs/plugin/README.md) and its
+[Chinese version](docs/plugin/README.zh-CN.md).
+
 ```ts
-import { defineAgent } from "@sortedyuan/application";
-import { ToolRegistry } from "@sortedyuan/core";
+import { defineAgent } from "@sortedyuan/may/application";
+import { ToolRegistry } from "@sortedyuan/may/core";
 import { openMcpClientPool } from "@sortedyuan/mcp";
 
 const mcp = await openMcpClientPool({

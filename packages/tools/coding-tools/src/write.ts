@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { atomicWriteText } from "./atomic-write.js";
 import { dirname } from "node:path";
-import type { Tool } from "@sortedyuan/core";
+import type { Tool } from "@sortedyuan/may/core";
 import {
   requireObject,
   requirePositiveIntegerOption,

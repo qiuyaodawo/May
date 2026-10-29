@@ -4,5 +4,5 @@
   "private": true,
   "type": "module",
   "scripts": { "start": "node demo.mjs" },
-  "dependencies": { "@sortedyuan/application": "workspace:*", "@sortedyuan/session": "workspace:*", "@sortedyuan/ui-client": "workspace:*", "@sortedyuan/web-ui": "workspace:*" }
+  "dependencies": { "@sortedyuan/may": "workspace:*", "@sortedyuan/ui-client": "workspace:*", "@sortedyuan/web-ui": "workspace:*" }
 }

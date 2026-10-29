@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import open from "open";
-import { AsyncEventQueue, isStreamingMayEvent } from "@sortedyuan/core";
+import { AsyncEventQueue, isStreamingMayEvent } from "@sortedyuan/may/core";
 import type { MaybeCodeController } from "./controller.js";
 import type { MaybeCodeEvent } from "./events.js";
 import { createMaybeCodeWebHost, startMaybeCodeWebServer } from "./web-ui.js";

@@ -8,8 +8,7 @@
     "types": ["node"]
   },
   "references": [
-    { "path": "../../packages/config" },
-    { "path": "../../packages/core" },
+    { "path": "../../packages/may" },
     { "path": "../../packages/providers" }
   ],
   "include": ["src/**/*.ts"]

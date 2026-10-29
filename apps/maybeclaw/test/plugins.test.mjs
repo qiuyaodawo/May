@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseMayConfig } from "@sortedyuan/config";
-import { loadPluginModules, PluginHost } from "@sortedyuan/plugin";
+import { parseMayConfig } from "@sortedyuan/may/config";
+import { loadPluginModules, PluginHost } from "@sortedyuan/may/plugin";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 
 function configuration(agents) {
@@ -10,7 +10,7 @@ function configuration(agents) {
 
 test("May Agent plugin selections preserve configuration and initialize real plugin state", async () => {
   const selection = {
-    module: new URL("../../../packages/plugin/test/module-plugin.mjs", import.meta.url).href,
+    module: new URL("../../../packages/may/test/plugin/module-plugin.mjs", import.meta.url).href,
     config: { increment: 4 },
   };
   const config = configuration([{ id: "configured", adapter: "may", plugins: [selection] }]);

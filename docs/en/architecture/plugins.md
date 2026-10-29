@@ -103,10 +103,10 @@ take precedence over continuation requests. Resume never replays historical tool
 ## Built-in plugin composition
 
 Shared service tokens and ordered contribution registries belong to
-`@sortedyuan/plugin-services`. Runtime, Context, Model, permissions, Skills, goals,
-history-memory, delegation, MCP, observability, delivery, channels, Agent adapters,
-coordination and Web/API are supplied by reusable factories under
-`packages/plugins/`. Product configuration and combinations belong to the
+`@sortedyuan/may/services`. Runtime, Context, Model, permissions, Skills, goals,
+history-memory, delegation, MCP, observability, delivery, Agent adapters,
+coordination and Web/API are supplied by reusable factories in their capability
+packages. MaybeClaw owns channel plugins. Product configuration and combinations belong to the
 applications' `src/plugins/` directories. Packages do not import applications.
 
 Tool and instruction contributions have stable identities and cleanup functions.
@@ -131,10 +131,10 @@ Session state. The default May loop is offered by a runtime plugin through a
 replaceable runtime factory. MaybeCode and MaybeClaw accept product-specific plugin
 selection without changing direct callers.
 
-`packages/plugin/test/` covers composition validation, scopes, Hook ordering,
+`packages/may/test/plugin/` covers composition validation, scopes, Hook ordering,
 cleanup, changes and state migration. Application tests cover integration with
 Session state and runtime replacement. From the repository root, run
-`pnpm --filter @sortedyuan/plugin test` and `pnpm --filter @sortedyuan/application test` for
+`pnpm --filter @sortedyuan/may test` for
 those checks. `pnpm test:package:plugin` installs the packed dependency chain in
 an external consumer and exercises public exports. These checks use local
 resources; external provider integration has separate evidence.

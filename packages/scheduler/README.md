@@ -36,7 +36,7 @@ misfire rules, restart recovery, SQLite ownership and verification commands.
 
 Node.js >=22.16.0 is required. Public entry points are `@sortedyuan/scheduler` and
 `@sortedyuan/scheduler/sqlite-store`. The release package list for this component is
-explicitly `@sortedyuan/scheduler`; its runtime dependencies are `@sortedyuan/core`,
+explicitly `@sortedyuan/scheduler`; its runtime dependencies are `@sortedyuan/may`,
 `cron-parser` and `luxon`. `pnpm test:package:scheduler` installs the packed package into a consumer
 outside the repository and verifies those dependencies.
 

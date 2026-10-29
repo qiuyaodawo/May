@@ -20,12 +20,12 @@ MaybeCode 在[首次启动配置](../guides/maybecode.md#首次启动配置)中�
 [MaybeClaw](../guides/maybeclaw.md)。
 
 为了获得编辑器补全与校验，请将配置文件关联到
-[`packages/config/may-config.schema.json`](../../../packages/config/may-config.schema.json)。
+[`packages/may/may-config.schema.json`](../../../packages/may/may-config.schema.json)。
 例如，仓库位于 `E:/code/May` 时，可以使用以下配置：
 
 ```json
 {
-  "$schema": "file:///E:/code/May/packages/config/may-config.schema.json",
+  "$schema": "file:///E:/code/May/packages/may/may-config.schema.json",
   "providers": {},
   "models": {}
 }
@@ -99,7 +99,7 @@ MaybeCode 的模型选择器可以持久化新的 `defaultModel`。它会重新�
 `thinkingConfig.thinkingLevel`；`thinkingBudget` 接受大于等于 `-1` 的整数。
 effort 与 budget 互斥。`includeThoughts` 为可选布尔值，省略思考选项时使用服务端及
 模型的默认行为。通过模型名称选择 effort 的服务可以使用 `gemini-3.8-flash-high`
-等名称，无需另外配置 effort。参阅 [Gemini adapter](../../../packages/providers/gemini/README.md)。
+等名称，无需另外配置 effort。参阅 [Gemini adapter](../../../packages/providers/docs/gemini/README.md)。
 
 常见标量：
 

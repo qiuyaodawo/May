@@ -1,19 +1,19 @@
 # `@sortedyuan/providers`
 
 Unified provider composition for May. This package owns model-profile
-selection, adapter registration, built-in adapter configuration, and model construction. It does
-not add provider-specific behavior to `@sortedyuan/core` or provider knowledge to
-`@sortedyuan/config`.
+selection, adapter registration, built-in adapter configuration, protocol adapters,
+and model construction. Runtime interfaces are provided by `@sortedyuan/may/core`
+and configuration loading by `@sortedyuan/may/config`.
 
 ## Built-in adapters
 
-- `deepseek-chat` → `@sortedyuan/provider-deepseek`
-- `zhipu-chat` → `@sortedyuan/provider-zhipu`
-- `kimi-chat` → `@sortedyuan/provider-kimi`
-- `anthropic-messages` → `@sortedyuan/provider-anthropic`
-- `openai-responses` → `@sortedyuan/provider-openai`
-- `openai-chat-completions` → `@sortedyuan/provider-openai-compatible`
-- `google-gemini` → `@sortedyuan/provider-gemini`
+- `deepseek-chat` → [`@sortedyuan/providers/deepseek`](docs/deepseek/README.md)
+- `zhipu-chat` → [`@sortedyuan/providers/zhipu`](docs/zhipu/README.md)
+- `kimi-chat` → [`@sortedyuan/providers/kimi`](docs/kimi/README.md)
+- `anthropic-messages` → [`@sortedyuan/providers/anthropic`](docs/anthropic/README.md)
+- `openai-responses` → [`@sortedyuan/providers/openai`](docs/openai/README.md)
+- `openai-chat-completions` → [`@sortedyuan/providers/openai-compatible`](docs/openai-compatible/README.md)
+- `google-gemini` → [`@sortedyuan/providers/gemini`](docs/gemini/README.md)
 
 ```ts
 import {
@@ -160,6 +160,6 @@ MaybeCode and May CLI accept an injected adapter registry. Configuration may
 create any number of provider connections from registered adapters; it does
 not import executable adapter modules.
 
-The package also re-exports the public APIs of the built-in provider adapter
-packages for convenience. The individual packages remain independently
-usable when an application does not want the built-in composition layer.
+The root entry re-exports the public APIs of the built-in provider adapters.
+Applications can import each adapter through its public subpath independently
+of the composition entry.

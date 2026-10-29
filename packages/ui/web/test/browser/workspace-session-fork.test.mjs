@@ -8,13 +8,13 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { FileSessionCatalog } from "@sortedyuan/session/catalog";
-import { GitWorkspaceConflictError } from "@sortedyuan/application/git-workspace";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
+import { GitWorkspaceConflictError } from "@sortedyuan/may/application/git-workspace";
 import { chromium } from "playwright";
-import { keyStroke } from "../../../keybindings/dist/index.js";
+import { keyStroke } from "../../../tui/dist/keybindings/index.js";
 import { WorkspaceDiffViewer } from "../../../tui/dist/index.js";
-import { loadMayConfig } from "../../../../config/dist/index.js";
+import { loadMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderModel, selectProviderModel } from "../../../../providers/dist/index.js";
 import { MaybeCodeWorkspace, createMaybeCodeWebHost, startMaybeCodeWebServer } from "../../../../../apps/maybecode/dist/index.js";
 

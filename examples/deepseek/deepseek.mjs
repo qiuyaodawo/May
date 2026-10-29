@@ -1,5 +1,5 @@
-import { InMemoryContext, May } from "@sortedyuan/core";
-import { DeepSeekModel } from "@sortedyuan/provider-deepseek";
+import { InMemoryContext, May } from "@sortedyuan/may/core";
+import { DeepSeekModel } from "@sortedyuan/providers/deepseek";
 
 const apiKey = process.env.DEEPSEEK_API_KEY;
 if (!apiKey) {

@@ -1,4 +1,4 @@
-import type { KeyBindingDefinition, KeyStroke } from "@sortedyuan/keybindings";
+import type { KeyBindingDefinition, KeyStroke } from "./keybindings/index.js";
 import sliceAnsi from "slice-ansi";
 import stringWidth from "string-width";
 import type {

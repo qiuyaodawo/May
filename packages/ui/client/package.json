@@ -14,7 +14,7 @@
   },
   "files": ["dist", "!dist/.tsbuildinfo"],
   "scripts": { "build": "tsc -b", "clean": "tsc -b --clean", "test": "pnpm run build && node --test test/*.test.mjs" },
-  "dependencies": { "@sortedyuan/application": "workspace:*", "@sortedyuan/core": "workspace:*", "@sortedyuan/media": "workspace:*", "@sortedyuan/permissions": "workspace:*", "@sortedyuan/session": "workspace:*" },
+  "dependencies": { "@sortedyuan/may": "workspace:*", "@sortedyuan/media": "workspace:*" },
   "devDependencies": { "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"

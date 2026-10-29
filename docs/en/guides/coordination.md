@@ -23,9 +23,16 @@ without a continuation identity require a verified recovery finding; queued task
 use the current protocol when they start. A saved identity prevents replay across
 the interval between Session completion and coordination outcome persistence.
 
+In submit mode, `identity` may supply the host's first-turn input ID. Recovery
+uses that same identity to validate the first yield before accepting later turns.
+Keep the identity callback deterministic for the task's initial turn. The adapter
+rejects concurrent execution of the same Session and retains the active Run's
+approval routing. Each Run combines `execution.runBudget` with the host's submit
+budget using the tighter limit for each dimension.
+
 ## Create and run a graph
 
-1. Make `@sortedyuan/application`, `@sortedyuan/core`, `@sortedyuan/coordination` and `@sortedyuan/session`
+1. Make `@sortedyuan/may` and `@sortedyuan/coordination`
    available to your TypeScript host. Use the repository's Node.js and pnpm
    requirements when working in this checkout.
 2. Configure a real provider `Model` with its required credentials. See
@@ -38,15 +45,15 @@ the interval between Session completion and coordination outcome persistence.
    after verifying that the result task completed.
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
-import type { Model } from "@sortedyuan/core";
+import { defineAgent } from "@sortedyuan/may";
+import type { Model } from "@sortedyuan/may/core";
 import {
   CoordinationRuntime,
   createApplicationAgent,
   parallelTasks,
 } from "@sortedyuan/coordination";
 import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 
 export async function compareApproaches(
   model: Model,

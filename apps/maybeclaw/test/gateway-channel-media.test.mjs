@@ -21,7 +21,7 @@ test("视频输入需要独立的Agent媒体能力配置", async () => {
   const attachment = { id: "video_1", kind: "video", mediaType: "video/mp4", source: { platform: "telegram", fileId: "video_1" } };
   await assert.rejects(readChannelContent(adapter, { account: adapter.account, sender: "7", conversation: "7", text: "检查视频", eventId: "video", attachments: [attachment] },
     [{ ...agent.capabilities, media: ["file"] }], new AbortController().signal), /不支持 video/);
-  const schema = JSON.parse(await readFile(new URL("../../../packages/config/may-config.schema.json", import.meta.url), "utf8"));
+  const schema = JSON.parse(await readFile(new URL("../../../packages/may/may-config.schema.json", import.meta.url), "utf8"));
   assert.deepEqual(schema.$defs.maybeclawAgent.properties.media.items.enum, ["image", "audio", "file", "video"]);
   await agent.close();
 });

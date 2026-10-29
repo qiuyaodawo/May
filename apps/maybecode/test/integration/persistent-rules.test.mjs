@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { userInfo } from "node:os";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { loadMayConfig } from "@sortedyuan/config";
-import { InMemoryContextFactory } from "@sortedyuan/context";
+import { loadMayConfig } from "@sortedyuan/may/config";
+import { InMemoryContextFactory } from "@sortedyuan/may/context";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
 test("real provider reuses persistent write permission after closing and reopening MaybeCode", {

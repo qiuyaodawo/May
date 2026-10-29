@@ -3,9 +3,9 @@ import { mkdtemp, mkdir, realpath, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join, basename, dirname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { FileSessionCatalog } from "@sortedyuan/session/catalog";
-import { loadMayConfig } from "../../packages/config/dist/index.js";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
+import { loadMayConfig } from "@sortedyuan/may/config";
 import { selectProviderModel, createBuiltinProviderModel } from "../../packages/providers/dist/index.js";
 import { MaybeCodeWorkspace, startMaybeCodeWebUI } from "../../apps/maybecode/dist/index.js";
 import { MaybeClaw, MaybeClawHost, startControlServer, selectTaskModel, loadTaskModel } from "../../apps/maybeclaw/dist/index.js";

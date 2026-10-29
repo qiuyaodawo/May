@@ -1,4 +1,4 @@
-import { Keymap, formatKeySequence, mergeKeyBindings, parseKeySequence, type KeyBindingDefinition } from "@sortedyuan/keybindings";
+import { Keymap, formatKeySequence, mergeKeyBindings, parseKeySequence, type KeyBindingDefinition } from "@sortedyuan/tui/keybindings";
 import { DEFAULT_EDITOR_KEYBINDINGS } from "@sortedyuan/tui";
 
 export const MAYBECODE_KEY_ACTIONS = [

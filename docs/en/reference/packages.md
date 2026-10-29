@@ -13,24 +13,28 @@ Node.js `>=22.16.0` and pnpm `12.4.2`. Read
 format stability. An import path listed here is a package export; installation
 and release scope are governed by the repository's release configuration.
 
+`@sortedyuan/may` contains the framework modules listed below; install the package
+once and import the required subpaths. Providers, Gateway, integrations and UI
+retain their own packages. The release list contains 14 packages.
+
 ## Choose a package for your task
 
 | Goal | Start with | Usually add |
 | --- | --- | --- |
-| Run a model/tool loop in memory | `@sortedyuan/core` | A provider adapter |
-| Define reusable Agent behavior and policy | `defineAgent()` from `@sortedyuan/application` | `ToolRegistry` from `@sortedyuan/core` |
-| Build a durable single-session Agent | `AgentDefinition.open()` or `AgentApplication.open()` | `@sortedyuan/session`, `@sortedyuan/context`, permissions and tools |
-| Manage several Sessions | `AgentWorkspace` from `@sortedyuan/application` | `SessionCatalog` from `@sortedyuan/session/catalog` |
+| Run a model/tool loop in memory | `@sortedyuan/may/core` | A provider adapter |
+| Define reusable Agent behavior and policy | `defineAgent()` from `@sortedyuan/may` | `ToolRegistry` from `@sortedyuan/may/core` |
+| Build a durable single-session Agent | `AgentDefinition.open()` or `AgentApplication.open()` | `@sortedyuan/may/session`, `@sortedyuan/may/context`, permissions and tools |
+| Manage several Sessions | `AgentWorkspace` from `@sortedyuan/may` | `SessionCatalog` from `@sortedyuan/may/session/catalog` |
 | Coordinate teams and remote workers | `@sortedyuan/coordination` | Agent definitions, durable stores and host policies |
-| Continue work toward a durable goal | `@sortedyuan/goal` | A host Agent and bounded continuation policy |
+| Continue work toward a durable goal | `@sortedyuan/may/goals` | A host Agent and bounded continuation policy |
 | Trigger tasks on a schedule or event | `@sortedyuan/scheduler` | SQLite storage and an idempotent dispatcher |
 | Evaluate task results across configurations | `@sortedyuan/eval` | Execution adapters, isolated environments, evaluators and reports |
-| Extend an application with lifecycle Hooks | `@sortedyuan/plugin` | `@sortedyuan/plugin-services` and reusable plugins |
-| Build a terminal Agent | An application controller | `@sortedyuan/tui` and optionally `@sortedyuan/keybindings` |
+| Extend an application with lifecycle Hooks | `@sortedyuan/may/plugin` | `@sortedyuan/may/services` and reusable plugins |
+| Build a terminal Agent | An application controller | `@sortedyuan/tui` and its `keybindings` subpath |
 | Build a browser Agent | `UiHost` or `ApplicationUiHost` | `@sortedyuan/ui-client` and `@sortedyuan/web-ui` |
 | Build a coding Agent | An application controller | `@sortedyuan/coding-tools` and an execution isolation policy |
-| Select models from configuration | `@sortedyuan/config` | `@sortedyuan/providers` |
-| Read durable history through a tool | `@sortedyuan/session/tools` | An active `Session` or `AgentApplication` |
+| Select models from configuration | `@sortedyuan/may/config` | `@sortedyuan/providers` |
+| Read durable history through a tool | `@sortedyuan/may/session/tools` | An active `Session` or `AgentApplication` |
 | Validate and store image replies | `@sortedyuan/media` | A host `MediaReader` for URL or file sources |
 | Trace execution and inspect diagnostics | Core's `Tracer` interface | `@sortedyuan/observability` |
 | Consume or expose MCP capabilities | `@sortedyuan/mcp` | Permissions and reviewed host services |
@@ -40,15 +44,15 @@ and shutdown, start with [Building an Agent](../guides/building-an-agent.md).
 
 ## Runtime and application
 
-### `@sortedyuan/file-storage`
+### `@sortedyuan/may/storage`
 
 Independent local file coordination exports `withFileAccess`, `acquireFileLock`,
 `recoverFileLock`, `releaseFileLock`, `replaceJournalFile` and `syncDirectory`.
-Session, configuration, media, MCP credentials and delivery reuse this package.
+Session, configuration, media, MCP credentials and delivery reuse this module.
 Session's file subpaths retain compatible exports with shared lock state.
 See [Coordinate local file access](../guides/custom-storage.md#coordinate-local-file-access).
 
-### `@sortedyuan/core`
+### `@sortedyuan/may/core`
 
 The provider-neutral execution kernel exports `May`, `Model`, `Tool`, `Context`,
 `ToolExecutor`, `ToolScheduler` and `InMemoryContext`. It runs model/tool Steps,
@@ -68,9 +72,9 @@ registration keeps schema references without deep freezing them.
 callbacks. An optional additive `toolSource` is resolved once for each
 Run/continue; authorization binds the tool definition and host version. See
 [Custom tools](../guides/custom-tool.md) and the
-[Core README](../../../packages/core/README.md).
+[Core README](../../../packages/may/docs/core/README.md).
 
-### `@sortedyuan/application`
+### `@sortedyuan/may` and `@sortedyuan/may/application`
 
 Headless orchestration above Core exports:
 
@@ -89,10 +93,10 @@ install `session_history` and tool presentation support.
 
 `AgentWorkspace` and `AgentWorkspace.open` use the generic parameter order
 `<Event, Extension, Compaction, Run, Application>`.
-`@sortedyuan/application/git-workspace` exports `ProjectGitWorkspace` and its checkpoint,
+`@sortedyuan/may/application/git-workspace` exports `ProjectGitWorkspace` and its checkpoint,
 diff, restore and worktree types for host-controlled Git workflows.
 See [Agent and Application](../concepts/agent-application.md) and the
-[Application README](../../../packages/application/README.md).
+[Application README](../../../packages/may/docs/application/README.md).
 
 ### `@sortedyuan/coordination`
 
@@ -144,7 +148,7 @@ See [Task graphs](../guides/coordination.md),
 [Remote Workers](../guides/coordination-remote.md) and
 [MaybeCode teams](../guides/maybecode-team.md).
 
-### `@sortedyuan/goal`
+### `@sortedyuan/may/goals`
 
 Durable goal state, bounded continuation and model-facing goal tools compose
 through public Agent, Model and Context interfaces. The host supplies execution
@@ -177,7 +181,7 @@ Suite modules and command evaluators execute trusted host code. Cancellation and
 restart preserve unknown-effect evidence for host reconciliation. See
 [Evaluate Agent task results](../guides/eval.md).
 
-### `@sortedyuan/plugin`
+### `@sortedyuan/may/plugin`
 
 Scoped plugin hosting provides typed versioned services, dependency validation,
 configuration schemas, state migration, ordered lifecycle Hooks, resource cleanup
@@ -185,23 +189,28 @@ and serialized composition changes. Application integrates plugins with Agent
 definitions, runtime factories and durable Sessions. See
 [Plugins, services and lifecycle Hooks](../guides/plugins.md).
 
-### `@sortedyuan/plugin-services` and reusable plugins
+### `@sortedyuan/may/services` and reusable plugins
 
 Shared service tokens and ordered registries describe tool, instruction, Model
 and Context contributions. Application reexports tokens through
 `applicationServices` and composes direct options through plugin factories.
 
-The [plugin catalog](../guides/plugins.md#reusable-plugin-packages) lists eight public
-feature plugin packages, the four factory subpaths in `@sortedyuan/plugin-services`,
-and `@sortedyuan/coordination/plugin` with their factory APIs.
-The Telegram and Feishu channel packages are private workspace packages.
-`@sortedyuan/plugin-agent-adapters/rpc` and
-`@sortedyuan/plugin-agent-adapters/examples/rpc-file-agent` provide the RPC adapter and
-its example. Product combinations live in each application's `src/plugins/`.
+The [plugin catalog](../guides/plugins.md#reusable-plugin-packages) lists factories
+in May, Coordination, MCP, Observability and Gateway. Telegram and Feishu channels
+belong to MaybeClaw. `@sortedyuan/gateway/rpc` and
+`@sortedyuan/gateway/examples/rpc-file-agent` provide the RPC adapter and its example.
+Product combinations live in each application's `src/plugins/`.
 `pnpm test:package:plugin` verifies independently installed tarballs and their
 runtime dependency chains.
 
-### `@sortedyuan/skills`
+### `@sortedyuan/gateway`
+
+Gateway extensions provide Agent adapters through `/adapters`, RPC through `/rpc`,
+durable delivery through `/delivery`, and HTTP service hosting through `/web-api`.
+The host supplies authentication, product routes, channel implementations and
+application policy. See [MaybeClaw](../guides/maybeclaw.md) for a complete host.
+
+### `@sortedyuan/may/skills`
 
 Agent Skills discovery, parsing, bounded resource loading and Session activation.
 Application integrates skills with durable state and dynamic Context instructions.
@@ -255,38 +264,38 @@ exported capabilities. See [MCP tools](../guides/mcp.md),
 
 ## State and policy
 
-### `@sortedyuan/context`
+### `@sortedyuan/may/context`
 
 Replaceable Context factories and compaction strategies include managed in-memory
 Context, inspection, automatic compaction, summary-tail, history-reference and
-pruning. `@sortedyuan/context/model-summarizer` provides model-backed summarization.
+pruning. `@sortedyuan/may/context/model-summarizer` provides model-backed summarization.
 Context contains the current model-visible view; Session retains durable history.
 See [Context and history](../concepts/context-and-history.md).
 
-### `@sortedyuan/session`
+### `@sortedyuan/may/session`
 
 Durable conversation identity and facts include serialized submission and
 continuation, event history, cursor-based queries, in-memory storage and branching
-through `Session.fork()`. `@sortedyuan/session/file-store` supplies JSONL storage;
-`@sortedyuan/session/catalog` supplies in-memory and file Catalogs. A Catalog discovers
+through `Session.fork()`. `@sortedyuan/may/session/file-store` supplies JSONL storage;
+`@sortedyuan/may/session/catalog` supplies in-memory and file Catalogs. A Catalog discovers
 Sessions; a Session Store reads and appends one Session's records.
 See [Configure Session storage](../guides/custom-storage.md) and
 [Session, Run and Step](../concepts/session-run-step.md).
 
-### `@sortedyuan/permissions`
+### `@sortedyuan/may/permissions`
 
 A headless `ToolExecutor` evaluates `PermissionPolicy`, publishes approval
 requests and accepts allow/deny decisions. Session grants last within the
 configured executor lifetime. `PermissionRuleStore`, `PersistentPermissionRule`
 and `InMemoryPermissionRuleStore` support persistent approval rules;
-`@sortedyuan/permissions/file-store` exports `FilePermissionRuleStore`.
+`@sortedyuan/may/permissions/file-store` exports `FilePermissionRuleStore`.
 The host provides approval UI and any required execution isolation. See
 [Permission policy](../guides/permission-policy.md) for scope, expiry and revocation.
 
-### `@sortedyuan/config`
+### `@sortedyuan/may/config`
 
 Loads and validates provider connections, model profiles and application-owned
-configuration. `@sortedyuan/config/schema` exports JSON Schema. The runtime `apps` value
+configuration. `@sortedyuan/may/config/schema` exports JSON Schema. The runtime `apps` value
 is generic; the bundled editor schema additionally describes MaybeCode settings.
 Third-party applications validate their own application section. See
 [Configuration reference](configuration.md).
@@ -299,26 +308,26 @@ Third-party applications validate their own application section. See
 configured model selection and capability resolution. Protocol implementations
 are also independently consumable:
 
-| Package | Protocol |
+| Import path | Protocol |
 | --- | --- |
-| `@sortedyuan/provider-openai` | OpenAI Responses API and native compaction |
-| `@sortedyuan/provider-openai-compatible` | Shared Chat Completions-compatible helpers |
-| `@sortedyuan/provider-anthropic` | Anthropic Messages API |
-| `@sortedyuan/provider-deepseek` | DeepSeek Chat |
-| `@sortedyuan/provider-zhipu` | Zhipu GLM Chat |
-| `@sortedyuan/provider-kimi` | Kimi Chat |
-| `@sortedyuan/provider-gemini` | Native Google Gemini streaming GenerateContent |
+| `@sortedyuan/providers/openai` | OpenAI Responses API and native compaction |
+| `@sortedyuan/providers/openai-compatible` | Shared Chat Completions-compatible helpers |
+| `@sortedyuan/providers/anthropic` | Anthropic Messages API |
+| `@sortedyuan/providers/deepseek` | DeepSeek Chat |
+| `@sortedyuan/providers/zhipu` | Zhipu GLM Chat |
+| `@sortedyuan/providers/kimi` | Kimi Chat |
+| `@sortedyuan/providers/gemini` | Native Google Gemini streaming GenerateContent |
 
-`google-gemini` uses `GeminiModel` from `@sortedyuan/provider-gemini`. It supports
+`google-gemini` uses `GeminiModel` from `@sortedyuan/providers/gemini`. It supports
 system instructions, media inputs, tool calls/results and structured output.
 Ordered native response parts, including `thoughtSignature`, are persisted in
 assistant `modelState` for continuation. Input usage includes cached tokens;
 output usage includes reasoning tokens. Missing detail fields stay absent.
 JSON/schema responses are validated and incompatible server output fails with
-the response usage receipt. See the [package reference](../../../packages/providers/gemini/README.md)
+the response usage receipt. See the [package reference](../../../packages/providers/docs/gemini/README.md)
 for options, source forms, errors and real service checks.
 
-`@sortedyuan/provider-openai-compatible/http` exports `readSseData` and
+`@sortedyuan/providers/openai-compatible/http` exports `readSseData` and
 `parseRetryAfterMs`. SSE decoding uses `eventsource-parser`, supports LF, CRLF and
 CR, and accepts a final event without a blank line at EOF. Aborting or ending
 iteration early releases the response body. Retry-After supports seconds,
@@ -353,7 +362,7 @@ returns `N`. Earlier non-terminating errors remain in `stderr` when a later comm
 succeeds. See [Custom tools](../guides/custom-tool.md) for permission and isolation
 requirements.
 
-### `@sortedyuan/session/tools`
+### `@sortedyuan/may/session/tools`
 
 The bounded, read-only `session_history` tool queries durable Session history.
 `AgentApplication` can install it automatically; lower-level hosts can construct
@@ -411,14 +420,14 @@ Product adapters preserve their Session/task semantics. See the
 [UI client README](../../../packages/ui/client/README.md) and
 [Web UI README](../../../packages/ui/web/README.md).
 
-### `@sortedyuan/keybindings`
+### `@sortedyuan/tui/keybindings`
 
 Maps context-specific key sequences to semantic UI actions. The host owns
 terminal rendering and product commands.
 
 ## Reference products
 
-MaybeCode is included in the [39-package release list](../../../scripts/release-packages.json).
+MaybeCode is included in the [14-package release list](../../../scripts/release-packages.json).
 MaybeClaw, CLI and Eval CLI remain private workspace packages. See the
 [release guide](../guides/npm-release.md) for verification and publication steps.
 

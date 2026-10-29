@@ -12,9 +12,8 @@ const consumer = resolve(repository, "..", "eval-package-consumers", `consumer-$
 await mkdir(packs, { recursive: true });
 await mkdir(consumer, { recursive: true });
 if (!relative(await realpath(repository), await realpath(consumer)).startsWith("..")) throw new Error("Consumer must be outside repository");
-const releaseNames = ["@sortedyuan/core", "@sortedyuan/context", "@sortedyuan/session", "@sortedyuan/permissions", "@sortedyuan/skills", "@sortedyuan/plugin",
-  "@sortedyuan/plugin-services", "@sortedyuan/file-storage",
-  "@sortedyuan/application", "@sortedyuan/coordination", "@sortedyuan/observability", "@sortedyuan/eval"];
+const releaseNames = ["@sortedyuan/may", "@sortedyuan/coding-tools", "@sortedyuan/mcp",
+  "@sortedyuan/coordination", "@sortedyuan/observability", "@sortedyuan/eval"];
 const manifests = new Map();
 async function discover(directory) {
   const entries = await readdir(directory, { withFileTypes: true });

@@ -28,8 +28,8 @@ paths under `src/` or `dist/` are implementation details. Use type-only imports
 when importing types:
 
 ```ts
-import { AgentApplication, type AgentApplicationEvent } from "@sortedyuan/application";
-import type { ContextFactory } from "@sortedyuan/context";
+import { AgentApplication, type AgentApplicationEvent } from "@sortedyuan/may";
+import type { ContextFactory } from "@sortedyuan/may/context";
 ```
 
 The [package catalog](packages.md) identifies responsibilities and public entry

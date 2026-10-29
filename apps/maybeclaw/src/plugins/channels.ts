@@ -1,6 +1,6 @@
-import type { AnyPlugin } from "@sortedyuan/plugin";
-import { createTelegramChannelPlugin } from "@sortedyuan/plugin-channel-telegram";
-import { createFeishuChannelPlugin } from "@sortedyuan/plugin-channel-feishu";
+import type { AnyPlugin } from "@sortedyuan/may/plugin";
+import { createTelegramChannelPlugin } from "../channels/telegram/index.js";
+import { createFeishuChannelPlugin } from "../channels/feishu/index.js";
 import { channelSecret, type HostSettings } from "../settings.js";
 
 export function createGatewayChannelPlugins(settings: HostSettings): AnyPlugin[] {

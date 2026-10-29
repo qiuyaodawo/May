@@ -1,7 +1,7 @@
 import type {
   MayConfig,
   ResolveProviderOptions,
-} from "@sortedyuan/config";
+} from "@sortedyuan/may/config";
 import {
   ProviderConfigurationError,
   selectProviderModel,

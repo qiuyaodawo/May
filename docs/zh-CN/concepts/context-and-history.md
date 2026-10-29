@@ -22,11 +22,11 @@ Context 保存当前模型视图，Session 历史保存持久化对话事实。�
 | 拥有 Session 身份 | 否 | 是 |
 | 重建工具/模型/策略 | 否 | 否 |
 
-`@sortedyuan/core` 的最小 `Context` 接口不依赖持久化。Core 在每次模型调用前请求快照，
+`@sortedyuan/may/core` 的最小 `Context` 接口不依赖持久化。Core 在每次模型调用前请求快照，
 并在执行过程中追加用户、助手和工具消息。指令作为 `system` 消息进入模型请求，
 Context 元数据作为请求元数据传递。
 
-`@sortedyuan/context` 增加 `ContextFactory` 和可选的 `ContextController` 管理能力。内置
+`@sortedyuan/may/context` 增加 `ContextFactory` 和可选的 `ContextController` 管理能力。内置
 `InMemoryContextFactory` 返回内存模型视图，以及用于检查和替换的控制器。
 自定义工厂可以省略控制器，因此应用必须处理检查或压缩不可用的情况。
 

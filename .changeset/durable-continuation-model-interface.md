@@ -1,8 +1,6 @@
 ---
-"@sortedyuan/core": patch
-"@sortedyuan/session": minor
+"@sortedyuan/may": minor
 "@sortedyuan/coordination": minor
-"@sortedyuan/goal": patch
 ---
 
 Add durable continuation identities and public Session outcome queries. Attached

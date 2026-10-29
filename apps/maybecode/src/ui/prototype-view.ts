@@ -1,5 +1,5 @@
-import type { KeyStroke, Keymap } from "@sortedyuan/keybindings";
-import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/permissions";
+import type { KeyStroke, Keymap } from "@sortedyuan/tui/keybindings";
+import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/may/permissions";
 import {
   Column,
   Dialog,
@@ -33,7 +33,7 @@ import {
 } from "@sortedyuan/tui/transcript";
 import type { ToolRendererRegistry } from "@sortedyuan/tui/tool-renderers";
 import type { MaybeCodeSlashCommandSuggestion } from "../slash-commands.js";
-import type { SessionSummary } from "@sortedyuan/session/catalog";
+import type { SessionSummary } from "@sortedyuan/may/session/catalog";
 import type {
   MaybeCodeModelProfile,
   MaybeCodeReasoningEffortState,

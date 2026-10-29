@@ -17,14 +17,14 @@ SSE。导出支持有大小限制的即时工具、固定资源和提示模板�
 
 ## 最小 stdio 示例
 
-在 ESM TypeScript 项目安装 `@sortedyuan/mcp` 和 `@sortedyuan/permissions`，将以下内容保存为
+在 ESM TypeScript 项目安装 `@sortedyuan/mcp` 和 `@sortedyuan/may`，将以下内容保存为
 `server.ts`，通过项目构建编译，再将生成的 JavaScript 作为 MCP 客户端启动命令。
 Stdout 专供协议使用。示例收到 SIGINT 后清理；产品启动程序还需要将自身关闭
 信号连接到同一清理流程。
 
 ```ts
 import { createMayMcpServer } from "@sortedyuan/mcp/server";
-import { PermissionToolExecutor } from "@sortedyuan/permissions";
+import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
 
 const workspaceId = "explicit-workspace";
 // 示例只导出 echo。应用需要使用自己的权限策略和审批界面。

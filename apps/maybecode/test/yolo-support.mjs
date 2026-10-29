@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { InMemorySessionStore } from "@sortedyuan/session";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { InMemorySessionCatalog, MaybeCodeWorkspace, createMaybeCodeModel } from "../dist/index.js";
 
 export async function yoloDirectory() {

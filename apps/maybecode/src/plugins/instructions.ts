@@ -1,6 +1,6 @@
-import { applicationHooks, applicationServices } from "@sortedyuan/application";
-import { runtimeHooks, ToolRegistry } from "@sortedyuan/core";
-import { definePlugin } from "@sortedyuan/plugin";
+import { applicationHooks, applicationServices } from "@sortedyuan/may";
+import { runtimeHooks, ToolRegistry } from "@sortedyuan/may/core";
+import { definePlugin } from "@sortedyuan/may/plugin";
 import { MaybeCodeInstructionState } from "../instructions.js";
 import { maybeCodeRuntimeInstructions, type MaybeCodeRuntimeEnvironment } from "../runtime-instructions.js";
 

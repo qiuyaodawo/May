@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { chmod, copyFile, lstat, mkdir, open, readFile, readdir, rename } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
-import type { SessionEvent } from "@sortedyuan/session";
-import { FileSessionStore, syncDirectory } from "@sortedyuan/session/file-store";
+import type { SessionEvent } from "@sortedyuan/may/session";
+import { FileSessionStore, syncDirectory } from "@sortedyuan/may/session/file-store";
 import { ChannelStore, type ChannelRecord, type InboxRecord } from "./channel-store.js";
 import { GatewayStore } from "./gateway-store.js";
 import { inspectLegacyTaskEvidence } from "./service.js";

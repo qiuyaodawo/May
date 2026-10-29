@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineAgent } from "../packages/application/dist/index.js";
-import { loadMayConfig } from "../packages/config/dist/index.js";
+import { defineAgent } from "../packages/may/dist/application/index.js";
+import { loadMayConfig } from "../packages/may/dist/config/index.js";
 import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver, selectProviderModel } from "../packages/providers/dist/index.js";
 import { BasicTracer, BoundedMetrics, DiagnosticsStore } from "../packages/observability/dist/index.js";
-import { FileSessionStore } from "../packages/session/dist/file-store.js";
+import { FileSessionStore } from "../packages/may/dist/session/file-store.js";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
 const parent = join(repository, "review", "model-telemetry-live");

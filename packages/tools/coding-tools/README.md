@@ -14,7 +14,7 @@ inside the workspace. Trusted applications may opt in per tool with
 `allowHardLinks: true`.
 
 ```ts
-import { InMemoryContext, May } from "@sortedyuan/core";
+import { InMemoryContext, May } from "@sortedyuan/may/core";
 import { createCodingTools } from "@sortedyuan/coding-tools";
 
 const tools = createCodingTools({ cwd: process.cwd() });

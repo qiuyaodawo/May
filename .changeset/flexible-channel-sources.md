@@ -1,5 +1,5 @@
 ---
-"@sortedyuan/plugin-delivery": minor
+"@sortedyuan/gateway": minor
 ---
 
 Allow independently implemented channel names and attachment source fields. ChannelAdapter.name accepts a string, and ChannelAttachmentSource contains a platform string plus bounded string fields validated by the owning adapter. ChannelStore provides generic journal persistence while hosts own application migration checks.

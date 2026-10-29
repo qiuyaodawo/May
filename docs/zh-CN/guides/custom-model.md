@@ -2,7 +2,7 @@
 
 [English](../../en/guides/custom-model.md) | **简体中文**
 
-模型适配器将 Provider 请求和响应转换为 `@sortedyuan/core` 导出的 `Model` 接口。
+模型适配器将 Provider 请求和响应转换为 `@sortedyuan/may/core` 导出的 `Model` 接口。
 接入新的 Provider 协议时，可以依据本文实现请求转换、流式响应、取消和错误处理。
 Session 与产品行为由应用管理。
 
@@ -13,7 +13,7 @@ Session 与产品行为由应用管理。
 
 以下本地文字转换器展示必需的流式协议，只执行大写转换，不调用外部模型服务。
 容量限制为示例数值。在 ESM TypeScript 应用中创建 `uppercase-model.ts`，
-将 `@sortedyuan/core`、`@sortedyuan/application` 和 `@sortedyuan/session` 加入直接依赖。
+将 `@sortedyuan/may` 加入直接依赖。
 工作区设置见[快速开始](../getting-started.md)。
 
 ```ts
@@ -24,7 +24,7 @@ import type {
   ModelLimits,
   ModelRequest,
   ModelStreamOptions,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 
 export class UppercaseModel implements Model {
   readonly limits: ModelLimits = {
@@ -67,8 +67,8 @@ function lastUserText(request: ModelRequest): string {
 在同一目录创建 `run.ts`，通过 `AgentApplication` 运行该协议：
 
 ```ts
-import { AgentApplication } from "@sortedyuan/application";
-import { InMemorySessionStore } from "@sortedyuan/session";
+import { AgentApplication } from "@sortedyuan/may";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { UppercaseModel } from "./uppercase-model.js";
 
 const application = await AgentApplication.open({
@@ -166,7 +166,7 @@ yield {
 - `limits`，应用可用 `contextBudgetFromModel()` 转为 Context 容量预算；
 - `contextCompactor`，用于 Provider 原生压缩。
 
-Provider 原生压缩是可选能力。`@sortedyuan/context` 通过
+Provider 原生压缩是可选能力。`@sortedyuan/may/context` 通过
 `ModelContextCompactionStrategy` 适配独立压缩器。
 压缩器应当在 `ModelContextCompactionResult.usage` 中报告压缩请求自身的用量，
 宿主根据实际用量计算费用。参阅

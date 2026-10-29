@@ -1,9 +1,6 @@
 ---
-"@sortedyuan/plugin-services": minor
-"@sortedyuan/application": minor
-"@sortedyuan/plugin-goals": minor
-"@sortedyuan/plugin-history-memory": patch
-"@sortedyuan/plugin-delegation": patch
+"@sortedyuan/may": minor
+"@sortedyuan/coordination": patch
 ---
 
 Expose structural contribution registries and separate Application execution,

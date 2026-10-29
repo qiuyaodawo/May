@@ -8,10 +8,10 @@
 ## 发布范围
 
 [明确的发布清单](../../../scripts/release-packages.json)包含 `@sortedyuan` 下的
-39 个包：38 个库和 MaybeCode。`pnpm release:check` 检查清单与 workspace
+14 个包：13 个库和 MaybeCode。`pnpm release:check` 检查清单与 workspace
 公开包完全一致，并检查它们完整的运行时依赖均可发布。
 
-MaybeClaw、CLI、Eval CLI、Telegram 和 Feishu 渠道插件以及示例保持私有。
+MaybeClaw、CLI、Eval CLI 和示例保持私有，Telegram 和 Feishu 渠道属于 MaybeClaw 内部模块。
 增加公开包需要更新清单，并在外部项目中验证其完整依赖能够安装。
 
 [Changesets 配置](../../../.changeset/config.json)使用 public access，关闭
@@ -21,11 +21,12 @@ major changeset。每项破坏性更改必须提供使用方迁移说明。
 
 ## 包名迁移
 
-组件工厂和历史工具的导入更新见[公开子路径迁移指南](package-subpaths.md)。
+框架、Provider 和插件的导入更新见[公开子路径迁移指南](package-subpaths.md)。
 
-将依赖名称、源码导入、`pnpm --filter` 选择器以及加载包模块的配置值中的
-`@may/` 更新为 `@sortedyuan/`。保留包名后半部分与导出子路径，例如
-`@sortedyuan/session/file-store`。重新安装依赖并编译使用方项目。
+按照迁移表更新依赖名称、源码导入、`pnpm --filter` 选择器以及加载包模块的配置值。
+例如，安装 `@sortedyuan/may`，导入 `@sortedyuan/may/session/file-store`。
+使用较早的 `@may/` 名称时，按照组件名称查找同一张迁移表。
+重新安装依赖并编译使用方项目。
 安装经过确认的新版本之前，可以执行 `pnpm remove --global @may/maybecode`
 卸载旧名称的全局 MaybeCode 安装。
 

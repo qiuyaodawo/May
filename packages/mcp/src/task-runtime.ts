@@ -1,7 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { isDeepStrictEqual } from "node:util";
 import { createHash } from "node:crypto";
-import type { UserMessage } from "@sortedyuan/core";
+import type { UserMessage } from "@sortedyuan/may/core";
 import { specTypeSchemas, type CallToolResult, type Tool, type RequestOptions, type JsonSchemaType } from "@modelcontextprotocol/client";
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
 import { McpTaskJournal, type McpTaskBinding, type McpTaskRecord } from "./task-journal.js";

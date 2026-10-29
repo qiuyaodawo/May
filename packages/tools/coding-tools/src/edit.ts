@@ -1,5 +1,5 @@
 import { atomicWriteText } from "./atomic-write.js";
-import type { Tool } from "@sortedyuan/core";
+import type { Tool } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
 import {
   requireObject,

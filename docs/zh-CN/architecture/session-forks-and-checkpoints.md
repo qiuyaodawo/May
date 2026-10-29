@@ -2,7 +2,7 @@
 
 [English](../../en/architecture/session-forks-and-checkpoints.md) | **简体中文**
 
-状态：已实现。公共组件 API 参见 [Session 文档](../../../packages/session/README.md)、
+状态：已实现。公共组件 API 参见 [Session 文档](../guides/custom-storage.md)、
 [Runtime 与 Session 架构](runtime-session.md)和 [Git 工作区指南](../guides/git-workspaces.md)。
 
 本文面向需要实现会话分支、文件版本显示与 worktree 管理的宿主和 UI 作者。

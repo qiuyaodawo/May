@@ -13,7 +13,7 @@
 ## 1. 包装内置工厂
 
 包装内置工厂可以保留其回放、容量预算、用量测量和自动压缩行为。
-在应用中创建 `audited-context.ts`，将 `@sortedyuan/core` 和 `@sortedyuan/context` 加入直接依赖：
+在应用中创建 `audited-context.ts`，将 `@sortedyuan/may` 加入直接依赖：
 
 ```ts
 import type {
@@ -22,13 +22,13 @@ import type {
   ContextSnapshot,
   Message,
   SnapshotOptions,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 import {
   InMemoryContextFactory,
   type ContextFactory,
   type ContextFactoryOptions,
   type ManagedContext,
-} from "@sortedyuan/context";
+} from "@sortedyuan/may/context";
 
 type Audit = (entry: {
   readonly operation: "snapshot" | "append";
@@ -76,7 +76,7 @@ export class AuditedContextFactory implements ContextFactory {
 
 ## 2. 使用工厂打开应用
 
-在入口导入 `@sortedyuan/application` 的 `AgentApplication`，以及 `./audited-context.js`
+在入口导入 `@sortedyuan/may` 的 `AgentApplication`，以及 `./audited-context.js`
 的 `AuditedContextFactory`。以下组合片段使用宿主已经初始化的 `model`、`store`
 和 `permissionPolicy`：
 

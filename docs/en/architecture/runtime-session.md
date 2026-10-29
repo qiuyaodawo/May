@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../../zh-CN/architecture/runtime-session.md)
 
-This page explains which package owns Agent execution, conversation state, and
+This page explains which module owns Agent execution, conversation state, and
 application resources. Use it when deciding where an extension belongs or
 reviewing dependencies between reusable packages and products.
 
@@ -36,29 +36,37 @@ without filesystem dependencies.
 ## Package responsibilities
 
 Reusable code lives under `packages`; executable product composition lives
-under `apps`. The dependency rule is:
+under `apps`. Core, Application, Session, Context, permissions and plugin services
+are modules of `@sortedyuan/may`, with public subpaths and a shared release version.
+The dependency direction is:
 
 ```mermaid
 flowchart LR
-  Apps[apps] --> Application["@sortedyuan/application"]
-  Application --> Plugin["@sortedyuan/plugin"]
-  Application --> Components[context / session / permissions]
-  Plugin --> Core["@sortedyuan/core"]
-  Components --> Core
+  subgraph May["@sortedyuan/may"]
+    Application[application] --> Plugin[plugin]
+    Application --> Components[context / session / permissions]
+    Plugin --> Core[core]
+    Components --> Core
+  end
+  Apps[apps] --> Application
   Apps --> Observability["@sortedyuan/observability"]
   Observability --> Core
   Apps --> MCP["@sortedyuan/mcp"]
   MCP --> Core
   Apps --> TUI["@sortedyuan/tui"]
-  TUI --> Terminal[coding-tools / keybindings / session / permissions / core]
-  Apps --> Products[provider / tool / config packages]
+  TUI --> Core
+  TUI --> Terminal[coding-tools / media]
+  Apps --> Providers["@sortedyuan/providers"]
+  Providers --> Core
+  Apps --> Gateway["@sortedyuan/gateway"]
+  Gateway --> Application
 ```
 
-This is a layering sketch, not a requirement that every package depend on
-every package to its right. The invariant is that reusable packages do not
-import an application. In particular, no package imports `apps/maybecode`.
+The diagram shows selected module dependencies. Package manifests define the
+complete install dependencies. Reusable modules depend on public framework
+interfaces, and product composition remains under `apps`.
 
-### `@sortedyuan/core`
+### `@sortedyuan/may/core`
 
 Core owns active execution:
 
@@ -80,7 +88,7 @@ one-shot run. Core owns only the small `Tracer`/`TraceSpan` port and explicit
 `TraceContext` propagation needed to instrument its own execution; it does not
 import a concrete telemetry implementation or vendor SDK.
 
-### `@sortedyuan/context`
+### `@sortedyuan/may/context`
 
 The context package provides factories and reusable implementations of Core's
 minimal `Context` contract. Applications can replace how model-visible history
@@ -92,16 +100,16 @@ snapshot; strategy selection and durable replacement events remain outside
 Core's minimal execution contract.
 
 A model adapter may optionally expose a provider-native context compactor.
-Core defines only the opaque capability boundary. `@sortedyuan/context` adapts it into
+Core defines only the opaque capability boundary. `@sortedyuan/may/context` adapts it into
 the automatic strategy chain, while the owning provider serializes and
 restores native continuation state through `modelState`.
 
-### `@sortedyuan/session`
+### `@sortedyuan/may/session`
 
 The session package composes Core into a long-lived identity. It owns a session
 id, metadata, serialized submission, context continuity, session events, and a
 storage seam. It also provides reusable in-memory and file-backed session
-Catalog implementations. It may depend on `@sortedyuan/core`; Core must not depend on
+Catalog implementations. It may depend on `@sortedyuan/may/core`; Core must not depend on
 it.
 
 Session executes through `AgentRuntime`. The default implementation is `May`;
@@ -109,6 +117,9 @@ custom runtime factories may own their Context and additional resources.
 Runtime identity and versioned state are persisted. At a replacement boundary,
 Session saves state and closes the old runtime while its plugin services are
 available, then restores the replacement before allowing execution.
+
+After `closeRuntime()` completes, submissions and continuations still waiting for
+history access or persistence reject before starting another Run.
 
 Session also owns durable Run outcome interpretation. `Session.inspectRun()` and
 `inspectSessionRunOutcome(history, selector)` query by `runId`, `inputId`,
@@ -135,7 +146,7 @@ partial history unavailable for resume and branching. `AgentWorkspace` persists
 the candidate's Catalog entry before closing or replacing the source; a Catalog
 failure preserves candidate history and leaves the source Application active.
 
-### `@sortedyuan/plugin`
+### `@sortedyuan/may/plugin`
 
 The plugin package owns composition validation, typed versioned services,
 scoped initialization, configuration and state validation, lifecycle Hooks,
@@ -143,7 +154,7 @@ serialized changes, and resource cleanup. It depends on Core's Hook interfaces.
 Application supplies runtime and Context services and connects plugin state to
 durable Session storage.
 
-### `@sortedyuan/permissions`
+### `@sortedyuan/may/permissions`
 
 Raw tools contain capabilities, not terminal interaction. Core exposes a
 general tool-executor seam. The permissions package implements that seam to
@@ -165,7 +176,7 @@ for precedence, revocation, and storage ownership.
 The observability package is an optional implementation of Core's tracing
 port. It provides sampling, immutable completed spans, in-memory and
 serialized/bounded processors, and basic exporters. The dependency points
-from `@sortedyuan/observability` to `@sortedyuan/core`: Core defines the capability it needs,
+from `@sortedyuan/observability` to `@sortedyuan/may/core`: Core defines the capability it needs,
 while the optional outer package implements it and is injected by a product.
 
 Tracing is fail-open operational data. It may be sampled, buffered, or dropped
@@ -200,7 +211,7 @@ process I/O begins. Runtime cancellation propagates to the remote request.
 Pool/process lifetime belongs to the product that opened the pool, not Core or
 an individual Session.
 
-### `@sortedyuan/application`
+### `@sortedyuan/may/application`
 
 The application package provides headless orchestration above Session and
 Core. `AgentDefinition` captures reusable behavior and policy without Session
@@ -253,7 +264,7 @@ UI can consume a headless controller directly.
 MaybeCode is an application composition layer, not another runtime. It selects
 and configures reusable packages, composes coding tools with `ToolRegistry`,
 captures generic behavior with `defineAgent()`, delegates one-session and
-workspace lifecycle to `@sortedyuan/application`, uses `@sortedyuan/tui`'s Agent transcript,
+workspace lifecycle to `@sortedyuan/may/application`, uses `@sortedyuan/tui`'s Agent transcript,
 and exposes a terminal coding-agent product. No reusable package depends on
 MaybeCode.
 

@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
-import type { RunResult, UserMessage } from "@sortedyuan/core";
-import { inspectSessionRunOutcome, validateSessionHistory, type SessionEvent, type SessionRunOutcome } from "@sortedyuan/session";
+import type { RunResult, UserMessage } from "@sortedyuan/may/core";
+import { inspectSessionRunOutcome, validateSessionHistory, type SessionEvent, type SessionRunOutcome } from "@sortedyuan/may/session";
 import type { TaskExecution, TaskOutput, TaskRecovery } from "./types.js";
 
 /** coordination agent 在自己的 Session 元数据中记录的持久身份。 */
@@ -64,7 +64,10 @@ export function inspectAttachedTaskSession(
       }
       continue;
     }
-    const earlier = inputs.find((event) => event.inputId === `${execution.task.dispatchId}:${index}`);
+    const earlierIdentity = index === start && options.inputId !== undefined
+      ? options.inputId
+      : `${execution.task.dispatchId}:${index}`;
+    const earlier = inputs.find((event) => event.inputId === earlierIdentity);
     if (earlier === undefined) return unknownTaskOutcome("Earlier turn input is missing");
     if (inspectSessionRunOutcome(events, { inputSeq: earlier.seq }).status !== "yielded") {
       return unknownTaskOutcome("Earlier turn has no safe yield boundary");

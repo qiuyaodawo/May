@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { withFileAccess } from "@sortedyuan/file-storage";
+import { withFileAccess } from "@sortedyuan/may/storage";
 
 const writes = new Map<string, Promise<unknown>>();
 

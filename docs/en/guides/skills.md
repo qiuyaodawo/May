@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../../zh-CN/guides/skills.md)
 
-`@sortedyuan/skills` implements the [Agent Skills format](https://agentskills.io/specification)
+`@sortedyuan/may/skills` implements the [Agent Skills format](https://agentskills.io/specification)
 for general agents. Use this guide to create a local skill, discover it in
 MaybeCode, and activate it for a Session. Start in the project directory used
 by the configured MaybeCode host.
@@ -98,14 +98,14 @@ sandbox nor a remote skill marketplace; choose sources appropriate for your host
 
 ## Generic integration
 
-Add `@sortedyuan/skills` and `@sortedyuan/application` as direct application dependencies.
+Add `@sortedyuan/may` as a direct application dependency.
 This snippet assumes `model`, `tools`, `permissionPolicy`, and `store` are
 initialized. Replace `/srv/agent-skills` with the directory containing your
 skill directories, and close the application after execution:
 
 ```ts
-import { SkillRegistry } from "@sortedyuan/skills";
-import { defineAgent } from "@sortedyuan/application";
+import { SkillRegistry } from "@sortedyuan/may/skills";
+import { defineAgent } from "@sortedyuan/may";
 
 const skills = await SkillRegistry.discover(["/srv/agent-skills"]);
 const definition = defineAgent({ model, tools, skills, permissionPolicy });

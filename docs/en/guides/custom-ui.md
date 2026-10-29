@@ -47,19 +47,19 @@ waits for event relays, and then closes the event stream.
 ## Projecting application events
 
 This projection function assumes an open controller, a `TranscriptStore`, and
-an application-owned `askApproval` dialog. Install `@sortedyuan/application`,
-`@sortedyuan/permissions` and `@sortedyuan/tui` in the consuming project. The function observes
+an application-owned `askApproval` dialog. Install `@sortedyuan/may`
+and `@sortedyuan/tui` in the consuming project. The function observes
 events until the controller closes; run input and exit handling concurrently.
 
 ```ts
 import type {
   AgentApplicationEvent,
   AgentController,
-} from "@sortedyuan/application";
+} from "@sortedyuan/may";
 import type {
   ApprovalDecision,
   ApprovalRequest,
-} from "@sortedyuan/permissions";
+} from "@sortedyuan/may/permissions";
 import { TranscriptStore } from "@sortedyuan/tui/transcript";
 
 type AskApproval = (

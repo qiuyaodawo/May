@@ -16,9 +16,9 @@ May 将持久化对话历史与 Session 发现分开：
 
 | 要求 | 后端 |
 | --- | --- |
-| 进程内历史 | `@sortedyuan/session` 的 `InMemorySessionStore` |
-| 跨重启本地历史 | `@sortedyuan/session/file-store` 的 `FileSessionStore` |
-| 本地 Session 发现 | `@sortedyuan/session/catalog` 的 `FileSessionCatalog` |
+| 进程内历史 | `@sortedyuan/may/session` 的 `InMemorySessionStore` |
+| 跨重启本地历史 | `@sortedyuan/may/session/file-store` 的 `FileSessionStore` |
+| 本地 Session 发现 | `@sortedyuan/may/session/catalog` 的 `FileSessionCatalog` |
 | 数据库、加密或跨进程协调 | 实现本文的存储接口 |
 
 使用文件存储时可以直接阅读[内置本地存储](#内置本地存储)。
@@ -55,7 +55,7 @@ Run 已经成功完成。
 
 ## 数据库适配器框架
 
-在依赖 `@sortedyuan/session` 的应用中创建适配器模块。
+在依赖 `@sortedyuan/may` 的应用中创建适配器模块。
 下面的 `SessionEventTable` 是数据库集成接口，需要使用数据库库提供具体实现，
 才能创建存储。`appendIfCurrentSequence` 必须在同一事务中检查当前最大序号并插入记录。
 
@@ -64,7 +64,7 @@ import {
   validateSessionHistory,
   type SessionEvent,
   type SessionStore,
-} from "@sortedyuan/session";
+} from "@sortedyuan/may/session";
 
 export interface SessionEventTable {
   appendIfCurrentSequence(input: {
@@ -160,14 +160,14 @@ Catalog 提供索引，Session 历史保存对话事实。普通 Run 的 Catalog
 
 ## 内置本地存储
 
-将 `@sortedyuan/application` 和 `@sortedyuan/session` 加入应用直接依赖，在入口初始化
+将 `@sortedyuan/may` 加入应用直接依赖，在入口初始化
 `model`、`tools` 和 `permissionPolicy` 后使用下面的组合片段。
 路径以进程工作目录为基准：
 
 ```ts
-import { AgentApplication, AgentWorkspace } from "@sortedyuan/application";
-import { FileSessionCatalog } from "@sortedyuan/session/catalog";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { AgentApplication, AgentWorkspace } from "@sortedyuan/may";
+import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 
 const store = new FileSessionStore(".may/sessions");
 const catalog = new FileSessionCatalog(".may/catalog.json");
@@ -202,15 +202,15 @@ Catalog 在本地多个进程间使用追加式原子操作文件，默认不自
 ## 协调本地文件访问
 
 应用自己的本地文件由多个进程共同访问时，使用
-`@sortedyuan/file-storage` 导出的 `withFileAccess`。将
-`@sortedyuan/file-storage` 加入直接依赖，把下面的示例保存为 `shared-state.mjs`，
+`@sortedyuan/may/storage` 导出的 `withFileAccess`。将
+`@sortedyuan/may` 加入直接依赖，把下面的示例保存为 `shared-state.mjs`，
 在应用目录运行 `node shared-state.mjs`。示例写入完整 JSON 内容，通过相同的
 访问函数读取内容，然后输出 `1`。
 
 ```js
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { withFileAccess } from "@sortedyuan/file-storage";
+import { withFileAccess } from "@sortedyuan/may/storage";
 
 await mkdir(".may", { recursive: true });
 const path = resolve(".may/shared-state.json");
@@ -287,14 +287,14 @@ Context 工作集与持久化历史的区别见[自定义 Context](custom-contex
 记录已吸收的精确操作文件名，因此清理中断不会重复重放。合并后不能使用旧版读取器；
 普通版本 1 目录仍可读取。
 
-`@sortedyuan/session/file-store` 的 `acquireFileLock(path)` 和
+`@sortedyuan/may/session/file-store` 的 `acquireFileLock(path)` 和
 `releaseFileLock(file, path)` 通过永久保留的 `<path>.access` 和
 `<path>.access.gate` 文件协调锁文件的创建与删除。并发创建或删除最多等待
 30 秒；已有所有者时，获取锁仍以 `EEXIST` 拒绝。再次使用存储前需要等待释放完成。
 使用和恢复期间保留两个访问协调文件，并同时升级全部参与进程。这些规则同样适用于
 Coordination 日志、资源日志、远程 Worker、Team 验证、Team patch 应用和默认模型配置更新。
 
-本地写入者锁可从 `@sortedyuan/session/file-store` 导入 `recoverFileLock` 处理。必须先停止所有
+本地写入者锁可从 `@sortedyuan/may/session/file-store` 导入 `recoverFileLock` 处理。必须先停止所有
 竞争宿主、打开和恢复操作，检查锁内容，再以 `expectedContents` 传入完整原文，并设置
 `confirmHostsStopped: true`。辅助函数拒绝存活 PID、远端宿主、危险链接和已变化的元数据。
 元数据不完整时，独立核实所有者后还需显式设置 `confirmUnknownOwner: true`。

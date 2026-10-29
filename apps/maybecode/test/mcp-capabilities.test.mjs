@@ -5,7 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openMcpClientPool, McpInteractionBroker, McpTaskJournal, InMemoryMcpCredentialStore } from "@sortedyuan/mcp";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { MaybeCodeWorkspace, openConfiguredMaybeCode, resolveMaybeCodeMcp, InMemorySessionCatalog, executeMaybeCodeSlashCommand, runTerminalUI, MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
 import { startCatalogFixture } from "../../../packages/mcp/test/fixtures/catalog-server.mjs";
 import { startTaskServer } from "../../../packages/mcp/test/fixtures/task-server.mjs";

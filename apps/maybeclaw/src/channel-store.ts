@@ -1,9 +1,9 @@
 import { access } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { ChannelStore as DeliveryChannelStore } from "@sortedyuan/plugin-delivery";
+import { ChannelStore as DeliveryChannelStore } from "@sortedyuan/gateway/delivery";
 
-export { inboxId, cursorId, validateChannelInput } from "@sortedyuan/plugin-delivery";
-export type { ChannelInput, ChannelAttachment, ChannelDeliveryReceipt, InboxRecord, DeliveryRecord, ChannelRecord } from "@sortedyuan/plugin-delivery";
+export { inboxId, cursorId, validateChannelInput } from "@sortedyuan/gateway/delivery";
+export type { ChannelInput, ChannelAttachment, ChannelDeliveryReceipt, InboxRecord, DeliveryRecord, ChannelRecord } from "@sortedyuan/gateway/delivery";
 export type ChannelStore = DeliveryChannelStore;
 export const ChannelStore = {
   inspect: (path: string) => DeliveryChannelStore.inspect(path),

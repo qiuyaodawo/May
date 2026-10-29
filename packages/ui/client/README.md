@@ -25,7 +25,7 @@ bounded snapshot preview.
 
 Saved `recovery.resolved` findings appear as user messages and participate in history
 search and full-field reads. These paths consume `SessionTranscriptReader` from
-`@sortedyuan/session`, including its shared input and steering delivery semantics.
+`@sortedyuan/may/session`, including its shared input and steering delivery semantics.
 
 `UiBlock.content` preserves ordered text and image attachments. `UiHost.media`
 and `UiClient.readMedia` provide authenticated, resource-scoped image access.

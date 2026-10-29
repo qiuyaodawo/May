@@ -9,9 +9,9 @@ import {
   type RuntimeTerminal,
 } from "@sortedyuan/tui";
 import { TranscriptStore } from "@sortedyuan/tui/transcript";
-import type { ApprovalRequest } from "@sortedyuan/permissions";
+import type { ApprovalRequest } from "@sortedyuan/may/permissions";
 import { userInfo } from "node:os";
-import type { SessionSummary } from "@sortedyuan/session/catalog";
+import type { SessionSummary } from "@sortedyuan/may/session/catalog";
 import type {
   MaybeCodeController,
   MaybeCodeModelProfile,

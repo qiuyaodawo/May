@@ -1,6 +1,6 @@
 import { open } from "node:fs/promises";
 import type { CoordinationLimits, TaskSpec } from "@sortedyuan/coordination";
-import { resolveRunBudget, type RunBudget } from "@sortedyuan/core";
+import { resolveRunBudget, type RunBudget } from "@sortedyuan/may/core";
 import { MaybeCodeUsageError } from "./errors.js";
 import { parseTeamChecks, type TeamCheckSpec } from "./team-verification.js";
 

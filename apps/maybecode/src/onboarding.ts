@@ -1,7 +1,7 @@
 import { SelectList } from "@sortedyuan/tui";
 import { createNodeTerminal } from "@sortedyuan/tui/node-terminal";
 import { setImmediate } from "node:timers/promises";
-import { createMayConfig, parseMayConfig, type MayConfig } from "@sortedyuan/config";
+import { createMayConfig, parseMayConfig, type MayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
 import type { MaybeCodeStartCommand } from "./args.js";
 

@@ -35,13 +35,13 @@ flowchart LR
 
 ## Package API
 
-在应用项目安装 `@sortedyuan/mcp` 和 `@sortedyuan/application`。以下集成片段假设已经创建
+在应用项目安装 `@sortedyuan/mcp` 和 `@sortedyuan/may`。以下集成片段假设已经创建
 `model`、`localTools`、`permissionPolicy`、`tracer` 和 `store`。将
 `mcp-server.mjs` 放在进程工作目录，或者使用绝对路径。服务端要求凭据时，
 在打开连接池前验证凭据，并通过 `env` 提供。
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
+import { defineAgent } from "@sortedyuan/may";
 import { openMcpClientPool } from "@sortedyuan/mcp";
 
 const mcp = await openMcpClientPool({

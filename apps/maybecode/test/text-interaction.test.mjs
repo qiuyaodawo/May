@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PassThrough } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
-import { keyStroke } from "@sortedyuan/keybindings";
+import { keyStroke } from "@sortedyuan/tui/keybindings";
 import { createTerminalClipboard, NodeTerminalDriver } from "@sortedyuan/tui";
 import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
 import { createMaybeCodeKeymap } from "../dist/keymap.js";

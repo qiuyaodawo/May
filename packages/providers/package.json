@@ -9,25 +9,27 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./openai": { "types": "./dist/openai/index.d.ts", "import": "./dist/openai/index.js" },
+    "./anthropic": { "types": "./dist/anthropic/index.d.ts", "import": "./dist/anthropic/index.js" },
+    "./gemini": { "types": "./dist/gemini/index.d.ts", "import": "./dist/gemini/index.js" },
+    "./deepseek": { "types": "./dist/deepseek/index.d.ts", "import": "./dist/deepseek/index.js" },
+    "./kimi": { "types": "./dist/kimi/index.d.ts", "import": "./dist/kimi/index.js" },
+    "./zhipu": { "types": "./dist/zhipu/index.d.ts", "import": "./dist/zhipu/index.js" },
+    "./openai-compatible": { "types": "./dist/openai-compatible/index.d.ts", "import": "./dist/openai-compatible/index.js" },
+    "./openai-compatible/http": { "types": "./dist/openai-compatible/http.d.ts", "import": "./dist/openai-compatible/http.js" }
   },
-  "files": ["dist", "!dist/.tsbuildinfo"],
+  "files": ["dist", "docs", "!dist/.tsbuildinfo"],
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "test": "pnpm run build && node --test test/*.test.mjs",
-    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+    "test": "pnpm run build && node --test test/*.test.mjs test/*/*.test.mjs",
+    "test:integration": "pnpm run build && node --test test/*/integration/*.test.mjs",
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs test/*/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/config": "workspace:*",
-    "@sortedyuan/core": "workspace:*",
-    "@sortedyuan/provider-anthropic": "workspace:*",
-    "@sortedyuan/provider-deepseek": "workspace:*",
-    "@sortedyuan/provider-gemini": "workspace:*",
-    "@sortedyuan/provider-kimi": "workspace:*",
-    "@sortedyuan/provider-openai": "workspace:*",
-    "@sortedyuan/provider-openai-compatible": "workspace:*",
-    "@sortedyuan/provider-zhipu": "workspace:*"
+    "@sortedyuan/may": "workspace:*",
+    "eventsource-parser": "3.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"

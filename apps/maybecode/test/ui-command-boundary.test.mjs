@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, rename, rmdir, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
 import { createBuiltinProviderModel, RetryingModel } from "@sortedyuan/providers";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
 import { MaybeCodeWorkspace, createMaybeCodeWebHost } from "../dist/index.js";
 
 async function openWorkspace(t) {

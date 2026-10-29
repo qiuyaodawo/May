@@ -26,12 +26,12 @@ Use this page to look up fields and defaults. For application startup and contro
 see [MaybeCode](../guides/maybecode.md) or [MaybeClaw](../guides/maybeclaw.md).
 
 For editor completion and validation, associate the file with
-[`packages/config/may-config.schema.json`](../../../packages/config/may-config.schema.json).
+[`packages/may/may-config.schema.json`](../../../packages/may/may-config.schema.json).
 For example, on this Windows checkout the user configuration can start with:
 
 ```json
 {
-  "$schema": "file:///E:/code/May/packages/config/may-config.schema.json",
+  "$schema": "file:///E:/code/May/packages/may/may-config.schema.json",
   "providers": {},
   "models": {}
 }
@@ -107,7 +107,7 @@ For `google-gemini`, `baseURL` includes the API version and defaults to
 upward. Configure either effort or budget. `includeThoughts` is optional; omitted
 thinking options use the server/model behavior. A provider that selects effort
 through model names can use a name such as `gemini-3.8-flash-high` without an
-additional effort option. See [Gemini adapter](../../../packages/providers/gemini/README.md).
+additional effort option. See [Gemini adapter](../../../packages/providers/docs/gemini/README.md).
 
 Common scalar values:
 

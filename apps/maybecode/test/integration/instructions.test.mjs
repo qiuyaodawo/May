@@ -4,13 +4,13 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { MaybeCodeApplication } from "../../dist/index.js";
-import { applicationServices } from "../../../../packages/application/dist/index.js";
-import { loadMayConfig } from "../../../../packages/config/dist/index.js";
-import { RunCancelledError, runtimeHooks } from "../../../../packages/core/dist/index.js";
-import { definePlugin } from "../../../../packages/plugin/dist/index.js";
+import { applicationServices } from "../../../../packages/may/dist/application/index.js";
+import { loadMayConfig } from "../../../../packages/may/dist/config/index.js";
+import { RunCancelledError, runtimeHooks } from "../../../../packages/may/dist/core/index.js";
+import { definePlugin } from "../../../../packages/may/dist/plugin/index.js";
 import { createBuiltinProviderModel, selectProviderModel } from "../../../../packages/providers/dist/index.js";
-import { InMemorySessionStore } from "../../../../packages/session/dist/index.js";
-import { SkillRegistry } from "../../../../packages/skills/dist/index.js";
+import { InMemorySessionStore } from "../../../../packages/may/dist/session/index.js";
+import { SkillRegistry } from "../../../../packages/may/dist/skills/index.js";
 
 async function workspaceFor(t) {
   const parent = fileURLToPath(new URL("../../../../review/prompt-verification/", import.meta.url));

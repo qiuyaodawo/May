@@ -3,14 +3,14 @@
 [English](../../en/guides/plugins.md) | **简体中文**
 
 本文用于为已有 May 应用添加服务或生命周期处理方法。需要应用组合、准备扩展的
-服务或 Hook，以及已经安装的 `@sortedyuan/plugin` 和 `@sortedyuan/application`。
+服务或 Hook，以及已经安装的 `@sortedyuan/may`。
 
 1. 按照[示例](#声明插件)声明服务和插件初始化方法。
 2. 将定义加入应用的 `plugins`，或通过[产品配置](#产品加载插件)加载模块。
 3. 获取资源时注册清理方法，选择负责管理它的范围。
 4. 验证初始化、Hook 执行、状态恢复与关闭。
 
-`@sortedyuan/plugin` 管理配置与资源；Core 定义带类型的 Hooks 和 `AgentRuntime`；
+`@sortedyuan/may/plugin` 管理配置与资源；Core 定义带类型的 Hooks 和 `AgentRuntime`；
 Application 将它们与权限、Context 和持久 Session 存储组合。
 [架构说明](../architecture/plugins.md)解释生命周期与依赖规则。
 
@@ -62,8 +62,8 @@ PluginContext 用于插件配置和生命周期管理。Agent 的 `Context` 接�
 输入添加 `Project: `，其他输入保持原值。应用另外提供自己的 Model 和存储。
 
 ```ts
-import { definePlugin, defineService } from "@sortedyuan/plugin";
-import { applicationHooks } from "@sortedyuan/application";
+import { definePlugin, defineService } from "@sortedyuan/may/plugin";
+import { applicationHooks } from "@sortedyuan/may";
 
 const labels = defineService<{ prefix: string }>({
   id: "example.labels", version: "1.0.0", scope: "application",
@@ -122,7 +122,7 @@ Hook 以及更短生命周期服务依赖，都在插件初始化前导致验证
 `operation` 和 `cancelOperation`。操作期间保持宿主开放，即使失败也需要关闭：
 
 ```ts
-import { PluginHost } from "@sortedyuan/plugin";
+import { PluginHost } from "@sortedyuan/may/plugin";
 
 const host = await PluginHost.create({ plugins, hooks: [myHook], services });
 try {
@@ -182,7 +182,7 @@ try {
 
 ## Runtime 和应用服务
 
-`@sortedyuan/plugin-services` 定义共享的带类型服务标识。`applicationServices` 导出相同
+`@sortedyuan/may/services` 定义共享的带类型服务标识。`applicationServices` 导出相同
 标识，并增加 `execution`、`history`、`state` 和 `application` 访问服务。
 它们的 `get()` 在创建阶段完成后返回冻结的结构化接口。
 服务包括 `model`、`modelInfo`、`contextFactory`、`contextOptions`、`sessionStore`、
@@ -234,29 +234,29 @@ provider、model、adapter 和 profile。仅提供 `model` 的插件将未知名
 
 | 导入路径 | 工厂及职责 |
 | --- | --- |
-| `@sortedyuan/plugin-services/runtime` | `createRuntimePlugin`、`createContextPlugin`、`createToolsPlugin`、`createContextWrapperPlugin`；组合 runtime、Context 和工具 |
-| `@sortedyuan/plugin-services/models` | `createModelPlugin`、`createModelWrapperPlugin`；Model 实例及包装 |
-| `@sortedyuan/plugin-services/permissions` | `createPermissionPlugin`；PermissionPolicy |
-| `@sortedyuan/plugin-services/skills` | `createSkillsPlugin`；发现、激活、指令、工具及状态保存 |
-| `@sortedyuan/plugin-goals` | `createGoalsPlugin`；持久目标、预算及继续执行 |
-| `@sortedyuan/plugin-history-memory` | `createHistoryMemoryPlugin`；历史 Context 笔记、查询和压缩 |
-| `@sortedyuan/plugin-delegation` | `createDelegationPlugin`、`createWorkspaceFilesPlugin`；子 Agent、共享预算及工作区文件访问 |
-| `@sortedyuan/plugin-mcp` | `createMcpPlugin`、`createMcpHostPlugin`、`createSharedMcpPlugin`；连接、工具目录、认证、交互及任务日志 |
-| `@sortedyuan/plugin-observability` | application、host 和共享资源工厂；tracing 及 exporter 关闭 |
-| `@sortedyuan/plugin-delivery` | `createDeliveryPlugin`；持久渠道记录、接收方登记及单次投递结果 |
-| `@sortedyuan/plugin-channel-telegram`（private） | `createTelegramChannelPlugin`；Telegram 接收、路由及附件 |
-| `@sortedyuan/plugin-channel-feishu`（private） | `createFeishuChannelPlugin`；Feishu 接收、路由及附件 |
-| `@sortedyuan/plugin-agent-adapters` | `createAgentAdaptersPlugin`、`createMayAgentAdapter`、`loadAgentAdapter` 和 RPC adapters；对话及 adapter 资源管理 |
+| `@sortedyuan/may/services/runtime` | `createRuntimePlugin`、`createContextPlugin`、`createToolsPlugin`、`createContextWrapperPlugin`；组合 runtime、Context 和工具 |
+| `@sortedyuan/may/services/models` | `createModelPlugin`、`createModelWrapperPlugin`；Model 实例及包装 |
+| `@sortedyuan/may/services/permissions` | `createPermissionPlugin`；PermissionPolicy |
+| `@sortedyuan/may/services/skills` | `createSkillsPlugin`；发现、激活、指令、工具及状态保存 |
+| `@sortedyuan/may/goals/plugin` | `createGoalsPlugin`；持久目标、预算及继续执行 |
+| `@sortedyuan/may/history-memory` | `createHistoryMemoryPlugin`；历史 Context 笔记、查询和压缩 |
+| `@sortedyuan/coordination/delegation` | `createDelegationPlugin`、`createWorkspaceFilesPlugin`；子 Agent、共享预算及工作区文件访问 |
+| `@sortedyuan/mcp/plugin` | `createMcpPlugin`、`createMcpHostPlugin`、`createSharedMcpPlugin`；连接、工具目录、认证、交互及任务日志 |
+| `@sortedyuan/observability/plugin` | application、host 和共享资源工厂；tracing 及 exporter 关闭 |
+| `@sortedyuan/gateway/delivery` | `createDeliveryPlugin`；持久渠道记录、接收方登记及单次投递结果 |
+| MaybeClaw `src/channels/telegram` | `createTelegramChannelPlugin`；Telegram 接收、路由及附件 |
+| MaybeClaw `src/channels/feishu` | `createFeishuChannelPlugin`；Feishu 接收、路由及附件 |
+| `@sortedyuan/gateway/adapters` | `createAgentAdaptersPlugin`、`createMayAgentAdapter`、`loadAgentAdapter` 和 RPC adapters；对话及 adapter 资源管理 |
 | `@sortedyuan/coordination/plugin` | `createCoordinationPlugin`；任务图创建、恢复和释放 |
-| `@sortedyuan/plugin-web-api` | `createWebApiPlugin`；HTTP 监听、活动请求及连接 |
+| `@sortedyuan/gateway/web-api` | `createWebApiPlugin`；HTTP 监听、活动请求及连接 |
 
-功能插件位于 `packages/plugins/<name>/`。共享服务标识、有序贡献登记和组件工厂子路径
-位于 `packages/plugin-services/`，Coordination 工厂位于
-`packages/coordination/src/plugin.ts`，插件宿主位于 `packages/plugin/`。产品组合位于
+功能插件位于对应能力包中。共享服务标识、有序贡献登记和组件工厂子路径
+位于 `packages/may/src/services/`，Coordination 工厂位于
+`packages/coordination/src/plugin.ts`，插件宿主位于 `packages/may/src/plugin/`。产品组合位于
 `apps/maybecode/src/plugins/` 和 `apps/maybeclaw/src/plugins/`。
 现有 package 的类和接口继续支持直接调用，应用保留已提取功能的兼容导出。
 
-`@sortedyuan/plugin-agent-adapters` 通过 `AgentAdapterContext.telemetry` 接收经过验证的
+`@sortedyuan/gateway/adapters` 通过 `AgentAdapterContext.telemetry` 接收经过验证的
 version 1 `TelemetryCorrelation`。RPC 协商 `telemetryVersion: 1` 后发送独立
 关联信息，并在执行前验证。业务去重不包含遥测身份。关联与配置职责参阅
 [模型与执行诊断](model-telemetry-integration.md)。
@@ -274,8 +274,8 @@ history-memory 和 delegation。MCP 命令、目录和事件使用活动 Applica
 后台处理和自动投递。暂停期间，`tick()` 处理已保存的输入并创建回复记录；
 `deliver()` 明确发送待投递消息。
 
-`pnpm test:package:plugin` 打包宿主、共享服务、Session、Coordination、八个公开功能插件包
-及其完整 May 运行时依赖，在仓库外的 consumer 目录安装 tarball 并执行导出 API。
+`pnpm test:package:plugin` 打包 May、Coordination、Gateway、MCP、Observability
+及其完整运行时依赖，在仓库外的 consumer 目录安装 tarball 并执行导出 API。
 MaybeCode 公开发布；MaybeClaw 和示例应用保持 private。新增公开 package 需要通过相同检查。
 
 ## Runtime factory
@@ -348,6 +348,6 @@ MaybeClaw 的 May adapter 读取
 依赖逆序关闭，以及重新打开后恢复持久状态。检查缺少依赖和不兼容状态版本在
 执行前报错。
 
-在仓库根目录运行 `pnpm --filter @sortedyuan/plugin test`、`pnpm docs:check` 和
+在仓库根目录运行 `pnpm --filter @sortedyuan/may test`、`pnpm docs:check` 和
 `pnpm test:package:plugin`，分别验证宿主、文档及独立安装的 package。
 真实 provider 测试独立于离线测试。

@@ -6,13 +6,13 @@ import { setTimeout as delay } from "node:timers/promises";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { InMemoryContext, May, createModelAttemptObserver, priceUsage } from "@sortedyuan/core";
+import { InMemoryContext, May, createModelAttemptObserver, priceUsage } from "@sortedyuan/may/core";
 import {
   BasicTracer, BoundedMetrics, DiagnosticsStore, InMemorySpanProcessor,
   BatchSpanProcessor, JsonlFileSpanExporter, alwaysOffSampler, createOtlpTelemetry,
 } from "../dist/index.js";
 import { RetryingModel, createBuiltinProviderAdapterRegistry, createModelCapabilityResolver } from "../../providers/dist/index.js";
-import { OpenAIChatCompletionsModel } from "../../providers/openai-compatible/dist/index.js";
+import { OpenAIChatCompletionsModel } from "@sortedyuan/providers/openai-compatible";
 import { localTelemetrySelection, startLocalTelemetryService } from "../../providers/test/fixtures/local-telemetry-service.mjs";
 
 test("metrics and local diagnostics include unsampled operations, active spans, and bounded records", () => {

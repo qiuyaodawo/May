@@ -24,8 +24,8 @@ Linux 与 Windows。选择部署环境时，查看工作流与目标包的 `engi
 导入类型时使用 type-only import：
 
 ```ts
-import { AgentApplication, type AgentApplicationEvent } from "@sortedyuan/application";
-import type { ContextFactory } from "@sortedyuan/context";
+import { AgentApplication, type AgentApplicationEvent } from "@sortedyuan/may";
+import type { ContextFactory } from "@sortedyuan/may/context";
 ```
 
 [包目录](packages.md)列出包职责与公共入口。提供弃用别名的 API 会单独记录说明；

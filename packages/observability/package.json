@@ -6,6 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./plugin": { "types": "./dist/plugin/index.d.ts", "import": "./dist/plugin/index.js" },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
@@ -13,16 +14,17 @@
   },
   "files": [
     "dist",
+    "docs",
     "!dist/.tsbuildinfo"
   ],
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "test": "pnpm run build && node --test test/*.test.mjs",
-    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+    "test": "pnpm run build && node --test test/*.test.mjs test/plugin/*.test.mjs",
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs test/plugin/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/may": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.222.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",

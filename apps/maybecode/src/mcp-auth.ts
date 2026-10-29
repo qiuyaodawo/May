@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { loadMayConfig, type MayConfig } from "@sortedyuan/config";
+import { loadMayConfig, type MayConfig } from "@sortedyuan/may/config";
 import { KeyringMcpCredentialStore, McpOAuthManager } from "@sortedyuan/mcp";
 import type { MaybeCodeMcpCommand } from "./args.js";
 import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeMcp } from "./configured.js";

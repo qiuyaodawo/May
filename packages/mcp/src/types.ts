@@ -5,7 +5,7 @@ import type {
   TraceAttributes,
   TraceContext,
   Tracer,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 import type { McpOAuthManager, McpOAuthOptions } from "./oauth.js";
 import type { McpInteractionBroker, McpInteractionOwner } from "./interactions.js";
 import type { McpHostServices, McpServerHostOptions } from "./host-services.js";

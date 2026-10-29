@@ -1,0 +1,41 @@
+import assert from "node:assert/strict";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+import { simpleGit } from "simple-git";
+import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
+
+test("真实仓库与 linked worktree 的初始化保留已有版本和仓库身份", async t => {
+const repository = await realpath(fileURLToPath(new URL("../../../../", import.meta.url)));
+  const parent = join(repository, "review", "git-workspace-startup");
+  await mkdir(parent, { recursive: true });
+  const root = await realpath(await mkdtemp(join(parent, "startup-")));
+  t.after(async () => {
+    const target = await realpath(root);
+    const path = relative(await realpath(parent), target);
+    assert.ok(path && !isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`));
+    await rm(target, { recursive: true, force: true });
+  });
+  const project = join(root, "project");
+  await simpleGit().clone(repository, project, ["--shared", "--quiet"]);
+  const git = simpleGit({ baseDir: project });
+  const originalHead = (await git.revparse(["HEAD"])).trim();
+  const originalIndex = await git.raw(["ls-files", "--stage"]);
+  const options = { dataRoot: join(root, "records"), worktreesRoot: join(root, "worktrees"), authorizeCommit: () => false };
+  const nested = await ProjectGitWorkspace.open({ ...options, workspace: join(project, "packages", "application") });
+  assert.equal((await nested.status()).commit, originalHead);
+  const initial = await nested.prepare("initial");
+  assert.equal(initial.status, "unchanged");
+  assert.equal(initial.commit, originalHead);
+  assert.equal((await nested.checkpoints("initial"))[0].id, initial.id);
+  assert.equal(await git.raw(["ls-files", "--stage"]), originalIndex);
+  assert.equal((await git.revparse(["HEAD"])).trim(), originalHead);
+  const linked = join(root, "linked");
+  await git.raw(["worktree", "add", "--detach", linked, "HEAD"]);
+  const manager = await ProjectGitWorkspace.open({ ...options, workspace: linked });
+  assert.equal(manager.projectId, nested.projectId);
+  assert.equal((await manager.status()).detached, true);
+  assert.equal((await manager.prepare("linked")).commit, originalHead);
+  assert.equal(dirname(manager.workspace), root);
+});

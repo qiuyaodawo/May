@@ -73,7 +73,7 @@ UI composition is covered by [Custom UI](custom-ui.md).
 `@sortedyuan/media` exports `DisplayPart`, `ImageAttachment`, `ImageData`, `MediaReader`,
 `MediaCapabilities`, `displayParts`, `imageAttachment`, `readEmbeddedImage`,
 `inspectImage`, `imagePng` and `FileMediaStore`. Its runtime dependencies are
-`@sortedyuan/core`, `@sortedyuan/session` and `sharp`; the Agent loop does not depend on it.
+`@sortedyuan/may` and `sharp`; the Agent loop does not depend on it.
 
 `FileMediaStore.save()` and `verify()` coordinate reads and replacements across
 local processes through empty `<image-path>.access` and `<image-path>.access.gate`

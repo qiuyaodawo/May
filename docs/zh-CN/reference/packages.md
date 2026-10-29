@@ -11,24 +11,27 @@ pnpm `12.4.2`。公开 API 和持久化格式的稳定性见
 [兼容性与稳定性](compatibility.md)。本页列出的导入路径属于 package exports；
 安装和发布范围由仓库的发布配置管理。
 
+`@sortedyuan/may` 包含下列框架模块；安装一次即可通过公开子路径导入所需能力。
+Providers、Gateway、外部集成与 UI 使用各自的包。发布清单包含 14 个包。
+
 ## 根据任务选择 package
 
 | 目标 | 使用入口 | 通常需要补充 |
 | --- | --- | --- |
-| 在内存中运行模型与工具循环 | `@sortedyuan/core` | Provider adapter |
-| 定义可复用的 Agent 行为与策略 | `@sortedyuan/application` 的 `defineAgent()` | `@sortedyuan/core` 的 `ToolRegistry` |
-| 构建持久化单 Session Agent | `AgentDefinition.open()` 或 `AgentApplication.open()` | `@sortedyuan/session`、`@sortedyuan/context`、权限和工具 |
-| 管理多个 Session | `@sortedyuan/application` 的 `AgentWorkspace` | `@sortedyuan/session/catalog` 的 `SessionCatalog` |
+| 在内存中运行模型与工具循环 | `@sortedyuan/may/core` | Provider adapter |
+| 定义可复用的 Agent 行为与策略 | `@sortedyuan/may` 的 `defineAgent()` | `@sortedyuan/may/core` 的 `ToolRegistry` |
+| 构建持久化单 Session Agent | `AgentDefinition.open()` 或 `AgentApplication.open()` | `@sortedyuan/may/session`、`@sortedyuan/may/context`、权限和工具 |
+| 管理多个 Session | `@sortedyuan/may` 的 `AgentWorkspace` | `@sortedyuan/may/session/catalog` 的 `SessionCatalog` |
 | 协调团队和远程 Worker | `@sortedyuan/coordination` | Agent definition、持久化存储和宿主策略 |
-| 持续执行持久化目标 | `@sortedyuan/goal` | 宿主 Agent 和有界 continuation 策略 |
+| 持续执行持久化目标 | `@sortedyuan/may/goals` | 宿主 Agent 和有界 continuation 策略 |
 | 根据时间或事件触发任务 | `@sortedyuan/scheduler` | SQLite 存储和幂等 dispatcher |
 | 评估不同配置的任务结果 | `@sortedyuan/eval` | Execution adapter、隔离环境、evaluator 和报告 |
-| 通过生命周期 Hook 扩展应用 | `@sortedyuan/plugin` | `@sortedyuan/plugin-services` 和可复用插件 |
-| 构建终端 Agent | Application controller | `@sortedyuan/tui`，可选 `@sortedyuan/keybindings` |
+| 通过生命周期 Hook 扩展应用 | `@sortedyuan/may/plugin` | `@sortedyuan/may/services` 和可复用插件 |
+| 构建终端 Agent | Application controller | `@sortedyuan/tui` 及其 `keybindings` 子路径 |
 | 构建浏览器 Agent | `UiHost` 或 `ApplicationUiHost` | `@sortedyuan/ui-client` 和 `@sortedyuan/web-ui` |
 | 构建编码 Agent | Application controller | `@sortedyuan/coding-tools` 和执行隔离策略 |
-| 根据配置选择模型 | `@sortedyuan/config` | `@sortedyuan/providers` |
-| 通过工具读取持久化历史 | `@sortedyuan/session/tools` | 活动 `Session` 或 `AgentApplication` |
+| 根据配置选择模型 | `@sortedyuan/may/config` | `@sortedyuan/providers` |
+| 通过工具读取持久化历史 | `@sortedyuan/may/session/tools` | 活动 `Session` 或 `AgentApplication` |
 | 校验并保存图片回复 | `@sortedyuan/media` | 读取 URL 或文件来源的宿主 `MediaReader` |
 | 追踪执行过程和查看诊断 | Core 的 `Tracer` 接口 | `@sortedyuan/observability` |
 | 使用或导出 MCP 能力 | `@sortedyuan/mcp` | 权限和经过审查的宿主服务 |
@@ -38,14 +41,14 @@ pnpm `12.4.2`。公开 API 和持久化格式的稳定性见
 
 ## Runtime 与 Application
 
-### `@sortedyuan/file-storage`
+### `@sortedyuan/may/storage`
 
 独立的本地文件协调接口导出 `withFileAccess`、`acquireFileLock`、`recoverFileLock`、
 `releaseFileLock`、`replaceJournalFile` 和 `syncDirectory`。Session、配置、媒体、
-MCP 凭据与投递存储共同使用这个 package。Session 文件子路径保留兼容导出，并共享
+MCP 凭据与投递存储共同使用这个模块。Session 文件子路径保留兼容导出，并共享
 文件锁状态。参阅[协调本地文件访问](../guides/custom-storage.md#协调本地文件访问)。
 
-### `@sortedyuan/core`
+### `@sortedyuan/may/core`
 
 与 provider 无关的执行内核，导出 `May`、`Model`、`Tool`、`Context`、
 `ToolExecutor`、`ToolScheduler` 和 `InMemoryContext`。它执行模型与工具 Step、
@@ -61,9 +64,9 @@ MCP 凭据与投递存储共同使用这个 package。Session 文件子路径保
 `May` 在构造时保存 iterable 成员快照。每次 Run 使用 `ToolRegistry.snapshot()`
 冻结复制后的 descriptor 和 schema，并捕获回调。可选的追加式 `toolSource`
 在每次 Run/continue 时解析一次；授权绑定工具定义和宿主版本。参阅
-[自定义工具](../guides/custom-tool.md)和 [Core README](../../../packages/core/README.md)。
+[自定义工具](../guides/custom-tool.md)和 [Core README](../../../packages/may/docs/core/README.md)。
 
-### `@sortedyuan/application`
+### `@sortedyuan/may` 和 `@sortedyuan/may/application`
 
 Core 之上的 headless 编排层，导出：
 
@@ -81,10 +84,10 @@ Definition 创建时保存工具 iterable 成员快照。每次 `open({ store, .
 
 `AgentWorkspace` 与 `AgentWorkspace.open` 使用泛型参数顺序
 `<Event, Extension, Compaction, Run, Application>`。
-`@sortedyuan/application/git-workspace` 导出 `ProjectGitWorkspace` 及 checkpoint、diff、
+`@sortedyuan/may/application/git-workspace` 导出 `ProjectGitWorkspace` 及 checkpoint、diff、
 restore 和 worktree 类型，用于宿主控制的 Git 操作。参阅
 [Agent 与 Application](../concepts/agent-application.md)和
-[Application README](../../../packages/application/README.md)。
+[Application README](../../../packages/may/docs/application/README.md)。
 
 ### `@sortedyuan/coordination`
 
@@ -131,7 +134,7 @@ Runtime 尚未启动且没有活动执行时，`resolveRecovery()` 也接受 que
 [远程 Worker](../guides/coordination-remote.md)和
 [MaybeCode 团队](../guides/maybecode-team.md)。
 
-### `@sortedyuan/goal`
+### `@sortedyuan/may/goals`
 
 持久化目标状态、有界 continuation 和模型可见目标工具通过公开的 Agent、Model
 和 Context 接口组合。宿主提供执行能力和 continuation 策略。参阅
@@ -161,29 +164,34 @@ Adapter 需要版本、全新执行资源和已绑定的 Trial 预算。Suite mo
 evaluator 执行可信宿主代码。取消和重启保留未知副作用证据，供宿主核实恢复。
 参阅[评估 Agent 任务结果](../guides/eval.md)。
 
-### `@sortedyuan/plugin`
+### `@sortedyuan/may/plugin`
 
 限定 scope 的插件宿主提供带类型和版本的 service、依赖校验、配置 schema、
 状态迁移、有序生命周期 Hook、资源清理和串行组合修改。Application 将插件与
 Agent definition、runtime factory 和持久化 Session 集成。参阅
 [插件、Service 与生命周期 Hook](../guides/plugins.md)。
 
-### `@sortedyuan/plugin-services` 与可复用插件
+### `@sortedyuan/may/services` 与可复用插件
 
 共享 service token 和有序 registry 描述 Tool、instruction、Model 和 Context
 贡献。Application 通过 `applicationServices` 重新导出 token，并通过 plugin
 factory 组合直接传入的配置。
 
-[插件目录](../guides/plugins.md#可复用插件-package)列出八个公开功能插件包、
-`@sortedyuan/plugin-services` 的四个工厂子路径以及 `@sortedyuan/coordination/plugin`
-的 factory API。
-Telegram 和 Feishu 渠道包为 workspace 私有包。
-`@sortedyuan/plugin-agent-adapters/rpc` 和
-`@sortedyuan/plugin-agent-adapters/examples/rpc-file-agent` 分别提供 RPC adapter 和示例。
+[插件目录](../guides/plugins.md#可复用插件-package)列出 May、Coordination、MCP、
+Observability 和 Gateway 的工厂 API。Telegram 和 Feishu 渠道属于 MaybeClaw。
+`@sortedyuan/gateway/rpc` 和 `@sortedyuan/gateway/examples/rpc-file-agent`
+分别提供 RPC adapter 和示例。
 产品插件组合位于各应用的 `src/plugins/`。`pnpm test:package:plugin` 验证独立安装
 的 tarball 及其完整运行时依赖。
 
-### `@sortedyuan/skills`
+### `@sortedyuan/gateway`
+
+Gateway 扩展通过 `/adapters` 提供 Agent adapter，通过 `/rpc` 提供 RPC，
+通过 `/delivery` 提供持久投递，通过 `/web-api` 提供 HTTP 服务管理。
+宿主提供身份验证、产品路由、渠道实现和应用策略。完整宿主示例见
+[MaybeClaw](../guides/maybeclaw.md)。
+
+### `@sortedyuan/may/skills`
 
 提供 Agent Skills 发现、解析、有界资源读取和 Session 激活。Application 将
 Skills 与持久化状态和动态 Context 指令组合。参阅[Agent Skills](../guides/skills.md)。
@@ -232,33 +240,33 @@ resource/template、prompt、completion 和 watch 使用有界内容及显式附
 
 ## 状态与策略
 
-### `@sortedyuan/context`
+### `@sortedyuan/may/context`
 
 可替换的 Context factory 和压缩策略包含内存托管 Context、检查、自动压缩、
-summary-tail、history-reference 和裁剪。`@sortedyuan/context/model-summarizer` 提供
+summary-tail、history-reference 和裁剪。`@sortedyuan/may/context/model-summarizer` 提供
 模型摘要能力。Context 保存当前模型可见内容，Session 保留持久化历史。参阅
 [Context 与持久化历史](../concepts/context-and-history.md)。
 
-### `@sortedyuan/session`
+### `@sortedyuan/may/session`
 
 持久化对话身份和事实包括串行提交、continuation、事件历史、基于 cursor 的
-查询、内存存储和 `Session.fork()` 分支。`@sortedyuan/session/file-store` 提供 JSONL
-存储，`@sortedyuan/session/catalog` 提供内存和文件 Catalog。Catalog 发现 Session，
+查询、内存存储和 `Session.fork()` 分支。`@sortedyuan/may/session/file-store` 提供 JSONL
+存储，`@sortedyuan/may/session/catalog` 提供内存和文件 Catalog。Catalog 发现 Session，
 Session Store 读取并追加单个 Session 的记录。参阅
 [配置 Session 存储](../guides/custom-storage.md)和
 [Session、Run 与 Step](../concepts/session-run-step.md)。
 
-### `@sortedyuan/permissions`
+### `@sortedyuan/may/permissions`
 
 Headless `ToolExecutor` 评估 `PermissionPolicy`、发布审批请求并接受允许或拒绝
 决定。Session grant 在配置的 executor 生命周期内有效。`PermissionRuleStore`、
 `PersistentPermissionRule` 和 `InMemoryPermissionRuleStore` 支持持久化审批规则；
-`@sortedyuan/permissions/file-store` 导出 `FilePermissionRuleStore`。宿主提供审批 UI 和
+`@sortedyuan/may/permissions/file-store` 导出 `FilePermissionRuleStore`。宿主提供审批 UI 和
 需要的执行隔离。作用域、过期和撤销见[权限策略](../guides/permission-policy.md)。
 
-### `@sortedyuan/config`
+### `@sortedyuan/may/config`
 
-加载并校验 provider 连接、model profile 和应用自有配置。`@sortedyuan/config/schema`
+加载并校验 provider 连接、model profile 和应用自有配置。`@sortedyuan/may/config/schema`
 导出 JSON Schema。Runtime 的 `apps` 值为通用结构；内置编辑器 schema 另外描述
 MaybeCode 配置。第三方应用自行校验它们的应用配置区段。参阅
 [配置参考](configuration.md)。
@@ -270,24 +278,24 @@ MaybeCode 配置。第三方应用自行校验它们的应用配置区段。参�
 `ProviderAdapterRegistry` 提供实例级内置 adapter 注册、配置模型选择和 capability
 解析。各协议实现也可以单独使用：
 
-| Package | 协议 |
+| 导入路径 | 协议 |
 | --- | --- |
-| `@sortedyuan/provider-openai` | OpenAI Responses API 和原生压缩 |
-| `@sortedyuan/provider-openai-compatible` | Chat Completions 兼容协议的共享能力 |
-| `@sortedyuan/provider-anthropic` | Anthropic Messages API |
-| `@sortedyuan/provider-deepseek` | DeepSeek Chat |
-| `@sortedyuan/provider-zhipu` | 智谱 GLM Chat |
-| `@sortedyuan/provider-kimi` | Kimi Chat |
-| `@sortedyuan/provider-gemini` | Google Gemini 原生流式 GenerateContent |
+| `@sortedyuan/providers/openai` | OpenAI Responses API 和原生压缩 |
+| `@sortedyuan/providers/openai-compatible` | Chat Completions 兼容协议的共享能力 |
+| `@sortedyuan/providers/anthropic` | Anthropic Messages API |
+| `@sortedyuan/providers/deepseek` | DeepSeek Chat |
+| `@sortedyuan/providers/zhipu` | 智谱 GLM Chat |
+| `@sortedyuan/providers/kimi` | Kimi Chat |
+| `@sortedyuan/providers/gemini` | Google Gemini 原生流式 GenerateContent |
 
-`google-gemini` 使用 `@sortedyuan/provider-gemini` 的 `GeminiModel`，支持 system
+`google-gemini` 使用 `@sortedyuan/providers/gemini` 的 `GeminiModel`，支持 system
 指令、媒体输入、工具调用及结果、结构化输出。原生响应 parts 按顺序保存在 assistant
 的 `modelState` 中，包含用于继续请求的 `thoughtSignature`。输入用量包含缓存
 token，输出用量包含推理 token，服务端未报告的明细字段保持缺失。
 JSON/schema 响应需要通过校验，不符合要求的服务端输出会产生错误并保留用量记录。
-选项、媒体来源、错误和真实服务检查见[包参考](../../../packages/providers/gemini/README.md)。
+选项、媒体来源、错误和真实服务检查见[包参考](../../../packages/providers/docs/gemini/README.md)。
 
-`@sortedyuan/provider-openai-compatible/http` 导出 `readSseData` 和 `parseRetryAfterMs`。
+`@sortedyuan/providers/openai-compatible/http` 导出 `readSseData` 和 `parseRetryAfterMs`。
 SSE 解码使用 `eventsource-parser`，支持 LF、CRLF 和 CR，并接受 EOF 之前没有
 空白行的最后一个事件。中止或提前结束迭代会释放响应 body。Retry-After 支持
 秒数，包括小数，以及 HTTP 日期；返回毫秒数，缺失或无法识别时返回 `undefined`。
@@ -317,7 +325,7 @@ Shell 命令以宿主进程权限执行。PowerShell 最后一条命令成功时
 返回 `1`。`exit N` 返回 `N`。后续命令成功时，之前的 non-terminating error
 仍保留在 `stderr` 中。权限和隔离要求见[自定义工具](../guides/custom-tool.md)。
 
-### `@sortedyuan/session/tools`
+### `@sortedyuan/may/session/tools`
 
 有界、只读 `session_history` 工具查询持久化 Session 历史。
 `AgentApplication` 可以自动安装，底层宿主也可以直接构造。
@@ -370,13 +378,13 @@ server 支持。`@sortedyuan/web-ui` 提供浏览器 workbench 组件，`/styles
 [UI client README](../../../packages/ui/client/README.md)和
 [Web UI README](../../../packages/ui/web/README.md)。
 
-### `@sortedyuan/keybindings`
+### `@sortedyuan/tui/keybindings`
 
 将特定 context 的按键序列映射为语义化 UI action。宿主管理终端渲染和产品命令。
 
 ## 参考产品
 
-MaybeCode 包含在 [39 个包的发布清单](../../../scripts/release-packages.json)中。
+MaybeCode 包含在 [14 个包的发布清单](../../../scripts/release-packages.json)中。
 MaybeClaw、CLI 和 Eval CLI 保持 workspace 私有包。验证与发布步骤见
 [发布指南](../guides/npm-release.md)。
 

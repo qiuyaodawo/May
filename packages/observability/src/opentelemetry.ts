@@ -4,7 +4,7 @@ import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import type { MetricRecord, TraceAttributes, TraceSpan, TraceSpanStartOptions, Tracer } from "@sortedyuan/core";
+import type { MetricRecord, TraceAttributes, TraceSpan, TraceSpanStartOptions, Tracer } from "@sortedyuan/may/core";
 import { boundedAttributes, telemetryLimits, type TelemetryLimits } from "./limits.js";
 import { metricAttributes, SpanMetrics } from "./metrics.js";
 import type { FinishedTraceSpan, MetricRecorder, ObservabilityErrorHandler, SpanObserver, TraceSpanEventData } from "./types.js";

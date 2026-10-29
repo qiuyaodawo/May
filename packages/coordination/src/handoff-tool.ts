@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Tool } from "@sortedyuan/core";
+import type { Tool } from "@sortedyuan/may/core";
 import type { HandoffSpec, TaskExecutionContext } from "./types.js";
 
 export function handoffTool(context: TaskExecutionContext, yielded: () => void): Tool {

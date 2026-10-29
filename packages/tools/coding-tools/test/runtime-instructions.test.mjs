@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { relative, resolve } from "node:path";
 import test from "node:test";
-import { ToolRegistry } from "@sortedyuan/core";
+import { ToolRegistry } from "@sortedyuan/may/core";
 
 import {
   CodingInstructionsError,

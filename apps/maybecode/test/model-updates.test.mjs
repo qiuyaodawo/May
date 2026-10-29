@@ -3,13 +3,13 @@ import { mkdir, open, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { applicationHooks, applicationServices } from "@sortedyuan/application";
-import { historyMemoryService } from "@sortedyuan/plugin-history-memory";
-import { goalsService } from "@sortedyuan/plugin-goals";
-import { delegationService } from "@sortedyuan/plugin-delegation";
-import { createMcpPlugin, mcpService } from "@sortedyuan/plugin-mcp";
+import { applicationHooks, applicationServices } from "@sortedyuan/may";
+import { historyMemoryService } from "@sortedyuan/may/history-memory";
+import { goalsService } from "@sortedyuan/may/goals/plugin";
+import { delegationService } from "@sortedyuan/coordination/delegation";
+import { createMcpPlugin, mcpService } from "@sortedyuan/mcp/plugin";
 import { MaybeCodeApplication, openConfiguredMaybeCode } from "../dist/index.js";
-import { InMemorySessionStore } from "@sortedyuan/session";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { localModel, yoloDirectory } from "./yolo-support.mjs";
 
 async function fixture(t, extra = {}) {

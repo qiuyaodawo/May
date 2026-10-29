@@ -1,7 +1,7 @@
 import {
   InMemoryContext, May, validateStructuredModelResponse,
   type JsonSchema, type Model, type ModelResponseFormat, type RunBudget,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 import type { EvalEvaluator, EvaluationContext, EvaluationResult } from "./types.js";
 import { EvalTelemetryCollector, evalMetrics } from "./telemetry.js";
 import { EvalTrialBudget } from "./agent-budget.js";

@@ -1,8 +1,8 @@
 import { createServer } from "node:http";
 import { join } from "node:path";
-import { defineAgent } from "../../../application/dist/index.js";
-import { FileSessionStore } from "../../../session/dist/file-store.js";
-import { OpenAIChatCompletionsModel } from "../../../providers/openai-compatible/dist/index.js";
+import { defineAgent } from "@sortedyuan/may";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { OpenAIChatCompletionsModel } from "@sortedyuan/providers/openai-compatible";
 import { BasicTracer, DiagnosticsStore } from "../../../observability/dist/index.js";
 import { createApplicationAgent } from "../../dist/index.js";
 import { CoordinationWorker } from "../../dist/remote-worker.js";

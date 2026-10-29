@@ -1,4 +1,4 @@
-import type { AgentApplicationEvent } from "@sortedyuan/application";
+import type { AgentApplicationEvent } from "@sortedyuan/may";
 import type { ChannelDeliveryReceipt, ChannelInput, ChannelRecord, DeliveryRecord } from "./channel-store.js";
 import { inboxId, validateChannelInput } from "./channel-store.js";
 import type { LegacyTaskRecord } from "./gateway-migration.js";

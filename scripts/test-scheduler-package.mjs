@@ -15,13 +15,13 @@ if (relative(await realpath(repository), await realpath(destination)).startsWith
 if (!relative(await realpath(repository), await realpath(consumer)).startsWith("..")) throw new Error("The consumer must be outside the repository");
 
 await runPnpm(["--filter", "@sortedyuan/scheduler", "build"], repository);
-const packages = ["@sortedyuan/core", "@sortedyuan/scheduler"];
+const packages = ["@sortedyuan/may", "@sortedyuan/scheduler"];
 const versions = new Map();
 for (const name of packages) versions.set(name, JSON.parse(await readFile(join(repository, `packages/${name.slice("@sortedyuan/".length)}/package.json`), "utf8")).version);
 for (const name of packages) await runPnpm(["--filter", name, "pack", "--pack-destination", packs], repository);
 await copyFile(join(repository, "packages/scheduler/test/consumer/package.json"), join(consumer, "package.json"));
 await copyFile(join(repository, "packages/scheduler/test/consumer/index.mjs"), join(consumer, "index.mjs"));
-await runPnpm(["config", "set", "overrides", JSON.stringify({ "@sortedyuan/core": `file:${join(packs, `sortedyuan-core-${versions.get("@sortedyuan/core")}.tgz`).replaceAll("\\", "/")}` }), "--json", "--location", "project"], consumer);
+await runPnpm(["config", "set", "overrides", JSON.stringify({ "@sortedyuan/may": `file:${join(packs, `sortedyuan-may-${versions.get("@sortedyuan/may")}.tgz`).replaceAll("\\", "/")}` }), "--json", "--location", "project"], consumer);
 await runPnpm(["add", ...packages.map(name => join(packs, `${name.replace("@", "").replace("/", "-")}-${versions.get(name)}.tgz`)), "--ignore-scripts"], consumer);
 await run(process.execPath, [join(consumer, "index.mjs")], consumer);
 console.log(`Verified ${packages.join(", ")} and its installed runtime dependencies`);

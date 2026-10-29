@@ -5,7 +5,7 @@
 Use this guide to record Run timing, usage, metrics and diagnostics. You need an
 existing May application and a destination for local files, console output or
 OTLP export. `@sortedyuan/observability` provides tracing and diagnostic implementations;
-`@sortedyuan/plugin-observability` can own them through an Application plugin.
+`@sortedyuan/observability/plugin` can own them through an Application plugin.
 
 For a complete configuration-backed example, see
 [model validation and execution diagnostics](model-telemetry-integration.md).
@@ -30,11 +30,11 @@ Session remain separate traces.
 
 Core exports the `Tracer`, `TraceSpan`, `TraceContext`, attribute types and
 protected telemetry-call helpers. In your consuming project, install
-`@sortedyuan/application` and `@sortedyuan/observability`. This integration snippet assumes
+`@sortedyuan/may` and `@sortedyuan/observability`. This integration snippet assumes
 already configured `model`, `tools`, `permissionPolicy` and `store`.
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
+import { defineAgent } from "@sortedyuan/may";
 import {
   BasicTracer,
   BatchSpanProcessor,

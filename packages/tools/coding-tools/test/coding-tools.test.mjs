@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { InMemoryContext, May } from "@sortedyuan/core";
+import { InMemoryContext, May } from "@sortedyuan/may/core";
 import { createReadOnlyTools } from "../dist/index.js";
 import { createWorkspace } from "./helpers.mjs";
 

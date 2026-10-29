@@ -8,8 +8,7 @@
     "types": ["node"]
   },
   "references": [
-    { "path": "../core" },
-    { "path": "../application" },
+    { "path": "../may" },
     { "path": "../coordination" },
     { "path": "../observability" }
   ],

@@ -1,8 +1,8 @@
 import { type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { PluginHost, definePlugin } from "@sortedyuan/plugin";
-import { createWebApiPlugin, webApiService } from "@sortedyuan/plugin-web-api";
+import { PluginHost, definePlugin } from "@sortedyuan/may/plugin";
+import { createWebApiPlugin, webApiService } from "@sortedyuan/gateway/web-api";
 import { gatewayPluginServices } from "./services.js";
 import { webUiAssets } from "@sortedyuan/web-ui/assets";
 import { createUiRouter, secureHeaders, sendJson, trustedRequest } from "@sortedyuan/ui-client/server";

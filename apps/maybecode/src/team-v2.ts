@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, realpath, rename, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { defineAgent } from "@sortedyuan/application";
+import { defineAgent } from "@sortedyuan/may";
 import { createEditTool, createReadTool, createWriteTool } from "@sortedyuan/coding-tools";
-import { loadMayConfig, type MayConfig } from "@sortedyuan/config";
+import { loadMayConfig, type MayConfig } from "@sortedyuan/may/config";
 import { CoordinationRuntime, createApplicationAgent, FileArtifactStore, FileSharedBudget, TaskWorkspaceManager,
   type CoordinationAgent, type CoordinationSnapshot, type TaskExecution } from "@sortedyuan/coordination";
 import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
-import { resolveRunBudget, type Model, type RunBudget, type Tool } from "@sortedyuan/core";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { withFileAccess } from "@sortedyuan/file-storage";
+import { resolveRunBudget, type Model, type RunBudget, type Tool } from "@sortedyuan/may/core";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { withFileAccess } from "@sortedyuan/may/storage";
 import type { MaybeCodeTeamCommand } from "./args.js";
 import { getDefaultMaybeCodeDataDirectory } from "./configured.js";
 import { createMaybeCodeModel, selectMaybeCodeModel, type SelectedMaybeCodeModel } from "./model.js";

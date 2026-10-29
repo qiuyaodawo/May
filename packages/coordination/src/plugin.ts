@@ -1,5 +1,5 @@
 import { CoordinationRuntime, type CreateCoordinationOptions, type CoordinationRuntimeOptions } from "./index.js";
-import { definePlugin, defineService, type PluginDefinition } from "@sortedyuan/plugin";
+import { definePlugin, defineService, type PluginDefinition } from "@sortedyuan/may/plugin";
 
 export interface CoordinationService {
   create(options: CreateCoordinationOptions): Promise<CoordinationRuntime>;

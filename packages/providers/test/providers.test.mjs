@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseMayConfig } from "@sortedyuan/config";
+import { parseMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderModel, createBuiltinProviderAdapterRegistry, createModelCapabilityResolver, ProviderAdapterRegistry, ProviderAdapterRegistryError, RetryingModel, selectProviderModel, withModelRetry } from "../dist/index.js";
 
 const request = {

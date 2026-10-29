@@ -1,6 +1,6 @@
 # @sortedyuan/coordination
 
-Developer-preview coordination above `@sortedyuan/application`. One durable coordinator
+Developer-preview coordination above `@sortedyuan/may/application`. One durable coordinator
 owns pipelines, DAGs, parallel reduction, delegation, peer messaging and handoffs.
 Execution can use local agents or independent remote leaf workers; this is not a
 high-availability or multi-writer scheduler.
@@ -8,6 +8,10 @@ high-availability or multi-writer scheduler.
 `@sortedyuan/coordination/plugin` exports `createCoordinationPlugin` and
 `coordinationService` for host-owned runtime creation, restoration and cleanup.
 See the [plugin reference](docs/plugin.md).
+
+`@sortedyuan/coordination/delegation` provides configured subagents, budgets and
+task tools. See the [delegation reference](docs/delegation/README.md) and its
+[Chinese version](docs/delegation/README.zh-CN.md).
 
 Root exports:
 
@@ -44,7 +48,7 @@ other interrupted tool effects still require durable evidence.
 `createAttachedApplicationAgent({ mode: "continue", ... })` assigns the first
 continuation its stable dispatch/turn identity. Session persists that identity
 before execution; subsequent turns use identified inputs. The adapter obtains
-Run outcomes through `inspectSessionRunOutcome()` from `@sortedyuan/session`.
+Run outcomes through `inspectSessionRunOutcome()` from `@sortedyuan/may/session`.
 Its `recoveryVersion: 1` is saved with each dispatch. Old dispatched continuations
 without a durable identity require a verified recovery finding. Previously queued
 tasks adopt the current recovery protocol when dispatched. Hosts wrapping an

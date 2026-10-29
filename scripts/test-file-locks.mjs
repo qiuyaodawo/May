@@ -8,8 +8,8 @@ import { createInterface } from "node:readline";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { withFileAccess } from "../packages/session/dist/file-access.js";
-import { acquireFileLock, releaseFileLock } from "../packages/session/dist/file-store.js";
+import { withFileAccess } from "../packages/may/dist/session/file-access.js";
+import { acquireFileLock, releaseFileLock } from "../packages/may/dist/session/file-store.js";
 import { targetFor, targetNames } from "./test-fixtures/file-lock-targets.mjs";
 
 const testRoot = fileURLToPath(new URL("../review/file-lock-matrix/", import.meta.url));
@@ -29,7 +29,7 @@ async function fixture(t, name) {
     ...target, directory,
     start(operation = "owner") {
       const worker = operation === "guard"
-        ? new URL("../packages/file-storage/test/fixtures/file-access-worker.mjs", import.meta.url)
+        ? new URL("../packages/may/test/storage/fixtures/file-access-worker.mjs", import.meta.url)
         : new URL("./test-fixtures/file-lock-worker.mjs", import.meta.url);
       const args = operation === "guard" ? ["hold", target.lockPath, "exclusive"] : [name, directory];
       const process = fork(worker, args, {

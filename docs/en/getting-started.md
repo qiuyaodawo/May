@@ -33,10 +33,8 @@ already includes direct children of `examples/`.
   "type": "module",
   "scripts": { "start": "node agent.mjs" },
   "dependencies": {
-    "@sortedyuan/application": "workspace:*",
-    "@sortedyuan/core": "workspace:*",
-    "@sortedyuan/provider-deepseek": "workspace:*",
-    "@sortedyuan/session": "workspace:*"
+    "@sortedyuan/may": "workspace:*",
+    "@sortedyuan/providers": "workspace:*"
   }
 }
 ```
@@ -50,10 +48,10 @@ use available published versions and the same public import paths.
 Create `examples/quickstart-agent/agent.mjs`:
 
 ```js
-import { defineAgent } from "@sortedyuan/application";
-import { ToolRegistry } from "@sortedyuan/core";
-import { DeepSeekModel } from "@sortedyuan/provider-deepseek";
-import { InMemorySessionStore } from "@sortedyuan/session";
+import { defineAgent } from "@sortedyuan/may";
+import { ToolRegistry } from "@sortedyuan/may/core";
+import { DeepSeekModel } from "@sortedyuan/providers/deepseek";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
 
 const apiKey = process.env.DEEPSEEK_API_KEY;
 const modelName = process.env.DEEPSEEK_MODEL;
@@ -61,7 +59,7 @@ if (!apiKey || !modelName) {
   throw new Error("Set DEEPSEEK_API_KEY and DEEPSEEK_MODEL");
 }
 
-/** @type {import("@sortedyuan/core").Tool<{a: number, b: number}, number>} */
+/** @type {import("@sortedyuan/may/core").Tool<{a: number, b: number}, number>} */
 const add = {
   name: "add",
   description: "Add two finite numbers",
@@ -161,7 +159,7 @@ The in-memory store retains history while this process and store object exist.
 To save it on disk, replace the `InMemorySessionStore` import and construction:
 
 ```js
-import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 
 const store = new FileSessionStore(".may/sessions");
 ```

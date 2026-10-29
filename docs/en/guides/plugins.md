@@ -4,7 +4,7 @@
 
 Use this guide to add a service or lifecycle handler to an existing May
 application. You need an application composition, the service or Hook you want
-to extend, and installed `@sortedyuan/plugin` and `@sortedyuan/application` packages.
+to extend, and the installed `@sortedyuan/may` package.
 
 1. Declare services and plugin setup using the [example](#declare-a-plugin).
 2. Add the definitions to your application's `plugins`, or
@@ -12,7 +12,7 @@ to extend, and installed `@sortedyuan/plugin` and `@sortedyuan/application` pack
 3. Register cleanup when acquiring resources and select the scope that owns them.
 4. Verify initialization, Hook execution, state restoration and shutdown.
 
-`@sortedyuan/plugin` manages configuration and resources. Core defines typed Hooks and
+`@sortedyuan/may/plugin` manages configuration and resources. Core defines typed Hooks and
 `AgentRuntime`; Application integrates them with permissions, Context and durable
 Session storage. The [architecture explanation](../architecture/plugins.md)
 describes their lifecycle and dependency rules.
@@ -70,8 +70,8 @@ In an ESM TypeScript module, declare the following two plugins. The example adds
 unchanged. The application supplies its own Model and storage separately.
 
 ```ts
-import { definePlugin, defineService } from "@sortedyuan/plugin";
-import { applicationHooks } from "@sortedyuan/application";
+import { definePlugin, defineService } from "@sortedyuan/may/plugin";
+import { applicationHooks } from "@sortedyuan/may";
 
 const labels = defineService<{ prefix: string }>({
   id: "example.labels", version: "1.0.0", scope: "application",
@@ -136,7 +136,7 @@ For a custom host, the following fragment assumes your plugin definitions,
 Keep the host alive for the operation and close it even if the operation fails:
 
 ```ts
-import { PluginHost } from "@sortedyuan/plugin";
+import { PluginHost } from "@sortedyuan/may/plugin";
 
 const host = await PluginHost.create({ plugins, hooks: [myHook], services });
 try {
@@ -204,7 +204,7 @@ that their own fields do not expose.
 
 ## Runtime and application services
 
-`@sortedyuan/plugin-services` defines the shared typed tokens. `applicationServices`
+`@sortedyuan/may/services` defines the shared typed tokens. `applicationServices`
 reexports them and adds `execution`, `history`, `state` and `application` accessors.
 Their `get()` methods return frozen structural interfaces after creation.
 Tokens cover `model`, `modelInfo`, `contextFactory`,
@@ -266,31 +266,31 @@ The catalog lists package and subpath imports. See
 
 | Import path | Factories and responsibility |
 | --- | --- |
-| `@sortedyuan/plugin-services/runtime` | `createRuntimePlugin`, `createContextPlugin`, `createToolsPlugin`, `createContextWrapperPlugin`; runtime, Context and tool composition |
-| `@sortedyuan/plugin-services/models` | `createModelPlugin`, `createModelWrapperPlugin`; Model instances and wrappers |
-| `@sortedyuan/plugin-services/permissions` | `createPermissionPlugin`; PermissionPolicy |
-| `@sortedyuan/plugin-services/skills` | `createSkillsPlugin`; discovery, activation, instructions, tools and saved state |
-| `@sortedyuan/plugin-goals` | `createGoalsPlugin`; persistent goals, budgets and continuation |
-| `@sortedyuan/plugin-history-memory` | `createHistoryMemoryPlugin`; historical context notes, retrieval and compaction |
-| `@sortedyuan/plugin-delegation` | `createDelegationPlugin`, `createWorkspaceFilesPlugin`; child Agents, shared budgets and workspace file access |
-| `@sortedyuan/plugin-mcp` | `createMcpPlugin`, `createMcpHostPlugin`, `createSharedMcpPlugin`; connections, catalogs, authentication, interactions and task journals |
-| `@sortedyuan/plugin-observability` | application, host and shared observability factories; tracing and exporter shutdown |
-| `@sortedyuan/plugin-delivery` | `createDeliveryPlugin`; durable channel records, registered receivers and single-attempt delivery outcomes |
-| `@sortedyuan/plugin-channel-telegram` (private) | `createTelegramChannelPlugin`; Telegram receiver, routing and attachments |
-| `@sortedyuan/plugin-channel-feishu` (private) | `createFeishuChannelPlugin`; Feishu receiver, routing and attachments |
-| `@sortedyuan/plugin-agent-adapters` | `createAgentAdaptersPlugin`, `createMayAgentAdapter`, `loadAgentAdapter`, RPC adapters; conversation and adapter resource management |
+| `@sortedyuan/may/services/runtime` | `createRuntimePlugin`, `createContextPlugin`, `createToolsPlugin`, `createContextWrapperPlugin`; runtime, Context and tool composition |
+| `@sortedyuan/may/services/models` | `createModelPlugin`, `createModelWrapperPlugin`; Model instances and wrappers |
+| `@sortedyuan/may/services/permissions` | `createPermissionPlugin`; PermissionPolicy |
+| `@sortedyuan/may/services/skills` | `createSkillsPlugin`; discovery, activation, instructions, tools and saved state |
+| `@sortedyuan/may/goals/plugin` | `createGoalsPlugin`; persistent goals, budgets and continuation |
+| `@sortedyuan/may/history-memory` | `createHistoryMemoryPlugin`; historical context notes, retrieval and compaction |
+| `@sortedyuan/coordination/delegation` | `createDelegationPlugin`, `createWorkspaceFilesPlugin`; child Agents, shared budgets and workspace file access |
+| `@sortedyuan/mcp/plugin` | `createMcpPlugin`, `createMcpHostPlugin`, `createSharedMcpPlugin`; connections, catalogs, authentication, interactions and task journals |
+| `@sortedyuan/observability/plugin` | application, host and shared observability factories; tracing and exporter shutdown |
+| `@sortedyuan/gateway/delivery` | `createDeliveryPlugin`; durable channel records, registered receivers and single-attempt delivery outcomes |
+| MaybeClaw `src/channels/telegram` | `createTelegramChannelPlugin`; Telegram receiver, routing and attachments |
+| MaybeClaw `src/channels/feishu` | `createFeishuChannelPlugin`; Feishu receiver, routing and attachments |
+| `@sortedyuan/gateway/adapters` | `createAgentAdaptersPlugin`, `createMayAgentAdapter`, `loadAgentAdapter`, RPC adapters; conversation and adapter resource management |
 | `@sortedyuan/coordination/plugin` | `createCoordinationPlugin`; task graph creation, restoration and release |
-| `@sortedyuan/plugin-web-api` | `createWebApiPlugin`; HTTP listener, active requests and connections |
+| `@sortedyuan/gateway/web-api` | `createWebApiPlugin`; HTTP listener, active requests and connections |
 
-Feature plugins live in `packages/plugins/<name>/`. Shared tokens, ordered
-registries and component factory subpaths live in `packages/plugin-services/`.
+Feature plugins live in their capability packages. Shared tokens, ordered
+registries and component factory subpaths live in `packages/may/src/services/`.
 The Coordination factory lives in `packages/coordination/src/plugin.ts`;
-the plugin host lives in `packages/plugin/`. Product composition lives in
+the plugin host lives in `packages/may/src/plugin/`. Product composition lives in
 `apps/maybecode/src/plugins/` and `apps/maybeclaw/src/plugins/`.
 Existing package classes and interfaces remain available for direct integration.
 Applications retain compatible exports for extracted functionality.
 
-`@sortedyuan/plugin-agent-adapters` supports validated version 1 `TelemetryCorrelation`
+`@sortedyuan/gateway/adapters` supports validated version 1 `TelemetryCorrelation`
 through `AgentAdapterContext.telemetry`. RPC transports negotiate
 `telemetryVersion: 1` before sending the separate envelope and validate it before
 execution. Business deduplication excludes telemetry identities. See
@@ -314,8 +314,8 @@ services; `startLoops()` starts receiving, background processing, and automatic
 delivery. While paused, `tick()` processes stored inputs and queues replies;
 `deliver()` explicitly sends pending messages.
 
-`pnpm test:package:plugin` packs the host, shared services, Session, Coordination,
-the eight public feature plugin packages and their complete May runtime dependency chains. It installs the
+`pnpm test:package:plugin` packs May, Coordination, Gateway, MCP, Observability
+and their complete runtime dependency chains. It installs the
 tarballs in a consumer directory outside the repository and executes their exported APIs.
 MaybeCode is public; MaybeClaw and the example applications remain private.
 Public package additions require the same check.
@@ -399,6 +399,6 @@ changes the intended input, resources close in reverse dependency order, and
 persisted state survives reopening. Check a missing dependency and incompatible
 state version fail before execution.
 
-From the repository root, run `pnpm --filter @sortedyuan/plugin test`, `pnpm docs:check`, and
+From the repository root, run `pnpm --filter @sortedyuan/may test`, `pnpm docs:check`, and
 `pnpm test:package:plugin` for the host, documentation and independently installed
 package checks. Real provider tests are separate from the offline suite.

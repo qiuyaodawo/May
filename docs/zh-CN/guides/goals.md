@@ -2,7 +2,7 @@
 
 [English](../../en/guides/goals.md) | **简体中文**
 
-`@sortedyuan/goal` 提供独立的 `GoalController`、模型工具、Context 组合、使用量统计和保存接口。
+`@sortedyuan/may/goals` 提供独立的 `GoalController`、模型工具、Context 组合、使用量统计和保存接口。
 基础 Agent package 保持独立。MaybeCode 为每个 Session 连接组件，在两个 Terminal 界面和
 Web UI 中提供 `/goal`。一个目标需要跨多个 Run 处理时，可以使用本文的操作。
 应用需要已经配置模型、Session 存储和正常工具权限，
@@ -56,14 +56,14 @@ SDK 宿主可以提供独立的 `verify` 验收函数；未通过验收的说明
 
 ## 组件连接
 
-将 `@sortedyuan/goal`、`@sortedyuan/application` 和 `@sortedyuan/context` 加入应用直接依赖。
+将 `@sortedyuan/may` 加入应用直接依赖。
 以下集成片段需要宿主已经初始化真实 `model`、`sessionStore`、`permissionPolicy`、
 `codingTools` 和持久化 `goalStore`，在应用异步入口中执行：
 
 ```ts
-import { GoalController } from "@sortedyuan/goal";
-import { AgentApplication } from "@sortedyuan/application";
-import { InMemoryContextFactory } from "@sortedyuan/context";
+import { GoalController } from "@sortedyuan/may/goals";
+import { AgentApplication } from "@sortedyuan/may";
+import { InMemoryContextFactory } from "@sortedyuan/may/context";
 
 const goals = new GoalController();
 const application = await AgentApplication.open({

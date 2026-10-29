@@ -3,6 +3,9 @@
 The package includes the PNG declarations required by its image dependency.
 Consumers can check installed declarations with TypeScript `skipLibCheck: false`.
 
+`@sortedyuan/tui/keybindings` provides key strokes and context-aware action
+resolution. See the [keybindings reference](docs/keybindings/README.md).
+
 `Text` accepts `continuationIndent`, a non-negative safe integer specifying the
 minimum indentation of wrapped continuation lines. Existing logical-line
 indentation is preserved when larger. Wrapping reserves this space on each row;
@@ -42,7 +45,7 @@ Both paths retain delivery order and stable row identities. Queued or cancelled
 input does not appear as delivered conversation content; idle follow-up Runs use
 their ordinary `input.submitted` history record.
 
-Saved history uses `SessionTranscriptReader` from `@sortedyuan/session`, including
+Saved history uses `SessionTranscriptReader` from `@sortedyuan/may/session`, including
 ordinary input and `recovery.resolved` findings. Tool items use `SessionToolStatus`:
 running, completed, failed, denied, not-started, or unknown. Terminal Run events mark
 unfinished tools unknown and partial assistant replies interrupted. Recovery records
@@ -92,7 +95,7 @@ The first milestone provides:
 - semantic theme tokens and ANSI style helpers;
 - explicit focus management and a batched TUI runtime;
 - a retained screen buffer and differential full-screen renderer;
-- a Node terminal driver that emits `@sortedyuan/keybindings` key strokes and treats
+- a Node terminal driver that emits `@sortedyuan/tui/keybindings` key strokes and treats
   bracketed paste as one safe multiline input operation;
 - a readline-backed `TerminalIO` adapter for prompt-driven applications, with
   history, live suggestions, prompt-safe asynchronous output, and normalized
@@ -133,7 +136,7 @@ history navigation at the first/last logical line, `Ctrl+W` or modified
 Backspace for backward word deletion, and modified Left/Right for word
 movement. Applications decide whether to provide and persist history.
 
-Editor, ScrollView and SelectList use `@sortedyuan/keybindings` semantic actions.
+Editor, ScrollView and SelectList use `@sortedyuan/tui/keybindings` semantic actions.
 Editor accepts `keybindings` overrides and an injected `Clipboard` with async
 `readText`/`writeText`. It supports mouse selection, Shift navigation, Ctrl+A,
 Ctrl+C/X/V and replacement of selected text. Home/End target logical lines.

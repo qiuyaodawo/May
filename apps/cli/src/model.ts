@@ -1,4 +1,4 @@
-import type { Model } from "@sortedyuan/core";
+import type { Model } from "@sortedyuan/may/core";
 import {
   createBuiltinProviderModel,
   type ProviderAdapterRegistry,

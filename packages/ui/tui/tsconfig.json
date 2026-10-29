@@ -9,11 +9,8 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
-    { "path": "../../core" },
+    { "path": "../../may" },
     { "path": "../../media" },
-    { "path": "../../permissions" },
-    { "path": "../../session" },
-    { "path": "../../tools/coding-tools" },
-    { "path": "../keybindings" }
+    { "path": "../../tools/coding-tools" }
   ]
 }

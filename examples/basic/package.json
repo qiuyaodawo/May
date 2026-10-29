@@ -6,6 +6,6 @@
     "start": "node basic.mjs"
   },
   "dependencies": {
-    "@sortedyuan/core": "workspace:*"
+    "@sortedyuan/may": "workspace:*"
   }
 }

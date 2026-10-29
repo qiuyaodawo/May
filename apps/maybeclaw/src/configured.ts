@@ -1,5 +1,5 @@
-import { loadMayConfig, type MayConfig } from "@sortedyuan/config";
-import { resolveRunBudget, type RunBudget, type Model } from "@sortedyuan/core";
+import { loadMayConfig, type MayConfig } from "@sortedyuan/may/config";
+import { resolveRunBudget, type RunBudget, type Model } from "@sortedyuan/may/core";
 import { createBuiltinProviderModel, selectProviderModel, type ProviderModelSelection } from "@sortedyuan/providers";
 import { digest, type TaskSpec } from "./types.js";
 import { hostSettings } from "./settings.js";

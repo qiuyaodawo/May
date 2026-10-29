@@ -1,1 +1,1 @@
-import "@sortedyuan/plugin-agent-adapters/examples/rpc-file-agent";
+import "@sortedyuan/gateway/examples/rpc-file-agent";

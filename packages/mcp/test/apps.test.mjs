@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { openMcpClientPool, mcpAppSandboxResponse, parseMcpAppResource, MCP_APP_MIME } from "../dist/index.js";
-import { PermissionToolExecutor } from "../../permissions/dist/index.js";
+import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
 import { executeMaybeCodeSlashCommand } from "../../../apps/maybecode/dist/index.js";
 import { startCatalogFixture } from "./fixtures/catalog-server.mjs";
 

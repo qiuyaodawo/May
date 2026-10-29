@@ -1,7 +1,5 @@
 packages:
   - "packages/*"
-  - "packages/providers/*"
-  - "packages/plugins/*"
   - "packages/tools/*"
   - "packages/ui/*"
   - "apps/*"

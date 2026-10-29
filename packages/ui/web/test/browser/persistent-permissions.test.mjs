@@ -4,13 +4,13 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { AgentWorkspace, defineAgent } from "@sortedyuan/application";
-import { OpenAIResponsesModel } from "@sortedyuan/provider-openai";
-import { InMemorySessionStore } from "@sortedyuan/session";
-import { InMemorySessionCatalog } from "@sortedyuan/session/catalog";
+import { AgentWorkspace, defineAgent } from "@sortedyuan/may";
+import { OpenAIResponsesModel } from "@sortedyuan/providers/openai";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
+import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
 import { ApplicationUiHost } from "@sortedyuan/ui-client/application";
 import { startUiServer } from "@sortedyuan/ui-client/server";
-import { FilePermissionRuleStore } from "../../../../permissions/dist/file-store.js";
+import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store";
 import { chromium } from "playwright";
 import { webUiAssets } from "../../dist/assets.js";
 

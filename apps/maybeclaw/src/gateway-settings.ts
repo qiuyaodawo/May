@@ -1,7 +1,7 @@
 import { isAbsolute } from "node:path";
-import type { MayConfig } from "@sortedyuan/config";
-import { resolveRunBudget, type RunBudget } from "@sortedyuan/core";
-import { parsePluginSelections } from "@sortedyuan/plugin";
+import type { MayConfig } from "@sortedyuan/may/config";
+import { resolveRunBudget, type RunBudget } from "@sortedyuan/may/core";
+import { parsePluginSelections } from "@sortedyuan/may/plugin";
 import { hostSettings } from "./settings.js";
 import { authSettings } from "./gateway-auth.js";
 import type { GatewayAgentConfig, GatewayEntry, GatewaySettings } from "./gateway-types.js";

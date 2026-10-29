@@ -2,8 +2,8 @@ import {
   loadMayConfig,
   type LoadMayConfigOptions,
   type MayConfig,
-} from "@sortedyuan/config";
-import { InMemoryContext, May, type Model } from "@sortedyuan/core";
+} from "@sortedyuan/may/config";
+import { InMemoryContext, May, type Model } from "@sortedyuan/may/core";
 import type { ProviderAdapterRegistry } from "@sortedyuan/providers";
 import { CLI_USAGE, parseCliArgs } from "./args.js";
 import { CliUsageError } from "./errors.js";

@@ -16,7 +16,7 @@ expose different inspection and compaction behavior.
 
 Decorating the built-in factory preserves its replay, budget, measurement, and
 automatic-compaction behavior. Create `audited-context.ts` in the application
-and add `@sortedyuan/core` and `@sortedyuan/context` as direct dependencies:
+and add `@sortedyuan/may` as a direct dependency:
 
 ```ts
 import type {
@@ -25,13 +25,13 @@ import type {
   ContextSnapshot,
   Message,
   SnapshotOptions,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 import {
   InMemoryContextFactory,
   type ContextFactory,
   type ContextFactoryOptions,
   type ManagedContext,
-} from "@sortedyuan/context";
+} from "@sortedyuan/may/context";
 
 type Audit = (entry: {
   readonly operation: "snapshot" | "append";
@@ -79,7 +79,7 @@ export class AuditedContextFactory implements ContextFactory {
 
 ## 2. Open an application with the factory
 
-In the entry point, import `AgentApplication` from `@sortedyuan/application` and
+In the entry point, import `AgentApplication` from `@sortedyuan/may` and
 `AuditedContextFactory` from `./audited-context.js`. This composition snippet
 uses the host's initialized `model`, `store`, and `permissionPolicy`:
 

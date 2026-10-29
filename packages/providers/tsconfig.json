@@ -8,15 +8,7 @@
     "types": ["node"]
   },
   "references": [
-    { "path": "../config" },
-    { "path": "../core" },
-    { "path": "./anthropic" },
-    { "path": "./deepseek" },
-    { "path": "./gemini" },
-    { "path": "./kimi" },
-    { "path": "./openai" },
-    { "path": "./openai-compatible" },
-    { "path": "./zhipu" }
+    { "path": "../may" }
   ],
   "include": ["src/**/*.ts"]
 }

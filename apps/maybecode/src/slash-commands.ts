@@ -4,8 +4,8 @@ import { DELEGATION_COMMAND_USAGE, executeDelegationCommand } from "./delegation
 import type {
   ContextCompactionResult,
   ContextInspection,
-} from "@sortedyuan/context";
-import type { SessionSummary } from "@sortedyuan/session/catalog";
+} from "@sortedyuan/may/context";
+import type { SessionSummary } from "@sortedyuan/may/session/catalog";
 import type { McpServerStatus } from "@sortedyuan/mcp";
 import {
   SlashCommandRegistry,

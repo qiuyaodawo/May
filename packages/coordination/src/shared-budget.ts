@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import type { Model, ModelEvent, Usage } from "@sortedyuan/core";
-import { ModelResponseValidationError, priceUsage, resolvePriceSchedule, resolveUsageTotals, validateUsageCost, type TokenPrices, type TokenPriceSchedule, type UsageCost, type UsagePricer } from "@sortedyuan/core";
+import type { Model, ModelEvent, Usage } from "@sortedyuan/may/core";
+import { ModelResponseValidationError, priceUsage, resolvePriceSchedule, resolveUsageTotals, validateUsageCost, type TokenPrices, type TokenPriceSchedule, type UsageCost, type UsagePricer } from "@sortedyuan/may/core";
 import { ResourceJournal, amount, count, resourceId } from "./resource-journal.js";
 
 export interface SharedBudgetLimits {

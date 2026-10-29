@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { AsyncEventQueue } from "@sortedyuan/core";
+import { AsyncEventQueue } from "@sortedyuan/may/core";
 import { specTypeSchemas, type ElicitRequestFormParams, type ElicitResult, type JsonSchemaType, type JsonSchemaValidator } from "@modelcontextprotocol/client";
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
 import { McpCapabilityError } from "./errors.js";

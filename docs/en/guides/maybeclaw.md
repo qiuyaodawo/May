@@ -30,14 +30,19 @@ Continue with [configuration](#sessions-and-configuration),
 
 ## Application composition
 
-Reusable channel, delivery, Agent adapter, coordination and HTTP functionality
-is provided by `packages/plugins/`. Product plugin composition lives in
+Reusable delivery, Agent adapter and HTTP functionality is provided by
+`@sortedyuan/gateway`; coordination uses `@sortedyuan/coordination`. Channel implementations
+live in `apps/maybeclaw/src/channels/`. Product plugin composition lives in
 `apps/maybeclaw/src/plugins/`; AgentGateway and GatewayHost manage the complete
 application lifecycle. Configured plugins may replace default Model and
 PermissionPolicy providers. Idle adapters are released through their registry
 and recreated from current configuration when needed. Shutdown starts cancelling
 Gateway work before waiting for HTTP requests and releasing resources. See the
 [plugin guide](plugins.md#reusable-plugin-packages).
+
+The May adapter owns each conversation's execution context from history inspection
+through completion. A concurrent request for the same conversation is rejected;
+the active request keeps its tools and event reporting until it finishes.
 
 Web, CLI and HTTP consumers use the `GatewayQueries` and `GatewayController`
 interfaces. Queries apply actor and session access checks and return independent

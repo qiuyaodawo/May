@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   FatalToolExecutionError, MayError, ModelResponseValidationError, RunBudgetMeter, RunBudgetExceededError, directToolExecutor, priceUsage, resolveUsageTotals,
   type Model, type ModelEvent, type RunBudget, type Tool, type ToolExecutor,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 import type { EvalTelemetryCollector } from "./telemetry.js";
 
 export class EvalTrialBudget {
@@ -188,7 +188,7 @@ export class EvalTrialBudget {
 
 class EvalBudgetResponseError extends ModelResponseValidationError {
   override readonly code: string;
-  constructor(error: unknown, usage: import("@sortedyuan/core").Usage | undefined, cost: import("@sortedyuan/core").UsageCost | undefined) {
+  constructor(error: unknown, usage: import("@sortedyuan/may/core").Usage | undefined, cost: import("@sortedyuan/may/core").UsageCost | undefined) {
     super("Evaluation trial model budget stopped execution", { cause: error,
       ...(usage === undefined ? {} : { usage }), ...(cost === undefined ? {} : { cost }) });
     this.code = code(error);

@@ -1,4 +1,4 @@
-import { MayError } from "@sortedyuan/core";
+import { MayError } from "@sortedyuan/may/core";
 
 export class McpConfigurationError extends MayError {
   constructor(message: string, options?: ErrorOptions) {

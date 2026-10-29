@@ -1,5 +1,5 @@
 import { createMayMcpServer } from "../../dist/server.js";
-import { directToolExecutor } from "@sortedyuan/core";
+import { directToolExecutor } from "@sortedyuan/may/core";
 
 const server = createMayMcpServer({ endpoint: "http://127.0.0.1/mcp", workspaceId: "stdio-workspace",
   ...(process.argv.includes("--legacy") ? { legacy: "stateless" } : {}),

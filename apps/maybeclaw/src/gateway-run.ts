@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createInterface } from "node:readline/promises";
 import open from "open";
-import { getDefaultMayConfigPath, loadMayConfig } from "@sortedyuan/config";
+import { getDefaultMayConfigPath, loadMayConfig } from "@sortedyuan/may/config";
 import type { Server } from "node:http";
 import { inspectGatewaySetup, startGatewaySetup } from "./gateway-setup.js";
 import type { UiCommand } from "@sortedyuan/ui-client";

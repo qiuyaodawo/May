@@ -1,4 +1,4 @@
-import type { Message, RunBudget, Usage, UsageCost } from "@sortedyuan/core";
+import type { Message, RunBudget, Usage, UsageCost } from "@sortedyuan/may/core";
 
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 export interface ComponentReference {

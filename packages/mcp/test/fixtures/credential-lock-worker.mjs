@@ -6,7 +6,7 @@ import { open, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { withFileAccess } from "@sortedyuan/file-storage";
+import { withFileAccess } from "@sortedyuan/may/storage";
 import { KeyringMcpCredentialStore } from "../../dist/credentials.js";
 
 const [operation, directory, key] = process.argv.slice(2);

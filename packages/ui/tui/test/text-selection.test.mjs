@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { stripVTControlCharacters } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
-import { keyStroke } from "@sortedyuan/keybindings";
+import { keyStroke } from "@sortedyuan/tui/keybindings";
 import { Markdown, ScrollView, Text } from "../dist/index.js";
 import { TranscriptStore, TranscriptView } from "../dist/agent/transcript.js";
 import { ToolRendererRegistry } from "../dist/agent/tool-renderers.js";

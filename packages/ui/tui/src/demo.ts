@@ -1,4 +1,4 @@
-import type { KeyStroke } from "@sortedyuan/keybindings";
+import type { KeyStroke } from "./keybindings/index.js";
 import {
   Editor,
   FocusManager,

@@ -3,7 +3,7 @@
 **English** | [简体中文](../../zh-CN/guides/custom-model.md)
 
 A model adapter converts provider requests and responses to the `Model`
-interface exported by `@sortedyuan/core`. Use this guide when adding a provider
+interface exported by `@sortedyuan/may/core`. Use this guide when adding a provider
 protocol. The adapter handles request conversion, streaming, cancellation,
 and Provider errors; the application owns Session and product behavior.
 
@@ -16,7 +16,7 @@ local protocol demonstration.
 The following local text transformer demonstrates the required stream protocol.
 It performs uppercase conversion and has no external model service. Its limits
 are example values. Create `uppercase-model.ts` in an ESM TypeScript application
-with `@sortedyuan/core`, `@sortedyuan/application`, and `@sortedyuan/session` as direct dependencies.
+with `@sortedyuan/may` as a direct dependency.
 See [Getting started](../getting-started.md) for workspace setup.
 
 ```ts
@@ -27,7 +27,7 @@ import type {
   ModelLimits,
   ModelRequest,
   ModelStreamOptions,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 
 export class UppercaseModel implements Model {
   readonly limits: ModelLimits = {
@@ -70,8 +70,8 @@ function lastUserText(request: ModelRequest): string {
 Create `run.ts` beside it to exercise the stream through `AgentApplication`:
 
 ```ts
-import { AgentApplication } from "@sortedyuan/application";
-import { InMemorySessionStore } from "@sortedyuan/session";
+import { AgentApplication } from "@sortedyuan/may";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { UppercaseModel } from "./uppercase-model.js";
 
 const application = await AgentApplication.open({
@@ -179,7 +179,7 @@ An adapter may expose:
   `contextBudgetFromModel()`;
 - `contextCompactor`, for a provider-native compaction operation.
 
-Provider-native compaction is optional. `@sortedyuan/context` adapts it through
+Provider-native compaction is optional. `@sortedyuan/may/context` adapts it through
 `ModelContextCompactionStrategy`; it does not belong in the normal
 `stream()` implementation. A compactor should also report the usage of its own
 compaction request in `ModelContextCompactionResult.usage`, so a host can account

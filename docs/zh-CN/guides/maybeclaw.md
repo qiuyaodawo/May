@@ -25,12 +25,17 @@ Telegram 和飞书需要各自的平台账户与凭据。
 
 ## 应用组合
 
-可复用渠道、投递、Agent adapter、coordination 和 HTTP 功能由
-`packages/plugins/` 提供。产品插件组合位于 `apps/maybeclaw/src/plugins/`，
+可复用投递、Agent adapter、coordination 和 HTTP 功能由
+对应能力包提供：`@sortedyuan/gateway` 提供投递、Agent adapter 和 HTTP，
+`@sortedyuan/coordination` 提供协作。渠道实现位于 `apps/maybeclaw/src/channels/`。
+产品插件组合位于 `apps/maybeclaw/src/plugins/`，
 `AgentGateway` 和 `GatewayHost` 管理完整应用生命周期。配置插件可以替换默认
 Model 和 PermissionPolicy 提供方。空闲 adapter 通过 registry 释放，下次使用
 时根据当前配置重新创建。关闭时开始取消 Gateway 工作，随后等待 HTTP 请求并
 释放资源。参见[插件指南](plugins.md#可复用插件-package)。
+
+May adapter 从检查历史开始持有该对话的执行上下文，直到请求完成。
+同一对话的并发请求会被拒绝，活动请求在完成前保留自己的工具和事件报告。
 
 Web、CLI 和 HTTP 使用 `GatewayQueries`、`GatewayController` 接口。
 查询根据调用者身份与会话访问权限返回独立快照。`GatewayHost` 通过

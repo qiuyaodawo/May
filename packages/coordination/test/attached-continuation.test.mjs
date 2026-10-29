@@ -4,11 +4,11 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { AgentApplication } from "../../application/dist/index.js";
-import { recoverFileLock } from "../../file-storage/dist/index.js";
-import { OpenAIChatCompletionsModel } from "../../providers/openai-compatible/dist/index.js";
-import { FileSessionStore } from "../../session/dist/file-store.js";
-import { inspectSessionRunOutcome } from "../../session/dist/index.js";
+import { AgentApplication } from "@sortedyuan/may";
+import { recoverFileLock } from "@sortedyuan/may/storage";
+import { OpenAIChatCompletionsModel } from "@sortedyuan/providers/openai-compatible";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { inspectSessionRunOutcome } from "@sortedyuan/may/session";
 import { CoordinationRuntime, createAttachedApplicationAgent } from "../dist/index.js";
 import { FileCoordinationStore } from "../dist/file-store.js";
 

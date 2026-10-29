@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Tool } from "@sortedyuan/core";
+import type { Tool } from "@sortedyuan/may/core";
 import type { TaskExecutionContext, TaskMessageSpec } from "./types.js";
 
 function object(value: unknown, keys: readonly string[]): Record<string, unknown> {

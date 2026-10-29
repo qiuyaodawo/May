@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { InMemoryCoordinationStore } from "@sortedyuan/coordination";
-import { PluginHost } from "@sortedyuan/plugin";
+import { PluginHost } from "@sortedyuan/may/plugin";
 import { createCoordinationPlugin, coordinationService } from "@sortedyuan/coordination/plugin";
 
 test("coordination plugin executes real file hashes and releases writer ownership across repeated cleanup", async t => {

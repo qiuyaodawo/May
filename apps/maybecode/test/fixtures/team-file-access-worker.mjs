@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { open, readFile } from "node:fs/promises";
-import { withFileAccess } from "@sortedyuan/file-storage";
+import { withFileAccess } from "@sortedyuan/may/storage";
 import { runMaybeCodeTeamCommand } from "../../dist/team.js";
 
 const [job] = await once(process, "message");

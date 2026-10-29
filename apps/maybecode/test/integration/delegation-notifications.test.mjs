@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadMayConfig, resolveModelProfile } from "@sortedyuan/config";
+import { loadMayConfig, resolveModelProfile } from "@sortedyuan/may/config";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 import { executeDelegationCommand } from "../../dist/delegation-commands.js";
 import { executeMaybeCodeSlashCommand } from "../../dist/slash-commands.js";

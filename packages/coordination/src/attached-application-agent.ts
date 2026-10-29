@@ -1,6 +1,6 @@
-import type { AgentApplication } from "@sortedyuan/application";
-import { correlationTraceAttributes, type UserMessage } from "@sortedyuan/core";
-import type { SessionContinueOptions, SessionEvent, SessionSubmitOptions } from "@sortedyuan/session";
+import type { AgentApplication } from "@sortedyuan/may";
+import { correlationTraceAttributes, resolveRunBudget, type UserMessage } from "@sortedyuan/may/core";
+import type { SessionContinueOptions, SessionEvent, SessionSubmitOptions } from "@sortedyuan/may/session";
 import {
   coordinationInput,
   inspectAttachedTaskSession,
@@ -61,7 +61,8 @@ export function createAttachedApplicationAgent(
   name(options.version, "agent version");
   // 宿主 Session 可能已经保存了更早请求的输入，按输入身份定位本轮。
   const inspect = (execution: TaskExecution) => {
-    const inputId = options.identity?.(execution, turnOf(execution));
+    const firstExecution = { ...execution, task: { ...execution.task, turn: execution.task.sessionStartTurn ?? 0 } };
+    const inputId = options.identity?.(firstExecution, turnOf(firstExecution));
     return {
       mode: options.mode ?? "submit" as const,
       ...(inputId === undefined ? {} : { inputId }),
@@ -74,7 +75,7 @@ export function createAttachedApplicationAgent(
     requestYield: () => undefined,
   });
   const identityOf = (execution: TaskExecution, turn: AttachedApplicationTurn): string =>
-    options.identity?.(execution, turn) ?? taskTurnInputId(execution);
+    (turn.first ? options.identity?.(execution, turn) : undefined) ?? taskTurnInputId(execution);
   const applications = new Map<string, Pick<AgentApplication, "submit" | "continue" | "resolveApproval">>();
   return {
     version: options.version,
@@ -83,8 +84,10 @@ export function createAttachedApplicationAgent(
       context.signal.throwIfAborted();
       const { sessionId } = execution.task;
       if (applications.has(sessionId)) throw new Error("Task Session already active");
+      const events = await options.read(sessionId);
+      if (applications.has(sessionId)) throw new Error("Task Session already active");
       if (inspectAttachedTaskSession(
-        await options.read(sessionId),
+        events,
         execution,
         { ...inspect(execution), allowUnsubmittedContinuation: true },
       ).status !== "not-started") {
@@ -100,9 +103,8 @@ export function createAttachedApplicationAgent(
       };
       const inputId = identityOf(execution, turn);
       const declared = options.submit(execution, turn, context);
-      const application = options.attach(execution);
-      applications.set(sessionId, application);
       const { input: _input, inputId: _inputId, ...rest } = declared;
+      rest.runBudget = resolveRunBudget(execution.runBudget, declared.runBudget);
       if (execution.telemetry !== undefined) {
         if (execution.telemetry.parent !== undefined) rest.traceContext = execution.telemetry.parent;
         rest.traceAttributes = { ...rest.traceAttributes, ...correlationTraceAttributes(execution.telemetry) };
@@ -110,6 +112,8 @@ export function createAttachedApplicationAgent(
       const signal = declared.signal === undefined
         ? context.signal
         : AbortSignal.any([declared.signal, context.signal]);
+      const application = options.attach(execution);
+      applications.set(sessionId, application);
       try {
         // 宿主的让出边界与委派让出共用同一个 Run 边界。
         const shouldYield = () => delegated || declared.shouldYield?.() === true;

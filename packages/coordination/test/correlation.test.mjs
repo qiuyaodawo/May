@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
-import { defineAgent } from "../../application/dist/index.js";
-import { InMemorySessionStore } from "../../session/dist/index.js";
+import { defineAgent } from "@sortedyuan/may";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { BasicTracer, DiagnosticsStore } from "../../observability/dist/index.js";
-import { OpenAIChatCompletionsModel } from "../../providers/openai-compatible/dist/index.js";
+import { OpenAIChatCompletionsModel } from "@sortedyuan/providers/openai-compatible";
 import { CoordinationRuntime, InMemoryCoordinationStore, createApplicationAgent } from "../dist/index.js";
 
 test("parallel coordination tasks preserve trace parents through ApplicationAgent and actual HTTP model calls", { timeout: 10_000 }, async t => {

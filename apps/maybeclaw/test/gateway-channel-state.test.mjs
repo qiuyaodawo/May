@@ -8,7 +8,7 @@ import { GatewayHost } from "../dist/gateway-host.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { ChannelStore, inboxId } from "../dist/channel-store.js";
 import { TelegramAdapter, telegramMemberInput } from "../dist/channels.js";
-import { createTelegramChannelPlugin } from "@sortedyuan/plugin-channel-telegram";
+import { createTelegramChannelPlugin } from "../dist/channels/telegram/index.js";
 import { digest } from "../dist/types.js";
 import { setTimeout as delay } from "node:timers/promises";
 

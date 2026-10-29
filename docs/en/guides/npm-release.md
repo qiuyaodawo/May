@@ -7,13 +7,13 @@ pnpm version declared in `package.json` (currently 12.4.2).
 
 ## Release scope
 
-The explicit [release list](../../../scripts/release-packages.json) contains 39
-packages under `@sortedyuan`: 38 libraries and MaybeCode. `pnpm release:check`
+The explicit [release list](../../../scripts/release-packages.json) contains 14
+packages under `@sortedyuan`: 13 libraries and MaybeCode. `pnpm release:check`
 checks that this list exactly matches public workspace packages and that their
 complete runtime dependency chains contain only publishable packages.
 
-MaybeClaw, CLI, Eval CLI, the Telegram and Feishu channel plugins, and examples
-are private. Adding a public package requires updating the list and verifying
+MaybeClaw, CLI, Eval CLI and examples are private. Telegram and Feishu channels
+are internal MaybeClaw modules. Adding a public package requires updating the list and verifying
 its complete dependency chain in an external project.
 
 The [Changesets configuration](../../../.changeset/config.json) uses public
@@ -24,13 +24,14 @@ Each breaking change must include consumer migration instructions.
 
 ## Package-name migration
 
-Component factory and history-tool imports use the
+Framework, Provider and plugin imports use the
 [public subpath migration guide](package-subpaths.md).
 
-Replace `@may/` with `@sortedyuan/` in dependency names, source imports,
+Use the migration table to update dependency names, source imports,
 `pnpm --filter` selectors and configuration values that load a package module.
-Keep the package suffix and export subpath, such as
-`@sortedyuan/session/file-store`. Reinstall dependencies and compile the consumer.
+For example, install `@sortedyuan/may` and import `@sortedyuan/may/session/file-store`.
+For older `@may/` names, match the component name to the same table.
+Reinstall dependencies and compile the consumer.
 An old global MaybeCode installation can be removed with
 `pnpm remove --global @may/maybecode` before installing the approved new version.
 

@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 import { OpenAIResponsesModel } from "@sortedyuan/providers";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
 import { MaybeCodeApplication, MaybeCodeWorkspace } from "../dist/index.js";
 import { createTestWorkspace } from "./fixtures/workspace.mjs";
 

@@ -5,23 +5,23 @@
 本文指导应用定义工具、校验参数、注册工具并处理取消。
 需要已经按照[构建 Agent](building-an-agent.md)配置应用和模型。
 
-`@sortedyuan/core` 的 `Tool` 接口包含三个主要部分：
+`@sortedyuan/may/core` 的 `Tool` 接口包含三个主要部分：
 
 - `inputSchema` 向模型描述调用；
 - 可选 `parse()` 校验并转换不可信的模型输出；
 - `execute()` 执行操作。
 
-`@sortedyuan/core` 提供实例级 `ToolRegistry`，用于组合和查询工具。
+`@sortedyuan/may/core` 提供实例级 `ToolRegistry`，用于组合和查询工具。
 `May`、`AgentApplication` 和 `AgentDefinition` 都接受
 `Iterable<Tool>`，所以可以传注册表、数组或其他可迭代对象。
 
 ## 完整工具示例
 
-在 TypeScript 应用中创建 `add-tool.ts`，并将 `@sortedyuan/core` 加入直接依赖。
+在 TypeScript 应用中创建 `add-tool.ts`，并将 `@sortedyuan/may` 加入直接依赖。
 该文件实现加法，`execute()` 返回 `{ value: number }`。
 
 ```ts
-import type { Tool } from "@sortedyuan/core";
+import type { Tool } from "@sortedyuan/may/core";
 
 interface AddInput {
   readonly left: number;
@@ -69,8 +69,8 @@ export const addTool: Tool<AddInput, AddOutput> = {
 构建指南关闭应用：
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
-import { ToolRegistry } from "@sortedyuan/core";
+import { defineAgent } from "@sortedyuan/may";
+import { ToolRegistry } from "@sortedyuan/may/core";
 
 const tools = new ToolRegistry([addTool]);
 tools.registerAll(productTools);
@@ -95,7 +95,7 @@ const application = await agent.open({ store });
 import {
   DuplicateToolNameError,
   ToolRegistry,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 
 const tools = new ToolRegistry([addTool]);
 tools.register(subtractTool);

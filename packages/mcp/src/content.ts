@@ -1,5 +1,5 @@
 import type { ContentBlock, ResourceContents } from "@modelcontextprotocol/client";
-import type { ContentPart, UserMessage } from "@sortedyuan/core";
+import type { ContentPart, UserMessage } from "@sortedyuan/may/core";
 import { McpContentError } from "./errors.js";
 import type { McpPromptExpansion, McpResourceRead, McpToolOutput } from "./types.js";
 

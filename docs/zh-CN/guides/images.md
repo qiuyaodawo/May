@@ -62,8 +62,8 @@ Provider file ID 需要宿主提供 `MediaReader`。
 
 `@sortedyuan/media` 导出 `DisplayPart`、`ImageAttachment`、`ImageData`、`MediaReader`、
 `MediaCapabilities`、`displayParts`、`imageAttachment`、`readEmbeddedImage`、
-`inspectImage`、`imagePng`、`FileMediaStore`。运行时依赖为 `@sortedyuan/core`、
-`@sortedyuan/session` 和 `sharp`，Agent 运行循环无需依赖它。
+`inspectImage`、`imagePng`、`FileMediaStore`。运行时依赖为 `@sortedyuan/may`
+和 `sharp`，Agent 运行循环无需依赖它。
 
 `FileMediaStore.save()` 与 `verify()` 通过 `<image-path>.access` 和
 `<image-path>.access.gate` 空文件，协调本机不同进程的读取与替换。请将它们与图片

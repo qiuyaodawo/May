@@ -172,6 +172,18 @@ importers:
       '@changesets/cli':
         specifier: 3.0.3
         version: 3.0.3
+      '@sortedyuan/coding-tools':
+        specifier: workspace:*
+        version: link:packages/tools/coding-tools
+      '@sortedyuan/may':
+        specifier: workspace:*
+        version: link:packages/may
+      '@sortedyuan/observability':
+        specifier: workspace:*
+        version: link:packages/observability
+      '@sortedyuan/providers':
+        specifier: workspace:*
+        version: link:packages/providers
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
@@ -187,12 +199,9 @@ importers:
 
   apps/cli:
     dependencies:
-      '@sortedyuan/config':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../packages/config
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../../packages/may
       '@sortedyuan/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -219,60 +228,27 @@ importers:
       '@node-rs/argon2':
         specifier: 2.2.1
         version: 2.2.1
-      '@sortedyuan/application':
-        specifier: workspace:*
-        version: link:../../packages/application
       '@sortedyuan/coding-tools':
         specifier: workspace:*
         version: link:../../packages/tools/coding-tools
-      '@sortedyuan/config':
-        specifier: workspace:*
-        version: link:../../packages/config
       '@sortedyuan/coordination':
         specifier: workspace:*
         version: link:../../packages/coordination
-      '@sortedyuan/core':
+      '@sortedyuan/gateway':
         specifier: workspace:*
-        version: link:../../packages/core
-      '@sortedyuan/file-storage':
+        version: link:../../packages/gateway
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../packages/file-storage
+        version: link:../../packages/may
       '@sortedyuan/media':
         specifier: workspace:*
         version: link:../../packages/media
-      '@sortedyuan/permissions':
+      '@sortedyuan/observability':
         specifier: workspace:*
-        version: link:../../packages/permissions
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../packages/plugin
-      '@sortedyuan/plugin-agent-adapters':
-        specifier: workspace:*
-        version: link:../../packages/plugins/agent-adapters
-      '@sortedyuan/plugin-channel-feishu':
-        specifier: workspace:*
-        version: link:../../packages/plugins/channel-feishu
-      '@sortedyuan/plugin-channel-telegram':
-        specifier: workspace:*
-        version: link:../../packages/plugins/channel-telegram
-      '@sortedyuan/plugin-delivery':
-        specifier: workspace:*
-        version: link:../../packages/plugins/delivery
-      '@sortedyuan/plugin-observability':
-        specifier: workspace:*
-        version: link:../../packages/plugins/observability
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../packages/plugin-services
-      '@sortedyuan/plugin-web-api':
-        specifier: workspace:*
-        version: link:../../packages/plugins/web-api
+        version: link:../../packages/observability
       '@sortedyuan/providers':
         specifier: workspace:*
         version: link:../../packages/providers
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../packages/session
       '@sortedyuan/ui-client':
         specifier: workspace:*
         version: link:../../packages/ui/client
@@ -301,33 +277,15 @@ importers:
 
   apps/maybecode:
     dependencies:
-      '@sortedyuan/application':
-        specifier: workspace:*
-        version: link:../../packages/application
       '@sortedyuan/coding-tools':
         specifier: workspace:*
         version: link:../../packages/tools/coding-tools
-      '@sortedyuan/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@sortedyuan/context':
-        specifier: workspace:*
-        version: link:../../packages/context
       '@sortedyuan/coordination':
         specifier: workspace:*
         version: link:../../packages/coordination
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../packages/core
-      '@sortedyuan/file-storage':
-        specifier: workspace:*
-        version: link:../../packages/file-storage
-      '@sortedyuan/goal':
-        specifier: workspace:*
-        version: link:../../packages/goal
-      '@sortedyuan/keybindings':
-        specifier: workspace:*
-        version: link:../../packages/ui/keybindings
+        version: link:../../packages/may
       '@sortedyuan/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
@@ -337,39 +295,9 @@ importers:
       '@sortedyuan/observability':
         specifier: workspace:*
         version: link:../../packages/observability
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../../packages/permissions
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../packages/plugin
-      '@sortedyuan/plugin-delegation':
-        specifier: workspace:*
-        version: link:../../packages/plugins/delegation
-      '@sortedyuan/plugin-goals':
-        specifier: workspace:*
-        version: link:../../packages/plugins/goals
-      '@sortedyuan/plugin-history-memory':
-        specifier: workspace:*
-        version: link:../../packages/plugins/history-memory
-      '@sortedyuan/plugin-mcp':
-        specifier: workspace:*
-        version: link:../../packages/plugins/mcp
-      '@sortedyuan/plugin-observability':
-        specifier: workspace:*
-        version: link:../../packages/plugins/observability
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../packages/plugin-services
       '@sortedyuan/providers':
         specifier: workspace:*
         version: link:../../packages/providers
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../packages/session
-      '@sortedyuan/skills':
-        specifier: workspace:*
-        version: link:../../packages/skills
       '@sortedyuan/tui':
         specifier: workspace:*
         version: link:../../packages/ui/tui
@@ -402,27 +330,24 @@ importers:
 
   examples/basic:
     dependencies:
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../../packages/may
 
   examples/deepseek:
     dependencies:
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../packages/core
-      '@sortedyuan/provider-deepseek':
+        version: link:../../packages/may
+      '@sortedyuan/providers':
         specifier: workspace:*
-        version: link:../../packages/providers/deepseek
+        version: link:../../packages/providers
 
   examples/web-ui:
     dependencies:
-      '@sortedyuan/application':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../packages/application
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../packages/session
+        version: link:../../packages/may
       '@sortedyuan/ui-client':
         specifier: workspace:*
         version: link:../../packages/ui/client
@@ -430,113 +355,33 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui/web
 
-  packages/application:
-    dependencies:
-      '@sortedyuan/context':
-        specifier: workspace:*
-        version: link:../context
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../core
-      '@sortedyuan/file-storage':
-        specifier: workspace:*
-        version: link:../file-storage
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../permissions
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../plugin
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../plugin-services
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../session
-      '@sortedyuan/skills':
-        specifier: workspace:*
-        version: link:../skills
-      diff:
-        specifier: 9.0.0
-        version: 9.0.0
-      simple-git:
-        specifier: ^4.0.2
-        version: 4.0.2
-    devDependencies:
-      '@sortedyuan/provider-openai':
-        specifier: workspace:*
-        version: link:../providers/openai
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/config:
-    dependencies:
-      '@sortedyuan/file-storage':
-        specifier: workspace:*
-        version: link:../file-storage
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/context:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../core
-
   packages/coordination:
     dependencies:
-      '@sortedyuan/application':
+      '@sortedyuan/coding-tools':
         specifier: workspace:*
-        version: link:../application
-      '@sortedyuan/core':
+        version: link:../tools/coding-tools
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../core
-      '@sortedyuan/file-storage':
+        version: link:../may
+      '@sortedyuan/mcp':
         specifier: workspace:*
-        version: link:../file-storage
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../permissions
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../plugin
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../session
+        version: link:../mcp
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
-
-  packages/core:
-    dependencies:
-      ajv:
-        specifier: ^8.17.1
-        version: 8.20.0
-      ajv-formats:
-        specifier: ^3.0.1
-        version: 3.0.1(ajv@8.20.0)
 
   packages/eval:
     dependencies:
-      '@sortedyuan/application':
-        specifier: workspace:*
-        version: link:../application
       '@sortedyuan/coordination':
         specifier: workspace:*
         version: link:../coordination
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../core
+        version: link:../may
       '@sortedyuan/observability':
         specifier: workspace:*
         version: link:../observability
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../permissions
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
@@ -548,28 +393,55 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
-  packages/file-storage:
+  packages/gateway:
     dependencies:
-      fs-native-extensions:
-        specifier: 1.5.1
-        version: 1.5.1
+      '@sortedyuan/may':
+        specifier: workspace:*
+        version: link:../may
+      '@sortedyuan/media':
+        specifier: workspace:*
+        version: link:../media
+      vscode-jsonrpc:
+        specifier: ^9.0.2
+        version: 9.0.2(patch_hash=f4280266a458a0c659987f7c4809f88177087f031b7349855764540aee508230)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
 
-  packages/goal:
+  packages/may:
     dependencies:
-      '@sortedyuan/context':
-        specifier: workspace:*
-        version: link:../context
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../core
+      ajv:
+        specifier: ^8.17.1
+        version: 8.20.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.20.0)
+      diff:
+        specifier: 9.0.0
+        version: 9.0.0
+      fs-native-extensions:
+        specifier: 1.5.1
+        version: 1.5.1
+      import-meta-resolve:
+        specifier: ^4.2.0
+        version: 4.2.0
+      semver:
+        specifier: ^7.7.2
+        version: 7.8.5
+      simple-git:
+        specifier: ^4.0.2
+        version: 4.0.2
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      '@types/semver':
+        specifier: ^7.7.0
+        version: 7.8.0
 
   packages/mcp:
     dependencies:
@@ -579,12 +451,12 @@ importers:
       '@modelcontextprotocol/server':
         specifier: 2.0.0
         version: 2.0.0
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../core
-      '@sortedyuan/file-storage':
+        version: link:../may
+      '@sortedyuan/observability':
         specifier: workspace:*
-        version: link:../file-storage
+        version: link:../observability
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -599,12 +471,9 @@ importers:
 
   packages/media:
     dependencies:
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../core
-      '@sortedyuan/file-storage':
-        specifier: workspace:*
-        version: link:../file-storage
+        version: link:../may
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -633,298 +502,9 @@ importers:
       '@opentelemetry/sdk-trace-base':
         specifier: ^2.11.0
         version: 2.11.0(@opentelemetry/api@1.9.1)
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/permissions:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugin:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../core
-      ajv:
-        specifier: ^8.17.1
-        version: 8.20.0
-      import-meta-resolve:
-        specifier: ^4.2.0
-        version: 4.2.0
-      semver:
-        specifier: ^7.7.2
-        version: 7.8.5
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-      '@types/semver':
-        specifier: ^7.7.0
-        version: 7.8.0
-
-  packages/plugin-services:
-    dependencies:
-      '@sortedyuan/context':
-        specifier: workspace:*
-        version: link:../context
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../core
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../permissions
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../plugin
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../session
-      '@sortedyuan/skills':
-        specifier: workspace:*
-        version: link:../skills
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/agent-adapters:
-    dependencies:
-      '@sortedyuan/application':
-        specifier: workspace:*
-        version: link:../../application
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../../permissions
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-delivery':
-        specifier: workspace:*
-        version: link:../delivery
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../session
-      vscode-jsonrpc:
-        specifier: ^9.0.2
-        version: 9.0.2(patch_hash=f4280266a458a0c659987f7c4809f88177087f031b7349855764540aee508230)
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/channel-feishu:
-    dependencies:
-      '@larksuiteoapi/node-sdk':
-        specifier: 1.73.3
-        version: 1.73.3(debug@4.4.3)
-      '@sortedyuan/media':
-        specifier: workspace:*
-        version: link:../../media
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-delivery':
-        specifier: workspace:*
-        version: link:../delivery
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/channel-telegram:
-    dependencies:
-      '@sortedyuan/media':
-        specifier: workspace:*
-        version: link:../../media
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-delivery':
-        specifier: workspace:*
-        version: link:../delivery
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/delegation:
-    dependencies:
-      '@sortedyuan/application':
-        specifier: workspace:*
-        version: link:../../application
-      '@sortedyuan/coding-tools':
-        specifier: workspace:*
-        version: link:../../tools/coding-tools
-      '@sortedyuan/config':
-        specifier: workspace:*
-        version: link:../../config
-      '@sortedyuan/context':
-        specifier: workspace:*
-        version: link:../../context
-      '@sortedyuan/coordination':
-        specifier: workspace:*
-        version: link:../../coordination
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../../permissions
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-goals':
-        specifier: workspace:*
-        version: link:../goals
-      '@sortedyuan/plugin-history-memory':
-        specifier: workspace:*
-        version: link:../history-memory
-      '@sortedyuan/plugin-mcp':
-        specifier: workspace:*
-        version: link:../mcp
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../plugin-services
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../session
-      '@sortedyuan/skills':
-        specifier: workspace:*
-        version: link:../../skills
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/delivery:
-    dependencies:
-      '@sortedyuan/file-storage':
-        specifier: workspace:*
-        version: link:../../file-storage
-      '@sortedyuan/media':
-        specifier: workspace:*
-        version: link:../../media
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/goals:
-    dependencies:
-      '@sortedyuan/application':
-        specifier: workspace:*
-        version: link:../../application
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/goal':
-        specifier: workspace:*
-        version: link:../../goal
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../plugin-services
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/history-memory:
-    dependencies:
-      '@sortedyuan/application':
-        specifier: workspace:*
-        version: link:../../application
-      '@sortedyuan/context':
-        specifier: workspace:*
-        version: link:../../context
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../plugin-services
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../session
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/mcp:
-    dependencies:
-      '@sortedyuan/application':
-        specifier: workspace:*
-        version: link:../../application
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/mcp':
-        specifier: workspace:*
-        version: link:../../mcp
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-observability':
-        specifier: workspace:*
-        version: link:../observability
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../plugin-services
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/observability:
-    dependencies:
-      '@sortedyuan/application':
-        specifier: workspace:*
-        version: link:../../application
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/observability':
-        specifier: workspace:*
-        version: link:../../observability
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
-      '@sortedyuan/plugin-services':
-        specifier: workspace:*
-        version: link:../../plugin-services
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/plugins/web-api:
-    dependencies:
-      '@sortedyuan/plugin':
-        specifier: workspace:*
-        version: link:../../plugin
+        version: link:../may
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -932,133 +512,22 @@ importers:
 
   packages/providers:
     dependencies:
-      '@sortedyuan/config':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../config
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../core
-      '@sortedyuan/provider-anthropic':
-        specifier: workspace:*
-        version: link:anthropic
-      '@sortedyuan/provider-deepseek':
-        specifier: workspace:*
-        version: link:deepseek
-      '@sortedyuan/provider-gemini':
-        specifier: workspace:*
-        version: link:gemini
-      '@sortedyuan/provider-kimi':
-        specifier: workspace:*
-        version: link:kimi
-      '@sortedyuan/provider-openai':
-        specifier: workspace:*
-        version: link:openai
-      '@sortedyuan/provider-openai-compatible':
-        specifier: workspace:*
-        version: link:openai-compatible
-      '@sortedyuan/provider-zhipu':
-        specifier: workspace:*
-        version: link:zhipu
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/providers/anthropic:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/provider-openai-compatible':
-        specifier: workspace:*
-        version: link:../openai-compatible
-    devDependencies:
-      '@sortedyuan/config':
-        specifier: workspace:*
-        version: link:../../config
-
-  packages/providers/deepseek:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/provider-openai-compatible':
-        specifier: workspace:*
-        version: link:../openai-compatible
-    devDependencies:
-      '@sortedyuan/config':
-        specifier: workspace:*
-        version: link:../../config
-
-  packages/providers/gemini:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/provider-openai-compatible':
-        specifier: workspace:*
-        version: link:../openai-compatible
-    devDependencies:
-      '@sortedyuan/config':
-        specifier: workspace:*
-        version: link:../../config
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/providers/kimi:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/provider-openai-compatible':
-        specifier: workspace:*
-        version: link:../openai-compatible
-    devDependencies:
-      '@sortedyuan/config':
-        specifier: workspace:*
-        version: link:../../config
-
-  packages/providers/openai:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/provider-openai-compatible':
-        specifier: workspace:*
-        version: link:../openai-compatible
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/providers/openai-compatible:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
+        version: link:../may
       eventsource-parser:
         specifier: 3.1.1
         version: 3.1.1
-
-  packages/providers/zhipu:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/provider-openai-compatible':
-        specifier: workspace:*
-        version: link:../openai-compatible
     devDependencies:
-      '@sortedyuan/config':
-        specifier: workspace:*
-        version: link:../../config
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
 
   packages/scheduler:
     dependencies:
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../core
+        version: link:../may
       cron-parser:
         specifier: ^5.6.0
         version: 5.10.1
@@ -1073,43 +542,11 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
-  packages/session:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../core
-      '@sortedyuan/file-storage':
-        specifier: workspace:*
-        version: link:../file-storage
-    devDependencies:
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../permissions
-      '@sortedyuan/provider-openai':
-        specifier: workspace:*
-        version: link:../providers/openai
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
-  packages/skills:
-    dependencies:
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../core
-      yaml:
-        specifier: ^2.9.0
-        version: 2.9.0
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.20.1
-
   packages/tools/coding-tools:
     dependencies:
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../core
+        version: link:../../may
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -1117,48 +554,28 @@ importers:
 
   packages/ui/client:
     dependencies:
-      '@sortedyuan/application':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../application
-      '@sortedyuan/core':
-        specifier: workspace:*
-        version: link:../../core
+        version: link:../../may
       '@sortedyuan/media':
         specifier: workspace:*
         version: link:../../media
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../../permissions
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../session
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
-
-  packages/ui/keybindings: {}
 
   packages/ui/tui:
     dependencies:
       '@sortedyuan/coding-tools':
         specifier: workspace:*
         version: link:../../tools/coding-tools
-      '@sortedyuan/core':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../core
-      '@sortedyuan/keybindings':
-        specifier: workspace:*
-        version: link:../keybindings
+        version: link:../../may
       '@sortedyuan/media':
         specifier: workspace:*
         version: link:../../media
-      '@sortedyuan/permissions':
-        specifier: workspace:*
-        version: link:../../permissions
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../session
       '@types/pngjs':
         specifier: 6.0.5
         version: 6.0.5
@@ -1218,15 +635,12 @@ importers:
         specifier: workspace:*
         version: link:../client
     devDependencies:
-      '@sortedyuan/application':
+      '@sortedyuan/may':
         specifier: workspace:*
-        version: link:../../application
-      '@sortedyuan/provider-openai':
+        version: link:../../may
+      '@sortedyuan/providers':
         specifier: workspace:*
-        version: link:../../providers/openai
-      '@sortedyuan/session':
-        specifier: workspace:*
-        version: link:../../session
+        version: link:../../providers
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1

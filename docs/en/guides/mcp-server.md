@@ -22,7 +22,7 @@ Host requests, progress relay and operation replay are unsupported.
 
 ## Minimal stdio example
 
-In an ESM TypeScript project, install `@sortedyuan/mcp` and `@sortedyuan/permissions`. Save the
+In an ESM TypeScript project, install `@sortedyuan/mcp` and `@sortedyuan/may`. Save the
 following as `server.ts`, compile it using your project build, and run its emitted
 JavaScript from the MCP client command. Stdout is reserved for protocol traffic.
 The process runs until SIGINT; your production launcher should also connect its
@@ -30,7 +30,7 @@ own shutdown signal to the same cleanup path.
 
 ```ts
 import { createMayMcpServer } from "@sortedyuan/mcp/server";
-import { PermissionToolExecutor } from "@sortedyuan/permissions";
+import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
 
 const workspaceId = "explicit-workspace";
 // 示例只导出 echo。应用需要使用自己的权限策略和审批界面。

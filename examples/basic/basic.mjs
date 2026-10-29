@@ -1,4 +1,4 @@
-import { InMemoryContext, May } from "@sortedyuan/core";
+import { InMemoryContext, May } from "@sortedyuan/may/core";
 
 let step = 0;
 

@@ -2,8 +2,8 @@ import {
   resolveModelProfile,
   type MayConfig,
   type ResolveProviderOptions,
-} from "@sortedyuan/config";
-import type { ModelLimits } from "@sortedyuan/core";
+} from "@sortedyuan/may/config";
+import type { ModelLimits } from "@sortedyuan/may/core";
 
 import { ProviderConfigurationError } from "./errors.js";
 import type {

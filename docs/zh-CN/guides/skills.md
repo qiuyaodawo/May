@@ -2,7 +2,7 @@
 
 [English](../../en/guides/skills.md) | **简体中文**
 
-`@sortedyuan/skills` 为通用 agent 实现
+`@sortedyuan/may/skills` 为通用 agent 实现
 [Agent Skills 格式](https://agentskills.io/specification)。本文指导用户创建本地 skill、
 在 MaybeCode 中发现并为 Session 激活它。在配置的 MaybeCode 宿主使用的项目目录中操作。
 
@@ -85,13 +85,13 @@ MaybeCode 的受限 skill_read 免审批，脚本仍经过既有 shell／MCP 权
 
 ## 通用集成
 
-将 `@sortedyuan/skills` 和 `@sortedyuan/application` 加入应用直接依赖。
+将 `@sortedyuan/may` 加入应用直接依赖。
 以下片段要求已经初始化 `model`、`tools`、`permissionPolicy` 和 `store`。
 用包含 skill 目录的实际路径替换 `/srv/agent-skills`，执行后关闭应用：
 
 ```ts
-import { SkillRegistry } from "@sortedyuan/skills";
-import { defineAgent } from "@sortedyuan/application";
+import { SkillRegistry } from "@sortedyuan/may/skills";
+import { defineAgent } from "@sortedyuan/may";
 
 const skills = await SkillRegistry.discover(["/srv/agent-skills"]);
 const definition = defineAgent({ model, tools, skills, permissionPolicy });

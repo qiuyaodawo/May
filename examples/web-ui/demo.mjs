@@ -1,7 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { AgentWorkspace, defineAgent } from "@sortedyuan/application";
-import { InMemorySessionStore } from "@sortedyuan/session";
-import { InMemorySessionCatalog } from "@sortedyuan/session/catalog";
+import { AgentWorkspace, defineAgent } from "@sortedyuan/may";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
+import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
 import { ApplicationUiHost } from "@sortedyuan/ui-client/application";
 import { startUiServer } from "@sortedyuan/ui-client/server";
 import { webUiAssets } from "@sortedyuan/web-ui/assets";

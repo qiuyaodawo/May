@@ -3,10 +3,10 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { loadMayConfig } from "@sortedyuan/config";
+import { loadMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
-import { createModelPlugin } from "@sortedyuan/plugin-services/models";
-import { createObservabilityPlugin } from "@sortedyuan/plugin-observability";
+import { createModelPlugin } from "@sortedyuan/may/services/models";
+import { createObservabilityPlugin } from "@sortedyuan/observability/plugin";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
 async function workspaceFor(t) {

@@ -1,6 +1,6 @@
 export * from "./application.js";
 export * from "./args.js";
-export * from "@sortedyuan/session/catalog";
+export * from "@sortedyuan/may/session/catalog";
 export * from "@sortedyuan/coding-tools/change-preview";
 export * from "./configured.js";
 export * from "./controller.js";

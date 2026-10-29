@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { ChannelStore, validateChannelInput, type ChannelAttachment, type ChannelInput, type ChannelRecord, type DeliveryRecord } from "./channel-store.js";
 import type { ChannelAdapter, ChannelAttachmentData, ChannelState } from "./channels.js";
-import type { ContentPart } from "@sortedyuan/core";
+import type { ContentPart } from "@sortedyuan/may/core";
 import { inspectImage, readEmbeddedImage, type ImageData } from "@sortedyuan/media";
 import { UiProjection } from "@sortedyuan/ui-client/projection";
 import { channelTextPages } from "./channel-text.js";
@@ -10,8 +10,8 @@ import type { GatewayChannelController } from "./gateway-api.js";
 import { gatewayInput } from "./gateway-input.js";
 import { actorKey, type GatewayActor, type GatewayCapabilities, type GatewayEntry } from "./gateway-types.js";
 import type { PendingInput, LegacyDelivery } from "./gateway-repository.js";
-import { PluginHost, definePlugin, defineService, type AnyPlugin } from "@sortedyuan/plugin";
-import { createDeliveryPlugin, deliveryServices, type DeliveryService } from "@sortedyuan/plugin-delivery";
+import { PluginHost, definePlugin, defineService, type AnyPlugin } from "@sortedyuan/may/plugin";
+import { createDeliveryPlugin, deliveryServices, type DeliveryService } from "@sortedyuan/gateway/delivery";
 import { gatewayPluginServices } from "./plugins/services.js";
 
 export class GatewayHost {

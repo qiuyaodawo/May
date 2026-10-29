@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
-import { aggregateUsage, priceUsage, resolveRunBudget, resolveUsageTotals, validateUsageCost, type Usage, type UsageCost } from "@sortedyuan/core";
+import { aggregateUsage, priceUsage, resolveRunBudget, resolveUsageTotals, validateUsageCost, type Usage, type UsageCost } from "@sortedyuan/may/core";
 import type { EvalRegistry } from "./registry.js";
 import { createEvalReport, type EvalReport } from "./report.js";
 import { assertJson, createEvalPlan, DEFAULT_EVIDENCE_POLICY, validateExperiment, trialFingerprints, fingerprint, serializableExperiment } from "./validation.js";

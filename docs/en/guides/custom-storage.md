@@ -18,9 +18,9 @@ model and permission policy; see [Build an Agent](building-an-agent.md).
 
 | Requirement | Backend |
 | --- | --- |
-| Process-local history | `InMemorySessionStore` from `@sortedyuan/session` |
-| Local history across restarts | `FileSessionStore` from `@sortedyuan/session/file-store` |
-| Local Session discovery | `FileSessionCatalog` from `@sortedyuan/session/catalog` |
+| Process-local history | `InMemorySessionStore` from `@sortedyuan/may/session` |
+| Local history across restarts | `FileSessionStore` from `@sortedyuan/may/session/file-store` |
+| Local Session discovery | `FileSessionCatalog` from `@sortedyuan/may/session/catalog` |
 | Database, encryption, or cross-process coordination | Custom implementations of the interfaces below |
 
 For file-backed storage, jump to [Built-in local storage](#built-in-local-storage).
@@ -58,7 +58,7 @@ Run completed successfully after saving final application state.
 
 ## Database adapter skeleton
 
-Create the adapter module in an application that depends on `@sortedyuan/session`.
+Create the adapter module in an application that depends on `@sortedyuan/may`.
 The `SessionEventTable` below is a database integration interface; supply its
 implementation using your database library before instantiating the store.
 `appendIfCurrentSequence` must check the current maximum sequence and
@@ -69,7 +69,7 @@ import {
   validateSessionHistory,
   type SessionEvent,
   type SessionStore,
-} from "@sortedyuan/session";
+} from "@sortedyuan/may/session";
 
 export interface SessionEventTable {
   appendIfCurrentSequence(input: {
@@ -170,14 +170,14 @@ durability matters.
 
 ## Built-in local storage
 
-Add `@sortedyuan/application` and `@sortedyuan/session` as direct application dependencies.
+Add `@sortedyuan/may` as a direct application dependency.
 In the entry point, initialize `model`, `tools`, and `permissionPolicy` before
 this composition snippet. Paths are relative to the process working directory:
 
 ```ts
-import { AgentApplication, AgentWorkspace } from "@sortedyuan/application";
-import { FileSessionCatalog } from "@sortedyuan/session/catalog";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { AgentApplication, AgentWorkspace } from "@sortedyuan/may";
+import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 
 const store = new FileSessionStore(".may/sessions");
 const catalog = new FileSessionCatalog(".may/catalog.json");
@@ -214,7 +214,7 @@ see [Local storage maintenance](#local-storage-maintenance) for the complete pro
 ## Coordinate local file access
 
 For an application-owned local file shared by several processes, use
-`withFileAccess` from `@sortedyuan/file-storage`. Add `@sortedyuan/file-storage`
+`withFileAccess` from `@sortedyuan/may/storage`. Add `@sortedyuan/may`
 as a direct dependency, save this example as `shared-state.mjs`, and run
 `node shared-state.mjs` from the application directory. It writes one complete
 JSON value and prints `1` after reading it through the same access helper.
@@ -222,7 +222,7 @@ JSON value and prints `1` after reading it through the same access helper.
 ```js
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { withFileAccess } from "@sortedyuan/file-storage";
+import { withFileAccess } from "@sortedyuan/may/storage";
 
 await mkdir(".may", { recursive: true });
 const path = resolve(".may/shared-state.json");
@@ -319,7 +319,7 @@ so interruption during deletion cannot replay already absorbed operations. Do no
 readers after compacting; ordinary version-1 catalogs remain readable.
 
 `acquireFileLock(path)` and `releaseFileLock(file, path)` from
-`@sortedyuan/session/file-store` coordinate lock creation and deletion through
+`@sortedyuan/may/session/file-store` coordinate lock creation and deletion through
 permanent `<path>.access` and `<path>.access.gate` files. Concurrent transitions
 wait up to 30 seconds; an existing owner still rejects acquisition with `EEXIST`.
 Always await release before reusing the storage. Preserve both access files during
@@ -327,7 +327,7 @@ use and recovery, and upgrade all participating processes together. These rules
 also apply to Coordination journals, resource journals, remote workers, Team
 verification, Team patch application, and default-model configuration updates.
 
-For local writer locks, import `recoverFileLock` from `@sortedyuan/session/file-store`. Stop all
+For local writer locks, import `recoverFileLock` from `@sortedyuan/may/session/file-store`. Stop all
 competing hosts/open/recovery operations, read and inspect the lock, then pass its exact
 text as `expectedContents` with `confirmHostsStopped: true`. The helper rejects live PIDs,
 remote-host ownership, unsafe links and changed metadata. Incomplete metadata additionally

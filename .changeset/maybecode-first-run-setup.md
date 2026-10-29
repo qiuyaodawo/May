@@ -1,6 +1,6 @@
 ---
 "@sortedyuan/maybecode": minor
-"@sortedyuan/config": minor
+"@sortedyuan/may": minor
 "@sortedyuan/tui": minor
 ---
 

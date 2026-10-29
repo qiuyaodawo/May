@@ -1,4 +1,4 @@
-import type { TraceAttributes, TraceAttributeValue } from "@sortedyuan/core";
+import type { TraceAttributes, TraceAttributeValue } from "@sortedyuan/may/core";
 
 export interface TelemetryLimits {
   readonly maxAttributes?: number;

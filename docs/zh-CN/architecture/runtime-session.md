@@ -2,7 +2,7 @@
 
 [English](../../en/architecture/runtime-session.md) | **简体中文**
 
-本文说明 Agent 执行、对话状态和应用资源分别由哪些包管理。
+本文说明 Agent 执行、对话状态和应用资源分别由哪些模块管理。
 设计扩展或检查可复用包与产品之间的依赖时，可以依据这些职责选择位置。
 
 May 使用四个生命周期层级：
@@ -34,28 +34,36 @@ Session 存储保持独立，内存对话无需引入文件系统依赖。
 
 ## 包职责
 
-可复用代码位于 `packages`，可执行产品组合位于 `apps`。依赖规则为：
+可复用代码位于 `packages`，可执行产品组合位于 `apps`。Core、Application、
+Session、Context、权限和插件服务属于 `@sortedyuan/may` 的内部模块，使用公开
+子路径并共享发布版本。依赖方向为：
 
 ```mermaid
 flowchart LR
-  Apps[apps] --> Application["@sortedyuan/application"]
-  Application --> Plugin["@sortedyuan/plugin"]
-  Application --> Components[context / session / permissions]
-  Plugin --> Core["@sortedyuan/core"]
-  Components --> Core
+  subgraph May["@sortedyuan/may"]
+    Application[application] --> Plugin[plugin]
+    Application --> Components[context / session / permissions]
+    Plugin --> Core[core]
+    Components --> Core
+  end
+  Apps[apps] --> Application
   Apps --> Observability["@sortedyuan/observability"]
   Observability --> Core
   Apps --> MCP["@sortedyuan/mcp"]
   MCP --> Core
   Apps --> TUI["@sortedyuan/tui"]
-  TUI --> Terminal[coding-tools / keybindings / session / permissions / core]
-  Apps --> Products[provider / tool / config packages]
+  TUI --> Core
+  TUI --> Terminal[coding-tools / media]
+  Apps --> Providers["@sortedyuan/providers"]
+  Providers --> Core
+  Apps --> Gateway["@sortedyuan/gateway"]
+  Gateway --> Application
 ```
 
-图中显示依赖方向，各个包的完整依赖以其 `package.json` 为准。可复用
-包不导入应用，任何包都不导入 `apps/maybecode`。
+图中显示部分模块的依赖方向，完整安装依赖以各包的 `package.json` 为准。
+可复用模块依赖公开框架接口，产品组合位于 `apps`。
 
-### `@sortedyuan/core`
+### `@sortedyuan/may/core`
 
 Core 负责活动执行：
 
@@ -74,7 +82,7 @@ Core 不负责 Session 发现、持久化、恢复、分支、UI 状态或某种
 支持临时的一次性 Run。Core 只拥有为自身执行插桩所需的小型
 `Tracer`/`TraceSpan` 接口与显式 `TraceContext` 传播，不导入具体遥测实现或厂商 SDK。
 
-### `@sortedyuan/context`
+### `@sortedyuan/may/context`
 
 Context 包提供工厂和 Core 最小 `Context` 接口的可复用实现。应用可以
 通过工厂替换模型可见历史的保存或选择方式。它不拥有 Session 身份
@@ -84,18 +92,21 @@ Context 包提供工厂和 Core 最小 `Context` 接口的可复用实现。应�
 压缩。Core 在请求快照时传递 Run 元数据和取消信号；策略选择和持久化替换由应用管理。
 
 模型适配器可以提供 Provider 原生 Context 压缩器。Core 只定义不透明
-能力边界；`@sortedyuan/context` 将其适配进自动策略链，Provider 自行通过
+能力边界；`@sortedyuan/may/context` 将其适配进自动策略链，Provider 自行通过
 `modelState` 序列化和恢复原生续接状态。
 
-### `@sortedyuan/session`
+### `@sortedyuan/may/session`
 
 Session 包把 Core 组合成长生命周期身份。它负责 Session 标识、元数据、串行
 提交、Context 连续性、Session 事件和存储接口，也提供可复用的内存及文件 Catalog。
-它可以依赖 `@sortedyuan/core`，但 Core 不得依赖它。
+它可以依赖 `@sortedyuan/may/core`，但 Core 不得依赖它。
 
 Session 通过 `AgentRuntime` 执行。默认实现为 `May`；自定义运行时工厂
 可以共同管理 Context 和其他资源。Session 保存运行时身份及具有版本的状态。
 替换期间，在插件服务仍然可用时保存状态并关闭旧运行时，恢复新运行时后允许执行。
+
+`closeRuntime()` 完成后，仍在等待历史读取或保存的提交与 continuation 会被拒绝，
+后续 Run 保持未启动状态。
 
 Session 统一解释持久化的 Run 结果。`Session.inspectRun()` 和
 `inspectSessionRunOutcome(history, selector)` 支持按 `runId`、`inputId`、
@@ -115,13 +126,13 @@ Session 分支保留选定的对话与执行历史，同时移除继承的输入
 初始化失败时保留部分历史，拒绝恢复和分支。`AgentWorkspace` 在关闭或替换来源之前
 保存新 Session 的 Catalog 记录；Catalog 失败时保留新历史，来源 Application 继续活动。
 
-### `@sortedyuan/plugin`
+### `@sortedyuan/may/plugin`
 
 Plugin 包负责组合验证、带类型和版本的服务、范围初始化、配置与状态验证、
 生命周期 Hooks、串行变更以及资源清理。它依赖 Core 的 Hook 接口。
 Application 提供运行时和 Context 服务，并通过 Session 存储保存插件状态。
 
-### `@sortedyuan/permissions`
+### `@sortedyuan/may/permissions`
 
 工具定义能力，终端交互由产品提供。Core 提供通用 `ToolExecutor` 接口；权限
 包实现该接口，用于允许、拒绝或暂停执行并等待审批。策略接收已解析的工具
@@ -137,7 +148,7 @@ Application 提供运行时和 Context 服务，并通过 Session 存储保存�
 
 Observability 包是 Core 追踪接口的可选实现，提供采样、不可变的已完成 Span、
 内存及串行或有界处理器和基础导出器。依赖方向从 `@sortedyuan/observability` 指向
-`@sortedyuan/core`：Core 定义自己所需的能力，外层可选包实现它，再由产品注入。
+`@sortedyuan/may/core`：Core 定义自己所需的能力，外层可选包实现它，再由产品注入。
 
 追踪失败不阻止 Agent 执行，追踪数据允许采样、缓冲或丢弃，不能代替 Session 历史或
 权限记录。内置 Span 不记录提示内容、消息、推理和工具输入输出。
@@ -162,7 +173,7 @@ Core 不依赖 MCP 或其 SDK。客户端池拥有 stdio 子进程与 Streamable
 先经过配置的 `ToolExecutor`（包括权限检查）和 `ToolScheduler`，再开始进程
 I/O。运行时取消会传播到远程请求。打开客户端池的产品管理它及其进程的生命周期。
 
-### `@sortedyuan/application`
+### `@sortedyuan/may/application`
 
 Application 包提供位于 Session 与 Core 之上的独立于 UI 的编排。
 `AgentDefinition` 保存可跨 Session 复用的模型、工具、指令、权限、Context、工具执行
@@ -204,7 +215,7 @@ Agent 层消费 Core、权限与 Session 事件并构建保留式对话视图，
 
 MaybeCode 负责产品组合。它选择和配置可复用包，使用
 `ToolRegistry` 组合编码工具，通过 `defineAgent()` 捕获通用行为，把单 Session 和
-Workspace 生命周期交给 `@sortedyuan/application`，使用 `@sortedyuan/tui` 的 Agent 对话视图，并
+Workspace 生命周期交给 `@sortedyuan/may/application`，使用 `@sortedyuan/tui` 的 Agent 对话视图，并
 形成终端编码 Agent 产品。任何可复用包都不依赖 MaybeCode。
 
 应用只保留产品策略和兼容适配：

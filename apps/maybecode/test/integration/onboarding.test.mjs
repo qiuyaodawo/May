@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { loadMayConfig, parseMayConfig, resolveProviderConfig } from "@sortedyuan/config";
+import { loadMayConfig, parseMayConfig, resolveProviderConfig } from "@sortedyuan/may/config";
 import { checkOnboardingConnection } from "../../dist/onboarding.js";
 
 const name = process.env.MAYBECODE_ONBOARDING_MODEL;

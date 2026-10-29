@@ -1,1 +1,1 @@
-export * from "@sortedyuan/plugin-delegation/host";
+export * from "@sortedyuan/coordination/delegation/host";

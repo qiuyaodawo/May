@@ -1,4 +1,4 @@
-import type { KeyStroke } from "@sortedyuan/keybindings";
+import type { KeyStroke } from "@sortedyuan/tui/keybindings";
 import { sanitizeTerminalText } from "@sortedyuan/tui";
 import {
   ListSelectionModel,

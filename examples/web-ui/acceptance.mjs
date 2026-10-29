@@ -3,8 +3,8 @@ import { mkdtemp, mkdir, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
 import { MaybeCodeWorkspace, startMaybeCodeWebUI } from "../../apps/maybecode/dist/index.js";
 import { MaybeClaw, MaybeClawHost, startControlServer, DEFAULT_TASK_BUDGET, digest } from "../../apps/maybeclaw/dist/index.js";
 

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { SessionSteeringQueue } from "../../../session/dist/steering.js";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { SessionSteeringQueue } from "../../../may/dist/session/steering.js";
 import { UiProjection } from "../dist/projection.js";
 import { recordedField, searchHistory } from "../dist/reading.js";
 

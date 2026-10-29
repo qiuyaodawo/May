@@ -3,7 +3,7 @@
 **English** | [简体中文](../../zh-CN/architecture/session-forks-and-checkpoints.md)
 
 Status: implemented. Public component APIs are described in the
-[Session documentation](../../../packages/session/README.md),
+[Session documentation](../guides/custom-storage.md),
 [Runtime and Session architecture](runtime-session.md), and
 [Git workspace guide](../guides/git-workspaces.md).
 

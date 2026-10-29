@@ -1,4 +1,4 @@
-import type { AssistantMessage, ContentPart, Message, Model, ToolCall } from "@sortedyuan/core";
+import type { AssistantMessage, ContentPart, Message, Model, ToolCall } from "@sortedyuan/may/core";
 import { randomUUID } from "node:crypto";
 import type { CreateMessageRequestParams, CreateMessageResult, CreateMessageResultWithTools, SamplingMessageContentBlock, SamplingContent } from "@modelcontextprotocol/client";
 import { mcpToolResultContent } from "./content.js";

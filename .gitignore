@@ -8,6 +8,7 @@ coverage/
 *.log
 .zcode/
 review/
+.test-output/
 plugin-verification/
 .pi-delegate/
 scheduler-verification/

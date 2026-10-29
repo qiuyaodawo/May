@@ -12,7 +12,7 @@ import {
   type CodingInstructions,
   type CodingInstructionSource,
 } from "@sortedyuan/coding-tools/instructions";
-import type { MayConfig } from "@sortedyuan/config";
+import type { MayConfig } from "@sortedyuan/may/config";
 
 import { MaybeCodeConfigError } from "./errors.js";
 

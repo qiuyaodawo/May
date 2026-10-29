@@ -3,7 +3,7 @@
 [English](../../en/guides/permission-policy.md) | **简体中文**
 
 本文指导应用配置直接执行、需要审批以及能够跨重启保留的授权。
-将 `@sortedyuan/permissions` 加入应用直接依赖，在配置策略前完成工具输入校验。
+将 `@sortedyuan/may` 加入应用直接依赖，在配置策略前完成工具输入校验。
 应用与事件消费者见[构建 Agent](building-an-agent.md)。
 
 `PermissionPolicy` 接收工具定义、已解析输入和执行标识，返回值决定授权行为：
@@ -26,7 +26,7 @@
 `send_notification` 工具：
 
 ```ts
-import type { PermissionPolicy } from "@sortedyuan/permissions";
+import type { PermissionPolicy } from "@sortedyuan/may/permissions";
 
 export const permissionPolicy: PermissionPolicy = ({ tool, input }) => {
   // 允许本产品支持的有限加法操作。
@@ -69,11 +69,11 @@ Grant key 表示授权范围。授权单个文件或目录时，使用能够区�
 或明确分发到独立队列：
 
 ```ts
-import type { AgentApplication } from "@sortedyuan/application";
+import type { AgentApplication } from "@sortedyuan/may";
 import type {
   ApprovalDecision,
   ApprovalRequest,
-} from "@sortedyuan/permissions";
+} from "@sortedyuan/may/permissions";
 
 type Choose = (request: ApprovalRequest) => Promise<ApprovalDecision>;
 
@@ -121,8 +121,8 @@ epoch milliseconds。无效选择会抛出异常。未知、正在处理或已�
 
 ```ts
 import { join } from "node:path";
-import { PermissionToolExecutor } from "@sortedyuan/permissions";
-import { FilePermissionRuleStore } from "@sortedyuan/permissions/file-store";
+import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
+import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store";
 
 const ruleStore = await FilePermissionRuleStore.open({
   path: join(projectDirectory, ".may", "permission-rules.json"),

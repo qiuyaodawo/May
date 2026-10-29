@@ -6,7 +6,7 @@
     "start": "node deepseek.mjs"
   },
   "dependencies": {
-    "@sortedyuan/core": "workspace:*",
-    "@sortedyuan/provider-deepseek": "workspace:*"
+    "@sortedyuan/may": "workspace:*",
+    "@sortedyuan/providers": "workspace:*"
   }
 }

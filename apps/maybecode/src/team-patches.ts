@@ -1,4 +1,4 @@
-import { acquireFileLock, releaseFileLock } from "@sortedyuan/file-storage";
+import { acquireFileLock, releaseFileLock } from "@sortedyuan/may/storage";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath, rename, unlink, type FileHandle } from "node:fs/promises";

@@ -6,7 +6,7 @@
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist", "!dist/.tsbuildinfo"],
   "scripts": { "build": "tsc -b", "test": "pnpm run build && node --test test/*.test.mjs" },
-  "dependencies": { "@sortedyuan/core": "workspace:*", "@sortedyuan/file-storage": "workspace:*", "sharp": "^0.34.5" },
+  "dependencies": { "@sortedyuan/may": "workspace:*", "sharp": "^0.34.5" },
   "devDependencies": { "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"

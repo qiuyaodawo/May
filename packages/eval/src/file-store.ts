@@ -4,7 +4,7 @@ import { open, mkdir, unlink, stat, lstat } from "node:fs/promises";
 import { resolve, join, relative, isAbsolute, dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Ajv } from "ajv";
-import { validateUsageCost } from "@sortedyuan/core";
+import { validateUsageCost } from "@sortedyuan/may/core";
 import type { EvalStore, EvalPlan, TrialState, EvalExecutionEvent, EvidenceReference, EvalTrial, EvalFingerprints } from "./types.js";
 import { assertJson, validateIdentifier } from "./validation.js";
 

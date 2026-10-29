@@ -75,7 +75,7 @@ type ApplicationEventShape =
 ```
 
 This excerpt shows the event categories; import `AgentApplicationEvent` from
-`@sortedyuan/application` for the full event fields.
+`@sortedyuan/may` for the full event fields.
 
 Tool presentations are persisted before their application event is emitted
 and before permission-policy evaluation proceeds. Successful automatic

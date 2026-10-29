@@ -5,7 +5,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { loadMayConfig } from "@sortedyuan/config";
+import { loadMayConfig } from "@sortedyuan/may/config";
 import { AgentGateway } from "../../dist/gateway.js";
 
 const base = fileURLToPath(new URL("../../../../.zcode/tmp/maybeclaw-live-tests/", import.meta.url));

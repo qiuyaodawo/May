@@ -5,7 +5,7 @@ import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { createMayMcpServer, createMayMcpBearerAuthenticator } from "../dist/server.js";
 import { openMcpClientPool } from "../dist/index.js";
-import { PermissionToolExecutor } from "../../permissions/dist/index.js";
+import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
 
 test("independent HTTP export authenticates and isolates principals, filters capabilities and uses the normal permission pipeline", { timeout: 10_000 }, async (t) => {
   const token = "a".repeat(40); const otherToken = "b".repeat(40); const wrongToken = "c".repeat(40);

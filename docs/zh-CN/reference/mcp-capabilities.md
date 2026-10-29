@@ -21,7 +21,7 @@ flowchart LR
 ```
 
 宿主选择端点、凭据、交互服务和导出能力。客户端工具经过通常的 Core 执行器，
-独立服务端通过参数取得执行器。Core 和 `@sortedyuan/application` 不依赖 MCP，浏览器
+独立服务端通过参数取得执行器。Core 和 `@sortedyuan/may/application` 不依赖 MCP，浏览器
 入口不依赖 Node。
 
 ## 已实现能力

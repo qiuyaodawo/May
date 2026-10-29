@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, mkdir, writeFile, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { InMemorySessionStore, InMemorySessionCatalog } from "@sortedyuan/session";
+import { InMemorySessionStore, InMemorySessionCatalog } from "@sortedyuan/may/session";
 import { MaybeCodeWorkspace, executeMaybeCodeSlashCommand, createMaybeCodeSlashCommandSuggester } from "../dist/index.js";
 
 async function fixture(t) {

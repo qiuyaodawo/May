@@ -1,9 +1,9 @@
-import type { ContentPart, MayEvent, UserMessage } from "@sortedyuan/core";
+import type { ContentPart, MayEvent, UserMessage } from "@sortedyuan/may/core";
 import { userInfo } from "node:os";
-import type { AgentApplicationEvent } from "@sortedyuan/application";
-import type { ContextInspection } from "@sortedyuan/context";
-import type { ApprovalRequest, PermissionEvent } from "@sortedyuan/permissions";
-import type { SessionEvent } from "@sortedyuan/session";
+import type { AgentApplicationEvent } from "@sortedyuan/may";
+import type { ContextInspection } from "@sortedyuan/may/context";
+import type { ApprovalRequest, PermissionEvent } from "@sortedyuan/may/permissions";
+import type { SessionEvent } from "@sortedyuan/may/session";
 import { sanitizeTerminalText, TerminalImages, encodeImage, workspaceGitLabel } from "@sortedyuan/tui";
 
 import type { FileChangeKind, ToolChangePreview } from "@sortedyuan/coding-tools/change-preview";

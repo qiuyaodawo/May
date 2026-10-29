@@ -5,7 +5,7 @@ import type {
   TraceSpanEndOptions,
   TraceSpanStartOptions,
   Tracer,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 
 import type {
   FinishedTraceSpan,
@@ -67,7 +67,7 @@ export class BasicTracer implements Tracer {
     this.observers = [options.observer, options.metrics === undefined ? undefined : new SpanMetrics(options.metrics)].filter((value): value is SpanObserver => value !== undefined);
   }
 
-  recordMetric(record: import("@sortedyuan/core").MetricRecord): void { this.metrics?.record(record); }
+  recordMetric(record: import("@sortedyuan/may/core").MetricRecord): void { this.metrics?.record(record); }
 
   startSpan(name: string, options: TraceSpanStartOptions = {}): TraceSpan {
     if (typeof name !== "string" || name.trim() === "") {
@@ -132,7 +132,7 @@ class BasicTraceSpan implements TraceSpan {
   private readonly clock: () => number;
   private readonly onError: ObservabilityErrorHandler | undefined;
   private readonly startTime: number;
-  private readonly attributes: Record<string, import("@sortedyuan/core").TraceAttributeValue>;
+  private readonly attributes: Record<string, import("@sortedyuan/may/core").TraceAttributeValue>;
   private readonly events: TraceSpanEventData[] = [];
   private ended = false;
   private readonly observers: readonly SpanObserver[];
@@ -242,7 +242,7 @@ function randomHex(byteLength: number): string {
 }
 
 function snapshotAttributes(attributes: TraceAttributes): TraceAttributes {
-  const result: Record<string, import("@sortedyuan/core").TraceAttributeValue> = {};
+  const result: Record<string, import("@sortedyuan/may/core").TraceAttributeValue> = {};
   for (const [name, value] of Object.entries(attributes)) {
     result[name] = Array.isArray(value) ? Object.freeze([...value]) : value;
   }

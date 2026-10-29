@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import type { Tool, ToolProgressUpdate } from "@sortedyuan/core";
+import type { Tool, ToolProgressUpdate } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
 import {
   optionalPositiveInteger,

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import test from "node:test";
-import { PermissionToolExecutor } from "../../permissions/dist/index.js";
+import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
 import { DiagnosticsStore } from "../../observability/dist/index.js";
 import { EvalTrialBudget } from "../dist/agent-budget.js";
 import { EvalTelemetryCollector, createEvalTaskAssessment, evalMetrics } from "../dist/telemetry.js";

@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { loadMayConfig } from "@sortedyuan/config";
+import { loadMayConfig } from "@sortedyuan/may/config";
 import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
 import { limits } from "../../../packages/coordination/dist/validation.js";
 import { runMaybeCodeTeamCommand } from "../dist/team.js";

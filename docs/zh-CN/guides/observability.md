@@ -4,7 +4,7 @@
 
 本文用于记录 Run 耗时、用量、指标和诊断。需要已有 May 应用，以及本地文件、
 控制台或 OTLP 导出目标。`@sortedyuan/observability` 提供追踪与诊断实现，
-`@sortedyuan/plugin-observability` 可以通过 Application 插件管理相关资源。
+`@sortedyuan/observability/plugin` 可以通过 Application 插件管理相关资源。
 
 完整的配置式示例参阅[模型验证与执行诊断](model-telemetry-integration.md)。
 下文提供直接 tracer 配置和遥测数据参考。
@@ -22,11 +22,11 @@
 ## 配置 Tracer
 
 Core 导出 `Tracer`、`TraceSpan`、`TraceContext`、属性类型和受保护的遥测调用方法。
-在使用项目安装 `@sortedyuan/application` 和 `@sortedyuan/observability`。以下集成片段假设
+在使用项目安装 `@sortedyuan/may` 和 `@sortedyuan/observability`。以下集成片段假设
 已经配置 `model`、`tools`、`permissionPolicy` 和 `store`。
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
+import { defineAgent } from "@sortedyuan/may";
 import {
   BasicTracer,
   BatchSpanProcessor,

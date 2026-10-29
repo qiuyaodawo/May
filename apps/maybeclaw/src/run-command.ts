@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { loadMayConfig } from "@sortedyuan/config";
+import { loadMayConfig } from "@sortedyuan/may/config";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadTaskModel, selectTaskModel } from "./configured.js";

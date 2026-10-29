@@ -66,7 +66,7 @@ type ApplicationEventShape =
   | { type: "context.compaction.failed"; /* 自动压缩失败；省略错误字段。 */ };
 ```
 
-该片段展示事件分类；完整字段通过 `@sortedyuan/application` 导出的 `AgentApplicationEvent` 查询。
+该片段展示事件分类；完整字段通过 `@sortedyuan/may` 导出的 `AgentApplicationEvent` 查询。
 
 工具显示信息会在应用事件发出前、权限策略开始评估前完成
 持久化。成功自动压缩也会先持久化，再发出事件并继续模型调用。手动压缩向调用方返回

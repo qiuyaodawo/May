@@ -1,5 +1,5 @@
-import type { MayConfig } from "@sortedyuan/config";
-import type { Model } from "@sortedyuan/core";
+import type { MayConfig } from "@sortedyuan/may/config";
+import type { Model } from "@sortedyuan/may/core";
 import {
   createBuiltinProviderAdapterRegistry,
   createBuiltinProviderModel,

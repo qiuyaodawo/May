@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright";
 import { createToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
-import { InMemorySessionStore } from "@sortedyuan/session";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { InMemorySessionCatalog, createMaybeCodeWebHost, startMaybeCodeWebServer } from "../../dist/index.js";
 import { yoloWorkspace } from "../yolo-support.mjs";
 

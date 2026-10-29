@@ -2,8 +2,8 @@ import { createServer } from "node:http";
 import { appendFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
-import { defineAgent } from "../../../application/dist/index.js";
-import { FileSessionStore } from "../../../session/dist/file-store.js";
+import { defineAgent } from "@sortedyuan/may";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { createApplicationAgent } from "../../dist/index.js";
 import { CoordinationWorker } from "../../dist/remote-worker.js";
 

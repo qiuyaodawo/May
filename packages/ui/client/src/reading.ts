@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readSessionTranscript, type SessionEvent } from "@sortedyuan/session";
+import { readSessionTranscript, type SessionEvent } from "@sortedyuan/may/session";
 import { UiError, type UiBlock, type UiField, type UiFieldPage, type UiFieldRequest, type UiPage, type UiPageRequest } from "./protocol.js";
 
 const PAGE_SIZE = 50, PAGE_CHARACTERS = 262_144;

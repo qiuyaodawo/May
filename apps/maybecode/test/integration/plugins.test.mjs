@@ -3,13 +3,13 @@ import test from "node:test";
 import { mkdir, mkdtemp, readFile, writeFile, readdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join, resolve, sep } from "node:path";
-import { loadMayConfig } from "@sortedyuan/config";
+import { loadMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { goalsService } from "@sortedyuan/plugin-goals";
-import { delegationService, defaultSubagentConfiguration } from "@sortedyuan/plugin-delegation";
-import { historyMemoryService } from "@sortedyuan/plugin-history-memory";
-import { createMcpPlugin } from "@sortedyuan/plugin-mcp";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { goalsService } from "@sortedyuan/may/goals/plugin";
+import { delegationService, defaultSubagentConfiguration } from "@sortedyuan/coordination/delegation";
+import { historyMemoryService } from "@sortedyuan/may/history-memory";
+import { createMcpPlugin } from "@sortedyuan/mcp/plugin";
 import { openMcpClientPool } from "@sortedyuan/mcp";
 import { MaybeCodeApplication, openConfiguredMaybeCode } from "../../dist/index.js";
 
@@ -155,7 +155,7 @@ test("configured MCP and tracing plugins serve actual files across Session chang
     workspace, model: "deepseek-v4-flash", dataDirectory: join(workspace, "data"), skills: false, subagents: false, goals: false,
     instructions: "Use the exact tool name requested and quote evidence from the tool output.",
     observability: { scheduledDelayMs: 60000 },
-    mcp: { servers: [{ id: "filesystem", command: process.execPath, args: [fileURLToPath(new URL("../../../../packages/plugins/mcp/test/read-server.mjs", import.meta.url)), workspace], protocolMode: "auto" }] },
+    mcp: { servers: [{ id: "filesystem", command: process.execPath, args: [fileURLToPath(new URL("../../../../packages/mcp/test/plugin/read-server.mjs", import.meta.url)), workspace], protocolMode: "auto" }] },
   });
   t.after(() => application.close());
   const events = [];
@@ -183,7 +183,7 @@ test("selected MCP services expose actual catalog, commands and events and own e
   const workspace = await workspaceFor(t, "plugin-selected-mcp-live-");
   const pools = [];
   const plugin = createMcpPlugin({
-    servers: [{ id: "filesystem", command: process.execPath, args: [fileURLToPath(new URL("../../../../packages/plugins/mcp/test/read-server.mjs", import.meta.url)), workspace], protocolMode: "auto" }],
+    servers: [{ id: "filesystem", command: process.execPath, args: [fileURLToPath(new URL("../../../../packages/mcp/test/plugin/read-server.mjs", import.meta.url)), workspace], protocolMode: "auto" }],
     enableInteractions: true,
     async open(options) {
       const pool = await openMcpClientPool(options);
@@ -245,7 +245,7 @@ test("delegation children use the selected MCP service with their own Session an
     git: false,
     workspace, model: "deepseek-v4-flash", dataDirectory: join(workspace, "data"),
     plugins: [createMcpPlugin({
-      servers: [{ id: "filesystem", command: process.execPath, args: [fileURLToPath(new URL("../../../../packages/plugins/mcp/test/read-server.mjs", import.meta.url)), workspace], protocolMode: "auto" }],
+      servers: [{ id: "filesystem", command: process.execPath, args: [fileURLToPath(new URL("../../../../packages/mcp/test/plugin/read-server.mjs", import.meta.url)), workspace], protocolMode: "auto" }],
     })],
     skills: false, goals: false, maxSteps: 8,
     subagents: { configuration: { ...base, roles: [{ name: "worker", tools: ["read"], delegateTo: [] }], limits: { ...base.limits, maxTasks: 2 } } },

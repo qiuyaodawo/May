@@ -1,1 +1,1 @@
-export { channelTextPages } from "@sortedyuan/plugin-delivery";
+export { channelTextPages } from "@sortedyuan/gateway/delivery";

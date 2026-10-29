@@ -2,11 +2,15 @@
 
 Fail-open tracing processors and exporters for May agents.
 
+`@sortedyuan/observability/plugin` manages tracing services through the plugin
+host. See the [plugin reference](docs/plugin/README.md) and its
+[Chinese version](docs/plugin/README.zh-CN.md).
+
 Core owns the small `Tracer`/`TraceSpan` port. This package depends on Core to
 implement that port without making telemetry a required Core dependency.
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
+import { defineAgent } from "@sortedyuan/may/application";
 import {
   BasicTracer,
   BatchSpanProcessor,

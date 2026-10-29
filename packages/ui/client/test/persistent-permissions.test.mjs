@@ -4,11 +4,11 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { AgentApplication, AgentWorkspace } from "../../../application/dist/index.js";
-import { InMemoryPermissionRuleStore, PermissionToolExecutor } from "../../../permissions/dist/index.js";
-import { InMemorySessionStore } from "../../../session/dist/index.js";
-import { InMemorySessionCatalog } from "../../../session/dist/catalog.js";
-import { DeepSeekModel } from "../../../providers/deepseek/dist/index.js";
+import { AgentApplication, AgentWorkspace } from "@sortedyuan/may";
+import { InMemoryPermissionRuleStore, PermissionToolExecutor } from "@sortedyuan/may/permissions";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
+import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
+import { DeepSeekModel } from "@sortedyuan/providers/deepseek";
 import { ApplicationUiHost } from "../dist/application.js";
 import { UiProjection } from "../dist/projection.js";
 

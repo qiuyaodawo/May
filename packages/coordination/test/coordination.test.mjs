@@ -4,12 +4,12 @@ import { setTimeout as delay } from "node:timers/promises";
 import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { defineAgent } from "../../application/dist/index.js";
-import { InMemorySessionStore } from "../../session/dist/index.js";
-import { FileSessionStore } from "../../session/dist/file-store.js";
+import { defineAgent } from "@sortedyuan/may";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { CoordinationRuntime, InMemoryCoordinationStore, createApplicationAgent, pipeline, parallelTasks } from "../dist/index.js";
 import { FileCoordinationStore } from "../dist/file-store.js";
-import { recoverFileLock } from "@sortedyuan/session/file-store";
+import { recoverFileLock } from "@sortedyuan/may/session/file-store";
 import { spawnSync } from "node:child_process";
 
 const policy = { version: "v1", authorize: () => true };

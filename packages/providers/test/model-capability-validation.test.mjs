@@ -3,8 +3,8 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { parseMayConfig } from "@sortedyuan/config";
-import { ModelResponseValidationError } from "@sortedyuan/core";
+import { parseMayConfig } from "@sortedyuan/may/config";
+import { ModelResponseValidationError } from "@sortedyuan/may/core";
 import { OpenAIChatCompletionsModel, OpenAIResponsesModel, createBuiltinProviderAdapterRegistry, createModelCapabilityResolver, validateModelRequest } from "../dist/index.js";
 
 const responseFormat = {

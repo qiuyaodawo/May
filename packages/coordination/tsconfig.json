@@ -9,11 +9,8 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
-    { "path": "../application" },
-    { "path": "../core" },
-    { "path": "../file-storage" },
-    { "path": "../plugin" },
-    { "path": "../permissions" },
-    { "path": "../session" }
+    { "path": "../may" },
+    { "path": "../tools/coding-tools" },
+    { "path": "../mcp" }
   ]
 }

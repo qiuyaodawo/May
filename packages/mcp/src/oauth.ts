@@ -5,7 +5,7 @@ import {
   type AuthProvider, type FetchLike, type OAuthClientProvider, type OAuthDiscoveryState,
   type StoredOAuthClientInformation, type StoredOAuthTokens,
 } from "@modelcontextprotocol/client";
-import { MayError } from "@sortedyuan/core";
+import { MayError } from "@sortedyuan/may/core";
 import type { McpCredentialStore } from "./credentials.js";
 import type { McpHttpServerOptions } from "./types.js";
 

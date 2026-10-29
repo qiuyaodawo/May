@@ -32,12 +32,11 @@ Reusable code lives in `packages/`; products in `apps/` select and configure tho
 packages. Examples live in `examples/`. Dependencies flow from applications into
 reusable packages.
 
-- `@sortedyuan/core` runs the model/tool loop; `@sortedyuan/context` manages the model-visible view.
-- `@sortedyuan/session` saves history; `@sortedyuan/application` owns application and workspace lifecycle.
-- `@sortedyuan/permissions` evaluates tool policy and handles approval requests.
-- `@sortedyuan/providers` selects configured models; individual provider packages implement protocols.
-- `@sortedyuan/plugin` and `@sortedyuan/plugin-services` compose scoped services, state, and Hooks;
-  reusable plugins live in `packages/plugins/`.
+- `@sortedyuan/may` provides the runtime, Context, Session, Application, permissions,
+  configuration, Skills and plugin services through public subpaths.
+- `@sortedyuan/providers` selects configured models and exposes each protocol through a subpath.
+- `@sortedyuan/gateway` provides Agent adapters, RPC, durable delivery and HTTP services.
+- Feature plugins belong to the package providing their capability; MaybeClaw owns its channels.
 - `@sortedyuan/coordination` runs durable teams and task graphs. `@sortedyuan/scheduler` triggers
   host tasks. `@sortedyuan/eval` evaluates repeated tasks and compares configurations.
 - MCP, Skills, media, tracing, coding tools, and UI packages extend these components.

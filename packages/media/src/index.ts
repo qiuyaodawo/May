@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, rename, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { ContentPart, MediaSource } from "@sortedyuan/core";
-import { withFileAccess } from "@sortedyuan/file-storage";
+import type { ContentPart, MediaSource } from "@sortedyuan/may/core";
+import { withFileAccess } from "@sortedyuan/may/storage";
 
 export interface ImageAttachment {
   readonly id: string;

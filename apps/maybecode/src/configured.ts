@@ -8,14 +8,14 @@ import {
   updateDefaultMayModel,
   type LoadMayConfigOptions,
   type MayConfig,
-} from "@sortedyuan/config";
+} from "@sortedyuan/may/config";
 import type {
   ContextBudget,
   ContextCompactionStrategy,
   ContextFactory,
   ContextSummarizer,
-} from "@sortedyuan/context";
-import { resolveRunBudget, type Model, type RunBudget } from "@sortedyuan/core";
+} from "@sortedyuan/may/context";
+import { resolveRunBudget, type Model, type RunBudget } from "@sortedyuan/may/core";
 import {
   type McpOAuthManager,
   type McpTaskJournal,
@@ -29,9 +29,9 @@ import {
   type McpOAuthOptions,
   type OpenMcpClientPoolOptions,
 } from "@sortedyuan/mcp";
-import { mcpHostService, mcpService, type McpPluginOptions } from "@sortedyuan/plugin-mcp";
-import { createSharedObservabilityPlugin, observabilityHostService, observabilityService } from "@sortedyuan/plugin-observability";
-import { services } from "@sortedyuan/plugin-services";
+import { mcpHostService, mcpService, type McpPluginOptions } from "@sortedyuan/mcp/plugin";
+import { createSharedObservabilityPlugin, observabilityHostService, observabilityService } from "@sortedyuan/observability/plugin";
+import { services } from "@sortedyuan/may/services";
 import { createMaybeCodeResourcePlugins, createMaybeCodeSharedPlugins } from "./plugins/resources.js";
 import {
   createModelCapabilityResolver,
@@ -41,11 +41,11 @@ import {
   withModelRetry,
   type RetryingModelOptions,
 } from "@sortedyuan/providers";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { FilePermissionRuleStore } from "@sortedyuan/permissions/file-store";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store";
 import { userInfo } from "node:os";
 
-import { FileSessionCatalog } from "@sortedyuan/session/catalog";
+import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
 import { MaybeCodeConfigError } from "./errors.js";
 import {
   createMaybeCodeModel,
@@ -60,9 +60,9 @@ import {
 import { MaybeCodeWorkspace } from "./workspace.js";
 import type { MaybeCodeAutoCompactionMode } from "./controller.js";
 import type { MaybeCodeModelConfiguration } from "./workspace.js";
-import type { ProjectGitWorkspaceOptions } from "@sortedyuan/application/git-workspace";
-import type { SkillRegistry } from "@sortedyuan/skills";
-import { PluginHost, loadPluginModules, parsePluginSelections, type AnyPlugin, type ServiceToken } from "@sortedyuan/plugin";
+import type { ProjectGitWorkspaceOptions } from "@sortedyuan/may/application/git-workspace";
+import type { SkillRegistry } from "@sortedyuan/may/skills";
+import { PluginHost, loadPluginModules, parsePluginSelections, type AnyPlugin, type ServiceToken } from "@sortedyuan/may/plugin";
 import { resolveMaybeCodeSkillDirectories } from "./skills.js";
 import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 import { resolveSubagentConfiguration, type MaybeCodeSubagentConfiguration, type MaybeCodeSubagentRole } from "./subagents.js";

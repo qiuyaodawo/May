@@ -20,10 +20,15 @@
 使用当前协议。Session 已经结束、协调结果尚未保存期间发生中断时，持久身份可以
 阻止重复执行。
 
+submit 模式下，`identity` 可以提供宿主的首轮输入 ID。恢复过程使用同一个身份
+检查首轮 yield，再接受后续轮次的结果。identity 回调需要为任务首轮返回稳定的值。
+适配器拒绝同一 Session 的并发执行，并保留活动 Run 的审批路由。每个 Run 合并
+`execution.runBudget` 与宿主提交的预算，各项限制使用两者中更小的值。
+
 ## 创建并运行任务图
 
-1. 在 TypeScript 宿主中提供 `@sortedyuan/application`、`@sortedyuan/core`、`@sortedyuan/coordination`
-   和 `@sortedyuan/session`。在本仓库开发时，使用仓库声明的 Node.js 和 pnpm 版本。
+1. 在 TypeScript 宿主中提供 `@sortedyuan/may` 和 `@sortedyuan/coordination`。
+   在本仓库开发时，使用仓库声明的 Node.js 和 pnpm 版本。
 2. 配置真实 provider 的 `Model` 及其凭据。Application 配置参见
    [构建 Agent](building-an-agent.md)。
 3. 为协作记录和 Session 记录分别选择绝对目录，并提供新的任务图 `id`。
@@ -32,15 +37,15 @@
    检查结果任务已经完成后返回比较文本。
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
-import type { Model } from "@sortedyuan/core";
+import { defineAgent } from "@sortedyuan/may";
+import type { Model } from "@sortedyuan/may/core";
 import {
   CoordinationRuntime,
   createApplicationAgent,
   parallelTasks,
 } from "@sortedyuan/coordination";
 import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 
 export async function compareApproaches(
   model: Model,

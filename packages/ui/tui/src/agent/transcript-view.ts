@@ -1,4 +1,4 @@
-import { Keymap, mergeKeyBindings, type KeyBindingDefinition, type KeyStroke } from "@sortedyuan/keybindings";
+import { Keymap, mergeKeyBindings, type KeyBindingDefinition, type KeyStroke } from "../keybindings/index.js";
 import { diffChars, type Change } from "diff";
 import type {
   Component,

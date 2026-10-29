@@ -1,7 +1,7 @@
 import { join } from "node:path";
-import { AgentApplication } from "../../../application/dist/index.js";
+import { AgentApplication } from "@sortedyuan/may";
 import { createBuiltinProviderModel, createModelCapabilityResolver } from "../../../providers/dist/index.js";
-import { FileSessionStore } from "../../../session/dist/file-store.js";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { CoordinationRuntime, createAttachedApplicationAgent } from "../../dist/index.js";
 import { FileCoordinationStore } from "../../dist/file-store.js";
 

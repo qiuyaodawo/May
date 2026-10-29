@@ -4,8 +4,8 @@
 
 本文用于在同一应用中组合模型能力验证、本地诊断和指标。需要 ESM TypeScript
 项目、具有默认模型与 provider 凭据的 `may.config.json`，以及一次推理请求的
-使用授权。项目需要安装 `@sortedyuan/application`、`@sortedyuan/config`、`@sortedyuan/providers`
-和 `@sortedyuan/session`、`@sortedyuan/plugin-observability`。
+使用授权。项目需要安装 `@sortedyuan/may`、`@sortedyuan/providers`
+和 `@sortedyuan/observability`。
 
 ## 配置经过验证的模型与本地诊断
 
@@ -18,12 +18,12 @@ observability 插件管理 processor，并在应用关闭时完成资源清理�
 3. 检查程序打印的能力快照、按 Session 查询的诊断、指标快照和导出队列诊断。
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
-import { loadMayConfig } from "@sortedyuan/config";
+import { defineAgent } from "@sortedyuan/may";
+import { loadMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver,
   selectProviderModel } from "@sortedyuan/providers";
-import { createObservabilityPlugin, observabilityService } from "@sortedyuan/plugin-observability";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { createObservabilityPlugin, observabilityService } from "@sortedyuan/observability/plugin";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 
 const config = await loadMayConfig({ path: "./may.config.json" });
 const selection = selectProviderModel(config);

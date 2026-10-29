@@ -3,10 +3,10 @@ import test from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { defineAgent } from "../../application/dist/index.js";
-import { InMemorySessionStore } from "../../session/dist/index.js";
-import { FileSessionStore } from "../../session/dist/file-store.js";
-import { parallelToolScheduler } from "../../core/dist/index.js";
+import { defineAgent } from "@sortedyuan/may";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { parallelToolScheduler } from "@sortedyuan/may/core";
 import { CoordinationRuntime, InMemoryCoordinationStore, createApplicationAgent } from "../dist/index.js";
 import { FileCoordinationStore } from "../dist/file-store.js";
 

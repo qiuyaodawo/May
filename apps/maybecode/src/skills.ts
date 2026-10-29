@@ -1,7 +1,7 @@
 import { MaybeCodeConfigError } from "./errors.js";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import type { MayConfig } from "@sortedyuan/config";
+import type { MayConfig } from "@sortedyuan/may/config";
 
 export function defaultMaybeCodeSkillDirectories(workspace: string, includeUser = true): readonly string[] {
   return [

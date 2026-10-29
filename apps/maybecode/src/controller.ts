@@ -1,10 +1,10 @@
-import type { AgentWorkspaceController } from "@sortedyuan/application";
-import type { GoalBudget, GoalState } from "@sortedyuan/goal";
-import type { ContextCompactionStrategy } from "@sortedyuan/context";
+import type { AgentWorkspaceController } from "@sortedyuan/may";
+import type { GoalBudget, GoalState } from "@sortedyuan/may/goals";
+import type { ContextCompactionStrategy } from "@sortedyuan/may/context";
 import type { McpClientPool, McpServerStatus, McpResourceSubscription, McpInteractionBroker } from "@sortedyuan/mcp";
 import type { MaybeCodeEvent, MaybeCodeRun, MaybeCodeSessionEvent } from "./events.js";
 import type { MaybeCodeInstructions } from "./instructions.js";
-import type { SkillDescriptor, SkillDiagnostic, SkillDocument } from "@sortedyuan/skills";
+import type { SkillDescriptor, SkillDiagnostic, SkillDocument } from "@sortedyuan/may/skills";
 import type { MaybeCodePermissionMode } from "./policy.js";
 import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@sortedyuan/ui-client";
 
@@ -79,8 +79,8 @@ export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   MaybeCodeCompactionSelection,
   MaybeCodeRun
 >, "forkSession"> {
-  steer?(options: import("@sortedyuan/session").SessionSteerOptions): Promise<import("@sortedyuan/session").SessionSteeringInput>;
-  listSteeringInputs?(): readonly import("@sortedyuan/session").SessionSteeringInput[];
+  steer?(options: import("@sortedyuan/may/session").SessionSteerOptions): Promise<import("@sortedyuan/may/session").SessionSteeringInput>;
+  listSteeringInputs?(): readonly import("@sortedyuan/may/session").SessionSteeringInput[];
   getForkPoints?(sessionId?: string): Promise<readonly UiForkPoint[]>;
   forkSession?(pointId: string, mode: "current" | "worktree"): Promise<string>;
   getWorkspaceGit?(): Promise<UiWorkspaceGit>;

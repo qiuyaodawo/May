@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { InMemoryPermissionRuleStore, PermissionToolExecutor } from "../../../permissions/dist/index.js";
+import { InMemoryPermissionRuleStore, PermissionToolExecutor } from "@sortedyuan/may/permissions";
 import { TranscriptStore, TranscriptView } from "../dist/agent/transcript.js";
 
 test("terminal transcript retains persistent approval range from real permission events", async t => {

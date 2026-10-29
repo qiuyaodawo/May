@@ -2,7 +2,7 @@
 
 **English** | [简体中文](../../zh-CN/guides/git-workspaces.md)
 
-`@sortedyuan/application/git-workspace` provides the Node.js `ProjectGitWorkspace`
+`@sortedyuan/may/application/git-workspace` provides the Node.js `ProjectGitWorkspace`
 component. It requires Git 2.36 or newer on `PATH`. Applications supply their workspace and
 commit authorization policy; the component supplies repository discovery,
 durable file versions, diffs, restoration previews, and registered worktrees.
@@ -23,7 +23,7 @@ In this integration snippet, `sessionId` is the application's identity and
 `confirmProjectCommit` is the host's actual approval function:
 
 ```ts
-import { ProjectGitWorkspace } from "@sortedyuan/application/git-workspace";
+import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 
 const files = await ProjectGitWorkspace.open({
   workspace: process.cwd(),
@@ -245,8 +245,8 @@ its isolated test repositories:
 
 ```powershell
 $env:MAY_GIT_CHECKPOINT_TEST_COMMITS = '1'
-pnpm --filter @sortedyuan/application build
-node --test packages/application/test/git-workspace*.test.mjs
+pnpm --filter @sortedyuan/may build
+node --test packages/may/test/application/git-workspace*.test.mjs
 ```
 
 The fixtures reside in the ignored `review/git-workspace-tests/` directory.
@@ -261,5 +261,5 @@ subpath:
 ```powershell
 $env:MAY_GIT_PACKAGE_TEST = '1'
 $env:MAY_GIT_CHECKPOINT_TEST_COMMITS = '1'
-pnpm --filter @sortedyuan/application test:package
+pnpm --filter @sortedyuan/may test:package
 ```

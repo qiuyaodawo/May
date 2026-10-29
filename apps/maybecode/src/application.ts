@@ -1,20 +1,20 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import type { ProjectGitWorkspace } from "@sortedyuan/application/git-workspace";
+import type { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 import { GitRequestController, requestMainRunIds, startGitGoalRequest, startGitRequest } from "./git-request.js";
 import { mediaHistory } from "./media-history.js";
-import type { SkillRegistry } from "@sortedyuan/skills";
+import type { SkillRegistry } from "@sortedyuan/may/skills";
 
 import {
   applicationServices,
   defineAgent,
   withDefaultCompactionThreshold,
-} from "@sortedyuan/application";
+} from "@sortedyuan/may";
 import type {
   AgentApplication,
   AgentApplicationEvent,
   AgentRun,
   AgentApplicationFork,
-} from "@sortedyuan/application";
+} from "@sortedyuan/may";
 import {
   createToolChangePreview,
   decodeToolChangePreviewPresentation,
@@ -29,7 +29,7 @@ import {
   type ContextFactory,
   type ContextInspection,
   PruneOldToolResultsStrategy,
-} from "@sortedyuan/context";
+} from "@sortedyuan/may/context";
 import {
   AsyncEventQueue,
   RunCancelledError,
@@ -42,10 +42,10 @@ import {
   type TraceAttributes,
   type Tracer,
   type UserMessage,
-} from "@sortedyuan/core";
-import type { ApprovalDecision, PermissionPolicy, PermissionRuleStore, PersistentApprovalOptions, PermissionCheck, CreatePermissionRuleOptions } from "@sortedyuan/permissions";
+} from "@sortedyuan/may/core";
+import type { ApprovalDecision, PermissionPolicy, PermissionRuleStore, PersistentApprovalOptions, PermissionCheck, CreatePermissionRuleOptions } from "@sortedyuan/may/permissions";
 import type { MaybeCodePermissionMode } from "./policy.js";
-import type { AnyPlugin, ServiceToken } from "@sortedyuan/plugin";
+import type { AnyPlugin, ServiceToken } from "@sortedyuan/may/plugin";
 import type { McpClientPool } from "@sortedyuan/mcp";
 import type {
   SessionHistoryPage,
@@ -54,7 +54,7 @@ import type {
   SessionSteerOptions,
   SessionSteeringInput,
   SessionSubmitOptions,
-} from "@sortedyuan/session";
+} from "@sortedyuan/may/session";
 
 import type {
   MaybeCodeAutoCompactionMode,
@@ -72,11 +72,11 @@ import {
   MaybeCodeInstructionState,
   type MaybeCodeInstructions,
 } from "./instructions.js";
-import { historyMemoryService, type HistoryMemoryService } from "@sortedyuan/plugin-history-memory";
-import { goalsService } from "@sortedyuan/plugin-goals";
-import { delegationService } from "@sortedyuan/plugin-delegation";
-import { mcpService } from "@sortedyuan/plugin-mcp";
-import type { GoalController, GoalAgent, GoalBudget } from "@sortedyuan/goal";
+import { historyMemoryService, type HistoryMemoryService } from "@sortedyuan/may/history-memory";
+import { goalsService } from "@sortedyuan/may/goals/plugin";
+import { delegationService } from "@sortedyuan/coordination/delegation";
+import { mcpService } from "@sortedyuan/mcp/plugin";
+import type { GoalController, GoalAgent, GoalBudget } from "@sortedyuan/may/goals";
 import { createMaybeCodePlugins, requestRecord, type MaybeCodePluginComposition } from "./plugins/application.js";
 import { createMaybeCodeInstructionsPlugin } from "./plugins/instructions.js";
 import { SubagentHost, type SubagentRequestPlan } from "./subagent-host.js";
@@ -121,7 +121,7 @@ export interface MaybeCodeSubagentOptions {
 
 export interface MaybeCodeApplicationOptions {
   readonly gitWorkspace?: ProjectGitWorkspace;
-  readonly onGitCheckpoint?: (checkpoint: import("@sortedyuan/application/git-workspace").GitCheckpoint) => void;
+  readonly onGitCheckpoint?: (checkpoint: import("@sortedyuan/may/application/git-workspace").GitCheckpoint) => void;
   readonly plugins?: readonly AnyPlugin[];
   readonly workspace: string;
   readonly model?: Model;
@@ -169,7 +169,7 @@ export interface MaybeCodeApplicationOptions {
  *
  * Coding tools, prompts, permission defaults, preview presentation and named
  * compaction choices remain product policy. Session/run/approval persistence and
- * cancellation are delegated to `@sortedyuan/application`.
+ * cancellation are delegated to `@sortedyuan/may`.
  */
 export class MaybeCodeApplication {
   readonly events: AsyncIterable<MaybeCodeSessionEvent>;

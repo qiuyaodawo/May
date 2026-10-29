@@ -1,4 +1,4 @@
-import type { Tool } from "@sortedyuan/core";
+import type { Tool } from "@sortedyuan/may/core";
 import type { WorkspaceFileGuard } from "./guard.js";
 import { createEditTool, type EditToolOptions } from "./edit.js";
 import { createReadTool, type ReadToolOptions } from "./read.js";

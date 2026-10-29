@@ -1,4 +1,4 @@
-import type { Model, ModelLimits } from "@sortedyuan/core";
+import type { Model, ModelLimits } from "@sortedyuan/may/core";
 
 import { ProviderConfigurationError } from "./errors.js";
 import type { ProviderModelSelection } from "./types.js";

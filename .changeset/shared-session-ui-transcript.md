@@ -1,5 +1,5 @@
 ---
-"@sortedyuan/session": minor
+"@sortedyuan/may": minor
 "@sortedyuan/tui": minor
 "@sortedyuan/ui-client": patch
 "@sortedyuan/maybecode": patch

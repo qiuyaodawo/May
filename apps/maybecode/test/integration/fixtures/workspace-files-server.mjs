@@ -1,4 +1,4 @@
-import { directToolExecutor } from "@sortedyuan/core";
+import { directToolExecutor } from "@sortedyuan/may/core";
 import { createMayMcpServer } from "@sortedyuan/mcp/server";
 import { createReadTool } from "@sortedyuan/coding-tools";
 

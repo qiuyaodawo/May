@@ -1,4 +1,4 @@
-import type { MetricRecord, TraceAttributes } from "@sortedyuan/core";
+import type { MetricRecord, TraceAttributes } from "@sortedyuan/may/core";
 import type { FinishedTraceSpan, MetricRecorder, SpanObserver, StartedTraceSpan } from "./types.js";
 import { boundedAttributes } from "./limits.js";
 
@@ -54,7 +54,7 @@ export function metricAttributes(attributes: TraceAttributes): TraceAttributes {
 }
 
 export class SpanMetrics implements SpanObserver {
-  private readonly activeAttributes = new WeakMap<import("@sortedyuan/core").TraceContext, TraceAttributes>();
+  private readonly activeAttributes = new WeakMap<import("@sortedyuan/may/core").TraceContext, TraceAttributes>();
   constructor(private readonly metrics: MetricRecorder) {}
   onStart(span: StartedTraceSpan): void {
     if (operation(span.name)) {

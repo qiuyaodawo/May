@@ -4,8 +4,8 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { createReadTool, createShellTool, createWriteTool } from "@sortedyuan/coding-tools";
-import { PermissionDeniedError, PermissionToolExecutor } from "@sortedyuan/permissions";
-import { FilePermissionRuleStore } from "@sortedyuan/permissions/file-store";
+import { PermissionDeniedError, PermissionToolExecutor } from "@sortedyuan/may/permissions";
+import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store";
 import { createCodingPermissionPolicy, executeMaybeCodeSlashCommand, openConfiguredMaybeCode } from "../dist/index.js";
 import { createMaybeCodeWebHost } from "../dist/web-ui.js";
 

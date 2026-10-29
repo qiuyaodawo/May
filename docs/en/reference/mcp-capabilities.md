@@ -24,7 +24,7 @@ flowchart LR
 
 The host chooses endpoints, credentials, interaction services and exported
 capabilities. Client tools use the normal Core executor. Independent server
-exports receive that executor explicitly. Core and `@sortedyuan/application` have no
+exports receive that executor explicitly. Core and `@sortedyuan/may/application` have no
 MCP dependency. The browser entry point has no Node dependencies.
 
 ## Implemented capabilities

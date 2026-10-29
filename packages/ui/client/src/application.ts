@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readEmbeddedImage, type MediaReader } from "@sortedyuan/media";
-import type { AgentApplicationEvent, AgentWorkspaceController } from "@sortedyuan/application";
-import type { PersistentPermissionRule } from "@sortedyuan/permissions";
+import type { AgentApplicationEvent, AgentWorkspaceController } from "@sortedyuan/may";
+import type { PersistentPermissionRule } from "@sortedyuan/may/permissions";
 import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice, type UiPageRequest, type UiFieldRequest, type UiControls, type UiCompletion } from "./protocol.js";
 import { UiProjection } from "./projection.js";
 import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";

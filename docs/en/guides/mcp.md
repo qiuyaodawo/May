@@ -42,14 +42,14 @@ tools does not need the MCP package.
 
 ## Package API
 
-In your application project, install `@sortedyuan/mcp` and `@sortedyuan/application`. This
+In your application project, install `@sortedyuan/mcp` and `@sortedyuan/may`. This
 integration snippet assumes you already created `model`, `localTools`,
 `permissionPolicy`, `tracer` and `store`. Place `mcp-server.mjs` in the process
 working directory, or supply an absolute path. If the server needs credentials,
 validate and supply them through `env` before opening the pool.
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
+import { defineAgent } from "@sortedyuan/may";
 import { openMcpClientPool } from "@sortedyuan/mcp";
 
 const mcp = await openMcpClientPool({

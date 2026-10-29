@@ -5,10 +5,10 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import { AgentApplication } from "../packages/application/dist/index.js";
-import { loadMayConfig } from "../packages/config/dist/index.js";
+import { AgentApplication } from "../packages/may/dist/application/index.js";
+import { loadMayConfig } from "../packages/may/dist/config/index.js";
 import { createBuiltinProviderModel, selectProviderModel } from "../packages/providers/dist/index.js";
-import { FileSessionStore } from "../packages/session/dist/file-store.js";
+import { FileSessionStore } from "../packages/may/dist/session/file-store.js";
 import { Scheduler, TaskRejectedError } from "../packages/scheduler/dist/index.js";
 import { SqliteSchedulerStore } from "../packages/scheduler/dist/sqlite-store.js";
 

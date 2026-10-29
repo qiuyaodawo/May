@@ -1,4 +1,4 @@
-import type { MayConfig } from "@sortedyuan/config";
+import type { MayConfig } from "@sortedyuan/may/config";
 
 export type GroupTrigger = "explicit" | "all";
 export interface EntranceTrigger { conversation: string; threadId?: string; trigger: GroupTrigger }

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { correlationTraceAttributes, validateTelemetryCorrelation, startTraceSpan, endTraceSpan, traceError, type TelemetryCorrelation, type Tracer } from "@sortedyuan/core";
+import { correlationTraceAttributes, validateTelemetryCorrelation, startTraceSpan, endTraceSpan, traceError, type TelemetryCorrelation, type Tracer } from "@sortedyuan/may/core";
 
 import { latestTime, nextTime } from "./triggers.js";
 import {

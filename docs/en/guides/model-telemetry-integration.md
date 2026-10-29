@@ -5,8 +5,8 @@
 Use this guide to combine model capability validation, local diagnostics and
 metrics in one application. You need an ESM TypeScript project, an existing
 `may.config.json` with a default model and provider credentials, and permission to
-send one inference request. Install `@sortedyuan/application`, `@sortedyuan/config`,
-`@sortedyuan/providers`, `@sortedyuan/session` and `@sortedyuan/plugin-observability` in that project.
+send one inference request. Install `@sortedyuan/may`, `@sortedyuan/providers`
+and `@sortedyuan/observability` in that project.
 
 ## Configure a validated model and local diagnostics
 
@@ -22,12 +22,12 @@ The observability plugin owns its processor and closes it with the application.
    and export queue diagnostic printed by the program.
 
 ```ts
-import { defineAgent } from "@sortedyuan/application";
-import { loadMayConfig } from "@sortedyuan/config";
+import { defineAgent } from "@sortedyuan/may";
+import { loadMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver,
   selectProviderModel } from "@sortedyuan/providers";
-import { createObservabilityPlugin, observabilityService } from "@sortedyuan/plugin-observability";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { createObservabilityPlugin, observabilityService } from "@sortedyuan/observability/plugin";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 
 const config = await loadMayConfig({ path: "./may.config.json" });
 const selection = selectProviderModel(config);

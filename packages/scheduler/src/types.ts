@@ -1,4 +1,4 @@
-import type { TelemetryCorrelation, Tracer } from "@sortedyuan/core";
+import type { TelemetryCorrelation, Tracer } from "@sortedyuan/may/core";
 
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { defineAgent } from "../../application/dist/index.js";
-import { InMemorySessionStore } from "../../session/dist/index.js";
-import { parallelToolScheduler } from "../../core/dist/index.js";
+import { defineAgent } from "@sortedyuan/may";
+import { InMemorySessionStore } from "@sortedyuan/may/session";
+import { parallelToolScheduler } from "@sortedyuan/may/core";
 import { CoordinationRuntime, InMemoryCoordinationStore, createApplicationAgent } from "../dist/index.js";
 
 const policy = { version: "v1", authorize: () => true, authorizeMessage: () => true, authorizeDelegation: () => true };

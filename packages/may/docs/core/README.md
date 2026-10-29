@@ -1,0 +1,318 @@
+# `@sortedyuan/may/core`
+
+The model- and tool-agnostic runtime at the heart of May agents.
+
+It accepts a `Model`, an iterable of `Tool`s, and a `Context`, executes an agent
+loop, and exposes the run as an async event stream.
+
+`run()` and `continue()` accept an optional synchronous host `shouldYield`
+callback. It is checked only after a complete model/tool step: all started tools
+settle and all tool results enter Context before yielding. Yield checkpoints
+`run.yielded` before emitting that terminal event and resolves the Run with
+`finishReason: "yielded"`. It is not task completion or cancellation. Core does
+not schedule wakeups or replay the step; the caller owns subsequent Runs. With no
+callback, normal execution is unchanged. See the [coordination guide](../../../../docs/en/guides/coordination.md)
+for slot-releasing subagent waits above Core.
+
+`stepInputSource({ runId, step, signal })` optionally returns additional user
+messages after a complete Step. The host must persist these messages before
+returning them. Core appends the committed messages before the next model call
+and emits `input.received`; it never interrupts the Step's tools or approvals.
+`shouldYield` takes precedence. A final assistant response followed by new input
+continues within the same Run, subject to its existing budget. If cancellation
+arrives after the host commits input, Core updates Context before stopping, so
+live Context agrees with durable history. `@sortedyuan/may/session` owns this source when
+composing a runtime and exposes its durable `steer()` queue.
+
+```ts
+import { InMemoryContext, May } from "@sortedyuan/may/core";
+
+const may = new May({
+  model,
+  tools: [weatherTool],
+  context: new InMemoryContext({
+    instructions: "You are May.",
+  }),
+});
+
+const run = may.run({ input: "What is the weather?" });
+
+for await (const event of run.events) {
+  console.log(event);
+}
+
+const result = await run.result;
+```
+
+`May` consumes and snapshots the tool iterable in its constructor. Later
+changes to the source iterable do not change an existing runtime.
+
+`MayOptions.responseFormat` supplies a provider-neutral JSON or JSON Schema
+format to each `ModelRequest`. `assertModelResponseFormat()` validates schema
+configuration before adapter execution, and `validateStructuredModelResponse()`
+validates the final response through Ajv. Intermediate tool-call responses
+allow empty bodies. Supported local schema dialects are draft-07 and 2020-12.
+`validateStructuredModelResponse(message, request, receipt)` accepts optional
+Usage/cost receipts. Invalid final JSON or schema results throw
+`ModelResponseValidationError`, whose `responseCompleted`, `usage`, and `cost`
+preserve physical completion and accounting while the response remains failed.
+Validation messages contain fixed descriptions; malformed JSON content is not
+included in the error or its cause. Retry wrappers treat these responses as
+completed attempts.
+`Model.configuration` and `capabilityVersion` optionally expose safe model
+configuration and the capability snapshot used by instrumentation.
+`Model.preflight(request, options)` optionally validates a request before May
+starts a physical attempt. Retry and budget wrappers preserve this operation;
+validation failures produce zero attempt records and reservations.
+
+## Runtime and lifecycle Hooks
+
+`AgentRuntime` defines the runtime operations consumed by Session: `run()`,
+`continue()`, and `appendMessages()`. `May` implements this interface;
+`defaultRuntimeFactory` creates it from `MayOptions`. A custom `RuntimeFactory`
+can provide another complete runtime with its own Context management. Its
+versioned `descriptor` identifies compatible Session history, while optional
+`saveState()` and `restoreState()` preserve additional runtime state.
+An incompatible saved descriptor requires explicit `migrateState()` support;
+`close()` releases resources owned by a runtime instance.
+
+The optional `MayOptions.hooks` accepts a typed `HookDispatcher` without adding
+a dependency on a plugin host. `runtimeHooks` and `RUNTIME_HOOKS` expose the
+supported definitions. Each definition includes its kind and a runtime
+validator; `defineHook()` also supports application-specific definitions.
+Dispatch receives `HookContext` with the cancellation signal, Run identity,
+and Step when applicable.
+
+Runtime Hooks cover Run start and settlement, Step boundaries, Context snapshot
+preparation, model requests and stream events, and tool input, progress, results,
+and completion. Transformed Context and model requests affect the current model
+view. Message validators require complete tool-call/result associations;
+provider usage remains associated with the durable Context message count.
+Tool input transformation precedes `Tool.parse()` and the configured
+executor's permission checks. Call identities remain stable. Tool result
+transformation affects model-visible `content`; durable tool `output` preserves
+the original execution result. Progress handlers complete before the tool outcome
+is released; completion observers follow its awaited checkpoint. Hook failures
+propagate; observer isolation is an explicit host
+policy on definitions that allow it.
+Control errors are identified by `HookExecutionError`, preserving the original
+cause and Hook name. Automatic Context strategy selection propagates this error.
+
+`runtimeHooks.runBeforeEnd` can return user `continueMessages` and a required
+`reason`. Core checkpoints an `input.generated` event before appending these
+messages and entering the next Step. Continuation obeys the current budget,
+cancellation, maximum Steps, and host yield control. Completed result fields
+cannot be changed by this Hook. Failure and terminal observers use definitions
+with `allowAborted: true`, so cancellation still permits their execution.
+
+## Tool registry
+
+`ToolRegistry` is an instance-scoped, insertion-ordered composition helper. It
+implements `Iterable<Tool>`, so it can be passed anywhere May accepts tools;
+there is no process-global registry.
+
+```ts
+import { ToolRegistry } from "@sortedyuan/may/core";
+
+const tools = new ToolRegistry([readTool])
+  .register(writeTool)
+  .registerAll([searchTool, fetchTool]);
+
+const may = new May({ model, tools, context });
+```
+
+The constructor, `register()`, and `registerAll()` validate tools and reject
+duplicate names with `DuplicateToolNameError`. `registerAll()` is atomic: if
+any incoming tool is invalid or conflicts with the registry or its incoming
+group, none of that group is added.
+
+Registry operations are:
+
+- `has(name)`, `get(name)`, and `require(name)` for lookup; `require()` throws
+  `ToolNotFoundError` when the name is absent;
+- `size`, `names()`, and `values()` for insertion-ordered snapshots;
+- `definitions()` for model-facing definitions without executable callbacks;
+- `clone()` for an independent registry with the same tools;
+- iteration for direct use as `Iterable<Tool>`; and
+- `ToolRegistry.compose(...sources)` for duplicate-safe composition of tool
+  iterables into a new registry.
+
+Registries snapshot collection membership and descriptor values/references,
+but intentionally return each original Tool object. Preserving identity lets
+products associate metadata with a Tool through a `WeakMap` or other
+identity-based mechanism. The `name`, `description`, and `inputSchema` fields
+are readonly in TypeScript; those fields plus `parse` and `execute` must remain
+stable after registration.
+
+Operations that return a Tool or model definition verify that its `name`,
+`description`, `inputSchema` reference, `parse`, and `execute` still match the
+registered descriptor and throw `TypeError` if not. This is a shallow
+integrity check, not a clone or deep freeze: mutating properties inside the
+same schema object is not detected, so schemas should also be treated as
+immutable.
+
+## Tool execution
+
+May validates tool input and sends the parsed call through a `ToolExecutor`.
+The default `directToolExecutor` calls the tool directly. Applications can
+supply another executor to add cross-cutting behavior without changing tools:
+
+```ts
+import { directToolExecutor, May } from "@sortedyuan/may/core";
+
+const toolExecutor = {
+  async execute(execution) {
+    console.log(`Executing ${execution.tool.name}`);
+    return directToolExecutor.execute(execution);
+  },
+};
+
+const may = new May({ model, tools, context, toolExecutor });
+```
+
+Permission checks, approvals, timeouts, and tracing can use this seam. Core
+does not impose any of those policies itself.
+
+The execution order is `tool.before`, optional `Tool.parse()`,
+`freezeToolInput()`, then the executor and its permission checks. `inputSchema`
+remains the model-facing tool declaration; tools that require final runtime
+validation provide `parse()`. Parsed input is recursively frozen before its
+`tool.started` checkpoint and before any executor receives it. The event's
+`input` records the effective arguments; `call.input` retains the model's
+original arguments and call identity.
+
+`freezeToolInput()` preserves object identity and custom class prototypes while
+freezing their own data properties, including nested arrays and symbol keys.
+Custom classes must make private fields, accessor state, and inherited mutable
+state immutable themselves. Parsed arguments cannot contain `Date`, `Map`,
+`Set`, `WeakMap`, `WeakSet`, `ArrayBuffer`, `SharedArrayBuffer`, typed arrays,
+`DataView`, `URL`, or `URLSearchParams`; these mutable built-ins raise `TypeError`
+before tool execution. All reachable own data values are checked before freezing
+begins.
+
+When migrating tools or executors, represent dates as ISO strings or timestamps,
+maps as records or entry arrays, sets as arrays, binary data as number arrays or
+external resource identifiers, and URLs as strings or plain data fields. Tools
+that need mutable working data can create an independent local copy of ordinary
+data with `structuredClone(input)`; approved arguments remain unchanged.
+
+Model adapters emit normalized `text.delta` and `response.completed` events.
+Ordinary tool failures are converted into tool messages so the model can
+recover. Infrastructure that cannot safely continue can throw
+`FatalToolExecutionError` to terminate the run after the failed tool outcome is
+recorded.
+
+Tools can report live, non-durable output or progress through their execution
+context:
+
+```ts
+async execute(input, context) {
+  context.report({ type: "progress", message: "starting" });
+  context.report({ type: "output.delta", channel: "stdout", delta: "..." });
+  return result;
+}
+```
+
+Multiple calls in one model response run sequentially by default. Supply a
+custom `ToolScheduler`, or `parallelToolScheduler` when all selected tools are
+safe to run concurrently. Schedulers must return outcomes in call order; Core
+also ensures each operation executes at most once.
+
+## Runs and observability
+
+A `May` instance rejects overlapping runs by default because it owns one
+mutable `Context`. `concurrentRuns: "allow"` is an explicit escape hatch for a
+context implementation that provides its own isolation or serialization.
+
+Each model call receives `runId`, `step`, and a retry-stable `modelCallId` in
+`ModelStreamOptions`. When a tracer is configured it also receives the current
+`traceContext`; tools receive their tool-call context through
+`ToolExecutionContext`. A successful `RunResult` reports `modelCalls`,
+`toolCalls`, and token usage aggregated across all completed model calls.
+
+Core exports the minimal `Tracer`, `TraceSpan`, `TraceContext`, and attribute
+contracts. Supply `tracer` and optional content-free `traceAttributes` to
+`May`; `RunOptions` can add attributes or an explicit parent context, and the
+returned `RunHandle` exposes the created context. Built-in instrumentation
+creates Run, Context, model, tool-batch, and tool-call spans. Calls into an
+injected tracer are protected so telemetry failure never becomes a Run
+failure. Sampling, buffering, and exporters live in optional
+`@sortedyuan/observability`; see the
+[tracing guide](../../../../docs/en/guides/observability.md).
+
+Live event queues retain at most `maxBufferedEvents` high-volume streaming
+events by default. When a consumer falls behind, text, reasoning, tool-output,
+and tool-progress deltas may be discarded before lifecycle events. Event
+sequence-number gaps make this observable; the result promise and durable
+context are unaffected.
+
+## Content
+
+`ContentPart` provides normalized text, reasoning, JSON, image, audio, file,
+and resource parts. Media may be supplied by URL, base64 data, or a
+provider-owned file id. Provider adapters convert only the forms their API
+supports and throw `UnsupportedContentError` for unsupported role/type pairs;
+Core does not silently stringify or discard rich input.
+
+## Model state
+
+An adapter can attach opaque continuation data to an assistant message:
+
+```ts
+const message = {
+  role: "assistant",
+  content: [],
+  modelState: {
+    type: "example-provider/response-v1",
+    data: { responseId: "response_123" },
+  },
+};
+```
+
+`type` should be namespaced and versioned by the adapter. May persists the state
+with the message and passes it back in later `ModelRequest.messages`, but never
+interprets it. This lets adapters preserve provider-specific continuation data,
+such as response IDs or signed reasoning blocks, while normalized content
+remains available to other providers.
+
+## Per-Run dynamic tool catalogs
+
+`MayOptions.toolSource`, also forwarded by `AgentApplication`, `defineAgent()`
+and `MaybeCodeApplication`, is a trusted synchronous `() => Iterable<Tool>`.
+It adds to static `tools`; it is called exactly once at each `run()` or
+`continue()` start, not on every model step. Duplicate names fail before Context
+mutation. Fetch/discover remote catalogs outside Core and publish their latest
+in-memory snapshot through this callback.
+
+`ToolRegistry.snapshot()` captures a frozen Tool facade and a deep-copied,
+frozen schema. A Run uses the same snapshot for model definitions, scheduler,
+parser, permissions and execution. Model-facing schemas are separate copies.
+Updates affect only the next Run. Ordinary registry lookup/`clone()` still
+preserve original Tool identity, but executors receive the Run facade: attach
+host metadata as Tool fields, not only in an identity-keyed WeakMap. Captured
+callbacks retain their original `this`; this is not a sandbox or a deep clone
+of arbitrary closure state. Tool schema values must support structured cloning.
+
+`Tool.workspaceEffect` is optional trusted host metadata, omitted from model
+definitions and captured in Run snapshots. `"read"` declares that execution
+preserves workspace files. `"write"` and omission require preparation in hosts
+that manage workspace checkpoints. Tool authors must include all subprocess and
+external-tool effects when making this declaration.
+
+`Tool.permissionVersion` is optional host-owned grant identity, omitted from
+model definitions. Permission session grants are now bound to canonical name,
+description, input schema and this version as well as the policy's `grantKey`.
+Changed definitions or host identity require new approval even with the same
+key. Equivalent schema key order does not. `revokeSessionGrant(key)` revokes all
+versions under that key; explicit policy deny still wins. Host adapters should
+include other execution-affecting fields and endpoint/account in their version.
+
+`Tool.resultContent(output)` optionally projects a result to model-visible
+`ContentPart[]` (including media). Run snapshots capture the callback; raw output
+remains in `tool.completed.output`, and `tool.completed.content` contains the
+model-visible projection. Both fields are included in the awaited tool checkpoint.
+Projection failures become tool failures.
+
+`MayOptions.toolScope()` snapshots optional trusted string labels per Run/continue
+as `ToolExecutionContext.scope`. Labels are host-only routing data, not model
+arguments or protocol capabilities, and do not replace permission policy.

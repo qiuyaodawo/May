@@ -2,7 +2,7 @@
 
 Image attachments, ordered presentation content, raster validation and filesystem
 storage shared by May applications and channels. Runtime dependencies are
-`@sortedyuan/core`, `@sortedyuan/session` and `sharp`. Requires Node.js 22 or later.
+`@sortedyuan/may` and `sharp`. Requires Node.js 22.16.0 or later.
 
 `FileMediaStore.save()` and `verify()` coordinate file access across local
 processes. Each saved image retains empty `.access` and `.access.gate` files beside

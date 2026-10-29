@@ -1,5 +1,5 @@
-import { assertModelResponseFormat, compileModelSchema, modelSchemaDialect, type ContentPart, type JsonSchema, type ModelRequest } from "@sortedyuan/core";
-export { validateStructuredModelResponse } from "@sortedyuan/core";
+import { assertModelResponseFormat, compileModelSchema, modelSchemaDialect, type ContentPart, type JsonSchema, type ModelRequest } from "@sortedyuan/may/core";
+export { validateStructuredModelResponse } from "@sortedyuan/may/core";
 import type { CapabilityValue, ModelCapabilities, ModelCapabilityKey } from "./capabilities.js";
 
 export type UnknownCapabilityPolicy = "allow" | "require-known";

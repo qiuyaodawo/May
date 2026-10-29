@@ -3,7 +3,7 @@ import type {
   TraceContext,
   TraceError,
   TraceSpanStatus,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 
 export interface TraceSpanEventData {
   readonly name: string;
@@ -67,5 +67,5 @@ export interface SpanObserver {
 }
 
 export interface MetricRecorder {
-  record(record: import("@sortedyuan/core").MetricRecord): void;
+  record(record: import("@sortedyuan/may/core").MetricRecord): void;
 }

@@ -4,12 +4,12 @@ import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises"
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { loadMayConfig } from "@sortedyuan/config";
-import { userMessage } from "@sortedyuan/core";
-import { definePlugin, defineService } from "@sortedyuan/plugin";
-import { createModelPlugin } from "@sortedyuan/plugin-services/models";
-import { createPermissionPlugin } from "@sortedyuan/plugin-services/permissions";
-import { services } from "@sortedyuan/plugin-services";
+import { loadMayConfig } from "@sortedyuan/may/config";
+import { userMessage } from "@sortedyuan/may/core";
+import { definePlugin, defineService } from "@sortedyuan/may/plugin";
+import { createModelPlugin } from "@sortedyuan/may/services/models";
+import { createPermissionPlugin } from "@sortedyuan/may/services/permissions";
+import { services } from "@sortedyuan/may/services";
 import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
 import { loadGatewayAdapter } from "../../dist/gateway-adapters.js";
 

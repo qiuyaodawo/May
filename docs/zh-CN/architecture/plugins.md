@@ -83,10 +83,10 @@ handler 注册。
 
 ## 内置插件组合
 
-共享服务标识与有序贡献登记由 `@sortedyuan/plugin-services` 提供。runtime、Context、
+共享服务标识与有序贡献登记由 `@sortedyuan/may/services` 提供。runtime、Context、
 Model、权限、Skills、goals、history-memory、delegation、MCP、observability、
-投递、channels、Agent adapters、coordination 和 Web/API 通过
-`packages/plugins/` 中的可复用工厂提供。产品配置和组合位于应用的 `src/plugins/`
+投递、Agent adapters、coordination 和 Web/API 通过
+对应能力包中的可复用工厂提供，渠道插件由 MaybeClaw 管理。产品配置和组合位于应用的 `src/plugins/`
 目录，package 不导入应用。
 
 工具和指令贡献具有稳定标识及清理方法。每个新 runtime 按照显式 order、插件声明
@@ -106,8 +106,8 @@ AgentDefinition 选择插件；AgentApplication 打开相应范围并接入 Sess
 默认 May loop 由 runtime 插件通过可替换 factory 提供。MaybeCode 和 MaybeClaw
 支持产品插件选择，直接调用方式保持有效。
 
-`packages/plugin/test/` 覆盖组合验证、范围、Hook 顺序、清理、变更与状态迁移。
+`packages/may/test/plugin/` 覆盖组合验证、范围、Hook 顺序、清理、变更与状态迁移。
 Application 测试覆盖 Session 状态集成与运行时替换。在仓库根目录执行
-`pnpm --filter @sortedyuan/plugin test` 和 `pnpm --filter @sortedyuan/application test` 验证
+`pnpm --filter @sortedyuan/may test` 验证
 这些行为。`pnpm test:package:plugin` 在仓库外安装打包后的完整依赖，并执行公开
 导出接口。这些检查使用本地资源，外部 provider 集成需要单独验证。

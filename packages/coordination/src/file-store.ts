@@ -1,8 +1,8 @@
 import { constants } from "node:fs";
-import { acquireFileLock, releaseFileLock, replaceJournalFile, withFileAccess } from "@sortedyuan/file-storage";
+import { acquireFileLock, releaseFileLock, replaceJournalFile, withFileAccess } from "@sortedyuan/may/storage";
 import { lstat, mkdir, open, readFile, type FileHandle } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { AsyncStateSerializer } from "@sortedyuan/application";
+import { AsyncStateSerializer } from "@sortedyuan/may";
 import type { CoordinationJournal, CoordinationSnapshot, CoordinationStore } from "./types.js";
 import { copy, name, positive, validateSnapshot } from "./validation.js";
 

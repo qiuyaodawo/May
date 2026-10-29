@@ -1,4 +1,4 @@
-import type { KeyStroke } from "@sortedyuan/keybindings";
+import type { KeyStroke } from "@sortedyuan/tui/keybindings";
 import { sanitizeTerminalText } from "@sortedyuan/tui";
 import {
   ListSelectionModel,
@@ -8,7 +8,7 @@ import {
   type ListNavigationAction,
 } from "@sortedyuan/tui/list-selection";
 
-import type { SessionSummary } from "@sortedyuan/session/catalog";
+import type { SessionSummary } from "@sortedyuan/may/session/catalog";
 import type { MaybeCodeController } from "./controller.js";
 import { createMaybeCodeKeymap, type MaybeCodeKeyAction } from "./keymap.js";
 import type { TerminalIO } from "@sortedyuan/tui/node-terminal";

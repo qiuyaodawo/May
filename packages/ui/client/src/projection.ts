@@ -1,8 +1,8 @@
-import type { ContentPart, MediaSource, MayEvent, SerializedError, UserMessage } from "@sortedyuan/core";
+import type { ContentPart, MediaSource, MayEvent, SerializedError, UserMessage } from "@sortedyuan/may/core";
 import { displayParts, imageAttachment } from "@sortedyuan/media";
-import type { AgentApplicationEvent } from "@sortedyuan/application";
-import type { PermissionEvent } from "@sortedyuan/permissions";
-import { isSessionRunTerminalEvent, readSessionTranscript, sessionToolFailureStatus, type SessionEvent } from "@sortedyuan/session";
+import type { AgentApplicationEvent } from "@sortedyuan/may";
+import type { PermissionEvent } from "@sortedyuan/may/permissions";
+import { isSessionRunTerminalEvent, readSessionTranscript, sessionToolFailureStatus, type SessionEvent } from "@sortedyuan/may/session";
 import type { UiBlock, UiBlockStatus, UiDiagnostic, UiInteraction } from "./protocol.js";
 
 const LIMIT = 65_536;

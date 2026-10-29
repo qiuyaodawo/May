@@ -1,0 +1,22 @@
+{
+  "name": "@sortedyuan/gateway",
+  "version": "0.0.0",
+  "description": "Agent adapters, RPC, durable delivery and HTTP services for May hosts.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./adapters": { "types": "./dist/adapters/index.d.ts", "import": "./dist/adapters/index.js" },
+    "./rpc": { "types": "./dist/adapters/rpc.d.ts", "import": "./dist/adapters/rpc.js" },
+    "./delivery": { "types": "./dist/delivery/index.d.ts", "import": "./dist/delivery/index.js" },
+    "./web-api": { "types": "./dist/web-api/index.d.ts", "import": "./dist/web-api/index.js" },
+    "./examples/rpc-file-agent": "./examples/rpc-file-agent.mjs"
+  },
+  "files": ["dist", "examples", "docs", "README.zh-CN.md", "!dist/.tsbuildinfo"],
+  "scripts": { "build": "tsc -b", "clean": "tsc -b --clean", "test": "pnpm run build && node --test test/*/*.test.mjs" },
+  "dependencies": { "@sortedyuan/may": "workspace:*", "@sortedyuan/media": "workspace:*", "vscode-jsonrpc": "^9.0.2" },
+  "devDependencies": { "@types/node": "^22.0.0" },
+  "engines": { "node": ">=22.16.0" },
+  "license": "MIT"
+}

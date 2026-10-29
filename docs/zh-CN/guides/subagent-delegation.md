@@ -7,7 +7,7 @@
 可以调用 `delegate_tasks`，按照用户提示委派，也可以自行选择委派。
 
 本指南要求已有[MaybeCode Session 配置](maybecode.md)，介绍请求行为、角色、
-文件分工、预算和恢复。可复用实现位于 `@sortedyuan/plugin-delegation`，MaybeCode
+文件分工、预算和恢复。可复用实现位于 `@sortedyuan/coordination/delegation`，MaybeCode
 将该插件与 `@sortedyuan/coordination` 提供的 `delegate_tasks` 工具组合。
 
 ## 请求委派工作

@@ -1,5 +1,5 @@
 import { codingRuntimeInstructions, getShellToolInfo } from "@sortedyuan/coding-tools";
-import type { Tool } from "@sortedyuan/core";
+import type { Tool } from "@sortedyuan/may/core";
 import type { MaybeCodeApplicationOptions } from "./application.js";
 
 export interface MaybeCodeRuntimeEnvironment {

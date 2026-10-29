@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
-import { SessionSteeringQueue } from "../../../session/dist/steering.js";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
+import { SessionSteeringQueue } from "../../../may/dist/session/steering.js";
 import { TranscriptStore, TranscriptView } from "../dist/agent/transcript.js";
 
 test("terminal transcript restores delivered steering from real file history in delivery order", async t => {

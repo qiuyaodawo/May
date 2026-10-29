@@ -41,7 +41,7 @@ const history = await controller.history();
 
 ## 投影 Application 事件
 
-在使用项目中安装 `@sortedyuan/application`、`@sortedyuan/permissions` 和 `@sortedyuan/tui`。
+在使用项目中安装 `@sortedyuan/may` 和 `@sortedyuan/tui`。
 以下函数需要已打开的 controller、`TranscriptStore` 和应用提供的 `askApproval`
 对话框。函数持续读取事件，直到 controller 关闭；输入和退出操作需要并发处理。
 
@@ -49,11 +49,11 @@ const history = await controller.history();
 import type {
   AgentApplicationEvent,
   AgentController,
-} from "@sortedyuan/application";
+} from "@sortedyuan/may";
 import type {
   ApprovalDecision,
   ApprovalRequest,
-} from "@sortedyuan/permissions";
+} from "@sortedyuan/may/permissions";
 import { TranscriptStore } from "@sortedyuan/tui/transcript";
 
 type AskApproval = (

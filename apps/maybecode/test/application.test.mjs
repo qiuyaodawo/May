@@ -4,10 +4,10 @@ import { join } from "node:path";
 import test from "node:test";
 import { createTestWorkspace as temporaryDirectory } from "./fixtures/workspace.mjs";
 
-import { InMemoryContext, RunCancelledError } from "@sortedyuan/core";
-import { ModelContextCompactionStrategy } from "@sortedyuan/context";
+import { InMemoryContext, RunCancelledError } from "@sortedyuan/may/core";
+import { ModelContextCompactionStrategy } from "@sortedyuan/may/context";
 import { OpenAIResponsesModel } from "@sortedyuan/providers";
-import { FileSessionStore } from "@sortedyuan/session/file-store";
+import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import {
   InMemorySessionCatalog,
   MaybeCodeWorkspace,
@@ -217,7 +217,7 @@ test("executes read, write, edit, and shell through the application", async (t) 
   const app = await MaybeCodeWorkspace.open({ git: false,
     workspace,
     model,
-    store: new (await import("@sortedyuan/session")).InMemorySessionStore(),
+    store: new (await import("@sortedyuan/may/session")).InMemorySessionStore(),
     catalog: new InMemorySessionCatalog(),
     autoResume: false,
     subagents: false,
@@ -288,7 +288,7 @@ test("exposes bounded active-session history as an approval-free tool", async ()
   const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model,
-    store: new (await import("@sortedyuan/session")).InMemorySessionStore(),
+    store: new (await import("@sortedyuan/may/session")).InMemorySessionStore(),
     catalog: new InMemorySessionCatalog(),
     autoResume: false,
     subagents: false,
@@ -308,7 +308,7 @@ test("exposes bounded active-session history as an approval-free tool", async ()
 });
 
 test("starts fresh by default and explicitly resumes workspace sessions", async () => {
-  const store = new (await import("@sortedyuan/session")).InMemorySessionStore();
+  const store = new (await import("@sortedyuan/may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();
   const requests = [];
   const model = {
@@ -366,7 +366,7 @@ test("starts fresh by default and explicitly resumes workspace sessions", async 
 });
 
 test("creates context through an injected factory for each session", async () => {
-  const store = new (await import("@sortedyuan/session")).InMemorySessionStore();
+  const store = new (await import("@sortedyuan/may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();
   const inputs = [];
   const contexts = [];
@@ -420,7 +420,7 @@ test("creates context through an injected factory for each session", async () =>
 });
 
 test("persists the default prune-and-summary view across resume", async () => {
-  const store = new (await import("@sortedyuan/session")).InMemorySessionStore();
+  const store = new (await import("@sortedyuan/may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();
   const requests = [];
   const summarized = [];
@@ -518,7 +518,7 @@ test("persists the default prune-and-summary view across resume", async () => {
 
 test("automatically compacts before a model call and persists the active view", async (t) => {
   const workspace = await temporaryDirectory(t);
-  const store = new (await import("@sortedyuan/session")).InMemorySessionStore();
+  const store = new (await import("@sortedyuan/may/session")).InMemorySessionStore();
   const catalog = new InMemorySessionCatalog();
   const requests = [];
   let modelCall = 0;
@@ -587,7 +587,7 @@ test("automatically compacts before a model call and persists the active view", 
 
 test("persists automatic compaction after the run events it contains", async (t) => {
   const workspace = await temporaryDirectory(t);
-  const { InMemorySessionStore, Session } = await import("@sortedyuan/session");
+  const { InMemorySessionStore, Session } = await import("@sortedyuan/may/session");
   const backing = new InMemorySessionStore();
   let releaseAssistant;
   const assistantGate = new Promise((resolve) => {
@@ -715,7 +715,7 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
       return openAIResponse("fallback worked");
     },
   });
-  const store = new (await import("@sortedyuan/session")).InMemorySessionStore();
+  const store = new (await import("@sortedyuan/may/session")).InMemorySessionStore();
   const events = [];
   const app = await MaybeCodeWorkspace.open({ git: false,
     workspace,
@@ -778,7 +778,7 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
 });
 
 test("cancels an active summary compaction without persisting it", async () => {
-  const store = new (await import("@sortedyuan/session")).InMemorySessionStore();
+  const store = new (await import("@sortedyuan/may/session")).InMemorySessionStore();
   let summaryStarted;
   const started = new Promise((resolve) => {
     summaryStarted = resolve;
@@ -845,7 +845,7 @@ test("cancels an active model call", async () => {
   const app = await MaybeCodeWorkspace.open({ git: false,
     workspace: process.cwd(),
     model,
-    store: new (await import("@sortedyuan/session")).InMemorySessionStore(),
+    store: new (await import("@sortedyuan/may/session")).InMemorySessionStore(),
     catalog: new InMemorySessionCatalog(),
     autoResume: false,
   });

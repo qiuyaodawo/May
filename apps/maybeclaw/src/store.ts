@@ -1,4 +1,4 @@
-import { acquireFileLock, releaseFileLock, replaceJournalFile, withFileAccess } from "@sortedyuan/file-storage";
+import { acquireFileLock, releaseFileLock, replaceJournalFile, withFileAccess } from "@sortedyuan/may/storage";
 import { access, mkdir, open, readdir, type FileHandle } from "node:fs/promises";
 import { hostname } from "node:os";
 import { join, resolve } from "node:path";

@@ -4,14 +4,14 @@ import type {
   MayEvent,
   ToolCall,
   UserMessage,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 import type {
   ApprovalDecision,
   ApprovalRequest,
   PermissionEvent,
-} from "@sortedyuan/permissions";
+} from "@sortedyuan/may/permissions";
 import { isSessionRunTerminalEvent, SessionTranscriptReader, sessionToolFailureStatus,
-  type SessionEvent, type SessionToolStatus, type SessionTranscriptEntry } from "@sortedyuan/session";
+  type SessionEvent, type SessionToolStatus, type SessionTranscriptEntry } from "@sortedyuan/may/session";
 import {
   decodeToolChangePreviewPresentation,
   type ToolChangePreview,

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { priceUsage, resolveRunBudget, RunBudgetMeter } from "@sortedyuan/core";
+import { priceUsage, resolveRunBudget, RunBudgetMeter } from "@sortedyuan/may/core";
 import { FileSharedBudget } from "../dist/index.js";
 
 const pricing = { id: "host", version: "2026-10-05", currency: "USD", source: "configuration", effectiveAt: "2026-10-05T00:00:00Z",

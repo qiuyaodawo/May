@@ -10,6 +10,7 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./plugin": { "types": "./dist/plugin/index.d.ts", "import": "./dist/plugin/index.js" },
     "./apps-browser": {
       "types": "./dist/apps-browser.d.ts",
       "import": "./dist/apps-browser.js"
@@ -21,18 +22,19 @@
   },
   "files": [
     "dist",
+    "docs",
     "!dist/.tsbuildinfo"
   ],
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test": "pnpm run build && node --test test/*.test.mjs test/plugin/*.test.mjs",
     "test:browser": "pnpm run build && node --test test/browser/*.test.mjs",
-    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs test/plugin/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/core": "workspace:*",
-    "@sortedyuan/file-storage": "workspace:*",
+    "@sortedyuan/may": "workspace:*",
+    "@sortedyuan/observability": "workspace:*",
     "@modelcontextprotocol/client": "^2.0.0",
     "@modelcontextprotocol/server": "2.0.0"
   },

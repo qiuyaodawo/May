@@ -23,8 +23,7 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/config": "workspace:*",
-    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/may": "workspace:*",
     "@sortedyuan/providers": "workspace:*"
   },
   "devDependencies": {

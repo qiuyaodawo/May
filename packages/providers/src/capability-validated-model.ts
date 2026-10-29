@@ -1,4 +1,4 @@
-import { ModelProtocolError, ModelResponseValidationError, assertModelResponseFormat, type Model, type ModelContextCompactor, type ModelLimits, type ModelEvent, type ModelRequest, type ModelResponseFormat, type ModelStreamOptions } from "@sortedyuan/core";
+import { ModelProtocolError, ModelResponseValidationError, assertModelResponseFormat, type Model, type ModelContextCompactor, type ModelLimits, type ModelEvent, type ModelRequest, type ModelResponseFormat, type ModelStreamOptions } from "@sortedyuan/may/core";
 import { createModelCapabilityResolver, type ModelCapabilities, type ModelCapabilityResolver } from "./capabilities.js";
 import { ModelRequestValidationError, validateModelRequest, validateStructuredModelResponse, type ModelRequestValidationOptions, type ModelRequestValidationResult } from "./validation.js";
 import type { ProviderModelSelection } from "./types.js";

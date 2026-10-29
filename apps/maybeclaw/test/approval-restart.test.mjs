@@ -37,8 +37,8 @@ if (process.argv[2] === "--child") {
     const directory = await mkdtemp(join(parent, "gateway-"));
     t.after(() => rm(directory, { recursive: true, force: true }));
     const configPath = join(directory, "config.json");
-    const example = fileURLToPath(new URL("../../../packages/plugins/agent-adapters/examples/rpc-file-agent.mjs", import.meta.url));
-    const reviewer = { id: "reviewer", adapter: "module", module: "@sortedyuan/plugin-agent-adapters/rpc", options: {
+    const example = fileURLToPath(new URL("../../../packages/gateway/examples/rpc-file-agent.mjs", import.meta.url));
+    const reviewer = { id: "reviewer", adapter: "module", module: "@sortedyuan/gateway/rpc", options: {
       transport: "stdio", command: process.execPath,
       args: [example, "--directory", join(directory, "rpc-state"), "--workspace", directory],
     } };

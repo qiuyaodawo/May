@@ -9,22 +9,26 @@
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
     "./file-store": { "types": "./dist/file-store.d.ts", "import": "./dist/file-store.js" },
     "./remote": { "types": "./dist/remote-worker.d.ts", "import": "./dist/remote-worker.js" },
-    "./plugin": { "types": "./dist/plugin.d.ts", "import": "./dist/plugin.js" }
+    "./plugin": { "types": "./dist/plugin.d.ts", "import": "./dist/plugin.js" },
+    "./delegation": { "types": "./dist/delegation/index.d.ts", "import": "./dist/delegation/index.js" },
+    "./delegation/host": { "types": "./dist/delegation/subagent-host.d.ts", "import": "./dist/delegation/subagent-host.js" },
+    "./delegation/budget": { "types": "./dist/delegation/subagent-budget.d.ts", "import": "./dist/delegation/subagent-budget.js" },
+    "./delegation/files": { "types": "./dist/delegation/subagent-files.d.ts", "import": "./dist/delegation/subagent-files.js" },
+    "./delegation/configuration": { "types": "./dist/delegation/subagents.d.ts", "import": "./dist/delegation/subagents.js" },
+    "./delegation/instructions": { "types": "./dist/delegation/subagent-instructions.d.ts", "import": "./dist/delegation/subagent-instructions.js" },
+    "./delegation/types": { "types": "./dist/delegation/delegation.d.ts", "import": "./dist/delegation/delegation.js" }
   },
   "files": ["dist", "!dist/.tsbuildinfo", "docs"],
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "test": "pnpm run build && node --test test/*.test.mjs",
-    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+    "test": "pnpm run build && node --test test/*.test.mjs test/delegation/*.test.mjs",
+    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs test/delegation/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/application": "workspace:*",
-    "@sortedyuan/core": "workspace:*",
-    "@sortedyuan/file-storage": "workspace:*",
-    "@sortedyuan/plugin": "workspace:*",
-    "@sortedyuan/permissions": "workspace:*",
-    "@sortedyuan/session": "workspace:*"
+    "@sortedyuan/may": "workspace:*",
+    "@sortedyuan/coding-tools": "workspace:*",
+    "@sortedyuan/mcp": "workspace:*"
   },
   "devDependencies": { "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },

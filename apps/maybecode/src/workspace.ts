@@ -4,36 +4,36 @@ import { mediaHistory } from "./media-history.js";
 import { MaybeCodeUsageError } from "./errors.js";
 import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 
-import { AgentWorkspace } from "@sortedyuan/application";
-import { observabilityService } from "@sortedyuan/plugin-observability";
+import { AgentWorkspace } from "@sortedyuan/may";
+import { observabilityService } from "@sortedyuan/observability/plugin";
 import type { DiagnosticQuery, DiagnosticResult } from "@sortedyuan/observability";
-import { GitCheckpointError, GitWorkspaceConflictError, ProjectGitWorkspace, type ProjectGitWorkspaceOptions, type GitRestorePreview } from "@sortedyuan/application/git-workspace";
+import { GitCheckpointError, GitWorkspaceConflictError, ProjectGitWorkspace, type ProjectGitWorkspaceOptions, type GitRestorePreview } from "@sortedyuan/may/application/git-workspace";
 import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@sortedyuan/ui-client";
 import type {
   ContextBudget,
   ContextCompactionResult,
   ContextInspection,
-} from "@sortedyuan/context";
+} from "@sortedyuan/may/context";
 import {
   AsyncEventQueue,
   RunCancelledError,
   isStreamingMayEvent,
   type Model,
   type RunOptions,
-} from "@sortedyuan/core";
+} from "@sortedyuan/may/core";
 import { mcpResourceToUserMessage, mcpPromptToUserMessage, mcpTaskToUserMessage, type McpClientPool, type McpServerStatus,
   type McpOperationOptions, type McpReadOptions, type McpCompletionParams, type McpResourceSubscription,
   type McpInteractionBroker, type McpTaskWaitOptions, type McpTaskUpdateOptions,
 } from "@sortedyuan/mcp";
-import type { ApprovalDecision, PersistentApprovalOptions, PermissionCheck, CreatePermissionRuleOptions } from "@sortedyuan/permissions";
+import type { ApprovalDecision, PersistentApprovalOptions, PermissionCheck, CreatePermissionRuleOptions } from "@sortedyuan/may/permissions";
 import type { ModelCapabilities } from "@sortedyuan/providers";
 import type {
   SessionHistoryPage,
   SessionHistoryQuery,
   SessionSteerOptions,
   SessionSubmitOptions,
-} from "@sortedyuan/session";
-import type { SessionCatalog, SessionSummary } from "@sortedyuan/session/catalog";
+} from "@sortedyuan/may/session";
+import type { SessionCatalog, SessionSummary } from "@sortedyuan/may/session/catalog";
 
 import {
   MaybeCodeApplication,
@@ -266,7 +266,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     const checkpoints = await this.git?.checkpoints() ?? [];
     const sessions = await this.listSessions();
     const worktrees = await this.git?.listWorktrees() ?? [];
-    const checkpointFor = (sourceId: string, runId: string): import("@sortedyuan/application/git-workspace").GitCheckpoint | undefined => {
+    const checkpointFor = (sourceId: string, runId: string): import("@sortedyuan/may/application/git-workspace").GitCheckpoint | undefined => {
       const seen = new Set<string>();
       while (!seen.has(sourceId)) {
         seen.add(sourceId);
@@ -345,7 +345,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       if (!(await this.listSessions()).some(session => session.id === created.fork!.sessionId)) break;
     }
     return points.map(point => {
-      let checkpoint: import("@sortedyuan/application/git-workspace").GitCheckpoint | undefined;
+      let checkpoint: import("@sortedyuan/may/application/git-workspace").GitCheckpoint | undefined;
       for (const sourceId of sourceIds) {
         checkpoint = [...checkpoints].reverse().find(item => item.sessionId === sourceId && (item.runId === point.runId || item.runIds?.includes(point.runId)));
         if (checkpoint) break;
@@ -359,7 +359,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     });
   }
 
-  private async checkpointForRun(sessionId: string, runId: string): Promise<import("@sortedyuan/application/git-workspace").GitCheckpoint | undefined> {
+  private async checkpointForRun(sessionId: string, runId: string): Promise<import("@sortedyuan/may/application/git-workspace").GitCheckpoint | undefined> {
     if (!this.git) return undefined;
     const seen = new Set<string>();
     while (!seen.has(sessionId)) {
@@ -754,7 +754,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   listSteeringInputs() { return this.manager.activeApplication.listSteeringInputs(); }
 
   getGoal() { return this.manager.activeApplication.getGoal(); }
-  startGoal(objective: string, budget?: import("@sortedyuan/goal").GoalBudget) {
+  startGoal(objective: string, budget?: import("@sortedyuan/may/goals").GoalBudget) {
     this.assertNoWorkspaceOperation();
     return this.manager.runStateTransition(app => app.startGoal(objective, budget));
   }

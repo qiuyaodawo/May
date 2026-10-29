@@ -4,7 +4,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { parseMayConfig } from "@sortedyuan/config";
+import { parseMayConfig } from "@sortedyuan/may/config";
 import { AgentGateway, GatewayUiHost, gatewaySettings, loadGatewayAdapter } from "../dist/index.js";
 import { startLocalTelemetryService, localTelemetrySelection } from "../../../packages/providers/test/fixtures/local-telemetry-service.mjs";
 

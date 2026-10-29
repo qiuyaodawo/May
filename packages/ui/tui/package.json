@@ -26,6 +26,7 @@
       "types": "./dist/agent/transcript.d.ts",
       "import": "./dist/agent/transcript.js"
     },
+    "./keybindings": { "types": "./dist/keybindings/index.d.ts", "import": "./dist/keybindings/index.js" },
     "./tool-renderers": {
       "types": "./dist/agent/tool-renderers.d.ts",
       "import": "./dist/agent/tool-renderers.js"
@@ -33,6 +34,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "!dist/.tsbuildinfo",
     "!dist/demo.*"
   ],
@@ -40,19 +42,16 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "demo": "pnpm run build && node dist/demo.js",
-    "test": "pnpm run build && node --test test/*.test.mjs",
+    "test": "pnpm run build && node --test test/*.test.mjs test/keybindings/*.test.mjs",
     "test:sixel": "pnpm run build && node --test test/terminal/*.test.mjs"
   },
   "dependencies": {
     "@types/pngjs": "6.0.5",
     "diff": "9.0.0",
     "@sortedyuan/coding-tools": "workspace:*",
-    "@sortedyuan/core": "workspace:*",
+    "@sortedyuan/may": "workspace:*",
     "@sortedyuan/media": "workspace:*",
     "supports-terminal-graphics": "0.1.0",
-    "@sortedyuan/keybindings": "workspace:*",
-    "@sortedyuan/permissions": "workspace:*",
-    "@sortedyuan/session": "workspace:*",
     "clipboardy": "5.3.2",
     "marked": "18.0.11",
     "jimp": "1.6.1",

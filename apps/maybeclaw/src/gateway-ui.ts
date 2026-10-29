@@ -4,7 +4,7 @@ import { commandArgs, createTelemetryPanel, UiError, type UiTelemetryData, type 
 import { historyPage, readPage, fieldPage } from "@sortedyuan/ui-client/reading";
 import { UiProjection } from "@sortedyuan/ui-client/projection";
 import { displayParts, imageAttachment, readEmbeddedImage } from "@sortedyuan/media";
-import type { ApprovalDecision } from "@sortedyuan/permissions";
+import type { ApprovalDecision } from "@sortedyuan/may/permissions";
 import type { GatewayController } from "./gateway-api.js";
 import type { GatewayActor, GatewayAgentConfig, GatewayEntry, GatewaySession } from "./gateway-types.js";
 import { actorKey } from "./gateway-types.js";

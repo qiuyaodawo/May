@@ -1,6 +1,6 @@
-import { type AnyPlugin, type PluginHost } from "@sortedyuan/plugin";
-import { createMcpHostPlugin, createSharedMcpPlugin, mcpHostService, type McpPluginOptions } from "@sortedyuan/plugin-mcp";
-import { createObservabilityHostPlugin, createSharedObservabilityPlugin, observabilityHostService } from "@sortedyuan/plugin-observability";
+import { type AnyPlugin, type PluginHost } from "@sortedyuan/may/plugin";
+import { createMcpHostPlugin, createSharedMcpPlugin, mcpHostService, type McpPluginOptions } from "@sortedyuan/mcp/plugin";
+import { createObservabilityHostPlugin, createSharedObservabilityPlugin, observabilityHostService } from "@sortedyuan/observability/plugin";
 import type { MaybeCodeObservabilityOptions } from "../configured.js";
 import { composeMaybeCodePlugins } from "./application.js";
 
