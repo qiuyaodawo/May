@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "ADR 0003: Shared lifecycle belongs in @sortedyuan/may/application",
+      "en": "6acd7c6febc16d1988d2b13463a6125803b8bf21b9bef7b195c2b06dc1fff9c1",
+      "zh": "5af3fe3a14391ddf59bac3e446e657ca008bb428bd3a332f76818a4ca5086ccf"
+    },
+    {
+      "heading": "Context",
+      "en": "682ab8975f44e52ef351dd7ff1c35f0475222055f58565f5b8e2129f43ac6128",
+      "zh": "b5c4e4cef26208875774af2e149a2ada6f558cec505f67ffa58d2b89927ea737"
+    },
+    {
+      "heading": "Decision",
+      "en": "c9f454efad7bd2566d323425d46e9679227e8679b728e50d1e65b0ea8945e047",
+      "zh": "df6499104f05156303f407d763a235560ebd12e39f2feeee0d271142ad4fb7c9"
+    },
+    {
+      "heading": "Consequences",
+      "en": "54ae27d0f917d63293e674da113a4bd035ed7c774270b23b4b39a03db796af5c",
+      "zh": "36d1d8d362ccdc8375ad92c06d525ed8a1c98deee58c5660b56cea221bc87399"
+    }
+  ]
+}

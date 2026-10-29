@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Manage long-running MCP tasks",
+      "en": "dbc03b34a1aba42268196a6c8a0338384e6f81dc72eec529b1f209d238d147bb",
+      "zh": "745309f6ef8b49337ba30241936ec477710c1f99c4cff92c5055471c96ef9959"
+    },
+    {
+      "heading": "Supported boundary",
+      "en": "f51e8b1e353ad9c974da4c2bca3e88c8e3cddc616ad9b400d378ccf1b6c6d422",
+      "zh": "d657c870544539d8b5da2861045f83d1760f46504c6152d98fc1c5c8e3ff2672"
+    },
+    {
+      "heading": "Enable Tasks",
+      "en": "c36cff9bbeb8fd69522dce8064107cfc6e66c76ab19e38040701ca6f09dfd1cc",
+      "zh": "897934d849a818095a3114c4cf238b71e60a0b638aa68b0b9b8869128704c40a"
+    },
+    {
+      "heading": "Inspect and complete a task",
+      "en": "b9d21b5614c3a59e864e746f7f87875ebe31ea3990fd22fea09e1bca3632f625",
+      "zh": "bf0108c46ed7d5a6a92f74a3ecb4894b204a44c8b710a0186be9cfbeaedb77e6"
+    },
+    {
+      "heading": "User controls and Context",
+      "en": "24e301603c98f25ac7619774e832b2092f98ebf469e213fffde3d352e4d81a45",
+      "zh": "592ca07e73ad4e3d03c3f55c27f6e0c64920e1ce76d68327d765307338d544fd"
+    },
+    {
+      "heading": "Ownership, input and cancellation",
+      "en": "6f54d6b6574cf02b5df01aa74b79ae36d68d64e6d72a9c15ea3ef46352d64040",
+      "zh": "714dd56f124c9c3968673b91bcc9e25a7ad8971512e44891aacc0c2bc8bede38"
+    },
+    {
+      "heading": "Storage, budgets and evidence",
+      "en": "107df78f0df903cd2e51dea3a74a61ecddd69457d1cca40c745b61daaa975ded",
+      "zh": "4b3b8ce6c5911a1aabbf082ad1c5ac879428c46c3074477d2565f42abdf8f335"
+    },
+    {
+      "heading": "Verify task recovery",
+      "en": "0dc2bf457bd373d49dbc7e037725c35f5f143978bcecc40c8a02391c5c4dc56d",
+      "zh": "247c44cb62677acc52beff7fc3fe46d4358b01f17ec3ecf06d1cfbac77eb1652"
+    }
+  ]
+}

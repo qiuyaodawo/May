@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Shared resources for multi-agent tasks",
+      "en": "851fc3e2f67a4530317a54397ab38f045348eedf2ee9890ee54421c6584b3aba",
+      "zh": "70dbea2ab2b61b9359c3605f6a5adc75d7d3e1a1feaab4453c992a114dbb65df"
+    },
+    {
+      "heading": "Shared model budget",
+      "en": "f438d9a70848c0edb17721d8035fb38fb50ff9e1f52eba8da04991954609dbe3",
+      "zh": "88dd14ce7a7977889e5307e27007e01c0dc80eb1848120b398e2063c9aef8800"
+    },
+    {
+      "heading": "Immutable artifacts",
+      "en": "695c4b9621cf54f34ac31b6788b8fd244afcaffaf27fe67ee450a45d9b0857fa",
+      "zh": "0f93703f2360e6e70bcde97cbef48b9399c8e3c8be07fcc23b00c8752b7b6411"
+    },
+    {
+      "heading": "Task workspace copies",
+      "en": "853997c35e5db0189bd3c5b11b36ca0fed0a77d59f513ec4165a9901584809f6",
+      "zh": "511b17383129f0daa115c135f03bbd351d2f2a185080f52ef9e62bd949022cc8"
+    },
+    {
+      "heading": "Persistence and ownership",
+      "en": "096f6e2e5e601c02d99452d9d53547912edbc5fc8fa3d920488b76360b964382",
+      "zh": "19e04ef41d94ddb8eab3306b52c7fec9e355bc275d258a898cfdb50914f5c154"
+    }
+  ]
+}

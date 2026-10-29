@@ -54,11 +54,11 @@ MCP request headers are not forwarded into OAuth requests. A static
 
 Registration options:
 
-- `clientId` plus `expectedIssuer`: a pre-registered **public native** client;
-  issuer comparison is exact. Secret-based machine clients require a different integration.
-- `clientMetadataUrl`: a public HTTPS Client ID Metadata Document with a document
-  path. Used when the server advertises CIMD support.
-- Otherwise the SDK uses legacy Dynamic Client Registration if advertised.
+| Registration configuration | Requirements |
+| --- | --- |
+| `clientId` plus `expectedIssuer` | Pre-registered public native client; exact issuer match. Secret-based machine clients require a different integration. |
+| `clientMetadataUrl` | Public HTTPS Client ID Metadata Document with a document path; the server advertises CIMD support. |
+| Neither option | The SDK uses Dynamic Client Registration when advertised. |
 
 Do not specify both client ID options. `callbackPort` optionally selects a
 loopback port (0–65535); the default 0 allocates an unused port. A new DCR login

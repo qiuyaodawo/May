@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Implement a model adapter",
+      "en": "a3572041fcb9e284b81f33b7685fb0ffd4a428e771ffc1d3ae4027747a248f57",
+      "zh": "37315c3d0ff4df3a867e76156c5353db4f80dd386eeead6f6af0f4e6438e788c"
+    },
+    {
+      "heading": "Minimal implementation",
+      "en": "a973e15eb4915b9ef0b91358c2a3f7a66b564f001cd8c792498a844c6051763c",
+      "zh": "016d71046965afddf11f3a489d2beb4afc2b027256c03b8db73a17caec4b2733"
+    },
+    {
+      "heading": "Stream protocol",
+      "en": "fb739742e80b82306d97882ee785da153cacf2f6392a1cd75b246345570a6d65",
+      "zh": "bc82c99f941e27babaf6ab9eb00b5e88bb642c37a76a4ca16e11bc25aa444a44"
+    },
+    {
+      "heading": "Mapping requests and responses",
+      "en": "6b4b32cf4d813d8f5e86d940759c742d34dcbec724494aff807825eaf8c92e6b",
+      "zh": "f7f017fcf2fc7d178af03e3455c3e719822001e3ff7a442717b97aedbcc2182f"
+    },
+    {
+      "heading": "Optional capabilities",
+      "en": "bbd56a853092b5895f3bf3e796bfa206b6aea9a59716eef5a101188aa3d759cc",
+      "zh": "54e381c51b531ed651797fa1b37da27f741b6e73cf3bdafd1ec16b264755e616"
+    },
+    {
+      "heading": "Registering a configurable adapter",
+      "en": "d9754cf01e4c107498ad51e750a3e4b835aa8892c975e74955f9dc340ac5c339",
+      "zh": "945d9fc436632bd99f3ad83e9661b856cf235ae1ee92f93d21df95f97bd02893"
+    },
+    {
+      "heading": "Built-in protocol and retry behavior",
+      "en": "5f44ebccb37256f9ce8020aff72e11ab085c9169805192e1189a7b394a056768",
+      "zh": "6ce52afe8f5e1bfb2d8fe726e9fd5f2788bf73dfcb582c843a22b041e70b7071"
+    },
+    {
+      "heading": "Adapter checklist",
+      "en": "3fd3d90d818c7aa2b0b3b25abb7553608783b6196bcbc4c11b4304771610ce1d",
+      "zh": "56588c6e29b42174793c4f1416cd8131de6f227f76b141f55a17a84f0dcc9afb"
+    }
+  ]
+}

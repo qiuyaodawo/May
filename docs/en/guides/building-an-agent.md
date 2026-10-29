@@ -258,6 +258,15 @@ its constructor, `register()`, atomic `registerAll()`, `clone()`, and static
 `Iterable<Tool>`, so definitions, applications, and Core accept it directly.
 There is deliberately no process-global registry.
 
+```ts
+const tools = ToolRegistry.compose(filesystemTools, searchTools);
+tools.register(reviewTool);
+
+if (tools.has("review")) {
+  console.log(tools.names());
+}
+```
+
 Both `May` and `AgentDefinition` snapshot iterable membership at construction;
 direct `AgentApplication.open()` snapshots tools while opening. A later
 registry mutation therefore affects only future consumers that receive that

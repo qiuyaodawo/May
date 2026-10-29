@@ -146,10 +146,35 @@ cross-references, and language mirrors together.
 
 ## Verification and delivery
 
+Section records live under `docs/i18n/` at the paired document's relative path
+with a `.json` extension. They contain English headings and SHA-256 hashes of
+both languages, including code bodies and the preamble. Sections correspond by
+heading order. Both languages have equal authority. CRLF is normalized to LF;
+whitespace between top-level Markdown blocks is ignored.
+
+The GFM structure check compares container nesting, ordered heading levels, list kinds, starting
+numbers, item counts, table dimensions, and code-block languages and metadata.
+Preserve these structures. Code bodies, Mermaid labels, and example text may be
+localized; review their meaning and executable behavior together.
+
+After reviewing a changed pair, run `pnpm docs:confirm guides/custom-tool.md`,
+using a path relative to either language directory. Multiple explicit paths are
+accepted. Confirmation refuses structural differences and writes only after all
+selected pairs pass. Include both documents and their records in the same change.
+Never refresh records merely to silence failures. Review the counterpart even
+when an edit requires no translation change. Remove the record when deleting a
+pair and move it with renamed pages.
+
+`pnpm docs:check` rejects missing, stale, and orphan records. Records identify
+content versions; translation meaning, localized links and anchors, code-body
+equivalence, and factual accuracy require review. Initial records establish the
+existing corpus baseline without claiming an exhaustive semantic audit.
+
 1. Run `pnpm docs:check` using the pnpm version declared in the root `package.json`.
 2. Manually review heading structure, language consistency, code fences, link
    anchors, and factual evidence for changed pages. The current checker verifies
    language pairs, language links, local destination files, and paired code fences.
+   It also verifies section records and the GFM structures described above.
    Verify translation meaning, anchors, external links, and example execution
    separately.
 3. When changing commands, configuration, or code examples, run relevant examples

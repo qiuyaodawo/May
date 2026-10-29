@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Prepare and verify npm releases",
+      "en": "82cfa69a4441e85d80c59fa222eefec87333e41022b7cba3baf875f99486799a",
+      "zh": "b674e11a56049ecb96f7fd25ed9d197bbf7572991380851645daaf4070744e28"
+    },
+    {
+      "heading": "Release scope",
+      "en": "425c856f3f0190ab97d177f682d9b34db93abcd25e771eed87a3f129607615b0",
+      "zh": "3786be86acb147b21261d95f8761d8f81fb89b991afe10623d410b29e9d2c8b6"
+    },
+    {
+      "heading": "Package-name migration",
+      "en": "1a1b045ba55f2cde25ca7419c03a77bc7f4cd148eb463d418ba479776f18d2e8",
+      "zh": "4a7ad6d993769f2a5a04d91dd7d7b8f1cfbb5ba7c44b82b89200f6b91fe21638"
+    },
+    {
+      "heading": "Record changes and prepare versions",
+      "en": "93999e75e69719ecd6c16cbf1331695e5bcd80e3d2865f456536e1a5a1ba481c",
+      "zh": "869fda72b68747c99e4d389d47953462640af35881334d2cf916b68d48fd53e3"
+    },
+    {
+      "heading": "Verify the candidate",
+      "en": "04c5e85a6f0c87afbf169a6a7bbacd4d486b7aa33b8eb00af8c3dcb54896d900",
+      "zh": "f494bf548fe307bafff9a4cf250e258dba8c26c0ad0d10eaa4c979ab2c9b453d"
+    },
+    {
+      "heading": "Publish an approved release",
+      "en": "3aa2fe7d332caa219b9dac7283fd337e37954ae4b4ef69ba78ae113cff15dfb9",
+      "zh": "c7f61db9ec87f2eea8fa07f4a3875cc6d645cccc81dd58e9ac10211a92300265"
+    }
+  ]
+}

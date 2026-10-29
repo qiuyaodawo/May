@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Run MaybeCode teams",
+      "en": "d7dcebda47f67a58163b181071b0d9aa6aaf38273944e4db32493df2c521cf1f",
+      "zh": "700f966f361c66467f92cf2de09b8ef1670321053b5f4b4ebddb6cb2fdc936d7"
+    },
+    {
+      "heading": "Run and configure",
+      "en": "161416b9ffa57937ea28b2946b1c2584d56c5423bf78610e0d39dcb89e553837",
+      "zh": "1b114ff00546eb3b539c80a44ffa2da99075255ebd780956154885be26b4c832"
+    },
+    {
+      "heading": "Execution is not acceptance",
+      "en": "3af31a01814da9781c2c69730971d5194a6f0dbdd0e7b7e4b176f3c5fcdb9bef",
+      "zh": "bd829a8a41a25f327a6cf58ea19780bc082c68b925ce61095fbff594ff783937"
+    },
+    {
+      "heading": "Storage and lifecycle",
+      "en": "19cae983ab2d09bb31af00bd35c06e90486d13a352943118b6e048870e83d201",
+      "zh": "cabfdda66fea34dfd1f0f292385dd03079962209c7c32570c06fea7d077c490c"
+    },
+    {
+      "heading": "Explicit recovery",
+      "en": "468fea073070dd5282367e2469524b114d7d6e011aa40cd7280a3900eb42bbd9",
+      "zh": "3ab0b19d2c7052738109280f3b5def3785e67457acbca0daf5c7d0d1761e8150"
+    },
+    {
+      "heading": "Controlled coding and permissions",
+      "en": "8e83ed34b563a61ed2363885782b690dd02b2c163a7477658904cc7be92ae29a",
+      "zh": "b11d87a37cb187eb1c56b1e896c62901045654680a569718caf4210b0499c31f"
+    },
+    {
+      "heading": "Existing teams and remaining scope",
+      "en": "1e44f392cb531e8b6a524f71261431f496773a980018f9d8672b9fd021feeeed",
+      "zh": "b5fa07547934deaad98814d925a98e3f304f69a4c36c9d5f4fe762dd1dad1215"
+    }
+  ]
+}

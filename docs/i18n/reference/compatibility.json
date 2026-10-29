@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Compatibility and stability",
+      "en": "e47065c363cd01e40d155a79f9284ef3117c1fc003b08c316acabd4e47ecc815",
+      "zh": "cd1c63f8e4efcf26f9a83abc010f61b62616b58a4f327fa3c9b6a6956dd7bdf0"
+    },
+    {
+      "heading": "Supported runtime",
+      "en": "d24429a3e3c944c13207b6fd2c6f6b0d0be184d75c2834f129c7a7a7230925ba",
+      "zh": "503d98f888cd25de8c480e51aded1a9a177beadb41fc808a57d66c227e09a69a"
+    },
+    {
+      "heading": "Public API boundary",
+      "en": "af51452aa59d7a1fc820c47a481c8a717bb63f342cfaad3eea909165aa6cebf5",
+      "zh": "fb2f8a1dc9f315bfe5ad841aeff56b2b5d349ed17e5a84a8586d220c43f346c5"
+    },
+    {
+      "heading": "Composition objects",
+      "en": "b52e1a0549a1ff5bbfa3869fbc6f759f49e2c7f00e01b8bae482c5967c486c1c",
+      "zh": "58616809a621acd9e8c0c1ca54fd82c24e3ce3deba18e9cbef0555e242d51f5c"
+    },
+    {
+      "heading": "Per-Run dynamic tool catalogs",
+      "en": "be6e978594dd04fa758eaa9c31e059c7723894f362c81a4174330fb73e6f2867",
+      "zh": "935c70b138adc8c3a78b1480d1711d4e4c15794ee735df6b9c67a82b00c5f278"
+    },
+    {
+      "heading": "Events and presentation data",
+      "en": "e76159ec706f17503ae75472cdf659e7f524ca6b603c9112f8c50b410414a235",
+      "zh": "d84b4aa39c77749386e4fe1266afc5a3758749360e4709c5402f70376c01e8c1"
+    },
+    {
+      "heading": "Session persistence",
+      "en": "f98e5657f100f7cf1c4112b2cbd406919d4176ead1ec1b5e4922810e30d30a3a",
+      "zh": "c9d72ad4950f4b66c1e7503194a84cd95db64c2d3b2e2d4befe883c29f50227d"
+    },
+    {
+      "heading": "Provider-owned state",
+      "en": "465f0ac086ded86053db608ac8c380f5dbd243546b1605bb067d0744619c86fe",
+      "zh": "16bd6883dd6a268d145e2278fce676819e6133b1e75d0242478b5d3b963d4cee"
+    },
+    {
+      "heading": "Coordination and teams",
+      "en": "569a21b0694b15cd48d8838750adae246372d4e122ca7360953f0feadeafc657",
+      "zh": "b4e2fe30ce91f343981e789c9d1e30dee75eb682c437e49b6484cd3e17d4a87f"
+    },
+    {
+      "heading": "MCP",
+      "en": "f857be28a32519a2907418b0c2f44643bf321bc7ceb43ce12ea244f56f5c1162",
+      "zh": "a8bdc9c4a27fd446de3414eb47a3d021bb8a8652a38607fea9ba6729f587c0ac"
+    },
+    {
+      "heading": "Tracing",
+      "en": "d5cd28ba322ab3690a3288723f5890b809fa9850334ab3c4e96f8b03c5675b7b",
+      "zh": "9f2fa4ff54ab6184c891114a01097ddddf3151123daff8f4998dcb616c9455c4"
+    },
+    {
+      "heading": "Security boundary",
+      "en": "02c891dd1b8d61dbfcc1d547ecb6a24f005afa2aa8491ffabe26ec5d6c8bb4a6",
+      "zh": "3963ff0c128d9d09e8a3cb0f4947b37d3d2d6d016d730c6a1baedc336efead87"
+    },
+    {
+      "heading": "Stable-release requirements",
+      "en": "219d3ff2f38cf04abfc06bd99e3e617b01a0bca9f747c5d5fd5adb9d41d245da",
+      "zh": "aa6067141f38b886166d9062b181c04b224caf97269998441dbeb0516d2a5ba0"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Create and activate Agent Skills",
+      "en": "976c10fe96538ddcd3b7d3a84bdd019a5606f70fe5a34e7314317e67df1ced36",
+      "zh": "1751b98ce6b07c8d79c36366825f0a71c44e87ee41d4f98fa95e3cadc3f955e4"
+    },
+    {
+      "heading": "1. Create the skill and its reference",
+      "en": "4f679c331893bd51cc5db4df7244c3641c00f0c3824b4e7dc5f1f76b9ba506eb",
+      "zh": "82a2c9e97a70b64fb678da9e745168e795d317f19bd87f43974a00beadfbf1d9"
+    },
+    {
+      "heading": "2. Discover and activate the skill",
+      "en": "2e5c39dc533208804fdea72571d8f1c1089c4dd1627059eea1df4fb864d1a626",
+      "zh": "c9ae2a989be186a61819ae61ba29eb94a513bf203597cec7f55062b7bf581203"
+    },
+    {
+      "heading": "3. Verify saved activation",
+      "en": "e6fff6cb7006c333117f92e5996e990722be71f389023542dc86d8e86af1fa92",
+      "zh": "a66f3b432f34b8765536ba0eb683aa2a19e9d1c0e202c294193a87d217646345"
+    },
+    {
+      "heading": "State and permissions",
+      "en": "e3f339f88595235c6d60fee77f6a8dc6cbbad840b55239bda66d96223229cccd",
+      "zh": "d446a5f9c14a6d048c7fd322115d93583d7a555734daccf8d1555d3b2933cda4"
+    },
+    {
+      "heading": "Generic integration",
+      "en": "2c71f3cbc3d2f79554c01e84b60842715a988804e75bb460404840c7aa925bc6",
+      "zh": "a17e825b4994b5d146b0d427ef3de6f0ae5c3eeab5334189686ebb1f7e06eba4"
+    }
+  ]
+}

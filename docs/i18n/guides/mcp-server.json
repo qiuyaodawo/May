@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Export a May MCP server",
+      "en": "b5dbdabf991bc13f2c53792761657bb8e656cbd7eb10931e48f44b8486140cf0",
+      "zh": "06a80db23632bb4be95ab98c924ca435fdd949a944457a6eb5291f9472fbc055"
+    },
+    {
+      "heading": "Separate, opt-in surface",
+      "en": "8c5302c2a1ec67666a7916b3d79ca0f2844c57251731e7c2066e8403ba825408",
+      "zh": "c1974db8d84317dd2397d9a919a080ec0093a8fb213106dbf8cd6218f7bcffb1"
+    },
+    {
+      "heading": "Minimal stdio example",
+      "en": "60a086b135c2fa13674ea9b54abbe0b3d13a38542e859504009c5cc2586783ac",
+      "zh": "3d5e6d4cb41330c3eb04038fba41ccbb8bca4ce687e3dccea7127efc4318f6c4"
+    },
+    {
+      "heading": "HTTP authentication and isolation",
+      "en": "0736830f33e44a7175a55ae4879dcd98de4f79cb6abaf8477c4ee203ef7bcdf5",
+      "zh": "2ea1d0122111b522ec5114ee37e21aec5040417a2dd8344b64f2df2a9bfcf9be"
+    },
+    {
+      "heading": "Export definitions and limits",
+      "en": "e656d108ae34093ccf2c6785b92f66846ff843a4b71ab457c57cb0889460ba19",
+      "zh": "aa6f52f5e8dac32efb3ed5dc459fb5a6b9a63f8ea30152f28479464f650dce23"
+    },
+    {
+      "heading": "Verify the export",
+      "en": "fd7c38eaa264677d2b581aeeb892036d317e90dfd6443b758b582355cdc4fdd7",
+      "zh": "7381df6b3923a64fcca5a8448747732d70a81b7d10f1ef4866b3792793d8d3b7"
+    }
+  ]
+}

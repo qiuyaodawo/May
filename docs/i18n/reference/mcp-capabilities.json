@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "MCP host capabilities and boundaries",
+      "en": "a057186c47dc47af58c86a15b25dbbae8174d4b98a0459fe689c87569f20fc06",
+      "zh": "639bc9fac5337850a74715f235fc518059265b69358297eb5d548d49f9635ec2"
+    },
+    {
+      "heading": "Package boundaries",
+      "en": "360427c19d6c533320cf1b6a26b7f8af00a669ec150656e8e985f4f270e5a076",
+      "zh": "cacf73bfa8c8eaaaf3a3688af20983757b3f0b93e0d19c5ee2b219e53c8802e1"
+    },
+    {
+      "heading": "Implemented capabilities",
+      "en": "ff666ff93373c3310b19a689883776f2eaf0001aa49f9ed1f4c4ee1adda762e9",
+      "zh": "6a57b56897b9cf9f14879ece1bf9b45fd31ba7ac2f58fde0b82148e9a6872c70"
+    },
+    {
+      "heading": "Protocol compatibility",
+      "en": "08fafbc4132a13abcf13ddb0334231b1dc0932768ac6296b85c5f263336ef669",
+      "zh": "5a94422043042414010fce4798865f3711392fd0b5a76249116c8104420308b1"
+    },
+    {
+      "heading": "Ownership and side effects",
+      "en": "a5cb6a3bd72fa82fe7c0f048594344eea022da864d38e617a10a9195e1ae033f",
+      "zh": "9342726b5d1f8ad48127701cb7c9ab49df52f186dea549c518fcaff9e2da65b6"
+    },
+    {
+      "heading": "Security services supplied by the host",
+      "en": "595194e91a47b4edd17af68e60eeb86a73ae1463ca1ccbce1cc736f79c65d403",
+      "zh": "101fa5b25a6f6f64072b8317130f97232ca78673353d4ea9bc53b21cdf9b40c3"
+    },
+    {
+      "heading": "Verification",
+      "en": "56073f1681375f7b76f133c585cff6f318f6e8d31f7bf9b8dd477cba1ecc6197",
+      "zh": "dc578da57c2a630654f03961790fb534aec43420f582d28f1deacfd1d9ba9cda"
+    }
+  ]
+}

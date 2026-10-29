@@ -249,13 +249,16 @@ file changes and composition. Command checking specifies executable, arguments,
 working directory and timeout. File checks inspect allowed change scope and
 declared contents. Mature formats use their corresponding parsing libraries.
 
-The built-in factories are `createCommandEvaluator({ id, version, command,
-confirmTermination?, expectedExitCode?, validate? })`,
-`createNodeCommandEvaluator({ id, version, command, expectedExitCode?, validate? })`,
-`createJsonSchemaEvaluator({ schema, read?, id?, version? })`,
-`createFileChangesEvaluator({ allowedPaths, requirements?, id?, version? })`,
-`createCompositeEvaluator({ id, version, evaluators })` and
-`createHumanEvaluator(id?, version?)`. Commands use explicit executable and
+The built-in factories are:
+
+- `createCommandEvaluator({ id, version, command, confirmTermination?, expectedExitCode?, validate? })`
+- `createNodeCommandEvaluator({ id, version, command, expectedExitCode?, validate? })`
+- `createJsonSchemaEvaluator({ schema, read?, id?, version? })`
+- `createFileChangesEvaluator({ allowedPaths, requirements?, id?, version? })`
+- `createCompositeEvaluator({ id, version, evaluators })`
+- `createHumanEvaluator(id?, version?)`
+
+Commands use explicit executable and
 argument arrays. The schema evaluator inspects `execution.output` unless `read()`
 supplies a value. File requirements support existence, exact text, included text
 and SHA-256 checks against the frozen snapshot. Allowed paths are exact normalized
@@ -346,9 +349,16 @@ deletion of the plaintext records.
 The same redaction also covers retained output, error messages, evaluation check
 messages and evidence labels.
 
-Plan and state records are limited to 32 MiB. Each telemetry event is limited to
-64 KiB. A trial can append 20,000 events or 16 MiB to its event file; each in-memory
-metrics scope accepts at most 10,000 unique events. These limits stop work with
+| Object | Default or fixed limit |
+| --- | --- |
+| Plan and state record | 32 MiB |
+| Telemetry event | 64 KiB |
+| Trial event file | 20,000 events or 16 MiB |
+| In-memory metrics scope | 10,000 unique events |
+| Evidence item | 65,536 bytes by default |
+| Trial evidence | 1,048,576 bytes and 64 items by default |
+
+These limits stop work with
 an explicit error. Full execution output is retained only with `retainContent: true`
 and is subject to redaction and evidence size limits.
 

@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Session, run, and step",
+      "en": "7a39b0cbba8062d1141b4fdaa3b9ef6e00c9c7c2847b28c39a08c7f475a186ca",
+      "zh": "3f3a67eb2aa8ed835fbe3035e57065bdabfa5e5ca419e0a24561b392ea669756"
+    },
+    {
+      "heading": "Session",
+      "en": "353122bbe88323f443820c31c137bcf89e5fca16f72a9c0b3022df9f128cd713",
+      "zh": "2aa29824c3c3c6458172179a152b2c10085414ac85035d500db771c17af0db17"
+    },
+    {
+      "heading": "Submission serialization",
+      "en": "f0782b55a6569cb261a72f8aa2294051ace63e3c4ff45ff866a5f8d5c20f67a1",
+      "zh": "e01c86bea62d86d3b4c349b7c3418403bd44c3f7e6231b7d49cc762ef088ecec"
+    },
+    {
+      "heading": "Run",
+      "en": "1ccbf625aaa101323f468e6a5c87067fb6b9d13ac1594b5c56e40bddb2d1fa96",
+      "zh": "1d13b35970a1f2eb348f1b3d523f4a29f5699c3f96dbf1fe555229ff9dcf25a2"
+    },
+    {
+      "heading": "Step",
+      "en": "989d01b45d3e425e51ea7105397e5b33a3eb09fe39f86acacbd679fadb79b8c5",
+      "zh": "2b8298f845b18dea10155e79f2618292405fce0990ffd0d926f308c674adab48"
+    },
+    {
+      "heading": "Cancellation and incomplete tool calls",
+      "en": "cb9ac53658991de720a6e85fe1e3980ba205ecf982cb5f8682f0486667b8b77a",
+      "zh": "74b1ba3a44285cd5a1068e928cf22f676d5d7e5e800691ea2286995b12dd07c5"
+    },
+    {
+      "heading": "Identity and ordering",
+      "en": "c72838614b587ef3fc891b57f4f4721303ff54a934514561c91e543a0be84cd1",
+      "zh": "7d5dc9cf1cf5d1f309010ef392c8d667f3aa8559b8b92e1d99f72ec0c915bd81"
+    },
+    {
+      "heading": "What is and is not durable",
+      "en": "d63bc916dd55c753e0722b58a53300e0f61d3a5bbccbd86f64188409976ae41b",
+      "zh": "3ab81bcd6a5e23a8db069e34a97f38ecdb1445d47c5b9dfb5f347c611ff63bf0"
+    },
+    {
+      "heading": "Session branches",
+      "en": "c2012351a9b7f8cd417018616fa08bc7abedd7c8023eec97c8660095f525e539",
+      "zh": "91df662d788d0d3286691aa6748401ce3237d67cef07bd06dffc72e10531e1d9"
+    },
+    {
+      "heading": "Current limits",
+      "en": "0a0258acf41d31bb033b140f04eeb912699c2258dea2185b222a090c98e29944",
+      "zh": "a9778ac670e9f2bed695debf3cec2d49ebd958187345e7a1f2cac3a931ede375"
+    }
+  ]
+}

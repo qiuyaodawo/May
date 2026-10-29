@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Build a custom UI",
+      "en": "6796df6d1ad450495269bc1446e921a31a03b3f68458c577a7274d7ca10095db",
+      "zh": "5304b64972a96c9fd39365d9ea07925f2a137be8af6ed7d1eaf9f4e00c99f65d"
+    },
+    {
+      "heading": "Headless controller boundary",
+      "en": "b00fc39ffeceaff2462bd8431ae7fdbb1bf2f161d55592e3b00fe312bee2c1d4",
+      "zh": "bc6d87b2d26606338d42b714724a37c51d1781e547daa6dacd8cffee883b4832"
+    },
+    {
+      "heading": "Projecting application events",
+      "en": "0a4b3347ddd14ca04f38d1ff1380fd09730493a08305c5251d63ed78dc6a28cc",
+      "zh": "15ca8a67cc030bcd3c88df23c912a6fcf4a94e4e3f8840e2b4c527ff6dd967ce"
+    },
+    {
+      "heading": "Retained terminal rendering",
+      "en": "7f8effea68f6a858d26b9e4988f0c909566d11a7608faef1b9abc3ca4ee1b0f6",
+      "zh": "e14a227f0d7b3a8970da449612b4c17c2c7e5a48e19fd23882bccb01b14061fa"
+    },
+    {
+      "heading": "Event consistency",
+      "en": "b54f0dd7bca332b3869daca8e2c0ac5793c851280835dff66193a42e85279b9b",
+      "zh": "94907057f6b5f90956edb271e34c7a97c025bd53adcb917f1f6bb21fedc26317"
+    },
+    {
+      "heading": "Security and shutdown",
+      "en": "09034933b5902a8ce80b5cc610788bdce58fbaec94eec25e4482910b4b2cf140",
+      "zh": "fa6e8e6bf257ef5350ae5b7896211055aee1bd42d55bb83b88b4ced2cb49206e"
+    },
+    {
+      "heading": "Browser authentication",
+      "en": "91bf6f519b8403ef4768b7e11bf390b9b792395d978b710c27918de356df0c87",
+      "zh": "0a7c7feda33b4f4d4e82e89ad474a16e9a7c3276708faf2f6b03bc312e934706"
+    },
+    {
+      "heading": "MCP user interactions",
+      "en": "d4a7b1b0819ff1bbe678b1cf03ee1684817ab4e8e9f6ff841a22ba4aeb582f82",
+      "zh": "02710de9768455ff0f4c6f6f939482b58c88643fb4ef6b40ba021ae22d3c29ee"
+    },
+    {
+      "heading": "MCP task controls",
+      "en": "66725da1916cd3f0bc683dd420ac2f7a57ee2e5ed21b9c9fc7f8cd47ab77a455",
+      "zh": "9eb422f8e2716f8a2879d882dd1bcdb027401cca96b912f4cd23c101eaad9773"
+    },
+    {
+      "heading": "Verify the UI lifecycle",
+      "en": "8bb1f054a379896e56b5896a708d0be1bd37053563977073ab7190114d006a14",
+      "zh": "dd59a5bb3052c00f0a80df8a09e7df6e50f0f2081261d6c9e7fc5e7475fde4a7"
+    }
+  ]
+}

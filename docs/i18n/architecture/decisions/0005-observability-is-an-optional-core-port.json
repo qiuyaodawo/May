@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "ADR 0005: Observability implements an optional Core-owned tracing port",
+      "en": "92ab27553e40479e4fe093c2293d31b8c1cad40cabf9ccd23a8ecc550b47ce43",
+      "zh": "c11719d583b5eb1c2210d3bb2a43e772d82358b27fac7dc0507922bd80e3a9fd"
+    },
+    {
+      "heading": "Context",
+      "en": "0d55d6bdf5bf1019170cd00d55b5de1c2c3946fda1c69ca665092936ea07c1a8",
+      "zh": "ec7bc38fc26ad2e6ee2916ff8898c2476962e65bbb357c0505d5e937db9ddc04"
+    },
+    {
+      "heading": "Decision",
+      "en": "2c11a290be09e4afea45f6dc88397af11e206bea362526bf57bf10e11bd8a7b7",
+      "zh": "964d75d15e5edc8ad8eb2b0de676c6feedcfeea64599f9ad67ef0c81541be56c"
+    },
+    {
+      "heading": "Consequences",
+      "en": "1ba3769169438060408ae155cf3e5372d552b27b188b3a586066532c38b3ce20",
+      "zh": "65dc9a48c7b0c302d8686f3e29b31723d3d6ce50041f17921af1361146d7c150"
+    }
+  ]
+}

@@ -8,7 +8,8 @@
   "scripts": {
     "build": "tsc -b && node scripts/build-maybecode.mjs",
     "clean": "tsc -b --clean",
-    "docs:check": "node scripts/check-docs.mjs",
+    "docs:check": "node scripts/check-docs.mjs && node scripts/check-document-pairs.mjs",
+    "docs:confirm": "node scripts/check-document-pairs.mjs --write",
     "changeset": "changeset",
     "release:status": "node scripts/check-release.mjs && changeset status",
     "release:check": "node scripts/check-release.mjs",
@@ -38,12 +39,15 @@
     "example:web-ui": "pnpm run build && pnpm --filter @sortedyuan/example-web-ui start"
   },
   "devDependencies": {
-    "@sortedyuan/may": "workspace:*",
-    "@sortedyuan/providers": "workspace:*",
-    "@sortedyuan/observability": "workspace:*",
-    "@sortedyuan/coding-tools": "workspace:*",
     "@changesets/cli": "3.0.3",
+    "@sortedyuan/coding-tools": "workspace:*",
+    "@sortedyuan/may": "workspace:*",
+    "@sortedyuan/observability": "workspace:*",
+    "@sortedyuan/providers": "workspace:*",
     "esbuild": "^0.28.2",
+    "mdast-util-from-markdown": "^2.1.0",
+    "mdast-util-gfm": "^3.1.0",
+    "micromark-extension-gfm": "^3.0.0",
     "semver": "7.8.5",
     "tar": "7.5.22",
     "typescript": "^7.0.2"

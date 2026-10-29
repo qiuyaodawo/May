@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Review and apply team coding changes",
+      "en": "acc5e1d6ebfa9c118e605a61d12f141ab5139c0224c20f0b56ba975526318760",
+      "zh": "ff1451e2dad267afdd0e1e60adeb50a6ac5f2c8ea0839483bf7bcf5a58783e94"
+    },
+    {
+      "heading": "Review and apply",
+      "en": "3229878124d95b94ecc26b3ff6c2200170074f6330649eacb2a71752c1938e15",
+      "zh": "95c901b7a55255db31492675555d5eedd923c1f1f0e71fba3b6b4e556057c7ca"
+    },
+    {
+      "heading": "What application checks",
+      "en": "b1888137fa56ef92500fbc5d596a08a308e23484efc39345e6c613ce768b1fb6",
+      "zh": "fa0cd8293559b77ca1aaf4cecf0b614d2634d6eb4383dfc37af20b1298854b98"
+    },
+    {
+      "heading": "Partial failure and crash recovery",
+      "en": "6a708d78161ef9bb5fac4046b654ebcc9c12295d177abb3b0e68e28939b30813",
+      "zh": "163e9438cccbbfdf3488d3e6ba1ef7d7b542cc90802ec2a359bbad697a026d74"
+    },
+    {
+      "heading": "Host APIs",
+      "en": "48486c6db929c65f17cc9daed4abc47b67591f9f786e4e5664f6024dbe39cbfb",
+      "zh": "04255614e483295d044731679e7d1cf6c5842fa58ceea14ad559293b673d7595"
+    },
+    {
+      "heading": "Interrupted staging cleanup",
+      "en": "8fe388b249e6759804d7d692eca8741a5c029ca42ec76a0632c3674f3699c465",
+      "zh": "52391e185283cea8bf72f7e688e9ab9717ee00eca4dbf0f9d39e3d967113d74b"
+    }
+  ]
+}

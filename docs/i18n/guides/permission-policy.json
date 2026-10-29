@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Configure tool permissions and approvals",
+      "en": "c74d29a4a63f49ed4ccd5410be2b0bc8d9ede0170544fea89c3ef0ce6478a7b8",
+      "zh": "59813c6c8b45dd0b1b267558db5edc1c22ab30b7c2798dd754ee06a72500a28c"
+    },
+    {
+      "heading": "Default-deny policy",
+      "en": "8d40454a7fd6648acb3796642bc81d98b01175926c7b4cff0f99b2e1c93c956c",
+      "zh": "2bd9d8aed174344048eb8929b4c982b29341c48655c42e734bd0c044027edc65"
+    },
+    {
+      "heading": "Approval protocol",
+      "en": "750ccc847665242a13a5259591f4e8069b41123c4bc4bce79eb2b6270592028f",
+      "zh": "b560ad645d97b67fd6b9f72ee6c536506ac683e3e2dbeda4f4c591e902b6aec3"
+    },
+    {
+      "heading": "Persistent scope and storage",
+      "en": "3891be677574df61a4d31f626d3d64417bb424b1d3c965e9a3700a93fb5d861e",
+      "zh": "eba735147e49b94ce33d309deea70e893becbcd35a1a60f8ead1907a561f9c50"
+    },
+    {
+      "heading": "Host rule management",
+      "en": "5498c4de452c876cf4df47ca5a723f5ad4204420bffa8529d0d2fc3a361773b0",
+      "zh": "cd6681d6a1505d7e2bb2f739d6a35c6e28ea9574ed7fe8655f2eb9f14ec87e97"
+    },
+    {
+      "heading": "Grant lifetime",
+      "en": "4573f1b17f607ac4d9640716f26c9730cd3f8d05cbf8752d9be58212a434433b",
+      "zh": "a6ed39f83af1e81fcfce1dca033a4f00800150d7af5e087aa32a9bdee97038d4"
+    },
+    {
+      "heading": "Failure semantics",
+      "en": "b538e0104763efbcb10fabcca5031c683944295b982ed870d7c09d6c9ded69c3",
+      "zh": "7574267979f0e93a12fe4eaf1934c63496d7c6dade9583121f0b1d9e95065018"
+    },
+    {
+      "heading": "Verify persistent approval",
+      "en": "b9c86e6af4e0e4b61be6ce7490bc181dfea2e40872b40362fb6e738bfe66f8b7",
+      "zh": "58aefae3617ecbe90c9ccc281cda09723d21001f4a9429df52783e24f6840625"
+    },
+    {
+      "heading": "Security boundary",
+      "en": "ef5789ba639bf38a983f901a4729d42fa2a65afcfdc7190bbaa231948a639f07",
+      "zh": "bc666ef29975406fabc3e949f74d50c2babff36c2a906172bc8d4fb17b8e1c16"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Plugin composition and lifecycle",
+      "en": "20c2772dcfadc3179035dc779020a4fcdb048ddc69d8babe68b91bf64ef5d011",
+      "zh": "308594ef79f2bdb14b9c1ca0f4b52d6e9bdc84a2767d30b4c463234981ff9bb3"
+    },
+    {
+      "heading": "Definitions",
+      "en": "f17faaaa50d3bc316ac41ba421d11349132b3334cde54eb9d5d2afd1b973460d",
+      "zh": "02d1de50a3083db7d35eb1e87590f1e8c109b5c91063e6df63707ef014fec2fb"
+    },
+    {
+      "heading": "Composition and services",
+      "en": "dc77f93d8b76ec8718d2f01b9a418f23c1547f15d64262240535339bb92f9bb7",
+      "zh": "eab671a513169938cee091834788ad2ba48d4f923aa97556472f300119a3191a"
+    },
+    {
+      "heading": "Lifecycle and scopes",
+      "en": "ee8cc90e0ebd5c23166e2e452bc9b7ae75c38d06dccdf9589d145c485a1d76d9",
+      "zh": "bcb96a1a4e7dbf89678fda18852c6d2418aa38f0778cee24463cf9c18fb4ee24"
+    },
+    {
+      "heading": "State and replacement",
+      "en": "716cd156e85a8c8153875717463e2c4ffb425691111e4cec0dd25a8920e021b7",
+      "zh": "4aaa05f800fff9812ef0ccf04330d613b277b44d1bb45877171b056198f62795"
+    },
+    {
+      "heading": "Hooks",
+      "en": "4ab9d849658c99ad7adf4bfe6937bc55276cdd26356d50ee75cce831bf2bd4c0",
+      "zh": "6dbd990caa57f6668fea981af9c5f0830f4115abee06add15b41e2c0021159c5"
+    },
+    {
+      "heading": "Built-in plugin composition",
+      "en": "c0097527e3165207c7191fd8766e2204f62bc61b7c83a46dfa251e845ac7b177",
+      "zh": "b26ddf79ecc049a149183688d78f6d801b5ed7dab8148f2d3666e66c886af28f"
+    },
+    {
+      "heading": "Integration and verification",
+      "en": "aad46a5c4afe52fca582c77bc1b880ce1a0490b11615faa4d1d72a72187b3f08",
+      "zh": "9b023b88a16ff078f19abb17002ebdd1028ac0f4ae8918f4bed0adfea116d181"
+    }
+  ]
+}

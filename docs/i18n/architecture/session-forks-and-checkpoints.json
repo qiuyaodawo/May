@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Session branching and Git checkpoints",
+      "en": "ee1e4b2b3be2cf0717a0810de9687b27e4c77a0489e3626296ef1b16730b6fb0",
+      "zh": "bf94fb9f85c3982956f0caa3fbaeac173e4956bb8198bdbcf6dd77cd3c573bae"
+    },
+    {
+      "heading": "Goals and concepts",
+      "en": "72c1fa796b4ba5c2484f8e5ac38d448da52f5ba6970067a41177b7c41602bf2a",
+      "zh": "549b1442f9a448e089b774477f06bf0ae71f862fcaf13b1a88d3fce478da8eb1"
+    },
+    {
+      "heading": "Product behavior",
+      "en": "9843887f0f0faed56ba6fb38eab2254c8988d48ac713569df7d60f8271a5b7bb",
+      "zh": "c029329d290314eb0249545c16a3f048e263fe12c862cc271c05084ca9b2145d"
+    },
+    {
+      "heading": "Complete replies and fork positions",
+      "en": "cfea04f56290b398e0304181cca95708c34344c5644a5663e687d9140239b5f5",
+      "zh": "e7237b70d0afa832617e04c24c7aa10d8117bf40b5b57cd5afbc3111facfa6ff"
+    },
+    {
+      "heading": "Fork interaction",
+      "en": "1b8feb45919caf995b5b9e625d1726cdcd1ab89cb12406ffeef47875f5ea2f65",
+      "zh": "88d119aadf56e47a222cc77b50a70ffd213ff764d638e231546e51a8fed38a91"
+    },
+    {
+      "heading": "TUI",
+      "en": "d4924aacf8f4b5c15286020a68b461d643beeb00d489171907bafbd2c96181b7",
+      "zh": "e3d51fd147e0bdcfd04bf2e90a84a53fcf18e6e1ad2281456e4f494fa9651687"
+    },
+    {
+      "heading": "WebUI and client applications",
+      "en": "34937f28833bb936c6c7cbd6a2eeacbf79b619baf0aa0a826ee9fc0e6a5dfff4",
+      "zh": "98161e52b96a4ea0e6ccec31f429a3907d97f0c2b91017cc2ce8fdb9d01b978d"
+    },
+    {
+      "heading": "Workspace modes",
+      "en": "c7501f54d4e0118bf5004f956efbbea1d3872a9ff62da58b3c969c79f758825c",
+      "zh": "83772b4d6db91e5fe932f42903732a0a4a1e0eeb17ce17260b56456f76fc3a03"
+    },
+    {
+      "heading": "Current workspace",
+      "en": "22a12a6a62e4a9d371bb5fce78396231932955d46fb52d2b137496b745e9240c",
+      "zh": "6dbb5ebe714f19cfaec34386c57dd2be0312e80055955dc1119206977de3d8d4"
+    },
+    {
+      "heading": "New worktree",
+      "en": "e52bc3474a4cc1e67524f9a6dd7c5542c2fdea1daa7ed9299cfdb3115504b0c5",
+      "zh": "00b59993ed6cbee6dec6b82e456a415c478b5d3821e136a57dfb4768ad04796b"
+    },
+    {
+      "heading": "Default Git management and initial version",
+      "en": "31e327d82076efe68c651a1336f0a7af84b4508e184a7c77be1f5fc5b26f6ced",
+      "zh": "7d5a926fb388c98d2f43782709b028f21daf688016d5ce18c63e7c853e424c0b"
+    },
+    {
+      "heading": "Per-round commits and checkpoints",
+      "en": "5e12acc089ebd5f5078247730e5962350ec8fd6df90d40b6a0718674be819f81",
+      "zh": "c3a8b5cb5ad1e3b6eeb5407ede8da4f8463f4428f1417cff814ea47845342e81"
+    },
+    {
+      "heading": "Diff presentation",
+      "en": "de13c3ef4a9752f9b5028238ea7e808422a05907ad52f4b7a9318c7f9fe56099",
+      "zh": "450cfc419cf045e43e617f34fd75dac42fc98ea9c3e25b3924ddf72b12fb5b5c"
+    },
+    {
+      "heading": "Branch display and state updates",
+      "en": "4a5d3d3553cc085881fd25b814fdc7e393c64c269efd93d97ee34201201eaec7",
+      "zh": "8c594bb644bfddc03891686b156d0c11bad92b484f2856566fe23da05f97e025"
+    },
+    {
+      "heading": "Worktree management and retention",
+      "en": "f0007d64fca233378a9346201a9e901035a4969acf6ad0f3de479d62edb55781",
+      "zh": "4a7f14d7d2f5714c2bccb0a49cc9ba8201f4680cf59aa05a3d78410ceba818c2"
+    }
+  ]
+}

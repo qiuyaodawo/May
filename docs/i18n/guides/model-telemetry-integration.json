@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Configure model validation and execution diagnostics",
+      "en": "1aea2a9f44eb00f6aaddae7a558dab9cde048e3ca12fdfb249b497b606986e5e",
+      "zh": "28752acc87ea4fed999ae9f86465827b3ca40986abad9e7044fa551ce9c94e83"
+    },
+    {
+      "heading": "Configure a validated model and local diagnostics",
+      "en": "c5e5d84bdb9e2dd2d632ce1e003c727a21b8073fa48b880081b504be704726be",
+      "zh": "17b1af186590e355f035a68f6a6c78295666b7c946fda5718cb04dc6c8229858"
+    },
+    {
+      "heading": "Capability and request decisions",
+      "en": "e1b71d4d7382f0802ebfc5be0824e66c2edca06cfc7729070093f50e1c434f32",
+      "zh": "0cb9393d4e1213b713f7965a6a4c200613d593f3433580d3aac94883bba88e86"
+    },
+    {
+      "heading": "Usage, cost and budgets",
+      "en": "776072613f23a900d26165a9b759cbc2706a5c231153d1244f0f2e1a349aac8d",
+      "zh": "f1574149f22c82680b3b1d3250acf2c820ac15cf1a53ff602e504c1f0149c705"
+    },
+    {
+      "heading": "Tasks, continuation and remote execution",
+      "en": "ae0463215d79dc24425545702be82579653a168ffe5b392e4c95be3ac9a5c1bb",
+      "zh": "46a3e2c64ce019d350d590d97b154842db1112fa6b1a1923bfe9520a790a88e0"
+    },
+    {
+      "heading": "Diagnostics, metrics and acceptance",
+      "en": "391dea65f55313fec61be755a160b2de7dcb051485806325e1bf1bcef859b613",
+      "zh": "0c7253b887edf0e718cc2c0afd11570f42d41160e8c1b78f994491f6f0f23ffe"
+    },
+    {
+      "heading": "Verification commands",
+      "en": "292be6ebc7fbeded32637b91c7b6de41ad730afe477f605752e4198753ba5e23",
+      "zh": "ecf4b7337c33a939ba8c5703dc085588d96fe4ac62a6268b1001ca537eb6722b"
+    }
+  ]
+}

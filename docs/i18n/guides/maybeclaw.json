@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Run and administer MaybeClaw",
+      "en": "a0c70eb3ff0dcf0836f1ab33ad987b4b3534bad0f12561c33f0301e64bc9d3c0",
+      "zh": "3426c3284b32bca92e6da4b76bb7ef50b6568a8520f45cdf9fc9ca7134d4de1d"
+    },
+    {
+      "heading": "Start a local console",
+      "en": "e44a28a05fe923ae2a091d975ac2c8c94fc7f287f7d6ed68c43aa6dd587d56e0",
+      "zh": "b2a1d3ca3bb48308bde75fe8732e822bcb0ad6fa9243f64548ebf23951bed994"
+    },
+    {
+      "heading": "Application composition",
+      "en": "df0526d6b4901ecb260430ce27dfc26f41bfff89fd4e1cf94b994782d07b6fb1",
+      "zh": "92441e868030aa981db764460e7717a543cfb4a682a66872023be49d611fdada"
+    },
+    {
+      "heading": "Sessions and configuration",
+      "en": "84781e96e69afa68f5560ceda8dacb3d59c53b407be98207e50075af60c7720f",
+      "zh": "106b7cd599265e01955bed72bc08e54e2e31e3ea2185adcd0bd3612ff3ed6e13"
+    },
+    {
+      "heading": "Persistent permission rules",
+      "en": "1743d1fca4798909fa12358c9b4ce4dfd11d2a499861ae268ce1ddc5f0f25891",
+      "zh": "856304baded6a85821d21358622aeebb16c7c2d0763027eda48e6311caa0705d"
+    },
+    {
+      "heading": "Startup, Web, and CLI",
+      "en": "5f8b9481574b48131bb43e1b059c9fd58f970a9602099edb00690d65ec737f20",
+      "zh": "ac75a3c7c7eefc0b7c825987e13589405e021638331a7e7e9bb4eba8cabc6c35"
+    },
+    {
+      "heading": "Chat commands and interruption",
+      "en": "5b8fc6164dcfe12683e8c7267a82b346602710ba7b565553df51ad4678c43389",
+      "zh": "ac39bebaae031265d7f7d63e67a045864eb97936f51c8eb73eaad58efba109b7"
+    },
+    {
+      "heading": "Channels, members, and approvals",
+      "en": "007bfd515aa47e7c4a4fe4990711a8448c91497f0037ee36bea087634e727546",
+      "zh": "14c30185f8ac5e9fc5301095c964c00c978f68fe95c9f38f9a422de0e22c5504"
+    },
+    {
+      "heading": "Lifecycle, storage, and migration",
+      "en": "8ed0683d6e01bcd1893d64a08db8a7f8c214b06bfd7e367732c067f0d8cca2d5",
+      "zh": "91a4ba4e7b2216ddec3c89bf46eb0e3ea911c6a31a0d265740c25fc3d6e474f9"
+    }
+  ]
+}

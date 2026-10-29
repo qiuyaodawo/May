@@ -95,6 +95,10 @@ stderr。`pool.events` 发布连接、目录更新、失败和断开事件。std
 
 ## 名称与冲突
 
+```text
+mcp__<server-id>__<remote-tool-name>
+```
+
 模型可见的远程工具名称采用 `mcp__<server-id>__<remote-tool-name>`。
 服务端 `id` 只接受字母、数字、`_` 和 `-`。远程名称中的其他字符转换为 `_`；
 长名称加入确定性 hash，最终名称最多 64 个字符。任何剩余名称冲突使启动失败。

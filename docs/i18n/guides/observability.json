@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Configure observability and tracing",
+      "en": "72b7a9742b62df60cca8650d9f5d6d81516cc01027f70d351c10acecb3b7b5c6",
+      "zh": "7eff95d058ce3952e910d0902e4751096fcf8442d383bb59501344ca7e423f59"
+    },
+    {
+      "heading": "Events, history, and traces",
+      "en": "9ab4cf1798b91c00dc38ea3975568021b6451c80dbaa9a73212bf087ab8fea9d",
+      "zh": "86697c4040fd8603bd5faa59090f171d968439343c98cbfadb0d55257ecdefc7"
+    },
+    {
+      "heading": "Configure a tracer",
+      "en": "b24e881f626d5652831e0814cdd3bc5f2feacaaaf19f0bea74d9f92649e526f2",
+      "zh": "a41782389bc0553595fe8743ee4b8b559d6cf86d06009c97a99bc7aa04e41e79"
+    },
+    {
+      "heading": "Built-in spans",
+      "en": "8c604205eaf1013516986aef7299c3747460002c70904d62c7f3bd8f8cbbbef0",
+      "zh": "6e34d249cb14a060e0ef75ad739f24bdf36759ea10c529c1a07e1e0227f4ce44"
+    },
+    {
+      "heading": "Processors, exporters, and sampling",
+      "en": "d2732b52d6c996647127730b4381cf679fa6dd2466caa454329d77cf7150e76b",
+      "zh": "e4820330b8a9f4de4356677d11a3b8a49d20184edfaebbeaa0619095ec6ddc58"
+    },
+    {
+      "heading": "Enable tracing in MaybeCode",
+      "en": "055ee727fa50cb725be196c234d594ddba5ea9202118a4a321802a7fa0886926",
+      "zh": "b09ab318e0df6c9084925f3c8776791c7e68cb661b9bb70138b756bf8c4534c5"
+    },
+    {
+      "heading": "Privacy and failure behavior",
+      "en": "ff3bd4f8693af97b18df51ddbdc7659afdd0233598295463bb301b379da076b5",
+      "zh": "888d7b3cb5f946a0d4dbb083cfcdc37240cfcff22d7f115e6a1694815e05cd99"
+    },
+    {
+      "heading": "Independent metrics and local diagnostics",
+      "en": "70dfacfef63b111c67ef072a7d248de8c3661d45c96ba370d9476151d38ea05b",
+      "zh": "8faedda909842b8c61f016ead3c1df63e1821a4d92a6c8848c678a76fe96c3c8"
+    },
+    {
+      "heading": "Model calls and attempts",
+      "en": "5602c18911d5e15903127ee0f51636128d681f289c8b2673aee19a37a1ed3181",
+      "zh": "2e038344b13afe37ccf73e264116a96ea43b9337e6362e75c7f841befba7c86f"
+    },
+    {
+      "heading": "OpenTelemetry and OTLP",
+      "en": "8a26478565e477b28dbb505bc0fa14a8b5938e5b000292a6df490619b3b65a55",
+      "zh": "9bcdb744c7cc010dd80d8e8c68d3ffacd72afa2e7c62e9c7331b0652bd584058"
+    },
+    {
+      "heading": "Correlation and acceptance",
+      "en": "47723853c4a2acb679ee09250138cdab49e77dcf0df97a5020bbadf469fe0897",
+      "zh": "584fcc177b3a48be409fa8d9d0301d49d2473271b6d8adc1a15e0cb399b15991"
+    },
+    {
+      "heading": "Limits and delivery diagnostics",
+      "en": "e1fe79bd2273e90186fbbeea073860cd97cdc1682f90782e57385e733d3872b4",
+      "zh": "c6d2c00175ad984463286daa4aa9e6c68e27bc4cb285bc23d60677f88318fead"
+    },
+    {
+      "heading": "Verification",
+      "en": "59683a378345d3e003835e95241c4ce1520bf7bb8f093112dcef33adfd8c6454",
+      "zh": "eb7d6cf64c31072625d7fd9e7ca701e9597fa5defb3d46814990d65c22ee5826"
+    }
+  ]
+}

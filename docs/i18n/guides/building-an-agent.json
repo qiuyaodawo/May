@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Build an Agent application",
+      "en": "d96b6dc91932ecb326273903dbdf63d6112e3b9184aa20279a8b6ff42a3378d5",
+      "zh": "b38b551df942959cb57db74107815771786e1775923a8218ab8069f1d793386a"
+    },
+    {
+      "heading": "The composition model",
+      "en": "ad3cf6576102f0135613a25c10a68b346519be62ba20d7519b1465964586671f",
+      "zh": "e73fb46a39b67962fd4f851ca0b0cbfa4e8edd0e6bfb2150818e3a84cf4326fa"
+    },
+    {
+      "heading": "Choose the lifecycle level first",
+      "en": "93208a1fac903c266e436f7e2aa21093853a6d539827f5e3ee7b9a5bf25d9cc6",
+      "zh": "67f4ca187a388c146a9fc44429dedc531d9ddbba3388238f668fe4dcee747918"
+    },
+    {
+      "heading": "Required and optional inputs",
+      "en": "a0901b4b261fc6d45f25acf9222f07d32af2d8ba08c9551742ef10701bd4df4c",
+      "zh": "5e594673f5ffe10663c68aa114170b71b80ad591f37e690be1b423c8cc311770"
+    },
+    {
+      "heading": "Define behavior once, then open Sessions",
+      "en": "4e62f1bbacaf79cad32533e6eba41b8d9479306fabbcec24b12da4f01f55ab55",
+      "zh": "7d3aa14e356264b0b4a7788ce7fbb394dae59c7a3146332847917930312e4632"
+    },
+    {
+      "heading": "Make each composition decision explicitly",
+      "en": "3833b0b699a99abed57ac780307f3f1785e1eb0f1f3f68a7453eb1704bfe1f8a",
+      "zh": "3eb7aab8dc903ad3130145205d14a69fff99b1c67000381eb9fc37fc4f5c754b"
+    },
+    {
+      "heading": "Model and provider",
+      "en": "e27b74677bea5530e234983ccbfe734b9bf4c89875ab9a9debb091e6329a3442",
+      "zh": "8ffd67678d82748c8d1cc5723ef9a014164d92c85d927afc5fa3d523e94b7fc0"
+    },
+    {
+      "heading": "Instructions",
+      "en": "e78bc03f3e8fbc7c06dad314286d4739d3b41b1ac821db2c4e07b6a4bc45b694",
+      "zh": "2d8683ba297529819c4702e194a8440734e3f7c0ff3b8ec8b646689e4ff9c70b"
+    },
+    {
+      "heading": "Tools",
+      "en": "77fcf828c543e9fff6f17ff0166a18155912564765b149827670c43592425d19",
+      "zh": "b700e6731bb98c3a824eeaec127025884057ed3dfe011097e6b489e7ff047c79"
+    },
+    {
+      "heading": "Permission decisions and execution limits",
+      "en": "d34c311e45c7c8f112819dc78bcf37253d9b0c98ea1c8c22c80dcecdbc349c53",
+      "zh": "6a309ac9e207c308f6882200a5b43783e817b5e138bee02d372fc967d558987e"
+    },
+    {
+      "heading": "Context and compaction",
+      "en": "8bee4328da6ca31ab088db996c882ec24148ee821a9f8d9d5173a56ac891aa09",
+      "zh": "8dfaf51978d06b32ec38ad7e11dc9788b7db2e06e097fe962aa831416882bc90"
+    },
+    {
+      "heading": "Session storage",
+      "en": "1a2b6bc7f178814c1fa89e5922e697dce6ffe990a5e5033075354d59666ba2d1",
+      "zh": "e942028353d7cff7ce5bdac060aa5b1a50717296ef2f53e038c18ce4d5b72578"
+    },
+    {
+      "heading": "Tool presentation metadata",
+      "en": "42b9293b1b3d1b50392f3b0789628da323a07efccb37732da31ccfe9db2f46d0",
+      "zh": "a4ec1cd1cdb1fc5d77d8e856e40e69e89ceeaf43baea30630c656d999dd2e702"
+    },
+    {
+      "heading": "Observability and tracing",
+      "en": "53db6e26aba21a2e58fd5b3a504dfa240d78b3f285174c8e928c754854d930cc",
+      "zh": "df6e2c0b1657c28285986ab90cb44e0269f69cd85714d3db0321d3de8ecff764"
+    },
+    {
+      "heading": "Consume one ordered application stream",
+      "en": "8f3960337e774eb2a693fbf1ed1e393a9a70f3345913860ed09b50b59fdd1453",
+      "zh": "3aae5feed7b7a21340bb43b9bb22f82e3003e8780e6d092db5188108efd874fd"
+    },
+    {
+      "heading": "Add Session navigation",
+      "en": "429876b5363c929fc7462691c11752d9b5bb544a7261a515d77b48a890f3a196",
+      "zh": "5d13b918b6cc67f7d4ee9b93af01622d9ada10205cd6e50acf7e2b5965d3dc8b"
+    },
+    {
+      "heading": "History, Context, events, and Catalog",
+      "en": "63c9c41d063aaa7f4086ef96b8de151dbac3398ada1c77d4f844985852927ab0",
+      "zh": "66a88aa894d7b8a15bb436818b8c6e2462127a74672b46af59a02560f9523997"
+    },
+    {
+      "heading": "Shutdown and ownership",
+      "en": "1867b96b1a473c51db91b58e57e6dc5dfbbde3f35be68454986011076955212a",
+      "zh": "98c202b34afaf2d2034195c00d993749a5ff1bb4f53d6bbfacd4792057d008a7"
+    },
+    {
+      "heading": "Verify the application",
+      "en": "9c8fdaebd694f7718f3b3ddf4918aca133be29481e2e8574cf77ed1344f9a23b",
+      "zh": "8b72960e76dcf3dd0fe1738642d4547189927be01798ef9660118e6a43de30f7"
+    },
+    {
+      "heading": "A practical build checklist",
+      "en": "3ccbd35e3f50ebbbd83d8e38b2f74f5f7d2f46370cdf522d65a7e9817fab596b",
+      "zh": "fcac09dfc6b005ba21b33d42ccba34a0858629149b60fe81e8260bcf291b109c"
+    },
+    {
+      "heading": "Related package documentation",
+      "en": "2c6368b9d3c2b3eaf851b8031fa0a3f14f31cf811f178c2b6e13976fc6baeb29",
+      "zh": "0ade0377fa89d2efa6709cc04e8e0c609f7b1cb50e2583a580e786a3179bf359"
+    }
+  ]
+}

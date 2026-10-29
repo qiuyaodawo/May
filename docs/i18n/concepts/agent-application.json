@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Agent definition, application, and workspace",
+      "en": "9bea9eb31efe869ac6ace1818d7e755f6b483a74bcb44c29d2eb802bc006107a",
+      "zh": "6e41962d4f15803d652348423d5b6c323dc07e8929ce65f9e1c86c5e99469ebf"
+    },
+    {
+      "heading": "AgentDefinition: reusable behavior and policy",
+      "en": "54a6f23f89bd454714ba160646cfd0f4e96357a3a29b52b33f2005a5646065d3",
+      "zh": "9cef952e36a88b13e552520d7041d515cdf4d162d6b00d1872f8e9f251d702a3"
+    },
+    {
+      "heading": "AgentApplication: one active session",
+      "en": "119c85b4bb3152e5e348806af2fcafdd61554c3bd1dc621cd5f0e03b8e66d315",
+      "zh": "ff8b230a56e8daedd223ad0e5282e4bf1e2bcdb1791ac947b833084827766ce0"
+    },
+    {
+      "heading": "Active-operation rules",
+      "en": "17226b3ab4f45260b0c74cdab57faee53817d5d4f865df887e5972f5a3de3342",
+      "zh": "b9352356c65c82a00e4ceda36e327fd0d465f67ce2b307bdb4df1507526ec114"
+    },
+    {
+      "heading": "AgentWorkspace: selecting the active application",
+      "en": "74de79e3d2c78424ba2d02a026f966445c72c92b446d23c1361a5a714003e2d5",
+      "zh": "e8111cb3666c591687a232ccc76f84cdce0ef0509e811f7bc858c30cf2676e67"
+    },
+    {
+      "heading": "Product configuration transitions",
+      "en": "5ea68b284e0f02002958a4050bb2f6664a3b02da35d3d871588c60edfcf4b81f",
+      "zh": "6ecfa2450d1a893a6bd8d7cf97873c77a06db0e6a7e3eb6c7da0e97fbfe1dad1"
+    },
+    {
+      "heading": "Catalog updates and deletion",
+      "en": "eb5eee181eb96512d2fa5f9299e072cc48000c7f15af5f2d80a4351a0a8a7aef",
+      "zh": "57373abd145b4c1e3d2853047f54e2e95f934188f93fdb00ac814710caa95bda"
+    },
+    {
+      "heading": "Shutdown order",
+      "en": "d55dfc7eea27e7dedcee758f71aded3e0ab0180097e7f34b17940cc2f63291f4",
+      "zh": "73f7a447333cad502696df62b88fc5ba371ac18b6b5a5af8c72bb73c3f00d820"
+    },
+    {
+      "heading": "Current limits",
+      "en": "9f4ab81ae1d33c513b17ba762c909d8cd3a7f0f346b9b0440cbdd6c04f93456c",
+      "zh": "46fd8f6943649496b8f1ba150f8eb633050409791f040f30d2e86e31c5c98421"
+    },
+    {
+      "heading": "Host-controlled execution boundaries",
+      "en": "819d725e3ba38aa4b0d77473131ffd018c09f8fcc3fe250a1d383fb6d2c95018",
+      "zh": "bb346228363d0e26c20a6ea87b85b09dfcdd5ff6ca08f78e05e1189bedfacda0"
+    }
+  ]
+}

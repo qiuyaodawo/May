@@ -42,9 +42,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
-      - name: Check bilingual documentation
+      - name: Check bilingual documentation structure and section confirmations
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
         run: pnpm docs:check
+      - name: Test documentation checks
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
+        run: node --test scripts/document-pair.test.mjs
       - name: Install Chromium for browser tests
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
         run: pnpm --filter @sortedyuan/web-ui exec playwright install --with-deps chromium

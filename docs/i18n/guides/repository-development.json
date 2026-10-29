@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Develop and verify the repository",
+      "en": "8c8e12b06e71d27f0412a67f7fc2e82c4000c77ca7ceec26f6ab098be3598727",
+      "zh": "27a2359811f57f52dcaa9f1204aa2b5ca2c0222c27de21dccb58c73d24fca564"
+    },
+    {
+      "heading": "Install and build",
+      "en": "0aa51cb6bac26c875bde43b96c2d8b474fa85c4a781b967418cc47816966fe1c",
+      "zh": "9a6f50881e4c7c83c00fc873f6acbf2bf57790347e149689426f2af8ef702f36"
+    },
+    {
+      "heading": "Choose the relevant checks",
+      "en": "e779b0d7f1451ce2b132284c2344afd4a409e656a82b77e2ed76da2498d46098",
+      "zh": "993cca1fe575a2fe66f1a2085d13ecca04bb03e273859d4a0abe54428c7b2df5"
+    },
+    {
+      "heading": "Continuous integration",
+      "en": "34f21d44536a797569d8992a454440de644c635c2741bc3e13d2604c198c52cc",
+      "zh": "c2b990e9c1eba3be6b12391f3d9b02eeab709ee5fd5258ae28601bf186a69e80"
+    },
+    {
+      "heading": "Checks requiring additional environments",
+      "en": "9e705851cbbba806a5c5e0e4b74d46499d8aebdd7a67f2605a0078fc91a34ad3",
+      "zh": "146245c968eece277cbed464a1551e618cdca8f2f512e2cb9f5ba5974b6c2ab8"
+    }
+  ]
+}

@@ -159,6 +159,14 @@ Tool 的描述字段视为稳定值。工具的其他内部运行状态可以按
 同一组工具。直接 `AgentApplication.open()` 会在打开期间快照工具。若产品需要不同
 能力集合，应显式创建新的运行时或 Definition。
 
+```ts
+const tools = new ToolRegistry([addTool]);
+const agent = defineAgent({ model, tools, permissionPolicy });
+
+tools.register(subtractTool); // 之后接收该 registry 的定义可以使用此工具。
+const application = await agent.open({ store });
+```
+
 <a id="execution-context"></a>
 
 ## 工具执行环境

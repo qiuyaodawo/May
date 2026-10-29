@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Recover an interrupted Session",
+      "en": "4fbd9c32ea5a09644ee9cd357e8b9ff177e293dcf6dbb75bcb4cc7583ddaf6b3",
+      "zh": "ecaccdb7b8f31c9024f4227a286d7ff2bbd048b7a1ab44adab1101502a1afd15"
+    },
+    {
+      "heading": "1. Reopen the Session",
+      "en": "dde988bbf6617569dff71fe083b27ffea0f45afd4212c278bd9aa9241927c5d5",
+      "zh": "275a69e5ab10f794881796404d96b7adf063a186201eacfe56b81f10fc80815f"
+    },
+    {
+      "heading": "2. Inspect pending recoveries",
+      "en": "c308db1eb7b551b2c77a1687a8aefaf63a5b42358e71b780fbff42e6c61da60b",
+      "zh": "98dd70750b14fa4521f6edcd30e6047e904e216cdc4c29ae59a7055976ec98da"
+    },
+    {
+      "heading": "3. Verify and record each external result",
+      "en": "52d2ff825528df54a8eec4b47f0bfdfd0a4d8a2c4f1696666061f25cc1f1d191",
+      "zh": "f3b53622a6f06925baf5b9f11429a610d1275d0987235e6cd50aea6a6b003228"
+    },
+    {
+      "heading": "4. Continue after all unknown results are resolved",
+      "en": "9e622c29cc5844d38f3d93d84db945bfffc83ae2afd3313c4c4b5812a5e271d0",
+      "zh": "fc6ce71cf48e519cdc90275b8367b7b12cd7a967a8450b8b70d2696fb18dade1"
+    },
+    {
+      "heading": "Checkpoint ordering",
+      "en": "94abcd2c998725e8141a6d46351acc40a644255f1a61673d103efac26d45bcb7",
+      "zh": "22721f203c4ab3d1620492cced9c5e79ac8157cde16f5b2cb938194b8393a330"
+    },
+    {
+      "heading": "Persistence failures and storage limits",
+      "en": "9786d64ba814c480eea1e996344888790dbb1c6ad239da7d48c46934cddb9064",
+      "zh": "1ef94bf9d22aef6009dbef7d529409d00832bd1250134bfefba54f259f741fa5"
+    }
+  ]
+}

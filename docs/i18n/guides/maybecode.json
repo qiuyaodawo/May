@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Use MaybeCode",
+      "en": "f1ff819343cd20020c150a77a860af154db51f6a27444798118034ccab574321",
+      "zh": "971c7e13a45973bdd3762d9766cecf0b85484d2b50ae876b031c6081328aef30"
+    },
+    {
+      "heading": "Start the application",
+      "en": "ccdc0bbd76dbea50a7e558c82c8119c585bfbba02ea0080a0a984796d101e3ae",
+      "zh": "7fd2cd7caccb176c8ff94b864ff669c196b2237287fd382b9e485206861a541c"
+    },
+    {
+      "heading": "First-run setup",
+      "en": "1dbc5c9b148c8811f1eecf6df31440c68a820fd0c9c384b21f451f284d7fee6e",
+      "zh": "ce27538c480b347c3c373116c939f01bf625fe85517d966712ef58164cdde20b"
+    },
+    {
+      "heading": "Run the local MaybeCode build from PowerShell",
+      "en": "a6a8f0433064bde07c36823588cb32d6196f4b2a4d424a61b5680e7f34c5ab71",
+      "zh": "0ab30f02a9350c01a89431e1dff5f866129b0fe9224e9f4180b59b88edc7b748"
+    },
+    {
+      "heading": "Control tool approval",
+      "en": "4c53195b03f35626faf83419e482ef4e074a7a746c7f8c3e72b7fd467837258b",
+      "zh": "39b6f760a166a666987989cfecc2d7c514d69d976fb199ff4582e4cead00fd03"
+    },
+    {
+      "heading": "Send input during MaybeCode execution",
+      "en": "8a011572de1b1fec441c2bf596f7ec08b0deb4abaf582b76fb87419b0c53caee",
+      "zh": "47654695f1f638c0b85280843b314704a5642896b2ec998b7dd95263ebd8f91c"
+    },
+    {
+      "heading": "Browse MaybeCode conversations",
+      "en": "d7e798477c60fce9503405c0bc164329150dceb99d89857be3df9fe7cdcdf62a",
+      "zh": "4d5428a19c0df787e54ebef320fc9f2343648b1798a827c74d09dade11ed806d"
+    },
+    {
+      "heading": "Find advanced tasks",
+      "en": "72166eef966a16b647f5b9f18cb68945ce0ed6cdbc795d9b2929bc9f34a10a4f",
+      "zh": "c0b647a91844838b1f7aaeaa745b3978033fa10fe356c07d63b8dd3875a1089c"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Configure MCP OAuth authentication",
+      "en": "d1320f359612c07f4c75c6bb27eb6dc986a5a9328bff5ce336a6427ae6f29d87",
+      "zh": "edcc8f89ac84d5c2cefa7bf66d6bdde563d1005c1918be7a0cf8ffaabd682b62"
+    },
+    {
+      "heading": "Configure a native OAuth client",
+      "en": "9c3084ecc7d8f85d2d5a5a80cf4fa0779ddc09b4a4c7fb88e74d5a03668ef48d",
+      "zh": "0a7c6bf2bb482a7500aa82c2a56c7805107a2a28d33bd8243643a0138f093ec0"
+    },
+    {
+      "heading": "Login, refresh, and logout",
+      "en": "9ed99c359b87fbe76a86fc7ed22db59394e8f9861f65827ebfda316b39822f1b",
+      "zh": "35e4db1f5ab0fbbb81fa7dc5d81681e00d8a09d4f44f573af68cc60ef545a374"
+    },
+    {
+      "heading": "Storage and embedding",
+      "en": "0cae8529043fe7336996ad5c00e2a65899d2f045f94b6bf6470e2c1fb4d6cb52",
+      "zh": "1b3771339e4dcd54daa05ae187d2d654ffc0abacbb50a4c5e350f369e9eefa8a"
+    },
+    {
+      "heading": "Troubleshooting",
+      "en": "3639386ba2bfafa3750147d8a461f4968c1c5730a8e459aa2491c454b0b8b49c",
+      "zh": "8172b6f94af6287bce82404b5e3c0dab72fdd5c6493ce2808fe718982b9fddf0"
+    }
+  ]
+}

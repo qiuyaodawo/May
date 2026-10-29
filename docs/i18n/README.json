@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "May documentation",
+      "en": "5c616db3b0dfdfc95b659bc9554c983e092f49a91124727cf917e3514c8cbbe3",
+      "zh": "dad80711367322be496454dcf11a4156bb9473417ba75c8db2216cb6780d0747"
+    },
+    {
+      "heading": "Tutorials",
+      "en": "691699c7611fa01ec6e0cf8af456edfe831a22a83aef2cabdc9a5051359e2236",
+      "zh": "9a8e701a7b0a11778a093bd7f0de8e9917f975d11169f646d70cc270f6000915"
+    },
+    {
+      "heading": "How-to guides",
+      "en": "eabd96514a195c45e6a65060d1922fc38630d217af6df916752a86415b83675b",
+      "zh": "1bcb0c6ab00f6d9537b9a2638c9f5f6726e771110927bbd321f042fbe9a18f8a"
+    },
+    {
+      "heading": "Applications and development",
+      "en": "2ca0213d62b5ceaceb22d5f28a8793f2a530d3197d3b83d6115d2fb20ed03266",
+      "zh": "29fdb3109ce1a3123ee803f4ca4dbcfbafe87a8f1f9ca93e49b3418c90c888df"
+    },
+    {
+      "heading": "Extend and operate an Agent",
+      "en": "f09a57439c7c147fb6e271de23e5726eaf72ebfec66b6e6aef4870104529bead",
+      "zh": "d15d69ab8207312879b722dd5f15312a8666263603886ab68171ef60e4336dc4"
+    },
+    {
+      "heading": "Coordinate Agents",
+      "en": "d93f8126e44fa7251a5a590a1c838597ec2b1ef4ea8861ec5547cc82d33e18f9",
+      "zh": "f57a83f08f30683b8f262ba74e0902bd95ee1a99430f602203341dd612146e8c"
+    },
+    {
+      "heading": "Connect MCP services",
+      "en": "30a96efb3143f25510b9909aaf2fdbb6cf76411774e7957ffdc94afa50248177",
+      "zh": "fbc035c613b9713635dacb3adf133fbb13defb23c7a298bdb6e15e064366ec73"
+    },
+    {
+      "heading": "Reference",
+      "en": "6f766f760df3aedc2b536b56d091a7224c88bdd37cdbf062897ee2738929d7a6",
+      "zh": "eca9b3379bf517aa5e06ab1c7b89ce93af533caec95a9ef912b2d0a905dfcb68"
+    },
+    {
+      "heading": "Explanations and architecture",
+      "en": "6213742e149a39f7e7d1307ac6e586a18502a8321c4f9fb76edc9bcdab171238",
+      "zh": "f8f4955d1fd1a2d0e20415e9458552dc6b9c6368499774cfb5fe2132b6edad67"
+    },
+    {
+      "heading": "Maintain these documents",
+      "en": "3c7162aa3d75afd5c0fce70b064ef5e53abec5480aae22ab22e32da380085317",
+      "zh": "52d4ae29f6a605e5e40b4d66d21bdda6c175f245eef17021ae26a820ae2f1567"
+    }
+  ]
+}

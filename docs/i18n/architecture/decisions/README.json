@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Architecture decision records",
+      "en": "c78aef97296487ed4c0f281cd5e65170276a159cea2c7324d3e2e05ec4922afd",
+      "zh": "13d9d6553aefa8cc9c8430c9622005a639f2a07879e1bad166b76c4a66535bdf"
+    },
+    {
+      "heading": "Status values",
+      "en": "644556cb04c1c19850f9b67b8f4239d45056491342df404fbc047d7396320f24",
+      "zh": "b47a16ec2a12bdf7d3a25f03c712584e1de660e8d5dff71634d633ddffae17d5"
+    },
+    {
+      "heading": "Records",
+      "en": "aa352a41fcda210d00a591cd46f1ab45e41ae6e51d6b71a9e3b210f61dccf038",
+      "zh": "a9449bd6e15ef5763c3a6939af2aaf874a8ae763c7c77feec62001cfa0022885"
+    },
+    {
+      "heading": "Adding a record",
+      "en": "c3599e7af9593d987ebc2a1cc1529aa1e7f328dd449c92de1eaad99133f57be6",
+      "zh": "7faf3286f8d1f72cb701c2dd35f41534c054d3c29dd135fd637a90c09c8f9e28"
+    }
+  ]
+}

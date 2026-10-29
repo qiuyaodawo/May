@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Evaluate Agent task results",
+      "en": "702712d0d2b3fc6ab642b51be84f5b810cb04504105d97be68a11579b0c04c56",
+      "zh": "52f6a9c84d86085f16bee4ec9e6d704147f4dddd7e4b234e0fd27c63d1d2a6fb"
+    },
+    {
+      "heading": "Running a trusted suite",
+      "en": "170406c3a6f57e1d306713f264352c2c12348b3f76d4f404fbf23df7b80dfb97",
+      "zh": "bd34f4c407f001286e9a7ea572c99009a11be87c2135e8e082c081ad2451db97"
+    },
+    {
+      "heading": "Cases, variants and registries",
+      "en": "653feea4e6c93a270462a8c3c3fc30cfcbfb8cb62f42a44c047787df5b6139d5",
+      "zh": "5167036af3fc603ed5f27142803af50e29ba5276e24f4f0b6b7e7996ad3c2a1f"
+    },
+    {
+      "heading": "Environment lifecycle",
+      "en": "c66b623ea4fa3c78fc1b6d59ee9a6764975fa6268559a085cd39374ec9003c25",
+      "zh": "ad1432f45891058c19d5b836a948905f30033a97b3fb54831baec5ddaf8cbddd"
+    },
+    {
+      "heading": "Execution and cancellation",
+      "en": "28df2044f11d5ad81bb6d58877e8e6b74c910b08fa0c597e7948e05e64ac4c86",
+      "zh": "1d8390081634cf9467f55a01c021e02709dfcc57cfe94792f2a36ad45146b31b"
+    },
+    {
+      "heading": "Restart and retry",
+      "en": "453ce3dd45ea193847a8090108978439b6917b432c0d57010ac4485cc63387e1",
+      "zh": "132f9dcecf05c8d066340efde721a156f79e4798416fff4cae50cecf2aeabfe5"
+    },
+    {
+      "heading": "Evaluators and grading",
+      "en": "f8361c447437d659199af02e738e50b3ff594323266e97fedb1bbd222a0d8b8c",
+      "zh": "5961b27643ec190e8dcf068000d2e9d0a6ea553fd082111299469c0488d7a9a1"
+    },
+    {
+      "heading": "Outcomes and metrics",
+      "en": "637eee463fea888a97e201e37968893ea4a898222f3dfd1f1006bdae02c8cefb",
+      "zh": "98dcb5bc0ec2935c7cf83ec639d55a6a8ce408e54902fe757f8b72f2e664cd19"
+    },
+    {
+      "heading": "Evidence and persistence",
+      "en": "3a79f7c1a816780c5faafed3e5b3abad70c4486e1a205f98ae23c30112b17e37",
+      "zh": "c728f6610ee0e2246f073d3597419c24f83d4fa4a6bf85cf281bb59657c0dc6d"
+    },
+    {
+      "heading": "Reports and comparison gates",
+      "en": "fd83d77aa316c8d28ff665b902a5107205d98262c0c56a93cc38b92dca276fc5",
+      "zh": "0a80183ea420a9099fc759b4ac7ea730cbb0c901c45e4c06fa0e042438391b61"
+    },
+    {
+      "heading": "Package scope and verification",
+      "en": "7f3c3263c96d4eb73169d999173c35ba95351ab141bd946106ad96a8ee53fe84",
+      "zh": "634600fb564f513774f30531b93a4c2f2ca56a2b3fce78dff934594b9b9ebc26"
+    }
+  ]
+}

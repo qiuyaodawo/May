@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Use the shared Web UI",
+      "en": "e07c09a8f6a3782067e9960a9a8ce6f89f794febda1ee7993700286336009e47",
+      "zh": "1c6fb8fee40e7c959525338848ca62292b105fefd25ccea22e9145784b6dc098"
+    },
+    {
+      "heading": "Run",
+      "en": "4e0248e4c6474fc6acfe38b04c8e4b2d82645e2187ed766416463d4c9dd56aca",
+      "zh": "9c3fab52473664f8dc6ca6138ac2540e3f5585f373471f05eea37e74de59de46"
+    },
+    {
+      "heading": "Open an existing MaybeCode workspace",
+      "en": "0876271bfe890b91a937555e41d06682c551818245459c459f6bc7c9604cd044",
+      "zh": "a80276e23f1f2646162c7553759d4bedb57460ad88a136180c39fd7d3289c314"
+    },
+    {
+      "heading": "Start a standalone MaybeCode Web host",
+      "en": "1940d571967b7a8f38540d82b4f64e821ddc33421a905a78b3e6a2d16355c116",
+      "zh": "00fec227ea218834658be225cfbba2f33792d183ce4c52635a52b6dad5051ab1"
+    },
+    {
+      "heading": "Start MaybeClaw",
+      "en": "f60b94f6f7ba514df97be6887ca74eec01aeb6e4320f568e8dce687b2b24c32d",
+      "zh": "d74234d788e2c017b969212546526f7c14b16af97ad653215f029d67a7ef34a8"
+    },
+    {
+      "heading": "MaybeCode commands and interactions",
+      "en": "2849e01f0a8e06201b189e9d595051fd09216be1e0f5893d4906e0378c616c5e",
+      "zh": "dc1f749eb45ff39ac36a7c40d409c904a5cf42c14440021c2736839b8c9c54a3"
+    },
+    {
+      "heading": "Session forks and file versions",
+      "en": "9b62ac7f90910adb9de43ffd0a23aa5917c8db8f4c52e6173c9cdad49e6dcf49",
+      "zh": "0dc391ab5d3da8e63b9c27aab451fdc78fbe46800e7c2e4c79502f4631f29f0b"
+    },
+    {
+      "heading": "Read history and details",
+      "en": "18e6d4aa267d6323efa9270e135a528e91974eda55a104656344ee06f356159c",
+      "zh": "a79719090d1cad34cfe77d17da4700c2987cd3fba69e15bf4e533be621e1334b"
+    },
+    {
+      "heading": "Execution evidence and approvals",
+      "en": "91f04eb8a3fda813a1d1207c4d42ab797f135baf83ccd21193e97374dafc2524",
+      "zh": "8c6e075eba8387b6a56b438692fa6a9d819c0eb83faef91301a883cced8ff2df"
+    },
+    {
+      "heading": "Models and diagnostics",
+      "en": "e12320ff01bd4b02db2ec3a33254564daf9497b5307e6874fcf678ca33a8ef29",
+      "zh": "f64d8155e7beba4c121be3cce7206c276d26924c71642fb59196c7afdf4348ff"
+    },
+    {
+      "heading": "Integrate a custom host",
+      "en": "26befac14c3629fc00175444117ff541360282b99a70b512aff7196fd03c3fc4",
+      "zh": "728306f9d0988ca30d152f085d8e8c82537f680b838dcc87e8f963efeb56f4e5"
+    },
+    {
+      "heading": "Protocol v1 and limits",
+      "en": "c4183be1f245a8138a04aeb1b4695aa4e478b527f5c3d077525dbc44c18b0d6d",
+      "zh": "e93c8731d6e961d23185775b0c6288cfbdc837c90b53eb15183a03f1548c712c"
+    },
+    {
+      "heading": "Verification",
+      "en": "65f46f758330d62470f85d15b019643203a33f912a36a0d6bdb7199d03e397e1",
+      "zh": "30a730adab297eb5342d5f5714a8667b1c0d5231efba0e708f1e2bfc57b60e0f"
+    }
+  ]
+}

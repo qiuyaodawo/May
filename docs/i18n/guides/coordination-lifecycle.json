@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Attempts and graph revisions",
+      "en": "ff48a1a0530f9c5b3de96eabf20b070143b5b9240c3fca35d7e883d63748da46",
+      "zh": "ade482026ab69a008ab8f9fbad5db4793b373766cbb61a2db208a4fba0dbde45"
+    },
+    {
+      "heading": "Authorize a new attempt",
+      "en": "099da93aa774f1cf8b46aea529cc8ec8cb03e4981ac5976ae51e8619375b9d59",
+      "zh": "d7274a8739af5762cabdeed9dc173d9eb2bfe7cbfc9997be97885247462a5ee5"
+    },
+    {
+      "heading": "Atomically revise future graph nodes",
+      "en": "c567b839b9210fd7f47e9cc5a30a28305a50c2ef4a96d809541eb771fdfb2d94",
+      "zh": "c0eabaa4989e04308bb79e791c00d05afd503577512d2c91b99fa1e2e2cd165d"
+    }
+  ]
+}

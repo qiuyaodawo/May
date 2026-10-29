@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "ADR 0006: MCP adapts to Core tools",
+      "en": "a75812d51135a162532a479b6ab0b73739be3591b1c3a42a885a3582ec8de82e",
+      "zh": "777d9d8132e976af73127a7c65fda6df8e645cdf3d808c2e13b985a9d13b3d8c"
+    },
+    {
+      "heading": "Context",
+      "en": "778526b949700f242ed30b84ada59002f8e982ef01d0df641920b85d199c1cf4",
+      "zh": "c891cd9689459c20654301c07b21a2b311e99738dd5903f664cf31cb4e69b1c5"
+    },
+    {
+      "heading": "Decision",
+      "en": "a93835307278a124ba512338387d82bbfa7fe3f274e51c1c2921c7076be423b6",
+      "zh": "11eab42acda57effde863a6c21ca15e5067b87566dfd20c0920256ea4112448b"
+    },
+    {
+      "heading": "Consequences",
+      "en": "e2952ece536253234f7e7e7dc194001dba2845e285bca43ca3ac9a4c7c5d3b6a",
+      "zh": "6ae669c5fe4be29d27f46995b9f50cb76f4df002066fe3353263874e7b379dd3"
+    },
+    {
+      "heading": "Related interfaces",
+      "en": "85f28503b289be03fc3a0246c908d7615f2c245080b446c0cc624e7a954fc6b5",
+      "zh": "9ca115cbb89640ebcaf878a7554491495c4e0af82738d708db137bc861387a7e"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Events and durability",
+      "en": "d0027d1f3dc82c984bde70bebd2a56d12d23737b9e42e64ac5ac9360343c1ce6",
+      "zh": "85a454a183719c621c0667ac4cedee1e7f72aca94f7ee90cc5fd8e2b9ef72bfc"
+    },
+    {
+      "heading": "Event layers",
+      "en": "44153dc8083559997dea815a01d7ec582c49947edb8db12f6fee52a513fa4c74",
+      "zh": "7da38849ee5424ce3ceee2412329a79950097372293f29b92f4fd17b0c43ea49"
+    },
+    {
+      "heading": "ModelEvent",
+      "en": "8fb18e430e3ffda460855740e649d6457a7d88f34841f641232cb6c2657bfe71",
+      "zh": "de6b3e832b8c16fe5513d45a64a320bdf8fcbede3332e5d0e19cd0e6618c0bc8"
+    },
+    {
+      "heading": "MayEvent",
+      "en": "8683e2deea82606734ff7c8c136817db10a3465b39bb770e16c65aa522ce9309",
+      "zh": "803a03a01bfd3812ab3dda41caad1a53fca1a203224d27c4d97623998b081507"
+    },
+    {
+      "heading": "PermissionEvent",
+      "en": "e23069a58d6cea63dac14d4d0b9452d29e5f7b452ef4b6e345960f46be10067d",
+      "zh": "a4ad3685ceb70aa9b3a5eb2ea48247b7a73613c8bc772a0a228ef0a7e7dcdf64"
+    },
+    {
+      "heading": "SessionEvent",
+      "en": "1e03f460eacd1ca6cc551ace4edf4f7ec35aca9d58238008797a2adf364d5143",
+      "zh": "f1971a99700e379005022277561f909bb810c7fd1f37ba17dd4e914d9ac0f1cc"
+    },
+    {
+      "heading": "AgentApplicationEvent",
+      "en": "f3d648136bc31febdd95dc299c1e910b4585990944a05243587a6c6795398bad",
+      "zh": "808dcdb9b8d9245fcee926dd1eef6d039a00366c0dbf03eced3fbdf99badb6b4"
+    },
+    {
+      "heading": "AgentWorkspaceEvent",
+      "en": "7ea6e57eac8afde02cd4ea97ba50e5babc62adde2aad8ea552b2d3aec5507e32",
+      "zh": "ed905491033be5bb649ec289b83cf4ab84896e19459a72874c557ea7229a6f0f"
+    },
+    {
+      "heading": "Host-controlled yielding",
+      "en": "ddf8f18705ac68fc70040ad911c927f4755f464f612ec93bbb59b1c9430ab23d",
+      "zh": "f0772f3fd47f0e288a10c85ccc12e28ba22c6cca4d7a70199c4e2962421616c7"
+    },
+    {
+      "heading": "Persistence-before-observation guarantees",
+      "en": "9928a23076013f067cf0bb9d4b42ee721c62eb659c5c92e966ce681aa337e22a",
+      "zh": "37722b32c85173ca483e86ace0bf26cc8a1245faff3f74d048c86af09da49415"
+    },
+    {
+      "heading": "Backpressure and droppable streaming events",
+      "en": "3747d03d2e340b09a69c6f899efcda5356c98018d33d9ac7dd8d2f578a5e4939",
+      "zh": "3eb1d6fb0d593817badb37d412ecc44a6638f81b3230b0077147d2abc8aad766"
+    },
+    {
+      "heading": "Live events do not become durable automatically",
+      "en": "2e5ffce952ef56cf7d3e76344065e8c886a3d8fddd1f1a1cf345a86cbaacbe81",
+      "zh": "ad5a4c2a654cca982f65005210c87259b558bcfa819499f1bcd03fd6b175d823"
+    },
+    {
+      "heading": "Shutdown and the end of a stream",
+      "en": "2599236d9eb66a7768996a0f3f386b4984699c1ff38125771bf2ef8f31c896d2",
+      "zh": "ebc7f28bc04fad4c17d5c86641a6158f2a1abe4f55a90040111db1f956e7fe1a"
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Package reference",
+      "en": "7fd8288156d4eddc6ea62f5d8febf48cd88964356613854216fa644bbaa25d4c",
+      "zh": "00d7fd095784360c1b874aa6bd921c58c4678504be321d6725649476eea87c2a"
+    },
+    {
+      "heading": "Choose a package for your task",
+      "en": "f9f1a6fc7bd2a4c576a2ab839b44d996e30713a51faf23e1f2f0599ee3fd0b10",
+      "zh": "7468436bef26965cec9d4cb95132ed20b85e28c0333e35d50227b395f81376c8"
+    },
+    {
+      "heading": "Runtime and application",
+      "en": "54aa12d9d6c87e0ae4211db7e0757e71f034da7837d3ae5328996ee0e2d713d7",
+      "zh": "bd4dfd112193f5f345405bd84b2ae2b92c2775f22bc6508d3fd1c8bf9f940065"
+    },
+    {
+      "heading": "@sortedyuan/may/storage",
+      "en": "bf8eb612a70b52f8452285217385c0559ea9bde5bc052d55ef33467a49abc101",
+      "zh": "ceb67645c8e566f6ab5353ef23f293de67de236ed61824cb340fd78aa7f52ff5"
+    },
+    {
+      "heading": "@sortedyuan/may/core",
+      "en": "166cc652b2c87f62df0b88fa52e1b6889bdf49459e175b1e59982219cbb8439d",
+      "zh": "6d712fed16134cf74fbda1c7e5f91b07a948c732b8543ad29b6b1908ebc46f56"
+    },
+    {
+      "heading": "@sortedyuan/may and @sortedyuan/may/application",
+      "en": "61fa15097fb2fd5046cd5ff0d13cc722c4f3c615b93ecf322b122162a290e7ba",
+      "zh": "4e38eff110dbe5dd58452889ccc811b794d16707f99cbbfd2e07c0cf2e0cff02"
+    },
+    {
+      "heading": "@sortedyuan/coordination",
+      "en": "6c8e5d24bd2bd720ccae6ec230b4fc00fb0d676a85293c22ddde5f4e7c860f5c",
+      "zh": "6496622e9d2ebf0daf812730960cd54784eff31e729f2dff93a7abedfa996544"
+    },
+    {
+      "heading": "@sortedyuan/may/goals",
+      "en": "157354d2839def3ae796f0cdfb6ded8baffc86b29b40690b56244c0dd328b652",
+      "zh": "5bbc4b124ffca8076f4664d81f269654c03f91d75dd05f1e0119e7445dbbc075"
+    },
+    {
+      "heading": "@sortedyuan/scheduler",
+      "en": "0593b0a028add37dd78c16de2eba74a20fea22440ebfcdce530e2f99576d2128",
+      "zh": "95eb95ffde04628e43aa9fa75318a4d28305c50dfc210090140e4fa35cbe1517"
+    },
+    {
+      "heading": "@sortedyuan/eval",
+      "en": "9f22ac8aa260b63ff851cd4cb887dcd7f75935003d9f13fc335144c2861ef5ec",
+      "zh": "2ece2ccda005114976a0c92f97de6e660a9b5a73b1e3c51bac9e8e8254db5b4d"
+    },
+    {
+      "heading": "@sortedyuan/may/plugin",
+      "en": "a4deee7a44ebdc33a595864020510aae9e727f70ea40baaae4d7a2e8cf7cf1f2",
+      "zh": "462cc64858e9c4d1b7b954f52bdec83e6723a7c2c83d8445c6addae53e76f93d"
+    },
+    {
+      "heading": "@sortedyuan/may/services and reusable plugins",
+      "en": "99150d72d5684c9e3fac461bbfca7e0b61d86084df5599eb78892fd81aec8ef3",
+      "zh": "b9610bb8240bd2b9c5c1979694308156fb7a7572eb6e338e8a43a1fa282f61ba"
+    },
+    {
+      "heading": "@sortedyuan/gateway",
+      "en": "b018ab8e14b6c2e5dcb0a1423290de70f6bb716bc03ba2e385b1870d9a49bc23",
+      "zh": "8b04c025449b91078366750c618836c1a9497a8bf0ee5bc412aaeb4e4daa24da"
+    },
+    {
+      "heading": "@sortedyuan/may/skills",
+      "en": "6d7b591b92ef899135201c8a34c08c92c0caa2d9e233926a66193645b2812e2b",
+      "zh": "ed3018f2918fd4935ea67ceebacd5aba13e5376ec1680a0dc4b64f5afb46a222"
+    },
+    {
+      "heading": "@sortedyuan/observability",
+      "en": "d2a800eedeadca921c436997f62e750efabd9e5f3eb49ebf05e54bb323efeb37",
+      "zh": "236ec1ebb2336f3317cd2c10d450442b1bd30122e9b09222c4f834ec9e0a9d68"
+    },
+    {
+      "heading": "@sortedyuan/mcp",
+      "en": "de40630db7025276a066073d56b1302d2084cb488c344c92dcfa3c21f1bb78da",
+      "zh": "f554ae0eddb588ff8f14f89f113ecc11cb3800326e73f7a3786755c4c32b722a"
+    },
+    {
+      "heading": "State and policy",
+      "en": "0118c6c34e0ac63672cf1937f32c49c784e252895237571a08e30b348525e44d",
+      "zh": "5de70063b62aff9fd676b8e8c94ebe834d305a88ae4d4376e88f94cbce2f4a4d"
+    },
+    {
+      "heading": "@sortedyuan/may/context",
+      "en": "c24599db746f8ff882223045add01d14e13df0f411929e81373199d7b66c8cd3",
+      "zh": "83f3a20d3850f58f51c52e364e6ee38abfb978cef7797b2759aa8c68f3849070"
+    },
+    {
+      "heading": "@sortedyuan/may/session",
+      "en": "b3bd923145e819070e71841a430117742ab36b23cfb6d936c4043b6c0eabcf36",
+      "zh": "d8457b1494ec6fb2782a5a6224e71a6c984efd44900316fcc7e4b9f13a48254a"
+    },
+    {
+      "heading": "@sortedyuan/may/permissions",
+      "en": "b6212c32ad3073c826d470a8b3d87d4ffb71753e7414c887140252ed6c586c25",
+      "zh": "98d6739d36833110e462d6c2777ed6d8df8237db29837da4fcc606df389f4ef4"
+    },
+    {
+      "heading": "@sortedyuan/may/config",
+      "en": "d88ced7d398ec3ebad442f4f1994d1153233da1eb8319a97c8d02348f9432877",
+      "zh": "d380b5c3fb8afda400ef8f1694c11886d6c6039a0f9da0a43f2c0b21aa5bfbf2"
+    },
+    {
+      "heading": "Models and providers",
+      "en": "f0f26c5e2af1c16a60bff07ba16eaf8161a454e89358b4da32acc1d1ff3392fd",
+      "zh": "e31167155fa524782bc0eaecfe430ab2fbd9a95ea369891060f2b2d321628438"
+    },
+    {
+      "heading": "@sortedyuan/providers",
+      "en": "fae48e157c1270ec5ae1562dcb40d74054704cfd84fb8f6ab8cd7fb2d2eef90a",
+      "zh": "485d6b6b75008f331e694f328c2107828ab455fcfcd0fc987f37019988655d45"
+    },
+    {
+      "heading": "Tools and media",
+      "en": "7867c9b447a4967ef01470b8a70b92043a72f68213d7edb5da51158f384efb66",
+      "zh": "10697c44c051c73eb4c4d6174586acc2077cee6e96f21897614ca20e1ae98ecb"
+    },
+    {
+      "heading": "@sortedyuan/coding-tools",
+      "en": "21213a49196f3a2fc80faeb10d1c0473d6019073910a656185464a6998812ee2",
+      "zh": "52e8cec2dc31bface270b06f916037412f6648a33208abe3b7d512e7b2025302"
+    },
+    {
+      "heading": "@sortedyuan/may/session/tools",
+      "en": "c774fb95fe22f9938b1f068d734eea1608a20e52327c0de1dc17ed92b9e638e2",
+      "zh": "9ae41d3847b2ca1c7d93c4f52e5eb5fa80e35e2af84725076ab0518b4cca81d1"
+    },
+    {
+      "heading": "@sortedyuan/media",
+      "en": "b01ddf40f8ec0295ec4ed8780fd27c885bc28a01209cd65c3c2bcefd75b233b2",
+      "zh": "1303ac9c2a3abc90d35a88244ee64cef7883bac1948e4c0eeaebab6822d14b78"
+    },
+    {
+      "heading": "UI",
+      "en": "fbb421867bcfb0b7da5dc1da7a7a48cdb1c1131dbe14eef799eaaa8998ac8207",
+      "zh": "fbb421867bcfb0b7da5dc1da7a7a48cdb1c1131dbe14eef799eaaa8998ac8207"
+    },
+    {
+      "heading": "@sortedyuan/tui",
+      "en": "786c91b6432161ee561099c20c43e899ce06817ba55c1275b3284c647fa6e33e",
+      "zh": "ebea09b06e9fcf62c6cfbb463ab32360ec24fc9b7dcc011f29ea0011fd2c1b82"
+    },
+    {
+      "heading": "@sortedyuan/ui-client / @sortedyuan/web-ui",
+      "en": "21b74185a4582f4f7e5d1770c8ed34a268079502d0acea85c653cb44e00b9e0e",
+      "zh": "7a54488b60a1432fe33ed221c4b4e65453d826a543ac3c6d1175adde9f38b76f"
+    },
+    {
+      "heading": "@sortedyuan/tui/keybindings",
+      "en": "272dd6827c65845e333693a3823997f34b2d72935a27b35c92ffff6dfb670b62",
+      "zh": "df110440a41f23087e59733ca31ade51efbc7558e5f9c08c8ef7ca1fe49e18ed"
+    },
+    {
+      "heading": "Reference products",
+      "en": "a752b6aad45de8187bce6ed7fe656413a54e25835e2ea839bcdb608a2bada878",
+      "zh": "921b959d4b03aeaf2d12936a2ce882908a6f85d6f04d7be175c906b780a2d68a"
+    }
+  ]
+}

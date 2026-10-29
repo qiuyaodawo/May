@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Connect MCP servers",
+      "en": "00678bac74c05058bd95cc0d9c0002e084c158cbfd862e07fff62cd51c35daa0",
+      "zh": "35cb8c46d0d2eba1927d7b8cd998408ccbc1930eb4819546341ac44421babb54"
+    },
+    {
+      "heading": "Why this is a separate package",
+      "en": "2bdb004e40c1caa9fbf846f47d102079c744c78340127497befd35e97cdd64bb",
+      "zh": "16422ac73be98280ddedd7625d3a6520f47422d6a60fd5983193e21b0bd3ddbe"
+    },
+    {
+      "heading": "Package API",
+      "en": "ccd71057cb921a322144fd4bfc399278dbe3bcda29e0fbc8820c826097407a73",
+      "zh": "8d095749dd667caa0f8055dd2c2eb51c4e497e34f5e85c3fd6b41b539aa2b0db"
+    },
+    {
+      "heading": "Names and collisions",
+      "en": "e591553943bf98ef97f750009be8ff341cc33a47560dfe9be31b8697377c4c3e",
+      "zh": "839b28df02cf8e7cdd87824491dfe94aa3966f98fda77e8ac422725cc5f93cc9"
+    },
+    {
+      "heading": "MaybeCode configuration",
+      "en": "d14a49c74c7a645982c2abb424fcefb603834cede8d66233bb375f865c81a83a",
+      "zh": "38b63f6a05114b333cde6c86b40e9ca4750a5cfca368031510e0460b5601b947"
+    },
+    {
+      "heading": "Streamable HTTP and protocol modes",
+      "en": "5f51b6e9d423ab5875755d617709f31cfa99078c6c036917960122c2b3705d4d",
+      "zh": "27e04d2a7af90a2b931a4462e07883a3c0f8ba77ad953a46c60a0317f11bed01"
+    },
+    {
+      "heading": "Tracing and security",
+      "en": "04d500355145a1ea20eb613c2448ee7f67a388bdb9ad516ac12f13781dd6b2f3",
+      "zh": "98a55868bd2c0642873c658aaf173f30b50fcacd990b772b0d5d602a70571b07"
+    },
+    {
+      "heading": "Current scope",
+      "en": "df7203f9a38edba90027edd93c25a058a96375ad55599850e3883a2246bc3171",
+      "zh": "d29b6b915082e0dd59ca97d12eccb6a5a5da3bb5133a21726bf93b720033de90"
+    },
+    {
+      "heading": "Dynamic catalogs and endpoint recovery",
+      "en": "12bb2333081154de871965d84bfc1ef668c53272766bf6e05bc2c9b355ceeef3",
+      "zh": "ca40957087082bab5f47f29070a381b5e564bbcff7618ad1ac208c3d7b4df62e"
+    },
+    {
+      "heading": "Resources, prompts, completion and attachments",
+      "en": "1d1b9f6395f06c899389e27d1449d16133d60ffb5dce52740cb47b8686333d36",
+      "zh": "83860b97a435f9f8c1b84419476a8fb418b460cc915058dabc46420a119393b8"
+    },
+    {
+      "heading": "Scoped user interaction (modern MRTR)",
+      "en": "199e51cddaf7d02bfb79fcdcfc4add21aab4b55fc103bd5fbd5c8bf5430c309c",
+      "zh": "0403d04324b7c4fc508039c119985183c743a91e82f1e30468da636e0dd66ca7"
+    },
+    {
+      "heading": "Roots, Sampling and legacy compatibility",
+      "en": "16bc9f14c8b8ad9190ed851c4bce4c640d06d31e1b27b61e1b739e5c964fd418",
+      "zh": "05ef8d1758032ae659bad429efbad762f60f689a680ac67be235d0b6125bd2f8"
+    },
+    {
+      "heading": "Troubleshooting",
+      "en": "6db0322ec32630444630a1b05e42b6b55ce55e83b69b0ef85d4910096b0f6203",
+      "zh": "8064db7d59d16ae87cd82d85f54ae8c3773eb09cad8f0c360f70a00d7ac4e8f4"
+    }
+  ]
+}

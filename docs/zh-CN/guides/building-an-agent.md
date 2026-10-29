@@ -8,7 +8,11 @@
 尚未运行 Agent 时先阅读[快速开始](../getting-started.md)。Agent definition、Session、
 Run 和 Step 见 [Runtime 与 Session 边界](../architecture/runtime-session.md)。
 
-`AgentDefinition` 和 `defineAgent()` 保存可复用行为，`ToolRegistry` 组合命名工具。
+May 提供两种实例级组合对象：
+
+- `AgentDefinition` 和 `defineAgent()` 保存可复用行为和策略。
+- `ToolRegistry` 组合命名工具。
+
 两者都接受 `Iterable<Tool>`，可以使用工具数组或注册表。
 
 ## 组合模型

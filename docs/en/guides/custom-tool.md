@@ -119,8 +119,24 @@ for (const registeredTool of composed) {
 }
 ```
 
-The constructor and registration methods validate the Tool shape. Duplicate
-names throw `DuplicateToolNameError`. `registerAll()` is atomic: if any member
+The constructor and registration methods validate the Tool shape.
+
+| API | Behavior |
+| --- | --- |
+| `new ToolRegistry(tools?)` | Register initial tools from an iterable |
+| `register(tool)` | Atomically register one tool and return this registry |
+| `registerAll(tools)` | Atomically register a group and return this registry |
+| `size`, `has(name)` | Query count or membership |
+| `get(name)` | Return the tool or `undefined` |
+| `require(name)` | Return the tool or throw `ToolNotFoundError` |
+| `names()`, `values()` | Return snapshots in registration order |
+| `definitions()` | Return model-facing definitions |
+| `snapshot()` | Freeze definitions, schemas and callbacks for a Run |
+| `clone()` | Create an independent registry |
+| `[Symbol.iterator]()` | Iterate in registration order |
+| `ToolRegistry.compose(...sources)` | Compose input iterables in order |
+
+Duplicate names throw `DuplicateToolNameError`. `registerAll()` is atomic: if any member
 is invalid, repeats another incoming name, or conflicts with an existing name,
 none of that group is registered. `register()` delegates to the same rule.
 `clone()` and `compose()` create independent registries; they do not mutate a

@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Run your first Agent application",
+      "en": "08a9aa21965b231e37dd8ced61f4f30f40d9260bec3ed5ca916fe39304ce2075",
+      "zh": "857018628ec8273a0d800e9dc037326f1ef4a68030547b99e2bfc5c7da6986a5"
+    },
+    {
+      "heading": "Prepare the workspace",
+      "en": "ff11ddae23843803ed1714fcf7fa77ca42b67fe95319e27717eb25df34cf0355",
+      "zh": "b9bac14d4d7471a114282ffa54ab5af351699bf5dc201da93d78f642a5534de7"
+    },
+    {
+      "heading": "Create a workspace package",
+      "en": "808ae71ac19ef4661a3f58fd562597cd78032765c2a7fe2e20c05360d138aa75",
+      "zh": "8f5a91c3430737aa59ccdcd9784fe7a38948ac20348825c181c1440bd281989d"
+    },
+    {
+      "heading": "Add the Agent",
+      "en": "1bfc72458a4fdde257861f71afddc947235daf6bd457859f5d30b26c1a66454c",
+      "zh": "d0a18e86f01eca3bd151d364851316c4c4ca2986a6ed29d196399aaf8afe9263"
+    },
+    {
+      "heading": "Run and check the result",
+      "en": "06343aec13ced13a527166ccf894ed19bd742def6383cd3a8bef89d8df45d92e",
+      "zh": "611c4c5c91a51d1d37933b2a7690fe54f471aceca9c132fad7a6e5105c8f41c5"
+    },
+    {
+      "heading": "Persist across process restarts",
+      "en": "0970d4cf85eaa4b46d5b49ff80d99c0536f0e1f15b88efe21d98f53b1b2491a4",
+      "zh": "3939df97a243476da3033233e027ef6bbe92de292da0b29b2de1c5f69bd4142c"
+    },
+    {
+      "heading": "Follow the next task",
+      "en": "2cf909dcb46f9271c2f8279dc2b9ae03770754b96b6c3326dcdcc1d635632b02",
+      "zh": "ae934974a49524a47b1248f83ab8c08c0db40cb39a6586e3b2dacb1339e7d0d2"
+    }
+  ]
+}

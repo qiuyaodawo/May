@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Implement and register a tool",
+      "en": "a4c6c5a549bf0ac5606bb7813c1db3e0b4c4a29941b0c978d7f946f0b1fa73cb",
+      "zh": "bc242b722fc646f4b2ec520cbc1bb352d72066eb28e7671cc0b6bb9afe367881"
+    },
+    {
+      "heading": "A complete tool",
+      "en": "2090c87905ae3362cdf09426d105cb37262ba0660fee8ed5e89d7eb1a26658cc",
+      "zh": "cd77015147b3c5827bf90f2f82ad4977056e4d754ff35a027e6964523f9b27ab"
+    },
+    {
+      "heading": "Registry composition and lookup",
+      "en": "7f61d17086dba41d63f15ac510c5af18b6fee7941662a494b8651a3b62e09169",
+      "zh": "b30d62d58ff01d1068c7bb1db60d5891256454aaa2d3541eb25edc7033563350"
+    },
+    {
+      "heading": "Execution context",
+      "en": "4cca093ff4ebaa1a483c63e3e907c38c720305d700cab3114d32eb502d5c8206",
+      "zh": "6d64a36afdad7f308e27c93b5e497cf04272dceef1df6b39104753aa9f2d91ce"
+    },
+    {
+      "heading": "Failure semantics",
+      "en": "6bbd8c5e366c58e3c35813db611c029ca562eed6ed62a0aee02016310729c0f6",
+      "zh": "7712376210c4ca7f14a664a7cf860a2635dc7c3a537daf6303e6c93fea8efc4b"
+    },
+    {
+      "heading": "Security boundary",
+      "en": "5b820c9a90d1cd8323de565d4d52c7c5de442f616c4ab217a3dbe7f5ef1d80d0",
+      "zh": "09e58ec988f834c6ad41dd66e9f455da16a78f0a41c727b58216a235c772ff46"
+    },
+    {
+      "heading": "Testing boundary",
+      "en": "e14f1d2c203b4cb9164393034f678949774f2d3a3d148a77e69d632a13351851",
+      "zh": "247dcdec90a4830296febe249b31119b3ac4c07817f3bdb049e4d6123f7e2370"
+    },
+    {
+      "heading": "Per-Run dynamic tool catalogs",
+      "en": "a85b1907985c7b47003402e95f21ceaec140bb4cbbf94b003051518832bcc873",
+      "zh": "c80c127af9f516460a257a6583ef3a20acf4170c04523c89f9256e7121c4db4c"
+    },
+    {
+      "heading": "Project model-visible results",
+      "en": "d935009eddfc10accb40c3dcf95dd9ada9607b0bf90b3b0191d68bd001df46de",
+      "zh": "ef35ed7ec572d844b4dd419df89e06d0bdfa2b0683a0e6302f76f91adab2f856"
+    },
+    {
+      "heading": "Supply trusted execution labels",
+      "en": "f2489ead1a8c7d23a0a02524e076a046e4bf3b65eab94cf773170aea5e6d5ce7",
+      "zh": "e7cd8e3634f0190aadf9b0b467e1b4097b19a2f716ffe2b4bb9c4bf77b007f14"
+    },
+    {
+      "heading": "File and process safety",
+      "en": "7ebdd97708d27a72557ade6075382f9b3d618e3c641a76a682e4e96c5b5744fd",
+      "zh": "6e9e83c2362188312e049d8b3021a36356fec76b338dfa5615e20371ef427873"
+    }
+  ]
+}

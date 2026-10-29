@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "May configuration reference",
+      "en": "514fa685ebfb77e0d113f27cd41b134c4363b8bfd6e4313a69f25ec94832dd3b",
+      "zh": "b3be3370df9d4a6b5e304b984c52a3e2ed1b7f7e198e9444646a2bdc2015a58a"
+    },
+    {
+      "heading": "Top-level fields",
+      "en": "4ad652957cfbdb3cf9af08c63439905ee0ca03aa97608cb0f7c019a2ab3b8ccd",
+      "zh": "c060d1efbc1fb1624b7c8fac165d126e6d676f9250543111745bead1db48a5a7"
+    },
+    {
+      "heading": "Built-in adapter options",
+      "en": "dbe27300ee168e329e2c78f78b4e11fe61a5797e0fa86ce28fa73fd67697c66f",
+      "zh": "20ad5b58482edbca0cbdff6f681ce6416701c0897e8181a3c9376ca9b118e32b"
+    },
+    {
+      "heading": "Model capabilities",
+      "en": "536e3c1a281257afd2fb2291f66fa012c4ee884f0bbf46e25f274a58207c3b0e",
+      "zh": "35273133809c74ca2275891c955fdd7576b3a1e50be66454f279aa8ea5a6dda9"
+    },
+    {
+      "heading": "Capability field declarations",
+      "en": "3620d4e7681930a12e7aeb3ba2bffab8c4d2ad74d56261ed43e12522a907f93d",
+      "zh": "d7e240729808621c96171521d6368c931361033e09f10bb6f43a2ceb02e65836"
+    },
+    {
+      "heading": "Request and response validation",
+      "en": "657a5a62c76b1e0446563b58f5e2702f3e95b4beafef5f9af982e67694fd43b5",
+      "zh": "23063b68a272fd53e248de80c6e885766a930a28b8b556eb33092aa6b8131ed9"
+    },
+    {
+      "heading": "Built-in reasoning catalog",
+      "en": "bb33c83e1717afe3d5e2c073b0fba4b8922fa6478b2a6e3f2b920e754564cff2",
+      "zh": "5597bd5c78373a0d66a3ff19b6b015e94aad98700a8e93069c299631c50abd9d"
+    },
+    {
+      "heading": "Thinking objects",
+      "en": "52e9e699af509e32e88d5c661b9a91954b1610e6198095520b9283fb6d49708c",
+      "zh": "b6c480130fa2a11e408fe29caae8472bf9e2d872da5293c0bb11a06a7eaaa156"
+    },
+    {
+      "heading": "Application plugins",
+      "en": "f2abd99da84759d7558fcf73b2a0e3c41530abba512088c5e759a110ea71ed0d",
+      "zh": "ac7a02790737a47855919f00fde512d715a5727c448ee85a672692f6f1e87bfb"
+    },
+    {
+      "heading": "MaybeCode project Git management",
+      "en": "224bb64c413543772138591c3ae577c45be93ba18dccfdb0c007296366027ccd",
+      "zh": "cb6a672712b9033f136f49f9c78cfac6854352e927a0c7187780cdd518a510bd"
+    },
+    {
+      "heading": "MaybeCode delegation notifications",
+      "en": "42a1359ae5ae5507f7df5c1d8e795f9d07a92bf1a3a6d5a4b8ae607983536ae3",
+      "zh": "b2263b9e16ffdc73cc39d133bb89a871884ba6e6e8cafa2d9b1ba0abe65256d9"
+    },
+    {
+      "heading": "MaybeCode permission mode",
+      "en": "558c2d691207c25de800f3a8b320ccca2f7c88fc636a7111c7c816884dadafd6",
+      "zh": "6c4bb16eeb202f1bd36b29ad67c0812d82eb85a5c13ccf555274a1bd8db1b97d"
+    },
+    {
+      "heading": "MaybeCode settings",
+      "en": "3aa76bf455fe90b8d81d68a6fcc65db7e5da50f2238a9500af6dea90e9a31fd4",
+      "zh": "2a0a9a4dc0cfbb32a3ddaa900bff5a1ae0298af54a954bebca18fc858a9c39fd"
+    },
+    {
+      "heading": "Observability",
+      "en": "bd1ec6017770804ff2d86e4818547e681622b9a20b33d7775456b44663053c1f",
+      "zh": "ccef48de43716caa6bdf187b085e857da0b12e2c6e0a16e9366e4c2719d4808c"
+    },
+    {
+      "heading": "MCP servers",
+      "en": "df3a7f3c64e272ad1380f94d6a75b18a71141cc7e2d78a532491df17c1a7d01c",
+      "zh": "dfc5619d3e34ab534c19bb09608849b8becf4ec1ebd0a18027daac32ba7a1731"
+    },
+    {
+      "heading": "MaybeCode terminal interaction",
+      "en": "2338c7adf911d9efc8e9ecfa51ada57cf6d11a3a6f1fea54ead2f0450c6aa3ae",
+      "zh": "681d5fadca4b4f7aaacc58f71a48773cdb3a6221d2bfb8548173284b6a77c53b"
+    },
+    {
+      "heading": "MaybeClaw settings",
+      "en": "8f2b3296c1baf898e6ab79b814c5b756f93180d1db1b98d13ea3ef70636c2e5d",
+      "zh": "b985f8f9dc519f4e8bff723620bcc6f48e0fcfbcf149b15f0570e529250e2dde"
+    },
+    {
+      "heading": "Maintenance source of truth",
+      "en": "356200e57f0a972a7f54c7c33228a9709cd04469629217d065b789229e13fcd0",
+      "zh": "ebd8cc89c4543cede272cfdb432af2c1bec211f8d4e549ad73642652b746f848"
+    }
+  ]
+}

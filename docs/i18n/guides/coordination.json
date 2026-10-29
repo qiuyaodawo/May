@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Multi-agent task graphs",
+      "en": "bc96d08c4d966730851e781186246d982b517317b46f3a11d334f09d6e920dc3",
+      "zh": "06e56f60a4b28a4762c49757f6359438abc61e85882ee50455dff97c71bf3402"
+    },
+    {
+      "heading": "Create and run a graph",
+      "en": "1a82638a0005de03ab1410db76c4da96cfc0cf2eb8ab413121a0855ad63d75e6",
+      "zh": "82d6c020c6778055850008670f59b0cf9bceae6ec9ca2cd4b8ec98b975916046"
+    },
+    {
+      "heading": "Dynamic delegation, yield and wakeup",
+      "en": "37e43736757cbfa49d253e7290228efe267eaef0a3bde0a1573cd0e8ce96c4bf",
+      "zh": "df2590cebbd7530ac8e29e6e6681a96e4a582f44373362f7096909bd4f2d92ab"
+    },
+    {
+      "heading": "Peer messages and task mailboxes",
+      "en": "f5ad281b82c799fa309877781eafa1d80f5145369a339a81cc89a6a946d41dbb",
+      "zh": "97b582792c2c96ca5a7115625f9509c67f53fa06871b2d2ffc286d827acfd505"
+    },
+    {
+      "heading": "Transfer task control with handoff",
+      "en": "1807e6dd40082a364007bfe8e2d6eb5415dbae2f36fef7ee24573c98ed8c1fc2",
+      "zh": "2ecb693266a38e9167d42e505085b7704eb0251f119f237f83e5fe6dab750ad4"
+    },
+    {
+      "heading": "Ownership and input boundaries",
+      "en": "6fd8cca4ffa68d204f402f05f577fecd9035cb6d1539d2bc7383dfdbfa7ce049",
+      "zh": "8ac3ada7657dc3d1641ee44336967fd5f230b061d299af315d67b126780d2236"
+    },
+    {
+      "heading": "Events, approvals, cancellation and limits",
+      "en": "2487194dc93f2e2e49753756791459ffae9ee2f7881f25bf9178eaa79140c0be",
+      "zh": "bcd0d637ae8fc0a3efa59af110b564615c90d4c09b097d5fd68c8bbd2cb5d0ef"
+    },
+    {
+      "heading": "Durability and recovery",
+      "en": "f7117f30d599d2e869e80c88395721160b337d59ab9e3fbdb699c1bed6aadde0",
+      "zh": "85d508988b4dd370351bc63750966f4b11b11d85cdcdfbf0adcf3daa922de48c"
+    },
+    {
+      "heading": "Integrate a custom conversation host",
+      "en": "5ff88a258569581985d9805bbffaa7c4d3f323495c3aa7af5718655ac6a91fc4",
+      "zh": "c4363eb5f90f0a29e23a12d43dc628092d524d6c716148fa923bd95983baab67"
+    },
+    {
+      "heading": "Related guides",
+      "en": "5bf16ac7f2238a7b96c87f7fa3f6b296c5ac0926494211f775f4ea4d892b316d",
+      "zh": "e5aca70d2b9450d87421c2b271eececb257a5d012d6939ecb8ca364ce2e65d08"
+    },
+    {
+      "heading": "Storage bounds and checkpoints",
+      "en": "4044381493b6d0168d8fee9760b53b61ff6aa585cdb2e764f322924cda8d13f7",
+      "zh": "635b0b0029f1ed61e429655b8d8376d3a20ca00195167e0fc5b77c460daf8483"
+    }
+  ]
+}

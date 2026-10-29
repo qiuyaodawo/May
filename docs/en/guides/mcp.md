@@ -93,10 +93,12 @@ remaining servers start. `close()` is idempotent, visits every connection even
 if one close fails, and owns termination of the child processes spawned by the
 stdio transport.
 
-`requestTimeoutMs` sets the per-request inactivity timeout;
-`maxTotalTimeoutMs` can additionally bound total time even when progress keeps
-arriving. `maxBufferSize` limits one stdio protocol message. Defaults are 60 seconds
-for `requestTimeoutMs` and 10 MiB for `maxBufferSize`; `maxTotalTimeoutMs` is unset.
+| Configuration | Meaning and default |
+| --- | --- |
+| `requestTimeoutMs` | Inactivity timeout, 60 seconds; progress can reset it |
+| `maxTotalTimeoutMs` | Absolute request deadline including progress and interaction; unset by default |
+| `maxBufferSize` | One stdio message, 10 MiB |
+| `stderrMaxBytes` | Retained stderr tail, 16 KiB |
 
 `pool.status()` returns a point-in-time view of every configured server,
 including its connection state, discovered tool names, latest diagnostic, and
@@ -286,25 +288,31 @@ an in-progress Run. Old snapshots reject with `MCP_STALE_TOOL` if a definition
 changed/disappeared or the catalog became untrustworthy. The wire request is not
 sent. A reconnect closes the old connection, so its snapshots cannot execute.
 
-- `mcp.catalog()` returns deeply frozen per-server metadata: revision,
+| Operation | Behavior |
+| --- | --- |
+| `mcp.catalog()` | Return frozen catalog metadata |
+| `mcp.refresh(serverId?, signal?)` | Refresh advertised catalogs for one or all endpoints |
+| `mcp.reconnect(serverId, signal?)` | Replace an endpoint, including an optional failed endpoint |
+
+`mcp.catalog()` returns deeply frozen per-server metadata: revision,
   capabilities, tools, resources, resource templates and prompts. Only advertised
   capabilities are queried; resources-only endpoints are valid. Metadata is
   untrusted server data, not permission to load URIs or execute prompts.
-- `await mcp.refresh(serverId?, signal?)` explicitly refetches all advertised lists
+`await mcp.refresh(serverId?, signal?)` explicitly refetches all advertised lists
   and publishes only a complete candidate. Each list has a 64-page cap, repeated
   cursors/duplicate identities fail closed, and retained candidate data is capped
   at 4,096 descriptors/8 MiB across lists. The refresh deadline is 60 seconds or
   `maxTotalTimeoutMs`. The Host separately manages HTTP-body memory limits.
-- Advertised list-change notifications invalidate tools immediately and schedule
+Advertised list-change notifications invalidate tools immediately and schedule
   one coalesced refresh. Modern endpoints use `subscriptions/listen`, legacy
   endpoints use notification handlers. Concurrent invalidations allow at most
   three discovery attempts; failure preserves the prior metadata as stale and
   removes its tools from new Runs. No content is automatically read or attached.
-- `await mcp.reconnect(serverId, signal?)` replaces only that configured endpoint,
+`await mcp.reconnect(serverId, signal?)` replaces only that configured endpoint,
   including optional endpoints that failed startup. In-flight tool calls make
   reconnect fail. Old Run
   snapshots must be abandoned; the new connection gets new permission identity.
-- `/mcp refresh [server-id]` and `/mcp reconnect <server-id>` expose these actions
+`/mcp refresh [server-id]` and `/mcp reconnect <server-id>` expose these actions
   in both terminal UIs. `/mcp` shows revision/staleness and notification coverage
   (`active`, `partial`, `unavailable`, `legacy`, `not-advertised`). Lost modern
   subscription streams are visible failures, not silent healthy subscriptions;
@@ -366,6 +374,15 @@ Remote prompt role labels remain data, not actual assistant/system history.
 `mcpResourceToUserMessage` and `mcpPromptToUserMessage` preserve untrusted MCP
 provenance. Resource links stay inert JSON: neither local file reads nor automatic
 URL downloads. Watch notices never change the model Context.
+
+| Item | Limit |
+| --- | --- |
+| Content results | 128 blocks, 8 MiB; validate base64 and MIME |
+| Terminal preview | 16,000 characters; binary content uses labels |
+| Completion | 100 items, 64 KiB; ten calls per second per connection |
+| Resource cache | 32 entries, 16 MiB per connection; positive TTL up to five minutes |
+| Resource subscriptions | 64 handles per connection; 32 notices per handle |
+| HTTP JSON and SSE frame | 10 MiB before SDK parsing |
 
 Results allow 128 blocks/8 MiB, validating base64/MIME; oversize results fail rather
 than silently truncating structured data/binary. Terminal previews allow 16,000

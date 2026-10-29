@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Context and durable history",
+      "en": "bb1ba54c46542f948621dc7f008f0da6863a4d209ce8c222ff26f062e26672e8",
+      "zh": "58ad7836225830cc85184a629ad6c60ca3fb18e14fae82863794c8cdaa80f7f1"
+    },
+    {
+      "heading": "Two different views",
+      "en": "e5de22653edcbe5f1154e65417044767efa9c94d9e356dcbdedc52e488681285",
+      "zh": "daf24b3b004bd89fe3ce4e62034b0d03d506453c73716a605f5783673f2a38c4"
+    },
+    {
+      "heading": "Inspection and budget",
+      "en": "714489f0f59eae99bffffded5f327836c5d8eb14701255070dfcc5269cd8fd6e",
+      "zh": "6c53365ec29864b8c5fa32a40d3f37e22d74dbc43d2079d2aba6e6c11746dae2"
+    },
+    {
+      "heading": "Compaction checkpoints",
+      "en": "8d6cc2d7e3ceb0da343da3d37ce38397a0e3f42fc931a5da159e60a545cbbe15",
+      "zh": "683954976b11c79ba2aa9601c3cd35e0700da390174e6be6980116edeb494547"
+    },
+    {
+      "heading": "History-reference work memory",
+      "en": "9e951ca72f2272c4ce1f4c8676007db5bc35b64a438df4301741b1d66dde41c6",
+      "zh": "09f8ba9def50a00ca885f678f05ff2aa23fdb7d7b0654462e45055ad607fc33e"
+    },
+    {
+      "heading": "Replay semantics",
+      "en": "fc76481211c45c8e0c08e65478832d6dc3aa2562e7e07a3a78511fa730a593a1",
+      "zh": "dbe041fad08dc8500ed616111a4bd036d5dea46279300a4a613cda578b308e5b"
+    },
+    {
+      "heading": "Reading durable history",
+      "en": "c1d1316fd9a9b664cebfa2b0549499985a2f40a2140f9f48f9fe3ed337677eaa",
+      "zh": "346f71957a0225d9959f7f862cc6383cbd1516702e5233cc0b8efb36dcbd3871"
+    },
+    {
+      "heading": "Catalog versus history",
+      "en": "512514f08773b242b104ed32e2170cd252365b7964f1efa18e9477854cd44a02",
+      "zh": "5f8a654ff252bf033147dde89ff204c97277866d9cc32ecc6afead75aa94d54a"
+    },
+    {
+      "heading": "Choosing the source for a feature",
+      "en": "971dbb052419238209abe326838203db974ef0d70fe218dd7a8bac3d596cd3ec",
+      "zh": "3cc1a203552d4e1342e485584ae8eeedc8f8342f16f19fedf2eac7353b112330"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Git workspaces and file checkpoints",
+      "en": "2309c965e501f37322ee1ba6c3696d9a6a29363ec6f535ae85b75d832475d65e",
+      "zh": "c61d3a7cb4eaa900d21c15494cbd8036618b9ec0318d33f34f8e4e0eecc74687"
+    },
+    {
+      "heading": "Preparing a workspace",
+      "en": "a54eca9a06c215e588121b6275b995cea4c2767132ecd6aaa081f6dad8734122",
+      "zh": "c08341017854549cf6b5b2b21e34070f1490d4c3d2357c643f2d594d2e098f9f"
+    },
+    {
+      "heading": "Completing a request",
+      "en": "af42ab5fbb9e66a9bbde5ece2c2094c1fd5c5f78d51b9bd387a030d278e68a52",
+      "zh": "23c846eeaec847547f47bbde0fe85ad5f0ce66f8c178aabc009837f646383910"
+    },
+    {
+      "heading": "Comparing and restoring files",
+      "en": "8eac449cfaf58cfe19e42ad8b4ef1cbb105ecb22c80bc5656afef4871166bc06",
+      "zh": "89fc98f582f0d4070943adfc787296fe4719c9da8ba2f92cbe76551ffea8b932"
+    },
+    {
+      "heading": "Managing worktrees",
+      "en": "9df0ab8fdf531fc89e6ea01d67cec914a1783a1fdbf317d87de72812b6d2b68c",
+      "zh": "af03f08c95155029bb834b1dca0e17efb67969886961041b7d4f95d9565d6488"
+    },
+    {
+      "heading": "Verify the integration",
+      "en": "ad8764b5ecfa043d34a155cdad48a9bcbd17c7e3dc504b8622d8a4a3f9234c06",
+      "zh": "2842135e4c2a2bb96ac91e8b391228040e1b0f95888f87767ddbecc844a19e21"
+    }
+  ]
+}

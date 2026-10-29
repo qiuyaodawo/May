@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "ADR 0002: Agent-aware terminal UI stays in @sortedyuan/tui",
+      "en": "af6046a65f1034976a51aea18b844684e0e331b9fc66b4ce38af9f08c97262c2",
+      "zh": "fa6de23a46ba33bf07d8a844759785e372d70feb523f24423544058b3d898ee8"
+    },
+    {
+      "heading": "Context",
+      "en": "fbef18f1d8039d95cb4b2f80ba55abfc2cb8228c590aba0ccbf55d463ff5e68c",
+      "zh": "83d26e2d52c4ebd6238dba63c5beb8195f8dd832b3ceea9d13a3f7191e921687"
+    },
+    {
+      "heading": "Decision",
+      "en": "f3b0bf9ea7ee30033e84ba980249de06169e3d718693f30193fd391c58387e13",
+      "zh": "b535bfeb4645ac5222cab548ee72d26a69f86463dca38dcc678f9d0d849b135e"
+    },
+    {
+      "heading": "Consequences",
+      "en": "ccb0534ffcdc9ec5d011f8833c7efeaf6f6bbc6cab673c19c4613789ae29db4b",
+      "zh": "cd4f0269cffef8869897c48f7f3d9229a6fec26b6156677fc969471161bcd6e8"
+    }
+  ]
+}

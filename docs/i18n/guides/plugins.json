@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Write and load plugins",
+      "en": "0ba434d162237631e68cc04894bf4c925089b7274b073cc47c175adf91405bb3",
+      "zh": "a70d833a49c399239f0fb677d7ce5f4dd2995fe1693ec930da68d5f20e6c7b5f"
+    },
+    {
+      "heading": "Plugin definition and composition",
+      "en": "1e6d58cf959e09ff27e13e00447eec7327737c9ab7c009d99497163f2d9fc39c",
+      "zh": "fb717d5ed6b6170cdddd3a67fb1dc118cc05b2579c9e3acba2a5f94acb186c06"
+    },
+    {
+      "heading": "PluginContext and ctx",
+      "en": "8291824cf9af3f8012edaf2d4cde5ab0e62e6e0f8b2e92b9cb86244d0ff6f54a",
+      "zh": "2343b777e9d3752d69b63dce15b75b0c247f296c82c3b656064e6b005e10601b"
+    },
+    {
+      "heading": "Declare a plugin",
+      "en": "cae8d6d461dd6d40cd7b408d98abcfdd6e4e8b371d90ffcc8fbef69aeb77b334",
+      "zh": "f90b0749026c5661dc786db4e76fa2bfffc367bfad358602a2cd42f64afe9c75"
+    },
+    {
+      "heading": "Own resources within scopes",
+      "en": "671d734dcdee4f9cbfee51710df0b1d31b9e2cb60cfb0f6b4426bbba7364e804",
+      "zh": "5eb4a7ba42c35311374bdbe567758ab848025425e063ed360d6c0347097f14e9"
+    },
+    {
+      "heading": "Transform and observe lifecycle data",
+      "en": "ffebb5fbe9fe9f52e98071b3fa396402eee030ec45b75d6623c5c0e827637a9c",
+      "zh": "90450bdf07cb0a7a1ffcc78b1af1ac7b2d02bcd7e700201ddf5570d10690e8dd"
+    },
+    {
+      "heading": "Runtime and application services",
+      "en": "1fc69180cba27016cabec93c4a885298c785ed3dc23f04461410ed910ebe3b13",
+      "zh": "926d5daf23b91d093aec4d69fa73e55a5ffb632682fe6ca36aaa2a27bd55485f"
+    },
+    {
+      "heading": "Reusable plugin packages",
+      "en": "89c299441a2549c8fe6664c5c75a68c16bddc0b2f9fe616170d36c3a137ccda7",
+      "zh": "1213776269232112d262a41b3593406a6be57f8b2d6669adf5a612e5c0ce2c40"
+    },
+    {
+      "heading": "Runtime factory",
+      "en": "6be49bfcac61eacc20fe0502a5b3d6187b756197fb481161beae31e0c101ecf7",
+      "zh": "7d2966c63f936b952294c0062d858fc0c8d64db30232426cbe12a244fbbf6443"
+    },
+    {
+      "heading": "Durable state and composition changes",
+      "en": "03130d14f9a2180731a3333b5082ccf807ab80f3c2773b2824a8695fc2fe0d21",
+      "zh": "d02fdfe57c7ebd279b03f06083f7a58735e538035f7e082a4053c1d18905cd06"
+    },
+    {
+      "heading": "Load plugins in products",
+      "en": "e2dd20f669ed91203e2df618ba94bc5a0f34bb06ebae11d49c4cf164ccfb7672",
+      "zh": "e5afb7ee9dfa48f868341255667a0fe3452c15697bbe2dbcb590839b9e7a4698"
+    },
+    {
+      "heading": "Verification",
+      "en": "6b53f146c7f207a7e07b739a40ed8e6d8f4b46a135efa09e4db9414c7b89c81e",
+      "zh": "1109cb0bbc85809dfd03115da9dc56f53ba820b37829fba4dfec694aacaf8a92"
+    }
+  ]
+}

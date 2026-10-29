@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Run work toward a goal",
+      "en": "53020d29cc60edc5746e44d6a5fcd7bd2f03bbb99e575f6e2689d949d8f40717",
+      "zh": "c6e0c9a5a31f99e87a76cc176f83e412157496be1866fa090e50ba07c5938b58"
+    },
+    {
+      "heading": "MaybeCode commands",
+      "en": "8d93974374ee6cdf75d081e074b2f1d449c2672d620fcd2e5065cf4581344b39",
+      "zh": "996e2b6aa90469492d80319c6df491cd07cb32f479feee4ee0014c86ba3c982c"
+    },
+    {
+      "heading": "Composition",
+      "en": "879bdb520f95cf2054a37aaf069a4b1d84b2d1a1aa9b2997be77a74dac0e9aaa",
+      "zh": "9bcfc1026b55601989ef93b6411e2c4da3934878e4dced9939fcfc8dbce16ccf"
+    },
+    {
+      "heading": "Verify execution and saved state",
+      "en": "e6b83850405cf6dfdc8f53d9a93e440368909116df755da67df338735294b05e",
+      "zh": "56240e5604fe191ade921075b85fad48a5cdf8b0a992d9cc86874a5c8e6d9d2f"
+    },
+    {
+      "heading": "Budgets and recovery",
+      "en": "a49b6260b74589e4bcdb620179274aaa39982ef56a294d07fe5d4f62755ccf30",
+      "zh": "51e18fadb8ed88e8de4f326b869c1ea6f6c01589a604641bffa97bee02251ba3"
+    }
+  ]
+}

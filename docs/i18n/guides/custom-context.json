@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Extend Context with a factory",
+      "en": "513183cb6296ddbe423d06ede4b913fff3d843136d7a8b1f80463c2c5d47b2f8",
+      "zh": "fbb0a32576a8171d04478683efe1753affeec63bed0ebf13e49ddc63b749fcea"
+    },
+    {
+      "heading": "1. Decorate the built-in factory",
+      "en": "46261c4396ac995cbfedd116ddc2322a025c2fd23598ac4111e269cda296a9e4",
+      "zh": "b6c893a6d415681287a17710a3a7785cf1fc78698c19ac2a1ad4f9bd5b5d066a"
+    },
+    {
+      "heading": "2. Open an application with the factory",
+      "en": "269f7b7fda67e8b0daad7095b156437c8dd676ed4286a66d820fab52d43ed9f7",
+      "zh": "eeb95a2d59519eb6af3feb5fbdb5519bdff44c0fee1240d982ba1d43729808c1"
+    },
+    {
+      "heading": "3. Verify independent Context instances",
+      "en": "7232900223e34180db6bf9cf55b60a8bb672b30bd7c41b81730022db0fe54895",
+      "zh": "f7e9201a12a16cbe723642afef0a71bb7d1603a0c94a7306c7beabe091662ced"
+    },
+    {
+      "heading": "Factory inputs",
+      "en": "7705f372562d5661bce4126956a9be5a1480b28da233bd24cb1cbc4498b82e99",
+      "zh": "536289e7e66fa5091557cb0d4595505962b05ff92c18831ba91f5f4141d437af"
+    },
+    {
+      "heading": "Implementing storage and replacement yourself",
+      "en": "c1fba0201d48c07210458c804f5690f3d042d1ab0c6e74d4174d5d6df01df195",
+      "zh": "c880a0048712586d16e4ecbc3b0e6a1a1da4568b24120e1789bdf758930a3769"
+    },
+    {
+      "heading": "Persistence boundary",
+      "en": "cd0cf7442e22d5fc1ba378a826496237277379cbf5303573cb8b812a9eb260d9",
+      "zh": "795efa0be8386c686e3db914602fb07659aaadc4d5c41eebc480ff9363378ed8"
+    },
+    {
+      "heading": "Safety and observability",
+      "en": "639a435fd39ada5b3a14e2667e4315d6f4203960111e25783f40354c2e2ea6c1",
+      "zh": "5e73a3cf26613a3ab1e0720772d6f577d067155e81087ccc5d20055405b583af"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Schedule persistent time and event tasks",
+      "en": "8002434b3d0e66b6900a45be8d1fec53b3923d020cb6ce1088f30db15ac2ea46",
+      "zh": "6154558e7adb193db89473693ed1d97d56896a096dda05d121d4393a64eb8f5d"
+    },
+    {
+      "heading": "Daily brief",
+      "en": "5c83e61bcc4dea45513cfcc17c1f64142778cef1d823517d96a4cf5a4d74b33d",
+      "zh": "9a4c3ed930a2ba2a6edcf2585caccd0f796eb0fd2de4cb6eaddbd951b05ebeb8"
+    },
+    {
+      "heading": "Rules and edits",
+      "en": "c3b6368f8a9f39f1faf1b7ff5a8e6f25f8e2bac4c652ffa09e9d02c9028e559d",
+      "zh": "c0350161401a1aeb00103629c62843e4cf0f9a24af10b4f500862c5c1236feaa"
+    },
+    {
+      "heading": "Late starts",
+      "en": "f826d99fb76abeee1e2a6407fc6b01b1c2912b33a80bf5c13cd44a81dd821fca",
+      "zh": "b51f566e365c640f6ff9579478a8bf91cb05387af8addcfd2912f9a0e4191109"
+    },
+    {
+      "heading": "Events",
+      "en": "748cacc2407a954528e003e43fdcf8a41473cd8a9d0f1fb52f8c8ea196875190",
+      "zh": "d0624af01f92a22d9c5c5dc8dc62ec3eee4bb2dab41074c6454aabfa7cec05fa"
+    },
+    {
+      "heading": "Lifecycle and failures",
+      "en": "febea05987acc2fabd9fdb048791a1c761e6ff22dd2bb6d9dab536b622818499",
+      "zh": "77c79e14d20b1a5b4f79e820ebe67e0061f397890f05eae4c69a9ecf598b1ece"
+    },
+    {
+      "heading": "Storage and deployment",
+      "en": "1078e9a185ec6b1b9c844b778fd503bcaf3835b2a10df8c1e543cf7cd32ab238",
+      "zh": "2a88aac8a749505d87c6ddcea9ee95e8628a9428c4ef4de3bd1c3176913e1c1f"
+    },
+    {
+      "heading": "Execution diagnostics",
+      "en": "36ff9f1807288e11780d1924cb2e79d1c341ce41f9af637ebc66478a592e34f5",
+      "zh": "9bcdcbea8319cf25b516ed186c54e4114f4865b2df5f62b5d44f2d9ae4817c25"
+    },
+    {
+      "heading": "Verification",
+      "en": "3d48691cfe26ae592d1e4a36955a4590295643bf091f4741b1dfb0ce6226c275",
+      "zh": "bed143cfeb0f741154a1fde48dbe3a53a3ae68a1b7ab2f6d0956b99bf3a6f3af"
+    }
+  ]
+}

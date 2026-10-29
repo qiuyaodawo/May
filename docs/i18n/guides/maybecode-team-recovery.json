@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Team inspection and explicit recovery",
+      "en": "25f8816c5d8229359ea378916c45b1d5b80a1e2a64314eb3a0608f3d7d16b58f",
+      "zh": "b81436505032e6ad9ef88350c7add2caef08f427f21f1f84133f19527313e14b"
+    },
+    {
+      "heading": "Inspect first",
+      "en": "cd9fd0ce38700613e00ddde1c52c0f0e60a723579d9cf1f1b3744c181c5c5474",
+      "zh": "1ce4d4478f7a05c84f52228c998f354a464e45d808f8a64d8a531e239af2c650"
+    },
+    {
+      "heading": "Reconcile one known finding",
+      "en": "95f183a986d1ef5a812d7e33b6dcbd7ecfcc020bceec6c36fdeaf43e8399fada",
+      "zh": "f499555fc759e19a2fb507becf56869feec3d836095544413aeefbe60591d4e0"
+    },
+    {
+      "heading": "Review the impact before retrying",
+      "en": "ba183623e34f1eb33acb0703e1fe80fd7e6e8821e05f2b003133b7b7d5b85553",
+      "zh": "68192a941c7f52379eadfb5617d24e56befd9b25f675b247acbd9b84b62cf2ec"
+    },
+    {
+      "heading": "Cancellation and verification",
+      "en": "9f88662e8303414a8e77e8b26ff068a10466b40ca36e58c2a3e63bc9d72e8137",
+      "zh": "db15b940687c8a02989c7c5f3136eab662bf3f724e943ba28845950a667904be"
+    }
+  ]
+}

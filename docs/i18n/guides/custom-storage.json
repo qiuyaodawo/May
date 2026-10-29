@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Configure Session storage",
+      "en": "4875c6c878520fe72a30ea216cf08fbca7b624f64954d9a66d0651a620a405d6",
+      "zh": "cc99e7bf1cd9558ad61e168893d87650e67739970f2eb7454b17b9474a58e8a6"
+    },
+    {
+      "heading": "Select a backend",
+      "en": "80f882e3f2b23465b814b70341c857add7c1d3cadfc8404a050f4fb24925668f",
+      "zh": "a89de07f8f5030cbb9093ad68bbd381f0ed4b0ed3f5aa11a1c5ae304969512b5"
+    },
+    {
+      "heading": "SessionStore contract",
+      "en": "d6d61291a49fbf780a660a07fba4f7e8a6c9de4ff1ba82bbc9330c20df95d740",
+      "zh": "81a4584bdb8701e18d320440a73234aa8a453c430203a6799e0ad40deeba098b"
+    },
+    {
+      "heading": "Database adapter skeleton",
+      "en": "764e6c863c843e9bfcb6c5bcc454a11f02842df200e0b84ec1bb4fab61a227cb",
+      "zh": "3dd65020a99f34836e870569d36a8d47bb72815a2e1a920a3fd5b1a6b7492b54"
+    },
+    {
+      "heading": "SessionCatalog contract",
+      "en": "e5f96b26c5e01a7115c205427b1f336cf46f1914609e7c33a053b5304ddc28cd",
+      "zh": "94c2bd22be1e1853ea9d504993bdad7a8d9792e1b166d66e9039119a696695ab"
+    },
+    {
+      "heading": "Built-in local storage",
+      "en": "dbfcb84bcfff7658b40306200c0b02d913410a602201c1c8457ee8e2323cd590",
+      "zh": "f68c1723f12ca1510ee4ab01297c1ae8a46889f4d6ee446ba611db37140e7a08"
+    },
+    {
+      "heading": "Coordinate local file access",
+      "en": "db152bc77f10eafdba836a1ec6cef6965f6ca0e9776a4b9af88e16b36dd30279",
+      "zh": "0e6a1018ec3353703839773d52397605c16dad408b1a71773ef299308833b6b5"
+    },
+    {
+      "heading": "Verify persistence",
+      "en": "d2114672e993f9b8c46e9179a408b880efdd0b6af83a6488e9748ece26b75271",
+      "zh": "a7049935b0bcee53bf9fa124406dbe37569bb1dfb35f3e3bf48078f347b2f97e"
+    },
+    {
+      "heading": "Failure and lifecycle rules",
+      "en": "f60bceb917eec4b233ea863e68a91b2f85610ed3a4fd1437f3f3ae9a7378d8ca",
+      "zh": "3eb2011cb4804bfaa397fcfcfabfd3f04137a4d8841bfd5714100337472fe207"
+    },
+    {
+      "heading": "Local storage maintenance",
+      "en": "baf60408ca882000af444e67bf3dc5ee6ec0f6b7d384da20f2aa002cfe6eb648",
+      "zh": "d12bd82bb65a784d23c789ef2ff750bfee7c183d53cd809c487a95f6f3337227"
+    }
+  ]
+}

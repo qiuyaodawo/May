@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Configure and inspect team acceptance",
+      "en": "d288f75362e330df963538d162c11fd37d6826018306691ec2c6eeb09f135d5e",
+      "zh": "b18819971e10eee55794d10764ce1834ada47a6d1c498faf21910d069fe0736a"
+    },
+    {
+      "heading": "Verify a team",
+      "en": "9e9298ff2d09e2ef78d51433f0caa22fdb4d23fb478c5850a533aa77156d478c",
+      "zh": "18ee70f6268823cbd8d842dc3c0b3aebe6d3da18f52cab79a88373e7184af74b"
+    },
+    {
+      "heading": "Structured reports",
+      "en": "052b07827aca80ce981748bbc07491002067594c94df46137e40b2141667aed3",
+      "zh": "be50253b7960579860a5cb486848a64d21a362108a83b6ba5e268619c86f5ef1"
+    },
+    {
+      "heading": "Host-defined checks",
+      "en": "e29ee737e84d8c60b5d9c93857c17b7bb2bc0d02233f1c8e682cc3f3c7bdb22c",
+      "zh": "0e266e5de24f4a4c2fb0b5e25776eddd2b4737d73af3449dbb4efcab5121035c"
+    },
+    {
+      "heading": "Freshness and acceptance",
+      "en": "1c3b50e4a281aab2f29fee3fdfce0fe722ade09339e13f58481675e9b590ce32",
+      "zh": "7ed53339430739b4e8d915df5edcd28a52041107c8b783b8c6b1771f993ad113"
+    },
+    {
+      "heading": "Interrupted checks",
+      "en": "0d5317e37fcfa94682a8fb074c84527e2a151fbaf206cc4b9016345fc27e78bb",
+      "zh": "705601353150008381d0f534c549073850a5c7a513c39beaf42af5c07f39b4e0"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Runtime and session boundaries",
+      "en": "41c8ec97b02de41593dbbf940cb8a1f927ac1063e294bb7a26e2d774486ab613",
+      "zh": "8a625a80f3b27d9022b006340e3e4a8b62468a3547994e9b20713957cf76b894"
+    },
+    {
+      "heading": "Lifecycle ownership",
+      "en": "6ab923f092ff01d48fb96a9fc5c3a87a974c7daa035266fc1b076c513e04e342",
+      "zh": "8b34f9ac9620b73f7cc478571175678236e48bdae24b165b10b645b230869424"
+    },
+    {
+      "heading": "Package responsibilities",
+      "en": "095fd0ecfc5c7a36378ab6f240a4721abcde3b10ee2b5b17e35bdb8fc22efe3f",
+      "zh": "a88d71eaf9af03afd75c2727989d910090b5b5e7ef482dbfeab8beadd929e33e"
+    },
+    {
+      "heading": "@sortedyuan/may/core",
+      "en": "16afda1c37390f09c83fec3c83c1636c57bc91a0966a364c63bc5d570f3e298d",
+      "zh": "f1036d169070c5029817bce31d6617bbf6e4d209a8ab1b8e7c4c00091f2640bd"
+    },
+    {
+      "heading": "@sortedyuan/may/context",
+      "en": "216c2e9e75a486116d6097439069f33dc6974d2c7b0e315caf0eb04c1e3eb32f",
+      "zh": "c57a30cd5ccc4393afa7263f0e8d337d971b505d53af8c47694fe8175e6a7b7d"
+    },
+    {
+      "heading": "@sortedyuan/may/session",
+      "en": "551bda682bd3c9a8744fa20253f0ecb82cc645f2f4c4f9f5d9d02467869fd86f",
+      "zh": "0e08dd6770468a5b26a92d6d9eee15ad84487aec6bb3af601244f9c12980addd"
+    },
+    {
+      "heading": "@sortedyuan/may/plugin",
+      "en": "c696a1fdb43a48af95f416816fd84b4d8529daf6aba61851d58a5c8c823d1a57",
+      "zh": "60c1dd202eddde5f9f542660841d555384569c67bbc390ea3efeca192f593389"
+    },
+    {
+      "heading": "@sortedyuan/may/permissions",
+      "en": "f73a0bf5e3586a49d58bed92551ce737d0e7749f697bf1b8593934ca419cd23b",
+      "zh": "4c8a16bd5dc4eff3d011499df8e67c7f45752a42f47b4e4855ed8603bb4053c4"
+    },
+    {
+      "heading": "@sortedyuan/observability",
+      "en": "5844a1e230b5d46489b2fccc354af5686cc239dbeea27d722055212c3e9ecfd5",
+      "zh": "69a527f878f514329dd596eb01aeee657f1842ae95f1aaebf6a0f7b5a70ba400"
+    },
+    {
+      "heading": "@sortedyuan/mcp",
+      "en": "6cbe6c35804c6265f67c2d367e7f1f3f80cc73c74ec75572e9b6287ca7713a8c",
+      "zh": "b59c098bf9967ed4392c35d66059bd321a7657f03eeb6ca4d477a757103ffd61"
+    },
+    {
+      "heading": "@sortedyuan/may/application",
+      "en": "5b02c0fcd16f9f3b741ac60db57e4e1ad5509d7fada2860ba089f8f07dcb817f",
+      "zh": "fc0b18d58783e7fed468f984ddf9c222ea04908c5025c24bf8b1ef60cc11f111"
+    },
+    {
+      "heading": "@sortedyuan/tui",
+      "en": "207945556c6d0f5e88d919a6f73ae39a48efa8a01a6e0e3f7cf72619a05d17bc",
+      "zh": "279e7f21e0343776a5682dd7ddf55448e185da55c8b43ee164deabe96bb9b00f"
+    },
+    {
+      "heading": "apps/maybecode",
+      "en": "ca87540265ad8d1166b96dd09d03ec4a6d305b0625f173c53d272e21062ae966",
+      "zh": "b8741fcb5724183ee7f5b168ca4efaa291f800bb8145ec38367e2d9cd122be50"
+    },
+    {
+      "heading": "Events and persistence",
+      "en": "4d717a04a0b0926f9381885b690d1d41fa2f65da80860d6f80d5c2ecbd586c72",
+      "zh": "5c6f3ea7a908c0ac7808314cbf988f61bbf03f1196e8380a0f2e8bc39d0ccf2a"
+    }
+  ]
+}

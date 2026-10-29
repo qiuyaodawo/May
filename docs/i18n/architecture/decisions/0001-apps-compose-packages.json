@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "ADR 0001: Applications compose reusable packages",
+      "en": "be4f034b50d6958a5e8e8724de3c2d86c6f0d5ac9df7ceab60aef97a6b137d9c",
+      "zh": "cdad2af4eb5fac7dac7bdfcc3a9427716e351dcbc289fe1b8ed1956f654cffa0"
+    },
+    {
+      "heading": "Context",
+      "en": "b39857ab692652714337affbc2e964290f5d14e863992469c7510376cd828e1a",
+      "zh": "eeb4a1044a2ba6e12b8bf44ef162f709093e2813fc73c2d5c01b33f3cf85f601"
+    },
+    {
+      "heading": "Decision",
+      "en": "7467f85c470166944767b988a7bcdb19888ea0d968650ebafa7bcaf7995b1ab9",
+      "zh": "add2c9376d4a2ceee0e77ed2f376dbc1cdf1e9ce6000a2847a2f883d732afc42"
+    },
+    {
+      "heading": "Consequences",
+      "en": "31a2389e8dcdc16ddf0a8df141e5fd26e6d4581787f54d14e10c3d2bf659d4c4",
+      "zh": "9ebfe42e5495a65c15a5e0e6b1a4ff08fd9930906c5484bb1069d51321fe90a7"
+    }
+  ]
+}

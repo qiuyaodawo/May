@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Migrate component imports to public subpaths",
+      "en": "6ec35abed8e66e5528c2c06774239c965557d2848954461f05b892c49f26040c",
+      "zh": "e96e833d313b578f1afa964e1758ba1e04c73d523a0a026d866246fb30b4dd87"
+    }
+  ]
+}

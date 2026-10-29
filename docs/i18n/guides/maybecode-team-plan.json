@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Configure a MaybeCode team plan",
+      "en": "4c0373d40a289c8a2054987e64abe22e7b0c24d5866b804ad5271c1d3333f0e6",
+      "zh": "6da805cc14a6c276aad6db65cd045ad13edccbce58f074db38e65512d4e869f0"
+    },
+    {
+      "heading": "Presets",
+      "en": "4a264f40509a6e194a74a40dbc5366b2013b054b9feafa561ad0a09fdcf1c856",
+      "zh": "29140f624869b717f1d2299976e1c3ad82c5e7829dca6ed50e3bbd78a5011827"
+    },
+    {
+      "heading": "Custom JSON plan",
+      "en": "a9aff22c0f3b86d3d11e098f797ec394739713de05f3164a1174e6cdeae6aad3",
+      "zh": "5c7c3df7e6887f48c60de3351b3bebd8b6e66ae513f38818006afd87a3abdd0d"
+    },
+    {
+      "heading": "Validation and persistence",
+      "en": "fa2c7e94251dae6cf5ff4a43ced13dda66fea2b9919e93b87e2ef275c2a031cc",
+      "zh": "26ee4c2923b9c27e0c9f671bff585f608726598fbcf9f7d179eb1c83b6ea33e2"
+    }
+  ]
+}

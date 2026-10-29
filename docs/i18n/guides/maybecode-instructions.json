@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Configure and inspect MaybeCode instructions",
+      "en": "c153caabdd89c74aabed3b1647938cf56df3a93b61726cebf7f3949863318101",
+      "zh": "fa1f2cc011864ccd2d2a9999b46dbcbe1c700a61aa144d6c7d63329e6c508827"
+    },
+    {
+      "heading": "Configure project and base instructions",
+      "en": "7f3d1a35f6140545f4e18146ca78fbf08d1999c1ed2d82860dc860d3366fc385",
+      "zh": "50a932f9da32bae949bb9e57cd93ce66767a56b19dc8792999b3464f2a3f0795"
+    },
+    {
+      "heading": "Sources and order",
+      "en": "1d9672b9ff524a9dc7abd2dabc44b54dcaa238a3e9c87da760c268c9e10ecd8e",
+      "zh": "314f8508922eb7098b860ead1ac21ebfc1cc9c81451d58b14f9a269e06283510"
+    },
+    {
+      "heading": "Project rule discovery",
+      "en": "7b501c0bd47b37a9ddbd0f9d66edde8191295cb5d723b37d65ce66f555f53b91",
+      "zh": "1240c2ba143963b973f938661cbc4921409f1dee1751a18236f62ad63ac16798"
+    },
+    {
+      "heading": "Environment and project updates",
+      "en": "fa08ff8a7c2a46af6d9b510ac6363f85159fd4c6e9bf743ac495f4d374a67bb2",
+      "zh": "f59f74c96c917cde106cb1ed843060e9be437d2412bb07e7003b410d883660f4"
+    },
+    {
+      "heading": "Conditional guidance",
+      "en": "8d58932d56680faff0d17a1049b2d56ba3e821203850722144f918c10a479bb6",
+      "zh": "46af2bf2805951cc1480612f2fb35fcbed607b4a4cd599550cab420b0a5a3017"
+    }
+  ]
+}

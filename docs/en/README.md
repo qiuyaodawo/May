@@ -93,3 +93,10 @@ declared in package `exports`.
 English and Simplified Chinese pages have matching relative paths. Follow
 [the documentation maintenance instructions](../AGENTS.md), update both languages,
 and run `pnpm docs:check`. Check example behavior and link anchors separately.
+
+The check compares heading, list, table, and code-block structure and verifies
+section hashes stored in `docs/i18n/`. After reviewing both languages, run
+`pnpm docs:confirm guides/custom-tool.md` with the updated pair's relative path,
+then run `pnpm docs:check`. Commit the confirmation record with the documents.
+Hashes detect content changes; translation meaning and localized code bodies
+require review.

@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Display image replies",
+      "en": "d5ac155400fff973cbb2b838537ba90609be0ebb406f60a64c82043eda2765f3",
+      "zh": "a76ae404b754b91a1fcf4255a83b86cdd0341b545b38456316134579ff144aad"
+    },
+    {
+      "heading": "MaybeCode",
+      "en": "61fccebb922e99d6c57b4002227733340fcb265577b7289f18c0c4d64badc8df",
+      "zh": "07b74158ce3785505dde69f7b5595dc523da371d27cb73aed820ea0882d437a9"
+    },
+    {
+      "heading": "Saved attachments",
+      "en": "101588931d16798e9412a177425d272ab2673008f21ed0f8763acb60a5828dcf",
+      "zh": "f1b71d0bbead674a09758a5c64e9f1ae0d5d904d7edc61a41bdcf8b007ad12df"
+    },
+    {
+      "heading": "Terminal graphics",
+      "en": "be373733b22d53f67e8faf8a164aa57832716b4576899c243b6c867df840e644",
+      "zh": "36e896bc7ec2e408a8fb5b7743eb230202968c34f5ea5a291a4e3b244ff27921"
+    },
+    {
+      "heading": "Web and other image sources",
+      "en": "0cf901ae11c37d59e223ef9a0d9f1ba9c52a7c4985b8d0708901781eb21227fd",
+      "zh": "a34523fc4cd8a53464b76db9dedaf76a8ea0833a14b7d9f3cdb2457dee9a271f"
+    },
+    {
+      "heading": "Reusable interfaces",
+      "en": "80b39035aa1b70152fd1190f23c9d8e38c27bc4ab6185e40debeff13fdf188ec",
+      "zh": "889e84bd1be3b1f75d0819ec00bff27956070495acb99b8fd53557cd106f3cef"
+    },
+    {
+      "heading": "Feishu and Telegram",
+      "en": "0c15764a3227394ffcb156791629fc12ffd3f153e828b027d437f901bf3e8efc",
+      "zh": "2174f8a59102bf74987a06b62ff6eb12b831d495e7277009dee9e8ce79799bef"
+    },
+    {
+      "heading": "Verify display and delivery",
+      "en": "0a8740169b00c11c03a5f1ecd64f80ddd4cfd4418258f4fc3b569884c5db201a",
+      "zh": "2a41974e4c05272fff2bb061f9574f6a60557f574621fd0710b6686482786c47"
+    }
+  ]
+}

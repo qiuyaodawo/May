@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "ADR 0004: Agent definitions and tool registries are reusable composition objects",
+      "en": "b7dea90e639ee41936b69012f5a0b32330c62cf3b30b26f6bc5a3c18dfbd1369",
+      "zh": "2480e7ad26d6e95572ab8fe2826282d7c51de64f57d8b446ce1f1a9e35e53854"
+    },
+    {
+      "heading": "Context",
+      "en": "e7f2f536e8ec6352fd39040221ecd0fef6aa7989ebd27e80f855820cb4a49cdb",
+      "zh": "c53dea640e998c4d7e10a364f5f7902f0e8b5763c3da4dc9466d612a8d719ca5"
+    },
+    {
+      "heading": "Decision",
+      "en": "69cca4a799c4d2dbecb4ba37ecc330ab544eb80725ed5a559882449fcfc62a83",
+      "zh": "17950de7cf03e2e4aaddb29bf0e511dc4c269ba0c540d4beb6e27493a1132574"
+    },
+    {
+      "heading": "Consequences",
+      "en": "0fbc87738a0de66157999c7b8968f597c150d9f8942c38dd4b07ce61e5e165e1",
+      "zh": "2638c2b991abb2f3f6b26993ac7405f3d191a820f96328da2c30974fc981e04f"
+    }
+  ]
+}

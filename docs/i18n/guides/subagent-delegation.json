@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Delegate work to sub-agents",
+      "en": "7b3f2bbba9dc854fc8fb20b8f5d9c5d1c2e2f8e4d495d73dd025a084af857bbc",
+      "zh": "bba93292da2977a3e0d11925a6d57a4ada4dd50ac387d9aa70c930bd7331c462"
+    },
+    {
+      "heading": "Request delegated work",
+      "en": "eda63487ac12bb849ccccc0bb4ada2f3a21e739ddf97abef903e5f9f2296c34a",
+      "zh": "6638106d54fc1493616a409c1ab0c6cd2396612afb4114da4c91f9b22a4890ed"
+    },
+    {
+      "heading": "One request, several Runs, one final answer",
+      "en": "45509107ab2b679b8da07178edd078efcb5a55b5c021ec3c2da4065159c6cbe7",
+      "zh": "f7a1e3a05491a06bf083d781beacae5034d17d1f9de5fa1bc5d24d3786f7d20f"
+    },
+    {
+      "heading": "Configuration",
+      "en": "a8331305cff9d2777935a433229ab3fb17d42eaacf05459526a82848874f5606",
+      "zh": "faeaf5371a64fb76cab3962451d1ae7c2398313fbbb922b4c814cf7c485620d0"
+    },
+    {
+      "heading": "Prompt, briefs and file ownership",
+      "en": "b1393fd5c94fd9ad0c732604ca16a1ac81d45d827194e43bc218993bc3eae13f",
+      "zh": "8c34e15fd76063eb6fcd8c7f4568f24fd39f1bb5fe832571f58628cc496d0ddb"
+    },
+    {
+      "heading": "Budget",
+      "en": "8fd984455f34f6dfd29ed6929a6bb0ff39193c742e3f8087545b4d0fddbdfc3b",
+      "zh": "0bd08e274cac029a229db73b742811d3d92d06fb290902fd27820e9925f5b8d3"
+    },
+    {
+      "heading": "Approvals, cancellation and recovery",
+      "en": "1ee46ca26fdff17a8d38a576d2bc76c0aea4b8ab148add713cfa136e0e86be79",
+      "zh": "405814c1b97220c92fbb8707b9f5118b9b98006a0af244b5bef2a31411bde162"
+    },
+    {
+      "heading": "Surfaces",
+      "en": "d020d1c3c9448af904b5357f9a145d7d7ac2dc5dd8e33279ec808a0870b89c40",
+      "zh": "f94878437049c40197b554f0bbf56e884722773855fbb0b8418b666062998c8b"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Remote coordination workers",
+      "en": "be80c6e8755b350d2891bb99bdaf81feffb6c94be6a473a306022af1f34bcf8b",
+      "zh": "7298bd34db3c9f3ebc59263d0327e15d5a41ab7650ab260e322e0a1e5f016b36"
+    },
+    {
+      "heading": "Embed a worker",
+      "en": "886b9119ca66b62a81c4c384d23044b1a77ca5dae27677c31b5148377d4a8cbb",
+      "zh": "87473906373178df4b55643d9292837159ce22b17bbb07789316d957b94a948c"
+    },
+    {
+      "heading": "Register the remote agent",
+      "en": "4bbb557f8804873daae962c42186910707f2b688a321e8157433679784ec8280",
+      "zh": "ad0e0961d92f61448b8a0cb892c54b287516318bf81f9d7679c0605d8b3f1524"
+    },
+    {
+      "heading": "Recovery and cancellation",
+      "en": "c7fb4d466044a1d73036bb1137bdbaee5ecdde53c3f23dde1b683058f591d14c",
+      "zh": "d17fa72fddd387a37a23e81d191bebe3faaafe237c0b8a53f60a2f055e5bd06b"
+    },
+    {
+      "heading": "Scope",
+      "en": "ead02ab10a9321a2f1b27c84800b46f2d815ac85c2579932b040bcf8bdf0ce7d",
+      "zh": "f895e1184b2ef7dfc7d31177be96dacbd35233a092d0c17ca666ff19f57be9d8"
+    }
+  ]
+}

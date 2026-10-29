@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Integrate isolated MCP Apps",
+      "en": "e8323ec3a538ccbe926b6cd9d2bc5404afe81baa98c017f5b391d6ddef1cc765",
+      "zh": "13d445543c238fb37da4fbc32b988db87a41cec677816a26afa5024de5ab3603"
+    },
+    {
+      "heading": "Opt-in graphical Host",
+      "en": "ef3a20ad130bba6e5e51d259344762d551e8433c6890d97c8d3a79b5eadd7c11",
+      "zh": "74bd0e2ab6c247a644e8169add2d47ea7192279f551a626f35ad513f6bacbf42"
+    },
+    {
+      "heading": "Browser integration",
+      "en": "11e2bc030d5ee0041087ee3066c5f7c17f4f6e7ef9fec1f1f3d607bf8edbb9b8",
+      "zh": "bc189b295aab405697871dca02cfddd5b068d129cd6b5c5a53ffc6837e3d32d5"
+    },
+    {
+      "heading": "Terminal fallback and evidence",
+      "en": "d302478a439450b7c8edc1853c8eb11d4c99f49a4e63e4964addba0fb1c8fe8b",
+      "zh": "a0413bfa415c90214f5b17c572aadfc0cc812d7ee31718be9999c1e1521a271f"
+    },
+    {
+      "heading": "Completion checks",
+      "en": "3208456fdfd14bb93ea834942770c1ff6bc829aa06634e053e46a1efca22d045",
+      "zh": "3360f15d8a42f5f21891e0b6f28cf1ed50a59100b756e90addb4522520a44be3"
+    }
+  ]
+}

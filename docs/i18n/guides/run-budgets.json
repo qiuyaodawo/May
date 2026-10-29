@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Configure Run budgets",
+      "en": "d9ee5411d54b8729971183513d5fb62b81a4302a339cb09a53f6592ce0cdab4a",
+      "zh": "4273b49bf2476095e9ae8f70dc0e7e1db67594cacfd7dc1feba9c825480e45c3"
+    },
+    {
+      "heading": "Set default limits",
+      "en": "5b7e95d3e913dac8cc086bccdd0cd9a7c4788b2794b98f3c28325c24ab0d3d0f",
+      "zh": "d703d86cc6792d75d9768355221d3f8d0f2cf837c582ee2b5670ec40c9f81051"
+    },
+    {
+      "heading": "Configure prices for a cost limit",
+      "en": "f7df42f689c828cdd17748299ae19adf1df752e872bd8efe904c36e181a22d1b",
+      "zh": "ba9a688553d99e00c5237fc09f34d28b6e66241db95958e2eec406cd09419262"
+    },
+    {
+      "heading": "Interpret provider usage",
+      "en": "7c1919e5dff278c22699eb7c51999361af37c9e91b3ed912f276d469d741e07d",
+      "zh": "3a71ff6033099ef8e6850f404bce05238f81dbd2f0f4dde1be0562e93d8e38ae"
+    },
+    {
+      "heading": "Inspect the result and budget failures",
+      "en": "d3b871b34ba03e4fb36a89be73c63523a053e0c9b75458412a89689338d55e4d",
+      "zh": "7e91673ee1736b2ac79237336138bd654f7d339ef93c2f507b7963996500ee59"
+    },
+    {
+      "heading": "Verify limits and understand their boundaries",
+      "en": "053cfa846947271f34d51d21145e9d4ce5d65255d16af37e53913c2b8bbf3f79",
+      "zh": "0690aab698633d1800e11207336f95a72d645208c3fd60a28d66267a4475512a"
+    }
+  ]
+}
