@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/coordination",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Durable, single-host task graphs above May Agent applications.",
   "type": "module",
   "main": "./dist/index.js",

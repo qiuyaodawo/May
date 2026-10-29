@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/eval",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "Repeatable Agent task execution, independent evaluation and evidence reports.",
   "type": "module",
   "main": "./dist/index.js",

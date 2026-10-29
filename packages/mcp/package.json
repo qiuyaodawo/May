@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/mcp",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Model Context Protocol clients, isolated Apps host and opt-in server exports for May.",
   "type": "module",
   "main": "./dist/index.js",

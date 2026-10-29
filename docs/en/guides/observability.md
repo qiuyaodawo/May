@@ -266,6 +266,9 @@ cost counters are recorded once at logical-call completion.
 
 ## OpenTelemetry and OTLP
 
+`@sortedyuan/observability` uses `@opentelemetry/api` 1.9.x, starting at 1.9.1,
+to match the API versions supported by its OpenTelemetry SDK dependencies.
+
 `OpenTelemetryTracer` adapts a host-owned OpenTelemetry API tracer with explicit
 parent propagation. `OpenTelemetryMetricRecorder` adapts a meter independently
 of trace sampling and limits metric series. The convenience composition owns

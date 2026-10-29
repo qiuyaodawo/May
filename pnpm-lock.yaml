@@ -485,7 +485,7 @@ importers:
   packages/observability:
     dependencies:
       '@opentelemetry/api':
-        specifier: ^1.9.1
+        specifier: ~1.9.1
         version: 1.9.1
       '@opentelemetry/exporter-metrics-otlp-http':
         specifier: ^0.222.0

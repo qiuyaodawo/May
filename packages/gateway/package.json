@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/gateway",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Agent adapters, RPC, durable delivery and HTTP services for May hosts.",
   "type": "module",
   "main": "./dist/index.js",

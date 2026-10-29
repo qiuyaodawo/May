@@ -236,6 +236,9 @@ Token 与费用指标仅在逻辑调用结束时记录一次。
 
 ## OpenTelemetry 与 OTLP
 
+`@sortedyuan/observability` 使用 `@opentelemetry/api` 的 1.9.x 版本，最低为
+1.9.1，符合配套 OpenTelemetry SDK 对 API 版本的要求。
+
 `OpenTelemetryTracer` 接入宿主管理的 OpenTelemetry API tracer，并显式传递父节点。
 `OpenTelemetryMetricRecorder` 独立于 Trace 采样记录 meter 指标并限制标签组合数量。
 以下接口使用官方 SDK 和 HTTP/JSON exporter，独立管理 provider：

@@ -1,6 +1,6 @@
 {
   "name": "@sortedyuan/may",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Composable Agent runtime, sessions, applications and plugin services.",
   "type": "module",
   "main": "./dist/application/index.js",
