@@ -7,6 +7,7 @@ import type {
   ModelStreamOptions,
 } from "@sortedyuan/may/core";
 import { parseRetryAfterMs } from "../openai-compatible/http.js";
+import { executeRecordedRequest, executeRecordedOperation, requestEndpoint, type ModelRequestRecorder } from "@sortedyuan/may/core";
 import { assertModelResponseFormat, validateStructuredModelResponse } from "@sortedyuan/may/core";
 
 import {
@@ -37,6 +38,7 @@ export interface OpenAIResponsesModelOptions {
 }
 
 export class OpenAIResponsesModel implements Model {
+  readonly supportsRequestRecording = true;
   readonly contextCompactor: ModelContextCompactor;
 
   private readonly apiKey: string;
@@ -69,7 +71,7 @@ export class OpenAIResponsesModel implements Model {
     this.contextCompactor = {
       name: "openai-responses-compact",
       compact: (snapshot, compactOptions) =>
-        this.compact(snapshot, compactOptions.signal),
+        this.compact(snapshot, compactOptions.signal, compactOptions.recordRequest),
     };
   }
 
@@ -106,6 +108,10 @@ export class OpenAIResponsesModel implements Model {
       }];
     }
 
+    yield* executeRecordedRequest({ version: 1, adapter: "openai-responses", purpose: "generation", endpoint: requestEndpoint(`${this.baseURL}/responses`), request, body }, options.recordRequest, options.signal, (body) => this.execute(body, request, options));
+  }
+
+  private async *execute(body: string, request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     const response = await this.fetch("/responses", body, options.signal);
     for await (const event of streamOpenAIResponse(response, options.signal)) {
       if (event.type === "response.completed") validateStructuredModelResponse(event.message, request, event);
@@ -116,6 +122,7 @@ export class OpenAIResponsesModel implements Model {
   private async compact(
     snapshot: Readonly<ContextSnapshot>,
     signal: AbortSignal | undefined,
+    recorder?: ModelRequestRecorder,
   ) {
     const effectiveSignal = signal ?? new AbortController().signal;
     const parts = toOpenAIResponsesRequestParts(
@@ -127,6 +134,11 @@ export class OpenAIResponsesModel implements Model {
       input: parts.input,
     };
     if (parts.instructions !== undefined) body.instructions = parts.instructions;
+    const request: ModelRequest = { messages: snapshot.instructions === undefined ? snapshot.messages : [{ role: "system", content: [{ type: "text", text: snapshot.instructions }] }, ...snapshot.messages], tools: [] };
+    return executeRecordedOperation({ version: 1, adapter: "openai-responses", purpose: "compaction", endpoint: requestEndpoint(`${this.baseURL}/responses/compact`), request, body }, recorder, effectiveSignal, (serialized) => this.executeCompact(serialized, effectiveSignal));
+  }
+
+  private async executeCompact(body: string, effectiveSignal: AbortSignal) {
     const response = await this.fetch("/responses/compact", body, effectiveSignal);
     const value = await response.json().catch((error) => {
       throw new OpenAIResponsesProtocolError(
@@ -187,7 +199,7 @@ export class OpenAIResponsesModel implements Model {
 
   private async fetch(
     path: string,
-    body: Record<string, unknown>,
+    body: Record<string, unknown> | string,
     signal: AbortSignal,
   ): Promise<Response> {
     const response = await this.fetchImplementation(`${this.baseURL}${path}`, {
@@ -196,7 +208,7 @@ export class OpenAIResponsesModel implements Model {
         authorization: `Bearer ${this.apiKey}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: typeof body === "string" ? body : JSON.stringify(body),
       signal,
     });
     if (!response.ok) throw await createApiError(response);

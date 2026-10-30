@@ -5,6 +5,11 @@
 本文说明 Agent 执行、对话状态和应用资源分别由哪些模块管理。
 设计扩展或检查可复用包与产品之间的依赖时，可以依据这些职责选择位置。
 
+[模型请求记录](../guides/model-request-recording.md) 在 provider 执行边界增加
+需要等待完成的请求 checkpoint，将相关事实保存到 Session 历史。
+Core 提供记录通道，Session 管理内容定义和查询，
+AgentApplication 将摘要和原生压缩调用连接到同一记录通道。
+
 May 使用四个生命周期层级：
 
 ```mermaid

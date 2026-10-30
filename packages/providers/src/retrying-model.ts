@@ -68,6 +68,7 @@ export interface RetryingModelOptions {
  * because the model stream has no reset or retraction event.
  */
 export class RetryingModel implements Model {
+  get supportsRequestRecording(): boolean { return this.model.supportsRequestRecording === true; }
   readonly reportsAttempts = true;
   get capabilityVersion(): string | undefined { return this.model.capabilityVersion; }
   get configuration(): NonNullable<Model["configuration"]> { return this.model.configuration ?? {}; }
@@ -138,6 +139,7 @@ export class RetryingModel implements Model {
         telemetry?.end({ status: "ok", completed, ...(usage === undefined ? {} : { usage }) });
         return;
       } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "RUN_CHECKPOINT_FAILED") throw error;
         if (error instanceof ModelResponseValidationError) { completed = error.responseCompleted; usage = error.usage; }
         telemetry?.end({
           status: options.signal.aborted ? "cancelled" : "error",

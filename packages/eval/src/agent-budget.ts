@@ -61,6 +61,7 @@ export class EvalTrialBudget {
     const budget = this;
     return {
       get limits() { return model.limits; }, reportsAttempts: true,
+      get supportsRequestRecording() { return model.supportsRequestRecording === true; },
       get capabilityVersion() { return model.capabilityVersion; }, get configuration() { return model.configuration; },
       async preflight(request, options) {
         if (options.modelCallId === undefined) throw new Error("Evaluation trial requires a stable modelCallId");

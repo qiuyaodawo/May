@@ -17,7 +17,7 @@ function assistant(text) {
 
 test("definitions snapshot run budgets and persist budget exhaustion", async () => {
   const runBudget = { maxTotalTokens: 1 };
-  const definition = defineAgent({ runBudget, permissionPolicy: () => "allow", model: {
+  const definition = defineAgent({ requestRecording: "off", runBudget, permissionPolicy: () => "allow", model: {
     async *stream() { yield { type: "response.completed", message: assistant("ok"), usage: { totalTokens: 2 } }; },
   }});
   runBudget.maxTotalTokens = 999;
@@ -51,6 +51,7 @@ test("AgentDefinition snapshots behavior and reuses it across Sessions", async (
   const tools = new ToolRegistry([lookup]);
 
   const definition = defineAgent({
+    requestRecording: "off",
     model,
     tools,
     instructions: "Use the lookup tool when needed.",
@@ -138,6 +139,7 @@ test("AgentDefinition forwards its tool scheduler", async () => {
   let modelCall = 0;
   let schedulerCalls = 0;
   const definition = defineAgent({
+    requestRecording: "off",
     model: {
       async *stream() {
         modelCall += 1;

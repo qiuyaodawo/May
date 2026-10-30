@@ -104,6 +104,7 @@ export class FileSharedBudget {
     return {
       get limits() { return model.limits; },
       get reportsAttempts() { return model.reportsAttempts; },
+      get supportsRequestRecording() { return model.supportsRequestRecording === true; },
       get capabilityVersion() { return model.capabilityVersion; },
       get configuration() { return model.configuration; },
       ...(model.preflight === undefined ? {} : { preflight: model.preflight.bind(model) }),

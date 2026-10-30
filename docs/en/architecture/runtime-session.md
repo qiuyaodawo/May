@@ -6,6 +6,12 @@ This page explains which module owns Agent execution, conversation state, and
 application resources. Use it when deciding where an extension belongs or
 reviewing dependencies between reusable packages and products.
 
+[Model request recording](../guides/model-request-recording.md) adds awaited
+request checkpoints at the provider execution boundary and stores their facts
+in Session history. Core exposes the recording sink; Session owns content
+definitions and queries; AgentApplication connects summary and native compaction
+calls to the same recorder.
+
 May uses four lifecycle levels:
 
 ```mermaid

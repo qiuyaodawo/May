@@ -202,7 +202,7 @@ export class SnapshotContextController implements ContextController {
         result = await this.enqueueCompaction(strategy, options, requested);
       } catch (error) {
         throwIfAborted(options.signal);
-        if (error instanceof HookExecutionError) throw error;
+        if (error instanceof HookExecutionError || error instanceof Error && "code" in error && error.code === "RUN_CHECKPOINT_FAILED") throw error;
         if (isAbortError(error)) throw error;
         const failure: ContextCompactionFailure = {
           strategy: strategy.name,

@@ -60,21 +60,21 @@ test("recovery distinguishes unknown effects from unstarted calls, blocks execut
   const createRuntime = (messages) => new May({ context: new InMemoryContext({ messages }), model: {
     async *stream(request) { calls++; seen = request.messages; yield { type: "response.completed", message: { role: "assistant", content: [] } }; },
   }});
-  const session = await Session.resume({ id: "s", store, createRuntime });
+  const session = await Session.resume({ requestRecording: "off", id: "s", store, createRuntime });
   assert.equal(session.listRecoveries().length, 1);
   assert.equal(session.listRecoveries()[0].call.id, "b");
   await assert.rejects(session.submit({ input: "continue" }), { code: "SESSION_RECOVERY_REQUIRED" });
   assert.equal(calls, 0);
   const repair = (await session.history()).at(-1);
   assert.deepEqual(repair.recoveries.map((r) => r.status), ["unknown", "not-started"]);
-  const reopened = await Session.resume({ id: "s", store, createRuntime });
+  const reopened = await Session.resume({ requestRecording: "off", id: "s", store, createRuntime });
   assert.equal((await reopened.history()).length, facts.length + 1);
   await reopened.resolveRecovery("r:1:b", "Checked the destination: write completed successfully; do not repeat it.");
   await (await reopened.continue()).result;
   assert.equal(seen.filter((m) => m.role === "tool").length, 3);
   assert.deepEqual(seen.filter((m) => m.role === "tool").map((m) => m.toolCallId), ["b", "a", "c"]);
   assert.match(seen.at(-1).content[0].text, /Checked the destination/);
-  const again = await Session.resume({ id: "s", store, createRuntime });
+  const again = await Session.resume({ requestRecording: "off", id: "s", store, createRuntime });
   assert.equal(again.listRecoveries().length, 0);
 });
 
@@ -84,7 +84,7 @@ test("old histories conservatively treat unfinished calls as unknown", async () 
     { type: "session.created" }, { type: "run.started", runId: "r" },
     { type: "assistant.completed", runId: "r", step: 1, message: assistant([call("a")]) },
   ].entries()) await store.append({ ...fact, sessionId: "s", seq: index + 1, timestamp: index });
-  const session = await Session.resume({ id: "s", store, createRuntime: (messages) => new May({ context: new InMemoryContext({ messages }), model: { async *stream() {} } }) });
+  const session = await Session.resume({ requestRecording: "off", id: "s", store, createRuntime: (messages) => new May({ context: new InMemoryContext({ messages }), model: { async *stream() {} } }) });
   assert.equal(session.listRecoveries()[0].status, "unknown");
 });
 
@@ -102,9 +102,9 @@ test("tools cannot run ahead of durable model/start/outcome checkpoints", async 
     assert.ok(history.some((e) => e.type === "assistant.completed"));
     executed++; return "done";
   }}] });
-  const session = await Session.create({ id: "s", store, runtime });
+  const session = await Session.create({ requestRecording: "off", id: "s", store, runtime });
   await assert.rejects((await session.submit({ input: "write" })).result, /disk unavailable/);
   assert.equal(executed, 1);
-  const resumed = await Session.resume({ id: "s", store, createRuntime: () => runtime });
+  const resumed = await Session.resume({ requestRecording: "off", id: "s", store, createRuntime: () => runtime });
   assert.equal(resumed.listRecoveries()[0].call.id, "a");
 });

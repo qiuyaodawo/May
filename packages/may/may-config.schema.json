@@ -161,6 +161,8 @@
       "type": "object",
       "required": ["id", "adapter"],
       "properties": {
+        "requestRecording": { "enum": ["off", "required"], "default": "required" },
+        "providerBodyRecording": { "type": "boolean", "default": false },
         "id": { "$ref": "#/$defs/maybeclawAgentId" },
         "name": { "$ref": "#/$defs/maybeclawIdentifier" },
         "adapter": { "enum": ["may", "module"] },
@@ -178,7 +180,7 @@
         "permissions": { "type": "object", "propertyNames": { "$ref": "#/$defs/maybeclawIdentifier" }, "additionalProperties": { "enum": ["allow", "deny", "ask"] } }
       },
       "if": { "properties": { "adapter": { "const": "module" } } },
-      "then": { "required": ["module"], "not": { "required": ["plugins"] } },
+      "then": { "required": ["module"], "not": { "anyOf": [{ "required": ["plugins"] }, { "required": ["requestRecording"] }, { "required": ["providerBodyRecording"] }] } },
       "else": { "not": { "anyOf": [{ "required": ["module"] }, { "required": ["export"] }, { "required": ["options"] }] } },
       "additionalProperties": false
     },
@@ -563,6 +565,8 @@
     "maybecode": {
       "type": "object",
       "properties": {
+        "requestRecording": { "enum": ["off", "required"], "default": "required" },
+        "providerBodyRecording": { "type": "boolean", "default": false },
         "git": {
           "oneOf": [
             { "const": false },

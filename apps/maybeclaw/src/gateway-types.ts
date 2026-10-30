@@ -83,6 +83,8 @@ export interface GatewayApproval {
   decision?: ApprovalDecision;
 }
 export interface GatewayAgentConfig {
+  requestRecording?: "off" | "required";
+  providerBodyRecording?: boolean;
   id: string;
   name?: string;
   adapter: "may" | "module";

@@ -9,6 +9,7 @@ export interface RuntimeDescriptor {
 }
 
 export interface AgentRuntime {
+  readonly supportsRequestRecording?: boolean;
   readonly descriptor?: RuntimeDescriptor;
   readonly supportedHooks?: readonly HookDefinition<unknown>[];
   run(options: RunOptions): RunHandle;

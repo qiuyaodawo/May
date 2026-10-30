@@ -28,6 +28,7 @@ test("relays live run events and stores only durable session facts", async () =>
     },
   };
   const session = await Session.create({
+    requestRecording: "off",
     id: "session_events",
     runtime: new May({ model, context: new InMemoryContext() }),
   });
@@ -86,6 +87,7 @@ test("serializes submissions and preserves context between runs", async () => {
     },
   };
   const session = await Session.create({
+    requestRecording: "off",
     runtime: new May({ model, context: new InMemoryContext() }),
   });
 
@@ -144,6 +146,7 @@ test("stores successful and failed tool outcomes", async () => {
     },
   };
   const session = await Session.create({
+    requestRecording: "off",
     store,
     runtime: new May({
       model,
@@ -197,6 +200,7 @@ test("stores successful and failed tool outcomes", async () => {
 
   let replayed;
   await Session.resume({
+    requestRecording: "off",
     id: session.id,
     store,
     createRuntime(messages) {
@@ -245,6 +249,7 @@ test("records approval decisions before their tool outcomes", async () => {
     policy: () => ({ decision: "ask", grantKey: "write:a.txt" }),
   });
   const session = await Session.create({
+    requestRecording: "off",
     runtime: new May({
       model,
       context: new InMemoryContext(),
@@ -316,6 +321,7 @@ test("records approval cancellation before run cancellation", async () => {
   };
   const permissions = new PermissionToolExecutor({ policy: () => "ask" });
   const session = await Session.create({
+    requestRecording: "off",
     store,
     runtime: new May({
       model,
@@ -355,6 +361,7 @@ test("records approval cancellation before run cancellation", async () => {
   );
   let replayed;
   await Session.resume({
+    requestRecording: "off",
     id: session.id,
     store,
     createRuntime(messages) {
@@ -387,6 +394,7 @@ test("records failures and starts the next queued submission", async () => {
     },
   };
   const session = await Session.create({
+    requestRecording: "off",
     runtime: new May({ model, context: new InMemoryContext() }),
   });
 
@@ -418,7 +426,7 @@ test("continues a failed run without recording another user input", async () => 
       },
     },
   });
-  const session = await Session.create({ runtime });
+  const session = await Session.create({ requestRecording: "off", runtime });
 
   await assert.rejects(
     (await session.submit({ input: "original input" })).result,
@@ -460,6 +468,7 @@ test("preserves cancellation and records its reason", async () => {
     },
   };
   const session = await Session.create({
+    requestRecording: "off",
     runtime: new May({ model, context: new InMemoryContext() }),
   });
 
@@ -477,6 +486,7 @@ test("preserves cancellation and records its reason", async () => {
 test("does not persist input from a submission that was already cancelled", async () => {
   const store = new InMemorySessionStore();
   const session = await Session.create({
+    requestRecording: "off",
     id: "pre_cancelled",
     runtime: createRuntime(),
     store,
@@ -493,6 +503,7 @@ test("does not persist input from a submission that was already cancelled", asyn
 
   let replayed;
   await Session.resume({
+    requestRecording: "off",
     id: session.id,
     store,
     createRuntime(messages) {
@@ -519,6 +530,7 @@ test("keeps durable and live input aligned when cancellation races storage", asy
   };
   const context = new InMemoryContext();
   const session = await Session.create({
+    requestRecording: "off",
     runtime: new May({
       context,
       model: {
@@ -558,10 +570,10 @@ test("keeps durable and live input aligned when cancellation races storage", asy
 
 test("rejects a duplicate session id in the same store", async () => {
   const store = new InMemorySessionStore();
-  await Session.create({ id: "same", runtime: createRuntime(), store });
+  await Session.create({ requestRecording: "off", id: "same", runtime: createRuntime(), store });
 
   await assert.rejects(
-    Session.create({ id: "same", runtime: createRuntime(), store }),
+    Session.create({ requestRecording: "off", id: "same", runtime: createRuntime(), store }),
     /already exists/,
   );
 });
@@ -611,6 +623,7 @@ test("resumes a file session and continues its context and sequence", async (t) 
   const directory = await createTempDirectory(t);
   const firstStore = new FileSessionStore(directory);
   const first = await Session.create({
+    requestRecording: "off",
     id: "resume_me",
     metadata: { workspace: "/repo" },
     store: firstStore,
@@ -635,6 +648,7 @@ test("resumes a file session and continues its context and sequence", async (t) 
   let secondRequest;
   const secondStore = new FileSessionStore(directory);
   const resumed = await Session.resume({
+    requestRecording: "off",
     id: "resume_me",
     store: secondStore,
     async createRuntime(messages) {
@@ -686,6 +700,7 @@ test("resumes a file session and continues its context and sequence", async (t) 
 test("restores the latest model input measurement when resuming", async () => {
   const store = new InMemorySessionStore();
   const session = await Session.create({
+    requestRecording: "off",
     id: "measured",
     store,
     runtime: new May({
@@ -705,6 +720,7 @@ test("restores the latest model input measurement when resuming", async () => {
 
   let runtimeInfo;
   await Session.resume({
+    requestRecording: "off",
     id: session.id,
     store,
     createRuntime(_messages, info) {
@@ -725,6 +741,7 @@ test("restores the latest model input measurement when resuming", async () => {
 test("replays the latest compacted context without deleting history", async () => {
   const store = new InMemorySessionStore();
   const session = await Session.create({
+    requestRecording: "off",
     id: "compacted",
     store,
     runtime: new May({
@@ -756,6 +773,7 @@ test("replays the latest compacted context without deleting history", async () =
   let replayed;
   let runtimeInfo;
   await Session.resume({
+    requestRecording: "off",
     id: session.id,
     store,
     createRuntime(messages, info) {
@@ -793,6 +811,7 @@ test("reports missing sessions and corrupt session files", async (t) => {
 
   await assert.rejects(
     Session.resume({
+      requestRecording: "off",
       id: "missing",
       store,
       createRuntime,
@@ -825,13 +844,13 @@ test("requires reopen after a durable append fails and preserves the sequence", 
       return backing.append(event);
     },
   };
-  const session = await Session.create({ runtime: createRuntime(), store });
+  const session = await Session.create({ requestRecording: "off", runtime: createRuntime(), store });
 
   const run = await session.submit({ input: "hello" });
 
   await assert.rejects(run.result, /store unavailable/);
   await assert.rejects(session.submit({ input: "retry" }), /reopen/);
-  const resumed = await Session.resume({ id: session.id, store, createRuntime });
+  const resumed = await Session.resume({ requestRecording: "off", id: session.id, store, createRuntime });
   await (await resumed.submit({ input: "retry" })).result;
   const history = await resumed.history();
   assert.deepEqual(

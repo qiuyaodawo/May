@@ -15,6 +15,8 @@ Only the explicitly granted read directory is accessible. No shell, writes, mess
 background work or long-term memory is available. Do not claim to have used these capabilities.`;
 
 export interface MaybeClawOptions {
+  readonly requestRecording?: "off" | "required";
+  readonly providerBodyRecording?: boolean;
   readonly directory: string;
   /** Called only for an identified, not-yet-submitted task, never by status or recovery. */
   readonly loadModel: (spec: TaskSpec) => Model | Promise<Model>;
@@ -112,7 +114,7 @@ export class MaybeClaw {
       task = await update(journal, task, "running");
       const sessionStore = new FileSessionStore(join(this.store.directory, "sessions"));
       const history = await sessionStore.read(id);
-      app = await defineAgent({ model, instructions: INSTRUCTIONS,
+      app = await defineAgent({ model, instructions: INSTRUCTIONS, requestRecording: this.options.requestRecording ?? "required", providerBodyRecording: this.options.providerBodyRecording,
         tools: task.spec.readDirectory === undefined ? [] : [createReadTool({ cwd: task.spec.readDirectory, maxBytes: 262_144, maxLines: 200 })],
         permissionPolicy: (check) => check.tool.name === "read" && task.spec.readDirectory !== undefined ? "allow" : "deny",
         runBudget: task.spec.runBudget, sessionHistory: false, providerNativeAutoCompaction: false, autoCompactionStrategies: [],

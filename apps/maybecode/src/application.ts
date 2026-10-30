@@ -120,6 +120,8 @@ export interface MaybeCodeSubagentOptions {
 }
 
 export interface MaybeCodeApplicationOptions {
+  readonly requestRecording?: "off" | "required";
+  readonly providerBodyRecording?: boolean;
   readonly gitWorkspace?: ProjectGitWorkspace;
   readonly onGitCheckpoint?: (checkpoint: import("@sortedyuan/may/application/git-workspace").GitCheckpoint) => void;
   readonly plugins?: readonly AnyPlugin[];
@@ -265,6 +267,8 @@ export class MaybeCodeApplication {
     });
     const composition = createPlugins(options);
     const definition = defineAgent({
+      requestRecording: options.requestRecording ?? "required",
+      providerBodyRecording: options.providerBodyRecording,
       plugins: composition.plugins,
       forkStateKeys: ["maybecode.context-notes", "maybecode.model"],
       forkPluginIds: ["may.history-memory"],

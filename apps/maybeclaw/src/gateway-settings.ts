@@ -16,7 +16,9 @@ export function gatewaySettings(config: MayConfig): GatewaySettings {
   const rawAgents = raw.agents ?? [];
   const ids = new Set<string>();
   const agents = rawAgents.map((value): GatewayAgentConfig => {
-    const item = object(value, "Agent", ["id", "name", "adapter", "enabled", "model", "instructions", "readDirectory", "module", "export", "options", "plugins", "idleMs", "runBudget", "permissions", "media"]);
+    const item = object(value, "Agent", ["id", "name", "adapter", "enabled", "model", "instructions", "readDirectory", "module", "export", "options", "plugins", "idleMs", "runBudget", "permissions", "media", "requestRecording", "providerBodyRecording"]);
+    if (item.providerBodyRecording !== undefined && (item.adapter !== "may" || typeof item.providerBodyRecording !== "boolean")) throw new Error("Agent providerBodyRecording 需要 may adapter，取值为布尔值。");
+    if (item.requestRecording !== undefined && (item.adapter !== "may" || !["off", "required"].includes(String(item.requestRecording)))) throw new Error("Agent requestRecording 需要 may adapter，取值为 off 或 required。");
     const id = identifier(item.id, "Agent ID");
     if (ids.has(id)) throw new Error(`Agent ID 重复：${id}`);
     ids.add(id);

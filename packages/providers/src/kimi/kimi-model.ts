@@ -1,3 +1,4 @@
+import { executeRecordedRequest, requestEndpoint } from "@sortedyuan/may/core";
 import type {
   Model,
   ModelEvent,
@@ -31,6 +32,7 @@ export interface KimiModelOptions {
 }
 
 export class KimiModel implements Model {
+  readonly supportsRequestRecording = true;
   private readonly apiKey: string;
   private readonly model: string;
   private readonly baseURL: string;
@@ -70,6 +72,10 @@ export class KimiModel implements Model {
     options: ModelStreamOptions,
   ): AsyncIterable<ModelEvent> {
     if (request.responseFormat !== undefined) throw new TypeError("Kimi adapter does not support responseFormat");
+    yield* executeRecordedRequest({ version: 1, adapter: "kimi-chat", purpose: "generation", endpoint: requestEndpoint(`${this.baseURL}/chat/completions`), request, body: this.createRequest(request) }, options.recordRequest, options.signal, (body) => this.execute(body, options));
+  }
+
+  private async *execute(body: string, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     const response = await this.fetchImplementation(
       `${this.baseURL}/chat/completions`,
       {
@@ -78,7 +84,7 @@ export class KimiModel implements Model {
           "authorization": `Bearer ${this.apiKey}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify(this.createRequest(request)),
+        body,
         signal: options.signal,
       },
     );

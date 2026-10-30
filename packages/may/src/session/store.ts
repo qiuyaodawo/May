@@ -1,9 +1,12 @@
 import type { SessionEvent } from "./events.js";
+import { readRecordedModelRequests } from "./requests.js";
 
 export interface SessionStore {
   /** 持久化目录；内存存储为 undefined，宿主可用它选择自己的记录目录。 */
   readonly directory?: string;
   append(event: SessionEvent): Promise<void>;
+  /** 按顺序保存一个批次，成功返回前完成持久化。 */
+  appendBatch?(events: readonly SessionEvent[]): Promise<void>;
   read(sessionId: string): Promise<readonly SessionEvent[]>;
   /** Read committed records without repair, ownership changes or other writes. */
   inspect?(sessionId: string): Promise<readonly SessionEvent[]>;
@@ -15,6 +18,7 @@ export function validateSessionHistory(
   sessionId: string,
   events: readonly SessionEvent[],
 ): void {
+  readRecordedModelRequests(events);
   const continuations = new Set<string>();
   const startedContinuations = new Set<string>();
   for (const [index, event] of events.entries()) {

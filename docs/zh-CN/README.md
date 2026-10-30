@@ -26,6 +26,8 @@ May 提供可组合的软件包，用于模型和工具执行、持久对话、�
 
 ### 扩展与运行 Agent
 
+- [保存和检查模型请求](guides/model-request-recording.md)
+
 - [组合插件、服务和生命周期 Hooks](guides/plugins.md)。
 - [编写模型适配器](guides/custom-model.md)。
 - [编写工具](guides/custom-tool.md)。

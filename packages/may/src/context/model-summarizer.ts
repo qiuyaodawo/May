@@ -49,6 +49,7 @@ export function createModelContextSummarizer(
 
       // Run 身份一并传给模型，直接使用同一个模型的计账方可以区分摘要调用。
       const streamOptions: ModelStreamOptions = {
+        purpose: "compaction",
         signal,
         ...(request.runId === undefined ? {} : { runId: request.runId }),
         ...(request.step === undefined ? {} : { step: request.step }),

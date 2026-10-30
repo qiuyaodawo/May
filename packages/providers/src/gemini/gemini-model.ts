@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { executeRecordedRequest, requestEndpoint } from "@sortedyuan/may/core";
 import { assertModelResponseFormat, validateStructuredModelResponse, type AssistantMessage, type Model, type ModelEvent, type ModelRequest, type ModelStreamOptions, type ToolCall } from "@sortedyuan/may/core";
 import { parseRetryAfterMs, readSseData } from "../openai-compatible/http.js";
 import { convertGeminiUsage, isRecord, toGeminiRequestParts } from "./convert.js";
@@ -17,6 +18,7 @@ export interface GeminiModelOptions {
 }
 
 export class GeminiModel implements Model {
+  readonly supportsRequestRecording = true;
   private readonly baseURL: string;
   private readonly fetchImplementation: typeof globalThis.fetch;
   private readonly options: GeminiModelOptions;
@@ -56,10 +58,14 @@ export class GeminiModel implements Model {
     }
     if (Object.keys(config).length > 0) body.generationConfig = config;
     const model = this.options.model.replace(/^models\//u, "");
+    yield* executeRecordedRequest({ version: 1, adapter: "gemini", purpose: "generation", endpoint: requestEndpoint(`${this.baseURL}/models/${encodeURIComponent(model)}:streamGenerateContent`), request, body, protocol: { model, alt: "sse" } }, options.recordRequest, options.signal, (body) => this.execute(body, model, request, options));
+  }
+
+  private async *execute(body: string, model: string, request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     const response = await this.fetchImplementation(`${this.baseURL}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
       method: "POST",
       headers: { "x-goog-api-key": this.options.apiKey, "content-type": "application/json", accept: "text/event-stream" },
-      body: JSON.stringify(body),
+      body,
       signal: options.signal,
     });
     if (!response.ok) throw new GeminiApiError(response.status, await response.text(), parseRetryAfterMs(response.headers.get("retry-after")));

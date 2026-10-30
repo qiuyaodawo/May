@@ -43,7 +43,7 @@ export function createUiRouter(host: UiHost, exit?: () => void) {
           else if (url.pathname.endsWith("/field") && selected && host.field) {
             const blockId = url.searchParams.get("block") ?? "", field = url.searchParams.get("field") as UiField;
             const offset = Number(url.searchParams.get("offset") ?? 0), version = url.searchParams.get("version");
-            if (!blockId || blockId.length > 512 || !["input", "text", "reasoning", "diagnostic", "presentation"].includes(field) || !Number.isSafeInteger(offset) || offset < 0 || (version?.length ?? 0) > 128) throw new UiError(400, "详情参数不正确。");
+            if (!blockId || blockId.length > 512 || !["input", "text", "reasoning", "diagnostic", "presentation", "request"].includes(field) || !Number.isSafeInteger(offset) || offset < 0 || (version?.length ?? 0) > 128) throw new UiError(400, "详情参数不正确。");
             sendJson(res, 200, await host.field(selected, { blockId, field, offset, ...(version ? { version } : {}) }));
           } else throw new UiError(400, "宿主不支持此读取或未指定资源。");
         } else if (req.method === "GET" && url.pathname === "/api/ui/events") {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readSessionTranscript, type SessionEvent } from "@sortedyuan/may/session";
+import { readSessionTranscript, readRecordedModelRequests, type SessionEvent } from "@sortedyuan/may/session";
 import { UiError, type UiBlock, type UiField, type UiFieldPage, type UiFieldRequest, type UiPage, type UiPageRequest } from "./protocol.js";
 
 const PAGE_SIZE = 50, PAGE_CHARACTERS = 262_144;
@@ -31,7 +31,7 @@ export function historyPage(hostId: string, selectedId: string, blocks: readonly
   return readPage(hostId, `history:${selectedId}`, blocks, request, (b, q) => Boolean(matches?.has(b.id)) || [b.title, b.text, b.input, b.reasoning, b.diagnostic?.message, b.diagnostic?.code, b.presentation?.text].some(value => value?.toLocaleLowerCase().includes(q)), true);
 }
 export function fieldText(block: UiBlock, field: UiField): string {
-  return field === "diagnostic" ? block.diagnostic?.message ?? "" : field === "presentation" ? block.presentation?.text ?? "" : block[field] ?? "";
+  return field === "request" ? "" : field === "diagnostic" ? block.diagnostic?.message ?? "" : field === "presentation" ? block.presentation?.text ?? "" : block[field] ?? "";
 }
 function display(value: unknown): string {
   try { return typeof value === "string" ? value : JSON.stringify(value, null, 2) ?? ""; } catch { return "[无法显示的数据]"; }
@@ -60,6 +60,10 @@ function* historyFields(events: readonly SessionEvent[]): Iterable<{ id: string;
   }
 }
 export function recordedField(events: readonly SessionEvent[], block: UiBlock, field: UiField): string {
+  if (field === "request") {
+    const requests = readRecordedModelRequests(events).filter(request => block.id === `assistant:${request.runId}:${request.step}` || block.id === `run:${request.runId}`);
+    return requests.length > 0 ? JSON.stringify(requests, null, 2) : "此处没有已保存的模型请求。";
+  }
   let text = fieldText(block, field);
   for (const entry of historyFields(events)) if (entry.id === block.id && entry.fields[field] !== undefined) text = entry.fields[field]!;
   return text;

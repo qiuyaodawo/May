@@ -190,6 +190,10 @@ export async function openConfiguredMaybeCode(
     plugin.provides?.some(candidate => candidate.id === service.id && candidate.scope === service.scope));
   const pluginModel = provided(services.model);
   const configuredPermissionMode = config.apps?.maybecode?.permissionMode;
+  const requestRecording = config.apps?.maybecode?.requestRecording ?? "required";
+  const providerBodyRecording = config.apps?.maybecode?.providerBodyRecording ?? false;
+  if (typeof providerBodyRecording !== "boolean") throw new MaybeCodeConfigError("apps.maybecode.providerBodyRecording must be boolean");
+  if (requestRecording !== "off" && requestRecording !== "required") throw new MaybeCodeConfigError("apps.maybecode.requestRecording must be off or required");
   const configuredDelegationNotifications = options.delegationNotifications === undefined
     ? config.apps?.maybecode?.delegationNotifications : options.delegationNotifications;
   const delegationNotifications = configuredDelegationNotifications === undefined ? false : configuredDelegationNotifications;
@@ -366,6 +370,8 @@ export async function openConfiguredMaybeCode(
         return { plugins: configuredPlugins, ...await permissionsFor(nextWorkspace), ...(directories === false ? { skills: false } : { skillDirectories: directories }) };
       },
       permissionMode,
+      requestRecording,
+      providerBodyRecording,
       delegationNotifications,
       workspace,
       ...(initialModel === undefined ? {} : { model: initialModel.model, modelInfo: initialModel.modelInfo }),

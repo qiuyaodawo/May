@@ -62,6 +62,8 @@ export function createMayAdapter(options: MayAdapterOptions): GatewayAgentAdapte
       const ids = new Set(selected.map(plugin => plugin.id));
       const provided = new Set(selected.flatMap(plugin => plugin.provides?.map(service => `${service.scope}:${service.id}`) ?? []));
       return defineAgent({
+        requestRecording: options.agent.requestRecording ?? "required",
+        providerBodyRecording: options.agent.providerBodyRecording,
         ...(options.permissionRuleStore === undefined ? {} : { permissionRuleStore: options.permissionRuleStore }),
         plugins: [...defaults.filter(plugin => !ids.has(plugin.id) && !plugin.provides?.some(service => provided.has(`${service.scope}:${service.id}`))), ...selected],
         ...(options.agent.instructions === undefined ? {} : { instructions: options.agent.instructions }),

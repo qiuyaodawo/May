@@ -20,7 +20,13 @@ export class FileSessionStore implements SessionStore {
   }
 
   append(event: SessionEvent): Promise<void> {
-    return this.enqueue(event.sessionId, () => this.appendNow(event));
+    return this.appendBatch([event]);
+  }
+
+  appendBatch(events: readonly SessionEvent[]): Promise<void> {
+    const batch = structuredClone(events);
+    if (batch.length === 0) return Promise.resolve();
+    return this.enqueue(batch[0]!.sessionId, () => this.appendNow(batch));
   }
 
   private enqueue<T>(sessionId: string, action: () => Promise<T>): Promise<T> {
@@ -60,13 +66,14 @@ export class FileSessionStore implements SessionStore {
     return this.enqueue(sessionId, () => this.readNow(sessionId, false));
   }
 
-  private async appendNow(event: SessionEvent): Promise<void> {
+  private async appendNow(events: readonly SessionEvent[]): Promise<void> {
+    const event = events[0]!;
     const cached = this.validated.get(event.sessionId);
     const info = cached === undefined ? undefined : await stat(this.filePath(event.sessionId)).catch(() => undefined);
     const unchanged = cached !== undefined && info !== undefined && cached.size === info.size && cached.mtimeMs === info.mtimeMs && cached.ctimeMs === info.ctimeMs && cached.ino === info.ino;
     const expectedSeq = (unchanged ? cached.seq : (await this.readNow(event.sessionId)).length) + 1;
 
-    if (event.seq !== expectedSeq) {
+    if (events.some((item, index) => item.sessionId !== event.sessionId || item.seq !== expectedSeq + index)) {
       throw new Error(
         `Expected session event sequence ${expectedSeq}, received ${event.seq}`,
       );
@@ -75,12 +82,12 @@ export class FileSessionStore implements SessionStore {
     await mkdir(this.directory, { recursive: true });
     const file = await open(this.filePath(event.sessionId), "a");
     try {
-      await file.writeFile(`${JSON.stringify(event)}\n`, "utf8");
+      await file.writeFile(events.map((item) => `${JSON.stringify(item)}\n`).join(""), "utf8");
       await file.sync();
       if (expectedSeq === 1) await syncDirectory(this.directory);
       const info = await file.stat();
       if (this.validated.size >= 256) this.validated.delete(this.validated.keys().next().value!);
-      this.validated.set(event.sessionId, { seq: expectedSeq, size: info.size, mtimeMs: info.mtimeMs, ctimeMs: info.ctimeMs, ino: info.ino });
+      this.validated.set(event.sessionId, { seq: expectedSeq + events.length - 1, size: info.size, mtimeMs: info.mtimeMs, ctimeMs: info.ctimeMs, ino: info.ino });
     } finally { await file.close(); }
   }
 
@@ -163,6 +170,9 @@ function validPayload(event: Record<string, unknown>): boolean {
   if ((String(event.type).startsWith("run.") || String(event.type).startsWith("tool.") || event.type === "assistant.completed") && typeof event.runId !== "string") return false;
   if ((String(event.type).startsWith("tool.") || event.type === "assistant.completed") && (!Number.isSafeInteger(event.step) || Number(event.step) < 1)) return false;
   switch (event.type) {
+    case "model.request.defined": return text(event.id) && "value" in event;
+    case "model.request.prepared": return text(event.modelCallId) && text(event.runId) && text(event.adapter) && Number.isSafeInteger(event.step) && Number(event.step) > 0 && Number.isSafeInteger(event.attempt) && Number(event.attempt) > 0 && ["generation", "compaction"].includes(String(event.purpose)) && object(event.request) && (event.body === undefined || object(event.body));
+    case "model.attempt.started": case "model.attempt.completed": case "model.attempt.failed": return text(event.modelCallId) && text(event.runId) && Number.isSafeInteger(event.attempt) && Number(event.attempt) > 0 && (event.type === "model.attempt.started" || typeof event.durationMs === "number" && Number.isFinite(event.durationMs) && event.durationMs >= 0) && (event.type !== "model.attempt.failed" || typeof event.cancelled === "boolean" && text(event.errorName));
     case "session.created": return (event.metadata === undefined || object(event.metadata)) &&
       (event.fork === undefined || object(event.fork) && typeof event.fork.sessionId === "string" &&
         typeof event.fork.runId === "string" && Number.isSafeInteger(event.fork.positionSeq) && Number(event.fork.positionSeq) > 0);

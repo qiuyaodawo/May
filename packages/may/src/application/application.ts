@@ -1,3 +1,4 @@
+import { withModelRequestRecording } from "../core/request-recording.js";
 import {
   type ContextBudget,
   type ContextCompactionFailure,
@@ -97,6 +98,8 @@ export interface AgentToolPresentation {
 }
 
 export interface AgentApplicationOptions {
+  readonly requestRecording?: "off" | "required";
+  readonly providerBodyRecording?: boolean | undefined;
   readonly model?: Model;
   readonly store: SessionStore;
   readonly permissionPolicy?: PermissionPolicy;
@@ -405,7 +408,12 @@ export class AgentApplication implements SteerableAgentController {
       messages: Message[] = [],
       runtimeInfo: SessionRuntimeInfo = {},
     ) => {
-      const model = sessionScope.get(applicationServices.modelWrappers).apply(sessionScope.get(applicationServices.model));
+      const configuredModel = sessionScope.get(applicationServices.modelWrappers).apply(sessionScope.get(applicationServices.model));
+      const model = options.requestRecording !== "off"
+        ? withModelRequestRecording(configuredModel, (event) => {
+          if (historySource === undefined) throw new Error("Session is not ready for request recording");
+          return historySource.recordModelRequest(event);
+        }) : configuredModel;
       const contextFactory = sessionScope.get(applicationServices.contextWrappers).apply(sessionScope.get(applicationServices.contextFactory));
       const configuredContext = sessionScope.provides(applicationServices.contextOptions) ? sessionScope.get(applicationServices.contextOptions) : {};
       contextOptions = typeof configuredContext === "function" ? configuredContext(model) : configuredContext;
@@ -518,6 +526,8 @@ export class AgentApplication implements SteerableAgentController {
     });
       const session = options.fork !== undefined
         ? await Session.fork({ sourceId: options.fork.sessionId, positionSeq: options.fork.positionSeq,
+            requestRecording: options.requestRecording ?? "required",
+            providerBodyRecording: options.providerBodyRecording,
             id: sessionId, store: options.store, deferBranchPositions: true, deferForkReady: true,
             stateKeys: [SKILL_STATE_KEY, PLUGIN_STATE_KEY, ...(options.forkStateKeys ?? [])],
             transformState: transformForkState,
@@ -532,6 +542,8 @@ export class AgentApplication implements SteerableAgentController {
             return runtime;
           })
         : await Session.create({
+            requestRecording: options.requestRecording ?? "required",
+            providerBodyRecording: options.providerBodyRecording,
             runtime: await createRuntime(),
             store: options.store,
             deferBranchPositions: true,
@@ -934,6 +946,14 @@ export class AgentApplication implements SteerableAgentController {
     return this.session.queryHistory(query);
   }
 
+  listModelRequests(options: { afterSeq?: number; limit?: number } = {}) {
+    return this.session.listModelRequests(options);
+  }
+
+  getModelRequest(modelCallId: string) {
+    return this.session.getModelRequest(modelCallId);
+  }
+
   async inspectContext(): Promise<ContextInspection | undefined> {
     this.throwIfClosed();
     return this.contextController?.inspect();
@@ -1163,6 +1183,8 @@ async function resumeSession(
     throw new Error("sessionId is required when resuming a session");
   }
   return Session.resume({
+    requestRecording: options.requestRecording ?? "required",
+    providerBodyRecording: options.providerBodyRecording,
     id: options.sessionId,
     store: options.store,
     deferBranchPositions: true,

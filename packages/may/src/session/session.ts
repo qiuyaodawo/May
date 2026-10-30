@@ -1,3 +1,5 @@
+import { readRecordedModelRequests, requestReferences, requestValueId, type RecordedModelRequest } from "./requests.js";
+import type { ModelRequestSink } from "../core/request-recording.js";
 import {
   AsyncEventQueue,
   isStreamingMayEvent,
@@ -46,6 +48,8 @@ import {
 } from "./store.js";
 
 export interface SessionOptions {
+  providerBodyRecording?: boolean | undefined;
+  requestRecording?: "off" | "required";
   runtime: AgentRuntime;
   store?: SessionStore;
   id?: string;
@@ -54,6 +58,8 @@ export interface SessionOptions {
 }
 
 export interface ResumeSessionOptions {
+  providerBodyRecording?: boolean | undefined;
+  requestRecording?: "off" | "required";
   id: string;
   store: SessionStore;
   deferBranchPositions?: boolean;
@@ -105,6 +111,11 @@ export interface SessionContinueOptions extends Omit<ContinueOptions, "stepInput
 }
 
 export class Session {
+  private requestRecording: "off" | "required" = "off";
+  private providerBodyRecording = false;
+  private requestRecordTail: Promise<void> = Promise.resolve();
+  private readonly requestDefinitions = new Set<string>();
+  private readonly requestAttempts = new Map<string, number>();
   readonly id: string;
   readonly metadata: Readonly<Record<string, unknown>> | undefined;
   readonly forkOrigin: SessionForkOrigin | undefined;
@@ -157,7 +168,9 @@ export class Session {
     this.deferBranchPositions = deferBranchPositions;
     this.steering = new SessionSteeringQueue((event) => this.record(event), history);
     for (const event of history) {
-      if ("runId" in event && typeof event.runId === "string") this.latestRunId = event.runId;
+      if (event.type === "model.request.defined") this.requestDefinitions.add(event.id);
+      if (event.type === "model.request.prepared") this.requestAttempts.set(event.modelCallId, event.attempt);
+      if (!event.type.startsWith("model.") && "runId" in event && typeof event.runId === "string") this.latestRunId = event.runId;
       if (event.type === "input.submitted" && event.inputId !== undefined) this.submittedInputIds.add(event.inputId);
     }
   }
@@ -181,6 +194,9 @@ export class Session {
       options.deferBranchPositions,
     );
     const runtime = options.runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
+    session.requestRecording = requestRecordingMode(options.requestRecording);
+    session.providerBodyRecording = options.providerBodyRecording ?? false;
+    if (session.requestRecording === "required" && options.runtime.supportsRequestRecording !== true) throw new Error("Runtime does not support complete request recording");
     validateRuntimeDescriptor(runtime);
     const initialState = options.runtime.saveState === undefined ? undefined : await snapshotRuntimeState(options.runtime);
     const created: SessionEventPayload = {
@@ -258,6 +274,9 @@ export class Session {
         recoveredEvents,
         options.deferBranchPositions,
       );
+      session.requestRecording = requestRecordingMode(options.requestRecording);
+      session.providerBodyRecording = options.providerBodyRecording ?? false;
+      if (session.requestRecording === "required" && runtime.supportsRequestRecording !== true) throw new Error("Runtime does not support complete request recording");
       for (const event of recoveredEvents) {
         if (event.type === "run.interrupted") {
           for (const recovery of event.recoveries) {
@@ -344,7 +363,11 @@ export class Session {
         await options.store.append(ready);
         history.push(ready);
       }
-      return new Session(id, runtime, options.store, options.metadata ?? created.metadata, history.length, history, options.deferBranchPositions);
+      const session = new Session(id, runtime, options.store, options.metadata ?? created.metadata, history.length, history, options.deferBranchPositions);
+      session.requestRecording = requestRecordingMode(options.requestRecording);
+      session.providerBodyRecording = options.providerBodyRecording ?? false;
+      if (session.requestRecording === "required" && runtime.supportsRequestRecording !== true) throw new Error("Runtime does not support complete request recording");
+      return session;
     } catch (error) { return closeRejectedRuntime(runtime, error); }
   }
 
@@ -477,6 +500,7 @@ export class Session {
     let accepted = false;
     let changing = false;
     try {
+      if (this.requestRecording === "required" && runtime.supportsRequestRecording !== true) throw new Error("Runtime does not support complete request recording");
       this.assertIdleRuntime();
       this.assertRecovered(true);
       this.runtimeMutation = true;
@@ -627,6 +651,7 @@ export class Session {
     }
     const runtimeOptions: RunOptions = {
       ...options,
+      ...(this.requestRecording === "required" ? { recordRequest: this.recordModelRequest } : {}),
       checkpoint: (event) => this.checkpoint(event, options.checkpoint),
       stepInputSource: ({ runId, step, signal }) => this.steering.deliver(runId, step, signal),
       traceAttributes: {
@@ -674,6 +699,7 @@ export class Session {
   private async startContinuation(options: SessionContinueOptions): Promise<RunHandle> {
     this.assertRecovered();
     const { continuationId, ...runtimeOptions } = options;
+    const recordingOptions = this.requestRecording === "required" ? { recordRequest: this.recordModelRequest } : {};
     if (continuationId !== undefined) {
       if (typeof continuationId !== "string" || continuationId.trim() === "" || continuationId.length > 256) {
         throw new TypeError("continuationId must be a nonempty string of at most 256 characters");
@@ -686,6 +712,7 @@ export class Session {
     this.assertRecovered();
     return this.wrapRun(this.runtime.continue({
       ...runtimeOptions,
+      ...recordingOptions,
       checkpoint: (event) => this.checkpoint(event, options.checkpoint, continuationId),
       stepInputSource: ({ runId, step, signal }) => this.steering.deliver(runId, step, signal),
       traceAttributes: {
@@ -944,6 +971,65 @@ export class Session {
     }
     await extra?.(event);
   }
+
+  async listModelRequests(options: { afterSeq?: number; limit?: number } = {}): Promise<readonly RecordedModelRequest[]> {
+    const limit = options.limit ?? 50;
+    if (options.afterSeq !== undefined && (!Number.isSafeInteger(options.afterSeq) || options.afterSeq < 0)) throw new RangeError("afterSeq must be a nonnegative integer");
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new RangeError("limit must be between 1 and 1000");
+    return readRecordedModelRequests(await this.history()).filter((request) => request.seq > (options.afterSeq ?? 0)).slice(0, limit);
+  }
+
+  async getModelRequest(modelCallId: string): Promise<readonly RecordedModelRequest[]> {
+    return readRecordedModelRequests(await this.history()).filter((request) => request.modelCallId === modelCallId);
+  }
+
+  readonly recordModelRequest: ModelRequestSink = (observation) => {
+    const operation = this.requestRecordTail.then(async () => {
+      const identity = { runId: observation.runId, step: observation.step, modelCallId: observation.modelCallId };
+      if (observation.type === "prepared") {
+        if (new TextEncoder().encode(JSON.stringify({ ...observation.record, body: this.providerBodyRecording ? observation.record.body : undefined })).byteLength > 64 * 1024 * 1024) throw new RangeError("Model request record exceeds 64 MiB");
+        const definitions = new Set(this.requestDefinitions);
+        const added: Array<{ id: string; value: unknown }> = [];
+        const define = (value: unknown): string => {
+          const id = requestValueId(value);
+          if (!definitions.has(id)) { definitions.add(id); added.push({ id, value }); }
+          return id;
+        };
+        const record = observation.record;
+        if (this.providerBodyRecording && (typeof record.body !== "object" || record.body === null || Array.isArray(record.body))) throw new TypeError("Recorded request body must be an object");
+        const request = requestReferences({ ...record.request }, define);
+        const body = this.providerBodyRecording ? requestReferences(record.body as Record<string, unknown>, define) : undefined;
+        const batch: SessionEventPayload[] = added.map((definition) => ({ type: "model.request.defined", ...definition }));
+        const attempt = (this.requestAttempts.get(observation.modelCallId) ?? 0) + 1;
+        batch.push({ type: "model.request.prepared", version: 1, ...identity, attempt, adapter: record.adapter, purpose: record.purpose, request, body, ...(record.endpoint === undefined ? {} : { endpoint: record.endpoint }), ...(record.protocol === undefined ? {} : { protocol: record.protocol }), ...(record.omittedPaths === undefined ? {} : { omittedPaths: record.omittedPaths }), ...(record.externalResourcePaths === undefined ? {} : { externalResourcePaths: record.externalResourcePaths }) });
+        const saved = this.recordTail.then(async () => {
+          const events = batch.map((payload, index) => ({ ...payload, sessionId: this.id, seq: this.seq + index + 1, timestamp: Date.now() }) as SessionEvent);
+          if (this.store.appendBatch) await this.store.appendBatch(events);
+          else for (const event of events) await this.store.append(event);
+          this.seq += events.length;
+        });
+        this.recordTail = saved.catch(() => undefined);
+        await saved;
+        for (const definition of added) this.requestDefinitions.add(definition.id);
+        this.requestAttempts.set(observation.modelCallId, attempt);
+      } else {
+        const attempt = this.requestAttempts.get(observation.modelCallId) ?? 0;
+        if (attempt === 0) throw new Error("Model outcome has no prepared request");
+        await this.record(observation.type === "started" ? { type: "model.attempt.started", ...identity, attempt }
+          : observation.type === "completed"
+          ? { type: "model.attempt.completed", ...identity, attempt, durationMs: observation.durationMs, ...(observation.usage === undefined ? {} : { usage: observation.usage }) }
+          : { type: "model.attempt.failed", ...identity, attempt, cancelled: observation.cancelled, errorName: observation.errorName, durationMs: observation.durationMs, ...(observation.httpStatus === undefined ? {} : { httpStatus: observation.httpStatus }) });
+      }
+    });
+    this.requestRecordTail = operation.catch(() => undefined);
+    return operation.catch((error) => { this.persistenceFailed = true; throw error; });
+  };
+}
+
+function requestRecordingMode(value: unknown): "off" | "required" {
+  if (value === undefined) return "required";
+  if (value !== "off" && value !== "required") throw new TypeError("requestRecording must be off or required");
+  return value;
 }
 
 export class SessionRecoveryRequiredError extends Error {

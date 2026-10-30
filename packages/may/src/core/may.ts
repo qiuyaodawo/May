@@ -23,6 +23,7 @@ import {
   type SerializedError,
 } from "./events.js";
 import type { Model, ModelRequest, ModelResponseFormat } from "./model.js";
+import type { ModelRequestSink } from "./request-recording.js";
 import { runtimeHooks, RUNTIME_HOOKS, type HookContext, type HookDefinition, type HookDispatcher } from "./hooks.js";
 import { DEFAULT_RUNTIME_DESCRIPTOR, type AgentRuntime } from "./runtime.js";
 import { jsonEqual } from "./json-equal.js";
@@ -89,6 +90,7 @@ export interface MayOptions {
 }
 
 export interface RunOptions {
+  readonly recordRequest?: ModelRequestSink;
   /** Host-only control, checked after a complete model/tool step. Never interrupts tools. */
   shouldYield?: () => boolean;
   /** 完整 Step 结束后接收输入；返回前由 host 保存输入记录。 */
@@ -105,6 +107,7 @@ export interface RunOptions {
 }
 
 export interface ContinueOptions {
+  readonly recordRequest?: ModelRequestSink;
   shouldYield?: () => boolean;
   stepInputSource?: StepInputSource;
   runBudget?: RunBudget;
@@ -136,6 +139,7 @@ export type StepInputSource = (boundary: {
 }) => Promise<readonly UserMessage[]>;
 
 export class May implements AgentRuntime {
+  get supportsRequestRecording(): boolean { return this.model.supportsRequestRecording === true; }
   readonly descriptor = DEFAULT_RUNTIME_DESCRIPTOR;
   readonly supportedHooks = RUNTIME_HOOKS;
   private readonly hooks: HookDispatcher | undefined;
@@ -207,6 +211,7 @@ export class May implements AgentRuntime {
       options.runBudget,
       options.shouldYield,
       options.stepInputSource,
+      options.recordRequest,
     );
   }
 
@@ -221,6 +226,7 @@ export class May implements AgentRuntime {
       options.runBudget,
       options.shouldYield,
       options.stepInputSource,
+      options.recordRequest,
     );
   }
 
@@ -233,7 +239,9 @@ export class May implements AgentRuntime {
     budgetOverride: RunBudget | undefined,
     shouldYield: (() => boolean) | undefined,
     stepInputSource: StepInputSource | undefined,
+    recordRequest: ModelRequestSink | undefined,
   ): RunHandle {
+    if (recordRequest !== undefined && this.model.supportsRequestRecording !== true) throw new Error("Model does not support complete request recording");
     if (this.unsafeToReuse) throw new RunCheckpointError(new Error("Tool outcomes or Context are uncertain; reconcile before creating a new runtime"));
     const budget = new RunBudgetMeter(resolveRunBudget(this.runBudget, budgetOverride));
     if (this.concurrentRuns === "reject" && this.activeRuns > 0) {
@@ -307,6 +315,7 @@ export class May implements AgentRuntime {
       shouldYield,
       stepInputSource,
       (reason) => controller.abort(reason),
+      recordRequest,
     ).then(
       (value) => {
         endTraceSpan(runSpan, {
@@ -378,6 +387,7 @@ export class May implements AgentRuntime {
     shouldYield: (() => boolean) | undefined,
     stepInputSource: StepInputSource | undefined,
     abortPending: (reason: unknown) => void,
+    recordRequest: ModelRequestSink | undefined,
   ): Promise<RunResult> {
     let aggregateUsage: Usage | undefined;
     let modelCalls = 0;
@@ -477,6 +487,7 @@ export class May implements AgentRuntime {
             modelCallId,
             emit,
             modelSpan,
+            recordRequest,
           );
           responseUsage = modelResponse.usage;
           aggregateUsage = addUsage(aggregateUsage, responseUsage);
@@ -825,6 +836,7 @@ export class May implements AgentRuntime {
     modelCallId: string,
     emit: (event: MayEventPayload) => void,
     modelSpan: TraceSpan | undefined,
+    recordRequest: ModelRequestSink | undefined,
   ): Promise<{ message: AssistantMessage; usage?: Usage; cost?: UsageCost }> {
     let completed: AssistantMessage | undefined;
     let usage: Usage | undefined;
@@ -862,6 +874,10 @@ export class May implements AgentRuntime {
     let singleAttempt: ReturnType<typeof attemptObserver.start> | undefined;
     const streamOptions = {
       signal, runId, step, modelCallId, attemptObserver,
+      ...(recordRequest === undefined ? {} : { recordRequest: async (event: import("./request-recording.js").ModelRequestObservation) => {
+        try { await recordRequest({ ...event, runId, step, modelCallId }); }
+        catch (error) { this.unsafeToReuse = true; throw new RunCheckpointError(error); }
+      } }),
       ...(modelSpan === undefined ? {} : { traceContext: modelSpan.context }),
     };
     try {

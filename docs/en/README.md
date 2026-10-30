@@ -29,6 +29,8 @@ experience. Public APIs and persistence formats are currently in developer previ
 
 ### Extend and operate an Agent
 
+- [Record and inspect model requests](guides/model-request-recording.md)
+
 - [Compose plugins, services, and lifecycle Hooks](guides/plugins.md).
 - [Implement a model adapter](guides/custom-model.md).
 - [Implement a tool](guides/custom-tool.md).

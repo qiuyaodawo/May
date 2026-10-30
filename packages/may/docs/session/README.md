@@ -4,6 +4,13 @@
 `createSessionHistoryRetrievalTools` for bounded model-visible history access.
 See the [history tool reference](tools.md).
 
+Set `requestRecording: "required"` when creating, reopening or forking a Session
+to save effective model requests and individual attempts. Query them through
+`listModelRequests()` and `getModelRequest()`. The default is `"required"`.
+Provider bodies are independently enabled with `providerBodyRecording: true`.
+See [model request recording](../../../../docs/en/guides/model-request-recording.md)
+for provider support, content reuse, recovery, privacy and application configuration.
+
 `@sortedyuan/may/session` composes a configured `@sortedyuan/may/core` runtime into a long-lived
 conversation identity. It serializes runs and records durable session facts
 without making Core depend on persistence or UI policy.

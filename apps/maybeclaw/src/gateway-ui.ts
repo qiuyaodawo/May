@@ -123,7 +123,7 @@ export class GatewayUiHost implements UiHost {
   async field(selectedId: string, request: UiFieldRequest) {
     const block = (await this.snapshot(selectedId, true)).blocks.find(item => item.id === request.blockId);
     if (!block) throw new UiError(404, "记录不属于当前会话。");
-    const text = request.field === "diagnostic" ? block.diagnostic?.message ?? "" : request.field === "presentation" ? block.presentation?.text ?? "" : block[request.field] ?? "";
+    const text = request.field === "request" ? "请通过 Agent Session 查询模型请求。" : request.field === "diagnostic" ? block.diagnostic?.message ?? "" : request.field === "presentation" ? block.presentation?.text ?? "" : block[request.field] ?? "";
     return fieldPage(this.hostId, selectedId, request, text);
   }
 

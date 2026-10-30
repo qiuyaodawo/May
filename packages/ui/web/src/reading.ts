@@ -173,7 +173,7 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
             details.addEventListener("toggle", () => { if (details.isConnected && nodes.get(block.id)?.node === node) toolOpen.set(block.id, details.open); });
             details.querySelector("summary")!.addEventListener("click", () => { following = false; });
           }
-          if (block.kind === "tool" || block.text.length > 1200 || block.diagnostic) {
+          if (block.kind === "tool" || block.kind === "assistant" || block.text.length > 1200 || block.diagnostic) {
             const action = button("查看详情", () => inspect(block), "text-button inspect-tool"); action.setAttribute("aria-label", `查看 ${block.title ?? (block.kind === "tool" ? "工具" : block.kind === "assistant" ? "回答" : "记录")} 详情`); node.append(action);
           }
           if (entry) entry.node.replaceWith(node);
@@ -254,7 +254,7 @@ export function createInspector(client: UiClient, extensions: WebUiExtensions, v
     root.append(header);
     root.append(element("p", "detail-note", `只读详情 · ${statusLabel(selected.status ?? "unknown")} · 不执行工具或审批`));
     const tabs = element("div", "detail-tabs");
-    const fields: [UiField | "overview", string][] = [["overview", "概览"], ["input", "输入"], ["text", "输出"], ["diagnostic", "错误"], ["presentation", "展示 / Diff"]];
+    const fields: [UiField | "overview", string][] = [["overview", "概览"], ["input", "输入"], ["text", "输出"], ["diagnostic", "错误"], ["presentation", "展示 / Diff"], ["request", "模型请求"]];
     for (const [key, label] of fields) {
       const tab = button(label, () => { requestId++; loading = false; field = key; page = undefined; offsets = []; if (key === "overview") render(); else void load(0); });
       tab.setAttribute("aria-pressed", String(key === field)); tab.disabled = key !== "overview" && !state.snapshot?.reads?.fields; tabs.append(tab);

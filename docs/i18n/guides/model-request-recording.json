@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "Record and inspect model requests",
+      "en": "902526f5cae85d2fd6aafe28fee08aef0a28588d8b1cde53f3211db061aa5f13",
+      "zh": "ea02626d803b787cc3d9ba339290d9a6391405f25a4dd77fb223779b24671848"
+    },
+    {
+      "heading": "Enable recording",
+      "en": "88ab6a469c718320f556f01a1f8bb09289acba521d6883b2f9c0ffa12baa3b34",
+      "zh": "3da62e75935b89b5c6430849c1916022ebe8a376ac024bf68cd46e41b9f5f44d"
+    },
+    {
+      "heading": "Saved contents",
+      "en": "4d968efff12162aea3483b3a664bc5d5351adc1220e2f6ac6347f045e849714f",
+      "zh": "5d15cd8e7147d9cf04a9395e82b317a7db9dd5ca951c2d9a4eb85ac3379cb4d2"
+    },
+    {
+      "heading": "Events and ordering",
+      "en": "7b2d569e25c3a628865182ee9016731979b18101bec45891e46ffaf87226ae4e",
+      "zh": "1c3e731b79d65352f78d3e3f2d5111b74f68bf88af99c3c88527620c593ef17c"
+    },
+    {
+      "heading": "Retries and compaction",
+      "en": "075f7addc554be94ab02692e3a4cfe6ed3e4e460029a324ad667442dc50b2fc6",
+      "zh": "fc0aa1b6ff9e1c6664cc5d7f71647dfb0b96aa3cac74128d6ea57cdfcfe53874"
+    },
+    {
+      "heading": "Query and display",
+      "en": "e7483d02f410656e91244bb124a87b1ba035bcff4066505901d274c84ac9e9d8",
+      "zh": "99d1d397623684e99b11b07c851a2a417e481642166837d6b45d3efb91696ef4"
+    },
+    {
+      "heading": "Recovery and branches",
+      "en": "1d13955a67d9490763ffa1252fe03180af7d519441fb6324b65d9a96ef3bed77",
+      "zh": "070e79f7b12904f7230b235a699d27285a5de5c69417d7e5b39f4c8a11996497"
+    },
+    {
+      "heading": "Custom adapters and runtimes",
+      "en": "7030d344f1efdfeadec6c41bc97d4a312994fd07a2dfe0844d0340207eb20940",
+      "zh": "d1ed8ab95ba0bc1e8b20fd4c35d6f4451578ee0fc76639f90d658698321efc75"
+    },
+    {
+      "heading": "Verification",
+      "en": "2902fcdf4b0e3901104530aa57d48536ae41480ef75b6c352e5482cbe6a2ded2",
+      "zh": "997f7f8a12593bed4271d79c5f4d2d984fda50940e1a51219536b5746dc70b8a"
+    }
+  ]
+}

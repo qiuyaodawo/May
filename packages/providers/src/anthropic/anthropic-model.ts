@@ -1,3 +1,4 @@
+import { executeRecordedRequest, requestEndpoint } from "@sortedyuan/may/core";
 import type {
   Message,
   Model,
@@ -33,6 +34,7 @@ export interface AnthropicModelOptions {
 const FILES_API_BETA = "files-api-2025-04-14";
 
 export class AnthropicModel implements Model {
+  readonly supportsRequestRecording = true;
   private readonly apiKey: string;
   private readonly model: string;
   private readonly baseURL: string;
@@ -93,6 +95,10 @@ export class AnthropicModel implements Model {
   ): AsyncIterable<ModelEvent> {
     if (request.responseFormat !== undefined) throw new TypeError("Anthropic adapter does not support responseFormat");
     const body = this.createRequest(request);
+    yield* executeRecordedRequest({ version: 1, adapter: "anthropic-messages", purpose: "generation", endpoint: requestEndpoint(`${this.baseURL}/v1/messages`), request, body, protocol: { "anthropic-version": this.apiVersion, ...(usesFileId(request.messages) ? { "anthropic-beta": FILES_API_BETA } : {}) } }, options.recordRequest, options.signal, (body) => this.execute(body, request, options));
+  }
+
+  private async *execute(body: string, request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     const headers: Record<string, string> = {
       "anthropic-version": this.apiVersion,
       "content-type": "application/json",
@@ -106,7 +112,7 @@ export class AnthropicModel implements Model {
       {
         method: "POST",
         headers,
-        body: JSON.stringify(body),
+        body,
         signal: options.signal,
       },
     );

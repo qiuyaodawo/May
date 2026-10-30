@@ -219,7 +219,7 @@ export interface UiReceipt { readonly selectedId?: string | null; readonly outpu
 
 export interface UiPageRequest { readonly query?: string; readonly cursor?: string }
 export interface UiPage<T> { readonly hostId: string; readonly items: readonly T[]; readonly nextCursor: string | null; readonly total: number }
-export type UiField = "input" | "text" | "reasoning" | "diagnostic" | "presentation";
+export type UiField = "input" | "text" | "reasoning" | "diagnostic" | "presentation" | "request";
 export interface UiFieldRequest { readonly blockId: string; readonly field: UiField; readonly offset: number; readonly version?: string }
 export interface UiFieldPage { readonly hostId: string; readonly text: string; readonly offset: number; readonly nextOffset: number | null; readonly total: number; readonly version: string }
 

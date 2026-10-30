@@ -2,6 +2,7 @@ export * from "./catalog.js";
 export * from "./branch.js";
 export * from "./events.js";
 export * from "./history.js";
+export * from "./requests.js";
 export * from "./outcome.js";
 export * from "./transcript.js";
 export * from "./session.js";

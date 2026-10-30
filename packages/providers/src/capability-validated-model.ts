@@ -64,6 +64,7 @@ export class CapabilityValidatedModel implements Model {
     return Object.keys(limits).length === 0 ? undefined : limits;
   }
   get reportsAttempts() { return this.model.reportsAttempts; }
+  get supportsRequestRecording(): boolean { return this.model.supportsRequestRecording === true; }
   get capabilityVersion() { return this.capabilities?.version; }
   get configuration(): Readonly<Record<string, string | number | boolean>> {
     return { provider: this.selection.provider, adapter: this.selection.adapter, model: this.selection.model, profile: this.selection.profile, ...(typeof this.selection.options.reasoningEffort === "string" ? { reasoningEffort: this.selection.options.reasoningEffort } : {}), ...(this.capabilityVersion === undefined ? {} : { capabilityVersion: this.capabilityVersion }) };

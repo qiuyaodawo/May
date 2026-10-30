@@ -20,6 +20,7 @@ test("close during input persistence cancels the acquired run", async () => {
   const backing = new InMemorySessionStore();
   let modelCalls = 0;
   const app = await AgentApplication.open({
+    requestRecording: "off",
     store: { read: (id) => backing.read(id), async append(event) {
       if (event.type === "input.submitted") { entered(); await pending; }
       await backing.append(event);
@@ -50,6 +51,7 @@ test("AgentApplication owns durable run, retry, and event lifecycles", async () 
   };
   const store = new InMemorySessionStore();
   const application = await AgentApplication.open({
+    requestRecording: "off",
     model,
     store,
     instructions: "Answer briefly.",
@@ -101,6 +103,7 @@ test("AgentWorkspace records summaries and serializes session replacement", asyn
     },
   };
   const openApplication = ({ sessionId, resume }) => AgentApplication.open({
+    requestRecording: "off",
     model,
     store,
     permissionPolicy: () => "allow",
@@ -153,6 +156,7 @@ test("AgentApplication persists presentation metadata before approval", async ()
     },
   };
   const application = await AgentApplication.open({
+    requestRecording: "off",
     model,
     store: new InMemorySessionStore(),
     tools: [{

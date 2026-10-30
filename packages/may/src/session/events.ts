@@ -112,6 +112,7 @@ export type RecordablePermissionEvent = (
 ) & { timestamp: number };
 
 export type SessionEventPayload =
+  | import("./requests.js").SessionRequestEvent
   | { type: "state.updated"; key: string; value: unknown }
   | { type: "run.budget.exceeded"; runId: string; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
   | { type: "session.created"; metadata?: Record<string, unknown>; runtime?: RuntimeDescriptor; fork?: SessionForkOrigin }

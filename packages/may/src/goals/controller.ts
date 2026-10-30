@@ -195,6 +195,7 @@ export class GoalController {
     return {
       get limits() { return model.limits; },
       get reportsAttempts() { return model.reportsAttempts; },
+      get supportsRequestRecording() { return model.supportsRequestRecording === true; },
       get configuration() { return model.configuration; },
       get capabilityVersion() { return model.capabilityVersion; },
       get contextCompactor(): Model["contextCompactor"] {

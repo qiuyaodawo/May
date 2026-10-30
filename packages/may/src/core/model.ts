@@ -42,7 +42,7 @@ export interface ModelContextCompactor {
   readonly name: string;
   compact(
     snapshot: Readonly<ContextSnapshot>,
-    options: { readonly signal?: AbortSignal; readonly runId?: string; readonly step?: number },
+    options: { readonly signal?: AbortSignal; readonly runId?: string; readonly step?: number; readonly recordRequest?: import("./request-recording.js").ModelRequestRecorder },
   ): Promise<ModelContextCompactionResult>;
 }
 
@@ -67,6 +67,8 @@ export type ModelEvent =
     };
 
 export interface ModelStreamOptions {
+  readonly purpose?: "generation" | "compaction";
+  readonly recordRequest?: import("./request-recording.js").ModelRequestRecorder;
   readonly signal: AbortSignal;
   /** Populated by May; optional for direct adapter use outside a run. */
   readonly runId?: string;
@@ -80,6 +82,7 @@ export interface ModelStreamOptions {
 }
 
 export interface Model {
+  readonly supportsRequestRecording?: boolean;
   readonly reportsAttempts?: boolean | undefined;
   readonly capabilityVersion?: string | undefined;
   readonly configuration?: Readonly<Record<string, string | number | boolean>> | undefined;
