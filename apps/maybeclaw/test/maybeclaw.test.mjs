@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { appendFile, mkdir, mkdtemp, readFile, realpath, rm, unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import test from "node:test";
 import { DEFAULT_TASK_BUDGET, FileTaskStore, MaybeClaw, digest, runMaybeClaw } from "../dist/index.js";
@@ -12,7 +12,9 @@ const usage = { inputTokens: 20, outputTokens: 5, totalTokens: 25 };
 const finished = (text) => ({ type: "response.completed", message: assistant(text), usage });
 
 async function fixture(t) {
-  const root = await realpath(await mkdtemp(join(tmpdir(), "maybeclaw-")));
+  const parent = fileURLToPath(new URL("../../../.test-output/maybeclaw/", import.meta.url));
+  await mkdir(parent, { recursive: true });
+  const root = await realpath(await mkdtemp(join(parent, "case-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const directory = join(root, "state");
   const readDirectory = join(root, "source");
@@ -26,7 +28,8 @@ async function fixture(t) {
 test("task round trip uses May tools, deduplicates, and recovers a missing completion projection without replay", async (t) => {
   const f = await fixture(t);
   let calls = 0;
-  const claw = new MaybeClaw({ directory: f.directory, loadModel: () => ({ async *stream(request) {
+  // 此处验证工具与任务生命周期，Model 仅支持 stream。
+  const claw = new MaybeClaw({ directory: f.directory, requestRecording: "off", loadModel: () => ({ async *stream(request) {
     calls++;
     assert.deepEqual(request.tools.map((tool) => tool.name), ["read"]);
     const output = request.messages.find((message) => message.role === "tool");
@@ -59,7 +62,7 @@ test("queued and active cancellation are durable, and a second owner cannot exec
   const f = await fixture(t);
   let started;
   const ready = new Promise((resolve) => { started = resolve; });
-  const claw = new MaybeClaw({ directory: f.directory, loadModel: () => ({ async *stream(_request, { signal }) {
+  const claw = new MaybeClaw({ directory: f.directory, requestRecording: "off", loadModel: () => ({ async *stream(_request, { signal }) {
     started();
     if (!signal.aborted) await new Promise((resolve) => signal.addEventListener("abort", resolve, { once: true }));
     signal.throwIfAborted();
@@ -84,7 +87,7 @@ test("crashed process leaves an explicit lock and submitted input is never repla
   const { task } = await claw.submit(f.spec);
   const moduleUrl = new URL("../dist/index.js", import.meta.url).href;
   const script = `import { MaybeClaw } from ${JSON.stringify(moduleUrl)};
-    const claw = new MaybeClaw({ directory: ${JSON.stringify(f.directory)}, loadModel: () => ({ async *stream() {
+    const claw = new MaybeClaw({ directory: ${JSON.stringify(f.directory)}, requestRecording: "off", loadModel: () => ({ async *stream() {
       process.stdout.write('MODEL_STARTED\\n'); await new Promise(() => {});
     } }) }); await claw.run(${JSON.stringify(task.id)});`;
   const child = spawn(process.execPath, ["--input-type=module", "-e", script], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });

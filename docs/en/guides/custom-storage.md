@@ -303,6 +303,13 @@ full lifecycle.
 
 ## Local storage maintenance
 
+MaybeClaw holds a separate operating-system exclusive lock on `host.lock.access`
+throughout directory use. Process exit releases it automatically; restart removes
+`host.lock` metadata for an exited local PID. Another host, a live PID, damaged
+metadata, or unverifiable ownership requires manual inspection. Preserve
+`host.lock.access` during use and recovery; never delete or replace it. See
+[MaybeClaw lifecycle and storage](maybeclaw.md#lifecycle-storage-and-migration).
+
 `FileSessionStore` serializes reads, writes and tail repair per Session in one instance.
 Append validation reuses the last sequence only while file identity, length and timestamps
 match; explicit history reads still validate complete records. Keep one writer per file.

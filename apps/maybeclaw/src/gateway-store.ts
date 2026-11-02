@@ -1,8 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { GatewayLock } from "./gateway-lock.js";
 
 const SCHEMA_VERSION = 1;
 const APPLICATION_ID = 0x4d434c57;
@@ -15,7 +14,7 @@ export class GatewayStore {
   private savepointSequence = 0;
 
   private constructor(directory: string, private readonly database: DatabaseSync,
-    private readonly lock: number, private readonly lockToken: string) {
+    private readonly lock: GatewayLock) {
     this.directory = directory;
     this.path = join(directory, "gateway.sqlite");
   }
@@ -23,13 +22,9 @@ export class GatewayStore {
   static open(directory: string): GatewayStore {
     const resolved = resolve(directory);
     mkdirSync(resolved, { recursive: true, mode: 0o700 });
-    const lockPath = join(resolved, "host.lock");
-    const lock = openSync(lockPath, "wx", 0o600);
-    const token = randomUUID();
+    const lock = GatewayLock.acquire(resolved);
     let database: DatabaseSync | undefined;
     try {
-      writeFileSync(lock, JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: Date.now(), token, format: "gateway-v1" }));
-      fsyncSync(lock);
       const path = join(resolved, "gateway.sqlite");
       if (!existsSync(path)) closeSync(openSync(path, "wx", 0o600));
       database = new DatabaseSync(path);
@@ -40,7 +35,7 @@ export class GatewayStore {
       if (version > SCHEMA_VERSION) throw new Error("Gateway database requires a newer MaybeClaw version");
       if (version !== 0 && applicationId !== APPLICATION_ID) throw new Error("Invalid Gateway database identity");
       database.exec("PRAGMA journal_mode = WAL;");
-      const store = new GatewayStore(resolved, database, lock, token);
+      const store = new GatewayStore(resolved, database, lock);
       if (version === 0) store.transaction(() => {
         database!.exec(`CREATE TABLE records (
           collection TEXT NOT NULL,
@@ -54,9 +49,7 @@ export class GatewayStore {
       database.prepare("SELECT collection, record_id, payload FROM records LIMIT 0").all();
       return store;
     } catch (error) {
-      database?.close();
-      closeSync(lock);
-      unlinkSync(lockPath);
+      try { database?.close(); } finally { lock.release(); }
       throw error;
     }
   }
@@ -127,11 +120,7 @@ export class GatewayStore {
     if (this.transactionDepth !== 0) throw new Error("Cannot close a Gateway store inside a transaction");
     this.database.close();
     this.closed = true;
-    closeSync(this.lock);
-    const lockPath = join(this.directory, "host.lock");
-    const owner = JSON.parse(readFileSync(lockPath, "utf8")) as { token?: unknown };
-    if (owner.token !== this.lockToken) throw new Error("Gateway host lock ownership changed");
-    unlinkSync(lockPath);
+    this.lock.release();
   }
 
   private assertOpen(): void {

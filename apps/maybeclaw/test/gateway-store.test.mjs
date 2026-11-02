@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFile, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
@@ -106,7 +106,7 @@ test("host lock rejects a real second process and a later owner can reopen", asy
   const result = spawnSync(process.execPath, ["--input-type=module", "-e",
     `import { GatewayStore } from ${JSON.stringify(moduleUrl)}; GatewayStore.open(process.argv[1]);`, path], { windowsHide: true, encoding: "utf8" });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /EEXIST/);
+  assert.match(result.stderr, /already in use/);
   store.close();
   const reopened = openStore(path);
   reopened.close();
@@ -118,7 +118,6 @@ test("process termination cannot commit half a SQLite transaction", async (t) =>
   const result = spawnSync(process.execPath, ["--input-type=module", "-e",
     `import { GatewayStore } from ${JSON.stringify(moduleUrl)}; const store = GatewayStore.open(process.argv[1]); store.transaction(() => { store.put("messages", "unfinished", {}); process.exit(9); });`, path], { windowsHide: true, encoding: "utf8" });
   assert.equal(result.status, 9);
-  await unlink(join(path, "host.lock"));
   const store = openStore(path);
   t.after(() => store.close());
   assert.equal(store.get("messages", "unfinished"), undefined);

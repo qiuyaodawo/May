@@ -38,6 +38,7 @@
     "@sortedyuan/ui-client": "workspace:*",
     "@sortedyuan/web-ui": "workspace:*",
     "@node-rs/argon2": "2.2.1",
+    "fs-native-extensions": "1.5.1",
     "open": "11.0.4",
     "shell-quote": "^1.10.0",
     "vscode-jsonrpc": "^9.0.2"

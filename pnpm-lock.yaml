@@ -264,6 +264,9 @@ importers:
       '@sortedyuan/web-ui':
         specifier: workspace:*
         version: link:../../packages/ui/web
+      fs-native-extensions:
+        specifier: 1.5.1
+        version: 1.5.1
       open:
         specifier: 11.0.4
         version: 11.0.4

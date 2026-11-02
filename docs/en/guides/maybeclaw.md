@@ -423,8 +423,14 @@ before releasing the data directory.
 
 `gateway.sqlite` stores sessions, bindings, messages, tasks, approvals, defaults,
 request receipts, and delivery records transactionally. May histories remain in
-Session stores. `host.lock` protects against concurrent writers; check a recorded
-owner has stopped before handling an abandoned lock.
+Session stores. The service holds an operating-system exclusive lock on
+`host.lock.access` throughout directory use and stores owner metadata in `host.lock`.
+The operating system releases the exclusive lock when the process exits. On restart,
+the service automatically removes metadata for an exited local process and reports
+its PID and path. A running PID, another host, damaged metadata, or an unverifiable
+owner prevents startup and requires administrator inspection. Preserve
+`host.lock.access`; never delete or replace it during use or recovery. File age
+does not determine automatic cleanup.
 Legacy task locks and configuration initialization locks retain `.lock.access`
 and `.lock.access.gate` files to coordinate creation and deletion. Preserve these
 files while the directory is in use, including during recovery; see

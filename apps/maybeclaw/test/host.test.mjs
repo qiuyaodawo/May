@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { request as httpRequest } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
@@ -36,14 +36,27 @@ test("channel credentials accept either literal values or environment names with
 });
 const finished = (text) => ({ type: "response.completed", message: { role: "assistant", content: [{ type: "text", text }] }, usage: { inputTokens: 20, outputTokens: 5, totalTokens: 25 } });
 async function fixture(t, model) {
-  const root = await realpath(await mkdtemp(join(tmpdir(), "maybeclaw-host-")));
+  const parent = fileURLToPath(new URL("../../../.test-output/maybeclaw-host/", import.meta.url));
+  await mkdir(parent, { recursive: true });
+  const root = await realpath(await mkdtemp(join(parent, "case-")));
   const cleanup = [];
   t.after(async () => { for (const close of cleanup.reverse()) await close(); await rm(root, { recursive: true, force: true }); });
   const spec = { configPath: join(root, "config.json"), modelProfile: "fixture", modelFingerprint: digest("fixture"), runBudget: DEFAULT_TASK_BUDGET };
-  const claw = new MaybeClaw({ directory: root, loadModel: () => model ?? { async *stream() { yield finished("Done"); } } });
+  // 这些测试验证宿主行为，提供的 Model 仅支持 stream。
+  const claw = new MaybeClaw({ directory: root, requestRecording: "off", loadModel: () => model ?? { async *stream() { yield finished("Done"); } } });
   return { root, spec, claw, cleanup };
 }
-async function until(probe) { for (let i = 0; i < 150; i++) { const result = await probe(); if (result) return result; await delay(30); } throw new Error("Condition timed out"); }
+async function until(probe, host) {
+  for (let i = 0; i < 150; i++) {
+    const status = host.status();
+    assert.deepEqual(status.dispatchErrors, {}, "宿主任务执行失败");
+    assert.equal(status.error, null, "宿主处理失败");
+    const result = await probe();
+    if (result) return result;
+    await delay(30);
+  }
+  throw new Error("Condition timed out");
+}
 
 test("loopback API authenticates, queues independently of clients, bounds concurrency and reopens without replay", async (t) => {
   let calls = 0, active = 0, peak = 0;
@@ -72,19 +85,19 @@ test("loopback API authenticates, queues independently of clients, bounds concur
   assert.equal((await request("/api/tasks", { prompt: "changed", requestId: "one" })).status, 400);
   await request("/api/tasks", { prompt: "second", requestId: "two" });
   // No client remains attached to either run.
-  await until(async () => (await f.claw.store.list()).every(t => t.status === "completed"));
+  await until(async () => (await f.claw.store.list()).every(t => t.status === "completed"), host);
   assert.equal(calls, 2); assert.equal(peak, 1);
   assert.match((await f.claw.status(first.task.id)).task.result, /<script>/);
   const persisted = await (await request(`/api/tasks/${first.task.id}`)).json();
   assert.equal(persisted.task.verification, "unverified");
   const interrupted = await (await request("/api/tasks", { prompt: "interrupt", requestId: "three" })).json();
   await request("/api/tasks", { prompt: "after restart", requestId: "four" });
-  await until(async () => calls === 3 && (await f.claw.status(interrupted.task.id)).task.status === "running");
+  await until(async () => calls === 3 && (await f.claw.status(interrupted.task.id)).task.status === "running", host);
   await server.close();
   assert.equal((await f.claw.status(interrupted.task.id)).task.status, "cancelled");
   host = await MaybeClawHost.start(options);
   server = await startControlServer({ host, token, port: 0 });
-  await until(async () => (await f.claw.store.list()).filter(t => t.status === "completed").length === 3);
+  await until(async () => (await f.claw.store.list()).filter(t => t.status === "completed").length === 3, host);
   assert.equal(calls, 4);
   assert.equal((await host.claw.store.list()).length, 4);
 });
@@ -108,7 +121,7 @@ test("shared Web UI retains task identity and separates execution, verification 
   const submit = () => fetch(server.url + "/api/ui/commands", { method: "POST", headers, body: JSON.stringify(command) });
   const first = await (await submit()).json(), second = await (await submit()).json();
   assert.equal(first.selectedId, second.selectedId);
-  await until(async () => (await f.claw.status(first.selectedId)).task.status === "completed");
+  await until(async () => (await f.claw.status(first.selectedId)).task.status === "completed", host);
   const done = await snapshot(first.selectedId);
   assert.equal(done.blocks.filter(b => b.kind === "assistant")[0].text, "Done");
   assert.ok(done.panels[0].fields.some(f => f.value === "尚未独立验证"));
@@ -116,9 +129,9 @@ test("shared Web UI retains task identity and separates execution, verification 
   assert.equal((await snapshot()).selectedId, null, "task browsing must remain client-local");
   assert.equal((await f.claw.store.list()).length, 1);
   const interrupted = await host.submit("interrupt fixture", "interrupt-ui");
-  await until(async () => (await snapshot(interrupted.task.id)).blocks.some(b => b.status === "streaming" && b.text));
+  await until(async () => (await snapshot(interrupted.task.id)).blocks.some(b => b.status === "streaming" && b.text), host);
   await f.claw.cancel(interrupted.task.id);
-  await until(async () => (await f.claw.status(interrupted.task.id)).task.status === "cancelled");
+  await until(async () => (await f.claw.status(interrupted.task.id)).task.status === "cancelled", host);
   const cancelled = await snapshot(interrupted.task.id);
   assert.ok(cancelled.blocks.some(b => b.kind === "assistant" && b.status === "interrupted" && b.text === "Partial answer"));
   assert.ok(cancelled.blocks.some(b => b.kind === "notice" && b.status === "cancelled"));
