@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
@@ -12,7 +13,7 @@ import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 import { createCodingTools } from "@sortedyuan/coding-tools";
 import { GitRequestController } from "../dist/git-request.js";
 
-const artifacts = fileURLToPath(new URL("../../../review/lazy-git-tests/", import.meta.url));
+const artifacts = join(testOutputRoot, "maybecode", "git-request-lazy");
 const execute = promisify(execFile);
 
 async function fixture(t, managed = false, options = {}) {

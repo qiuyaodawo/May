@@ -1,27 +1,4 @@
-import { executeRecordedRequest, requestEndpoint } from "@sortedyuan/may/core";
-import type {
-  Model,
-  ModelEvent,
-  ModelRequest,
-  ModelStreamOptions,
-} from "@sortedyuan/may/core";
-import { assertModelResponseFormat, validateStructuredModelResponse } from "@sortedyuan/may/core";
-
-import {
-  toOpenAICompatibleMessages,
-  toOpenAICompatibleTools,
-} from "./convert.js";
-import {
-  OpenAIChatCompletionsApiError,
-  OpenAIChatCompletionsFinishReasonError,
-  OpenAIChatCompletionsProtocolError,
-} from "./errors.js";
-import type {
-  OpenAICompatibleMessage,
-  OpenAICompatibleToolDefinition,
-} from "./protocol.js";
-import { streamOpenAICompatibleResponse } from "./stream.js";
-import { parseRetryAfterMs } from "./http.js";
+import { OpenAICompatibleChatModel } from "./chat-model.js";
 
 /** Provider/model metadata determines concrete supported values. */
 export type OpenAIChatCompletionsReasoningEffort = string;
@@ -36,152 +13,14 @@ export interface OpenAIChatCompletionsModelOptions {
   fetch?: typeof globalThis.fetch;
 }
 
-interface OpenAIChatCompletionsRequest {
-  model: string;
-  messages: OpenAICompatibleMessage[];
-  stream: true;
-  stream_options: { include_usage: true };
-  tools?: OpenAICompatibleToolDefinition[];
-  max_completion_tokens?: number;
-  reasoning_effort?: OpenAIChatCompletionsReasoningEffort;
-  store?: boolean;
-  response_format?: Readonly<Record<string, unknown>>;
-}
-
-export class OpenAIChatCompletionsModel implements Model {
-  readonly supportsRequestRecording = true;
-  private readonly apiKey: string;
-  private readonly model: string;
-  private readonly baseURL: string;
-  private readonly maxOutputTokens: number | undefined;
-  private readonly reasoningEffort:
-    | OpenAIChatCompletionsReasoningEffort
-    | undefined;
-  private readonly store: boolean | undefined;
-  private readonly fetchImplementation: typeof globalThis.fetch;
-
+export class OpenAIChatCompletionsModel extends OpenAICompatibleChatModel {
   constructor(options: OpenAIChatCompletionsModelOptions) {
-    if (options.apiKey.trim() === "") {
-      throw new TypeError("apiKey must not be empty");
-    }
-    if (options.model.trim() === "") {
-      throw new TypeError("model must not be empty");
-    }
-    if (
-      options.maxOutputTokens !== undefined &&
-      (!Number.isSafeInteger(options.maxOutputTokens) ||
-        options.maxOutputTokens < 1)
-    ) {
-      throw new RangeError("maxOutputTokens must be a positive safe integer");
-    }
-
-    this.apiKey = options.apiKey;
-    this.model = options.model;
-    this.baseURL = (options.baseURL ?? "https://api.openai.com/v1")
-      .replace(/\/+$/, "");
-    this.maxOutputTokens = options.maxOutputTokens;
-    this.reasoningEffort = options.reasoningEffort;
-    this.store = options.store;
-    this.fetchImplementation = options.fetch ?? globalThis.fetch;
+    const { store, ...shared } = options;
+    super(shared, {
+      provider: "OpenAI-compatible chat", adapter: "openai-chat-completions", errorCodePrefix: "OPENAI_CHAT_COMPLETIONS",
+      defaultBaseURL: "https://api.openai.com/v1", maxTokensField: "max_completion_tokens",
+      streamUsage: true, includeToolName: false, requireDone: true, supportsResponseFormat: true,
+      ...(store === undefined ? {} : { extendRequest: (body) => { body.store = store; } }),
+    });
   }
-
-  async *stream(
-    request: ModelRequest,
-    options: ModelStreamOptions,
-  ): AsyncIterable<ModelEvent> {
-    assertModelResponseFormat(request);
-    yield* executeRecordedRequest({ version: 1, adapter: "openai-chat-completions", purpose: "generation", endpoint: requestEndpoint(`${this.baseURL}/chat/completions`), request, body: this.createRequest(request) }, options.recordRequest, options.signal, (body) => this.execute(body, request, options));
-  }
-
-  private async *execute(body: string, request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
-    const response = await this.fetchImplementation(
-      `${this.baseURL}/chat/completions`,
-      {
-        method: "POST",
-        headers: {
-          "authorization": `Bearer ${this.apiKey}`,
-          "content-type": "application/json",
-        },
-        body,
-        signal: options.signal,
-      },
-    );
-
-    if (!response.ok) throw await createApiError(response);
-
-    for await (const event of streamOpenAICompatibleResponse(response, {
-      signal: options.signal,
-      providerName: "OpenAI-compatible chat",
-      requireDone: true,
-      protocolError: (message, errorOptions) =>
-        new OpenAIChatCompletionsProtocolError(message, errorOptions),
-      finishReasonError: (finishReason) =>
-        new OpenAIChatCompletionsFinishReasonError(finishReason),
-    })) {
-      if (event.type === "response.completed") validateStructuredModelResponse(event.message, request, event);
-      yield event;
-    }
-  }
-
-  private createRequest(request: ModelRequest): OpenAIChatCompletionsRequest {
-    const body: OpenAIChatCompletionsRequest = {
-      model: this.model,
-      messages: toOpenAICompatibleMessages(request.messages),
-      stream: true,
-      stream_options: { include_usage: true },
-    };
-    if (request.tools.length > 0) {
-      body.tools = toOpenAICompatibleTools(request.tools);
-    }
-    if (this.maxOutputTokens !== undefined) {
-      body.max_completion_tokens = this.maxOutputTokens;
-    }
-    if (this.reasoningEffort !== undefined) {
-      body.reasoning_effort = this.reasoningEffort;
-    }
-    if (this.store !== undefined) body.store = this.store;
-    if (request.responseFormat !== undefined) {
-      const format = request.responseFormat;
-      body.response_format = format.type === "json"
-        ? { type: "json_object" }
-        : { type: "json_schema", json_schema: { name: format.name, schema: format.schema, ...(format.strict === undefined ? {} : { strict: format.strict }) } };
-    }
-    return body;
-  }
-}
-
-async function createApiError(
-  response: Response,
-): Promise<OpenAIChatCompletionsApiError> {
-  const text = await response.text();
-  let message = text ||
-    `OpenAI-compatible chat request failed with status ${response.status}`;
-  let providerType: string | undefined;
-  let providerCode: string | undefined;
-
-  try {
-    const parsed = JSON.parse(text) as {
-      error?: { message?: unknown; type?: unknown; code?: unknown };
-    };
-    if (typeof parsed.error?.message === "string") {
-      message = parsed.error.message;
-    }
-    if (typeof parsed.error?.type === "string") {
-      providerType = parsed.error.type;
-    }
-    if (typeof parsed.error?.code === "string") {
-      providerCode = parsed.error.code;
-    }
-  } catch {
-    // Keep the response text when the endpoint did not return JSON.
-  }
-
-  const options: ConstructorParameters<
-    typeof OpenAIChatCompletionsApiError
-  >[0] = { status: response.status, message };
-  if (providerType !== undefined) options.providerType = providerType;
-  if (providerCode !== undefined) options.providerCode = providerCode;
-  const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
-  if (retryAfterMs !== undefined) options.retryAfterMs = retryAfterMs;
-  return new OpenAIChatCompletionsApiError(options);
 }

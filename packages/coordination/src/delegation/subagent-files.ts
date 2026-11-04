@@ -71,7 +71,7 @@ export class SharedWorkspaceFileGuard {
       // 声明的文件只约束修改；读取在工作区内不受限制。
       if (operation.tool !== "read" && scope !== undefined && !scope.has(relative)) {
         throw new Error(
-          `File conflict: this task may only modify ${[...scope].join(", ")}; ` +
+          (scope.size === 0 ? "File conflict: this task may not modify files; " : `File conflict: this task may only modify ${[...scope].join(", ")}; `) +
           `${relative} is outside its assigned files. Ask the main agent for a different assignment.`,
         );
       }

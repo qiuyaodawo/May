@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
 import { mkdir, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -6,7 +7,7 @@ import { join } from "node:path";
 import { telegramInput, telegramMemberInput, feishuInput, feishuMemberInputs, feishuRecallInput, channelAccepts, channelTrigger, telegramDeliveryRouting, feishuDeliveryRequest } from "../dist/channels.js";
 import { ChannelStore, inboxId, validateChannelInput } from "../dist/channel-store.js";
 import { hostSettings } from "../dist/settings.js";
-import { digest } from "../dist/types.js";
+import { digest } from "../dist/gateway-types.js";
 
 const telegramMessage = { message_id: 45, message_thread_id: 12, date: 1_790_000_000, from: { id: 7, is_bot: false }, chat: { id: -10012, type: "supergroup" }, text: "@maybeclaw /session 项目 检查修改", entities: [{ type: "mention", offset: 0, length: 10 }], reply_to_message: { message_id: 42, from: { id: 88, is_bot: true } } };
 const feishuEvent = { event_id: "event_45", sender: { sender_type: "user", sender_id: { open_id: "ou_alice" } }, message: { chat_type: "group", chat_id: "oc_project", message_id: "om_45", parent_id: "om_42", thread_id: "omt_topic", message_type: "text", content: JSON.stringify({ text: "@_user_1 /session 项目 检查修改" }), mentions: [{ key: "@_user_1", id: { open_id: "ou_bot" } }] } };
@@ -97,18 +98,18 @@ test("附件输入保留完整文件信息，并检查持久记录格式", () =>
 
 test("渠道访问和群聊触发配置独立检查", () => {
   const channels = { telegram: { enabled: true, allowUsers: ["7"], allowGroups: ["-10012"], groupTrigger: "explicit", entranceTriggers: [{ conversation: "-10012", threadId: "12", trigger: "all" }] } };
-  const settings = hostSettings({ apps: { maybeclaw: { channels, agents: [], access: {} } } }).telegram;
+  const settings = hostSettings({ apps: { maybeclaw: { version: 2, channels, agents: [], access: {} } } }).telegram;
   assert.equal(channelAccepts(settings, { kind: "private", sender: "7", conversation: "7" }), true);
   assert.equal(channelAccepts(settings, { kind: "private", sender: "8", conversation: "8" }), false);
   assert.equal(channelAccepts(settings, { kind: "group", sender: "8", conversation: "-10012" }), true);
   assert.equal(channelAccepts(settings, { kind: "group", sender: "7", conversation: "-10013" }), false);
   assert.equal(channelTrigger(settings, { conversation: "-10012", threadId: "12" }), "all");
   assert.equal(channelTrigger(settings, { conversation: "-10012", threadId: "13" }), "explicit");
-  assert.equal(hostSettings({ apps: { maybeclaw: { channels: { telegram: { enabled: true, allowGroups: ["-10012"] } } } } }).telegram.allowUsers.length, 0);
-  assert.throws(() => hostSettings({ apps: { maybeclaw: { channels: { telegram: { enabled: true, allowUsers: [] } } } } }), /allowUsers or allowGroups/);
-  assert.throws(() => hostSettings({ apps: { maybeclaw: { channels: { telegram: { ...channels.telegram, allowGroups: true } } } } }), /allowGroups/);
-  assert.throws(() => hostSettings({ apps: { maybeclaw: { channels: { telegram: { ...channels.telegram, groupTrigger: "typo" } } } } }), /groupTrigger/);
-  assert.throws(() => hostSettings({ apps: { maybeclaw: { channels: { telegram: { ...channels.telegram, entranceTriggers: [{ conversation: "-10013", trigger: "all" }] } } } } }), /entrance trigger/);
+  assert.equal(hostSettings({ apps: { maybeclaw: { version: 2, channels: { telegram: { enabled: true, allowGroups: ["-10012"] } } } } }).telegram.allowUsers.length, 0);
+  assert.throws(() => hostSettings({ apps: { maybeclaw: { version: 2, channels: { telegram: { enabled: true, allowUsers: [] } } } } }), /telegram\.allowUsers must NOT have fewer than 1 items/);
+  assert.throws(() => hostSettings({ apps: { maybeclaw: { version: 2, channels: { telegram: { ...channels.telegram, allowGroups: true } } } } }), /allowGroups/);
+  assert.throws(() => hostSettings({ apps: { maybeclaw: { version: 2, channels: { telegram: { ...channels.telegram, groupTrigger: "typo" } } } } }), /groupTrigger/);
+  assert.throws(() => hostSettings({ apps: { maybeclaw: { version: 2, channels: { telegram: { ...channels.telegram, entranceTriggers: [{ conversation: "-10013", trigger: "all" }] } } } } }), /entrance trigger/);
 });
 
 test("原生回复请求保持消息和话题目标", () => {
@@ -127,7 +128,7 @@ test("原生回复请求保持消息和话题目标", () => {
 });
 
 test("渠道记录重启保留来源和发送回执，只读检查不改变未知发送", async t => {
-  const base = fileURLToPath(new URL("../../../.zcode/tmp/channel-tests/", import.meta.url));
+  const base = join(testOutputRoot, "maybeclaw", "channel-gateway");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "records-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
@@ -145,9 +146,5 @@ test("渠道记录重启保留来源和发送回执，只读检查不改变未�
   assert.equal(store.get(delivery.id).status, "unknown");
   assert.equal(store.get(delivery.id).messageId, "48");
   assert.deepEqual(store.get(inboxId(input)).input, input);
-  await store.close();
-  await writeFile(join(directory, "gateway.format.json"), JSON.stringify({ version: 1 }));
-  await assert.rejects(ChannelStore.open(join(directory, "channels.jsonl")), /read-only/);
-  store = await ChannelStore.open(path);
   await store.close();
 });

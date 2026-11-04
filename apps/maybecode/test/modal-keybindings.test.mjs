@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { stripVTControlCharacters } from "node:util";
 import { keyStroke } from "@sortedyuan/tui/keybindings";
-import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { MaybeCodeTerminalView } from "../dist/ui/terminal-view.js";
 import { createMaybeCodeKeymap } from "../dist/keymap.js";
 
 const key = (view, name, modifiers = {}) => view.handleKey(keyStroke(name, modifiers));
@@ -10,7 +11,7 @@ const paste = (view, text) => key(view, "paste", { text });
 const render = view => view.render({ width: 100, height: 28 }).lines.map(stripVTControlCharacters);
 
 function viewFor(t, options = {}) {
-  const view = new MaybeCodePrototypeView({
+  const view = new MaybeCodeTerminalView({
     store: new TranscriptStore(), workspace: "workspace",
     onSubmit: () => assert.fail("弹窗不能提交 Agent 输入"), ...options,
   });

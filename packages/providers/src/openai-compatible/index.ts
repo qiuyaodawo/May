@@ -1,3 +1,4 @@
+export * from "./chat-model.js";
 export * from "./convert.js";
 export * from "./errors.js";
 export * from "./openai-chat-completions-model.js";

@@ -3,11 +3,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { fileURLToPath } from "node:url";
 
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
-test("runs and resumes a real DeepSeek coding session", async (t) => {
+test("runs and resumes a real coding session", async (t) => {
   const dataDirectory = await mkdtemp(join(tmpdir(), "maybecode-live-"));
   t.after(() => rm(dataDirectory, { recursive: true, force: true }));
   const workspace = fileURLToPath(new URL("../../../..", import.meta.url));
@@ -16,6 +17,7 @@ test("runs and resumes a real DeepSeek coding session", async (t) => {
     git: false,
     workspace,
     dataDirectory,
+    model: liveModelProfile(),
     autoResume: false,
     maxSteps: 8,
   });
@@ -37,7 +39,7 @@ test("runs and resumes a real DeepSeek coding session", async (t) => {
     ),
   );
 
-  const resumed = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory });
+  const resumed = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory, model: liveModelProfile(), autoResume: true });
   assert.equal(resumed.sessionId, sessionId);
   const resumedEvents = collectAndApprove(resumed);
   const secondResult = await (await resumed.submit({

@@ -15,13 +15,12 @@ import type {
   ContextFactory,
   ContextSummarizer,
 } from "@sortedyuan/may/context";
-import { resolveRunBudget, type Model, type RunBudget } from "@sortedyuan/may/core";
+import { omitUndefined, resolveRunBudget, type Model, type RunBudget } from "@sortedyuan/may/core";
 import {
   type McpOAuthManager,
   type McpTaskJournal,
   createMcpModelSampler,
   type McpHostRequestContext,
-  type McpServerHostOptions,
   validateMcpServerOptions,
   type McpClientPool,
   type McpServerBaseOptions,
@@ -53,19 +52,17 @@ import {
   type MaybeCodeModelSelector,
   type SelectedMaybeCodeModel,
 } from "./model.js";
-import {
-  MAYBECODE_APPLICATION_ID,
-  resolveMaybeCodeInstructionsDirectory,
-} from "./instructions.js";
+import { resolveMaybeCodeInstructionsDirectory } from "./instructions.js";
+import { readMaybeCodeSettings, type MaybeCodeSettings } from "./settings.js";
 import { MaybeCodeWorkspace } from "./workspace.js";
 import type { MaybeCodeAutoCompactionMode } from "./controller.js";
 import type { MaybeCodeModelConfiguration } from "./workspace.js";
 import type { ProjectGitWorkspaceOptions } from "@sortedyuan/may/application/git-workspace";
 import type { SkillRegistry } from "@sortedyuan/may/skills";
-import { PluginHost, loadPluginModules, parsePluginSelections, type AnyPlugin, type ServiceToken } from "@sortedyuan/may/plugin";
+import { PluginHost, loadPluginModules, type AnyPlugin, type ServiceToken } from "@sortedyuan/may/plugin";
 import { resolveMaybeCodeSkillDirectories } from "./skills.js";
 import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
-import { resolveSubagentConfiguration, type MaybeCodeSubagentConfiguration, type MaybeCodeSubagentRole } from "./subagents.js";
+import { resolveSubagentConfiguration, type MaybeCodeSubagentConfiguration, type MaybeCodeSubagentRole } from "@sortedyuan/coordination/delegation/configuration";
 
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly git?: false | Omit<ProjectGitWorkspaceOptions, "workspace">;
@@ -86,8 +83,6 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly compactionStrategy?: ContextCompactionStrategy;
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
   readonly autoCompactionMode?: MaybeCodeAutoCompactionMode;
-  /** @deprecated Use autoCompactionMode instead. */
-  readonly providerNativeAutoCompaction?: boolean;
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly maxSteps?: number;
@@ -147,24 +142,26 @@ export function getDefaultMaybeCodeDataDirectory(): string {
   return join(homedir(), ".may", "maybecode");
 }
 
+export interface MaybeCodeRecording {
+  readonly requestRecording: "off" | "required";
+  readonly providerBodyRecording: boolean;
+}
+
+export function resolveMaybeCodeRecording(config: MayConfig): MaybeCodeRecording {
+  const settings = readMaybeCodeSettings(config);
+  return { requestRecording: settings.requestRecording ?? "required", providerBodyRecording: settings.providerBodyRecording ?? false };
+}
+
 export function resolveMaybeCodeGit(config: MayConfig): false | Omit<ProjectGitWorkspaceOptions, "workspace"> {
-  const value = config.apps?.maybecode?.git;
-  if (value === undefined) return {};
-  if (value === false) return false;
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new MaybeCodeConfigError("apps.maybecode.git must be false or an object");
-  const fields = value as Record<string, unknown>;
-  const allowed = ["autoCommit", "readOnly", "dataRoot", "worktreesRoot", "excludedPaths"];
-  for (const name of Object.keys(fields)) if (!allowed.includes(name)) throw new MaybeCodeConfigError(`Unknown apps.maybecode.git field: ${name}`);
-  for (const name of ["autoCommit", "readOnly"]) if (fields[name] !== undefined && typeof fields[name] !== "boolean") throw new MaybeCodeConfigError(`apps.maybecode.git.${name} must be boolean`);
-  for (const name of ["dataRoot", "worktreesRoot"]) if (fields[name] !== undefined && (typeof fields[name] !== "string" || !fields[name].trim())) throw new MaybeCodeConfigError(`apps.maybecode.git.${name} must be a non-empty path`);
-  if (fields.excludedPaths !== undefined && (!Array.isArray(fields.excludedPaths) || fields.excludedPaths.some(path => typeof path !== "string" || !path.trim()))) throw new MaybeCodeConfigError("apps.maybecode.git.excludedPaths must contain non-empty paths");
-  return {
-    ...(fields.autoCommit === undefined ? {} : { autoCommit: fields.autoCommit as boolean }),
-    ...(fields.readOnly === undefined ? {} : { readOnly: fields.readOnly as boolean }),
-    ...(fields.dataRoot === undefined ? {} : { dataRoot: resolveGitConfigurationPath(config.path, fields.dataRoot as string) }),
-    ...(fields.worktreesRoot === undefined ? {} : { worktreesRoot: resolveGitConfigurationPath(config.path, fields.worktreesRoot as string) }),
-    ...(fields.excludedPaths === undefined ? {} : { excludedPaths: fields.excludedPaths as string[] }),
-  };
+  const git = readMaybeCodeSettings(config).git;
+  if (git === false) return false;
+  return omitUndefined({
+    autoCommit: git?.autoCommit,
+    readOnly: git?.readOnly,
+    dataRoot: git?.dataRoot === undefined ? undefined : resolveGitConfigurationPath(config.path, git.dataRoot),
+    worktreesRoot: git?.worktreesRoot === undefined ? undefined : resolveGitConfigurationPath(config.path, git.worktreesRoot),
+    excludedPaths: git?.excludedPaths === undefined ? undefined : [...git.excludedPaths],
+  });
 }
 
 function resolveGitConfigurationPath(configPath: string, path: string): string {
@@ -179,40 +176,27 @@ export async function openConfiguredMaybeCode(
 ): Promise<MaybeCodeWorkspace> {
   const workspace = await resolveWorkspace(options.workspace ?? process.cwd());
   const loadConfig = dependencies.loadConfig ?? loadMayConfig;
-  const config = await loadConfig(
-    options.configPath === undefined ? {} : { path: options.configPath },
-  );
+  const config = await loadConfig(omitUndefined({ path: options.configPath }));
+  const settings = readMaybeCodeSettings(config);
   const retry = options.retry ?? resolveMaybeCodeRetry(config);
-  const plugins = options.plugins ?? await loadPluginModules(
-    parsePluginSelections(config.apps?.maybecode?.plugins), config.path,
-  );
+  const plugins = options.plugins ?? await loadPluginModules(settings.plugins ?? [], config.path);
   const provided = (service: ServiceToken<unknown>) => plugins.some(plugin =>
     plugin.provides?.some(candidate => candidate.id === service.id && candidate.scope === service.scope));
   const pluginModel = provided(services.model);
-  const configuredPermissionMode = config.apps?.maybecode?.permissionMode;
-  const requestRecording = config.apps?.maybecode?.requestRecording ?? "required";
-  const providerBodyRecording = config.apps?.maybecode?.providerBodyRecording ?? false;
-  if (typeof providerBodyRecording !== "boolean") throw new MaybeCodeConfigError("apps.maybecode.providerBodyRecording must be boolean");
-  if (requestRecording !== "off" && requestRecording !== "required") throw new MaybeCodeConfigError("apps.maybecode.requestRecording must be off or required");
-  const configuredDelegationNotifications = options.delegationNotifications === undefined
-    ? config.apps?.maybecode?.delegationNotifications : options.delegationNotifications;
-  const delegationNotifications = configuredDelegationNotifications === undefined ? false : configuredDelegationNotifications;
-  if (typeof delegationNotifications !== "boolean") throw new MaybeCodeConfigError("apps.maybecode.delegationNotifications must be boolean");
+  const { requestRecording, providerBodyRecording } = resolveMaybeCodeRecording(config);
+  const delegationNotifications = options.delegationNotifications ?? settings.delegationNotifications ?? false;
   const git = options.git ?? resolveMaybeCodeGit(config);
   const permissionMode = options.permissionMode === undefined
-    ? configuredPermissionMode === undefined ? "default" : parsePermissionMode(configuredPermissionMode)
+    ? settings.permissionMode ?? "default"
     : parsePermissionMode(options.permissionMode);
-  const persistentRules = options.persistentRules ?? config.apps?.maybecode?.persistentRules ?? false;
-  if (typeof persistentRules !== "boolean") throw new MaybeCodeConfigError("apps.maybecode.persistentRules must be boolean");
+  const persistentRules = options.persistentRules ?? settings.persistentRules ?? false;
   const skillDirectories = options.skillDirectories ?? resolveMaybeCodeSkillDirectories(config, workspace);
-  const runBudget = resolveRunBudget(options.runBudget ?? config.apps?.maybecode?.runBudget as RunBudget | undefined);
+  const runBudget = resolveRunBudget(options.runBudget ?? settings.runBudget);
   const capabilityResolver = dependencies.capabilityResolver ??
     createModelCapabilityResolver();
   const adapterRegistry = dependencies.adapterRegistry ?? createBuiltinProviderAdapterRegistry({ resolver: capabilityResolver });
   const selectionFor = (profile?: string): SelectedMaybeCodeModel =>
-    selectMaybeCodeModel(config, {
-      ...(profile === undefined ? {} : { model: profile }),
-    });
+    selectMaybeCodeModel(config, omitUndefined({ model: profile }));
   const configureModel = (
     profile?: string,
     runtimeOptions: Readonly<Record<string, unknown>> = {},
@@ -230,7 +214,7 @@ export async function openConfiguredMaybeCode(
       model,
       selection,
     );
-    return {
+    return omitUndefined({
       model,
       modelInfo: {
         profile: selection.profile,
@@ -238,8 +222,8 @@ export async function openConfiguredMaybeCode(
         adapter: selection.adapter,
         model: selection.model,
       },
-      ...(contextBudget === undefined ? {} : { contextBudget }),
-    };
+      contextBudget,
+    });
   };
   const initialModel = pluginModel ? undefined : configureModel(options.model);
   const modelProfiles = pluginModel ? [] : Object.entries(config.models).map(([name, profile]) => {
@@ -260,16 +244,13 @@ export async function openConfiguredMaybeCode(
   const instructionsDirectory = options.instructions === undefined
     ? resolveMaybeCodeInstructionsDirectory(config)
     : undefined;
-  const autoCompactionMode = options.autoCompactionMode ??
-    (options.providerNativeAutoCompaction === undefined
-      ? resolveMaybeCodeAutoCompactionMode(config)
-      : options.providerNativeAutoCompaction ? "provider-native" : "prune-summary");
+  const autoCompactionMode = options.autoCompactionMode ?? resolveMaybeCodeAutoCompactionMode(config);
   const dataDirectory = resolve(
     options.dataDirectory ?? getDefaultMaybeCodeDataDirectory(),
   );
   const observabilityOptions = provided(observabilityService) || provided(services.tracer) ? false : options.observability ??
     resolveMaybeCodeObservability(config);
-  const subagents = resolveMaybeCodeSubagents(options.subagents, config);
+  const subagents = resolveMaybeCodeSubagents(options.subagents, settings);
   const subagentCreateModel = (role: MaybeCodeSubagentRole): MaybeCodeModelConfiguration | undefined =>
     role.model === undefined
       ? initialModel
@@ -315,16 +296,13 @@ export async function openConfiguredMaybeCode(
     const tracer = resourceHost?.provides(observabilityHostService) ? resourceHost.get(observabilityHostService).tracer : undefined;
     return {
       servers: next.servers,
-      ...(next.taskJournal === undefined ? {} : { taskJournal: next.taskJournal }),
-      ...(next.oauth === undefined ? {} : { oauth: next.oauth }),
-      ...(tracer === undefined ? {} : { tracer }),
-      ...(dependencies.openMcp === undefined ? {} : { open: dependencies.openMcp }),
+      ...omitUndefined({ taskJournal: next.taskJournal, oauth: next.oauth, tracer, open: dependencies.openMcp }),
       enableInteractions: options.mcpInteractions === true,
       hostServices: {
         roots: async (context) => { checkHostOwner(context); return [{ uri: pathToFileURL(application!.workspace).href, name: "MaybeCode workspace" }]; },
         ...(pluginModel ? {} : { sampling: createMcpModelSampler((maxTokens, context) => {
           checkHostOwner(context);
-          const selected = selectionFor(application!.modelInfo?.profile);
+          const selected = selectionFor(application!.application.modelInfo?.profile);
           const selection = { ...selected, options: { ...selected.options, maxTokens, maxOutputTokens: maxTokens } };
           // sampling 使用独立 provider 实例和本次调用的模型预算。
           const model = dependencies.createModel === undefined ? createMaybeCodeModel(selection, dependencies.adapterRegistry) : dependencies.createModel(selection);
@@ -384,42 +362,24 @@ export async function openConfiguredMaybeCode(
       store: new FileSessionStore(join(dataDirectory, "sessions")),
       plugins: applicationPlugins,
       catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
-      ...(mcp === undefined
-        ? {}
-        : { mcp }),
       closeOwnedResources: closeResources,
-      ...(options.sessionId === undefined
-        ? {}
-        : { sessionId: options.sessionId }),
-      ...(options.autoResume === undefined
-        ? {}
-        : { autoResume: options.autoResume }),
-      ...(options.contextFactory === undefined
-        ? {}
-        : { contextFactory: options.contextFactory }),
-      ...((options.contextBudget ?? initialModel?.contextBudget) === undefined
-        ? {}
-        : { contextBudget: options.contextBudget ?? initialModel!.contextBudget! }),
-      ...(options.compactionStrategy === undefined
-        ? {}
-        : { compactionStrategy: options.compactionStrategy }),
-      ...(options.autoCompactionStrategies === undefined
-        ? {}
-        : { autoCompactionStrategies: options.autoCompactionStrategies }),
       autoCompactionMode,
-      ...(options.contextSummarizer === undefined
-        ? {}
-        : { contextSummarizer: options.contextSummarizer }),
-      ...(options.instructions === undefined
-        ? {}
-        : { instructions: options.instructions }),
-      ...(instructionsDirectory === undefined
-        ? {}
-        : { instructionsDirectory }),
-      ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
       runBudget,
-      ...(options.skills === undefined ? {} : { skills: options.skills }),
-      ...(options.goals === undefined ? {} : { goals: options.goals }),
+      ...omitUndefined({
+        mcp,
+        sessionId: options.sessionId,
+        autoResume: options.autoResume,
+        contextFactory: options.contextFactory,
+        contextBudget: options.contextBudget ?? initialModel?.contextBudget,
+        compactionStrategy: options.compactionStrategy,
+        autoCompactionStrategies: options.autoCompactionStrategies,
+        contextSummarizer: options.contextSummarizer,
+        instructions: options.instructions,
+        instructionsDirectory,
+        maxSteps: options.maxSteps,
+        skills: options.skills,
+        goals: options.goals,
+      }),
       ...(subagents === false
         ? { subagents: false as const }
         : {
@@ -454,218 +414,79 @@ export function resolveMaybeCodeMcp(
   workspace: string,
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): false | MaybeCodeMcpOptions {
-  const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.mcpServers;
-  if (value === undefined || value === false) return false;
-  const servers = objectValue(value, "apps.maybecode.mcpServers");
+  const servers = readMaybeCodeSettings(config).mcpServers;
+  if (servers === undefined || servers === false) return false;
   const resolved: McpServerOptions[] = [];
-
-  for (const [id, raw] of Object.entries(servers)) {
-    if (!/^[A-Za-z0-9_-]+$/u.test(id)) {
-      throw new MaybeCodeConfigError(
-        `apps.maybecode.mcpServers server id "${id}" may contain only letters, digits, underscores, and hyphens`,
-      );
-    }
-    const field = `apps.maybecode.mcpServers.${id}`;
-    const server = objectValue(raw, field);
-    rejectUnknownOptions(
-      server,
-      [
-        "enabled",
-        "required",
-        "transport",
-        "protocolMode",
-        "host",
-        "tasks",
-        "url",
-        "headers",
-        "auth",
-        "command",
-        "args",
-        "cwd",
-        "env",
-        "requestTimeoutMs",
-        "maxTotalTimeoutMs",
-        "maxBufferSize",
-        "stderrMaxBytes",
-      ],
-      field,
-    );
-    if (server.enabled !== undefined && typeof server.enabled !== "boolean") {
-      throw new MaybeCodeConfigError(`${field}.enabled must be a boolean`);
-    }
+  for (const [id, server] of Object.entries(servers)) {
     if (server.enabled === false) continue;
-    if (server.required !== undefined && typeof server.required !== "boolean") {
-      throw new MaybeCodeConfigError(`${field}.required must be a boolean`);
-    }
-    if (server.transport !== undefined && server.transport !== "stdio" &&
-        server.transport !== "streamable-http") {
-      throw new MaybeCodeConfigError(`${field}.transport must be "stdio" or "streamable-http"`);
-    }
-    if (server.protocolMode !== undefined && server.protocolMode !== "legacy" &&
-        server.protocolMode !== "auto") {
-      throw new MaybeCodeConfigError(`${field}.protocolMode must be "legacy" or "auto"`);
-    }
-    const requestTimeoutMs = optionalPositiveInteger(
-      server.requestTimeoutMs,
-      `${field}.requestTimeoutMs`,
-    );
-    const maxTotalTimeoutMs = optionalPositiveInteger(
-      server.maxTotalTimeoutMs,
-      `${field}.maxTotalTimeoutMs`,
-    );
-    const common: McpServerBaseOptions = {
+    const field = `apps.maybecode.mcpServers.${id}`;
+    const common: McpServerBaseOptions = omitUndefined({
       id,
-      ...(server.required === undefined ? {} : { required: server.required }),
-      ...(server.protocolMode === undefined ? {} : { protocolMode: server.protocolMode }),
-      ...(server.tasks === undefined ? {} : { tasks: server.tasks as boolean }),
-      ...(server.host === undefined ? {} : { host: objectValue(server.host, `${field}.host`) as McpServerHostOptions }),
-      ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
-      ...(maxTotalTimeoutMs === undefined ? {} : { maxTotalTimeoutMs }),
-    };
+      required: server.required,
+      protocolMode: server.protocolMode,
+      tasks: server.tasks,
+      host: server.host,
+      requestTimeoutMs: server.requestTimeoutMs,
+      maxTotalTimeoutMs: server.maxTotalTimeoutMs,
+    });
     if (server.transport === "streamable-http") {
-      for (const key of ["command", "args", "cwd", "env", "maxBufferSize", "stderrMaxBytes"]) {
-        if (key in server) throw new MaybeCodeConfigError(`${field}.${key} is stdio-only`);
-      }
-      const headers = resolveMcpEnvironment(server.headers, `${field}.headers`, environment);
-      const endpoint: McpServerOptions = {
+      const endpoint: McpServerOptions = omitUndefined({
         ...common,
-        transport: "streamable-http",
-        url: nonEmptyString(server.url, `${field}.url`),
-        ...(headers === undefined ? {} : { headers }),
-        ...(server.auth === undefined ? {} : { auth: objectValue(server.auth, `${field}.auth`) as unknown as McpOAuthOptions }),
-      };
+        transport: "streamable-http" as const,
+        url: server.url!,
+        headers: resolveMcpEnvironment(server.headers, `${field}.headers`, environment),
+        auth: server.auth as McpOAuthOptions | undefined,
+      });
       try {
         validateMcpServerOptions(endpoint);
       } catch (error) {
-        throw new MaybeCodeConfigError(error instanceof Error ? error.message : "Invalid MCP endpoint");
+        throw new MaybeCodeConfigError((error as Error).message, { cause: error });
       }
       resolved.push(endpoint);
       continue;
     }
-    for (const key of ["url", "headers", "auth"]) {
-      if (key in server) throw new MaybeCodeConfigError(`${field}.${key} requires streamable-http`);
-    }
-    const command = nonEmptyString(server.command, `${field}.command`);
-    const args = optionalStringArray(server.args, `${field}.args`);
-    const cwd = server.cwd === undefined
-      ? workspace
-      : resolve(workspace, nonEmptyString(server.cwd, `${field}.cwd`));
-    const env = resolveMcpEnvironment(server.env, `${field}.env`, environment);
-    const maxBufferSize = optionalPositiveInteger(
-      server.maxBufferSize,
-      `${field}.maxBufferSize`,
-    );
-    const stderrMaxBytes = optionalPositiveInteger(
-      server.stderrMaxBytes,
-      `${field}.stderrMaxBytes`,
-    );
-
-    resolved.push({
+    resolved.push(omitUndefined({
       ...common,
-      command,
-      ...(args === undefined ? {} : { args }),
-      cwd,
-      ...(env === undefined ? {} : { env }),
-      ...(maxBufferSize === undefined ? {} : { maxBufferSize }),
-      ...(stderrMaxBytes === undefined ? {} : { stderrMaxBytes }),
-    });
+      command: server.command!,
+      args: server.args,
+      cwd: server.cwd === undefined ? workspace : resolve(workspace, server.cwd),
+      env: resolveMcpEnvironment(server.env, `${field}.env`, environment),
+      maxBufferSize: server.maxBufferSize,
+      stderrMaxBytes: server.stderrMaxBytes,
+    }));
   }
-
   return { servers: resolved };
 }
 
 export function resolveMaybeCodeObservability(
   config: MayConfig,
 ): false | MaybeCodeObservabilityOptions {
-  const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.observability;
-  if (value === undefined || value === false) return false;
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new MaybeCodeConfigError(
-      "apps.maybecode.observability must be false or an object",
-    );
-  }
-
-  const candidate = value as Record<string, unknown>;
-  rejectUnknownOptions(
-    candidate,
-    [
-      "enabled",
-      "exporter",
-      "file",
-      "samplingRatio",
-      "retentionDays",
-      "batch",
-    ],
-    "apps.maybecode.observability",
-  );
-  const enabled = candidate.enabled;
-  if (enabled !== undefined && typeof enabled !== "boolean") {
-    throw new MaybeCodeConfigError(
-      "apps.maybecode.observability.enabled must be a boolean",
-    );
-  }
-  if (candidate.exporter !== undefined && candidate.exporter !== "file") {
-    throw new MaybeCodeConfigError(
-      'apps.maybecode.observability.exporter must be "file"',
-    );
-  }
-  const file = candidate.file === undefined
-    ? undefined
-    : nonEmptyString(
-        candidate.file,
-        "apps.maybecode.observability.file",
-      );
-  const samplingRatio = optionalRatio(
-    candidate.samplingRatio,
-    "apps.maybecode.observability.samplingRatio",
-  );
-  const retentionDays = optionalPositiveInteger(
-    candidate.retentionDays,
-    "apps.maybecode.observability.retentionDays",
-  );
-  const batch = candidate.batch === undefined
-    ? {}
-    : objectValue(candidate.batch, "apps.maybecode.observability.batch");
-  rejectUnknownOptions(
-    batch,
-    ["maxQueueSize", "maxExportBatchSize", "scheduledDelayMs"],
-    "apps.maybecode.observability.batch",
-  );
-  const maxQueueSize = optionalPositiveInteger(
-    batch.maxQueueSize,
-    "apps.maybecode.observability.batch.maxQueueSize",
-  );
-  const maxExportBatchSize = optionalPositiveInteger(
-    batch.maxExportBatchSize,
-    "apps.maybecode.observability.batch.maxExportBatchSize",
-  );
-  const scheduledDelayMs = optionalNonNegativeNumber(
-    batch.scheduledDelayMs,
-    "apps.maybecode.observability.batch.scheduledDelayMs",
-  );
-  if ((maxExportBatchSize ?? 512) > (maxQueueSize ?? 2_048)) {
+  const observability = readMaybeCodeSettings(config).observability;
+  if (observability === undefined || observability === false) return false;
+  const batch = observability.batch ?? {};
+  if ((batch.maxExportBatchSize ?? 512) > (batch.maxQueueSize ?? 2_048)) {
     throw new MaybeCodeConfigError(
       "apps.maybecode.observability.batch.maxExportBatchSize cannot exceed maxQueueSize",
     );
   }
-  if (enabled === false) return false;
-  return {
-    ...(file === undefined ? {} : { file }),
-    ...(samplingRatio === undefined ? {} : { samplingRatio }),
-    ...(retentionDays === undefined ? {} : { retentionDays }),
-    ...(maxQueueSize === undefined ? {} : { maxQueueSize }),
-    ...(maxExportBatchSize === undefined ? {} : { maxExportBatchSize }),
-    ...(scheduledDelayMs === undefined ? {} : { scheduledDelayMs }),
-  };
+  if (observability.enabled === false) return false;
+  return omitUndefined({
+    file: observability.file,
+    samplingRatio: observability.samplingRatio,
+    retentionDays: observability.retentionDays,
+    maxQueueSize: batch.maxQueueSize,
+    maxExportBatchSize: batch.maxExportBatchSize,
+    scheduledDelayMs: batch.scheduledDelayMs,
+  });
 }
 
 function resolveMaybeCodeSubagents(
   value: false | MaybeCodeSubagentConfigurationOptions | undefined,
-  config: MayConfig,
+  settings: MaybeCodeSettings,
 ): false | ResolvedSubagents {
   if (value === false) return false;
   if (value?.configuration !== undefined) return value as ResolvedSubagents;
-  const resolved = resolveSubagentConfiguration(config);
+  const resolved = resolveSubagentConfiguration(settings.subagents);
   if (resolved === false) return false;
   return { ...(value ?? {}), configuration: resolved };
 }
@@ -692,73 +513,20 @@ function resolveDefaultModelPersistence(
 export function resolveMaybeCodeAutoCompactionMode(
   config: MayConfig,
 ): MaybeCodeAutoCompactionMode {
-  const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.autoCompaction;
-  if (value === undefined) return "prune-summary";
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new MaybeCodeConfigError(
-      "apps.maybecode.autoCompaction must be an object",
-    );
-  }
-  const { mode, providerNative } = value as Record<string, unknown>;
-  if (providerNative !== undefined && typeof providerNative !== "boolean") {
-    throw new MaybeCodeConfigError(
-      "apps.maybecode.autoCompaction.providerNative must be a boolean",
-    );
-  }
-  if (mode === undefined) return providerNative === true ? "provider-native" : "prune-summary";
-  if (mode !== "prune-summary" && mode !== "history-reference" && mode !== "provider-native") {
-    throw new MaybeCodeConfigError(
-      "apps.maybecode.autoCompaction.mode must be prune-summary, history-reference, or provider-native",
-    );
-  }
-  return mode;
-}
-
-/** @deprecated Use resolveMaybeCodeAutoCompactionMode instead. */
-export function resolveProviderNativeAutoCompaction(config: MayConfig): boolean {
-  return resolveMaybeCodeAutoCompactionMode(config) === "provider-native";
+  return readMaybeCodeSettings(config).autoCompaction?.mode ?? "prune-summary";
 }
 
 export function resolveMaybeCodeRetry(
   config: MayConfig,
 ): false | RetryingModelOptions {
-  const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.retry;
-  if (value === undefined) return {};
-  if (value === false) return false;
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new MaybeCodeConfigError(
-      "apps.maybecode.retry must be false or an object",
-    );
-  }
-
-  const retry = value as Record<string, unknown>;
-  const maxAttempts = optionalPositiveInteger(
-    retry.maxAttempts,
-    "apps.maybecode.retry.maxAttempts",
-  );
-  const baseDelayMs = optionalNonNegativeNumber(
-    retry.baseDelayMs,
-    "apps.maybecode.retry.baseDelayMs",
-  );
-  const maxDelayMs = optionalNonNegativeNumber(
-    retry.maxDelayMs,
-    "apps.maybecode.retry.maxDelayMs",
-  );
-  const jitterRatio = optionalRatio(
-    retry.jitterRatio,
-    "apps.maybecode.retry.jitterRatio",
-  );
-  if ((baseDelayMs ?? 500) > (maxDelayMs ?? 8_000)) {
+  const retry = readMaybeCodeSettings(config).retry;
+  if (retry === false) return false;
+  if ((retry?.baseDelayMs ?? 500) > (retry?.maxDelayMs ?? 8_000)) {
     throw new MaybeCodeConfigError(
       "apps.maybecode.retry.baseDelayMs cannot exceed maxDelayMs",
     );
   }
-  return {
-    ...(maxAttempts === undefined ? {} : { maxAttempts }),
-    ...(baseDelayMs === undefined ? {} : { baseDelayMs }),
-    ...(maxDelayMs === undefined ? {} : { maxDelayMs }),
-    ...(jitterRatio === undefined ? {} : { jitterRatio }),
-  };
+  return { ...retry };
 }
 
 function createContextBudget(
@@ -772,10 +540,7 @@ function createContextBudget(
   if (contextWindowTokens === undefined && outputReserveTokens === undefined) {
     return undefined;
   }
-  return {
-    ...(contextWindowTokens === undefined ? {} : { contextWindowTokens }),
-    ...(outputReserveTokens === undefined ? {} : { outputReserveTokens }),
-  };
+  return omitUndefined({ contextWindowTokens, outputReserveTokens });
 }
 
 async function resolveWorkspace(workspace: string): Promise<string> {
@@ -796,73 +561,14 @@ async function resolveWorkspace(workspace: string): Promise<string> {
   return path;
 }
 
-function optionalPositiveInteger(
-  value: unknown,
-  field: string,
-): number | undefined {
-  if (value === undefined) return undefined;
-  if (!Number.isSafeInteger(value) || (value as number) < 1) {
-    throw new MaybeCodeConfigError(`${field} must be a positive safe integer`);
-  }
-  return value as number;
-}
-
-function optionalNonNegativeNumber(
-  value: unknown,
-  field: string,
-): number | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    throw new MaybeCodeConfigError(`${field} must be a non-negative number`);
-  }
-  return value;
-}
-
-function optionalRatio(value: unknown, field: string): number | undefined {
-  const number = optionalNonNegativeNumber(value, field);
-  if (number !== undefined && number > 1) {
-    throw new MaybeCodeConfigError(`${field} must be between 0 and 1`);
-  }
-  return number;
-}
-
-function nonEmptyString(value: unknown, field: string): string {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new MaybeCodeConfigError(`${field} must be a non-empty string`);
-  }
-  return value;
-}
-
-function objectValue(value: unknown, field: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new MaybeCodeConfigError(`${field} must be an object`);
-  }
-  return value as Record<string, unknown>;
-}
-
-function optionalStringArray(
-  value: unknown,
-  field: string,
-): readonly string[] | undefined {
-  if (value === undefined) return undefined;
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
-    throw new MaybeCodeConfigError(`${field} must be an array of strings`);
-  }
-  return [...value] as string[];
-}
-
 function resolveMcpEnvironment(
-  value: unknown,
+  configured: Readonly<Record<string, string>> | undefined,
   field: string,
   environment: Readonly<Record<string, string | undefined>>,
 ): Readonly<Record<string, string>> | undefined {
-  if (value === undefined) return undefined;
-  const configured = objectValue(value, field);
+  if (configured === undefined) return undefined;
   const resolved: Record<string, string> = {};
   for (const [name, raw] of Object.entries(configured)) {
-    if (name === "" || typeof raw !== "string") {
-      throw new MaybeCodeConfigError(`${field} must contain string values`);
-    }
     resolved[name] = raw.replace(
       /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/gu,
       (_match, environmentName: string) => {
@@ -877,16 +583,4 @@ function resolveMcpEnvironment(
     );
   }
   return resolved;
-}
-
-function rejectUnknownOptions(
-  value: Record<string, unknown>,
-  allowed: readonly string[],
-  field: string,
-): void {
-  const names = new Set(allowed);
-  const unknown = Object.keys(value).find((name) => !names.has(name));
-  if (unknown !== undefined) {
-    throw new MaybeCodeConfigError(`${field}.${unknown} is not supported`);
-  }
 }

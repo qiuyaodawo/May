@@ -72,7 +72,7 @@ export function validateGraph(tasks: readonly TaskSpec[], maxTasks: number, maxI
    */
 export function validateTaskFiles(files: readonly string[] | undefined): void {
   if (files === undefined) return;
-  if (!Array.isArray(files) || files.length < 1 || files.length > 128) throw new TypeError("Task files must contain 1-128 paths");
+  if (!Array.isArray(files) || files.length > 128) throw new TypeError("Task files must contain at most 128 paths");
   const seen = new Set<string>();
   for (const file of files) {
     if (typeof file !== "string" || file.length === 0 || file.length > 512 || file.includes("\0")) throw new TypeError("Task file paths must be nonempty strings of at most 512 characters");

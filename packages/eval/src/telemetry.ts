@@ -1,5 +1,5 @@
 import type { AgentApplicationEvent } from "@sortedyuan/may";
-import { priceUsage, resolveUsageTotals, validateUsageCost, type RunBudget, type Usage, type UsageCost, type TraceAttributes } from "@sortedyuan/may/core";
+import { omitUndefined, priceUsage, resolveUsageTotals, validateUsageCost, type RunBudget, type Usage, type UsageCost, type TraceAttributes } from "@sortedyuan/may/core";
 import {
   BasicTracer,
   type FinishedTraceSpan,
@@ -107,12 +107,13 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
     if (this.spans.size >= this.maxRecords) { this.exceededRecords = true; this.scopes.delete(span.context.spanId); return; }
     const attributes = Object.fromEntries(Object.entries({ ...this.scopes.get(span.context.spanId), ...span.attributes })
       .filter(([key]) => safeAttributes.has(key)));
-    const saved = { ...span, attributes, events: [], error: span.error === undefined ? undefined : { name: span.error.name, ...(span.error.code === undefined ? {} : { code: span.error.code }) } };
     const sanitized: FinishedTraceSpan = {
-      name: saved.name, context: saved.context, startTime: saved.startTime, endTime: saved.endTime,
-      durationMs: saved.durationMs, status: saved.status, attributes, events: [],
-      ...(saved.parentSpanId === undefined ? {} : { parentSpanId: saved.parentSpanId }),
-      ...(saved.error === undefined ? {} : { error: saved.error }),
+      name: span.name, context: span.context, startTime: span.startTime, endTime: span.endTime,
+      durationMs: span.durationMs, status: span.status, attributes, events: [],
+      ...omitUndefined({
+        parentSpanId: span.parentSpanId,
+        error: span.error === undefined ? undefined : omitUndefined({ name: span.error.name, code: span.error.code }),
+      }),
     };
     this.spans.set(span.context.spanId, sanitized);
     this.scopes.delete(span.context.spanId);
@@ -179,7 +180,7 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
       await emit({ id, type: "model-call", scope });
       const receipt = this.usage.get(id) ?? spanUsage(span.attributes);
       const cost = this.cost(span, receipt);
-      await emit({ id: `${id}:usage`, type: "usage", scope, ...(receipt === undefined ? {} : { usage: receipt }), cost });
+      await emit({ id: `${id}:usage`, type: "usage", scope, ...omitUndefined({ usage: receipt }), cost });
     }
     for (const id of this.attempts) await emit({ id, type: "model-attempt", scope });
     for (const [id, failed] of this.tools) {
@@ -225,9 +226,7 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
       const { currency, kind, pricingId, pricingVersion } = receiptCost;
       const key = JSON.stringify([currency, kind, pricingId, pricingVersion]);
       const cost = costs.get(key) ?? { currency, kind, complete: true, missingReasons: [],
-        ...(pricingId === undefined ? {} : { pricingId }), ...(pricingVersion === undefined ? {} : { pricingVersion }),
-        ...(receiptCost.source === undefined ? {} : { source: receiptCost.source }),
-        ...(receiptCost.effectiveAt === undefined ? {} : { effectiveAt: receiptCost.effectiveAt }) };
+        ...omitUndefined({ pricingId, pricingVersion, source: receiptCost.source, effectiveAt: receiptCost.effectiveAt }) };
       const amount = receiptCost.amount;
       if (amount !== undefined) cost.amount = (cost.amount ?? 0) + amount;
       if (!receiptCost.complete || amount === undefined) {
@@ -263,7 +262,7 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
     const pricingVersion = text(span.attributes, "may.model.pricing_version");
     return { ...calculated, amount, currency: text(span.attributes, "may.model.currency") ?? calculated.currency,
       kind: span.attributes["may.model.cost_kind"] === "provider" ? "provider" : "estimated", complete,
-      ...(pricingId === undefined ? {} : { pricingId }), ...(pricingVersion === undefined ? {} : { pricingVersion }),
+      ...omitUndefined({ pricingId, pricingVersion }),
       missingReasons: complete ? [] : calculated.missingReasons.length ? calculated.missingReasons : ["model-cost-incomplete"] };
   }
 
@@ -289,6 +288,7 @@ export function evalMetrics(metrics: EvalAgentMetrics): Partial<EvalMetrics> {
   if (currencies.size > 1) missingReasons.push("multiple-currencies");
   if (!metrics.coverageComplete) missingReasons.push(...metrics.coverageMissingReasons);
   const kinds = new Set(costGroups.map(cost => cost.kind));
+  const single = costGroups.length === 1 ? costGroups[0] : undefined;
   const count = (value: number): MeasuredValue => ({ value, complete: metrics.coverageComplete, missingReasons: metrics.coverageMissingReasons });
   return {
     approvalWaitMs: count(metrics.approvalWaitMs), modelCalls: count(metrics.modelCalls),
@@ -296,14 +296,11 @@ export function evalMetrics(metrics: EvalAgentMetrics): Partial<EvalMetrics> {
       missingReasons: [...metrics.coverageMissingReasons, ...(metrics.modelAttemptsComplete ? [] : ["native-compaction-attempt-count-unavailable"])] }, retryWaitMs: count(metrics.retryWaitMs),
     toolCalls: count(metrics.toolCalls), toolFailures: count(metrics.toolFailures),
     contextCompactions: count(metrics.contextCompactions), humanInterventions: count(metrics.humanInterventions),
-    totalTokens: { ...(metrics.tokens.totalTokens === undefined ? {} : { value: metrics.tokens.totalTokens }), complete: metrics.tokens.complete, missingReasons: metrics.tokens.missingReasons },
+    totalTokens: { ...omitUndefined({ value: metrics.tokens.totalTokens }), complete: metrics.tokens.complete, missingReasons: metrics.tokens.missingReasons },
     cost: { ...(known.length === 0 || currencies.size !== 1 ? {} : { amount: known.reduce((sum, cost) => sum + cost.amount!, 0) }),
       currency: currencies.size === 1 ? costGroups[0]!.currency : "USD", kind: kinds.size === 1 ? costGroups[0]!.kind : "estimated",
       complete, missingReasons,
-      ...(costGroups.length === 1 && costGroups[0]!.pricingId !== undefined ? { pricingId: costGroups[0]!.pricingId } : {}),
-      ...(costGroups.length === 1 && costGroups[0]!.pricingVersion !== undefined ? { pricingVersion: costGroups[0]!.pricingVersion } : {}),
-      ...(costGroups.length === 1 && costGroups[0]!.source !== undefined ? { source: costGroups[0]!.source } : {}),
-      ...(costGroups.length === 1 && costGroups[0]!.effectiveAt !== undefined ? { effectiveAt: costGroups[0]!.effectiveAt } : {}),
+      ...omitUndefined({ pricingId: single?.pricingId, pricingVersion: single?.pricingVersion, source: single?.source, effectiveAt: single?.effectiveAt }),
     },
   };
 }
@@ -319,14 +316,17 @@ export function createEvalTaskAssessment(options: {
   readonly timestamp?: number;
 }): TaskAssessment {
   const identities = options.identities;
+  const only = (values: readonly string[] | undefined) => values?.length === 1 ? values[0] : undefined;
   return {
-    taskId: identities?.taskIds.length === 1 ? identities.taskIds[0]! : options.trialId,
+    taskId: only(identities?.taskIds) ?? options.trialId,
     evaluator: options.evaluatorId, evaluatorVersion: options.evaluatorVersion, result: options.verdict,
-    ...(options.configurationVersion === undefined ? {} : { configurationVersion: options.configurationVersion }),
-    ...(identities?.sessionIds.length === 1 ? { sessionId: identities.sessionIds[0]! } : {}),
-    ...(identities?.runIds.length === 1 ? { runId: identities.runIds[0]! } : {}),
-    ...(identities?.coordinationIds.length === 1 ? { coordinationId: identities.coordinationIds[0]! } : {}),
-    ...(identities?.traceIds.length === 1 ? { traceId: identities.traceIds[0]! } : {}),
+    ...omitUndefined({
+      configurationVersion: options.configurationVersion,
+      sessionId: only(identities?.sessionIds),
+      runId: only(identities?.runIds),
+      coordinationId: only(identities?.coordinationIds),
+      traceId: only(identities?.traceIds),
+    }),
     ...(options.evidenceReferences === undefined ? {} : { evidenceReferences: [...options.evidenceReferences] }),
     timestamp: options.timestamp ?? Date.now(),
   };
@@ -347,7 +347,7 @@ function spanUsage(attributes: TraceAttributes): Usage | undefined {
   const outputTokens = numeric(attributes, "may.model.output_tokens");
   const totalTokens = numeric(attributes, "may.model.total_tokens");
   if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined) return undefined;
-  return { ...(inputTokens === undefined ? {} : { inputTokens }), ...(outputTokens === undefined ? {} : { outputTokens }),
-    ...(totalTokens === undefined ? {} : { totalTokens }),
-    completeness: { status: attributes["may.model.usage_complete"] === true ? "complete" : "partial", ...(attributes["may.model.usage_complete"] === true ? {} : { reason: "model-call-usage-incomplete" }) } };
+  const complete = attributes["may.model.usage_complete"] === true;
+  return { ...omitUndefined({ inputTokens, outputTokens, totalTokens }),
+    completeness: complete ? { status: "complete" } : { status: "partial", reason: "model-call-usage-incomplete" } };
 }

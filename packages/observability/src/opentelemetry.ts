@@ -4,7 +4,7 @@ import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import type { MetricRecord, TraceAttributes, TraceSpan, TraceSpanStartOptions, Tracer } from "@sortedyuan/may/core";
+import { omitUndefined, type MetricRecord, type TraceAttributes, type TraceSpan, type TraceSpanStartOptions, type Tracer } from "@sortedyuan/may/core";
 import { boundedAttributes, telemetryLimits, type TelemetryLimits } from "./limits.js";
 import { metricAttributes, SpanMetrics } from "./metrics.js";
 import type { FinishedTraceSpan, MetricRecorder, ObservabilityErrorHandler, SpanObserver, TraceSpanEventData } from "./types.js";
@@ -27,7 +27,7 @@ export class OpenTelemetryMetricRecorder implements MetricRecorder {
     }
     let entry = this.instruments.get(record.name);
     if (entry === undefined) {
-      const options = record.unit === undefined ? {} : { unit: record.unit };
+      const options = omitUndefined({ unit: record.unit });
       const instrument = record.kind === "counter" ? this.meter.createCounter(record.name, options)
         : record.kind === "updown" ? this.meter.createUpDownCounter(record.name, options)
         : record.kind === "gauge" ? this.meter.createGauge(record.name, options)
@@ -69,7 +69,7 @@ export class OpenTelemetryTracer implements Tracer {
     const identity = native.spanContext();
     const context = Object.freeze({ traceId: identity.traceId, spanId: identity.spanId, sampled: (identity.traceFlags & TraceFlags.SAMPLED) !== 0 });
     const events: TraceSpanEventData[] = [];
-    const start = { name, context, startTime, attributes, ...(parent === undefined ? {} : { parentSpanId: parent.spanId }) };
+    const start = { name, context, startTime, attributes, ...omitUndefined({ parentSpanId: parent?.spanId }) };
     this.observe(observer => observer.onStart(start));
     let ended = false;
     return {
@@ -94,10 +94,10 @@ export class OpenTelemetryTracer implements Tracer {
         ended = true;
         const endTime = Date.now();
         const status = end.status ?? (end.error === undefined ? "ok" : "error");
-        native.setAttributes(otelAttributes({ ...attributes, "may.status": status, ...(end.error === undefined ? {} : { "error.type": end.error.name, ...(end.error.code === undefined ? {} : { "error.code": end.error.code }) }) }));
+        native.setAttributes(otelAttributes({ ...attributes, "may.status": status, ...omitUndefined({ "error.type": end.error?.name, "error.code": end.error?.code }) }));
         native.setStatus({ code: status === "error" ? SpanStatusCode.ERROR : status === "ok" ? SpanStatusCode.OK : SpanStatusCode.UNSET });
         native.end(endTime);
-        const finished: FinishedTraceSpan = Object.freeze({ ...start, attributes, endTime, durationMs: performance.now() - monotonicStart, status, events: Object.freeze([...events]), ...(end.error === undefined ? {} : { error: end.error }) });
+        const finished: FinishedTraceSpan = Object.freeze({ ...start, attributes, endTime, durationMs: performance.now() - monotonicStart, status, events: Object.freeze([...events]), ...omitUndefined({ error: end.error }) });
         this.observe(observer => observer.onEnd(finished));
       },
     };
@@ -184,18 +184,19 @@ export function createOtlpTelemetry(options: OtlpTelemetryOptions): {
   const ratio = options.samplingRatio ?? 1;
   if (!Number.isFinite(ratio) || ratio < 0 || ratio > 1) throw new RangeError("Invalid samplingRatio");
   for (const url of [options.tracesUrl, options.metricsUrl]) if (!["http:", "https:"].includes(new URL(url).protocol)) throw new TypeError("OTLP requires an HTTP URL");
-  boundedAttributes({ "service.name": options.serviceName, ...(options.serviceVersion === undefined ? {} : { "service.version": options.serviceVersion }) });
-  const resource = resourceFromAttributes({ "service.name": options.serviceName, ...(options.serviceVersion === undefined ? {} : { "service.version": options.serviceVersion }) });
+  const resourceAttributes = omitUndefined({ "service.name": options.serviceName, "service.version": options.serviceVersion });
+  boundedAttributes(resourceAttributes);
+  const resource = resourceFromAttributes(resourceAttributes);
   let traceFailures = 0;
   let metricFailures = 0;
   let lifecycleFailures = 0;
   const report = (error: unknown): void => { try { options.onError?.(error); } catch { /* 保持遥测错误与 Agent 执行独立。 */ } };
-  const traceExporter = new ReportingTraceExporter({ url: options.tracesUrl, ...(options.headers === undefined ? {} : { headers: options.headers }), timeoutMillis: timeoutMs, concurrencyLimit: 1 }, error => { traceFailures += 1; report(error); });
-  const metricExporter = new ReportingMetricExporter({ url: options.metricsUrl, ...(options.headers === undefined ? {} : { headers: options.headers }), timeoutMillis: timeoutMs, concurrencyLimit: 1 }, error => { metricFailures += 1; report(error); });
+  const traceExporter = new ReportingTraceExporter(omitUndefined({ url: options.tracesUrl, headers: options.headers, timeoutMillis: timeoutMs, concurrencyLimit: 1 }), error => { traceFailures += 1; report(error); });
+  const metricExporter = new ReportingMetricExporter(omitUndefined({ url: options.metricsUrl, headers: options.headers, timeoutMillis: timeoutMs, concurrencyLimit: 1 }), error => { metricFailures += 1; report(error); });
   const traceProvider = new BasicTracerProvider({ resource, sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(ratio) }), spanProcessors: [new OtelBatchSpanProcessor(traceExporter, { maxQueueSize, maxExportBatchSize, exportTimeoutMillis: timeoutMs })] });
   const metricProvider = new MeterProvider({ resource, readers: [new PeriodicExportingMetricReader({ exporter: metricExporter, exportIntervalMillis: positive(options.exportIntervalMs ?? 60_000), exportTimeoutMillis: timeoutMs })] });
   const metrics = new OpenTelemetryMetricRecorder(metricProvider.getMeter("@sortedyuan/observability"), options.maxMetricSeries ?? 1_024);
-  const tracer = new OpenTelemetryTracer({ tracer: traceProvider.getTracer("@sortedyuan/observability"), metrics, ...(options.observer === undefined ? {} : { observer: options.observer }), ...(options.onError === undefined ? {} : { onError: options.onError }) });
+  const tracer = new OpenTelemetryTracer(omitUndefined({ tracer: traceProvider.getTracer("@sortedyuan/observability"), metrics, observer: options.observer, onError: options.onError }));
   let closed = false;
   const lifecycle = async (action: () => Promise<unknown>): Promise<void> => {
     try {

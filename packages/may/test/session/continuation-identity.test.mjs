@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { InMemoryContext, May } from "@sortedyuan/may/core";
 import { OpenAIChatCompletionsModel } from "@sortedyuan/providers/openai-compatible";
 import { Session, inspectSessionRunOutcome } from "@sortedyuan/may/session";
@@ -16,11 +14,7 @@ function runtime(messages = []) {
 }
 
 test("identified continuation records cancellation durably and rejects duplicates across restart", async t => {
-  const base = fileURLToPath(new URL("../../../../review/architecture-fix-20261023/session/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "identity-"));
-  assert.ok(directory.startsWith(base));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/continuation-identity");
   const store = new FileSessionStore(directory);
   const session = await Session.create({ runtime: runtime(), store });
   const controller = new AbortController();

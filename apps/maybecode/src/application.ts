@@ -34,6 +34,7 @@ import {
   AsyncEventQueue,
   RunCancelledError,
   isStreamingMayEvent,
+  omitUndefined,
   ToolRegistry,
   type Model,
   type RunOptions,
@@ -45,7 +46,7 @@ import {
 } from "@sortedyuan/may/core";
 import type { ApprovalDecision, PermissionPolicy, PermissionRuleStore, PersistentApprovalOptions, PermissionCheck, CreatePermissionRuleOptions } from "@sortedyuan/may/permissions";
 import type { MaybeCodePermissionMode } from "./policy.js";
-import type { AnyPlugin, ServiceToken } from "@sortedyuan/may/plugin";
+import type { AnyPlugin } from "@sortedyuan/may/plugin";
 import type { McpClientPool } from "@sortedyuan/mcp";
 import type {
   SessionHistoryPage,
@@ -60,12 +61,13 @@ import type {
   MaybeCodeAutoCompactionMode,
   MaybeCodeCompactionSelection,
   MaybeCodeModelInfo,
+  MaybeCodeSkillInfo,
 } from "./controller.js";
 import type {
   MaybeCodeDelegationRequest,
   MaybeCodeDelegationState,
   MaybeCodeDelegationToolRecords,
-} from "./delegation.js";
+} from "@sortedyuan/coordination/delegation/types";
 import type { MaybeCodeRun, MaybeCodeSessionEvent } from "./events.js";
 import {
   loadMaybeCodeInstructions,
@@ -79,11 +81,8 @@ import { mcpService } from "@sortedyuan/mcp/plugin";
 import type { GoalController, GoalAgent, GoalBudget } from "@sortedyuan/may/goals";
 import { createMaybeCodePlugins, requestRecord, type MaybeCodePluginComposition } from "./plugins/application.js";
 import { createMaybeCodeInstructionsPlugin } from "./plugins/instructions.js";
-import { SubagentHost, type SubagentRequestPlan } from "./subagent-host.js";
-import {
-  type MaybeCodeSubagentConfiguration,
-  type MaybeCodeSubagentRole,
-} from "./subagents.js";
+import { SubagentHost, type SubagentRequestPlan } from "@sortedyuan/coordination/delegation/host";
+import type { MaybeCodeSubagentConfiguration, MaybeCodeSubagentRole } from "@sortedyuan/coordination/delegation/configuration";
 
 export { DEFAULT_MAYBE_CODE_INSTRUCTIONS } from "./instructions.js";
 export { composeMaybeCodePlugins, createMaybeCodePlugins } from "./plugins/application.js";
@@ -151,8 +150,6 @@ export interface MaybeCodeApplicationOptions {
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
   /** Defaults to prune-summary; explicit strategies override this mode. */
   readonly autoCompactionMode?: MaybeCodeAutoCompactionMode;
-  /** @deprecated Use autoCompactionMode: "provider-native" for native-only compaction. */
-  readonly providerNativeAutoCompaction?: boolean;
   readonly contextSummarizer?: ContextSummarizer;
   readonly instructions?: string;
   readonly instructionsDirectory?: string;
@@ -178,7 +175,7 @@ export class MaybeCodeApplication {
   readonly sessionId: string;
   readonly workspace: string;
   private readonly instructionState: MaybeCodeInstructionState;
-  private readonly application: AgentApplication;
+  readonly agent: AgentApplication;
   private serviceReferences: MaybeCodeApplicationServices;
   private updatingModel = false;
   private modelUpdate: Promise<void> | undefined;
@@ -209,7 +206,7 @@ export class MaybeCodeApplication {
     private readonly createModelPlugins: (update: MaybeCodeModelUpdate) => MaybeCodePluginComposition,
   ) {
     this.workspace = workspace;
-    this.application = application;
+    this.agent = application;
     this.sessionId = application.sessionId;
     this.instructionState = instructions;
     this.serviceReferences = this.readServices();
@@ -249,7 +246,7 @@ export class MaybeCodeApplication {
     const createPlugins = (current: MaybeCodeApplicationOptions) => createMaybeCodePlugins({ ...current,
       plugins: [createMaybeCodeInstructionsPlugin(instructionState, {
         workspace, options: current, historicalBranch: forkOrigin !== undefined || fork !== undefined,
-        ...(forkOrigin === undefined ? {} : { historicalSource: forkOrigin.sessionId }),
+        ...omitUndefined({ historicalSource: forkOrigin?.sessionId }),
       }), ...(current.plugins ?? [])],
       onGitCheckpoint: checkpoint => {
         options.onGitCheckpoint?.(checkpoint);
@@ -276,27 +273,23 @@ export class MaybeCodeApplication {
       tools: configuredTools,
       toolScope: { workspaceId: resolve(options.workspace) },
       beforeToolExecute: gitRequest.beforeToolExecute,
-      ...(options.permissionRuleStore === undefined ? {} : { permissionRuleStore: options.permissionRuleStore }),
       instructions: instructions.system.content,
-      ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
+      ...omitUndefined({
+        permissionRuleStore: options.permissionRuleStore,
+        tracer: options.tracer,
+        runBudget: options.runBudget,
+      }),
       traceAttributes: {
         ...(options.traceAttributes ?? {}),
         "may.agent.name": "maybecode",
-        ...(initialModelInfo?.profile === undefined
-          ? {}
-          : { "may.model.profile": initialModelInfo.profile }),
-        ...(initialModelInfo?.provider === undefined
-          ? {}
-          : { "may.model.provider": initialModelInfo.provider }),
-        ...(initialModelInfo?.adapter === undefined
-          ? {}
-          : { "may.model.adapter": initialModelInfo.adapter }),
-        ...(initialModelInfo?.model === undefined
-          ? {}
-          : { "may.model.name": initialModelInfo.model }),
+        ...omitUndefined({
+          "may.model.profile": initialModelInfo?.profile,
+          "may.model.provider": initialModelInfo?.provider,
+          "may.model.adapter": initialModelInfo?.adapter,
+          "may.model.name": initialModelInfo?.model,
+        }),
       },
       maxSteps: options.maxSteps ?? MAYBECODE_MAX_STEPS,
-      ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
       sessionHistory: { retrieval: true },
       createToolPresentation: async (check) => {
         const preview = await createToolChangePreview(
@@ -319,11 +312,7 @@ export class MaybeCodeApplication {
       store: options.store,
       metadata: { ...options.sessionMetadata, workspace },
       contextMetadata: { workspace },
-      ...(options.sessionId === undefined
-        ? {}
-        : { sessionId: options.sessionId }),
-      ...(options.resume === undefined ? {} : { resume: options.resume }),
-      ...(options.fork === undefined ? {} : { fork: options.fork }),
+      ...omitUndefined({ sessionId: options.sessionId, resume: options.resume, fork: options.fork }),
     });
     product = new MaybeCodeApplication(
       workspace,
@@ -349,11 +338,11 @@ export class MaybeCodeApplication {
 
   private readServices(): MaybeCodeApplicationServices {
     return {
-      history: this.application.getService(historyMemoryService),
-      modelInfo: this.application.getOptionalService(applicationServices.modelInfo),
-      goals: this.application.getOptionalService(goalsService),
-      subagents: this.application.getOptionalService(delegationService)?.get(),
-      mcp: this.application.getOptionalService(mcpService),
+      history: this.agent.getService(historyMemoryService),
+      modelInfo: this.agent.getOptionalService(applicationServices.modelInfo),
+      goals: this.agent.getOptionalService(goalsService),
+      subagents: this.agent.getOptionalService(delegationService)?.get(),
+      mcp: this.agent.getOptionalService(mcpService),
     };
   }
 
@@ -376,10 +365,9 @@ export class MaybeCodeApplication {
   private async recordModel(runtimeOptions?: Readonly<Record<string, unknown>>): Promise<void> {
     const info = this.modelInfo;
     if (info === undefined) return;
-    await this.application.recordState("maybecode.model", {
+    await this.agent.recordState("maybecode.model", {
       provider: info.provider, model: info.model,
-      ...(info.adapter === undefined ? {} : { adapter: info.adapter }),
-      ...(info.profile === undefined ? {} : { profile: info.profile }),
+      ...omitUndefined({ adapter: info.adapter, profile: info.profile }),
       runtimeOptions: typeof runtimeOptions?.reasoningEffort === "string"
         ? { reasoningEffort: runtimeOptions.reasoningEffort } : {},
     });
@@ -408,7 +396,7 @@ export class MaybeCodeApplication {
 
   private async replaceModelPlugins(composition: MaybeCodePluginComposition, update: MaybeCodeModelUpdate): Promise<void> {
     try {
-      await this.application.updatePlugins(composition.plugins);
+      await this.agent.updatePlugins(composition.plugins);
       this.removeGoalListener?.();
       await this.subagentRelay;
       this.serviceReferences = this.readServices();
@@ -422,13 +410,13 @@ export class MaybeCodeApplication {
   }
 
   get isRunning(): boolean {
-    return this.updatingModel || this.inputOperations > 0 || this.currentRun !== undefined || this.application.isRunning ||
+    return this.updatingModel || this.inputOperations > 0 || this.currentRun !== undefined || this.agent.isRunning ||
       this.goals?.isRunning === true || this.subagents?.isRunning === true;
   }
 
   get instructions(): MaybeCodeInstructions {
     return { ...this.instructionState.current,
-      effective: this.application.getService(applicationServices.instructionSources).snapshot() };
+      effective: this.agent.getService(applicationServices.instructionSources).snapshot() };
   }
 
   submit(options: SessionSubmitOptions): Promise<MaybeCodeRun> {
@@ -440,23 +428,23 @@ export class MaybeCodeApplication {
       const goalPause = this.goals?.isRunning ? this.goals.pause("Paused for a new user message") : undefined;
       if (run || compaction) {
         this.historyMemory.cancelRequest();
-        this.application.cancel("Interrupted by a new user message");
+        this.agent.cancel("Interrupted by a new user message");
         await this.subagents?.cancel("Interrupted by a new user message");
       }
-      await this.application.cancelSteeringInputs("Replaced by a new user message");
+      await this.agent.cancelSteeringInputs("Replaced by a new user message");
       await goalPause;
       await Promise.allSettled([...(run ? [run.result] : []), ...(compaction ? [compaction] : [])]);
       if (epoch !== this.inputEpoch) throw new RunCancelledError("Input cancelled before execution");
       options.signal?.throwIfAborted();
-      const next = this.track(await this.startRequest({
+      const next = this.track(await this.startRequest(omitUndefined({
         mode: "submit",
         input: options.input,
         record: requestRecord(options.input),
-        ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
-        ...(options.shouldYield === undefined ? {} : { shouldYield: options.shouldYield }),
-        ...(options.signal === undefined ? {} : { signal: options.signal }),
-        ...(options.traceAttributes === undefined ? {} : { traceAttributes: options.traceAttributes }),
-      }, options));
+        runBudget: options.runBudget,
+        shouldYield: options.shouldYield,
+        signal: options.signal,
+        traceAttributes: options.traceAttributes,
+      }), options));
       if (epoch !== this.inputEpoch) { next.cancel("Input cancelled during startup"); await next.result.catch(() => undefined); }
       return next;
     });
@@ -467,8 +455,8 @@ export class MaybeCodeApplication {
     return this.serializeInput(async () => {
       if (epoch !== this.inputEpoch) throw new RunCancelledError("Input cancelled before acceptance");
       await this.steeringCancellation;
-      const input = await this.application.steer(options);
-      if (epoch !== this.inputEpoch) { await this.steeringCancellation; return this.application.listSteeringInputs().find(item => item.inputId === input.inputId)!; }
+      const input = await this.agent.steer(options);
+      if (epoch !== this.inputEpoch) { await this.steeringCancellation; return this.agent.listSteeringInputs().find(item => item.inputId === input.inputId)!; }
       if (input.status === "idle" && !this.goals?.isRunning && this.subagents?.isRunning !== true) {
         const run = this.track(await this.startRequest({
           mode: "steer",
@@ -478,11 +466,9 @@ export class MaybeCodeApplication {
         }, undefined, input.inputId));
         if (epoch !== this.inputEpoch) run.cancel("Input cancelled during startup");
       }
-      return this.application.listSteeringInputs().find(item => item.inputId === input.inputId)!;
+      return this.agent.listSteeringInputs().find(item => item.inputId === input.inputId)!;
     });
   }
-
-  listSteeringInputs(): readonly SessionSteeringInput[] { return this.application.listSteeringInputs(); }
 
   private serializeInput<T>(operation: () => Promise<T>, allowClosed = false): Promise<T> {
     this.inputOperations++;
@@ -507,14 +493,14 @@ export class MaybeCodeApplication {
   }
 
   private async resumeSteering(): Promise<void> {
-    if (this.closed || this.updatingModel || this.modelUpdateFailure !== undefined || !this.application.listSteeringInputs().some(input => input.status === "idle")) return;
+    if (this.closed || this.updatingModel || this.modelUpdateFailure !== undefined || !this.agent.listSteeringInputs().some(input => input.status === "idle")) return;
     const epoch = this.inputEpoch;
     await this.serializeInput(async () => {
-      if (this.closed || epoch !== this.inputEpoch || this.application.isRunning ||
+      if (this.closed || epoch !== this.inputEpoch || this.agent.isRunning ||
         this.goals?.isRunning || this.subagents?.isRunning) return;
       await this.steeringCancellation;
       if (this.closed || epoch !== this.inputEpoch) return;
-      const input = this.application.listSteeringInputs().find(item => item.status === "idle");
+      const input = this.agent.listSteeringInputs().find(item => item.status === "idle");
       if (input) {
         this.track(await this.startRequest({
           mode: "steer",
@@ -527,8 +513,6 @@ export class MaybeCodeApplication {
   }
 
   getGoal() { return this.goals?.getGoal(); }
-  getService<T>(service: ServiceToken<T>): T { return this.application.getService(service); }
-  getOptionalService<T>(service: ServiceToken<T>): T | undefined { return this.application.getOptionalService(service); }
   startGoal(objective: string, budget?: GoalBudget) { return this.requireGoals().start(objective, budget); }
   resumeGoal() { return this.requireGoals().resume(); }
   pauseGoal() { return this.requireGoals().pause(); }
@@ -561,8 +545,8 @@ export class MaybeCodeApplication {
     return startGitRequest(this.gitRequest, this.sessionId,
       () => this.startRequestRun(plan, options, inputId),
       checkpoint => this.eventQueue.push({ type: "workspace.git.changed", checkpoint }),
-      async runId => (await this.application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
-      async firstRunId => requestMainRunIds(await this.application.history(), firstRunId));
+      async runId => (await this.agent.branchPositions()).find(position => position.runId === runId)?.positionSeq,
+      async firstRunId => requestMainRunIds(await this.agent.history(), firstRunId));
   }
 
   private async startRequestRun(
@@ -571,21 +555,21 @@ export class MaybeCodeApplication {
     inputId?: string,
   ): Promise<MaybeCodeRun> {
     if (this.subagents !== undefined) {
-      return this.subagents.start({
+      return this.subagents.start(omitUndefined({
         input: plan.input,
         record: plan.record,
-        ...(inputId === undefined ? {} : { inputId }),
-        ...(plan.runBudget === undefined ? {} : { runBudget: plan.runBudget }),
-        ...(plan.shouldYield === undefined ? {} : { shouldYield: plan.shouldYield }),
-        ...(plan.signal === undefined ? {} : { signal: plan.signal }),
-        ...(plan.traceAttributes === undefined ? {} : { traceAttributes: plan.traceAttributes }),
-      }, plan.mode === "continue" ? "continue" : "submit");
+        inputId,
+        runBudget: plan.runBudget,
+        shouldYield: plan.shouldYield,
+        signal: plan.signal,
+        traceAttributes: plan.traceAttributes,
+      }), plan.mode === "continue" ? "continue" : "submit");
     }
-    if (plan.mode === "continue") return this.plainRun(await this.application.retry());
+    if (plan.mode === "continue") return this.plainRun(await this.agent.retry());
     if (plan.mode === "steer") {
-      return this.plainRun(await this.application.startSteeringInput(inputId!));
+      return this.plainRun(await this.agent.startSteeringInput(inputId!));
     }
-    return this.plainRun(await this.application.submit(options!));
+    return this.plainRun(await this.agent.submit(options!));
   }
 
   /** 没有委派的单个 Run 同样以一次请求的身份报告。 */
@@ -595,7 +579,7 @@ export class MaybeCodeApplication {
       id: run.id,
       requestId: `run-${run.id}`,
       result: run.result,
-      ...(run.traceContext === undefined ? {} : { traceContext: run.traceContext }),
+      ...omitUndefined({ traceContext: run.traceContext }),
       cancel: (reason?: string) => run.cancel(reason),
       runs: async () => [{ runId: run.id, sessionId, turn: 0, result: await run.result }],
     };
@@ -612,32 +596,32 @@ export class MaybeCodeApplication {
     return {
       sessionId: this.sessionId,
       get isRunning(): boolean {
-        return owner.application.isRunning || owner.subagents?.isRunning === true;
+        return owner.agent.isRunning || owner.subagents?.isRunning === true;
       },
-      submit: (options) => startGitGoalRequest(owner.gitRequest, owner.sessionId, () => owner.startRequestRun({
+      submit: (options) => startGitGoalRequest(owner.gitRequest, owner.sessionId, () => owner.startRequestRun(omitUndefined({
         mode: "submit",
         input: options.input,
         record: requestRecord(options.input),
-        ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
-        ...(options.shouldYield === undefined ? {} : { shouldYield: options.shouldYield }),
-        ...(options.signal === undefined ? {} : { signal: options.signal }),
-      }, { ...options, input: options.input }),
+        runBudget: options.runBudget,
+        shouldYield: options.shouldYield,
+        signal: options.signal,
+      }), { ...options, input: options.input }),
         checkpoint => owner.eventQueue.push({ type: "workspace.git.changed", checkpoint }),
-        runId => owner.application.saveBranchPosition(runId, { allowYielded: true }),
-        async runId => (await owner.application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
-        async firstRunId => requestMainRunIds(await owner.application.history(), firstRunId)),
-      continue: (options) => startGitGoalRequest(owner.gitRequest, owner.sessionId, () => owner.subagents ? owner.startRequestRun({
+        runId => owner.agent.saveBranchPosition(runId, { allowYielded: true }),
+        async runId => (await owner.agent.branchPositions()).find(position => position.runId === runId)?.positionSeq,
+        async firstRunId => requestMainRunIds(await owner.agent.history(), firstRunId)),
+      continue: (options) => startGitGoalRequest(owner.gitRequest, owner.sessionId, () => owner.subagents ? owner.startRequestRun(omitUndefined({
         mode: "continue",
         input: "",
         record: "Continue the active goal",
-        ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
-        ...(options.shouldYield === undefined ? {} : { shouldYield: options.shouldYield }),
-        ...(options.signal === undefined ? {} : { signal: options.signal }),
-      }) : owner.application.continue(options),
+        runBudget: options.runBudget,
+        shouldYield: options.shouldYield,
+        signal: options.signal,
+      })) : owner.agent.continue(options),
         checkpoint => owner.eventQueue.push({ type: "workspace.git.changed", checkpoint }),
-        runId => owner.application.saveBranchPosition(runId, { allowYielded: true }),
-        async runId => (await owner.application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
-        async firstRunId => requestMainRunIds(await owner.application.history(), firstRunId)),
+        runId => owner.agent.saveBranchPosition(runId, { allowYielded: true }),
+        async runId => (await owner.agent.branchPositions()).find(position => position.runId === runId)?.positionSeq,
+        async firstRunId => requestMainRunIds(await owner.agent.history(), firstRunId)),
     };
   }
 
@@ -678,11 +662,11 @@ export class MaybeCodeApplication {
     this.inputEpoch++;
     const request = this.subagents?.isRunning === true;
     if (request) void this.subagents?.cancel(reason ?? "Cancelled by user");
-    const pending = this.inputOperations > 0 || this.application.listSteeringInputs().some(input => input.status === "pending" || input.status === "idle");
-    this.steeringCancellation = this.application.cancelSteeringInputs(reason);
+    const pending = this.inputOperations > 0 || this.agent.listSteeringInputs().some(input => input.status === "pending" || input.status === "idle");
+    this.steeringCancellation = this.agent.cancelSteeringInputs(reason);
     this.historyMemory.cancelRequest();
     if (this.goals?.interrupt(reason)) return true;
-    return this.application.cancel(reason) || pending || request;
+    return this.agent.cancel(reason) || pending || request;
   }
 
   resolveApproval(
@@ -692,52 +676,58 @@ export class MaybeCodeApplication {
   ): Promise<boolean> {
     const subagent = this.subagents?.resolveApproval(requestId, decision);
     return subagent === undefined
-      ? this.application.resolveApproval(requestId, decision, options)
-      : subagent.then(resolved => resolved || this.application.resolveApproval(requestId, decision, options));
+      ? this.agent.resolveApproval(requestId, decision, options)
+      : subagent.then(resolved => resolved || this.agent.resolveApproval(requestId, decision, options));
   }
 
   get persistentRulesEnabled(): boolean { return this.permissionScopeId !== undefined; }
   async listPermissionRules(scopeId?: string) {
     if (this.permissionScopeId === undefined) throw new Error("持久权限规则没有启用。");
     if (scopeId !== undefined && scopeId !== this.permissionScopeId) throw new Error("权限规则范围不属于当前宿主。");
-    return this.application.listPermissionRules(this.permissionScopeId);
+    return this.agent.listPermissionRules(this.permissionScopeId);
   }
-  createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions) { return this.application.createPermissionRule(check, options); }
+  createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions) { return this.agent.createPermissionRule(check, options); }
   async createPermissionRuleFrom(id: string, options: CreatePermissionRuleOptions) {
     if (!(await this.listPermissionRules()).some(rule => rule.id === id)) throw new Error("规则不属于当前宿主。");
-    return this.application.createPermissionRuleFrom(id, options);
+    return this.agent.createPermissionRuleFrom(id, options);
   }
   async revokePermissionRule(id: string) {
     if (!(await this.listPermissionRules()).some(rule => rule.id === id)) return false;
-    return this.application.revokePermissionRule(id);
+    return this.agent.revokePermissionRule(id);
   }
 
   async history() {
-    return mediaHistory(await this.application.history());
+    return mediaHistory(await this.agent.history());
   }
 
-  listRecoveries() { return this.application.listRecoveries(); }
-  get skills() { return this.application.skills; }
+  listRecoveries() { return this.agent.listRecoveries(); }
+  listSkills(): readonly MaybeCodeSkillInfo[] {
+    const skills = this.agent.skills;
+    const active = new Map(skills?.listActive().map((item) => [item.name, item]));
+    const all = new Map(skills?.registry.list().map((item) => [item.name, item]));
+    for (const [name, item] of active) all.set(name, item);
+    return [...all.values()].map((item) => ({ ...item, active: active.has(item.name) }));
+  }
   activateSkill(name: string) {
     if (this.isRunning) throw new Error("Cannot activate a skill while an operation is active");
-    return this.application.activateSkill(name);
+    return this.agent.activateSkill(name);
   }
   resolveRecovery(id: string, finding: string) {
     if (this.isRunning) throw new Error("Cannot resolve recovery while an operation is active");
-    return this.application.resolveRecovery(id, finding);
+    return this.agent.resolveRecovery(id, finding);
   }
 
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage> {
-    return this.application.queryHistory(query);
+    return this.agent.queryHistory(query);
   }
 
   branchPositions() {
-    return this.application.branchPositions();
+    return this.agent.branchPositions();
   }
 
   inspectContext(): Promise<ContextInspection | undefined> {
     if (this.modelUpdateFailure !== undefined) throw new Error("Model update failed; retry the model update before continuing", { cause: this.modelUpdateFailure });
-    return this.application.inspectContext();
+    return this.agent.inspectContext();
   }
 
   compactContext(
@@ -747,7 +737,7 @@ export class MaybeCodeApplication {
       throw new Error("Cannot compact context while a request or goal is active");
     }
     if (this.modelUpdateFailure !== undefined) throw new Error("Model update failed; retry the model update before continuing", { cause: this.modelUpdateFailure });
-    const result = this.application.compactContext(
+    const result = this.agent.compactContext(
       this.resolveCompactionStrategy(selection),
     );
     this.compaction = result;
@@ -765,7 +755,7 @@ export class MaybeCodeApplication {
     try {
       if (this.modelUpdate) await Promise.allSettled([this.modelUpdate]);
       await this.steeringCancellation;
-      await this.application.close();
+      await this.agent.close();
       await this.inputTail;
       await this.eventRelay;
       await this.subagentRelay;
@@ -776,7 +766,7 @@ export class MaybeCodeApplication {
   }
 
   private async relaySubagentEvents(
-    events: AsyncIterable<import("./delegation.js").MaybeCodeDelegationEvent>,
+    events: AsyncIterable<import("@sortedyuan/coordination/delegation/types").MaybeCodeDelegationEvent>,
   ): Promise<void> {
     for await (const event of events) this.eventQueue.push(event);
   }

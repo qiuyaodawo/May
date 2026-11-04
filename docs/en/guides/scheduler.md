@@ -213,7 +213,7 @@ Tests use real SQLite, real host task receipts, actual artifact handlers and chi
 process interruption. `test:live` records an exact start timestamp and schedules
 one task at that timestamp plus 60,000 ms. It reports planned and observed times,
 delay, execution identity, task identity and the resulting artifact. Output lives
-under the ignored `scheduler-verification/` directory. This offline task-host
+under the ignored `.test-output/scheduler/` directory. This offline task-host
 check validates scheduling and acceptance independently of model or news access.
 
 `test:integration:scheduler` uses the host's configured default model and makes

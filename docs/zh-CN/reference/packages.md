@@ -43,17 +43,17 @@ Providers、Gateway、外部集成与 UI 使用各自的包。发布清单包含
 
 ### `@sortedyuan/may/storage`
 
-独立的本地文件协调接口导出 `withFileAccess`、`acquireFileLock`、`recoverFileLock`、
-`releaseFileLock`、`replaceJournalFile` 和 `syncDirectory`。Session、配置、媒体、
-MCP 凭据与投递存储共同使用这个模块。Session 文件子路径保留兼容导出，并共享
-文件锁状态。参阅[协调本地文件访问](../guides/custom-storage.md#协调本地文件访问)。
+独立的本地文件协调接口导出 `withFileAccess`、`acquireFileLock`、`acquireFileLockSync`、
+`writeFileDurable`、`replaceJournalFile`、`syncDirectory` 和 `hasErrorCode`。Session、配置、
+媒体、MCP 凭据与投递存储共同使用这个模块。参阅[协调本地文件访问](../guides/custom-storage.md#协调本地文件访问)。
 
 ### `@sortedyuan/may/core`
 
 与 provider 无关的执行内核，导出 `May`、`Model`、`Tool`、`Context`、
 `ToolExecutor`、`ToolScheduler` 和 `InMemoryContext`。它执行模型与工具 Step、
 传递流式事件、调度工具并传播取消信号。存储、provider 选择、应用配置、权限策略
-和 UI 由宿主应用提供。
+和 UI 由宿主应用提供。它还导出依次执行异步状态修改的 `AsyncStateSerializer`，以及复制对象并
+去掉值为 `undefined` 的字段、同时把这些字段的类型改为可选字段的 `omitUndefined()`。
 
 `ToolRegistry` 实现 `Iterable<Tool>`，提供 `register()`、原子 `registerAll()`、
 `has()`、`get()`、`require()`、`size`、`names()`、`values()`、`definitions()`、
@@ -73,8 +73,7 @@ Core 之上的 headless 编排层，导出：
 - `AgentDefinition` 和 `defineAgent()`：定义可复用行为与策略；
 - `AgentApplication`：管理一个活动的持久化 Session；
 - `AgentWorkspace`：管理活动 Session 选择和 Catalog 更新；
-- `AgentController` 和 `AgentWorkspaceController`：提供与 UI 无关的控制接口；
-- `AsyncStateSerializer`：串行执行应用与 Session 状态迁移。
+- `AgentController` 和 `AgentWorkspaceController`：提供与 UI 无关的控制接口。
 
 Definition 创建时保存工具 iterable 成员快照。每次 `open({ store, ... })` 创建
 独立的 application/Session 生命周期，宿主提供存储、身份和 metadata。Definition

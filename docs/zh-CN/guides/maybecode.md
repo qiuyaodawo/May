@@ -53,7 +53,7 @@ pnpm maybecode
 使用者协调文件访问。如果其他进程已经创建该文件，向导终止保存并保留已有文件。
 存储位置需要支持 hard link，以便发布完整文件。后续应用启动失败时保留已保存的配置。
 
-retained、classic 和 Web 模式共用终端向导。Web 模式在进入向导前检查
+retained 和 Web 模式共用终端向导。Web 模式在进入向导前检查
 `MAYBECODE_CONTROL_TOKEN`。工作目录、会话恢复、权限和端口参数继续交给正常启动流程。
 非交互环境缺少配置时，应用输出操作说明并以退出码 1 结束。
 help、MCP 和 team 命令保持各自的启动行为。
@@ -64,7 +64,7 @@ CLI 按需加载选中的命令和界面。图片需要处理时加载图片编�
 尚未建立 Git 版本的工作区显示“Git 尚未准备”。
 
 每次启动默认创建新的 Session。正常退出时，MaybeCode 删除本次运行创建且没有提交消息、
-排队消息或 Run 的 Session；重新启动后，这些 Session 不再出现在 `/resume` 中。
+排队消息、Run 或 goal 的 Session；重新启动后，这些 Session 不再出现在 `/resume` 中。
 输入框中尚未提交的内容不会保留 Session。恢复的 Session 和通过 `/fork` 创建的 Session
 会继续保留。
 
@@ -114,8 +114,8 @@ pnpm maybecode
 空闲时启动 Run；完成或宿主让出执行权后仍待交付的输入，在当前操作结束后执行。
 
 `/stop` 和 Web 取消按钮取消活动工作与待交付输入。终端没有选择文字时，`Ctrl+C`
-执行相同操作。已取消的补充输入保留在历史中，需要重新提交才会执行。classic TUI、
-retained TUI 和 WebUI 均支持这些操作。
+执行相同操作。已取消的补充输入保留在历史中，需要重新提交才会执行。retained TUI
+和 WebUI 均支持这些操作。
 
 ## 查看 MaybeCode 对话
 

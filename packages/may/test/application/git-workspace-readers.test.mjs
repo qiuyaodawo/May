@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { join, resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { simpleGit } from "simple-git";
@@ -10,10 +10,7 @@ import { GitWorkspaceConflictError, ProjectGitWorkspace } from "@sortedyuan/may/
 test("read-only Git status remains available during a blocked real commit Hook", {
   skip: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1", timeout: 20_000,
 }, async t => {
-  const artifacts = resolve(fileURLToPath(new URL("../../../../review/git-workspace-tests/", import.meta.url)));
-  await mkdir(artifacts, { recursive: true });
-  const root = await mkdtemp(join(artifacts, "readers-"));
-  t.after(async () => { assert.ok(resolve(root).startsWith(`${artifacts}\\`) || resolve(root).startsWith(`${artifacts}/`)); await rm(root, { recursive: true, force: true }); });
+  const root = await createTestDirectory(t, "may/git-workspace-readers");
   const workspace = join(root, "project");
   await mkdir(workspace);
   const git = simpleGit({ baseDir: workspace });

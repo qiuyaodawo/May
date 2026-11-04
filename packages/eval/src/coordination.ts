@@ -1,5 +1,5 @@
 import type { CoordinationRuntime, CoordinationSnapshot } from "@sortedyuan/coordination";
-import type { Tracer } from "@sortedyuan/may/core";
+import { omitUndefined, type Tracer } from "@sortedyuan/may/core";
 import type { EvalExecutionAdapter, EvalExecutionResult, ExecutionCreateContext } from "./types.js";
 import { type EvalApprovalHandler, errorCode, waitWithSignal } from "./application.js";
 import { EvalTelemetryCollector, evalIdentities, evalMetrics } from "./telemetry.js";
@@ -108,9 +108,9 @@ export function createCoordinationExecutionAdapter(options: CoordinationExecutio
               sessionId: task.sessionId, parentTaskId: task.parentTaskId })) }) });
         const outputTask = options.outputTaskId === undefined ? undefined : snapshot.tasks.find(task => task.id === options.outputTaskId);
         return { status, terminationConfirmed, identities, metrics: evalMetrics(telemetry.metrics()), evidence: [evidence],
-          ...(reason === undefined ? {} : { reason }),
+          ...omitUndefined({ reason }),
           output: outputTask === undefined
-            ? { tasks: snapshot.tasks.map(task => ({ id: task.id, status: task.status, ...(task.output === undefined ? {} : { text: task.output.text }) })) }
+            ? { tasks: snapshot.tasks.map(task => omitUndefined({ id: task.id, status: task.status, text: task.output?.text })) }
             : outputTask.output === undefined ? null : { text: outputTask.output.text },
         };
       };

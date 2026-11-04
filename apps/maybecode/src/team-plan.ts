@@ -1,6 +1,6 @@
 import { open } from "node:fs/promises";
 import type { CoordinationLimits, TaskSpec } from "@sortedyuan/coordination";
-import { resolveRunBudget, type RunBudget } from "@sortedyuan/may/core";
+import { omitUndefined, resolveRunBudget, type RunBudget } from "@sortedyuan/may/core";
 import { MaybeCodeUsageError } from "./errors.js";
 import { parseTeamChecks, type TeamCheckSpec } from "./team-verification.js";
 
@@ -61,9 +61,8 @@ export function parseTeamPlan(value: unknown, options: { readonly mode?: TeamMod
     delegateTo.forEach((target) => identifier(target, `role ${id}.delegateTo`));
     if (role.messaging !== undefined && typeof role.messaging !== "boolean") fail(`role ${id}.messaging must be boolean`);
     const runBudget = role.runBudget === undefined ? undefined : budget(role.runBudget, `role ${id}.runBudget`);
-    roles[id] = { ...(model === undefined ? {} : { model }), ...(instructions === undefined ? {} : { instructions }),
-      tools: tools as TeamToolName[], delegateTo, messaging: role.messaging ?? false,
-      ...(runBudget === undefined ? {} : { runBudget }) };
+    roles[id] = omitUndefined({ model, instructions,
+      tools: tools as TeamToolName[], delegateTo, messaging: role.messaging ?? false, runBudget });
   }
   for (const [id, role] of Object.entries(roles)) {
     for (const target of role.delegateTo) if (!Object.hasOwn(roles, target)) fail(`Unknown delegated role ${target} in role ${id}`);
@@ -87,8 +86,7 @@ export function parseTeamPlan(value: unknown, options: { readonly mode?: TeamMod
   try { checks = plan.checks === undefined ? [] : parseTeamChecks(plan.checks); }
   catch (error) { fail(`plan.checks: ${error instanceof Error ? error.message : "Invalid checks"}`); }
   for (const check of checks) if (!tasks.some((task) => task.id === check.taskId)) fail(`Check ${check.id} references unknown task ${check.taskId}`);
-  const result: TeamPlan = { format: 1, ...(name === undefined ? {} : { name }), roles, tasks, resultTaskId,
-    ...(limits === undefined ? {} : { limits }), checks };
+  const result: TeamPlan = omitUndefined({ format: 1, name, roles, tasks, resultTaskId, limits, checks });
   if (Buffer.byteLength(JSON.stringify(result), "utf8") > MAX_PLAN_BYTES) fail("Team plan exceeds 1 MiB");
   return freeze(result);
 }
@@ -118,10 +116,10 @@ export function createTeamPreset(preset: TeamPreset, prompt: string, options: { 
   if (!["supervisor", "pipeline", "parallel"].includes(preset)) fail(`Unknown team preset: ${preset}`);
   text(prompt, "team prompt", 32_768);
   const coding = options.mode === "coding";
-  const worker = { ...(options.model === undefined ? {} : { model: options.model }), tools: coding ? [...READ_TOOLS, "write", "edit"] : READ_TOOLS,
+  const worker = { ...omitUndefined({ model: options.model }), tools: coding ? [...READ_TOOLS, "write", "edit"] : READ_TOOLS,
     instructions: coding ? "Implement a bounded change in your own workspace copy. Run only configured checks. Submit evidence and a report; never claim source changes have been applied."
       : "Investigate independently using workspace evidence. Do not change files or claim unperformed tests. Submit findings, evidence, and limitations." };
-  const final = { ...(options.model === undefined ? {} : { model: options.model }), tools: READ_TOOLS,
+  const final = { ...omitUndefined({ model: options.model }), tools: READ_TOOLS,
     delegateTo: preset === "supervisor" ? ["worker"] : [],
     instructions: "Synthesize the dependency reports, identify each task's contribution, and distinguish verified evidence from unverified claims. Dependency workspaces are not automatically merged. Do not wait for unsolicited messages." };
   const restriction = coding ? "Work only in your isolated copy; source application requires later human confirmation." : "Do not change files.";

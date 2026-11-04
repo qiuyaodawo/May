@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { imageSource } from "../../../packages/media/test/fixture.mjs";
 import { readEmbeddedImage } from "@sortedyuan/media";
-import { channelAttachmentContent, readChannelContent, channelTextPages, channelEntry } from "../dist/gateway-host.js";
+import { channelTextPages } from "@sortedyuan/gateway/delivery";
+import { channelAttachmentContent, readChannelContent, channelEntry } from "../dist/gateway-host.js";
 import { createMayAdapter } from "../dist/gateway-adapters.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { TelegramAdapter } from "../dist/channels.js";
@@ -13,7 +15,8 @@ import { TelegramAdapter } from "../dist/channels.js";
 test("视频输入需要独立的Agent媒体能力配置", async () => {
   const config = media => ({ apps: { maybeclaw: { version: 2, agents: [{ id: "media", adapter: "may", media }] } } });
   const settings = gatewaySettings(config(["image", "audio", "file", "video"]));
-  const agent = createMayAdapter({ directory: ".zcode/tmp/gateway-channel-media", configPath: ".zcode/tmp/gateway-channel-media/config.json", agent: settings.agents[0] });
+  const mediaDirectory = join(testOutputRoot, "maybeclaw", "channel-media");
+  const agent = createMayAdapter({ directory: mediaDirectory, configPath: join(mediaDirectory, "config.json"), agent: settings.agents[0] });
   assert.deepEqual(agent.capabilities.media, ["image", "audio", "file", "video"]);
   assert.throws(() => gatewaySettings(config(["video", "video"])), /media/);
   assert.throws(() => gatewaySettings(config(["unknown"])), /media/);
@@ -21,13 +24,11 @@ test("视频输入需要独立的Agent媒体能力配置", async () => {
   const attachment = { id: "video_1", kind: "video", mediaType: "video/mp4", source: { platform: "telegram", fileId: "video_1" } };
   await assert.rejects(readChannelContent(adapter, { account: adapter.account, sender: "7", conversation: "7", text: "检查视频", eventId: "video", attachments: [attachment] },
     [{ ...agent.capabilities, media: ["file"] }], new AbortController().signal), /不支持 video/);
-  const schema = JSON.parse(await readFile(new URL("../../../packages/may/may-config.schema.json", import.meta.url), "utf8"));
-  assert.deepEqual(schema.$defs.maybeclawAgent.properties.media.items.enum, ["image", "audio", "file", "video"]);
   await agent.close();
 });
 
 test("文件附件的实际字节和名称进入UserMessage媒体内容", async t => {
-  const base = fileURLToPath(new URL("../../../.zcode/tmp/gateway-channel-media/", import.meta.url));
+  const base = join(testOutputRoot, "maybeclaw", "channel-media");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "input-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

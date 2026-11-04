@@ -228,7 +228,7 @@ test("拒绝实际自定义发现接口返回的非法metadata", async (t) => {
   const service = await startService(t);
   service.state.capabilityFields = { "input.text": { status: "known", source: "provider", value: "invalid-boolean" } };
   const resolver = createModelCapabilityResolver({ discoveries: [{ name: "local-metadata", async discoverCapabilities(selected) { return (await fetch(`${selected.providerConfig.baseURL}/capabilities`)).json(); } }] });
-  await assert.rejects(resolver.resolve(selection(service.baseURL)), /must be a boolean/);
+  await assert.rejects(resolver.resolve(selection(service.baseURL)), /fields\.input\.text must be boolean/);
   service.state.capabilityFields = { "input.text": { status: "known", source: "provider", value: true } };
   const capabilities = await resolver.resolve(selection(service.baseURL), { fields: ["input.text"], refresh: true });
   assert.equal(capabilities.fields["input.text"].source, "provider");
@@ -261,6 +261,6 @@ test("校验能力配置并保留reasoning覆盖配置的兼容性", () => {
   const config = parseMayConfig({ providers: { local: { adapter: "openai-chat-completions", capabilities: { fields: { "input.audio": false } } } }, models: { local: { provider: "local", model: "local-echo", capabilities: { reasoning: { efforts: ["low", "high"], defaultEffort: "low" }, fields: { "input.image.sources": ["base64"], maxImages: 4 } } } } });
   assert.equal(config.providers.local.capabilities.fields["input.audio"], false);
   assert.deepEqual(config.models.local.capabilities.reasoning.efforts, ["low", "high"]);
-  assert.throws(() => parseMayConfig({ providers: { local: { adapter: "custom", capabilities: { fields: { maxImages: 0 } } } } }), /positive safe integer/);
-  assert.throws(() => parseMayConfig({ providers: { local: { adapter: "custom", capabilities: { fields: { "input.image.sources": ["disk"] } } } } }), /sources must be/);
+  assert.throws(() => parseMayConfig({ providers: { local: { adapter: "custom", capabilities: { fields: { maxImages: 0 } } } } }), /fields\.maxImages must be >= 1/);
+  assert.throws(() => parseMayConfig({ providers: { local: { adapter: "custom", capabilities: { fields: { "input.image.sources": ["disk"] } } } } }), /fields\.input\.image\.sources\.0 must be equal to one of the allowed values/);
 });

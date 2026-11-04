@@ -5,6 +5,7 @@ import { resolve, join, relative, isAbsolute, dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Ajv } from "ajv";
 import { validateUsageCost } from "@sortedyuan/may/core";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 import type { EvalStore, EvalPlan, TrialState, EvalExecutionEvent, EvidenceReference, EvalTrial, EvalFingerprints } from "./types.js";
 import { assertJson, validateIdentifier } from "./validation.js";
 
@@ -22,7 +23,7 @@ export class FileEvalStore implements EvalStore {
     await mkdir(directory, { recursive: true });
     await this.checkDirectory(directory);
     const path = join(directory, "writer-lock.sqlite");
-    try { const metadata = await lstat(path); if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Writer ownership requires a regular SQLite file"); } catch (error) { if (!hasCode(error, "ENOENT")) throw error; }
+    try { const metadata = await lstat(path); if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Writer ownership requires a regular SQLite file"); } catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; }
     const ownership = new DatabaseSync(path, { timeout: 0 });
     try { ownership.exec("BEGIN EXCLUSIVE"); } catch (error) { ownership.close(); throw new Error("Experiment already has an active writer or invalid ownership database", { cause: error }); }
     this.owned.set(experimentId, ownership);
@@ -75,7 +76,7 @@ export class FileEvalStore implements EvalStore {
       if (value.trial.id !== trialId || value.trial.experimentId !== experimentId) throw new TypeError("Mismatched trial state identity");
       validateUsageCost(value.metrics.cost); validateUsageCost(value.graderMetrics.cost);
       return value;
-    } catch (error) { if (hasCode(error, "ENOENT")) return undefined; throw error; }
+    } catch (error) { if (hasErrorCode(error, "ENOENT")) return undefined; throw error; }
   }
   async listTrials(experimentId: string): Promise<readonly TrialState[]> {
     const plan = await this.readPlan(experimentId);
@@ -97,9 +98,9 @@ export class FileEvalStore implements EvalStore {
     const path = join(directory, `${trialId}.jsonl`); const key = `${experimentId}:${trialId}`;
     let accumulated = this.eventCounts.get(key);
     if (accumulated === undefined) {
-      let existingBytes = 0; try { existingBytes = (await stat(path)).size; } catch (error) { if (!hasCode(error, "ENOENT")) throw error; }
+      let existingBytes = 0; try { existingBytes = (await stat(path)).size; } catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; }
       let existingCount = 0; let reservedBytes = existingBytes;
-      try { const metadata = await this.readJson(`${path}.meta.json`) as { count: number; bytes: number }; if (!Number.isSafeInteger(metadata.count) || metadata.count < 0 || !Number.isSafeInteger(metadata.bytes) || metadata.bytes < 0 || metadata.bytes < existingBytes) throw new Error("Telemetry metadata is inconsistent"); existingCount = metadata.count; reservedBytes = metadata.bytes; } catch (error) { if (!hasCode(error, "ENOENT")) throw error; if (existingBytes > 0) throw new Error("Telemetry metadata is unavailable"); }
+      try { const metadata = await this.readJson(`${path}.meta.json`) as { count: number; bytes: number }; if (!Number.isSafeInteger(metadata.count) || metadata.count < 0 || !Number.isSafeInteger(metadata.bytes) || metadata.bytes < 0 || metadata.bytes < existingBytes) throw new Error("Telemetry metadata is inconsistent"); existingCount = metadata.count; reservedBytes = metadata.bytes; } catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; if (existingBytes > 0) throw new Error("Telemetry metadata is unavailable"); }
       accumulated = { count: existingCount, bytes: reservedBytes }; this.eventCounts.set(key, accumulated);
     }
     if (accumulated.count >= 20_000 || accumulated.bytes + bytes > 16_777_216) throw new RangeError("Trial telemetry exceeds 20,000 appended events or 16 MiB");
@@ -157,7 +158,7 @@ export class FileEvalStore implements EvalStore {
     try {
       const metadata = lstatSync(lockPath);
       if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Record access requires a regular SQLite file");
-    } catch (error) { if (!hasCode(error, "ENOENT")) throw error; }
+    } catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; }
     const lock = new DatabaseSync(lockPath, { timeout: 5_000 });
     try {
       lock.exec("BEGIN IMMEDIATE");
@@ -174,7 +175,6 @@ export class FileEvalStore implements EvalStore {
     try { this.withRecordAccess(path, () => renameSync(temporary, path)); } catch (error) { await unlink(temporary); throw error; }
   }
 }
-function hasCode(value: unknown, code: string): boolean { return typeof value === "object" && value !== null && "code" in value && value.code === code; }
 
 const textSchema = { type: "string", minLength: 1 };
 const phaseSchema = { enum: ["prepare", "execute", "freeze", "evaluate", "cleanup"] };

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -10,7 +11,7 @@ const repository = fileURLToPath(new URL("../../../", import.meta.url));
 const bin = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
 const suite = fileURLToPath(new URL("../examples/suite.mjs", import.meta.url));
 const fixtures = fileURLToPath(new URL("./fixtures/", import.meta.url));
-const verificationRoot = resolve(repository, "eval-verification");
+const verificationRoot = join(testOutputRoot, "eval-cli");
 const workspaceRoot = join(verificationRoot, `cli-workspaces-${randomUUID()}`);
 
 after(async () => {

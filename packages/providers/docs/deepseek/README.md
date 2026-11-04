@@ -17,7 +17,10 @@ const may = new May({
 ```
 
 The adapter uses DeepSeek's streaming Chat Completions endpoint and preserves
-`reasoning_content` across tool-call turns.
+`reasoning_content` across tool-call turns. It is built on
+`OpenAICompatibleChatModel` and reports failures with the shared
+[OpenAI-compatible errors](../openai-compatible/README.md) whose `provider` is
+`"DeepSeek"`.
 
 ## Live integration test
 

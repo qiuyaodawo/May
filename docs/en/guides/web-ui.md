@@ -333,7 +333,7 @@ pnpm --filter @sortedyuan/web-ui test:browser
 ```
 
 These checks include resource paging/search, additions/deletions/renames, retained
-page state and expired cursors. Browser work stays under ignored `review/`.
+page state and expired cursors. Browser work stays under ignored `.test-output/web-ui/`.
 Checks that require configured providers have separate prerequisites:
 
 | Check | Required flags and command |
@@ -344,7 +344,8 @@ Checks that require configured providers have separate prerequisites:
 
 The file-version check initializes the configured Model and checks Git and the
 page. Tests that submit messages use configured credentials and consume provider
-quota. Workspace checks require the configured `deepseek-v4-flash` profile. The commit flag
+quota. Workspace checks use the profile named by `MAY_LIVE_MODEL`, or
+`defaultModel` when the variable is unset. The commit flag
 authorizes commits only in the test's isolated repository/worktrees. Tests skip
 without their required flags. Report actual execution, layout, external delivery
 and recovery checks separately; a passing local test does not establish all of them.

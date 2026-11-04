@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdir, mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { join, resolve, sep } from "node:path";
+import { writeFile, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { SharedWorkspaceFileGuard, createWorkspaceFilesPlugin, workspaceFilesService } from "../../dist/delegation/index.js";
+import { validateTaskFiles } from "../../dist/index.js";
 import { PluginHost } from "@sortedyuan/may/plugin";
 import { services, ToolSources } from "@sortedyuan/may/services";
 
@@ -21,10 +22,7 @@ test("workspace files plugin creates real tools and removes its catalog contribu
 });
 
 test("actual file changes require a task read and reject changes after another writer", async (t) => {
-  const base = fileURLToPath(new URL("../../../../plugin-verification/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "delegation-files-"));
-  t.after(async () => { assert.ok(resolve(directory).startsWith(resolve(base) + sep)); await rm(directory, { recursive: true, force: true }); });
+  const directory = await createTestDirectory(t, "coordination/delegation-files");
   await writeFile(join(directory, "notes.txt"), "Existing notes.");
   const guard = new SharedWorkspaceFileGuard(directory).create({ names: ["read", "write"], requireRead: true, files: ["notes.txt"] });
   const read = guard.tools.find(tool => tool.name === "read");
@@ -38,4 +36,17 @@ test("actual file changes require a task read and reject changes after another w
   await write.execute(write.parse({ path: "notes.txt", content: "Changed notes." }), context);
   assert.equal(await readFile(join(directory, "notes.txt"), "utf8"), "Changed notes.");
   assert.deepEqual(guard.changedFiles(), ["notes.txt"]);
+});
+
+test("an empty files list is accepted and allows reads without modifications", async (t) => {
+  const directory = await createTestDirectory(t, "coordination/delegation-files");
+  await writeFile(join(directory, "notes.txt"), "Existing notes.");
+  validateTaskFiles([]);
+  const guard = new SharedWorkspaceFileGuard(directory).create({ names: ["read", "write"], requireRead: true, files: [] });
+  const read = guard.tools.find(tool => tool.name === "read");
+  const write = guard.tools.find(tool => tool.name === "write");
+  const context = { runId: "files", step: 1, toolCallId: "read", idempotencyKey: "files-read", signal: new AbortController().signal, report() {} };
+  await read.execute(read.parse({ path: "notes.txt" }), context);
+  await assert.rejects(write.execute(write.parse({ path: "notes.txt", content: "Changed notes." }), context), /may not modify files/u);
+  assert.equal(await readFile(join(directory, "notes.txt"), "utf8"), "Existing notes.");
 });

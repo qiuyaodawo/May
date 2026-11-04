@@ -16,7 +16,6 @@
     "./session/tools": { "types": "./dist/session/tools.d.ts", "import": "./dist/session/tools.js" },
     "./session/catalog": { "types": "./dist/session/catalog.d.ts", "import": "./dist/session/catalog.js" },
     "./session/file-store": { "types": "./dist/session/file-store.d.ts", "import": "./dist/session/file-store.js" },
-    "./session/file-access": { "types": "./dist/session/file-access.d.ts", "import": "./dist/session/file-access.js" },
     "./storage": { "types": "./dist/storage/index.d.ts", "import": "./dist/storage/index.js" },
     "./permissions": { "types": "./dist/permissions/index.d.ts", "import": "./dist/permissions/index.js" },
     "./permissions/file-store": { "types": "./dist/permissions/file-store.d.ts", "import": "./dist/permissions/file-store.js" },
@@ -51,9 +50,10 @@
     "json-canonicalize": "^3.0.1",
     "semver": "^7.7.2",
     "simple-git": "^4.0.2",
+    "write-file-atomic": "7.0.1",
     "yaml": "^2.9.0"
   },
-  "devDependencies": { "@types/node": "^22.0.0", "@types/semver": "^7.7.0" },
+  "devDependencies": { "@sortedyuan/test-support": "workspace:*", "@types/node": "^22.0.0", "@types/semver": "^7.7.0", "@types/write-file-atomic": "4.0.3" },
   "engines": { "node": ">=22.16.0" },
   "license": "MIT"
 }

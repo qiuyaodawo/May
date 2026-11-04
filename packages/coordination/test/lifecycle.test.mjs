@@ -23,7 +23,7 @@ test("explicit attempts keep failed Sessions, fresh input identity and lifetime 
         assert.equal(request.messages[0].content.find((part) => part.type === "json").value.retry.attempt, 1);
       }
       yield { type: "response.completed", message: answer("done") };
-    } } });
+    } }, requestRecording: "off" });
   } });
   const options = { id: "attempts", store, policy, agents: { worker } };
   const runtime = await CoordinationRuntime.create({ ...options, tasks: [task("a"), task("b", ["a"])], limits: { maxAttempts: 2 } });

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { executeRecordedRequest, requestEndpoint } from "@sortedyuan/may/core";
+import { executeRecordedRequest, omitUndefined, requestEndpoint } from "@sortedyuan/may/core";
 import { assertModelResponseFormat, validateStructuredModelResponse, type AssistantMessage, type Model, type ModelEvent, type ModelRequest, type ModelStreamOptions, type ToolCall } from "@sortedyuan/may/core";
 import { parseRetryAfterMs, readSseData } from "../openai-compatible/http.js";
 import { convertGeminiUsage, isRecord, toGeminiRequestParts } from "./convert.js";
@@ -46,11 +46,11 @@ export class GeminiModel implements Model {
     const config: NonNullable<GeminiGenerateContentRequest["generationConfig"]> = {};
     if (this.options.maxOutputTokens !== undefined) config.maxOutputTokens = this.options.maxOutputTokens;
     if (this.options.reasoningEffort !== undefined || this.options.thinkingBudget !== undefined || this.options.includeThoughts !== undefined) {
-      config.thinkingConfig = {
-        ...(this.options.reasoningEffort === undefined ? {} : { thinkingLevel: this.options.reasoningEffort }),
-        ...(this.options.thinkingBudget === undefined ? {} : { thinkingBudget: this.options.thinkingBudget }),
-        ...(this.options.includeThoughts === undefined ? {} : { includeThoughts: this.options.includeThoughts }),
-      };
+      config.thinkingConfig = omitUndefined({
+        thinkingLevel: this.options.reasoningEffort,
+        thinkingBudget: this.options.thinkingBudget,
+        includeThoughts: this.options.includeThoughts,
+      });
     }
     if (request.responseFormat !== undefined) {
       config.responseMimeType = "application/json";

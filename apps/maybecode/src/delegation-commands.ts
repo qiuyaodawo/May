@@ -3,7 +3,7 @@ import type {
   MaybeCodeDelegationRequest,
   MaybeCodeDelegationState,
   MaybeCodeDelegationTask,
-} from "./delegation.js";
+} from "@sortedyuan/coordination/delegation/types";
 
 export const DELEGATION_COMMAND_USAGE =
   "/delegations [show|notifications <on|off|status>|tools <task-id>|resolve <task-id> <failed|cancelled> <finding>]";
@@ -30,10 +30,7 @@ export async function formatDelegationToolRecords(
   controller: MaybeCodeController,
   taskId: string,
 ): Promise<string> {
-  if (controller.delegationToolRecords === undefined) {
-    throw new Error("Sub-agents are disabled in this workspace");
-  }
-  const records = await controller.delegationToolRecords(taskId);
+  const records = await controller.application.delegationToolRecords(taskId);
   if (records.records.length === 0) {
     return `Task ${taskId} (${records.sessionId}) has no finished tool records.`;
   }
@@ -65,13 +62,14 @@ export async function executeDelegationCommand(
     }
     return `Delegation notifications: ${controller.delegationNotifications === true ? "on" : "off"}`;
   }
-  if (controller.listDelegationRequests === undefined) {
+  const application = controller.application;
+  if (application.subagents === undefined) {
     return "Sub-agents are disabled in this workspace.";
   }
-  const requests = controller.listDelegationRequests();
+  const requests = application.listDelegationRequests();
   const verb = arguments_[0];
   if (arguments_.length === 0 || verb === "show") {
-    return formatDelegationRequests(requests, controller.getDelegationState?.());
+    return formatDelegationRequests(requests, application.getDelegationState());
   }
   if (verb === "tools") {
     if (arguments_.length !== 2) throw new Error(DELEGATION_COMMAND_USAGE);

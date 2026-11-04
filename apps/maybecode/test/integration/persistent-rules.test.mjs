@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { selectLiveModelProfile, testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { userInfo } from "node:os";
@@ -12,9 +13,8 @@ test("real provider reuses persistent write permission after closing and reopeni
   skip: process.env.MAYBECODE_PERSISTENT_RULES_LIVE !== "1", timeout: 120_000,
 }, async t => {
   const config = await loadMayConfig();
-  const profile = process.env.MAYBECODE_PERSISTENT_RULES_MODEL ?? config.defaultModel;
-  assert.ok(profile && Object.hasOwn(config.models, profile), "A configured profile is required");
-  const base = fileURLToPath(new URL("../../../../review/persistent-rules/", import.meta.url));
+  const profile = selectLiveModelProfile(config);
+  const base = join(testOutputRoot, "maybecode", "persistent-rules-live");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "live-"));
   const workspace = join(directory, "project"), dataDirectory = join(directory, "data");
@@ -23,7 +23,7 @@ test("real provider reuses persistent write permission after closing and reopeni
   const contextFactory = { create(options) { const managed = actualFactory.create(options); contexts.push(managed.context); return managed; } };
   const options = { git: false, workspace, dataDirectory, autoResume: false, persistentRules: true, permissionMode: "default", model: profile,
     mcp: false, observability: false, skills: false, goals: false, subagents: false, plugins: [], retry: false,
-    autoCompactionStrategies: [], providerNativeAutoCompaction: false, contextFactory,
+    autoCompactionStrategies: [], contextFactory,
     maxSteps: 3, runBudget: { maxDurationMs: 45_000, maxModelCalls: 3, maxToolCalls: 2 },
     instructions: "Perform precisely the user's requested write with the write tool. Do not use any other tool. After the write succeeds, provide the requested short acknowledgement.",
   };

@@ -1,5 +1,6 @@
 import { resolve, join } from "node:path";
 import { loadMayConfig, type MayConfig } from "@sortedyuan/may/config";
+import { omitUndefined } from "@sortedyuan/may/core";
 import { KeyringMcpCredentialStore, McpOAuthManager } from "@sortedyuan/mcp";
 import type { MaybeCodeMcpCommand } from "./args.js";
 import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeMcp } from "./configured.js";
@@ -16,7 +17,7 @@ export interface MaybeCodeMcpAuthDependencies {
 /** Authentication is available before agent/model startup, even for required endpoints. */
 export async function runMaybeCodeMcpCommand(command: MaybeCodeMcpCommand, dependencies: MaybeCodeMcpAuthDependencies): Promise<void> {
   const config = await (dependencies.loadConfig?.(command.configPath) ??
-    loadMayConfig(command.configPath === undefined ? {} : { path: command.configPath }));
+    loadMayConfig(omitUndefined({ path: command.configPath })));
   const mcp = resolveMaybeCodeMcp(config, resolve(command.workspace ?? process.cwd()));
   const server = mcp === false ? undefined : mcp.servers.find((entry) => entry.id === command.serverId);
   if (server?.transport !== "streamable-http" || server.auth === undefined) {
@@ -34,7 +35,7 @@ export async function runMaybeCodeMcpCommand(command: MaybeCodeMcpCommand, depen
         onAuthorizationUrl: dependencies.onAuthorizationUrl ?? ((url) => {
           dependencies.write(`Open this URL in your browser to authorize MCP server ${server.id}:\n${url.href}\nWaiting for authorization (Ctrl+C to cancel)...\n`);
         }),
-        ...(dependencies.signal === undefined ? {} : { signal: dependencies.signal }),
+        ...omitUndefined({ signal: dependencies.signal }),
       });
       dependencies.write(`MCP server ${server.id}: login complete. Restart an already-running workspace to reconnect.\n`);
       return;

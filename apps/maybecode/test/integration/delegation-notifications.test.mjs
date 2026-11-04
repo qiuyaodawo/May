@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,12 +11,12 @@ import { executeDelegationCommand } from "../../dist/delegation-commands.js";
 import { executeMaybeCodeSlashCommand } from "../../dist/slash-commands.js";
 
 test("配置文件、命令、Session 切换和重新打开工作区保留正确的通知设置", async t => {
-  const base = fileURLToPath(new URL("../../../../review/delegation-notifications/", import.meta.url));
+  const base = join(testOutputRoot, "maybecode", "delegation-notifications");
   await mkdir(base, { recursive: true });
   const workspace = await mkdtemp(join(base, "settings-"));
   const configPath = join(workspace, "may.json");
   const saved = await loadMayConfig();
-  const selected = resolveModelProfile(saved, process.env.MAY_TEST_MODEL);
+  const selected = resolveModelProfile(saved, liveModelProfile());
   assert.ok(selected.providerConfig.apiKey, "The configured provider must have credentials");
   const credentialVariable = "MAY_NOTIFICATION_TEST_PROVIDER_KEY";
   const previousCredential = process.env[credentialVariable];

@@ -5,7 +5,7 @@ import type {
   ToolCall,
   ToolDefinition,
 } from "@sortedyuan/may/core";
-import { UnsupportedContentError } from "@sortedyuan/may/core";
+import { UnsupportedContentError, omitUndefined } from "@sortedyuan/may/core";
 import type {
   OpenAICompatibleMessage,
   OpenAICompatibleToolCall,
@@ -108,10 +108,7 @@ function toUserContent(
       const imageUrl = imageSourceUrl(part.source);
       return [{
         type: "image_url" as const,
-        image_url: {
-          url: imageUrl,
-          ...(part.detail === undefined ? {} : { detail: part.detail }),
-        },
+        image_url: omitUndefined({ url: imageUrl, detail: part.detail }),
       }];
     }
     throw new UnsupportedContentError(

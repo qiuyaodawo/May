@@ -1,11 +1,13 @@
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
-import { InMemorySessionCatalog, MaybeCodeWorkspace, createMaybeCodeModel } from "../dist/index.js";
+import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
+import { MaybeCodeWorkspace } from "../dist/workspace.js";
+import { createMaybeCodeModel } from "../dist/model.js";
 
 export async function yoloDirectory() {
-  const base = fileURLToPath(new URL("../../../review/yolo-tests/", import.meta.url));
+  const base = join(testOutputRoot, "maybecode", "yolo");
   await mkdir(base, { recursive: true });
   return mkdtemp(join(base, "case-"));
 }

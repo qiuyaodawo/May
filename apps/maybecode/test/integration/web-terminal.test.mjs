@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { openConfiguredMaybeCode, executeMaybeCodeSlashCommand } from "../../dist/index.js";
+import { openConfiguredMaybeCode } from "../../dist/index.js";
+import { executeMaybeCodeSlashCommand } from "../../dist/slash-commands.js";
 import { MaybeCodeTerminalWeb } from "../../dist/terminal-web.js";
 
 test("真实 Provider：终端和 Web 共享会话、审批、事件与关闭行为", { skip: process.env.MAYBECODE_WEB_LIVE !== "1", timeout: 120_000 }, async t => {
-  const parent = fileURLToPath(new URL("../../../../review/web-terminal", import.meta.url));
+  const parent = join(testOutputRoot, "maybecode", "web-terminal");
   await mkdir(parent, { recursive: true });
   const directory = await mkdtemp(join(parent, "live-"));
   const workspace = join(directory, "workspace");

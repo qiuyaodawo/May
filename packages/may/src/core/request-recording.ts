@@ -1,5 +1,6 @@
 import type { Model, ModelRequest, ModelEvent } from "./model.js";
 import { RunCheckpointError } from "./errors.js";
+import { omitUndefined } from "./omit-undefined.js";
 
 export interface ModelRequestRecord {
   readonly version: 1;
@@ -49,7 +50,7 @@ export async function* executeRecordedRequest(
     await recorder?.(requestFailure(error, signal, started));
     throw error;
   }
-  await recorder?.({ type: "completed", durationMs: performance.now() - started, ...(usage === undefined ? {} : { usage }) });
+  await recorder?.(omitUndefined({ type: "completed", durationMs: performance.now() - started, usage }));
 }
 
 export async function executeRecordedOperation<T>(record: ModelRequestRecord, recorder: ModelRequestRecorder | undefined, signal: AbortSignal, execute: (body: string) => Promise<T>): Promise<T> {

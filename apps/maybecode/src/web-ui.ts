@@ -1,3 +1,4 @@
+import { omitUndefined } from "@sortedyuan/may/core";
 import { ApplicationUiHost, type ApplicationUiOptions } from "@sortedyuan/ui-client/application";
 import { UiError, createTelemetryPanel } from "@sortedyuan/ui-client";
 import type { MaybeCodeController } from "./controller.js";
@@ -10,7 +11,7 @@ export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<A
   const host = new ApplicationUiHost(app, {
     ...options,
     permissionActor: () => `local:${userInfo().username}`,
-    ...(app.persistentRulesEnabled !== false && app.listPermissionRules && app.revokePermissionRule ? { permissionRules: {
+    ...(app.application.persistentRulesEnabled && app.listPermissionRules && app.revokePermissionRule ? { permissionRules: {
       list: () => app.listPermissionRules!(), revoke: (id: string) => app.revokePermissionRule!(id),
       ...(app.createPermissionRuleFrom ? { create: (id: string, decision: "allow" | "deny") =>
         app.createPermissionRuleFrom!(id, { decision, createdBy: `local:${userInfo().username}` }) } : {}),
@@ -35,8 +36,8 @@ export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<A
     choices: async () => {
       const models = await app.listModels();
       const effort = await app.getReasoningEffort();
-      const resetEffort = models.find(model => model.name === app.modelInfo?.profile)?.reasoningEffort ?? effort.defaultEffort;
-      return [...(models.length ? [{ command: "model.switch", label: "模型配置", value: app.modelInfo?.profile ?? models[0]!.name, options: models.map(m => ({ value: m.name, label: m.name })) }] : []),
+      const resetEffort = models.find(model => model.name === app.application.modelInfo?.profile)?.reasoningEffort ?? effort.defaultEffort;
+      return [...(models.length ? [{ command: "model.switch", label: "模型配置", value: app.application.modelInfo?.profile ?? models[0]!.name, options: models.map(m => ({ value: m.name, label: m.name })) }] : []),
         ...(effort.status === "known" ? [{ command: "effort.set", label: "Reasoning effort", value: effort.overridden ? effort.effectiveEffort ?? "default" : "default", options: [{ value: "default", label: `配置默认 (${resetEffort ?? "Provider"})` }, ...effort.efforts.map(value => ({ value, label: value }))] }] : []),
         { command: "permission.set", label: "Permissions", value: app.permissionMode, options: [
           { value: "default", label: "Default" }, { value: "yolo", label: "YOLO · Auto-approve" },
@@ -44,11 +45,11 @@ export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<A
     },
     panels: async () => [
       { id: "permissions", title: "Permissions", fields: [{ label: "Mode", value: app.permissionMode === "yolo" ? "YOLO · Auto-approve" : "Default" }] },
-      { id: "model", title: "模型", fields: [{ label: "当前模型", value: app.modelInfo?.model ?? "未知" }, { label: "Provider", value: app.modelInfo?.provider ?? "未知" }] },
+      { id: "model", title: "模型", fields: [{ label: "当前模型", value: app.application.modelInfo?.model ?? "未知" }, { label: "Provider", value: app.application.modelInfo?.provider ?? "未知" }] },
       ...(app.getModelCapabilities && app.modelCapabilitiesAvailable !== false ? [{ id: "model-capabilities", title: "模型能力", fields: capabilityFields(await app.getModelCapabilities()), actions: [{ label: "刷新能力信息", command: "model.capabilities.refresh", args: {} }] }] : []),
       ...(app.getTelemetry ? [createTelemetryPanel(app.getTelemetry({ limit: 40 }))] : []),
-      { id: "subagents", title: "子 Agent", ...subagentPanel(app) },      { id: "recovery", title: "恢复", fields: [{ label: "待处理项", value: String(app.listRecoveries?.().length ?? 0) }, { label: "处理方式", value: "使用 /recovery 查看证据并记录核查结果。" }] },
-      ...(app.getGoal ? [{ id: "goal", title: "目标", fields: [{ label: "状态", value: formatGoal(app.getGoal()) }] }] : []),
+      { id: "subagents", title: "子 Agent", ...subagentPanel(app) },      { id: "recovery", title: "恢复", fields: [{ label: "待处理项", value: String(app.listRecoveries().length) }, { label: "处理方式", value: "使用 /recovery 查看证据并记录核查结果。" }] },
+      { id: "goal", title: "目标", fields: [{ label: "状态", value: formatGoal(app.application.getGoal()) }] },
       ...(options.terminal ? [{ id: "terminal", title: "终端", fields: [{ label: "共享会话", value: "MCP 交互可以在终端或当前页面处理。退出宿主会关闭 Web 服务。" }] }] : []),
     ],
     execute: command => commands.execute(command),
@@ -67,8 +68,8 @@ function capabilityFields(capabilities: import("@sortedyuan/providers").ModelCap
 
 /** 活动请求的子任务树，条目数量有界，适合面板布局。 */
 function subagentPanel(app: MaybeCodeController): { readonly fields: readonly { readonly label: string; readonly value: string }[] } {
-  const state = app.getDelegationState?.();
-  const requests = app.listDelegationRequests?.() ?? [];
+  const state = app.application.getDelegationState();
+  const requests = app.application.listDelegationRequests();
   if (state === undefined && requests.length === 0) {
     return { fields: [{ label: "状态", value: "本次会话还没有子 Agent 请求。" }] };
   }
@@ -92,7 +93,7 @@ function subagentPanel(app: MaybeCodeController): { readonly fields: readonly { 
         `${state.budget.totalTokens} tokens${state.budget.usageComplete ? "" : "（含预留值计账）"}`,
     });
   }
-  const pending = (app.listDelegationRequests?.() ?? []).flatMap((request) =>
+  const pending = requests.flatMap((request) =>
     request.tasks.filter((task) => task.status === "recovery-required").map((task) => task.id));
   fields.push({
     label: "查看与恢复",
@@ -117,7 +118,7 @@ export async function startMaybeCodeWebUI(app: MaybeCodeController, options: { t
 export async function runMaybeCodeWebUI(app: MaybeCodeController, options: { port?: number; write: (text: string) => void }): Promise<void> {
   const token = process.env.MAYBECODE_CONTROL_TOKEN ?? "";
   if (!token) { await app.close(); throw new Error("Set MAYBECODE_CONTROL_TOKEN (32..256 printable ASCII characters) before starting --ui web."); }
-  const server = await startMaybeCodeWebUI(app, { token, ...(options.port === undefined ? {} : { port: options.port }) });
+  const server = await startMaybeCodeWebUI(app, omitUndefined({ token, port: options.port }));
   options.write(`MaybeCode Web UI: ${server.url}\nEnter MAYBECODE_CONTROL_TOKEN in the connection dialog. Closing a browser tab does not stop the agent. Ctrl+C stops the host.\n`);
   const stop = () => { void server.close(); };
   process.once("SIGINT", stop); process.once("SIGTERM", stop);

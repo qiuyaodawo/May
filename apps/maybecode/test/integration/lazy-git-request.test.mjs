@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -8,14 +9,15 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
 import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
-import { MaybeCodeWorkspace } from "../../dist/index.js";
+import { MaybeCodeWorkspace } from "../../dist/workspace.js";
 
-const artifacts = fileURLToPath(new URL("../../../../review/lazy-git-live/", import.meta.url));
+const artifacts = join(testOutputRoot, "maybecode", "lazy-git-request");
 const execute = promisify(execFile);
 const live = { timeout: 240_000, skip: process.env.MAY_LIVE_GIT_REQUEST_TESTS !== "1" };
 
@@ -29,7 +31,7 @@ async function fixture(t, managed) {
   const git = async (...args) => (await execute("git", args, { cwd: workspace })).stdout.trim();
   if (managed) await git("init");
   const options = { workspace,
-    model: createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" })),
+    model: createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: liveModelProfile() })),
     store: new FileSessionStore(join(directory, "sessions")),
     catalog: new FileSessionCatalog(join(directory, "catalog.json")), skills: false,
     git: { autoCommit: !managed, dataRoot: join(directory, "records"), worktreesRoot: join(directory, "worktrees"),
@@ -113,16 +115,16 @@ test("real delegated and Goal writes use lazy request checkpoints with autoCommi
     assert.equal(existsSync(join(f.directory, "records")), false);
     await (await app.submit({ input: "Delegate one task to worker using delegate_tasks. The worker must use write to create child.txt containing exactly CHILD followed by a newline. Wait for completion and report the result. Do not create the file yourself." })).result;
     assert.equal(await readFile(join(f.workspace, "child.txt"), "utf8"), "CHILD\n");
-    assert.ok(app.listDelegationRequests().length > 0);
+    assert.ok(app.application.listDelegationRequests().length > 0);
     const manager = await ProjectGitWorkspace.open({ ...f.options.git, workspace: f.workspace });
     assert.equal((await manager.checkpoints(app.sessionId)).filter(value => value.runId).length, 1);
     await app.startGoal("Use write to create goal.txt containing exactly GOAL followed by a newline, then report completion with update_goal. Do not use shell.");
     const deadline = Date.now() + 120_000;
-    while (["active", "running"].includes(app.getGoal()?.status)) {
+    while (["active", "running"].includes(app.application.getGoal()?.status)) {
       if (Date.now() >= deadline) throw new Error("Goal did not finish before the test deadline");
       await delay(50);
     }
-    assert.equal(app.getGoal().status, "completed");
+    assert.equal(app.application.getGoal().status, "completed");
     assert.equal(await readFile(join(f.workspace, "goal.txt"), "utf8"), "GOAL\n");
     assert.equal((await manager.status()).commit, undefined);
     const lease = await manager.beginRound({ sessionId: "after-goal" });

@@ -16,11 +16,14 @@ options 包含 `timeoutMs`（默认 30000）、`signal` 和 `initialize`（默�
 `FILE_ACCESS_NOT_INITIALIZED`。超时和取消会终止获取访问锁；已经执行的 action
 保持访问权直到结束。进程终止会释放原生文件锁。
 
-`acquireFileLock(path)` 创建单个写入者的所有权文件并返回打开的 `FileHandle`。
-调用方写入所有者信息，结束后调用 `releaseFileLock(handle, path)`。已有所有权文件
-会触发 `EEXIST`。`recoverFileLock(path, { expectedContents, confirmHostsStopped: true,
-confirmUnknownOwner? })` 检查保存的所有者信息，并要求全部竞争宿主已经停止。
-所有者信息不完整时，独立确认所有者状态后还需要提供 `confirmUnknownOwner: true`。
+`acquireFileLock(path)` 对 `path` 获取操作系统提供的排他锁，并返回 `FileLock`。
+已有其他所有者时，获取立即以 `ELOCKED` 失败，错误信息包含 `<path>.owner` 中保存的
+进程 ID 和主机名。所有者进程退出时，操作系统自动释放锁。`path` 不再指向已锁定的
+文件时，`lock.assertHeld()` 拒绝；`lock.release()` 释放锁。`acquireFileLockSync(path)`
+为同步存储提供同一种锁。
+
+`writeFileDurable(path, contents, mode?)` 通过 `write-file-atomic` 原子替换文件并同步
+所在目录。`hasErrorCode(error, code)` 检查 Node.js 错误码。
 
 `replaceJournalFile(path, contents)` 写入并同步临时文件，在独占访问期间替换目标，
 同步所在目录，随后返回打开的追加句柄。调用方负责持有日志写入锁并关闭返回的句柄。

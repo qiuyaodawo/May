@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { fork } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
@@ -14,7 +15,7 @@ import { parseTeamPlan } from "../dist/team-plan.js";
 import { teamReviewDigest } from "../dist/team-recovery.js";
 
 const workerPath = new URL("./fixtures/team-file-access-worker.mjs", import.meta.url);
-const fixtureRoot = fileURLToPath(new URL("../../../review/migration/team-file-tests/", import.meta.url));
+const fixtureRoot = join(testOutputRoot, "maybecode", "team-file-access");
 
 async function fixture(t, version, { writeManifest = true } = {}) {
   await mkdir(fixtureRoot, { recursive: true });

@@ -1,20 +1,18 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { fileURLToPath } from "node:url";
 import { InMemoryPermissionRuleStore } from "@sortedyuan/may/permissions";
 import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store";
+import { acquireFileLock } from "@sortedyuan/may/storage";
 
-const parent = fileURLToPath(new URL("../../../../review/persistent-rules/", import.meta.url));
 const fixture = fileURLToPath(new URL("fixtures/rule-store-process.mjs", import.meta.url));
 
-async function directory(t) {
-  await mkdir(parent, { recursive: true });
-  const path = await mkdtemp(join(parent, "rule-store-"));
-  t.after(() => rm(path, { recursive: true, force: true }));
-  return path;
+function directory(t) {
+  return createTestDirectory(t, "may/rule-store");
 }
 
 function rule(overrides = {}) {
@@ -111,14 +109,13 @@ test("file store serializes mutations and persists immutable snapshots after reo
     assert.equal(await store.revoke("rule_other"), true);
     const disk = JSON.parse(await readFile(path, "utf8"));
     assert.deepEqual(disk, { version: 1, rules: [rule()] });
-    assert.deepEqual((await readdir(join(root, "nested"))).sort(), ["permission-rules.json", "permission-rules.json.lock"]);
+    assert.deepEqual((await readdir(join(root, "nested"))).sort(), ["permission-rules.json", "permission-rules.json.lock", "permission-rules.json.lock.owner"]);
   } finally { await store.close(); }
   await assert.rejects(store.list(), /closed/);
   await assert.rejects(store.create(rule({ id: "after_close" })), /closed/);
   const reopened = await FilePermissionRuleStore.open({ path });
   try { assert.deepEqual(await reopened.list(), [rule()]); }
   finally { await reopened.close(); }
-  await assert.rejects(lstat(`${path}.lock`), { code: "ENOENT" });
 });
 
 test("separate processes create, reload, and revoke committed permission rules", async (t) => {
@@ -139,8 +136,8 @@ test("single writer lock rejects competing processes and is released only on clo
   try {
     const child = run("list", path);
     assert.notEqual(child.status, 0);
-    assert.match(child.stderr, /EEXIST/);
-    await assert.rejects(FilePermissionRuleStore.open({ path }), { code: "EEXIST" });
+    assert.match(child.stderr, /ELOCKED/);
+    await assert.rejects(FilePermissionRuleStore.open({ path }), { code: "ELOCKED" });
     assert.ok((await lstat(`${path}.lock`)).isFile());
     await store.create(rule());
   } finally { await store.close(); }
@@ -149,13 +146,14 @@ test("single writer lock rejects competing processes and is released only on clo
   assert.deepEqual(JSON.parse(child.stdout), [rule()]);
 });
 
-test("terminated writer leaves a lock and committed rules without automatic ownership recovery", async (t) => {
+test("terminated writer keeps committed rules and releases ownership", async (t) => {
   const path = join(await directory(t), "permission-rules.json");
   const child = run("crash", path, rule());
   assert.equal(child.status, 23, child.stderr);
   assert.deepEqual(JSON.parse(await readFile(path, "utf8")).rules, [rule()]);
-  await assert.rejects(FilePermissionRuleStore.open({ path }), { code: "EEXIST" });
-  assert.ok((await lstat(`${path}.lock`)).isFile());
+  const store = await FilePermissionRuleStore.open({ path });
+  try { assert.deepEqual(await store.list(), [rule()]); }
+  finally { await store.close(); }
 });
 
 test("corrupt or unsupported files fail on open and release the newly acquired lock", async (t) => {
@@ -170,7 +168,8 @@ test("corrupt or unsupported files fail on open and release the newly acquired l
     const path = join(root, `invalid-${index}.json`);
     await writeFile(path, invalid[index]);
     await assert.rejects(FilePermissionRuleStore.open({ path }));
-    await assert.rejects(lstat(`${path}.lock`), { code: "ENOENT" });
+    const lock = await acquireFileLock(`${path}.lock`);
+    await lock.release();
     assert.equal(await readFile(path, "utf8"), invalid[index]);
   }
 });

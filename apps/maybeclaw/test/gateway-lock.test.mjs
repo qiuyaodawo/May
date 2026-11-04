@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { fork } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
-import { hostname } from "node:os";
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -23,8 +22,8 @@ async function directory(t) {
   return path;
 }
 
-async function child(t, path, mode = "current") {
-  const process = fork(new URL("fixtures/gateway-lock-child.mjs", import.meta.url), [path, mode], { stdio: ["ignore", "ignore", "pipe", "ipc"], windowsHide: true });
+async function child(path) {
+  const process = fork(new URL("fixtures/gateway-lock-child.mjs", import.meta.url), [path], { stdio: ["ignore", "ignore", "pipe", "ipc"], windowsHide: true });
   let ended = false;
   process.on("exit", () => { ended = true; });
   const stop = async () => {
@@ -39,7 +38,7 @@ async function child(t, path, mode = "current") {
 }
 
 test("forced termination releases ownership and preserves saved data", { timeout: 15000 }, async t => {
-  const path = await directory(t), owner = await child(t, path);
+  const path = await directory(t), owner = await child(path);
   assert.equal((await owner.open()).opened, true);
   assert.throws(() => GatewayStore.open(path), /already in use/);
   await owner.stop();
@@ -48,7 +47,6 @@ test("forced termination releases ownership and preserves saved data", { timeout
     assert.deepEqual(store.get("sessions", "saved"), { text: "persisted" });
     assert.throws(() => GatewayStore.open(path), /already in use/);
   } finally { store.close(); }
-  assert.equal(await readFile(join(path, "host.lock.access"), "utf8"), "");
   GatewayStore.open(path).close();
 });
 
@@ -56,37 +54,16 @@ for (const abandoned of [false, true]) {
   test(`concurrent processes admit one owner; abandoned=${abandoned}`, { timeout: 15000 }, async t => {
     const path = await directory(t);
     if (abandoned) {
-      const previous = await child(t, path);
+      const previous = await child(path);
       assert.equal((await previous.open()).opened, true);
       await previous.stop();
     }
-    const first = await child(t, path), second = await child(t, path);
+    const first = await child(path), second = await child(path);
     const results = await Promise.all([first.open(), second.open()]);
     assert.equal(results.filter(result => result.opened).length, 1);
     assert.match(results.find(result => !result.opened).error, /already in use/);
   });
 }
-
-test("live legacy owner is preserved; recovery succeeds after termination", { timeout: 15000 }, async t => {
-  const path = await directory(t), owner = await child(t, path, "legacy");
-  assert.equal((await owner.open()).opened, true);
-  const contents = await readFile(join(path, "host.lock"), "utf8");
-  assert.throws(() => GatewayStore.open(path), /still running/);
-  assert.equal(await readFile(join(path, "host.lock"), "utf8"), contents);
-  await owner.stop();
-  GatewayStore.open(path).close();
-});
-
-test("unverifiable and damaged metadata remain available for inspection", async t => {
-  const path = await directory(t), lock = join(path, "host.lock");
-  for (const contents of ["", "{", "null", JSON.stringify({ pid: process.pid, hostname: "other-host" }), JSON.stringify({ pid: -1, hostname: hostname() })]) {
-    await writeFile(lock, contents);
-    assert.throws(() => GatewayStore.open(path), /metadata|verify/);
-    assert.equal(await readFile(lock, "utf8"), contents);
-  }
-  await unlink(lock);
-  GatewayStore.open(path).close();
-});
 
 test("directory aliases cannot acquire a second owner", async t => {
   const path = await directory(t), alias = `${path}-alias`;
@@ -102,15 +79,5 @@ test("database open failure releases ownership for the next attempt", async t =>
   await mkdir(database);
   assert.throws(() => GatewayStore.open(path));
   await rm(database, { recursive: true });
-  GatewayStore.open(path).close();
-});
-
-test("changed lock contents are preserved on close and native ownership is released", async t => {
-  const path = await directory(t), store = GatewayStore.open(path), lock = join(path, "host.lock");
-  const replacement = JSON.stringify({ pid: process.pid, hostname: hostname(), token: "changed" });
-  await writeFile(lock, replacement);
-  assert.throws(() => store.close(), /ownership changed/);
-  assert.equal(await readFile(lock, "utf8"), replacement);
-  await unlink(lock);
   GatewayStore.open(path).close();
 });

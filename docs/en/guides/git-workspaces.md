@@ -249,7 +249,7 @@ pnpm --filter @sortedyuan/may build
 node --test packages/may/test/application/git-workspace*.test.mjs
 ```
 
-The fixtures reside in the ignored `review/git-workspace-tests/` directory.
+The fixtures reside in the ignored `.test-output/may/` directory.
 Each writable fixture initializes and validates its own repository before
 configuring test identity. Production repository identity and index are kept
 outside fixture operations.

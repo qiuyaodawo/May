@@ -1,11 +1,9 @@
 import type { AgentApplicationEvent } from "@sortedyuan/may";
-import type { ChannelDeliveryReceipt, ChannelInput, ChannelRecord, DeliveryRecord } from "./channel-store.js";
+import type { ChannelDeliveryReceipt, ChannelInput } from "./channel-store.js";
 import { inboxId, validateChannelInput } from "./channel-store.js";
-import type { LegacyTaskRecord } from "./gateway-migration.js";
 import type { GatewayReceipt } from "./gateway.js";
 import type { GatewayStore } from "./gateway-store.js";
-import { actorKey, entryKey, type GatewayDelivery, type GatewayEntry, type GatewayMessage, type GatewaySession } from "./gateway-types.js";
-import { digest } from "./types.js";
+import { actorKey, digest, entryKey, type GatewayDelivery, type GatewayEntry, type GatewayMessage, type GatewaySession } from "./gateway-types.js";
 
 export interface PendingInput {
   id: string;
@@ -23,15 +21,11 @@ export interface ChannelReply {
   status: "pending" | "sending" | "sent" | "unknown";
   after?: string;
 }
-export interface LegacyDelivery extends Omit<DeliveryRecord, "status"> {
-  status: DeliveryRecord["status"] | "failed";
-  detail?: string;
-}
 export interface GatewayEventRecord { id: string; sessionId: string; taskId: string; event: AgentApplicationEvent; at: number }
 export interface PlatformMessage { id?: string; sessionId: string; agentId?: string }
 export interface ChannelMessageChange { id: string; input: ChannelInput; originalState: PendingInput["state"]; sessionId?: string; noticeId?: string }
 type DeliveryOutcome = "sending" | "sent" | "unknown";
-export type DeliverySelection = "current" | "reply" | "legacy";
+export type DeliverySelection = "current" | "reply";
 
 /** 渠道宿主只能访问接收、投递及其必要的会话信息。 */
 export interface GatewayChannelRepository {
@@ -52,15 +46,9 @@ export interface GatewayChannelRepository {
   delivery(id: string): GatewayDelivery | undefined;
   replies(): readonly ChannelReply[];
   reply(id: string): ChannelReply | undefined;
-  legacyDeliveries(): readonly LegacyDelivery[];
-  legacyDelivery(id: string): LegacyDelivery | undefined;
-  legacyTask(id: string): LegacyTaskRecord | undefined;
-  legacyCursors(): readonly ChannelRecord[];
   recoverChannelDeliveries(): void;
   commitDelivery(selection: DeliverySelection, id: string, status: DeliveryOutcome, receipt?: ChannelDeliveryReceipt): void;
-  failDelivery(selection: "current" | "legacy", id: string, detail: string): void;
-  suppressLegacyDelivery(id: string): void;
-  retryLegacyDelivery(id: string, confirmUnknown: boolean): LegacyDelivery;
+  failDelivery(id: string, detail: string): void;
 }
 
 /** Gateway 与渠道宿主共享业务记录，全部关联写入使用同一 SQLite 事务。 */
@@ -161,10 +149,6 @@ export class GatewayRepository implements GatewayChannelRepository {
   delivery(id: string): GatewayDelivery | undefined { return this.store.get("deliveries", id); }
   replies(): ChannelReply[] { return this.store.list("channel-replies"); }
   reply(id: string): ChannelReply | undefined { return this.store.get("channel-replies", id); }
-  legacyDeliveries(): LegacyDelivery[] { return this.store.list("legacy-deliveries"); }
-  legacyDelivery(id: string): LegacyDelivery | undefined { return this.store.get("legacy-deliveries", id); }
-  legacyTask(id: string): LegacyTaskRecord | undefined { return this.store.get("legacy-tasks", id); }
-  legacyCursors(): ChannelRecord[] { return this.store.list("legacy-cursors"); }
   enqueueDelivery(delivery: GatewayDelivery): void {
     if (!this.session(delivery.sessionId)) throw new Error("投递所属会话不存在。");
     if (this.delivery(delivery.id)) throw new Error("投递 ID 已经存在。");
@@ -172,16 +156,16 @@ export class GatewayRepository implements GatewayChannelRepository {
     this.store.put("deliveries", delivery.id, delivery);
   }
   recoverDeliveries(): void {
-    this.recoverSelectedDeliveries(["current", "reply", "legacy"]);
+    this.recoverSelectedDeliveries(["current", "reply"]);
   }
   recoverChannelDeliveries(): void {
-    this.recoverSelectedDeliveries(["reply", "legacy"]);
+    this.recoverSelectedDeliveries(["reply"]);
   }
   private recoverSelectedDeliveries(selections: readonly DeliverySelection[]): void {
     this.store.transaction(() => {
       for (const selection of selections) {
         const collection = deliveryCollection(selection);
-        for (const record of this.store.list<GatewayDelivery | ChannelReply | LegacyDelivery>(collection)) {
+        for (const record of this.store.list<GatewayDelivery | ChannelReply>(collection)) {
           if (record.status === "sending") this.store.put(collection, record.id, { ...record, status: "unknown" });
         }
       }
@@ -189,7 +173,7 @@ export class GatewayRepository implements GatewayChannelRepository {
   }
   commitDelivery(selection: DeliverySelection, id: string, status: DeliveryOutcome, receipt?: ChannelDeliveryReceipt): void {
     this.store.transaction(() => {
-      const collection = deliveryCollection(selection), current = this.store.get<GatewayDelivery | ChannelReply | LegacyDelivery>(collection, id);
+      const collection = deliveryCollection(selection), current = this.store.get<GatewayDelivery | ChannelReply>(collection, id);
       if (!current) return;
       if ("sessionId" in current && current.sessionId && !this.session(current.sessionId)) return;
       if (status === "sending" && current.status !== "pending" || status !== "sending" && current.status !== "sending") throw new Error("投递状态已经变化。");
@@ -203,17 +187,11 @@ export class GatewayRepository implements GatewayChannelRepository {
       }
     });
   }
-  failDelivery(selection: "current" | "legacy", id: string, detail: string): void {
-    const collection = deliveryCollection(selection), current = this.store.get<GatewayDelivery | LegacyDelivery>(collection, id);
+  failDelivery(id: string, detail: string): void {
+    const current = this.delivery(id);
     if (!current) return;
     if (current.status !== "pending") throw new Error("只有等待发送的投递能够记录准备失败。");
-    this.store.put(collection, id, { ...current, status: "failed", detail });
-  }
-  suppressLegacyDelivery(id: string): void {
-    const current = this.legacyDelivery(id);
-    if (!current) return;
-    if (current.status !== "pending") throw new Error("只有等待发送的投递能够取消发送。");
-    this.store.put("legacy-deliveries", id, { ...current, status: "suppressed" });
+    this.store.put("deliveries", id, { ...current, status: "failed", detail });
   }
   retryDelivery(id: string, confirmUnknown: boolean): GatewayDelivery | ChannelReply {
     const delivery = this.delivery(id), current = delivery ?? this.reply(id);
@@ -221,14 +199,6 @@ export class GatewayRepository implements GatewayChannelRepository {
     assertRetry(current.status, confirmUnknown);
     const pending = { ...current, status: "pending" as const };
     this.store.put(delivery ? "deliveries" : "channel-replies", id, pending);
-    return pending;
-  }
-  retryLegacyDelivery(id: string, confirmUnknown: boolean): LegacyDelivery {
-    const current = this.legacyDelivery(id);
-    if (!current) throw new Error("历史投递记录不存在。");
-    assertRetry(current.status, confirmUnknown);
-    const pending = { ...current, status: "pending" as const };
-    this.store.put("legacy-deliveries", id, pending);
     return pending;
   }
   recordMessageChange(input: ChannelInput, originalState: PendingInput["state"], sessionId: string | undefined,
@@ -272,8 +242,8 @@ export class GatewayRepository implements GatewayChannelRepository {
   }
 }
 
-function deliveryCollection(selection: DeliverySelection): "deliveries" | "channel-replies" | "legacy-deliveries" {
-  return selection === "current" ? "deliveries" : selection === "reply" ? "channel-replies" : "legacy-deliveries";
+function deliveryCollection(selection: DeliverySelection): "deliveries" | "channel-replies" {
+  return selection === "current" ? "deliveries" : "channel-replies";
 }
 function sameMessage(left: ChannelInput, right: ChannelInput): boolean {
   return left.account === right.account && left.conversation === right.conversation && (left.threadId ?? null) === (right.threadId ?? null) && left.messageId === right.messageId;

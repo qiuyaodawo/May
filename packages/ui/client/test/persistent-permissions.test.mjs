@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -20,7 +21,7 @@ const product = { id: "rules", title: "Rules", subtitle: "Permission management"
 const context = { runId: "real-file-operation", step: 1, toolCallId: "write-guide", idempotencyKey: "write-guide", signal: new AbortController().signal, report() {} };
 
 test("projection offers persistent approval for a real file operation and retains read-only scope evidence", async t => {
-  const verificationDirectory = fileURLToPath(new URL("../../../../plugin-verification/persistent-ui/", import.meta.url));
+  const verificationDirectory = join(testOutputRoot, "ui-client", "persistent-permissions");
   await mkdir(verificationDirectory, { recursive: true });
   const root = await mkdtemp(join(verificationDirectory, "run-"));
   t.after(() => rm(root, { recursive: true, force: true }));

@@ -181,7 +181,7 @@ pnpm docs:check
 测试使用真实 SQLite、真实宿主任务凭据、执行产物处理器和子进程中断。
 `test:live` 记录准确开始时间，并把单次任务设置在该时间加 60,000 ms 后执行。
 输出包括计划时间、观察到的提交时间、延迟、执行身份、宿主任务身份和生成的产物。
-结果位于已经忽略的 `scheduler-verification/` 目录。这个离线宿主验证覆盖调度
+结果位于已经忽略的 `.test-output/scheduler/` 目录。这个离线宿主验证覆盖调度
 和任务接受，模型调用与新闻获取需要相应的集成验证。
 
 `test:integration:scheduler` 使用宿主配置的默认模型，进行一次真实 May Agent

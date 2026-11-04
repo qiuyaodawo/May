@@ -1,4 +1,4 @@
-import type { ContextSnapshot, Message, SystemMessage } from "../core/index.js";
+import { omitUndefined, type ContextSnapshot, type Message, type SystemMessage } from "../core/index.js";
 
 import type {
   ContextCompactionOptions,
@@ -55,12 +55,12 @@ export class SummaryTailStrategy implements ContextCompactionStrategy {
     const prefix = snapshot.messages.slice(0, boundary);
     if (prefix.length < this.minimumPrefixMessages) return snapshot.messages;
 
-    const summary = (await this.summarizer.summarize({
+    const summary = (await this.summarizer.summarize(omitUndefined({
       messages: prefix,
-      ...(options.signal === undefined ? {} : { signal: options.signal }),
-      ...(options.runId === undefined ? {} : { runId: options.runId }),
-      ...(options.step === undefined ? {} : { step: options.step }),
-    }))
+      signal: options.signal,
+      runId: options.runId,
+      step: options.step,
+    })))
       .trim();
     if (summary === "") {
       throw new Error("Context summarizer returned an empty summary");

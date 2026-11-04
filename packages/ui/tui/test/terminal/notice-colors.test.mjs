@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -10,7 +11,7 @@ import { Text } from "../../dist/index.js";
 const require = createRequire(import.meta.url);
 
 test("xterm 续行的 RGB 前景、背景与组合样式保持一致", { timeout: 60000 }, async t => {
-  const base = fileURLToPath(new URL("../../../../../review/notice-colors/", import.meta.url));
+  const base = join(testOutputRoot, "tui", "notice-colors");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "terminal-"));
   const variables = Object.fromEntries(["TMP", "TEMP", "TMPDIR"].map(key => [key, process.env[key]]));

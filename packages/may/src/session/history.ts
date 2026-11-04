@@ -1,3 +1,4 @@
+import { omitUndefined } from "../core/omit-undefined.js";
 import type { SessionEvent } from "./events.js";
 import type { SessionStore } from "./store.js";
 import { validateSessionHistory } from "./store.js";
@@ -105,13 +106,13 @@ export class SessionHistoryReader {
       throw new RangeError("types cannot be empty");
     }
     for (const type of types ?? []) validateEventType(type);
-    return {
-      ...(query.afterSeq === undefined ? {} : { afterSeq: query.afterSeq }),
-      ...(query.beforeSeq === undefined ? {} : { beforeSeq: query.beforeSeq }),
+    return omitUndefined({
+      afterSeq: query.afterSeq,
+      beforeSeq: query.beforeSeq,
       limit,
       order: query.order ?? "asc",
-      ...(types === undefined ? {} : { types }),
-    };
+      types,
+    });
   }
 }
 

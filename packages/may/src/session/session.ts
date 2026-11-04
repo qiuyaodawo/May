@@ -2,14 +2,15 @@ import { readRecordedModelRequests, requestReferences, requestValueId, type Reco
 import type { ModelRequestSink } from "../core/request-recording.js";
 import {
   AsyncEventQueue,
+  AsyncStateSerializer,
   isStreamingMayEvent,
   type AgentRuntime,
   type RuntimeDescriptor,
   DEFAULT_RUNTIME_DESCRIPTOR,
-  assertRuntimeCompatible,
   validateRuntimeDescriptor,
   runtimeDescriptorsEqual,
   jsonEqual,
+  omitUndefined,
   type MayEvent,
   type Message,
   type ContinueOptions,
@@ -113,7 +114,7 @@ export interface SessionContinueOptions extends Omit<ContinueOptions, "stepInput
 export class Session {
   private requestRecording: "off" | "required" = "off";
   private providerBodyRecording = false;
-  private requestRecordTail: Promise<void> = Promise.resolve();
+  private readonly requestRecords = new AsyncStateSerializer();
   private readonly requestDefinitions = new Set<string>();
   private readonly requestAttempts = new Map<string, number>();
   readonly id: string;
@@ -125,7 +126,7 @@ export class Session {
   private readonly historyReader: SessionHistoryReader;
   private seq: number;
   private tail: Promise<void> = Promise.resolve();
-  private recordTail: Promise<void> = Promise.resolve();
+  private readonly records = new AsyncStateSerializer();
   private readonly completedModelSteps = new Set<string>();
   private readonly modelCompletionWaiters = new Map<string, Deferred<void>>();
   private readonly observedStepStarts = new Set<string>();
@@ -240,19 +241,8 @@ export class Session {
     const replay = replaySession(recoveredEvents);
     const runtime = await options.createRuntime(replay.messages, replay.info);
     try {
-      const savedDescriptor = replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR;
       const currentDescriptor = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
-      const migrated = !runtimeDescriptorsEqual(savedDescriptor, currentDescriptor);
-      let runtimeState = replay.info.runtimeState;
-      if (migrated) {
-        if (runtime.migrateState === undefined) assertRuntimeCompatible(savedDescriptor, runtime);
-        runtimeState = await runtime.migrateState!(savedDescriptor, runtimeState);
-      }
-      if (runtimeState !== undefined) {
-        if (runtime.restoreState === undefined) throw new Error("Runtime cannot restore its saved Session state");
-        await runtime.restoreState(runtimeState);
-      }
-      if (runtime.saveState !== undefined) runtimeState = await snapshotRuntimeState(runtime);
+      const { state: runtimeState, migrated } = await adoptRuntimeState(runtime, replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR, replay.info.runtimeState);
       for (const event of repairs) await options.store.append(event);
       if (migrated || !jsonEqual(runtimeState, replay.info.runtimeState)) {
         const change: SessionEvent = {
@@ -342,21 +332,10 @@ export class Session {
     const replay = replaySession(history);
     const runtime = await options.createRuntime(replay.messages, replay.info);
     try {
-      const savedDescriptor = replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR;
       const currentDescriptor = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
-      let state = replay.info.runtimeState;
-      const migrated = !runtimeDescriptorsEqual(savedDescriptor, currentDescriptor);
-      if (migrated) {
-        if (runtime.migrateState === undefined) assertRuntimeCompatible(savedDescriptor, runtime);
-        state = await runtime.migrateState!(savedDescriptor, state);
-      }
-      if (state !== undefined) {
-        if (runtime.restoreState === undefined) throw new Error("Runtime cannot restore the selected Session state");
-        await runtime.restoreState(state);
-      }
-      if (runtime.saveState !== undefined) state = await snapshotRuntimeState(runtime);
-      if (migrated || state !== undefined) append({ type: migrated ? "runtime.changed" : "runtime.state.saved",
-        runtime: { ...currentDescriptor }, ...(state === undefined ? {} : { state }) } as SessionEventPayload, Date.now());
+      const { state, migrated } = await adoptRuntimeState(runtime, replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR, replay.info.runtimeState);
+      if (migrated || state !== undefined) append(omitUndefined({ type: migrated ? "runtime.changed" : "runtime.state.saved",
+        runtime: { ...currentDescriptor }, state }) as SessionEventPayload, Date.now());
       for (const event of history) await options.store.append(event);
       if (options.deferForkReady !== true) {
         const ready: SessionEvent = { type: "session.fork.ready", sessionId: id, seq: history.length + 1, timestamp: Date.now() };
@@ -456,7 +435,7 @@ export class Session {
   }
 
   async history(): Promise<readonly SessionEvent[]> {
-    await this.recordTail;
+    await this.records.idle();
     return this.historyReader.readAll(this.id);
   }
 
@@ -510,21 +489,12 @@ export class Session {
       if (suspended !== undefined && runtime === previous) throw new Error("A suspended runtime requires a new replacement instance");
       const savedDescriptor = suspended?.descriptor ?? this.runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
       const currentDescriptor = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
-      const migrated = !runtimeDescriptorsEqual(savedDescriptor, currentDescriptor);
-      let state = suspended === undefined
+      const saved = suspended === undefined
         ? this.runtime.saveState === undefined
           ? replaySession(await this.history()).info.runtimeState
           : await snapshotRuntimeState(this.runtime)
         : structuredClone(suspended.state);
-      if (migrated) {
-        if (runtime.migrateState === undefined) assertRuntimeCompatible(savedDescriptor, runtime);
-        state = await runtime.migrateState!(savedDescriptor, state);
-      }
-      if (state !== undefined) {
-        if (runtime.restoreState === undefined) throw new Error("Replacement runtime cannot restore Session state");
-        await runtime.restoreState(state);
-      }
-      if (runtime.saveState !== undefined) state = await snapshotRuntimeState(runtime);
+      const { state, migrated } = await adoptRuntimeState(runtime, savedDescriptor, saved);
       if (migrated) {
         await this.record({ type: "runtime.changed", runtime: { ...currentDescriptor }, ...(state === undefined ? {} : { state: structuredClone(state) }) });
       } else if (state !== undefined) {
@@ -578,7 +548,7 @@ export class Session {
   async queryHistory(
     query: SessionHistoryQuery = {},
   ): Promise<SessionHistoryPage> {
-    await this.recordTail;
+    await this.records.idle();
     return this.historyReader.query(this.id, query);
   }
 
@@ -640,7 +610,7 @@ export class Session {
   private async start(options: SessionSubmitOptions): Promise<RunHandle> {
     this.assertRecovered();
     if (options.inputId !== undefined) {
-      if (typeof options.inputId !== "string" || options.inputId.length === 0 || options.inputId.length > 256) throw new TypeError("inputId must be a non-empty string of at most 256 characters");
+      if (options.inputId.length === 0 || options.inputId.length > 256) throw new TypeError("inputId must be a non-empty string of at most 256 characters");
       if ((await this.history()).some((event) => event.type === "input.submitted" && event.inputId === options.inputId)) throw new Error(`Input already submitted: ${options.inputId}`);
       const steeringInput = this.steering.get(options.inputId);
       if (steeringInput !== undefined) {
@@ -666,7 +636,7 @@ export class Session {
       return this.wrapRun(this.runtime.run(runtimeOptions));
     }
     if (options.inputId !== undefined) this.submittedInputIds.add(options.inputId);
-    await this.record({ type: "input.submitted", message: input, ...(options.inputId === undefined ? {} : { inputId: options.inputId }) });
+    await this.record(omitUndefined({ type: "input.submitted", message: input, inputId: options.inputId }));
     if (options.inputId !== undefined) {
       this.steering.submitted(options.inputId);
     }
@@ -701,7 +671,7 @@ export class Session {
     const { continuationId, ...runtimeOptions } = options;
     const recordingOptions = this.requestRecording === "required" ? { recordRequest: this.recordModelRequest } : {};
     if (continuationId !== undefined) {
-      if (typeof continuationId !== "string" || continuationId.trim() === "" || continuationId.length > 256) {
+      if (continuationId.trim() === "" || continuationId.length > 256) {
         throw new TypeError("continuationId must be a nonempty string of at most 256 characters");
       }
       if ((await this.history()).some(event => event.type === "continuation.submitted" && event.continuationId === continuationId)) {
@@ -773,9 +743,7 @@ export class Session {
       id: run.id,
       events,
       result,
-      ...(run.traceContext === undefined
-        ? {}
-        : { traceContext: run.traceContext }),
+      ...omitUndefined({ traceContext: run.traceContext }),
       cancel: (reason?: string) => run.cancel(reason),
     };
   }
@@ -901,11 +869,7 @@ export class Session {
     payload: SessionEventPayload,
     timestamp = Date.now(),
   ): Promise<void> {
-    const operation = this.recordTail.then(() =>
-      this.recordNow(payload, timestamp)
-    );
-    this.recordTail = operation.catch(() => undefined);
-    return operation;
+    return this.records.run(() => this.recordNow(payload, timestamp));
   }
 
   private async recordNow(
@@ -963,7 +927,7 @@ export class Session {
   private async checkpoint(event: RunCheckpointEvent, extra?: (event: RunCheckpointEvent) => Promise<void>, continuationId?: string): Promise<void> {
     const live = { ...event, timestamp: Date.now(), seq: 0 };
     const payload = event.type === "run.started"
-      ? { ...event, checkpointVersion: 1 as const, ...(continuationId === undefined ? {} : { continuationId }) }
+      ? { ...event, checkpointVersion: 1 as const, ...omitUndefined({ continuationId }) }
       : toSessionEvent(live);
     if (payload !== undefined) {
       await this.record(payload, live.timestamp);
@@ -984,7 +948,7 @@ export class Session {
   }
 
   readonly recordModelRequest: ModelRequestSink = (observation) => {
-    const operation = this.requestRecordTail.then(async () => {
+    const operation = this.requestRecords.run(async () => {
       const identity = { runId: observation.runId, step: observation.step, modelCallId: observation.modelCallId };
       if (observation.type === "prepared") {
         if (new TextEncoder().encode(JSON.stringify({ ...observation.record, body: this.providerBodyRecording ? observation.record.body : undefined })).byteLength > 64 * 1024 * 1024) throw new RangeError("Model request record exceeds 64 MiB");
@@ -1001,15 +965,13 @@ export class Session {
         const body = this.providerBodyRecording ? requestReferences(record.body as Record<string, unknown>, define) : undefined;
         const batch: SessionEventPayload[] = added.map((definition) => ({ type: "model.request.defined", ...definition }));
         const attempt = (this.requestAttempts.get(observation.modelCallId) ?? 0) + 1;
-        batch.push({ type: "model.request.prepared", version: 1, ...identity, attempt, adapter: record.adapter, purpose: record.purpose, request, body, ...(record.endpoint === undefined ? {} : { endpoint: record.endpoint }), ...(record.protocol === undefined ? {} : { protocol: record.protocol }), ...(record.omittedPaths === undefined ? {} : { omittedPaths: record.omittedPaths }), ...(record.externalResourcePaths === undefined ? {} : { externalResourcePaths: record.externalResourcePaths }) });
-        const saved = this.recordTail.then(async () => {
+        batch.push({ type: "model.request.prepared", version: 1, ...identity, attempt, adapter: record.adapter, purpose: record.purpose, request, body, ...omitUndefined({ endpoint: record.endpoint, protocol: record.protocol, omittedPaths: record.omittedPaths, externalResourcePaths: record.externalResourcePaths }) });
+        await this.records.run(async () => {
           const events = batch.map((payload, index) => ({ ...payload, sessionId: this.id, seq: this.seq + index + 1, timestamp: Date.now() }) as SessionEvent);
           if (this.store.appendBatch) await this.store.appendBatch(events);
           else for (const event of events) await this.store.append(event);
           this.seq += events.length;
         });
-        this.recordTail = saved.catch(() => undefined);
-        await saved;
         for (const definition of added) this.requestDefinitions.add(definition.id);
         this.requestAttempts.set(observation.modelCallId, attempt);
       } else {
@@ -1017,11 +979,10 @@ export class Session {
         if (attempt === 0) throw new Error("Model outcome has no prepared request");
         await this.record(observation.type === "started" ? { type: "model.attempt.started", ...identity, attempt }
           : observation.type === "completed"
-          ? { type: "model.attempt.completed", ...identity, attempt, durationMs: observation.durationMs, ...(observation.usage === undefined ? {} : { usage: observation.usage }) }
-          : { type: "model.attempt.failed", ...identity, attempt, cancelled: observation.cancelled, errorName: observation.errorName, durationMs: observation.durationMs, ...(observation.httpStatus === undefined ? {} : { httpStatus: observation.httpStatus }) });
+          ? omitUndefined({ type: "model.attempt.completed", ...identity, attempt, durationMs: observation.durationMs, usage: observation.usage })
+          : omitUndefined({ type: "model.attempt.failed", ...identity, attempt, cancelled: observation.cancelled, errorName: observation.errorName, durationMs: observation.durationMs, httpStatus: observation.httpStatus }));
       }
     });
-    this.requestRecordTail = operation.catch(() => undefined);
     return operation.catch((error) => { this.persistenceFailed = true; throw error; });
   };
 }
@@ -1051,7 +1012,7 @@ function interruptedRuns(events: readonly SessionEvent[]): SessionEventPayload[]
     if (event.type === "approval.requested") approvals.add(event.request.id);
     if (event.type === "approval.resolved" || event.type === "approval.cancelled") approvals.delete(event.requestId);
     if (event.type === "run.started") {
-      runs.set(event.runId, { ...(event.checkpointVersion === undefined ? {} : { version: event.checkpointVersion }), pending: new Map(), started: new Set() });
+      runs.set(event.runId, { ...omitUndefined({ version: event.checkpointVersion }), pending: new Map(), started: new Set() });
     } else if (event.type === "assistant.completed") {
       const run = runs.get(event.runId);
       for (const call of event.message.toolCalls ?? []) {
@@ -1247,10 +1208,8 @@ function replaySession(events: readonly SessionEvent[]): {
   }
   return {
     messages,
-    info: { ...(latestModelMeasurement === undefined ? {} : { latestModelMeasurement }),
-      ...(runtime === undefined ? {} : { runtime }),
-      ...(runtimeState === undefined ? {} : { runtimeState }),
-      ...(Object.keys(state).length === 0 ? {} : { state }) },
+    info: omitUndefined({ latestModelMeasurement, runtime, runtimeState,
+      state: Object.keys(state).length === 0 ? undefined : state }),
   };
 }
 
@@ -1274,28 +1233,17 @@ function toPermissionSessionEvent(
   if (event.type === "rule.revoked") return { type: event.type, ruleId: event.ruleId, scopeId: event.scopeId };
   if (event.type === "rule.used") return { type: event.type, ruleId: event.ruleId, scopeId: event.scopeId, decision: event.decision, runId: event.runId, toolCallId: event.toolCallId };
   if (event.type === "approval.requested") {
-    const request: SessionApprovalRequest = event.request.grantKey === undefined
-      ? {
-          id: event.request.id,
-          createdAt: event.request.createdAt,
-          tool: event.request.tool,
-          input: event.request.input,
-          runId: event.request.context.runId,
-          step: event.request.context.step,
-          toolCallId: event.request.context.toolCallId,
-          idempotencyKey: event.request.context.idempotencyKey,
-        }
-      : {
-          id: event.request.id,
-          createdAt: event.request.createdAt,
-          tool: event.request.tool,
-          input: event.request.input,
-          runId: event.request.context.runId,
-          step: event.request.context.step,
-          toolCallId: event.request.context.toolCallId,
-          idempotencyKey: event.request.context.idempotencyKey,
-          grantKey: event.request.grantKey,
-        };
+    const request: SessionApprovalRequest = {
+      id: event.request.id,
+      createdAt: event.request.createdAt,
+      tool: event.request.tool,
+      input: event.request.input,
+      runId: event.request.context.runId,
+      step: event.request.context.step,
+      toolCallId: event.request.context.toolCallId,
+      idempotencyKey: event.request.context.idempotencyKey,
+      ...omitUndefined({ grantKey: event.request.grantKey }),
+    };
     if (event.request.persistent !== undefined) request.persistent = structuredClone(event.request.persistent);
     return { type: "approval.requested", request };
   }
@@ -1306,13 +1254,7 @@ function toPermissionSessionEvent(
       decision: event.decision,
     };
   }
-  return event.reason === undefined
-    ? { type: "approval.cancelled", requestId: event.requestId }
-    : {
-        type: "approval.cancelled",
-        requestId: event.requestId,
-        reason: event.reason,
-      };
+  return omitUndefined({ type: "approval.cancelled", requestId: event.requestId, reason: event.reason });
 }
 
 function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
@@ -1322,28 +1264,20 @@ function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
     case "run.budget.exceeded":
       return { type: event.type, runId: event.runId, dimension: event.dimension, limit: event.limit, consumed: event.consumed, budget: event.budget };
     case "tool.started":
-      return { type: "tool.started", runId: event.runId, step: event.step, call: event.call, ...(event.input === undefined ? {} : { input: event.input }) };
+      return omitUndefined({ type: "tool.started", runId: event.runId, step: event.step, call: event.call, input: event.input });
     case "run.started":
       return event.continuation === true
         ? { type: "run.started", runId: event.runId, continuation: true }
         : { type: "run.started", runId: event.runId };
     case "model.completed":
-      return event.usage === undefined
-        ? {
-            type: "assistant.completed",
-            runId: event.runId,
-            step: event.step,
-            message: event.message,
-            contextMessageCount: event.contextMessageCount,
-          }
-        : {
-            type: "assistant.completed",
-            runId: event.runId,
-            step: event.step,
-            message: event.message,
-            usage: event.usage,
-            contextMessageCount: event.contextMessageCount,
-          };
+      return omitUndefined({
+        type: "assistant.completed",
+        runId: event.runId,
+        step: event.step,
+        message: event.message,
+        usage: event.usage,
+        contextMessageCount: event.contextMessageCount,
+      });
     case "tool.completed":
       return {
         type: "tool.completed",
@@ -1376,13 +1310,7 @@ function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
         error: event.error,
       };
     case "run.cancelled":
-      return event.reason === undefined
-        ? { type: "run.cancelled", runId: event.runId }
-        : {
-            type: "run.cancelled",
-            runId: event.runId,
-            reason: event.reason,
-          };
+      return omitUndefined({ type: "run.cancelled", runId: event.runId, reason: event.reason });
     default:
       return undefined;
   }
@@ -1403,6 +1331,26 @@ async function snapshotRuntimeState(runtime: AgentRuntime): Promise<unknown> {
   const state = await runtime.saveState!();
   if (state === undefined) throw new Error("Stateful runtime must save an explicit state value");
   return structuredClone(state);
+}
+
+/** Migrate, restore and re-snapshot saved runtime state for a newly created runtime instance. */
+async function adoptRuntimeState(runtime: AgentRuntime, saved: RuntimeDescriptor, savedState: unknown): Promise<{ state: unknown; migrated: boolean }> {
+  const current = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
+  validateRuntimeDescriptor(current);
+  const migrated = !runtimeDescriptorsEqual(saved, current);
+  let state = savedState;
+  if (migrated) {
+    if (runtime.migrateState === undefined) {
+      throw new Error(`Session runtime ${saved.id}@${saved.version} is incompatible with ${current.id}@${current.version}`);
+    }
+    state = await runtime.migrateState(saved, state);
+  }
+  if (state !== undefined) {
+    if (runtime.restoreState === undefined) throw new Error("Runtime cannot restore saved Session state");
+    await runtime.restoreState(state);
+  }
+  if (runtime.saveState !== undefined) state = await snapshotRuntimeState(runtime);
+  return { state, migrated };
 }
 
 async function closeRejectedRuntime(runtime: AgentRuntime, error: unknown): Promise<never> {

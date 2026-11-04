@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { MaybeCodeApplication } from "../../dist/index.js";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
+import { MaybeCodeApplication } from "../../dist/application.js";
 import { applicationServices } from "../../../../packages/may/dist/application/index.js";
 import { loadMayConfig } from "../../../../packages/may/dist/config/index.js";
 import { RunCancelledError, runtimeHooks } from "../../../../packages/may/dist/core/index.js";
@@ -13,7 +15,7 @@ import { InMemorySessionStore } from "../../../../packages/may/dist/session/inde
 import { SkillRegistry } from "../../../../packages/may/dist/skills/index.js";
 
 async function workspaceFor(t) {
-  const parent = fileURLToPath(new URL("../../../../review/prompt-verification/", import.meta.url));
+  const parent = join(testOutputRoot, "maybecode", "instructions");
   await mkdir(parent, { recursive: true });
   const workspace = await mkdtemp(join(parent, "workspace-"));
   t.after(() => rm(workspace, { recursive: true, force: true }));
@@ -21,7 +23,7 @@ async function workspaceFor(t) {
 }
 
 async function configuredModel() {
-  return createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" }));
+  return createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: liveModelProfile() }));
 }
 
 test("startup ancestor rules reach the actual request and refresh after input", { timeout: 30_000 }, async t => {
@@ -115,7 +117,7 @@ test("MaybeCode assembles actual tool metadata and refreshes project and permiss
   assert.equal(application.instructions.effective, first);
   assert.ok(requests[0].tools.some(tool => tool.name === "shell"));
 
-  await application.getService(applicationServices.skills).activate("source-review");
+  await application.agent.getService(applicationServices.skills).activate("source-review");
   permissionMode = "yolo";
   await writeFile(join(workspace, "AGENTS.md"), "Use the updated project guidance.");
   await assert.rejects((await application.submit({ input: "Continue the source review" })).result, RunCancelledError);
@@ -210,7 +212,7 @@ test("steering refreshes project guidance and changed instructions invalidate ac
   permissionMode = "yolo";
   assert.equal((await application.inspectContext()).measurementMethod, "estimated");
   const sessionId = application.sessionId;
-  const positions = await application.getService(applicationServices.application).get().branchPositions();
+  const positions = await application.agent.branchPositions();
   assert.ok(positions.length > 0);
   await application.close();
   application = await MaybeCodeApplication.open({

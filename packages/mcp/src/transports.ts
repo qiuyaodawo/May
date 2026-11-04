@@ -1,4 +1,5 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import { omitUndefined } from "@sortedyuan/may/core";
 import {
   getDefaultEnvironment,
   StdioClientTransport,
@@ -19,10 +20,7 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
     return new StreamableHTTPClientTransport(new URL(options.url), {
       ...(options.auth === undefined ? {} : { authProvider: oauth!.binding(options) }),
       onInsufficientScope: "throw",
-      requestInit: {
-        ...(options.headers === undefined ? {} : { headers: options.headers }),
-        redirect: "error",
-      },
+      requestInit: omitUndefined({ headers: options.headers, redirect: "error" }),
       // Do not resume streams or replay an operation with an uncertain outcome.
       reconnectionOptions: {
         maxRetries: 0,
@@ -48,7 +46,7 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
         const response = await fetch(input, {
           ...init,
           headers,
-          ...(signal === undefined ? {} : { signal }),
+          ...omitUndefined({ signal }),
           redirect: "error",
         });
         if (response.status === 403 && options.auth !== undefined) {
@@ -62,11 +60,10 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
   return orderedStdio(new StdioClientTransport({
     command: options.command,
     ...(options.args === undefined ? {} : { args: [...options.args] }),
-    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
     ...(options.env === undefined
       ? {}
       : { env: { ...getDefaultEnvironment(), ...options.env } }),
-    ...(options.maxBufferSize === undefined ? {} : { maxBufferSize: options.maxBufferSize }),
+    ...omitUndefined({ cwd: options.cwd, maxBufferSize: options.maxBufferSize }),
     stderr: "pipe",
   }));
 }

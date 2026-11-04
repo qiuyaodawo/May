@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { InMemoryContext, May } from "@sortedyuan/may/core";
-import { KimiApiError, KimiModel } from "../../dist/kimi/index.js";
+import { KimiModel } from "../../dist/kimi/index.js";
+import { OpenAICompatibleApiError } from "../../dist/openai-compatible/index.js";
 
 const emptyRequest = {
   messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
@@ -294,7 +295,8 @@ test("surfaces structured Kimi HTTP errors", async () => {
       signal: new AbortController().signal,
     })),
     (error) => {
-      assert.ok(error instanceof KimiApiError);
+      assert.ok(error instanceof OpenAICompatibleApiError);
+      assert.equal(error.provider, "Kimi");
       assert.equal(error.code, "KIMI_API_ERROR");
       assert.equal(error.status, 401);
       assert.equal(error.message, "Authentication failed");

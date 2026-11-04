@@ -1,4 +1,4 @@
-import type { Model } from "../core/index.js";
+import { omitUndefined, type Model } from "../core/index.js";
 import { definePlugin, type Disposer, type PluginContext, type PluginDefinition } from "../plugin/index.js";
 import { services, factoryMetadata, type ModelInfo, type ModelWrapper, type ContributionOptions, type PluginFactoryMetadata } from "./index.js";
 
@@ -37,8 +37,8 @@ export interface ModelWrapperPluginOptions<C = unknown> extends Omit<Contributio
 export function createModelWrapperPlugin<C = unknown>(options: ModelWrapperPluginOptions<C>): PluginDefinition<C> {
   return definePlugin({ ...factoryMetadata(options, [{ service: services.modelWrappers }]), id: options.id, async setup(context) {
     if (options.dispose) context.defer(options.dispose);
-    context.defer(context.get(services.modelWrappers).add(await options.create(context), {
-      id: context.pluginId, pluginOrder: context.pluginOrder, ...(options.order === undefined ? {} : { order: options.order }),
-    }));
+    context.defer(context.get(services.modelWrappers).add(await options.create(context), omitUndefined({
+      id: context.pluginId, pluginOrder: context.pluginOrder, order: options.order,
+    })));
   } });
 }

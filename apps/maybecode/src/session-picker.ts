@@ -8,6 +8,7 @@ import {
   type ListNavigationAction,
 } from "@sortedyuan/tui/list-selection";
 
+import { omitUndefined } from "@sortedyuan/may/core";
 import type { SessionSummary } from "@sortedyuan/may/session/catalog";
 import type { MaybeCodeController } from "./controller.js";
 import { createMaybeCodeKeymap, type MaybeCodeKeyAction } from "./keymap.js";
@@ -62,7 +63,7 @@ export async function runSessionPicker(
         query: selection.query,
         renameText,
         preview,
-        ...(notice === undefined ? {} : { notice }),
+        ...omitUndefined({ notice }),
       })));
       notice = undefined;
 

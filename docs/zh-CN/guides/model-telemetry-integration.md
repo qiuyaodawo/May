@@ -154,4 +154,4 @@ pnpm test:integration:model-telemetry
 live integration 命令使用宿主配置的默认模型与 provider 配额，发送一次推理请求。
 OpenAI 传输同时验证原生 JSON Schema 输出。命令检查实际用量、能力版本、attempt
 父级关系和独立指标。报告与 Session 历史保存在被忽略的
-`review/model-telemetry-live/`。本地协议、SQLite、文件与进程测试无需外部模型账户。
+`.test-output/model-telemetry-live/`。本地协议、SQLite、文件与进程测试无需外部模型账户。

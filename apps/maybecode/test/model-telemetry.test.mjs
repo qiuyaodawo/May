@@ -6,7 +6,9 @@ import test from "node:test";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { createObservabilityPlugin } from "@sortedyuan/observability/plugin";
 import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver } from "@sortedyuan/providers";
-import { InMemorySessionCatalog, MaybeCodeWorkspace, startMaybeCodeWebUI } from "../dist/index.js";
+import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
+import { MaybeCodeWorkspace } from "../dist/workspace.js";
+import { startMaybeCodeWebUI } from "../dist/web-ui.js";
 import { startLocalTelemetryService, localTelemetrySelection } from "../../../packages/providers/test/fixtures/local-telemetry-service.mjs";
 
 const base = fileURLToPath(new URL("../dist/test-output/model-telemetry/", import.meta.url));

@@ -44,7 +44,7 @@ export async function runModelPicker(
     initialIndex: Math.max(
       0,
       options.models.findIndex((model) =>
-        model.name === options.controller.modelInfo?.profile
+        model.name === options.controller.application.modelInfo?.profile
       ),
     ),
     pageSize: 10,
@@ -54,7 +54,7 @@ export async function runModelPicker(
       options.terminal.renderView(sanitizeTerminalText(renderModelPicker(
         options.models,
         selection.selectedIndex,
-        options.controller.modelInfo?.profile,
+        options.controller.application.modelInfo?.profile,
       )));
       const action = resolvePickerAction(
         keymap,
@@ -85,7 +85,7 @@ async function runLineModelPicker(
 ): Promise<ModelPickerResult> {
   options.terminal.write(sanitizeTerminalText(`\n${renderLineModelList(
     options.models,
-    options.controller.modelInfo?.profile,
+    options.controller.application.modelInfo?.profile,
   )}`));
   const answer = (await options.question(
     "Select a model number/name, or d <selection> to set default (Enter to cancel): ",

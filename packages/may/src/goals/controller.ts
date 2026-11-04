@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import type { ContextFactory } from "../context/index.js";
-import type { Model, ModelRequest, ModelStreamOptions, Tool, Usage } from "../core/index.js";
+import { omitUndefined, type Model, type ModelRequest, type ModelStreamOptions, type Tool, type Usage } from "../core/index.js";
 import { goalBudget, goalText, restoreGoal } from "./state.js";
 import type { GoalAgent, GoalBudget, GoalContextOptions, GoalEvent, GoalModelOptions, GoalOptions, GoalRun, GoalState, GoalStore } from "./types.js";
 
@@ -228,7 +228,7 @@ export class GoalController {
         await goal.change(state => {
           goal.checkLimits(state, false);
           if (state.calls.length >= 10_000) throw new GoalLimitError("Goal model call limit reached (10000)");
-          return { ...state, calls: [...state.calls, { id, status: "pending", ...(options.runId === undefined ? {} : { runId: options.runId }) }] };
+          return { ...state, calls: [...state.calls, omitUndefined({ id, status: "pending", runId: options.runId })] };
         });
         let settled = false;
         try {
@@ -245,7 +245,7 @@ export class GoalController {
               const tokens = totalTokens(event.usage);
               if (!Number.isSafeInteger(goal.state!.usage.totalTokens + (tokens ?? 0))) throw new Error("Goal token counter exceeds the safe integer limit");
               await goal.change(state => ({ ...state,
-                calls: state.calls.map(call => call.id === id ? { ...call, status: tokens === undefined ? "unknown" : "settled", ...(tokens === undefined ? {} : { tokens }) } : call),
+                calls: state.calls.map(call => call.id === id ? { ...call, status: tokens === undefined ? "unknown" : "settled", ...omitUndefined({ tokens }) } : call),
                 usage: { ...state.usage, totalTokens: state.usage.totalTokens + (tokens ?? 0), usageComplete: state.usage.usageComplete && tokens !== undefined } }));
               settled = true;
               if (tokens === undefined && goal.state!.budget.maxTotalTokens !== undefined) throw new Error("Model did not report usage required by the goal token budget");

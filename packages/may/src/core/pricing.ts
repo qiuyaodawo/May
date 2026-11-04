@@ -1,3 +1,4 @@
+import { omitUndefined } from "./omit-undefined.js";
 import type { Usage, UsageItem, UsageTokenRelation } from "./types.js";
 
 export interface TokenPrices {
@@ -64,11 +65,11 @@ export function resolvePriceSchedule(value?: TokenPriceSchedule | TokenPrices): 
   object(value, "pricing");
   if ("inputUsdPerMillion" in value) {
     validateTokenPrices(value);
-    return Object.freeze({ id: "legacy-token-prices", version: "1", currency: "USD", source: "host", effectiveAt: "1970-01-01T00:00:00.000Z",
+    return Object.freeze(omitUndefined({ id: "legacy-token-prices", version: "1", currency: "USD", source: "host", effectiveAt: "1970-01-01T00:00:00.000Z",
       inputPerMillion: value.inputUsdPerMillion, outputPerMillion: value.outputUsdPerMillion,
-      ...(value.cachedReadUsdPerMillion === undefined ? {} : { cachedReadPerMillion: value.cachedReadUsdPerMillion }),
-      ...(value.cachedWriteUsdPerMillion === undefined ? {} : { cachedWritePerMillion: value.cachedWriteUsdPerMillion }),
-      ...(value.reasoningUsdPerMillion === undefined ? {} : { reasoningPerMillion: value.reasoningUsdPerMillion }) });
+      cachedReadPerMillion: value.cachedReadUsdPerMillion,
+      cachedWritePerMillion: value.cachedWriteUsdPerMillion,
+      reasoningPerMillion: value.reasoningUsdPerMillion }));
   }
   const fields = ["id", "version", "currency", "source", "effectiveAt", "inputPerMillion", "outputPerMillion", "cachedReadPerMillion", "cachedWritePerMillion", "reasoningPerMillion", "items"];
   for (const key of Object.keys(value)) if (!fields.includes(key)) throw new TypeError(`Unknown pricing field: ${key}`);
@@ -116,7 +117,7 @@ export function resolveUsageTotals(usage?: Usage): UsageTotals {
   if (components !== undefined && !Number.isSafeInteger(components)) throw new RangeError("Usage total exceeds a safe integer");
   if (totalTokens !== undefined && !Number.isSafeInteger(totalTokens)) throw new RangeError("Usage total exceeds a safe integer");
   if (usage.totalTokens !== undefined && components !== undefined && totalTokens! < components) throw new RangeError("Usage totalTokens is smaller than its included components");
-  return { ...(totalTokens === undefined ? {} : { totalTokens }), complete: missing.length === 0, missingReasons: missing };
+  return omitUndefined({ totalTokens, complete: missing.length === 0, missingReasons: missing });
 }
 
 export function aggregateUsage(current: Usage | undefined, next: Usage | undefined): Usage | undefined {
@@ -233,7 +234,7 @@ function calculateUsageCost(usage: Usage | undefined, pricing: Readonly<TokenPri
   if ((input !== undefined && input < 0) || (output !== undefined && output < 0)) throw new RangeError("Usage detail subsets exceed their containing token count");
   if (Object.values(quantities).some(value => value !== undefined && value < 0)) throw new RangeError("Usage item subsets exceed their containing token count");
   const amount = input === undefined || output === undefined ? undefined : (input * pricing.inputPerMillion + output * pricing.outputPerMillion + detailTokenCost) / 1_000_000 + itemCost;
-  return { ...result, ...(amount === undefined ? {} : { amount }), complete: missing.length === 0, missingReasons: missing };
+  return { ...result, ...omitUndefined({ amount }), complete: missing.length === 0, missingReasons: missing };
 }
 
 function validateUsage(usage: Usage): void {

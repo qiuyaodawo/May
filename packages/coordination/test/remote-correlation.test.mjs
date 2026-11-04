@@ -7,14 +7,14 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { BasicTracer, DiagnosticsStore } from "../../observability/dist/index.js";
 import { CoordinationRuntime, InMemoryCoordinationStore } from "../dist/index.js";
 import { createRemoteAgent } from "../dist/remote-worker.js";
 
 test("independent HTTP worker preserves trace parents and rejects invalid correlation without new execution", { timeout: 15_000 }, async t => {
-  const parentDirectory = fileURLToPath(new URL("../../../review/correlation-tests/", import.meta.url));
-  await mkdir(parentDirectory, { recursive: true });
-  const directory = await mkdtemp(join(parentDirectory, "worker-"));
+  await mkdir(join(testOutputRoot, "coordination"), { recursive: true });
+  const directory = await mkdtemp(join(testOutputRoot, "coordination", "remote-correlation-"));
   let modelCalls = 0;
   const service = createServer(async (request, response) => {
     const chunks = [];

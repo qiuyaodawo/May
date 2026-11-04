@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
@@ -14,7 +15,7 @@ import { chromium } from "playwright";
 import { webUiAssets } from "../../dist/assets.js";
 
 test("阅读器等长更新未读提示与增量 DOM 渲染真实浏览器集成测试", { timeout: 120_000 }, async t => {
-  const base = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../review/web-ui-browser");
+  const base = join(testOutputRoot, "web-ui", "browser");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "reading-incremental-"));
   let app, server, browser;

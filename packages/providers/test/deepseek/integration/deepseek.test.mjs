@@ -5,7 +5,33 @@ import { loadMayConfig, resolveModelProfile } from "@sortedyuan/may/config";
 import { InMemoryContext, May } from "@sortedyuan/may/core";
 import { DeepSeekModel } from "@sortedyuan/providers/deepseek";
 
-test("completes a real reasoning and tool-call loop", { timeout: 120_000 }, async () => {
+test("streams real reasoning_content", { timeout: 120_000 }, async () => {
+  const config = await readDeepSeekConfig();
+  const events = [];
+  const model = new DeepSeekModel({
+    apiKey: config.apiKey,
+    baseURL: config.baseURL,
+    model: config.model,
+    thinking: "enabled",
+    maxTokens: 4096,
+  });
+  const run = new May({ model, context: new InMemoryContext() }).run({
+    input: "一个数乘以 3 再加 7 等于 52，这个数是多少？",
+  });
+
+  const collecting = (async () => {
+    for await (const event of run.events) events.push(event);
+  })();
+  await run.result;
+  await collecting;
+
+  assert.ok(
+    events.some((event) => event.type === "model.reasoning.delta"),
+    "DeepSeek did not emit reasoning_content",
+  );
+});
+
+test("completes a real tool-call loop", { timeout: 120_000 }, async () => {
   const config = await readDeepSeekConfig();
   const events = [];
   const model = new DeepSeekModel({
@@ -56,10 +82,6 @@ test("completes a real reasoning and tool-call loop", { timeout: 120_000 }, asyn
   const result = await run.result;
   await collecting;
 
-  assert.ok(
-    events.some((event) => event.type === "model.reasoning.delta"),
-    "DeepSeek did not emit reasoning_content",
-  );
   assert.ok(
     events.some((event) => event.type === "tool.completed"),
     "DeepSeek did not call the add tool",

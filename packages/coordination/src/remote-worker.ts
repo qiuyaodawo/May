@@ -2,9 +2,9 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { mkdir, open, readFile, type FileHandle } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
-import { AsyncStateSerializer, type AgentApplicationEvent } from "@sortedyuan/may";
-import { acquireFileLock, releaseFileLock } from "@sortedyuan/may/storage";
-import { isStreamingMayEvent, validateTelemetryCorrelation } from "@sortedyuan/may/core";
+import type { AgentApplicationEvent } from "@sortedyuan/may";
+import { acquireFileLock, type FileLock } from "@sortedyuan/may/storage";
+import { AsyncStateSerializer, isStreamingMayEvent, validateTelemetryCorrelation } from "@sortedyuan/may/core";
 import type { ApprovalDecision } from "@sortedyuan/may/permissions";
 import type { CoordinationAgent, TaskExecution, TaskRecovery } from "./types.js";
 import { canonical, copy, freeze, name, positive, validateOutput } from "./validation.js";
@@ -56,7 +56,7 @@ export class CoordinationWorker {
   private fatal: unknown;
 
   private constructor(options: CoordinationWorkerOptions, private readonly file: FileHandle,
-    private readonly lock: FileHandle, private readonly lockPath: string) {
+    private readonly lock: FileLock) {
     validateToken(options.token); this.secret = Buffer.from(options.token);
     this.maxConcurrent = options.maxConcurrent ?? 4; this.maxJobs = options.maxJobs ?? 1024;
     this.maxRequestBytes = options.maxRequestBytes ?? 1_048_576; this.maxJournalBytes = options.maxJournalBytes ?? 67_108_864;
@@ -74,12 +74,11 @@ export class CoordinationWorker {
   static async open(options: CoordinationWorkerOptions): Promise<CoordinationWorker> {
     validateToken(options.token);
     const directory = resolve(options.directory); await mkdir(directory, { recursive: true });
-    const lockPath = join(directory, "worker.lock"), path = join(directory, "worker.jsonl");
-    const lock = await acquireFileLock(lockPath); let file: FileHandle | undefined;
+    const path = join(directory, "worker.jsonl");
+    const lock = await acquireFileLock(join(directory, "worker.lock")); let file: FileHandle | undefined;
     try {
-      await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
       file = await open(path, "a+");
-      const worker = new CoordinationWorker(options, file, lock, lockPath);
+      const worker = new CoordinationWorker(options, file, lock);
       if ((await file.stat()).size > worker.maxJournalBytes) throw new Error("Worker journal exceeds maxJournalBytes");
       const bytes = await readFile(path), end = bytes.length === 0 || bytes.at(-1) === 10 ? bytes.length : bytes.lastIndexOf(10) + 1;
       for (const line of bytes.subarray(0, end).toString("utf8").split("\n").slice(0, -1)) {
@@ -96,7 +95,7 @@ export class CoordinationWorker {
         await worker.recordRecovery(job, await worker.inspect(job));
       }
       return worker;
-    } catch (error) { await file?.close(); await releaseFileLock(lock, lockPath); throw error; }
+    } catch (error) { try { await file?.close(); } finally { await lock.release(); } throw error; }
   }
 
   /** Pass to an HTTPS server, or an HTTP server bound to loopback. No CORS/browser API. */
@@ -307,7 +306,7 @@ export class CoordinationWorker {
             await this.recordRecovery(job, await this.inspect(job));
           }
         });
-      } finally { await this.serial.close(); await this.file.close(); await releaseFileLock(this.lock, this.lockPath); }
+      } finally { await this.serial.close(); try { await this.file.close(); } finally { await this.lock.release(); } }
     })();
   }
 }

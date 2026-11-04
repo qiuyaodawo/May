@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { omitUndefined } from "@sortedyuan/may/core";
 import { definePlugin, defineService } from "@sortedyuan/may/plugin";
 import { services } from "@sortedyuan/may/services";
 import { observabilityHostService } from "@sortedyuan/observability/plugin";
@@ -35,9 +36,8 @@ export function createMcpPlugin(options: McpPluginOptions) {
     id: "may.mcp", version: "1.0.0", scope: "application", provides: [mcpService],
     requires: [{ service: services.toolSources }], optional: [{ service: services.tracer }],
     async setup(context) {
-      const tracer = context.optional(services.tracer);
       const pool = await (options.open ?? openMcpClientPool)({
-        ...configuredOptions(options), ...(tracer === undefined ? {} : { tracer }), signal: context.signal,
+        ...configuredOptions(options), ...omitUndefined({ tracer: context.optional(services.tracer) }), signal: context.signal,
       });
       context.defer(() => pool.close());
       context.provide(mcpService, pool);
@@ -51,9 +51,8 @@ export function createMcpHostPlugin(options: McpPluginOptions) {
     id: "may.workspace-mcp", version: "1.0.0", scope: "host", provides: [mcpHostService],
     optional: [{ service: observabilityHostService }],
     async setup(context) {
-      const tracer = context.optional(observabilityHostService)?.tracer;
       const pool = await (options.open ?? openMcpClientPool)({
-        ...configuredOptions(options), ...(tracer === undefined ? {} : { tracer }), signal: context.signal,
+        ...configuredOptions(options), ...omitUndefined({ tracer: context.optional(observabilityHostService)?.tracer }), signal: context.signal,
       });
       context.defer(() => pool.close());
       context.provide(mcpHostService, pool);

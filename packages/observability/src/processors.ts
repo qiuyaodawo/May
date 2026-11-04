@@ -1,3 +1,4 @@
+import { omitUndefined } from "@sortedyuan/may/core";
 import type {
   FinishedTraceSpan,
   ObservabilityErrorHandler,
@@ -35,7 +36,7 @@ export class SimpleSpanProcessor implements SpanProcessor {
     onError?: ObservabilityErrorHandler,
     options: Omit<BatchSpanProcessorOptions, "maxExportBatchSize" | "onError"> = {},
   ) {
-    this.processor = new BatchSpanProcessor(exporter, { ...options, maxExportBatchSize: 1, ...(onError === undefined ? {} : { onError }) });
+    this.processor = new BatchSpanProcessor(exporter, { ...options, maxExportBatchSize: 1, ...omitUndefined({ onError }) });
   }
 
   get droppedSpans(): number { return this.processor.droppedSpans; }

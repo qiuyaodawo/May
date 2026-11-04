@@ -1,4 +1,5 @@
 import type { KeyStroke, Keymap } from "@sortedyuan/tui/keybindings";
+import { omitUndefined } from "@sortedyuan/may/core";
 import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/may/permissions";
 import {
   Column,
@@ -42,7 +43,7 @@ import { createMaybeCodeKeymap, MAYBECODE_EDITOR_KEYBINDINGS, type MaybeCodeKeym
 import { MAYBECODE_DARK_THEME } from "./theme.js";
 import { MaybeCodeUiActionRegistry } from "./actions.js";
 
-export interface MaybeCodePrototypeViewOptions {
+export interface MaybeCodeTerminalViewOptions {
   readonly isRunning?: () => boolean;
   readonly permissionMode?: () => import("../policy.js").MaybeCodePermissionMode;
   readonly clipboard?: Clipboard;
@@ -77,7 +78,7 @@ export type ModelDialogAction =
   | { readonly type: "set-default"; readonly profile: string };
 
 /** Retained MaybeCode view shared by the experimental terminal frontend. */
-export class MaybeCodePrototypeView implements InteractiveComponent {
+export class MaybeCodeTerminalView implements InteractiveComponent {
   private readonly focus = new FocusManager();
   private readonly keymap: Keymap;
   private readonly theme: TuiTheme;
@@ -146,7 +147,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
     handlePointer: event => this.layout.handlePointer(event),
   };
 
-  constructor(private readonly options: MaybeCodePrototypeViewOptions) {
+  constructor(private readonly options: MaybeCodeTerminalViewOptions) {
     this.keymap = createMaybeCodeKeymap(options.keymap);
     this.theme = options.theme ?? MAYBECODE_DARK_THEME;
     this.model = options.model ?? "model: unknown";
@@ -157,7 +158,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
       assistantLabel: "MaybeCode",
       selectedToolDetailsHint: "Enter details",
       toolDetailsHint: `${this.shortcutHint("app.tools.toggle")} all`,
-      ...(options.toolRenderers === undefined ? {} : { toolRenderers: options.toolRenderers }),
+      ...omitUndefined({ toolRenderers: options.toolRenderers }),
     });
     this.transcript = new ScrollView(this.transcriptView, {
       followEnd: true,
@@ -241,7 +242,7 @@ export class MaybeCodePrototypeView implements InteractiveComponent {
   private editorOptions(): Pick<EditorOptions, "clipboard" | "onInvalidate" | "onError" | "keybindings"> {
     return {
       keybindings: MAYBECODE_EDITOR_KEYBINDINGS,
-      ...(this.options.clipboard === undefined ? {} : { clipboard: this.options.clipboard }),
+      ...omitUndefined({ clipboard: this.options.clipboard }),
       onInvalidate: () => this.options.onInvalidate?.(),
       onError: error => this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`),
     };

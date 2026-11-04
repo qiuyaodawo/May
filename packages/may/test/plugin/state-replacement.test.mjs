@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setImmediate } from "node:timers/promises";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { definePlugin, defineService, PluginHost } from "@sortedyuan/may/plugin";
 
-const output = fileURLToPath(new URL("../.test-output/", import.meta.url));
 const deferred = () => {
   let resolve;
   const promise = new Promise(done => { resolve = done; });
@@ -16,9 +15,6 @@ const deferred = () => {
 for (const scope of ["application", "session"]) {
   for (const method of ["set", "update"]) {
     test(`${scope} 插件替换保留正在保存的 ${method} 状态更新`, async t => {
-      await mkdir(output, { recursive: true });
-      const directory = await mkdtemp(join(output, "state-replacement-"));
-      const file = join(directory, "state.json");
       const writing = deferred();
       const release = deferred();
       let disposed = 0;
@@ -36,8 +32,8 @@ for (const scope of ["application", "session"]) {
       t.after(async () => {
         release.resolve();
         await host.close();
-        await rm(directory, { recursive: true, force: true });
       });
+      const file = join(await createTestDirectory(t, "may/state-replacement"), "state.json");
       const scopeOptions = {
         id: scope,
         onStateChange(snapshot) {
@@ -126,9 +122,6 @@ test("替换插件的 setup 能够更新已经保存的状态", async t => {
 });
 
 test("插件关闭等待已经接受的状态保存完成后清理资源", async t => {
-  await mkdir(output, { recursive: true });
-  const directory = await mkdtemp(join(output, "state-close-"));
-  const file = join(directory, "state.json");
   const writing = deferred();
   const release = deferred();
   let savedAtCleanup;
@@ -142,7 +135,8 @@ test("插件关闭等待已经接受的状态保存完成后清理资源", async
     },
   });
   const host = await PluginHost.create({ plugins: [plugin] });
-  t.after(async () => { release.resolve(); await host.close(); await rm(directory, { recursive: true, force: true }); });
+  t.after(async () => { release.resolve(); await host.close(); });
+  const file = join(await createTestDirectory(t, "may/state-close"), "state.json");
   const application = await host.createScope("application", {
     id: "application",
     async onStateChange(snapshot) {

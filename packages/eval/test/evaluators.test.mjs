@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,7 @@ import { FileEvalStore } from "../dist/file-store.js";
 
 const workload = fileURLToPath(new URL("./fixtures/workload.mjs", import.meta.url));
 async function setup(evaluators) {
-  const parent = resolve("eval-verification", "evaluator-tests");
+  const parent = join(testOutputRoot, "eval", "evaluators");
   await mkdir(parent, { recursive: true });
   const root = await mkdtemp(join(parent, "run-"));
   const source = join(root, "source");

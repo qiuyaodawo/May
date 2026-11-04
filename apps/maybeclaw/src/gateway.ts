@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import { realpath } from "node:fs/promises";
-import { channelTextPages } from "./channel-text.js";
+import { channelTextPages } from "@sortedyuan/gateway/delivery";
 import type { ChannelInput } from "./channel-store.js";
 import { gatewayInput } from "./gateway-input.js";
 import { withGatewayConfiguration } from "./gateway-config.js";
@@ -9,7 +9,7 @@ import { CoordinationRuntime, coordinationInput, createCoordinationTools, valida
 import type { AgentApplicationEvent } from "@sortedyuan/may";
 import type { ApprovalDecision, ApprovalRequest, PersistentPermissionRule } from "@sortedyuan/may/permissions";
 import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store";
-import type { ContentPart, Tool } from "@sortedyuan/may/core";
+import { omitUndefined, type ContentPart, type Tool } from "@sortedyuan/may/core";
 import { PluginHost } from "@sortedyuan/may/plugin";
 import { agentAdapterRegistryService } from "@sortedyuan/gateway/adapters";
 import { coordinationService } from "@sortedyuan/coordination/plugin";
@@ -17,9 +17,7 @@ import { createGatewayAgentPlugins } from "./plugins/agents.js";
 import { GatewayStore } from "./gateway-store.js";
 import { GatewayRepository, type GatewayChannelRepository, type GatewayEventRecord, type PendingInput } from "./gateway-repository.js";
 import { gatewayEntry } from "./gateway-settings.js";
-import { digest } from "./types.js";
-import type { LegacyTaskRecord } from "./gateway-migration.js";
-import { actorKey, entryKey, type GatewayActor, type GatewayAgentAdapter, type GatewayApproval, type GatewayBinding, type GatewayDelivery,
+import { actorKey, digest, entryKey, type GatewayActor, type GatewayAgentAdapter, type GatewayApproval, type GatewayBinding, type GatewayDelivery,
   type GatewayEntry, type GatewayMessage, type GatewaySession, type GatewaySettings, type GatewayTask } from "./gateway-types.js";
 
 export interface GatewayInput {
@@ -94,8 +92,6 @@ export class AgentGateway {
     return this.repository.delivery(id) ?? this.repository.reply(id);
   }
   events(sessionId: string, actor: GatewayActor): GatewayEventRecord[] { return this.visibleRecords("events", actor, sessionId); }
-  legacyTasks(actor: GatewayActor): LegacyTaskRecord[] { this.requireOperator(actor); return this.store.list("legacy-tasks"); }
-  legacyTask(id: string, actor: GatewayActor): LegacyTaskRecord | undefined { this.requireOperator(actor); return this.repository.legacyTask(id); }
   coordinationSnapshots(actor: GatewayActor): CoordinationSnapshot[] { this.requireOperator(actor); return this.store.list("coordination"); }
   entryDefaults(actor: GatewayActor): { sessionId: string }[] { this.requireOperator(actor); return this.store.list("defaults"); }
   configuration(actor: GatewayActor): GatewaySettings { this.requireOperator(actor); return structuredClone(this.options.settings); }
@@ -468,16 +464,6 @@ export class AgentGateway {
     }
     if (words[0] === "/agent" && words[1] === "list") return { text: this.status().agents.map(agent => `${agent.id}  ${agent.status}`).join("\n") };
     if (["/status", "/result", "/cancel"].includes(words[0] ?? "") && words[1]) {
-      const legacy = this.store.get<LegacyTaskRecord>("legacy-tasks", words[1]);
-      if (legacy) {
-        if (actor.kind !== "operator" && (actor.threadId || !legacy.origins.some(origin => origin.account === actor.account && origin.conversation === actor.conversation && origin.sender === actor.userId))) throw new Error("当前身份无权查看此历史任务。");
-        if (words[0] === "/cancel") {
-          if (legacy.status !== "awaiting-assignment") throw new Error("该历史任务当前无法取消，请查询原执行状态。");
-          this.store.put("legacy-tasks", legacy.id, { ...legacy, status: "cancelled", cancellationRequested: true });
-          return { text: `历史任务已取消：${legacy.id}` };
-        }
-        return { text: `${legacy.id} · 历史任务 · ${legacy.status}\n${words[0] === "/result" ? legacy.result ?? legacy.detail ?? "结果尚未生成。" : legacy.detail ?? ""}` };
-      }
       selected ??= this.store.get<GatewayTask>("tasks", words[1])?.sessionId;
     }
     const reply = input.entry && input.replyTo ? this.repository.platformMessage(input.entry, input.replyTo) : undefined;
@@ -668,7 +654,7 @@ export class AgentGateway {
             },
           }] : [];
           const result = await adapter.execute({ conversationId: binding.conversationId!, inputId, input: taskInput, signal: context.signal,
-            ...(execution.telemetry === undefined ? {} : { telemetry: execution.telemetry }),
+            ...omitUndefined({ telemetry: execution.telemetry }),
             permissionScope: JSON.stringify(actor.kind === "operator" ? ["operator", actor.id] : ["platform", actor.account, actor.userId]),
             tools, shouldYield: () => yielded,
             report: event => { context.report(event); this.onEvent(session, task, event); } });

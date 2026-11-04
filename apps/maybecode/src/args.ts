@@ -1,3 +1,4 @@
+import { omitUndefined } from "@sortedyuan/may/core";
 import { MaybeCodeUsageError } from "./errors.js";
 import type { MaybeCodePermissionMode } from "./policy.js";
 
@@ -19,7 +20,7 @@ Options:
   --model <name>       Use a named model profile
   --yolo               Auto-approve tool requests, preserving explicit denials
   --no-yolo            Use normal approvals, overriding configuration
-  --ui <name>          UI implementation: retained (default), classic or web
+  --ui <name>          UI implementation: retained (default) or web
   --port <number>      Local Web UI port (default: 3940; requires --ui web)
   -c, --continue       Continue the most recent session for this workspace
   -r, --resume <id>    Resume a specific session (--session is an alias)
@@ -53,7 +54,7 @@ export interface MaybeCodeStartCommand {
   readonly port?: number;
 }
 
-export type MaybeCodeUI = "classic" | "retained" | "web";
+export type MaybeCodeUI = "retained" | "web";
 
 export interface MaybeCodeMcpCommand {
   readonly type: "mcp";
@@ -134,9 +135,9 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
     }
     if (argument === "--ui") {
       const value = readValue(args, ++index, "--ui");
-      if (value !== "classic" && value !== "retained" && value !== "web") {
+      if (value !== "retained" && value !== "web") {
         throw new MaybeCodeUsageError(
-          '--ui must be "classic", "retained" or "web"',
+          '--ui must be "retained" or "web"',
         );
       }
       if (ui !== undefined) {
@@ -178,17 +179,17 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   }
   if (port !== undefined && ui !== "web") throw new MaybeCodeUsageError("--port requires --ui web");
 
-  return {
+  return omitUndefined({
     type: "start",
-    ...(permissionMode === undefined ? {} : { permissionMode }),
+    permissionMode,
     autoResume: continueLatest,
     ui: ui ?? "retained",
-    ...(port === undefined ? {} : { port }),
-    ...(workspace === undefined ? {} : { workspace }),
-    ...(configPath === undefined ? {} : { configPath }),
-    ...(model === undefined ? {} : { model }),
-    ...(sessionId === undefined ? {} : { sessionId }),
-  };
+    port,
+    workspace,
+    configPath,
+    model,
+    sessionId,
+  });
 }
 
 function parseTeamCommand(args: readonly string[]): MaybeCodeTeamCommand | MaybeCodeHelpCommand {
@@ -262,8 +263,7 @@ function parseMcpCommand(args: readonly string[]): MaybeCodeMcpCommand | MaybeCo
   }
   return {
     type: "mcp", action: action as MaybeCodeMcpCommand["action"], serverId,
-    ...(configPath === undefined ? {} : { configPath }),
-    ...(workspace === undefined ? {} : { workspace }),
+    ...omitUndefined({ configPath, workspace }),
     ...(scopes.length === 0 ? {} : { scopes }),
   };
 }

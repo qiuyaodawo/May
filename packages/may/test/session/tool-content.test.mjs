@@ -1,14 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { Session } from "@sortedyuan/may/session";
 
 test("file history restores saved multimodal content and withholds legacy raw output", async (t) => {
-  const review = new URL("../../../../review/", import.meta.url);
-  await mkdir(review, { recursive: true });
-  const directory = await mkdtemp(new URL("session-content-", review));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/session-content");
   const store = new FileSessionStore(directory);
   const content = [
     { type: "text", text: "Public result" },

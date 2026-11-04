@@ -1,3 +1,4 @@
+import { omitUndefined } from "@sortedyuan/may/core";
 import type { EvalPlan, TrialState, MeasuredValue } from "./types.js";
 
 export interface MetricDistribution { readonly count: number; readonly planned: number; readonly complete: number; readonly coverage: number; readonly min?: number; readonly max?: number; readonly mean?: number; readonly median?: number; }
@@ -36,7 +37,7 @@ export function createEvalReport(plan: EvalPlan, states: readonly TrialState[]):
       successful, successRate: successful / trials.length, outcomes,
       durationMs: distribution(recorded.map(value => value.metrics.durationMs), trials.length),
       cost: distribution(recorded.map(value => ({ ...(currency !== undefined && value.metrics.cost.currency === currency && value.metrics.cost.amount !== undefined ? { value: value.metrics.cost.amount } : {}), complete: currency !== undefined && value.metrics.cost.complete, missingReasons: value.metrics.cost.missingReasons })), trials.length),
-      ...(currency === undefined ? {} : { costCurrency: currency }),
+      ...omitUndefined({ costCurrency: currency }),
       cases: plan.experiment.cases.map(item => { const planned = trials.filter(value => value.caseId === item.id).length; const successes = recorded.filter(value => value.trial.caseId === item.id && isSuccessful(value)).length; return { caseId: item.id, planned, successful: successes, successRate: successes / planned }; }) };
   });
   return { schemaVersion: 1, experimentId: plan.experiment.id, planned: plan.trials.length, recorded: states.length, variants, trials: [...states], plan };

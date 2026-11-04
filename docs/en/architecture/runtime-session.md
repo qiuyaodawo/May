@@ -285,22 +285,22 @@ The application keeps only product policy and compatibility adapters:
 - optional local tracing configuration plus ownership of its shared processor;
 - optional stdio / Streamable HTTP MCP configuration plus ownership of its shared client pool;
 - slash-command definitions, product events, theme, page layout, model/session
-  picker flows, and classic-versus-retained terminal behavior.
+  picker flows, and the retained terminal behavior.
 
-`MaybeCodeApplication` is now a product composition wrapper around
-`AgentApplication`. It maps generic tool-presentation events to the existing
-change-preview event while delegating run, approval, history, Context, and close
-operations. `MaybeCodeWorkspace` similarly wraps `AgentWorkspace` and retains
-primarily model-profile and effort policy.
+`MaybeCodeApplication` is a product composition around one `AgentApplication`,
+which it exposes as `agent`. It adds goals, sub-agent requests, Git checkpoints,
+model updates and input serialization, and maps generic tool-presentation events
+to the change-preview event. `MaybeCodeWorkspace` wraps `AgentWorkspace` for
+sessions, worktrees, MCP operations and model-profile and effort policy.
 
 Its explicit product UI boundary is `MaybeCodeController`: user intents are
 methods, while asynchronous model, tool, permission, context, and session
 changes are a `MaybeCodeEvent` stream. `MaybeCodeWorkspace` implements this
-headless contract.
-The bundled frontends consume this contract. Another UI can consume the same
+headless interface. `controller.application` returns the `MaybeCodeApplication` of
+the active Session for reading its state, and `controller.transition(action)` runs a
+state change on that Session's queue.
+The bundled frontends consume this interface. Another UI can consume the same
 controller without inheriting MaybeCode's rendering or command policy.
-`MaybeCodeTerminal` is a narrower line-oriented I/O adapter for reusing the
-classic frontend rather than the custom-UI boundary.
 
 ## Events and persistence
 

@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { homedir } from "node:os";
 import { loadMayConfig } from "@sortedyuan/may/config";
-import { resolveMaybeCodeGit } from "../dist/index.js";
+import { resolveMaybeCodeGit } from "../dist/configured.js";
 
-const artifacts = fileURLToPath(new URL("../../../review/git-configuration/", import.meta.url));
+const artifacts = join(testOutputRoot, "maybecode", "git-configuration");
 
 test("project Git configuration defaults, path resolution and explicit controls use the saved config", async t => {
   await mkdir(artifacts, { recursive: true });

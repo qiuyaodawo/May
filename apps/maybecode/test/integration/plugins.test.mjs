@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { mkdir, mkdtemp, readFile, writeFile, readdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join, resolve, sep } from "node:path";
@@ -11,10 +13,11 @@ import { delegationService, defaultSubagentConfiguration } from "@sortedyuan/coo
 import { historyMemoryService } from "@sortedyuan/may/history-memory";
 import { createMcpPlugin } from "@sortedyuan/mcp/plugin";
 import { openMcpClientPool } from "@sortedyuan/mcp";
-import { MaybeCodeApplication, openConfiguredMaybeCode } from "../../dist/index.js";
+import { openConfiguredMaybeCode } from "../../dist/index.js";
+import { MaybeCodeApplication } from "../../dist/application.js";
 
 async function workspaceFor(t, label) {
-  const base = fileURLToPath(new URL("../../../../plugin-verification/", import.meta.url));
+  const base = join(testOutputRoot, "maybecode", "plugins");
   await mkdir(base, { recursive: true });
   const workspace = await mkdtemp(join(base, label));
   t.after(async () => { assert.ok(resolve(workspace).startsWith(resolve(base) + sep)); await rm(workspace, { recursive: true, force: true }); });
@@ -24,7 +27,7 @@ async function workspaceFor(t, label) {
 
 async function realModel() {
   const config = await loadMayConfig();
-  return createBuiltinProviderModel(selectProviderModel(config, { model: "deepseek-v4-flash" }));
+  return createBuiltinProviderModel(selectProviderModel(config, { model: liveModelProfile() }));
 }
 
 test("product plugin goals use actual model and tools and restore their persisted controller state", { timeout: 120000 }, async (t) => {
@@ -34,8 +37,8 @@ test("product plugin goals use actual model and tools and restore their persiste
   const options = { workspace, model, store, skills: false, subagents: false, instructions: "Use the tools requested by the user and provide evidence from their actual outputs.", maxSteps: 8 };
   const application = await MaybeCodeApplication.open(options);
   t.after(() => application.close());
-  assert.equal(application.goals, application.getService(goalsService));
-  assert.ok(application.getService(historyMemoryService).memory);
+  assert.equal(application.goals, application.agent.getService(goalsService));
+  assert.ok(application.agent.getService(historyMemoryService).memory);
   await application.startGoal("Use the read tool to read README.md. When the first Markdown heading is confirmed from the tool output, call update_goal with status completed and quote that heading as evidence. Do not use shell.", { maxRuns: 3, maxTotalTokens: 100000 });
   await application.goals.wait();
   const goal = application.getGoal();
@@ -124,7 +127,7 @@ test("delegation plugin executes an actual child agent with separate Session and
     } },
   });
   t.after(() => application.close());
-  assert.equal(application.subagents, application.getService(delegationService).get());
+  assert.equal(application.subagents, application.agent.getService(delegationService).get());
   const result = await (await application.submit({ input: "Delegate exactly one worker task with id read-doc. Give it a standalone brief: use read to read README.md, then return the first Markdown heading quoted from the actual read output. Assign no files for modification. When it finishes, reply with that heading. Do not read the file yourself and do not use shell." })).result;
   assert.match(JSON.stringify(result.message), /May/u);
   const state = application.getDelegationState();
@@ -152,7 +155,7 @@ test("configured MCP and tracing plugins serve actual files across Session chang
   const workspace = await workspaceFor(t, "plugin-mcp-live-");
   const application = await openConfiguredMaybeCode({
     git: false,
-    workspace, model: "deepseek-v4-flash", dataDirectory: join(workspace, "data"), skills: false, subagents: false, goals: false,
+    workspace, model: liveModelProfile(), dataDirectory: join(workspace, "data"), skills: false, subagents: false, goals: false,
     instructions: "Use the exact tool name requested and quote evidence from the tool output.",
     observability: { scheduledDelayMs: 60000 },
     mcp: { servers: [{ id: "filesystem", command: process.execPath, args: [fileURLToPath(new URL("../../../../packages/mcp/test/plugin/read-server.mjs", import.meta.url)), workspace], protocolMode: "auto" }] },
@@ -193,7 +196,7 @@ test("selected MCP services expose actual catalog, commands and events and own e
   });
   const application = await openConfiguredMaybeCode({
     git: false,
-    workspace, model: "deepseek-v4-flash", dataDirectory: join(workspace, "data"),
+    workspace, model: liveModelProfile(), dataDirectory: join(workspace, "data"),
     plugins: [plugin], skills: false, goals: false, subagents: false,
     mcp: { servers: [{ id: "unused", command: "unused-mcp-command" }] },
     instructions: "Use the exact requested tool and quote its actual output. Do not use other tools.",
@@ -243,7 +246,7 @@ test("delegation children use the selected MCP service with their own Session an
   const base = defaultSubagentConfiguration();
   const application = await openConfiguredMaybeCode({
     git: false,
-    workspace, model: "deepseek-v4-flash", dataDirectory: join(workspace, "data"),
+    workspace, model: liveModelProfile(), dataDirectory: join(workspace, "data"),
     plugins: [createMcpPlugin({
       servers: [{ id: "filesystem", command: process.execPath, args: [fileURLToPath(new URL("../../../../packages/mcp/test/plugin/read-server.mjs", import.meta.url)), workspace], protocolMode: "auto" }],
     })],
@@ -264,12 +267,12 @@ test("delegation children use the selected MCP service with their own Session an
   })();
   const result = await (await application.submit({ input: "Delegate exactly one worker task with id mcp-read-doc. Provide this standalone brief: use mcp__filesystem__read to read README.md and quote its first Markdown heading from the actual output. Do not use local read or shell, and do not modify any files. After the child completes, reply with its heading. Do not read the file yourself." })).result;
   assert.match(JSON.stringify(result.message), /May/u);
-  const state = application.getDelegationState();
+  const state = application.application.getDelegationState();
   const child = state.tasks.find(task => task.id === "mcp-read-doc");
   assert.ok(child);
   assert.equal(child.status, "completed");
   assert.notEqual(child.sessionId, application.sessionId);
-  const records = await application.delegationToolRecords(child.id);
+  const records = await application.application.delegationToolRecords(child.id);
   assert.ok(records.records.some(record => record.name === "mcp__filesystem__read" && record.status === "completed"));
   assert.ok(approvals.some(event => event.type === "delegation.event" && event.sessionId === child.sessionId));
   assert.ok(state.budget.modelCalls >= 3);

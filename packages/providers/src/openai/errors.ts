@@ -1,3 +1,5 @@
+import { omitUndefined } from "@sortedyuan/may/core";
+
 export class OpenAIResponsesError extends Error {
   readonly status: number | undefined;
   readonly providerType: string | undefined;
@@ -16,7 +18,7 @@ export class OpenAIResponsesError extends Error {
       cause?: unknown;
     } = {},
   ) {
-    super(message, options.cause === undefined ? {} : { cause: options.cause });
+    super(message, omitUndefined({ cause: options.cause }));
     this.name = "OpenAIResponsesError";
     this.status = options.status;
     this.providerType = options.providerType;
@@ -28,7 +30,7 @@ export class OpenAIResponsesError extends Error {
 
 export class OpenAIResponsesProtocolError extends OpenAIResponsesError {
   constructor(message: string, options: ErrorOptions = {}) {
-    super(message, options.cause === undefined ? {} : { cause: options.cause });
+    super(message, omitUndefined({ cause: options.cause }));
     this.name = "OpenAIResponsesProtocolError";
   }
 }

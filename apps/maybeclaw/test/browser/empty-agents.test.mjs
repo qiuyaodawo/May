@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -7,10 +8,10 @@ import test from "node:test";
 import { chromium } from "playwright";
 import { AgentGateway } from "../../dist/gateway.js";
 import { gatewaySettings } from "../../dist/gateway-settings.js";
-import { startGatewayServer } from "../../dist/gateway-server.js";
+import { startGatewayServer } from "../../dist/plugins/web-api.js";
 
 test("browser empty agent list startup, login, adding first agent, persistent config, session creation without restart, and deletion protection", { timeout: 35_000 }, async t => {
-  const base = fileURLToPath(new URL("../../../../.zcode/tmp/maybeclaw-browser-tests/", import.meta.url));
+  const base = join(testOutputRoot, "maybeclaw", "browser");
   await mkdir(base, { recursive: true }); const directory = await mkdtemp(join(base, "case-"));
   const path = join(directory, "config.json"), password = `  ${randomBytes(32).toString("base64url")}  `;
   const config = { apps: { maybeclaw: { version: 2, agents: [], server: { auth: { password } } } } };

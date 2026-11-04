@@ -1,3 +1,4 @@
+import { omitUndefined } from "../core/omit-undefined.js";
 import type { PluginDefinition, ServiceDependency } from "../plugin/index.js";
 
 export type PluginFactoryMetadata<C = unknown> = Pick<PluginDefinition<C>,
@@ -9,11 +10,13 @@ export function factoryMetadata<C>(options: PluginFactoryMetadata<C>, defaults: 
     declared.service.id === dependency.service.id && declared.service.scope === dependency.service.scope)), ...(options.requires ?? [])];
   return {
     scope: "application", version: options.version ?? "1.0.0",
-    ...(options.config === undefined ? {} : { config: options.config }),
-    ...(options.configSchema === undefined ? {} : { configSchema: options.configSchema }),
-    ...(requires.length === 0 ? {} : { requires }),
-    ...(options.optional === undefined ? {} : { optional: options.optional }),
-    ...(options.requiresHooks === undefined ? {} : { requiresHooks: options.requiresHooks }),
-    ...(options.state === undefined ? {} : { state: options.state }),
+    ...omitUndefined({
+      config: options.config,
+      configSchema: options.configSchema,
+      requires: requires.length === 0 ? undefined : requires,
+      optional: options.optional,
+      requiresHooks: options.requiresHooks,
+      state: options.state,
+    }),
   };
 }

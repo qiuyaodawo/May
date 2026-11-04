@@ -1,10 +1,11 @@
 import { satisfies, valid } from "semver";
+import { AsyncStateSerializer } from "../core/state-serializer.js";
 import type { AnyPlugin, PluginState, PluginStateRecord, PluginStateSnapshot } from "./types.js";
 import { validateJson, validateSchema } from "./validation.js";
 
 export class StateStore {
   private entries: Record<string, PluginStateRecord>;
-  private pending: Promise<void> = Promise.resolve();
+  private readonly serial = new AsyncStateSerializer();
   private acceptingWrites = true;
 
   constructor(snapshot: PluginStateSnapshot, private readonly save?: (snapshot: PluginStateSnapshot) => Promise<void>) {
@@ -73,7 +74,7 @@ export class StateStore {
   }
 
   async settled(): Promise<void> {
-    await this.pending;
+    await this.serial.idle();
   }
 
   private assertAcceptingWrites(): void {
@@ -90,8 +91,6 @@ export class StateStore {
   }
 
   private enqueue(task: () => Promise<void>): Promise<void> {
-    const operation = this.pending.then(task);
-    this.pending = operation.catch(() => {});
-    return operation;
+    return this.serial.run(task);
   }
 }

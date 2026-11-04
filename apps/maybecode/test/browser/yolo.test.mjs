@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import test from "node:test";
 import { chromium } from "playwright";
-import { createMaybeCodeWebHost, startMaybeCodeWebServer } from "../../dist/index.js";
+import { createMaybeCodeWebHost, startMaybeCodeWebServer } from "../../dist/web-ui.js";
 import { yoloWorkspace } from "../yolo-support.mjs";
 
 test("WebUI 与 workspace 同步 YOLO，窄屏固定标识可见，切换会话继续保留模式", { timeout: 60_000 }, async t => {

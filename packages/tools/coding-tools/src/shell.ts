@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import type { Tool, ToolProgressUpdate } from "@sortedyuan/may/core";
+import { omitUndefined, type Tool, type ToolProgressUpdate } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
 import {
   optionalPositiveInteger,
@@ -161,10 +161,7 @@ export function createShellTool(options: ShellToolOptions): Tool<
           `shell: timeoutMs must not exceed ${maxTimeoutMs}`,
         );
       }
-      return {
-        command,
-        ...(timeoutMs === undefined ? {} : { timeoutMs }),
-      };
+      return omitUndefined({ command, timeoutMs });
     },
     async execute(input, context) {
       if (context.signal.aborted) {

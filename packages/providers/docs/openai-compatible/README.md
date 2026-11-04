@@ -19,8 +19,15 @@ description instead of a silent completion. Earlier text and reasoning deltas
 stay visible, but the stream never emits `response.completed`, and a following
 `[DONE]` or `finish_reason` never turns the failure into a success.
 
-Provider-specific packages reuse the conversion and streaming helpers while
-retaining their own request extensions and error handling.
+`OpenAIChatCompletionsModel`, `DeepSeekModel`, `KimiModel` and `ZhipuModel` all extend
+`OpenAICompatibleChatModel`. An `OpenAICompatibleDialect` describes each endpoint's
+default base URL, output-limit field, tool-name and `[DONE]` requirements, structured
+output support and request extensions. All of them report failures with
+`OpenAICompatibleApiError` (HTTP status, `providerType`, `providerCode`,
+`retryAfterMs`), `OpenAICompatibleProtocolError` and
+`OpenAICompatibleFinishReasonError`. Each error's `provider` field names the
+dialect, for example `"DeepSeek"`, and its `code` keeps the dialect prefix such as
+`DEEPSEEK_API_ERROR`.
 
 The `@sortedyuan/providers/openai-compatible/http` subpath exports `readSseData` and
 `parseRetryAfterMs`, shared by the Anthropic, OpenAI Responses, and Chat

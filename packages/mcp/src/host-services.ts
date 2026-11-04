@@ -1,6 +1,7 @@
 import { realpath, stat } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { specTypeSchemas, type ClientCapabilities, type CreateMessageRequestParams, type CreateMessageResult, type CreateMessageResultWithTools, type Root } from "@modelcontextprotocol/client";
+import { omitUndefined } from "@sortedyuan/may/core";
 import { McpCapabilityError } from "./errors.js";
 import type { McpInteractionBroker, McpInteractionOwner, McpHostReviewParams } from "./interactions.js";
 
@@ -74,7 +75,7 @@ export class McpHostServiceRunner {
       const uri = pathToFileURL(path).href;
       if (roots.some((entry) => entry.uri === uri)) continue;
       if (root.name !== undefined && (typeof root.name !== "string" || root.name.length > 256)) throw hostFailure(this.serverId, "invalid root name");
-      roots.push({ uri, ...(root.name === undefined ? {} : { name: root.name }) });
+      roots.push(omitUndefined({ uri, name: root.name }));
     }
     const reviewed = await this.review(binding, signal, { mode: "review", kind: "roots", editable: false,
       message: "Share these host-selected root paths with this MCP server? Roots are guidance, NOT a filesystem sandbox or an access grant.", data: roots });

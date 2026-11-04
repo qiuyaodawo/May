@@ -1,6 +1,7 @@
 import {
   ModelProtocolError,
   RunCancelledError,
+  omitUndefined,
   type AssistantMessage,
   type Message,
   type Model,
@@ -48,12 +49,12 @@ export function createModelContextSummarizer(
       let completed: AssistantMessage | undefined;
 
       // Run 身份一并传给模型，直接使用同一个模型的计账方可以区分摘要调用。
-      const streamOptions: ModelStreamOptions = {
+      const streamOptions: ModelStreamOptions = omitUndefined({
         purpose: "compaction",
         signal,
-        ...(request.runId === undefined ? {} : { runId: request.runId }),
-        ...(request.step === undefined ? {} : { step: request.step }),
-      };
+        runId: request.runId,
+        step: request.step,
+      });
 
       try {
         for await (const event of model.stream(

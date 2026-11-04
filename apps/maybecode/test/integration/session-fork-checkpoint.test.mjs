@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { execFile, fork } from "node:child_process";
 import { mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -7,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
+import { liveModelProfile, liveSwitchModelProfile } from "../fixtures/live-model.mjs";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
 import { loadMayConfig } from "@sortedyuan/may/config";
@@ -17,11 +19,12 @@ import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 import { GoalController } from "@sortedyuan/may/goals";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
 import { runtimeHooks } from "@sortedyuan/may/core";
-import { MaybeCodeApplication, MaybeCodeWorkspace } from "../../dist/index.js";
+import { MaybeCodeApplication } from "../../dist/application.js";
+import { MaybeCodeWorkspace } from "../../dist/workspace.js";
 import { gitRequestService, startGitGoalRequest } from "../../dist/git-request.js";
 
 const execute = promisify(execFile);
-const artifacts = fileURLToPath(new URL("../../../../review/maybecode-fork-verification/", import.meta.url));
+const artifacts = join(testOutputRoot, "maybecode", "session-fork-checkpoint");
 
 test("real coding requests preserve Git checkpoints, current files and historical worktrees", {
   timeout: 180_000, skip: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1",
@@ -42,7 +45,7 @@ test("real coding requests preserve Git checkpoints, current files and historica
   await writeFile(join(skillDirectory, "references", "location.txt"), "PROJECT_SKILL_RESOURCE\n");
   await writeFile(join(workspace, "value.txt"), "INITIAL_VALUE\n");
   const config = await loadMayConfig();
-  const model = createBuiltinProviderModel(selectProviderModel(config, { model: "deepseek-v4-flash" }));
+  const model = createBuiltinProviderModel(selectProviderModel(config, { model: liveModelProfile() }));
   const options = { workspace, model, store: new FileSessionStore(join(directory, "sessions")),
     catalog: new FileSessionCatalog(join(directory, "catalog.json")), goals: false, subagents: false,
     permissionPolicy: (check) => ["shell", "bash"].includes(check.tool.name) ? "deny" : "allow",
@@ -81,7 +84,7 @@ test("real coding requests preserve Git checkpoints, current files and historica
   assert.equal(await readFile(join(workspace, "value.txt"), "utf8"), "LATER_VERSION\n");
   assert.equal(app.workspace, workspace);
   assert.equal((await app.history()).some((event) => event.type === "input.submitted" && event.message.content.some((part) => part.text?.includes("LATER_VERSION"))), false);
-  assert.match(app.instructions.effective, /Workspace files may have changed since that point/u);
+  assert.match(app.application.instructions.effective, /Workspace files may have changed since that point/u);
   const inherited = (await app.getForkPoints(currentId)).find((point) => point.runId === first.id);
   assert.equal(inherited.commit, firstPoint.commit);
   assert.equal(inherited.worktreeAvailable, true);
@@ -92,7 +95,7 @@ test("real coding requests preserve Git checkpoints, current files and historica
   assert.equal(await readFile(join(worktreeWorkspace, "value.txt"), "utf8"), "FIRST_VERSION\n");
   assert.equal(await readFile(join(worktreeWorkspace, "extra.txt"), "utf8"), "FIRST_EXTRA\n");
   assert.equal((await app.getWorkspaceGit()).commit, firstPoint.commit);
-  assert.equal((await app.listSkills()).find((skill) => skill.name === "git-fork-guide").active, true);
+  assert.equal(app.application.listSkills().find((skill) => skill.name === "git-fork-guide").active, true);
   assert.equal((await app.readSkill("git-fork-guide")).directory, join(worktreeWorkspace, ".may", "skills", "git-fork-guide"));
   const skillRequest = await app.submit({ input: "Use skill_read to read git-fork-guide references/location.txt. Reply with the resource contents only. Do not modify files." });
   assert.match((await skillRequest.result).message.content.map((part) => part.text ?? "").join(""), /PROJECT_SKILL_RESOURCE/u);
@@ -107,7 +110,7 @@ test("real coding requests preserve Git checkpoints, current files and historica
   assert.equal(app.workspace, workspace);
   assert.equal(await readFile(join(workspace, "value.txt"), "utf8"), "LATER_VERSION\n");
   await app.resumeSession(currentId);
-  assert.match(app.instructions.effective, /Workspace files may have changed since that point/u);
+  assert.match(app.application.instructions.effective, /Workspace files may have changed since that point/u);
 });
 
 test("real completed Goal saves its final files and a recoverable yielded position", {
@@ -118,7 +121,7 @@ test("real completed Goal saves its final files and a recoverable yielded positi
   t.after(async () => { await app.close(); await fixture.cleanup(); });
   await app.startGoal("Use write to create goal.txt containing exactly COMPLETED_GOAL followed by a newline, then call update_goal with status completed and evidence that the requested file was written. Do not use shell.");
   await waitForGoal(app);
-  assert.equal(app.getGoal().status, "completed", JSON.stringify(app.getGoal()));
+  assert.equal(app.application.getGoal().status, "completed", JSON.stringify(app.application.getGoal()));
   assert.equal(await readFile(join(fixture.workspace, "goal.txt"), "utf8"), "COMPLETED_GOAL\n");
   assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "2");
   const history = await app.history();
@@ -131,7 +134,7 @@ test("real completed Goal saves its final files and a recoverable yielded positi
   assert.equal((await fixture.gitWorkspace.checkpointByRun(app.sessionId, final.runId)).historyPosition, Number(point.id.slice(app.sessionId.length + 1)));
   const forkId = await app.forkSession(point.id, "current");
   assert.notEqual(forkId, final.sessionId);
-  assert.equal(app.getGoal(), undefined);
+  assert.equal(app.application.getGoal(), undefined);
   assert.equal((await app.getForkPoints(forkId)).find(item => item.runId === final.runId).available, true);
 });
 
@@ -165,8 +168,8 @@ test("real Goal verification owns the Git lease and saves files after accepted v
   t.after(async () => { await app.close(); await competitor.close(); await fixture.cleanup(); });
   await app.startGoal("Call get_goal at the beginning of every Run. When usage.runs is 1, use write to create goal.txt containing exactly NEEDS_VERIFICATION followed by a newline, then update_goal completed. During subsequent Runs, follow the verifier's correction in goal.progress and request completion again. Do not use shell.", { maxRuns: 3 });
   await waitForGoal(app);
-  assert.equal(app.getGoal().status, "completed", JSON.stringify(app.getGoal()));
-  assert.equal(app.getGoal().completion.source, "verifier");
+  assert.equal(app.application.getGoal().status, "completed", JSON.stringify(app.application.getGoal()));
+  assert.equal(app.application.getGoal().completion.source, "verifier");
   assert.equal(checks, 2);
   assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "3");
   const yielded = (await app.history()).filter(event => event.type === "run.yielded");
@@ -251,8 +254,8 @@ test("real verification failure and cancellation release the Goal lease with unc
   t.after(async () => { await app.close(); await competitor.close(); await fixture.cleanup(); });
   await app.startGoal("Use write to create retained.txt containing exactly RETAINED_GOAL followed by a newline, then update_goal completed. Do not create any other files. Do not use shell.");
   await waitForGoal(app);
-  assert.equal(app.getGoal().status, "failed");
-  assert.match(app.getGoal().reason, /ENOENT/u);
+  assert.equal(app.application.getGoal().status, "failed");
+  assert.match(app.application.getGoal().reason, /ENOENT/u);
   assert.equal(await fixture.git("rev-list", "--count", "HEAD"), "1");
   assert.match(await fixture.git("status", "--porcelain"), /retained\.txt/u);
   assert.equal((await app.getForkPoints(app.sessionId)).some(point => point.available), false);
@@ -294,7 +297,7 @@ async function goalGitFixture(prefix) {
     statePath: join(directory, "external-goal.json"),
     gitWorkspace: await ProjectGitWorkspace.open({ ...gitOptions, workspace }),
     options: { workspace,
-      model: createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" })),
+      model: createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: liveModelProfile() })),
       store: new FileSessionStore(join(directory, "sessions")), catalog: new FileSessionCatalog(join(directory, "catalog.json")),
       git: gitOptions, subagents: false, skills: false,
       permissionPolicy: check => ["shell", "bash"].includes(check.tool.name) ? "deny" : "allow",
@@ -315,7 +318,7 @@ test("real historical forks restore the selected model profile, effort and conti
   const workspace = join(directory, "project");
   await mkdir(workspace);
   let config = await loadMayConfig();
-  const profiles = ["deepseek-v4-flash", "deepseek-fork-profile"];
+  const profiles = [liveModelProfile(), "live-fork-profile"];
   config = { ...config, models: { ...config.models, [profiles[1]]: {
     ...config.models[profiles[0]], options: { ...config.models[profiles[0]].options, reasoningEffort: "high" },
   } } };
@@ -361,15 +364,15 @@ test("real historical forks restore the selected model profile, effort and conti
   breakCatalog = true;
   await assert.rejects(app.forkSession(secondPoint.id, "current"), /could not be recorded in the catalog/u);
   assert.equal(app.sessionId, originalId);
-  assert.equal(app.modelInfo.profile, profiles[0]);
+  assert.equal(app.application.modelInfo.profile, profiles[0]);
   assert.ok(resolve(catalogOperations).startsWith(`${resolve(directory)}${sep}`));
   await rm(catalogOperations);
   await rename(`${catalogOperations}.saved`, catalogOperations);
   await app.newSession();
-  assert.equal(app.modelInfo.profile, profiles[0], "Failed fork creation must retain the current model configuration");
+  assert.equal(app.application.modelInfo.profile, profiles[0], "Failed fork creation must retain the current model configuration");
   await app.resumeSession(originalId);
   const lateFork = await app.forkSession(secondPoint.id, "current");
-  assert.equal(app.modelInfo.profile, profiles[1]);
+  assert.equal(app.application.modelInfo.profile, profiles[1]);
   const copied = [...await app.history()].reverse().find(event => event.type === "assistant.completed" && event.runId === second.id);
   assert.deepEqual(copied.message, secondResult.message);
   const savedModel = [...await app.history()].reverse().find(event => event.type === "state.updated" && event.key === "maybecode.model");
@@ -379,9 +382,9 @@ test("real historical forks restore the selected model profile, effort and conti
   await app.resumeSession(originalId);
   const earlyFork = await app.forkSession(firstPoint.id, "current");
   assert.notEqual(earlyFork, lateFork);
-  assert.equal(app.modelInfo.profile, profiles[0]);
+  assert.equal(app.application.modelInfo.profile, profiles[0]);
   assert.equal((await app.history()).some(event => event.type === "assistant.completed" && event.runId === second.id), false);
-  config = { ...config, models: { ...config.models, [profiles[1]]: config.models["gpt-5.6-luna"] } };
+  config = { ...config, models: { ...config.models, [profiles[1]]: config.models[liveSwitchModelProfile()] } };
   await assert.rejects(app.forkSession(secondPoint.id, "current"), /original provider, model and adapter/u);
   assert.equal(app.sessionId, earlyFork);
 });
@@ -400,7 +403,7 @@ test("real delegated requests keep the Git lease through child tasks and the fin
   await git("config", "--local", "user.email", "may-test@example.invalid");
   await git("config", "--local", "core.autocrlf", "false");
   await writeFile(join(workspace, "README.md"), "# Delegated checkpoint fixture\n");
-  const model = createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" }));
+  const model = createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: liveModelProfile() }));
   const base = defaultSubagentConfiguration();
   const options = {
     workspace, model, store: new FileSessionStore(join(directory, "sessions")),
@@ -458,7 +461,7 @@ test("real delegated requests keep the Git lease through child tasks and the fin
   assert.equal(await git("rev-list", "--count", "HEAD"), "2");
   assert.equal(await readFile(join(workspace, "child-a.txt"), "utf8"), "CHILD_A\n");
   assert.equal(await readFile(join(workspace, "child-b.txt"), "utf8"), "CHILD_B\n");
-  const state = app.getDelegationState();
+  const state = app.application.getDelegationState();
   assert.equal(state.status, "completed");
   assert.equal(state.tasks.filter((task) => task.depth === 2 && task.status === "completed").length, 2);
   assert.deepEqual(state.mainRunIds, runs.map((run) => run.runId));
@@ -518,7 +521,7 @@ for (const mode of ["request", "Goal"]) {
         await Promise.race([reportRun, requestError.then(error => { throw error; })]);
       } else {
         await app.startGoal(input, { maxRuns: 2 });
-        await Promise.race([reportRun, waitForGoal(app).then(() => { throw new Error(`The Goal finished before its report Run started: ${JSON.stringify(app.getGoal())}; observed main Runs: ${observedMainRuns}; delegation: ${JSON.stringify(app.getDelegationState())}`); })]);
+        await Promise.race([reportRun, waitForGoal(app).then(() => { throw new Error(`The Goal finished before its report Run started: ${JSON.stringify(app.application.getGoal())}; observed main Runs: ${observedMainRuns}; delegation: ${JSON.stringify(app.application.getDelegationState())}`); })]);
       }
       const lastRunId = await reportRun;
       if (outcome === "cancellation") {
@@ -531,7 +534,7 @@ for (const mode of ["request", "Goal"]) {
         assert.match(String(error), outcome === "failure" ? /ENOENT/u : /Cancel|cancel/u);
       } else {
         await waitForGoal(app);
-        assert.equal(app.getGoal().status, outcome === "failure" ? "failed" : "cancelled", JSON.stringify(app.getGoal()));
+        assert.equal(app.application.getGoal().status, outcome === "failure" ? "failed" : "cancelled", JSON.stringify(app.application.getGoal()));
       }
       const runIds = (await app.history()).filter(event => event.type === "run.started").map(event => event.runId);
       assert.equal(runIds.length, 2);
@@ -563,21 +566,21 @@ test("real delegated Goal meters a role model and saves one completed request ch
   const app = await MaybeCodeWorkspace.open({ ...fixture.options,
     subagents: { dataDirectory: join(fixture.workspace, "..", "delegation"),
       createRoleModel(role) {
-        assert.equal(role.model, "deepseek-v4-flash");
+        assert.equal(role.model, liveModelProfile());
         roleModels++;
         return createBuiltinProviderModel(selectProviderModel(config, { model: role.model }));
       },
-      configuration: { ...base, roles: [{ name: "worker", model: "deepseek-v4-flash", tools: ["read", "write", "edit"], delegateTo: [] }] },
+      configuration: { ...base, roles: [{ name: "worker", model: liveModelProfile(), tools: ["read", "write", "edit"], delegateTo: [] }] },
     },
   });
   t.after(async () => { await app.close(); await fixture.cleanup(); });
   await app.startGoal("Call delegate_tasks exactly once with one independent worker task. The worker owns only role-child.txt and must use write to create it with exactly ROLE_CHILD_GOAL followed by a newline. Include its exact files array and a standalone brief. After the child finishes, read role-child.txt and then call update_goal completed with the file contents as evidence. Do not write the file yourself. Do not use shell.", { maxRuns: 2 });
   await waitForGoal(app);
-  const goal = app.getGoal();
+  const goal = app.application.getGoal();
   assert.equal(goal.status, "completed", JSON.stringify(goal));
   assert.ok(roleModels > 0);
   assert.equal(goal.usage.usageComplete, true);
-  const child = app.getDelegationState().tasks.find(task => task.depth === 2);
+  const child = app.application.getDelegationState().tasks.find(task => task.depth === 2);
   assert.equal(child.status, "completed");
   const childRunIds = (await fixture.options.store.inspect(child.sessionId)).filter(event => event.type === "run.started").map(event => event.runId);
   assert.ok(childRunIds.length > 0);
@@ -637,10 +640,10 @@ test("real delegated Goal duration stops its child process and releases the Git 
   const competitor = await MaybeCodeWorkspace.open({ ...fixture.options, goals: false });
   t.after(async () => { await app.close(); await competitor.close(); await fixture.cleanup(); });
   await app.startGoal("Call delegate_tasks exactly once with one independent worker task. The worker owns only duration.txt and must first use write to create it with exactly DURATION_GOAL followed by a newline, then call wait_for_goal_timeout exactly once and wait for that required verification process. Include its exact files array and a standalone brief with both operations. Do not perform the worker's operations yourself. Do not use shell.", { maxRuns: 2, maxDurationMs: 30_000 });
-  const pid = await Promise.race([started, waitForGoal(app).then(() => { throw new Error(`The Goal stopped before its child process started: ${JSON.stringify(app.getGoal())}`); })]);
+  const pid = await Promise.race([started, waitForGoal(app).then(() => { throw new Error(`The Goal stopped before its child process started: ${JSON.stringify(app.application.getGoal())}`); })]);
   await assert.rejects(fixture.gitWorkspace.beginRound({ sessionId: competitor.sessionId }), /Git workspace is already in use/u);
   await waitForGoal(app);
-  assert.equal(app.getGoal().status, "budget_exhausted", JSON.stringify(app.getGoal()));
+  assert.equal(app.application.getGoal().status, "budget_exhausted", JSON.stringify(app.application.getGoal()));
   await exited;
   assert.throws(() => process.kill(pid, 0), /ESRCH/u);
   assert.equal(await readFile(join(fixture.workspace, "duration.txt"), "utf8"), "DURATION_GOAL\n");

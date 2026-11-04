@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { isAbsolute } from "node:path";
+import { omitUndefined } from "@sortedyuan/may/core";
 import type { EvalExecutionAdapter, ExecutionCreateContext } from "./types.js";
 import { startEvalProcess, type CommandOutcome, type EvalCommand, type EvalProcess } from "./process.js";
 
@@ -14,7 +15,7 @@ export interface CommandExecutionAdapterOptions {
 export function createCommandExecutionAdapter(options: CommandExecutionAdapterOptions): EvalExecutionAdapter {
   return {
     id: options.id, version: options.version,
-    ...(options.validate === undefined ? {} : { validate: options.validate }),
+    ...omitUndefined({ validate: options.validate }),
     async create(context) {
       let active: EvalProcess | undefined;
       let command: EvalCommand | undefined;
@@ -66,7 +67,7 @@ export function createNodeCommandExecutionAdapter(options: {
 }): EvalExecutionAdapter {
   return createCommandExecutionAdapter({
     id: options.id, version: options.version,
-    ...(options.validate === undefined ? {} : { validate: options.validate }),
+    ...omitUndefined({ validate: options.validate }),
     command: context => nodeEvalCommand(options.command(context)),
     confirmTermination: ({ outcome }) => outcome.processTerminationConfirmed,
   });
@@ -79,7 +80,6 @@ export function nodeEvalCommand(command: NodeEvalCommand): EvalCommand {
   return { executable: process.execPath,
     args: ["--permission", `--allow-fs-read=${command.script}`, `--allow-fs-read=${command.cwd}`, `--allow-fs-write=${command.cwd}`, command.script, ...(command.args ?? [])],
     cwd: command.cwd,
-    ...(command.env === undefined ? {} : { env: command.env }),
-    ...(command.maxOutputBytes === undefined ? {} : { maxOutputBytes: command.maxOutputBytes }),
+    ...omitUndefined({ env: command.env, maxOutputBytes: command.maxOutputBytes }),
   };
 }

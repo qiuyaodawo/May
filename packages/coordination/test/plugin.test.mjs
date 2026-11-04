@@ -1,18 +1,15 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { InMemoryCoordinationStore } from "@sortedyuan/coordination";
 import { PluginHost } from "@sortedyuan/may/plugin";
 import { createCoordinationPlugin, coordinationService } from "@sortedyuan/coordination/plugin";
 
 test("coordination plugin executes real file hashes and releases writer ownership across repeated cleanup", async t => {
-  const base = fileURLToPath(new URL("../../../plugin-verification/coordination/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "graph-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "coordination/plugin-graph");
   const path = join(directory, "document.txt"), text = "Coordination file evidence";
   await writeFile(path, text);
   const store = new InMemoryCoordinationStore(), host = await PluginHost.create({ plugins: [createCoordinationPlugin()] });

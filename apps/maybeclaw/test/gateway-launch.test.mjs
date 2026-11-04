@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
@@ -12,7 +13,7 @@ import { runMaybeClaw } from "../dist/run.js";
 
 const execute = promisify(execFile);
 const cli = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
-const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-launch-tests/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-launch");
 async function fixture(t) {
   await mkdir(base, { recursive: true }); const directory = await mkdtemp(join(base, "case-"));
   t.after(async () => { assert.ok(resolve(directory).startsWith(resolve(base) + sep)); await rm(directory, { recursive: true, force: true }); });
@@ -25,7 +26,7 @@ test("bare CLI loads the default configuration and help remains explicit", async
   await writeFile(join(directory, ".may", "config.json"), JSON.stringify({ providers: {}, apps: { maybeclaw: { version: 1 } } }));
   await assert.rejects(execute(process.execPath, [cli], { env, timeout: 10000 }), error => {
     assert.equal(error.code, 1); assert.equal(error.stdout, "");
-    assert.match(error.stderr, /旧版 MaybeClaw 配置/); return true;
+    assert.match(error.stderr, /version: 2/); return true;
   });
   for (const help of ["--help", "-h"]) {
     const result = await execute(process.execPath, [cli, help], { env });
@@ -149,7 +150,7 @@ test("launch accepts empty agents array and omitted agents, rejects invalid agen
     let err = ""; stderrBad.on("data", c => { err += c.toString(); });
     const code = await runMaybeClaw(["--no-open", "--config", badPath, "--data-directory", join(directory, `state-bad-${typeof badAgents}`), "--port", "0"], { stderr: stderrBad, signal: controllerBad.signal });
     assert.equal(code, 1);
-    assert.match(err, /agents 必须为列表/);
+    assert.match(err, /apps\.maybeclaw\.agents must be array/);
     stderrBad.destroy();
   }
 

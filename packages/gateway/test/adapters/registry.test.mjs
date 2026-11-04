@@ -1,19 +1,17 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { setImmediate, setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { PluginHost } from "@sortedyuan/may/plugin";
 import { createAgentAdaptersPlugin, agentAdapterRegistryService, createGatewayRpcAdapter } from "../../dist/adapters/index.js";
 
 const example = fileURLToPath(new URL("../../examples/rpc-file-agent.mjs", import.meta.url));
-async function directory(t) {
-  const base = fileURLToPath(new URL("../../../../plugin-verification/agent-adapters/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const path = await mkdtemp(join(base, "files-"));
-  t.after(() => { assert.ok(resolve(path).startsWith(resolve(base) + sep)); return rm(path, { recursive: true, force: true }); }); return path;
+function directory(t) {
+  return createTestDirectory(t, "gateway/agent-adapters");
 }
 function rpcOptions(path) { return { transport: "stdio", command: process.execPath, args: [example, "--directory", join(path, "state"), "--workspace", path] }; }
 const context = (conversationId, inputId, path) => ({ conversationId, inputId, input: { role: "user", content: [{ type: "text", text: JSON.stringify({ operation: "sha256", path }) }] }, signal: new AbortController().signal, tools: [], shouldYield: () => false, report(event) { throw new Error(`File hash service does not emit application event ${event.type}`); } });

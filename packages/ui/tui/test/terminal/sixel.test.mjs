@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -15,7 +16,7 @@ import { NodeTerminalDriver, TerminalImages, TerminalImageSupport, FullscreenRen
 const require = createRequire(import.meta.url);
 
 test("真实 xterm 终端查询、Sixel 显示、重绘、清除和 readline 输入", { timeout: 120_000 }, async t => {
-  const base = fileURLToPath(new URL("../../../../../review/sixel-tests/", import.meta.url));
+  const base = join(testOutputRoot, "tui", "sixel");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "terminal-"));
   const variables = Object.fromEntries(["TMP", "TEMP", "TMPDIR", "MAY_IMAGE_PROTOCOL"].map(key => [key, process.env[key]]));

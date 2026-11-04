@@ -8,7 +8,8 @@ import { historyMemoryService } from "@sortedyuan/may/history-memory";
 import { goalsService } from "@sortedyuan/may/goals/plugin";
 import { delegationService } from "@sortedyuan/coordination/delegation";
 import { createMcpPlugin, mcpService } from "@sortedyuan/mcp/plugin";
-import { MaybeCodeApplication, openConfiguredMaybeCode } from "../dist/index.js";
+import { openConfiguredMaybeCode } from "../dist/index.js";
+import { MaybeCodeApplication } from "../dist/application.js";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { localModel, yoloDirectory } from "./yolo-support.mjs";
 
@@ -62,7 +63,7 @@ test("模型和 reasoning effort 更新保留 application 并更新服务、状�
   await app.activateSkill("model-update-check");
   await app.startGoal("Verify paused goal persistence");
   await app.pauseGoal();
-  const paused = app.getGoal();
+  const paused = app.application.getGoal();
   assert.equal(paused.status, "paused");
   assert.equal(paused.usage.runs, 0);
   assert.equal((await app.inspectContext()).contextWindowTokens, 32000);
@@ -72,11 +73,11 @@ test("模型和 reasoning effort 更新保留 application 并更新服务、状�
     const current = instances.at(-1);
     assert.equal(current.application, first.application);
     assert.equal(app.sessionId, sessionId);
-    assert.equal(app.modelInfo.profile, "second");
+    assert.equal(app.application.modelInfo.profile, "second");
     assert.equal(app.permissionMode, "yolo");
-    assert.equal(app.listSkills().find(skill => skill.name === "model-update-check").active, true);
+    assert.equal(app.application.listSkills().find(skill => skill.name === "model-update-check").active, true);
     assert.equal((await app.inspectContext()).contextWindowTokens, 64000);
-    assert.deepEqual(app.getGoal(), paused);
+    assert.deepEqual(app.application.getGoal(), paused);
     assert.notEqual(current.history, previous.history);
     assert.notEqual(current.goals, previous.goals);
     assert.notEqual(current.subagents, previous.subagents);
@@ -122,15 +123,15 @@ test("插件资源读取失败会终止模型更新，恢复资源后可以重�
   const { app, instances, handles, resourcePath } = await fixture(t);
   await rm(resourcePath);
   await assert.rejects(app.switchModel("second"), /initialization failed/i);
-  assert.equal(app.modelInfo.profile, "first");
+  assert.equal(app.application.modelInfo.profile, "first");
   assert.ok(handles.every(handle => handle.fd === -1));
   await assert.rejects(app.submit({ input: "Do not send this request" }), /Model update failed/);
   await writeFile(resourcePath, "resource restored");
   await app.switchModel("first");
-  assert.equal(app.modelInfo.profile, "first");
+  assert.equal(app.application.modelInfo.profile, "first");
   assert.equal((await app.inspectContext()).contextWindowTokens, 32000);
   await app.switchModel("second");
-  assert.equal(app.modelInfo.profile, "second");
+  assert.equal(app.application.modelInfo.profile, "second");
   assert.equal(instances.at(-1).application, instances[0].application);
   assert.equal(app.permissionMode, "yolo");
   assert.equal((await app.inspectContext()).contextWindowTokens, 64000);
@@ -160,7 +161,7 @@ test("关闭等待模型更新完成，并发输入和重复更新立即失败",
   await writeFile(path, "model update lifecycle");
   const entered = Promise.withResolvers(), release = Promise.withResolvers();
   const handles = [];
-  const app = await MaybeCodeApplication.open({ workspace, model: localModel(), store: new InMemorySessionStore(),
+  const app = await MaybeCodeApplication.open({ workspace, model: localModel(), store: new InMemorySessionStore(), requestRecording: "off",
     skills: false, goals: false, subagents: false, plugins: [{
       id: "verification.update-boundary", version: "1.0.0",
       async setup(context) {

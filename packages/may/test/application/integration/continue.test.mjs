@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { selectLiveModelProfile } from "@sortedyuan/test-support";
 import { AgentApplication } from "@sortedyuan/may";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { loadMayConfig } from "@sortedyuan/may/config";
@@ -7,7 +8,7 @@ import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/pro
 
 test("a standalone application continues context with a real provider and retains one user input", { timeout: 60_000 }, async t => {
   const config = await loadMayConfig();
-  const model = createBuiltinProviderModel(selectProviderModel(config, { model: "deepseek-v4-flash" }));
+  const model = createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) }));
   const app = await AgentApplication.open({ model, store: new InMemorySessionStore(), permissionPolicy: () => "deny" });
   const events = [];
   const relay = (async () => { for await (const event of app.events) events.push(event); })();

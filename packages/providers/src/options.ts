@@ -1,4 +1,4 @@
-import type { Model, ModelLimits } from "@sortedyuan/may/core";
+import { omitUndefined, type Model, type ModelLimits, type ModelRequest, type ModelStreamOptions } from "@sortedyuan/may/core";
 
 import { ProviderConfigurationError } from "./errors.js";
 import type { ProviderModelSelection } from "./types.js";
@@ -107,9 +107,12 @@ export function attachModelLimits(
   if (effectiveLimits === undefined) return model;
   return {
     limits: effectiveLimits,
-    ...(model.contextCompactor === undefined
-      ? {}
-      : { contextCompactor: model.contextCompactor }),
+    supportsRequestRecording: model.supportsRequestRecording === true,
+    reportsAttempts: model.reportsAttempts,
+    capabilityVersion: model.capabilityVersion,
+    configuration: model.configuration,
+    contextCompactor: model.contextCompactor,
+    ...(model.preflight === undefined ? {} : { preflight: (request: ModelRequest, streamOptions: ModelStreamOptions) => model.preflight!(request, streamOptions) }),
     stream: (request, streamOptions) => model.stream(request, streamOptions),
   };
 }
@@ -120,12 +123,8 @@ function mergeLimits(
 ): ModelLimits | undefined {
   if (limits === undefined && maxOutputTokens === undefined) return undefined;
   const effectiveOutputTokens = maxOutputTokens ?? limits?.maxOutputTokens;
-  return {
-    ...(limits?.contextWindowTokens === undefined
-      ? {}
-      : { contextWindowTokens: limits.contextWindowTokens }),
-    ...(effectiveOutputTokens === undefined
-      ? {}
-      : { maxOutputTokens: effectiveOutputTokens }),
-  };
+  return omitUndefined({
+    contextWindowTokens: limits?.contextWindowTokens,
+    maxOutputTokens: effectiveOutputTokens,
+  });
 }

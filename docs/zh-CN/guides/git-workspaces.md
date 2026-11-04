@@ -200,7 +200,7 @@ pnpm --filter @sortedyuan/may build
 node --test packages/may/test/application/git-workspace*.test.mjs
 ```
 
-测试目录保存在被忽略的 `review/git-workspace-tests/` 下。每个可写测试目录都初始化
+测试目录保存在被忽略的 `.test-output/may/` 下。每个可写测试目录都初始化
 并核对自己的仓库身份，随后配置测试作者信息。测试操作限定在独立仓库内。
 
 独立 package consumer 验证会打包完整 runtime 依赖，通过 tarball 离线安装，

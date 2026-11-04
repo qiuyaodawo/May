@@ -6,8 +6,10 @@
     "node": ">=22.16.0"
   },
   "scripts": {
-    "build": "tsc -b && node scripts/build-maybecode.mjs",
+    "build": "tsc -b && node scripts/build-maybecode.mjs && node scripts/write-config-schema.mjs maybecode && node scripts/write-config-schema.mjs maybeclaw",
     "clean": "tsc -b --clean",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "docs:check": "node scripts/check-docs.mjs && node scripts/check-document-pairs.mjs",
     "docs:confirm": "node scripts/check-document-pairs.mjs --write",
     "changeset": "changeset",
@@ -48,6 +50,7 @@
     "mdast-util-from-markdown": "^2.1.0",
     "mdast-util-gfm": "^3.1.0",
     "micromark-extension-gfm": "^3.0.0",
+    "prettier": "3.9.10",
     "semver": "7.8.5",
     "tar": "7.5.22",
     "typescript": "^7.0.2"

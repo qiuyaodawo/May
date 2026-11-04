@@ -1,5 +1,5 @@
 import type { AgentApplication } from "@sortedyuan/may";
-import { correlationTraceAttributes, resolveRunBudget, type UserMessage } from "@sortedyuan/may/core";
+import { correlationTraceAttributes, omitUndefined, resolveRunBudget, type UserMessage } from "@sortedyuan/may/core";
 import type { SessionContinueOptions, SessionEvent, SessionSubmitOptions } from "@sortedyuan/may/session";
 import {
   coordinationInput,
@@ -63,10 +63,7 @@ export function createAttachedApplicationAgent(
   const inspect = (execution: TaskExecution) => {
     const firstExecution = { ...execution, task: { ...execution.task, turn: execution.task.sessionStartTurn ?? 0 } };
     const inputId = options.identity?.(firstExecution, turnOf(firstExecution));
-    return {
-      mode: options.mode ?? "submit" as const,
-      ...(inputId === undefined ? {} : { inputId }),
-    };
+    return omitUndefined({ mode: options.mode ?? "submit", inputId });
   };
   const turnOf = (execution: TaskExecution): AttachedApplicationTurn => ({
     index: execution.task.turn ?? 0,

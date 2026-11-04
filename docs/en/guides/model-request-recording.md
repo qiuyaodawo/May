@@ -23,11 +23,10 @@ const requests = await session.listModelRequests({ limit: 50 });
 const attempts = await session.getModelRequest(requests[0]!.modelCallId);
 ```
 
-MaybeCode accepts `apps.maybecode.requestRecording` in its configuration.
-MaybeClaw Gateway accepts `apps.maybeclaw.agents[].requestRecording` for a `may`
-adapter. Both accept `"off"` and `"required"`. The standalone MaybeClaw service
-also accepts `MaybeClawOptions.requestRecording`.
-All these configuration locations also accept the boolean `providerBodyRecording`.
+MaybeCode accepts `apps.maybecode.requestRecording` in its configuration; its sub-agent
+and Team Sessions use the same setting. MaybeClaw Gateway accepts
+`apps.maybeclaw.agents[].requestRecording` for a `may` adapter. Both accept `"off"` and
+`"required"`. Both configuration locations also accept the boolean `providerBodyRecording`.
 
 ## Saved contents
 
@@ -123,5 +122,5 @@ After `pnpm build`, run the request-history checks with
 `node --test packages/providers/test/request-recording.test.mjs`.
 Run the actual-provider scenario with
 `node --test packages/providers/test/request-recording/integration/session.test.mjs`.
-It uses the configured default profile, or `MAY_RECORDING_MODEL`, and verifies
+It uses `MAY_LIVE_MODEL`, or the configured default profile, and verifies
 saved requests, reopen, branching, deduplication and subsequent execution.

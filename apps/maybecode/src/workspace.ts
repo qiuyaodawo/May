@@ -4,7 +4,7 @@ import { mediaHistory } from "./media-history.js";
 import { MaybeCodeUsageError } from "./errors.js";
 import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 
-import { AgentWorkspace } from "@sortedyuan/may";
+import { AgentWorkspace, type AgentStateTransitionOptions } from "@sortedyuan/may";
 import { observabilityService } from "@sortedyuan/observability/plugin";
 import type { DiagnosticQuery, DiagnosticResult } from "@sortedyuan/observability";
 import { GitCheckpointError, GitWorkspaceConflictError, ProjectGitWorkspace, type ProjectGitWorkspaceOptions, type GitRestorePreview } from "@sortedyuan/may/application/git-workspace";
@@ -18,6 +18,7 @@ import {
   AsyncEventQueue,
   RunCancelledError,
   isStreamingMayEvent,
+  omitUndefined,
   type Model,
   type RunOptions,
 } from "@sortedyuan/may/core";
@@ -25,6 +26,7 @@ import { mcpResourceToUserMessage, mcpPromptToUserMessage, mcpTaskToUserMessage,
   type McpOperationOptions, type McpReadOptions, type McpCompletionParams, type McpResourceSubscription,
   type McpInteractionBroker, type McpTaskWaitOptions, type McpTaskUpdateOptions,
 } from "@sortedyuan/mcp";
+import { GOAL_STATE_KEY } from "@sortedyuan/may/goals";
 import type { ApprovalDecision, PersistentApprovalOptions, PermissionCheck, CreatePermissionRuleOptions } from "@sortedyuan/may/permissions";
 import type { ModelCapabilities } from "@sortedyuan/providers";
 import type {
@@ -51,12 +53,7 @@ import type {
   MaybeCodeRun,
   MaybeCodeSessionEvent,
 } from "./events.js";
-import type {
-  MaybeCodeDelegationRequest,
-  MaybeCodeDelegationState,
-  MaybeCodeDelegationToolRecords,
-} from "./delegation.js";
-import type { MaybeCodeInstructions } from "./instructions.js";
+import type { MaybeCodeDelegationRequest } from "@sortedyuan/coordination/delegation/types";
 
 export interface MaybeCodeModelConfiguration {
   readonly model: Model;
@@ -246,6 +243,14 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   get workspace(): string { return this.manager.workspace; }
+
+  /** Application of the active Session; a Session change replaces it. */
+  get application(): MaybeCodeApplication { return this.manager.activeApplication; }
+
+  /** Run a state change on the Session queue of the active application. */
+  transition<T>(action: (application: MaybeCodeApplication) => T | Promise<T>, options?: AgentStateTransitionOptions): Promise<T> {
+    return this.manager.runStateTransition(action, options);
+  }
 
   private get git(): ProjectGitWorkspace | undefined { return this.state.git.get(this.workspace); }
 
@@ -452,7 +457,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   async restoreFiles(previewId: string): Promise<void> {
-    return this.runWorkspaceOperation(() => this.manager.runStateTransition(() => this.restoreWorkspaceFiles(previewId)));
+    return this.runWorkspaceOperation(() => this.transition(() => this.restoreWorkspaceFiles(previewId)));
   }
 
   private async restoreWorkspaceFiles(previewId: string): Promise<void> {
@@ -475,7 +480,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   private assertWorkspaceIdle(): void {
     this.throwIfClosed();
-    if (this.isRunning || this.getGoal()?.status === "active" || this.getMcpInteractions().length) throw new Error("Finish the active operation before changing the workspace");
+    if (this.isRunning || this.application.getGoal()?.status === "active" || this.getMcpInteractions().length) throw new Error("Finish the active operation before changing the workspace");
   }
 
   private assertNoWorkspaceOperation(): void {
@@ -485,7 +490,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   private runWorkspaceOperation<T>(work: () => Promise<T>, requireIdle = true): Promise<T> {
     if (requireIdle) this.assertWorkspaceIdle(); else this.assertNoWorkspaceOperation();
-    if (this.getGoal()?.status === "active") throw new GitWorkspaceConflictError("Pause or finish the active Goal before changing the workspace");
+    if (this.application.getGoal()?.status === "active") throw new GitWorkspaceConflictError("Pause or finish the active Goal before changing the workspace");
     const previousSessionId = this.sessionId;
     const previousOptions = this.state.options;
     const operation = Promise.resolve().then(work).catch(error => {
@@ -526,9 +531,9 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     this.assertNoWorkspaceOperation();
     this.throwIfClosed();
     parsePermissionMode(mode);
-    await this.manager.runStateTransition(() => {
+    await this.transition(() => {
       if (mode === this.permissionMode) return;
-      if (this.isRunning || this.getGoal()?.status === "active" || this.getMcpInteractions().length > 0) {
+      if (this.isRunning || this.application.getGoal()?.status === "active" || this.getMcpInteractions().length > 0) {
         throw new Error("Pause or cancel the current operation before changing permission mode");
       }
       this.state.options = { ...this.state.options, permissionMode: mode };
@@ -540,43 +545,25 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.workspaceOperation !== undefined || this.manager.isRunning || this.mcpOperationController !== undefined || this.pendingInputs.size > 0 || this.pendingSteering > 0;
   }
 
-  get instructions(): MaybeCodeInstructions {
-    return this.manager.activeApplication.instructions;
-  }
-
-  listSkills() {
-    const skills = this.manager.activeApplication.skills;
-    const active = new Map(skills?.listActive().map((item) => [item.name, item]));
-    const all = new Map(skills?.registry.list().map((item) => [item.name, item]));
-    for (const [name, item] of active) all.set(name, item);
-    return [...all.values()].map((item) => ({ ...item, active: active.has(item.name) }));
-  }
-
-  getSkillDiagnostics() { return this.manager.activeApplication.skills?.registry.diagnostics ?? []; }
-
   readSkill(name: string) {
     this.assertNoWorkspaceOperation();
-    return this.manager.runStateTransition(async (app) => {
-      if (!app.skills) throw new Error("Skills are disabled");
-      return app.skills.listActive().find((item) => item.name === name) ?? app.skills.registry.load(name);
+    return this.transition(async ({ agent }) => {
+      if (!agent.skills) throw new Error("Skills are disabled");
+      return agent.skills.listActive().find((item) => item.name === name) ?? agent.skills.registry.load(name);
     }, { requireIdle: false });
   }
 
   activateSkill(name: string) {
     this.assertNoWorkspaceOperation();
-    return this.manager.runStateTransition((app) => app.activateSkill(name));
+    return this.transition((app) => app.activateSkill(name));
   }
 
   submitSkill(name: string, input: string): Promise<MaybeCodeRun> {
     this.assertNoWorkspaceOperation();
     return this.manager.submitPrepared(async () => {
-      await this.manager.activeApplication.activateSkill(name);
+      await this.application.activateSkill(name);
       return { input: `Use the ${name} skill for this task:\n${input}` };
     });
-  }
-
-  get modelInfo(): MaybeCodeModelInfo | undefined {
-    return this.manager.activeApplication.modelInfo;
   }
 
   async getMcpStatus(): Promise<readonly McpServerStatus[]> {
@@ -585,7 +572,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   private get mcp(): MaybeCodeWorkspaceOptions["mcp"] {
-    return this.manager.activeApplication.mcp ?? this.state.options.mcp;
+    return this.application.mcp ?? this.state.options.mcp;
   }
 
   getMcpInteractions() {
@@ -609,11 +596,11 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   /** 活动请求的子 Session 保留自己的 MCP 身份与授权记录。 */
   private delegatedSessions(): readonly string[] {
-    return this.manager.activeApplication.ownedDelegatedSessions();
+    return this.application.ownedDelegatedSessions();
   }
 
   ownsSession(sessionId: string): boolean {
-    return sessionId === this.sessionId || this.manager.activeApplication.ownsSession(sessionId);
+    return sessionId === this.sessionId || this.application.ownsSession(sessionId);
   }
 
   async refreshMcp(serverId?: string): Promise<void> {
@@ -642,19 +629,19 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.mcp?.listTasks?.(this.mcpOwner()) ?? Promise.resolve([]);
   }
   getMcpTask(serverId: string, id: string, options: McpOperationOptions = {}) {
-    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("getTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+    return this.mcpOperation((signal) => this.transition(() => this.mcpMethod("getTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
   updateMcpTask(serverId: string, id: string, options: McpOperationOptions & McpTaskUpdateOptions = {}) {
-    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("updateTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+    return this.mcpOperation((signal) => this.transition(() => this.mcpMethod("updateTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
   waitMcpTask(serverId: string, id: string, options: McpOperationOptions & McpTaskWaitOptions = {}) {
-    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("waitTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+    return this.mcpOperation((signal) => this.transition(() => this.mcpMethod("waitTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
   cancelMcpTask(serverId: string, id: string, options: McpOperationOptions = {}) {
-    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("cancelTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+    return this.mcpOperation((signal) => this.transition(() => this.mcpMethod("cancelTask")(serverId, id, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
   forgetMcpTask(serverId: string, id: string) {
-    return this.mcpOperation(() => this.manager.runStateTransition(() => this.mcpMethod("forgetTask")(serverId, id, this.mcpOwner())));
+    return this.mcpOperation(() => this.transition(() => this.mcpMethod("forgetTask")(serverId, id, this.mcpOwner())));
   }
   submitMcpTask(serverId: string, id: string, instruction?: string): Promise<MaybeCodeRun> {
     return this.mcpOperation((signal) => this.manager.submitPrepared(async () => ({
@@ -663,19 +650,19 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   readMcpResource(serverId: string, uri: string, options: McpReadOptions = {}) {
-    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("readResource")(serverId, uri, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+    return this.mcpOperation((signal) => this.transition(() => this.mcpMethod("readResource")(serverId, uri, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
 
   readMcpResourceTemplate(serverId: string, template: string, variables: Readonly<Record<string, string | string[]>>, options: McpReadOptions = {}) {
-    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("readResourceTemplate")(serverId, template, variables, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+    return this.mcpOperation((signal) => this.transition(() => this.mcpMethod("readResourceTemplate")(serverId, template, variables, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
 
   getMcpPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>, options: McpOperationOptions = {}) {
-    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("getPrompt")(serverId, name, args, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+    return this.mcpOperation((signal) => this.transition(() => this.mcpMethod("getPrompt")(serverId, name, args, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
 
   completeMcp(serverId: string, params: McpCompletionParams, options: McpOperationOptions = {}) {
-    return this.mcpOperation((signal) => this.manager.runStateTransition(() => this.mcpMethod("complete")(serverId, params, { ...options, signal, owner: this.mcpOwner() })), options.signal);
+    return this.mcpOperation((signal) => this.transition(() => this.mcpMethod("complete")(serverId, params, { ...options, signal, owner: this.mcpOwner() })), options.signal);
   }
 
   submitMcpResource(serverId: string, uri: string, instruction?: string): Promise<MaybeCodeRun> {
@@ -744,23 +731,20 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     const epoch = this.inputEpoch;
     this.pendingSteering++;
     try {
-      return await this.manager.runStateTransition(app => {
+      return await this.transition(app => {
         if (epoch !== this.inputEpoch) throw new RunCancelledError("Input cancelled before acceptance");
         return app.steer(options);
       }, { requireIdle: false });
     } finally { this.pendingSteering--; }
   }
 
-  listSteeringInputs() { return this.manager.activeApplication.listSteeringInputs(); }
-
-  getGoal() { return this.manager.activeApplication.getGoal(); }
   startGoal(objective: string, budget?: import("@sortedyuan/may/goals").GoalBudget) {
     this.assertNoWorkspaceOperation();
-    return this.manager.runStateTransition(app => app.startGoal(objective, budget));
+    return this.transition(app => app.startGoal(objective, budget));
   }
-  resumeGoal() { this.assertNoWorkspaceOperation(); return this.manager.runStateTransition(app => app.resumeGoal()); }
-  pauseGoal() { return this.manager.runStateTransition(app => app.pauseGoal(), { requireIdle: false }); }
-  cancelGoal() { return this.manager.runStateTransition(app => app.cancelGoal(), { requireIdle: false }); }
+  resumeGoal() { this.assertNoWorkspaceOperation(); return this.transition(app => app.resumeGoal()); }
+  pauseGoal() { return this.transition(app => app.pauseGoal(), { requireIdle: false }); }
+  cancelGoal() { return this.transition(app => app.cancelGoal(), { requireIdle: false }); }
 
   retry(): Promise<MaybeCodeRun> {
     this.assertNoWorkspaceOperation();
@@ -783,10 +767,9 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     return this.manager.resolveApproval(requestId, decision, options);
   }
 
-  get persistentRulesEnabled(): boolean { return this.manager.activeApplication.persistentRulesEnabled; }
   listPermissionRules(scopeId?: string) { return this.manager.listPermissionRules(scopeId); }
   createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions) { return this.manager.createPermissionRule(check, options); }
-  createPermissionRuleFrom(id: string, options: CreatePermissionRuleOptions) { return this.manager.runStateTransition(app => app.createPermissionRuleFrom(id, options)); }
+  createPermissionRuleFrom(id: string, options: CreatePermissionRuleOptions) { return this.transition(app => app.createPermissionRuleFrom(id, options)); }
   revokePermissionRule(id: string) { return this.manager.revokePermissionRule(id); }
 
   listSessions(): Promise<readonly SessionSummary[]> {
@@ -846,7 +829,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     );
     if (selected === undefined) throw new Error(`Unknown model profile "${profile}"`);
 
-    const result = await this.manager.runStateTransition(async (current) => {
+    const result = await this.transition(async (current) => {
       if (current.modelInfo?.profile === profile && !current.modelUpdateFailed) {
         this.manager.emit({ type: "model.changed", model: current.modelInfo });
         return current.modelInfo;
@@ -874,7 +857,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       this.assertModelChangeAllowed();
       await current.updateModel({
         ...configuration,
-        ...(nextOptions.modelRuntimeOptions === undefined ? {} : { modelRuntimeOptions: nextOptions.modelRuntimeOptions }),
+        ...omitUndefined({ modelRuntimeOptions: nextOptions.modelRuntimeOptions }),
       });
       this.state.options = nextOptions;
       this.manager.emit({ type: "model.changed", model: current.modelInfo! });
@@ -895,7 +878,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   setDefaultModel(profile: string): Promise<void> {
     this.assertNoWorkspaceOperation();
     this.throwIfClosed();
-    return this.manager.runStateTransition(async () => {
+    return this.transition(async () => {
       const profiles = this.state.options.modelProfiles ?? [];
       if (!profiles.some((candidate) => candidate.name === profile)) {
         throw new Error(`Unknown model profile "${profile}"`);
@@ -919,7 +902,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
 
   async getReasoningEffort(): Promise<MaybeCodeReasoningEffortState> {
     this.throwIfClosed();
-    const profile = this.modelInfo?.profile;
+    const profile = this.application.modelInfo?.profile;
     if (profile === undefined) return unknownReasoningEffort();
     const resolveCapabilities = this.state.options.resolveModelCapabilities;
     if (resolveCapabilities === undefined) return unknownReasoningEffort();
@@ -945,16 +928,15 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       efforts: capabilities.status === "known"
         ? [...capabilities.efforts]
         : [],
-      ...(capabilities.status === "known" &&
-          capabilities.defaultEffort !== undefined
-        ? { defaultEffort: capabilities.defaultEffort }
-        : {}),
-      ...(effectiveEffort === undefined ? {} : { effectiveEffort }),
+      ...omitUndefined({
+        defaultEffort: capabilities.status === "known" ? capabilities.defaultEffort : undefined,
+        effectiveEffort,
+      }),
       overridden,
     };
   }
 
-  async getModelCapabilities(profile = this.modelInfo?.profile, refresh = false): Promise<ModelCapabilities> {
+  async getModelCapabilities(profile = this.application.modelInfo?.profile, refresh = false): Promise<ModelCapabilities> {
     if (profile === undefined || this.state.options.resolveModelCapabilities === undefined) {
       throw new Error("The active workspace does not provide model capability discovery");
     }
@@ -965,13 +947,13 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   }
 
   get modelCapabilitiesAvailable(): boolean {
-    return this.modelInfo?.profile !== undefined && this.state.options.resolveModelCapabilities !== undefined;
+    return this.application.modelInfo?.profile !== undefined && this.state.options.resolveModelCapabilities !== undefined;
   }
 
   getTelemetry(query: DiagnosticQuery = {}): DiagnosticResult | undefined {
     const sessionId = query.sessionId ?? this.sessionId;
     if (!this.ownsSession(sessionId)) throw new Error("Telemetry session does not belong to this workspace");
-    return this.manager.activeApplication.getOptionalService(observabilityService)?.diagnostics?.getDiagnostics({ ...query, sessionId });
+    return this.application.agent.getOptionalService(observabilityService)?.diagnostics?.getDiagnostics({ ...query, sessionId });
   }
 
   async setReasoningEffort(
@@ -979,7 +961,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   ): Promise<MaybeCodeReasoningEffortState> {
     this.assertNoWorkspaceOperation();
     this.throwIfClosed();
-    await this.manager.runStateTransition(async (current) => {
+    await this.transition(async (current) => {
       this.assertModelChangeAllowed();
       const profile = current.modelInfo?.profile;
       if (profile === undefined) {
@@ -1021,7 +1003,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       this.assertModelChangeAllowed();
       await current.updateModel({
         ...configuration,
-        ...(nextOptions.modelRuntimeOptions === undefined ? {} : { modelRuntimeOptions: nextOptions.modelRuntimeOptions }),
+        ...omitUndefined({ modelRuntimeOptions: nextOptions.modelRuntimeOptions }),
       });
       this.state.options = nextOptions;
       if (effort === undefined) this.modelOptionOverrides.delete(profile);
@@ -1039,18 +1021,6 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
   listRecoveries() { return this.manager.listRecoveries(); }
   resolveRecovery(id: string, finding: string) { this.assertNoWorkspaceOperation(); return this.manager.resolveRecovery(id, finding); }
 
-  listDelegationRequests(): readonly MaybeCodeDelegationRequest[] {
-    return this.manager.activeApplication.listDelegationRequests();
-  }
-
-  getDelegationState(): MaybeCodeDelegationState | undefined {
-    return this.manager.activeApplication.getDelegationState();
-  }
-
-  delegationToolRecords(taskId: string): Promise<MaybeCodeDelegationToolRecords> {
-    return this.manager.activeApplication.delegationToolRecords(taskId);
-  }
-
   resolveDelegationRecovery(
     requestId: string,
     taskId: string,
@@ -1058,7 +1028,7 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
     outcome: { readonly status: "completed" | "failed" | "cancelled"; readonly detail: string },
   ): Promise<MaybeCodeDelegationRequest> {
     this.assertNoWorkspaceOperation();
-    return this.manager.activeApplication.resolveDelegationRecovery(requestId, taskId, finding, outcome);
+    return this.application.resolveDelegationRecovery(requestId, taskId, finding, outcome);
   }
 
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage> {
@@ -1122,7 +1092,8 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
       const history = await store.read(sessionId);
       if (history.some(event => event.type === "input.submitted" ||
           event.type === "input.steering.queued" || event.type === "run.started" ||
-          event.type === "assistant.completed" || event.type === "session.created" && event.fork !== undefined)) continue;
+          event.type === "assistant.completed" || event.type === "session.created" && event.fork !== undefined ||
+          event.type === "state.updated" && event.key === GOAL_STATE_KEY)) continue;
       if (!store.delete || !catalog.remove) throw new Error("Empty Session cleanup requires store and catalog deletion support");
       await store.delete(sessionId);
       await catalog.remove(sessionId, workspace);
@@ -1257,8 +1228,7 @@ function withModelConfiguration(
 }
 
 function configuredModelOptions(options: ActiveWorkspaceOptions, profile: string | undefined): Readonly<Record<string, unknown>> {
-  const effort = options.modelProfiles?.find(item => item.name === profile)?.reasoningEffort;
-  return effort === undefined ? {} : { reasoningEffort: effort };
+  return omitUndefined({ reasoningEffort: options.modelProfiles?.find(item => item.name === profile)?.reasoningEffort });
 }
 
 function readHistoricalModel(value: unknown): MaybeCodeModelInfo & { readonly runtimeOptions: Readonly<Record<string, unknown>> } {

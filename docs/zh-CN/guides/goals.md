@@ -105,7 +105,7 @@ MaybeCode 在这个回调完成之前保留工作区 Git 互斥保护。完成�
 Goal Context 将动态 instructions 与当前宿主状态加入模型请求，提示内容纳入上下文估计，
 发送位置的调整保留原有消息计数。状态提示会在上下文压缩后重新生成。
 这条提示不写入原始用户消息。MaybeCode 通过应用拥有的 Session 状态，将目标记录保存在
-`may.goal` 下。SDK 调用方可以在打开 MaybeCode 时使用 `goals: false` 禁用组件。
+`may.goal` 下，`@sortedyuan/may/goals` 将这个键导出为 `GOAL_STATE_KEY`。SDK 调用方可以在打开 MaybeCode 时使用 `goals: false` 禁用组件。
 其他应用自行决定是否导入和连接这个 package。
 
 goals plugin 将活动指导注册到 `instructionSources`，使用 `order: 40`。

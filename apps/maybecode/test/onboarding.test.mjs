@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -9,7 +10,7 @@ import test from "node:test";
 const bin = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
 
 async function onboardingDirectory(t) {
-  const base = fileURLToPath(new URL("../../../review/onboarding/", import.meta.url));
+  const base = join(testOutputRoot, "maybecode", "onboarding");
   await mkdir(base, { recursive: true });
   const root = await mkdtemp(join(base, "cli-"));
   const home = join(root, "home");

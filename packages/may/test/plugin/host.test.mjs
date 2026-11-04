@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EventEmitter } from "node:events";
-import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { open, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { defineHook } from "@sortedyuan/may/core";
 import { definePlugin, defineService, PluginHost } from "@sortedyuan/may/plugin";
 
-const testRoot = fileURLToPath(new URL("../.test-output/", import.meta.url));
 const signal = () => new AbortController().signal;
 const numberHook = defineHook({ name: "number", kind: "transform", validate(value) {
   assert.equal(typeof value, "number");
@@ -92,9 +92,8 @@ test("rejects cycles, conflicting providers, versions and missing hook capabilit
   await assert.rejects(PluginHost.create({ plugins: [{ ...a, requires: [] }, { ...b, provides: [], requires: [{ service: one, capabilities: ["write"] }] }] }), /lacks capability/);
 });
 
-test("starts dependencies in graph order and resolves declared compatible versions", async () => {
-  await mkdir(testRoot, { recursive: true });
-  const path = `${testRoot}/service.txt`;
+test("starts dependencies in graph order and resolves declared compatible versions", async (t) => {
+  const path = join(await createTestDirectory(t, "may/plugin-host"), "service.txt");
   const events = [];
   const requested = defineService({ id: "file", version: "1.0.0", scope: "application" });
   const provided = defineService({ id: "file", version: "1.2.0", scope: "application", capabilities: ["write"] });
@@ -117,7 +116,6 @@ test("starts dependencies in graph order and resolves declared compatible versio
   await app.close();
   assert.deepEqual(events, ["provider", "consumer", "consumer closed", "provider closed"]);
   await host.close();
-  await rm(path);
 });
 
 test("preserves caller owned instances and rejects undeclared service access", async () => {
@@ -136,9 +134,8 @@ test("preserves caller owned instances and rejects undeclared service access", a
     (error) => error.cause?.message === "Plugin consumer did not declare dependency events");
 });
 
-test("keeps session state separate and saves state before exposing updates", async () => {
-  await mkdir(testRoot, { recursive: true });
-  const path = `${testRoot}/state.json`;
+test("keeps session state separate and saves state before exposing updates", async (t) => {
+  const path = join(await createTestDirectory(t, "may/plugin-host"), "state.json");
   const plugin = { id: "memory", version: "1.0.0", scope: "session", provides: [memory],
     state: { version: 1, initial: { count: 0 }, schema: { type: "object", properties: { count: { type: "integer", minimum: 0 } }, required: ["count"], additionalProperties: false } },
     setup(ctx) { ctx.provide(memory, ctx.state); },
@@ -156,7 +153,6 @@ test("keeps session state separate and saves state before exposing updates", asy
   await assert.rejects(restored.get(memory).set({ count: -1 }), /Invalid state/);
   assert.deepEqual(restored.get(memory).get(), { count: 2 });
   await host.close();
-  await rm(path);
 });
 
 test("migrates persistent state before setup and rejects incompatible state", async () => {

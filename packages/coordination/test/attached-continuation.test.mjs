@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { AgentApplication } from "@sortedyuan/may";
-import { recoverFileLock } from "@sortedyuan/may/storage";
 import { OpenAIChatCompletionsModel } from "@sortedyuan/providers/openai-compatible";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { inspectSessionRunOutcome } from "@sortedyuan/may/session";
@@ -14,17 +13,13 @@ import { FileCoordinationStore } from "../dist/file-store.js";
 
 for (const [boundary, expected] of [["continuation.submitted", "recovery-required"], ["run.cancelled", "cancelled"], ["run.failed", "failed"]]) {
   test(`attached continuation recovers after process exit at ${boundary}`, async t => {
-    const base = fileURLToPath(new URL("../../../review/architecture-fix-20261023/coordination/", import.meta.url));
-    await mkdir(base, { recursive: true });
-    const directory = await mkdtemp(join(base, "interrupted-"));
-    assert.ok(directory.startsWith(base));
     let application;
     let resumed;
     t.after(async () => {
       await resumed?.close();
       await application?.close();
-      await rm(directory, { recursive: true, force: true });
     });
+    const directory = await createTestDirectory(t, "coordination/attached-continuation");
     const fixture = fileURLToPath(new URL("./fixtures/attached-continuation-crash.mjs", import.meta.url));
     const child = spawnSync(process.execPath, [fixture, directory, boundary], { encoding: "utf8", timeout: 15000 });
     assert.equal(child.status, 23, child.stderr);
@@ -37,8 +32,6 @@ for (const [boundary, expected] of [["continuation.submitted", "recovery-require
     assert.equal(history.at(-1).type, boundary);
     const continuationId = `${interrupted.tasks[0].dispatchId}:0`;
     assert.equal(inspectSessionRunOutcome(history, { continuationId }).status, expected);
-    const lockPath = join(directory, "coordination", `${Buffer.from("attached-recovery").toString("base64url")}.lock`);
-    await recoverFileLock(lockPath, { expectedContents: await readFile(lockPath, "utf8"), confirmHostsStopped: true });
     application = await AgentApplication.open({ sessionId: "attached-root", resume: true, store: sessions,
       model: new OpenAIChatCompletionsModel({ apiKey: "unused-during-recovery", model: "gpt-4o" }),
     });

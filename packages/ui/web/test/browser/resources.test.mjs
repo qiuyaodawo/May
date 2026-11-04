@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
@@ -14,7 +15,7 @@ import { chromium } from "playwright";
 import { webUiAssets } from "../../dist/assets.js";
 
 test("资源新增、删除和重命名同步到已加载页面及搜索结果", { timeout: 120_000 }, async t => {
-  const base = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../review/web-ui-browser");
+  const base = join(testOutputRoot, "web-ui", "browser");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "resources-"));
   let app, server, browser;

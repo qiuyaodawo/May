@@ -1,5 +1,5 @@
 import { UriTemplate, type Client, type ReadResourceResult, type RequestOptions, type McpSubscription } from "@modelcontextprotocol/client";
-import { AsyncEventQueue } from "@sortedyuan/may/core";
+import { AsyncEventQueue, AsyncStateSerializer } from "@sortedyuan/may/core";
 import { McpCapabilityError } from "./errors.js";
 import { assertMcpContentSize, mcpPromptToUserMessage, mcpResourceToUserMessage } from "./content.js";
 import type {
@@ -24,7 +24,7 @@ export class McpCapabilities {
   private readonly watches = new Map<string, Set<Watch>>();
   private watchCount = 0;
   private readonly remoteWatches = new Map<string, McpSubscription>();
-  private watchChain = Promise.resolve();
+  private readonly watchChanges = new AsyncStateSerializer();
   private closed = false;
   private catalog: McpServerCatalog | undefined;
   private completionWindow = 0;
@@ -124,7 +124,7 @@ export class McpCapabilities {
     this.require("resources");
     if (this.catalog?.capabilities.resources?.subscribe !== true) this.invalid("resource subscriptions are not supported", "MCP_CAPABILITY_UNSUPPORTED");
     // Serialize legacy per-URI refcounts, but never tool execution or UI responses.
-    const pending = this.watchChain.then(() => this.run("resources/subscribe", options, async (request) => {
+    return this.watchChanges.run(() => this.run("resources/subscribe", options, async (request) => {
       if (this.closed || this.watchCount >= 64) this.invalid("resource subscription limit reached or connection closed");
       const modern = this.client.getProtocolEra() === "modern";
       const existing = this.watches.get(uri);
@@ -179,8 +179,6 @@ export class McpCapabilities {
       if (options.signal?.aborted || this.closed) void watch.close().catch(() => {});
       return { serverId: this.server.id, uri, events: queue, closed, close: watch.close };
     }));
-    this.watchChain = pending.then(() => {}, () => {});
-    return pending;
   }
 
   async close(): Promise<void> {
@@ -188,12 +186,12 @@ export class McpCapabilities {
     // Connection shutdown owns the transport; handles finish locally without extra auth/network waits.
     for (const watchers of this.watches.values()) for (const watch of [...watchers]) watch.finish("connection-closed");
     this.remoteWatches.clear();
-    await this.watchChain;
+    await this.watchChanges.idle();
   }
 
   private async endWatch(uri: string, watch: Watch): Promise<void> {
     // Refcount change and unsubscribe share the same queue as subscription creation.
-    const pending = this.watchChain.then(async () => {
+    return this.watchChanges.run(async () => {
       const registered = this.watches.get(uri)?.has(watch) === true;
       watch.finish("local");
       const remote = this.remoteWatches.get(uri);
@@ -205,8 +203,6 @@ export class McpCapabilities {
         await this.run("resources/unsubscribe", {}, (request) => this.client.unsubscribeResource({ uri }, request));
       }
     });
-    this.watchChain = pending.catch(() => {});
-    return pending;
   }
 
   private require(capability: "resources" | "prompts" | "completions"): void {

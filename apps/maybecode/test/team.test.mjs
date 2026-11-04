@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { parseMaybeCodeArgs, runMaybeCodeTeamCommand } from "../dist/index.js";
+import { parseMaybeCodeArgs } from "../dist/args.js";
+import { runMaybeCodeTeamCommand } from "../dist/team.js";
 
 test("team CLI validates bounded options without changing normal startup", () => {
   assert.deepEqual(parseMaybeCodeArgs(["team", "run", "inspect", "--workspace", ".", "--max-concurrent", "2"]), {
@@ -25,7 +26,7 @@ test("team entry runs isolated workers plus supervisor, persists artifacts/budge
   await writeFile(join(workspace, "README.md"), "fixture evidence");
   await writeFile(join(workspace, ".env"), "SHOULD_NOT_LEAK=secret");
   const config = { path: join(directory, "config.json"), providers: { fake: { adapter: "openai-responses", apiKey: "private-test-key" } },
-    models: { test: { provider: "fake", model: "fixture" } }, defaultModel: "test" };
+    models: { test: { provider: "fake", model: "fixture" } }, defaultModel: "test", apps: { maybecode: { requestRecording: "off" } } };
   let calls = 0;
   let output = "";
   const dependencies = {

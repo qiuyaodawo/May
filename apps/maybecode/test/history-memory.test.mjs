@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
-import { MaybeCodeApplication } from "../dist/index.js";
+import { MaybeCodeApplication } from "../dist/application.js";
 import { createTestWorkspace } from "./fixtures/workspace.mjs";
 
 const notes = { goal: "Fix the parser", constraints: "Keep existing APIs", progress: "Found the failing input", nextSteps: "Add a regression test" };
 const assistant = (text) => ({ role: "assistant", content: [{ type: "text", text }] });
 const call = (name, input = {}) => ({ role: "assistant", content: [], toolCalls: [{ id: `call_${name}_${Math.random()}`, name, input }] });
 const options = (model, store = new InMemorySessionStore()) => ({
-  workspace: process.cwd(), model, store, tools: [], skills: false, subagents: false,
+  workspace: process.cwd(), model, store, tools: [], skills: false, subagents: false, requestRecording: "off",
   instructions: "Complete the task.", autoCompactionMode: "history-reference",
   contextBudget: { contextWindowTokens: 10000, compactTriggerRatio: 0.8 },
   contextSummarizer: { summarize() { assert.fail("Do not summarize history"); } },

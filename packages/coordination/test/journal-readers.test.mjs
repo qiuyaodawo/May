@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readdir, rm, unlink } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { readdir, unlink } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { FileCoordinationStore } from "../dist/file-store.js";
 import { ResourceJournal } from "../dist/resource-journal.js";
 import { limits } from "../dist/validation.js";
@@ -18,9 +19,6 @@ const validateResource = value => {
 
 for (const kind of ["coordination", "resource"]) {
   test(`${kind} checkpoints remain readable while another process inspects them`, { timeout: 20_000 }, async t => {
-    const base = fileURLToPath(new URL("../../../review/coordination-journal-tests/", import.meta.url));
-    await mkdir(base, { recursive: true });
-    const directory = await mkdtemp(join(base, `${kind}-`));
     let journal;
     let child;
     let closed;
@@ -28,9 +26,8 @@ for (const kind of ["coordination", "resource"]) {
       if (child && child.exitCode === null && child.signalCode === null) child.kill();
       await closed;
       await journal?.close();
-      assert.ok(resolve(directory).startsWith(resolve(base) + sep));
-      await rm(directory, { recursive: true, force: true });
     });
+    const directory = await createTestDirectory(t, `coordination/journal-readers-${kind}`);
     let current;
     if (kind === "coordination") {
       journal = await new FileCoordinationStore(directory, maxBytes).acquire("reading");
@@ -83,13 +80,7 @@ for (const kind of ["coordination", "resource"]) {
 }
 
 test("inspection of missing journals leaves the directory unchanged", async t => {
-  const base = fileURLToPath(new URL("../../../review/coordination-journal-tests/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "missing-"));
-  t.after(async () => {
-    assert.ok(resolve(directory).startsWith(resolve(base) + sep));
-    await rm(directory, { recursive: true, force: true });
-  });
+  const directory = await createTestDirectory(t, "coordination/journal-readers-missing");
   assert.equal(await new FileCoordinationStore(directory).inspect("missing"), undefined);
   await assert.rejects(ResourceJournal.inspect(join(directory, "missing.jsonl"), validateResource), { code: "ENOENT" });
   assert.deepEqual(await readdir(directory), []);

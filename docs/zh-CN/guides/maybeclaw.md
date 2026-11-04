@@ -21,7 +21,7 @@ Telegram 和飞书需要各自的平台账户与凭据。
 
 具体操作见[配置](#会话与配置)、[权限](#持久权限规则)、
 [Web 与 CLI](#启动web-与-cli)、[聊天命令](#聊天命令与打断)、
-[渠道](#渠道成员与审批)和[存储与迁移](#生命周期存储与迁移)。
+[渠道](#渠道成员与审批)和[存储](#生命周期与存储)。
 
 ## 应用组合
 
@@ -42,7 +42,6 @@ Web、CLI 和 HTTP 使用 `GatewayQueries`、`GatewayController` 接口。
 `GatewayChannelRepository` 接收输入、处理消息变更并完成投递。repository
 管理渠道记录及其关联关系；输入完成与回复记录、投递回执与平台消息关联、
 会话清理分别使用 SQLite 事务。`GatewayStore` 由内部实现使用。
-MaybeClaw 的 `ChannelStore` 包装负责应用迁移标记检查。
 
 ## 会话与配置
 
@@ -65,9 +64,10 @@ Agent 自动进入名单。个人会话绑定一个平台身份；群聊会话�
 初始化要求一次性凭据，程序会自动将其传入浏览器。使用 `--no-open` 或 `serve` 时，
 打开终端显示的本机初始化 HTML 文件。该文件需要保密，初始化完成或正常关闭服务后
 自动删除。刷新初始化页面会清除页面中的凭据，重新打开初始化文件可以继续操作。
-初始化仅接受本机来源。已有有效配置直接启动；旧配置要求明确迁移；损坏配置会报错并
-保持原文件。同一配置文件禁止并发初始化。如果进程被强制终止，需要确认进程已经停止，
-再删除对应的 `<config-path>.initialize.lock` 和遗留的 `*.initialize.html` 文件，重新启动。
+初始化仅接受本机来源。已有有效配置直接启动；缺少 `version: 2` 的配置和损坏配置会报错并
+保持原文件。同一配置文件禁止并发初始化。初始化进程退出时，操作系统自动释放
+`<config-path>.initialize.lock` 上的锁。进程被强制终止后，删除遗留的 `*.initialize.html`
+文件并重新启动。
 
 手动配置时，保留 May 已有的 `providers`、`models`，合并以下内容：
 
@@ -214,7 +214,7 @@ API 客户端向 `/api/auth/login` POST `{ "password": "..." }`，将返回的 `
 Web 管理器提供图形化创建和“直接使用命令创建”，复用相同的 Gateway 命令与校验。
 发送普通消息前必须创建会话。浏览只改变当前页面；设置聊天入口默认会话通过独立
 管理操作完成。会话默认 Agent 的修改对全部获准成员和访问界面共同生效。管理器
-同时提供 Agent 配置、入口绑定、会话管理员、审批、渠道状态和独立历史任务查看。
+同时提供 Agent 配置、入口绑定、会话管理员、审批和渠道状态查看。
 
 ```powershell
 pnpm maybeclaw task submit "检查这段修改" --session <session-id> --agent reviewer --server http://127.0.0.1:3939 --request-id review-1
@@ -337,7 +337,7 @@ May Agent 通过 `media` 明确声明可接收类型，例如
 类型；只声明 `file` 不会开启视频。RPC Agent 在能力握手时声明同样的类型。
 Provider 继续验证其实际输入能力。
 
-## 生命周期、存储与迁移
+## 生命周期与存储
 
 空闲资源按配置延迟释放，对话 ID 与历史继续保存。重启时，访问权限撤销、访问配置
 或 Agent 版本变化会使对应的未完成任务进入待核对状态，其他会话继续恢复。持久记录
@@ -353,39 +353,14 @@ Provider 继续验证其实际输入能力。
 
 `gateway.sqlite` 通过事务保存会话、对话关联、消息、任务、审批、默认值、请求凭据
 和投递记录。May 历史继续使用 Session 存储。服务在整个数据目录使用期间持有
-`host.lock.access` 的操作系统独占锁，同时通过 `host.lock` 保存所有者记录。
-进程退出后操作系统自动释放独占锁。重新启动时，程序自动清理本机已退出进程的
-遗留记录，并输出旧 PID 和文件路径。仍在运行的 PID、其他机器的记录、损坏记录
-以及无法确认所有者的情况会阻止启动，需要管理员检查。保留 `host.lock.access`，
-使用和恢复期间禁止删除或替换该文件。文件年龄不参与自动清理判断。
-历史任务锁和配置初始化锁保留 `.lock.access` 与 `.lock.access.gate` 文件，
-用于协调创建与删除。目录使用和恢复期间保留这些文件，具体要求参阅
-[本地存储维护](custom-storage.md#本地存储维护)。
+`host.lock` 的操作系统独占锁，并在 `host.lock.owner` 中记录进程 ID 和主机名。
+进程退出后操作系统自动释放锁，因此异常退出后重新启动不需要清理。其他运行中的进程
+持有锁时，启动失败并输出记录的所有者。配置初始化在 `<config>.initialize.lock` 上
+使用同一种锁，具体参阅[本地存储维护](custom-storage.md#本地存储维护)。
+真实 Provider 和平台验证范围取决于实际适配器、凭据与网络。
 
-历史 JSONL 任务与渠道日志在不同进程之间协调查询、追加记录、修复末尾记录和检查点
-替换。每个日志保留 `<journal-path>.access` 和 `<journal-path>.access.gate` 文件。
-首次状态查询、迁移检查或写入时创建这些文件，需要目录写入权限；后续查询使用只读
-句柄，保持日志数据不变。为已有数据设置只读监控时，使用具有写入权限的账户初始化
-访问协调文件，然后限制权限。共享目录的全部进程需要同时升级；有活动读取者或
-写入者时，保留访问协调文件。
-
-```powershell
-pnpm maybeclaw migrate check --data-directory <directory>
-pnpm maybeclaw migrate run --data-directory <directory>
-```
-
-迁移核对使用权限、保存原数据备份、保留独立历史任务与渠道证据，并记录完成状态。
-旧的排队工作等待明确分配到已创建会话。已发送消息保持已发送，结果未知的记录等待
-核对。数据迁移之后需要明确配置 version 2 的 Agent 名单。真实 Provider 和平台
-验证范围取决于实际适配器、凭据与网络。
-
-服务管理员通过渠道状态查看迁移后的投递记录。核对未知发送结果之后，可以使用
-`maybeclaw delivery retry-legacy <id> --confirm --server <url>` 明确接受平台消息
-可能重复的情况，并将该记录恢复为等待投递。经过认证的 HTTP 操作为
-`POST /api/v2/legacy-deliveries/<id>/retry`，正文为 `{ "confirmUnknown": true }`。
-已经确认发送的消息不能重新发送。
-
-当前消息与渠道回复使用 `delivery retry <id> --confirm --server <url>`，或使用
-`POST /api/v2/deliveries/<id>/retry` 并传入相同的确认正文。Web 渠道管理器为结果
+发送结果未知或发送失败的消息与渠道回复使用 `delivery retry <id> --confirm --server <url>`，
+或使用 `POST /api/v2/deliveries/<id>/retry` 并传入 `{ "confirmUnknown": true }`，
+明确接受平台消息可能重复的情况。已经确认发送的消息不能重新发送。Web 渠道管理器为结果
 未知和发送失败的记录提供明确确认操作。重新发送只改变投递状态，不重新执行
 Agent 的工作。

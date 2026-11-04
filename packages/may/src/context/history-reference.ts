@@ -1,4 +1,4 @@
-import type { ContextSnapshot, Message, SystemMessage } from "../core/index.js";
+import { omitUndefined, type ContextSnapshot, type Message, type SystemMessage } from "../core/index.js";
 
 import type {
   ContextCompactionOptions,
@@ -54,7 +54,7 @@ export class HistoryReferenceStrategy implements ContextCompactionStrategy {
           ...snapshot,
           messages: [...snapshot.messages],
         },
-        ...(options.signal === undefined ? {} : { signal: options.signal }),
+        ...omitUndefined({ signal: options.signal }),
       })).trim();
     throwIfAborted(options.signal);
     if (reference === "") throw new Error("history reference cannot be empty");

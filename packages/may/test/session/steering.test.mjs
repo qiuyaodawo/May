@@ -1,20 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { resolve, join, sep } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { SessionSteeringQueue } from "../../dist/session/steering.js";
 import { SessionHistoryReader } from "@sortedyuan/may/session";
 
 async function openQueue(t) {
-  const root = resolve(import.meta.dirname, "../../../.zcode/tmp/session-steering-tests");
-  await mkdir(root, { recursive: true });
-  const directory = await mkdtemp(join(root, "history-"));
-  t.after(async () => {
-    assert.ok(resolve(directory).startsWith(`${root}${sep}`));
-    await rm(directory, { recursive: true, force: true });
-  });
-  const store = new FileSessionStore(directory);
+  const store = new FileSessionStore(await createTestDirectory(t, "may/session-steering"));
   let seq = 0;
   const record = (event) => store.append({ ...event, sessionId: "steering", seq: ++seq, timestamp: Date.now() });
   await record({ type: "session.created" });

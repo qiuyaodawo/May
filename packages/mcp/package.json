@@ -10,7 +10,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./plugin": { "types": "./dist/plugin/index.d.ts", "import": "./dist/plugin/index.js" },
+    "./plugin": {
+      "types": "./dist/plugin/index.d.ts",
+      "import": "./dist/plugin/index.js"
+    },
     "./apps-browser": {
       "types": "./dist/apps-browser.d.ts",
       "import": "./dist/apps-browser.js"
@@ -33,13 +36,16 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs test/plugin/*.test.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "@sortedyuan/may": "workspace:*",
     "@sortedyuan/observability": "workspace:*",
-    "@modelcontextprotocol/client": "^2.0.0",
-    "@modelcontextprotocol/server": "2.0.0"
+    "write-file-atomic": "7.0.1"
   },
   "devDependencies": {
+    "@sortedyuan/test-support": "workspace:*",
     "@types/node": "^22.0.0",
+    "@types/write-file-atomic": "4.0.3",
     "playwright": "1.63.0"
   },
   "engines": {

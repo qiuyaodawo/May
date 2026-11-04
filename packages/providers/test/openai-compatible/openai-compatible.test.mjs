@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  OpenAIChatCompletionsProtocolError,
+  OpenAICompatibleProtocolError,
   streamOpenAICompatibleResponse,
   toOpenAICompatibleMessages,
   toOpenAICompatibleTools,
@@ -450,15 +450,15 @@ test("fails on a server error reported inside a 200 stream", async (t) => {
           providerName: "OpenAI-compatible chat",
           requireDone: true,
           protocolError: (message, options) =>
-            new OpenAIChatCompletionsProtocolError(message, options),
+            new OpenAICompatibleProtocolError("OpenAI-compatible chat", "OPENAI_CHAT_COMPLETIONS", message, options),
           finishReasonError: (reason) => new Error(reason),
         },
       ));
 
-      assert.ok(error instanceof OpenAIChatCompletionsProtocolError);
+      assert.ok(error instanceof OpenAICompatibleProtocolError);
       const serialized = serializeError(error);
       assert.deepEqual(serialized, {
-        name: "OpenAIChatCompletionsProtocolError",
+        name: "OpenAICompatibleProtocolError",
         message:
           "OpenAI-compatible chat stream reported an error: Upstream provider closed the connection. type: server_error code: upstream_disconnect",
         code: "OPENAI_CHAT_COMPLETIONS_PROTOCOL_ERROR",

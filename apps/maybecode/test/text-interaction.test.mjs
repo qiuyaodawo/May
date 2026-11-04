@@ -4,7 +4,8 @@ import { PassThrough } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 import { keyStroke } from "@sortedyuan/tui/keybindings";
 import { createTerminalClipboard, NodeTerminalDriver } from "@sortedyuan/tui";
-import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { MaybeCodeTerminalView } from "../dist/ui/terminal-view.js";
 import { createMaybeCodeKeymap } from "../dist/keymap.js";
 import { matchMaybeCodeSlashCommands } from "../dist/slash-commands.js";
 
@@ -18,7 +19,7 @@ test("MaybeCode 使用有效组合键生成提示并保留文字编辑按键", t
   assert.throws(() => createMaybeCodeKeymap({ leader: "ctrl+x" }), /conflicts/);
   assert.throws(() => createMaybeCodeKeymap({ leader: "ctrl+j" }), /conflicts/);
   assert.throws(() => createMaybeCodeKeymap({ leader: "x" }), /modified/);
-  const view = new MaybeCodePrototypeView({ store: new TranscriptStore(), workspace: "workspace",
+  const view = new MaybeCodeTerminalView({ store: new TranscriptStore(), workspace: "workspace",
     keymap: { leader: "ctrl+q" }, onSubmit: () => assert.fail("快捷键不能提交文字") });
   t.after(() => view.dispose());
   assert.match(render(view), /Ctrl\+Q R/);
@@ -33,7 +34,7 @@ test("MaybeCode 使用有效组合键生成提示并保留文字编辑按键", t
 test("输入框复制清除待完成组合键，失败时保留选择且不取消任务", async t => {
   const submitted = [];
   let cancelled = 0;
-  const view = new MaybeCodePrototypeView({ store: new TranscriptStore(), workspace: "workspace",
+  const view = new MaybeCodeTerminalView({ store: new TranscriptStore(), workspace: "workspace",
     clipboard: createTerminalClipboard({ mode: "disabled" }),
     onSubmit: value => submitted.push(value), onCancel: () => cancelled++ });
   t.after(() => view.dispose());
@@ -51,7 +52,7 @@ test("输入框复制清除待完成组合键，失败时保留选择且不取�
 
 test("输入框 End 和 Shift+End 按逻辑行操作，多行替换保留行尾", t => {
   const submitted = [];
-  const view = new MaybeCodePrototypeView({ store: new TranscriptStore(), workspace: "workspace",
+  const view = new MaybeCodeTerminalView({ store: new TranscriptStore(), workspace: "workspace",
     onSubmit: value => submitted.push(value) });
   t.after(() => view.dispose());
   input(view, "first\n中文👩‍💻 last");
@@ -67,7 +68,7 @@ test("输入框 End 和 Shift+End 按逻辑行操作，多行替换保留行尾"
 
 test("命令建议显示时 Ctrl+J 插入换行并通过 Enter 提交", async t => {
   const submitted = [];
-  const view = new MaybeCodePrototypeView({ store: new TranscriptStore(), workspace: "workspace",
+  const view = new MaybeCodeTerminalView({ store: new TranscriptStore(), workspace: "workspace",
     suggestions: matchMaybeCodeSlashCommands,
     onSubmit: value => submitted.push(value) });
   t.after(() => view.dispose());
@@ -87,7 +88,7 @@ test("终端 LF 插入换行，CR 提交，bracketed paste 保留换行", async 
   const source = new PassThrough();
   const output = new PassThrough();
   const driver = new NodeTerminalDriver({ input: source, output, requireTTY: false });
-  const view = new MaybeCodePrototypeView({ store: new TranscriptStore(), workspace: "workspace",
+  const view = new MaybeCodeTerminalView({ store: new TranscriptStore(), workspace: "workspace",
     onSubmit: value => submitted.push(value) });
   t.after(() => { driver.close(); view.dispose(); });
   const strokes = [];
@@ -108,7 +109,7 @@ test("终端 LF 插入换行，CR 提交，bracketed paste 保留换行", async 
 
 test("弹窗结束后恢复输入框，并清除进入弹窗之前的组合键", async t => {
   const submitted = [];
-  const view = new MaybeCodePrototypeView({ store: new TranscriptStore(), workspace: "workspace",
+  const view = new MaybeCodeTerminalView({ store: new TranscriptStore(), workspace: "workspace",
     onSubmit: value => submitted.push(value) });
   t.after(() => view.dispose());
   input(view, "draft");

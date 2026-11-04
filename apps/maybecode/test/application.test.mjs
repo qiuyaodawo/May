@@ -8,11 +8,9 @@ import { InMemoryContext, RunCancelledError } from "@sortedyuan/may/core";
 import { ModelContextCompactionStrategy } from "@sortedyuan/may/context";
 import { OpenAIResponsesModel } from "@sortedyuan/providers";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
-import {
-  InMemorySessionCatalog,
-  MaybeCodeWorkspace,
-  TranscriptStore,
-} from "../dist/index.js";
+import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { MaybeCodeWorkspace } from "../dist/workspace.js";
 
 test("runs coding tools and reuses an approved session grant", async (t) => {
   const workspace = await temporaryDirectory(t);
@@ -47,7 +45,7 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
   };
   const sessionDirectory = join(workspace, ".sessions");
   const catalog = new InMemorySessionCatalog();
-  const app = await MaybeCodeWorkspace.open({ git: false,
+  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace,
     subagents: false,
     model,
@@ -105,7 +103,7 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
     ["create", "update"],
   );
 
-  const resumed = await MaybeCodeWorkspace.open({ git: false,
+  const resumed = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace,
     subagents: false,
     model,
@@ -128,7 +126,7 @@ test("retries a failed run after resuming its durable session", async (t) => {
   const workspace = await temporaryDirectory(t);
   const store = new FileSessionStore(join(workspace, ".sessions"));
   const catalog = new InMemorySessionCatalog();
-  const first = await MaybeCodeWorkspace.open({ git: false,
+  const first = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace,
     model: {
       async *stream() {
@@ -147,7 +145,7 @@ test("retries a failed run after resuming its durable session", async (t) => {
   await first.close();
 
   let request;
-  const resumed = await MaybeCodeWorkspace.open({ git: false,
+  const resumed = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace,
     model: {
       async *stream(value) {
@@ -214,7 +212,7 @@ test("executes read, write, edit, and shell through the application", async (t) 
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({ git: false,
+  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace,
     model,
     store: new (await import("@sortedyuan/may/session")).InMemorySessionStore(),
@@ -285,7 +283,7 @@ test("exposes bounded active-session history as an approval-free tool", async ()
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({ git: false,
+  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace: process.cwd(),
     model,
     store: new (await import("@sortedyuan/may/session")).InMemorySessionStore(),
@@ -333,12 +331,12 @@ test("starts fresh by default and explicitly resumes workspace sessions", async 
     catalog,
   };
 
-  const first = await MaybeCodeWorkspace.open({ ...options, git: false, autoResume: false });
+  const first = await MaybeCodeWorkspace.open({ ...options, git: false, requestRecording: "off", autoResume: false });
   const firstId = first.sessionId;
   await (await first.submit({ input: "first" })).result;
   await first.close();
 
-  const resumed = await MaybeCodeWorkspace.open({ ...options, git: false, autoResume: true });
+  const resumed = await MaybeCodeWorkspace.open({ ...options, git: false, requestRecording: "off", autoResume: true });
   assert.equal(resumed.sessionId, firstId);
   const inspection = await resumed.inspectContext();
   assert.equal(inspection.measurementMethod, "estimated");
@@ -360,7 +358,7 @@ test("starts fresh by default and explicitly resumes workspace sessions", async 
   assert.equal(resumed.sessionId, firstId);
   await resumed.close();
 
-  const fresh = await MaybeCodeWorkspace.open({ ...options, git: false });
+  const fresh = await MaybeCodeWorkspace.open({ ...options, git: false, requestRecording: "off" });
   assert.notEqual(fresh.sessionId, firstId);
   await fresh.close();
 });
@@ -390,7 +388,7 @@ test("creates context through an injected factory for each session", async () =>
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({ git: false,
+  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace: process.cwd(),
     model,
     store,
@@ -475,7 +473,7 @@ test("persists the default prune-and-summary view across resume", async () => {
     },
   };
 
-  const first = await MaybeCodeWorkspace.open({ ...options, git: false, autoResume: false });
+  const first = await MaybeCodeWorkspace.open({ ...options, git: false, requestRecording: "off", autoResume: false });
   await (await first.submit({ input: "first request" })).result;
   await (await first.submit({ input: "second request" })).result;
   await (await first.submit({ input: "third request" })).result;
@@ -495,7 +493,7 @@ test("persists the default prune-and-summary view across resume", async () => {
   );
   await first.close();
 
-  const resumed = await MaybeCodeWorkspace.open({ ...options, git: false, autoResume: true });
+  const resumed = await MaybeCodeWorkspace.open({ ...options, git: false, requestRecording: "off", autoResume: true });
   await (await resumed.submit({ input: "fourth request" })).result;
   const resumedRequest = requests.at(-1);
   assert.ok(
@@ -535,7 +533,7 @@ test("automatically compacts before a model call and persists the active view", 
     },
   };
   const events = [];
-  const app = await MaybeCodeWorkspace.open({ git: false,
+  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace,
     instructions: "Use the available tools.",
     model,
@@ -614,7 +612,7 @@ test("persists automatic compaction after the run events it contains", async (t)
     compactionDidStart = resolve;
   });
   let modelCall = 0;
-  const app = await MaybeCodeWorkspace.open({ git: false,
+  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace,
     instructions: "Use the available tools.",
     subagents: false,
@@ -684,6 +682,7 @@ test("persists automatic compaction after the run events it contains", async (t)
   await Session.resume({
     id: app.sessionId,
     store,
+    requestRecording: "off",
     createRuntime(messages) {
       replayed = messages;
       return {};
@@ -717,7 +716,7 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
   });
   const store = new (await import("@sortedyuan/may/session")).InMemorySessionStore();
   const events = [];
-  const app = await MaybeCodeWorkspace.open({ git: false,
+  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace,
     instructions: "Use the available tools.",
     model,
@@ -783,7 +782,7 @@ test("cancels an active summary compaction without persisting it", async () => {
   const started = new Promise((resolve) => {
     summaryStarted = resolve;
   });
-  const app = await MaybeCodeWorkspace.open({ git: false,
+  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace: process.cwd(),
     model: {
       async *stream() {
@@ -842,7 +841,7 @@ test("cancels an active model call", async () => {
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({ git: false,
+  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
     workspace: process.cwd(),
     model,
     store: new (await import("@sortedyuan/may/session")).InMemorySessionStore(),
@@ -858,8 +857,8 @@ test("cancels an active model call", async () => {
   );
   assert.equal(app.cancel("stop"), true);
   await assert.rejects(run.result, RunCancelledError);
-  assert.equal(app.getDelegationState().status, "cancelled");
-  assert.equal(app.getDelegationState().budget.usageComplete, false);
+  assert.equal(app.application.getDelegationState().status, "cancelled");
+  assert.equal(app.application.getDelegationState().budget.usageComplete, false);
   await app.close();
 });
 

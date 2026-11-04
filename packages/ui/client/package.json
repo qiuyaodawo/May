@@ -6,16 +6,46 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./application": { "types": "./dist/application.d.ts", "import": "./dist/application.js" },
-    "./reading": { "types": "./dist/reading.d.ts", "import": "./dist/reading.js" },
-    "./projection": { "types": "./dist/projection.d.ts", "import": "./dist/projection.js" },
-    "./server": { "types": "./dist/server.d.ts", "import": "./dist/server.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./application": {
+      "types": "./dist/application.d.ts",
+      "import": "./dist/application.js"
+    },
+    "./reading": {
+      "types": "./dist/reading.d.ts",
+      "import": "./dist/reading.js"
+    },
+    "./projection": {
+      "types": "./dist/projection.d.ts",
+      "import": "./dist/projection.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    }
   },
-  "files": ["dist", "!dist/.tsbuildinfo"],
-  "scripts": { "build": "tsc -b", "clean": "tsc -b --clean", "test": "pnpm run build && node --test test/*.test.mjs" },
-  "dependencies": { "@sortedyuan/may": "workspace:*", "@sortedyuan/media": "workspace:*" },
-  "devDependencies": { "@types/node": "^22.0.0" },
-  "engines": { "node": ">=22" },
+  "files": [
+    "dist",
+    "!dist/.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "pnpm run build && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@sortedyuan/may": "workspace:*",
+    "@sortedyuan/media": "workspace:*"
+  },
+  "devDependencies": {
+    "@sortedyuan/test-support": "workspace:*",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "license": "MIT"
 }

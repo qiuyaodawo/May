@@ -15,7 +15,12 @@ import test from "node:test";
 import { InMemoryContext } from "@sortedyuan/may/core";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
 
-import { createMaybeCodeSlashCommandSuggester, createCodingPermissionPolicy, executeMaybeCodeSlashCommand, formatMaybeCodeMcpStatus, openConfiguredMaybeCode, parseMaybeCodeArgs, resolveMaybeCodeMcp, runMaybeCode, runMaybeCodeMcpCommand, resolveMaybeCodeObservability, resolveMaybeCodeRetry } from "../dist/index.js";
+import { openConfiguredMaybeCode, runMaybeCode } from "../dist/index.js";
+import { createMaybeCodeSlashCommandSuggester, executeMaybeCodeSlashCommand, formatMaybeCodeMcpStatus } from "../dist/slash-commands.js";
+import { createCodingPermissionPolicy } from "../dist/policy.js";
+import { parseMaybeCodeArgs } from "../dist/args.js";
+import { resolveMaybeCodeMcp, resolveMaybeCodeObservability, resolveMaybeCodeRetry } from "../dist/configured.js";
+import { runMaybeCodeMcpCommand } from "../dist/mcp-auth.js";
 
 test("parses MaybeCode startup options", () => {
   assert.deepEqual(
@@ -39,7 +44,7 @@ test("parses MaybeCode startup options", () => {
     },
   );
   assert.equal(parseMaybeCodeArgs(["--ui", "retained"]).ui, "retained");
-  assert.equal(parseMaybeCodeArgs(["--ui", "classic"]).ui, "classic");
+  assert.throws(() => parseMaybeCodeArgs(["--ui", "classic"]), /--ui must be "retained" or "web"/);
   assert.equal(parseMaybeCodeArgs([]).autoResume, false);
   assert.equal(parseMaybeCodeArgs(["--continue"]).autoResume, true);
   assert.throws(
@@ -101,6 +106,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
           defaultModel: "chat",
           apps: {
             maybecode: {
+              requestRecording: "off",
               instructionsDirectory: "instructions/maybecode",
             },
           },
@@ -122,7 +128,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   );
 
   assert.equal(selected.model, "deepseek-chat");
-  assert.deepEqual(app.modelInfo, {
+  assert.deepEqual(app.application.modelInfo, {
     profile: "chat",
     provider: "deepseek",
     adapter: "deepseek-chat",
@@ -142,9 +148,9 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
     /\n\n# Project instructions\n\nSource: [^\n]+\n\nproject rules\n\n# Tool use\n\n/u,
   );
   assert.ok(request.messages[0].content[0].text.includes(`Source: ${await realpath(join(directory, "AGENTS.md"))}`));
-  assert.equal(app.instructions.system.source.type, "file");
-  assert.equal(app.instructions.runtime.source.type, "runtime");
-  assert.equal(app.instructions.project.source.type, "file");
+  assert.equal(app.application.instructions.system.source.type, "file");
+  assert.equal(app.application.instructions.runtime.source.type, "runtime");
+  assert.equal(app.application.instructions.project.source.type, "file");
   assert.deepEqual(contextOptions.metadata, { workspace: await realpath(directory) });
   assert.deepEqual(contextOptions.budget, {
     contextWindowTokens: 64000,
@@ -181,6 +187,7 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
           defaultModel: "chat",
           apps: {
             maybecode: {
+              requestRecording: "off",
               retry: false,
               mcpServers: {
                 local: { command: "test-server", args: ["--stdio"] },
@@ -311,6 +318,7 @@ test("writes configured content-free traces and flushes them on close", async (t
           defaultModel: "chat",
           apps: {
             maybecode: {
+              requestRecording: "off",
               retry: false,
               observability: {
                 enabled: true,
@@ -465,7 +473,7 @@ test("resolves HTTP MCP headers, validates transport options, and formats protoc
   ]) {
     assert.throws(() => resolveMaybeCodeMcp(config({ ...endpoint, ...change }), workspace, { MCP_TOKEN: "secret" }));
   }
-  assert.throws(() => resolveMaybeCodeMcp(config({ command: "node", headers: {} }), workspace), /requires streamable-http/u);
+  assert.throws(() => resolveMaybeCodeMcp(config({ command: "node", headers: {} }), workspace), /mcpServers\.remote\.headers is not supported/u);
   assert.match(formatMaybeCodeMcpStatus([{
     serverId: "remote", transport: "streamable-http", required: false,
     state: "connected", protocolVersion: "2026-07-28", toolNames: ["mcp__remote__lookup"],
@@ -499,7 +507,7 @@ test("MCP login commands run before model startup and accept OAuth configuration
   });
   assert.equal(code, 0);
   configured.apps.maybecode.mcpServers.remote.auth.clientId = "public-client";
-  assert.throws(() => resolveMaybeCodeMcp(configured, process.cwd()), /requires expectedIssuer/u);
+  assert.throws(() => resolveMaybeCodeMcp(configured, process.cwd()), /auth must have property expectedIssuer/u);
 });
 
 test("scopes MCP approval grants to one namespaced tool", async () => {
@@ -559,7 +567,7 @@ test("switches configured model profiles by prefix without changing sessions", a
             },
           },
           defaultModel: "cliproxy-high",
-          apps: { maybecode: { retry: false } },
+          apps: { maybecode: { retry: false, requestRecording: "off" } },
         };
       },
       createModel(selection) {
@@ -598,7 +606,7 @@ test("switches configured model profiles by prefix without changing sessions", a
   assert.equal(switched.type, "model.switched");
   assert.equal(switched.profile, "cliproxy-low");
   assert.equal(app.sessionId, sessionId);
-  assert.equal(app.modelInfo.profile, "cliproxy-low");
+  assert.equal(app.application.modelInfo.profile, "cliproxy-low");
   assert.deepEqual(created, ["cliproxy-high", "cliproxy-low"]);
   assert.deepEqual(persistedDefaults, ["cliproxy-low"]);
   assert.deepEqual(
@@ -640,7 +648,7 @@ test("switches supported reasoning effort without duplicating model profiles", a
             },
           },
           defaultModel: "reasoner",
-          apps: { maybecode: { retry: false } },
+          apps: { maybecode: { retry: false, requestRecording: "off" } },
         };
       },
       createModel(selection) {
@@ -686,17 +694,6 @@ test("does not enable provider-native automatic compaction by default", async (t
   await opened.app.close();
 });
 
-test("legacy providerNative selects native compaction only", async (t) => {
-  const opened = await openWithCapturedOpenAIContext(t, {
-    maybecode: { autoCompaction: { providerNative: true } },
-  });
-
-  assert.deepEqual(opened.strategyNames, [
-    "openai-responses-compact",
-  ]);
-  await opened.app.close();
-});
-
 test("selects independent automatic compaction modes", async (t) => {
   for (const [mode, expected] of [
     ["prune-summary", ["prune-old-tool-results", "summary-tail"]],
@@ -704,7 +701,7 @@ test("selects independent automatic compaction modes", async (t) => {
     ["provider-native", ["openai-responses-compact"]],
   ]) {
     const opened = await openWithCapturedOpenAIContext(t, {
-      maybecode: { autoCompaction: { mode, providerNative: true } },
+      maybecode: { autoCompaction: { mode } },
     });
     assert.deepEqual(opened.strategyNames, expected);
     await opened.app.close();
@@ -715,23 +712,17 @@ test("validates automatic compaction mode", async (t) => {
   for (const mode of ["unknown", true, null]) {
     await assert.rejects(
       openWithCapturedOpenAIContext(t, { maybecode: { autoCompaction: { mode } } }),
-      /autoCompaction\.mode must be prune-summary, history-reference, or provider-native/,
+      /apps\.maybecode\.autoCompaction\.mode must be equal to one of the allowed values/,
     );
   }
 });
 
-test("validates provider-native automatic compaction configuration", async (t) => {
-  await assert.rejects(
-    openWithCapturedOpenAIContext(t, {
-      maybecode: { autoCompaction: { providerNative: "yes" } },
-    }),
-    /apps\.maybecode\.autoCompaction\.providerNative must be a boolean/,
-  );
+test("validates automatic compaction configuration shape", async (t) => {
   await assert.rejects(
     openWithCapturedOpenAIContext(t, {
       maybecode: { autoCompaction: true },
     }),
-    /apps\.maybecode\.autoCompaction must be an object/,
+    /apps\.maybecode\.autoCompaction must be object/,
   );
 });
 
@@ -763,7 +754,7 @@ test("resolves and validates MaybeCode model retry configuration", () => {
   assert.throws(() => resolveMaybeCodeRetry({
     ...base,
     apps: { maybecode: { retry: { maxAttempts: 0 } } },
-  }), /maxAttempts must be a positive safe integer/u);
+  }), /apps\.maybecode\.retry\.maxAttempts must be >= 1/u);
   assert.throws(() => resolveMaybeCodeRetry({
     ...base,
     apps: { maybecode: { retry: { baseDelayMs: 9000 } } },
@@ -793,6 +784,7 @@ test("configured MaybeCode automatically retries transient model failures", asyn
           defaultModel: "chat",
           apps: {
             maybecode: {
+              requestRecording: "off",
               retry: {
                 maxAttempts: 2,
                 baseDelayMs: 0,

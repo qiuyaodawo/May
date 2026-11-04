@@ -242,13 +242,13 @@ store。待处理审批继续使用 Session 恢复机制。
 
 MaybeCode 的真实 Provider 验证需要显式启用。运行 `pnpm build` 后设置
 `MAYBECODE_PERSISTENT_RULES_LIVE=1`，可以通过
-`MAYBECODE_PERSISTENT_RULES_MODEL=<configured-profile>` 选择已有模型配置，然后运行
+`MAY_LIVE_MODEL=<configured-profile>` 选择已有模型配置，然后运行
 `node --test apps/maybecode/test/integration/persistent-rules.test.mjs`。
 测试通过当前用户配置调用真实 Provider，两次写入同一个独立文件，并在两次请求之间
 关闭和重新打开 Session 与 executor。验证内容包括一次持久审批、历史中的规则创建
 和使用证据，以及模型 Context 中没有权限记录。每个 Run 最多调用模型三次，时限
 45 秒；关闭 retries、Git、MCP、Skills、Goals 和子 Agent。证据保存在被忽略的
-`review/persistent-rules` 目录；常规离线运行跳过这一测试。
+`.test-output/maybecode/persistent-rules-live` 目录；常规离线运行跳过这一测试。
 
 ## 安全边界
 

@@ -10,7 +10,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./config/schema": "./dist/maybecode-config.schema.json"
   },
   "bin": {
     "maybecode": "./dist/bin.js"
@@ -20,7 +21,7 @@
     "!dist/.tsbuildinfo"
   ],
   "scripts": {
-    "build": "tsc -b && node ../../scripts/build-maybecode.mjs",
+    "build": "tsc -b && node ../../scripts/build-maybecode.mjs && node ../../scripts/write-config-schema.mjs maybecode",
     "clean": "tsc -b --clean",
     "start": "pnpm run build && node dist/bin.js",
     "test": "pnpm run build && node --test test/*.test.mjs",
@@ -29,9 +30,9 @@
     "test:integration": "pnpm run build && node --test test/integration/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/may": "workspace:*",
     "@sortedyuan/coding-tools": "workspace:*",
     "@sortedyuan/coordination": "workspace:*",
+    "@sortedyuan/may": "workspace:*",
     "@sortedyuan/mcp": "workspace:*",
     "@sortedyuan/media": "workspace:*",
     "@sortedyuan/observability": "workspace:*",
@@ -41,14 +42,17 @@
     "@sortedyuan/web-ui": "workspace:*",
     "clipboardy": "5.3.2",
     "diff": "9.0.0",
-    "open": "11.0.4"
+    "open": "11.0.4",
+    "write-file-atomic": "7.0.1"
   },
   "optionalDependencies": {
     "@napi-rs/keyring": "2.0.0"
   },
   "devDependencies": {
-    "playwright": "1.63.0",
-    "@types/node": "^22.0.0"
+    "@sortedyuan/test-support": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@types/write-file-atomic": "4.0.3",
+    "playwright": "1.63.0"
   },
   "engines": {
     "node": ">=22"

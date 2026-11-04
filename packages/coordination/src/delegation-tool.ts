@@ -40,7 +40,7 @@ export function delegationTool(
           agent: { type: "string", description: "One authorized role" },
           input: { type: "string", description: "Complete standalone brief for this child" },
           files: { type: "array", maxItems: 128, items: { type: "string" },
-            description: "Workspace-relative files this child may modify" },
+            description: "Workspace-relative files this child may modify; an empty list allows no file modifications" },
         },
       } },
     } },

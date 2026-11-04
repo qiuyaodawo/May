@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { closeSync, openSync, writeSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, rmdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import {
   BasicTracer,
   BatchSpanProcessor,
@@ -10,7 +10,7 @@ import {
   JsonlFileSpanExporter,
 } from "../../dist/index.js";
 
-const root = fileURLToPath(new URL("../../../../review/", import.meta.url));
+const root = join(testOutputRoot, "observability");
 await mkdir(root, { recursive: true });
 const directory = await mkdtemp(join(root, "export-failure-"));
 const path = join(directory, "spans.jsonl");

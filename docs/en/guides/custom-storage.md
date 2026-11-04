@@ -325,19 +325,12 @@ The atomic version-2 catalog snapshot records exact absorbed operation names bef
 so interruption during deletion cannot replay already absorbed operations. Do not use older
 readers after compacting; ordinary version-1 catalogs remain readable.
 
-`acquireFileLock(path)` and `releaseFileLock(file, path)` from
-`@sortedyuan/may/session/file-store` coordinate lock creation and deletion through
-permanent `<path>.access` and `<path>.access.gate` files. Concurrent transitions
-wait up to 30 seconds; an existing owner still rejects acquisition with `EEXIST`.
-Always await release before reusing the storage. Preserve both access files during
-use and recovery, and upgrade all participating processes together. These rules
-also apply to Coordination journals, resource journals, remote workers, Team
-verification, Team patch application, and default-model configuration updates.
-
-For local writer locks, import `recoverFileLock` from `@sortedyuan/may/session/file-store`. Stop all
-competing hosts/open/recovery operations, read and inspect the lock, then pass its exact
-text as `expectedContents` with `confirmHostsStopped: true`. The helper rejects live PIDs,
-remote-host ownership, unsafe links and changed metadata. Incomplete metadata additionally
-requires `confirmUnknownOwner: true` after independent owner verification. PID probing is
-not atomic lock election; recovery must never race another acquirer. Recovery only releases
-ownership and never replays work.
+`acquireFileLock(path)` from `@sortedyuan/may/storage` takes an exclusive
+operating-system lock on `path`. Another owner makes acquisition fail immediately with
+`ELOCKED`; the error includes the process ID and host name recorded in `<path>.owner`,
+which only describes the owner. The operating system releases the lock when the owning
+process exits, so a lock left by a stopped process never needs manual recovery. Await
+`lock.release()` before reusing the storage. Hosts built on synchronous storage use
+`acquireFileLockSync(path)`. The same lock protects Coordination journals, resource
+journals, remote workers, Team verification, Team patch application, and default-model
+configuration updates.

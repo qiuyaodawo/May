@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { selectLiveModelProfile } from "@sortedyuan/test-support";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
@@ -10,7 +11,8 @@ import { definePlugin, defineService } from "@sortedyuan/may/plugin";
 import { defineAgent } from "@sortedyuan/may";
 
 test("actual applications retain base defaults beside host services with matching ids", { timeout: 120000 }, async t => {
-  const model = createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" }));
+  const config = await loadMayConfig();
+  const model = createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) }));
   const values = [
     [services.contextFactory, new InMemoryContextFactory()],
     [services.runtimeFactory, defaultRuntimeFactory],

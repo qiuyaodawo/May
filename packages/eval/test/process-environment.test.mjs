@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, writeFile, access } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -9,7 +10,7 @@ import { promisify } from "node:util";
 import treeKill from "tree-kill";
 import { createLocalDirectoryEnvironment, readFileManifest, startEvalProcess, nodeEvalCommand, createCommandExecutionAdapter } from "../dist/index.js";
 
-const parent = resolve("eval-verification", "environment-tests");
+const parent = join(testOutputRoot, "eval", "process-environment");
 const workload = fileURLToPath(new URL("./fixtures/workload.mjs", import.meta.url));
 async function setup() {
   await mkdir(parent, { recursive: true });

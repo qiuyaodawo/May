@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
@@ -10,7 +11,7 @@ import { chromium } from "playwright";
 import { runMaybeClaw } from "../../dist/run.js";
 
 test("首次启动通过浏览器设置密码、添加 Agent 并创建会话", { timeout: 30000 }, async t => {
-  const base = fileURLToPath(new URL("../../../../.zcode/tmp/maybeclaw-browser-tests/", import.meta.url));
+  const base = join(testOutputRoot, "maybeclaw", "browser");
   await mkdir(base, { recursive: true }); const directory = await mkdtemp(join(base, "init-"));
   const path = join(directory, "config.json"), controller = new AbortController(), stdout = new PassThrough(), stderr = new PassThrough();
   let browser, work, output = "", errors = "";

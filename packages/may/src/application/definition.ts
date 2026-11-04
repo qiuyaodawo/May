@@ -1,4 +1,4 @@
-import { ToolRegistry, resolveRunBudget, type Tool } from "../core/index.js";
+import { ToolRegistry, omitUndefined, resolveRunBudget, type Tool } from "../core/index.js";
 import type { SessionStore } from "../session/index.js";
 
 import {
@@ -60,15 +60,10 @@ export class AgentDefinition {
   }
 
   open(options: AgentDefinitionOpenOptions): Promise<AgentApplication> {
-    assertOpenOptions(options);
     return AgentApplication.open({
       ...this.applicationOptions,
       store: options.store,
-      ...(options.sessionId === undefined
-        ? {}
-        : { sessionId: options.sessionId }),
-      ...(options.resume === undefined ? {} : { resume: options.resume }),
-      ...(options.fork === undefined ? {} : { fork: options.fork }),
+      ...omitUndefined({ sessionId: options.sessionId, resume: options.resume, fork: options.fork }),
       ...(options.metadata === undefined
         ? {}
         : { metadata: { ...options.metadata } }),
@@ -124,13 +119,7 @@ function snapshotDefinitionOptions(
   });
 }
 
-function assertDefinitionOptions(
-  options: AgentDefinitionOptions,
-): asserts options is AgentDefinitionOptions {
-  if (typeof options !== "object" || options === null) {
-    throw new TypeError("Agent definition options must be an object");
-  }
-
+function assertDefinitionOptions(options: AgentDefinitionOptions): void {
   const candidate = options as AgentDefinitionOptions &
     Partial<Record<SessionBoundAgentOption, unknown>>;
   for (
@@ -148,16 +137,5 @@ function assertDefinitionOptions(
         `Agent definition option "${name}" is Session-bound; pass it to open()`,
       );
     }
-  }
-}
-
-function assertOpenOptions(
-  options: AgentDefinitionOpenOptions,
-): asserts options is AgentDefinitionOpenOptions {
-  if (typeof options !== "object" || options === null) {
-    throw new TypeError("Agent definition open options must be an object");
-  }
-  if (!("store" in options) || options.store === undefined) {
-    throw new TypeError("store is required when opening an Agent definition");
   }
 }

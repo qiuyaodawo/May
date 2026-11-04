@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -14,7 +15,7 @@ import { gatewaySettings } from "../dist/gateway-settings.js";
 
 const example = fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url));
 async function directory(t) {
-  const root = fileURLToPath(new URL("../../../.zcode/tmp/rpc-tests/", import.meta.url));
+  const root = join(testOutputRoot, "maybeclaw", "gateway-rpc");
   await mkdir(root, { recursive: true });
   const path = await mkdtemp(join(root, "files-"));
   t.after(() => rm(path, { recursive: true, force: true }));

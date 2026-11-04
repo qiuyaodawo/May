@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,7 +8,7 @@ import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { inboxId } from "../dist/channel-store.js";
 
-const base = fileURLToPath(new URL("../../../review/gateway-repository/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-repository");
 const operator = { kind: "operator", id: "administrator" };
 
 test("Gateway queries isolate actors and repository state survives reopen and session deletion", async t => {

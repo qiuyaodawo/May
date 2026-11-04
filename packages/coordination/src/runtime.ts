@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { AsyncStateSerializer } from "@sortedyuan/may";
-import { AsyncEventQueue, correlationTraceAttributes, endTraceSpan, startTraceSpan, validateTelemetryCorrelation, type TelemetryCorrelation, type Tracer } from "@sortedyuan/may/core";
+import { AsyncEventQueue, AsyncStateSerializer, correlationTraceAttributes, endTraceSpan, omitUndefined, startTraceSpan, validateTelemetryCorrelation, type TelemetryCorrelation, type Tracer } from "@sortedyuan/may/core";
 import type { ApprovalDecision } from "@sortedyuan/may/permissions";
 import type {
   CoordinationAgent, CoordinationEvent, CoordinationJournal, CoordinationLimits, CoordinationPolicy,
@@ -55,20 +54,8 @@ export class CoordinationRuntime {
     this.tracer = options.tracer;
     this.telemetry = options.telemetry === undefined ? undefined : validateTelemetryCorrelation(options.telemetry);
     this.state = freeze(copy(state));
-    // Snapshot callbacks as well as versions; registry mutation cannot change live authority.
-    this.agents = new Map(Object.entries(options.agents).map(([key, agent]) => [key, Object.freeze({
-      version: agent.version, execute: agent.execute.bind(agent), recover: agent.recover.bind(agent),
-      ...(agent.recoveryVersion === undefined ? {} : { recoveryVersion: agent.recoveryVersion }),
-      ...(agent.cancel === undefined ? {} : { cancel: agent.cancel.bind(agent) }),
-      ...(agent.resolveApproval === undefined ? {} : { resolveApproval: agent.resolveApproval.bind(agent) }),
-    })]));
-    this.policy = Object.freeze({ version: options.policy.version, authorize: options.policy.authorize.bind(options.policy),
-      ...(options.policy.authorizeDelegation === undefined ? {} : { authorizeDelegation: options.policy.authorizeDelegation.bind(options.policy) }),
-      ...(options.policy.authorizeMessage === undefined ? {} : { authorizeMessage: options.policy.authorizeMessage.bind(options.policy) }),
-      ...(options.policy.authorizeHandoff === undefined ? {} : { authorizeHandoff: options.policy.authorizeHandoff.bind(options.policy) }),
-      ...(options.policy.authorizeRetry === undefined ? {} : { authorizeRetry: options.policy.authorizeRetry.bind(options.policy) }),
-      ...(options.policy.authorizeGraphRewrite === undefined ? {} : { authorizeGraphRewrite: options.policy.authorizeGraphRewrite.bind(options.policy) }),
-    });
+    this.agents = new Map(Object.entries(options.agents).map(([key, agent]) => [key, snapshotAgent(agent)]));
+    this.policy = snapshotPolicy(options.policy);
     this.events = this.queue;
   }
 
@@ -226,8 +213,7 @@ export class CoordinationRuntime {
       const next: CoordinationTask = { ...taskSpec(task), dependsOn: [...task.dependsOn], agentVersion: task.agentVersion,
         dispatchId: randomUUID(), sessionId: randomUUID(), turn, sessionStartTurn: turn,
         attempt: (task.attempt ?? 0) + 1, attemptStartTurn: turn, attempts: [...attempts, { commandId, finding, task: previous }], status: "queued",
-        ...(task.parentTaskId === undefined ? {} : { parentTaskId: task.parentTaskId }),
-        ...(task.createdByCommand === undefined ? {} : { createdByCommand: task.createdByCommand }),
+        ...omitUndefined({ parentTaskId: task.parentTaskId, createdByCommand: task.createdByCommand }),
       };
       await this.save({ ...this.replace(next), commands: { ...this.state.commands, [commandId]: payload } });
       await this.pump();
@@ -343,7 +329,7 @@ export class CoordinationRuntime {
       }
       const { waitFor, waitForMessages: _messages, inbox: _inbox, wakeFrom: _wake, ...rest } = task;
       await this.save(this.replace({ ...rest, status: "queued", turn: (task.turn ?? 0) + 1,
-        ...(waitFor === undefined ? {} : { wakeFrom: waitFor }) }));
+        ...omitUndefined({ wakeFrom: waitFor }) }));
     }
     while (!this.state.stopReason && this.active.size < this.state.limits.maxConcurrent) {
       const task = this.state.tasks.find((task) => task.status === "queued" && task.dependsOn.every((id) => this.task(id).status === "completed") &&
@@ -371,8 +357,7 @@ export class CoordinationRuntime {
       const inbox = task.inbox ?? this.pendingMessages(task.id).map((message) => message.id);
       const { recoveryVersion: _previousRecoveryVersion, ...pending } = task;
       const recoveryVersion = this.agents.get(task.agent)!.recoveryVersion;
-      const running = { ...pending, inbox, status: "running" as const,
-        ...(recoveryVersion === undefined ? {} : { recoveryVersion }) };
+      const running = { ...pending, inbox, status: "running" as const, ...omitUndefined({ recoveryVersion }) };
       await this.save({ ...this.replace(running), messages: (this.state.messages ?? []).map((message) =>
         inbox.includes(message.id) ? { ...message, deliveredTurn: task.turn ?? 0 } : message) });
       this.launch(running);
@@ -385,11 +370,11 @@ export class CoordinationRuntime {
     const agent = this.agents.get(task.agent)!;
     const baseExecution = this.execution(task);
     const span = startTraceSpan(this.tracer, "may.coordination.dispatch", {
-      ...(this.telemetry?.parent === undefined ? {} : { parent: this.telemetry.parent }),
+      ...omitUndefined({ parent: this.telemetry?.parent }),
       attributes: { ...correlationTraceAttributes(baseExecution.telemetry!), "may.task.turn": task.turn ?? 0 },
     });
     const execution = { ...baseExecution, telemetry: {
-      ...baseExecution.telemetry!, ...(span === undefined ? {} : { parent: span.context }),
+      ...baseExecution.telemetry!, ...omitUndefined({ parent: span?.context }),
     } };
     const done = Promise.resolve().then(async () => {
       let outcome: TaskRecovery;
@@ -432,9 +417,9 @@ export class CoordinationRuntime {
       messages: (this.state.messages ?? []).filter((message) => task.inbox?.includes(message.id)),
       ...(task.wakeFrom === undefined ? {} : { wakeResults: task.wakeFrom.map((id) => {
         const child = this.task(id);
-        return { taskId: id, status: child.status, ...(child.output === undefined ? {} : { output: child.output }), ...(child.detail === undefined ? {} : { detail: child.detail }) };
+        return omitUndefined({ taskId: id, status: child.status, output: child.output, detail: child.detail });
       }) }),
-      ...(this.state.limits.runBudget === undefined ? {} : { runBudget: this.state.limits.runBudget }),
+      ...omitUndefined({ runBudget: this.state.limits.runBudget }),
     }));
   }
 
@@ -756,19 +741,29 @@ function captureOptions<T extends CoordinationRuntimeOptions>(options: T): T {
     if (agent.recoveryVersion !== undefined && (!Number.isSafeInteger(agent.recoveryVersion) || agent.recoveryVersion < 1)) {
       throw new TypeError("Agent recoveryVersion must be a positive safe integer");
     }
-    return [key, Object.freeze({ version: agent.version, execute: agent.execute.bind(agent), recover: agent.recover.bind(agent),
-      ...(agent.recoveryVersion === undefined ? {} : { recoveryVersion: agent.recoveryVersion }),
-      ...(agent.cancel === undefined ? {} : { cancel: agent.cancel.bind(agent) }),
-      ...(agent.resolveApproval === undefined ? {} : { resolveApproval: agent.resolveApproval.bind(agent) }),
-    })];
+    return [key, snapshotAgent(agent)];
   }));
-  return { ...options, agents, policy: { version: options.policy.version, authorize: options.policy.authorize.bind(options.policy),
-    ...(options.policy.authorizeDelegation === undefined ? {} : { authorizeDelegation: options.policy.authorizeDelegation.bind(options.policy) }),
-    ...(options.policy.authorizeMessage === undefined ? {} : { authorizeMessage: options.policy.authorizeMessage.bind(options.policy) }),
-    ...(options.policy.authorizeHandoff === undefined ? {} : { authorizeHandoff: options.policy.authorizeHandoff.bind(options.policy) }),
-    ...(options.policy.authorizeRetry === undefined ? {} : { authorizeRetry: options.policy.authorizeRetry.bind(options.policy) }),
-    ...(options.policy.authorizeGraphRewrite === undefined ? {} : { authorizeGraphRewrite: options.policy.authorizeGraphRewrite.bind(options.policy) }),
-  } };
+  return { ...options, agents, policy: snapshotPolicy(options.policy) };
+}
+
+/** Snapshot callbacks as well as versions, so later registry mutation cannot change live authority. */
+function snapshotAgent(agent: CoordinationAgent): CoordinationAgent {
+  return Object.freeze(omitUndefined({
+    version: agent.version, execute: agent.execute.bind(agent), recover: agent.recover.bind(agent),
+    recoveryVersion: agent.recoveryVersion,
+    cancel: agent.cancel?.bind(agent),
+    resolveApproval: agent.resolveApproval?.bind(agent),
+  }));
+}
+
+function snapshotPolicy(policy: CoordinationPolicy): CoordinationPolicy {
+  return Object.freeze(omitUndefined({ version: policy.version, authorize: policy.authorize.bind(policy),
+    authorizeDelegation: policy.authorizeDelegation?.bind(policy),
+    authorizeMessage: policy.authorizeMessage?.bind(policy),
+    authorizeHandoff: policy.authorizeHandoff?.bind(policy),
+    authorizeRetry: policy.authorizeRetry?.bind(policy),
+    authorizeGraphRewrite: policy.authorizeGraphRewrite?.bind(policy),
+  }));
 }
 
 function handoffCount(task: CoordinationTask): number {

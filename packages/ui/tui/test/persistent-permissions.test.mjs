@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -7,7 +8,7 @@ import { InMemoryPermissionRuleStore, PermissionToolExecutor } from "@sortedyuan
 import { TranscriptStore, TranscriptView } from "../dist/agent/transcript.js";
 
 test("terminal transcript retains persistent approval range from real permission events", async t => {
-  const verificationDirectory = fileURLToPath(new URL("../../../../plugin-verification/persistent-terminal/", import.meta.url));
+  const verificationDirectory = join(testOutputRoot, "tui", "persistent-permissions");
   await mkdir(verificationDirectory, { recursive: true });
   const root = await mkdtemp(join(verificationDirectory, "run-"));
   t.after(() => rm(root, { recursive: true, force: true }));

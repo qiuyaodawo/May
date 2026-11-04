@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { selectLiveModelProfile, testOutputRoot } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
@@ -16,7 +17,8 @@ import { keyStroke } from "../../../tui/dist/keybindings/index.js";
 import { WorkspaceDiffViewer } from "../../../tui/dist/index.js";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderModel, selectProviderModel } from "../../../../providers/dist/index.js";
-import { MaybeCodeWorkspace, createMaybeCodeWebHost, startMaybeCodeWebServer } from "../../../../../apps/maybecode/dist/index.js";
+import { MaybeCodeWorkspace } from "../../../../../apps/maybecode/dist/workspace.js";
+import { createMaybeCodeWebHost, startMaybeCodeWebServer } from "../../../../../apps/maybecode/dist/web-ui.js";
 
 const execute = promisify(execFile);
 
@@ -24,7 +26,7 @@ test("真实 Provider 与 MaybeCode WebUI 完成回复分支、worktree 和文�
   timeout: 240_000, skip: process.env.MAY_LIVE_PROVIDER_UI_TESTS !== "1" || process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1",
 }, async t => {
   const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
-  const base = join(repositoryRoot, "review", "web-ui-browser");
+  const base = join(testOutputRoot, "web-ui", "browser");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "session-fork-live-"));
   const workspace = join(directory, "project"); await mkdir(workspace);
@@ -46,9 +48,11 @@ test("真实 Provider 与 MaybeCode WebUI 完成回复分支、worktree 和文�
   await git("config", "--local", "user.email", "may-test@example.invalid");
   await git("config", "--local", "core.autocrlf", "false");
   await writeFile(join(workspace, "value.txt"), "INITIAL_VALUE\n");
+  await git("add", "value.txt");
+  await git("commit", "-m", "Initial test content");
   const config = await loadMayConfig();
   app = await MaybeCodeWorkspace.open({ workspace,
-    model: createBuiltinProviderModel(selectProviderModel(config, { model: "deepseek-v4-flash" })),
+    model: createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) })),
     store: new FileSessionStore(join(directory, "sessions")), catalog: new FileSessionCatalog(join(directory, "catalog.json")),
     goals: false, subagents: false, skills: false,
     permissionPolicy: check => ["shell", "bash"].includes(check.tool.name) ? "deny" : "allow",

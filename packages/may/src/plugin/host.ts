@@ -1,4 +1,5 @@
 import type { HookContext, HookDefinition, HookDispatcher } from "../core/index.js";
+import { AsyncStateSerializer } from "../core/state-serializer.js";
 import { satisfies } from "semver";
 import { asError, handlerContext, HookRegistry, immutable, orderHandlers, withDeadline } from "./hooks.js";
 import { StateStore } from "./state.js";
@@ -38,7 +39,7 @@ export class PluginHost implements HookDispatcher {
   private ready = false;
   private changing = false;
   private changeCount = 0;
-  private changeQueue: Promise<void> = Promise.resolve();
+  private readonly changes = new AsyncStateSerializer();
   private closeResult: Promise<void> | undefined;
   private initializationSignal: AbortSignal | undefined;
 
@@ -157,7 +158,7 @@ export class PluginHost implements HookDispatcher {
   private async transformValue<T>(hook: HookDefinition<T>, value: T, context: HookContext, cancellation: AbortSignal): Promise<T> {
     const canonical = this.resolveHook(hook, "transform");
     if (!canonical.allowAborted) context.signal.throwIfAborted();
-    let current = canonical.validate(structuredClone(value));
+    let current = value;
     for (const registration of this.handlers(hook.name)) {
       const parentSignal = AbortSignal.any([registration.signal, cancellation,
         ...(canonical.allowAborted ? [] : [context.signal])]);
@@ -166,9 +167,9 @@ export class PluginHost implements HookDispatcher {
         parentSignal, registration.options.timeoutMs ?? this.options.timeoutMs!,
         `Hook ${hook.name} in plugin ${registration.pluginId}`, (task, cancel) => this.track(task, cancel),
       );
-      if (result !== undefined) current = canonical.validate(structuredClone(result));
+      if (result !== undefined) current = canonical.validate(structuredClone(result)) as T;
     }
-    return current as T;
+    return current;
   }
 
   observe<T>(hook: HookDefinition<T>, value: T, context: HookContext): Promise<void> {
@@ -178,13 +179,15 @@ export class PluginHost implements HookDispatcher {
   private async observeValue<T>(hook: HookDefinition<T>, value: T, context: HookContext, cancellation: AbortSignal): Promise<void> {
     const canonical = this.resolveHook(hook, "observe");
     if (!canonical.allowAborted) context.signal.throwIfAborted();
-    const current = canonical.validate(structuredClone(value));
-    for (const registration of this.handlers(hook.name)) {
+    const registrations = this.handlers(hook.name);
+    if (registrations.length === 0) return;
+    const current = immutable(value);
+    for (const registration of registrations) {
       const parentSignal = AbortSignal.any([registration.signal, cancellation,
         ...(canonical.allowAborted ? [] : [context.signal])]);
       try {
         const result = await withDeadline(
-          (signal) => registration.handler(immutable(current), handlerContext(context, signal)),
+          (signal) => registration.handler(current, handlerContext(context, signal)),
           parentSignal, registration.options.timeoutMs ?? this.options.timeoutMs!,
           `Hook ${hook.name} in plugin ${registration.pluginId}`, (task, cancel) => this.track(task, cancel),
         );
@@ -264,7 +267,7 @@ export class PluginHost implements HookDispatcher {
       try { await child.close(); } catch (error) { errors.push(error); }
     }
     await this.idle();
-    await this.changeQueue;
+    await this.changes.idle();
     this.stateStore.pauseWrites();
     try { await this.stateStore.settled(); } catch (error) { errors.push(error); }
     try { await this.stop(); } catch (error) { errors.push(error); }
@@ -469,7 +472,7 @@ export class PluginHost implements HookDispatcher {
     this.signal.throwIfAborted();
     this.changeCount++;
     const root = this.chain()[0]!;
-    const operation = root.changeQueue.then(async () => {
+    const operation = root.changes.run(async () => {
       if (this.closed) throw new Error(`Plugin scope ${this.id} is closed`);
       const { plugins, descendants, graphs } = this.prepareChange(create());
       for (const scope of descendants) scope.changing = true;
@@ -500,7 +503,6 @@ export class PluginHost implements HookDispatcher {
         for (const scope of descendants) scope.changing = false;
       }
     });
-    root.changeQueue = operation.catch(() => {});
     return operation.finally(() => { this.changeCount--; });
   }
 }

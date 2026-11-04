@@ -6,7 +6,7 @@ import { goalsService } from "@sortedyuan/may/goals/plugin";
 import { mcpService } from "@sortedyuan/mcp/plugin";
 import type { AutoCompactionMode } from "@sortedyuan/may/history-memory";
 import type { ContextBudget, ContextCompactionStrategy } from "@sortedyuan/may/context";
-import type { Model, Tool, TraceAttributes } from "@sortedyuan/may/core";
+import { omitUndefined, type Model, type Tool, type TraceAttributes } from "@sortedyuan/may/core";
 import type { SkillRegistry } from "@sortedyuan/may/skills";
 import { SubagentHost } from "./subagent-host.js";
 import { SharedWorkspaceFileGuard } from "./subagent-files.js";
@@ -35,6 +35,8 @@ export function createWorkspaceFilesPlugin(options: { readonly workspace: string
 
 export interface DelegationPluginOptions {
   readonly workspace: string;
+  readonly requestRecording?: "off" | "required";
+  readonly providerBodyRecording?: boolean;
   readonly configuration?: MaybeCodeSubagentConfiguration;
   readonly dataDirectory?: string;
   readonly createRoleModel?: (role: MaybeCodeSubagentRole) => Model | undefined;
@@ -100,29 +102,33 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
           workspace: resolve(options.workspace),
           dataDirectory: options.dataDirectory ?? (store.directory === undefined ? join(homedir(), ".may", "maybecode") : dirname(store.directory)),
           sessionId: application.sessionId, application, store, model,
+          requestRecording: options.requestRecording ?? "required",
+          providerBodyRecording: options.providerBodyRecording ?? false,
           instructions: options.instructions,
-          ...(options.instructionsSource === undefined ? {} : { instructionsSource: options.instructionsSource }),
-          ...(options.projectInstructionsSource === undefined ? {} : { projectInstructionsSource: options.projectInstructionsSource }),
-          ...(options.prepareInstructions === undefined ? {} : { prepareInstructions: options.prepareInstructions }),
-          ...(options.permissionModeSource === undefined ? {} : { permissionModeSource: options.permissionModeSource }),
           permissionPolicy: context.get(applicationServices.permissionPolicy),
           fileGuard: context.get(workspaceFilesService),
-          ...(options.beforeToolExecute === undefined ? {} : { beforeToolExecute: options.beforeToolExecute }),
           autoCompactionMode: options.autoCompactionMode ?? "prune-summary",
+          ...omitUndefined({
+            instructionsSource: options.instructionsSource,
+            projectInstructionsSource: options.projectInstructionsSource,
+            prepareInstructions: options.prepareInstructions,
+            permissionModeSource: options.permissionModeSource,
+            beforeToolExecute: options.beforeToolExecute,
+            contextBudgetFor: options.contextBudgetFor,
+            skills,
+            contextBudget,
+            compactionStrategy: options.compactionStrategy,
+            maxSteps: options.maxSteps,
+            tracer: context.optional(applicationServices.tracer),
+            traceAttributes: options.traceAttributes,
+          }),
           ...(options.createRoleModel === undefined ? {} : { createRoleModel: (role: MaybeCodeSubagentRole) => {
             const selected = options.createRoleModel!(role);
             return selected === undefined ? undefined : wrapChildModel(selected);
           } }),
-          ...(options.contextBudgetFor === undefined ? {} : { contextBudgetFor: options.contextBudgetFor }),
-          ...(skills === undefined ? {} : { skills }),
           ...(options.toolSource === undefined && mcp === undefined ? {} : {
             toolSource: () => [...(options.toolSource?.() ?? []), ...(mcp?.tools ?? [])],
           }),
-          ...(contextBudget === undefined ? {} : { contextBudget }),
-          ...(options.compactionStrategy === undefined ? {} : { compactionStrategy: options.compactionStrategy }),
-          ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
-          ...(context.optional(applicationServices.tracer) === undefined ? {} : { tracer: context.optional(applicationServices.tracer)! }),
-          ...(options.traceAttributes === undefined ? {} : { traceAttributes: options.traceAttributes }),
           loadRequests: async () => {
             const saved = context.state.get<RequestState>().requests;
             if (saved.length > 0) return saved;

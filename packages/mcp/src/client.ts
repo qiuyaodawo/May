@@ -10,7 +10,9 @@ import {
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import {
   AsyncEventQueue,
+  AsyncStateSerializer,
   endTraceSpan,
+  omitUndefined,
   startTraceSpan,
   traceError,
   type JsonSchema,
@@ -226,10 +228,10 @@ class McpConnection {
       throw new McpConnectionError(
         options.id,
         sanitizeDiagnosticText(errorMessage(safeError), 2_000),
-        {
-          ...(safeError instanceof Error ? { cause: safeError } : {}),
-          ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
-        },
+        omitUndefined({
+          cause: safeError instanceof Error ? safeError : undefined,
+          stderr: recentStderr,
+        }),
       );
     } finally {
       poolOptions.signal?.removeEventListener("abort", abortConnect);
@@ -259,19 +261,19 @@ class McpConnection {
       const options = requestOptions(this.options, signal);
       // Explicit page walking rejects repeated cursors rather than publishing a partial catalog.
       const tools = capabilities.tools === undefined ? [] : await listAll(this.options.id, async (cursor) => {
-        const result = await this.client.request({ method: "tools/list", params: cursor === undefined ? {} : { cursor } }, options);
+        const result = await this.client.request({ method: "tools/list", params: omitUndefined({ cursor }) }, options);
         return { items: result.tools, nextCursor: result.nextCursor };
       });
       const resources = capabilities.resources === undefined ? [] : await listAll(this.options.id, async (cursor) => {
-        const result = await this.client.request({ method: "resources/list", params: cursor === undefined ? {} : { cursor } }, options);
+        const result = await this.client.request({ method: "resources/list", params: omitUndefined({ cursor }) }, options);
         return { items: result.resources, nextCursor: result.nextCursor };
       });
       const resourceTemplates = capabilities.resources === undefined ? [] : await listAll(this.options.id, async (cursor) => {
-        const result = await this.client.request({ method: "resources/templates/list", params: cursor === undefined ? {} : { cursor } }, options);
+        const result = await this.client.request({ method: "resources/templates/list", params: omitUndefined({ cursor }) }, options);
         return { items: result.resourceTemplates, nextCursor: result.nextCursor };
       });
       const prompts = capabilities.prompts === undefined ? [] : await listAll(this.options.id, async (cursor) => {
-        const result = await this.client.request({ method: "prompts/list", params: cursor === undefined ? {} : { cursor } }, options);
+        const result = await this.client.request({ method: "prompts/list", params: omitUndefined({ cursor }) }, options);
         return { items: result.prompts, nextCursor: result.nextCursor };
       });
       const catalog = { capabilities, tools, resources, resourceTemplates, prompts };
@@ -292,9 +294,9 @@ class McpConnection {
       if (error instanceof McpCatalogError) throw error;
       if (safeError instanceof McpAuthenticationError || safeError instanceof McpCredentialStoreError) throw safeError;
       const recentStderr = this.stderr.text();
-      throw new McpToolsListError(this.options.id, sanitizeDiagnosticText(errorMessage(safeError), 2_000), {
-        ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
-      });
+      throw new McpToolsListError(this.options.id, sanitizeDiagnosticText(errorMessage(safeError), 2_000), omitUndefined({
+        stderr: recentStderr,
+      }));
     }
   }
 
@@ -312,9 +314,7 @@ class McpConnection {
     }
     this.activeCalls++;
     const span = startTraceSpan(this.tracer, "may.mcp.tool.call", {
-      ...(context.traceContext === undefined
-        ? {}
-        : { parent: context.traceContext }),
+      ...omitUndefined({ parent: context.traceContext }),
       attributes: {
         ...this.traceAttributes,
         "may.step": context.step,
@@ -356,13 +356,11 @@ class McpConnection {
 
       this.onAvailability();
       endTraceSpan(span, { status: "ok" });
-      return {
+      return omitUndefined({
         content: result.content,
-        ...(result._meta === undefined ? {} : { _meta: result._meta }),
-        ...(result.structuredContent === undefined
-          ? {}
-          : { structuredContent: result.structuredContent }),
-      };
+        _meta: result._meta,
+        structuredContent: result.structuredContent,
+      });
     } catch (error) {
       const safeError = safeMcpTransportError(error, this.options);
       endMcpSpan(span, safeError, context.signal);
@@ -437,13 +435,13 @@ class McpConnection {
     signal.throwIfAborted();
     if (this.stale) throw new McpCapabilityError(this.options.id, "catalog is stale; refresh or reconnect before using capabilities");
     this.activeCalls++;
-    const span = startTraceSpan(this.tracer, `may.mcp.${method.replaceAll("/", ".")}`, {
-      attributes: this.traceAttributes, ...(options.traceContext === undefined ? {} : { parent: options.traceContext }),
-    });
+    const span = startTraceSpan(this.tracer, `may.mcp.${method.replaceAll("/", ".")}`, omitUndefined({
+      attributes: this.traceAttributes, parent: options.traceContext,
+    }));
     try {
       await this.checkAuthorization();
       signal.throwIfAborted();
-      const request = this.client.scope({ ...requestOptions(this.options, signal), ...(wholeTimeoutMs === undefined ? {} : { maxTotalTimeout: wholeTimeoutMs }) }, options.owner, this.lifetime.signal, async () => {
+      const request = this.client.scope({ ...requestOptions(this.options, signal), ...omitUndefined({ maxTotalTimeout: wholeTimeoutMs }) }, options.owner, this.lifetime.signal, async () => {
         await this.checkAuthorization();
         if (this.stale) throw new McpCapabilityError(this.options.id, "catalog changed during interaction; start a new operation");
       });
@@ -572,10 +570,10 @@ class McpConnection {
       throw new McpConnectionError(
         this.options.id,
         `disconnect failed: ${errorMessage(safeError)}`,
-        {
-          ...(safeError instanceof Error ? { cause: safeError } : {}),
-          ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
-        },
+        omitUndefined({
+          cause: safeError instanceof Error ? safeError : undefined,
+          stderr: recentStderr,
+        }),
       );
     }
   }
@@ -607,10 +605,7 @@ class McpConnection {
             cause.message,
             2_000,
           )}`,
-      {
-        ...(cause === undefined ? {} : { cause }),
-        ...(recentStderr === undefined ? {} : { stderr: recentStderr }),
-      },
+      omitUndefined({ cause, stderr: recentStderr }),
     ));
   }
 }
@@ -694,7 +689,7 @@ interface PoolEntry {
   catalog?: McpServerCatalog;
   tools: readonly Tool[];
   invalidations: number;
-  chain: Promise<void>;
+  readonly operations: AsyncStateSerializer;
   refreshTimer?: ReturnType<typeof setTimeout>;
   refreshScheduled?: boolean;
 }
@@ -711,7 +706,7 @@ class DefaultMcpClientPool implements McpClientPool {
   constructor(private readonly options: OpenMcpClientPoolOptions) {
     this.events = this.recorder.events;
     this.entries = options.servers.map((server) => ({
-      server, tools: [], invalidations: 0, chain: Promise.resolve(),
+      server, tools: [], invalidations: 0, operations: new AsyncStateSerializer(),
       status: { serverId: server.id, transport: server.transport ?? "stdio",
         required: server.required !== false, state: "failed", toolNames: [] },
     }));
@@ -733,8 +728,7 @@ class DefaultMcpClientPool implements McpClientPool {
       return { ...status,
         ...(connection === undefined ? {} : { catalogSubscription: connection.catalogSubscription }),
         toolNames: [...status.toolNames],
-        ...(catalog === undefined ? {} : { catalogRevision: catalog.revision }),
-        ...(stderr === undefined ? {} : { stderr }),
+        ...omitUndefined({ catalogRevision: catalog?.revision, stderr }),
         ...(status.diagnostic === undefined ? {} : { diagnostic: { ...status.diagnostic } }),
       };
     });
@@ -828,7 +822,7 @@ class DefaultMcpClientPool implements McpClientPool {
     this.closed = true;
     this.lifetime.abort("MCP pool is closing");
     for (const entry of this.entries) clearTimeout(entry.refreshTimer);
-    await Promise.allSettled(this.entries.map((entry) => entry.chain));
+    await Promise.all(this.entries.map((entry) => entry.operations.idle()));
     const failures: unknown[] = [];
     for (const entry of [...this.entries].reverse()) {
       if (entry.connection === undefined) continue;
@@ -855,9 +849,7 @@ class DefaultMcpClientPool implements McpClientPool {
 
   private enqueue(entry: PoolEntry, work: () => Promise<void>): Promise<void> {
     if (this.closed) return Promise.reject(new McpClientPoolClosedError());
-    const promise = entry.chain.then(() => { this.lifetime.signal.throwIfAborted(); return work(); });
-    entry.chain = promise.catch(() => {});
-    return promise;
+    return entry.operations.run(() => { this.lifetime.signal.throwIfAborted(); return work(); });
   }
 
   private async connect(entry: PoolEntry, signal: AbortSignal): Promise<void> {
@@ -1042,15 +1034,11 @@ function requestOptions(
   options: McpServerOptions,
   signal?: AbortSignal,
 ): RequestOptions {
-  return {
-    ...(signal === undefined ? {} : { signal }),
-    ...(options.requestTimeoutMs === undefined
-      ? {}
-      : { timeout: options.requestTimeoutMs }),
-    ...(options.maxTotalTimeoutMs === undefined
-      ? {}
-      : { maxTotalTimeout: options.maxTotalTimeoutMs }),
-  };
+  return omitUndefined({
+    signal,
+    timeout: options.requestTimeoutMs,
+    maxTotalTimeout: options.maxTotalTimeoutMs,
+  });
 }
 
 function formatProgress(progress: unknown): string {
@@ -1131,12 +1119,12 @@ function toDiagnostic(error: unknown): McpDiagnostic {
       error instanceof McpToolsListError
     ? error.stderr
     : undefined;
-  return {
+  return omitUndefined({
     name: error instanceof Error ? error.name : "Error",
     message: sanitizeDiagnosticText(summary, 2_000),
-    ...(code === undefined ? {} : { code }),
-    ...(stderr === undefined ? {} : { stderr }),
-  };
+    code,
+    stderr,
+  });
 }
 
 class BoundedStderrBuffer {

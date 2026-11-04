@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile, access } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -6,13 +7,14 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { createServer } from "node:http";
 import { loadMayConfig, updateDefaultMayModel } from "@sortedyuan/may/config";
+import { acquireFileLock } from "@sortedyuan/may/storage";
 import { inspectGatewaySetup, startGatewaySetup } from "../dist/gateway-setup.js";
 import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
-import { startGatewayServer } from "../dist/gateway-server.js";
+import { startGatewayServer } from "../dist/plugins/web-api.js";
 
 async function fixture(t, config) {
-  const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-setup-tests/", import.meta.url));
+  const base = join(testOutputRoot, "maybeclaw", "gateway-setup");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "case-")), path = join(directory, "config.json");
   if (config) await writeFile(path, JSON.stringify(config));
@@ -60,7 +62,7 @@ test("首次设置直接保存密码哈希并在同一地址启用控制台", as
 test("初始化保留其他配置并拒绝并发初始化", async t => {
   const config = { providers: {}, models: {}, apps: { other: { label: "保留" }, maybeclaw: { version: 2, agents: [{ id: "code", adapter: "may" }], server: { maxConcurrent: 2 } } } };
   const { setup, path, submit, activate } = await fixture(t, config);
-  await assert.rejects(startGatewaySetup({ path, port: 0, activate }), { code: "EEXIST" });
+  await assert.rejects(startGatewaySetup({ path, port: 0, activate }), { code: "ELOCKED" });
   config.apps.other.label = "初始化期间保存";
   await writeFile(path, JSON.stringify(config));
   const response = await submit(); assert.equal(response.status, 200); await response.json(); await setup.completed;
@@ -79,15 +81,15 @@ test("外部设置认证后拒绝覆盖，取消初始化清理入口", async t 
   assert.equal(await readFile(path, "utf8"), original);
   await setup.close();
   await assert.rejects(access(setup.launchPath), { code: "ENOENT" });
-  await assert.rejects(access(`${path}.initialize.lock`), { code: "ENOENT" });
+  await (await acquireFileLock(`${path}.initialize.lock`)).release();
 });
 
-test("旧配置和损坏配置明确拒绝初始化", async t => {
+test("不支持的配置版本和损坏配置明确拒绝初始化", async t => {
   const { setup, path } = await fixture(t);
   await setup.close();
   for (const config of [{ providers: {}, apps: { maybeclaw: { runBudget: { maxSteps: 3 } } } }, { providers: {}, apps: { maybeclaw: { version: 1 } } }]) {
     const original = JSON.stringify(config); await writeFile(path, original);
-    await assert.rejects(inspectGatewaySetup(path), /迁移/); assert.equal(await readFile(path, "utf8"), original);
+    await assert.rejects(inspectGatewaySetup(path), /version: 2/); assert.equal(await readFile(path, "utf8"), original);
   }
   await writeFile(path, "{"); await assert.rejects(inspectGatewaySetup(path), /有效的 JSON/);
 });
@@ -99,12 +101,12 @@ test("初始化端口占用时释放配置锁和初始化文件", async t => {
   await new Promise(resolve => occupied.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve, reject) => occupied.close(error => error ? reject(error) : resolve())));
   await assert.rejects(startGatewaySetup({ path, port: occupied.address().port, activate }), { code: "EADDRINUSE" });
-  await assert.rejects(access(`${path}.initialize.lock`), { code: "ENOENT" });
+  await (await acquireFileLock(`${path}.initialize.lock`)).release();
   await assert.rejects(access(path), { code: "ENOENT" });
 });
 
 test("初始化检查在配置父目录缺失时保持目录不存在", async t => {
-  const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-setup-tests/", import.meta.url));
+  const base = join(testOutputRoot, "maybeclaw", "gateway-setup");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "missing-"));
   t.after(async () => {
@@ -120,7 +122,7 @@ test("初始化检查在配置父目录缺失时保持目录不存在", async t 
 
 test("HTTP 初始化与配置读取及模型更新并发完成并保留各自修改", { timeout: 30_000 }, async t => {
   const config = {
-    providers: { local: { adapter: "openai-responses", options: { payload: "x".repeat(64 * 1024) } } },
+    providers: { local: { adapter: "custom-test-adapter", options: { payload: "x".repeat(64 * 1024) } } },
     models: { first: { provider: "local", model: "first" }, second: { provider: "local", model: "second" } },
     defaultModel: "first",
     apps: { other: { label: "保留" }, maybeclaw: { version: 2, agents: [], server: { maxConcurrent: 2 } } },

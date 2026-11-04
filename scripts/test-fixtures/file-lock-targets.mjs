@@ -2,19 +2,16 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { hostname, homedir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { acquireFileLock, releaseFileLock } from "../../packages/may/dist/session/file-store.js";
+import { acquireFileLock } from "../../packages/may/dist/storage/index.js";
 import { FilePermissionRuleStore } from "../../packages/may/dist/permissions/file-store.js";
 import { FileCoordinationStore } from "../../packages/coordination/dist/file-store.js";
 import { ResourceJournal } from "../../packages/coordination/dist/resource-journal.js";
 import { CoordinationWorker } from "../../packages/coordination/dist/remote-worker.js";
 import { ProjectGitWorkspace } from "../../packages/may/dist/application/git-workspace.js";
 import { updateDefaultMayModel } from "../../packages/may/dist/config/index.js";
-import { FileTaskStore } from "../../apps/maybeclaw/dist/store.js";
-import { MaybeClaw } from "../../apps/maybeclaw/dist/service.js";
-import { MaybeClawHost } from "../../apps/maybeclaw/dist/host.js";
 import { GatewayStore } from "../../apps/maybeclaw/dist/gateway-store.js";
 import { startGatewaySetup } from "../../apps/maybeclaw/dist/gateway-setup.js";
 import { TeamVerificationStore } from "../../apps/maybecode/dist/team-verification.js";
@@ -24,7 +21,7 @@ import { applyTeamPatch, createTeamPatch } from "../../apps/maybecode/dist/team-
 const run = promisify(execFile);
 export const targetNames = [
   "session", "permissions", "coordination", "resource", "worker",
-  "task", "host", "gateway", "setup", "verification", "git", "config", "patch",
+  "gateway", "setup", "verification", "git", "config", "patch",
 ];
 export const configuration = {
   providers: { local: { adapter: "openai-responses" } },
@@ -39,8 +36,7 @@ export async function targetFor(name, directory, initialize = false) {
     const lockPath = join(directory, "owner.lock");
     return { lockPath, async acquire() {
       const lock = await acquireFileLock(lockPath);
-      await lock.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname() }));
-      return { close: () => releaseFileLock(lock, lockPath) };
+      return { close: () => lock.release() };
     } };
   }
   if (name === "permissions") return {
@@ -64,24 +60,9 @@ export async function targetFor(name, directory, initialize = false) {
       directory, token: "local-lock-verification-token-0123456789", agents: {}, authorize: () => false,
     }),
   };
-  if (name === "task") {
-    const store = new FileTaskStore(directory);
-    const id = "a".repeat(64);
-    if (initialize) await mkdir(join(directory, "tasks"), { recursive: true });
-    return { lockPath: store.path(id, "lock"), failurePath: store.path(id, "jsonl"), acquire: () => store.acquire(id) };
-  }
-  if (name === "host") {
-    const claw = new MaybeClaw({ directory, loadModel: async () => { throw new Error("This host has no configured tasks"); } });
-    return {
-      lockPath: join(directory, "host.lock"), failurePath: join(directory, "channels.jsonl"),
-      acquire: () => MaybeClawHost.start({
-        claw, startPaused: true, selectSpec: async () => { throw new Error("This host does not admit tasks"); },
-      }),
-    };
-  }
   if (name === "gateway") return {
     lockPath: join(directory, "host.lock"), failurePath: join(directory, "gateway.sqlite"),
-    acquire: async () => GatewayStore.open(directory),
+    acquire: async () => { const store = GatewayStore.open(directory); return { close: async () => store.close() }; },
   };
   if (name === "setup") return {
     lockPath: `${path}.initialize.lock`, failurePath: path,
@@ -105,7 +86,7 @@ export async function targetFor(name, directory, initialize = false) {
     const scope = createHash("sha256").update(manager.repository).digest("hex").slice(0, 24);
     const base = join(directory, "records", manager.projectId, scope);
     return {
-      lockPath: `${base}.lock`, failurePath: `${base}.intent.json`, automaticRecovery: true,
+      lockPath: `${base}.lock`, failurePath: `${base}.intent.json`,
       acquire: () => manager.beginRound({ sessionId: "file-lock-verification" }),
     };
   }
@@ -140,7 +121,7 @@ export async function targetFor(name, directory, initialize = false) {
     if (initialize) await mkdir(lockDirectory, { recursive: true });
     const lockPath = join(lockDirectory, `${createHash("sha256").update(sourceDirectory).digest("hex")}.lock`);
     return {
-      lockPath, oneShot: true, cleanupFiles: [lockPath, `${lockPath}.access`, `${lockPath}.access.gate`],
+      lockPath, oneShot: true, cleanupFiles: [lockPath, `${lockPath}.owner`],
       failurePath: join(teamDirectory, "patches", "applications", descriptor.patchId, "apply.jsonl"),
       async acquire() {
         const workspaces = await TaskWorkspaceManager.open(workspaceOptions);

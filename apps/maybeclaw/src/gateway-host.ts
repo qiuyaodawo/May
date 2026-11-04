@@ -3,15 +3,12 @@ import { ChannelStore, validateChannelInput, type ChannelAttachment, type Channe
 import type { ChannelAdapter, ChannelAttachmentData, ChannelState } from "./channels.js";
 import type { ContentPart } from "@sortedyuan/may/core";
 import { inspectImage, readEmbeddedImage, type ImageData } from "@sortedyuan/media";
-import { UiProjection } from "@sortedyuan/ui-client/projection";
-import { channelTextPages } from "./channel-text.js";
-export { channelTextPages } from "./channel-text.js";
 import type { GatewayChannelController } from "./gateway-api.js";
 import { gatewayInput } from "./gateway-input.js";
 import { actorKey, type GatewayActor, type GatewayCapabilities, type GatewayEntry } from "./gateway-types.js";
-import type { PendingInput, LegacyDelivery } from "./gateway-repository.js";
+import type { PendingInput } from "./gateway-repository.js";
 import { PluginHost, definePlugin, defineService, type AnyPlugin } from "@sortedyuan/may/plugin";
-import { createDeliveryPlugin, deliveryServices, type DeliveryService } from "@sortedyuan/gateway/delivery";
+import { channelTextPages, createDeliveryPlugin, deliveryServices, type DeliveryService } from "@sortedyuan/gateway/delivery";
 import { gatewayPluginServices } from "./plugins/services.js";
 
 export class GatewayHost {
@@ -41,7 +38,6 @@ export class GatewayHost {
         channels = await ChannelStore.open(join(options.gateway.options.directory, "gateway-channels.jsonl"));
         context.defer(() => channels!.close());
         await channels.remove(channels.values().filter(record => record.kind === "inbox").map(record => record.id));
-        for (const cursor of options.gateway.channels.legacyCursors()) if (!channels.get(cursor.id)) await channels.put(cursor);
         const state: ChannelState = { get: id => channels!.get(id), put: record => channels!.put(record), values: () => [
           ...channels!.values(),
           ...options.gateway.channels.inputs().map((record): ChannelRecord => ({ kind: "inbox", id: record.id, input: record.input, processed: record.state !== "pending" })),
@@ -74,7 +70,6 @@ export class GatewayHost {
     error: this.processingError?.message ?? gateway.error,
     channels: this.options.adapters.map(adapter => ({ account: adapter.account, name: adapter.name, state: this.channelErrors.get(adapter.account) ?? adapter.status(), capabilities: adapter.capabilities })),
     deliveries: this.gateway.channels.deliveries().slice(-100),
-    legacyDeliveries: this.gateway.channels.legacyDeliveries().slice(-100),
     channelReplies: this.gateway.channels.replies().slice(-100) }; }
   startLoops(): void {
     if (this.timer || this.controller.signal.aborted) return;
@@ -164,7 +159,6 @@ export class GatewayHost {
   }
   async deliver(): Promise<void> {
     const repository = this.gateway.channels;
-    await this.deliverLegacy();
     for (const delivery of repository.deliveries()) {
       if (this.controller.signal.aborted || delivery.status !== "pending") continue;
       if (delivery.after && repository.delivery(delivery.after)?.status !== "sent") continue;
@@ -182,7 +176,7 @@ export class GatewayHost {
       } catch (error) {
         if (!repository.delivery(delivery.id)) continue;
         const detail = error instanceof Error ? error.message : "图片无法发送。";
-        repository.failDelivery("current", delivery.id, detail);
+        repository.failDelivery(delivery.id, detail);
         this.queueReply({ id: `${delivery.id}:media-error`, state: "done", input: { account: entry.account, sender: entry.owner ?? "gateway", conversation: entry.conversation,
           kind: entry.kind, eventId: delivery.id, text: detail, ...(entry.threadId ? { threadId: entry.threadId } : {}), ...(delivery.replyTo ? { messageId: delivery.replyTo } : {}) } }, detail, delivery.sessionId);
         this.gateway.changed(); continue;
@@ -212,50 +206,6 @@ export class GatewayHost {
       } catch (error) {
         if (repository.reply(reply.id)?.status !== "unknown" && repository.reply(reply.id)) throw error;
       }
-    }
-  }
-  retryLegacyDelivery(id: string, actor: GatewayActor, confirmUnknown = false): LegacyDelivery {
-    if (actor.kind !== "operator") throw new Error("重新发送历史消息需要服务管理员权限。");
-    const pending = this.gateway.channels.retryLegacyDelivery(id, confirmUnknown);
-    this.gateway.changed(); return pending;
-  }
-  private async deliverLegacy(): Promise<void> {
-    const repository = this.gateway.channels;
-    for (const delivery of repository.legacyDeliveries()) {
-      if (this.controller.signal.aborted || delivery.status !== "pending") continue;
-      if (delivery.after && repository.legacyDelivery(delivery.after)?.status !== "sent") continue;
-      const adapter = this.options.adapters.find(value => value.account === delivery.account);
-      if (!adapter) continue;
-      const input: ChannelInput = { account: delivery.account, sender: delivery.sender, conversation: delivery.conversation, eventId: delivery.id, text: delivery.text,
-        kind: delivery.conversationKind ?? "private", ...(delivery.threadId ? { threadId: delivery.threadId } : {}) };
-      if (!(adapter.accepts?.(input) ?? adapter.allowUsers.includes(input.sender)) || this.gateway.options.settings.access.deniedUsers.includes(`${delivery.account}:${delivery.sender}`)) {
-        repository.suppressLegacyDelivery(delivery.id); continue;
-      }
-      let image: ImageData | undefined;
-      try {
-        if (delivery.imageId) {
-          const task = delivery.taskId && repository.legacyTask(delivery.taskId);
-          if (!task || !task.origins.some(origin => origin.account === delivery.account && origin.sender === delivery.sender && origin.conversation === delivery.conversation)) throw new Error("历史附件缺少可核验的来源。");
-          if (!adapter.media?.images || !adapter.capabilities?.outputAttachments.includes("image")) throw new Error("当前渠道不支持发送历史图片。");
-          const projection = new UiProjection(Infinity); projection.history(task.history);
-          const source = projection.mediaSources.get(delivery.imageId);
-          if (!source) throw new Error("历史任务中不存在该附件。");
-          image = await readEmbeddedImage(source, this.controller.signal);
-          if (image.data.byteLength > adapter.media.maxImageBytes || !adapter.media.mediaTypes.includes(image.mediaType)) throw new Error("历史图片超过渠道限制。");
-        }
-      } catch (error) {
-        if (!repository.legacyDelivery(delivery.id)) continue;
-        repository.failDelivery("legacy", delivery.id, error instanceof Error ? error.message : "历史附件无法发送。");
-        this.gateway.changed(); continue;
-      }
-      if (!repository.legacyDelivery(delivery.id)) continue;
-      try {
-        await this.delivery.attempt(adapter, { ...delivery, status: "pending" }, { signal: this.controller.signal, ...(image ? { image } : {}),
-          commit: (status, receipt) => repository.commitDelivery("legacy", delivery.id, status, receipt) });
-      } catch (error) {
-        if (repository.legacyDelivery(delivery.id)?.status !== "unknown" && repository.legacyDelivery(delivery.id)) throw error;
-      }
-      this.gateway.changed();
     }
   }
   close(): Promise<void> {

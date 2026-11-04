@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -15,7 +16,7 @@ import { chromium } from "playwright";
 import { webUiAssets } from "../../dist/assets.js";
 
 test("浏览器读取持久图片、保持内容顺序、下载和会话权限", { timeout: 120_000 }, async t => {
-  const base = fileURLToPath(new URL("../../../../../review/media-tests/", import.meta.url));
+  const base = join(testOutputRoot, "web-ui", "images");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "browser-"));
   const variables = Object.fromEntries(["TMP", "TEMP", "TMPDIR"].map(key => [key, process.env[key]]));

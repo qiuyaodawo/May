@@ -16,7 +16,8 @@ pnpm build
 安装使用 lockfile 中的依赖版本。本地存储缺少依赖时需要访问 registry。明确修改
 依赖时使用 `pnpm install`，并检查 lockfile 的变化。
 
-根目录构建会检查类型并编译工作目录，随后使用 esbuild 打包 MaybeCode CLI。
+根目录构建会检查类型并编译工作目录，使用 esbuild 打包 MaybeCode CLI，并把每个应用的组合
+配置 schema 写入 `apps/<application>/dist/<application>-config.schema.json`。
 `pnpm --filter @sortedyuan/maybecode build` 同样生成 CLI 打包文件。
 `dist/bin.js` 必须与 `dist/cli/` 中的文件一起使用。package 的 library exports
 继续使用 TypeScript 编译的模块。CLI 根据选中的命令加载对应功能，图片编码模块和
@@ -24,16 +25,21 @@ Web 服务资源在使用时加载。
 
 ## 选择相关检查
 
+- `pnpm format`：使用 Prettier（`printWidth: 120`）格式化仓库；`pnpm format:check` 只报告
+  未格式化的文件，不修改文件。CI 在 Linux 和 Node.js 24 上运行这项检查。
 - `pnpm docs:check`：检查双语文件配对、语言链接、本地目标文件和代码围栏配对。
   锚点、表达及示例需要另外检查。
 - `pnpm --filter <package-name> test`：检查一个 package，使用其 `package.json` 中
   的名称替换参数。
+- 测试把临时数据写入被忽略的 `.test-output/`。私有 package `@sortedyuan/test-support` 提供
+  `createTestDirectory(t, name)`，它创建 `.test-output/<name>-XXXXXX` 并在测试结束后删除；
+  共用的测试目录使用 `testOutputRoot`。
 - `pnpm test`：执行工作目录中的离线测试，继续检查各个 package 后报告失败；
   package 测试全部通过后执行文件锁检查。
 - `pnpm test:locks`：在 `pnpm build` 后运行，通过实际 package 与应用 API 检查
   锁所有权、进程终止、初始化失败和释放。Windows 还通过 PowerShell 与 Windows
   文件 API 控制待删除状态，验证竞争时序。测试数据位于忽略的
-  `review/file-lock-matrix/`；Team patch 检查结束后清理临时来源目录对应的应用锁文件。
+  `.test-output/file-lock-matrix/`；Team patch 检查结束后清理临时来源目录对应的应用锁文件。
 - `pnpm test:coverage`：执行各个 package 提供的覆盖率检查。
 - `pnpm test:path-alias`：通过 Windows junction 或 POSIX symlink 使用临时目录，
   检查代码对规范路径的假设。
@@ -65,11 +71,20 @@ Web 服务资源在使用时加载。
 
 ## 需要额外环境的检查
 
-真实 Provider 检查使用相应 `test:integration` 命令和已经配置的凭据。例如，
-MaybeClaw 需要 `MAYBECLAW_LIVE_MODEL` 及 Provider 凭据：
+真实 Provider 检查使用相应 `test:integration` 命令和已经配置的凭据。适用于任意
+Provider 的测试使用 `MAY_LIVE_MODEL` 指定的模型配置；没有设置这个变量时，使用
+`~/.may/config.json` 中的 `defaultModel`。针对某个 adapter 的 Provider 测试选择
+使用该 adapter 的模型配置：
 
 ```bash
 pnpm --filter @sortedyuan/maybeclaw test:integration
+```
+
+MaybeCode 的模型切换和历史分支测试还读取 `MAY_LIVE_SWITCH_MODEL`。它必须是另一个
+已经配置的模型，provider、model 或 adapter 不同，并且推理强度能力已知：
+
+```bash
+MAY_LIVE_SWITCH_MODEL=<other-profile> pnpm test:integration:maybecode
 ```
 
 系统剪贴板检查需要 Windows 桌面会话：

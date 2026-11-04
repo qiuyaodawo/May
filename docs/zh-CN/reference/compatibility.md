@@ -54,7 +54,7 @@ Context factory、executor、scheduler、权限策略闭包及其他有状态对
 ### 每次 Run 的动态工具目录
 
 `MayOptions.toolSource` 是可信宿主提供的同步 `() => Iterable<Tool>`，也由
-`AgentApplication`、`defineAgent()` 和 `MaybeCodeApplication` 接受。每次
+`AgentApplication` 和 `defineAgent()` 接受。每次
 `run()` 或 `continue()` 启动时调用一次，将返回工具追加到静态集合。远程发现和
 刷新需要在 Core 外完成，回调返回最新的内存集合。工具重名会在修改 Context 前报错。
 

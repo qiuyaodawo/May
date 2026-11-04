@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { omitUndefined } from "@sortedyuan/may/core";
 import type { McpCredentialStore } from "./credentials.js";
 import type { McpInteractionOwner } from "./interactions.js";
 import { freezeTree, integer, object, parseMcpTask, taskFailure, text, type McpRemoteTask, type McpTaskStatus } from "./tasks.js";
@@ -89,7 +90,7 @@ export class McpTaskJournal {
       if (journal.records.some((other) => other.id !== id && other.binding.endpointIdentity === binding.endpointIdentity && other.binding.serverId === binding.serverId && other.remote?.taskId === state.taskId)) throw taskFailure(binding.serverId, "remote task id already belongs to another local operation");
       await this.bindRemote(record, state.taskId, signal);
       const { taskId, status, createdAt, lastUpdatedAt, ttlMs, pollIntervalMs } = state;
-      record.remote = { taskId, status, createdAt, lastUpdatedAt, ttlMs, ...(pollIntervalMs === undefined ? {} : { pollIntervalMs }) };
+      record.remote = omitUndefined({ taskId, status, createdAt, lastUpdatedAt, ttlMs, pollIntervalMs });
       record.status = status;
     }, signal);
   }

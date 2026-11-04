@@ -1,4 +1,4 @@
-import { jsonEqual } from "../core/index.js";
+import { jsonEqual, omitUndefined } from "../core/index.js";
 import type {
   Context,
   ContextSnapshot,
@@ -17,10 +17,7 @@ import type {
 export class InMemoryContextFactory implements ContextFactory {
   create(options: ContextFactoryOptions): ManagedContext {
     const context = new ReplaceableInMemoryContext({
-      ...(options.instructionsSource === undefined ? {} : { instructionsSource: options.instructionsSource }),
-      ...(options.instructions === undefined
-        ? {}
-        : { instructions: options.instructions }),
+      ...omitUndefined({ instructionsSource: options.instructionsSource, instructions: options.instructions }),
       ...(options.messages === undefined
         ? {}
         : { messages: [...options.messages] }),
@@ -29,19 +26,15 @@ export class InMemoryContextFactory implements ContextFactory {
         : { metadata: { ...options.metadata } }),
     });
     const controller = new SnapshotContextController(context, {
-        ...(options.budget === undefined ? {} : { budget: options.budget }),
-        ...(options.measurement === undefined
-          ? {}
-          : { measurement: options.measurement }),
+        ...omitUndefined({
+          budget: options.budget,
+          measurement: options.measurement,
+          autoCompactionStrategies: options.autoCompactionStrategies,
+        }),
         compactionStrategy: options.compactionStrategy ??
           new PruneOldToolResultsStrategy(),
         replaceMessages: (messages, expectedMessages) =>
           context.replaceMessages(messages, expectedMessages),
-        ...(options.autoCompactionStrategies === undefined
-          ? {}
-          : {
-              autoCompactionStrategies: options.autoCompactionStrategies,
-            }),
       });
     return {
       context: new ModelViewContext(context, controller),

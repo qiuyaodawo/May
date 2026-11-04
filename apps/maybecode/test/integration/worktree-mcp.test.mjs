@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
 const execute = promisify(execFile);
-const artifacts = fileURLToPath(new URL("../../../../review/worktree-mcp-tests/", import.meta.url));
+const artifacts = join(testOutputRoot, "maybecode", "worktree-mcp");
 const server = fileURLToPath(new URL("./fixtures/workspace-files-server.mjs", import.meta.url));
 
 test("configured MCP processes use the selected historical worktree directory", {
@@ -25,7 +27,7 @@ test("configured MCP processes use the selected historical worktree directory", 
   await git("config", "--local", "user.name", "May MCP test");
   await git("config", "--local", "user.email", "may-test@example.invalid");
   await writeFile(join(workspace, "value.txt"), "ORIGINAL_MCP_CONTENT\n");
-  const app = await openConfiguredMaybeCode({ workspace, model: "deepseek-v4-flash",
+  const app = await openConfiguredMaybeCode({ workspace, model: liveModelProfile(),
     dataDirectory: join(directory, "sessions"), skills: false, goals: false, subagents: false,
     observability: false, plugins: [], permissionMode: "yolo",
     mcp: { servers: [{ id: "workspace", command: process.execPath, args: [server], required: true, protocolMode: "auto" }] },

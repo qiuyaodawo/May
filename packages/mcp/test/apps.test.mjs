@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { openMcpClientPool, mcpAppSandboxResponse, parseMcpAppResource, MCP_APP_MIME } from "../dist/index.js";
 import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
-import { executeMaybeCodeSlashCommand } from "../../../apps/maybecode/dist/index.js";
+import { executeMaybeCodeSlashCommand } from "../../../apps/maybecode/dist/slash-commands.js";
 import { startCatalogFixture } from "./fixtures/catalog-server.mjs";
 
 const owner = { workspaceId: "workspace", sessionId: "session" };

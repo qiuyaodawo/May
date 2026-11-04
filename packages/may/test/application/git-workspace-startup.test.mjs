@@ -1,22 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { realpath } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { simpleGit } from "simple-git";
 import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 
 test("真实仓库与 linked worktree 的初始化保留已有版本和仓库身份", async t => {
   const repository = await realpath(fileURLToPath(new URL("../../../../", import.meta.url)));
-  const parent = join(repository, "review", "git-workspace-startup");
-  await mkdir(parent, { recursive: true });
-  const root = await realpath(await mkdtemp(join(parent, "startup-")));
-  t.after(async () => {
-    const target = await realpath(root);
-    const path = relative(await realpath(parent), target);
-    assert.ok(path && !isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`));
-    await rm(target, { recursive: true, force: true });
-  });
+  const root = await realpath(await createTestDirectory(t, "may/git-workspace-startup"));
   const project = join(root, "project");
   await simpleGit().clone(repository, project, ["--shared", "--quiet"]);
   const git = simpleGit({ baseDir: project });

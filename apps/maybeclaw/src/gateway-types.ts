@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { ContentPart, RunBudget } from "@sortedyuan/may/core";
 import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/may/permissions";
 import type { PluginModuleSelection } from "@sortedyuan/may/plugin";
@@ -135,4 +136,17 @@ export function actorKey(actor: GatewayActor): string {
 }
 export function entryKey(entry: Pick<GatewayEntry, "account" | "conversation" | "threadId">): string {
   return JSON.stringify([entry.account, entry.conversation, entry.threadId ?? null]);
+}
+
+export function digest(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
+}
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)]));
+  }
+  return value;
 }

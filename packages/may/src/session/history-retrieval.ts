@@ -1,4 +1,4 @@
-import type { Tool } from "../core/index.js";
+import { omitUndefined, type Tool } from "../core/index.js";
 import { sessionHistoryEventContent, type SessionHistorySource } from "./session-history.js";
 
 /** Search bounded batches of complete events, then read matching records in chunks. */
@@ -26,10 +26,10 @@ export function createSessionHistoryRetrievalTools(options: {
       async execute(input, context) {
         const value = input as { query: string; afterSeq?: number };
         context.signal.throwIfAborted();
-        const page = await options.source().queryHistory({
-          ...(value.afterSeq === undefined ? {} : { afterSeq: value.afterSeq }),
+        const page = await options.source().queryHistory(omitUndefined({
+          afterSeq: value.afterSeq,
           limit: 50, order: "asc",
-        });
+        }));
         context.signal.throwIfAborted();
         const matches = [];
         for (const [index, event] of page.events.entries()) {
@@ -46,7 +46,7 @@ export function createSessionHistoryRetrievalTools(options: {
             ...(page.hasMore || index < page.events.length - 1 ? { nextSeq: event.seq } : {}),
           };
         }
-        return { matches, hasMore: page.hasMore, ...(page.nextSeq === undefined ? {} : { nextSeq: page.nextSeq }) };
+        return omitUndefined({ matches, hasMore: page.hasMore, nextSeq: page.nextSeq });
       },
     },
     {

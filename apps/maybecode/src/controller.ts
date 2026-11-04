@@ -1,10 +1,10 @@
-import type { AgentWorkspaceController } from "@sortedyuan/may";
+import type { AgentStateTransitionOptions, AgentWorkspaceController } from "@sortedyuan/may";
 import type { GoalBudget, GoalState } from "@sortedyuan/may/goals";
+import type { MaybeCodeApplication } from "./application.js";
 import type { ContextCompactionStrategy } from "@sortedyuan/may/context";
 import type { McpClientPool, McpServerStatus, McpResourceSubscription, McpInteractionBroker } from "@sortedyuan/mcp";
 import type { MaybeCodeEvent, MaybeCodeRun, MaybeCodeSessionEvent } from "./events.js";
-import type { MaybeCodeInstructions } from "./instructions.js";
-import type { SkillDescriptor, SkillDiagnostic, SkillDocument } from "@sortedyuan/may/skills";
+import type { SkillDescriptor, SkillDocument } from "@sortedyuan/may/skills";
 import type { MaybeCodePermissionMode } from "./policy.js";
 import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@sortedyuan/ui-client";
 
@@ -79,8 +79,11 @@ export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   MaybeCodeCompactionSelection,
   MaybeCodeRun
 >, "forkSession"> {
+  /** Application of the active Session; a Session change replaces it. */
+  readonly application: MaybeCodeApplication;
+  /** Run a state change on the Session queue of the active application. */
+  transition<T>(action: (application: MaybeCodeApplication) => T | Promise<T>, options?: AgentStateTransitionOptions): Promise<T>;
   steer?(options: import("@sortedyuan/may/session").SessionSteerOptions): Promise<import("@sortedyuan/may/session").SessionSteeringInput>;
-  listSteeringInputs?(): readonly import("@sortedyuan/may/session").SessionSteeringInput[];
   getForkPoints?(sessionId?: string): Promise<readonly UiForkPoint[]>;
   forkSession?(pointId: string, mode: "current" | "worktree"): Promise<string>;
   getWorkspaceGit?(): Promise<UiWorkspaceGit>;
@@ -94,31 +97,21 @@ export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   readonly permissionMode: MaybeCodePermissionMode;
   readonly delegationNotifications?: boolean;
   setDelegationNotifications?(enabled: boolean): void;
-  readonly persistentRulesEnabled?: boolean;
   setPermissionMode(mode: MaybeCodePermissionMode): Promise<void>;
-  readonly instructions: MaybeCodeInstructions;
-  readonly modelInfo: MaybeCodeModelInfo | undefined;
-  getGoal?(): GoalState | undefined;
   startGoal?(objective: string, budget?: GoalBudget): Promise<GoalState>;
   resumeGoal?(): Promise<GoalState>;
   pauseGoal?(): Promise<GoalState>;
   cancelGoal?(): Promise<GoalState>;
-  listSkills?(): readonly MaybeCodeSkillInfo[];
-  getSkillDiagnostics?(): readonly SkillDiagnostic[];
   readSkill?(name: string): Promise<SkillDocument>;
   activateSkill?(name: string): Promise<SkillDocument>;
   submitSkill?(name: string, input: string): Promise<import("./events.js").MaybeCodeRun>;
 
-  /** 普通请求的子 Agent 委派；关闭时返回空列表。 */
-  listDelegationRequests?(): readonly import("./delegation.js").MaybeCodeDelegationRequest[];
-  getDelegationState?(): import("./delegation.js").MaybeCodeDelegationState | undefined;
-  delegationToolRecords?(taskId: string): Promise<import("./delegation.js").MaybeCodeDelegationToolRecords>;
   resolveDelegationRecovery?(
     requestId: string,
     taskId: string,
     finding: string,
     outcome: { readonly status: "completed" | "failed" | "cancelled"; readonly detail: string },
-  ): Promise<import("./delegation.js").MaybeCodeDelegationRequest>;
+  ): Promise<import("@sortedyuan/coordination/delegation/types").MaybeCodeDelegationRequest>;
   /** 对工作区 Session 以及它当前持有的子 Session 返回 true。 */
   ownsSession?(sessionId: string): boolean;
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { Model, ModelEvent, ModelStreamOptions, SerializedError } from "@sortedyuan/may/core";
-import { ModelResponseValidationError, priceUsage, type UsageCost } from "@sortedyuan/may/core";
+import { ModelResponseValidationError, omitUndefined, priceUsage, type UsageCost } from "@sortedyuan/may/core";
 import {
   FileSharedBudget,
   type ExternalCallResult,
@@ -123,7 +123,7 @@ export class SubagentRequestLedger {
               await this.budget.settleCall(current, error.usage, preparedCost);
               concluded = true;
               if (priced) cost = (await this.budget.snapshot()).calls.find(call => call.id === current)?.cost;
-              failure = new ModelResponseValidationError(error.message, { cause: error, usage: error.usage, ...(cost === undefined ? {} : { cost }) });
+              failure = new ModelResponseValidationError(error.message, omitUndefined({ cause: error, usage: error.usage, cost }));
             } catch (accountingError) { failure = validationAccountingError(error, accountingError, cost); }
           }
           if (!concluded) {
@@ -173,8 +173,8 @@ export class SubagentRequestLedger {
 }
 
 function validationAccountingError(error: ModelResponseValidationError, accountingError: unknown, cost?: UsageCost): ModelResponseValidationError {
-  return new ModelResponseValidationError(error.message, { cause: new AggregateError([error, accountingError], "Model response validation and request budget accounting failed"),
-    ...(error.usage === undefined ? {} : { usage: error.usage }), ...(cost === undefined ? {} : { cost }) });
+  return new ModelResponseValidationError(error.message, omitUndefined({ cause: new AggregateError([error, accountingError], "Model response validation and request budget accounting failed"),
+    usage: error.usage, cost }));
 }
 
 /**
@@ -241,7 +241,7 @@ export function withRequestBudget(
     get supportsRequestRecording() { return model.supportsRequestRecording === true; },
     get capabilityVersion() { return model.capabilityVersion; },
     get configuration() { return model.configuration; },
-    ...(model.preflight === undefined ? {} : { preflight: model.preflight.bind(model) }),
+    ...omitUndefined({ preflight: model.preflight?.bind(model) }),
     ...(compactor === undefined ? {} : { contextCompactor: {
       name: compactor.name,
       async compact(snapshot, options) {

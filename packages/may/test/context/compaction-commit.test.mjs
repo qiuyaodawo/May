@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { HistoryReferenceStrategy, InMemoryContextFactory, PruneOldToolResultsStrategy } from "@sortedyuan/may/context";
 
-const output = fileURLToPath(new URL("../.test-output/", import.meta.url));
 const source = fileURLToPath(new URL("../../../../AGENTS.md", import.meta.url));
 const deferred = () => {
   let resolve;
@@ -14,9 +14,7 @@ const deferred = () => {
 };
 
 async function fixture(t) {
-  await mkdir(output, { recursive: true });
-  const directory = await mkdtemp(join(output, "commit-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/compaction-commit");
   const messages = [
     { role: "user", content: [{ type: "text", text: "读取仓库指令" }] },
     { role: "assistant", content: [], toolCalls: [{ id: "verification.read", name: "read_file", input: { path: source } }] },

@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { InMemoryContext, May } from "@sortedyuan/may/core";
+import { DeepSeekModel } from "../../dist/deepseek/index.js";
 import {
-  DeepSeekApiError,
-  DeepSeekFinishReasonError,
-  DeepSeekModel,
-  DeepSeekProtocolError,
-} from "../../dist/deepseek/index.js";
+  OpenAICompatibleApiError,
+  OpenAICompatibleFinishReasonError,
+  OpenAICompatibleProtocolError,
+} from "../../dist/openai-compatible/index.js";
 
 const emptyRequest = {
   messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
@@ -397,7 +397,8 @@ test("surfaces structured DeepSeek HTTP errors", async () => {
       signal: new AbortController().signal,
     })),
     (error) => {
-      assert.ok(error instanceof DeepSeekApiError);
+      assert.ok(error instanceof OpenAICompatibleApiError);
+      assert.equal(error.provider, "DeepSeek");
       assert.equal(error.code, "DEEPSEEK_API_ERROR");
       assert.equal(error.status, 401);
       assert.equal(error.message, "Authentication failed");
@@ -425,22 +426,22 @@ test("rejects malformed and incomplete DeepSeek streams", async (t) => {
   }
 
   await t.test("invalid JSON", () =>
-    rejectStream(["{"], DeepSeekProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+    rejectStream(["{"], OpenAICompatibleProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
   await t.test("missing finish reason", () =>
     rejectStream([
       { choices: [{ index: 0, delta: { content: "partial" } }] },
       "[DONE]",
-    ], DeepSeekProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+    ], OpenAICompatibleProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
   await t.test("length finish reason", () =>
     rejectStream([
       { choices: [{ index: 0, delta: {}, finish_reason: "length" }] },
       "[DONE]",
-    ], DeepSeekFinishReasonError, "DEEPSEEK_INCOMPLETE_RESPONSE"));
+    ], OpenAICompatibleFinishReasonError, "DEEPSEEK_INCOMPLETE_RESPONSE"));
   await t.test("tool finish without calls", () =>
     rejectStream([
       { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
       "[DONE]",
-    ], DeepSeekProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+    ], OpenAICompatibleProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
   await t.test("incomplete tool call", () =>
     rejectStream([
       {
@@ -452,7 +453,7 @@ test("rejects malformed and incomplete DeepSeek streams", async (t) => {
       },
       { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
       "[DONE]",
-    ], DeepSeekProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+    ], OpenAICompatibleProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
 });
 
 test("passes AbortSignal to fetch and propagates cancellation", async () => {

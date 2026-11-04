@@ -305,7 +305,7 @@ export function createMaybeCodeSlashCommandSuggester(
     }
     if (definition?.name === "/skills") {
       const match = /^(show|use)\s+(\S*)$/u.exec(argumentPrefix);
-      if (match) return (controller.listSkills?.() ?? [])
+      if (match) return controller.application.listSkills()
         .filter((skill) => skill.name.startsWith(match[2]!))
         .map((skill) => ({ value: `${command} ${match[1]} ${skill.name}`, label: skill.name, description: skill.description }));
       if (/\s/u.test(argumentPrefix)) return [];
@@ -359,7 +359,7 @@ export function createMaybeCodeSlashCommandSuggester(
         .map((model) => ({
           value: `${command} ${model.name}`,
           label: model.name,
-          description: model.name === controller.modelInfo?.profile
+          description: model.name === controller.application.modelInfo?.profile
             ? `Current · ${model.provider}/${model.model}`
             : `${model.provider}/${model.model} · ${model.adapter}`,
         }));
@@ -446,7 +446,7 @@ export async function executeMaybeCodeSlashCommand(
       return { type: "display", text: controller.permissionMode === "yolo" ? "YOLO enabled" : "YOLO disabled" };
     }
     case "/permissions": {
-      if (controller.persistentRulesEnabled === false || !controller.listPermissionRules || !controller.revokePermissionRule) throw new Error("此宿主没有启用规则管理。");
+      if (!controller.application.persistentRulesEnabled || !controller.listPermissionRules || !controller.revokePermissionRule) throw new Error("此宿主没有启用规则管理。");
       const action = arguments_[0] ?? "list";
       if (action === "list" && arguments_.length <= 1) {
         const rules = await controller.listPermissionRules();
@@ -470,8 +470,8 @@ export async function executeMaybeCodeSlashCommand(
       return noArguments(arguments_, definition) ?? { type: "web.requested" };
     case "/skills": {
       if (arguments_.length === 0) {
-        const skills = controller.listSkills?.() ?? [];
-        const diagnostics = controller.getSkillDiagnostics?.() ?? [];
+        const skills = controller.application.listSkills();
+        const diagnostics = controller.application.agent.skills?.registry.diagnostics ?? [];
         const text = skills.length === 0 ? "No skills discovered."
           : skills.map((skill) => `${skill.name}${skill.active ? " [active]" : ""} — ${skill.description}\n  ${skill.directory}`).join("\n");
         return { type: "display", text: text + (diagnostics.length === 0 ? "" : "\n\nDiscovery diagnostics:\n" + diagnostics.map((item) => `${item.path}: ${item.message}`).join("\n")) };
@@ -494,7 +494,7 @@ export async function executeMaybeCodeSlashCommand(
     }
     case "/recovery": {
       if (arguments_.length === 0) {
-        const pending = controller.listRecoveries?.() ?? [];
+        const pending = controller.listRecoveries();
         return { type: "display", text: pending.length === 0 ? "No unresolved recovery findings."
           : pending.map((item) => `${item.id} — ${item.call.name}: outcome unknown\nInput: ${JSON.stringify(item.call.input)}`).join("\n\n") + "\nVerify external effects, then use /recovery resolve <id> <verified finding>." };
       }
@@ -514,7 +514,7 @@ export async function executeMaybeCodeSlashCommand(
     case "/instructions":
       return noArguments(arguments_, definition) ?? {
         type: "instructions",
-        instructions: controller.instructions,
+        instructions: controller.application.instructions,
       };
     case "/retry": {
       const invalid = noArguments(arguments_, definition);

@@ -1,5 +1,6 @@
 import { appendFile, mkdir, readdir, unlink } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
+import { AsyncStateSerializer } from "@sortedyuan/may/core";
 
 import type { FinishedTraceSpan, SpanExporter } from "./types.js";
 
@@ -61,7 +62,7 @@ export class JsonlFileSpanExporter implements SpanExporter {
   private readonly rotation: "daily" | undefined;
   private readonly retentionDays: number;
   private readonly clock: () => number;
-  private tail: Promise<void> = Promise.resolve();
+  private readonly writes = new AsyncStateSerializer();
   private directoryReady: Promise<void> | undefined;
   private lastCleanupDate: string | undefined;
 
@@ -94,8 +95,8 @@ export class JsonlFileSpanExporter implements SpanExporter {
   }
 
   export(spans: readonly FinishedTraceSpan[]): Promise<void> {
-    if (spans.length === 0) return this.tail;
-    const operation = this.tail.then(async () => {
+    if (spans.length === 0) return this.writes.idle();
+    return this.writes.run(async () => {
       await this.prepareDirectory();
       if (this.rotation === undefined) {
         await appendSpans(this.path, spans);
@@ -117,12 +118,10 @@ export class JsonlFileSpanExporter implements SpanExporter {
         await appendSpans(this.rotatedPath(date), group);
       }
     });
-    this.tail = operation.catch(() => undefined);
-    return operation;
   }
 
   async shutdown(): Promise<void> {
-    await this.tail;
+    await this.writes.idle();
   }
 
   private async prepareDirectory(): Promise<void> {

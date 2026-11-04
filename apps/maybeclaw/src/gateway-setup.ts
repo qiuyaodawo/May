@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import type { AddressInfo } from "node:net";
 import { parseMayConfig } from "@sortedyuan/may/config";
 import { withFileAccess } from "@sortedyuan/may/storage";
-import { acquireFileLock, releaseFileLock } from "@sortedyuan/may/storage";
+import { acquireFileLock } from "@sortedyuan/may/storage";
 import { UiError } from "@sortedyuan/ui-client";
 import { authorized, secureHeaders, sendJson, trustedRequest } from "@sortedyuan/ui-client/server";
 import { gatewaySettings } from "./gateway-settings.js";
@@ -31,7 +31,7 @@ function parseGatewaySetup(path: string, original: string | undefined) {
   }
   const parsed = parseMayConfig(config, path);
   const raw = parsed.apps?.maybeclaw;
-  if (raw && Object.keys(raw).length && raw.version !== 2) throw new Error("检测到旧版 MaybeClaw 配置。请运行 pnpm maybeclaw migrate check，并根据迁移结果执行 migrate run；随后按照配置指南转换为 version: 2。原配置保持不变。");
+  if (raw && Object.keys(raw).length && raw.version !== 2) throw new Error("MaybeClaw 配置需要 version: 2。原配置保持不变。");
   const candidate: Record<string, any> = { version: 2, agents: [], ...raw };
   gatewaySettings({ ...parsed, apps: { ...parsed.apps, maybeclaw: candidate } });
   const needsSetup = candidate.server === undefined || (candidate.server as Record<string, unknown>).auth === undefined;
@@ -39,9 +39,9 @@ function parseGatewaySetup(path: string, original: string | undefined) {
 }
 
 export async function startGatewaySetup(options: { path: string; port?: number; activate: (server: Server) => Promise<void> }) {
-  const path = resolve(options.path), lockPath = `${path}.initialize.lock`;
+  const path = resolve(options.path);
   await mkdir(dirname(path), { recursive: true });
-  const lock = await acquireFileLock(lockPath);
+  const lock = await acquireFileLock(`${path}.initialize.lock`);
   const launchPath = `${path}.${randomUUID()}.initialize.html`;
   const token = randomBytes(32).toString("base64url");
   let busy = false, consumed = false, transferred = false, released = false, closing: Promise<void> | undefined;
@@ -100,7 +100,7 @@ export async function startGatewaySetup(options: { path: string; port?: number; 
     requests.add(work);
   });
   server.requestTimeout = 15000; server.headersTimeout = 10000; server.maxConnections = 16;
-  async function release() { if (released) return; released = true; await rm(launchPath, { force: true }); await releaseFileLock(lock, lockPath); }
+  async function release() { if (released) return; released = true; try { await rm(launchPath, { force: true }); } finally { await lock.release(); } }
   try {
     if (!(await inspectGatewaySetup(path)).needsSetup) throw new Error("管理员密码已经配置，请直接启动控制台。");
     await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(options.port ?? 3939, "127.0.0.1", () => { server.removeListener("error", reject); resolve(); }); });

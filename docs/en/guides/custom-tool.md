@@ -252,8 +252,8 @@ See also [Custom model adapters](./custom-model.md) and
 
 ## Per-Run dynamic tool catalogs
 
-`MayOptions.toolSource`, also forwarded by `AgentApplication`, `defineAgent()`
-and `MaybeCodeApplication`, is a trusted synchronous `() => Iterable<Tool>`.
+`MayOptions.toolSource`, also forwarded by `AgentApplication` and `defineAgent()`,
+is a trusted synchronous `() => Iterable<Tool>`.
 It adds to static `tools`; it is called exactly once at each `run()` or
 `continue()` start, not on every model step. Duplicate names fail before Context
 mutation. Fetch/discover remote catalogs outside Core and publish their latest

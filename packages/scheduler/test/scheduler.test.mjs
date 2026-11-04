@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { fork } from "node:child_process";
 import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -12,7 +13,7 @@ import { SqliteSchedulerStore } from "../dist/sqlite-store.js";
 import { latestTime, nextTime } from "../dist/triggers.js";
 import { DurableTaskHost, HttpTaskDispatcher } from "./fixtures/durable-host.mjs";
 
-const verificationRoot = fileURLToPath(new URL("../../../scheduler-verification/", import.meta.url));
+const verificationRoot = join(testOutputRoot, "scheduler", "verification");
 
 async function directory(name) {
   await mkdir(verificationRoot, { recursive: true });

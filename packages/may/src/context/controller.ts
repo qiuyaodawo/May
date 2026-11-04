@@ -1,4 +1,4 @@
-import { HookExecutionError, jsonEqual } from "../core/index.js";
+import { HookExecutionError, jsonEqual, omitUndefined } from "../core/index.js";
 import type { Context, ContextSnapshot, Message, Usage } from "../core/index.js";
 
 import type {
@@ -152,12 +152,7 @@ export class SnapshotContextController implements ContextController {
   }
 
   async inspect(): Promise<ContextInspection> {
-    return inspectContextSnapshot(await this.context.snapshot(), {
-      ...(this.budget === undefined ? {} : { budget: this.budget }),
-      ...(this.measurement === undefined
-        ? {}
-        : { measurement: this.measurement }),
-    });
+    return inspectContextSnapshot(await this.context.snapshot(), this.inspectionOptions());
   }
 
   recordModelUsage(usage: Usage, contextMessageCount: number): void {
@@ -388,12 +383,7 @@ export class SnapshotContextController implements ContextController {
     budget?: ContextBudget;
     measurement?: ContextMeasurement;
   } {
-    return {
-      ...(this.budget === undefined ? {} : { budget: this.budget }),
-      ...(this.measurement === undefined
-        ? {}
-        : { measurement: this.measurement }),
-    };
+    return omitUndefined({ budget: this.budget, measurement: this.measurement });
   }
 }
 
@@ -436,13 +426,11 @@ function normalizeCompactionOutput(
   if (output.terminal !== undefined && typeof output.terminal !== "boolean") {
     throw new TypeError("terminal must be a boolean");
   }
-  return {
+  return omitUndefined({
     messages: output.messages,
-    ...(output.effectiveTokens === undefined
-      ? {}
-      : { effectiveTokens: output.effectiveTokens }),
-    ...(output.terminal === undefined ? {} : { terminal: output.terminal }),
-  };
+    effectiveTokens: output.effectiveTokens,
+    terminal: output.terminal,
+  });
 }
 
 export function inspectContextSnapshot(

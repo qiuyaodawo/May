@@ -14,8 +14,8 @@ export class MaybeCodeWebCommands {
   }
 
   available(name: string): boolean {
-    if (["session.fork", "worktree.open", "worktree.delete", "changes.restore.preview", "changes.restore.apply"].includes(name) && (this.app.isRunning || this.app.getGoal?.()?.status === "active" || this.app.getMcpInteractions?.().length)) return false;
-    if (name === "permission.set" && (this.app.isRunning || this.app.getGoal?.()?.status === "active" || this.app.getMcpInteractions?.().length)) return false;
+    if (["session.fork", "worktree.open", "worktree.delete", "changes.restore.preview", "changes.restore.apply"].includes(name) && (this.app.isRunning || this.app.application.getGoal()?.status === "active" || this.app.getMcpInteractions?.().length)) return false;
+    if (name === "permission.set" && (this.app.isRunning || this.app.application.getGoal()?.status === "active" || this.app.getMcpInteractions?.().length)) return false;
     if (name === "message.submit") return !this.busy;
     if (name === "mcp.respond") return Boolean(this.app.getMcpInteractions?.().length);
     if (name === "console.cancel") return true;
@@ -174,7 +174,7 @@ export class MaybeCodeWebCommands {
       case "display": case "mcp.display": return output("命令结果", result.text);
       case "help": return output("命令帮助", result.commands.map(item => `${item.usage} — ${item.description}`).join("\n") + "\n/details — 展开或收起工具详情\n/thinking — 显示或隐藏思考过程");
       case "instructions": return output("当前指令", result.instructions.effective);
-      case "status": return output("运行状态", `Session: ${this.app.sessionId}\nWorkspace: ${this.app.workspace}\nModel: ${this.app.modelInfo?.model ?? "未知"}\nEffort: ${(await this.app.getReasoningEffort()).effectiveEffort ?? "默认"}\n${JSON.stringify(result.inspection, null, 2) ?? ""}`);
+      case "status": return output("运行状态", `Session: ${this.app.sessionId}\nWorkspace: ${this.app.workspace}\nModel: ${this.app.application.modelInfo?.model ?? "未知"}\nEffort: ${(await this.app.getReasoningEffort()).effectiveEffort ?? "默认"}\n${JSON.stringify(result.inspection, null, 2) ?? ""}`);
       case "context": return output("上下文", JSON.stringify(result.inspection, null, 2) ?? "当前模型没有提供上下文用量。");
       case "compacted": return output("上下文压缩", `${result.result.strategy}: ${result.result.before.messageCount} → ${result.result.after.messageCount}`);
       case "mcp.status": return output("MCP", formatMaybeCodeMcpStatus(result.servers));
@@ -184,7 +184,7 @@ export class MaybeCodeWebCommands {
         { ...action(`重命名 · ${session.title ?? session.id}`, "session.rename", session.id), input: { name: "title", label: "会话名称", value: session.title ?? "" } },
         ...(session.id === this.app.sessionId ? [] : [{ ...action(`删除 · ${session.title ?? session.id}`, "session.delete", session.id), confirm: `确认删除会话 ${session.title ?? session.id} 及其历史记录？` }]),
       ]));
-      case "model.selection.requested": return output("模型配置", `当前：${this.app.modelInfo?.profile ?? "未知"}`, result.models.flatMap(model => [action(`切换 · ${model.name}`, "model.switch", model.name), action(`${model.isDefault ? "当前默认" : "设为默认"} · ${model.name}`, "model.default", model.name)]));
+      case "model.selection.requested": return output("模型配置", `当前：${this.app.application.modelInfo?.profile ?? "未知"}`, result.models.flatMap(model => [action(`切换 · ${model.name}`, "model.switch", model.name), action(`${model.isDefault ? "当前默认" : "设为默认"} · ${model.name}`, "model.default", model.name)]));
       case "effort.selection.requested": case "effort.changed": return output("Reasoning effort", `当前：${result.state.effectiveEffort ?? "默认"}\nProvider 默认：${result.state.defaultEffort ?? "未提供"}\n能力状态：${result.state.status}`, result.state.status === "known" ? ["default", ...result.state.efforts].map(effort => action(effort === "default" ? "恢复配置默认" : effort, "effort.set", effort)) : []);
       case "skill.run-started": case "mcp.run-started": case "retry.started":
         void result.run.result.catch(() => {}).finally(this.changed);

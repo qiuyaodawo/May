@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { open, readFile } from "node:fs/promises";
 import { setTimeout } from "node:timers/promises";
 import test from "node:test";
+import { selectLiveModelProfile } from "@sortedyuan/test-support";
 
 import { AgentApplication, applicationHooks, applicationServices, PLUGIN_STATE_KEY } from "@sortedyuan/may";
 import { May, runtimeHooks, userMessage } from "@sortedyuan/may/core";
@@ -15,7 +16,8 @@ const packagePath = new URL("../../../../../package.json", import.meta.url);
 const counterService = defineService({ id: "verification.counter", version: "1.0.0", scope: "application" });
 
 async function createModel() {
-  return createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" }));
+  const config = await loadMayConfig();
+  return createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) }));
 }
 
 function statePlugin(resources, options = {}) {
@@ -108,6 +110,7 @@ test("runtime service replacements apply at a Run boundary and invalid dependenc
         activeRuntime = {
           descriptor: { id: version === 3 ? "verification.incompatible" : "verification.loop", version: String(version), stateVersion: version },
           supportedHooks: loop.supportedHooks,
+          supportsRequestRecording: loop.supportsRequestRecording,
           run(options) { calls += 1; return loop.run(options); },
           continue(options) { calls += 1; return loop.continue(options); },
           appendMessages: messages => loop.appendMessages(messages),

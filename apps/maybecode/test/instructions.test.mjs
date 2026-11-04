@@ -4,7 +4,8 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { DEFAULT_MAYBE_CODE_INSTRUCTIONS, loadMaybeCodeInstructions, MaybeCodeConfigError, MaybeCodeInstructionState, resolveMaybeCodeInstructionsDirectory } from "../dist/index.js";
+import { MaybeCodeConfigError } from "../dist/index.js";
+import { DEFAULT_MAYBE_CODE_INSTRUCTIONS, loadMaybeCodeInstructions, MaybeCodeInstructionState, resolveMaybeCodeInstructionsDirectory } from "../dist/instructions.js";
 
 test("uses the built-in system prompt when no override is configured", async (t) => {
   const workspace = await temporaryDirectory(t);
@@ -133,7 +134,7 @@ test("resolves the maybecode instruction directory from config", () => {
       models: {},
       apps: { maybecode: { instructionsDirectory: 42 } },
     }),
-    /apps\.maybecode\.instructionsDirectory must be a non-empty string/u,
+    /apps\.maybecode\.instructionsDirectory must be string/u,
   );
 });
 

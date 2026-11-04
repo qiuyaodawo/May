@@ -1,4 +1,4 @@
-import { ModelProtocolError, ModelResponseValidationError, assertModelResponseFormat, type Model, type ModelContextCompactor, type ModelLimits, type ModelEvent, type ModelRequest, type ModelResponseFormat, type ModelStreamOptions } from "@sortedyuan/may/core";
+import { ModelProtocolError, ModelResponseValidationError, assertModelResponseFormat, omitUndefined, type Model, type ModelContextCompactor, type ModelLimits, type ModelEvent, type ModelRequest, type ModelResponseFormat, type ModelStreamOptions } from "@sortedyuan/may/core";
 import { createModelCapabilityResolver, type ModelCapabilities, type ModelCapabilityResolver } from "./capabilities.js";
 import { ModelRequestValidationError, validateModelRequest, validateStructuredModelResponse, type ModelRequestValidationOptions, type ModelRequestValidationResult } from "./validation.js";
 import type { ProviderModelSelection } from "./types.js";
@@ -67,7 +67,8 @@ export class CapabilityValidatedModel implements Model {
   get supportsRequestRecording(): boolean { return this.model.supportsRequestRecording === true; }
   get capabilityVersion() { return this.capabilities?.version; }
   get configuration(): Readonly<Record<string, string | number | boolean>> {
-    return { provider: this.selection.provider, adapter: this.selection.adapter, model: this.selection.model, profile: this.selection.profile, ...(typeof this.selection.options.reasoningEffort === "string" ? { reasoningEffort: this.selection.options.reasoningEffort } : {}), ...(this.capabilityVersion === undefined ? {} : { capabilityVersion: this.capabilityVersion }) };
+    const reasoningEffort = this.selection.options.reasoningEffort;
+    return omitUndefined({ provider: this.selection.provider, adapter: this.selection.adapter, model: this.selection.model, profile: this.selection.profile, reasoningEffort: typeof reasoningEffort === "string" ? reasoningEffort : undefined, capabilityVersion: this.capabilityVersion });
   }
   get lastValidation() { return this.validation; }
   async getModelCapabilities(): Promise<ModelCapabilities> {

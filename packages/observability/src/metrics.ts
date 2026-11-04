@@ -1,4 +1,4 @@
-import type { MetricRecord, TraceAttributes } from "@sortedyuan/may/core";
+import { omitUndefined, type MetricRecord, type TraceAttributes } from "@sortedyuan/may/core";
 import type { FinishedTraceSpan, MetricRecorder, SpanObserver, StartedTraceSpan } from "./types.js";
 import { boundedAttributes } from "./limits.js";
 
@@ -90,8 +90,7 @@ export class SpanMetrics implements SpanObserver {
       const cost = span.attributes["may.model.cost"];
       if (typeof cost === "number") this.metrics.record({ name: "may.model.cost", kind: "counter", value: cost, attributes: {
         ...attributes, currency: String(span.attributes["may.model.currency"] ?? "USD"),
-        ...(span.attributes["may.model.cost_kind"] === undefined ? {} : { cost_kind: span.attributes["may.model.cost_kind"] }),
-        ...(span.attributes["may.model.cost_complete"] === undefined ? {} : { cost_complete: span.attributes["may.model.cost_complete"] }),
+        ...omitUndefined({ cost_kind: span.attributes["may.model.cost_kind"], cost_complete: span.attributes["may.model.cost_complete"] }),
       } });
       if (span.attributes["may.model.cost_complete"] === false) this.metrics.record({ name: "may.model.cost_missing", kind: "counter", value: 1, attributes });
     }

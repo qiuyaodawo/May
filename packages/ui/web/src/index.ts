@@ -199,7 +199,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     if (open) { shell.classList.add("details-open"); syncDetails(); }
   }, () => hideDetails());
   details.append(inspector.root, workspaceDetails);
-  const reader = createTranscriptReader(client, { scroll, messages, approvals }, options.extensions ?? {}, block => inspector.inspect(block), { fork: point => versionUI.fork(point), changes: runId => versionUI.changes(runId) });
+  const reader = createTranscriptReader(client, { scroll, messages, approvals }, options.extensions ?? {}, block => inspector.inspect(block), showError, { fork: point => versionUI.fork(point), changes: runId => versionUI.changes(runId) });
   const commandUI = createCommandUI(client, composer, command => {
     if (command === "/details") { reader.toggleDetails(); return true; }
     if (command === "/thinking") { shell.classList.toggle("hide-reasoning"); return true; }

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readEmbeddedImage, type MediaReader } from "@sortedyuan/media";
 import type { AgentApplicationEvent, AgentWorkspaceController } from "@sortedyuan/may";
+import { AsyncStateSerializer } from "@sortedyuan/may/core";
 import type { PersistentPermissionRule } from "@sortedyuan/may/permissions";
 import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice, type UiPageRequest, type UiFieldRequest, type UiControls, type UiCompletion } from "./protocol.js";
 import { UiProjection } from "./projection.js";
@@ -46,7 +47,7 @@ export class ApplicationUiHost implements UiHost {
   private listeners = new Set<() => void>();
   private iterator: AsyncIterator<{ type: string }>;
   private relay: Promise<void>;
-  private mutation: Promise<unknown> = Promise.resolve();
+  private readonly mutations = new AsyncStateSerializer();
   private readonly pendingCommands = new Set<Promise<UiReceipt>>();
   private closed = false;
   private closing: Promise<void> | undefined;
@@ -68,7 +69,7 @@ export class ApplicationUiHost implements UiHost {
   snapshot(_selectedId?: string): Promise<UiSnapshot> { return this.queuedSnapshot(); }
   private queuedSnapshot(selectedId?: string, all = false): Promise<UiSnapshot> {
     this.assertOpen();
-    return this.mutation.then(() => this.buildSnapshot(selectedId, 0, all));
+    return this.mutations.idle().then(() => this.buildSnapshot(selectedId, 0, all));
   }
   private commandNames(viewingActive = true): string[] {
     if (this.closed || this.fault) return [];
@@ -171,8 +172,7 @@ export class ApplicationUiHost implements UiHost {
   execute(command: UiCommand): Promise<UiReceipt> {
     if (this.closed) return Promise.reject(new UiError(503, "宿主正在关闭。"));
     const concurrent = this.options.concurrentCommands?.includes(command.name) === true;
-    const work = (concurrent ? Promise.resolve() : this.mutation).then(() => this.apply(command));
-    if (!concurrent) this.mutation = work.catch(() => {});
+    const work = concurrent ? Promise.resolve().then(() => this.apply(command)) : this.mutations.run(() => this.apply(command));
     this.pendingCommands.add(work);
     void work.then(() => this.pendingCommands.delete(work), () => this.pendingCommands.delete(work));
     return work;

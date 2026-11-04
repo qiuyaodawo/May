@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { testOutputRoot } from "../packages/test-support/index.mjs";
 import { defineAgent } from "../packages/may/dist/application/index.js";
 import { loadMayConfig } from "../packages/may/dist/config/index.js";
 import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver, selectProviderModel } from "../packages/providers/dist/index.js";
 import { BasicTracer, BoundedMetrics, DiagnosticsStore } from "../packages/observability/dist/index.js";
 import { FileSessionStore } from "../packages/may/dist/session/file-store.js";
 
-const repository = dirname(dirname(fileURLToPath(import.meta.url)));
-const parent = join(repository, "review", "model-telemetry-live");
+const parent = join(testOutputRoot, "model-telemetry-live");
 await mkdir(parent, { recursive: true });
 const directory = await mkdtemp(join(parent, "run-"));
 const selection = selectProviderModel(await loadMayConfig());

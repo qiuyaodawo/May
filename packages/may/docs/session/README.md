@@ -169,10 +169,7 @@ delete.
 
 ## Shared file access
 
-`withFileAccess` from `@sortedyuan/may/session/file-access` reexports
-`@sortedyuan/may/storage`. Both paths share lock state. Local storage integrations
-can import `@sortedyuan/may/storage` directly.
-The helper coordinates cooperating
+`withFileAccess` from `@sortedyuan/may/storage` coordinates cooperating
 processes accessing one local file. Use `"shared"` for reads and `"exclusive"`
 for complete write, replacement, or deletion operations. Its async callback must
 await every file operation and close opened handles before returning. The helper

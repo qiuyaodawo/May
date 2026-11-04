@@ -1,16 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { join, resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { simpleGit } from "simple-git";
 import { ProjectGitWorkspace, GitCheckpointError } from "@sortedyuan/may/application/git-workspace";
 
 test("post-commit Hook edits are reported as a partial checkpoint and survive recovery", { skip: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1" }, async t => {
-  const artifacts = resolve(fileURLToPath(new URL("../../../../review/git-workspace-tests/", import.meta.url)));
-  await mkdir(artifacts, { recursive: true });
-  const root = await mkdtemp(join(artifacts, "post-commit-"));
-  t.after(async () => { assert.ok(resolve(root).startsWith(artifacts)); await rm(root, { recursive: true, force: true }); });
+  const root = await createTestDirectory(t, "may/git-workspace-post-commit");
   const workspace = join(root, "project");
   await mkdir(workspace);
   const git = simpleGit({ baseDir: workspace });

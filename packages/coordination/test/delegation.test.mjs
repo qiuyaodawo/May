@@ -18,11 +18,11 @@ const root = { id: "root", agent: "manager", input: "root" };
 function deferred() { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; }
 function manager(model, store = new InMemorySessionStore()) {
   return createApplicationAgent({ version: "v1", store, delegation: true,
-    definition: ({ tools }) => defineAgent({ model, tools, toolScheduler: parallelToolScheduler, permissionPolicy: () => "allow" }),
+    definition: ({ tools }) => defineAgent({ model, tools, toolScheduler: parallelToolScheduler, permissionPolicy: () => "allow", requestRecording: "off" }),
   });
 }
 function worker(model, store = new InMemorySessionStore()) {
-  return createApplicationAgent({ version: "v1", store, definition: defineAgent({ model, permissionPolicy: () => "deny" }) });
+  return createApplicationAgent({ version: "v1", store, definition: defineAgent({ model, permissionPolicy: () => "deny", requestRecording: "off" }) });
 }
 async function directory(t) {
   const parent = resolve(tmpdir()); const path = await mkdtemp(join(parent, "may-delegation-"));
@@ -76,7 +76,7 @@ test("nested delegation yields the only slot, drains parallel tool calls and wak
     assert.equal(history.filter((event) => event.type === "run.interrupted").length, 0);
     const inputs = history.filter((event) => event.type === "input.submitted");
     assert.deepEqual(inputs.map((event) => event.inputId), [`${task.dispatchId}:0`, `${task.dispatchId}:1`]);
-    const reopened = await defineAgent({ model: { async *stream() { throw new Error("Duplicate input must not call a model"); } }, permissionPolicy: () => "deny" })
+    const reopened = await defineAgent({ model: { async *stream() { throw new Error("Duplicate input must not call a model"); } }, permissionPolicy: () => "deny", requestRecording: "off" })
       .open({ store: sessions, sessionId: task.sessionId, resume: true });
     await assert.rejects(reopened.submit({ input: "duplicate", inputId: inputs[0].inputId }), /Input already submitted/);
     await reopened.close();

@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, rename, rmdir, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
 import { createBuiltinProviderModel, RetryingModel } from "@sortedyuan/providers";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
-import { MaybeCodeWorkspace, createMaybeCodeWebHost } from "../dist/index.js";
+import { MaybeCodeWorkspace } from "../dist/workspace.js";
+import { createMaybeCodeWebHost } from "../dist/web-ui.js";
 
 async function openWorkspace(t) {
-  const parent = resolve(import.meta.dirname, "../../../review/architecture-fix-20261023");
+  const parent = join(testOutputRoot, "maybecode", "ui-command-boundary");
   await mkdir(parent, { recursive: true });
   const workspace = await mkdtemp(join(parent, "ui-command-"));
   const dataDirectory = join(workspace, "data");

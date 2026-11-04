@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import test from "node:test";
@@ -7,7 +8,7 @@ import { DiagnosticsStore } from "../../observability/dist/index.js";
 import { EvalTrialBudget } from "../dist/agent-budget.js";
 import { EvalTelemetryCollector, createEvalTaskAssessment, evalMetrics } from "../dist/telemetry.js";
 
-const directory = resolve("../../eval-verification/adapter-tests");
+const directory = join(testOutputRoot, "eval", "adapters");
 await mkdir(directory, { recursive: true });
 
 test("trial tool budget checks a real file writer before additional effects", async () => {

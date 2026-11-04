@@ -26,7 +26,7 @@ Continue with [configuration](#sessions-and-configuration),
 [permissions](#persistent-permission-rules), [Web and CLI](#startup-web-and-cli),
 [chat commands](#chat-commands-and-interruption),
 [channels](#channels-members-and-approvals), or
-[storage and migration](#lifecycle-storage-and-migration).
+[storage](#lifecycle-and-storage).
 
 ## Application composition
 
@@ -50,8 +50,7 @@ snapshots. `GatewayHost` uses `GatewayChannelRepository` to accept inputs, updat
 message changes and complete deliveries. The repository owns channel records and
 their relationships; input completion with its replies, delivery receipts with
 platform-message associations, and session cleanup use SQLite transactions.
-`GatewayStore` is an internal implementation dependency. MaybeClaw's `ChannelStore`
-wrapper owns checks for application migration markers.
+`GatewayStore` is an internal implementation dependency.
 
 ## Sessions and configuration
 
@@ -82,10 +81,11 @@ With `--no-open` or `serve`, open the local initialization HTML file printed by 
 terminal. Keep this file private; it is removed after setup or normal shutdown.
 Refreshing the setup page clears its credential; reopen the initialization file to retry.
 Only the local origin is accepted during initialization. Existing valid configuration
-starts normally. Old configuration requires explicit migration; malformed configuration
-is reported without changes. Concurrent initialization of the same file is rejected.
-If a process is forcibly terminated, confirm it has stopped before removing its
-`<config-path>.initialize.lock` and leftover `*.initialize.html` files to restart setup.
+starts normally. Configuration without `version: 2` and malformed configuration
+are reported without changes. Concurrent initialization of the same file is rejected.
+The operating system releases the `<config-path>.initialize.lock` lock when a setup
+process exits. After a forced termination, remove leftover `*.initialize.html` files and
+restart setup.
 
 For manual configuration, retain existing May `providers` and `models` and merge:
 
@@ -268,7 +268,7 @@ are sent. Browsing sessions changes only the current page; changing the platform
 entrance default is a separate management operation. Session-wide default Agent
 changes apply to every authorized participant and interface. The manager also
 provides Agent configuration, entrance binding, session administrators, approvals,
-channel status, and independent historical task inspection.
+and channel status.
 
 ```powershell
 pnpm maybeclaw task submit "Review the changes" --session <session-id> --agent reviewer --server http://127.0.0.1:3939 --request-id review-1
@@ -400,7 +400,7 @@ as a file content part retaining its `video/*` MIME type. A `file` declaration
 alone does not enable videos. RPC Agents declare the same kinds during their
 capability handshake. The provider validates its actual input support.
 
-## Lifecycle, storage, and migration
+## Lifecycle and storage
 
 Idle resources release after the configured delay while conversation identity
 and history persist. On restart, revoked access and changed policy or Agent
@@ -423,49 +423,20 @@ before releasing the data directory.
 
 `gateway.sqlite` stores sessions, bindings, messages, tasks, approvals, defaults,
 request receipts, and delivery records transactionally. May histories remain in
-Session stores. The service holds an operating-system exclusive lock on
-`host.lock.access` throughout directory use and stores owner metadata in `host.lock`.
-The operating system releases the exclusive lock when the process exits. On restart,
-the service automatically removes metadata for an exited local process and reports
-its PID and path. A running PID, another host, damaged metadata, or an unverifiable
-owner prevents startup and requires administrator inspection. Preserve
-`host.lock.access`; never delete or replace it during use or recovery. File age
-does not determine automatic cleanup.
-Legacy task locks and configuration initialization locks retain `.lock.access`
-and `.lock.access.gate` files to coordinate creation and deletion. Preserve these
-files while the directory is in use, including during recovery; see
+Session stores. The service holds an operating-system exclusive lock on `host.lock`
+throughout directory use and records its process ID and host name in
+`host.lock.owner`. The operating system releases the lock when the process exits, so
+a restart after a crash needs no cleanup. When another running process holds the
+lock, startup fails and reports the recorded owner. Configuration initialization
+uses the same kind of lock on `<config>.initialize.lock`; see
 [Local storage maintenance](custom-storage.md#local-storage-maintenance).
+Real provider and platform verification depends on the configured adapter,
+credentials, and network.
 
-Legacy JSONL task and channel journals coordinate inspection with appends, tail
-repair and checkpoint replacement across processes. Each journal retains
-`<journal-path>.access` and `<journal-path>.access.gate` files. The first status
-query, migration check or writer creates these files and needs directory write
-permission; later inspections use read-only handles and preserve journal data.
-For read-only monitoring of existing data, initialize the access files with a
-write-capable account before restricting permissions. Upgrade every process sharing
-the directory together, and preserve access files while any reader or writer is active.
-
-```powershell
-pnpm maybeclaw migrate check --data-directory <directory>
-pnpm maybeclaw migrate run --data-directory <directory>
-```
-
-Migration verifies ownership, backs up the original data, preserves independent
-historical tasks and channel evidence, and records completion. Old queued work
-awaits explicit assignment to a created session. Sent messages remain sent;
-unknown results require reconciliation. Configure the version 2 Agent catalogue
-explicitly after data migration. Real provider and platform verification depends
-on the configured adapter, credentials, and network.
-
-Service administrators inspect migrated delivery records in channel status.
-After checking an uncertain send, `maybeclaw delivery retry-legacy <id> --confirm
---server <url>` explicitly accepts the possibility of a duplicate platform message
-and returns that delivery to pending. The authenticated HTTP equivalent is
-`POST /api/v2/legacy-deliveries/<id>/retry` with `{ "confirmUnknown": true }`.
-Confirmed sent messages cannot be retried.
-
-Current messages and channel replies use `delivery retry <id> --confirm --server
-<url>` or `POST /api/v2/deliveries/<id>/retry` with the same confirmation body.
+Messages and channel replies with an uncertain or failed send use `delivery retry
+<id> --confirm --server <url>` or `POST /api/v2/deliveries/<id>/retry` with
+`{ "confirmUnknown": true }`, which explicitly accepts a possible duplicate platform
+message. Confirmed sent messages cannot be retried.
 The Web channel manager provides an explicit confirmation action for uncertain
 and failed deliveries. A retry changes delivery state; it does not execute the
 Agent's work again.

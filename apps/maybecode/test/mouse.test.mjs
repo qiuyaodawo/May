@@ -3,12 +3,13 @@ import { PassThrough } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 import test from "node:test";
 import { EditorHistory, NodeTerminalDriver } from "@sortedyuan/tui";
-import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { MaybeCodeTerminalView } from "../dist/ui/terminal-view.js";
 
 test("mouse input scrolls the transcript while preserving the editor and reading position", (t) => {
   const store = new TranscriptStore();
   store.appendUser(Array.from({ length: 80 }, (_, index) => `message-${index}`).join("\n"));
-  const view = new MaybeCodePrototypeView({
+  const view = new MaybeCodeTerminalView({
     store,
     workspace: "workspace",
     inputHistory: new EditorHistory({ entries: ["previous-command"] }),

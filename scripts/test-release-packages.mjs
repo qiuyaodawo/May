@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { x } from "tar";
 import semver from "semver";
 import { checkRelease, releaseNames, repository, runPnpm } from "./release-utils.mjs";
+import { testOutputRoot } from "../packages/test-support/index.mjs";
 
 const args = process.argv.slice(2).filter(argument => argument !== "--");
 assert.equal(args.length, 2, "Usage: pnpm test:package:release -- --directory <external-parent>");
@@ -15,7 +16,7 @@ await mkdir(parent, { recursive: true });
 const parentPath = await realpath(parent);
 const pathFromRepository = relative(await realpath(repository), parentPath);
 assert.ok(pathFromRepository === ".." || pathFromRepository.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(pathFromRepository), "The consumer must be outside the repository");
-const output = join(repository, "review", "release-packages", String(Date.now()));
+const output = join(testOutputRoot, "release-packages", String(Date.now()));
 const packs = join(output, "packs");
 const consumer = join(parentPath, `release-consumer-${Date.now()}`);
 await mkdir(packs, { recursive: true });

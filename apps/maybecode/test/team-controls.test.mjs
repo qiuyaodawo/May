@@ -4,7 +4,8 @@ import { setTimeout } from "node:timers/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import test from "node:test";
-import { parseMaybeCodeArgs, runMaybeCodeTeamCommand } from "../dist/index.js";
+import { parseMaybeCodeArgs } from "../dist/args.js";
+import { runMaybeCodeTeamCommand } from "../dist/team.js";
 
 async function fixture(t) {
   const parent = resolve(tmpdir()), directory = await mkdtemp(join(parent, "may-team-controls-"));
@@ -13,7 +14,8 @@ async function fixture(t) {
   const workspace = join(directory, "source"), dataDirectory = join(directory, "state");
   await mkdir(workspace); await writeFile(join(workspace, "value.txt"), "1");
   const config = { path: join(directory, "config.json"), providers: { fake: { adapter: "openai-responses", apiKey: "private-test-key" } },
-    models: { coder: { provider: "fake", model: "code" }, reviewer: { provider: "fake", model: "review" } }, defaultModel: "coder" };
+    models: { coder: { provider: "fake", model: "code" }, reviewer: { provider: "fake", model: "review" } }, defaultModel: "coder",
+    apps: { maybecode: { requestRecording: "off" } } };
   let text = "";
   return { directory, workspace, dataDirectory, config, write: (value) => { text += value; }, output: () => text, clear: () => { text = ""; },
     id: async () => (await readdir(join(dataDirectory, "teams")))[0] };

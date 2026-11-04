@@ -23,11 +23,10 @@ const requests = await session.listModelRequests({ limit: 50 });
 const attempts = await session.getModelRequest(requests[0]!.modelCallId);
 ```
 
-MaybeCode 接受配置项 `apps.maybecode.requestRecording`。
-MaybeClaw Gateway 的 `may` adapter 接受
+MaybeCode 接受配置项 `apps.maybecode.requestRecording`，子 Agent 和 Team 的 Session
+使用同一设置。MaybeClaw Gateway 的 `may` adapter 接受
 `apps.maybeclaw.agents[].requestRecording`。两者均接受 `"off"` 和 `"required"`。
-独立 MaybeClaw service 还接受 `MaybeClawOptions.requestRecording`。
-以上配置位置均接受布尔选项 `providerBodyRecording`。
+两个配置位置都接受布尔选项 `providerBodyRecording`。
 
 ## 保存内容
 
@@ -112,5 +111,5 @@ required 模式在调用前拒绝尚未声明支持的 runtime 和模型。
 执行 `pnpm build` 后，通过
 `node --test packages/providers/test/request-recording.test.mjs` 检查请求历史。
 通过 `node --test packages/providers/test/request-recording/integration/session.test.mjs`
-运行真实 provider 场景。它使用配置中的默认模型，或者 `MAY_RECORDING_MODEL`，
+运行真实 provider 场景。它使用 `MAY_LIVE_MODEL`，或者配置中的默认模型，
 验证请求保存、重新打开、分支、内容复用及后续执行。

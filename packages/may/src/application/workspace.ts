@@ -33,7 +33,7 @@ import type {
   AgentRun,
   AgentWorkspaceEvent,
 } from "./events.js";
-import { AsyncStateSerializer } from "./state-serializer.js";
+import { AsyncStateSerializer, omitUndefined } from "../core/index.js";
 
 export interface AgentApplicationSelection {
   readonly sessionId?: string;
@@ -137,7 +137,7 @@ export class AgentWorkspace<
   private readonly state = new AsyncStateSerializer();
   private application: Application;
   private eventRelay: Promise<void>;
-  private sessionRecordTail: Promise<void> = Promise.resolve();
+  private readonly sessionRecords = new AsyncStateSerializer();
   private closed = false;
 
   private constructor(
@@ -208,11 +208,11 @@ export class AgentWorkspace<
     const paths = new Set([options.workspace, ...(await options.workspacePaths?.() ?? [])]);
     const summaries = sessionId === undefined ? [] : (await Promise.all([...paths].map((path) => options.catalog.list(path)))).flat();
     const selectedWorkspace = summaries.find((summary) => summary.id === sessionId)?.workspace ?? options.workspace;
-    const application = await options.openApplication({
-      ...(sessionId === undefined ? {} : { sessionId }),
+    const application = await options.openApplication(omitUndefined({
+      sessionId,
       resume: resumed,
       workspace: selectedWorkspace,
-    });
+    }));
     if (sessionId !== undefined && application.sessionId !== sessionId) {
       await application.close();
       throw new Error(
@@ -227,7 +227,12 @@ export class AgentWorkspace<
       Application
     >(options, application, resumed);
     workspace.currentWorkspace = selectedWorkspace;
-    await workspace.recordCurrentSession().catch(() => undefined);
+    try { await workspace.recordCurrentSession(); }
+    catch (error) {
+      try { await workspace.close(); }
+      catch (cleanupError) { throw new AggregateError([error, cleanupError], "Session catalog recording and workspace cleanup failed", { cause: error }); }
+      throw error;
+    }
     return workspace;
   }
 
@@ -236,8 +241,7 @@ export class AgentWorkspace<
   }
 
   get workspace(): string {
-    const application = this.application as Application & { readonly workspace?: string };
-    return application.workspace ?? this.currentWorkspace;
+    return this.currentWorkspace;
   }
 
   get isRunning(): boolean {
@@ -251,9 +255,8 @@ export class AgentWorkspace<
 
   async submit(options: SessionSubmitOptions): Promise<Run> {
     return this.state.run(async () => {
-      const run = await this.application.submit(options);
-      void this.recordCurrentSession().catch(() => undefined);
-      return this.withSessionRecord(run);
+      await this.recordCurrentSession();
+      return this.withSessionRecord(await this.application.submit(options));
     });
   }
 
@@ -264,20 +267,19 @@ export class AgentWorkspace<
       this.assertIdle("Cannot prepare input while an operation is active");
       const options = await prepare();
       options.signal?.throwIfAborted();
-      const run = await this.application.submit(options);
-      void this.recordCurrentSession().catch(() => undefined);
-      return this.withSessionRecord(run);
+      await this.recordCurrentSession();
+      return this.withSessionRecord(await this.application.submit(options));
     });
   }
 
   async retry(): Promise<Run> {
     return this.state.run(async () => {
-      void this.recordCurrentSession().catch(() => undefined);
+      await this.recordCurrentSession();
       return this.withSessionRecord(await this.application.retry());
     });
   }
 
-  listRecoveries() { return this.application.listRecoveries?.() ?? []; }
+  listRecoveries() { return this.application.listRecoveries(); }
 
   resolveRecovery(id: string, finding: string): Promise<void> {
     return this.state.run(async () => {
@@ -362,8 +364,8 @@ export class AgentWorkspace<
       if (this.store.inspect === undefined) throw new Error("Session forking requires read-only store inspection");
       const position = readSessionBranchPositions(await this.store.inspect(sourceId)).find((value) => value.positionSeq === positionSeq);
       if (position === undefined || !position.available) throw new Error(position?.reason ?? "Selected history position has no recoverable state");
-      const next = await this.openApplication({ resume: false, fork: { sessionId: sourceId, positionSeq },
-        workspace: options.workspace ?? this.workspace, ...(options.metadata === undefined ? {} : { metadata: options.metadata }) });
+      const next = await this.openApplication(omitUndefined({ resume: false, fork: { sessionId: sourceId, positionSeq },
+        workspace: options.workspace ?? this.workspace, metadata: options.metadata }));
       if (next.sessionId === sourceId) { await next.close(); throw new Error("Forked Session must have an independent identity"); }
       const forked = (await next.history())[0];
       if (forked?.type !== "session.created" || forked.fork?.sessionId !== sourceId || forked.fork.positionSeq !== positionSeq) {
@@ -509,7 +511,7 @@ export class AgentWorkspace<
     this.throwIfClosed();
     return this.state.run(async () => {
       this.assertIdle("Cannot replace the application while an operation is active");
-      await this.recordCurrentSession().catch(() => undefined);
+      await this.recordCurrentSession();
       const previous = this.application;
       const next = await create(previous);
       if (next === previous) {
@@ -544,7 +546,7 @@ export class AgentWorkspace<
     await this.state.close();
     await this.application.close();
     await this.eventRelay;
-    await this.sessionRecordTail;
+    await this.sessionRecords.close();
     this.eventQueue.close();
   }
 
@@ -562,7 +564,7 @@ export class AgentWorkspace<
 
     this.application = next;
     this.eventRelay = this.relayEvents(next);
-    await this.recordCurrentSession().catch(() => undefined);
+    await this.recordCurrentSession();
     if (resumed !== undefined) {
       this.eventQueue.push({
         type: "session.changed",
@@ -572,8 +574,8 @@ export class AgentWorkspace<
     }
   }
 
-  private async recordCurrentSession(application = this.application, workspace = this.workspace): Promise<void> {
-    const operation = this.sessionRecordTail.then(async () => {
+  private recordCurrentSession(application = this.application, workspace = this.workspace): Promise<void> {
+    return this.sessionRecords.run(async () => {
       const history = await application.history();
       const createdAt = history[0]?.timestamp ?? this.now();
       await this.catalog.record({
@@ -584,8 +586,6 @@ export class AgentWorkspace<
         ...this.summarizeSession(history),
       });
     });
-    this.sessionRecordTail = operation.catch(() => undefined);
-    return operation;
   }
 
   private async listFamilySessions(): Promise<readonly SessionSummary[]> {
@@ -597,11 +597,12 @@ export class AgentWorkspace<
   private withSessionRecord(run: Run): Run {
     const result = run.result.then(
       async (value) => {
-        await this.recordCurrentSession().catch(() => undefined);
+        await this.recordCurrentSession();
         return value;
       },
       async (error: unknown) => {
-        await this.recordCurrentSession().catch(() => undefined);
+        try { await this.recordCurrentSession(); }
+        catch (recordError) { throw new AggregateError([error, recordError], "Run and session catalog recording both failed", { cause: error }); }
         throw error;
       },
     );
@@ -650,11 +651,11 @@ export function summarizeSessionHistory(
     : "";
   const preview = messages.at(-1);
   const turnCount = history.filter((event) => event.type === "input.submitted").length;
-  return {
-    ...(title === "" ? {} : { title: truncate(title, 80) }),
-    ...(preview === undefined ? {} : { preview: truncate(preview, 180) }),
+  return omitUndefined({
+    title: title === "" ? undefined : truncate(title, 80),
+    preview: preview === undefined ? undefined : truncate(preview, 180),
     turnCount,
-  };
+  });
 }
 
 function truncate(value: string, limit: number): string {

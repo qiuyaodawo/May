@@ -9,6 +9,7 @@ import {
   type RuntimeTerminal,
 } from "@sortedyuan/tui";
 import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { omitUndefined } from "@sortedyuan/may/core";
 import type { ApprovalRequest } from "@sortedyuan/may/permissions";
 import { userInfo } from "node:os";
 import type { SessionSummary } from "@sortedyuan/may/session/catalog";
@@ -24,7 +25,7 @@ import {
   parseMaybeCodeSlashCommand,
   type MaybeCodeSlashCommandResult,
 } from "../slash-commands.js";
-import { MaybeCodePrototypeView } from "./prototype-view.js";
+import { MaybeCodeTerminalView } from "./terminal-view.js";
 import type { MaybeCodeEvent } from "../events.js";
 import { presentMcpInteraction } from "../mcp-interaction-ui.js";
 import { MaybeCodeTerminalWeb } from "../terminal-web.js";
@@ -93,13 +94,11 @@ export async function runRetainedTerminalUI(
     if (app.isRunning) app.cancel("Interrupted by process signal");
     finish();
   };
-  const view = new MaybeCodePrototypeView({
+  const view = new MaybeCodeTerminalView({
     isRunning: () => app.isRunning,
     permissionMode: () => app.permissionMode,
     clipboard: options.clipboard ?? createTerminalClipboard({ output: terminal }),
-    keymap: options.keymap ?? {
-      ...(process.env.MAY_TUI_LEADER === undefined ? {} : { leader: process.env.MAY_TUI_LEADER }),
-    },
+    keymap: options.keymap ?? omitUndefined({ leader: process.env.MAY_TUI_LEADER }),
     images,
     store,
     workspace: app.workspace,
@@ -171,7 +170,7 @@ export async function runRetainedTerminalUI(
 async function consumeEvents(
   app: MaybeCodeController,
   store: TranscriptStore,
-  view: MaybeCodePrototypeView,
+  view: MaybeCodeTerminalView,
   isClosing: () => boolean,
   events: AsyncIterable<MaybeCodeEvent>,
   images: TerminalImages,
@@ -185,7 +184,7 @@ async function consumeEvents(
     if (event.type === "run.event") {
       if (event.event.type === "run.started") {
         view.setStatus("Running");
-        const unread = app.listSteeringInputs?.().filter(input => input.status === "delivered" && !displayedSteering.has(input.inputId)) ?? [];
+        const unread = app.application.agent.listSteeringInputs().filter(input => input.status === "delivered" && !displayedSteering.has(input.inputId));
         if (unread.length > 0) {
           const history = await app.history();
           const runId = event.event.runId;
@@ -198,7 +197,7 @@ async function consumeEvents(
         }
       }
       if (event.event.type === "input.received") {
-        for (const input of app.listSteeringInputs?.() ?? []) {
+        for (const input of app.application.agent.listSteeringInputs()) {
           if (input.status === "delivered" && input.runId === event.event.runId) displayedSteering.add(input.inputId);
         }
       }
@@ -298,7 +297,7 @@ async function consumeEvents(
 /** 打开审批对话框并把决定交回宿主，由宿主路由到提出请求的 Session。 */
 function presentApproval(
   app: MaybeCodeController,
-  view: MaybeCodePrototypeView,
+  view: MaybeCodeTerminalView,
   store: TranscriptStore,
   request: ApprovalRequest,
   isClosing: () => boolean,
@@ -404,7 +403,7 @@ async function handleCommand(
   input: string,
   app: MaybeCodeController,
   store: TranscriptStore,
-  view: MaybeCodePrototypeView,
+  view: MaybeCodeTerminalView,
   finish: () => void,
   web: MaybeCodeTerminalWeb,
   observeRun: (result: Promise<unknown>) => void,
@@ -432,7 +431,7 @@ async function presentCommandResult(
   result: MaybeCodeSlashCommandResult,
   app: MaybeCodeController,
   store: TranscriptStore,
-  view: MaybeCodePrototypeView,
+  view: MaybeCodeTerminalView,
   finish: () => void,
   observeRun: (result: Promise<unknown>) => void,
 ): Promise<void> {
@@ -559,7 +558,7 @@ async function presentCommandResult(
 }
 
 async function runEffortDialog(
-  view: MaybeCodePrototypeView,
+  view: MaybeCodeTerminalView,
   app: MaybeCodeController,
   store: TranscriptStore,
   state: MaybeCodeReasoningEffortState,
@@ -578,7 +577,7 @@ async function runEffortDialog(
 }
 
 async function runModelDialog(
-  view: MaybeCodePrototypeView,
+  view: MaybeCodeTerminalView,
   app: MaybeCodeController,
   store: TranscriptStore,
   initialModels: readonly MaybeCodeModelProfile[],
@@ -587,7 +586,7 @@ async function runModelDialog(
   while (true) {
     const action = await view.requestModelAction(
       models,
-      app.modelInfo?.profile,
+      app.application.modelInfo?.profile,
     );
     if (action === undefined) return;
     try {
@@ -606,7 +605,7 @@ async function runModelDialog(
 }
 
 async function runSessionDialog(
-  view: MaybeCodePrototypeView,
+  view: MaybeCodeTerminalView,
   app: MaybeCodeController,
   store: TranscriptStore,
   initialSessions: readonly SessionSummary[],
@@ -656,11 +655,12 @@ function modelLabel(
   app: MaybeCodeController,
   effort: MaybeCodeReasoningEffortState | "loading" = "loading",
 ): string {
-  if (app.modelInfo === undefined) return "unknown · effort: unknown";
-  const endpoint = `${app.modelInfo.provider}/${app.modelInfo.model}`;
-  const model = app.modelInfo.profile === undefined
+  const info = app.application.modelInfo;
+  if (info === undefined) return "unknown · effort: unknown";
+  const endpoint = `${info.provider}/${info.model}`;
+  const model = info.profile === undefined
     ? endpoint
-    : `${app.modelInfo.profile} (${endpoint})`;
+    : `${info.profile} (${endpoint})`;
   return `${model} · effort: ${reasoningEffortLabel(effort)}`;
 }
 
@@ -682,7 +682,7 @@ async function resolvedModelLabel(app: MaybeCodeController): Promise<string> {
 }
 
 async function refreshModelLabel(
-  view: MaybeCodePrototypeView,
+  view: MaybeCodeTerminalView,
   app: MaybeCodeController,
 ): Promise<void> {
   const identity = modelIdentity(app);
@@ -691,7 +691,7 @@ async function refreshModelLabel(
 }
 
 function modelIdentity(app: MaybeCodeController): string {
-  const model = app.modelInfo;
+  const model = app.application.modelInfo;
   return model === undefined
     ? ""
     : `${model.profile ?? ""}\u0000${model.provider}\u0000${model.model}`;

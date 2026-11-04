@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 
-const parent = fileURLToPath(new URL("../../../review/approval-restart/", import.meta.url));
+const parent = join(testOutputRoot, "maybeclaw", "approval-restart");
 const operator = { kind: "operator", id: "review" };
 const entry = { account: "telegram:42", conversation: "-100", kind: "group" };
 const member = { kind: "platform", account: entry.account, conversation: entry.conversation, userId: "7" };
@@ -52,10 +53,7 @@ if (process.argv[2] === "--child") {
     t.after(() => { if (child.exitCode === null) child.kill(); });
     const [exitCode] = await once(child, "exit");
     assert.equal(exitCode, 71, stderr);
-    const owner = JSON.parse(await readFile(join(directory, "host.lock"), "utf8"));
-    assert.equal(owner.pid, child.pid);
-    assert.throws(() => process.kill(owner.pid, 0), { code: "ESRCH" });
-    await unlink(join(directory, "host.lock"));
+    assert.equal(JSON.parse(await readFile(join(directory, "host.lock.owner"), "utf8")).pid, child.pid);
     const options = { directory, configPath, settings: gatewaySettings(config) };
     const gateway = new AgentGateway(options);
     t.after(() => gateway.close());

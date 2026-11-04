@@ -11,7 +11,7 @@ import { UiError, type UiCommand } from "@sortedyuan/ui-client";
 import { GatewayUiHost, controlActor } from "../gateway-ui.js";
 import type { GatewayServerController } from "../gateway-api.js";
 
-export async function startGatewayServer(options: { gateway: GatewayServerController; port?: number; server?: Server; status?: () => unknown; close?: () => Promise<void>; retryLegacyDelivery?: (id: string, confirmUnknown: boolean) => unknown }) {
+export async function startGatewayServer(options: { gateway: GatewayServerController; port?: number; server?: Server; status?: () => unknown; close?: () => Promise<void> }) {
   const publicOrigin = options.gateway.options.settings.publicOrigin;
   const port = options.port ?? 3939;
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
@@ -30,7 +30,7 @@ export async function startGatewayServer(options: { gateway: GatewayServerContro
       context.signal.addEventListener("abort", cancel, { once: true });
       context.defer(() => context.signal.removeEventListener("abort", cancel));
       auth = await GatewayAuth.open(options.gateway.options.configPath); context.defer(() => auth.close());
-      uiHost = new GatewayUiHost(options.gateway, options.status, options.retryLegacyDelivery); context.defer(() => uiHost.close());
+      uiHost = new GatewayUiHost(options.gateway, options.status); context.defer(() => uiHost.close());
       ui = createUiRouter(uiHost); context.defer(() => ui.close());
       context.provide(gatewayPluginServices.webHandler, (req, res, request) => route(req, res, request.origin).catch((error: unknown) => {
         if (res.headersSent) res.destroy();
@@ -62,7 +62,7 @@ export async function startGatewayServer(options: { gateway: GatewayServerContro
       if (path === "/api/agents") { sendJson(res, 200, options.gateway.configuration(controlActor).agents); return; }
       if (path === "/api/approvals") { sendJson(res, 200, options.gateway.approvals(controlActor)); return; }
       if (path === "/api/permission-rules") { sendJson(res, 200, await options.gateway.listPermissionRules(controlActor)); return; }
-      if (path === "/api/tasks") { sendJson(res, 200, { tasks: options.gateway.tasks(controlActor), legacy: options.gateway.legacyTasks(controlActor) }); return; }
+      if (path === "/api/tasks") { sendJson(res, 200, { tasks: options.gateway.tasks(controlActor) }); return; }
       const sessionMatch = /^\/api\/sessions\/([^/]+)(?:\/(messages))?$/u.exec(path);
       if (sessionMatch) {
         const session = options.gateway.session(decodeURIComponent(sessionMatch[1]!), controlActor);
@@ -71,9 +71,9 @@ export async function startGatewayServer(options: { gateway: GatewayServerContro
       const taskMatch = /^\/api\/tasks\/([^/]+)$/u.exec(path);
       if (taskMatch) {
         const id = decodeURIComponent(taskMatch[1]!);
-        const task = options.gateway.task(id, controlActor), legacy = options.gateway.legacyTask(id, controlActor);
-        if (!task && !legacy) throw new UiError(404, "Task not found");
-        sendJson(res, 200, task ? { task } : { legacy }); return;
+        const task = options.gateway.task(id, controlActor);
+        if (!task) throw new UiError(404, "Task not found");
+        sendJson(res, 200, { task }); return;
       }
     }
     if (req.method === "POST") {
@@ -99,17 +99,11 @@ export async function startGatewayServer(options: { gateway: GatewayServerContro
       const taskMatch = /^\/api\/tasks\/([^/]+)\/(cancel|recover|dispatch)$/u.exec(path);
       if (taskMatch) {
         const task = options.gateway.task(decodeURIComponent(taskMatch[1]!), controlActor);
-        if (!task) throw new UiError(404, "Gateway task not found; legacy work requires explicit assignment to a session");
+        if (!task) throw new UiError(404, "Gateway task not found");
         if (taskMatch[2] === "cancel") await options.gateway.stop(options.gateway.session(task.sessionId, controlActor), controlActor, undefined, task.id);
         else if (taskMatch[2] === "recover") await options.gateway.recoverTask(task.id, controlActor);
         else await options.gateway.dispatchTask(task.id, controlActor);
         sendJson(res, 200, { task: options.gateway.task(task.id, controlActor) }); return;
-      }
-      const legacyDelivery = /^\/api\/legacy-deliveries\/([^/]+)\/retry$/u.exec(path);
-      if (legacyDelivery) {
-        if (!options.retryLegacyDelivery) throw new UiError(409, "重新发送需要正在运行的 GatewayHost。");
-        if (data.confirmUnknown !== undefined && typeof data.confirmUnknown !== "boolean") throw new UiError(400, "confirmUnknown must be a boolean");
-        sendJson(res, 200, { delivery: options.retryLegacyDelivery(decodeURIComponent(legacyDelivery[1]!), data.confirmUnknown === true) }); return;
       }
       const delivery = /^\/api\/deliveries\/([^/]+)\/retry$/u.exec(path);
       if (delivery) {

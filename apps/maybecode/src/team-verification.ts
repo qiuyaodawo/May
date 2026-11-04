@@ -1,11 +1,11 @@
-import { acquireFileLock, releaseFileLock } from "@sortedyuan/may/storage";
+import { acquireFileLock, hasErrorCode, type FileLock } from "@sortedyuan/may/storage";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, type FileHandle } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { AsyncStateSerializer } from "@sortedyuan/may";
+import { AsyncStateSerializer } from "@sortedyuan/may/core";
 import type { TaskExecution } from "@sortedyuan/coordination";
 import type { Tool } from "@sortedyuan/may/core";
 
@@ -49,19 +49,17 @@ export class TeamVerificationStore {
   private failed = false;
   private closing?: Promise<void>;
   private readonly active = new Set<Promise<unknown>>();
-  private constructor(private readonly file: FileHandle, private readonly lock: FileHandle,
-    private readonly lockPath: string, private readonly checks: readonly TeamCheckSpec[]) {}
+  private constructor(private readonly file: FileHandle, private readonly lock: FileLock,
+    private readonly checks: readonly TeamCheckSpec[]) {}
 
   static async open(options: { readonly directory: string; readonly checks?: readonly TeamCheckSpec[] }): Promise<TeamVerificationStore> {
     const checks = parseTeamChecks(options.checks ?? []);
     await mkdir(options.directory, { recursive: true });
     if ((await lstat(options.directory)).isSymbolicLink()) throw new Error("Verification directory must not be a symbolic link");
     const path = join(await realpath(options.directory), "verification.jsonl");
-    const lockPath = `${path}.lock`;
-    const lock = await acquireFileLock(lockPath);
+    const lock = await acquireFileLock(`${path}.lock`);
     let file: FileHandle | undefined;
     try {
-      await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
       await rejectLinkIfPresent(path);
       file = await open(path, constants.O_CREAT | constants.O_APPEND | constants.O_RDWR | noFollow(), 0o600);
       const { entries, committed, size } = await readJournal(file);
@@ -71,7 +69,7 @@ export class TeamVerificationStore {
         try { await repair.truncate(committed); await repair.sync(); }
         finally { await repair.close(); }
       }
-      const store = new TeamVerificationStore(file, lock, lockPath, checks);
+      const store = new TeamVerificationStore(file, lock, checks);
       store.size = committed;
       for (const entry of entries) { store.apply(entry.event); store.sequence = entry.sequence; }
       if (entries.length && !isDeepStrictEqual((entries[0]!.event as { checks: readonly TeamCheckSpec[] }).checks, checks)) throw new Error("Verification checks changed on resume");
@@ -81,7 +79,7 @@ export class TeamVerificationStore {
         await store.append({ type: "check", result: { ...result, status: "unknown", detail: "Interrupted check; inspect effects and reconcile before a new command." } });
       }
       return store;
-    } catch (error) { await file?.close().catch(() => undefined); await releaseFileLock(lock, lockPath); throw error; }
+    } catch (error) { try { await file?.close(); } finally { await lock.release(); } throw error; }
   }
 
   /** Read-only status inspection, including while a writer owns the journal. */
@@ -90,7 +88,7 @@ export class TeamVerificationStore {
     await rejectLinkIfPresent(path);
     let file: FileHandle;
     try { file = await open(path, constants.O_RDONLY | noFollow()); }
-    catch (error) { if (isMissing(error)) return { reports: [], checks: [] }; throw error; }
+    catch (error) { if (hasErrorCode(error, "ENOENT")) return { reports: [], checks: [] }; throw error; }
     try {
       const { entries } = await readJournal(file);
       const reports: StoredTeamReport[] = []; const checks = new Map<string, TeamCheckResult>();
@@ -180,7 +178,7 @@ export class TeamVerificationStore {
   close(): Promise<void> {
     return this.closing ??= (async () => {
       await Promise.allSettled([...this.active]); await this.serial.close();
-      try { await this.file.close(); } finally { await releaseFileLock(this.lock, this.lockPath); }
+      try { await this.file.close(); } finally { await this.lock.release(); }
     })();
   }
 
@@ -450,8 +448,7 @@ function safeRelative(value: unknown): asserts value is string {
   boundedString(value, "workspace relative path", 2048);
   if (isAbsolute(value) || /[:\u0000-\u001f]/u.test(value) || value.replace(/\\/gu, "/").split("/").some((part) => !part || part === "." || part === "..")) throw new Error("Unsafe workspace relative path");
 }
-async function rejectLinkIfPresent(path: string): Promise<void> { try { if ((await lstat(path)).isSymbolicLink()) throw new Error("Verification file must not be a symbolic link"); } catch (error) { if (!isMissing(error)) throw error; } }
-function isMissing(error: unknown): boolean { return error instanceof Error && "code" in error && error.code === "ENOENT"; }
+async function rejectLinkIfPresent(path: string): Promise<void> { try { if ((await lstat(path)).isSymbolicLink()) throw new Error("Verification file must not be a symbolic link"); } catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; } }
 function noFollow(): number { return process.platform === "win32" ? 0 : constants.O_NOFOLLOW; }
 function hash(value: string | Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }
 function message(error: unknown): string { return (error instanceof Error ? error.message : String(error)).slice(0, 2048); }

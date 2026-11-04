@@ -1,8 +1,8 @@
-import { acquireFileLock, releaseFileLock, replaceJournalFile, withFileAccess } from "@sortedyuan/may/storage";
+import { acquireFileLock, hasErrorCode, replaceJournalFile, withFileAccess, type FileLock } from "@sortedyuan/may/storage";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, type FileHandle } from "node:fs/promises";
 import { dirname } from "node:path";
-import { AsyncStateSerializer } from "@sortedyuan/may";
+import { AsyncStateSerializer } from "@sortedyuan/may/core";
 
 interface Revision { readonly format: 1; readonly revision: number }
 
@@ -11,8 +11,8 @@ export class ResourceJournal<T extends Revision> {
   private readonly serial = new AsyncStateSerializer();
   private failed = false;
   private closing: Promise<void> | undefined;
-  private constructor(private file: FileHandle, private readonly path: string, private readonly lock: FileHandle,
-    private readonly lockPath: string, private current: T, private size: number,
+  private constructor(private file: FileHandle, private readonly path: string, private readonly lock: FileLock,
+    private current: T, private size: number,
     private readonly validate: (value: T) => void, private readonly maxBytes: number) {}
 
   /** 查询保持日志内容不变；首次访问会创建协调文件，读取时持有共享访问锁。 */
@@ -42,14 +42,12 @@ export class ResourceJournal<T extends Revision> {
   static async open<T extends Revision>(path: string, initial: T, validate: (value: T) => void,
     maxBytes = 67_108_864): Promise<ResourceJournal<T>> {
     await mkdir(dirname(path), { recursive: true });
-    const lockPath = `${path}.lock`;
-    const lock = await acquireFileLock(lockPath);
+    const lock = await acquireFileLock(`${path}.lock`);
     let file: FileHandle | undefined;
     try {
-      await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
       const journal = await withFileAccess(path, "exclusive", async () => {
         try { if ((await lstat(path)).isSymbolicLink()) throw new Error("Resource journal must not be a symbolic link"); }
-        catch (error) { if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error; }
+        catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; }
         file = await open(path, constants.O_CREAT | constants.O_APPEND | constants.O_RDWR | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW), 0o600);
         const stat = await file.stat();
         if (!stat.isFile() || stat.size > maxBytes) throw new Error("Resource journal exceeds its byte limit or is not a file");
@@ -68,12 +66,13 @@ export class ResourceJournal<T extends Revision> {
           const repair = await open(path, "r+");
           try { await repair.truncate(committed); await repair.sync(); } finally { await repair.close(); }
         }
-        return new ResourceJournal(file, path, lock, lockPath, current, committed, validate, maxBytes);
+        return new ResourceJournal(file, path, lock, current, committed, validate, maxBytes);
       });
       if (journal.size === 0) await journal.transact((state) => ({ ...state }));
       return journal;
     } catch (error) {
-      await file?.close().catch(() => undefined); await releaseFileLock(lock, lockPath); throw error;
+      try { await file?.close(); } finally { await lock.release(); }
+      throw error;
     }
   }
 
@@ -110,7 +109,7 @@ export class ResourceJournal<T extends Revision> {
 
   close(): Promise<void> {
     return this.closing ??= (async () => {
-      await this.serial.close(); try { await this.file.close(); } finally { await releaseFileLock(this.lock, this.lockPath); }
+      await this.serial.close(); try { await this.file.close(); } finally { await this.lock.release(); }
     })();
   }
 

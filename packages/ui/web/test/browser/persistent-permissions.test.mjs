@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -15,7 +16,7 @@ import { chromium } from "playwright";
 import { webUiAssets } from "../../dist/assets.js";
 
 test("持久规则入口在真实 WebUI 中提供查询、创建和撤销操作", { timeout: 30_000 }, async t => {
-  const base = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../plugin-verification/persistent-browser");
+  const base = join(testOutputRoot, "web-ui", "persistent-permissions");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "run-"));
   let app, rules, server, browser;

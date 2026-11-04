@@ -1,6 +1,8 @@
 # `@sortedyuan/providers/kimi`
 
-Kimi model adapter for May.
+Kimi model adapter for May. It is built on `OpenAICompatibleChatModel` and reports
+failures with the shared [OpenAI-compatible errors](../openai-compatible/README.md)
+whose `provider` is `"Kimi"`.
 
 ```ts
 import { InMemoryContext, May } from "@sortedyuan/may/core";

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -9,10 +10,10 @@ import { gatewaySettings } from "../dist/gateway-settings.js";
 import { ChannelStore, inboxId } from "../dist/channel-store.js";
 import { TelegramAdapter, telegramMemberInput } from "../dist/channels.js";
 import { createTelegramChannelPlugin } from "../dist/channels/telegram/index.js";
-import { digest } from "../dist/types.js";
+import { digest } from "../dist/gateway-types.js";
 import { setTimeout as delay } from "node:timers/promises";
 
-const base = fileURLToPath(new URL("../../../.zcode/tmp/gateway-channel-state/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "channel-state");
 const operator = { kind: "operator", id: "admin" };
 const input = { account: "telegram:42", sender: "7", conversation: "7", kind: "private", eventId: "100", messageId: "1", text: "原始问题" };
 async function setup(t) {
@@ -47,18 +48,10 @@ test("重启将发送中的通知记为unknown，并移除旧正文镜像", asyn
   await channels.close();
   const id = digest("reply");
   gateway.store.put("channel-replies", id, { id, input, text: "通知正文", status: "sending" });
-  const legacyId = digest("legacy");
-  gateway.store.put("legacy-deliveries", legacyId, { kind: "delivery", id: legacyId, account: input.account, sender: input.sender, conversation: input.conversation, text: "历史回复", status: "sending" });
   const host = await GatewayHost.start({ gateway, adapters: [] });
   t.after(() => host.close());
   assert.equal(host.status().channelReplies[0].status, "unknown");
-  assert.equal(host.status().legacyDeliveries[0].status, "unknown");
   assert.doesNotMatch(await readFile(path, "utf8"), /原始问题/);
-  assert.throws(() => host.retryLegacyDelivery(legacyId, operator), /确认可能重复/);
-  assert.throws(() => host.retryLegacyDelivery(legacyId, { kind: "platform", account: input.account, conversation: input.conversation, userId: input.sender }, true), /服务管理员/);
-  assert.equal(host.retryLegacyDelivery(legacyId, operator, true).status, "pending");
-  await host.deliver();
-  assert.equal(host.status().legacyDeliveries[0].status, "pending");
   await host.close();
 });
 

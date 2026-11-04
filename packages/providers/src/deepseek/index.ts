@@ -1,2 +1,27 @@
-export * from "./deepseek-model.js";
-export * from "./errors.js";
+import { omitUndefined } from "@sortedyuan/may/core";
+import { OpenAICompatibleChatModel } from "../openai-compatible/chat-model.js";
+
+/** Provider/model metadata determines concrete supported values. */
+export type DeepSeekReasoningEffort = string;
+
+export interface DeepSeekModelOptions {
+  apiKey: string;
+  model: string;
+  baseURL?: string;
+  thinking?: "enabled" | "disabled";
+  reasoningEffort?: DeepSeekReasoningEffort;
+  maxTokens?: number;
+  fetch?: typeof globalThis.fetch;
+}
+
+export class DeepSeekModel extends OpenAICompatibleChatModel {
+  constructor(options: DeepSeekModelOptions) {
+    const { thinking, maxTokens, ...shared } = options;
+    super(omitUndefined({ ...shared, maxOutputTokens: maxTokens }), {
+      provider: "DeepSeek", adapter: "deepseek-chat", errorCodePrefix: "DEEPSEEK",
+      defaultBaseURL: "https://api.deepseek.com", maxTokensField: "max_tokens",
+      streamUsage: true, includeToolName: false, requireDone: false, supportsResponseFormat: false,
+      ...(thinking === undefined ? {} : { extendRequest: (body) => { body.thinking = { type: thinking }; } }),
+    });
+  }
+}

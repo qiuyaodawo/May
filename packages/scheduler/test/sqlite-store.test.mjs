@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { fork } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -11,7 +12,7 @@ import { SqliteSchedulerStore } from "../dist/sqlite-store.js";
 import { Scheduler } from "../dist/index.js";
 import { DurableTaskHost } from "./fixtures/durable-host.mjs";
 
-const fixtureRoot = fileURLToPath(new URL("../../../scheduler-verification/", import.meta.url));
+const fixtureRoot = join(testOutputRoot, "scheduler", "verification");
 const cleanupOperations = new WeakMap();
 
 if (process.argv[2] === "--owner") {

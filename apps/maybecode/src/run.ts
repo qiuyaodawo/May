@@ -1,3 +1,4 @@
+import { omitUndefined } from "@sortedyuan/may/core";
 import {
   MAYBE_CODE_USAGE,
   parseMaybeCodeArgs,
@@ -96,30 +97,21 @@ export async function runMaybeCode(
       ? dependencies.runWebUI ?? (await import("./web-ui.js")).runMaybeCodeWebUI : undefined;
     const runRetainedUI = command.ui === "retained"
       ? dependencies.runRetainedUI ?? (await import("./ui/retained-tui.js")).runRetainedTerminalUI : undefined;
-    const runClassicUI = command.ui === "classic" ? (await import("./tui.js")).runTerminalUI : undefined;
-    const app = await open({
-      ...(command.permissionMode === undefined ? {} : { permissionMode: command.permissionMode }),
+    const app = await open(omitUndefined({
+      permissionMode: command.permissionMode,
       mcpInteractions: true,
-      ...(command.workspace === undefined
-        ? {}
-        : { workspace: command.workspace }),
-      ...(command.configPath === undefined
-        ? {}
-        : { configPath: command.configPath }),
-      ...(command.model === undefined ? {} : { model: command.model }),
-      ...(command.sessionId === undefined
-        ? {}
-        : { sessionId: command.sessionId }),
+      workspace: command.workspace,
+      configPath: command.configPath,
+      model: command.model,
+      sessionId: command.sessionId,
       autoResume: command.autoResume,
-    });
+    }));
     if (command.ui === "web") {
-      await runWebUI!(app, { ...(command.port === undefined ? {} : { port: command.port }), write: text => outputTerminal().write(text) });
+      await runWebUI!(app, { ...omitUndefined({ port: command.port }), write: text => outputTerminal().write(text) });
       terminal?.close();
-    } else if (command.ui === "retained") {
+    } else {
       terminal?.close();
       await runRetainedUI!(app);
-    } else {
-      await runClassicUI!(app, { terminal: outputTerminal() });
     }
     return 0;
   } catch (error) {

@@ -23,7 +23,6 @@ export function parseGoalStart(arguments_: readonly string[]): { objective: stri
 }
 
 export async function executeGoalCommand(arguments_: readonly string[], app: MaybeCodeController): Promise<string> {
-  if (!app.getGoal) throw new Error("This controller does not support goals");
   const [verb = "status", ...rest] = arguments_;
   if (verb === "start") {
     if (!app.startGoal) throw new Error("This controller cannot start goals");
@@ -31,7 +30,7 @@ export async function executeGoalCommand(arguments_: readonly string[], app: May
     return formatGoal(await app.startGoal(objective, budget));
   }
   if (rest.length) throw new Error(GOAL_COMMAND_USAGE);
-  if (verb === "status") return formatGoal(app.getGoal());
+  if (verb === "status") return formatGoal(app.application.getGoal());
   const method = verb === "pause" ? app.pauseGoal : verb === "resume" ? app.resumeGoal : verb === "cancel" ? app.cancelGoal : undefined;
   if (!method) throw new Error(GOAL_COMMAND_USAGE);
   return formatGoal(await method.call(app));

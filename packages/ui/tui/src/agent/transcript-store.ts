@@ -5,6 +5,7 @@ import type {
   ToolCall,
   UserMessage,
 } from "@sortedyuan/may/core";
+import { omitUndefined } from "@sortedyuan/may/core";
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -306,11 +307,7 @@ export class TranscriptStore {
       if (item.kind !== "approval") return item;
       return event.type === "approval.resolved"
         ? { ...item, status: "resolved", decision: event.decision }
-        : {
-            ...item,
-            status: "cancelled",
-            ...(event.reason === undefined ? {} : { reason: event.reason }),
-          };
+        : { ...item, status: "cancelled", ...omitUndefined({ reason: event.reason }) };
     });
   }
 
@@ -478,11 +475,7 @@ export class TranscriptStore {
       if (item.kind !== "approval") return item;
       return event.type === "approval.resolved"
         ? { ...item, status: "resolved", decision: event.decision }
-        : {
-            ...item,
-            status: "cancelled",
-            ...(event.reason === undefined ? {} : { reason: event.reason }),
-          };
+        : { ...item, status: "cancelled", ...omitUndefined({ reason: event.reason }) };
     });
   }
 

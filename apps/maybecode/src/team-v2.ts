@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, realpath, rename, stat } from "node:fs/promises";
+import { mkdir, open, readFile, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { defineAgent } from "@sortedyuan/may";
 import { createEditTool, createReadTool, createWriteTool } from "@sortedyuan/coding-tools";
@@ -9,9 +9,11 @@ import { CoordinationRuntime, createApplicationAgent, FileArtifactStore, FileSha
 import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
 import { resolveRunBudget, type Model, type RunBudget, type Tool } from "@sortedyuan/may/core";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
-import { withFileAccess } from "@sortedyuan/may/storage";
+import { hasErrorCode, withFileAccess } from "@sortedyuan/may/storage";
+import writeFileAtomic from "write-file-atomic";
 import type { MaybeCodeTeamCommand } from "./args.js";
-import { getDefaultMaybeCodeDataDirectory } from "./configured.js";
+import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeRecording, type MaybeCodeRecording } from "./configured.js";
+import { readMaybeCodeSettings } from "./settings.js";
 import { createMaybeCodeModel, selectMaybeCodeModel, type SelectedMaybeCodeModel } from "./model.js";
 import { createListTool, type RunMaybeCodeTeamDependencies } from "./team.js";
 import { createTeamPreset, loadTeamPlan, parseTeamPlan, type TeamMode, type TeamPlan, type TeamRole } from "./team-plan.js";
@@ -51,7 +53,7 @@ export async function runTeamV2Command(command: MaybeCodeTeamCommand, dependenci
     const roleModels: Record<string, Manifest["roleModels"][string]> = {};
     for (const [name, role] of Object.entries(plan.roles)) {
       const selected = selectMaybeCodeModel(config, { model: role.model ?? defaultModel.profile });
-      const runBudget = resolveRunBudget(resolveRunBudget(config.apps?.maybecode?.runBudget as RunBudget | undefined, DEFAULT_RUN_BUDGET), role.runBudget);
+      const runBudget = resolveRunBudget(resolveRunBudget(readMaybeCodeSettings(config).runBudget, DEFAULT_RUN_BUDGET), role.runBudget);
       roleModels[name] = { profile: selected.profile, fingerprint: modelFingerprint(selected), runBudget };
     }
     manifest = { format: 1, version: VERSION, id, createdAt: new Date().toISOString(), workspace, configPath: resolve(config.path),
@@ -72,7 +74,7 @@ export async function runTeamV2Command(command: MaybeCodeTeamCommand, dependenci
     // This projection is deliberately labeled: verify rechecks fingerprints under ownership.
     const path = join(directory, "acceptance.json");
     try { write(`Last acceptance projection (may be stale): ${await withFileAccess(path, "shared", () => readFile(path, "utf8"))}\n`); }
-    catch (error) { if (!isMissing(error)) throw error; }
+    catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; }
     return 0;
   }
   if (command.action === "cancel") {
@@ -82,8 +84,10 @@ export async function runTeamV2Command(command: MaybeCodeTeamCommand, dependenci
 
   const executes = command.action === "run" || command.action === "resume";
   const selections = new Map<string, SelectedMaybeCodeModel>();
+  let recording: MaybeCodeRecording | undefined;
   if (executes) {
     config ??= await (dependencies.loadConfig ?? loadMayConfig)({ path: manifest.configPath });
+    recording = resolveMaybeCodeRecording(config);
     for (const [name, binding] of Object.entries(manifest.roleModels)) {
       const selected = selectMaybeCodeModel(config, { model: binding.profile });
       if (modelFingerprint(selected) !== binding.fingerprint) throw new Error(`Model configuration changed for role ${name}; restore it before resuming`);
@@ -139,8 +143,9 @@ export async function runTeamV2Command(command: MaybeCodeTeamCommand, dependenci
           });
           const allowed = new Set([...selectedTools, ...tools].map((tool) => tool.name));
           const roleBudget = manifest.roleModels[name]!.runBudget;
-          const budget = config ? resolveRunBudget(roleBudget, config.apps?.maybecode?.runBudget as RunBudget | undefined) : roleBudget;
-          return defineAgent({ model: modelFor(name), tools: [...selectedTools, ...tools], runBudget: budget,
+          const budget = config ? resolveRunBudget(roleBudget, readMaybeCodeSettings(config).runBudget) : roleBudget;
+          if (!recording) throw new Error("A host control command cannot start a model");
+          return defineAgent({ ...recording, model: modelFor(name), tools: [...selectedTools, ...tools], runBudget: budget,
             instructions: instructions(manifest, name, role), toolScope: { workspaceId: workspace },
             permissionPolicy: (check) => allowed.has(check.tool.name) ? "allow" : "deny" });
         },
@@ -272,7 +277,7 @@ export async function runTeamV2Command(command: MaybeCodeTeamCommand, dependenci
       const observeCancellation = async () => {
         const path = join(directory, "cancel.request.json");
         try { await withFileAccess(path, "shared", () => stat(path)); controller.abort("Team verification cancelled"); }
-        catch (error) { if (!isMissing(error)) { controller.abort("Cannot establish cancellation state"); throw error; } }
+        catch (error) { if (!hasErrorCode(error, "ENOENT")) { controller.abort("Cannot establish cancellation state"); throw error; } }
       };
       await observeCancellation();
       timer = setInterval(() => { void observeCancellation().catch(() => controller.abort("Cancellation monitoring failed")); }, 300);
@@ -292,7 +297,7 @@ export async function runTeamV2Command(command: MaybeCodeTeamCommand, dependenci
     const checkCancellation = async () => {
       const path = join(directory, "cancel.request.json");
       try { await withFileAccess(path, "shared", () => stat(path)); cancel(); }
-      catch (error) { if (!isMissing(error)) { cancel(); throw error; } }
+      catch (error) { if (!hasErrorCode(error, "ENOENT")) { cancel(); throw error; } }
     };
     dependencies.signal?.addEventListener("abort", cancel, { once: true });
     await checkCancellation(); if (dependencies.signal?.aborted) cancel();
@@ -367,22 +372,21 @@ function validateManifest(value: Manifest, id: string): void {
 }
 
 async function writeJson(path: string, value: unknown, exclusive = false): Promise<void> {
+  const contents = `${JSON.stringify(value, null, 2)}\n`;
   await withFileAccess(path, "exclusive", async () => {
-    const target = exclusive ? path : `${path}.${randomUUID()}.tmp`;
-    const file = await open(target, "wx", 0o600);
-    try { await file.writeFile(`${JSON.stringify(value, null, 2)}\n`); await file.sync(); }
+    if (!exclusive) return writeFileAtomic(path, contents, { mode: 0o600 });
+    const file = await open(path, "wx", 0o600);
+    try { await file.writeFile(contents); await file.sync(); }
     finally { await file.close(); }
-    if (!exclusive) await rename(target, path);
   });
 }
 function inside(root: string, path: string): boolean { const child = relative(root, path); return child === "" || (!isAbsolute(child) && child !== ".." && !child.startsWith(`..${sep}`)); }
 async function canonicalPotentialPath(path: string): Promise<string> {
   try { return await realpath(path); }
   catch (error) {
-    if (!isMissing(error)) throw error;
+    if (!hasErrorCode(error, "ENOENT")) throw error;
     const parent = dirname(path); if (parent === path) throw error;
     return join(await canonicalPotentialPath(parent), relative(parent, path));
   }
 }
 function safeTerminal(text: string): string { return text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/gu, ""); }
-function isMissing(error: unknown): boolean { return !!error && typeof error === "object" && "code" in error && error.code === "ENOENT"; }

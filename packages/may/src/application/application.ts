@@ -12,10 +12,12 @@ import {
 } from "../context/index.js";
 import {
   AsyncEventQueue,
+  AsyncStateSerializer,
   directToolExecutor,
   endTraceSpan,
   HookExecutionError,
   isStreamingMayEvent,
+  omitUndefined,
   RUNTIME_HOOKS,
   serializeError,
   startTraceSpan,
@@ -278,9 +280,9 @@ export class AgentApplication implements SteerableAgentController {
     let contextController: ContextController | undefined;
     let historySource: Session | undefined;
     let pendingPluginState = false;
-    let pluginStateTail: Promise<void> = Promise.resolve();
-    const persistPluginState = (scope: "application" | "session", snapshot: ApplicationPluginState["application"]) => {
-      const operation = pluginStateTail.then(async () => {
+    const pluginStateWrites = new AsyncStateSerializer();
+    const persistPluginState = (scope: "application" | "session", snapshot: ApplicationPluginState["application"]) =>
+      pluginStateWrites.run(async () => {
         const candidate = { ...pluginState, [scope]: snapshot };
         if (historySource === undefined) pendingPluginState = true;
         else await historySource.recordState(PLUGIN_STATE_KEY, candidate);
@@ -292,9 +294,6 @@ export class AgentApplication implements SteerableAgentController {
         }
         pluginState = candidate;
       });
-      pluginStateTail = operation.catch(() => undefined);
-      return operation;
-    };
     const access = createApplicationAccess(() => {
       if (application === undefined) throw new Error("AgentApplication is unavailable before application.created");
       if (application.stateRecordingClosed) throw new Error("Agent application is closed");
@@ -302,12 +301,12 @@ export class AgentApplication implements SteerableAgentController {
     });
     const composePlugins = (plugins: readonly AnyPlugin[]) => composeApplicationPlugins(plugins, options, access, () => options.instructions ?? "");
     let configuredPlugins = composePlugins(options.plugins ?? []);
-    const pluginHost = await PluginHost.create({
+    const pluginHost = await PluginHost.create(omitUndefined({
       plugins: configuredPlugins,
       hooks: [...RUNTIME_HOOKS, ...APPLICATION_HOOKS],
-      ...(options.pluginHookTimeoutMs === undefined ? {} : { timeoutMs: options.pluginHookTimeoutMs }),
-      ...(options.onPluginHookError === undefined ? {} : { onHookError: options.onPluginHookError }),
-    });
+      timeoutMs: options.pluginHookTimeoutMs,
+      onHookError: options.onPluginHookError,
+    }));
     let applicationScope: ApplicationPluginScope;
     let sessionScope: ApplicationPluginScope;
     try {
@@ -321,13 +320,13 @@ export class AgentApplication implements SteerableAgentController {
         state: pluginState.session,
         onStateChange: (snapshot) => persistPluginState("session", snapshot),
       });
-      const opening = await sessionScope.transform(applicationHooks.beforeCreate, {
+      const opening = await sessionScope.transform(applicationHooks.beforeCreate, omitUndefined({
         sessionId,
         resume: options.resume === true,
-        ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
-        ...(options.contextMetadata === undefined ? {} : { contextMetadata: options.contextMetadata }),
-        ...(options.instructions === undefined ? {} : { instructions: options.instructions }),
-      }, { signal: new AbortController().signal, sessionId });
+        metadata: options.metadata,
+        contextMetadata: options.contextMetadata,
+        instructions: options.instructions,
+      }), { signal: new AbortController().signal, sessionId });
       if (opening.sessionId !== sessionId || opening.resume !== (options.resume === true)) throw new Error("Application identity cannot be modified by a Hook");
       options = { ...options, ...opening };
       sessionScope.get(applicationServices.model);
@@ -382,7 +381,7 @@ export class AgentApplication implements SteerableAgentController {
       },
     };
     const permissions = new PermissionToolExecutor({
-      ...(options.permissionRuleStore === undefined ? {} : { ruleStore: options.permissionRuleStore }),
+      ...omitUndefined({ ruleStore: options.permissionRuleStore }),
       beforeCheck: async (check) => {
         const presentation = await options.createToolPresentation?.(check);
         if (presentation !== undefined) {
@@ -425,9 +424,8 @@ export class AgentApplication implements SteerableAgentController {
       const hookStrategy = (strategy: ContextCompactionStrategy): ContextCompactionStrategy => ({
         name: strategy.name,
         async compact(snapshot, compactionOptions = {}) {
-          const context: HookContext = { signal: compactionOptions.signal ?? new AbortController().signal, sessionId,
-            ...(compactionOptions.runId === undefined ? {} : { runId: compactionOptions.runId }),
-            ...(compactionOptions.step === undefined ? {} : { step: compactionOptions.step }) };
+          const context: HookContext = omitUndefined({ signal: compactionOptions.signal ?? new AbortController().signal, sessionId,
+            runId: compactionOptions.runId, step: compactionOptions.step });
           let selected;
           try {
             selected = await hooks.transform(applicationHooks.compactionBefore, { strategy: strategy.name, automatic: true }, context);
@@ -451,35 +449,28 @@ export class AgentApplication implements SteerableAgentController {
         return current;
       };
       const contextMetadata = options.contextMetadata ?? options.metadata;
-      const managedContext = await contextFactory.create({
+      const skillsInUse = skills !== undefined && (skills.registry.list().length > 0 || skills.listActive().length > 0);
+      const managedContext = await contextFactory.create(omitUndefined({
         instructions: instructionsSource(), instructionsSource,
         messages,
-        ...(contextMetadata === undefined
-          ? {}
-          : { metadata: contextMetadata }),
-        ...(contextOptions.budget === undefined
-          ? {}
-          : { budget: contextOptions.budget }),
-        ...(runtimeInfo.latestModelMeasurement === undefined || (skills !== undefined && (skills.registry.list().length > 0 || skills.listActive().length > 0))
-          ? {}
-          : { measurement: runtimeInfo.latestModelMeasurement }),
-        ...(contextOptions.compactionStrategy === undefined
-          ? {}
-          : { compactionStrategy: contextOptions.compactionStrategy }),
+        metadata: contextMetadata,
+        budget: contextOptions.budget,
+        measurement: skillsInUse ? undefined : runtimeInfo.latestModelMeasurement,
+        compactionStrategy: contextOptions.compactionStrategy,
         autoCompactionStrategies: autoCompactionStrategies.map(hookStrategy),
-      });
+      }));
       contextController = managedContext.controller;
       instructionController = managedContext.controller;
       const modelInfo = sessionScope.provides(applicationServices.modelInfo) ? sessionScope.get(applicationServices.modelInfo) : undefined;
       const runtimeTraceAttributes: Record<string, import("../core/index.js").TraceAttributeValue> = { ...(options.traceAttributes ?? {}), "may.session.id": sessionId };
       for (const key of ["may.model.provider", "may.model.name", "may.model.adapter", "may.model.profile"]) delete runtimeTraceAttributes[key];
       if (modelInfo !== undefined) {
-        Object.assign(runtimeTraceAttributes, {
+        Object.assign(runtimeTraceAttributes, omitUndefined({
           "may.model.provider": modelInfo.provider,
           "may.model.name": modelInfo.model,
-          ...(modelInfo.adapter === undefined ? {} : { "may.model.adapter": modelInfo.adapter }),
-          ...(modelInfo.profile === undefined ? {} : { "may.model.profile": modelInfo.profile }),
-        });
+          "may.model.adapter": modelInfo.adapter,
+          "may.model.profile": modelInfo.profile,
+        }));
       }
       const runtimeOptions: MayOptions = {
         model,
@@ -490,14 +481,13 @@ export class AgentApplication implements SteerableAgentController {
         hooks,
         toolExecutor: permissions,
         tracer,
-        ...(options.responseFormat === undefined ? {} : { responseFormat: options.responseFormat }),
-        ...(Object.keys(runtimeTraceAttributes).length === 0
-          ? {}
-          : { traceAttributes: runtimeTraceAttributes }),
-        ...(sessionScope.provides(applicationServices.toolScheduler)
-          ? { toolScheduler: sessionScope.get(applicationServices.toolScheduler) } : {}),
-        ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
-        ...(options.runBudget === undefined ? {} : { runBudget: options.runBudget }),
+        ...omitUndefined({
+          responseFormat: options.responseFormat,
+          traceAttributes: Object.keys(runtimeTraceAttributes).length === 0 ? undefined : runtimeTraceAttributes,
+          toolScheduler: sessionScope.provides(applicationServices.toolScheduler) ? sessionScope.get(applicationServices.toolScheduler) : undefined,
+          maxSteps: options.maxSteps,
+          runBudget: options.runBudget,
+        }),
       };
       validateToolCatalog();
       const runtime = await sessionScope.get(applicationServices.runtimeFactory)(runtimeOptions);
@@ -531,7 +521,7 @@ export class AgentApplication implements SteerableAgentController {
             id: sessionId, store: options.store, deferBranchPositions: true, deferForkReady: true,
             stateKeys: [SKILL_STATE_KEY, PLUGIN_STATE_KEY, ...(options.forkStateKeys ?? [])],
             transformState: transformForkState,
-            ...(options.metadata === undefined ? {} : { metadata: { ...options.metadata } }),
+            ...omitUndefined({ metadata: options.metadata === undefined ? undefined : { ...options.metadata } }),
             createRuntime: async (messages, info) => {
               const runtime = await createRuntime(messages, info); pendingRuntime = undefined; return runtime;
             } })
@@ -547,10 +537,10 @@ export class AgentApplication implements SteerableAgentController {
             runtime: await createRuntime(),
             store: options.store,
             deferBranchPositions: true,
-            ...(options.metadata === undefined
-              ? {}
-              : { metadata: { ...options.metadata } }),
-            ...(options.sessionId === undefined ? {} : { id: options.sessionId }),
+            ...omitUndefined({
+              metadata: options.metadata === undefined ? undefined : { ...options.metadata },
+              id: options.sessionId,
+            }),
           });
       historySource = session;
       openedSession = session;
@@ -564,14 +554,14 @@ export class AgentApplication implements SteerableAgentController {
         await session.recordPermissionEvent(event);
         const payload = event.type === "approval.requested" ? {
           ...event,
-          request: { ...event.request, context: {
+          request: { ...event.request, context: omitUndefined({
             runId: event.request.context.runId,
             step: event.request.context.step,
             toolCallId: event.request.context.toolCallId,
             idempotencyKey: event.request.context.idempotencyKey,
-            ...(event.request.context.scope === undefined ? {} : { scope: event.request.context.scope }),
-            ...(event.request.context.traceContext === undefined ? {} : { traceContext: event.request.context.traceContext }),
-          } },
+            scope: event.request.context.scope,
+            traceContext: event.request.context.traceContext,
+          }) },
         } : event;
         if (event.type === "approval.requested" || event.type === "approval.resolved" || event.type === "approval.cancelled") {
           await hooks.observe(event.type === "approval.requested" ? applicationHooks.approvalRequested : applicationHooks.approvalResolved,
@@ -664,7 +654,7 @@ export class AgentApplication implements SteerableAgentController {
     assertSessionInputOptions(options);
     let input: InputHook;
     return this.startRun(async () => {
-      input = await this.prepareInput({ input: options.input, ...(options.inputId === undefined ? {} : { inputId: options.inputId }) }, options.signal);
+      input = await this.prepareInput(omitUndefined({ input: options.input, inputId: options.inputId }), options.signal);
       return this.session.submit({ ...options, input: input.input, signal: this.hookContext(options.signal).signal,
         ...(input.inputId === undefined ? {} : { inputId: input.inputId }) });
     }, (run) => this.hookScope().observe(applicationHooks.inputSubmitted, { ...input, runId: run.id }, this.hookContext(options.signal)), options.signal);
@@ -673,7 +663,7 @@ export class AgentApplication implements SteerableAgentController {
   async steer(options: SessionSteerOptions): Promise<SessionSteeringInput> {
     this.throwIfClosed();
     if (this.starting || this.changingPlugins || this.activeCompaction !== undefined) throw new Error("Cannot steer while an agent operation is starting or compacting context");
-    const input = await this.prepareInput({ input: options.input, steering: true, ...(options.inputId === undefined ? {} : { inputId: options.inputId }) });
+    const input = await this.prepareInput(omitUndefined({ input: options.input, steering: true, inputId: options.inputId }));
     const result = await this.session.steer({ ...options, input: input.input, ...(input.inputId === undefined ? {} : { inputId: input.inputId }) });
     await this.hookScope().observe(applicationHooks.inputSubmitted, { ...input, inputId: result.inputId }, this.hookContext());
     return result;
@@ -776,9 +766,7 @@ export class AgentApplication implements SteerableAgentController {
       const wrapped: AgentRun = {
         id: run.id,
         result,
-        ...(run.traceContext === undefined
-          ? {}
-          : { traceContext: run.traceContext }),
+        ...omitUndefined({ traceContext: run.traceContext }),
         cancel: (reason?: string) => run.cancel(reason),
       };
       this.currentRun = wrapped;
@@ -872,9 +860,9 @@ export class AgentApplication implements SteerableAgentController {
   }
 
   private hookContext(signal = new AbortController().signal): HookContext {
-    return { signal: AbortSignal.any([signal, this.lifecycleController.signal,
+    return omitUndefined({ signal: AbortSignal.any([signal, this.lifecycleController.signal,
       ...(this.startingController === undefined ? [] : [this.startingController.signal])]), sessionId: this.sessionId,
-      ...(this.currentRun === undefined ? {} : { runId: this.currentRun.id }) };
+      runId: this.currentRun?.id });
   }
 
   private connectCompactionSinks(): void {
@@ -972,12 +960,10 @@ export class AgentApplication implements SteerableAgentController {
 
     const controller = new AbortController();
     const span = startTraceSpan(this.tracer, "may.context.compact", {
-      attributes: {
+      attributes: omitUndefined({
         "may.session.id": this.sessionId,
-        ...(strategy === undefined
-          ? {}
-          : { "may.context.compaction.strategy": strategy.name }),
-      },
+        "may.context.compaction.strategy": strategy?.name,
+      }),
     });
     const operation = this.performCompaction(strategy, controller.signal).then(
       (result) => {
@@ -1017,7 +1003,7 @@ export class AgentApplication implements SteerableAgentController {
   ): Promise<ContextCompactionResult> {
     try {
       const selection = await this.sessionScope.transform(applicationHooks.compactionBefore,
-        { ...(strategy === undefined ? {} : { strategy: strategy.name }), automatic: false }, this.hookContext(signal));
+        omitUndefined({ strategy: strategy?.name, automatic: false }), this.hookContext(signal));
       if (selection.strategy !== strategy?.name) throw new Error(`Unsupported compaction strategy: ${selection.strategy}`);
       const result = await this.contextController!.compact!(strategy, { signal });
       if (result.changed) {
@@ -1033,7 +1019,7 @@ export class AgentApplication implements SteerableAgentController {
       return result;
     } catch (error) {
       await this.sessionScope.observe(applicationHooks.compactionFailed,
-        { ...(strategy === undefined ? {} : { strategy: strategy.name }), automatic: false, error: serializeError(error) }, this.hookContext(signal));
+        omitUndefined({ strategy: strategy?.name, automatic: false, error: serializeError(error) }), this.hookContext(signal));
       throw error;
     }
   }
@@ -1216,12 +1202,12 @@ function composeApplicationPlugins(
     composition.push(createContextPlugin({ ...(options.contextFactory === undefined ? {} : { create: () => options.contextFactory! }) }));
   }
   if ([options.contextBudget, options.compactionStrategy, options.autoCompactionStrategies, options.providerNativeAutoCompaction].some((value) => value !== undefined)) {
-    composition.push(valuePlugin(applicationServices.contextOptions, {
-      ...(options.contextBudget === undefined ? {} : { budget: options.contextBudget }),
-      ...(options.compactionStrategy === undefined ? {} : { compactionStrategy: options.compactionStrategy }),
-      ...(options.autoCompactionStrategies === undefined ? {} : { autoCompactionStrategies: options.autoCompactionStrategies }),
-      ...(options.providerNativeAutoCompaction === undefined ? {} : { providerNativeAutoCompaction: options.providerNativeAutoCompaction }),
-    }));
+    composition.push(valuePlugin(applicationServices.contextOptions, omitUndefined({
+      budget: options.contextBudget,
+      compactionStrategy: options.compactionStrategy,
+      autoCompactionStrategies: options.autoCompactionStrategies,
+      providerNativeAutoCompaction: options.providerNativeAutoCompaction,
+    })));
   }
   if (options.toolExecutor !== undefined) composition.push(valuePlugin(applicationServices.toolExecutor, options.toolExecutor));
   if (options.toolScheduler !== undefined) composition.push(valuePlugin(applicationServices.toolScheduler, options.toolScheduler));
@@ -1273,14 +1259,10 @@ function filterForkPluginState(state: ApplicationPluginState, pluginIds: readonl
 /** Derive context capacity from provider-neutral model limits. */
 export function contextBudgetFromModel(model: Model): ContextBudget | undefined {
   if (model.limits === undefined) return undefined;
-  return {
-    ...(model.limits.contextWindowTokens === undefined
-      ? {}
-      : { contextWindowTokens: model.limits.contextWindowTokens }),
-    ...(model.limits.maxOutputTokens === undefined
-      ? {}
-      : { outputReserveTokens: model.limits.maxOutputTokens }),
-  };
+  return omitUndefined({
+    contextWindowTokens: model.limits.contextWindowTokens,
+    outputReserveTokens: model.limits.maxOutputTokens,
+  });
 }
 
 function assertSessionInputOptions(options: { readonly stepInputSource?: unknown }): void {

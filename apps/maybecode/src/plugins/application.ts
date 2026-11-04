@@ -1,7 +1,7 @@
 import type { AnyPlugin } from "@sortedyuan/may/plugin";
 import type { ContextBudget } from "@sortedyuan/may/context";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
-import type { UserMessage } from "@sortedyuan/may/core";
+import { omitUndefined, type UserMessage } from "@sortedyuan/may/core";
 import type { McpClientPool } from "@sortedyuan/mcp";
 import { applicationHooks, contextBudgetFromModel, withDefaultCompactionThreshold } from "@sortedyuan/may";
 import { services, type ModelInfo } from "@sortedyuan/may/services";
@@ -40,8 +40,7 @@ export function createMaybeCodePlugins(
   },
 ): MaybeCodePluginComposition {
   const { workspace, instructions, contextBudget } = environment;
-  const autoMode = options.autoCompactionMode ??
-    (options.providerNativeAutoCompaction === true ? "provider-native" : "prune-summary");
+  const autoMode = options.autoCompactionMode ?? "prune-summary";
   let hasDelegation = false;
   let modelInfo: ModelInfo | undefined;
   let mcp: McpClientPool | undefined;
@@ -49,10 +48,9 @@ export function createMaybeCodePlugins(
     createModelPlugin({ create: () => {
       if (options.model === undefined) throw new TypeError("MaybeCode requires a Model or an application Model plugin");
       return options.model;
-    }, ...(options.modelInfo === undefined ? {} : { info: options.modelInfo }) }),
+    }, ...omitUndefined({ info: options.modelInfo }) }),
     createPermissionPlugin({ create: () => createCodingPermissionPolicy({
-      ...(options.permissionPolicy === undefined ? {} : { policy: options.permissionPolicy }),
-      ...(options.permissionModeSource === undefined ? {} : { mode: options.permissionModeSource }),
+      ...omitUndefined({ policy: options.permissionPolicy, mode: options.permissionModeSource }),
       ...(options.gitWorkspace?.readOnly === true ? { readOnly: true } : {}),
       ...(options.permissionRuleStore === undefined ? {} : { persistent: { workspace, scopeId: options.permissionScopeId ?? `maybecode:${workspace}:main` } }),
     }) }),
@@ -61,9 +59,11 @@ export function createMaybeCodePlugins(
     createHistoryMemoryPlugin({
       mode: autoMode,
       budget: model => withDefaultCompactionThreshold(options.contextBudget ?? contextBudgetFromModel(model)),
-      ...(options.contextSummarizer === undefined ? {} : { summarizer: options.contextSummarizer }),
-      ...(options.compactionStrategy === undefined ? {} : { compactionStrategy: options.compactionStrategy }),
-      ...(options.autoCompactionStrategies === undefined ? {} : { autoCompactionStrategies: options.autoCompactionStrategies }),
+      ...omitUndefined({
+        summarizer: options.contextSummarizer,
+        compactionStrategy: options.compactionStrategy,
+        autoCompactionStrategies: options.autoCompactionStrategies,
+      }),
     }),
   ];
   if (options.skills !== false) defaults.push(createSkillsPlugin({
@@ -101,17 +101,23 @@ export function createMaybeCodePlugins(
   }));
   if (options.subagents !== false) defaults.push(createDelegationPlugin({
     workspace, instructions,
-    ...(environment.instructionsSource === undefined ? {} : { instructionsSource: environment.instructionsSource }),
-    ...(environment.projectInstructionsSource === undefined ? {} : { projectInstructionsSource: environment.projectInstructionsSource }),
-    ...(environment.prepareInstructions === undefined ? {} : { prepareInstructions: environment.prepareInstructions }),
+    requestRecording: options.requestRecording ?? "required",
+    providerBodyRecording: options.providerBodyRecording ?? false,
+    ...omitUndefined({
+      instructionsSource: environment.instructionsSource,
+      projectInstructionsSource: environment.projectInstructionsSource,
+      prepareInstructions: environment.prepareInstructions,
+    }),
     permissionModeSource: () => options.gitWorkspace?.readOnly ? "read-only" : options.permissionModeSource?.() ?? (options.permissionPolicy ? "custom" : "default"),
     ...(options.subagents ?? {}),
     beforeToolExecute: environment.gitRequest.beforeToolExecute,
-    ...(options.toolSource === undefined ? {} : { toolSource: options.toolSource }),
-    ...(contextBudget === undefined ? {} : { contextBudget }),
-    ...(options.compactionStrategy === undefined ? {} : { compactionStrategy: options.compactionStrategy }),
+    ...omitUndefined({
+      toolSource: options.toolSource,
+      contextBudget,
+      compactionStrategy: options.compactionStrategy,
+      maxSteps: options.maxSteps,
+    }),
     autoCompactionMode: autoMode,
-    ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
     traceAttributes: { "may.agent.name": "maybecode" },
   }));
   const plugins = composeMaybeCodePlugins(defaults, options.plugins ?? []);

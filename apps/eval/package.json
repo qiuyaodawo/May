@@ -7,14 +7,24 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "scripts": {
     "build": "tsc -b",
     "test": "pnpm run build && node --test test/*.test.mjs"
   },
-  "dependencies": { "@sortedyuan/eval": "workspace:*" },
-  "devDependencies": { "@types/node": "^22.0.0" },
-  "engines": { "node": ">=22.16.0" },
+  "dependencies": {
+    "@sortedyuan/eval": "workspace:*"
+  },
+  "devDependencies": {
+    "@sortedyuan/test-support": "workspace:*",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  },
   "license": "MIT"
 }

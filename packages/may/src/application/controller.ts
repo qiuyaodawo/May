@@ -56,7 +56,7 @@ export interface AgentController<
   history(): Promise<readonly SessionEvent[]>;
   branchPositions?(): Promise<readonly SessionBranchPosition[]>;
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage>;
-  listRecoveries?(): readonly SessionRecovery[];
+  listRecoveries(): readonly SessionRecovery[];
   resolveRecovery?(id: string, finding: string): Promise<void>;
   inspectContext(): Promise<ContextInspection | undefined>;
   compactContext(

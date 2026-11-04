@@ -25,7 +25,7 @@ test("shared host authenticates, deduplicates commands, restores approvals and s
       }
     } },
     tools: [{ name: "check", description: "Fixture", inputSchema: { type: "object", properties: {} }, execute: () => { toolCalls++; return "checked"; } }],
-    permissionPolicy: () => "ask", sessionHistory: false,
+    permissionPolicy: () => "ask", sessionHistory: false, requestRecording: "off",
   });
   const app = await AgentWorkspace.open({ workspace: "fixture", store, catalog: new InMemorySessionCatalog(), openApplication: selection => definition.open({ ...selection, store }) });
   const host = new ApplicationUiHost(app, { product: { id: "fixture", title: "Fixture", subtitle: "Fixture", resourceKind: "session", suggestions: [] } });
@@ -149,7 +149,7 @@ test("read APIs page beyond the snapshot, search stored text and bind detail chu
     const text = last?.role === "user" ? last.content.map(p => p.text ?? "").join("") : "Tool complete";
     yield { type: "response.completed", message: { role: "assistant", content: [{ type: "text", text }], modelState: { type: "private", data: { secret: "DO_NOT_EXPOSE" } },
       ...(text === "large" ? { toolCalls: [{ id: "large-call", name: "fixture", input: {} }] } : {}) } };
-  } }, tools: [{ name: "fixture", description: "Fixture", inputSchema: { type: "object" }, execute: () => large }], permissionPolicy: () => "allow", sessionHistory: false });
+  } }, tools: [{ name: "fixture", description: "Fixture", inputSchema: { type: "object" }, execute: () => large }], permissionPolicy: () => "allow", sessionHistory: false, requestRecording: "off" });
   const app = await AgentWorkspace.open({ workspace: "reading", store, catalog, openApplication: selection => { opens++; return definition.open({ ...selection, store }); } });
   const host = new ApplicationUiHost(app, { product: { id: "reading", title: "Reading", subtitle: "Fixture", resourceKind: "session", suggestions: [] } });
   const server = await startUiServer({ host, token, port: 0, assets: new Map(), close: () => host.close() }); t.after(() => server.close());

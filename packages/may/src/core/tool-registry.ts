@@ -1,4 +1,5 @@
 import { MayError, ToolNotFoundError } from "./errors.js";
+import { omitUndefined } from "./omit-undefined.js";
 import type { ToolDefinition } from "./model.js";
 import type { Tool } from "./tool.js";
 
@@ -118,8 +119,7 @@ export class ToolRegistry implements Iterable<Tool> {
         ...tool,
         name: tool.name,
         description: tool.description,
-        ...(tool.permissionVersion === undefined ? {} : { permissionVersion: tool.permissionVersion }),
-        ...(tool.workspaceEffect === undefined ? {} : { workspaceEffect: tool.workspaceEffect }),
+        ...omitUndefined({ permissionVersion: tool.permissionVersion, workspaceEffect: tool.workspaceEffect }),
         inputSchema: freezeTree(structuredClone(tool.inputSchema)),
         ...(parse === undefined ? {} : { parse: (input: unknown) => parse.call(tool, input) }),
         ...(resultContent === undefined ? {} : { resultContent: (output: unknown) => resultContent.call(tool, output) }),

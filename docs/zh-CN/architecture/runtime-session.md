@@ -231,19 +231,20 @@ Workspace 生命周期交给 `@sortedyuan/may/application`，使用 `@sortedyuan
 - Provider 与模型配置、推理强度覆盖和默认模型持久化；
 - 可选的本地追踪配置，以及共享处理器的生命周期管理；
 - 可选的 stdio / Streamable HTTP MCP 配置，以及共享客户端池的生命周期管理；
-- 斜杠命令、产品事件、主题、页面布局、模型与 Session 选择流程，以及 `classic`
-  与 `retained` 两种终端行为。
+- 斜杠命令、产品事件、主题、页面布局、模型与 Session 选择流程，以及 `retained`
+  终端行为。
 
-`MaybeCodeApplication` 在 `AgentApplication` 上提供产品组合。它将通用
-工具显示事件映射为变更预览事件，同时委托 Run、审批、历史、Context
-和关闭操作。`MaybeCodeWorkspace` 同样包装 `AgentWorkspace`，主要保留模型
-配置与推理强度策略。
+`MaybeCodeApplication` 围绕一个 `AgentApplication` 提供产品组合，并通过 `agent` 字段
+公开它。它增加 Goal、子 Agent 请求、Git 检查点、模型更新和输入串行处理，并将通用
+工具显示事件映射为变更预览事件。`MaybeCodeWorkspace` 包装 `AgentWorkspace`，负责
+Session、worktree、MCP 操作以及模型配置与推理强度策略。
 
 它明确的产品 UI 边界是 `MaybeCodeController`：用户意图通过方法表达，异步模型、
 工具、权限、Context 和 Session 变化形成 `MaybeCodeEvent` 事件流。
-`MaybeCodeWorkspace` 实现该独立于 UI 的接口。随项目提供的前端使用此接口，其他 UI
-也可复用同一个控制器。MaybeCode 渲染和命令策略由相应前端提供。
-`MaybeCodeTerminal` 为 `classic` 前端提供行式 I/O 适配器；自定义 UI 使用 `MaybeCodeController`。
+`MaybeCodeWorkspace` 实现该独立于 UI 的接口。`controller.application` 返回当前 Session
+的 `MaybeCodeApplication`，用于读取状态；`controller.transition(action)` 在该 Session 的
+队列中执行状态修改。随项目提供的前端使用此接口，其他 UI 也可复用同一个控制器。
+MaybeCode 渲染和命令策略由相应前端提供。
 
 ## 事件与持久化
 

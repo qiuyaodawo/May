@@ -1,6 +1,6 @@
 import type { AgentDefinition, AgentApplication } from "@sortedyuan/may";
 import type { SessionStore } from "@sortedyuan/may/session";
-import { correlationTraceAttributes } from "@sortedyuan/may/core";
+import { correlationTraceAttributes, omitUndefined } from "@sortedyuan/may/core";
 import { digest } from "../delivery/index.js";
 import type { AgentAdapter, AgentAdapterContext } from "./types.js";
 
@@ -29,7 +29,7 @@ export function createMayAgentAdapter(options: MayAgentAdapterOptions): AgentAda
       const definition = await options.definition(source, () => opened.get(id)?.context);
       const history = await historyOf(id);
       const metadata = options.metadata?.(id);
-      const app = await definition.open({ store, sessionId: id, resume: history.length > 0, ...(metadata === undefined ? {} : { metadata }) });
+      const app = await definition.open(omitUndefined({ store, sessionId: id, resume: history.length > 0, metadata }));
       if (closed) { await app.close(); throw new Error("Agent adapter closed during conversation creation"); }
       const record: { app: AgentApplication; context?: AgentAdapterContext; relay: Promise<void> } = { app, relay: Promise.resolve() };
       opened.set(id, record);
@@ -41,7 +41,7 @@ export function createMayAgentAdapter(options: MayAgentAdapterOptions): AgentAda
     try { return await work; } finally { opening.delete(id); }
   }
   return {
-    ...(options.modelCapabilities === undefined ? {} : { modelCapabilities: options.modelCapabilities }),
+    ...omitUndefined({ modelCapabilities: options.modelCapabilities }),
     capabilities: { cancel: true, steer: true, resume: true, delete: store.delete !== undefined, approvals: true, collaboration: true, media: [...(options.media ?? [])] },
     ...(options.diagnostics === undefined ? {} : { diagnostics: (id: string, query?: { readonly limit?: number; readonly offset?: number }) => {
       const application = opened.get(id)?.app;
@@ -63,7 +63,7 @@ export function createMayAgentAdapter(options: MayAgentAdapterOptions): AgentAda
         const prior = await this.inspect(context.conversationId, context.inputId);
         if (prior.status !== "not-started") throw new Error("该输入已经提交，请查询原执行结果。");
         const run = await app.submit({ input: context.input, inputId: context.inputId, signal: context.signal, shouldYield: context.shouldYield,
-          ...(context.telemetry?.parent === undefined ? {} : { traceContext: context.telemetry.parent }),
+          ...omitUndefined({ traceContext: context.telemetry?.parent }),
           ...(context.telemetry === undefined ? {} : { traceAttributes: correlationTraceAttributes(context.telemetry) }),
         });
         const result = await run.result;

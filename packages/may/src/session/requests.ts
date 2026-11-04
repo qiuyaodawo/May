@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { canonicalize } from "json-canonicalize";
+import { omitUndefined } from "../core/omit-undefined.js";
 import type { ModelRequestRecord } from "../core/request-recording.js";
 import type { SessionEvent } from "./events.js";
 
@@ -54,10 +55,12 @@ export function readRecordedModelRequests(events: readonly SessionEvent[]): Reco
       requests.push({ runId: event.runId, step: event.step, modelCallId: event.modelCallId, attempt: event.attempt, seq: event.seq, status: "prepared", record: {
         version: 1, adapter: event.adapter, purpose: event.purpose,
         request, ...(event.body === undefined ? {} : { body: restore(event.body) }),
-        ...(event.protocol === undefined ? {} : { protocol: event.protocol }),
-        ...(event.endpoint === undefined ? {} : { endpoint: event.endpoint }),
-        ...(event.omittedPaths === undefined ? {} : { omittedPaths: event.omittedPaths }),
-        ...(event.externalResourcePaths === undefined ? {} : { externalResourcePaths: event.externalResourcePaths }),
+        ...omitUndefined({
+          protocol: event.protocol,
+          endpoint: event.endpoint,
+          omittedPaths: event.omittedPaths,
+          externalResourcePaths: event.externalResourcePaths,
+        }),
       } });
     } else if (event.type === "model.attempt.started" || event.type === "model.attempt.completed" || event.type === "model.attempt.failed") {
       const index = pending.get(`${event.modelCallId}:${event.attempt}`);

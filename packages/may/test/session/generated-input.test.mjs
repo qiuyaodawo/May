@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 
 import { InMemoryContext, May, userMessage } from "@sortedyuan/may/core";
 import { OpenAIResponsesModel } from "@sortedyuan/providers/openai";
@@ -8,11 +8,7 @@ import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { Session, SessionHistoryReader } from "@sortedyuan/may/session";
 
 async function createStore(t) {
-  const review = new URL("../../../../review/", import.meta.url);
-  await mkdir(review, { recursive: true });
-  const directory = await mkdtemp(new URL("session-generated-", review));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return new FileSessionStore(directory);
+  return new FileSessionStore(await createTestDirectory(t, "may/session-generated"));
 }
 
 function generatedInput(overrides = {}) {

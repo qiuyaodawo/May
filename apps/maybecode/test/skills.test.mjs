@@ -4,7 +4,8 @@ import { mkdtemp, mkdir, writeFile, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { InMemorySessionStore, InMemorySessionCatalog } from "@sortedyuan/may/session";
-import { MaybeCodeWorkspace, executeMaybeCodeSlashCommand, createMaybeCodeSlashCommandSuggester } from "../dist/index.js";
+import { MaybeCodeWorkspace } from "../dist/workspace.js";
+import { executeMaybeCodeSlashCommand, createMaybeCodeSlashCommandSuggester } from "../dist/slash-commands.js";
 
 async function fixture(t) {
   const workspace = await realpath(await mkdtemp(join(tmpdir(), "may-skills-app-")));
@@ -18,22 +19,22 @@ async function fixture(t) {
 
 test("skills commands list, preview, activate, complete and explicitly submit without granting execution", async (t) => {
   const { workspace } = await fixture(t); let requests = 0; let last;
-  const app = await MaybeCodeWorkspace.open({ git: false, workspace, subagents: false, store: new InMemorySessionStore(), catalog: new InMemorySessionCatalog(), model: {
+  const app = await MaybeCodeWorkspace.open({ git: false, workspace, subagents: false, requestRecording: "off", store: new InMemorySessionStore(), catalog: new InMemorySessionCatalog(), model: {
     async *stream(request) { requests++; last = request; yield { type: "response.completed", message: { role: "assistant", content: [] } }; },
   }});
   t.after(() => app.close());
   assert.match((await executeMaybeCodeSlashCommand("/skills", app)).text, /research/);
-  assert.doesNotMatch(app.instructions.effective, /PINNED_PROCEDURE/);
+  assert.doesNotMatch(app.application.instructions.effective, /PINNED_PROCEDURE/);
   assert.match((await executeMaybeCodeSlashCommand("/skills show research", app)).text, /PINNED_PROCEDURE/);
-  assert.equal(app.listSkills()[0].active, false);
+  assert.equal(app.application.listSkills()[0].active, false);
   assert.equal(requests, 0);
   const suggest = createMaybeCodeSlashCommandSuggester(app);
   const suggestions = await suggest("/skills use re");
   assert.ok(suggestions.some((item) => item.value === "/skills use research"));
   await executeMaybeCodeSlashCommand("/skills use research", app);
-  assert.equal(app.listSkills()[0].active, true);
+  assert.equal(app.application.listSkills()[0].active, true);
   assert.equal(requests, 0);
-  assert.match(app.instructions.effective, /PINNED_PROCEDURE/);
+  assert.match(app.application.instructions.effective, /PINNED_PROCEDURE/);
   const result = await executeMaybeCodeSlashCommand("/skills use research inspect the topic", app);
   assert.equal(result.type, "skill.run-started"); await result.run.result;
   assert.equal(requests, 1);
@@ -52,10 +53,10 @@ test("model activation loads resources, remains after compaction/resume and rese
     last = request; requests++;
     yield { type: "response.completed", message: { role: "assistant", content: [], ...(requests <= 2 ? { toolCalls: [{ id: `call${requests}`, name: "skill_read", input: requests === 1 ? { name: "research" } : { name: "research", path: "references/guide.md" } }] } : {}) } };
   }};
-  const options = { workspace, store, catalog, model, subagents: false, autoCompactionStrategies: [] };
+  const options = { workspace, store, catalog, model, subagents: false, autoCompactionStrategies: [], requestRecording: "off" };
   const app = await MaybeCodeWorkspace.open({ ...options, git: false });
   await (await app.submit({ input: "use research" })).result;
-  assert.equal(app.listSkills()[0].active, true);
+  assert.equal(app.application.listSkills()[0].active, true);
   assert.match(JSON.stringify(last.messages), /RESOURCE_CONTENT/);
   assert.equal((await app.history()).some((e) => e.type === "approval.requested"), false);
   await app.compactContext({ name: "remove-all", compact() { return []; } });
@@ -66,9 +67,9 @@ test("model activation loads resources, remains after compaction/resume and rese
   await (await resumed.submit({ input: "continue" })).result;
   assert.match(last.messages[0].content[0].text, /PINNED_PROCEDURE/);
   assert.doesNotMatch(last.messages[0].content[0].text, /NEW_PROCEDURE/);
-  assert.equal(resumed.listSkills()[0].active, true);
+  assert.equal(resumed.application.listSkills()[0].active, true);
   await resumed.newSession();
-  assert.equal(resumed.listSkills()[0].active, false);
+  assert.equal(resumed.application.listSkills()[0].active, false);
   await resumed.activateSkill("research");
-  assert.match(resumed.instructions.effective, /NEW_PROCEDURE/);
+  assert.match(resumed.application.instructions.effective, /NEW_PROCEDURE/);
 });

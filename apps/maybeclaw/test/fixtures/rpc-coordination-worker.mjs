@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -11,7 +12,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { CoordinationWorker, createRemoteAgent } from "@sortedyuan/coordination/remote";
 import { createGatewayRpcAdapter } from "@sortedyuan/gateway/rpc";
 
-const parent = fileURLToPath(new URL("../../../../review/worker-cancellation/", import.meta.url));
+const parent = join(testOutputRoot, "maybeclaw", "worker-cancellation");
 const example = fileURLToPath(new URL("../../../../packages/gateway/examples/rpc-file-agent.mjs", import.meta.url));
 
 export async function until(probe) {

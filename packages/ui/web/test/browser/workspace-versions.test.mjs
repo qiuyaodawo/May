@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { selectLiveModelProfile, testOutputRoot } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
@@ -21,7 +22,7 @@ const execute = promisify(execFile);
 
 test("真实 Git 版本状态与未提交 diff 在 WebUI 中更新并支持键盘阅读", { timeout: 120_000, skip: process.env.MAY_LIVE_PROVIDER_UI_TESTS !== "1" }, async t => {
   const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
-  const base = join(repositoryRoot, "review", "web-ui-browser");
+  const base = join(testOutputRoot, "web-ui", "browser");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "workspace-versions-"));
   const repository = join(directory, "project");
@@ -39,7 +40,7 @@ test("真实 Git 版本状态与未提交 diff 在 WebUI 中更新并支持键�
   const store = new InMemorySessionStore();
   const config = await loadMayConfig();
   const definition = defineAgent({
-    model: createBuiltinProviderModel(selectProviderModel(config, { model: "deepseek-v4-flash" })),
+    model: createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) })),
     permissionPolicy: () => "deny", sessionHistory: false, providerNativeAutoCompaction: false, autoCompactionStrategies: [],
   });
   app = await AgentWorkspace.open({ workspace: repository, store, catalog: new InMemorySessionCatalog(), openApplication: selection => definition.open({ ...selection, store }) });

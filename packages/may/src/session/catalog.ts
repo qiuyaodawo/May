@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { syncDirectory } from "./file-ownership.js";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { omitUndefined } from "../core/omit-undefined.js";
+import { writeFileDurable } from "../storage/index.js";
 import { join, resolve } from "node:path";
 
 export interface SessionSummary {
@@ -82,16 +83,9 @@ export class FileSessionCatalog implements SessionCatalog {
       });
       const absorbed = names.filter((name) => name.endsWith(".json"));
       if (absorbed.length === 0) return;
-      const temporary = `${this.path}.${randomUUID()}.tmp`;
-      try {
-        const file = await open(temporary, "wx", 0o600);
-        try { await file.writeFile(JSON.stringify({ version: 2, sessions, absorbed })); await file.sync(); }
-        finally { await file.close(); }
-        await rename(temporary, this.path);
-        await syncDirectory(resolve(this.path, ".."));
-        // The snapshot records exact absorbed names, so a crash during cleanup is replay-safe.
-        for (const name of absorbed) await rm(join(this.operationsDirectory, name), { force: true });
-      } finally { await rm(temporary, { force: true }); }
+      await writeFileDurable(this.path, JSON.stringify({ version: 2, sessions, absorbed }));
+      // The snapshot records exact absorbed names, so a crash during cleanup is replay-safe.
+      for (const name of absorbed) await rm(join(this.operationsDirectory, name), { force: true });
     });
   }
 
@@ -318,9 +312,7 @@ function mergeSummary(
   return {
     ...update,
     createdAt: current?.createdAt ?? update.createdAt,
-    ...(title === undefined ? {} : { title }),
-    ...(preview === undefined ? {} : { preview }),
-    ...(turnCount === undefined ? {} : { turnCount }),
+    ...omitUndefined({ title, preview, turnCount }),
   };
 }
 

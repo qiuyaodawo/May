@@ -1,16 +1,13 @@
 import assert from "node:assert/strict";
-import { appendFile, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { appendFile, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { PluginHost, defineService } from "@sortedyuan/may/plugin";
 import { ChannelStore, createDeliveryPlugin, deliveryServices, digest, inboxId, channelTextPages, boundedBytes } from "../../dist/delivery/index.js";
 
 test("channel journals retain inbox, cursor and uncertain delivery evidence after reopen", async t => {
-  const base = fileURLToPath(new URL("../../../../plugin-verification/channel-journal/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "records-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "gateway/channel-journal");
   const path = join(directory, "channels.jsonl");
   const input = { account: "telegram:271", eventId: "event-document", sender: "991", conversation: "991", text: "Read documentation" };
   let store = await ChannelStore.open(path);
@@ -32,10 +29,7 @@ test("channel journals retain inbox, cursor and uncertain delivery evidence afte
 });
 
 test("delivery plugin resolves actual journal dependencies and owns an empty registry", async t => {
-  const base = fileURLToPath(new URL("../../../../plugin-verification/channel-host/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "scope-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "gateway/channel-host");
   const store = await ChannelStore.open(join(directory, "channel.jsonl"));
   const ingress = defineService({ id: "test.file-channel-ingress", version: "1.0.0", scope: "host" });
   const host = await PluginHost.create({ plugins: [createDeliveryPlugin({ ingress })], services: [{ service: ingress, value: {
@@ -43,22 +37,20 @@ test("delivery plugin resolves actual journal dependencies and owns an empty reg
   } }] });
   assert.deepEqual(host.get(deliveryServices.registry).list(), []);
   assert.equal(host.get(deliveryServices.registry).errors().size, 0);
-  assert.equal(typeof host.get(deliveryServices.delivery).attempt, "function");
   await host.close(); await store.close();
 });
 
 test("an independent file channel persists custom attachment references and sends through its own transport", async t => {
-  const base = fileURLToPath(new URL("../../../../review/independent-file-channel/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "channel-"));
+  let store;
+  let host;
+  t.after(async () => { await host?.close(); await store?.close(); });
+  const directory = await createTestDirectory(t, "gateway/independent-file-channel");
   const path = join(directory, "channels.jsonl"), documentId = "report.txt";
   const input = { account: "local-files:inbox", eventId: "document-1", sender: "local", conversation: "reports", text: "Read report",
     attachments: [{ id: "report", kind: "file", source: { platform: "local-files", documentId } }] };
   await writeFile(join(directory, documentId), "Independent channel content");
   await writeFile(join(directory, "input.json"), JSON.stringify(input));
-  const store = await ChannelStore.open(path);
-  let host;
-  t.after(async () => { await host?.close(); await store.close(); await rm(directory, { recursive: true, force: true }); });
+  store = await ChannelStore.open(path);
   const adapter = {
     name: "local-files", account: input.account, allowUsers: ["local"],
     status: () => "ready",
@@ -101,19 +93,17 @@ test("an independent file channel persists custom attachment references and send
 });
 
 test("channel inspections remain readable while records are removed", async t => {
-  const base = fileURLToPath(new URL("../../../../review/delivery-journal-tests/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "readers-"));
-  const path = join(directory, "channels.jsonl");
-  const store = await ChannelStore.open(path);
+  let store;
   let stopped = false;
   let readers = [];
   t.after(async () => {
     stopped = true;
     await Promise.all(readers);
-    await store.close();
-    await rm(directory, { recursive: true, force: true });
+    await store?.close();
   });
+  const directory = await createTestDirectory(t, "gateway/delivery-journal");
+  const path = join(directory, "channels.jsonl");
+  store = await ChannelStore.open(path);
   const content = "x".repeat(4096);
   for (let index = 0; index < 64; index++) {
     await store.put({ kind: "delivery", id: digest(index), account: "account", sender: "sender", conversation: "conversation", text: content, status: "pending" });

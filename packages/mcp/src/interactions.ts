@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { AsyncEventQueue } from "@sortedyuan/may/core";
+import { AsyncEventQueue, omitUndefined } from "@sortedyuan/may/core";
 import { specTypeSchemas, type ElicitRequestFormParams, type ElicitResult, type JsonSchemaType, type JsonSchemaValidator } from "@modelcontextprotocol/client";
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
 import { McpCapabilityError } from "./errors.js";
@@ -101,7 +101,7 @@ export class McpInteractionBroker {
       const abort = () => entry.finish();
       const timer = setTimeout(abort, Math.min(expiresAt - Date.now(), 2_147_483_647));
       const entry: Pending = {
-        request, ...(validate === undefined ? {} : { validate }),
+        request, ...omitUndefined({ validate }),
         finish: (response) => {
           if (!this.pending.delete(request.id)) return;
           clearTimeout(timer); signal.removeEventListener("abort", abort);

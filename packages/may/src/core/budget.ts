@@ -1,4 +1,5 @@
 import { MayError } from "./errors.js";
+import { omitUndefined } from "./omit-undefined.js";
 import type { Usage } from "./types.js";
 import { priceUsage, resolvePriceSchedule, resolveUsageTotals, validateTokenPrices, validateUsageCost, type TokenPrices, type TokenPriceSchedule, type UsageCost, type UsagePricer } from "./pricing.js";
 
@@ -90,11 +91,10 @@ export class RunBudgetMeter {
   constructor(readonly limits: Readonly<RunBudget>) {}
 
   snapshot(): RunBudgetSnapshot {
-    return { elapsedMs: Math.max(0, Date.now() - this.startedAt), steps: this.steps,
+    return omitUndefined({ elapsedMs: Math.max(0, Date.now() - this.startedAt), steps: this.steps,
       modelCalls: this.modelCalls, toolCalls: this.toolCalls, totalTokens: this.totalTokens,
       costUsd: this.costUsd, usageComplete: this.usageComplete, costComplete: this.costComplete,
-      ...(this.costKind === undefined ? {} : { costKind: this.costKind }),
-      ...(this.latestCost === undefined ? {} : { latestCost: this.latestCost }) };
+      costKind: this.costKind, latestCost: this.latestCost });
   }
 
   checkTime(): void {

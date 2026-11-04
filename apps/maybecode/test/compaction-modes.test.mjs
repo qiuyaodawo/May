@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
-import { MaybeCodeApplication, createMaybeCodeSlashCommandSuggester, executeMaybeCodeSlashCommand } from "../dist/index.js";
+import { MaybeCodeApplication } from "../dist/application.js";
+import { createMaybeCodeSlashCommandSuggester, executeMaybeCodeSlashCommand } from "../dist/slash-commands.js";
 
 const message = (role, text) => ({ role, content: [{ type: "text", text }] });
 const history = [
@@ -15,6 +16,7 @@ const history = [
 async function open(t, overrides = {}) {
   const requests = [];
   const app = await MaybeCodeApplication.open({
+    requestRecording: "off",
     workspace: process.cwd(),
     instructions: "Continue the task.",
     skills: false,

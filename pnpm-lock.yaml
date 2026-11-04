@@ -196,6 +196,9 @@ importers:
       micromark-extension-gfm:
         specifier: ^3.0.0
         version: 3.0.0
+      prettier:
+        specifier: 3.9.10
+        version: 3.9.10
       semver:
         specifier: 7.8.5
         version: 7.8.5
@@ -225,6 +228,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/eval
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../../packages/test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -264,9 +270,6 @@ importers:
       '@sortedyuan/web-ui':
         specifier: workspace:*
         version: link:../../packages/ui/web
-      fs-native-extensions:
-        specifier: 1.5.1
-        version: 1.5.1
       open:
         specifier: 11.0.4
         version: 11.0.4
@@ -277,6 +280,9 @@ importers:
         specifier: ^9.0.2
         version: 9.0.2(patch_hash=f4280266a458a0c659987f7c4809f88177087f031b7349855764540aee508230)
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../../packages/test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -328,10 +334,19 @@ importers:
       open:
         specifier: 11.0.4
         version: 11.0.4
+      write-file-atomic:
+        specifier: 7.0.1
+        version: 7.0.1
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../../packages/test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      '@types/write-file-atomic':
+        specifier: 4.0.3
+        version: 4.0.3
       playwright:
         specifier: 1.63.0
         version: 1.63.0
@@ -379,6 +394,9 @@ importers:
         specifier: workspace:*
         version: link:../mcp
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -401,6 +419,9 @@ importers:
         specifier: ^1.2.2
         version: 1.2.2
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -417,6 +438,9 @@ importers:
         specifier: ^9.0.2
         version: 9.0.2(patch_hash=f4280266a458a0c659987f7c4809f88177087f031b7349855764540aee508230)
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -447,16 +471,25 @@ importers:
       simple-git:
         specifier: ^4.0.2
         version: 4.0.2
+      write-file-atomic:
+        specifier: 7.0.1
+        version: 7.0.1
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
       '@types/semver':
         specifier: ^7.7.0
         version: 7.8.0
+      '@types/write-file-atomic':
+        specifier: 4.0.3
+        version: 4.0.3
 
   packages/mcp:
     dependencies:
@@ -472,10 +505,19 @@ importers:
       '@sortedyuan/observability':
         specifier: workspace:*
         version: link:../observability
+      write-file-atomic:
+        specifier: 7.0.1
+        version: 7.0.1
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      '@types/write-file-atomic':
+        specifier: 4.0.3
+        version: 4.0.3
       playwright:
         specifier: 1.63.0
         version: 1.63.0
@@ -493,6 +535,9 @@ importers:
         specifier: ^0.34.5
         version: 0.34.5
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -521,6 +566,9 @@ importers:
         specifier: workspace:*
         version: link:../may
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -534,6 +582,9 @@ importers:
         specifier: 3.1.1
         version: 3.1.1
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -550,6 +601,9 @@ importers:
         specifier: ^3.7.2
         version: 3.7.2
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/luxon':
         specifier: ^3.7.1
         version: 3.7.6
@@ -557,12 +611,17 @@ importers:
         specifier: ^22.0.0
         version: 22.20.1
 
+  packages/test-support: {}
+
   packages/tools/coding-tools:
     dependencies:
       '@sortedyuan/may':
         specifier: workspace:*
         version: link:../../may
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -576,6 +635,9 @@ importers:
         specifier: workspace:*
         version: link:../../media
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -631,6 +693,9 @@ importers:
         specifier: ^10.0.2
         version: 10.0.2
     devDependencies:
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -656,6 +721,9 @@ importers:
       '@sortedyuan/providers':
         specifier: workspace:*
         version: link:../../providers
+      '@sortedyuan/test-support':
+        specifier: workspace:*
+        version: link:../../test-support
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -1518,6 +1586,9 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
+  '@types/write-file-atomic@4.0.3':
+    resolution: {integrity: sha512-qdo+vZRchyJIHNeuI1nrpsLw+hnkgqP/8mlaN6Wle/NKhydHmUN9l4p3ZE8yP90AJNJW4uB8HQhedb4f1vNayQ==}
+
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
     engines: {node: '>=16.20.0'}
@@ -2317,6 +2388,11 @@ packages:
     resolution: {integrity: sha512-C+y9x90UElAddDZmV4qOx9W53B61PO7cIqWz2dQsWlwswuq4mr8NEwytdGKboYbQlGZ3awrkTeNvcZiZNHnQ8A==}
     engines: {node: '>=20'}
 
+  prettier@3.9.10:
+    resolution: {integrity: sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA==}
+    engines: {node: '>=14'}
+    hasBin: true
+
   pretty-ms@9.3.1:
     resolution: {integrity: sha512-HzMy3Geq23nVALD/M2LliU+F+M+gVNsvkQWWqeBZ8HDiCgzo6YPJ/Omrmtq24EFrIsk0a3EkQGEd7bDOo+IhGA==}
     engines: {node: '>=18'}
@@ -2538,6 +2614,10 @@ packages:
   wrap-ansi@10.0.2:
     resolution: {integrity: sha512-6OLRNZqRntVGBm26ghZ5eZhCuWWyOkRCSn8XsOIuq5stpCE/tjLbdozd93naILZig0lmD8ANfRwnhn0DLeXGlg==}
     engines: {node: '>=20'}
+
+  write-file-atomic@7.0.1:
+    resolution: {integrity: sha512-OTIk8iR8/aCRWBqvxrzxR0hgxWpnYBblY1S5hDWBQfk/VFmJwzmJgQFN3WsoUKHISv2eAwe+PpbUzyL1CKTLXg==}
+    engines: {node: ^20.17.0 || >=22.9.0}
 
   ws@8.21.3:
     resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
@@ -3426,6 +3506,10 @@ snapshots:
   '@types/shell-quote@1.7.5': {}
 
   '@types/unist@3.0.3': {}
+
+  '@types/write-file-atomic@4.0.3':
+    dependencies:
+      '@types/node': 22.20.1
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
@@ -4324,6 +4408,8 @@ snapshots:
 
   powershell-utils@0.2.1: {}
 
+  prettier@3.9.10: {}
+
   pretty-ms@9.3.1:
     dependencies:
       parse-ms: 4.0.0
@@ -4596,6 +4682,10 @@ snapshots:
     dependencies:
       ansi-styles: 6.2.3
       string-width: 8.3.0
+
+  write-file-atomic@7.0.1:
+    dependencies:
+      signal-exit: 4.1.0
 
   ws@8.21.3: {}
 

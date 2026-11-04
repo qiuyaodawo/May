@@ -63,7 +63,7 @@ If another process creates the file first, setup stops without replacing it.
 Storage must support hard links for publishing the complete file. A later
 application startup error preserves the saved configuration.
 
-The same terminal wizard serves retained, classic, and Web modes. Web mode checks
+The same terminal wizard serves retained and Web modes. Web mode checks
 `MAYBECODE_CONTROL_TOKEN` before setup. Workspace, resume, permission, and port
 arguments continue into normal startup. Noninteractive startup with missing
 configuration exits with instructions and code 1. Help, MCP, and team commands
@@ -78,7 +78,7 @@ A workspace without a Git version displays “Git 尚未准备”.
 
 Each launch creates a new Session by default. On normal exit, MaybeCode deletes
 Sessions created during that launch that have no submitted messages, queued
-messages, or Runs. These Sessions no longer appear in `/resume` after restarting.
+messages, Runs, or goals. These Sessions no longer appear in `/resume` after restarting.
 Unsubmitted editor drafts do not retain a Session. Resumed Sessions and Sessions
 created through `/fork` are preserved.
 
@@ -136,8 +136,8 @@ after completion or a host yield starts after the active operation finishes.
 
 `/stop` and the Web cancel control cancel active work and queued input. `Ctrl+C`
 without a text selection does the same in a terminal. Cancelled steering remains
-in history and requires a new submission to execute. Classic TUI, retained TUI,
-and Web UI provide these controls.
+in history and requires a new submission to execute. The retained TUI and Web UI
+provide these controls.
 
 ## Browse MaybeCode conversations
 

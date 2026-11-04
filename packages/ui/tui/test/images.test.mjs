@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -9,7 +10,7 @@ import { imageSource } from "../../../media/test/fixture.mjs";
 import { TerminalImages, FullscreenRenderer, Stack, ScrollView, Text, TranscriptStore, TranscriptView } from "../dist/index.js";
 
 test("真实图片的 Terminal 布局、滚动、清除及纯文本输出", async () => {
-  const base = fileURLToPath(new URL("../../../../review/media-tests/", import.meta.url));
+  const base = join(testOutputRoot, "tui", "images");
   await mkdir(base, { recursive: true });
   const source = await imageSource(), media = new FileMediaStore(await mkdtemp(join(base, "terminal-")));
   const images = new TerminalImages(media, "kitty");

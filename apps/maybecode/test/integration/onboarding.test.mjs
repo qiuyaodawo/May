@@ -3,14 +3,13 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { loadMayConfig, parseMayConfig, resolveProviderConfig } from "@sortedyuan/may/config";
 import { checkOnboardingConnection } from "../../dist/onboarding.js";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 
-const name = process.env.MAYBECODE_ONBOARDING_MODEL;
-const options = { skip: !name, timeout: 40_000 };
+const name = liveModelProfile();
+const options = { timeout: 40_000 };
 
 async function configuration() {
   const config = await loadMayConfig();
-  const model = config.models[name];
-  assert.ok(model, "MAYBECODE_ONBOARDING_MODEL must name an existing profile");
   return { ...config, defaultModel: name };
 }
 

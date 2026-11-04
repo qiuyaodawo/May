@@ -23,10 +23,12 @@ import {
   type SerializedError,
 } from "./events.js";
 import type { Model, ModelRequest, ModelResponseFormat } from "./model.js";
-import type { ModelRequestSink } from "./request-recording.js";
+import { randomUUID } from "node:crypto";
+import type { ModelRequestObservation, ModelRequestSink } from "./request-recording.js";
 import { runtimeHooks, RUNTIME_HOOKS, type HookContext, type HookDefinition, type HookDispatcher } from "./hooks.js";
 import { DEFAULT_RUNTIME_DESCRIPTOR, type AgentRuntime } from "./runtime.js";
 import { jsonEqual } from "./json-equal.js";
+import { omitUndefined } from "./omit-undefined.js";
 import {
   directToolExecutor,
   freezeToolInput,
@@ -138,6 +140,21 @@ export type StepInputSource = (boundary: {
   readonly signal: AbortSignal;
 }) => Promise<readonly UserMessage[]>;
 
+interface RunExecution {
+  readonly tools: ToolRegistry;
+  readonly runId: string;
+  readonly input: UserMessage | undefined;
+  readonly signal: AbortSignal;
+  readonly emit: (event: MayEventPayload) => void;
+  readonly runTraceContext: TraceContext | undefined;
+  readonly checkpoint: RunCheckpoint | undefined;
+  readonly budget: RunBudgetMeter;
+  readonly shouldYield: (() => boolean) | undefined;
+  readonly stepInputSource: StepInputSource | undefined;
+  readonly abortPending: (reason: unknown) => void;
+  readonly recordRequest: ModelRequestSink | undefined;
+}
+
 export class May implements AgentRuntime {
   get supportsRequestRecording(): boolean { return this.model.supportsRequestRecording === true; }
   readonly descriptor = DEFAULT_RUNTIME_DESCRIPTOR;
@@ -184,12 +201,6 @@ export class May implements AgentRuntime {
     this.toolExecutor = options.toolExecutor ?? directToolExecutor;
     this.toolScheduler = options.toolScheduler ?? sequentialToolScheduler;
     this.concurrentRuns = options.concurrentRuns ?? "reject";
-    if (
-      this.concurrentRuns !== "reject" &&
-      this.concurrentRuns !== "allow"
-    ) {
-      throw new TypeError("concurrentRuns must be \"reject\" or \"allow\"");
-    }
     this.maxBufferedEvents = options.maxBufferedEvents ?? 1024;
     if (!Number.isSafeInteger(this.maxBufferedEvents) || this.maxBufferedEvents < 1) {
       throw new RangeError("maxBufferedEvents must be a positive safe integer");
@@ -199,48 +210,19 @@ export class May implements AgentRuntime {
   }
 
   run(options: RunOptions): RunHandle {
-    const input = typeof options.input === "string"
-      ? userMessage(options.input)
-      : options.input;
-    return this.start(
-      input,
-      options.signal,
-      options.traceContext,
-      options.traceAttributes,
-      options.checkpoint,
-      options.runBudget,
-      options.shouldYield,
-      options.stepInputSource,
-      options.recordRequest,
-    );
+    return this.start(typeof options.input === "string" ? userMessage(options.input) : options.input, options);
   }
 
   /** Continue from the existing context without appending a user message. */
   continue(options: ContinueOptions = {}): RunHandle {
-    return this.start(
-      undefined,
-      options.signal,
-      options.traceContext,
-      options.traceAttributes,
-      options.checkpoint,
-      options.runBudget,
-      options.shouldYield,
-      options.stepInputSource,
-      options.recordRequest,
-    );
+    return this.start(undefined, options);
   }
 
-  private start(
-    input: UserMessage | undefined,
-    externalSignal: AbortSignal | undefined,
-    parentTraceContext: TraceContext | undefined,
-    runTraceAttributes: TraceAttributes | undefined,
-    checkpoint: RunCheckpoint | undefined,
-    budgetOverride: RunBudget | undefined,
-    shouldYield: (() => boolean) | undefined,
-    stepInputSource: StepInputSource | undefined,
-    recordRequest: ModelRequestSink | undefined,
-  ): RunHandle {
+  private start(input: UserMessage | undefined, options: ContinueOptions): RunHandle {
+    const {
+      signal: externalSignal, traceContext: parentTraceContext, traceAttributes: runTraceAttributes,
+      checkpoint, runBudget: budgetOverride, shouldYield, stepInputSource, recordRequest,
+    } = options;
     if (recordRequest !== undefined && this.model.supportsRequestRecording !== true) throw new Error("Model does not support complete request recording");
     if (this.unsafeToReuse) throw new RunCheckpointError(new Error("Tool outcomes or Context are uncertain; reconcile before creating a new runtime"));
     const budget = new RunBudgetMeter(resolveRunBudget(this.runBudget, budgetOverride));
@@ -263,10 +245,8 @@ export class May implements AgentRuntime {
       controller.abort(new RunBudgetExceededError("durationMs", budget.limits.maxDurationMs!, budget.snapshot().elapsedMs));
     }, budget.limits.maxDurationMs);
     let seq = 0;
-    const runSpan = startTraceSpan(this.tracer, "may.run", {
-      ...(parentTraceContext === undefined
-        ? {}
-        : { parent: parentTraceContext }),
+    const runSpan = startTraceSpan(this.tracer, "may.run", omitUndefined({
+      parent: parentTraceContext,
       attributes: {
         ...this.traceAttributes,
         ...(runTraceAttributes ?? {}),
@@ -274,7 +254,7 @@ export class May implements AgentRuntime {
         "may.run.continuation": input === undefined,
         "may.run.max_steps": this.maxSteps,
       },
-    });
+    }));
 
     const onExternalAbort = () => controller.abort(externalSignal?.reason);
     if (externalSignal?.aborted) {
@@ -303,20 +283,20 @@ export class May implements AgentRuntime {
       }
     };
 
-    const result = this.execute(
+    const result = this.execute({
       tools,
       runId,
       input,
-      controller.signal,
+      signal: controller.signal,
       emit,
-      runSpan?.context,
-      durableCheckpoint,
+      runTraceContext: runSpan?.context,
+      checkpoint: durableCheckpoint,
       budget,
       shouldYield,
       stepInputSource,
-      (reason) => controller.abort(reason),
+      abortPending: (reason) => controller.abort(reason),
       recordRequest,
-    ).then(
+    }).then(
       (value) => {
         endTraceSpan(runSpan, {
           status: "ok",
@@ -336,7 +316,7 @@ export class May implements AgentRuntime {
             ? "cancelled"
             : "error",
           error: traceError(error),
-          attributes: {
+          attributes: omitUndefined({
             "may.run.model_calls": snapshot.modelCalls,
             "may.run.tool_calls": snapshot.toolCalls,
             "may.run.steps": snapshot.steps,
@@ -344,8 +324,8 @@ export class May implements AgentRuntime {
             "may.run.usage_complete": snapshot.usageComplete,
             "may.run.cost_usd": snapshot.costUsd,
             "may.run.cost_complete": snapshot.costComplete === true,
-            ...(snapshot.costKind === undefined ? {} : { "may.run.cost_kind": snapshot.costKind }),
-          },
+            "may.run.cost_kind": snapshot.costKind,
+          }),
         });
         try {
           await this.observe(runtimeHooks.runFailed, { error: serializeError(error) }, { runId, signal: controller.signal });
@@ -366,29 +346,27 @@ export class May implements AgentRuntime {
     // Avoid an unhandled-rejection warning when a caller only consumes events.
     void result.catch(() => undefined);
 
-    return {
+    return omitUndefined({
       id: runId,
       events,
       result,
-      ...(runSpan === undefined ? {} : { traceContext: runSpan.context }),
+      traceContext: runSpan?.context,
       cancel: (reason?: string) => controller.abort(reason),
-    };
+    });
   }
 
-  private async execute(
-    tools: ToolRegistry,
-    runId: string,
-    input: UserMessage | undefined,
-    signal: AbortSignal,
-    emit: (event: MayEventPayload) => void,
-    runTraceContext: TraceContext | undefined,
-    checkpoint: RunCheckpoint | undefined,
-    budget: RunBudgetMeter,
-    shouldYield: (() => boolean) | undefined,
-    stepInputSource: StepInputSource | undefined,
-    abortPending: (reason: unknown) => void,
-    recordRequest: ModelRequestSink | undefined,
-  ): Promise<RunResult> {
+  private async execute(run: RunExecution): Promise<RunResult> {
+    const {
+      tools, runId, input, signal, emit, runTraceContext, checkpoint, budget,
+      shouldYield, stepInputSource, abortPending, recordRequest,
+    } = run;
+    const yieldRun = async (step: number, result: RunResult): Promise<RunResult> => {
+      result.finishReason = "yielded";
+      await checkpoint?.({ type: "run.yielded", runId, result });
+      await this.observe(runtimeHooks.runEnded, result, { runId, step, signal });
+      emit({ type: "run.yielded", result });
+      return result;
+    };
     let aggregateUsage: Usage | undefined;
     let modelCalls = 0;
     let toolCalls = 0;
@@ -430,10 +408,10 @@ export class May implements AgentRuntime {
         await this.observe(runtimeHooks.stepBefore, { step }, { runId, step, signal });
         emit({ type: "step.started", step });
 
-        const snapshotSpan = startTraceSpan(this.tracer, "may.context.snapshot", {
-          ...(runTraceContext === undefined ? {} : { parent: runTraceContext }),
+        const snapshotSpan = startTraceSpan(this.tracer, "may.context.snapshot", omitUndefined({
+          parent: runTraceContext,
           attributes: { "may.step": step },
-        });
+        }));
         let snapshot: ContextSnapshot;
         let contextMessageCount: number;
         try {
@@ -465,8 +443,8 @@ export class May implements AgentRuntime {
         emit({ type: "model.started", step });
         modelCalls += 1;
         const modelCallId = `${runId}:model:${step}`;
-        const modelSpan = startTraceSpan(this.tracer, "may.model.call", {
-          ...(runTraceContext === undefined ? {} : { parent: runTraceContext }),
+        const modelSpan = startTraceSpan(this.tracer, "may.model.call", omitUndefined({
+          parent: runTraceContext,
           attributes: {
             "may.step": step,
             "may.model.call_id": modelCallId,
@@ -474,7 +452,7 @@ export class May implements AgentRuntime {
             "may.model.message_count": request.messages.length,
             "may.model.tool_definition_count": request.tools.length,
           },
-        });
+        }));
         let modelResponse: { message: AssistantMessage; usage?: Usage; cost?: UsageCost };
         let responseUsage: Usage | undefined;
         let accounted = false;
@@ -490,7 +468,7 @@ export class May implements AgentRuntime {
             recordRequest,
           );
           responseUsage = modelResponse.usage;
-          aggregateUsage = addUsage(aggregateUsage, responseUsage);
+          aggregateUsage = mergeUsage(aggregateUsage, responseUsage);
           accounted = true;
           budget.recordUsage(responseUsage, modelResponse.cost);
           if (!budget.snapshot().usageComplete && aggregateUsage !== undefined) {
@@ -511,17 +489,17 @@ export class May implements AgentRuntime {
           let failure = error;
           if (!accounted && error instanceof ModelResponseValidationError) {
             responseUsage = error.usage;
-            aggregateUsage = addUsage(aggregateUsage, responseUsage);
+            aggregateUsage = mergeUsage(aggregateUsage, responseUsage);
             accounted = true;
             try {
               budget.recordUsage(responseUsage, error.cost);
             } catch (accountingError) {
               const latestCost = budget.snapshot().latestCost;
-              failure = new ModelResponseValidationError(error.message, {
-                ...(responseUsage === undefined ? {} : { usage: responseUsage }),
-                ...(latestCost === undefined ? {} : { cost: latestCost }),
+              failure = new ModelResponseValidationError(error.message, omitUndefined({
+                usage: responseUsage,
+                cost: latestCost,
                 cause: new AggregateError([error, accountingError], "Model validation and accounting failed", { cause: error }),
-              });
+              }));
               if (accountingError instanceof RunBudgetExceededError) emit({ type: "run.budget.exceeded", dimension: accountingError.dimension, limit: accountingError.limit, consumed: accountingError.consumed, budget: budget.snapshot() });
             }
           }
@@ -551,18 +529,8 @@ export class May implements AgentRuntime {
           signal,
           () => this.context.append([message], { runId, step }),
         );
-        await checkpoint?.({ type: "model.completed", runId, step, message,
-          contextMessageCount, ...(usage === undefined ? {} : { usage }) });
-        emitOptionalUsage(
-          emit,
-          {
-            type: "model.completed",
-            step,
-            message,
-            contextMessageCount,
-          },
-          usage,
-        );
+        await checkpoint?.(omitUndefined({ type: "model.completed", runId, step, message, contextMessageCount, usage }));
+        emit(omitUndefined({ type: "model.completed", step, message, contextMessageCount, usage }));
         const calls = message.toolCalls ?? [];
         if (calls.length > 0) pendingTools = { step, calls, outcomes: [], executions: [] };
         await this.observe(runtimeHooks.modelAfter, { message }, { runId, step, signal });
@@ -579,25 +547,13 @@ export class May implements AgentRuntime {
             aggregateUsage,
           );
           result.budget = budget.snapshot();
-          if (shouldYield?.() === true) {
-            result.finishReason = "yielded";
-            await checkpoint?.({ type: "run.yielded", runId, result });
-            await this.observe(runtimeHooks.runEnded, result, { runId, step, signal });
-            emit({ type: "run.yielded", result });
-            return result;
-          }
+          if (shouldYield?.() === true) return await yieldRun(step, result);
           if (await this.receiveStepInput(stepInputSource, runId, step, signal, emit)) continue;
           const settlement = await this.transform(runtimeHooks.runBeforeEnd, { result, continueMessages: [] }, { runId, step, signal });
           if (!jsonEqual(settlement.result, result)) throw new ModelProtocolError("Run settlement cannot change the completed result");
           throwIfAborted(signal);
           budget.checkTime();
-          if (shouldYield?.() === true) {
-            result.finishReason = "yielded";
-            await checkpoint?.({ type: "run.yielded", runId, result });
-            await this.observe(runtimeHooks.runEnded, result, { runId, step, signal });
-            emit({ type: "run.yielded", result });
-            return result;
-          }
+          if (shouldYield?.() === true) return await yieldRun(step, result);
           if (settlement.continueMessages.length > 0) {
             const generated = { type: "input.generated" as const, runId, step, messages: [...settlement.continueMessages], reason: settlement.reason! };
             await checkpoint?.(generated);
@@ -613,14 +569,13 @@ export class May implements AgentRuntime {
 
         budget.reserveTools(calls.length);
         toolCalls += calls.length;
-        pendingTools = { step, calls, outcomes: [], executions: [] };
-        const batchSpan = startTraceSpan(this.tracer, "may.tools.batch", {
-          ...(runTraceContext === undefined ? {} : { parent: runTraceContext }),
+        const batchSpan = startTraceSpan(this.tracer, "may.tools.batch", omitUndefined({
+          parent: runTraceContext,
           attributes: {
             "may.step": step,
             "may.tool.call_count": calls.length,
           },
-        });
+        }));
         let outcomes: readonly ToolExecutionOutcome[];
         try {
           outcomes = await this.scheduleTools(
@@ -630,7 +585,7 @@ export class May implements AgentRuntime {
             calls,
             signal,
             emit,
-            pendingTools,
+            pendingTools!,
             batchSpan?.context,
             checkpoint,
           );
@@ -678,11 +633,7 @@ export class May implements AgentRuntime {
           budget.checkTime();
           const result = createRunResult(runId, step, modelCalls, toolCalls, message, aggregateUsage);
           result.budget = budget.snapshot();
-          result.finishReason = "yielded";
-          await checkpoint?.({ type: "run.yielded", runId, result });
-          await this.observe(runtimeHooks.runEnded, result, { runId, step, signal });
-          emit({ type: "run.yielded", result });
-          return result;
+          return await yieldRun(step, result);
         }
         await this.receiveStepInput(stepInputSource, runId, step, signal, emit);
       }
@@ -818,14 +769,12 @@ export class May implements AgentRuntime {
 
     messages.push(...snapshot.messages);
 
-    return {
+    return omitUndefined({
       messages,
       tools: tools.definitions(),
-      ...(this.responseFormat === undefined ? {} : { responseFormat: structuredClone(this.responseFormat) }),
-      ...(snapshot.metadata === undefined
-        ? {}
-        : { metadata: snapshot.metadata }),
-    };
+      responseFormat: this.responseFormat === undefined ? undefined : structuredClone(this.responseFormat),
+      metadata: snapshot.metadata,
+    });
   }
 
   private async consumeModel(
@@ -847,16 +796,16 @@ export class May implements AgentRuntime {
     let text = false;
     let attempts = 0;
     let retryWaitMs = 0;
-    const observer = createModelAttemptObserver({
-      ...(this.tracer === undefined ? {} : { tracer: this.tracer }),
-      ...(modelSpan === undefined ? {} : { parent: modelSpan.context }),
+    const observer = createModelAttemptObserver(omitUndefined({
+      tracer: this.tracer,
+      parent: modelSpan?.context,
       modelCallId,
       attributes: { ...modelConfigurationTraceAttributes(this.model), "may.run.id": runId, "may.step": step },
-      onRetryWait(durationMs) {
+      onRetryWait(durationMs: number) {
         retryWaitMs += durationMs;
         setTraceAttributes(modelSpan, { "may.model.retry_wait_ms": retryWaitMs });
       },
-      onContent(kind) {
+      onContent(kind: "text" | "reasoning" | "tool" | "other") {
         if (!content) {
           content = true;
           setTraceAttributes(modelSpan, { "may.model.first_content_ms": performance.now() - started });
@@ -866,20 +815,20 @@ export class May implements AgentRuntime {
           setTraceAttributes(modelSpan, { "may.model.first_text_ms": performance.now() - started });
         }
       },
-    });
+    }));
     const attemptObserver = {
       retryWait(durationMs: number) { observer.retryWait?.(durationMs); },
       start(attempt: number) { attempts += 1; return observer.start(attempt); },
     };
     let singleAttempt: ReturnType<typeof attemptObserver.start> | undefined;
-    const streamOptions = {
+    const streamOptions = omitUndefined({
       signal, runId, step, modelCallId, attemptObserver,
-      ...(recordRequest === undefined ? {} : { recordRequest: async (event: import("./request-recording.js").ModelRequestObservation) => {
+      recordRequest: recordRequest === undefined ? undefined : async (event: ModelRequestObservation) => {
         try { await recordRequest({ ...event, runId, step, modelCallId }); }
         catch (error) { this.unsafeToReuse = true; throw new RunCheckpointError(error); }
-      } }),
-      ...(modelSpan === undefined ? {} : { traceContext: modelSpan.context }),
-    };
+      },
+      traceContext: modelSpan?.context,
+    });
     try {
       await this.model.preflight?.(request, streamOptions);
       singleAttempt = this.model.reportsAttempts === true ? undefined : attemptObserver.start(1);
@@ -908,15 +857,13 @@ export class May implements AgentRuntime {
       }
 
       if (event.type === "retrying") {
-        addTraceEvent(modelSpan, "may.model.retry", {
+        addTraceEvent(modelSpan, "may.model.retry", omitUndefined({
           "may.model.retry.attempt": event.attempt,
           "may.model.retry.max_attempts": event.maxAttempts,
           "may.model.retry.delay_ms": event.delayMs,
           "error.type": event.error.name,
-          ...(event.error.code === undefined
-            ? {}
-            : { "error.code": event.error.code }),
-        });
+          "error.code": event.error.code,
+        }));
         emit({
           type: "model.retrying",
           step,
@@ -939,14 +886,8 @@ export class May implements AgentRuntime {
         "Model stream ended without a response.completed event",
       );
     }
-    singleAttempt?.end({ status: "ok", completed: true, ...(usage === undefined ? {} : { usage }) });
-
-    const result: { message: AssistantMessage; usage?: Usage; cost?: UsageCost } = {
-      message: completed,
-    };
-    if (usage !== undefined) result.usage = usage;
-    if (cost !== undefined) result.cost = cost;
-    return result;
+    singleAttempt?.end(omitUndefined({ status: "ok", completed: true, usage }));
+    return omitUndefined({ message: completed, usage, cost });
     } catch (error) {
       let failure = error;
       if (error instanceof ModelResponseValidationError) {
@@ -954,20 +895,12 @@ export class May implements AgentRuntime {
         cost = error.cost ?? cost;
         responseCompleted = error.responseCompleted;
         if (error.usage !== usage || error.cost !== cost) {
-          failure = new ModelResponseValidationError(error.message, {
-            ...(usage === undefined ? {} : { usage }),
-            ...(cost === undefined ? {} : { cost }),
-            cause: error,
-          });
+          failure = new ModelResponseValidationError(error.message, omitUndefined({ usage, cost, cause: error }));
         }
       } else if (responseCompleted) {
-        failure = new ModelResponseValidationError("Model response processing failed after completion", {
-          ...(usage === undefined ? {} : { usage }),
-          ...(cost === undefined ? {} : { cost }),
-          cause: error,
-        });
+        failure = new ModelResponseValidationError("Model response processing failed after completion", omitUndefined({ usage, cost, cause: error }));
       }
-      singleAttempt?.end({ status: signal.aborted ? "cancelled" : "error", error: traceError(failure), completed: responseCompleted, ...(usage === undefined ? {} : { usage }) });
+      singleAttempt?.end(omitUndefined({ status: signal.aborted ? "cancelled" : "error", error: traceError(failure), completed: responseCompleted, usage }));
       throw failure;
     } finally {
       setTraceAttributes(modelSpan, {
@@ -1078,16 +1011,14 @@ export class May implements AgentRuntime {
     let active = true;
     let progressTail = Promise.resolve();
     let rawOutput: { readonly value: unknown; readonly content: ContentPart[] } | undefined;
-    const toolSpan = startTraceSpan(this.tracer, "may.tool.call", {
-      ...(parentTraceContext === undefined
-        ? {}
-        : { parent: parentTraceContext }),
+    const toolSpan = startTraceSpan(this.tracer, "may.tool.call", omitUndefined({
+      parent: parentTraceContext,
       attributes: {
         "may.step": step,
         "may.tool.name": call.name,
         "may.tool.call_id": call.id,
       },
-    });
+    }));
 
     try {
       const tool = tools.get(call.name);
@@ -1104,28 +1035,25 @@ export class May implements AgentRuntime {
       const output = await this.toolExecutor.execute(Object.freeze({
         tool,
         input,
-        context: {
+        context: omitUndefined({
           scope: this.runScopes.get(runId)!,
           runId,
           step,
           toolCallId: call.id,
           idempotencyKey: `${runId}:${step}:${call.id}`,
           signal,
-          ...(toolSpan === undefined
-            ? {}
-            : { traceContext: toolSpan.context }),
-          report: (update) => {
+          traceContext: toolSpan?.context,
+          report: (update: ToolProgressUpdate) => {
             if (!active || signal.aborted) return;
             emitToolProgress(step, call, update, emit);
             const savedUpdate = structuredClone(update);
             progressTail = progressTail.then(() => this.observe(runtimeHooks.toolProgress, { call, update: savedUpdate }, { runId, step, signal }));
             void progressTail.catch(() => undefined);
           },
-        },
+        }),
       }));
 
-      rawOutput = { value: output, content: [{ type: "json", value: output }] };
-      const originalContent = tool.resultContent?.(output) ?? rawOutput.content;
+      const originalContent: ContentPart[] = tool.resultContent?.(output) ?? [{ type: "json", value: output }];
       rawOutput = { value: output, content: originalContent };
       await progressTail;
       const projected = await this.transform(runtimeHooks.toolResult, { call, content: originalContent }, { runId, step, signal });
@@ -1193,7 +1121,7 @@ export class May implements AgentRuntime {
   private async transform<T>(hook: HookDefinition<T>, value: T, context: HookContext): Promise<T> {
     if (this.hooks === undefined) return value;
     try {
-      return hook.validate(await this.hooks.transform(hook, structuredClone(value), context));
+      return await this.hooks.transform(hook, value, context);
     } catch (error) {
       const failure = error instanceof HookExecutionError ? error : new HookExecutionError(error, hook.name);
       if (hook.name.startsWith("tool.")) throw new FatalToolExecutionError(failure.message, { cause: failure });
@@ -1204,7 +1132,7 @@ export class May implements AgentRuntime {
   private async observe<T>(hook: HookDefinition<T>, value: T, context: HookContext): Promise<void> {
     if (this.hooks === undefined) return;
     try {
-      await this.hooks.observe(hook, hook.validate(structuredClone(value)), context);
+      await this.hooks.observe(hook, value, context);
     } catch (error) {
       throw error instanceof HookExecutionError ? error : new HookExecutionError(error, hook.name);
     }
@@ -1290,7 +1218,7 @@ function emitToolOutcomes(
 }
 
 function createRunId(): string {
-  return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  return `run_${randomUUID()}`;
 }
 
 function throwIfAborted(signal: AbortSignal): void {
@@ -1324,13 +1252,6 @@ function createRunResult(
   return result;
 }
 
-function addUsage(
-  aggregate: Usage | undefined,
-  usage: Usage | undefined,
-): Usage | undefined {
-  return mergeUsage(aggregate, usage);
-}
-
 async function traceOperation<T>(
   tracer: Tracer | undefined,
   name: string,
@@ -1339,10 +1260,7 @@ async function traceOperation<T>(
   signal: AbortSignal,
   operation: () => Promise<T>,
 ): Promise<T> {
-  const span = startTraceSpan(tracer, name, {
-    ...(parent === undefined ? {} : { parent }),
-    attributes,
-  });
+  const span = startTraceSpan(tracer, name, omitUndefined({ parent, attributes }));
   try {
     const value = await operation();
     endTraceSpan(span, { status: "ok" });
@@ -1383,32 +1301,26 @@ function usageTraceAttributes(
   prefix = "may.run",
 ): TraceAttributes {
   if (usage === undefined) return { [`${prefix}.usage_complete`]: false };
-  return {
-    ...(usage.cachedReadTokens === undefined ? {} : { [`${prefix}.cached_read_tokens`]: usage.cachedReadTokens }),
-    ...(usage.cachedWriteTokens === undefined ? {} : { [`${prefix}.cached_write_tokens`]: usage.cachedWriteTokens }),
-    ...(usage.reasoningTokens === undefined ? {} : { [`${prefix}.reasoning_tokens`]: usage.reasoningTokens }),
+  return omitUndefined({
+    [`${prefix}.cached_read_tokens`]: usage.cachedReadTokens,
+    [`${prefix}.cached_write_tokens`]: usage.cachedWriteTokens,
+    [`${prefix}.reasoning_tokens`]: usage.reasoningTokens,
     [`${prefix}.usage_complete`]: resolveUsageTotals(usage).complete,
-    ...(usage.inputTokens === undefined
-      ? {}
-      : { [`${prefix}.input_tokens`]: usage.inputTokens }),
-    ...(usage.outputTokens === undefined
-      ? {}
-      : { [`${prefix}.output_tokens`]: usage.outputTokens }),
-    ...(usage.totalTokens === undefined
-      ? {}
-      : { [`${prefix}.total_tokens`]: usage.totalTokens }),
-  };
+    [`${prefix}.input_tokens`]: usage.inputTokens,
+    [`${prefix}.output_tokens`]: usage.outputTokens,
+    [`${prefix}.total_tokens`]: usage.totalTokens,
+  }) as TraceAttributes;
 }
 
-function costTraceAttributes(cost: import("./pricing.js").UsageCost): TraceAttributes {
-  return {
-    ...(cost.amount === undefined ? {} : { "may.model.cost": cost.amount }),
+function costTraceAttributes(cost: UsageCost): TraceAttributes {
+  return omitUndefined({
+    "may.model.cost": cost.amount,
     "may.model.currency": cost.currency,
     "may.model.cost_kind": cost.kind,
     "may.model.cost_complete": cost.complete,
-    ...(cost.pricingVersion === undefined ? {} : { "may.model.pricing_version": cost.pricingVersion }),
-    ...(cost.pricingId === undefined ? {} : { "may.model.pricing_id": cost.pricingId }),
-  };
+    "may.model.pricing_version": cost.pricingVersion,
+    "may.model.pricing_id": cost.pricingId,
+  });
 }
 
 function emitToolProgress(
@@ -1446,14 +1358,6 @@ function emitToolProgress(
         message: update.message,
         data: update.data,
       });
-}
-
-function emitOptionalUsage(
-  emit: (event: MayEventPayload) => void,
-  event: Extract<MayEventPayload, { type: "model.completed" }>,
-  usage: Usage | undefined,
-): void {
-  emit(usage === undefined ? event : { ...event, usage });
 }
 
 async function settleWithin(pending: readonly Promise<unknown>[], timeoutMs: number): Promise<boolean> {

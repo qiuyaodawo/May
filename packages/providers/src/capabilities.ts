@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { MODEL_CAPABILITY_KEYS, parseMayConfig, type ModelCapabilityDeclaration, type ModelCapabilitiesOverride, type ModelCapabilityKey } from "@sortedyuan/may/config";
-import type { ModelRequest } from "@sortedyuan/may/core";
+import { omitUndefined, type ModelRequest } from "@sortedyuan/may/core";
 import type { ProviderModelSelection } from "./types.js";
 
 export { MODEL_CAPABILITY_KEYS };
@@ -201,7 +201,7 @@ export class ModelCapabilityResolver {
       reasoningEffort ??= foundReasoning;
     }
     const observedAt = Date.now();
-    return { fields, ...(reasoningEffort === undefined ? {} : { reasoningEffort }), observedAt, expiresAt: observedAt + this.ttl, diagnostics };
+    return omitUndefined({ fields, reasoningEffort, observedAt, expiresAt: observedAt + this.ttl, diagnostics });
   }
 }
 export function createModelCapabilityResolver(options: ModelCapabilityResolverOptions = {}): ModelCapabilityResolver { return new ModelCapabilityResolver(options); }
@@ -218,7 +218,7 @@ function declaredReasoning(overrides: ModelCapabilitiesOverride | undefined, sou
   const reasoning = overrides?.reasoning;
   if (reasoning === undefined) return undefined;
   if (reasoning === false || reasoning.efforts.length === 0) return { status: "unsupported", source };
-  return { status: "known", source, efforts: [...reasoning.efforts], ...(reasoning.defaultEffort === undefined ? {} : { defaultEffort: reasoning.defaultEffort }) };
+  return omitUndefined({ status: "known", source, efforts: [...reasoning.efforts], defaultEffort: reasoning.defaultEffort });
 }
 function intersectReasoning(model: ReasoningEffortCapabilities, connection: ReasoningEffortCapabilities | undefined): ReasoningEffortCapabilities {
   if (model.status === "unsupported") return model;
@@ -280,7 +280,7 @@ const BUILTIN_REASONING_EFFORTS = new Map<string, CatalogReasoningEffort>([
 ]);
 function builtinReasoningEffort(selection: ProviderModelSelection): ReasoningEffortCapabilities | undefined {
   const entry = BUILTIN_REASONING_EFFORTS.get(catalogKey(selection.adapter, selection.model));
-  return entry === undefined ? undefined : { status: "known", source: "builtin", efforts: [...entry.efforts], ...(entry.defaultEffort === undefined ? {} : { defaultEffort: entry.defaultEffort }) };
+  return entry === undefined ? undefined : omitUndefined({ status: "known", source: "builtin", efforts: [...entry.efforts], defaultEffort: entry.defaultEffort });
 }
 function catalogKey(adapter: string, model: string): string { return `${adapter}\u0000${model}`; }
 class CpaCodexCapabilityDiscovery implements ModelCapabilityDiscovery {
@@ -324,7 +324,7 @@ function assertReasoningCapabilities(capability: ReasoningEffortCapabilities): v
   if (!["user", "provider", "builtin", "adapter"].includes(capability.source)) throw new TypeError("Invalid reasoning capability source");
   if (capability.status === "unsupported") return;
   if (capability.status !== "known") throw new TypeError("Invalid reasoning capability status");
-  parseMayConfig({ providers: { metadata: { adapter: "metadata" } }, models: { metadata: { provider: "metadata", model: "metadata", capabilities: { reasoning: { efforts: capability.efforts, ...(capability.defaultEffort === undefined ? {} : { defaultEffort: capability.defaultEffort }) } } } } });
+  parseMayConfig({ providers: { metadata: { adapter: "metadata" } }, models: { metadata: { provider: "metadata", model: "metadata", capabilities: { reasoning: omitUndefined({ efforts: capability.efforts, defaultEffort: capability.defaultEffort }) } } } });
 }
 function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 function positive(value: number, field: string): number { if (!Number.isSafeInteger(value) || value < 1) throw new RangeError(`${field} must be a positive safe integer`); return value; }

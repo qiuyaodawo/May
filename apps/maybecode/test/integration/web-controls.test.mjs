@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp } from "node:fs/promises";
@@ -13,10 +14,14 @@ import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
 import { UiClient } from "@sortedyuan/ui-client";
 import { ApplicationUiHost } from "@sortedyuan/ui-client/application";
 import { AgentWorkspace } from "@sortedyuan/may/application";
-import { openConfiguredMaybeCode, startMaybeCodeWebUI, MaybeCodeWorkspace, MaybeCodeApplication, createMaybeCodeModel, selectMaybeCodeModel } from "../../dist/index.js";
+import { openConfiguredMaybeCode } from "../../dist/index.js";
+import { startMaybeCodeWebUI } from "../../dist/web-ui.js";
+import { MaybeCodeWorkspace } from "../../dist/workspace.js";
+import { MaybeCodeApplication } from "../../dist/application.js";
+import { createMaybeCodeModel, selectMaybeCodeModel } from "../../dist/model.js";
 
 async function directory() {
-  const parent = fileURLToPath(new URL("../../../../review/web-parity", import.meta.url));
+  const parent = join(testOutputRoot, "maybecode", "web-controls");
   await mkdir(parent, { recursive: true });
   return mkdtemp(join(parent, "test-"));
 }
@@ -49,7 +54,7 @@ test("真实配置：Web 命令、effort 和会话管理", { skip: process.env.M
   await assert.rejects(client.command("message.submit", { text: "/new" }), { status: 400 });
   await slash("/model");
   assert.ok(client.state.output.actions.some(action => action.args.action === "model.default"));
-  await client.command("console.action", { action: "model.switch", value: app.modelInfo.profile });
+  await client.command("console.action", { action: "model.switch", value: app.application.modelInfo.profile });
   const effort = await app.getReasoningEffort();
   await slash("/effort");
   if (effort.status === "known") {
@@ -59,7 +64,7 @@ test("真实配置：Web 命令、effort 和会话管理", { skip: process.env.M
     assert.equal(client.state.snapshot.choices.find(choice => choice.command === "effort.set").value, value);
     await slash("/effort default");
     assert.equal((await app.getReasoningEffort()).overridden, false);
-    const profile = (await app.listModels()).find(model => model.name === app.modelInfo.profile);
+    const profile = (await app.listModels()).find(model => model.name === app.application.modelInfo.profile);
     const resetEffort = profile.reasoningEffort ?? effort.defaultEffort;
     assert.ok(client.state.snapshot.choices.find(choice => choice.command === "effort.set").options[0].label.includes(resetEffort ?? "Provider"));
   }

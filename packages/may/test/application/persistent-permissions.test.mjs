@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -13,7 +14,6 @@ import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store";
 
 const execute = promisify(execFile);
-const verificationDirectory = fileURLToPath(new URL("../../../../plugin-verification/persistent-integration/", import.meta.url));
 const scopeId = "project:may:agent:writer";
 const tool = { name: "write", description: "Write project Markdown", inputSchema: { type: "object" }, permissionVersion: "1" };
 const policy = () => ({ decision: "ask", grantKey: "docs-markdown", persistent: { scopeId, description: "Modify Markdown files under project docs" } });
@@ -32,9 +32,7 @@ function permissionCheck() {
 }
 
 async function directory(t) {
-  await mkdir(verificationDirectory, { recursive: true });
-  const directory = await mkdtemp(join(verificationDirectory, "run-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/persistent-permissions");
   return directory;
 }
 

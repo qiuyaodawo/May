@@ -1,6 +1,7 @@
 import { Ajv } from "ajv";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
+import { omitUndefined } from "@sortedyuan/may/core";
 import type { EvalEvaluator, EvaluationCheck, EvaluationContext, EvaluationResult, JsonValue } from "./types.js";
 import { readFileManifest, within, type FileManifestEntry } from "./environment.js";
 import { startEvalProcess, type CommandOutcome, type EvalCommand } from "./process.js";
@@ -16,7 +17,7 @@ export function createCommandEvaluator(options: {
 }): EvalEvaluator {
   return {
     id: options.id, version: options.version,
-    ...(options.validate === undefined ? {} : { validate: options.validate }),
+    ...omitUndefined({ validate: options.validate }),
     async evaluate(context, signal) {
       const command = options.command(context);
       const outcome = await startEvalProcess(command, signal).result;
@@ -42,8 +43,7 @@ export function createNodeCommandEvaluator(options: {
 }): EvalEvaluator {
   return createCommandEvaluator({
     id: options.id, version: options.version,
-    ...(options.expectedExitCode === undefined ? {} : { expectedExitCode: options.expectedExitCode }),
-    ...(options.validate === undefined ? {} : { validate: options.validate }),
+    ...omitUndefined({ expectedExitCode: options.expectedExitCode, validate: options.validate }),
     command: context => nodeEvalCommand(options.command(context)),
     confirmTermination: ({ outcome }) => outcome.processTerminationConfirmed,
   });

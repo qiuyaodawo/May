@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { ModelResponseValidationError, priceUsage, resolveRunBudget, RunBudgetMeter } from "@sortedyuan/may/core";
 import { OpenAIChatCompletionsModel, createCapabilityValidatedModel, createModelCapabilityResolver } from "../../../providers/dist/index.js";
 import { FileSharedBudget } from "../../../coordination/dist/index.js";
@@ -36,12 +35,8 @@ async function service(t, includeUsage = true, toolCalls = false) {
   return { get requests() { return requests; }, model: () => new OpenAIChatCompletionsModel({ apiKey: "local-response-budget", model: "schema-budget",
     baseURL: `http://127.0.0.1:${server.address().port}` }) };
 }
-async function directory(t) {
-  const base = fileURLToPath(new URL("../../../../review/invalid-response-budgets/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const path = await mkdtemp(join(base, "http-"));
-  t.after(() => rm(path, { recursive: true, force: true }));
-  return path;
+function directory(t) {
+  return createTestDirectory(t, "coordination/invalid-response-budget");
 }
 
 test("shared budget settles schema-invalid final usage and forwards its single custom pricing receipt", async t => {

@@ -2,8 +2,8 @@ import type { AgentApplicationEvent } from "@sortedyuan/may";
 import type { MaybeCodeModelInfo } from "./controller.js";
 import type { ToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
 import type { McpClientEvent, McpInteractionEvent } from "@sortedyuan/mcp";
-import type { MaybeCodeDelegationEvent } from "./delegation.js";
-export type { MaybeCodeRun } from "./delegation.js";
+import type { MaybeCodeDelegationEvent } from "@sortedyuan/coordination/delegation/types";
+export type { MaybeCodeRun } from "@sortedyuan/coordination/delegation/types";
 
 export type MaybeCodeSessionEvent =
   | { type: "workspace.git.changed"; checkpoint: import("@sortedyuan/may/application/git-workspace").GitCheckpoint }

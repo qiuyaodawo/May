@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { Model, ModelEvent, Usage } from "@sortedyuan/may/core";
-import { ModelResponseValidationError, priceUsage, resolvePriceSchedule, resolveUsageTotals, validateUsageCost, type TokenPrices, type TokenPriceSchedule, type UsageCost, type UsagePricer } from "@sortedyuan/may/core";
+import { ModelResponseValidationError, omitUndefined, priceUsage, resolvePriceSchedule, resolveUsageTotals, validateUsageCost, type TokenPrices, type TokenPriceSchedule, type UsageCost, type UsagePricer } from "@sortedyuan/may/core";
 import { ResourceJournal, amount, count, resourceId } from "./resource-journal.js";
 
 export interface SharedBudgetLimits {
@@ -107,7 +107,7 @@ export class FileSharedBudget {
       get supportsRequestRecording() { return model.supportsRequestRecording === true; },
       get capabilityVersion() { return model.capabilityVersion; },
       get configuration() { return model.configuration; },
-      ...(model.preflight === undefined ? {} : { preflight: model.preflight.bind(model) }),
+      ...omitUndefined({ preflight: model.preflight?.bind(model) }),
       // Native compaction would be a hidden provider call without usage; deliberately not forwarded.
       async *stream(request, streamOptions): AsyncIterable<ModelEvent> {
         streamOptions.signal.throwIfAborted();
@@ -145,7 +145,7 @@ export class FileSharedBudget {
                 const snapshot = await budget.settle(id, error.usage, false, preparedCost);
                 settled = true;
                 if (priced) cost = snapshot.calls.find(call => call.id === id)?.cost;
-                validationError = new ModelResponseValidationError(error.message, { cause: error, usage: error.usage, ...(cost === undefined ? {} : { cost }) });
+                validationError = new ModelResponseValidationError(error.message, omitUndefined({ cause: error, usage: error.usage, cost }));
                 if (sharedBudgetTotals(snapshot).blocked) throw new Error("Shared budget exceeded after an invalid model response");
               } catch (accountingError) {
                 validationError = validationAccountingError(error, accountingError, cost);
@@ -331,13 +331,13 @@ function usageTotals(usage: Usage | undefined, limits: SharedBudgetLimits, price
 }
 
 function validationAccountingError(error: ModelResponseValidationError, accountingError: unknown, cost?: UsageCost): ModelResponseValidationError {
-  return new ModelResponseValidationError(error.message, { cause: new AggregateError([error, accountingError], "Model response validation and budget accounting failed"),
-    ...(error.usage === undefined ? {} : { usage: error.usage }), ...(cost === undefined ? {} : { cost }) });
+  return new ModelResponseValidationError(error.message, omitUndefined({ cause: new AggregateError([error, accountingError], "Model response validation and budget accounting failed"),
+    usage: error.usage, cost }));
 }
 
 function estimatedTotals(reservation: ModelReservation): { totalTokens: number; costUsd: number; cost: UsageCost } {
   return { totalTokens: reservation.totalTokens, costUsd: reservation.costUsd ?? 0,
-    cost: { ...(reservation.costUsd === undefined ? {} : { amount: reservation.costUsd }), currency: "USD", kind: "estimated", complete: false, source: "reservation", missingReasons: ["provider-usage-missing"] } };
+    cost: omitUndefined({ amount: reservation.costUsd, currency: "USD", kind: "estimated", complete: false, source: "reservation", missingReasons: ["provider-usage-missing"] }) };
 }
 
 function validate(state: SharedBudgetSnapshot, id: string, limits: SharedBudgetLimits, pricer?: UsagePricer): void {

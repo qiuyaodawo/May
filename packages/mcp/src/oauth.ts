@@ -5,7 +5,7 @@ import {
   type AuthProvider, type FetchLike, type OAuthClientProvider, type OAuthDiscoveryState,
   type StoredOAuthClientInformation, type StoredOAuthTokens,
 } from "@modelcontextprotocol/client";
-import { MayError } from "@sortedyuan/may/core";
+import { MayError, omitUndefined } from "@sortedyuan/may/core";
 import type { McpCredentialStore } from "./credentials.js";
 import type { McpHttpServerOptions } from "./types.js";
 
@@ -62,11 +62,11 @@ export class McpOAuthManager {
   async status(server: McpHttpServerOptions) {
     const state = await this.read(server);
     const grant = state.issuer === undefined ? undefined : state.grants[state.issuer];
-    return {
+    return omitUndefined({
       authenticated: grant?.tokens !== undefined,
       requiresConsent: state.pendingScope !== undefined,
-      ...(grant?.expiresAt === undefined ? {} : { expiresAt: grant.expiresAt }),
-    };
+      expiresAt: grant?.expiresAt,
+    });
   }
 
   /** Opaque grant generation; validates stored credentials before serving private caches. */
@@ -133,10 +133,9 @@ export class McpOAuthManager {
         const fetchFn = this.authFetch(server, signal);
         const scope = computeScopeUnion(settings.scopes?.join(" "), state.pendingScope,
           state.issuer === undefined ? undefined : state.grants[state.issuer]?.tokens?.scope);
-        const result = await auth(provider, {
-          serverUrl: server.url, fetchFn, forceReauthorization: true,
-          ...(scope === undefined ? {} : { scope }),
-        });
+        const result = await auth(provider, omitUndefined({
+          serverUrl: server.url, fetchFn, forceReauthorization: true, scope,
+        }));
         if (result === "REDIRECT") {
           const parameters = await callback.result;
           const discovery = await provider.discoveryState!();
@@ -147,11 +146,11 @@ export class McpOAuthManager {
           });
           // Only inspect callback error fields after issuer validation. Never display their values.
           if (parameters.has("error") || !parameters.get("code")) throw new McpAuthenticationError(server.id);
-          await auth(provider, {
+          await auth(provider, omitUndefined({
             serverUrl: server.url, fetchFn, authorizationCode: parameters.get("code")!,
-            ...(parameters.has("iss") ? { iss: parameters.get("iss")! } : {}),
-            ...(scope === undefined ? {} : { scope }),
-          });
+            iss: parameters.get("iss") ?? undefined,
+            scope,
+          }));
         }
         delete state.pendingScope;
         await this.store.set(this.key(server), state);
@@ -196,11 +195,9 @@ export class McpOAuthManager {
       const scope = computeScopeUnion(oauthSettings(server).scopes?.join(" "), requestedScope,
         state.issuer === undefined ? undefined : state.grants[state.issuer]?.tokens?.scope);
       // Discover again on expiry/401, so a moved issuer cannot consume old refresh/client credentials.
-      await auth(provider, {
-        serverUrl: server.url, fetchFn: this.authFetch(server),
-        ...(resourceMetadataUrl === undefined ? {} : { resourceMetadataUrl }),
-        ...(scope === undefined ? {} : { scope }),
-      });
+      await auth(provider, omitUndefined({
+        serverUrl: server.url, fetchFn: this.authFetch(server), resourceMetadataUrl, scope,
+      }));
     }).catch((error: unknown) => this.fail(server, error));
   }
 
@@ -215,7 +212,7 @@ export class McpOAuthManager {
     const grant = (issuer: string): Grant => state.grants[issuer] ??= {};
     const provider: OAuthClientProvider = {
       redirectUrl,
-      ...(settings.clientMetadataUrl === undefined ? {} : { clientMetadataUrl: settings.clientMetadataUrl }),
+      ...omitUndefined({ clientMetadataUrl: settings.clientMetadataUrl }),
       clientMetadata: {
         client_name: "May MCP", application_type: "native", redirect_uris: [redirectUrl],
         grant_types: ["authorization_code", "refresh_token"], response_types: ["code"],

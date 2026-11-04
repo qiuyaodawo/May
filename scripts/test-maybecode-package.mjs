@@ -39,7 +39,7 @@ await rm(join(repository, "apps", "maybecode", "dist"), {
 });
 await runPnpm(["run", "build"], { cwd: repository, inherit: true });
 const packedOutput = await runPnpm([
-  "--filter",
+  "--filter-prod",
   "@sortedyuan/maybecode...",
   "pack",
   "--pack-destination",
@@ -167,11 +167,13 @@ assert.equal(typeof browser.mountMcpApp, "function");
 `, "utf8");
 await runPnpm(["exec", "node", "mcp-subpaths.mjs"], { cwd: consumerDirectory });
 
-const launched = await runPnpm([
+const launched = await launchUntil([
   "exec",
   "maybecode",
   "--ui",
-  "classic",
+  "web",
+  "--port",
+  "0",
   "--config",
   join(consumerDirectory, "config.json"),
   workspaceDirectory,
@@ -184,14 +186,13 @@ const launched = await runPnpm([
     APPDATA: join(homeDirectory, "AppData", "Roaming"),
     LOCALAPPDATA: join(homeDirectory, "AppData", "Local"),
     GIT_CEILING_DIRECTORIES: consumerDirectory,
+    MAYBECODE_CONTROL_TOKEN: "package-smoke-test-control-token-0123456789",
   },
-  input: "/quit\n",
-  inputAfter: /Type \/help/u,
+}, /MaybeCode Web UI: (http:\/\/\S+)/u, async ([, url]) => {
+  const page = await fetch(url);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /MaybeCode/u);
 });
-assert.match(launched.stdout, /MaybeCode/u);
-assert.match(launched.stdout, new RegExp(`Workspace: ${escapeRegExp(
-  await realpath(workspaceDirectory),
-)}`, "u"));
 assert.doesNotMatch(launched.stdout + launched.stderr, /Error:/u);
 
 process.stdout.write(
@@ -359,13 +360,39 @@ function run(command, args, options = {}) {
   });
 }
 
+/** Start a long-running pnpm command, run a check once its output matches, then stop its process tree. */
+function launchUntil(args, options, pattern, check) {
+  const [command, commandArgs] = /\.[cm]?js$/iu.test(pnpm) ? [process.execPath, [pnpm, ...args]] : [pnpm, args];
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(command, commandArgs, { cwd: options.cwd, env: options.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    let stdout = "", stderr = "", matched = false;
+    const stop = () => {
+      if (process.platform === "win32" && child.pid !== undefined) {
+        spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+      } else child.kill("SIGINT");
+    };
+    const timer = setTimeout(() => { stop(); reject(new Error(`${command} did not report its URL in time:\n${stdout}${stderr}`)); }, 120_000);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => stderr += chunk);
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      const match = matched ? null : pattern.exec(stdout);
+      if (match === null) return;
+      matched = true;
+      clearTimeout(timer);
+      check(match).then(() => { stop(); resolvePromise({ stdout, stderr }); }, (error) => { stop(); reject(error); });
+    });
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (!matched) { clearTimeout(timer); reject(commandError(command, commandArgs, code, signal, stdout + stderr)); }
+    });
+  });
+}
+
 function commandError(command, args, code, signal, output) {
   return new Error(
     `${command} ${args.join(" ")} failed ` +
       `(code ${String(code)}, signal ${String(signal)})${output === "" ? "" : `:\n${output}`}`,
   );
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }

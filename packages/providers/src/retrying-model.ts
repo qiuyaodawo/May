@@ -3,6 +3,7 @@ import {
   traceError,
   ModelProtocolError,
   ModelResponseValidationError,
+  omitUndefined,
   type Model,
   type ModelContextCompactor,
   type ModelEvent,
@@ -136,17 +137,17 @@ export class RetryingModel implements Model {
           yield event;
         }
         if (!completed) throw new ModelProtocolError("Model stream ended without a response.completed event");
-        telemetry?.end({ status: "ok", completed, ...(usage === undefined ? {} : { usage }) });
+        telemetry?.end(omitUndefined({ status: "ok", completed, usage }));
         return;
       } catch (error) {
         if (error instanceof Error && "code" in error && error.code === "RUN_CHECKPOINT_FAILED") throw error;
         if (error instanceof ModelResponseValidationError) { completed = error.responseCompleted; usage = error.usage; }
-        telemetry?.end({
+        telemetry?.end(omitUndefined({
           status: options.signal.aborted ? "cancelled" : "error",
           error: traceError(error),
           completed,
-          ...(usage === undefined ? {} : { usage }),
-        });
+          usage,
+        }));
         const context: ModelRetryContext = {
           attempt,
           maxAttempts: this.maxAttempts,
@@ -177,7 +178,7 @@ export class RetryingModel implements Model {
           options.attemptObserver?.retryWait?.(performance.now() - waitStarted);
         }
       } finally {
-        telemetry?.end({ status: options.signal.aborted ? "cancelled" : "error", completed, ...(usage === undefined ? {} : { usage }) });
+        telemetry?.end(omitUndefined({ status: options.signal.aborted ? "cancelled" : "error", completed, usage }));
       }
     }
   }

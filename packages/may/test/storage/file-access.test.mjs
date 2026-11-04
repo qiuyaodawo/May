@@ -1,28 +1,24 @@
 import assert from "node:assert/strict";
 import { fork } from "node:child_process";
 import { once } from "node:events";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { chmod, lstat, mkdir, readFile, readdir, rename, symlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { withFileAccess } from "@sortedyuan/may/storage";
 
-const testRoot = fileURLToPath(new URL("../../../../review/file-access-tests/", import.meta.url));
 const workerPath = new URL("./fixtures/file-access-worker.mjs", import.meta.url);
 
 async function setup(t) {
-  await mkdir(testRoot, { recursive: true });
-  const directory = await mkdtemp(join(testRoot, "access-"));
   const workers = [];
   t.after(async () => {
     for (const worker of workers) {
       if (worker.child.exitCode === null && worker.child.signalCode === null) worker.child.kill();
     }
     await Promise.all(workers.map(worker => worker.closed));
-    assert.ok(resolve(directory).startsWith(`${resolve(testRoot)}${sep}`));
-    await rm(directory, { recursive: true, force: true });
   });
+  const directory = await createTestDirectory(t, "may/file-access");
   return {
     directory,
     path: join(directory, "state.json"),

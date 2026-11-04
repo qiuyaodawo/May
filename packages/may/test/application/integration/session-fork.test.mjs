@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { appendFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory, selectLiveModelProfile } from "@sortedyuan/test-support";
 import { AgentApplication, AgentWorkspace, applicationHooks, applicationServices } from "@sortedyuan/may";
 import { FileSessionCatalog, InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
 import { readSessionBranchPositions } from "@sortedyuan/may/session";
@@ -11,16 +12,13 @@ import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/pro
 import { SkillRegistry } from "@sortedyuan/may/skills";
 
 test("durable Session forks restore the selected real-provider Context and declared state", { timeout: 90_000 }, async (t) => {
-  const root = resolve("../../review/session-fork-verification");
-  await mkdir(root, { recursive: true });
-  const directory = await mkdtemp(join(root, "session-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/session-fork");
   const skillsDirectory = join(directory, "skills", "fork-guidance");
   await mkdir(skillsDirectory, { recursive: true });
   await writeFile(join(skillsDirectory, "SKILL.md"), "---\nname: fork-guidance\ndescription: Preserve request identifiers.\n---\nAlways retain user-provided identifiers.\n");
   const skills = await SkillRegistry.discover([join(directory, "skills")]);
   const config = await loadMayConfig();
-  const model = createBuiltinProviderModel(selectProviderModel(config, { model: "deepseek-v4-flash" }));
+  const model = createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) }));
   const store = new FileSessionStore(join(directory, "sessions"));
   const outputFile = join(directory, "tool-output.txt");
   const recordingTool = { name: "record_fork_marker", description: "Append FIRST_FORK_MARKER to the request verification file once.",
@@ -104,12 +102,9 @@ test("durable Session forks restore the selected real-provider Context and decla
 });
 
 test("AgentWorkspace creates and catalogs independent selected-position branches", { timeout: 60_000 }, async (t) => {
-  const root = resolve("../../review/session-fork-verification");
-  await mkdir(root, { recursive: true });
-  const directory = await mkdtemp(join(root, "workspace-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/session-fork-workspace");
   const config = await loadMayConfig();
-  const model = createBuiltinProviderModel(selectProviderModel(config, { model: "deepseek-v4-flash" }));
+  const model = createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) }));
   const store = new FileSessionStore(join(directory, "sessions"));
   const catalog = new InMemorySessionCatalog();
   const destination = join(directory, "independent-workspace");
@@ -140,12 +135,9 @@ test("AgentWorkspace creates and catalogs independent selected-position branches
 });
 
 test("fork catalog persistence failure keeps the source Application active and preserves candidate history", { timeout: 60_000 }, async t => {
-  const root = resolve("../../review/session-fork-verification");
-  await mkdir(root, { recursive: true });
-  const directory = await mkdtemp(join(root, "catalog-failure-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/session-fork-catalog-failure");
   const config = await loadMayConfig();
-  const model = createBuiltinProviderModel(selectProviderModel(config, { model: "deepseek-v4-flash" }));
+  const model = createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) }));
   const store = new FileSessionStore(join(directory, "sessions"));
   const catalog = new FileSessionCatalog(join(directory, "catalog.json"));
   const operations = `${catalog.path}.operations`;

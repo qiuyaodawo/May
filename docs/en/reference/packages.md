@@ -47,16 +47,18 @@ and shutdown, start with [Building an Agent](../guides/building-an-agent.md).
 ### `@sortedyuan/may/storage`
 
 Independent local file coordination exports `withFileAccess`, `acquireFileLock`,
-`recoverFileLock`, `releaseFileLock`, `replaceJournalFile` and `syncDirectory`.
-Session, configuration, media, MCP credentials and delivery reuse this module.
-Session's file subpaths retain compatible exports with shared lock state.
+`acquireFileLockSync`, `writeFileDurable`, `replaceJournalFile`, `syncDirectory` and
+`hasErrorCode`. Session, configuration, media, MCP credentials and delivery reuse this module.
 See [Coordinate local file access](../guides/custom-storage.md#coordinate-local-file-access).
 
 ### `@sortedyuan/may/core`
 
 The provider-neutral execution kernel exports `May`, `Model`, `Tool`, `Context`,
 `ToolExecutor`, `ToolScheduler` and `InMemoryContext`. It runs model/tool Steps,
-streams events, schedules tools and propagates cancellation. Storage, provider
+streams events, schedules tools and propagates cancellation. It also exports
+`AsyncStateSerializer`, which runs asynchronous state changes one at a time, and
+`omitUndefined()`, which copies an object without its `undefined` fields and types
+those fields as optional. Storage, provider
 selection, application configuration, permission policy and UI belong to the
 host application.
 
@@ -81,8 +83,7 @@ Headless orchestration above Core exports:
 - `AgentDefinition` and `defineAgent()` for reusable behavior and policy;
 - `AgentApplication` for one active durable Session;
 - `AgentWorkspace` for active Session selection and Catalog updates;
-- `AgentController` and `AgentWorkspaceController` for UI-independent control;
-- `AsyncStateSerializer` for serialized application and Session transitions.
+- `AgentController` and `AgentWorkspaceController` for UI-independent control.
 
 Definitions snapshot tool iterable membership. Each `open({ store, ... })`
 creates an independent application/Session lifecycle with host-supplied storage,

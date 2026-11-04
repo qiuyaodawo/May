@@ -13,7 +13,7 @@ const unknown = async () => ({ status: "recovery-required", detail: "No durable 
 function deferred() { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; }
 function agent(store, respond) {
   return createApplicationAgent({ version: "v1", store, messaging: true,
-    definition: ({ tools }) => defineAgent({ tools, permissionPolicy: () => "allow", toolScheduler: parallelToolScheduler,
+    definition: ({ tools }) => defineAgent({ tools, permissionPolicy: () => "allow", toolScheduler: parallelToolScheduler, requestRecording: "off",
       model: { async *stream(request) { yield { type: "response.completed", message: await respond(request) }; } },
     }),
   });

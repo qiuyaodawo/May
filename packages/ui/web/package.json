@@ -6,14 +6,38 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
     "./styles.css": "./assets/workbench.css",
-    "./assets": { "types": "./dist/assets.d.ts", "import": "./dist/assets.js" }
+    "./assets": {
+      "types": "./dist/assets.d.ts",
+      "import": "./dist/assets.js"
+    }
   },
-  "files": ["dist", "assets", "!dist/.tsbuildinfo"],
-  "scripts": { "build": "tsc -b", "clean": "tsc -b --clean", "test:browser": "pnpm --filter @sortedyuan/providers build && pnpm run build && node --test test/browser/*.test.mjs" },
-  "dependencies": { "@sortedyuan/ui-client": "workspace:*" },
-  "devDependencies": { "@sortedyuan/may": "workspace:*", "@sortedyuan/providers": "workspace:*", "@types/node": "^22.0.0", "playwright": "1.63.0" },
-  "engines": { "node": ">=22" },
+  "files": [
+    "dist",
+    "assets",
+    "!dist/.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test:browser": "pnpm --filter @sortedyuan/providers build && pnpm run build && node --test test/browser/*.test.mjs"
+  },
+  "dependencies": {
+    "@sortedyuan/ui-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@sortedyuan/may": "workspace:*",
+    "@sortedyuan/providers": "workspace:*",
+    "@sortedyuan/test-support": "workspace:*",
+    "@types/node": "^22.0.0",
+    "playwright": "1.63.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "license": "MIT"
 }

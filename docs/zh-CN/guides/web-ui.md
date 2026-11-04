@@ -277,7 +277,7 @@ pnpm --filter @sortedyuan/web-ui test:browser
 ```
 
 这些检查包含资源分页与搜索、新增、删除、重命名、已加载页面状态及过期游标。
-浏览器工作文件保存在被忽略的 `review/`。需要已配置 Provider 的检查具有以下要求：
+浏览器工作文件保存在被忽略的 `.test-output/web-ui/`。需要已配置 Provider 的检查具有以下要求：
 
 | 检查 | 必需环境与命令 |
 | --- | --- |
@@ -286,7 +286,7 @@ pnpm --filter @sortedyuan/web-ui test:browser
 | Session 分支与隔离测试提交 | `MAY_LIVE_PROVIDER_UI_TESTS=1` 和 `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`；`node --test packages/ui/web/test/browser/workspace-session-fork.test.mjs` |
 
 工作区文件版本检查初始化配置的 Model 并检查 Git 和页面；发送消息的检查使用
-已配置凭据并消耗 Provider 配额。工作区检查要求配置
-`deepseek-v4-flash` profile。提交标志仅授权独立测试仓库与 worktree 的提交。
+已配置凭据并消耗 Provider 配额。工作区检查使用 `MAY_LIVE_MODEL` 指定的模型配置，
+没有设置时使用 `defaultModel`。提交标志仅授权独立测试仓库与 worktree 的提交。
 缺少必需标志时测试跳过。实际执行、布局、外部投递及恢复需要分别报告，单项
 本地测试通过不代表已经验证全部行为。

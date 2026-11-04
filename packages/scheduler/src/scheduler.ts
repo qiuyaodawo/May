@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { correlationTraceAttributes, validateTelemetryCorrelation, startTraceSpan, endTraceSpan, traceError, type TelemetryCorrelation, type Tracer } from "@sortedyuan/may/core";
+import { correlationTraceAttributes, omitUndefined, validateTelemetryCorrelation, startTraceSpan, endTraceSpan, traceError, type TelemetryCorrelation, type Tracer } from "@sortedyuan/may/core";
 
 import { latestTime, nextTime } from "./triggers.js";
 import {
@@ -174,7 +174,7 @@ export class Scheduler {
         revision: 1,
         createdAt: timestamp,
         updatedAt: timestamp,
-        ...(nextAt === undefined ? {} : { nextAt }),
+        ...omitUndefined({ nextAt }),
       };
       this.store.put("jobs", result.id, result);
       this.store.put("meta", executionIdentity(["job", result.id]), { createdAt: timestamp });
@@ -203,7 +203,7 @@ export class Scheduler {
         ...merged,
         revision: current.revision + 1,
         updatedAt: new Date(now).toISOString(),
-        ...(nextAt === undefined ? {} : { nextAt }),
+        ...omitUndefined({ nextAt }),
       };
       this.store.put("jobs", id, result);
       return result;
@@ -388,10 +388,7 @@ export class Scheduler {
       }
       const { nextAt: _previous, ...definition } = job;
       const nextAt = nextTime(job.trigger, now);
-      this.store.put("jobs", job.id, {
-        ...definition,
-        ...(nextAt === undefined ? {} : { nextAt }),
-      });
+      this.store.put("jobs", job.id, { ...definition, ...omitUndefined({ nextAt }) });
     }
     const ids = this.store.list<ExecutionRecord>("executions")
       .filter((record) => (record.status === "pending" || record.status === "dispatching") && !this.reserved.has(record.id))
@@ -422,9 +419,7 @@ export class Scheduler {
       status,
       createdAt: timestamp,
       updatedAt: timestamp,
-      ...(scheduledAt === undefined ? {} : { scheduledAt }),
-      ...(event === undefined ? {} : { event: cloneJson(event) }),
-      ...(detail === undefined ? {} : { detail }),
+      ...omitUndefined({ scheduledAt, event: event === undefined ? undefined : cloneJson(event), detail }),
     };
     this.store.put("meta", "sequence", { value: record.seq });
     this.store.put("executions", id, record);
@@ -464,7 +459,7 @@ export class Scheduler {
       const record = claimed.record;
       const correlation: TelemetryCorrelation = { ...this.telemetry, version: 1, schedulerExecutionId: id };
       const span = startTraceSpan(this.tracer, "may.scheduler.submit", {
-        ...(correlation.parent === undefined ? {} : { parent: correlation.parent }),
+        ...omitUndefined({ parent: correlation.parent }),
         attributes: { ...correlationTraceAttributes(correlation), "may.scheduler.job_id": record.job.id, "may.scheduler.job_revision": record.job.revision },
       });
       let taskId: string;
@@ -473,9 +468,8 @@ export class Scheduler {
           executionId: id,
           handler: record.job.task.handler,
           payload: record.job.task.payload,
-          ...(this.tracer === undefined && this.telemetry === undefined ? {} : { telemetry: { ...correlation, ...(span === undefined ? {} : { parent: span.context }) } }),
-          ...(record.scheduledAt === undefined ? {} : { scheduledAt: record.scheduledAt }),
-          ...(record.event === undefined ? {} : { event: record.event }),
+          ...(this.tracer === undefined && this.telemetry === undefined ? {} : { telemetry: { ...correlation, ...omitUndefined({ parent: span?.context }) } }),
+          ...omitUndefined({ scheduledAt: record.scheduledAt, event: record.event }),
         }));
         validateId(result.taskId);
         taskId = result.taskId;

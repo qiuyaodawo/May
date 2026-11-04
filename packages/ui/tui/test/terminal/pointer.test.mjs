@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -11,7 +12,7 @@ import { NodeTerminalDriver } from "../../dist/index.js";
 const require = createRequire(import.meta.url);
 
 test("真实 xterm 鼠标拖动和 End 按键进入终端驱动", { timeout: 60_000 }, async t => {
-  const base = fileURLToPath(new URL("../../../../../review/pointer-tests/", import.meta.url));
+  const base = join(testOutputRoot, "tui", "pointer");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "terminal-"));
   const variables = Object.fromEntries(["TMP", "TEMP", "TMPDIR"].map(key => [key, process.env[key]]));

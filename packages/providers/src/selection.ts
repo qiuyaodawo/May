@@ -3,7 +3,7 @@ import {
   type MayConfig,
   type ResolveProviderOptions,
 } from "@sortedyuan/may/config";
-import type { ModelLimits } from "@sortedyuan/may/core";
+import { omitUndefined, type ModelLimits } from "@sortedyuan/may/core";
 
 import { ProviderConfigurationError } from "./errors.js";
 import type {
@@ -18,33 +18,24 @@ export function selectProviderModel(
 ): ProviderModelSelection {
   const profileName = selector.model ?? config.defaultModel ?? onlyModel(config);
   const profile = resolveModelProfile(config, profileName, resolveOptions);
-  return {
+  return omitUndefined({
     profile: profile.name,
     provider: profile.provider,
     adapter: profile.adapter,
     model: profile.model,
     providerConfig: profile.providerConfig,
     options: profile.options,
-    ...(profile.capabilities === undefined
-      ? {}
-      : { capabilities: profile.capabilities }),
-    ...modelLimits(profile.contextWindowTokens, profile.maxOutputTokens),
-  };
+    capabilities: profile.capabilities,
+    limits: modelLimits(profile.contextWindowTokens, profile.maxOutputTokens),
+  });
 }
 
 function modelLimits(
   contextWindowTokens: number | undefined,
   maxOutputTokens: number | undefined,
-): { limits?: ModelLimits } {
-  if (contextWindowTokens === undefined && maxOutputTokens === undefined) {
-    return {};
-  }
-  return {
-    limits: {
-      ...(contextWindowTokens === undefined ? {} : { contextWindowTokens }),
-      ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
-    },
-  };
+): ModelLimits | undefined {
+  if (contextWindowTokens === undefined && maxOutputTokens === undefined) return undefined;
+  return omitUndefined({ contextWindowTokens, maxOutputTokens });
 }
 
 function onlyModel(config: MayConfig): string {

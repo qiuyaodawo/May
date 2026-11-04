@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { createHash, randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
 import { request as httpRequest } from "node:http";
@@ -11,11 +12,11 @@ import test from "node:test";
 import { AgentGateway } from "../dist/gateway.js";
 import { GatewayHost } from "../dist/gateway-host.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
-import { startGatewayServer } from "../dist/gateway-server.js";
+import { startGatewayServer } from "../dist/plugins/web-api.js";
 import { entryKey } from "../dist/gateway-types.js";
 
 const execute = promisify(execFile);
-const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-http-tests/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-server");
 const cli = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
 
 async function fixture(t, publicOrigin) {
@@ -82,13 +83,8 @@ test("local CLI creates and queries persistent sessions without contacting a mod
   await assert.rejects(execute(process.execPath, [cli, "session", "list", "unexpected", ...common]), error => error.code === 2);
 });
 
-test("legacy delivery retry requires explicit confirmation of uncertain sends", async t => {
+test("delivery retry requires explicit confirmation of uncertain sends", async t => {
   const { gateway, request, server, password } = await fixture(t);
-  gateway.store.put("legacy-deliveries", "uncertain", { kind: "delivery", id: "uncertain", account: "telegram:42", sender: "7", conversation: "7", text: "保存的工作结果", status: "unknown" });
-  assert.equal((await request("/api/v2/legacy-deliveries/uncertain/retry", {})).status, 400);
-  const result = await execute(process.execPath, [cli, "delivery", "retry-legacy", "uncertain", "--confirm", "--server", server.url], { env: { ...process.env, MAYBECLAW_ADMIN_PASSWORD: password } });
-  assert.equal(JSON.parse(result.stdout).delivery.status, "pending");
-  assert.equal(gateway.store.get("legacy-deliveries", "uncertain").status, "pending");
   gateway.store.put("channel-replies", "reply", { id: "reply", text: "渠道回复", input: { account: "telegram:42", conversation: "7", sender: "7" }, status: "unknown" });
   assert.equal((await request("/api/v2/deliveries/reply/retry", {})).status, 400);
   const reply = await execute(process.execPath, [cli, "delivery", "retry", "reply", "--confirm", "--server", server.url], { env: { ...process.env, MAYBECLAW_ADMIN_PASSWORD: password } });

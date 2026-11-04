@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  AgentApplication,
-  AgentWorkspace,
-  AsyncStateSerializer,
-} from "@sortedyuan/may";
-import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
+import { AgentApplication, AgentWorkspace } from "@sortedyuan/may";
+import { AsyncStateSerializer } from "@sortedyuan/may/core";
+import { rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createTestDirectory } from "@sortedyuan/test-support";
+import { FileSessionCatalog, InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 
 function assistant(text) {
@@ -222,4 +222,28 @@ test("AsyncStateSerializer preserves FIFO order after a rejected operation", asy
   assert.equal(await second, 2);
   assert.deepEqual(order, ["first", "second"]);
   await serializer.close();
+});
+
+test("AgentWorkspace rejects input without starting a Run when the session catalog cannot be written", async (t) => {
+  const directory = await createTestDirectory(t, "may/workspace-catalog");
+  const store = new InMemorySessionStore();
+  const catalogPath = join(directory, "catalog.json");
+  const workspace = await AgentWorkspace.open({
+    workspace: "/work",
+    store,
+    catalog: new FileSessionCatalog(catalogPath),
+    openApplication: ({ sessionId, resume }) => AgentApplication.open({
+      requestRecording: "off",
+      model: { async *stream() { yield { type: "response.completed", message: assistant("unexpected") }; } },
+      store,
+      permissionPolicy: () => "allow",
+      ...(sessionId === undefined ? {} : { sessionId }),
+      ...(resume ? { resume: true } : {}),
+    }),
+  });
+  t.after(() => workspace.close());
+  await rm(`${catalogPath}.operations`, { recursive: true, force: true });
+  await writeFile(`${catalogPath}.operations`, "occupied");
+  await assert.rejects(workspace.submit({ input: "question" }));
+  assert.equal((await store.read(workspace.sessionId)).some((event) => event.type === "run.started"), false);
 });

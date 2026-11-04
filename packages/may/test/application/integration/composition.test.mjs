@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { open } from "node:fs/promises";
 import test from "node:test";
+import { selectLiveModelProfile } from "@sortedyuan/test-support";
 import { AgentApplication, applicationHooks, applicationServices, defineAgent } from "@sortedyuan/may";
 import { createModelPlugin, createModelWrapperPlugin } from "@sortedyuan/may/services/models";
 import { createPermissionPlugin } from "@sortedyuan/may/services/permissions";
@@ -12,7 +13,8 @@ import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/pro
 import { BasicTracer, InMemorySpanProcessor } from "@sortedyuan/observability";
 
 async function createModel() {
-  return createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" }));
+  const config = await loadMayConfig();
+  return createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) }));
 }
 
 test("plugin factories compose real Model, Context, tools and actual application access independently", { timeout: 120_000 }, async t => {
@@ -34,7 +36,7 @@ test("plugin factories compose real Model, Context, tools and actual application
     },
   };
   const wrapper = (id, order) => createModelWrapperPlugin({ id, order, create: context => model => ({
-    limits: model.limits, contextCompactor: model.contextCompactor,
+    limits: model.limits, contextCompactor: model.contextCompactor, supportsRequestRecording: model.supportsRequestRecording,
     async *stream(request, options) {
       calls.push(`${context.scopeId}:${id}`);
       yield* model.stream(request, options);
@@ -59,7 +61,7 @@ test("plugin factories compose real Model, Context, tools and actual application
   const first = await definition.open({ store });
   const second = await definition.open({ store });
   t.after(async () => { await first.close(); await second.close(); });
-  assert.equal(attached[0], first); assert.equal(attached[1], second);
+  assert.equal(attached[0].sessionId, first.sessionId); assert.equal(attached[1].sessionId, second.sessionId);
   assert.notEqual(first.getService(resourcesService), second.getService(resourcesService));
   assert.deepEqual(contexts.slice(0, 2), [`${first.sessionId}:verification.context-outer`, `${first.sessionId}:verification.context-inner`]);
   const catalog = first.getService(applicationServices.toolSources).snapshot();
@@ -69,7 +71,7 @@ test("plugin factories compose real Model, Context, tools and actual application
   assert.deepEqual(calls.slice(0, 2), [`${first.sessionId}:verification.outer`, `${first.sessionId}:verification.inner`]);
   assert.ok(calls.every(call => call.startsWith(first.sessionId)));
   await first.updatePlugins(plugins);
-  assert.equal(attached.at(-1), first);
+  assert.equal(attached.at(-1).sessionId, first.sessionId);
   assert.equal(first.getService(resourcesService).attached(), 2);
   assert.ok(resources.slice(0, 3).every(handle => handle.fd === -1));
   assert.ok(second.getService(resourcesService).handle.fd >= 0);
@@ -123,7 +125,7 @@ test("Session plugins have prepared state before creation and receive ordered ap
   });
   const app = await AgentApplication.open({ model: await createModel(), store: new InMemorySessionStore(), plugins: [observer("session"), observer("application")] });
   assert.deepEqual(calls, ["session:beforeCreate", "application:beforeCreate", "session:created", "application:created"]);
-  assert.ok(attached.every(value => value === app));
+  assert.ok(attached.every(value => value.sessionId === app.sessionId));
   assert.equal((await app.inspectContext()).instructionsBytes, Buffer.byteLength("session application"));
   await app.close();
   assert.deepEqual(calls.slice(4), ["session:beforeClose", "application:beforeClose", "session:closed", "application:closed"]);
@@ -154,7 +156,8 @@ test("closing plugins persist their final state before resources close and subse
 });
 
 test("actual Model metadata controls trace labels across plugin replacement", { timeout: 120_000 }, async t => {
-  const selection = selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" });
+  const config = await loadMayConfig();
+  const selection = selectProviderModel(config, { model: selectLiveModelProfile(config) });
   const model = createBuiltinProviderModel(selection);
   const processor = new InMemorySpanProcessor();
   const info = { provider: selection.provider, model: selection.model };

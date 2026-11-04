@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, rename, rm } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { AgentApplication, applicationHooks } from "@sortedyuan/may";
 import { May, userMessage } from "@sortedyuan/may/core";
 import { PruneOldToolResultsStrategy } from "@sortedyuan/may/context";
@@ -11,12 +12,12 @@ import { createRuntimePlugin } from "@sortedyuan/may/services/runtime";
 import { OpenAIResponsesModel } from "@sortedyuan/providers/openai";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 
-const output = fileURLToPath(new URL("../.test-output/", import.meta.url));
 const source = fileURLToPath(new URL("../../../../AGENTS.md", import.meta.url));
 
 async function openApplication(t, automatic, completion) {
-  await mkdir(output, { recursive: true });
-  const directory = await mkdtemp(join(output, "compaction-"));
+  let application;
+  t.after(() => application?.close());
+  const directory = await createTestDirectory(t, "may/compaction-persistence");
   const store = new FileSessionStore(join(directory, "sessions"));
   const strategy = new PruneOldToolResultsStrategy({ keepRecentToolResults: 0, minimumResultBytes: 1 });
   let context;
@@ -36,8 +37,7 @@ async function openApplication(t, automatic, completion) {
       }),
     ],
   };
-  const application = await AgentApplication.open(options);
-  t.after(async () => { await application.close(); await rm(directory, { recursive: true, force: true }); });
+  application = await AgentApplication.open(options);
   await context.append([
     userMessage("读取仓库指令"),
     { role: "assistant", content: [], toolCalls: [{ id: "verification.read", name: "read_file", input: { path: source } }] },

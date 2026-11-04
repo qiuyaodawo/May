@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { PassThrough } from "node:stream";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -12,20 +14,25 @@ import { NodeTerminalDriver } from "@sortedyuan/tui";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
-import { openConfiguredMaybeCode, executeMaybeCodeSlashCommand, createMaybeCodeWebHost, runRetainedTerminalUI, runTerminalUI, createNodeTerminal, MaybeCodeWorkspace, createMaybeCodeModel, selectMaybeCodeModel, createCodingPermissionPolicy } from "../../dist/index.js";
+import { openConfiguredMaybeCode } from "../../dist/index.js";
+import { executeMaybeCodeSlashCommand } from "../../dist/slash-commands.js";
+import { createMaybeCodeWebHost } from "../../dist/web-ui.js";
+import { runRetainedTerminalUI } from "../../dist/ui/retained-tui.js";
+import { MaybeCodeWorkspace } from "../../dist/workspace.js";
+import { createMaybeCodeModel, selectMaybeCodeModel } from "../../dist/model.js";
 
 const workspace = fileURLToPath(new URL("../../../..", import.meta.url));
 
 async function open(t, extra = {}) {
-  const parent = join(workspace, "review", "goal-tests");
+  const parent = join(testOutputRoot, "maybecode", "goal");
   await mkdir(parent, { recursive: true });
   const dataDirectory = await mkdtemp(join(parent, "session-"));
-  const options = { git: false, workspace, dataDirectory, model: "deepseek-v4-flash", autoResume: false,
+  const options = { git: false, workspace, dataDirectory, model: liveModelProfile(), autoResume: false,
     mcp: false, observability: false, skills: false, retry: false, maxSteps: 8, ...extra };
   const app = extra.permissionPolicy === undefined ? await openConfiguredMaybeCode(options) : await MaybeCodeWorkspace.open({
     git: false,
     workspace, store: new FileSessionStore(join(dataDirectory, "sessions")), catalog: new FileSessionCatalog(join(dataDirectory, "catalog")),
-    model: createMaybeCodeModel(selectMaybeCodeModel(await loadMayConfig(), { model: "deepseek-v4-flash" })),
+    model: createMaybeCodeModel(selectMaybeCodeModel(await loadMayConfig(), { model: liveModelProfile() })),
     permissionPolicy: extra.permissionPolicy, skills: false,
   });
   t.after(() => app.close());
@@ -36,7 +43,7 @@ async function stopped(app) {
   const deadline = Date.now() + 150_000;
   while (app.isRunning && Date.now() < deadline) await delay(20);
   assert.equal(app.isRunning, false, "goal did not stop within the test deadline");
-  return app.getGoal();
+  return app.application.getGoal();
 }
 
 async function drain(app) {
@@ -72,7 +79,7 @@ test("real provider drives two goal runs, durable completion, token limits and W
   const resumed = await openConfiguredMaybeCode({ ...options, sessionId: id });
   t.after(() => resumed.close());
   const relay = drain(resumed);
-  assert.deepEqual(resumed.getGoal(), goal);
+  assert.deepEqual(resumed.application.getGoal(), goal);
   await executeMaybeCodeSlashCommand("/goal start --tokens 1 -- Reply with OK and finish the goal.", resumed);
   const exhausted = await stopped(resumed);
   assert.equal(exhausted.status, "budget_exhausted", JSON.stringify(exhausted));
@@ -89,9 +96,9 @@ test("goal pauses before a model request, survives reopen, and accepts a fresh u
   const { app, options } = await open(t);
   const relay = drain(app);
   await app.startGoal("Read the first 3 lines of README.md and report its first heading through update_goal completed. Do not use shell or modify files.");
-  assert.deepEqual(app.getGoal().budget, {});
+  assert.deepEqual(app.application.getGoal().budget, {});
   await app.pauseGoal();
-  const paused = app.getGoal();
+  const paused = app.application.getGoal();
   assert.equal(paused.status, "paused");
   assert.equal(app.isRunning, false);
   const id = app.sessionId;
@@ -99,19 +106,19 @@ test("goal pauses before a model request, survives reopen, and accepts a fresh u
   const resumed = await openConfiguredMaybeCode({ ...options, sessionId: id });
   t.after(() => resumed.close());
   const resumedRelay = drain(resumed);
-  assert.equal(resumed.getGoal().status, "paused");
-  assert.deepEqual(resumed.getGoal().budget, {});
+  assert.equal(resumed.application.getGoal().status, "paused");
+  assert.deepEqual(resumed.application.getGoal().budget, {});
   const status = await executeMaybeCodeSlashCommand("/goal status", resumed);
   assert.match(status.text, /Runs: \d+\/unlimited/u);
   assert.match(status.text, /Active time: \d+\/unlimited ms/u);
-  assert.equal(resumed.getGoal().usage.totalTokens, paused.usage.totalTokens);
+  assert.equal(resumed.application.getGoal().usage.totalTokens, paused.usage.totalTokens);
   await resumed.resumeGoal();
   assert.equal((await stopped(resumed)).status, "completed");
   await resumed.startGoal("Read README.md, report progress, then finish the goal.");
   const run = await resumed.submit({ input: "Reply with exactly USER_MESSAGE_OK. Do not use tools." });
   const result = await run.result;
   assert.match(result.message.content.filter(part => part.type === "text").map(part => part.text).join(""), /USER_MESSAGE_OK/u);
-  assert.equal(resumed.getGoal().status, "paused");
+  assert.equal(resumed.application.getGoal().status, "paused");
   await resumed.close(); await resumedRelay;
 });
 
@@ -133,41 +140,32 @@ test("explicit run and duration limits stop goal execution independently", { tim
   await app.close(); await relay;
 });
 
-for (const retained of [false, true]) {
-  test(`real ${retained ? "retained" : "readline"} terminal executes goal commands`, { timeout: 90_000 }, async t => {
-    const policy = createCodingPermissionPolicy();
-    const { app } = await open(t, retained ? {} : { permissionPolicy: check => check.tool.name === "read" ? "ask" : policy(check) });
-    const input = new PassThrough();
-    const output = new PassThrough();
-    let text = "";
-    let approvalCount = 0;
-    output.on("data", chunk => {
-      const value = chunk.toString();
-      text += value;
-      if (!retained && value.includes("[a]llow once")) { approvalCount++; setImmediate(() => input.write("a\n")); }
-    });
-    const terminal = retained ? new NodeTerminalDriver({ input, output, requireTTY: false }) : createNodeTerminal({ input, output });
-    const task = retained ? runRetainedTerminalUI(app, { terminal }) : runTerminalUI(app, { terminal });
-    t.after(async () => { input.destroy(); await app.close(); terminal.close(); });
-    await delay(40);
-    input.write("/goal start --max-runs 3 -- Use read to inspect the first 3 lines of README.md, then update_goal completed with evidence of the first heading. Do not use shell or modify files.\r\n");
-    const deadline = Date.now() + 60_000;
-    while (!app.getGoal() && Date.now() < deadline) await delay(20);
-    assert.ok(app.getGoal(), stripVTControlCharacters(text).slice(-2000));
-    assert.equal((await stopped(app)).status, "completed");
-    if (!retained) assert.ok(approvalCount > 0, "read approval must be handled while goal input is active");
-    input.write("/goal status\r\n");
-    await delay(100);
-    assert.match(stripVTControlCharacters(text), /completed/u);
-    input.write("/quit\r\n");
-    await task;
-  });
-}
+test("real retained terminal executes goal commands", { timeout: 90_000 }, async t => {
+  const { app } = await open(t, {});
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let text = "";
+  output.on("data", chunk => { text += chunk.toString(); });
+  const terminal = new NodeTerminalDriver({ input, output, requireTTY: false });
+  const task = runRetainedTerminalUI(app, { terminal });
+  t.after(async () => { input.destroy(); await app.close(); terminal.close(); });
+  await delay(40);
+  input.write("/goal start --max-runs 3 -- Use read to inspect the first 3 lines of README.md, then update_goal completed with evidence of the first heading. Do not use shell or modify files.\r\n");
+  const deadline = Date.now() + 60_000;
+  while (!app.application.getGoal() && Date.now() < deadline) await delay(20);
+  assert.ok(app.application.getGoal(), stripVTControlCharacters(text).slice(-2000));
+  assert.equal((await stopped(app)).status, "completed");
+  input.write("/goal status\r\n");
+  await delay(100);
+  assert.match(stripVTControlCharacters(text), /completed/u);
+  input.write("/quit\r\n");
+  await task;
+});
 
 test("goals disabled leaves ordinary runs free of goal tools and state", { timeout: 60_000 }, async t => {
   const { app } = await open(t, { goals: false });
   const relay = drain(app);
-  assert.equal(app.getGoal(), undefined);
+  assert.equal(app.application.getGoal(), undefined);
   await assert.rejects(app.startGoal("unused"), /disabled/u);
   await (await app.submit({ input: "Reply with exactly ORDINARY_OK. Do not call tools." })).result;
   assert.equal((await app.history()).some(event => event.type === "state.updated" && event.key === "may.goal"), false);
@@ -175,7 +173,7 @@ test("goals disabled leaves ordinary runs free of goal tools and state", { timeo
 });
 
 test("process interruption restores a paused goal with unknown usage and no automatic replay", { timeout: 60_000 }, async t => {
-  const parent = join(workspace, "review", "goal-tests");
+  const parent = join(testOutputRoot, "maybecode", "goal");
   await mkdir(parent, { recursive: true });
   const dataDirectory = await mkdtemp(join(parent, "crash-"));
   const child = spawn(process.execPath, [fileURLToPath(new URL("./fixtures/goal-crash.mjs", import.meta.url)), workspace, dataDirectory], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -195,15 +193,15 @@ test("process interruption restores a paused goal with unknown usage and no auto
   await exited;
   const sessionId = /SESSION:([^\r\n]+)/u.exec(output)?.[1];
   assert.ok(sessionId);
-  const app = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory, sessionId, model: "deepseek-v4-flash", mcp: false, observability: false, skills: false, retry: false });
+  const app = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory, sessionId, model: liveModelProfile(), mcp: false, observability: false, skills: false, retry: false });
   t.after(() => app.close());
   const relay = drain(app);
   assert.equal(app.isRunning, false);
-  assert.equal(app.getGoal().status, "paused");
-  assert.equal(app.getGoal().usage.usageComplete, false);
-  assert.ok(app.getGoal().calls.some(call => call.status === "unknown"));
+  assert.equal(app.application.getGoal().status, "paused");
+  assert.equal(app.application.getGoal().usage.usageComplete, false);
+  assert.ok(app.application.getGoal().calls.some(call => call.status === "unknown"));
   await assert.rejects(app.resumeGoal(), /unknown/u);
   await app.cancelGoal();
-  assert.equal(app.getGoal().status, "cancelled");
+  assert.equal(app.application.getGoal().status, "cancelled");
   await app.close(); await relay;
 });

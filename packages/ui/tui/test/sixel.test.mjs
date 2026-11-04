@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -23,7 +24,7 @@ function decodeFrame(frame) {
 }
 
 async function mediaStore() {
-  const base = fileURLToPath(new URL("../../../../review/sixel-tests/", import.meta.url));
+  const base = join(testOutputRoot, "tui", "sixel");
   await mkdir(base, { recursive: true });
   return new FileMediaStore(await mkdtemp(join(base, "images-")));
 }

@@ -1,14 +1,8 @@
-import {
-  open,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { open, stat } from "node:fs/promises";
 import type { Stats } from "node:fs";
-import { randomUUID } from "node:crypto";
-import { basename, dirname, join, resolve } from "node:path";
-import { withFileAccess, acquireFileLock, releaseFileLock } from "../storage/index.js";
+import { resolve } from "node:path";
+import writeFileAtomic from "write-file-atomic";
+import { withFileAccess, acquireFileLock } from "../storage/index.js";
 
 import {
   MayConfigFileError,
@@ -26,11 +20,10 @@ export async function updateDefaultMayModel(
   const path = resolve(configPath);
   let lock;
   try { lock = await acquireFileLock(`${path}.lock`); }
-  catch (error) { throw new MayConfigWriteError(path, `configuration is locked: ${path}.lock; stop competing writers before recovering a stale lock`, { cause: error }); }
+  catch (error) { throw new MayConfigWriteError(path, `configuration is being written by another process: ${path}.lock`, { cause: error }); }
   try {
-    await lock.writeFile(JSON.stringify({ pid: process.pid })); await lock.sync();
     return await withFileAccess(path, "exclusive", () => updateLocked(path, profile));
-  } finally { await releaseFileLock(lock, `${path}.lock`); }
+  } finally { await lock.release(); }
 }
 
 async function updateLocked(path: string, profile: string): Promise<MayConfig> {
@@ -49,32 +42,15 @@ async function updateLocked(path: string, profile: string): Promise<MayConfig> {
   };
   const updated = parseMayConfig(updatedValue, path);
   const output = serializeLike(source, updatedValue);
-  const temporary = join(
-    dirname(path),
-    `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`,
-  );
-
-  try {
-    await writeFile(temporary, output, {
-      encoding: "utf8",
-      flag: "wx",
-      mode: information.mode,
-    });
-    const current = await stat(path);
-    if (!sameSnapshot(information, current)) {
-      throw new MayConfigWriteError(
-        path,
-        "the file changed while it was being updated; retry the operation",
-      );
-    }
-    await rename(temporary, path);
-    return updated;
-  } catch (error) {
-    if (error instanceof MayConfigWriteError) throw error;
-    throw new MayConfigWriteError(path, undefined, { cause: error });
-  } finally {
-    await rm(temporary, { force: true }).catch(() => undefined);
+  if (!sameSnapshot(information, await stat(path))) {
+    throw new MayConfigWriteError(path, "the file changed while it was being updated; retry the operation");
   }
+  try {
+    await writeFileAtomic(path, output, { encoding: "utf8", mode: information.mode });
+  } catch (error) {
+    throw new MayConfigWriteError(path, undefined, { cause: error });
+  }
+  return updated;
 }
 
 async function readConfigSnapshot(path: string): Promise<{
@@ -98,7 +74,7 @@ async function readConfigSnapshot(path: string): Promise<{
     if (error instanceof MayConfigWriteError) throw error;
     throw new MayConfigFileError(path, { cause: error });
   } finally {
-    await handle?.close().catch(() => undefined);
+    await handle?.close();
   }
 }
 

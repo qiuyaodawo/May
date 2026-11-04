@@ -1,7 +1,7 @@
 import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { GatewayLock } from "./gateway-lock.js";
+import { acquireFileLockSync, hasErrorCode, type FileLockSync } from "@sortedyuan/may/storage";
 
 const SCHEMA_VERSION = 1;
 const APPLICATION_ID = 0x4d434c57;
@@ -14,7 +14,7 @@ export class GatewayStore {
   private savepointSequence = 0;
 
   private constructor(directory: string, private readonly database: DatabaseSync,
-    private readonly lock: GatewayLock) {
+    private readonly lock: FileLockSync) {
     this.directory = directory;
     this.path = join(directory, "gateway.sqlite");
   }
@@ -22,7 +22,12 @@ export class GatewayStore {
   static open(directory: string): GatewayStore {
     const resolved = resolve(directory);
     mkdirSync(resolved, { recursive: true, mode: 0o700 });
-    const lock = GatewayLock.acquire(resolved);
+    let lock: FileLockSync;
+    try { lock = acquireFileLockSync(join(resolved, "host.lock")); }
+    catch (error) {
+      if (hasErrorCode(error, "ELOCKED")) throw new Error(`Gateway data directory is already in use: ${resolved}`, { cause: error });
+      throw error;
+    }
     let database: DatabaseSync | undefined;
     try {
       const path = join(resolved, "gateway.sqlite");

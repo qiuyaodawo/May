@@ -1,5 +1,4 @@
-import { resolveRunBudget, type RunBudget } from "@sortedyuan/may/core";
-import type { MayConfig } from "@sortedyuan/may/config";
+import { omitUndefined, resolveRunBudget, type RunBudget } from "@sortedyuan/may/core";
 import { MaybeCodeConfigError } from "./errors.js";
 
 /** 子 Agent 角色在共享工作区里可以使用的编码工具。 */
@@ -45,10 +44,17 @@ export interface MaybeCodeSubagentConfiguration {
   readonly reservationTokens: number;
 }
 
-const LIMIT_CAPS = {
-  maxConcurrent: 8, maxTasks: 128, maxDepth: 4, maxTaskTurns: 16,
-  maxDurationMs: 3_600_000, maxInputBytes: 65_536, maxOutputBytes: 262_144,
-} as const;
+/** 配置文件中经过 JSON Schema 校验的 `subagents` 对象。 */
+export interface MaybeCodeSubagentSettings {
+  readonly enabled?: boolean;
+  readonly roles?: Readonly<Record<string, Omit<Partial<MaybeCodeSubagentRole>, "name">>>;
+  readonly defaultRole?: string;
+  readonly limits?: Partial<MaybeCodeSubagentLimits>;
+  readonly runBudget?: RunBudget;
+  readonly maxModelCalls?: number;
+  readonly maxTotalTokens?: number;
+  readonly reservationTokens?: number;
+}
 
 const DEFAULT_LIMITS: MaybeCodeSubagentLimits = {
   maxConcurrent: 2,
@@ -83,28 +89,21 @@ export function defaultSubagentConfiguration(): MaybeCodeSubagentConfiguration {
   });
 }
 
-/** 解析 apps.maybecode.subagents；false 完全关闭委派。 */
-export function resolveSubagentConfiguration(config: MayConfig): false | MaybeCodeSubagentConfiguration {
-  const value = config.apps?.maybecode?.subagents;
-  if (value === false) return false;
-  if (value === undefined) return defaultSubagentConfiguration();
-  const field = "apps.maybecode.subagents";
-  const record = objectValue(value, field);
-  rejectUnknown(record, [
-    "enabled", "roles", "defaultRole", "limits", "runBudget",
-    "maxModelCalls", "maxTotalTokens", "reservationTokens",
-  ], field);
-  if (record.enabled === false) return false;
-  if (record.enabled !== undefined && typeof record.enabled !== "boolean") {
-    throw new MaybeCodeConfigError(`${field}.enabled must be a boolean`);
-  }
+/** 由已校验的 `apps.maybecode.subagents` 得到委派配置；false 完全关闭委派。 */
+export function resolveSubagentConfiguration(settings: false | MaybeCodeSubagentSettings | undefined): false | MaybeCodeSubagentConfiguration {
+  if (settings === false || settings?.enabled === false) return false;
   const base = defaultSubagentConfiguration();
-  const roles = record.roles === undefined
-    ? base.roles
-    : parseRoles(objectValue(record.roles, `${field}.roles`), field);
-  const defaultRole = record.defaultRole === undefined
-    ? base.defaultRole
-    : identifier(record.defaultRole, `${field}.defaultRole`);
+  if (settings === undefined) return base;
+  const field = "apps.maybecode.subagents";
+  const roles = settings.roles === undefined ? base.roles : Object.freeze(Object.entries(settings.roles).map(([name, role]) =>
+    Object.freeze({
+      ...role,
+      name,
+      tools: Object.freeze([...(role.tools ?? SUBAGENT_TOOL_NAMES)]),
+      delegateTo: Object.freeze([...(role.delegateTo ?? [])]),
+      ...(role.runBudget === undefined ? {} : { runBudget: runBudget(role.runBudget, `${field}.roles.${name}.runBudget`) }),
+    })));
+  const defaultRole = settings.defaultRole ?? base.defaultRole;
   if (!roles.some((role) => role.name === defaultRole)) {
     throw new MaybeCodeConfigError(`${field}.defaultRole must name a registered role`);
   }
@@ -115,130 +114,25 @@ export function resolveSubagentConfiguration(config: MayConfig): false | MaybeCo
       }
     }
   }
-  const limits = record.limits === undefined
-    ? base.limits
-    : parseLimits(objectValue(record.limits, `${field}.limits`), field);
-  const runBudget = record.runBudget === undefined
-    ? base.runBudget
-    : parseRunBudget(record.runBudget, `${field}.runBudget`);
-  const maxModelCalls = record.maxModelCalls === undefined
-    ? base.maxModelCalls
-    : positiveInteger(record.maxModelCalls, `${field}.maxModelCalls`, 10_000);
-  const maxTotalTokens = record.maxTotalTokens === undefined
-    ? undefined
-    : positiveInteger(record.maxTotalTokens, `${field}.maxTotalTokens`, Number.MAX_SAFE_INTEGER);
-  const reservationTokens = record.reservationTokens === undefined
-    ? base.reservationTokens
-    : positiveInteger(record.reservationTokens, `${field}.reservationTokens`, 10_000_000);
-  if (maxTotalTokens !== undefined && maxTotalTokens < reservationTokens) {
+  const reservationTokens = settings.reservationTokens ?? base.reservationTokens;
+  if (settings.maxTotalTokens !== undefined && settings.maxTotalTokens < reservationTokens) {
     throw new MaybeCodeConfigError(`${field}.maxTotalTokens must hold at least reservationTokens`);
   }
-  return Object.freeze({
-    roles: Object.freeze(roles),
+  return Object.freeze(omitUndefined({
+    roles,
     defaultRole,
-    limits: Object.freeze(limits),
-    runBudget,
-    maxModelCalls,
-    ...(maxTotalTokens === undefined ? {} : { maxTotalTokens }),
+    limits: Object.freeze({ ...base.limits, ...settings.limits }),
+    runBudget: settings.runBudget === undefined ? base.runBudget : runBudget(settings.runBudget, `${field}.runBudget`),
+    maxModelCalls: settings.maxModelCalls ?? base.maxModelCalls,
+    maxTotalTokens: settings.maxTotalTokens,
     reservationTokens,
-  });
+  }));
 }
 
-function parseRoles(value: Record<string, unknown>, field: string): readonly MaybeCodeSubagentRole[] {
-  const names = Object.keys(value);
-  if (names.length < 1 || names.length > 8) throw new MaybeCodeConfigError(`${field}.roles must define 1-8 roles`);
-  const roles = names.map((name): MaybeCodeSubagentRole => {
-    identifier(name, `${field}.roles name`);
-    const label = `${field}.roles.${name}`;
-    const role = objectValue(value[name], label);
-    rejectUnknown(role, ["model", "reasoningEffort", "instructions", "tools", "delegateTo", "runBudget"], label);
-    const tools = role.tools === undefined ? [...SUBAGENT_TOOL_NAMES] : stringArray(role.tools, `${label}.tools`, 4);
-    for (const tool of tools) {
-      if (!SUBAGENT_TOOL_NAMES.includes(tool as SubagentToolName)) {
-        throw new MaybeCodeConfigError(`${label}.tools contains unknown tool "${tool}"`);
-      }
-    }
-    const delegateTo = role.delegateTo === undefined ? [] : stringArray(role.delegateTo, `${label}.delegateTo`, 8);
-    for (const target of delegateTo) identifier(target, `${label}.delegateTo entry`);
-    return Object.freeze({
-      name,
-      ...(role.model === undefined ? {} : { model: identifier(role.model, `${label}.model`) }),
-      ...(role.reasoningEffort === undefined ? {} : { reasoningEffort: text(role.reasoningEffort, `${label}.reasoningEffort`, 64) }),
-      ...(role.instructions === undefined ? {} : { instructions: text(role.instructions, `${label}.instructions`, 16_384) }),
-      tools: Object.freeze(tools.map((tool) => tool as SubagentToolName)) as readonly SubagentToolName[],
-      delegateTo: Object.freeze(delegateTo) as readonly string[],
-      ...(role.runBudget === undefined ? {} : { runBudget: parseRunBudget(role.runBudget, `${label}.runBudget`) }),
-    });
-  });
-  const seen = new Set<string>();
-  for (const role of roles) {
-    if (seen.has(role.name)) throw new MaybeCodeConfigError(`${field}.roles contains duplicate role "${role.name}"`);
-    seen.add(role.name);
-  }
-  return Object.freeze(roles);
-}
-
-function parseLimits(value: Record<string, unknown>, field: string): MaybeCodeSubagentLimits {
-  rejectUnknown(value, Object.keys(LIMIT_CAPS), `${field}.limits`);
-  const result: Record<string, number> = { ...DEFAULT_LIMITS };
-  for (const [key, cap] of Object.entries(LIMIT_CAPS)) {
-    if (value[key] === undefined) continue;
-    result[key] = positiveInteger(value[key], `${field}.limits.${key}`, cap);
-  }
-  if (result.maxDepth! < 2) throw new MaybeCodeConfigError(`${field}.limits.maxDepth must allow at least one child level`);
-  if (result.maxTaskTurns! < 2) throw new MaybeCodeConfigError(`${field}.limits.maxTaskTurns must allow a wakeup turn`);
-  return Object.freeze(result as unknown as MaybeCodeSubagentLimits);
-}
-
-function parseRunBudget(value: unknown, field: string): RunBudget {
-  objectValue(value, field);
+function runBudget(value: RunBudget, field: string): RunBudget {
   try {
-    return resolveRunBudget(value as RunBudget);
+    return resolveRunBudget(value);
   } catch (error) {
-    throw new MaybeCodeConfigError(`${field}: ${error instanceof Error ? error.message : "invalid Run budget"}`);
+    throw new MaybeCodeConfigError(`${field}: ${(error as Error).message}`, { cause: error });
   }
-}
-
-function objectValue(value: unknown, field: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new MaybeCodeConfigError(`${field} must be an object`);
-  }
-  return value as Record<string, unknown>;
-}
-
-function rejectUnknown(value: Record<string, unknown>, allowed: readonly string[], field: string): void {
-  const names = new Set(allowed);
-  const unknown = Object.keys(value).find((name) => !names.has(name));
-  if (unknown !== undefined) throw new MaybeCodeConfigError(`${field}.${unknown} is not supported`);
-}
-
-function identifier(value: unknown, field: string): string {
-  if (typeof value !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/u.test(value) ||
-    ["__proto__", "constructor", "prototype"].includes(value)) {
-    throw new MaybeCodeConfigError(`${field} must be a 1-64 character ASCII identifier`);
-  }
-  return value;
-}
-
-function text(value: unknown, field: string, maxBytes: number): string {
-  if (typeof value !== "string" || value.trim() === "" || value.includes("\0") ||
-    Buffer.byteLength(value, "utf8") > maxBytes) {
-    throw new MaybeCodeConfigError(`${field} must be nonempty text of at most ${maxBytes} bytes`);
-  }
-  return value;
-}
-
-function stringArray(value: unknown, field: string, max: number): string[] {
-  if (!Array.isArray(value) || value.length > max || value.some((item) => typeof item !== "string") ||
-    new Set(value).size !== value.length) {
-    throw new MaybeCodeConfigError(`${field} must be an array of at most ${max} unique strings`);
-  }
-  return value as string[];
-}
-
-function positiveInteger(value: unknown, field: string, cap: number): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > cap) {
-    throw new MaybeCodeConfigError(`${field} must be an integer from 1 to ${cap}`);
-  }
-  return value as number;
 }

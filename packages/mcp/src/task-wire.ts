@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { JSONRPCErrorResponse, JSONRPCResponse, JSONRPCNotification, RequestOptions, Transport, Tool } from "@modelcontextprotocol/client";
+import { omitUndefined } from "@sortedyuan/may/core";
 import { assertMcpContentSize } from "./content.js";
 import { MCP_TASKS_EXTENSION, object, taskFailure } from "./tasks.js";
 
@@ -57,7 +58,7 @@ export class McpTaskWire {
       if (signal.aborted) { abort(); return; }
       void transport.send(message, { requestSignal: signal,
         onRequestStreamEnd: () => entry.finish(undefined, taskFailure(this.serverId(), "task response stream ended; operation is not replayed")),
-        ...(headers === undefined ? {} : { headers }),
+        ...omitUndefined({ headers }),
       }).catch(() => entry.finish(undefined, taskFailure(this.serverId(), "task transport failed; remote outcome may be unknown")));
     });
   }

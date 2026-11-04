@@ -4,7 +4,7 @@ import {
   type ContextBudget, type ContextController, type ContextFactory,
   type ContextCompactionStrategy,
 } from "../context/index.js";
-import type { Message, Tool, ToolExecutionContext } from "../core/index.js";
+import { omitUndefined, type Message, type Tool, type ToolExecutionContext } from "../core/index.js";
 import type { SessionEvent } from "../session/index.js";
 
 const STATE_KEY = "maybecode.context-notes";
@@ -80,7 +80,7 @@ export class HistoryReferenceMemory {
         }) }] },
         currentRequest,
       ];
-      const after = inspectContextSnapshot({ ...snapshot, messages }, this.budget === undefined ? {} : { budget: this.budget });
+      const after = inspectContextSnapshot({ ...snapshot, messages }, omitUndefined({ budget: this.budget }));
       if (after.shouldCompact === true || bytes(messages) >= bytes(snapshot.messages)) {
         throw new Error("Saved notes and current request do not fit a smaller context; shorten notes or stop the task");
       }

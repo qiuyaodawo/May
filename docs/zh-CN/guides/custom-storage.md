@@ -293,16 +293,9 @@ MaybeClaw 数据目录使用独立的 `host.lock.access` 操作系统独占锁�
 记录已吸收的精确操作文件名，因此清理中断不会重复重放。合并后不能使用旧版读取器；
 普通版本 1 目录仍可读取。
 
-`@sortedyuan/may/session/file-store` 的 `acquireFileLock(path)` 和
-`releaseFileLock(file, path)` 通过永久保留的 `<path>.access` 和
-`<path>.access.gate` 文件协调锁文件的创建与删除。并发创建或删除最多等待
-30 秒；已有所有者时，获取锁仍以 `EEXIST` 拒绝。再次使用存储前需要等待释放完成。
-使用和恢复期间保留两个访问协调文件，并同时升级全部参与进程。这些规则同样适用于
-Coordination 日志、资源日志、远程 Worker、Team 验证、Team patch 应用和默认模型配置更新。
-
-本地写入者锁可从 `@sortedyuan/may/session/file-store` 导入 `recoverFileLock` 处理。必须先停止所有
-竞争宿主、打开和恢复操作，检查锁内容，再以 `expectedContents` 传入完整原文，并设置
-`confirmHostsStopped: true`。辅助函数拒绝存活 PID、远端宿主、危险链接和已变化的元数据。
-元数据不完整时，独立核实所有者后还需显式设置 `confirmUnknownOwner: true`。
-PID 探测与锁获取分别执行，恢复需要在其他获取锁操作全部停止后进行。
-释放锁仅改变所属关系。
+`@sortedyuan/may/storage` 的 `acquireFileLock(path)` 对 `path` 获取操作系统提供的排他锁。
+已有其他所有者时，获取立即以 `ELOCKED` 失败，错误信息包含 `<path>.owner` 中记录的进程 ID
+和主机名；这个文件只用于说明所有者。持有锁的进程退出时，操作系统自动释放锁，因此已经停止的
+进程留下的锁不需要手动恢复。再次使用存储前需要等待 `lock.release()` 完成。基于同步存储的宿主
+使用 `acquireFileLockSync(path)`。Coordination 日志、资源日志、远程 Worker、Team 验证、
+Team patch 应用和默认模型配置更新使用同一种锁。

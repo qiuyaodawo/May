@@ -1,5 +1,5 @@
 import { codingRuntimeInstructions, getShellToolInfo } from "@sortedyuan/coding-tools";
-import type { Tool } from "@sortedyuan/may/core";
+import { omitUndefined, type Tool } from "@sortedyuan/may/core";
 import type { MaybeCodeApplicationOptions } from "./application.js";
 
 export interface MaybeCodeRuntimeEnvironment {
@@ -12,12 +12,12 @@ export interface MaybeCodeRuntimeEnvironment {
 export function maybeCodeRuntimeInstructions(environment: MaybeCodeRuntimeEnvironment, tools: Iterable<Tool>): string {
   const { workspace, options } = environment;
   const shell = [...tools].map(getShellToolInfo).find(info => info !== undefined);
-  return codingRuntimeInstructions({
+  return codingRuntimeInstructions(omitUndefined({
     workspace,
-    ...(shell === undefined ? {} : { shell }),
+    shell,
     agentRole: "main agent",
     sessionOrigin: environment.historicalBranch ? "historical branch" : options.resume ? "resumed session" : "new session",
     permissionMode: options.gitWorkspace?.readOnly ? "read-only" : options.permissionModeSource?.() ?? (options.permissionPolicy ? "custom" : "default"),
-    ...(environment.historicalSource === undefined ? {} : { historicalSource: environment.historicalSource }),
-  });
+    historicalSource: environment.historicalSource,
+  }));
 }

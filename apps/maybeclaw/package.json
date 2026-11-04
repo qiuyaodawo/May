@@ -14,13 +14,14 @@
     "./rpc": {
       "types": "./dist/gateway-rpc-adapter.d.ts",
       "import": "./dist/gateway-rpc-adapter.js"
-    }
+    },
+    "./config/schema": "./dist/maybeclaw-config.schema.json"
   },
   "bin": {
     "maybeclaw": "./dist/bin.js"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && node ../../scripts/write-config-schema.mjs maybeclaw",
     "clean": "tsc -b --clean",
     "test": "pnpm run build && node --test test/*.test.mjs test/feishu/*.test.mjs test/telegram/*.test.mjs",
     "test:browser": "pnpm run build && node --test test/browser/*.test.mjs",
@@ -28,22 +29,22 @@
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "1.73.3",
-    "@sortedyuan/may": "workspace:*",
-    "@sortedyuan/gateway": "workspace:*",
-    "@sortedyuan/observability": "workspace:*",
+    "@node-rs/argon2": "2.2.1",
     "@sortedyuan/coding-tools": "workspace:*",
     "@sortedyuan/coordination": "workspace:*",
+    "@sortedyuan/gateway": "workspace:*",
+    "@sortedyuan/may": "workspace:*",
     "@sortedyuan/media": "workspace:*",
+    "@sortedyuan/observability": "workspace:*",
     "@sortedyuan/providers": "workspace:*",
     "@sortedyuan/ui-client": "workspace:*",
     "@sortedyuan/web-ui": "workspace:*",
-    "@node-rs/argon2": "2.2.1",
-    "fs-native-extensions": "1.5.1",
     "open": "11.0.4",
     "shell-quote": "^1.10.0",
     "vscode-jsonrpc": "^9.0.2"
   },
   "devDependencies": {
+    "@sortedyuan/test-support": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/shell-quote": "^1.7.5",
     "playwright": "1.63.0"

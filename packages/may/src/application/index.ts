@@ -5,5 +5,4 @@ export * from "./events.js";
 export * from "./hooks.js";
 export * from "./plugins.js";
 export * from "./plugin-access.js";
-export * from "./state-serializer.js";
 export * from "./workspace.js";

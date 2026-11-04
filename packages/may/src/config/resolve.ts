@@ -1,3 +1,4 @@
+import { omitUndefined } from "../core/omit-undefined.js";
 import { MayConfigResolutionError } from "./errors.js";
 import type {
   MayConfig,
@@ -51,22 +52,18 @@ export function resolveModelProfile(
     profile.provider,
     options,
   );
-  const contextWindowTokens = profile.contextWindowTokens;
-  const maxOutputTokens = profile.maxOutputTokens;
-  return {
+  return omitUndefined({
     name: profileName,
     provider: profile.provider,
     adapter: profile.adapter ?? providerConfig.adapter,
     model: profile.model,
-    ...(contextWindowTokens === undefined ? {} : { contextWindowTokens }),
-    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+    contextWindowTokens: profile.contextWindowTokens,
+    maxOutputTokens: profile.maxOutputTokens,
     options: {
       ...(providerConfig.options ?? {}),
       ...(profile.options ?? {}),
     },
-    ...(profile.capabilities === undefined
-      ? {}
-      : { capabilities: profile.capabilities }),
+    capabilities: profile.capabilities,
     providerConfig,
-  };
+  });
 }

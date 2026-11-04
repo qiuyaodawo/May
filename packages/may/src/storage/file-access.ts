@@ -4,6 +4,7 @@ import { lstat, open, type FileHandle } from "node:fs/promises";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { tryLock, unlock } from "fs-native-extensions";
+import { hasErrorCode } from "./errors.js";
 
 export interface FileAccessOptions {
   readonly initialize?: boolean;
@@ -21,10 +22,6 @@ export async function withFileAccess<T>(
   action: () => Promise<T>,
   options: FileAccessOptions = {},
 ): Promise<T> {
-  if (typeof path !== "string" || path.length === 0) throw new TypeError("File access requires a nonempty path");
-  if (mode !== "shared" && mode !== "exclusive") throw new TypeError("Invalid file access mode");
-  if (typeof action !== "function") throw new TypeError("File access requires an action");
-  if (options.initialize !== undefined && typeof options.initialize !== "boolean") throw new TypeError("Invalid file access initialization option");
   const timeoutMs = options.timeoutMs ?? 30_000;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new TypeError("File access timeout must be a positive finite number");
   options.signal?.throwIfAborted();
@@ -86,7 +83,7 @@ async function openAccessFile(path: string, mode: "shared" | "exclusive", initia
   const flags = (mode === "shared" ? constants.O_RDONLY : constants.O_RDWR) | noFollow | constants.O_NONBLOCK;
   try { return await open(path, flags); }
   catch (error) {
-    if (!hasCode(error, "ENOENT")) throw error;
+    if (!hasErrorCode(error, "ENOENT")) throw error;
     if (!initialize) {
       throw Object.assign(new Error(`File access is not initialized: ${path}. Initialize it once with withFileAccess using directory write permission before opening read-only storage.`, { cause: error }), { code: "FILE_ACCESS_NOT_INITIALIZED" });
     }
@@ -95,7 +92,7 @@ async function openAccessFile(path: string, mode: "shared" | "exclusive", initia
     const created = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | noFollow, 0o600);
     await created.close();
   } catch (error) {
-    if (!hasCode(error, "EEXIST")) throw error;
+    if (!hasErrorCode(error, "EEXIST")) throw error;
   }
   return open(path, flags);
 }
@@ -107,8 +104,4 @@ async function validateAccessFile(path: string, file: FileHandle) {
     throw new Error(`File access requires an unchanged regular file without symbolic links: ${path}`);
   }
   return info;
-}
-
-function hasCode(error: unknown, code: string): boolean {
-  return error instanceof Error && "code" in error && error.code === code;
 }

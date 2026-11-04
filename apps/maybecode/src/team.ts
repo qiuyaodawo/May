@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
-import { lstat, open, readFile, readdir, realpath, rename, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { lstat, open, readFile, readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { defineAgent } from "@sortedyuan/may";
 import { createReadTool } from "@sortedyuan/coding-tools";
@@ -12,9 +12,11 @@ import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
 import type { Model, Tool } from "@sortedyuan/may/core";
 import { resolveRunBudget } from "@sortedyuan/may/core";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
-import { withFileAccess } from "@sortedyuan/may/storage";
+import { hasErrorCode, withFileAccess } from "@sortedyuan/may/storage";
+import writeFileAtomic from "write-file-atomic";
 import type { MaybeCodeTeamCommand } from "./args.js";
-import { getDefaultMaybeCodeDataDirectory } from "./configured.js";
+import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeRecording } from "./configured.js";
+import { readMaybeCodeSettings } from "./settings.js";
 import { MaybeCodeUsageError } from "./errors.js";
 import { createMaybeCodeModel, selectMaybeCodeModel, type SelectedMaybeCodeModel } from "./model.js";
 
@@ -71,7 +73,7 @@ async function runLegacyMaybeCodeTeamCommand(command: LegacyTeamCommand, depende
     write(`Team ${id}\nWorkspace: ${manifest.workspace}\nModel profile: ${manifest.model}\n`);
     const path = join(directory, "status.txt");
     try { write(`${await withFileAccess(path, "shared", () => readFile(path, "utf8"))}\n`); }
-    catch (error) { if (!isMissing(error)) throw error; write("No execution snapshot yet.\n"); }
+    catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; write("No execution snapshot yet.\n"); }
     write(`Records: ${directory}\n`);
     return 0;
   }
@@ -83,9 +85,10 @@ async function runLegacyMaybeCodeTeamCommand(command: LegacyTeamCommand, depende
 
   const config = await (dependencies.loadConfig ?? loadMayConfig)({ path: manifest.configPath });
   const selected = selectMaybeCodeModel(config, { model: manifest.model });
+  const recording = resolveMaybeCodeRecording(config);
   if (fingerprint(selected) !== manifest.modelFingerprint) throw new Error("Team model configuration changed; restore the original profile before resuming");
   // Explicit limits replace no caller defaults: resolveRunBudget keeps configured limits non-loosening.
-  const runBudget = resolveRunBudget(config.apps?.maybecode?.runBudget as Parameters<typeof resolveRunBudget>[0], {
+  const runBudget = resolveRunBudget(readMaybeCodeSettings(config).runBudget, {
     maxSteps: 10, maxModelCalls: 10, maxToolCalls: 24, maxDurationMs: 180_000,
   });
   const outputLimit = Math.min(4096, selected.limits?.maxOutputTokens ?? 4096,
@@ -119,7 +122,7 @@ async function runLegacyMaybeCodeTeamCommand(command: LegacyTeamCommand, depende
       const adapter = (execution: TaskExecution, workspace: string) => createApplicationAgent({
         version: VERSION, store, delegation: role === "supervisor", messaging: true,
         definition: ({ tools }) => defineAgent({
-          model, instructions: roleInstructions(role), tools: [createReadTool({ cwd: workspace, maxBytes: 262_144, maxLines: 160 }), createListTool(workspace), ...artifacts!.forTask(execution.task.id).tools(), ...tools],
+          ...recording, model, instructions: roleInstructions(role), tools: [createReadTool({ cwd: workspace, maxBytes: 262_144, maxLines: 160 }), createListTool(workspace), ...artifacts!.forTask(execution.task.id).tools(), ...tools],
           toolScope: { workspaceId: workspace }, runBudget,
           permissionPolicy: (check) => ["read", "list_files", "publish_artifact", "read_artifact", "delegate_tasks", "send_message", "wait_for_messages"].includes(check.tool.name) ? "allow" : "deny",
         }),
@@ -138,7 +141,6 @@ async function runLegacyMaybeCodeTeamCommand(command: LegacyTeamCommand, depende
           return result;
         },
         async recover(execution) {
-          // inspect() never opens an application or calls its model/tools.
           const result = await adapter(execution, manifest.workspace).recover(execution);
           if (result.status === "completed") await publish(execution, result.output);
           return result;
@@ -174,7 +176,7 @@ async function runLegacyMaybeCodeTeamCommand(command: LegacyTeamCommand, depende
     const checkCancellation = async () => {
       const path = join(directory, "cancel.request.json");
       try { await withFileAccess(path, "shared", () => stat(path)); cancel(); }
-      catch (error) { if (!isMissing(error)) { cancel(); throw error; } }
+      catch (error) { if (!hasErrorCode(error, "ENOENT")) { cancel(); throw error; } }
     };
     dependencies.signal?.addEventListener("abort", cancel, { once: true });
     await checkCancellation();
@@ -253,13 +255,8 @@ async function writeDurable(path: string, value: unknown): Promise<void> {
 
 async function writeStatus(directory: string, snapshot: CoordinationSnapshot): Promise<void> {
   const path = join(directory, "status.txt");
-  await withFileAccess(path, "exclusive", async () => {
-    const temporary = `${path}.${randomUUID()}.tmp`;
-    const file = await open(temporary, "wx", 0o600);
-    try { await file.writeFile(`Revision ${snapshot.revision}\n${snapshot.tasks.map((task) => `${task.id}: ${task.status}`).join("\n")}\n`); }
-    finally { await file.close(); }
-    await rename(temporary, path);
-  });
+  await withFileAccess(path, "exclusive", () => writeFileAtomic(path,
+    `Revision ${snapshot.revision}\n${snapshot.tasks.map((task) => `${task.id}: ${task.status}`).join("\n")}\n`, { mode: 0o600 }));
 }
 
 function inside(root: string, path: string): boolean {
@@ -268,4 +265,3 @@ function inside(root: string, path: string): boolean {
 }
 
 function terminalSafe(text: string): string { return text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/gu, ""); }
-function isMissing(error: unknown): boolean { return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"; }

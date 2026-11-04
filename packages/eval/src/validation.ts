@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Ajv } from "ajv";
-import { resolveRunBudget } from "@sortedyuan/may/core";
+import { omitUndefined, resolveRunBudget } from "@sortedyuan/may/core";
 import type { EvalRegistry } from "./registry.js";
 import type { EvalExperiment, EvalFingerprints, EvalPlan, EvalTrial, EvidencePolicy, JsonValue } from "./types.js";
 
@@ -51,8 +51,10 @@ function canonical(value: unknown): unknown {
   return value;
 }
 export function serializableExperiment(experiment: EvalExperiment): EvalExperiment {
-  const evidencePolicy = experiment.evidencePolicy === undefined ? undefined : { maxItemBytes: experiment.evidencePolicy.maxItemBytes, maxTrialBytes: experiment.evidencePolicy.maxTrialBytes, maxItems: experiment.evidencePolicy.maxItems, ...(experiment.evidencePolicy.retainContent === undefined ? {} : { retainContent: experiment.evidencePolicy.retainContent }), ...(experiment.evidencePolicy.redactorId === undefined ? {} : { redactorId: experiment.evidencePolicy.redactorId }), ...(experiment.evidencePolicy.redactorVersion === undefined ? {} : { redactorVersion: experiment.evidencePolicy.redactorVersion }) };
-  return structuredClone({ ...experiment, ...(evidencePolicy === undefined ? {} : { evidencePolicy }) });
+  const policy = experiment.evidencePolicy;
+  const evidencePolicy = policy === undefined ? undefined : omitUndefined({ maxItemBytes: policy.maxItemBytes, maxTrialBytes: policy.maxTrialBytes, maxItems: policy.maxItems,
+    retainContent: policy.retainContent, redactorId: policy.redactorId, redactorVersion: policy.redactorVersion });
+  return structuredClone({ ...experiment, ...omitUndefined({ evidencePolicy }) });
 }
 export function validateExperiment(experiment: EvalExperiment, registry: EvalRegistry): void {
   validateIdentifier(experiment.id, "experiment.id");

@@ -1,5 +1,8 @@
 import type { GoalBudget, GoalState, GoalStatus } from "./types.js";
 
+/** Session state key that stores the current goal. */
+export const GOAL_STATE_KEY = "may.goal";
+
 export function goalBudget(value: GoalBudget = {}): GoalState["budget"] {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("goal budget must be an object");
   for (const [key, limit] of Object.entries(value)) {

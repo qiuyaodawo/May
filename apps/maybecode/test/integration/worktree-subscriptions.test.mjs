@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
 const execute = promisify(execFile);
-const artifacts = fileURLToPath(new URL("../../../../review/worktree-subscription-tests/", import.meta.url));
+const artifacts = join(testOutputRoot, "maybecode", "worktree-subscriptions");
 const server = fileURLToPath(new URL("../../../../packages/mcp/test/fixtures/workspace-resource-server.mjs", import.meta.url));
 
 test("real MCP subscriptions retain their workspace and Session ownership", {
@@ -24,7 +26,7 @@ test("real MCP subscriptions retain their workspace and Session ownership", {
   await git("config", "--local", "user.email", "may-test@example.invalid");
   await git("config", "--local", "core.autocrlf", "false");
   await writeFile(join(workspace, "value.txt"), "INITIAL_SUBSCRIPTION\n");
-  const app = await openConfiguredMaybeCode({ workspace, model: "deepseek-v4-flash",
+  const app = await openConfiguredMaybeCode({ workspace, model: liveModelProfile(),
     dataDirectory: join(directory, "sessions"), skills: false, goals: false, subagents: false,
     observability: false, plugins: [], permissionMode: "yolo",
     mcp: { servers: [{ id: "workspace", command: process.execPath, args: [server], required: true, protocolMode: "auto" }] },

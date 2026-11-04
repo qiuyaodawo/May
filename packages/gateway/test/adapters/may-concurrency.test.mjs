@@ -1,20 +1,24 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { defineAgent } from "@sortedyuan/may";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { OpenAIResponsesModel } from "@sortedyuan/providers/openai";
 import { createMayAgentAdapter } from "../../dist/adapters/index.js";
 
 test("May adapter owns its execution context during history inspection and releases failed attempts", async t => {
-  const base = fileURLToPath(new URL("../../../../review/gateway-execution-tests/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "conversation-"));
+  const executions = [];
+  let adapter;
+  t.after(async () => {
+    await Promise.all(executions);
+    await adapter?.close();
+  });
+  const directory = await createTestDirectory(t, "gateway/may-concurrency");
   const store = new FileSessionStore(directory);
   let currentContext;
-  const adapter = createMayAgentAdapter({
+  adapter = createMayAgentAdapter({
     agentId: "execution-owner",
     store,
     definition: (tools, context) => {
@@ -24,13 +28,6 @@ test("May adapter owns its execution context during history inspection and relea
         toolSource: tools,
       });
     },
-  });
-  const executions = [];
-  t.after(async () => {
-    await Promise.all(executions);
-    await adapter.close();
-    assert.ok(resolve(directory).startsWith(resolve(base) + sep));
-    await rm(directory, { recursive: true, force: true });
   });
   const conversationId = await adapter.createConversation("concurrent-inputs");
   const cancelled = new Error("Execution cancelled before model access");

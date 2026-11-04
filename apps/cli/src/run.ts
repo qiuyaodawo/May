@@ -3,7 +3,7 @@ import {
   type LoadMayConfigOptions,
   type MayConfig,
 } from "@sortedyuan/may/config";
-import { InMemoryContext, May, type Model } from "@sortedyuan/may/core";
+import { InMemoryContext, May, omitUndefined, type Model } from "@sortedyuan/may/core";
 import type { ProviderAdapterRegistry } from "@sortedyuan/providers";
 import { CLI_USAGE, parseCliArgs } from "./args.js";
 import { CliUsageError } from "./errors.js";
@@ -54,13 +54,9 @@ export async function runCli(
 
   try {
     const loadConfig = dependencies.loadConfig ?? loadMayConfig;
-    const loadOptions: LoadMayConfigOptions = command.configPath === undefined
-      ? {}
-      : { path: command.configPath };
+    const loadOptions: LoadMayConfigOptions = omitUndefined({ path: command.configPath });
     const config = await loadConfig(loadOptions);
-    const selector: ModelSelector = {
-      ...(command.model === undefined ? {} : { model: command.model }),
-    };
+    const selector: ModelSelector = omitUndefined({ model: command.model });
     const selection = selectModelConfig(config, selector);
     const model = dependencies.createModel === undefined
       ? createConfiguredModel(selection, dependencies.adapterRegistry)

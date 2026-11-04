@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -6,13 +7,13 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { AgentGateway } from "../dist/gateway.js";
 import { GatewayHost } from "../dist/gateway-host.js";
-import { startGatewayServer } from "../dist/gateway-server.js";
+import { startGatewayServer } from "../dist/plugins/web-api.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { inboxId } from "../dist/channel-store.js";
 import { TelegramAdapter } from "../dist/channels.js";
 import { actorKey, entryKey } from "../dist/gateway-types.js";
 
-const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-message-change-tests/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-message-changes");
 const operator = { kind: "operator", id: "service-admin" };
 const entry = { account: "telegram:42", conversation: "-100", kind: "group", threadId: "7" };
 const actor = { kind: "platform", account: entry.account, conversation: entry.conversation, threadId: entry.threadId, userId: "123" };

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { fork } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
@@ -9,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { KeyringMcpCredentialStore } from "../dist/credentials.js";
 
-const testRoot = fileURLToPath(new URL("../../../review/credential-lock-tests/", import.meta.url));
+const testRoot = join(testOutputRoot, "mcp", "credential-lock");
 const key = "concurrent-credential";
 async function setup(t) {
   await mkdir(testRoot, { recursive: true });
@@ -119,19 +120,13 @@ test("credential guard acquisition times out without entering work", { timeout: 
   await store.exclusive(key, async () => {});
 });
 
-test("process termination preserves the credential owner file until explicit recovery", { timeout: 15_000 }, async t => {
-  const { store, path, start } = await setup(t);
+test("process termination releases the credential guard without manual recovery", { timeout: 15_000 }, async t => {
+  const { store, start } = await setup(t);
   const holder = start("hold");
   await holder.first;
-  const owner = await readFile(path, "utf8");
-  assert.equal(JSON.parse(owner).pid, holder.child.pid);
   holder.child.kill();
   await holder.closed;
   let entered = false;
-  await assert.rejects(store.exclusive(key, async () => { entered = true; }), /verify its PID/u);
-  assert.equal(entered, false);
-  assert.equal(await readFile(path, "utf8"), owner);
-  await rm(path);
   await store.exclusive(key, async () => { entered = true; });
   assert.equal(entered, true);
 });

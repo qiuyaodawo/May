@@ -181,5 +181,5 @@ The live integration command uses the host's configured default model and its
 provider quota for one inference request. OpenAI transports also exercise native
 JSON Schema output. It validates actual usage, capability version, attempt
 parentage and independent metrics. Reports and Session history remain under
-ignored `review/model-telemetry-live/`. Local protocol, SQLite, file and process
+ignored `.test-output/model-telemetry-live/`. Local protocol, SQLite, file and process
 tests do not require an external model account.

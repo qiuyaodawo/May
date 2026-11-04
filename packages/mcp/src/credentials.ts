@@ -1,9 +1,9 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { mkdir, readFile, stat, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
-import { MayError } from "@sortedyuan/may/core";
-import { withFileAccess } from "@sortedyuan/may/storage";
+import writeFileAtomic from "write-file-atomic";
+import { MayError, omitUndefined } from "@sortedyuan/may/core";
+import { hasErrorCode, withFileAccess } from "@sortedyuan/may/storage";
 
 /** Secrets are opaque to the host. Implementations must not log their values. */
 export interface McpCredentialStore {
@@ -77,14 +77,13 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
       try { return JSON.parse(plain.toString("utf8")) as T; }
       finally { plain.fill(0); }
     } catch (error) {
-      if (hasCode(error, "ENOENT")) return undefined;
-      throw new McpCredentialStoreError(undefined, error instanceof SyntaxError ? "invalid-record" : hasCode(error, "EACCES") || hasCode(error, "EPERM") ? "permission-denied" : error instanceof McpCredentialStoreError ? error.reason : "invalid-or-unreadable-record");
+      if (hasErrorCode(error, "ENOENT")) return undefined;
+      throw new McpCredentialStoreError(undefined, error instanceof SyntaxError ? "invalid-record" : hasErrorCode(error, "EACCES") || hasErrorCode(error, "EPERM") ? "permission-denied" : error instanceof McpCredentialStoreError ? error.reason : "invalid-or-unreadable-record");
     }
   }
 
   async set(key: string, value: unknown): Promise<void> {
     const path = this.path(key);
-    let temporary: string | undefined;
     try {
       const plain = Buffer.from(JSON.stringify(value));
       if (plain.length > 1024 * 1024) throw new McpCredentialStoreError("MCP credential record is too large");
@@ -95,60 +94,34 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
       try { ciphertext = Buffer.concat([cipher.update(plain), cipher.final()]); }
       finally { plain.fill(0); }
       await mkdir(this.directory, { recursive: true, mode: 0o700 });
-      const staged = `${path}.${randomUUID()}.tmp`;
-      temporary = staged;
-      const file = await open(staged, "wx", 0o600);
-      try {
-        await file.writeFile(JSON.stringify({
-          version: 1, nonce: nonce.toString("base64"),
-          tag: cipher.getAuthTag().toString("base64"), ciphertext: ciphertext.toString("base64"),
-        }));
-        await file.sync();
-      } finally { await file.close(); }
-      await withFileAccess(path, "exclusive", () => rename(staged, path));
+      const record = JSON.stringify({
+        version: 1, nonce: nonce.toString("base64"),
+        tag: cipher.getAuthTag().toString("base64"), ciphertext: ciphertext.toString("base64"),
+      });
+      await withFileAccess(path, "exclusive", () => writeFileAtomic(path, record, { mode: 0o600 }));
     } catch { throw new McpCredentialStoreError(); }
-    finally { if (temporary !== undefined) await unlink(temporary).catch(() => {}); }
   }
 
   async delete(key: string): Promise<void> {
     const path = this.path(key);
     try { await withFileAccess(path, "exclusive", () => unlink(path)); }
-    catch (error) { if (!hasCode(error, "ENOENT")) throw new McpCredentialStoreError(); }
+    catch (error) { if (!hasErrorCode(error, "ENOENT")) throw new McpCredentialStoreError(); }
   }
 
   async exclusive<T>(key: string, work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     signal?.throwIfAborted();
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
     const path = join(this.directory, `${digest(key)}.lock`);
-    const deadline = performance.now() + 10_000;
     let entered = false;
     try {
       return await withFileAccess(path, "exclusive", async () => {
         entered = true;
-        let file;
-        while (file === undefined) {
-          signal?.throwIfAborted();
-          try { file = await open(path, "wx", 0o600); }
-          catch (error) {
-            if (!hasCode(error, "EEXIST")) throw new McpCredentialStoreError();
-            if (performance.now() >= deadline) {
-              throw new McpCredentialStoreError("MCP credentials are locked by another operation; if it crashed, verify its PID has exited before removing the vault .lock file");
-            }
-            await delay(50, undefined, signal === undefined ? {} : { signal });
-          }
-        }
-        try {
-          await file.writeFile(JSON.stringify({ pid: process.pid, createdAt: Date.now() }));
-          signal?.throwIfAborted();
-          return await work();
-        } finally {
-          try { await file.close(); }
-          finally { await unlink(path); }
-        }
-      }, { timeoutMs: 10_000, ...(signal === undefined ? {} : { signal }) });
+        signal?.throwIfAborted();
+        return work();
+      }, omitUndefined({ timeoutMs: 10_000, signal }));
     } catch (error) {
       if (entered || signal?.aborted) throw error;
-      throw new McpCredentialStoreError(undefined, hasCode(error, "ETIMEDOUT") ? "lock-timeout" : "storage-unavailable");
+      throw new McpCredentialStoreError(undefined, hasErrorCode(error, "ETIMEDOUT") ? "lock-timeout" : "storage-unavailable");
     }
   }
 
@@ -175,6 +148,3 @@ export class KeyringMcpCredentialStore implements McpCredentialStore {
 }
 
 function digest(value: string): string { return createHash("sha256").update(value).digest("hex"); }
-function hasCode(error: unknown, code: string): boolean {
-  return error instanceof Error && "code" in error && error.code === code;
-}

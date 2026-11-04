@@ -1,3 +1,4 @@
+import { omitUndefined } from "@sortedyuan/may/core";
 import { CliUsageError } from "./errors.js";
 
 export const CLI_USAGE = `May CLI
@@ -109,10 +110,5 @@ function createRunCommand(
   configPath: string | undefined,
   model: string | undefined,
 ): RunCommand {
-  return {
-    type: "run",
-    prompt,
-    ...(configPath === undefined ? {} : { configPath }),
-    ...(model === undefined ? {} : { model }),
-  };
+  return omitUndefined({ type: "run", prompt, configPath, model });
 }

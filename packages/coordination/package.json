@@ -30,7 +30,7 @@
     "@sortedyuan/coding-tools": "workspace:*",
     "@sortedyuan/mcp": "workspace:*"
   },
-  "devDependencies": { "@types/node": "^22.0.0" },
+  "devDependencies": { "@sortedyuan/test-support": "workspace:*", "@types/node": "^22.0.0" },
   "engines": { "node": ">=22" },
   "license": "MIT"
 }

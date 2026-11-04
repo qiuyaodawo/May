@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
@@ -9,7 +10,7 @@ import { SqliteSchedulerStore } from "../dist/sqlite-store.js";
 import { DurableTaskHost, HttpTaskDispatcher } from "./fixtures/durable-host.mjs";
 
 test("scheduler propagates versioned correlation through SQLite and HTTP task submission", { timeout: 10_000 }, async t => {
-  const parentDirectory = fileURLToPath(new URL("../../../review/correlation-tests/", import.meta.url));
+  const parentDirectory = join(testOutputRoot, "scheduler", "correlation");
   await mkdir(parentDirectory, { recursive: true });
   const directory = await mkdtemp(join(parentDirectory, "scheduler-"));
   const host = await DurableTaskHost.open(join(directory, "host"));

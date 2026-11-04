@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -9,7 +10,7 @@ import { gatewayEntry, gatewaySettings } from "../dist/gateway-settings.js";
 import { gatewayInput } from "../dist/gateway-input.js";
 import { actorKey, entryKey } from "../dist/gateway-types.js";
 
-const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-management-tests/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-management");
 const operator = { kind: "operator", id: "service-admin" };
 const entry = { account: "telegram:42", conversation: "-100", kind: "group" };
 const member = { kind: "platform", account: entry.account, conversation: entry.conversation, userId: "123" };
@@ -108,7 +109,6 @@ gateway.observe(() => { if (gateway.store.list("sessions").length === 1) process
 await gateway.handle(process.argv[3], { kind: "operator", id: "service-admin" }, { requestId: "interrupted-create" });`;
   const result = spawnSync(process.execPath, ["--input-type=module", "-e", script, directory, JSON.stringify(configuration()), command], { windowsHide: true, encoding: "utf8" });
   assert.equal(result.status, 7, result.stderr);
-  await unlink(join(directory, "host.lock"));
   const reopened = open();
   await assert.rejects(reopened.handle(command, operator, { requestId: "interrupted-create" }), /未确认|需要核对|尚未确认|尚无确认/);
   assert.deepEqual(reopened.sessions(operator).map(session => session.name), ["Interrupted"]);
@@ -163,12 +163,12 @@ test("archived sessions reject conversation creation before loading an Agent", a
 });
 
 test("configuration validates Agent identities, adapter requirements and integer limits", () => {
-  assert.throws(() => gatewaySettings(configuration({ version: 1 })), /version: 2/);
+  assert.throws(() => gatewaySettings(configuration({ version: 1 })), /apps\.maybeclaw\.version must be equal to constant/);
   assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "same", adapter: "may" }, { id: "same", adapter: "may" }] })), /重复/);
   assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "external", adapter: "module" }] })), /module/);
-  assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "..\/escape", adapter: "may" }] })), /Agent ID/);
+  assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "..\/escape", adapter: "may" }] })), /agents\.0\.id must match pattern/);
   assert.throws(() => gatewaySettings(configuration({ server: { maxConcurrent: 0 } })), /maxConcurrent/);
-  assert.throws(() => gatewaySettings(configuration({ server: { approvalMs: 1.5 } })), /正.*整数/);
+  assert.throws(() => gatewaySettings(configuration({ server: { approvalMs: 1.5 } })), /server\.approvalMs must be integer/);
   assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", permissions: { read: "sometimes" } }] })), /permissions/);
 });
 
@@ -207,8 +207,8 @@ test("entry and Agent configuration validation rejects ambiguous identities and 
   assert.throws(() => gatewaySettings(configuration({ access: { allowedAgents: { scope: ["unregistered"] } } })), /未登记/);
   assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", runBudget: { maxSteps: -1 } }] })), /maxSteps/);
   assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", readDirectory: "relative" }] })), /绝对目录/);
-  assert.throws(() => gatewaySettings(configuration({ runBudget: { maxSteps: 1 } })), /agents\[\]\.runBudget/);
-  assert.throws(() => gatewaySettings(configuration({ server: { shutdownMs: 2_147_483_648 } })), /定时器/);
+  assert.throws(() => gatewaySettings(configuration({ runBudget: { maxSteps: 1 } })), /apps\.maybeclaw\.runBudget is not supported/);
+  assert.throws(() => gatewaySettings(configuration({ server: { shutdownMs: 2_147_483_648 } })), /server\.shutdownMs must be <= 2147483647/);
 });
 
 test("public control origin requires canonical HTTPS origin without credentials or URL suffixes", () => {
@@ -224,7 +224,7 @@ test("gatewaySettings accepts empty array and omitted agents, rejects non-array 
   const omitted = { apps: { maybeclaw: { version: 2 } } };
   assert.deepEqual(gatewaySettings(omitted).agents, []);
   for (const bad of [null, {}, "bad", 123, true]) {
-    assert.throws(() => gatewaySettings(configuration({ agents: bad })), /agents 必须为列表/);
+    assert.throws(() => gatewaySettings(configuration({ agents: bad })), /apps\.maybeclaw\.agents must be array/);
   }
 });
 

@@ -61,7 +61,7 @@ and metadata do not serialize their behavior or current permission policy.
 ### Per-Run dynamic tool catalogs
 
 `MayOptions.toolSource` is a trusted synchronous `() => Iterable<Tool>`, also
-accepted by `AgentApplication`, `defineAgent()` and `MaybeCodeApplication`. It adds
+accepted by `AgentApplication` and `defineAgent()`. It adds
 tools to the static collection once at each `run()` or `continue()` start. Discover
 or refresh remote tools outside Core, then return the latest in-memory collection.
 Duplicate names fail before Context mutation.

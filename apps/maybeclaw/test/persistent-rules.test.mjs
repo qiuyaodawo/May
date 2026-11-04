@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile, lstat } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
@@ -11,9 +12,9 @@ import { createGatewayPermissionPolicy } from "../dist/gateway-adapters.js";
 import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { GatewayUiHost } from "../dist/gateway-ui.js";
-import { startGatewayServer } from "../dist/gateway-server.js";
+import { startGatewayServer } from "../dist/plugins/web-api.js";
 
-const parent = fileURLToPath(new URL("../../../review/persistent-rules/", import.meta.url));
+const parent = join(testOutputRoot, "maybeclaw", "persistent-rules");
 const operator = { kind: "operator", id: "control" };
 const actorScope = JSON.stringify(["operator", operator.id]);
 
@@ -162,7 +163,7 @@ test("Gateway administrators create and revoke rules using verified existing sco
     await assert.rejects(gateway.createPermissionRule(original.id, "deny", member), /服务管理员/);
     await assert.rejects(gateway.revokePermissionRule(original.id, member), /服务管理员/);
     assert.deepEqual(await gateway.listPermissionRules(operator), [original]);
-    await assert.rejects(FilePermissionRuleStore.open({ path: f.path }), { code: "EEXIST" });
+    await assert.rejects(FilePermissionRuleStore.open({ path: f.path }), { code: "ELOCKED" });
     const command = { version: 1, hostId: ui.hostId, targetId: null, requestId: "create-deny", name: "permission.rule.create", args: { sourceId: original.id, decision: "deny" } };
     const receipt = await ui.execute(command);
     const deny = JSON.parse(receipt.output.text);
@@ -174,7 +175,6 @@ test("Gateway administrators create and revoke rules using verified existing sco
     assert.equal(await gateway.revokePermissionRule(original.id, operator), false);
     assert.equal(gateway.store.list("permission-rule-events").length, 2);
   } finally { ui.close(); await gateway.close(); }
-  await assert.rejects(lstat(`${f.path}.lock`), { code: "ENOENT" });
   const restarted = new AgentGateway(f);
   try {
     const rules = await restarted.listPermissionRules(operator);

@@ -9,8 +9,14 @@ import { createWriteTool, createShellTool } from "@sortedyuan/coding-tools";
 import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
 import { services } from "@sortedyuan/may/services";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
-import { InMemorySessionCatalog, createCodingPermissionPolicy, parseMaybeCodeArgs, executeMaybeCodeSlashCommand,
-  openConfiguredMaybeCode, MaybeCodeApplication, MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
+import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { openConfiguredMaybeCode } from "../dist/index.js";
+import { createCodingPermissionPolicy } from "../dist/policy.js";
+import { parseMaybeCodeArgs } from "../dist/args.js";
+import { executeMaybeCodeSlashCommand } from "../dist/slash-commands.js";
+import { MaybeCodeApplication } from "../dist/application.js";
+import { MaybeCodeTerminalView } from "../dist/ui/terminal-view.js";
 import { localModel, yoloDirectory, yoloWorkspace } from "./yolo-support.mjs";
 
 function context(signal = new AbortController().signal) {
@@ -80,7 +86,7 @@ test("YOLO workspace 状态用于命令和固定状态栏，会话切换后保�
   await historical.close();
   const app = await yoloWorkspace({ workspace, store, catalog, sessionId: historical.sessionId }); t.after(() => app.close());
   assert.equal(app.permissionMode, "default");
-  const view = new MaybeCodePrototypeView({ store: new TranscriptStore(), workspace: app.workspace,
+  const view = new MaybeCodeTerminalView({ store: new TranscriptStore(), workspace: app.workspace,
     permissionMode: () => app.permissionMode, onSubmit: () => {} });
   t.after(() => view.dispose());
   const render = width => view.render({ width, height: 24 }).lines.map(stripVTControlCharacters).join("\n");
@@ -122,7 +128,7 @@ test("真实配置文件与启动选项确定 YOLO，运行时切换不写入配
   const app = await openConfiguredMaybeCode({ ...options, git: false }); t.after(() => app.close());
   assert.equal(app.permissionMode, "yolo");
   await Promise.all([app.switchModel("second"), app.setPermissionMode("default")]);
-  assert.equal(app.modelInfo.profile, "second"); assert.equal(app.permissionMode, "default");
+  assert.equal(app.application.modelInfo.profile, "second"); assert.equal(app.permissionMode, "default");
   assert.equal(await readFile(configPath, "utf8"), configuration); await app.close();
   const overridden = await openConfiguredMaybeCode({ ...options, git: false, permissionMode: "default" });
   t.after(() => overridden.close()); assert.equal(overridden.permissionMode, "default"); await overridden.close();

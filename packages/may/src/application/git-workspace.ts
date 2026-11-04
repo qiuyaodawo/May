@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { hostname, homedir } from "node:os";
+import { homedir } from "node:os";
 import { access, chmod, lstat, mkdir, open, readFile, readdir, realpath, rename, rm } from "node:fs/promises";
-import type { FileHandle } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { simpleGit, type SimpleGit, type StatusResult } from "simple-git";
 import { createPatch, diffLines } from "diff";
-import { withFileAccess } from "../storage/index.js";
+import writeFileAtomic from "write-file-atomic";
+import { omitUndefined } from "../core/index.js";
+import { acquireFileLock, hasErrorCode, withFileAccess, type FileLock } from "../storage/index.js";
 
 export interface ProjectGitWorkspaceOptions {
   readonly workspace: string;
@@ -265,8 +266,8 @@ export class ProjectGitWorkspace {
     const commit = await this.head(status);
     return { files: status, state: { workspace: this.workspace, repository: this.repository, projectId: this.projectId,
       autoCommit: this.autoCommit, readOnly: this.readOnly, state: commit === undefined ? "unborn" : "ready",
-      ...(status.detached || !status.current ? {} : { branch: status.current }),
-      ...(commit === undefined ? {} : { commit }), detached: status.detached, dirty: !status.isClean() } };
+      ...omitUndefined({ branch: status.detached || !status.current ? undefined : status.current, commit }),
+      detached: status.detached, dirty: !status.isClean() } };
   }
 
   async prepare(sessionId: string): Promise<GitCheckpoint> {
@@ -296,15 +297,13 @@ export class ProjectGitWorkspace {
       const fromCommit = (await this.status()).commit;
       let finished = false;
       return {
-        ...(fromCommit === undefined ? {} : { fromCommit }),
+        ...omitUndefined({ fromCommit }),
         complete: async (completion) => {
           if (finished) throw new Error("Git round lease has already completed");
           finished = true;
           try {
             return await this.saveCheckpoint({ ...options,
-              ...(completion.runId === undefined ? {} : { runId: completion.runId }),
-              ...(completion.runIds === undefined ? {} : { runIds: completion.runIds }),
-              ...(completion.historyPosition === undefined ? {} : { historyPosition: completion.historyPosition }) },
+              ...omitUndefined({ runId: completion.runId, runIds: completion.runIds, historyPosition: completion.historyPosition }) },
             fromCommit, completion.commitMessage ?? "Save workspace changes after agent run", false, completion.outcome);
           } finally { await lock.close(); }
         },
@@ -368,9 +367,9 @@ export class ProjectGitWorkspace {
       files.push({ path, status: "untracked", binary, patch: binary ? "" : createPatch(path, "", text),
         insertions: binary ? 0 : diffLines("", text).reduce((count, part) => count + (part.added ? part.count ?? 0 : 0), 0), deletions: 0 });
     }
-    return { from, ...(to === undefined ? {} : { to }), patch: files.map(file => file.patch).join("\n"), files,
+    return omitUndefined({ from, to, patch: files.map(file => file.patch).join("\n"), files,
       insertions: files.reduce((count, file) => count + file.insertions, 0),
-      deletions: files.reduce((count, file) => count + file.deletions, 0), untracked };
+      deletions: files.reduce((count, file) => count + file.deletions, 0), untracked });
   }
 
   async previewRestore(options: { readonly checkpointId: string; readonly paths: readonly string[] }): Promise<GitRestorePreview> {
@@ -562,13 +561,12 @@ export class ProjectGitWorkspace {
     const { state, files: status } = await this.inspectStatus();
     if (!status) throw new Error("Git checkpoint requires a managed repository");
     const base: GitCheckpoint = { id, ...options, workspace: this.workspace, repository: this.repository!,
-      ...(fromCommit === undefined ? state.commit === undefined ? {} : { fromCommit: state.commit } : { fromCommit }),
-      ...(state.branch === undefined ? {} : { branch: state.branch }), createdAt: Date.now(), status: "unchanged" };
+      ...omitUndefined({ fromCommit: fromCommit ?? state.commit, branch: state.branch }), createdAt: Date.now(), status: "unchanged" };
     let appliedCommit: string | undefined;
     try {
       if (outcome !== "completed" || !this.autoCommit || this.readOnly) {
         const value: GitCheckpoint = { ...base, status: state.commit === undefined || !status.isClean() ? "uncommitted" : "unchanged",
-          ...(state.commit === undefined ? {} : { commit: state.commit }) };
+          ...omitUndefined({ commit: state.commit }) };
         if (!this.readOnly) await this.saveProtectedCheckpoint(value);
         return value;
       }
@@ -581,8 +579,8 @@ export class ProjectGitWorkspace {
         return value;
       }
       if (!/^[\x20-\x7e\r\n]+$/u.test(message) || !/[A-Za-z]/u.test(message)) throw new Error("Automatic Git commit message must be English");
-      const request: GitCommitRequest = { workspace: this.workspace, sessionId: options.sessionId,
-        ...(options.runId === undefined ? {} : { runId: options.runId }), initial, message, paths };
+      const request: GitCommitRequest = omitUndefined({ workspace: this.workspace, sessionId: options.sessionId,
+        runId: options.runId, initial, message, paths });
       if (this.options.authorizeCommit !== undefined && !await this.options.authorizeCommit(request)) throw new Error("Git commit authorization was rejected");
       if (paths.length > 0) await this.git.add(["--all", "--", ...paths.map(literalPath)]);
       const tree = (await this.git.raw(["write-tree"])).trim();
@@ -604,7 +602,7 @@ export class ProjectGitWorkspace {
       await rm(this.intentPath());
       return value;
     } catch (error) {
-      const value: GitCheckpoint = { ...base, ...(appliedCommit === undefined ? {} : { commit: appliedCommit }), status: "failed", error: errorMessage(error) };
+      const value: GitCheckpoint = { ...base, ...omitUndefined({ commit: appliedCommit }), status: "failed", error: errorMessage(error) };
       if (!this.readOnly) {
         try { await this.saveProtectedCheckpoint(value); }
         catch (persistenceError) { throw new GitCheckpointError(value, new AggregateError([error, persistenceError], "Checkpoint and failure record could not be persisted")); }
@@ -752,34 +750,13 @@ export class ProjectGitWorkspace {
     if (this.readOnly) return { close: async () => {} };
     await mkdir(this.directory, { recursive: true });
     const path = join(this.directory, `${scope}.lock`);
-    return withFileAccess(path, "exclusive", async () => {
-      let handle: FileHandle;
-      try { handle = await open(path, "wx", 0o600); }
-      catch (error) {
-        if (!isFsError(error, "EEXIST")) throw error;
-        const owner = await readLockOwner(path);
-        if (owner.hostname !== hostname() || processAlive(owner.pid)) throw new GitWorkspaceConflictError("Git workspace is already in use by another process", { cause: error });
-        const reclaimPath = `${path}.reclaim`;
-        const reclaim = await open(reclaimPath, "wx", 0o600);
-        try {
-          const latest = await readLockOwner(path);
-          if (latest.hostname !== hostname() || processAlive(latest.pid)) throw new GitWorkspaceConflictError("Git workspace lock changed during recovery");
-          await rm(path);
-          handle = await open(path, "wx", 0o600);
-        } finally { await reclaim.close(); await rm(reclaimPath); }
-      }
-      await handle.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname() }));
-      await handle.sync();
-      let closing: Promise<void> | undefined;
-      return { close: () => closing ??= (async () => {
-        try {
-          await withFileAccess(path, "exclusive", async () => {
-            try { await handle.close(); }
-            finally { await rm(path); }
-          });
-        } finally { await handle.close(); }
-      })() };
-    });
+    let lock: FileLock;
+    try { lock = await acquireFileLock(path); }
+    catch (error) {
+      if (hasErrorCode(error, "ELOCKED")) throw new GitWorkspaceConflictError("Git workspace is already in use by another process", { cause: error });
+      throw error;
+    }
+    return { close: () => lock.release() };
   }
 
   private async updateWorktree(id: string, update: (record: ManagedGitWorktree) => ManagedGitWorktree): Promise<ManagedGitWorktree> {
@@ -850,52 +827,31 @@ function isWithin(root: string, path: string): boolean {
   const value = relative(root, path);
   return value === "" || (!value.startsWith(`..${sep}`) && value !== ".." && !isAbsolute(value));
 }
-function isFsError(error: unknown, code: string): boolean { return typeof error === "object" && error !== null && "code" in error && error.code === code; }
 function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }
-async function readLockOwner(path: string): Promise<{ pid: number; hostname: string }> {
-  let owner: unknown;
-  try { owner = JSON.parse(await readFile(path, "utf8")); }
-  catch (error) {
-    if (error instanceof SyntaxError || isFsError(error, "ENOENT")) {
-      throw new GitWorkspaceConflictError("Git workspace lock metadata is incomplete or changed; verify its owner before recovery", { cause: error });
-    }
-    throw error;
-  }
-  if (owner === null || typeof owner !== "object" || !("pid" in owner) || !("hostname" in owner) ||
-      !Number.isSafeInteger(owner.pid) || (owner.pid as number) <= 0 || typeof owner.hostname !== "string") {
-    throw new GitWorkspaceConflictError("Git workspace lock metadata is incomplete; verify its owner before recovery");
-  }
-  return owner as { pid: number; hostname: string };
-}
 function processAlive(pid: number): boolean {
-  if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error("Git lock contains an invalid PID");
   try { process.kill(pid, 0); return true; }
-  catch (error) { if (isFsError(error, "ESRCH")) return false; throw error; }
+  catch (error) { if (hasErrorCode(error, "ESRCH")) return false; throw error; }
 }
 async function exists(path: string): Promise<boolean> {
   try { await access(path); return true; }
-  catch (error) { if (isFsError(error, "ENOENT")) return false; throw error; }
+  catch (error) { if (hasErrorCode(error, "ENOENT")) return false; throw error; }
 }
 async function readJson<T>(path: string, initialize = true): Promise<T | undefined> {
   try {
     if (!initialize) await access(path);
     return await withFileAccess(path, "shared", async () => JSON.parse(await readFile(path, "utf8")) as T, { initialize });
   }
-  catch (error) { if (isFsError(error, "ENOENT")) return undefined; throw error; }
+  catch (error) { if (hasErrorCode(error, "ENOENT")) return undefined; throw error; }
 }
 async function writeJson(path: string, value: unknown): Promise<void> {
   await mkdir(resolve(path, ".."), { recursive: true });
-  const temporary = `${path}.${randomUUID()}.pending`;
-  const file = await open(temporary, "wx", 0o600);
-  try { await file.writeFile(`${JSON.stringify(value)}\n`); await file.sync(); }
-  finally { await file.close(); }
-  await withFileAccess(path, "exclusive", () => rename(temporary, path));
+  await withFileAccess(path, "exclusive", () => writeFileAtomic(path, `${JSON.stringify(value)}\n`, { mode: 0o600 }));
 }
 function fingerprint(content: Buffer, mode: string): string { return createHash("sha256").update(mode).update(content).digest("hex"); }
 async function regularFile(path: string): Promise<{ content: Buffer; mode: string } | undefined> {
   let stat;
   try { stat = await lstat(path); }
-  catch (error) { if (isFsError(error, "ENOENT")) return undefined; throw error; }
+  catch (error) { if (hasErrorCode(error, "ENOENT")) return undefined; throw error; }
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("File restoration supports regular files only");
   return { content: await readFile(path), mode: (stat.mode & 0o111) === 0 ? "100644" : "100755" };
 }

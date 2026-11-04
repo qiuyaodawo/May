@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -7,7 +8,7 @@ import { imageSource } from "../../../packages/media/test/fixture.mjs";
 import { readEmbeddedImage } from "@sortedyuan/media";
 import { telegramImageRequest, feishuImageRequest } from "../dist/channels.js";
 import { ChannelStore } from "../dist/channel-store.js";
-import { digest } from "../dist/types.js";
+import { digest } from "../dist/gateway-types.js";
 
 test("渠道图片使用实际 multipart 文件和平台尺寸规则", async () => {
   const image = await readEmbeddedImage(await imageSource());
@@ -22,7 +23,7 @@ test("渠道图片使用实际 multipart 文件和平台尺寸规则", async () 
 });
 
 test("附件投递引用和发送顺序经过持久存储恢复", async () => {
-  const base = fileURLToPath(new URL("../../../review/media-tests/", import.meta.url));
+  const base = join(testOutputRoot, "maybeclaw", "images");
   await mkdir(base, { recursive: true });
   const path = join(await mkdtemp(join(base, "channels-")), "channels.jsonl");
   let store = await ChannelStore.open(path);

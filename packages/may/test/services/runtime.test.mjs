@@ -19,7 +19,6 @@ test("Runtime, Context and tool factories acquire and release real resources", a
     } }),
   ], services: [{ service: services.toolSources, value: toolSources }, { service: services.contextWrappers, value: contextWrappers }] });
   const scope = await host.createScope("application", { id: "verification" });
-  assert.equal(typeof scope.get(services.runtimeFactory), "function");
   const context = contextWrappers.apply(scope.get(services.contextFactory)).create({});
   assert.equal((await context.context.snapshot()).instructions, "plugin instructions");
   assert.ok(await toolSources.snapshot().require("read_file").execute({}) > 0);

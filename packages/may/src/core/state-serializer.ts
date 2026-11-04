@@ -1,8 +1,4 @@
-/**
- * A failure-tolerant FIFO serializer for application state transitions.
- *
- * A rejected operation rejects its caller but never poisons later operations.
- */
+/** FIFO serializer. A rejected operation rejects its caller and later operations still run. */
 export class AsyncStateSerializer {
   private tail: Promise<void> = Promise.resolve();
   private accepting = true;

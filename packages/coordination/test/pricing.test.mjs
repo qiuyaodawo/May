@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { priceUsage, resolveRunBudget, RunBudgetMeter } from "@sortedyuan/may/core";
 import { FileSharedBudget } from "../dist/index.js";
 
@@ -10,12 +8,8 @@ const pricing = { id: "host", version: "2026-10-05", currency: "USD", source: "c
   inputPerMillion: 2, outputPerMillion: 8, cachedReadPerMillion: 0.2 };
 const usage = { inputTokens: 100, outputTokens: 20, totalTokens: 120, cachedReadTokens: 80, tokenRelations: { cachedRead: "input" } };
 
-async function directory(t) {
-  const root = fileURLToPath(new URL("../../../review/metering-tests/", import.meta.url));
-  await mkdir(root, { recursive: true });
-  const path = await mkdtemp(join(root, "budget-"));
-  t.after(() => rm(path, { recursive: true, force: true }));
-  return path;
+function directory(t) {
+  return createTestDirectory(t, "coordination/pricing");
 }
 
 test("shared and Run budgets use identical versioned pricing and durable cost receipts", async t => {

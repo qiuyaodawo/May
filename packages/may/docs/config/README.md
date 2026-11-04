@@ -3,10 +3,17 @@
 Optional configuration loading and validation for May applications.
 
 The complete user-facing reference is in
-[`docs/en/reference/configuration.md`](../../../../docs/en/reference/configuration.md) ([简体中文](../../../../docs/zh-CN/reference/configuration.md)). A JSON Schema for editor
-completion and validation is available at
-[`may-config.schema.json`](../../may-config.schema.json) and is exported as
-`@sortedyuan/may/config/schema`.
+[`docs/en/reference/configuration.md`](../../../../docs/en/reference/configuration.md) ([简体中文](../../../../docs/zh-CN/reference/configuration.md)).
+[`may-config.schema.json`](../../may-config.schema.json), exported as
+`@sortedyuan/may/config/schema`, describes `providers`, `models` and `defaultModel`;
+`parseMayConfig` validates every file against it and reports
+`MayConfigValidationError` with the failing field path. Each `apps` entry is an
+object owned by its application: `createApplicationConfigSchema(id, section, title)`
+composes the application's section schema with the core schema for editors, and
+`createApplicationConfigValidator(id, section)` returns a function that validates
+`apps.<id>` and returns it as the application's settings type. Section schemas use
+`#/$defs/` references for both their own definitions and core definitions such as
+`runBudget` and `pluginSelections`.
 
 Model profiles and provider connections accept `capabilities.reasoning` and
 field-level `capabilities.fields`. Profile fields describe model support;

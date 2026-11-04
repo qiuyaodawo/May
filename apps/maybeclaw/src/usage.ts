@@ -13,9 +13,8 @@ maybeclaw agent default|allow <id> [--agent <id>] --session <id>
 maybeclaw task submit <prompt> --session <id> [--agent <id>] [--request-id <id>]
 maybeclaw task list|status|result|cancel|run|recover [id]
 maybeclaw channel status
-maybeclaw delivery retry|retry-legacy <id> [--confirm] --server <url>
+maybeclaw delivery retry <id> [--confirm] --server <url>
 maybeclaw command <slash-command> [--session <id>]
-maybeclaw migrate check|run
 
 Common options: --config <path>, --data-directory <path> (default ~/.may/maybeclaw).
 With no subcommand, start the Web console and open the default browser.

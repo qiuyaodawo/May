@@ -9,7 +9,7 @@ import { CoordinationWorker } from "../../dist/remote-worker.js";
 
 const directory = process.argv[2];
 const agent = createApplicationAgent({ version: "v1", store: new FileSessionStore(join(directory, "sessions")),
-  definition: defineAgent({ permissionPolicy: () => "deny", model: { async *stream(request, options) {
+  definition: defineAgent({ permissionPolicy: () => "deny", requestRecording: "off", model: { async *stream(request, options) {
     const input = request.messages.find((message) => message.role === "user").content[0].text;
     await appendFile(join(directory, "calls.log"), `${input}\n`);
     if (input === "slow") await setTimeout(200, undefined, { signal: options.signal });

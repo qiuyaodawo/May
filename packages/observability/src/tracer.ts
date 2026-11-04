@@ -6,6 +6,7 @@ import type {
   TraceSpanStartOptions,
   Tracer,
 } from "@sortedyuan/may/core";
+import { omitUndefined } from "@sortedyuan/may/core";
 
 import type {
   FinishedTraceSpan,
@@ -84,27 +85,24 @@ export class BasicTracer implements Tracer {
     const context: TraceContext = Object.freeze({
       traceId,
       spanId,
-      sampled: options.parent?.sampled ?? this.sampler({
+      sampled: options.parent?.sampled ?? this.sampler(omitUndefined({
         name,
         context: samplingContext,
-        ...(options.parent === undefined ? {} : { parent: options.parent }),
+        parent: options.parent,
         attributes,
-      }),
+      })),
     });
     const sampled = context.sampled === true;
     return new BasicTraceSpan({
       name,
       context,
-      ...(options.parent === undefined
-        ? {}
-        : { parentSpanId: options.parent.spanId }),
       attributes,
       sampled,
       processor: this.processor,
       clock: this.clock,
       observers: this.observers,
       limits: this.limits,
-      ...(this.onError === undefined ? {} : { onError: this.onError }),
+      ...omitUndefined({ parentSpanId: options.parent?.spanId, onError: this.onError }),
     });
   }
 }
@@ -151,7 +149,7 @@ class BasicTraceSpan implements TraceSpan {
     this.observers = options.observers;
     this.limits = options.limits;
     for (const observer of this.observers) {
-      try { observer.onStart({ name: this.name, context: this.context, startTime: this.startTime, attributes: options.attributes, ...(this.parentSpanId === undefined ? {} : { parentSpanId: this.parentSpanId }) }); }
+      try { observer.onStart(omitUndefined({ name: this.name, context: this.context, startTime: this.startTime, attributes: options.attributes, parentSpanId: this.parentSpanId })); }
       catch (error) { reportError(this.onError, error); }
     }
   }

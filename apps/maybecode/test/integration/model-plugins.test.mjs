@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
 import { createModelPlugin } from "@sortedyuan/may/services/models";
@@ -10,7 +12,7 @@ import { createObservabilityPlugin } from "@sortedyuan/observability/plugin";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
 async function workspaceFor(t) {
-  const base = fileURLToPath(new URL("../../../../plugin-verification/", import.meta.url));
+  const base = join(testOutputRoot, "maybecode", "model-plugins");
   await mkdir(base, { recursive: true });
   const workspace = await mkdtemp(join(base, "configured-model-plugin-"));
   t.after(async () => {
@@ -21,7 +23,7 @@ async function workspaceFor(t) {
 }
 
 async function selectionFor() {
-  const selection = selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" });
+  const selection = selectProviderModel(await loadMayConfig(), { model: liveModelProfile() });
   return {
     ...selection,
     limits: { contextWindowTokens: 65536, maxOutputTokens: 4096 },
@@ -40,7 +42,7 @@ test("a real Model plugin starts, runs and restores a Session with no configured
   const options = { workspace, configPath, dataDirectory: join(workspace, "data"), plugins: [plugin], skills: false, goals: false, subagents: false, instructions: "Answer the user with the exact text requested. Do not call tools." };
   const application = await openConfiguredMaybeCode({ ...options, git: false });
   t.after(() => application.close());
-  assert.equal(application.modelInfo, undefined);
+  assert.equal(application.application.modelInfo, undefined);
   assert.deepEqual(await application.listModels(), []);
   assert.equal((await application.getReasoningEffort()).status, "unknown");
   await assert.rejects(application.switchModel("missing"), /Unknown model profile/u);
@@ -54,7 +56,7 @@ test("a real Model plugin starts, runs and restores a Session with no configured
   const resumed = await openConfiguredMaybeCode({ ...options, git: false, sessionId });
   t.after(() => resumed.close());
   assert.equal(resumed.sessionId, sessionId);
-  assert.equal(resumed.modelInfo, undefined);
+  assert.equal(resumed.application.modelInfo, undefined);
   assert.equal(creations, 2);
   assert.equal((await resumed.inspectContext()).contextWindowTokens, model.limits?.contextWindowTokens);
   const continued = await (await resumed.submit({ input: "Reply with exactly PLUGIN_RESUMED if the previous request asked for CONFIGURED_PLUGIN_OK." })).result;
@@ -84,7 +86,7 @@ test("selected real Model metadata and Context limits replace unused configured 
     instructions: "Answer with the exact text requested. Do not call tools.",
   });
   t.after(() => application.close());
-  assert.deepEqual(application.modelInfo, info);
+  assert.deepEqual(application.application.modelInfo, info);
   assert.equal((await application.inspectContext()).contextWindowTokens, model.limits?.contextWindowTokens);
   assert.equal(model.limits.contextWindowTokens, 65536);
   const result = await (await application.submit({ input: "Reply with exactly METADATA_VERIFIED." })).result;

@@ -42,6 +42,9 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
+      - name: Check formatting
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
+        run: pnpm format:check
       - name: Check bilingual documentation structure and section confirmations
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.node == 24 }}
         run: pnpm docs:check

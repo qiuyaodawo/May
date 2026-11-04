@@ -1,3 +1,4 @@
+import { omitUndefined } from "./omit-undefined.js";
 import type { TraceAttributes, TraceContext } from "./tracing.js";
 
 export interface TelemetryCorrelation {
@@ -36,12 +37,12 @@ export function validateTelemetryCorrelation(value: unknown): TelemetryCorrelati
 
 export function correlationTraceAttributes(value: TelemetryCorrelation): TraceAttributes {
   const correlation = validateTelemetryCorrelation(value);
-  return {
+  return omitUndefined({
     "may.correlation.version": 1,
-    ...(correlation.taskId === undefined ? {} : { "may.task.id": correlation.taskId }),
-    ...(correlation.coordinationId === undefined ? {} : { "may.coordination.id": correlation.coordinationId }),
-    ...(correlation.dispatchId === undefined ? {} : { "may.dispatch.id": correlation.dispatchId }),
-    ...(correlation.schedulerExecutionId === undefined ? {} : { "may.scheduler.execution_id": correlation.schedulerExecutionId }),
-    ...(correlation.resumedFromRunId === undefined ? {} : { "may.run.resumed_from": correlation.resumedFromRunId }),
-  };
+    "may.task.id": correlation.taskId,
+    "may.coordination.id": correlation.coordinationId,
+    "may.dispatch.id": correlation.dispatchId,
+    "may.scheduler.execution_id": correlation.schedulerExecutionId,
+    "may.run.resumed_from": correlation.resumedFromRunId,
+  });
 }

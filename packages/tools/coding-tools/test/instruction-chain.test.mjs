@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { link, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -315,7 +316,7 @@ test("启动前和读取过程中取消会保留取消原因", async (t) => {
 });
 
 async function fixture(t) {
-  const parent = fileURLToPath(new URL("../../../../review/instruction-chain-tests/", import.meta.url));
+  const parent = join(testOutputRoot, "coding-tools", "instruction-chain");
   await mkdir(parent, { recursive: true });
   const path = await mkdtemp(join(parent, "workspace-"));
   t.after(() => rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));

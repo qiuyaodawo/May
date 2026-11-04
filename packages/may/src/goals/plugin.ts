@@ -1,5 +1,5 @@
 import { applicationHooks, applicationServices, type ApplicationFacade } from "../application/index.js";
-import { GoalController, type GoalAgent, type GoalOptions, type GoalState } from "./index.js";
+import { GOAL_STATE_KEY, GoalController, type GoalAgent, type GoalOptions, type GoalState } from "./index.js";
 import { definePlugin, defineService } from "../plugin/index.js";
 
 export const goalsService = defineService<GoalController>({
@@ -54,13 +54,13 @@ export function createGoalsPlugin(options: GoalsPluginOptions = {}) {
             const saved = context.state.get<GoalsState>().goal;
             if (saved !== null) return saved;
             const event = [...await history.history()].reverse().find(
-              item => item.type === "state.updated" && item.key === "may.goal",
+              item => item.type === "state.updated" && item.key === GOAL_STATE_KEY,
             );
             return event?.type === "state.updated" ? event.value as GoalState : undefined;
           },
           write: async goal => {
             await context.state.set({ goal });
-            await state.recordState("may.goal", goal);
+            await state.recordState(GOAL_STATE_KEY, goal);
           },
         });
       }, { order: 20 });

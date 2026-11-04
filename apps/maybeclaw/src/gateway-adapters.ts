@@ -4,12 +4,13 @@ import { realpath } from "node:fs/promises";
 import { isDeepStrictEqual } from "node:util";
 import { AgentDefinition, defineAgent } from "@sortedyuan/may";
 import { loadMayConfig } from "@sortedyuan/may/config";
+import { omitUndefined } from "@sortedyuan/may/core";
 import { createReadTool, resolveExistingWorkspacePath, resolveWritableWorkspacePath } from "@sortedyuan/coding-tools";
 import type { PermissionPolicy, PermissionRuleStore } from "@sortedyuan/may/permissions";
 import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver, selectProviderModel, type ModelCapabilities } from "@sortedyuan/providers";
 import { observabilityService } from "@sortedyuan/observability/plugin";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
-import { loadPluginModules, parsePluginSelections, type AnyPlugin } from "@sortedyuan/may/plugin";
+import { loadPluginModules, type AnyPlugin } from "@sortedyuan/may/plugin";
 import { createMayAgentAdapter, loadAgentAdapter } from "@sortedyuan/gateway/adapters";
 import { createModelPlugin } from "@sortedyuan/may/services/models";
 import { createPermissionPlugin } from "@sortedyuan/may/services/permissions";
@@ -31,7 +32,7 @@ export async function loadGatewayAdapter(options: MayAdapterOptions): Promise<Ga
   if (options.agent.adapter === "may") {
     if (!options.definition) {
       const config = await loadMayConfig({ path: options.configPath });
-      const plugins = options.plugins ?? await loadPluginModules(parsePluginSelections(options.agent.plugins), config.path);
+      const plugins = options.plugins ?? await loadPluginModules(options.agent.plugins ?? [], config.path);
       if (!plugins.some(plugin => plugin.provides?.some(service => service.id === services.model.id && service.scope === services.model.scope))) selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {});
       return createMayAdapter({ ...options, plugins });
     }
@@ -50,7 +51,7 @@ export function createMayAdapter(options: MayAdapterOptions): GatewayAgentAdapte
     metadata: conversationId => ({ maybeclaw: { agentId: options.agent.id, conversationId } }),
     definition: options.definition ?? (async (source, context) => {
       const config = await loadMayConfig({ path: options.configPath });
-      const selected = options.plugins ?? await loadPluginModules(parsePluginSelections(options.agent.plugins), config.path);
+      const selected = options.plugins ?? await loadPluginModules(options.agent.plugins ?? [], config.path);
       const defaults = [
         createModelPlugin({ create: () => registry.create(selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {})) }),
         createPermissionPlugin({ create: () => createGatewayPermissionPolicy(options, () => context()?.permissionScope) }),
@@ -64,9 +65,8 @@ export function createMayAdapter(options: MayAdapterOptions): GatewayAgentAdapte
       return defineAgent({
         requestRecording: options.agent.requestRecording ?? "required",
         providerBodyRecording: options.agent.providerBodyRecording,
-        ...(options.permissionRuleStore === undefined ? {} : { permissionRuleStore: options.permissionRuleStore }),
         plugins: [...defaults.filter(plugin => !ids.has(plugin.id) && !plugin.provides?.some(service => provided.has(`${service.scope}:${service.id}`))), ...selected],
-        ...(options.agent.instructions === undefined ? {} : { instructions: options.agent.instructions }),
+        ...omitUndefined({ permissionRuleStore: options.permissionRuleStore, instructions: options.agent.instructions }),
         ...(options.agent.runBudget ? { runBudget: options.agent.runBudget } : {}),
       });
     }),
@@ -75,7 +75,7 @@ export function createMayAdapter(options: MayAdapterOptions): GatewayAgentAdapte
   if (options.definition !== undefined || options.plugins?.some(plugin => plugin.provides?.some(service => service.id === services.model.id && service.scope === services.model.scope))) return adapter;
   return { ...adapter, modelCapabilities: async (refresh = false) => {
     const config = await loadMayConfig({ path: options.configPath });
-    const selected = options.plugins ?? await loadPluginModules(parsePluginSelections(options.agent.plugins), config.path);
+    const selected = options.plugins ?? await loadPluginModules(options.agent.plugins ?? [], config.path);
     if (selected.some(plugin => plugin.provides?.some(service => service.id === services.model.id))) {
       throw new Error("自定义 Model 插件需要自行提供模型能力查询。");
     }

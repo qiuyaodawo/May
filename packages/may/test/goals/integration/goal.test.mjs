@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { createTestDirectory, selectLiveModelProfile } from "@sortedyuan/test-support";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -14,9 +15,7 @@ import { createCodingTools } from "@sortedyuan/coding-tools";
 
 test("independent goal composition verifies real reads across compaction and meters auxiliary model calls", { timeout: 90_000 }, async t => {
   const workspace = fileURLToPath(new URL("../../../../..", import.meta.url));
-  const parent = join(workspace, "review", "goal-sdk-tests");
-  await mkdir(parent, { recursive: true });
-  const directory = await mkdtemp(join(parent, "session-"));
+  const directory = await createTestDirectory(t, "may/goal-sdk");
   const heading = (await readFile(join(workspace, "README.md"), "utf8")).split(/\r?\n/u).find(line => line.startsWith("# ")).slice(2).trim();
   let application;
   let compacted = false;
@@ -32,7 +31,8 @@ test("independent goal composition verifies real reads across compaction and met
     summarized ||= goal.getGoal().usage.totalTokens > before;
     return { completed: false, evidence: `A second read of README.md in a new run is required. Read the first 3 lines again and report the heading. Recorded summary: ${summary}` };
   } });
-  const model = goal.wrapModel(createBuiltinProviderModel(selectProviderModel(await loadMayConfig(), { model: "deepseek-v4-flash" })));
+  const config = await loadMayConfig();
+  const model = goal.wrapModel(createBuiltinProviderModel(selectProviderModel(config, { model: selectLiveModelProfile(config) })));
   const summarizer = createModelContextSummarizer(model, { instructions: "Summarize the stated objective and reported result in one short sentence.", requestText: "Return the summary." });
   application = await AgentApplication.open({ model, store: new FileSessionStore(directory),
     tools: createCodingTools({ cwd: workspace }).filter(tool => tool.name === "read"),

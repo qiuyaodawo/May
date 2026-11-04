@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { Client, SdkError, SdkErrorCode, specTypeSchemas, type RequestOptions, type Tool } from "@modelcontextprotocol/client";
+import { omitUndefined } from "@sortedyuan/may/core";
 import { McpTaskWire } from "./task-wire.js";
 import { object, taskFailure } from "./tasks.js";
 import { McpCapabilityError } from "./errors.js";
@@ -165,6 +166,5 @@ export class McpHostClient extends Client {
 
 export function mcpOwner(scope: Readonly<Record<string, string>> | undefined, runId?: string, toolCallId?: string): McpInteractionOwner | undefined {
   if (!scope?.workspaceId || !scope.sessionId) return undefined;
-  return { workspaceId: scope.workspaceId, sessionId: scope.sessionId,
-    ...(runId === undefined ? {} : { runId }), ...(toolCallId === undefined ? {} : { toolCallId }) };
+  return omitUndefined({ workspaceId: scope.workspaceId, sessionId: scope.sessionId, runId, toolCallId });
 }

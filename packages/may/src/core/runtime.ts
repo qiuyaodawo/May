@@ -33,17 +33,6 @@ export function validateRuntimeDescriptor(value: RuntimeDescriptor): void {
   if (value.stateVersion !== undefined && (!Number.isSafeInteger(value.stateVersion) || value.stateVersion < 1)) throw new TypeError("Runtime stateVersion must be a positive safe integer");
 }
 
-export function assertRuntimeCompatible(saved: RuntimeDescriptor, runtime: AgentRuntime): void {
-  validateRuntimeDescriptor(saved);
-  const current = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
-  validateRuntimeDescriptor(current);
-  if (!runtimeDescriptorsEqual(saved, current)) {
-    throw new Error(`Session runtime ${saved.id}@${saved.version} is incompatible with ${current.id}@${current.version}`);
-  }
-}
-
 export function runtimeDescriptorsEqual(left: RuntimeDescriptor, right: RuntimeDescriptor): boolean {
-  validateRuntimeDescriptor(left);
-  validateRuntimeDescriptor(right);
   return left.id === right.id && left.version === right.version && left.stateVersion === right.stateVersion;
 }

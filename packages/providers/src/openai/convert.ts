@@ -5,7 +5,7 @@ import type {
   ModelState,
   ToolDefinition,
 } from "@sortedyuan/may/core";
-import { UnsupportedContentError } from "@sortedyuan/may/core";
+import { UnsupportedContentError, omitUndefined } from "@sortedyuan/may/core";
 
 import { OpenAIResponsesProtocolError } from "./errors.js";
 import {
@@ -120,11 +120,11 @@ function toInputContent(
     }
     if (part.type === "image") {
       const source = toOpenAIImageSource(part.source);
-      return [{
+      return [omitUndefined({
         type: "input_image",
         ...source,
-        ...(part.detail === undefined ? {} : { detail: part.detail }),
-      }];
+        detail: part.detail,
+      })];
     }
     if (part.type === "file") {
       return [{ type: "input_file", ...toOpenAIFileSource(part.source, part.name) }];

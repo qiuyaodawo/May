@@ -4,7 +4,7 @@ import {
   type ContextBudget, type ContextCompactionOptions, type ContextCompactionOutput,
   type ContextCompactionStrategy, type ContextSummarizer,
 } from "../context/index.js";
-import type { ContextSnapshot, Model } from "../core/index.js";
+import { omitUndefined, type ContextSnapshot, type Model } from "../core/index.js";
 import { definePlugin, defineService } from "../plugin/index.js";
 import { HistoryReferenceMemory, type SavedNotes } from "./history-memory.js";
 import { createModelContextSummarizer } from "./summarizer.js";
@@ -65,8 +65,7 @@ export function createHistoryMemoryPlugin(options: HistoryMemoryPluginOptions = 
       context.provide(applicationServices.contextOptions, (effectiveModel: Model) => {
         const budget = typeof options.budget === "function" ? options.budget(effectiveModel) : options.budget;
         return {
-          ...(budget === undefined ? {} : { budget }),
-          ...(options.compactionStrategy === undefined ? {} : { compactionStrategy: options.compactionStrategy }),
+          ...omitUndefined({ budget, compactionStrategy: options.compactionStrategy }),
           get autoCompactionStrategies() {
             if (options.autoCompactionStrategies !== undefined) return options.autoCompactionStrategies;
             const value = current(effectiveModel);

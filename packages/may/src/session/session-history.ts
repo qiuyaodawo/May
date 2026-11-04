@@ -1,4 +1,4 @@
-import type { Tool } from "../core/index.js";
+import { omitUndefined, type Tool } from "../core/index.js";
 import {
   SESSION_EVENT_TYPES,
   sessionToolResultContent,
@@ -149,13 +149,7 @@ function parseInput(input: unknown, maxEvents: number): SessionHistoryToolInput 
     throw new TypeError('session_history: order must be "asc" or "desc"');
   }
   const types = parseTypes(value.types);
-  return {
-    ...(afterSeq === undefined ? {} : { afterSeq }),
-    ...(beforeSeq === undefined ? {} : { beforeSeq }),
-    ...(limit === undefined ? {} : { limit }),
-    ...(order === undefined ? {} : { order }),
-    ...(types === undefined ? {} : { types }),
-  };
+  return omitUndefined({ afterSeq, beforeSeq, limit, order, types });
 }
 
 function parseTypes(value: unknown): readonly SessionEventType[] | undefined {

@@ -1,4 +1,4 @@
-import { userMessage, type UserMessage } from "../core/index.js";
+import { omitUndefined, userMessage, type UserMessage } from "../core/index.js";
 import type { SessionEvent, SessionEventPayload } from "./events.js";
 
 export interface SessionSteerOptions {
@@ -46,13 +46,13 @@ export class SessionSteeringQueue {
 
   enqueue(options: SessionSteerOptions, activeRunId?: string): Promise<SessionSteeringInput> {
     const inputId = options.inputId ?? `steer_${crypto.randomUUID()}`;
-    if (typeof inputId !== "string" || inputId.length === 0 || inputId.length > 256) throw new TypeError("inputId must be a non-empty string of at most 256 characters");
+    if (inputId.length === 0 || inputId.length > 256) throw new TypeError("inputId must be a non-empty string of at most 256 characters");
     if (options.runId !== undefined && options.runId !== activeRunId) throw new Error("The target run is no longer active");
     if (this.inputIds.has(inputId)) return Promise.reject(new Error(`Steering input already exists: ${inputId}`));
     const input: SessionSteeringInput = {
       inputId,
       message: structuredClone(typeof options.input === "string" ? userMessage(options.input) : options.input),
-      ...(activeRunId === undefined ? {} : { runId: activeRunId }),
+      ...omitUndefined({ runId: activeRunId }),
       status: activeRunId === undefined ? "idle" : "pending",
     };
     if (input.message.role !== "user" || !Array.isArray(input.message.content)) throw new TypeError("Steering input must be a user message");
@@ -114,7 +114,7 @@ export class SessionSteeringQueue {
   private update(inputId: string, status: SessionSteeringInput["status"], reason?: string): void {
     const input = this.inputs.get(inputId);
     if (input === undefined) throw new Error(`Unknown steering input: ${inputId}`);
-    this.inputs.set(inputId, { ...input, status, ...(reason === undefined ? {} : { reason }) });
+    this.inputs.set(inputId, { ...input, status, ...omitUndefined({ reason }) });
   }
 
   private serialize<T>(operation: () => Promise<T>): Promise<T> {

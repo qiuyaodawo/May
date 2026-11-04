@@ -25,13 +25,23 @@ MaybeCode uses this operation during [first-run setup](../guides/maybecode.md#fi
 Use this page to look up fields and defaults. For application startup and controls,
 see [MaybeCode](../guides/maybecode.md) or [MaybeClaw](../guides/maybeclaw.md).
 
-For editor completion and validation, associate the file with
-[`packages/may/may-config.schema.json`](../../../packages/may/may-config.schema.json).
-For example, on this Windows checkout the user configuration can start with:
+[`packages/may/may-config.schema.json`](../../../packages/may/may-config.schema.json)
+(exported as `@sortedyuan/may/config/schema`) describes `providers`, `models` and
+`defaultModel`. Each application owns the schema of its `apps.<id>` entry and validates
+it when it starts; an invalid value reports `MayConfigValidationError` with the field path.
+For editor completion of a whole file, associate it with the composed schema of the
+application that uses it:
+
+| Application | Schema |
+| --- | --- |
+| MaybeCode | `@sortedyuan/maybecode/config/schema` (`apps/maybecode/dist/maybecode-config.schema.json`) |
+| MaybeClaw | `apps/maybeclaw/dist/maybeclaw-config.schema.json` |
+
+For example, on this Windows checkout after `pnpm build` the user configuration can start with:
 
 ```json
 {
-  "$schema": "file:///E:/code/May/packages/may/may-config.schema.json",
+  "$schema": "file:///E:/code/May/apps/maybecode/dist/maybecode-config.schema.json",
   "providers": {},
   "models": {}
 }
@@ -39,7 +49,9 @@ For example, on this Windows checkout the user configuration can start with:
 
 The exact file URL depends on the checkout location. Editors also allow mapping
 `~/.may/config.json` to the schema in workspace
-settings without adding `$schema` to the file.
+settings without adding `$schema` to the file. Applications build their composed schema
+with `createApplicationConfigSchema(id, section, title)` from `@sortedyuan/may/config` and
+validate their entry with `createApplicationConfigValidator(id, section)`.
 
 ## Top-level fields
 
@@ -367,9 +379,7 @@ existing ranges. Rules record an operator, and deny takes precedence.
 `history-reference` (reset older context with a history reference), or
 `provider-native` (native compaction only, requiring model support). Modes never
 fall back to one another; unresolved pressure stops the run. Changed context
-remains persisted even if it is still above threshold. The deprecated
-`autoCompaction.providerNative` boolean selects native-only mode when true and
-no `mode` is set; explicit `mode` wins.
+remains persisted even if it is still above threshold.
 
 Manual `/compact` uses prune-and-summary by default. `/compact history-reference`
 and `/compact provider-native` select independent operations without changing

@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { ContentPart, MediaSource } from "@sortedyuan/may/core";
+import { omitUndefined, type ContentPart, type MediaSource } from "@sortedyuan/may/core";
 import { FileMediaStore, imageAttachment, imagePng, readEmbeddedImage, type SavedImage } from "@sortedyuan/media";
 import type { Jimp } from "jimp";
 import { terminalImageProtocol, type ImageProtocol, type TerminalCellSize } from "./image-support.js";
@@ -42,7 +42,7 @@ export class TerminalImages {
     const attachment = imageAttachment(source), image = this.values.get(attachment.id);
     const caption = image ? `图片 ${image.width}×${image.height} · ${image.mediaType} · ${image.data.byteLength} bytes\n${image.path}`
       : attachment.url ? `图片链接：${attachment.url}` : `图片 ${attachment.id}（媒体读取接口未提供此资源）`;
-    const label = new Text(sanitizeTerminalText(caption), sourceId === undefined ? {} : { sourceId }).render(size);
+    const label = new Text(sanitizeTerminalText(caption), omitUndefined({ sourceId })).render(size);
     if (!image || this.protocol === "none") return label;
     if (this.protocol === "sixel") return this.renderSixel(image, label, size);
     const columns = Math.max(1, Math.min(size.width, 80));

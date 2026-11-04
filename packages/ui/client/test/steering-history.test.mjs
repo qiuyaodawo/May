@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
@@ -8,7 +9,7 @@ import { UiProjection } from "../dist/projection.js";
 import { recordedField, searchHistory } from "../dist/reading.js";
 
 test("file history and live projection retain steering text, FIFO order, and full searchable fields", async t => {
-  const root = resolve(import.meta.dirname, "../../../../.zcode/tmp/ui-steering");
+  const root = join(testOutputRoot, "ui-client", "steering");
   await mkdir(root, { recursive: true });
   const directory = await mkdtemp(join(root, "history-"));
   t.after(async () => { assert.ok(resolve(directory).startsWith(root + sep)); await rm(directory, { recursive: true, force: true }); });

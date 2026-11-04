@@ -1,17 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { fork } from "node:child_process";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { createMayConfig, loadMayConfig } from "@sortedyuan/may/config";
 
-async function directory(t) {
-  const base = fileURLToPath(new URL("../../../../review/onboarding/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const path = await mkdtemp(join(base, "config-"));
-  t.after(() => rm(path, { recursive: true, force: true }));
-  return path;
+function directory(t) {
+  return createTestDirectory(t, "may/config-create");
 }
 
 test("creates a readable config in a new directory and preserves existing files", async t => {

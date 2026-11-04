@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, realpath, rename, unlink, type FileHandle } from "node:fs/promises";
-import { hostname } from "node:os";
+import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
+import { AsyncStateSerializer } from "../core/index.js";
+import { acquireFileLock, hasErrorCode, writeFileDurable, type FileLock } from "../storage/index.js";
 import {
   copyPermissionRule,
   validateRuleIdentifier,
@@ -15,26 +15,24 @@ export interface FilePermissionRuleStoreOptions {
 }
 
 export class FilePermissionRuleStore implements PermissionRuleStore {
-  private tail: Promise<void> = Promise.resolve();
+  private readonly serial = new AsyncStateSerializer();
   private failure: Error | undefined;
   private closing: Promise<void> | undefined;
 
-  private constructor(readonly path: string, private readonly lock: FileHandle) {}
+  private constructor(readonly path: string, private readonly lock: FileLock) {}
 
   static async open(options: FilePermissionRuleStoreOptions): Promise<FilePermissionRuleStore> {
     validateRuleIdentifier(options.path, "path");
     const requested = resolve(options.path);
     await mkdir(dirname(requested), { recursive: true });
     const path = join(await realpath(dirname(requested)), basename(requested));
-    const lock = await open(`${path}.lock`, "wx", 0o600);
+    const lock = await acquireFileLock(`${path}.lock`);
     const store = new FilePermissionRuleStore(path, lock);
     try {
-      await lock.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname() }));
-      await lock.sync();
       let exists = true;
       try { await lstat(path); }
       catch (error) {
-        if (!isNodeError(error, "ENOENT")) throw error;
+        if (!hasErrorCode(error, "ENOENT")) throw error;
         exists = false;
       }
       if (exists) await store.readNow();
@@ -77,37 +75,24 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
 
   close(): Promise<void> {
     return this.closing ??= (async () => {
-      await this.tail;
       try {
-        const current = await lstat(`${this.path}.lock`, { bigint: true });
-        const owned = await this.lock.stat({ bigint: true });
-        if (!current.isFile() || current.isSymbolicLink() || current.ino !== owned.ino || current.dev !== owned.dev) {
-          throw new Error("Permission rule writer lock ownership changed");
-        }
-        await this.lock.close();
-        await unlink(`${this.path}.lock`);
-        await syncDirectory(dirname(this.path));
-      } catch (error) {
-        try { await this.lock.close(); }
-        catch (cleanup) { throw new AggregateError([error, cleanup], "Cannot release permission rule writer lock"); }
-        throw error;
-      }
+        await this.serial.close();
+        await this.lock.assertHeld();
+      } finally { await this.lock.release(); }
     })();
   }
 
   private enqueue<T>(action: () => Promise<T>): Promise<T> {
     if (this.closing !== undefined) return Promise.reject(new Error("Permission rule store is closed"));
-    const operation = this.tail.then(() => {
+    return this.serial.run(() => {
       if (this.failure !== undefined) throw this.failure;
       return action();
     });
-    this.tail = operation.then(() => undefined, () => undefined);
-    return operation;
   }
 
   private async readNow(): Promise<readonly PersistentPermissionRule[]> {
     try {
-      await this.checkOwnership();
+      await this.lock.assertHeld();
       const before = await lstat(this.path, { bigint: true });
       if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n) {
         throw new Error("Permission rule store must be a regular file with one link");
@@ -132,39 +117,17 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
   }
 
   private async writeNow(rules: readonly PersistentPermissionRule[]): Promise<void> {
-    const temporary = `${this.path}.${randomUUID()}.tmp`;
-    let created = false;
     try {
-      await this.checkOwnership();
-      const file = await open(temporary, "wx", 0o600);
-      created = true;
-      try {
-        await file.writeFile(`${JSON.stringify({ version: 1, rules }, null, 2)}\n`, "utf8");
-        await file.sync();
-      } finally { await file.close(); }
-      await rename(temporary, this.path);
-      created = false;
-      await syncDirectory(dirname(this.path));
+      await this.lock.assertHeld();
+      await writeFileDurable(this.path, `${JSON.stringify({ version: 1, rules }, null, 2)}\n`);
     } catch (error) {
       this.fail(error);
-      if (created) {
-        try { await unlink(temporary); }
-        catch (cleanup) { throw new AggregateError([error, cleanup], "Cannot write or clean permission rule store"); }
-      }
       throw error;
     }
   }
 
   private fail(error: unknown): void {
     this.failure ??= error instanceof Error ? error : new Error("Permission rule storage failed", { cause: error });
-  }
-
-  private async checkOwnership(): Promise<void> {
-    const current = await lstat(`${this.path}.lock`, { bigint: true });
-    const owned = await this.lock.stat({ bigint: true });
-    if (!current.isFile() || current.isSymbolicLink() || current.ino !== owned.ino || current.dev !== owned.dev) {
-      throw new Error("Permission rule writer lock ownership changed");
-    }
   }
 }
 
@@ -181,16 +144,4 @@ function parseRules(value: unknown): readonly PersistentPermissionRule[] {
     ids.add(rule.id);
   }
   return rules;
-}
-
-async function syncDirectory(path: string): Promise<void> {
-  // Windows 的 Node.js 文件接口不提供目录 fsync。
-  if (process.platform === "win32") return;
-  const directory = await open(path, "r");
-  try { await directory.sync(); }
-  finally { await directory.close(); }
-}
-
-function isNodeError(error: unknown, code: string): boolean {
-  return error instanceof Error && "code" in error && error.code === code;
 }

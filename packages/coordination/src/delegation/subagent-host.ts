@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import { applicationHooks, applicationServices, defineAgent, type ApplicationExecution, type AgentApplicationEvent } from "@sortedyuan/may";
 import { definePlugin } from "@sortedyuan/may/plugin";
-import { AsyncEventQueue } from "@sortedyuan/may/core";
+import { AsyncEventQueue, omitUndefined } from "@sortedyuan/may/core";
 import {
   InMemoryContextFactory,
   ModelContextCompactionStrategy,
@@ -112,6 +112,8 @@ export interface SubagentHostOptions {
   readonly application: Pick<ApplicationExecution, "submit" | "continue" | "resolveApproval">;
   readonly store: SessionStore;
   readonly model: Model;
+  readonly requestRecording: "off" | "required";
+  readonly providerBodyRecording: boolean;
   /** 声明了自己 model profile 的角色使用的宿主模型工厂。 */
   readonly createRoleModel?: (role: MaybeCodeSubagentRole) => Model | undefined;
   /** 角色自有模型的上下文预算；没有配置时继承主会话。 */
@@ -411,23 +413,22 @@ export class SubagentHost {
     }
     const files = task.files ?? [];
     const changed = changedFiles.get(task.id) ?? [];
-    return {
+    const budget = task.output?.budget;
+    return omitUndefined({
       id: task.id,
-      ...(task.parentTaskId === undefined ? {} : { parentTaskId: task.parentTaskId }),
+      parentTaskId: task.parentTaskId,
       role: task.agent === MAIN_AGENT ? "main" : task.agent,
       depth,
       status: task.status,
       sessionId: task.sessionId,
-      ...(task.output?.runId === undefined ? {} : { runId: task.output.runId }),
-      ...(files.length === 0 ? {} : { files }),
-      ...(task.output?.usage === undefined ? {} : { usage: task.output.usage }),
-      ...(task.output?.budget === undefined
-        ? {}
-        : { budget: { modelCalls: task.output.budget.modelCalls, totalTokens: task.output.budget.totalTokens } }),
-      ...(task.output === undefined ? {} : { output: bounded(task.output.text, OUTPUT_LIMIT) }),
-      ...(task.detail === undefined ? {} : { detail: task.detail }),
-      ...(changed.length === 0 ? {} : { changedFiles: changed }),
-    };
+      runId: task.output?.runId,
+      files: files.length === 0 ? undefined : files,
+      usage: task.output?.usage,
+      budget: budget === undefined ? undefined : { modelCalls: budget.modelCalls, totalTokens: budget.totalTokens },
+      output: task.output === undefined ? undefined : bounded(task.output.text, OUTPUT_LIMIT),
+      detail: task.detail,
+      changedFiles: changed.length === 0 ? undefined : changed,
+    });
   }
 
   /** 一次请求图的协调存储；读取、核对与恢复都使用同一路径。 */
@@ -521,11 +522,11 @@ export class SubagentHost {
         const request = host.active;
         if (request === undefined) throw new Error("The sub-agent request is no longer active");
         const coding = role.tools;
-        const files = (options.fileGuard ?? new SharedWorkspaceFileGuard(options.workspace)).create({
+        const files = (options.fileGuard ?? new SharedWorkspaceFileGuard(options.workspace)).create(omitUndefined({
           names: coding,
           requireRead: true,
-          ...(execution.task.files === undefined ? {} : { files: execution.task.files }),
-        });
+          files: execution.task.files,
+        }));
         const contextBudget = role.model === undefined
           ? options.contextBudget
           : options.contextBudgetFor?.(role) ?? options.contextBudget;
@@ -558,13 +559,13 @@ export class SubagentHost {
               const shell = [...childTools, ...context.get(applicationServices.toolSources).snapshot(),
                 ...(context.optional(applicationServices.tools) ?? [])]
                 .map(getShellToolInfo).find(info => info !== undefined);
-              return "# Current environment\n\n" + codingRuntimeInstructions({
+              return "# Current environment\n\n" + codingRuntimeInstructions(omitUndefined({
                 workspace: options.workspace,
-                ...(shell === undefined ? {} : { shell }),
+                shell,
                 agentRole: "sub-agent", assignedRole: role.name, parentTask: execution.task.parentTaskId ?? execution.task.id,
                 sessionOrigin,
-                ...(options.permissionModeSource === undefined ? {} : { permissionMode: options.permissionModeSource() }),
-              });
+                permissionMode: options.permissionModeSource?.(),
+              }));
             }, { ...registration, id: `${context.pluginId}.environment`, order: -80 }));
             if (options.projectInstructionsSource !== undefined) {
               context.defer(sources.add(options.projectInstructionsSource, {
@@ -589,19 +590,24 @@ export class SubagentHost {
           },
         });
         return defineAgent({
+          requestRecording: options.requestRecording,
+          providerBodyRecording: options.providerBodyRecording,
           model: childModel,
           plugins: [childInstructions],
           tools: childTools,
           toolScope: { workspaceId: options.workspace },
-          ...(options.beforeToolExecute === undefined ? {} : { beforeToolExecute: options.beforeToolExecute }),
+          ...omitUndefined({
+            beforeToolExecute: options.beforeToolExecute,
+            skills: options.skills,
+            contextBudget,
+            compactionStrategy: options.compactionStrategy,
+            tracer: options.tracer,
+          }),
           toolSource: () => [...(options.toolSource?.() ?? [])],
           instructions: options.instructionsSource?.() ?? options.instructions,
-          ...(options.skills === undefined ? {} : { skills: options.skills }),
           permissionPolicy: options.permissionPolicy,
           sessionHistory: { retrieval: true },
           contextFactory: memory.wrap(new InMemoryContextFactory(), { includeInstructions: false }),
-          ...(contextBudget === undefined ? {} : { contextBudget }),
-          ...(options.compactionStrategy === undefined ? {} : { compactionStrategy: options.compactionStrategy }),
           autoCompactionStrategies: automaticCompactionStrategies(
             options.autoCompactionMode,
             summary,
@@ -613,7 +619,6 @@ export class SubagentHost {
           // maxSteps 已确定，角色预算与子 Agent 预算的较小值对子 Run 同样生效。
           maxSteps,
           runBudget: roleBudget,
-          ...(options.tracer === undefined ? {} : { tracer: options.tracer }),
           traceAttributes: {
             ...(options.traceAttributes ?? {}),
             "may.agent.name": "maybecode-subagent",
@@ -730,16 +735,16 @@ class SubagentRequest {
   /** 一轮主会话的 submit 选项；身份与取消由 agent 负责。 */
   submitOptions(turn: { readonly first: boolean }): SessionSubmitOptions {
     if (this.budgetReason !== undefined) void this.cancel(this.budgetReason);
-    return {
+    return omitUndefined({
       input: this.plan.input,
-      ...(this.plan.runBudget === undefined ? {} : { runBudget: this.plan.runBudget }),
-      ...(this.plan.shouldYield === undefined ? {} : { shouldYield: this.plan.shouldYield }),
-      ...(this.plan.signal === undefined ? {} : { signal: this.plan.signal }),
+      runBudget: this.plan.runBudget,
+      shouldYield: this.plan.shouldYield,
+      signal: this.plan.signal,
       traceAttributes: {
         ...(this.plan.traceAttributes ?? {}),
         "may.request.id": this.requestId,
       },
-    };
+    });
   }
 
   observeMainRun(runId: string, turn: number, result: Promise<RunResult>): void {
@@ -822,11 +827,11 @@ class SubagentRequest {
     const host = this.host;
     const options = host.options;
     const configuration = options.configuration;
-    this.ledger = await SubagentRequestLedger.open(host.directory(this.requestId), this.requestId, {
+    this.ledger = await SubagentRequestLedger.open(host.directory(this.requestId), this.requestId, omitUndefined({
       maxModelCalls: configuration.maxModelCalls,
-      ...(configuration.maxTotalTokens === undefined ? {} : { maxTotalTokens: configuration.maxTotalTokens }),
+      maxTotalTokens: configuration.maxTotalTokens,
       reservationTokens: configuration.reservationTokens,
-    });
+    }));
     this.totals = await this.ledger.totals();
     await this.checkBudget();
     let runtime: CoordinationRuntime;
@@ -963,13 +968,13 @@ class SubagentRequest {
       startedAt: this.startedAt,
       updatedAt: Date.now(),
       tasks: snapshot.tasks.map((task) => this.host.projectTask(task, snapshot, changedFiles)),
-      budget: {
+      budget: omitUndefined({
         modelCalls: this.totals.modelCalls,
         totalTokens: this.totals.totalTokens,
         maxModelCalls: configuration.maxModelCalls,
-        ...(configuration.maxTotalTokens === undefined ? {} : { maxTotalTokens: configuration.maxTotalTokens }),
+        maxTotalTokens: configuration.maxTotalTokens,
         usageComplete: this.usageComplete,
-      },
+      }),
     };
   }
 

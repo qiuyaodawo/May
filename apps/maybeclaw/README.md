@@ -31,7 +31,7 @@ administrators independently of platform roles.
 
 See the [English guide](../../docs/en/guides/maybeclaw.md) or
 [简体中文指南](../../docs/zh-CN/guides/maybeclaw.md) for configuration, commands,
-permissions, adapters, lifecycle, and migration.
+permissions, adapters, and lifecycle.
 
 `apps.maybeclaw.persistentRules: true` enables administrator-managed permission
 rules in `<data-directory>/permission-rules.json`. Eligible approvals offer
@@ -62,8 +62,8 @@ On first startup, missing configuration or missing administrator authentication 
 a local password setup page. Enter and confirm a password of 10–1024 characters.
 MaybeClaw writes `version: 2`, `agents: []`, and an Argon2id `passwordHash`, preserving
 existing May configuration, then serves the console at the same address. Log in and
-add an Agent. Existing valid configuration starts normally; old configuration and
-legacy data require explicit migration. Invalid configuration is reported without changes.
+add an Agent. Existing valid configuration starts normally. Configuration without
+`version: 2` and invalid configuration are reported without changes.
 Setup inspection and initialization writes coordinate configuration access with
 default-model updates. Initialization preserves completed updates and releases
 file access before activating the console. Inspecting a missing configuration
@@ -106,19 +106,10 @@ default session is an explicit operation.
 
 `task submit` requires `--session`. Model and directory choices belong in Agent
 configuration. While the server owns the data directory, use `--server` for CLI
-management. Existing task data requires `migrate check` and `migrate run` before
-Gateway startup. This application remains private.
+management. This application remains private.
 
-Legacy task and channel journal inspection coordinates with writes through
-permanent `.access` and `.access.gate` files. The first query requires directory
-write permission to initialize them; later inspection uses read-only handles.
-Upgrade all processes sharing the data together and preserve the access files
-while readers or writers are active.
-
-`channel status --server <url>` includes migrated delivery evidence. After
-checking an unknown outcome, `delivery retry-legacy <id> --confirm --server <url>`
-explicitly requests another send and acknowledges possible duplicate messages.
-Current messages use `delivery retry <id> --confirm --server <url>`. The Web
+After checking an unknown outcome, `delivery retry <id> --confirm --server <url>`
+explicitly requests another send and acknowledges possible duplicate messages. The Web
 channel manager provides the same explicit confirmation. Remote Web access
 requires a configured HTTPS `server.publicOrigin` and a reverse proxy to the
 loopback listener; administrator login remains required.

@@ -239,8 +239,8 @@ Core 默认串行调度。只有同一模型响应选择的每个工具都可安
 
 ## 每次 Run 的动态工具目录
 
-`MayOptions.toolSource`（也由 `AgentApplication`、`defineAgent()` 和
-`MaybeCodeApplication` 透传）是可信宿主提供的同步 `() => Iterable<Tool>`。
+`MayOptions.toolSource`（也由 `AgentApplication` 和 `defineAgent()` 透传）是可信宿主
+提供的同步 `() => Iterable<Tool>`。
 它在静态 `tools` 之外追加工具，每次 `run()` 或 `continue()` 启动时仅调用一次，
 同一 Run 的模型步骤复用该目录。重名在 Context 修改前失败。远程发现和刷新应在 Core
 之外完成，再通过回调发布最新内存快照。

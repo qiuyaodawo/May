@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import test from "node:test";
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -7,7 +8,7 @@ import { PluginHost } from "@sortedyuan/may/plugin";
 import { createObservabilityHostPlugin, observabilityHostService } from "../../dist/plugin/index.js";
 
 test("host plugin flushes an actual trace export during owned resource shutdown", async (t) => {
-  const base = fileURLToPath(new URL("../../../../plugin-verification/", import.meta.url));
+  const base = join(testOutputRoot, "observability", "plugin");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "plugin-tracing-"));
   t.after(async () => { assert.ok(resolve(directory).startsWith(resolve(base) + sep)); await rm(directory, { recursive: true, force: true }); });

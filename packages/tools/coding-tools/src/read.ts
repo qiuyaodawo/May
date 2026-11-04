@@ -1,4 +1,4 @@
-import type { Tool } from "@sortedyuan/may/core";
+import { omitUndefined, type Tool } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
 import {
   optionalPositiveInteger,
@@ -78,11 +78,7 @@ export function createReadTool(options: ReadToolOptions): Tool<
           `read: limit must not exceed ${maxLines}`,
         );
       }
-      return {
-        path,
-        ...(offset === undefined ? {} : { offset }),
-        ...(limit === undefined ? {} : { limit }),
-      };
+      return omitUndefined({ path, offset, limit });
     },
     async execute(input, context) {
       const file = await resolveExistingWorkspacePath(options.cwd, input.path, {

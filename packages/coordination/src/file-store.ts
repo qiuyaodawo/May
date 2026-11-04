@@ -1,12 +1,12 @@
 import { constants } from "node:fs";
-import { acquireFileLock, releaseFileLock, replaceJournalFile, withFileAccess } from "@sortedyuan/may/storage";
+import { acquireFileLock, hasErrorCode, replaceJournalFile, withFileAccess, type FileLock } from "@sortedyuan/may/storage";
 import { lstat, mkdir, open, readFile, type FileHandle } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { AsyncStateSerializer } from "@sortedyuan/may";
+import { AsyncStateSerializer } from "@sortedyuan/may/core";
 import type { CoordinationJournal, CoordinationSnapshot, CoordinationStore } from "./types.js";
 import { copy, name, positive, validateSnapshot } from "./validation.js";
 
-/** Local single-writer JSONL journal. Stale locks are never stolen automatically. */
+/** Local single-writer JSONL journal. */
 export class FileCoordinationStore implements CoordinationStore {
   readonly directory: string;
   constructor(directory: string, readonly maxJournalBytes = 67_108_864) {
@@ -53,11 +53,10 @@ export class FileCoordinationStore implements CoordinationStore {
     const lock = await acquireFileLock(lockPath);
     let file: FileHandle | undefined;
     try {
-      await lock.writeFile(JSON.stringify({ pid: process.pid, id })); await lock.sync();
       const path = join(this.directory, `${filename}.jsonl`);
       return await withFileAccess(path, "exclusive", async () => {
         try { if ((await lstat(path)).isSymbolicLink()) throw new Error("Coordination journal must not be a symbolic link"); }
-        catch (error) { if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error; }
+        catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; }
         file = await open(path, constants.O_CREAT | constants.O_APPEND | constants.O_RDWR | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW), 0o600);
         if ((await file.stat()).size > this.maxJournalBytes) throw new Error("Coordination journal exceeds maxJournalBytes");
         const bytes = await readFile(path);
@@ -78,17 +77,16 @@ export class FileCoordinationStore implements CoordinationStore {
           try { await repair.truncate(committedLength); await repair.sync(); }
           finally { await repair.close(); }
         }
-        return journal(file, path, lock, lockPath, id, current, committedLength, this.maxJournalBytes);
+        return journal(file, path, lock, id, current, committedLength, this.maxJournalBytes);
       });
     } catch (error) {
-      await file?.close().catch(() => undefined);
-      await releaseFileLock(lock, lockPath);
+      try { await file?.close(); } finally { await lock.release(); }
       throw error;
     }
   }
 }
 
-function journal(file: FileHandle, path: string, lock: FileHandle, lockPath: string, id: string,
+function journal(file: FileHandle, path: string, lock: FileLock, id: string,
   initial: CoordinationSnapshot | undefined, initialSize: number, maxBytes: number): CoordinationJournal {
   const serial = new AsyncStateSerializer();
   let current = initial;
@@ -121,8 +119,7 @@ function journal(file: FileHandle, path: string, lock: FileHandle, lockPath: str
     },
     close: () => closing ??= (async () => {
       await serial.close();
-      // Never release ownership before all writes and the file handle are closed.
-      try { await file.close(); } finally { await releaseFileLock(lock, lockPath); }
+      try { await file.close(); } finally { await lock.release(); }
     })(),
   };
 }

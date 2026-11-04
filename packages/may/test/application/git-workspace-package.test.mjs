@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
-const artifacts = join(repository, "review", "git-workspace-package-tests");
 
 test("packed Git workspace subpath installs and runs in an independent consumer", {
   skip: process.env.MAY_GIT_PACKAGE_TEST !== "1" || process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1",
@@ -15,9 +15,7 @@ test("packed Git workspace subpath installs and runs in an independent consumer"
   const pnpm = process.env.npm_execpath;
   assert.ok(pnpm, "Run this check through pnpm --filter @sortedyuan/may test:package");
   assert.equal((await runPnpm(pnpm, ["--version"], repository)).trim(), "12.4.2");
-  await mkdir(artifacts, { recursive: true });
-  const directory = await mkdtemp(join(artifacts, "consumer-"));
-  t.after(async () => { assert.ok(resolve(directory).startsWith(`${artifacts}\\`) || resolve(directory).startsWith(`${artifacts}/`)); await rm(directory, { recursive: true, force: true }); });
+  const directory = await createTestDirectory(t, "may/git-workspace-package");
   const packs = join(directory, "packs");
   const consumer = join(directory, "consumer");
   await mkdir(packs);

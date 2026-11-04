@@ -2,7 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { Server, createMcpHandler, specTypeSchemas, type CallToolResult, type Resource, type Prompt, type ReadResourceResult, type GetPromptResult } from "@modelcontextprotocol/server";
 import { serveStdio, StdioServerTransport, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
-import type { Tool, ToolExecutor, ToolExecutionContext } from "@sortedyuan/may/core";
+import { omitUndefined, type Tool, type ToolExecutor, type ToolExecutionContext } from "@sortedyuan/may/core";
 import { assertMcpContentSize, mcpToolResultContent, mcpResourceToUserMessage, mcpPromptToUserMessage } from "./content.js";
 import { freezeTree, object } from "./tasks.js";
 
@@ -61,7 +61,7 @@ export function createMayMcpServer(options: MayMcpServerOptions) {
   const validator = new AjvJsonSchemaValidator();
   const tools = (options.tools ?? []).map(({ tool, result }) => {
     if (typeof tool.execute !== "function" || typeof result !== "function" || tool.inputSchema.type !== "object") throw new Error("Exported tools require execution and public-result projection");
-    const frozen = Object.freeze({ ...tool, execute: tool.execute.bind(tool), ...(tool.parse === undefined ? {} : { parse: tool.parse.bind(tool) }), inputSchema: freezeTree(structuredClone(tool.inputSchema)) });
+    const frozen = Object.freeze({ ...tool, execute: tool.execute.bind(tool), ...omitUndefined({ parse: tool.parse?.bind(tool) }), inputSchema: freezeTree(structuredClone(tool.inputSchema)) });
     return { tool: frozen, result, validate: validator.getValidator(frozen.inputSchema) };
   });
   const resources = (options.resources ?? []).map((entry) => ({ ...entry, definition: freezeTree(structuredClone(entry.definition)) }));
@@ -87,7 +87,7 @@ export function createMayMcpServer(options: MayMcpServerOptions) {
     const check = async (signal: AbortSignal, method: string, target?: string) => {
       signal.throwIfAborted(); valid(trusted);
       if (reauthenticate !== undefined) await bounded(signal, () => reauthenticate(signal));
-      if (await bounded(signal, () => options.authorize({ principal: trusted, workspaceId, signal, method, ...(target === undefined ? {} : { target }) })) !== true) throw denied();
+      if (await bounded(signal, () => options.authorize(omitUndefined({ principal: trusted, workspaceId, signal, method, target }))) !== true) throw denied();
       signal.throwIfAborted(); valid(trusted);
     };
     const server = new GuardedServer(check, lifetime.signal, timeout);

@@ -436,5 +436,5 @@ performance conclusions require their corresponding real environment evidence.
 `test:integration:eval` reads the host's May configuration through
 `loadMayConfig()` and selects its configured provider and model. It executes real
 single-Agent and task-graph trials, model grading, permission handling and budget
-checks and consumes provider quota. Records remain under `eval-verification/live/run-*` for review; they
+checks and consumes provider quota. Records remain under the ignored `.test-output/eval-agent/run-*` for review; they
 describe the configured tasks and model used in that execution.

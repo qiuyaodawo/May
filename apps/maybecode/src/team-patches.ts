@@ -1,4 +1,4 @@
-import { acquireFileLock, releaseFileLock } from "@sortedyuan/may/storage";
+import { acquireFileLock, hasErrorCode } from "@sortedyuan/may/storage";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath, rename, unlink, type FileHandle } from "node:fs/promises";
@@ -52,7 +52,7 @@ export async function createTeamPatch(options: { readonly directory: string; rea
   const path = join(patches, `${bundle.id}.json`);
   try { await durableFile(path, `${JSON.stringify(bundle, null, 2)}\n`, "wx"); }
   catch (error) {
-    if (!hasCode(error, "EEXIST")) throw error;
+    if (!hasErrorCode(error, "EEXIST")) throw error;
     if (!isDeepStrictEqual(await readTeamPatch(options.directory, bundle.id), bundle)) throw new Error("Patch id already exists with different content");
   }
   return bundle;
@@ -109,8 +109,7 @@ export async function applyTeamPatch(options: {
   if (inside(source, resolve(lockDirectory))) throw new Error("Apply lock directory must be outside the source workspace");
   const locks = await privateDirectory(lockDirectory);
   if (inside(source, locks)) throw new Error("Apply lock directory must be outside the source workspace");
-  const lockPath = join(locks, `${hash(source)}.lock`);
-  const lock = await acquireFileLock(lockPath);
+  const lock = await acquireFileLock(join(locks, `${hash(source)}.lock`));
   let journal: FileHandle | undefined;
   let sequence = 0;
   const appliedPaths: string[] = [];
@@ -122,7 +121,6 @@ export async function applyTeamPatch(options: {
     await journal!.sync(); sequence++;
   };
   try {
-    await lock.writeFile(`${JSON.stringify({ pid: process.pid, patchId: bundle.id, source })}\n`); await lock.sync();
     // Closing the race with another cooperative applier is separate from task/source validation.
     const prior = await readTeamPatchApplication(options.directory, bundle.id);
     if (prior) return { ...prior, ...(prior.status === "applied" ? { alreadyApplied: true } : {}) };
@@ -182,12 +180,14 @@ export async function applyTeamPatch(options: {
   } catch (error) {
     if (!begun) throw error;
     // An error after the durable start is conservatively unknown, even when no effect was observed.
-    try { await append({ type: "unknown" }); } catch { /* Preserve original evidence; never assume a failed journal write had no effect. */ }
+    // If the unknown record cannot be written, the journal ends after its start record, which readers report as unknown.
+    try { await append({ type: "unknown" }); }
+    catch (appendError) { throw new AggregateError([error, appendError], "Patch application failed and its unknown outcome could not be recorded"); }
     return { status: "unknown", patchId: bundle.id, digest: bundle.digest, appliedPaths,
       uncertainPaths: bundle.files.map((file) => file.path).filter((path) => !appliedPaths.includes(path)), journalPath,
       detail: error instanceof Error ? error.message : "Patch application outcome is unknown" };
   } finally {
-    try { await journal?.close(); } finally { await releaseFileLock(lock, lockPath); }
+    try { await journal?.close(); } finally { await lock.release(); }
   }
 }
 
@@ -354,7 +354,7 @@ function assertBefore(file: TeamPatchFile, current?: Buffer): void {
 async function safeRead(root: string, path: string, maxBytes: number): Promise<Buffer | undefined> {
   await assertParents(root, path);
   let before;
-  try { before = await lstat(path); } catch (error) { if (hasCode(error, "ENOENT")) return undefined; throw error; }
+  try { before = await lstat(path); } catch (error) { if (hasErrorCode(error, "ENOENT")) return undefined; throw error; }
   if (!before.isFile() || before.isSymbolicLink() || before.nlink > 1 || before.size > maxBytes) throw new Error("Patch file is unsafe or exceeds its byte limit");
   const file = await open(path, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
   try {
@@ -377,7 +377,7 @@ async function assertParents(root: string, path: string): Promise<void> {
   for (const part of relative(root, dirname(path)).split(sep).filter(Boolean)) {
     cursor = join(cursor, part);
     try { const info = await lstat(cursor); if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Patch parent is not a safe directory"); }
-    catch (error) { if (hasCode(error, "ENOENT")) return; throw error; }
+    catch (error) { if (hasErrorCode(error, "ENOENT")) return; throw error; }
   }
 }
 
@@ -388,7 +388,7 @@ async function missingDirectories(root: string, path: string): Promise<string[]>
   for (const part of relative(root, path).split(sep).filter(Boolean)) {
     cursor = join(cursor, part);
     try { const info = await lstat(cursor); if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Patch parent is unsafe"); }
-    catch (error) { if (!hasCode(error, "ENOENT")) throw error; missing.push(cursor); }
+    catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; missing.push(cursor); }
   }
   return missing;
 }
@@ -405,10 +405,10 @@ async function privateDirectory(path: string): Promise<string> {
   const missing: string[] = [];
   let parent = absolute;
   for (;;) {
-    try { await safeRoot(parent); break; } catch (error) { if (!hasCode(error, "ENOENT")) throw error; missing.unshift(parent); parent = dirname(parent); }
+    try { await safeRoot(parent); break; } catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; missing.unshift(parent); parent = dirname(parent); }
   }
   for (const directory of missing) {
-    try { await mkdir(directory, { mode: 0o700 }); } catch (error) { if (!hasCode(error, "EEXIST")) throw error; }
+    try { await mkdir(directory, { mode: 0o700 }); } catch (error) { if (!hasErrorCode(error, "EEXIST")) throw error; }
     await safeRoot(directory);
   }
   return safeRoot(absolute);
@@ -422,7 +422,7 @@ async function durableFile(path: string, content: string | Uint8Array, flag: "wx
 async function syncDirectory(path: string): Promise<void> {
   let directory: FileHandle | undefined;
   try { directory = await open(path, "r"); await directory.sync(); }
-  catch (error) { if (process.platform !== "win32" || !["EPERM", "EACCES", "EINVAL", "EISDIR"].some((code) => hasCode(error, code))) throw error; }
+  catch (error) { if (process.platform !== "win32" || !["EPERM", "EACCES", "EINVAL", "EISDIR"].some((code) => hasErrorCode(error, code))) throw error; }
   finally { await directory?.close(); }
 }
 
@@ -433,4 +433,3 @@ function assertRelativePath(path: string): void {
 function assertPatchId(id: string): void { if (!/^patch-[a-f0-9]{64}$/u.test(id)) throw new Error("Invalid patch id"); }
 function inside(root: string, path: string): boolean { const child = relative(root, path); return child === "" || (!isAbsolute(child) && child !== ".." && !child.startsWith(`..${sep}`)); }
 function hash(value: string | Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }
-function hasCode(error: unknown, code: string): boolean { return typeof error === "object" && error !== null && "code" in error && error.code === code; }

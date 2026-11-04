@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -11,7 +12,7 @@ import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { actorKey } from "../dist/gateway-types.js";
 
-const base = fileURLToPath(new URL("../../../.zcode/tmp/gateway-restore-access/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-restore-access");
 const module = fileURLToPath(new URL("../dist/gateway-rpc-adapter.js", import.meta.url));
 const example = fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url));
 const operator = { kind: "operator", id: "restore-review" };

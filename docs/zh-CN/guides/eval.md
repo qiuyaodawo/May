@@ -359,4 +359,4 @@ pnpm docs:check
 `test:integration:eval` 通过 `loadMayConfig()` 读取宿主配置，使用配置的
 provider 和模型执行真实单 Agent、任务图、模型评分、权限处理和预算检查。
 命令需要 provider 访问，会消耗模型额度，保存模型、用量和验收证据。
-记录位于 `eval-verification/live/run-*`，说明本次配置的任务及模型。
+记录位于被忽略的 `.test-output/eval-agent/run-*`，说明本次配置的任务及模型。

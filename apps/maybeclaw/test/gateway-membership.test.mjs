@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,7 @@ import { GatewayHost } from "../dist/gateway-host.js";
 import { inboxId } from "../dist/channel-store.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 
-const base = fileURLToPath(new URL("../../../.zcode/tmp/gateway-membership/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-membership");
 const module = fileURLToPath(new URL("../dist/gateway-rpc-adapter.js", import.meta.url));
 const example = fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url));
 const operator = { kind: "operator", id: "membership-verification" };

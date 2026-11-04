@@ -20,7 +20,7 @@ const unknown = async () => ({ status: "recovery-required", detail: "Unknown eff
 function deferred() { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; }
 function adapter(store, respond, capabilities = {}) {
   return createApplicationAgent({ version: "v1", store, ...capabilities,
-    definition: ({ tools }) => defineAgent({ tools, permissionPolicy: () => "allow",
+    definition: ({ tools }) => defineAgent({ tools, permissionPolicy: () => "allow", requestRecording: "off",
       model: { async *stream(request) { yield { type: "response.completed", message: await respond(request) }; } },
     }),
   });
@@ -165,7 +165,7 @@ test("handoff never forwards old pending mail and cancellation wins before a com
     definition: ({ tools }) => defineAgent({ tools: [...tools, {
       name: "hold", description: "An already-started operation", inputSchema: { type: "object" }, parse: (input) => input,
       async execute() { held.resolve(); await release.promise; return "settled"; },
-    }], toolScheduler: parallelToolScheduler, permissionPolicy: () => "allow",
+    }], toolScheduler: parallelToolScheduler, permissionPolicy: () => "allow", requestRecording: "off",
     model: { async *stream() { yield { type: "response.completed", message: answer("", [call("handoff_task", { agent: "target", input: "Summary" }), call("hold", {})]) }; } },
     }),
   });

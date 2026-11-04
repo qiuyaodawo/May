@@ -4,14 +4,17 @@ import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
-import { InMemorySessionCatalog, MaybeCodeWorkspace, parseMaybeCodeArgs, startMaybeCodeWebUI } from "../dist/index.js";
+import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
+import { MaybeCodeWorkspace } from "../dist/workspace.js";
+import { parseMaybeCodeArgs } from "../dist/args.js";
+import { startMaybeCodeWebUI } from "../dist/web-ui.js";
 
 test("MaybeCode web entry serves browser-only modules and preserves session guards", async t => {
   assert.equal(parseMaybeCodeArgs(["--ui", "web", "--port", "0"]).port, 0);
   assert.throws(() => parseMaybeCodeArgs(["--port", "3940"]), /requires --ui web/);
   const workspace = await realpath(await mkdtemp(join(tmpdir(), "may-web-ui-")));
   t.after(() => rm(workspace, { recursive: true, force: true }));
-  const app = await MaybeCodeWorkspace.open({ git: false, workspace, model: { async *stream() { yield { type: "response.completed", message: { role: "assistant", content: [{ type: "text", text: "Done" }] } }; } }, store: new InMemorySessionStore(), catalog: new InMemorySessionCatalog(), autoResume: false });
+  const app = await MaybeCodeWorkspace.open({ git: false, workspace, model: { async *stream() { yield { type: "response.completed", message: { role: "assistant", content: [{ type: "text", text: "Done" }] } }; } }, store: new InMemorySessionStore(), catalog: new InMemorySessionCatalog(), autoResume: false, requestRecording: "off" });
   const token = "fixture-token-0123456789abcdef012345";
   const server = await startMaybeCodeWebUI(app, { token, port: 0 }); t.after(() => server.close());
   const page = await fetch(server.url); assert.equal(page.status, 200); assert.match(await page.text(), /data-kind="session"/);

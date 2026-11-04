@@ -2,8 +2,7 @@ import { mkdir, open, readFile, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import type { SessionEvent } from "./events.js";
-import { syncDirectory } from "./file-ownership.js";
-export { acquireFileLock, recoverFileLock, releaseFileLock, syncDirectory, replaceJournalFile } from "./file-ownership.js";
+import { syncDirectory } from "../storage/index.js";
 import {
   type SessionStore,
   validateSessionHistory,

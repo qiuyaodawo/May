@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,10 +7,13 @@ import test from "node:test";
 import { createReadTool, createShellTool, createWriteTool } from "@sortedyuan/coding-tools";
 import { PermissionDeniedError, PermissionToolExecutor } from "@sortedyuan/may/permissions";
 import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store";
-import { createCodingPermissionPolicy, executeMaybeCodeSlashCommand, openConfiguredMaybeCode } from "../dist/index.js";
+import { acquireFileLock } from "@sortedyuan/may/storage";
+import { openConfiguredMaybeCode } from "../dist/index.js";
+import { createCodingPermissionPolicy } from "../dist/policy.js";
+import { executeMaybeCodeSlashCommand } from "../dist/slash-commands.js";
 import { createMaybeCodeWebHost } from "../dist/web-ui.js";
 
-const artifacts = fileURLToPath(new URL("../../../review/persistent-rules/maybecode/", import.meta.url));
+const artifacts = join(testOutputRoot, "maybecode", "persistent-rules");
 const resources = new Map();
 
 async function directory(t) {
@@ -151,7 +155,7 @@ test("configured host owns the shared store across sessions and supports rule ma
   const { root, options } = await configured(t, true);
   let app = await openConfiguredMaybeCode(options);
   resources.get(root).push(() => app.close());
-  assert.equal(app.persistentRulesEnabled, true);
+  assert.equal(app.application.persistentRulesEnabled, true);
   const tool = createWriteTool({ cwd: root });
   const rule = await app.createPermissionRule({ tool, input: tool.parse({ path: "guide.md", content: "unused" }), context: context() },
     { decision: "allow", createdBy: "local:operator" });
@@ -176,14 +180,15 @@ test("configured host owns the shared store across sessions and supports rule ma
   await executeMaybeCodeSlashCommand(`/permissions revoke ${rule.id}`, app);
   assert.equal((await app.listPermissionRules()).length, 1);
   await app.close();
-  await assert.rejects(stat(join(root, ".may", "permission-rules.json.lock")), { code: "ENOENT" });
+  const lock = await acquireFileLock(join(root, ".may", "permission-rules.json.lock"));
+  await lock.release();
 });
 
 test("persistent rules are opt-in and malformed configuration fails", async t => {
   const { root, options } = await configured(t);
   const app = await openConfiguredMaybeCode(options);
   resources.get(root).push(() => app.close());
-  assert.equal(app.persistentRulesEnabled, false);
+  assert.equal(app.application.persistentRulesEnabled, false);
   await assert.rejects(stat(join(root, ".may", "permission-rules.json")), { code: "ENOENT" });
   const host = createMaybeCodeWebHost(app);
   assert.equal((await host.snapshot()).commands.includes("permission.rules.list"), false);

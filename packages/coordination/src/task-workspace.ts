@@ -203,7 +203,6 @@ async function scan(root: string, config: WorkspaceState["config"], rejectUnsafe
       if (++visited > config.maxFiles * 4) throw new Error("Workspace has too many directory entries");
       const path = join(directory, entry.name);
       const stat = await lstat(path);
-      // Links, sockets and devices are never copied or followed.
       if (stat.isSymbolicLink()) { if (rejectUnsafe) throw new Error("Patch workspace contains a symbolic link"); continue; }
       if (stat.isDirectory()) { await visit(path, depth + 1); continue; }
       if (!stat.isFile()) { if (rejectUnsafe) throw new Error("Patch workspace contains a special file"); continue; }

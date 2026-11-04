@@ -1,18 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { createSkillsPlugin } from "@sortedyuan/may/services/skills";
 import { PluginHost } from "@sortedyuan/may/plugin";
 import { services, ToolSources, InstructionSources } from "@sortedyuan/may/services";
 import { SkillRegistry } from "@sortedyuan/may/skills";
 
 test("Skills plugin activates actual skill files, persists state and restores an independent instance", async t => {
-  const destination = fileURLToPath(new URL("../../../../plugin-verification/", import.meta.url));
-  await mkdir(destination, { recursive: true });
-  const directory = await mkdtemp(join(destination, "skills-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/skills-plugin");
   await mkdir(join(directory, "verification"));
   await writeFile(join(directory, "verification", "SKILL.md"), "---\nname: verification\ndescription: Read verification files\n---\nRead the actual documentation.");
   const registry = await SkillRegistry.discover([directory]);

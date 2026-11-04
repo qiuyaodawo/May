@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  MaybeCodePrototypeView,
-  TranscriptStore,
-  TranscriptView,
-} from "../dist/index.js";
+import { TranscriptStore, TranscriptView } from "@sortedyuan/tui/transcript";
+import { MaybeCodeTerminalView } from "../dist/ui/terminal-view.js";
 import { ScrollView } from "@sortedyuan/tui";
 
 test("keeps the newest transcript rows after the scroll buffer limit", () => {
@@ -32,7 +29,7 @@ test("keeps the newest transcript rows after the scroll buffer limit", () => {
 
 test("does not display input that the controller rejected", async () => {
   const store = new TranscriptStore();
-  const view = new MaybeCodePrototypeView({
+  const view = new MaybeCodeTerminalView({
     store,
     workspace: "workspace",
     async onSubmit() {
@@ -64,7 +61,7 @@ test("does not display input that the controller rejected", async () => {
 });
 
 test("routes approval shortcuts through the retained modal", async () => {
-  const view = new MaybeCodePrototypeView({
+  const view = new MaybeCodeTerminalView({
     store: new TranscriptStore(),
     workspace: "workspace",
     onSubmit() {},
@@ -102,7 +99,7 @@ test("routes approval shortcuts through the retained modal", async () => {
 
 test("completes slash commands and selects sessions in retained dialogs", async () => {
   const submitted = [];
-  const view = new MaybeCodePrototypeView({
+  const view = new MaybeCodeTerminalView({
     store: new TranscriptStore(),
     workspace: "workspace",
     suggestions: async (input) => input.startsWith("/res")

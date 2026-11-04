@@ -1,5 +1,6 @@
 import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, resolve, relative, sep } from "node:path";
+import { omitUndefined } from "@sortedyuan/may/core";
 import { shellRuntimeInstructions, type ShellToolInfo } from "./shell.js";
 
 export const DEFAULT_CODING_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
@@ -201,13 +202,13 @@ export async function loadCodingInstructions(
   const projectSection = formatCodingProjectInstructions(projects, settings.labels.project);
   if (projectSection !== "") sections.push(projectSection);
 
-  return {
+  return omitUndefined({
     system,
     projects,
-    ...(runtime === undefined ? {} : { runtime }),
-    ...(project === undefined ? {} : { project }),
+    runtime,
+    project,
     effective: sections.join("\n\n"),
-  };
+  });
 }
 
 export function formatCodingProjectInstructions(

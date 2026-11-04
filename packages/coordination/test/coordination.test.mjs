@@ -9,8 +9,6 @@ import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { CoordinationRuntime, InMemoryCoordinationStore, createApplicationAgent, pipeline, parallelTasks } from "../dist/index.js";
 import { FileCoordinationStore } from "../dist/file-store.js";
-import { recoverFileLock } from "@sortedyuan/may/session/file-store";
-import { spawnSync } from "node:child_process";
 
 const policy = { version: "v1", authorize: () => true };
 const answer = (text) => ({ role: "assistant", content: [{ type: "text", text }] });
@@ -18,7 +16,7 @@ const task = (id, dependsOn = []) => ({ id, agent: "worker", input: id, dependsO
 const statuses = (runtime) => Object.fromEntries(runtime.snapshot().tasks.map(({ id, status }) => [id, status]));
 function deferred() { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; }
 function agent(model, store = new InMemorySessionStore(), permissionPolicy = () => "allow", tools = []) {
-  return createApplicationAgent({ version: "v1", store, definition: defineAgent({ model, tools, permissionPolicy }) });
+  return createApplicationAgent({ version: "v1", store, definition: defineAgent({ model, tools, permissionPolicy, requestRecording: "off" }) });
 }
 async function directory(t) {
   const parent = resolve(tmpdir());
@@ -184,7 +182,7 @@ test("file journals enforce ownership, version matching, tail repair and complet
   const worker = agent({ async *stream() { yield { type: "response.completed", message: answer("ok") }; } });
   const options = { id: "journal", store, agents: { worker }, policy };
   const runtime = await CoordinationRuntime.create({ ...options, tasks: [task("a")] });
-  await assert.rejects(CoordinationRuntime.resume(options), { code: "EEXIST" });
+  await assert.rejects(CoordinationRuntime.resume(options), { code: "ELOCKED" });
   await runtime.wait(); await runtime.close();
   await assert.rejects(CoordinationRuntime.resume({ ...options, policy: { ...policy, version: "v2" } }), /version changed/);
   await assert.rejects(CoordinationRuntime.resume({ ...options, agents: { worker: { ...worker, version: "v2" } } }), /version changed/);
@@ -199,7 +197,7 @@ test("file journals enforce ownership, version matching, tail repair and complet
   const repaired = await CoordinationRuntime.resume(options); await repaired.close();
 });
 
-test("bounded journals checkpoint snapshots, reject oversized inputs, and expose guarded lock recovery", async (t) => {
+test("bounded journals checkpoint snapshots and reject oversized inputs", async (t) => {
   const path = await directory(t);
   const store = new FileCoordinationStore(path, 2048);
   const worker = agent({ async *stream() { yield { type: "response.completed", message: answer("ok") }; } });
@@ -214,16 +212,6 @@ test("bounded journals checkpoint snapshots, reject oversized inputs, and expose
   assert.ok(Buffer.byteLength(await readFile(file)) <= 2048);
   const resumed = await CoordinationRuntime.resume(options);
   await resumed.close();
-  const lock = join(path, "owner.lock");
-  const live = JSON.stringify({ pid: process.pid });
-  await writeFile(lock, live);
-  await assert.rejects(recoverFileLock(lock, { expectedContents: live, confirmHostsStopped: true }), /alive/);
-  const child = spawnSync(process.execPath, ["-e", ""]);
-  assert.equal(child.status, 0);
-  const stale = JSON.stringify({ pid: child.pid });
-  await writeFile(lock, stale);
-  await recoverFileLock(lock, { expectedContents: stale, confirmHostsStopped: true });
-  await assert.rejects(readFile(lock), { code: "ENOENT" });
 });
 
 test("deadlines stop pending dispatches and uncertain adapters are not restarted", async (t) => {

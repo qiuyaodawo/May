@@ -4,6 +4,7 @@ import {
   endTraceSpan,
   FatalToolExecutionError,
   freezeToolInput,
+  omitUndefined,
   RunCancelledError,
   startTraceSpan,
   traceError,
@@ -215,10 +216,10 @@ export class PermissionToolExecutor implements ToolExecutor {
         throw new TypeError(`Approval request "${requestId}" does not allow persistent rules`);
       }
       validateRuleOptions(options);
-      options = Object.freeze({
+      options = Object.freeze(omitUndefined({
         createdBy: options!.createdBy,
-        ...(options!.expiresAt === undefined ? {} : { expiresAt: options!.expiresAt }),
-      });
+        expiresAt: options!.expiresAt,
+      }));
     }
 
     pending.resolving = true;
@@ -240,11 +241,11 @@ export class PermissionToolExecutor implements ToolExecutor {
     if (options.decision !== "allow" && options.decision !== "deny") {
       throw new TypeError("Invalid persistent rule decision");
     }
-    options = Object.freeze({
+    options = Object.freeze(omitUndefined({
       decision: options.decision,
       createdBy: options.createdBy,
-      ...(options.expiresAt === undefined ? {} : { expiresAt: options.expiresAt }),
-    });
+      expiresAt: options.expiresAt,
+    }));
     const store = this.requireRuleStore();
     const immutable = immutableCheck(check);
     const outcome = await this.evaluatePolicy(immutable);
@@ -277,17 +278,17 @@ export class PermissionToolExecutor implements ToolExecutor {
     if (options.decision !== "allow" && options.decision !== "deny") {
       throw new TypeError("Invalid persistent rule decision");
     }
-    options = Object.freeze({
+    options = Object.freeze(omitUndefined({
       decision: options.decision,
       createdBy: options.createdBy,
-      ...(options.expiresAt === undefined ? {} : { expiresAt: options.expiresAt }),
-    });
+      expiresAt: options.expiresAt,
+    }));
     const store = this.requireRuleStore();
     const source = (await store.list()).find((rule) => rule.id === sourceId);
     this.throwIfClosed();
     if (source === undefined) throw new TypeError(`Persistent permission rule does not exist: ${sourceId}`);
     validateRuleOptions(options);
-    const rule = Object.freeze({
+    const rule = Object.freeze(omitUndefined({
       id: `permission_rule_${crypto.randomUUID()}`,
       scopeId: source.scopeId,
       toolName: source.toolName,
@@ -297,8 +298,8 @@ export class PermissionToolExecutor implements ToolExecutor {
       decision: options.decision,
       createdAt: Date.now(),
       createdBy: options.createdBy,
-      ...(options.expiresAt === undefined ? {} : { expiresAt: options.expiresAt }),
-    });
+      expiresAt: options.expiresAt,
+    }));
     await store.create(rule);
     this.throwIfClosed();
     await this.emit({ type: "rule.created", rule });
@@ -432,7 +433,7 @@ export class PermissionToolExecutor implements ToolExecutor {
         definitions.add(sessionDefinitionKey(pending.outcome, pending.definitionKey));
         this.sessionGrants.set(sessionGrantKey, definitions);
       }
-      pending.resolve({ decision, ...(ruleId === undefined ? {} : { ruleId }) });
+      pending.resolve(omitUndefined({ decision, ruleId }));
       return true;
     } catch (error) {
       if (this.pending.get(requestId) === pending) {
@@ -674,12 +675,12 @@ function endPermissionSpan(
 
 export function permissionDefinitionKey(tool: PermissionCheck["tool"]): string {
   // 递归排序，使属性顺序不同的等价 JSON Schema 使用相同 identity。
-  const canonical = JSON.stringify({
+  const canonical = JSON.stringify(omitUndefined({
     name: tool.name,
     description: tool.description,
     inputSchema: tool.inputSchema,
-    ...(tool.permissionVersion === undefined ? {} : { permissionVersion: tool.permissionVersion }),
-  }, (_key, value: unknown) => {
+    permissionVersion: tool.permissionVersion,
+  }), (_key, value: unknown) => {
     if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
     return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
   });
@@ -688,19 +689,19 @@ export function permissionDefinitionKey(tool: PermissionCheck["tool"]): string {
 
 function immutableCheck(check: PermissionCheck): PermissionCheck {
   return Object.freeze({
-    tool: freezeToolInput({
+    tool: freezeToolInput(omitUndefined({
       name: check.tool.name,
       description: check.tool.description,
       inputSchema: structuredClone(check.tool.inputSchema),
-      ...(check.tool.permissionVersion === undefined ? {} : { permissionVersion: check.tool.permissionVersion }),
-    }),
+      permissionVersion: check.tool.permissionVersion,
+    })),
     input: freezeToolInput(structuredClone(check.input)),
     context: check.context,
   });
 }
 
 function validateRuleOptions(options: ApprovalResolveOptions | undefined): asserts options is ApprovalResolveOptions {
-  if (options === undefined || typeof options.createdBy !== "string" || options.createdBy.trim() === "") {
+  if (options === undefined || options.createdBy.trim() === "") {
     throw new TypeError("Persistent permission rules require a trusted createdBy identity");
   }
   if (options.expiresAt !== undefined
@@ -715,7 +716,7 @@ function makeRule(
   definitionKey: string,
   options: CreatePermissionRuleOptions,
 ): PersistentPermissionRule {
-  return Object.freeze({
+  return Object.freeze(omitUndefined({
     id: `permission_rule_${crypto.randomUUID()}`,
     scopeId: outcome.persistent!.scopeId,
     toolName: check.tool.name,
@@ -725,8 +726,8 @@ function makeRule(
     decision: options.decision,
     createdAt: Date.now(),
     createdBy: options.createdBy,
-    ...(options.expiresAt === undefined ? {} : { expiresAt: options.expiresAt }),
-  });
+    expiresAt: options.expiresAt,
+  }));
 }
 
 function sameScope(left: NormalizedDecision, right: NormalizedDecision): boolean {

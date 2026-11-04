@@ -2,8 +2,8 @@
 
 [English](../../en/guides/subagent-delegation.md) | **简体中文**
 
-普通 MaybeCode 请求可以将独立工作交给子 Agent。终端界面、Web UI、无头
-控制器和 `MaybeCodeApplication.open()` 默认启用委派。模型在活动 Run 中
+普通 MaybeCode 请求可以将独立工作交给子 Agent。终端界面、Web UI 和无头
+控制器默认启用委派。模型在活动 Run 中
 可以调用 `delegate_tasks`，按照用户提示委派，也可以自行选择委派。
 
 本指南要求已有[MaybeCode Session 配置](maybecode.md)，介绍请求行为、角色、
@@ -102,7 +102,8 @@ Goal 的 Run 与 steering 的 Run 同样是一次请求，因此宿主启动的�
 它可以修改的工作区相对文件：
 
 - 子任务可以读取工作区内的任何文件；
-- `write` 与 `edit` 拒绝 `files` 之外的路径；
+- `write` 与 `edit` 拒绝 `files` 之外的路径；空列表表示不允许修改任何文件，不提供
+  `files` 时不限制写入范围；
 - 已存在的文件必须由该子任务先读取，读取之后内容发生变化的文件会被当作冲突拒绝；
 - `shell` 工具没有这些限制，因此任务说明要明确写出文件分工。
 

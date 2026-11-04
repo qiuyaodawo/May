@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver } from "../../../providers/dist/index.js";
 import { FileSharedBudget } from "../../../coordination/dist/index.js";
 import { SubagentRequestLedger, withRequestBudget } from "../../dist/delegation/subagent-budget.js";
@@ -12,9 +10,7 @@ import { SubagentRequestLedger, withRequestBudget } from "../../dist/delegation/
 const request = { messages: [{ role: "user", content: [{ type: "text", text: "Budget capability refresh" }] }], tools: [] };
 
 test("actual HTTP capability preflight updates both budget wrappers without reserving a model call", { timeout: 10_000 }, async t => {
-  const base = fileURLToPath(new URL("../../../../review/budget-model-refresh/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "http-"));
+  const directory = await createTestDirectory(t, "coordination/budget-model-refresh");
   const state = { contextWindowTokens: 200, maxOutputTokens: 20, text: true, metadataRequests: 0, modelRequests: 0 };
   const service = createServer(async (incoming, outgoing) => {
     if (incoming.url === "/v1/capabilities") {
@@ -36,7 +32,7 @@ test("actual HTTP capability preflight updates both budget wrappers without rese
   });
   service.listen(0, "127.0.0.1");
   await once(service, "listening");
-  t.after(async () => { service.closeAllConnections(); await new Promise(resolve => service.close(resolve)); await rm(directory, { recursive: true, force: true }); });
+  t.after(async () => { service.closeAllConnections(); await new Promise(resolve => service.close(resolve)); });
   const baseURL = `http://127.0.0.1:${service.address().port}/v1`;
   for (const kind of ["shared", "request"]) {
     state.contextWindowTokens = 200;

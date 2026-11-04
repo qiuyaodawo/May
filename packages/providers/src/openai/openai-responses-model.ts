@@ -1,5 +1,6 @@
 import type {
   ContextSnapshot,
+  Message,
   Model,
   ModelContextCompactor,
   ModelEvent,
@@ -8,7 +9,7 @@ import type {
 } from "@sortedyuan/may/core";
 import { parseRetryAfterMs } from "../openai-compatible/http.js";
 import { executeRecordedRequest, executeRecordedOperation, requestEndpoint, type ModelRequestRecorder } from "@sortedyuan/may/core";
-import { assertModelResponseFormat, validateStructuredModelResponse } from "@sortedyuan/may/core";
+import { assertModelResponseFormat, omitUndefined, validateStructuredModelResponse } from "@sortedyuan/may/core";
 
 import {
   toOpenAIResponsesRequestParts,
@@ -94,7 +95,7 @@ export class OpenAIResponsesModel implements Model {
       const format = request.responseFormat;
       body.text = { format: format.type === "json"
         ? { type: "json_object" }
-        : { type: "json_schema", name: format.name, schema: format.schema, ...(format.strict === undefined ? {} : { strict: format.strict }) } };
+        : omitUndefined({ type: "json_schema", name: format.name, schema: format.schema, strict: format.strict }) };
     }
     if (this.maxOutputTokens !== undefined) {
       body.max_output_tokens = this.maxOutputTokens;
@@ -166,35 +167,30 @@ export class OpenAIResponsesModel implements Model {
       );
     }
     const usage = parseUsage(compacted.usage);
-    return {
-      messages: [{
-        role: "assistant" as const,
-        content: [],
-        modelState: {
-          type: OPENAI_RESPONSES_MODEL_STATE_TYPE,
-          data: { items: compacted.output },
-        },
-      }],
+    const messages: Message[] = [{
+      role: "assistant",
+      content: [],
+      modelState: {
+        type: OPENAI_RESPONSES_MODEL_STATE_TYPE,
+        data: { items: compacted.output },
+      },
+    }];
+    return omitUndefined({
+      messages,
       // 压缩请求本身就是一次 provider 调用，它的 usage 一并上报给计账方。
-      ...(usage === undefined ? {} : { usage }),
-      ...(usage?.outputTokens === undefined
-        ? {}
-        : { effectiveTokens: usage.outputTokens }),
-    };
+      usage,
+      effectiveTokens: usage?.outputTokens,
+    });
   }
 
   private reasoningConfig(): Record<string, unknown> | undefined {
     if (this.reasoningEffort === undefined && this.reasoningSummary === undefined) {
       return undefined;
     }
-    return {
-      ...(this.reasoningEffort === undefined
-        ? {}
-        : { effort: this.reasoningEffort }),
-      ...(this.reasoningSummary === undefined
-        ? {}
-        : { generate_summary: this.reasoningSummary }),
-    };
+    return omitUndefined({
+      effort: this.reasoningEffort,
+      generate_summary: this.reasoningSummary,
+    });
   }
 
   private async fetch(
@@ -233,13 +229,13 @@ async function createApiError(response: Response): Promise<OpenAIResponsesError>
     // Preserve the HTTP response text when the body is not structured JSON.
   }
   const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
-  return new OpenAIResponsesError(message, {
+  return new OpenAIResponsesError(message, omitUndefined({
     status: response.status,
-    ...(providerType === undefined ? {} : { providerType }),
-    ...(providerCode === undefined ? {} : { providerCode }),
-    ...(requestId === undefined ? {} : { requestId }),
-    ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
-  });
+    providerType,
+    providerCode,
+    requestId,
+    retryAfterMs,
+  }));
 }
 
 function requireRecord(value: unknown, field: string): Record<string, unknown> {

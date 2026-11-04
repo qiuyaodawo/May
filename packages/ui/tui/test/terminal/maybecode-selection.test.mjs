@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -14,14 +15,14 @@ test("真实 xterm 中选择 MaybeCode 输入和回复并使用系统剪贴板",
   timeout: 60_000,
   skip: process.env.MAY_TEST_SYSTEM_CLIPBOARD !== "1",
 }, async t => {
-  const { MaybeCodePrototypeView } = await import("../../../../../apps/maybecode/dist/ui/prototype-view.js");
+  const { MaybeCodeTerminalView } = await import("../../../../../apps/maybecode/dist/ui/terminal-view.js");
   const clipboard = new SystemClipboard();
   const previous = await clipboard.readText();
   if (previous === "") {
     t.skip("当前剪贴板没有可恢复的文字内容");
     return;
   }
-  const base = fileURLToPath(new URL("../../../../../review/pointer-tests/", import.meta.url));
+  const base = join(testOutputRoot, "tui", "maybecode-selection");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "maybecode-"));
   const variables = Object.fromEntries(["TMP", "TEMP", "TMPDIR"].map(key => [key, process.env[key]]));
@@ -36,7 +37,7 @@ test("真实 xterm 中选择 MaybeCode 输入和回复并使用系统剪贴板",
   const submitted = [];
   let cancelled = 0;
   let runtime;
-  const view = new MaybeCodePrototypeView({
+  const view = new MaybeCodeTerminalView({
     store,
     workspace: process.cwd(),
     clipboard,

@@ -284,7 +284,7 @@ service is unavailable, choose an explicit deny or fail the run.
 
 The real-provider MaybeCode check is opt-in. After `pnpm build`, set
 `MAYBECODE_PERSISTENT_RULES_LIVE=1` and optionally
-`MAYBECODE_PERSISTENT_RULES_MODEL=<configured-profile>`, then run
+`MAY_LIVE_MODEL=<configured-profile>`, then run
 `node --test apps/maybecode/test/integration/persistent-rules.test.mjs`.
 The current user configuration supplies the actual provider. Two writes target
 one isolated file, with the Session and executor closed and reopened between
@@ -292,7 +292,7 @@ them. The check verifies one persistent approval, rule creation/use in history
 and permission evidence remaining outside model Context. Each Run permits at
 most three model calls and 45 seconds. Retries, Git, MCP, Skills, Goals and
 subagents are disabled. Saved evidence remains under the ignored
-`review/persistent-rules` directory; ordinary offline runs skip the check.
+`.test-output/maybecode/persistent-rules-live` directory; ordinary offline runs skip the check.
 
 ## Security boundary
 

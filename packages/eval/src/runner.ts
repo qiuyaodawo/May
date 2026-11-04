@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
-import { aggregateUsage, priceUsage, resolveRunBudget, resolveUsageTotals, validateUsageCost, type Usage, type UsageCost } from "@sortedyuan/may/core";
+import { aggregateUsage, omitUndefined, priceUsage, resolveRunBudget, resolveUsageTotals, validateUsageCost, type Usage, type UsageCost } from "@sortedyuan/may/core";
 import type { EvalRegistry } from "./registry.js";
 import { createEvalReport, type EvalReport } from "./report.js";
 import { assertJson, createEvalPlan, DEFAULT_EVIDENCE_POLICY, validateExperiment, trialFingerprints, fingerprint, serializableExperiment } from "./validation.js";
@@ -311,7 +311,7 @@ function sanitizeEvent(event: EvalExecutionEvent): EvalExecutionEvent {
   const allowed = ["model-call", "model-attempt", "retry-wait", "tool-call", "tool-failure", "context-compaction", "human-intervention", "approval-wait", "usage", "identity"];
   if (!event.id || event.id.length > 512 || !allowed.includes(event.type)) throw new TypeError("Invalid execution event");
   if (event.durationMs !== undefined && (!Number.isFinite(event.durationMs) || event.durationMs < 0)) throw new RangeError("Event duration must be nonnegative");
-  const saved = { id: event.id, type: event.type, ...(event.scope === undefined ? {} : { scope: event.scope }), ...(event.durationMs === undefined ? {} : { durationMs: event.durationMs }), ...(event.usage === undefined ? {} : { usage: event.usage }), ...(event.cost === undefined ? {} : { cost: event.cost }), ...(event.identities === undefined ? {} : { identities: event.identities }) };
+  const saved = omitUndefined({ id: event.id, type: event.type, scope: event.scope, durationMs: event.durationMs, usage: event.usage, cost: event.cost, identities: event.identities });
   assertJson(saved); return saved;
 }
 class MetricsAccumulator {
@@ -321,7 +321,7 @@ class MetricsAccumulator {
     const key = `${event.scope ?? "agent"}:${event.type}:${event.id}`; if (this.seen.has(key)) return; if (this.seen.size >= 10_000) throw new RangeError("Trial telemetry exceeds 10,000 unique events per scope"); this.seen.add(key);
     const field = ({ "model-call": "modelCalls", "model-attempt": "modelAttempts", "retry-wait": "retryWaitMs", "tool-call": "toolCalls", "tool-failure": "toolFailures", "context-compaction": "contextCompactions", "human-intervention": "humanInterventions", "approval-wait": "approvalWaitMs" } as Record<string, string>)[event.type];
     if (field !== undefined) this.counts[field] = (this.counts[field] ?? 0) + (event.type === "retry-wait" || event.type === "approval-wait" ? event.durationMs ?? 0 : 1);
-    if (event.type === "usage") { const budget = resolveRunBudget(this.item.limits.runBudget, this.variant.runBudget); this.receipts.set(event.id, { ...(event.usage === undefined ? {} : { usage: event.usage }), cost: event.cost === undefined ? priceUsage(event.usage, budget.pricing ?? budget.tokenPrices) : validateUsageCost(event.cost) }); }
+    if (event.type === "usage") { const budget = resolveRunBudget(this.item.limits.runBudget, this.variant.runBudget); this.receipts.set(event.id, { ...omitUndefined({ usage: event.usage }), cost: event.cost === undefined ? priceUsage(event.usage, budget.pricing ?? budget.tokenPrices) : validateUsageCost(event.cost) }); }
   }
   snapshot(overrides?: EvalMetrics): EvalMetrics {
     let usage: Usage | undefined; const missing = new Set<string>();
@@ -330,9 +330,9 @@ class MetricsAccumulator {
     if (calls !== undefined && calls > this.receipts.size) missing.add("model-call-usage-missing");
     const costs = [...this.receipts.values()].map(value => value.cost); const currencies = new Set(costs.map(value => value.currency)); const costReasons = [...new Set(costs.flatMap(value => value.missingReasons))];
     if (calls !== undefined && calls > costs.length) costReasons.push("model-call-cost-missing"); if (currencies.size > 1) costReasons.push("multiple-currencies"); if (costs.length === 0) costReasons.push("cost-not-reported");
-    const cost: UsageCost = { ...(currencies.size <= 1 && costs.some(value => value.amount !== undefined) ? { amount: costs.reduce((sum, value) => sum + (value.amount ?? 0), 0) } : {}), currency: costs[0]?.currency ?? "USD", kind: costs.length > 0 && costs.every(value => value.kind === "provider") ? "provider" : "estimated", complete: costs.length > 0 && calls !== undefined && costs.length >= calls && currencies.size === 1 && costs.every(value => value.complete), missingReasons: costReasons, ...(costs.length === 1 && costs[0]!.pricingId !== undefined ? { pricingId: costs[0]!.pricingId } : {}), ...(costs.length === 1 && costs[0]!.pricingVersion !== undefined ? { pricingVersion: costs[0]!.pricingVersion } : {}) };
+    const cost: UsageCost = { ...(currencies.size <= 1 && costs.some(value => value.amount !== undefined) ? { amount: costs.reduce((sum, value) => sum + (value.amount ?? 0), 0) } : {}), currency: costs[0]?.currency ?? "USD", kind: costs.length > 0 && costs.every(value => value.kind === "provider") ? "provider" : "estimated", complete: costs.length > 0 && calls !== undefined && costs.length >= calls && currencies.size === 1 && costs.every(value => value.complete), missingReasons: costReasons, ...(costs.length === 1 ? omitUndefined({ pricingId: costs[0]!.pricingId, pricingVersion: costs[0]!.pricingVersion }) : {}) };
     const count = (field: string) => this.counts[field] === undefined ? unknown(`${field}-not-reported`) : measured(this.counts[field]!);
-    return { durationMs: overrides?.durationMs ?? unknown("execution-not-finished"), approvalWaitMs: count("approvalWaitMs"), modelCalls: count("modelCalls"), modelAttempts: count("modelAttempts"), retryWaitMs: count("retryWaitMs"), toolCalls: count("toolCalls"), toolFailures: count("toolFailures"), contextCompactions: count("contextCompactions"), humanInterventions: count("humanInterventions"), totalTokens: { ...(totals.totalTokens === undefined ? {} : { value: totals.totalTokens }), complete: calls !== undefined && totals.complete && missing.size === 0, missingReasons: [...new Set([...totals.missingReasons, ...missing, ...(calls === undefined ? ["model-call-count-not-reported"] : [])])] }, cost, ...(usage === undefined ? {} : { usage }) };
+    return { durationMs: overrides?.durationMs ?? unknown("execution-not-finished"), approvalWaitMs: count("approvalWaitMs"), modelCalls: count("modelCalls"), modelAttempts: count("modelAttempts"), retryWaitMs: count("retryWaitMs"), toolCalls: count("toolCalls"), toolFailures: count("toolFailures"), contextCompactions: count("contextCompactions"), humanInterventions: count("humanInterventions"), totalTokens: { ...omitUndefined({ value: totals.totalTokens }), complete: calls !== undefined && totals.complete && missing.size === 0, missingReasons: [...new Set([...totals.missingReasons, ...missing, ...(calls === undefined ? ["model-call-count-not-reported"] : [])])] }, cost, ...omitUndefined({ usage }) };
   }
 }
 function mergeMetrics(previous: EvalMetrics, added: EvalMetrics, overrides?: Partial<EvalMetrics>): EvalMetrics {

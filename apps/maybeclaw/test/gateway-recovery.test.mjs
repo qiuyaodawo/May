@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -8,9 +9,9 @@ import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { actorKey, entryKey } from "../dist/gateway-types.js";
 import { inboxId } from "../dist/channel-store.js";
-import { digest } from "../dist/types.js";
+import { digest } from "../dist/gateway-types.js";
 
-const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-recovery-tests/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-recovery");
 const operator = { kind: "operator", id: "service-admin" };
 const entry = { account: "telegram:42", conversation: "-100", kind: "group" };
 

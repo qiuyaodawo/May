@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { testOutputRoot } from "../packages/test-support/index.mjs";
 import { defineAgent } from "../packages/may/dist/application/index.js";
 import { InMemoryContext } from "../packages/may/dist/core/index.js";
 import { loadMayConfig } from "../packages/may/dist/config/index.js";
@@ -13,8 +13,7 @@ import { createCoordinationExecutionAdapter } from "../packages/eval/dist/coordi
 import { EvalRunner, EvalRegistry, createLocalDirectoryEnvironment, createFileChangesEvaluator, createJsonSchemaEvaluator, createModelEvaluator } from "../packages/eval/dist/index.js";
 import { FileEvalStore } from "../packages/eval/dist/file-store.js";
 
-const repository = dirname(dirname(fileURLToPath(import.meta.url)));
-const parent = join(repository, "eval-verification", "live");
+const parent = join(testOutputRoot, "eval-agent");
 await mkdir(parent, { recursive: true });
 const directory = await mkdtemp(join(parent, "run-"));
 const source = join(directory, "source");
@@ -159,6 +158,7 @@ registry.registerExecution(createApplicationExecutionAdapter({
       get limits() { return provider.limits; }, get configuration() { return provider.configuration; },
       get capabilityVersion() { return provider.capabilityVersion; }, get reportsAttempts() { return provider.reportsAttempts; },
       get contextCompactor() { return provider.contextCompactor; },
+      get supportsRequestRecording() { return provider.supportsRequestRecording; },
       preflight: (request, options) => provider.preflight?.(request, options),
       async *stream(request, options) {
         for await (const event of provider.stream(request, options)) {

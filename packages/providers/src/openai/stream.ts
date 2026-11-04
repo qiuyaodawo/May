@@ -5,6 +5,7 @@ import type {
   ToolCall,
   Usage,
 } from "@sortedyuan/may/core";
+import { omitUndefined } from "@sortedyuan/may/core";
 import { readSseData } from "../openai-compatible/http.js";
 
 import {
@@ -65,9 +66,7 @@ export async function* streamOpenAIResponse(
     );
   }
   const parsed = parseCompletedOpenAIResponse(completed);
-  yield parsed.usage === undefined
-    ? { type: "response.completed", message: parsed.message }
-    : { type: "response.completed", message: parsed.message, usage: parsed.usage };
+  yield omitUndefined({ type: "response.completed", message: parsed.message, usage: parsed.usage });
 }
 
 export function parseCompletedOpenAIResponse(value: unknown): {
@@ -136,7 +135,7 @@ export function parseCompletedOpenAIResponse(value: unknown): {
     },
   };
   const usage = parseUsage(response.usage);
-  return usage === undefined ? { message } : { message, usage };
+  return omitUndefined({ message, usage });
 }
 
 export function openAIResponseContent(message: AssistantMessage): readonly ContentPart[] {
@@ -160,18 +159,18 @@ export function parseUsage(value: unknown): Usage | undefined {
   if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined && cachedReadTokens === undefined && reasoningTokens === undefined) {
     return undefined;
   }
-  return {
-    ...(inputTokens === undefined ? {} : { inputTokens }),
-    ...(outputTokens === undefined ? {} : { outputTokens }),
-    ...(totalTokens === undefined ? {} : { totalTokens }),
-    ...(cachedReadTokens === undefined ? {} : { cachedReadTokens }),
-    ...(reasoningTokens === undefined ? {} : { reasoningTokens }),
+  return omitUndefined({
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cachedReadTokens,
+    reasoningTokens,
     ...(cachedReadTokens === undefined && reasoningTokens === undefined ? {} : { tokenRelations: {
       ...(cachedReadTokens === undefined ? {} : { cachedRead: "input" as const }),
       ...(reasoningTokens === undefined ? {} : { reasoning: "output" as const }),
     } }),
     ...(inputTokens === undefined || outputTokens === undefined ? { completeness: { status: "partial" as const, reason: "provider-token-components-missing" } } : {}),
-  };
+  });
 }
 
 function parseArguments(value: string, callId: string): unknown {

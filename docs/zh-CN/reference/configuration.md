@@ -19,20 +19,30 @@ MaybeCode 在[首次启动配置](../guides/maybecode.md#首次启动配置)中�
 本文用于查询字段与默认值。应用启动及操作见[MaybeCode](../guides/maybecode.md)和
 [MaybeClaw](../guides/maybeclaw.md)。
 
-为了获得编辑器补全与校验，请将配置文件关联到
-[`packages/may/may-config.schema.json`](../../../packages/may/may-config.schema.json)。
-例如，仓库位于 `E:/code/May` 时，可以使用以下配置：
+[`packages/may/may-config.schema.json`](../../../packages/may/may-config.schema.json)
+（导出为 `@sortedyuan/may/config/schema`）描述 `providers`、`models` 和 `defaultModel`。
+每个应用持有自己 `apps.<id>` 部分的 schema，并在启动时校验；取值无效时报告带有字段路径的
+`MayConfigValidationError`。为了在编辑器中补全整个文件，请把文件关联到使用它的应用的组合 schema：
+
+| 应用 | Schema |
+| --- | --- |
+| MaybeCode | `@sortedyuan/maybecode/config/schema`（`apps/maybecode/dist/maybecode-config.schema.json`） |
+| MaybeClaw | `apps/maybeclaw/dist/maybeclaw-config.schema.json` |
+
+例如，仓库位于 `E:/code/May` 并已运行 `pnpm build` 时，可以使用以下配置：
 
 ```json
 {
-  "$schema": "file:///E:/code/May/packages/may/may-config.schema.json",
+  "$schema": "file:///E:/code/May/apps/maybecode/dist/maybecode-config.schema.json",
   "providers": {},
   "models": {}
 }
 ```
 
 具体文件 URL 取决于仓库位置。也可以在编辑器的工作区设置中把
-`~/.may/config.json` 映射到 schema。
+`~/.may/config.json` 映射到 schema。应用通过 `@sortedyuan/may/config` 的
+`createApplicationConfigSchema(id, section, title)` 生成组合 schema，并通过
+`createApplicationConfigValidator(id, section)` 校验自己的部分。
 
 ## 顶层字段
 
@@ -335,8 +345,7 @@ MaybeCode 接受 `apps.maybecode.plugins`，MaybeClaw 的 May Agent 接受
 `autoCompaction.mode` 选择独立的自动压缩模式：`prune-summary`（默认，先裁剪旧工具
 结果，仍超阈值时再摘要）、`history-reference`（用历史引用重置较早上下文），或
 `provider-native`（仅原生压缩，要求模型支持）。模式之间不会自动降级；压缩后仍超
-阈值时停止 Run，已变化的上下文仍会持久化。旧的 `autoCompaction.providerNative`
-布尔配置已弃用；没有 `mode` 时，`true` 选择仅原生压缩，显式 `mode` 优先。
+阈值时停止 Run，已变化的上下文仍会持久化。
 
 手动 `/compact` 默认执行裁剪与摘要。`/compact history-reference` 和
 `/compact provider-native` 分别执行独立操作，不改变自动模式。编程接口通过

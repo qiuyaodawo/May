@@ -146,7 +146,7 @@ is cancelled immediately, and its result and host finalization finish before the
 Goal stops.
 
 MaybeCode stores goal records under `may.goal` using application-owned Session
-state. SDK callers can disable the component with `goals: false` when opening
+state. `@sortedyuan/may/goals` exports this key as `GOAL_STATE_KEY`. SDK callers can disable the component with `goals: false` when opening
 MaybeCode. Other applications choose whether to import and connect the package.
 
 ## Verify execution and saved state

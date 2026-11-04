@@ -1,5 +1,5 @@
 import type { ContentPart, Message, Usage } from "@sortedyuan/may/core";
-import { UnsupportedContentError } from "@sortedyuan/may/core";
+import { UnsupportedContentError, omitUndefined } from "@sortedyuan/may/core";
 import { GeminiProtocolError } from "./errors.js";
 import { GEMINI_MODEL_STATE_TYPE, type GeminiContent, type GeminiGenerateContentRequest, type GeminiModelStateData, type GeminiPart, type GeminiUsageMetadata } from "./protocol.js";
 
@@ -26,7 +26,7 @@ export function toGeminiRequestParts(messages: readonly Message[]): Pick<GeminiG
           throw new UnsupportedContentError("Google Gemini", part.type, "tool");
         }),
       };
-      appendContent(contents, "user", [{ functionResponse: { name: call.name, ...(call.id === undefined ? {} : { id: call.id }), response } }]);
+      appendContent(contents, "user", [{ functionResponse: omitUndefined({ name: call.name, id: call.id, response }) }]);
       continue;
     }
     if (message.role === "assistant") {

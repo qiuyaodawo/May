@@ -1,0 +1,13 @@
+dist/
+coverage/
+pnpm-lock.yaml
+.changeset/*.md
+.zcode/
+review/
+.test-output/
+plugin-verification/
+.pi-delegate/
+scheduler-verification/
+.eval-results/
+.eval-workspaces/
+eval-verification/

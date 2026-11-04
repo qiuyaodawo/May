@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdir, mkdtemp, rm, writeFile, readFile, stat, appendFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { requestReferences, requestValueId, readRecordedModelRequests, validateSessionHistory } from "@sortedyuan/may/session";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { executeRecordedOperation } from "@sortedyuan/may/core";
 
 test("真实文件保存内容引用、尝试状态并拒绝损坏的历史", async () => {
-  const root = resolve(".test-output/request-recording");
+  const root = join(testOutputRoot, "providers", "request-recording");
   await mkdir(root, { recursive: true });
   const directory = await mkdtemp(`${root}/history-`);
   try {
@@ -39,7 +40,7 @@ test("真实文件保存内容引用、尝试状态并拒绝损坏的历史", as
 });
 
 test("请求准备记录省略 URL 凭据，执行保留原始内容，文件记录失败时停止执行", async () => {
-  const root = resolve(".test-output/request-recording");
+  const root = join(testOutputRoot, "providers", "request-recording");
   await mkdir(root, { recursive: true });
   const directory = await mkdtemp(`${root}/operation-`);
   try {

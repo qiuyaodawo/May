@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { selectLiveModelProfile, testOutputRoot } from "@sortedyuan/test-support";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -13,8 +14,9 @@ import { services } from "@sortedyuan/may/services";
 import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/providers";
 import { loadGatewayAdapter } from "../../dist/gateway-adapters.js";
 
-const base = fileURLToPath(new URL("../../../../plugin-verification/maybeclaw-plugin-live/", import.meta.url));
-const liveOptions = { skip: !process.env.MAYBECLAW_LIVE_MODEL, timeout: 120_000 };
+const base = join(testOutputRoot, "maybeclaw", "plugins-live");
+const liveOptions = { timeout: 120_000 };
+const liveModel = selectLiveModelProfile(await loadMayConfig());
 async function directory() {
   await mkdir(base, { recursive: true });
   const value = await mkdtemp(join(base, "case-"));
@@ -33,7 +35,7 @@ const budget = { maxSteps: 5, maxModelCalls: 5, maxToolCalls: 4, maxDurationMs: 
 
 test("real provider: supplied Model and Permission plugins create and resume without provider configuration", liveOptions, async t => {
   const configured = await loadMayConfig();
-  const model = createBuiltinProviderModel(selectProviderModel(configured, { model: process.env.MAYBECLAW_LIVE_MODEL }));
+  const model = createBuiltinProviderModel(selectProviderModel(configured, { model: liveModel }));
   const path = await directory(), configPath = join(path, "config.json"), marker = `plugin-memory-${randomUUID()}`;
   let adapter;
   t.after(() => cleanup(path, adapter));
@@ -79,7 +81,7 @@ test("real provider: host services sharing IDs retain application default provid
   const configured = await loadMayConfig(), path = await directory(), marker = `scope-memory-${randomUUID()}`;
   let adapter;
   t.after(() => cleanup(path, adapter));
-  const model = createBuiltinProviderModel(selectProviderModel(configured, { model: process.env.MAYBECLAW_LIVE_MODEL }));
+  const model = createBuiltinProviderModel(selectProviderModel(configured, { model: liveModel }));
   const hostModel = defineService({ id: services.model.id, version: services.model.version, scope: "host" });
   const hostPolicy = defineService({ id: services.permissionPolicy.id, version: services.permissionPolicy.version, scope: "host" });
   await writeFile(join(path, "note.txt"), marker);
@@ -91,7 +93,7 @@ test("real provider: host services sharing IDs retain application default provid
     context.provide(hostPolicy, () => { hostChecks += 1; return "deny"; });
   } });
   const options = { directory: path, configPath: configured.path, plugins: [plugin], agent: { id: "scope-reader", adapter: "may",
-    model: process.env.MAYBECLAW_LIVE_MODEL, readDirectory: path, runBudget: budget,
+    model: liveModel, readDirectory: path, runBudget: budget,
     instructions: "Use read exactly when requested. Preserve values from earlier messages. Keep replies short." } };
   adapter = await loadGatewayAdapter(options);
   const conversation = await adapter.createConversation("scope-conversation"), events = [];

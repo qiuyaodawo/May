@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { InMemoryContext, May } from "@sortedyuan/may/core";
-import { ZhipuApiError, ZhipuModel } from "../../dist/zhipu/index.js";
+import { ZhipuModel } from "../../dist/zhipu/index.js";
+import { OpenAICompatibleApiError } from "../../dist/openai-compatible/index.js";
 
 const emptyRequest = {
   messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
@@ -283,7 +284,8 @@ test("surfaces structured Zhipu HTTP errors", async () => {
       signal: new AbortController().signal,
     })),
     (error) => {
-      assert.ok(error instanceof ZhipuApiError);
+      assert.ok(error instanceof OpenAICompatibleApiError);
+      assert.equal(error.provider, "Zhipu");
       assert.equal(error.code, "ZHIPU_API_ERROR");
       assert.equal(error.status, 401);
       assert.equal(error.message, "Authentication failed");

@@ -2,11 +2,12 @@ import { spawn } from "node:child_process";
 import { copyFile, mkdir, readFile, readdir, realpath } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { testOutputRoot } from "../packages/test-support/index.mjs";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
 const pnpm = process.env.npm_execpath;
 if (!pnpm) throw new Error("Run through pnpm test:package:eval");
-const output = resolve(repository, "eval-verification", `package-${Date.now()}`);
+const output = join(testOutputRoot, "eval-package", String(Date.now()));
 const packs = join(output, "packs");
 const consumer = resolve(repository, "..", "eval-package-consumers", `consumer-${Date.now()}`);
 await mkdir(packs, { recursive: true });

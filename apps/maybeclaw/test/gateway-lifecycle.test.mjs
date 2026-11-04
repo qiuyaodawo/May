@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -8,7 +9,7 @@ import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { GatewayStore } from "../dist/gateway-store.js";
 
-const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-lifecycle-tests/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-lifecycle");
 const example = fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url));
 const modulePath = fileURLToPath(new URL("../dist/gateway-rpc-adapter.js", import.meta.url));
 const operator = { kind: "operator", id: "service-admin" };

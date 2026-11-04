@@ -26,7 +26,10 @@
       "types": "./dist/agent/transcript.d.ts",
       "import": "./dist/agent/transcript.js"
     },
-    "./keybindings": { "types": "./dist/keybindings/index.d.ts", "import": "./dist/keybindings/index.js" },
+    "./keybindings": {
+      "types": "./dist/keybindings/index.d.ts",
+      "import": "./dist/keybindings/index.js"
+    },
     "./tool-renderers": {
       "types": "./dist/agent/tool-renderers.d.ts",
       "import": "./dist/agent/tool-renderers.js"
@@ -46,28 +49,29 @@
     "test:sixel": "pnpm run build && node --test test/terminal/*.test.mjs"
   },
   "dependencies": {
-    "@types/pngjs": "6.0.5",
-    "diff": "9.0.0",
     "@sortedyuan/coding-tools": "workspace:*",
     "@sortedyuan/may": "workspace:*",
     "@sortedyuan/media": "workspace:*",
-    "supports-terminal-graphics": "0.1.0",
+    "@types/pngjs": "6.0.5",
     "clipboardy": "5.3.2",
-    "marked": "18.0.11",
-    "jimp": "1.6.1",
+    "diff": "9.0.0",
     "image-q": "4.0.0",
+    "jimp": "1.6.1",
+    "marked": "18.0.11",
     "node-ansiparser": "2.2.1",
     "sixel": "0.16.0",
     "slice-ansi": "^7.1.2",
     "string-width": "^7.2.0",
+    "supports-terminal-graphics": "0.1.0",
     "tty-events": "1.0.0",
     "wrap-ansi": "^10.0.2"
   },
   "devDependencies": {
-    "@xterm/xterm": "6.0.0",
+    "@sortedyuan/test-support": "workspace:*",
+    "@types/node": "^22.0.0",
     "@xterm/addon-image": "0.9.0",
-    "playwright": "1.63.0",
-    "@types/node": "^22.0.0"
+    "@xterm/xterm": "6.0.0",
+    "playwright": "1.63.0"
   },
   "engines": {
     "node": ">=22"

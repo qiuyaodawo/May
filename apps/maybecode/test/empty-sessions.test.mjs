@@ -1,20 +1,22 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { PassThrough } from "node:stream";
+import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
+import { NodeTerminalDriver } from "@sortedyuan/tui";
 import { OpenAIResponsesModel } from "@sortedyuan/providers";
+import { openConfiguredMaybeCode, runMaybeCode } from "../dist/index.js";
+import { runRetainedTerminalUI } from "../dist/ui/retained-tui.js";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
-import { MaybeCodeApplication, MaybeCodeWorkspace } from "../dist/index.js";
+import { MaybeCodeApplication } from "../dist/application.js";
+import { MaybeCodeWorkspace } from "../dist/workspace.js";
 import { createTestWorkspace } from "./fixtures/workspace.mjs";
 
-test("真实 CLI 通过 /quit 退出后清理历史文件和会话目录", async t => {
+test("CLI 在 retained 界面通过 /quit 退出后清理历史文件和会话目录", async t => {
   const workspace = await createTestWorkspace(t);
-  const home = join(workspace, "home");
-  await mkdir(home);
+  const dataDirectory = join(workspace, "data");
   const configPath = join(workspace, "may.json");
   await writeFile(configPath, JSON.stringify({
     providers: { local: { adapter: "openai-responses", apiKey: "unused-without-model-requests" } },
@@ -22,19 +24,18 @@ test("真实 CLI 通过 /quit 退出后清理历史文件和会话目录", async
     models: { offline: { provider: "local", model: "gpt-4.1" } },
     apps: { maybecode: { git: false } },
   }));
-  const execution = promisify(execFile)(process.execPath, [
-    fileURLToPath(new URL("../dist/bin.js", import.meta.url)),
-    "--config", configPath, "--ui", "classic", workspace,
-  ], {
-    cwd: workspace,
-    env: { ...process.env, HOME: home, USERPROFILE: home },
-    windowsHide: true,
-    timeout: 15_000,
+  const input = new PassThrough(), output = new PassThrough();
+  let rendered = "";
+  output.on("data", chunk => { rendered += chunk.toString(); });
+  const terminal = new NodeTerminalDriver({ input, output, requireTTY: false });
+  t.after(() => { terminal.close(); input.destroy(); output.destroy(); });
+  const exitCode = runMaybeCode(["--config", configPath, workspace], {
+    open: options => openConfiguredMaybeCode({ ...options, dataDirectory }),
+    runRetainedUI: app => runRetainedTerminalUI(app, { terminal }),
   });
-  execution.child.stdin.end("/quit\n");
-  const { stderr } = await execution;
-  assert.equal(stderr, "");
-  const dataDirectory = join(home, ".may", "maybecode");
+  while (!rendered.includes("MaybeCode")) await delay(20);
+  input.write("/quit\r");
+  assert.equal(await exitCode, 0);
   assert.deepEqual((await readdir(join(dataDirectory, "sessions"))).filter(name => name.endsWith(".jsonl")), []);
   assert.deepEqual(await new FileSessionCatalog(join(dataDirectory, "catalog.json")).list(workspace), []);
 });
@@ -115,6 +116,22 @@ test("提交消息后即使模型请求失败，退出后仍然保留会话", as
   }
   const history = await options.store.inspect(sessionId);
   assert.ok(history.some(event => event.type === "input.submitted"));
+  assert.ok((await options.catalog.list(options.workspace)).some(session => session.id === sessionId));
+});
+
+test("启动并暂停 goal 后，退出时保留会话", async t => {
+  const { goals: _goals, ...options } = await storageOptions(t);
+  const app = await MaybeCodeWorkspace.open(options);
+  const sessionId = app.sessionId;
+  try {
+    await app.startGoal("Preserve this goal");
+    await app.pauseGoal();
+  } finally {
+    await app.close();
+  }
+  const history = await options.store.inspect(sessionId);
+  assert.equal(history.some(event => event.type === "run.started"), false);
+  assert.ok(history.some(event => event.type === "state.updated" && event.key === "may.goal"));
   assert.ok((await options.catalog.list(options.workspace)).some(session => session.id === sessionId));
 });
 

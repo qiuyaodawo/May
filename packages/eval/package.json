@@ -6,25 +6,45 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./application": { "types": "./dist/application.d.ts", "import": "./dist/application.js" },
-    "./coordination": { "types": "./dist/coordination.d.ts", "import": "./dist/coordination.js" },
-    "./file-store": { "types": "./dist/file-store.d.ts", "import": "./dist/file-store.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./application": {
+      "types": "./dist/application.d.ts",
+      "import": "./dist/application.js"
+    },
+    "./coordination": {
+      "types": "./dist/coordination.d.ts",
+      "import": "./dist/coordination.js"
+    },
+    "./file-store": {
+      "types": "./dist/file-store.d.ts",
+      "import": "./dist/file-store.js"
+    }
   },
-  "files": ["dist", "!dist/.tsbuildinfo"],
+  "files": [
+    "dist",
+    "!dist/.tsbuildinfo"
+  ],
   "scripts": {
     "build": "tsc -b",
     "test": "pnpm run build && node --test test/*.test.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/may": "workspace:*",
     "@sortedyuan/coordination": "workspace:*",
+    "@sortedyuan/may": "workspace:*",
     "@sortedyuan/observability": "workspace:*",
     "ajv": "^8.20.0",
     "tree-kill": "^1.2.2"
   },
-  "devDependencies": { "@types/node": "^22.0.0" },
-  "engines": { "node": ">=22.16.0" },
+  "devDependencies": {
+    "@sortedyuan/test-support": "workspace:*",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  },
   "license": "MIT"
 }

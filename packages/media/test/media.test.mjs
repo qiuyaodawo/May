@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -9,7 +10,7 @@ import { imageSource } from "./fixture.mjs";
 
 test("concurrent image verification and saving keep the image readable", async () => {
   const source = await imageSource();
-  const base = fileURLToPath(new URL("../../../review/media-tests/", import.meta.url));
+  const base = join(testOutputRoot, "media", "media-tests");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "concurrent-"));
   const writer = new FileMediaStore(directory);
@@ -34,7 +35,7 @@ test("图片校验、稳定附件标识和文件保存", async () => {
   const source = await imageSource();
   const image = await readEmbeddedImage(source);
   assert.equal(image.width, 64); assert.equal(image.height, 32);
-  const base = fileURLToPath(new URL("../../../review/media-tests/", import.meta.url));
+  const base = join(testOutputRoot, "media", "media-tests");
   await mkdir(base, { recursive: true });
   const store = new FileMediaStore(await mkdtemp(join(base, "files-")));
   const saved = await store.save(source);

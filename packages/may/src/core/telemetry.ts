@@ -1,4 +1,5 @@
 import type { Usage } from "./types.js";
+import { omitUndefined } from "./omit-undefined.js";
 import { resolveUsageTotals } from "./pricing.js";
 import {
   endTraceSpan, setTraceAttributes, startTraceSpan,
@@ -39,7 +40,7 @@ export function createModelAttemptObserver(options: {
     start(attempt) {
       const started = performance.now();
       const span = startTraceSpan(options.tracer, "may.model.attempt", {
-        ...(options.parent === undefined ? {} : { parent: options.parent }),
+        ...omitUndefined({ parent: options.parent }),
         attributes: {
           ...options.attributes,
           "may.model.call_id": options.modelCallId,
@@ -51,7 +52,7 @@ export function createModelAttemptObserver(options: {
       let text = false;
       let ended = false;
       return {
-        ...(span === undefined ? {} : { traceContext: span.context }),
+        ...omitUndefined({ traceContext: span?.context }),
         content(kind) {
           if (ended) return;
           if (!content) {
@@ -67,23 +68,23 @@ export function createModelAttemptObserver(options: {
         end(end) {
           if (ended) return;
           ended = true;
-          endTraceSpan(span, {
+          endTraceSpan(span, omitUndefined({
             status: end.status,
-            ...(end.error === undefined ? {} : { error: end.error }),
-            attributes: {
+            error: end.error,
+            attributes: omitUndefined({
               "may.model.has_content": content,
               "may.model.has_text": text,
               "may.model.completed": end.completed === true,
               "may.model.usage_available": end.usage !== undefined,
               "may.model.usage_complete": resolveUsageTotals(end.usage).complete,
-              ...(end.usage?.inputTokens === undefined ? {} : { "may.model.input_tokens": end.usage.inputTokens }),
-              ...(end.usage?.outputTokens === undefined ? {} : { "may.model.output_tokens": end.usage.outputTokens }),
-              ...(end.usage?.totalTokens === undefined ? {} : { "may.model.total_tokens": end.usage.totalTokens }),
-              ...(end.usage?.cachedReadTokens === undefined ? {} : { "may.model.cached_read_tokens": end.usage.cachedReadTokens }),
-              ...(end.usage?.cachedWriteTokens === undefined ? {} : { "may.model.cached_write_tokens": end.usage.cachedWriteTokens }),
-              ...(end.usage?.reasoningTokens === undefined ? {} : { "may.model.reasoning_tokens": end.usage.reasoningTokens }),
-            },
-          });
+              "may.model.input_tokens": end.usage?.inputTokens,
+              "may.model.output_tokens": end.usage?.outputTokens,
+              "may.model.total_tokens": end.usage?.totalTokens,
+              "may.model.cached_read_tokens": end.usage?.cachedReadTokens,
+              "may.model.cached_write_tokens": end.usage?.cachedWriteTokens,
+              "may.model.reasoning_tokens": end.usage?.reasoningTokens,
+            }),
+          }));
         },
       };
     },

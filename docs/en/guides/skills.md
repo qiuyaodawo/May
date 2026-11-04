@@ -39,10 +39,9 @@ unknown tags and invalid field types are rejected.
 
 Configured MaybeCode (including CLI) scans `~/.agents/skills`, `~/.may/skills`,
 `<workspace>/.agents/skills`, then `<workspace>/.may/skills`. Later roots override
-earlier names with diagnostics. Programmatic `MaybeCodeApplication.open()` and
-`MaybeCodeWorkspace.open()` scan only workspace roots by default. Supply
-`skillDirectories`, an immutable `skills: SkillRegistry`, or `skills: false`.
-`openConfiguredMaybeCode()` uses all four defaults.
+earlier names with diagnostics. `openConfiguredMaybeCode()` uses all four defaults;
+supply `skillDirectories`, an immutable `skills: SkillRegistry`, or `skills: false`
+to change them.
 
 Set `apps.maybecode.skills` to `false` to disable, or to
 `{ "directories": ["./skills", "~/skills"] }` to replace defaults. Relative

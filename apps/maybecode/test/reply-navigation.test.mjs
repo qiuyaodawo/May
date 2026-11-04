@@ -3,10 +3,11 @@ import { PassThrough } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 import test from "node:test";
 import { NodeTerminalDriver } from "@sortedyuan/tui";
-import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { MaybeCodeTerminalView } from "../dist/ui/terminal-view.js";
 
 function openView(t, store) {
-  const view = new MaybeCodePrototypeView({
+  const view = new MaybeCodeTerminalView({
     store,
     workspace: "workspace",
     onSubmit() { assert.fail("navigation must not submit the draft"); },

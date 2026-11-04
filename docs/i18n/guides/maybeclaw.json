@@ -13,18 +13,18 @@
     },
     {
       "heading": "Start a local console",
-      "en": "e44a28a05fe923ae2a091d975ac2c8c94fc7f287f7d6ed68c43aa6dd587d56e0",
-      "zh": "b2a1d3ca3bb48308bde75fe8732e822bcb0ad6fa9243f64548ebf23951bed994"
+      "en": "d76eab95487673770b8b4a2ca44097862cebe2b143018456074966df18e1a70c",
+      "zh": "dc7608d34ebcb247bd4015910c86ec9026473a606218814e81a4b4c76a85d61f"
     },
     {
       "heading": "Application composition",
-      "en": "df0526d6b4901ecb260430ce27dfc26f41bfff89fd4e1cf94b994782d07b6fb1",
-      "zh": "92441e868030aa981db764460e7717a543cfb4a682a66872023be49d611fdada"
+      "en": "28f66b6fe6f68ea28d919cc7f1f8d99143b38bc2b92d9b0f1c769d03189f2c85",
+      "zh": "bb6242114cca9834469296ee062ba4cf8261128d4a84e83f6d8308bdb4b07c29"
     },
     {
       "heading": "Sessions and configuration",
-      "en": "84781e96e69afa68f5560ceda8dacb3d59c53b407be98207e50075af60c7720f",
-      "zh": "106b7cd599265e01955bed72bc08e54e2e31e3ea2185adcd0bd3612ff3ed6e13"
+      "en": "59d6bb75751acf648538c05d83e59f6e8bb557143db953c1f81a14df633a1407",
+      "zh": "afcb28bd0c5e71e52ebf829e39fbe3676eedb13ae9018479f58b17041edcd5af"
     },
     {
       "heading": "Persistent permission rules",
@@ -33,8 +33,8 @@
     },
     {
       "heading": "Startup, Web, and CLI",
-      "en": "5f8b9481574b48131bb43e1b059c9fd58f970a9602099edb00690d65ec737f20",
-      "zh": "ac75a3c7c7eefc0b7c825987e13589405e021638331a7e7e9bb4eba8cabc6c35"
+      "en": "9ebeedd2baae74e6a7a6ebc1c564506f94e34bf1ea4e3489b066e1b7f0d2971a",
+      "zh": "a86bde696a8ebe0eec35008e173f9d1ba42ea1cfa8c27d451d69b6b8a605ffda"
     },
     {
       "heading": "Chat commands and interruption",
@@ -47,9 +47,9 @@
       "zh": "14c30185f8ac5e9fc5301095c964c00c978f68fe95c9f38f9a422de0e22c5504"
     },
     {
-      "heading": "Lifecycle, storage, and migration",
-      "en": "5ef7cbd08a6e2339b7c04c78c8ac30a5ea63d92766a621df68b58c705d1b0445",
-      "zh": "e0a9d319d85b6b53041bb2990d20f41c9e83da572eea9777f4c5f78c05945eab"
+      "heading": "Lifecycle and storage",
+      "en": "319489fce49a9ebd56fca88b218a43eb1a0d1a68403902e57f476e0e5642bfe5",
+      "zh": "cd00fb2a42bc763df80d11c6a3cf3f2be2fe4b8e351d63f878ed1b8cdc67fc1b"
     }
   ]
 }

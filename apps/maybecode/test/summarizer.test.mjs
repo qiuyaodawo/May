@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createModelContextSummarizer } from "../dist/index.js";
+import { createModelContextSummarizer } from "@sortedyuan/may/history-memory";
 
 test("summarizes messages with a tool-free model request", async () => {
   let captured;

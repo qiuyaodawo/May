@@ -3,7 +3,7 @@ import { createConnection, type Socket } from "node:net";
 import { once } from "node:events";
 import { createMessageConnection, ErrorCodes, ResponseError, StreamMessageReader, StreamMessageWriter, type MessageConnection } from "vscode-jsonrpc/node";
 import type { AgentApplicationEvent } from "@sortedyuan/may";
-import { freezeToolInput, validateTelemetryCorrelation, type ContentPart } from "@sortedyuan/may/core";
+import { freezeToolInput, omitUndefined, validateTelemetryCorrelation, type ContentPart } from "@sortedyuan/may/core";
 import type { ApprovalDecision, PersistentApprovalOptions } from "@sortedyuan/may/permissions";
 import type { AgentAdapterContext, AgentAdapter, AgentCapabilities, AgentTaskStatus } from "./types.js";
 
@@ -130,7 +130,7 @@ class RpcAdapter implements AgentAdapter {
     context.signal.addEventListener("abort", abort, { once: true });
     try {
       const result = object(await this.request("conversation/execute", { conversationId: context.conversationId, inputId: context.inputId, input: context.input,
-        ...(context.permissionScope === undefined ? {} : { permissionScope: context.permissionScope }),
+        ...omitUndefined({ permissionScope: context.permissionScope }),
         ...(this.handshake?.telemetryVersion !== 1 || telemetry === undefined ? {} : { telemetry }),
         tools: this.capabilities.collaboration ? context.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema })) : [] }, context.inputId, this.options.executionTimeoutMs ?? 0), "execution result");
       const cancellation = this.cancellations.get(context.conversationId); if (cancellation) await cancellation;
@@ -172,7 +172,7 @@ class RpcAdapter implements AgentAdapter {
     });
   }
   async resolveApproval(conversationId: string, requestId: string, decision: ApprovalDecision, options?: PersistentApprovalOptions): Promise<boolean> {
-    this.require("approvals"); const result = object(await this.request("conversation/resolveApproval", { conversationId, requestId, decision, ...(options === undefined ? {} : { options }) }, requestId), "approval result");
+    this.require("approvals"); const result = object(await this.request("conversation/resolveApproval", omitUndefined({ conversationId, requestId, decision, options }), requestId), "approval result");
     if (typeof result.resolved !== "boolean") throw new Error("Invalid RPC approval result"); return result.resolved;
   }
   async release(conversationId: string): Promise<void> {

@@ -282,7 +282,7 @@ test("configuration readers and default model updates share file access", async 
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, "config.json");
   await writeFile(path, JSON.stringify({
-    providers: { local: { adapter: "openai-responses", options: { payload: "x".repeat(64 * 1024) } } },
+    providers: { local: { adapter: "custom-test-adapter", options: { payload: "x".repeat(64 * 1024) } } },
     models: { first: { provider: "local", model: "first" }, second: { provider: "local", model: "second" } },
     defaultModel: "first",
   }));

@@ -19,13 +19,17 @@ beside the data; preserve them while any process uses the data. With
 Timeout and cancellation stop lock acquisition. An action already running keeps
 ownership until it settles. Process termination releases native locks.
 
-`acquireFileLock(path)` creates a single-writer ownership file and returns its
-open `FileHandle`; the caller writes owner metadata and later calls
-`releaseFileLock(handle, path)`. Existing ownership fails with `EEXIST`.
-`recoverFileLock(path, { expectedContents, confirmHostsStopped: true,
-confirmUnknownOwner? })` verifies the exact saved owner and requires every
-competing host to be stopped. Incomplete owner metadata additionally requires
-`confirmUnknownOwner: true` after independent owner verification.
+`acquireFileLock(path)` takes an exclusive operating-system lock on `path` and
+returns a `FileLock`. Another owner makes acquisition fail immediately with
+`ELOCKED`, and the error includes the process ID and host name saved in
+`<path>.owner`. The operating system releases the lock when the owner exits.
+`lock.assertHeld()` rejects when `path` no longer refers to the locked file, and
+`lock.release()` releases it. `acquireFileLockSync(path)` provides the same lock
+for synchronous storage.
+
+`writeFileDurable(path, contents, mode?)` atomically replaces a file through
+`write-file-atomic` and syncs its directory. `hasErrorCode(error, code)` checks a
+Node.js error code.
 
 `replaceJournalFile(path, contents)` writes and syncs a temporary file, replaces
 the destination under exclusive access, syncs its directory and returns an open

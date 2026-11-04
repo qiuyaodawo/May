@@ -1,4 +1,4 @@
-import type { Tool } from "@sortedyuan/may/core";
+import { omitUndefined, type Tool } from "@sortedyuan/may/core";
 import type { WorkspaceFileGuard } from "./guard.js";
 import { createEditTool, type EditToolOptions } from "./edit.js";
 import { createReadTool, type ReadToolOptions } from "./read.js";
@@ -35,7 +35,7 @@ export function createCodingTool(
 
 /** 守卫只属于文件工具；显式工具配置优先。 */
 function guardOf(options: CodingToolsOptions): { guard?: WorkspaceFileGuard } {
-  return options.guard === undefined ? {} : { guard: options.guard };
+  return omitUndefined({ guard: options.guard });
 }
 
 export function createCodingTools(options: CodingToolsOptions): Tool[] {

@@ -1,4 +1,4 @@
-import { May, type RuntimeFactory } from "../core/index.js";
+import { May, omitUndefined, type RuntimeFactory } from "../core/index.js";
 import { InMemoryContextFactory, type ContextFactory } from "../context/index.js";
 import { definePlugin, type PluginContext, type PluginDefinition, type Disposer } from "../plugin/index.js";
 import { services, factoryMetadata, type PluginFactoryMetadata, type ContextOptionsSource, type ContextWrapper, type ContributionOptions, type ToolSource } from "./index.js";
@@ -43,9 +43,9 @@ export interface ContextWrapperPluginOptions<C = unknown> extends Omit<Contribut
 export function createContextWrapperPlugin<C = unknown>(options: ContextWrapperPluginOptions<C>): PluginDefinition<C> {
   return definePlugin({ ...factoryMetadata(options, [{ service: services.contextWrappers }]), id: options.id, async setup(context) {
     if (options.dispose) context.defer(options.dispose);
-    context.defer(context.get(services.contextWrappers).add(await options.create(context), {
-      id: context.pluginId, pluginOrder: context.pluginOrder, ...(options.order === undefined ? {} : { order: options.order }),
-    }));
+    context.defer(context.get(services.contextWrappers).add(await options.create(context), omitUndefined({
+      id: context.pluginId, pluginOrder: context.pluginOrder, order: options.order,
+    })));
   } });
 }
 
@@ -56,8 +56,8 @@ export interface ToolsPluginOptions<C = unknown> extends Omit<ContributionOption
 export function createToolsPlugin<C = unknown>(options: ToolsPluginOptions<C>): PluginDefinition<C> {
   return definePlugin({ ...factoryMetadata(options, [{ service: services.toolSources }]), id: options.id, async setup(context) {
     if (options.dispose) context.defer(options.dispose);
-    context.defer(context.get(services.toolSources).add(await options.create(context), {
-      id: context.pluginId, pluginOrder: context.pluginOrder, ...(options.order === undefined ? {} : { order: options.order }),
-    }));
+    context.defer(context.get(services.toolSources).add(await options.create(context), omitUndefined({
+      id: context.pluginId, pluginOrder: context.pluginOrder, order: options.order,
+    })));
   } });
 }

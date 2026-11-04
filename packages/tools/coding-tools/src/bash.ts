@@ -1,4 +1,4 @@
-import type { Tool } from "@sortedyuan/may/core";
+import { omitUndefined, type Tool } from "@sortedyuan/may/core";
 import {
   createBashShellProfile,
   createShellTool,
@@ -30,9 +30,7 @@ export function createBashTool(options: BashToolOptions): Tool<
   const { executable, ...shellOptions } = options;
   const tool = createShellTool({
     ...shellOptions,
-    profile: createBashShellProfile({
-      ...(executable === undefined ? {} : { executable }),
-    }),
+    profile: createBashShellProfile(omitUndefined({ executable })),
   });
   return {
     ...tool,

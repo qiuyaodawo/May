@@ -6,7 +6,7 @@ const exceptional = (block: UiBlock) => ["failed", "unknown", "interrupted", "de
 function unique(blocks: readonly UiBlock[]): UiBlock[] { return [...new Map(blocks.map(block => [block.id, block])).values()]; }
 
 /** View-local reading state. No selection, cancellation or execution commands are issued here. */
-export function createTranscriptReader(client: UiClient, elements: { scroll: HTMLElement; messages: HTMLElement; approvals: HTMLElement }, extensions: WebUiExtensions, inspect: (block: UiBlock) => void, versions?: { fork(point: UiForkPoint): void; changes(runId: string): void }) {
+export function createTranscriptReader(client: UiClient, elements: { scroll: HTMLElement; messages: HTMLElement; approvals: HTMLElement }, extensions: WebUiExtensions, inspect: (block: UiBlock) => void, showError: (error: unknown) => void, versions?: { fork(point: UiForkPoint): void; changes(runId: string): void }) {
   const { scroll, messages, approvals } = elements;
   const toolbar = element("div", "reading-toolbar"); toolbar.setAttribute("aria-label", "执行过程阅读");
   const summary = element("span", "reading-summary"); summary.setAttribute("aria-live", "polite");
@@ -191,7 +191,7 @@ export function createTranscriptReader(client: UiClient, elements: { scroll: HTM
     if (approvals.dataset.signature !== approvalsKey) {
       approvals.dataset.signature = approvalsKey;
       approvals.replaceChildren(...(snapshot?.interactions ?? []).map(request => approvalCard(request, decision => {
-        void client.command("approval.resolve", { id: request.id, decision }).catch(() => {});
+        void client.command("approval.resolve", { id: request.id, decision }).catch(showError);
       }, approvalsDisabled, extensions, { state, command: client.command.bind(client) })));
     }
     if (initialized && !following && contentChanged) {

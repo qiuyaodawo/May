@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, opendir, realpath } from "node:fs/promises";
+import { omitUndefined } from "../core/omit-undefined.js";
+import { hasErrorCode } from "../storage/index.js";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parseDocument } from "yaml";
 
@@ -84,7 +86,7 @@ export class SkillRegistry {
           }
         }
       } catch (error) {
-        if (!isMissing(error)) diagnostics.push({ path: root, message: errorMessage(error) });
+        if (!hasErrorCode(error, "ENOENT")) diagnostics.push({ path: root, message: errorMessage(error) });
       }
     }
     return new SkillRegistry(entries, Object.freeze(diagnostics.map((item) => Object.freeze(item))));
@@ -111,7 +113,7 @@ export class SkillRegistry {
     return "# Available skills\n\n" +
       "When the task matches a skill description or the user requests a skill, read its instructions with skill_read. " +
       "Read referenced resources as needed with skill_read {name, path}; paths are relative to the skill directory.\n\n" +
-      JSON.stringify(this.list().map(({ name, description, compatibility }) => ({ name, description, ...(compatibility === undefined ? {} : { compatibility }) })));
+      JSON.stringify(this.list().map(({ name, description, compatibility }) => omitUndefined({ name, description, compatibility })));
   }
 
   private require(name: string): SkillDescriptor {
@@ -173,5 +175,4 @@ function requiredString(value: unknown, name: string, max: number): string {
   return value.trim();
 }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
-function isMissing(error: unknown): boolean { return error instanceof Error && "code" in error && error.code === "ENOENT"; }
 function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }

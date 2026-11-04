@@ -1,4 +1,4 @@
-import type { AssistantMessage, ContentPart, Message, Model, ToolCall } from "@sortedyuan/may/core";
+import { omitUndefined, type AssistantMessage, type ContentPart, type Message, type Model, type ToolCall } from "@sortedyuan/may/core";
 import { randomUUID } from "node:crypto";
 import type { CreateMessageRequestParams, CreateMessageResult, CreateMessageResultWithTools, SamplingMessageContentBlock, SamplingContent } from "@modelcontextprotocol/client";
 import { mcpToolResultContent } from "./content.js";
@@ -25,9 +25,9 @@ export function createMcpModelSampler(create: (maxTokens: number, context: McpHo
     let streamedBytes = 0;
     let outputTokens = 0;
     try {
-      for await (const event of selection.model.stream({ messages, tools }, { signal,
-        ...(context.owner.runId === undefined ? {} : { runId: context.owner.runId }), modelCallId: `mcp-sampling:${randomUUID()}`,
-      })) {
+      for await (const event of selection.model.stream({ messages, tools }, omitUndefined({ signal,
+        runId: context.owner.runId, modelCallId: `mcp-sampling:${randomUUID()}`,
+      }))) {
         signal.throwIfAborted();
         if (event.type === "text.delta" || event.type === "reasoning.delta") {
           streamedBytes += Buffer.byteLength(event.delta);
@@ -80,9 +80,9 @@ function samplingMessages(params: CreateMessageRequestParams, serverId: string):
         const name = calls.get(part.toolUseId);
         if (message.role !== "user" || name === undefined) throw hostFailure(serverId, "sampling tool result has no matching call");
         calls.delete(part.toolUseId);
-        results.push({ role: "tool", name, toolCallId: part.toolUseId,
-          content: mcpToolResultContent(serverId, name, part).slice(1), ...(part.isError === undefined ? {} : { isError: part.isError }),
-        });
+        results.push(omitUndefined({ role: "tool", name, toolCallId: part.toolUseId,
+          content: mcpToolResultContent(serverId, name, part).slice(1), isError: part.isError,
+        }));
       } else content.push(...requestPart(part, serverId));
     }
     messages.push(...results);

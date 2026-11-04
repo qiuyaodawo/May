@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { selectLiveModelProfile, testOutputRoot } from "@sortedyuan/test-support";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -8,19 +9,18 @@ import test from "node:test";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { AgentGateway } from "../../dist/gateway.js";
 
-const base = fileURLToPath(new URL("../../../../.zcode/tmp/maybeclaw-live-tests/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-live");
 const workspace = fileURLToPath(new URL("../../../../", import.meta.url));
 const actor = { kind: "operator", id: "live-verification" };
 
 test("real provider: persistent conversations, defaults, collaboration, steering and interruption", {
-  skip: !process.env.MAYBECLAW_LIVE_MODEL,
   timeout: 240_000,
 }, async () => {
   const config = await loadMayConfig();
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "case-"));
   const settings = { version: 2,
-    agents: ["writer", "reviewer", "reader"].map(id => ({ id, adapter: "may", model: process.env.MAYBECLAW_LIVE_MODEL,
+    agents: ["writer", "reviewer", "reader"].map(id => ({ id, adapter: "may", model: selectLiveModelProfile(config),
       instructions: "Use supplied tools exactly when requested. Only delegate when explicitly requested. Keep final answers short.",
       ...(id === "reader" ? { readDirectory: workspace, permissions: { read: "ask" } } : {}),
       runBudget: { maxSteps: 8, maxModelCalls: 8, maxToolCalls: 12, maxDurationMs: 120000 } })),

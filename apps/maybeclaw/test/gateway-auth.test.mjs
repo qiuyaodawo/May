@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -7,12 +8,12 @@ import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { verify } from "@node-rs/argon2";
 import { AgentGateway } from "../dist/gateway.js";
-import { startGatewayServer } from "../dist/gateway-server.js";
+import { startGatewayServer } from "../dist/plugins/web-api.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { GatewayAuth } from "../dist/gateway-auth.js";
 import { withGatewayConfiguration } from "../dist/gateway-config.js";
 
-const base = fileURLToPath(new URL("../../../.zcode/tmp/maybeclaw-auth-tests/", import.meta.url));
+const base = join(testOutputRoot, "maybeclaw", "gateway-auth");
 async function fixture(t, sessionMs) {
   await mkdir(base, { recursive: true }); const directory = await mkdtemp(join(base, "case-"));
   const password = `  ${randomBytes(24).toString("base64url")}  `;

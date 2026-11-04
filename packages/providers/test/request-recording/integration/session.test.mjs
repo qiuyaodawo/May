@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join } from "node:path";
+import { selectLiveModelProfile, testOutputRoot } from "@sortedyuan/test-support";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { InMemoryContext, May, runtimeHooks, withModelRequestRecording } from "@sortedyuan/may/core";
 import { AgentApplication } from "@sortedyuan/may";
@@ -12,9 +13,9 @@ import { createBuiltinProviderModel, selectProviderModel } from "@sortedyuan/pro
 
 test("真实模型请求保存、重新打开和分支保留完整请求", { timeout: 180_000 }, async () => {
   const config = await loadMayConfig();
-  const selection = selectProviderModel(config, process.env.MAY_RECORDING_MODEL ? { model: process.env.MAY_RECORDING_MODEL } : {});
+  const selection = selectProviderModel(config, { model: selectLiveModelProfile(config) });
   const model = createBuiltinProviderModel(selection);
-  const root = resolve(".test-output/request-recording");
+  const root = join(testOutputRoot, "providers", "request-recording");
   await mkdir(root, { recursive: true });
   const directory = await mkdtemp(`${root}/session-`);
   const store = new FileSessionStore(directory);
@@ -69,8 +70,8 @@ test("真实模型请求保存、重新打开和分支保留完整请求", { tim
 
 test("真实应用保存 modelBefore 处理后的最终输入", { timeout: 120_000 }, async () => {
   const config = await loadMayConfig();
-  const selection = selectProviderModel(config, process.env.MAY_RECORDING_MODEL ? { model: process.env.MAY_RECORDING_MODEL } : {});
-  const root = resolve(".test-output/request-recording");
+  const selection = selectProviderModel(config, { model: selectLiveModelProfile(config) });
+  const root = join(testOutputRoot, "providers", "request-recording");
   await mkdir(root, { recursive: true });
   const directory = await mkdtemp(`${root}/application-`);
   const marker = "The model request includes the verified Hook instructions.";

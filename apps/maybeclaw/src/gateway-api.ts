@@ -3,7 +3,7 @@ import type { AgentGateway } from "./gateway.js";
 /** 查询经过身份校验，结果为独立数据快照。 */
 export interface GatewayQueries extends Pick<AgentGateway,
   "sessions" | "session" | "messages" | "tasks" | "task" | "approvals" | "bindings" | "deliveries" | "delivery" |
-  "events" | "legacyTasks" | "legacyTask" | "coordinationSnapshots" | "entryDefaults" | "configuration" | "status"
+  "events" | "coordinationSnapshots" | "entryDefaults" | "configuration" | "status"
 > {}
 
 /** 控制端使用的会话、执行、审批和配置操作。 */

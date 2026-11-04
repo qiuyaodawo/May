@@ -1,23 +1,17 @@
 import assert from "node:assert/strict";
 import { fork } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { simpleGit } from "simple-git";
 import { ProjectGitWorkspace, GitCheckpointError, GitWorkspaceConflictError } from "@sortedyuan/may/application/git-workspace";
 
-const artifactRoot = resolve(fileURLToPath(new URL("../../../../review/git-workspace-tests/", import.meta.url)));
 const commitTests = { skip: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1" };
 
 async function fixture(t) {
-  await mkdir(artifactRoot, { recursive: true });
-  const root = await mkdtemp(join(artifactRoot, "git-"));
-  t.after(async () => {
-    const target = resolve(root);
-    assert.ok(target.startsWith(`${artifactRoot}\\`) || target.startsWith(`${artifactRoot}/`));
-    await rm(target, { recursive: true, force: true });
-  });
+  const root = await createTestDirectory(t, "may/git-workspace");
   const workspace = join(root, "project");
   await mkdir(workspace);
   const options = { workspace, dataRoot: join(root, "records"), worktreesRoot: join(root, "worktrees") };

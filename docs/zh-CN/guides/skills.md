@@ -36,9 +36,8 @@ allowed-tools 字段。拒绝空正文、YAML 别名、重复键、未知标签�
 
 使用配置的 MaybeCode（含 CLI）依次扫描 `~/.agents/skills`、`~/.may/skills`、
 `<workspace>/.agents/skills` 和 `<workspace>/.may/skills`，后面的同名项覆盖前面并
-记录诊断。直接调用 `MaybeCodeApplication.open()` / `MaybeCodeWorkspace.open()`
-默认仅扫描工作区目录，可传 `skillDirectories`、不可变的 `skills: SkillRegistry`
-或 `skills: false`。`openConfiguredMaybeCode()` 使用全部四个默认目录。
+记录诊断。`openConfiguredMaybeCode()` 使用全部四个默认目录；传入 `skillDirectories`、
+不可变的 `skills: SkillRegistry` 或 `skills: false` 可以改变它们。
 
 `apps.maybecode.skills` 设为 `false` 可禁用，也可用
 `{ "directories": ["./skills", "~/skills"] }` 替换默认目录。配置中的相对路径

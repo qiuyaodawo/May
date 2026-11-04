@@ -379,7 +379,7 @@ export function createGatewayManager(client: UiClient): GatewayManager {
     type ChannelEntry = { sessionId: string; name: string; entry: unknown };
     type ChannelDefault = { id: string; [key: string]: unknown };
     const value = await data("channels") as {
-      host: { deliveries?: Delivery[]; channelReplies?: Delivery[]; legacyDeliveries?: Delivery[] };
+      host: { deliveries?: Delivery[]; channelReplies?: Delivery[] };
       defaults?: ChannelDefault[];
       entries?: ChannelEntry[];
     };
@@ -387,9 +387,8 @@ export function createGatewayManager(client: UiClient): GatewayManager {
     const view = modal("聊天渠道");
 
     const currentDeliveries = [...(value.host.deliveries ?? []), ...(value.host.channelReplies ?? [])];
-    const legacyDeliveries = value.host.legacyDeliveries ?? [];
-    const totalDeliveries = currentDeliveries.length + legacyDeliveries.length;
-    const abnormalDeliveries = [...currentDeliveries, ...legacyDeliveries].filter(d => ["unknown", "failed"].includes(d.status));
+    const totalDeliveries = currentDeliveries.length;
+    const abnormalDeliveries = currentDeliveries.filter(d => ["unknown", "failed"].includes(d.status));
     const entries = value.entries ?? [];
     const defaults = value.defaults ?? [];
 
@@ -439,15 +438,14 @@ export function createGatewayManager(client: UiClient): GatewayManager {
       deliveriesHeading.style.margin = "12px 0 6px";
       view.insert(deliveriesHeading);
 
-      for (const [scope, deliveries] of [["current", currentDeliveries], ["legacy", legacyDeliveries]] as const) {
-        for (const delivery of deliveries) {
+        for (const delivery of currentDeliveries) {
           const card = document.createElement("div");
           card.className = "gateway-card";
           const header = document.createElement("div");
           header.className = "gateway-card-header";
           const title = document.createElement("span");
           title.className = "gateway-card-title";
-          title.textContent = `投递 ${delivery.id.slice(0, 16)} · 作用域 ${scope}`;
+          title.textContent = `投递 ${delivery.id.slice(0, 16)}`;
           header.append(title, statusPill(delivery.status));
           card.append(header);
 
@@ -463,7 +461,7 @@ export function createGatewayManager(client: UiClient): GatewayManager {
               const retry = modal("确认重新发送消息");
               note(retry, `${delivery.text}\n发送状态：${delivery.status}。重新发送可能在平台中产生重复消息。`);
               submit(retry, "确认重新发送", async () => {
-                await client.command("delivery.retry", { id: delivery.id, scope, confirm: "true" });
+                await client.command("delivery.retry", { id: delivery.id, confirm: "true" });
                 retry.dialog.close();
                 view.dialog.close();
                 void channels();
@@ -473,7 +471,6 @@ export function createGatewayManager(client: UiClient): GatewayManager {
           }
           view.insert(card);
         }
-      }
     } else if (!entries.length) {
       note(view, "当前服务没有记录的消息投递或已绑定聊天入口。");
     }
@@ -547,7 +544,7 @@ export function createGatewayManager(client: UiClient): GatewayManager {
 
   async function manageSession() {
     const id = client.state.snapshot?.selectedId;
-    if (!id || id.startsWith("legacy:")) {
+    if (!id) {
       createSession();
       return;
     }

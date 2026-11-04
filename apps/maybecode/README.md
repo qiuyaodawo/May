@@ -326,20 +326,17 @@ await controller.close();
 await observation;
 ```
 
-The controller covers submission, cancellation, approvals, sessions, history,
-session rename/deletion, and context inspection/compaction.
-`MaybeCodeWorkspace` is the default concrete
-implementation. `MaybeCodeTerminal` is only the low-level input/output adapter
-for the bundled `runTerminalUI`; implementing it changes terminal mechanics but
-does not replace the bundled UI's command or rendering policy.
-
-Custom UIs can reuse the bundled command policy without reusing the terminal
-renderer. `MAYBECODE_SLASH_COMMANDS` exposes command metadata,
-`createMaybeCodeSlashCommandSuggester(controller)` provides command, compaction
-strategy, and session suggestions, and
-`executeMaybeCodeSlashCommand(input, controller)` returns a structured result
-for the UI to render. Alternatively, a UI can call `MaybeCodeController`
-directly and define a completely different command system.
+The controller covers submission, steering, cancellation, approvals, sessions,
+history, session rename/deletion, and context inspection/compaction.
+`controller.application` is the application of the active Session; read its
+state there, for example `application.getGoal()`, `application.modelInfo`,
+`application.instructions`, `application.listSkills()` and
+`application.getDelegationState()`. A Session change replaces it, so read it again
+after switching. `controller.transition(action)` runs a state change on the
+Session queue of the active application. The package exports only
+`runMaybeCode`, `openConfiguredMaybeCode`, `MaybeCodeController` with its event
+types, and `MaybeCodeUsageError`; a custom UI defines its own command system on
+top of the controller.
 
 Ordinary input submitted during execution cancels the current operation, waits
 for its cancellation to finish, and starts the new input in the same Session.
@@ -352,17 +349,15 @@ inputs in order after the active operation finishes.
 `/stop`, the Web cancel control, and `Ctrl+C` without a text selection cancel the
 current operation and every queued input. Cancelled steering inputs remain in
 history and are not submitted again automatically. To use one later, explicitly
-send the message again. These rules apply to both terminal frontends, Web UI,
-and `MaybeCodeWorkspace.submit()` / `steer()`. General `AgentApplication.submit()`
+send the message again. These rules apply to the terminal frontend, Web UI,
+and `MaybeCodeController.submit()` / `steer()`. General `AgentApplication.submit()`
 continues to require that the application has no active operation.
 
 The bundled SessionPicker uses the optional `@sortedyuan/keybindings` package to map
 context-specific key sequences to semantic actions. Custom UIs may reuse that
 resolver or provide their own keyboard and interaction system.
 
-The retained-screen frontend is the default. The previous line-oriented
-frontend remains available with `maybecode --ui classic [workspace]`. The
-retained frontend supports Slash-command completion and a `/resume` dialog with search (`/`),
+The retained-screen frontend is the default terminal frontend. It supports Slash-command completion and a `/resume` dialog with search (`/`),
 rename (`r`), delete (`d`), and resume (`Enter`) actions. It also renders safe
 terminal Markdown and uses specialized, collapsible renderers for `read`,
 `shell`, `edit`, and `write`.
@@ -676,8 +671,7 @@ See the [instruction composition guide](../../docs/en/guides/maybecode-instructi
 or its [Chinese version](../../docs/zh-CN/guides/maybecode-instructions.md).
 
 Programmatic callers can pass a `ContextFactory` to
-`openConfiguredMaybeCode`, `MaybeCodeWorkspace.open`, or
-`MaybeCodeApplication.open`. When omitted, MaybeCode uses
+`openConfiguredMaybeCode`. When omitted, MaybeCode uses
 `InMemoryContextFactory` from `@sortedyuan/context`. Factories return the Core context
 and may also return a `ContextController` for application-level inspection.
 
@@ -839,9 +833,7 @@ Each changed view is persisted as `context.compacted` before the model request
 and is restored on resume, including a summary that is still above threshold.
 Programmatic callers select `autoCompactionMode`; an explicit
 `autoCompactionStrategies` array overrides it, and an empty array disables
-automatic compaction. The deprecated `providerNative: true` configuration and
-`providerNativeAutoCompaction: true` option now select native-only mode when no
-mode is specified; an explicit mode takes precedence.
+automatic compaction.
 
 ### History-reference work memory
 
@@ -913,7 +905,7 @@ pnpm test:integration:maybecode
 
 The persistent permission integration check is opt-in. After `pnpm build`, set
 `MAYBECODE_PERSISTENT_RULES_LIVE=1` and optionally
-`MAYBECODE_PERSISTENT_RULES_MODEL=<configured-profile>`, then run
+`MAY_LIVE_MODEL=<configured-profile>`, then run
 `node --test apps/maybecode/test/integration/persistent-rules.test.mjs`.
 It uses the current user configuration and actual provider to write one isolated
 file twice, closing and reopening the Session between writes. It verifies one

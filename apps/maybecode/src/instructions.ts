@@ -8,15 +8,13 @@ import {
   DEFAULT_SYSTEM_INSTRUCTIONS_FILENAME,
   formatCodingProjectInstructions,
   loadCodingInstructions,
-  type CodingInstructionDocument,
   type CodingInstructions,
-  type CodingInstructionSource,
 } from "@sortedyuan/coding-tools/instructions";
 import type { MayConfig } from "@sortedyuan/may/config";
 
 import { MaybeCodeConfigError } from "./errors.js";
+import { readMaybeCodeSettings } from "./settings.js";
 
-export const MAYBECODE_APPLICATION_ID = "maybecode";
 export const SYSTEM_INSTRUCTIONS_FILENAME =
   DEFAULT_SYSTEM_INSTRUCTIONS_FILENAME;
 export const PROJECT_INSTRUCTIONS_FILENAME =
@@ -60,12 +58,6 @@ without repeating explanations of the corrected mistake.
 Make the final response understandable on its own.
 Explain the deliverable, relevant verification, and remaining limitations.`;
 
-/** Compatibility alias for the reusable coding-instructions source. */
-export type InstructionSource = CodingInstructionSource;
-
-/** Compatibility alias for the reusable coding-instructions document. */
-export type InstructionDocument = CodingInstructionDocument;
-
 /** MaybeCode's product name for the reusable instruction set. */
 export type MaybeCodeInstructions = CodingInstructions;
 
@@ -79,14 +71,8 @@ export interface LoadMaybeCodeInstructionsOptions {
 export function resolveMaybeCodeInstructionsDirectory(
   config: MayConfig,
 ): string | undefined {
-  const value = config.apps?.[MAYBECODE_APPLICATION_ID]?.instructionsDirectory;
+  const value = readMaybeCodeSettings(config).instructionsDirectory;
   if (value === undefined) return undefined;
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new MaybeCodeConfigError(
-      "apps.maybecode.instructionsDirectory must be a non-empty string",
-    );
-  }
-
   const expanded = expandHome(value);
   if (isAbsolute(expanded)) return resolve(expanded);
   return resolve(dirname(resolve(config.path)), expanded);

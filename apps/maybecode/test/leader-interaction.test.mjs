@@ -4,7 +4,8 @@ import { PassThrough } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import { stripVTControlCharacters } from "node:util";
 import { NodeTerminalDriver } from "@sortedyuan/tui";
-import { MaybeCodePrototypeView, TranscriptStore } from "../dist/index.js";
+import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { MaybeCodeTerminalView } from "../dist/ui/terminal-view.js";
 
 function open(t, width = 80) {
   const store = new TranscriptStore();
@@ -15,7 +16,7 @@ function open(t, width = 80) {
   store.applyMayEvent({ type: "model.completed", runId: "run", step: 1, seq: 1,
     timestamp: 1, contextMessageCount: 1, message });
   const submitted = [];
-  const view = new MaybeCodePrototypeView({ store, workspace: "workspace", onSubmit: value => submitted.push(value) });
+  const view = new MaybeCodeTerminalView({ store, workspace: "workspace", onSubmit: value => submitted.push(value) });
   const input = new PassThrough();
   const driver = new NodeTerminalDriver({ input, output: new PassThrough(), requireTTY: false });
   driver.onKey(stroke => view.handleKey(stroke));

@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node";
 import { createGatewayRpcAdapter } from "../../dist/adapters/index.js";
 
@@ -15,10 +16,7 @@ const telemetry = { version: 1, taskId: "hash-task", coordinationId: "file-work"
   parent: { traceId: "1234567890abcdef1234567890abcdef", spanId: "1234567890abcdef", sampled: true } };
 const input = { role: "user", content: [{ type: "text", text: JSON.stringify({ operation: "sha256", path: "document.txt" }) }] };
 async function workspace(t) {
-  const base = fileURLToPath(new URL("../../../../review/rpc-correlation-tests/", import.meta.url));
-  await mkdir(base, { recursive: true });
-  const directory = await mkdtemp(join(base, "hash-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "gateway/rpc-correlation");
   await writeFile(join(directory, "document.txt"), "RPC telemetry file calculation");
   return directory;
 }

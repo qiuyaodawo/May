@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -7,15 +6,15 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createInterface } from "node:readline/promises";
 import open from "open";
 import { getDefaultMayConfigPath, loadMayConfig } from "@sortedyuan/may/config";
+import { omitUndefined } from "@sortedyuan/may/core";
 import type { Server } from "node:http";
 import { inspectGatewaySetup, startGatewaySetup } from "./gateway-setup.js";
 import type { UiCommand } from "@sortedyuan/ui-client";
 import { AgentGateway } from "./gateway.js";
 import { GatewayHost } from "./gateway-host.js";
 import { gatewaySettings } from "./gateway-settings.js";
-import { checkLegacy, migrateLegacy } from "./gateway-migration.js";
 import { GatewayUiHost, controlActor } from "./gateway-ui.js";
-import { startGatewayServer } from "./gateway-server.js";
+import { startGatewayServer } from "./plugins/web-api.js";
 import { hostSettings } from "./settings.js";
 import { createGatewayChannelPlugins } from "./plugins/channels.js";
 import type { GatewayTask } from "./gateway-types.js";
@@ -36,8 +35,6 @@ async function runGatewayService(command: Command, deps: MaybeClawDependencies, 
   if (deps.signal.aborted) return 0;
   const signal = deps.signal, path = resolve(command.config ?? getDefaultMayConfigPath());
   const print = (value: unknown) => (deps.stdout ?? process.stdout).write(`${JSON.stringify(value, null, 2)}\n`);
-  const legacy = await checkLegacy(command.directory);
-  if (legacy.hasLegacy && !legacy.migrated) throw new Error("已有任务数据需要迁移，请执行 pnpm maybeclaw migrate check 和 pnpm maybeclaw migrate run。");
   let gateway: AgentGateway | undefined, host: GatewayHost | undefined;
   let server: Awaited<ReturnType<typeof startGatewayServer>> | undefined, setup: Awaited<ReturnType<typeof startGatewaySetup>> | undefined;
   let stopped!: () => void;
@@ -46,12 +43,12 @@ async function runGatewayService(command: Command, deps: MaybeClawDependencies, 
     const config = await (deps.loadConfig ?? loadMayConfig)({ path });
     gateway = new AgentGateway({ directory: command.directory, configPath: config.path, settings: gatewaySettings(config) });
     host = await GatewayHost.start({ gateway, plugins: createGatewayChannelPlugins(hostSettings(config)) });
-    server = await startGatewayServer({ gateway, ...(listener ? { server: listener } : {}), ...(command.port === undefined ? {} : { port: command.port }), status: () => host!.status(), close: () => host!.close(), retryLegacyDelivery: (id, confirmUnknown) => host!.retryLegacyDelivery(id, controlActor, confirmUnknown) });
+    server = await startGatewayServer({ gateway, ...(listener ? { server: listener } : {}), ...omitUndefined({ port: command.port }), status: () => host!.status(), close: () => host!.close() });
     print({ url: server.url, ...(server.publicUrl ? { publicUrl: server.publicUrl } : {}), directory: command.directory, channels: host.status().channels });
   }
   try {
     if ((await inspectGatewaySetup(path)).needsSetup) {
-      setup = await startGatewaySetup({ path, ...(command.port === undefined ? {} : { port: command.port }), activate });
+      setup = await startGatewaySetup({ path, ...omitUndefined({ port: command.port }), activate });
       print({ initialization: true, initializationFile: setup.launchPath, message: "请在本机浏览器打开初始化文件，设置管理员密码。" });
       if (launch.openBrowser && !command.noOpen && !signal.aborted) await open(setup.url);
       if (!signal.aborted) await Promise.race([setup.completed, aborted]);
@@ -68,14 +65,6 @@ async function runGatewayService(command: Command, deps: MaybeClawDependencies, 
   }
 }
 
-export function handlesGatewayCommand(args: readonly string[]): boolean {
-  if (["serve", "session", "agent", "channel", "delivery", "command", "migrate"].includes(args[0] ?? "")) return true;
-  if (args[0] !== "task") return false;
-  if (["submit", "run"].includes(args[1] ?? "") || args.includes("--server") || args.includes("--session")) return true;
-  const index = args.indexOf("--data-directory");
-  return existsSync(join(index >= 0 ? args[index + 1] ?? "" : join(homedir(), ".may", "maybeclaw"), "gateway.sqlite"));
-}
-
 export async function runGatewayCommand(args: readonly string[], deps: MaybeClawDependencies, launch: { openBrowser?: boolean } = {}): Promise<number> {
   const out = deps.stdout ?? process.stdout, err = deps.stderr ?? process.stderr;
   const print = (value: unknown) => out.write(`${JSON.stringify(value, null, 2)}\n`);
@@ -83,12 +72,9 @@ export async function runGatewayCommand(args: readonly string[], deps: MaybeClaw
   try { command = parse(args); }
   catch (error) { err.write(`${error instanceof Error ? error.message : "Invalid command"}\n${GATEWAY_USAGE}`); return 2; }
   try {
-    if (command.object === "migrate") { print(command.action === "check" ? await checkLegacy(command.directory) : await migrateLegacy(command.directory)); return 0; }
     if (command.server) { print(await remote(command)); return 0; }
     if (command.object === "serve") return await runGatewayService(command, deps, launch);
     const config = await (deps.loadConfig ?? loadMayConfig)(command.config ? { path: command.config } : {});
-    const legacy = await checkLegacy(command.directory);
-    if (legacy.hasLegacy && !legacy.migrated) throw new Error("Existing task data requires explicit migration: maybeclaw migrate check, then maybeclaw migrate run");
     const settings = gatewaySettings(config), gateway = new AgentGateway({ directory: command.directory, configPath: config.path, settings });
     const ui = new GatewayUiHost(gateway);
     try {
@@ -97,9 +83,9 @@ export async function runGatewayCommand(args: readonly string[], deps: MaybeClaw
       if (command.object === "agent" && command.action === "list") { print(gateway.status().agents); return 0; }
       if (command.object === "channel") { print({ configuredEntries: gateway.sessions(controlActor).filter(session => session.entry).map(session => ({ sessionId: session.id, entry: session.entry })), gateway: gateway.status() }); return 0; }
       if (command.object === "task" && command.action !== "submit") {
-        if (command.action === "list") { print({ tasks: gateway.tasks(controlActor), legacy: gateway.legacyTasks(controlActor) }); return 0; }
+        if (command.action === "list") { print({ tasks: gateway.tasks(controlActor) }); return 0; }
         const task = gateway.task(command.value!, controlActor);
-        if (!task) { const legacyTask = gateway.legacyTask(command.value!, controlActor); if (legacyTask && ["status", "result"].includes(command.action)) { print({ legacy: legacyTask }); return 0; } throw new Error("Task not found or legacy work requires explicit assignment to a session"); }
+        if (!task) throw new Error("Task not found");
         if (command.action === "cancel") await gateway.stop(gateway.session(task.sessionId, controlActor), controlActor, undefined, task.id);
         else if (command.action === "run") {
           await gateway.dispatchTask(task.id, controlActor);
@@ -177,15 +163,14 @@ async function remote(command: Command): Promise<unknown> {
   if (command.object === "session" && command.action === "show") return request(`/api/v2/sessions/${encodeURIComponent(command.value!)}`);
   if (command.object === "agent" && command.action === "list") return request("/api/v2/agents");
   if (command.object === "channel") return request("/api/v2/health");
-  if (command.object === "delivery") return request(`/api/v2/${command.action === "retry-legacy" ? "legacy-deliveries" : "deliveries"}/${encodeURIComponent(command.value!)}/retry`, { confirmUnknown: command.confirm === true });
+  if (command.object === "delivery") return request(`/api/v2/deliveries/${encodeURIComponent(command.value!)}/retry`, { confirmUnknown: command.confirm === true });
   if (command.object === "task") {
     if (command.action === "list") return request("/api/v2/tasks");
     if (command.action === "submit") return request("/api/v2/tasks", { prompt: command.value, sessionId: command.session, ...(command.agents[0] ? { agent: command.agents[0] } : {}), requestId: command.requestId ?? randomUUID() });
     const suffix = ["cancel", "recover", "run"].includes(command.action) ? `/${command.action === "run" ? "dispatch" : command.action}` : "";
     const result = await request(`/api/v2/tasks/${encodeURIComponent(command.value!)}${suffix}`, suffix ? {} : undefined);
     if (command.action === "result") {
-      const data = result as { task?: GatewayTask; legacy?: { status: string } };
-      if ((data.task?.status ?? data.legacy?.status) !== "completed") throw new Error("Task result is not complete");
+      if ((result as { task?: GatewayTask }).task?.status !== "completed") throw new Error("Task result is not complete");
     }
     return result;
   }
@@ -211,7 +196,7 @@ async function uiCommand(command: Command, hostId: string): Promise<UiCommand> {
 
 function parse(args: readonly string[]): Command {
   const object = args[0] ?? "", action = object === "serve" ? "serve" : object === "command" ? "command" : args[1] ?? "";
-  const allowed: Record<string, readonly string[]> = { serve: ["serve"], session: ["create", "list", "show", "select", "archive", "restore", "delete", "rename", "admins"], agent: ["list", "check", "save", "delete", "create", "default", "allow"], task: ["submit", "list", "status", "result", "cancel", "run", "recover"], channel: ["status"], delivery: ["retry", "retry-legacy"], command: ["command"], migrate: ["check", "run"] };
+  const allowed: Record<string, readonly string[]> = { serve: ["serve"], session: ["create", "list", "show", "select", "archive", "restore", "delete", "rename", "admins"], agent: ["list", "check", "save", "delete", "create", "default", "allow"], task: ["submit", "list", "status", "result", "cancel", "run", "recover"], channel: ["status"], delivery: ["retry"], command: ["command"] };
   if (!allowed[object]?.includes(action)) throw new Error("Unknown Gateway command");
   const result: Command = { object, action, directory: join(homedir(), ".may", "maybeclaw"), agents: [], allowed: [], identities: [] };
   const single = new Set<string>();
@@ -222,7 +207,7 @@ function parse(args: readonly string[]): Command {
     "agent.save": ["--definition"], "agent.delete": ["--confirm"], "agent.create": ["--session", "--request-id"],
     "agent.default": ["--session", "--agent", "--request-id"], "agent.allow": ["--session", "--agent", "--request-id"],
     "task.submit": ["--session", "--agent", "--request-id"], "command.command": ["--session", "--request-id"],
-    "delivery.retry": ["--confirm"], "delivery.retry-legacy": ["--confirm"],
+    "delivery.retry": ["--confirm"],
   };
   const permitted = new Set(["--config", "--data-directory", "--server", "--password-env", ...(options[`${object}.${action}`] ?? [])]);
   const names = { "--data-directory": "directory", "--config": "config", "--server": "server", "--password-env": "passwordEnv", "--session": "session", "--request-id": "requestId", "--name": "name", "--account": "account", "--conversation": "conversation", "--kind": "kind", "--owner": "owner", "--thread": "thread", "--definition": "definition" } as const;
@@ -239,19 +224,18 @@ function parse(args: readonly string[]): Command {
     if (!(flag in names)) throw new Error(`Unsupported option: ${flag}. Model and directory options belong in Agent configuration.`);
     result[names[flag as keyof typeof names]] = value;
   }
-  if (!["serve", "list", "status", "check", "run"].includes(action) && !result.value) throw new Error("A name, ID, or message is required");
+  if (!["serve", "list", "status"].includes(action) && !result.value) throw new Error("A name, ID, or message is required");
   if (object === "task" && action !== "list" && !result.value) throw new Error("Task prompt or ID is required");
   if (object === "agent" && action !== "list" && !result.value) throw new Error("Agent ID is required");
-  if ((["serve", "migrate", "channel"].includes(object) || action === "list") && result.value !== undefined) throw new Error("This command does not accept a positional argument");
+  if ((["serve", "channel"].includes(object) || action === "list") && result.value !== undefined) throw new Error("This command does not accept a positional argument");
   if (object === "session" && action === "create" && !result.agents.length) throw new Error("Session creation requires --agent <id>");
   if ((object === "task" && action === "submit" || object === "agent" && ["create", "default", "allow"].includes(action)) && !result.session) throw new Error("This operation requires --session <id>. Create a session with session create first.");
   if (object === "agent" && action === "save" && !result.definition) throw new Error("agent save requires --definition <json-file>");
   if (object === "task" && action === "submit" && result.agents.length > 1) throw new Error("Use one --agent to target a single Agent, or omit it to use the session defaults");
   if (object === "delivery" && !result.server) throw new Error("delivery retry requires --server <url>");
   if (!result.server && result.passwordEnv) throw new Error("--password-env requires --server");
-  if (object === "migrate" && result.config) throw new Error("migrate uses only --data-directory");
   if (object === "session" && action === "rename" && !result.name) throw new Error("session rename requires --name <name>");
-  if (object === "serve" && result.server || object === "migrate" && result.server) throw new Error("This command requires direct access to the data directory");
+  if (object === "serve" && result.server) throw new Error("This command requires direct access to the data directory");
   if (result.server && (result.config || single.has("--data-directory"))) throw new Error("--server uses the server's configuration and data directory");
   if (result.kind && (!["private", "group"].includes(result.kind) || !result.account || !result.conversation || result.kind === "private" && !result.owner)) throw new Error("Entry requires --kind private|group, --account, --conversation and --owner for a private chat");
   if (!result.kind && (result.account || result.conversation || result.owner || result.thread)) throw new Error("Entry options require --kind");

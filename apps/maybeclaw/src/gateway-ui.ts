@@ -7,9 +7,7 @@ import { displayParts, imageAttachment, readEmbeddedImage } from "@sortedyuan/me
 import type { ApprovalDecision } from "@sortedyuan/may/permissions";
 import type { GatewayController } from "./gateway-api.js";
 import type { GatewayActor, GatewayAgentConfig, GatewayEntry, GatewaySession } from "./gateway-types.js";
-import { actorKey } from "./gateway-types.js";
-import type { LegacyTaskRecord } from "./gateway-migration.js";
-import { digest } from "./types.js";
+import { actorKey, digest } from "./gateway-types.js";
 
 export const controlActor: GatewayActor = { kind: "operator", id: "control" };
 
@@ -18,20 +16,18 @@ export class GatewayUiHost implements UiHost {
   private revision = 0;
   private readonly listeners = new Set<() => void>();
   private readonly unsubscribe: () => void;
-  constructor(readonly gateway: GatewayController, private readonly hostStatus: () => unknown = () => gateway.status(), private readonly retryLegacyDelivery?: (id: string, confirmUnknown: boolean) => unknown) {
+  constructor(readonly gateway: GatewayController, private readonly hostStatus: () => unknown = () => gateway.status()) {
     this.unsubscribe = gateway.observe(() => { this.revision++; for (const listener of this.listeners) listener(); });
   }
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
   close(): void { this.unsubscribe(); this.listeners.clear(); }
 
   async snapshot(selectedId?: string, all = false): Promise<UiSnapshot> {
-    const legacy = selectedId?.startsWith("legacy:") ? this.gateway.legacyTask(selectedId.slice(7), controlActor) : undefined;
-    if (selectedId?.startsWith("legacy:") && !legacy) throw new UiError(404, "历史任务不存在。");
-    const session = selectedId && !legacy ? this.gateway.session(selectedId, controlActor) : undefined;
+    const session = selectedId ? this.gateway.session(selectedId, controlActor) : undefined;
     const persistentRules = this.gateway.configuration(controlActor).persistentRules;
     const tasks = session ? this.gateway.tasks(controlActor, session.id) : [];
     const approvals = session ? this.gateway.approvals(controlActor, session.id) : [];
-    const blocks = legacy ? this.legacyBlocks(legacy) : session ? this.blocks(session) : [];
+    const blocks = session ? this.blocks(session) : [];
     const page = historyPage(this.hostId, selectedId ?? "", blocks);
     const resources = this.resourceList();
     const commands = ["session.new", "session.create", "session.activate", "gateway.command", "gateway.inspect", "agent.save", "agent.delete", "agent.check", "approval.resolve", "delivery.retry"];
@@ -71,10 +67,9 @@ export class GatewayUiHost implements UiHost {
   }
 
   private resourceList() {
-    return [
-      ...this.gateway.sessions(controlActor).map(session => ({ id: session.id, kind: "session" as const, title: session.name, status: session.status, updatedAt: session.updatedAt })),
-      ...this.gateway.legacyTasks(controlActor).map(task => ({ id: `legacy:${task.id}`, kind: "task" as const, title: `历史任务 · ${task.snapshot.spec.prompt.slice(0, 64)}`, status: task.status, updatedAt: task.snapshot.updatedAt })),
-    ].sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
+    return this.gateway.sessions(controlActor)
+      .map(session => ({ id: session.id, kind: "session" as const, title: session.name, status: session.status, updatedAt: session.updatedAt }))
+      .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
   }
   private blocks(session: GatewaySession): UiBlock[] {
     const times = new Map<string, number>();
@@ -101,22 +96,13 @@ export class GatewayUiHost implements UiHost {
     return messages.sort((a, b) => (times.get(a.id) ?? 0) - (times.get(b.id) ?? 0));
   }
   async media(selectedId: string, id: string) {
-    const projection = new UiProjection(Infinity);
-    if (selectedId.startsWith("legacy:")) {
-      const legacy = this.gateway.legacyTask(selectedId.slice(7), controlActor);
-      if (!legacy) throw new UiError(404, "历史任务不存在。"); projection.history(legacy.history);
-    } else {
-      for (const message of this.gateway.messages(selectedId, controlActor)) for (const part of message.content ?? []) {
-        if (part.type === "image" && imageAttachment(part.source).id === id) return readEmbeddedImage(part.source);
-      }
-      for (const item of this.gateway.events(selectedId, controlActor)) projection.event(item.event);
+    for (const message of this.gateway.messages(selectedId, controlActor)) for (const part of message.content ?? []) {
+      if (part.type === "image" && imageAttachment(part.source).id === id) return readEmbeddedImage(part.source);
     }
+    const projection = new UiProjection(Infinity);
+    for (const item of this.gateway.events(selectedId, controlActor)) projection.event(item.event);
     const source = projection.mediaSources.get(id); if (!source) throw new UiError(404, "图片不属于当前会话。");
     return readEmbeddedImage(source);
-  }
-  private legacyBlocks(task: LegacyTaskRecord): UiBlock[] {
-    const projection = new UiProjection(Infinity); projection.history(task.history); projection.settle();
-    return [{ id: `legacy:${task.id}`, kind: "notice", text: `历史任务 · ${task.status}\n${task.detail ?? ""}` }, ...projection.blocks.values()];
   }
   async resources(request: UiPageRequest) { return readPage(this.hostId, "resources", this.resourceList(), request, (item, query) => `${item.title} ${item.status}`.toLocaleLowerCase().includes(query)); }
   async history(selectedId: string, request: UiPageRequest) { return historyPage(this.hostId, selectedId, (await this.snapshot(selectedId, true)).blocks, request); }
@@ -129,7 +115,7 @@ export class GatewayUiHost implements UiHost {
 
   async execute(command: UiCommand): Promise<UiReceipt> {
     if (command.hostId !== this.hostId) throw new UiError(409, "服务已经重启，请刷新状态。");
-    const target = command.targetId && !command.targetId.startsWith("legacy:") ? this.gateway.session(command.targetId, controlActor) : undefined;
+    const target = command.targetId ? this.gateway.session(command.targetId, controlActor) : undefined;
     const requestId = `ui:${command.requestId}`;
     if (command.name === "session.activate") {
       commandArgs(command, []);
@@ -138,12 +124,8 @@ export class GatewayUiHost implements UiHost {
       return { selectedId: command.targetId };
     }
     if (command.name === "delivery.retry") {
-      commandArgs(command, ["id", "scope"], ["confirm"]);
-      if (!["current", "legacy"].includes(command.args.scope!)) throw new UiError(400, "投递范围无效。");
-      if (command.args.scope === "legacy") {
-        if (!this.retryLegacyDelivery) throw new UiError(409, "重新发送历史消息需要正在运行的 GatewayHost。");
-        this.retryLegacyDelivery(command.args.id!, command.args.confirm === "true");
-      } else this.gateway.retryDelivery(command.args.id!, controlActor, command.args.confirm === "true");
+      commandArgs(command, ["id"], ["confirm"]);
+      this.gateway.retryDelivery(command.args.id!, controlActor, command.args.confirm === "true");
       return {};
     }
     if (command.name === "gateway.inspect") {

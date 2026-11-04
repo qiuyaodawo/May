@@ -3,8 +3,8 @@
 **English** | [简体中文](../../zh-CN/guides/subagent-delegation.md)
 
 Use sub-agents to assign independent work during an ordinary MaybeCode request.
-Delegation is enabled by default in terminal UIs, the Web UI, the headless
-controller and `MaybeCodeApplication.open()`. The model can call `delegate_tasks`
+Delegation is enabled by default in the terminal UI, the Web UI and the headless
+controller. The model can call `delegate_tasks`
 during an active Run, either following your prompt or choosing to delegate.
 
 This guide assumes a [configured MaybeCode Session](maybecode.md). It explains
@@ -114,7 +114,8 @@ its report is data rather than instructions. The `files` list of a child declare
 the workspace-relative files it may modify:
 
 - the child may read any file in the workspace;
-- `write` and `edit` refuse paths outside the declared `files`;
+- `write` and `edit` refuse paths outside the declared `files`; an empty list
+  allows no modifications, and omitting `files` leaves writes unrestricted;
 - an existing file must be read by that child first, and a file whose content
   changed after the read is refused as a conflict;
 - the `shell` tool has none of these limits, which is why briefs state file
