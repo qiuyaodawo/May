@@ -38,24 +38,37 @@ export function renderTextDocument(
   size: RenderSize,
   options: { readonly sourceId?: string; readonly wrap?: boolean; readonly continuationIndent?: number } = {},
 ): RenderResult {
-  if (options.continuationIndent !== undefined && (!Number.isSafeInteger(options.continuationIndent) || options.continuationIndent < 0)) {
+  if (
+    options.continuationIndent !== undefined &&
+    (!Number.isSafeInteger(options.continuationIndent) || options.continuationIndent < 0)
+  ) {
     throw new RangeError("continuationIndent must be a non-negative safe integer");
   }
-  const source = options.sourceId === undefined ? "" : document.filter(line => line.copy !== undefined)
-    .map(line => stripVTControlCharacters(line.value).slice(line.copy!.start, line.copy!.end))
-    .join("\n");
+  const source =
+    options.sourceId === undefined
+      ? ""
+      : document
+          .filter((line) => line.copy !== undefined)
+          .map((line) => stripVTControlCharacters(line.value).slice(line.copy!.start, line.copy!.end))
+          .join("\n");
   const lines: string[] = [];
   const textRows: Array<TextRow | undefined> = [];
   let sourceOffset = 0;
   for (const line of document) {
     const expanded = expandTabs(line.value);
-    const indent = options.continuationIndent === undefined || options.wrap === false ? 0 : Math.min(
-      Math.max(0, size.width - 2),
-      Math.max(options.continuationIndent, /^ */u.exec(stripVTControlCharacters(expanded.value))![0].length),
-    );
-    const wrapped = options.wrap === false
-      ? [sliceAnsi(expanded.value, 0, size.width)]
-      : wrapAnsi(expanded.value, Math.max(1, size.width - indent), { hard: true, trim: false, wordWrap: true }).split("\n");
+    const indent =
+      options.continuationIndent === undefined || options.wrap === false
+        ? 0
+        : Math.min(
+            Math.max(0, size.width - 2),
+            Math.max(options.continuationIndent, /^ */u.exec(stripVTControlCharacters(expanded.value))![0].length),
+          );
+    const wrapped =
+      options.wrap === false
+        ? [sliceAnsi(expanded.value, 0, size.width)]
+        : wrapAnsi(expanded.value, Math.max(1, size.width - indent), { hard: true, trim: false, wordWrap: true }).split(
+            "\n",
+          );
     let displayOffset = 0;
     for (const [rowIndex, value] of wrapped.entries()) {
       if (lines.length >= size.height) break;
@@ -69,9 +82,29 @@ export function renderTextDocument(
         const rowDisplayOffset = displayOffset;
         const rowSourceOffset = sourceOffset;
         let spans: readonly TextSpan[] | undefined;
-        const start = sourceOffset + Math.max(0, Math.min(line.copy.end - line.copy.start, (expanded.starts?.[displayOffset] ?? displayOffset) - line.copy.start));
-        const end = sourceOffset + Math.max(0, Math.min(line.copy.end - line.copy.start, (expanded.ends?.[displayOffset + plain.length] ?? displayOffset + plain.length) - line.copy.start));
-        textRows.push({ sourceId: options.sourceId, source, start, end,
+        const start =
+          sourceOffset +
+          Math.max(
+            0,
+            Math.min(
+              line.copy.end - line.copy.start,
+              (expanded.starts?.[displayOffset] ?? displayOffset) - line.copy.start,
+            ),
+          );
+        const end =
+          sourceOffset +
+          Math.max(
+            0,
+            Math.min(
+              line.copy.end - line.copy.start,
+              (expanded.ends?.[displayOffset + plain.length] ?? displayOffset + plain.length) - line.copy.start,
+            ),
+          );
+        textRows.push({
+          sourceId: options.sourceId,
+          source,
+          start,
+          end,
           get spans() {
             if (spans !== undefined) return spans;
             const values: TextSpan[] = [];
@@ -83,8 +116,12 @@ export function renderTextDocument(
               const partEnd = expanded.ends?.[displayEnd] ?? displayEnd;
               const width = stringWidth(part.segment);
               if (partStart >= copy.start && partEnd <= copy.end) {
-                const span = { x, width, start: rowSourceOffset + partStart - copy.start,
-                  end: rowSourceOffset + partEnd - copy.start };
+                const span = {
+                  x,
+                  width,
+                  start: rowSourceOffset + partStart - copy.start,
+                  end: rowSourceOffset + partEnd - copy.start,
+                };
                 const previous = values.at(-1);
                 if (previous !== undefined && previous.end === span.end && previous.start === span.start) {
                   values[values.length - 1] = { ...previous, width: previous.width + width };
@@ -111,7 +148,10 @@ function expandTabs(value: string): { value: string; starts?: readonly number[];
   const starts = [0];
   const ends = [0];
   for (let index = 0; index < plain.length; index++) {
-    if (plain[index] === "\t") { starts.push(index); ends.push(index + 1); }
+    if (plain[index] === "\t") {
+      starts.push(index);
+      ends.push(index + 1);
+    }
     starts.push(index + 1);
     ends.push(index + 1);
   }
@@ -128,10 +168,16 @@ export function textRowOffset(row: TextRow, x: number): number {
 
 export function highlightTextRow(line: string, row: TextRow, start: number, end: number): string {
   if (row.end <= start || row.start >= end) return line;
-  const spans = row.spans.filter(span => span.start < end && span.end > start);
+  const spans = row.spans.filter((span) => span.start < end && span.end > start);
   if (spans.length === 0) return line;
   const first = spans[0]!.x;
   const last = spans.at(-1)!;
   const after = last.x + last.width;
-  return sliceAnsi(line, 0, first) + "\x1b[7m" + stripVTControlCharacters(sliceAnsi(line, first, after)) + "\x1b[27m" + sliceAnsi(line, after);
+  return (
+    sliceAnsi(line, 0, first) +
+    "\x1b[7m" +
+    stripVTControlCharacters(sliceAnsi(line, first, after)) +
+    "\x1b[27m" +
+    sliceAnsi(line, after)
+  );
 }

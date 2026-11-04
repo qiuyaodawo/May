@@ -27,11 +27,21 @@ export async function acquireFileLock(path: string): Promise<FileLock> {
     if (!(await file.stat()).isFile()) throw new Error(`Lock path is not a regular file: ${path}`);
     locked = tryLock(file.fd, 0, 0, { shared: false });
     if (!locked) {
-      throw Object.assign(new Error(`Lock is held by another owner: ${path}${await describeOwner(path)}`), { code: "ELOCKED" });
+      throw Object.assign(new Error(`Lock is held by another owner: ${path}${await describeOwner(path)}`), {
+        code: "ELOCKED",
+      });
     }
-    await writeFileAtomic(`${path}.owner`, JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: new Date().toISOString() }), { mode: 0o600 });
+    await writeFileAtomic(
+      `${path}.owner`,
+      JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: new Date().toISOString() }),
+      { mode: 0o600 },
+    );
   } catch (error) {
-    try { if (locked) unlock(file.fd, 0, 0); } finally { await file.close(); }
+    try {
+      if (locked) unlock(file.fd, 0, 0);
+    } finally {
+      await file.close();
+    }
     throw error;
   }
   let releasing: Promise<void> | undefined;
@@ -45,9 +55,14 @@ export async function acquireFileLock(path: string): Promise<FileLock> {
         throw new Error(`Lock ownership changed: ${path}`);
       }
     },
-    release: () => releasing ??= (async () => {
-      try { unlock(file.fd, 0, 0); } finally { await file.close(); }
-    })(),
+    release: () =>
+      (releasing ??= (async () => {
+        try {
+          unlock(file.fd, 0, 0);
+        } finally {
+          await file.close();
+        }
+      })()),
   };
 }
 
@@ -65,11 +80,21 @@ export function acquireFileLockSync(path: string): FileLockSync {
     if (!fstatSync(file).isFile()) throw new Error(`Lock path is not a regular file: ${path}`);
     locked = tryLock(file, 0, 0, { shared: false });
     if (!locked) {
-      throw Object.assign(new Error(`Lock is held by another owner: ${path}${describeOwnerSync(path)}`), { code: "ELOCKED" });
+      throw Object.assign(new Error(`Lock is held by another owner: ${path}${describeOwnerSync(path)}`), {
+        code: "ELOCKED",
+      });
     }
-    writeFileAtomic.sync(`${path}.owner`, JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: new Date().toISOString() }), { mode: 0o600 });
+    writeFileAtomic.sync(
+      `${path}.owner`,
+      JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: new Date().toISOString() }),
+      { mode: 0o600 },
+    );
   } catch (error) {
-    try { if (locked) unlock(file, 0, 0); } finally { closeSync(file); }
+    try {
+      if (locked) unlock(file, 0, 0);
+    } finally {
+      closeSync(file);
+    }
     throw error;
   }
   let released = false;
@@ -78,14 +103,19 @@ export function acquireFileLockSync(path: string): FileLockSync {
     release() {
       if (released) return;
       released = true;
-      try { unlock(file, 0, 0); } finally { closeSync(file); }
+      try {
+        unlock(file, 0, 0);
+      } finally {
+        closeSync(file);
+      }
     },
   };
 }
 
 function describeOwnerSync(path: string): string {
-  try { return ` (owner: ${readFileSync(`${path}.owner`, "utf8").slice(0, 512)})`; }
-  catch (error) {
+  try {
+    return ` (owner: ${readFileSync(`${path}.owner`, "utf8").slice(0, 512)})`;
+  } catch (error) {
     if (hasErrorCode(error, "ENOENT")) return "";
     throw error;
   }
@@ -93,8 +123,9 @@ function describeOwnerSync(path: string): string {
 
 async function describeOwner(path: string): Promise<string> {
   let text: string;
-  try { text = await readFile(`${path}.owner`, "utf8"); }
-  catch (error) {
+  try {
+    text = await readFile(`${path}.owner`, "utf8");
+  } catch (error) {
     if (hasErrorCode(error, "ENOENT")) return "";
     throw error;
   }
@@ -105,7 +136,11 @@ export async function syncDirectory(path: string): Promise<void> {
   // Windows does not provide POSIX directory fsync through Node.
   if (process.platform === "win32") return;
   const directory = await open(path, "r");
-  try { await directory.sync(); } finally { await directory.close(); }
+  try {
+    await directory.sync();
+  } finally {
+    await directory.close();
+  }
 }
 
 /** Atomically replace a file's contents and make the rename durable. */

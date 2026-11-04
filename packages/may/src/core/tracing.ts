@@ -1,11 +1,6 @@
 /** Scalar values that are safe to attach to operational telemetry. */
 export type TraceAttributeValue =
-  | string
-  | number
-  | boolean
-  | readonly string[]
-  | readonly number[]
-  | readonly boolean[];
+  string | number | boolean | readonly string[] | readonly number[] | readonly boolean[];
 
 export type TraceAttributes = Readonly<Record<string, TraceAttributeValue>>;
 
@@ -60,7 +55,11 @@ export interface MetricRecord {
 }
 
 export function recordMetric(tracer: Tracer | undefined, record: MetricRecord): void {
-  try { tracer?.recordMetric?.(record); } catch { /* 遥测失败由组件的诊断接口记录。 */ }
+  try {
+    tracer?.recordMetric?.(record);
+  } catch {
+    /* 遥测失败由组件的诊断接口记录。 */
+  }
 }
 
 /** Start a span without allowing a third-party tracer failure to affect May. */
@@ -78,10 +77,7 @@ export function startTraceSpan(
 }
 
 /** Set attributes without putting telemetry on the execution failure path. */
-export function setTraceAttributes(
-  span: TraceSpan | undefined,
-  attributes: TraceAttributes,
-): void {
+export function setTraceAttributes(span: TraceSpan | undefined, attributes: TraceAttributes): void {
   try {
     span?.setAttributes(attributes);
   } catch {
@@ -90,11 +86,7 @@ export function setTraceAttributes(
 }
 
 /** Add an instantaneous span event without affecting Agent execution. */
-export function addTraceEvent(
-  span: TraceSpan | undefined,
-  name: string,
-  attributes?: TraceAttributes,
-): void {
+export function addTraceEvent(span: TraceSpan | undefined, name: string, attributes?: TraceAttributes): void {
   try {
     span?.addEvent(name, attributes);
   } catch {
@@ -103,10 +95,7 @@ export function addTraceEvent(
 }
 
 /** End a span without allowing exporter or processor failures to escape. */
-export function endTraceSpan(
-  span: TraceSpan | undefined,
-  options?: TraceSpanEndOptions,
-): void {
+export function endTraceSpan(span: TraceSpan | undefined, options?: TraceSpanEndOptions): void {
   try {
     span?.end(options);
   } catch {
@@ -117,9 +106,7 @@ export function endTraceSpan(
 /** Convert an arbitrary failure into content-free trace error metadata. */
 export function traceError(error: unknown): TraceError {
   if (!(error instanceof Error)) return { name: "Error" };
-  const code = "code" in error && typeof error.code === "string"
-    ? error.code
-    : undefined;
+  const code = "code" in error && typeof error.code === "string" ? error.code : undefined;
   return code === undefined ? { name: error.name } : { name: error.name, code };
 }
 

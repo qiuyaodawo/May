@@ -31,7 +31,11 @@ function openStore(path) {
 
 function setSchemaVersion(path, version) {
   const database = new DatabaseSync(join(path, "gateway.sqlite"));
-  try { database.exec(`PRAGMA user_version = ${version}`); } finally { database.close(); }
+  try {
+    database.exec(`PRAGMA user_version = ${version}`);
+  } finally {
+    database.close();
+  }
 }
 
 test("SQLite records persist across reopen and isolated reads cannot mutate stored values", async (t) => {
@@ -50,19 +54,27 @@ test("SQLite records persist across reopen and isolated reads cannot mutate stor
 
 test("SQLite transactions preserve atomic related records and nested savepoints", async (t) => {
   const store = openStore(await directory(t));
-  assert.throws(() => store.transaction(() => {
-    store.put("messages", "one", { text: "input" });
-    store.put("runs", "one", { messageId: "one" });
-    throw new Error("Rejected admission");
-  }), /Rejected admission/);
+  assert.throws(
+    () =>
+      store.transaction(() => {
+        store.put("messages", "one", { text: "input" });
+        store.put("runs", "one", { messageId: "one" });
+        throw new Error("Rejected admission");
+      }),
+    /Rejected admission/,
+  );
   assert.deepEqual(store.list("messages"), []);
   assert.deepEqual(store.list("runs"), []);
   store.transaction(() => {
     store.put("messages", "two", { text: "accepted" });
-    assert.throws(() => store.transaction(() => {
-      store.put("messages", "three", { text: "rejected" });
-      throw new Error("Rejected nested operation");
-    }), /Rejected nested/);
+    assert.throws(
+      () =>
+        store.transaction(() => {
+          store.put("messages", "three", { text: "rejected" });
+          throw new Error("Rejected nested operation");
+        }),
+      /Rejected nested/,
+    );
     store.put("runs", "two", { messageId: "two" });
   });
   assert.deepEqual(store.list("messages"), [{ text: "accepted" }]);
@@ -76,8 +88,16 @@ test("SQLite transactions preserve atomic related records and nested savepoints"
 test("process termination cannot commit half a SQLite transaction", async (t) => {
   const path = await directory(t);
   const moduleUrl = new URL("../dist/gateway-store.js", import.meta.url).href;
-  const result = spawnSync(process.execPath, ["--input-type=module", "-e",
-    `import { GatewayStore } from ${JSON.stringify(moduleUrl)}; const store = GatewayStore.open(process.argv[1]); store.transaction(() => { store.put("messages", "unfinished", {}); process.exit(9); });`, path], { windowsHide: true, encoding: "utf8" });
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `import { GatewayStore } from ${JSON.stringify(moduleUrl)}; const store = GatewayStore.open(process.argv[1]); store.transaction(() => { store.put("messages", "unfinished", {}); process.exit(9); });`,
+      path,
+    ],
+    { windowsHide: true, encoding: "utf8" },
+  );
   assert.equal(result.status, 9);
   const store = openStore(path);
   assert.equal(store.get("messages", "unfinished"), undefined);

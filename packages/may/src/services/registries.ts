@@ -41,18 +41,25 @@ class Contributions<T> {
   add(value: T, options: ContributionOptions): Disposer {
     if (typeof value !== "function") throw new TypeError("Contribution must be a function");
     if (typeof options.id !== "string" || options.id.trim() === "") throw new TypeError("Contribution id is required");
-    if (![options.order ?? 0, options.pluginOrder ?? 0].every(Number.isFinite)) throw new TypeError("Contribution order must be finite");
+    if (![options.order ?? 0, options.pluginOrder ?? 0].every(Number.isFinite))
+      throw new TypeError("Contribution order must be finite");
     if (this.entries.has(options.id)) throw new Error(`Duplicate contribution id: ${options.id}`);
     const entry = { value, options: Object.freeze({ ...options }), sequence: this.sequence++ };
     this.entries.set(options.id, entry);
-    return () => { if (this.entries.get(options.id) === entry) this.entries.delete(options.id); };
+    return () => {
+      if (this.entries.get(options.id) === entry) this.entries.delete(options.id);
+    };
   }
 
   protected values(): readonly T[] {
-    return [...this.entries.values()].sort((left, right) =>
-      (left.options.order ?? 0) - (right.options.order ?? 0) ||
-      (left.options.pluginOrder ?? 0) - (right.options.pluginOrder ?? 0) ||
-      left.sequence - right.sequence).map((entry) => entry.value);
+    return [...this.entries.values()]
+      .sort(
+        (left, right) =>
+          (left.options.order ?? 0) - (right.options.order ?? 0) ||
+          (left.options.pluginOrder ?? 0) - (right.options.pluginOrder ?? 0) ||
+          left.sequence - right.sequence,
+      )
+      .map((entry) => entry.value);
   }
 }
 
@@ -68,11 +75,14 @@ export class ToolSources extends Contributions<ToolSource> implements ToolSource
 export type InstructionSource = () => string;
 export class InstructionSources extends Contributions<InstructionSource> implements InstructionSourceRegistry {
   snapshot(): string {
-    return this.values().map((source) => {
-      const instructions = source();
-      if (typeof instructions !== "string") throw new TypeError("Instruction source must return a string");
-      return instructions;
-    }).filter(Boolean).join("\n\n");
+    return this.values()
+      .map((source) => {
+        const instructions = source();
+        if (typeof instructions !== "string") throw new TypeError("Instruction source must return a string");
+        return instructions;
+      })
+      .filter(Boolean)
+      .join("\n\n");
   }
 }
 

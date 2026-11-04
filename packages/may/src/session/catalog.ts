@@ -25,11 +25,7 @@ export class InMemorySessionCatalog implements SessionCatalog {
   private readonly sessions = new Map<string, SessionSummary>();
 
   async list(workspace: string): Promise<readonly SessionSummary[]> {
-    return sortSessions(
-      [...this.sessions.values()].filter((item) =>
-        sameWorkspace(item.workspace, workspace)
-      ),
-    );
+    return sortSessions([...this.sessions.values()].filter((item) => sameWorkspace(item.workspace, workspace)));
   }
 
   async record(summary: SessionSummary): Promise<void> {
@@ -37,11 +33,7 @@ export class InMemorySessionCatalog implements SessionCatalog {
     this.sessions.set(summary.id, mergeSummary(current, summary));
   }
 
-  async rename(
-    sessionId: string,
-    workspace: string,
-    title: string,
-  ): Promise<boolean> {
+  async rename(sessionId: string, workspace: string, title: string): Promise<boolean> {
     const current = this.sessions.get(sessionId);
     if (current === undefined || !sameWorkspace(current.workspace, workspace)) {
       return false;
@@ -75,11 +67,13 @@ export class FileSessionCatalog implements SessionCatalog {
 
   /** Offline maintenance: stop other catalog users before compacting operation files. */
   compact(options: { readonly confirmHostsStopped: true }): Promise<void> {
-    if (options.confirmHostsStopped !== true) return Promise.reject(new Error("Catalog compaction requires stopped hosts"));
+    if (options.confirmHostsStopped !== true)
+      return Promise.reject(new Error("Catalog compaction requires stopped hosts"));
     return this.enqueue(async () => {
       const sessions = await this.readNow();
       const names = await readdir(this.operationsDirectory).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return []; throw error;
+        if (error.code === "ENOENT") return [];
+        throw error;
       });
       const absorbed = names.filter((name) => name.endsWith(".json"));
       if (absorbed.length === 0) return;
@@ -96,11 +90,7 @@ export class FileSessionCatalog implements SessionCatalog {
 
   async list(workspace: string): Promise<readonly SessionSummary[]> {
     await this.tail;
-    return sortSessions(
-      (await this.readNow()).filter((item) =>
-        sameWorkspace(item.workspace, workspace)
-      ),
-    );
+    return sortSessions((await this.readNow()).filter((item) => sameWorkspace(item.workspace, workspace)));
   }
 
   record(summary: SessionSummary): Promise<void> {
@@ -109,14 +99,10 @@ export class FileSessionCatalog implements SessionCatalog {
     });
   }
 
-  rename(
-    sessionId: string,
-    workspace: string,
-    title: string,
-  ): Promise<boolean> {
+  rename(sessionId: string, workspace: string, title: string): Promise<boolean> {
     return this.enqueue(async () => {
-      const exists = (await this.readNow()).some((item) =>
-        item.id === sessionId && sameWorkspace(item.workspace, workspace)
+      const exists = (await this.readNow()).some(
+        (item) => item.id === sessionId && sameWorkspace(item.workspace, workspace),
       );
       if (!exists) return false;
       await this.appendOperation({ type: "rename", sessionId, workspace, title });
@@ -126,8 +112,8 @@ export class FileSessionCatalog implements SessionCatalog {
 
   remove(sessionId: string, workspace: string): Promise<boolean> {
     return this.enqueue(async () => {
-      const exists = (await this.readNow()).some((item) =>
-        item.id === sessionId && sameWorkspace(item.workspace, workspace)
+      const exists = (await this.readNow()).some(
+        (item) => item.id === sessionId && sameWorkspace(item.workspace, workspace),
       );
       if (!exists) return false;
       await this.appendOperation({ type: "remove", sessionId, workspace });
@@ -149,17 +135,11 @@ export class FileSessionCatalog implements SessionCatalog {
     const sessions = new Map(snapshot.sessions.map((summary) => [summary.id, summary]));
     for (const operation of await this.readOperations(new Set(snapshot.absorbed))) {
       if (operation.type === "record") {
-        sessions.set(
-          operation.summary.id,
-          mergeSummary(sessions.get(operation.summary.id), operation.summary),
-        );
+        sessions.set(operation.summary.id, mergeSummary(sessions.get(operation.summary.id), operation.summary));
         continue;
       }
       const current = sessions.get(operation.sessionId);
-      if (
-        current === undefined ||
-        !sameWorkspace(current.workspace, operation.workspace)
-      ) {
+      if (current === undefined || !sameWorkspace(current.workspace, operation.workspace)) {
         continue;
       }
       if (operation.type === "rename") {
@@ -187,15 +167,19 @@ export class FileSessionCatalog implements SessionCatalog {
       throw new Error(`Invalid May session catalog JSON: ${this.path}`);
     }
     if (
-      typeof value !== "object" || value === null ||
-      !("version" in value) || (value.version !== 1 && value.version !== 2) ||
-      !("sessions" in value) || !Array.isArray(value.sessions) ||
+      typeof value !== "object" ||
+      value === null ||
+      !("version" in value) ||
+      (value.version !== 1 && value.version !== 2) ||
+      !("sessions" in value) ||
+      !Array.isArray(value.sessions) ||
       !value.sessions.every(isSessionSummary)
     ) {
       throw new Error(`Invalid May session catalog: ${this.path}`);
     }
     const absorbed = value.version === 2 && "absorbed" in value ? value.absorbed : [];
-    if (!Array.isArray(absorbed) || absorbed.some((name) => typeof name !== "string" || !/^[\w.-]+\.json$/u.test(name))) throw new Error(`Invalid May session catalog checkpoint: ${this.path}`);
+    if (!Array.isArray(absorbed) || absorbed.some((name) => typeof name !== "string" || !/^[\w.-]+\.json$/u.test(name)))
+      throw new Error(`Invalid May session catalog checkpoint: ${this.path}`);
     return { sessions: value.sessions.map((item) => ({ ...item })), absorbed };
   }
 
@@ -231,19 +215,13 @@ export class FileSessionCatalog implements SessionCatalog {
   private async appendOperation(operation: CatalogOperation): Promise<void> {
     await mkdir(this.operationsDirectory, { recursive: true });
     const token = randomUUID();
-    const temporary = join(
-      this.operationsDirectory,
-      `.${process.pid}-${token}.tmp`,
-    );
+    const temporary = join(this.operationsDirectory, `.${process.pid}-${token}.tmp`);
     try {
       await writeFile(temporary, `${JSON.stringify(operation)}\n`, "utf8");
       const timestamp = await this.nextOperationTimestamp();
       await rename(
         temporary,
-        join(
-          this.operationsDirectory,
-          `${String(timestamp).padStart(16, "0")}-${process.pid}-${token}.json`,
-        ),
+        join(this.operationsDirectory, `${String(timestamp).padStart(16, "0")}-${process.pid}-${token}.json`),
       );
     } finally {
       await rm(temporary, { force: true });
@@ -285,27 +263,23 @@ function isCatalogOperation(value: unknown): value is CatalogOperation {
   }
   if (value.type !== "rename" && value.type !== "remove") return false;
   if (
-    !("sessionId" in value) || typeof value.sessionId !== "string" ||
-    value.sessionId === "" || !("workspace" in value) ||
-    typeof value.workspace !== "string" || value.workspace === ""
+    !("sessionId" in value) ||
+    typeof value.sessionId !== "string" ||
+    value.sessionId === "" ||
+    !("workspace" in value) ||
+    typeof value.workspace !== "string" ||
+    value.workspace === ""
   ) {
     return false;
   }
-  return value.type === "remove" ||
-    ("title" in value && typeof value.title === "string" && value.title !== "");
+  return value.type === "remove" || ("title" in value && typeof value.title === "string" && value.title !== "");
 }
 
-export async function latestSession(
-  catalog: SessionCatalog,
-  workspace: string,
-): Promise<SessionSummary | undefined> {
+export async function latestSession(catalog: SessionCatalog, workspace: string): Promise<SessionSummary | undefined> {
   return (await catalog.list(workspace))[0];
 }
 
-function mergeSummary(
-  current: SessionSummary | undefined,
-  update: SessionSummary,
-): SessionSummary {
+function mergeSummary(current: SessionSummary | undefined, update: SessionSummary): SessionSummary {
   const title = current?.title ?? update.title;
   const preview = update.preview ?? current?.preview;
   const turnCount = update.turnCount ?? current?.turnCount;
@@ -330,7 +304,8 @@ function normalizeWorkspace(workspace: string): string {
 }
 
 function isSessionSummary(value: unknown): value is SessionSummary {
-  return typeof value === "object" &&
+  return (
+    typeof value === "object" &&
     value !== null &&
     "id" in value &&
     typeof value.id === "string" &&
@@ -344,12 +319,11 @@ function isSessionSummary(value: unknown): value is SessionSummary {
     "lastUsedAt" in value &&
     typeof value.lastUsedAt === "number" &&
     Number.isFinite(value.lastUsedAt) &&
-    (!("title" in value) ||
-      (typeof value.title === "string" && value.title.trim() !== "")) &&
+    (!("title" in value) || (typeof value.title === "string" && value.title.trim() !== "")) &&
     (!("preview" in value) || typeof value.preview === "string") &&
     (!("turnCount" in value) ||
-      (Number.isSafeInteger(value.turnCount) &&
-        typeof value.turnCount === "number" && value.turnCount >= 0));
+      (Number.isSafeInteger(value.turnCount) && typeof value.turnCount === "number" && value.turnCount >= 0))
+  );
 }
 
 function isNodeError(error: unknown, code: string): boolean {

@@ -24,7 +24,7 @@ import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 
 const files = await ProjectGitWorkspace.open({
   workspace: process.cwd(),
-  authorizeCommit: request => confirmProjectCommit(request),
+  authorizeCommit: (request) => confirmProjectCommit(request),
 });
 await files.prepare(sessionId);
 ```

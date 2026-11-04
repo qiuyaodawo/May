@@ -13,8 +13,11 @@ export class GatewayStore {
   private transactionDepth = 0;
   private savepointSequence = 0;
 
-  private constructor(directory: string, private readonly database: DatabaseSync,
-    private readonly lock: FileLockSync) {
+  private constructor(
+    directory: string,
+    private readonly database: DatabaseSync,
+    private readonly lock: FileLockSync,
+  ) {
     this.directory = directory;
     this.path = join(directory, "gateway.sqlite");
   }
@@ -23,9 +26,11 @@ export class GatewayStore {
     const resolved = resolve(directory);
     mkdirSync(resolved, { recursive: true, mode: 0o700 });
     let lock: FileLockSync;
-    try { lock = acquireFileLockSync(join(resolved, "host.lock")); }
-    catch (error) {
-      if (hasErrorCode(error, "ELOCKED")) throw new Error(`Gateway data directory is already in use: ${resolved}`, { cause: error });
+    try {
+      lock = acquireFileLockSync(join(resolved, "host.lock"));
+    } catch (error) {
+      if (hasErrorCode(error, "ELOCKED"))
+        throw new Error(`Gateway data directory is already in use: ${resolved}`, { cause: error });
       throw error;
     }
     let database: DatabaseSync | undefined;
@@ -36,13 +41,15 @@ export class GatewayStore {
       database.exec("PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL;");
       const applicationId = Number(database.prepare("PRAGMA application_id").get()!.application_id);
       const version = Number(database.prepare("PRAGMA user_version").get()!.user_version);
-      if (applicationId !== 0 && applicationId !== APPLICATION_ID) throw new Error("Database belongs to another application");
+      if (applicationId !== 0 && applicationId !== APPLICATION_ID)
+        throw new Error("Database belongs to another application");
       if (version > SCHEMA_VERSION) throw new Error("Gateway database requires a newer MaybeClaw version");
       if (version !== 0 && applicationId !== APPLICATION_ID) throw new Error("Invalid Gateway database identity");
       database.exec("PRAGMA journal_mode = WAL;");
       const store = new GatewayStore(resolved, database, lock);
-      if (version === 0) store.transaction(() => {
-        database!.exec(`CREATE TABLE records (
+      if (version === 0)
+        store.transaction(() => {
+          database!.exec(`CREATE TABLE records (
           collection TEXT NOT NULL,
           record_id TEXT NOT NULL,
           payload TEXT NOT NULL CHECK(json_valid(payload)),
@@ -50,11 +57,15 @@ export class GatewayStore {
         ) STRICT;
         PRAGMA application_id = ${APPLICATION_ID};
         PRAGMA user_version = ${SCHEMA_VERSION};`);
-      });
+        });
       database.prepare("SELECT collection, record_id, payload FROM records LIMIT 0").all();
       return store;
     } catch (error) {
-      try { database?.close(); } finally { lock.release(); }
+      try {
+        database?.close();
+      } finally {
+        lock.release();
+      }
       throw error;
     }
   }
@@ -63,21 +74,27 @@ export class GatewayStore {
     this.assertOpen();
     validateCollection(collection);
     validateKey(id);
-    const row = this.database.prepare("SELECT payload FROM records WHERE collection = ? AND record_id = ?").get(collection, id);
-    return row === undefined ? undefined : JSON.parse(String(row.payload)) as T;
+    const row = this.database
+      .prepare("SELECT payload FROM records WHERE collection = ? AND record_id = ?")
+      .get(collection, id);
+    return row === undefined ? undefined : (JSON.parse(String(row.payload)) as T);
   }
 
   list<T>(collection: string): T[] {
     this.assertOpen();
     validateCollection(collection);
-    return this.database.prepare("SELECT payload FROM records WHERE collection = ? ORDER BY rowid").all(collection)
+    return this.database
+      .prepare("SELECT payload FROM records WHERE collection = ? ORDER BY rowid")
+      .all(collection)
       .map((row) => JSON.parse(String(row.payload)) as T);
   }
 
   entries<T>(collection: string): { id: string; value: T }[] {
     this.assertOpen();
     validateCollection(collection);
-    return this.database.prepare("SELECT record_id, payload FROM records WHERE collection = ? ORDER BY rowid").all(collection)
+    return this.database
+      .prepare("SELECT record_id, payload FROM records WHERE collection = ? ORDER BY rowid")
+      .all(collection)
       .map((row) => ({ id: String(row.record_id), value: JSON.parse(String(row.payload)) as T }));
   }
 
@@ -87,7 +104,10 @@ export class GatewayStore {
     validateKey(id);
     const payload = JSON.stringify(value);
     if (payload === undefined) throw new Error("Gateway records require JSON values");
-    this.database.prepare("INSERT INTO records(collection, record_id, payload) VALUES (?, ?, ?) ON CONFLICT(collection, record_id) DO UPDATE SET payload = excluded.payload")
+    this.database
+      .prepare(
+        "INSERT INTO records(collection, record_id, payload) VALUES (?, ?, ?) ON CONFLICT(collection, record_id) DO UPDATE SET payload = excluded.payload",
+      )
       .run(collection, id, payload);
   }
 
@@ -134,9 +154,11 @@ export class GatewayStore {
 }
 
 function validateCollection(collection: string): void {
-  if (typeof collection !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u.test(collection)) throw new Error("Invalid Gateway collection name");
+  if (typeof collection !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u.test(collection))
+    throw new Error("Invalid Gateway collection name");
 }
 
 function validateKey(id: string): void {
-  if (typeof id !== "string" || id.length === 0 || id.length > 512 || /[\u0000-\u001f\u007f]/u.test(id)) throw new Error("Invalid Gateway record ID");
+  if (typeof id !== "string" || id.length === 0 || id.length > 512 || /[\u0000-\u001f\u007f]/u.test(id))
+    throw new Error("Invalid Gateway record ID");
 }

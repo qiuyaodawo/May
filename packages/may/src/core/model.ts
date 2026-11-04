@@ -1,9 +1,4 @@
-import type {
-  AssistantMessage,
-  JsonSchema,
-  Message,
-  Usage,
-} from "./types.js";
+import type { AssistantMessage, JsonSchema, Message, Usage } from "./types.js";
 import type { ContextSnapshot } from "./context.js";
 import type { SerializedError } from "./events.js";
 import type { TraceContext } from "./tracing.js";
@@ -42,7 +37,12 @@ export interface ModelContextCompactor {
   readonly name: string;
   compact(
     snapshot: Readonly<ContextSnapshot>,
-    options: { readonly signal?: AbortSignal; readonly runId?: string; readonly step?: number; readonly recordRequest?: import("./request-recording.js").ModelRequestRecorder },
+    options: {
+      readonly signal?: AbortSignal;
+      readonly runId?: string;
+      readonly step?: number;
+      readonly recordRequest?: import("./request-recording.js").ModelRequestRecorder;
+    },
   ): Promise<ModelContextCompactionResult>;
 }
 
@@ -90,8 +90,5 @@ export interface Model {
   /** Optional provider-native context compaction capability. */
   readonly contextCompactor?: ModelContextCompactor | undefined;
   preflight?(request: ModelRequest, options: ModelStreamOptions): Promise<void>;
-  stream(
-    request: ModelRequest,
-    options: ModelStreamOptions,
-  ): AsyncIterable<ModelEvent>;
+  stream(request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent>;
 }

@@ -5,11 +5,23 @@ import { parseMaybeCodeSlashCommand, matchMaybeCodeSlashCommands } from "../dist
 
 test("goal command registration and budget arguments preserve the objective", () => {
   assert.equal(parseMaybeCodeSlashCommand("/goal pause").definition.name, "/goal");
-  assert.deepEqual(matchMaybeCodeSlashCommands("/go").map(value => value.value), ["/goal"]);
+  assert.deepEqual(
+    matchMaybeCodeSlashCommands("/go").map((value) => value.value),
+    ["/goal"],
+  );
   assert.deepEqual(parseGoalStart(["检查", "README.md"]), { objective: "检查 README.md", budget: {} });
   assert.deepEqual(parseGoalStart(["--tokens", "20000", "--max-runs", "4", "--", "检查", "README.md"]), {
-    objective: "检查 README.md", budget: { maxTotalTokens: 20000, maxRuns: 4 },
+    objective: "检查 README.md",
+    budget: { maxTotalTokens: 20000, maxRuns: 4 },
   });
-  for (const args of [[], ["--tokens"], ["--tokens", "0", "task"], ["--tokens", "1.5", "task"], ["--other", "1", "task"], ["--max-runs", "2", "--max-runs", "3", "task"]]) assert.throws(() => parseGoalStart(args));
+  for (const args of [
+    [],
+    ["--tokens"],
+    ["--tokens", "0", "task"],
+    ["--tokens", "1.5", "task"],
+    ["--other", "1", "task"],
+    ["--max-runs", "2", "--max-runs", "3", "task"],
+  ])
+    assert.throws(() => parseGoalStart(args));
   assert.equal(formatGoal(undefined), "No goal has been created.");
 });

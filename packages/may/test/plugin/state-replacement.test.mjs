@@ -8,24 +8,31 @@ import { definePlugin, defineService, PluginHost } from "@sortedyuan/may/plugin"
 
 const deferred = () => {
   let resolve;
-  const promise = new Promise(done => { resolve = done; });
+  const promise = new Promise((done) => {
+    resolve = done;
+  });
   return { promise, resolve };
 };
 
 for (const scope of ["application", "session"]) {
   for (const method of ["set", "update"]) {
-    test(`${scope} 插件替换保留正在保存的 ${method} 状态更新`, async t => {
+    test(`${scope} 插件替换保留正在保存的 ${method} 状态更新`, async (t) => {
       const writing = deferred();
       const release = deferred();
       let disposed = 0;
       let saveTail = Promise.resolve();
       const service = defineService({ id: "verification.state", version: "1.0.0", scope });
       const plugin = definePlugin({
-        id: "verification.state", version: "1.0.0", scope, provides: [service],
+        id: "verification.state",
+        version: "1.0.0",
+        scope,
+        provides: [service],
         state: { version: 1, initial: { count: 0 } },
         setup(context) {
           context.provide(service, context.state);
-          return () => { disposed++; };
+          return () => {
+            disposed++;
+          };
         },
       });
       const host = await PluginHost.create({ plugins: [plugin] });
@@ -48,10 +55,13 @@ for (const scope of ["application", "session"]) {
           return result;
         },
       };
-      const application = await host.createScope("application", scope === "application" ? scopeOptions : { id: "application" });
+      const application = await host.createScope(
+        "application",
+        scope === "application" ? scopeOptions : { id: "application" },
+      );
       const owner = scope === "application" ? application : await application.createScope("session", scopeOptions);
       const state = owner.get(service);
-      const update = method === "set" ? state.set({ count: 1 }) : state.update(value => ({ count: value.count + 1 }));
+      const update = method === "set" ? state.set({ count: 1 }) : state.update((value) => ({ count: value.count + 1 }));
       await writing.promise;
       const replacing = application.replacePlugins([plugin]);
       await setImmediate();
@@ -66,17 +76,24 @@ for (const scope of ["application", "session"]) {
   }
 }
 
-test("插件替换等待活动操作完成状态写入", async t => {
+test("插件替换等待活动操作完成状态写入", async (t) => {
   const entered = deferred();
   const release = deferred();
   const service = defineService({ id: "verification.active-state", version: "1.0.0", scope: "application" });
   const plugin = definePlugin({
-    id: "verification.active-state", version: "1.0.0", provides: [service],
+    id: "verification.active-state",
+    version: "1.0.0",
+    provides: [service],
     state: { version: 1, initial: { count: 0 } },
-    setup(context) { context.provide(service, context.state); },
+    setup(context) {
+      context.provide(service, context.state);
+    },
   });
   const host = await PluginHost.create({ plugins: [plugin] });
-  t.after(async () => { release.resolve(); await host.close(); });
+  t.after(async () => {
+    release.resolve();
+    await host.close();
+  });
   const application = await host.createScope("application", { id: "application" });
   const state = application.get(service);
   const operation = application.use(async () => {
@@ -92,28 +109,34 @@ test("插件替换等待活动操作完成状态写入", async t => {
   assert.deepEqual(application.get(service).get(), { count: 1 });
 });
 
-test("替换插件的 setup 能够更新已经保存的状态", async t => {
+test("替换插件的 setup 能够更新已经保存的状态", async (t) => {
   const entered = deferred();
   const release = deferred();
   const service = defineService({ id: "verification.setup-state", version: "1.0.0", scope: "application" });
   const plugin = definePlugin({
-    id: "verification.setup-state", version: "1.0.0", provides: [service], config: { increment: 0 },
+    id: "verification.setup-state",
+    version: "1.0.0",
+    provides: [service],
+    config: { increment: 0 },
     state: { version: 1, initial: { count: 0 } },
     async setup(context) {
-      await context.state.update(value => ({ count: value.count + context.config.increment }));
+      await context.state.update((value) => ({ count: value.count + context.config.increment }));
       context.provide(service, context.state);
     },
   });
   const host = await PluginHost.create({ plugins: [plugin] });
-  t.after(async () => { release.resolve(); await host.close(); });
+  t.after(async () => {
+    release.resolve();
+    await host.close();
+  });
   const application = await host.createScope("application", { id: "application" });
-  const updating = application.get(service).update(async value => {
+  const updating = application.get(service).update(async (value) => {
     entered.resolve();
     await release.promise;
     return { count: value.count + 1 };
   });
   await entered.promise;
-  const queued = application.get(service).update(value => ({ count: value.count + 1 }));
+  const queued = application.get(service).update((value) => ({ count: value.count + 1 }));
   const replacing = application.replacePlugins([{ ...plugin, config: { increment: 5 } }]);
   await setImmediate();
   release.resolve();
@@ -121,26 +144,36 @@ test("替换插件的 setup 能够更新已经保存的状态", async t => {
   assert.deepEqual(application.get(service).get(), { count: 7 });
 });
 
-test("插件关闭等待已经接受的状态保存完成后清理资源", async t => {
+test("插件关闭等待已经接受的状态保存完成后清理资源", async (t) => {
   const writing = deferred();
   const release = deferred();
   let savedAtCleanup;
   const service = defineService({ id: "verification.closing-state", version: "1.0.0", scope: "application" });
   const plugin = definePlugin({
-    id: "verification.closing-state", version: "1.0.0", provides: [service],
+    id: "verification.closing-state",
+    version: "1.0.0",
+    provides: [service],
     state: { version: 1, initial: { count: 0 } },
     setup(context) {
       context.provide(service, context.state);
-      return async () => { savedAtCleanup = JSON.parse(await readFile(file, "utf8"))[plugin.id].value; };
+      return async () => {
+        savedAtCleanup = JSON.parse(await readFile(file, "utf8"))[plugin.id].value;
+      };
     },
   });
   const host = await PluginHost.create({ plugins: [plugin] });
-  t.after(async () => { release.resolve(); await host.close(); });
+  t.after(async () => {
+    release.resolve();
+    await host.close();
+  });
   const file = join(await createTestDirectory(t, "may/state-close"), "state.json");
   const application = await host.createScope("application", {
     id: "application",
     async onStateChange(snapshot) {
-      if (snapshot[plugin.id].value.count === 1) { writing.resolve(); await release.promise; }
+      if (snapshot[plugin.id].value.count === 1) {
+        writing.resolve();
+        await release.promise;
+      }
       await writeFile(file, JSON.stringify(snapshot));
     },
   });

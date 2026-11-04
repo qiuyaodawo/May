@@ -53,10 +53,7 @@ export class ToolRegistry implements Iterable<Tool> {
     const incomingNames = new Set<string>();
 
     for (const registration of additions) {
-      if (
-        this.byName.has(registration.name) ||
-        incomingNames.has(registration.name)
-      ) {
+      if (this.byName.has(registration.name) || incomingNames.has(registration.name)) {
         throw new DuplicateToolNameError(registration.name);
       }
       incomingNames.add(registration.name);
@@ -111,22 +108,25 @@ export class ToolRegistry implements Iterable<Tool> {
 
   /** Capture definitions and callbacks for one Run, independent of later catalog edits. */
   snapshot(): ToolRegistry {
-    return new ToolRegistry(this.values().map((tool) => {
-      const execute = tool.execute;
-      const parse = tool.parse;
-      const resultContent = tool.resultContent;
-      return Object.freeze({
-        ...tool,
-        name: tool.name,
-        description: tool.description,
-        ...omitUndefined({ permissionVersion: tool.permissionVersion, workspaceEffect: tool.workspaceEffect }),
-        inputSchema: freezeTree(structuredClone(tool.inputSchema)),
-        ...(parse === undefined ? {} : { parse: (input: unknown) => parse.call(tool, input) }),
-        ...(resultContent === undefined ? {} : { resultContent: (output: unknown) => resultContent.call(tool, output) }),
-        execute: (input: unknown, context: Parameters<Tool["execute"]>[1]) =>
-          execute.call(tool, input, context),
-      });
-    }));
+    return new ToolRegistry(
+      this.values().map((tool) => {
+        const execute = tool.execute;
+        const parse = tool.parse;
+        const resultContent = tool.resultContent;
+        return Object.freeze({
+          ...tool,
+          name: tool.name,
+          description: tool.description,
+          ...omitUndefined({ permissionVersion: tool.permissionVersion, workspaceEffect: tool.workspaceEffect }),
+          inputSchema: freezeTree(structuredClone(tool.inputSchema)),
+          ...(parse === undefined ? {} : { parse: (input: unknown) => parse.call(tool, input) }),
+          ...(resultContent === undefined
+            ? {}
+            : { resultContent: (output: unknown) => resultContent.call(tool, output) }),
+          execute: (input: unknown, context: Parameters<Tool["execute"]>[1]) => execute.call(tool, input, context),
+        });
+      }),
+    );
   }
 
   clone(): ToolRegistry {
@@ -160,11 +160,7 @@ function validateTool(tool: Tool): void {
   if (tool.workspaceEffect !== undefined && tool.workspaceEffect !== "read" && tool.workspaceEffect !== "write") {
     throw new TypeError("tool workspaceEffect must be read or write");
   }
-  if (
-    typeof tool.inputSchema !== "object" ||
-    tool.inputSchema === null ||
-    Array.isArray(tool.inputSchema)
-  ) {
+  if (typeof tool.inputSchema !== "object" || tool.inputSchema === null || Array.isArray(tool.inputSchema)) {
     throw new TypeError("tool inputSchema must be an object");
   }
   if (tool.permissionVersion !== undefined && typeof tool.permissionVersion !== "string") {
@@ -208,9 +204,7 @@ function assertRegistrationUnchanged(registration: RegisteredTool): void {
     tool.permissionVersion !== registration.permissionVersion ||
     tool.workspaceEffect !== registration.workspaceEffect
   ) {
-    throw new TypeError(
-      `Tool "${registration.name}" changed after it was registered`,
-    );
+    throw new TypeError(`Tool "${registration.name}" changed after it was registered`);
   }
 }
 

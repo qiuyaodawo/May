@@ -19,45 +19,49 @@ async function collect(iterable) {
 function sseResponse(values, options = {}) {
   const lineBreak = options.lineBreak ?? "\n";
   const source = values
-    .map((value) =>
-      `data: ${typeof value === "string" ? value : JSON.stringify(value)}` +
-      lineBreak + lineBreak
-    )
+    .map((value) => `data: ${typeof value === "string" ? value : JSON.stringify(value)}` + lineBreak + lineBreak)
     .join("");
   const bytes = new TextEncoder().encode(source);
   const chunkSize = options.chunkSize ?? bytes.length;
 
-  return new Response(new ReadableStream({
-    start(controller) {
-      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-        controller.enqueue(bytes.slice(offset, offset + chunkSize));
-      }
-      controller.close();
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+          controller.enqueue(bytes.slice(offset, offset + chunkSize));
+        }
+        controller.close();
+      },
+    }),
+    {
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
     },
-  }), {
-    status: 200,
-    headers: { "content-type": "text/event-stream" },
-  });
+  );
 }
 
 function completionChunks({ reasoning = "", text = "", usage = true } = {}) {
   const chunks = [];
   if (reasoning) {
     chunks.push({
-      choices: [{
-        index: 0,
-        delta: { reasoning_content: reasoning },
-        finish_reason: null,
-      }],
+      choices: [
+        {
+          index: 0,
+          delta: { reasoning_content: reasoning },
+          finish_reason: null,
+        },
+      ],
     });
   }
   if (text) {
     chunks.push({
-      choices: [{
-        index: 0,
-        delta: { content: text },
-        finish_reason: null,
-      }],
+      choices: [
+        {
+          index: 0,
+          delta: { content: text },
+          finish_reason: null,
+        },
+      ],
     });
   }
   chunks.push({
@@ -83,10 +87,7 @@ test("streams reasoning, text, usage, and sends Zhipu configuration", async () =
   const fetch = async (url, init) => {
     capturedUrl = url;
     capturedInit = init;
-    return sseResponse(
-      completionChunks({ reasoning: "Think.", text: "Answer." }),
-      { lineBreak: "\r\n", chunkSize: 7 },
-    );
+    return sseResponse(completionChunks({ reasoning: "Think.", text: "Answer." }), { lineBreak: "\r\n", chunkSize: 7 });
   };
   const model = new ZhipuModel({
     apiKey: "secret",
@@ -100,9 +101,11 @@ test("streams reasoning, text, usage, and sends Zhipu configuration", async () =
   });
   const controller = new AbortController();
 
-  const events = await collect(model.stream(emptyRequest, {
-    signal: controller.signal,
-  }));
+  const events = await collect(
+    model.stream(emptyRequest, {
+      signal: controller.signal,
+    }),
+  );
 
   assert.equal(capturedUrl, "https://example.test/chat/completions");
   assert.equal(capturedInit.method, "POST");
@@ -145,47 +148,59 @@ test("round-trips reasoning_content through a May tool-call loop", async () => {
   const responses = [
     sseResponse([
       {
-        choices: [{
-          index: 0,
-          delta: { reasoning_content: "I need the add tool." },
-          finish_reason: null,
-        }],
+        choices: [
+          {
+            index: 0,
+            delta: { reasoning_content: "I need the add tool." },
+            finish_reason: null,
+          },
+        ],
       },
       {
-        choices: [{
-          index: 0,
-          delta: {
-            tool_calls: [{
-              index: 0,
-              id: "call_add",
-              type: "function",
-              function: { name: "add", arguments: "{\"a\":2" },
-            }],
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "call_add",
+                  type: "function",
+                  function: { name: "add", arguments: '{"a":2' },
+                },
+              ],
+            },
+            finish_reason: null,
           },
-          finish_reason: null,
-        }],
+        ],
       },
       {
-        choices: [{
-          index: 0,
-          delta: {
-            tool_calls: [{
-              index: 0,
-              function: { arguments: ",\"b\":3}" },
-            }],
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  function: { arguments: ',"b":3}' },
+                },
+              ],
+            },
+            finish_reason: null,
           },
-          finish_reason: null,
-        }],
+        ],
       },
       {
         choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
       },
       "[DONE]",
     ]),
-    sseResponse(completionChunks({
-      reasoning: "The tool returned five.",
-      text: "2 + 3 = 5",
-    })),
+    sseResponse(
+      completionChunks({
+        reasoning: "The tool returned five.",
+        text: "2 + 3 = 5",
+      }),
+    ),
   ];
   const fetch = async (_url, init) => {
     requests.push(JSON.parse(init.body));
@@ -221,10 +236,7 @@ test("round-trips reasoning_content through a May tool-call loop", async () => {
   const events = await eventPromise;
 
   assert.equal(result.steps, 2);
-  assert.equal(
-    result.message.content.find((part) => part.type === "text").text,
-    "2 + 3 = 5",
-  );
+  assert.equal(result.message.content.find((part) => part.type === "text").text, "2 + 3 = 5");
   assert.equal(requests.length, 2);
   assert.deepEqual(requests[0].tools[0], {
     type: "function",
@@ -241,38 +253,41 @@ test("round-trips reasoning_content through a May tool-call loop", async () => {
   });
 
   const secondMessages = requests[1].messages;
-  assert.deepEqual(secondMessages.map((message) => message.role), [
-    "user",
-    "assistant",
-    "tool",
-  ]);
+  assert.deepEqual(
+    secondMessages.map((message) => message.role),
+    ["user", "assistant", "tool"],
+  );
   assert.equal(secondMessages[1].reasoning_content, "I need the add tool.");
   assert.equal(secondMessages[1].content, "");
-  assert.deepEqual(secondMessages[1].tool_calls, [{
-    id: "call_add",
-    type: "function",
-    function: { name: "add", arguments: "{\"a\":2,\"b\":3}" },
-  }]);
+  assert.deepEqual(secondMessages[1].tool_calls, [
+    {
+      id: "call_add",
+      type: "function",
+      function: { name: "add", arguments: '{"a":2,"b":3}' },
+    },
+  ]);
   assert.equal(secondMessages[2].tool_call_id, "call_add");
   assert.equal(secondMessages[2].content, "5");
   assert.deepEqual(
-    events
-      .filter((event) => event.type === "model.reasoning.delta")
-      .map((event) => event.delta),
+    events.filter((event) => event.type === "model.reasoning.delta").map((event) => event.delta),
     ["I need the add tool.", "The tool returned five."],
   );
 });
 
 test("surfaces structured Zhipu HTTP errors", async () => {
-  const fetch = async () => new Response(JSON.stringify({
-    error: {
-      message: "Authentication failed",
-      code: 1002,
-    },
-  }), {
-    status: 401,
-    headers: { "content-type": "application/json" },
-  });
+  const fetch = async () =>
+    new Response(
+      JSON.stringify({
+        error: {
+          message: "Authentication failed",
+          code: 1002,
+        },
+      }),
+      {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      },
+    );
   const model = new ZhipuModel({
     apiKey: "bad",
     model: "model",
@@ -280,9 +295,11 @@ test("surfaces structured Zhipu HTTP errors", async () => {
   });
 
   await assert.rejects(
-    collect(model.stream(emptyRequest, {
-      signal: new AbortController().signal,
-    })),
+    collect(
+      model.stream(emptyRequest, {
+        signal: new AbortController().signal,
+      }),
+    ),
     (error) => {
       assert.ok(error instanceof OpenAICompatibleApiError);
       assert.equal(error.provider, "Zhipu");
@@ -316,9 +333,11 @@ test("passes AbortSignal to fetch and propagates cancellation", async () => {
     fetch,
   });
   const controller = new AbortController();
-  const collecting = collect(model.stream(emptyRequest, {
-    signal: controller.signal,
-  }));
+  const collecting = collect(
+    model.stream(emptyRequest, {
+      signal: controller.signal,
+    }),
+  );
 
   await started;
   const reason = new Error("stop request");
@@ -328,4 +347,3 @@ test("passes AbortSignal to fetch and propagates cancellation", async () => {
   assert.equal(receivedSignal, controller.signal);
   assert.equal(receivedSignal.reason, reason);
 });
-

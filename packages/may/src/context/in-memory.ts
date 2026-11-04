@@ -1,41 +1,26 @@
 import { jsonEqual, omitUndefined } from "../core/index.js";
-import type {
-  Context,
-  ContextSnapshot,
-  Message,
-  SnapshotOptions,
-} from "../core/index.js";
+import type { Context, ContextSnapshot, Message, SnapshotOptions } from "../core/index.js";
 
 import { SnapshotContextController } from "./controller.js";
 import { PruneOldToolResultsStrategy } from "./prune-old-tool-results.js";
-import type {
-  ContextFactory,
-  ContextFactoryOptions,
-  ManagedContext,
-} from "./factory.js";
+import type { ContextFactory, ContextFactoryOptions, ManagedContext } from "./factory.js";
 
 export class InMemoryContextFactory implements ContextFactory {
   create(options: ContextFactoryOptions): ManagedContext {
     const context = new ReplaceableInMemoryContext({
       ...omitUndefined({ instructionsSource: options.instructionsSource, instructions: options.instructions }),
-      ...(options.messages === undefined
-        ? {}
-        : { messages: [...options.messages] }),
-      ...(options.metadata === undefined
-        ? {}
-        : { metadata: { ...options.metadata } }),
+      ...(options.messages === undefined ? {} : { messages: [...options.messages] }),
+      ...(options.metadata === undefined ? {} : { metadata: { ...options.metadata } }),
     });
     const controller = new SnapshotContextController(context, {
-        ...omitUndefined({
-          budget: options.budget,
-          measurement: options.measurement,
-          autoCompactionStrategies: options.autoCompactionStrategies,
-        }),
-        compactionStrategy: options.compactionStrategy ??
-          new PruneOldToolResultsStrategy(),
-        replaceMessages: (messages, expectedMessages) =>
-          context.replaceMessages(messages, expectedMessages),
-      });
+      ...omitUndefined({
+        budget: options.budget,
+        measurement: options.measurement,
+        autoCompactionStrategies: options.autoCompactionStrategies,
+      }),
+      compactionStrategy: options.compactionStrategy ?? new PruneOldToolResultsStrategy(),
+      replaceMessages: (messages, expectedMessages) => context.replaceMessages(messages, expectedMessages),
+    });
     return {
       context: new ModelViewContext(context, controller),
       controller,
@@ -81,12 +66,8 @@ class ReplaceableInMemoryContext implements Context {
     const instructions = this.instructionsSource?.() ?? this.instructions;
     return {
       messages: structuredClone(this.messages),
-      ...(instructions === undefined
-        ? {}
-        : { instructions }),
-      ...(this.metadata === undefined
-        ? {}
-        : { metadata: structuredClone(this.metadata) }),
+      ...(instructions === undefined ? {} : { instructions }),
+      ...(this.metadata === undefined ? {} : { metadata: structuredClone(this.metadata) }),
     };
   }
 
@@ -94,10 +75,7 @@ class ReplaceableInMemoryContext implements Context {
     this.messages.push(...structuredClone(messages));
   }
 
-  replaceMessages(
-    messages: readonly Message[],
-    expectedMessages: readonly Message[],
-  ): boolean {
+  replaceMessages(messages: readonly Message[], expectedMessages: readonly Message[]): boolean {
     if (!jsonEqual(this.messages, expectedMessages)) {
       return false;
     }

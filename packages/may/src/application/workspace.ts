@@ -1,13 +1,12 @@
+import type { ContextCompactionResult, ContextCompactionStrategy, ContextInspection } from "../context/index.js";
+import { AsyncEventQueue, isStreamingMayEvent } from "../core/index.js";
 import type {
-  ContextCompactionResult,
-  ContextCompactionStrategy,
-  ContextInspection,
-} from "../context/index.js";
-import {
-  AsyncEventQueue,
-  isStreamingMayEvent,
-} from "../core/index.js";
-import type { ApprovalDecision, ApprovalResolveOptions, CreatePermissionRuleOptions, PermissionCheck, PersistentPermissionRule } from "../permissions/index.js";
+  ApprovalDecision,
+  ApprovalResolveOptions,
+  CreatePermissionRuleOptions,
+  PermissionCheck,
+  PersistentPermissionRule,
+} from "../permissions/index.js";
 import type {
   SessionEvent,
   SessionHistoryPage,
@@ -18,21 +17,10 @@ import type {
   SessionBranchPosition,
 } from "../session/index.js";
 import { readSessionBranchNode, readSessionBranchPositions } from "../session/index.js";
-import {
-  latestSession,
-  type SessionCatalog,
-  type SessionSummary,
-} from "../session/catalog.js";
+import { latestSession, type SessionCatalog, type SessionSummary } from "../session/catalog.js";
 
-import type {
-  AgentController,
-  AgentWorkspaceController,
-} from "./controller.js";
-import type {
-  AgentApplicationEvent,
-  AgentRun,
-  AgentWorkspaceEvent,
-} from "./events.js";
+import type { AgentController, AgentWorkspaceController } from "./controller.js";
+import type { AgentApplicationEvent, AgentRun, AgentWorkspaceEvent } from "./events.js";
 import { AsyncStateSerializer, omitUndefined } from "../core/index.js";
 
 export interface AgentApplicationSelection {
@@ -55,32 +43,25 @@ export type SessionSummaryFactory = (
 export interface AgentWorkspaceOptions<
   ApplicationEvent = AgentApplicationEvent,
   CompactionSelection = ContextCompactionStrategy,
-  Application extends AgentController<
+  Application extends AgentController<ApplicationEvent, CompactionSelection> = AgentController<
     ApplicationEvent,
     CompactionSelection
-  > = AgentController<ApplicationEvent, CompactionSelection>,
+  >,
 > {
   readonly workspace: string;
   readonly workspacePaths?: () => readonly string[] | Promise<readonly string[]>;
   readonly store: SessionStore;
   readonly catalog: SessionCatalog;
-  readonly openApplication: (
-    selection: AgentApplicationSelection,
-  ) => Application | Promise<Application>;
+  readonly openApplication: (selection: AgentApplicationSelection) => Application | Promise<Application>;
   readonly sessionId?: string;
   /** Resume the latest non-empty workspace session when no id is given. */
   readonly autoResume?: boolean;
   readonly summarizeSession?: SessionSummaryFactory;
   readonly now?: () => number;
-  readonly isDroppableEvent?: (
-    event: AgentWorkspaceEvent<ApplicationEvent, unknown>,
-  ) => boolean;
+  readonly isDroppableEvent?: (event: AgentWorkspaceEvent<ApplicationEvent, unknown>) => boolean;
 }
 
-export interface AgentApplicationTransitionOptions<
-  Application,
-  ExtensionEvent,
-> {
+export interface AgentApplicationTransitionOptions<Application, ExtensionEvent> {
   /** Defaults to true; model/config transitions should preserve the session. */
   readonly preserveSession?: boolean;
   readonly event?: ExtensionEvent;
@@ -105,20 +86,13 @@ export class AgentWorkspace<
   ExtensionEvent = never,
   CompactionSelection = ContextCompactionStrategy,
   Run extends AgentRun = AgentRun,
-  Application extends AgentController<
+  Application extends AgentController<ApplicationEvent, CompactionSelection, Run> = AgentController<
     ApplicationEvent,
     CompactionSelection,
     Run
-  > = AgentController<ApplicationEvent, CompactionSelection, Run>,
-> implements AgentWorkspaceController<
-    ApplicationEvent,
-    ExtensionEvent,
-    CompactionSelection,
-    Run
-  > {
-  readonly events: AsyncIterable<
-    AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>
-  >;
+  >,
+> implements AgentWorkspaceController<ApplicationEvent, ExtensionEvent, CompactionSelection, Run> {
+  readonly events: AsyncIterable<AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>>;
   private currentWorkspace: string;
 
   private readonly store: SessionStore;
@@ -131,9 +105,7 @@ export class AgentWorkspace<
   private readonly summarizeSession: SessionSummaryFactory;
   private readonly now: () => number;
   private readonly workspacePaths: (() => readonly string[] | Promise<readonly string[]>) | undefined;
-  private readonly eventQueue: AsyncEventQueue<
-    AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>
-  >;
+  private readonly eventQueue: AsyncEventQueue<AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>>;
   private readonly state = new AsyncStateSerializer();
   private application: Application;
   private eventRelay: Promise<void>;
@@ -141,11 +113,7 @@ export class AgentWorkspace<
   private closed = false;
 
   private constructor(
-    options: AgentWorkspaceOptions<
-      ApplicationEvent,
-      CompactionSelection,
-      Application
-    >,
+    options: AgentWorkspaceOptions<ApplicationEvent, CompactionSelection, Application>,
     application: Application,
     resumed: boolean,
   ) {
@@ -158,10 +126,7 @@ export class AgentWorkspace<
     this.currentWorkspace = options.workspace;
     this.eventQueue = new AsyncEventQueue({
       maxBufferedValues: 1024,
-      isDroppable: (value) => isDroppableWorkspaceEvent(
-        value,
-        options.isDroppableEvent,
-      ),
+      isDroppable: (value) => isDroppableWorkspaceEvent(value, options.isDroppableEvent),
     });
     this.events = this.eventQueue;
     this.application = application;
@@ -178,24 +143,14 @@ export class AgentWorkspace<
     ExtensionEvent = never,
     CompactionSelection = ContextCompactionStrategy,
     Run extends AgentRun = AgentRun,
-    Application extends AgentController<
+    Application extends AgentController<ApplicationEvent, CompactionSelection, Run> = AgentController<
       ApplicationEvent,
       CompactionSelection,
       Run
-    > = AgentController<ApplicationEvent, CompactionSelection, Run>,
-  >(
-    options: AgentWorkspaceOptions<
-      ApplicationEvent,
-      CompactionSelection,
-      Application
     >,
-  ): Promise<AgentWorkspace<
-    ApplicationEvent,
-    ExtensionEvent,
-    CompactionSelection,
-    Run,
-    Application
-  >> {
+  >(
+    options: AgentWorkspaceOptions<ApplicationEvent, CompactionSelection, Application>,
+  ): Promise<AgentWorkspace<ApplicationEvent, ExtensionEvent, CompactionSelection, Run, Application>> {
     let sessionId = options.sessionId;
     if (sessionId === undefined && options.autoResume === true) {
       sessionId = (await latestSession(options.catalog, options.workspace))?.id;
@@ -205,32 +160,37 @@ export class AgentWorkspace<
     }
 
     const resumed = sessionId !== undefined;
-    const paths = new Set([options.workspace, ...(await options.workspacePaths?.() ?? [])]);
-    const summaries = sessionId === undefined ? [] : (await Promise.all([...paths].map((path) => options.catalog.list(path)))).flat();
+    const paths = new Set([options.workspace, ...((await options.workspacePaths?.()) ?? [])]);
+    const summaries =
+      sessionId === undefined ? [] : (await Promise.all([...paths].map((path) => options.catalog.list(path)))).flat();
     const selectedWorkspace = summaries.find((summary) => summary.id === sessionId)?.workspace ?? options.workspace;
-    const application = await options.openApplication(omitUndefined({
-      sessionId,
-      resume: resumed,
-      workspace: selectedWorkspace,
-    }));
+    const application = await options.openApplication(
+      omitUndefined({
+        sessionId,
+        resume: resumed,
+        workspace: selectedWorkspace,
+      }),
+    );
     if (sessionId !== undefined && application.sessionId !== sessionId) {
       await application.close();
-      throw new Error(
-        `Application resumed unexpected session "${application.sessionId}"; expected "${sessionId}"`,
-      );
+      throw new Error(`Application resumed unexpected session "${application.sessionId}"; expected "${sessionId}"`);
     }
-    const workspace = new AgentWorkspace<
-      ApplicationEvent,
-      ExtensionEvent,
-      CompactionSelection,
-      Run,
-      Application
-    >(options, application, resumed);
+    const workspace = new AgentWorkspace<ApplicationEvent, ExtensionEvent, CompactionSelection, Run, Application>(
+      options,
+      application,
+      resumed,
+    );
     workspace.currentWorkspace = selectedWorkspace;
-    try { await workspace.recordCurrentSession(); }
-    catch (error) {
-      try { await workspace.close(); }
-      catch (cleanupError) { throw new AggregateError([error, cleanupError], "Session catalog recording and workspace cleanup failed", { cause: error }); }
+    try {
+      await workspace.recordCurrentSession();
+    } catch (error) {
+      try {
+        await workspace.close();
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], "Session catalog recording and workspace cleanup failed", {
+          cause: error,
+        });
+      }
       throw error;
     }
     return workspace;
@@ -279,7 +239,9 @@ export class AgentWorkspace<
     });
   }
 
-  listRecoveries() { return this.application.listRecoveries(); }
+  listRecoveries() {
+    return this.application.listRecoveries();
+  }
 
   resolveRecovery(id: string, finding: string): Promise<void> {
     return this.state.run(async () => {
@@ -294,36 +256,39 @@ export class AgentWorkspace<
     return this.application.cancel(reason);
   }
 
-  resolveApproval(
-    requestId: string,
-    decision: ApprovalDecision,
-    options?: ApprovalResolveOptions,
-  ): Promise<boolean> {
+  resolveApproval(requestId: string, decision: ApprovalDecision, options?: ApprovalResolveOptions): Promise<boolean> {
     this.throwIfClosed();
     return this.application.resolveApproval(requestId, decision, options);
   }
 
   listPermissionRules(scopeId?: string): Promise<readonly PersistentPermissionRule[]> {
     this.throwIfClosed();
-    if (this.application.listPermissionRules === undefined) throw new Error("Application does not support permission rules");
+    if (this.application.listPermissionRules === undefined)
+      throw new Error("Application does not support permission rules");
     return this.application.listPermissionRules(scopeId);
   }
 
-  createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule> {
+  createPermissionRule(
+    check: PermissionCheck,
+    options: CreatePermissionRuleOptions,
+  ): Promise<PersistentPermissionRule> {
     this.throwIfClosed();
-    if (this.application.createPermissionRule === undefined) throw new Error("Application does not support permission rules");
+    if (this.application.createPermissionRule === undefined)
+      throw new Error("Application does not support permission rules");
     return this.application.createPermissionRule(check, options);
   }
 
   createPermissionRuleFrom(sourceId: string, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule> {
     this.throwIfClosed();
-    if (this.application.createPermissionRuleFrom === undefined) throw new Error("Application does not support permission rule range reuse");
+    if (this.application.createPermissionRuleFrom === undefined)
+      throw new Error("Application does not support permission rule range reuse");
     return this.application.createPermissionRuleFrom(sourceId, options);
   }
 
   revokePermissionRule(id: string): Promise<boolean> {
     this.throwIfClosed();
-    if (this.application.revokePermissionRule === undefined) throw new Error("Application does not support permission rules");
+    if (this.application.revokePermissionRule === undefined)
+      throw new Error("Application does not support permission rules");
     return this.application.revokePermissionRule(id);
   }
 
@@ -335,7 +300,7 @@ export class AgentWorkspace<
   readSessionHistory(sessionId: string): Promise<readonly SessionEvent[]> {
     this.throwIfClosed();
     return this.state.run(async () => {
-      const known = (await this.listFamilySessions()).some(session => session.id === sessionId);
+      const known = (await this.listFamilySessions()).some((session) => session.id === sessionId);
       if (!known) throw new Error("Session does not belong to this workspace");
       if (!this.store.inspect) throw new Error("Session store does not support read-only inspection");
       return this.store.inspect(sessionId);
@@ -362,26 +327,64 @@ export class AgentWorkspace<
       const known = (await this.listFamilySessions()).some((session) => session.id === sourceId);
       if (!known) throw new Error("Source Session does not belong to this workspace");
       if (this.store.inspect === undefined) throw new Error("Session forking requires read-only store inspection");
-      const position = readSessionBranchPositions(await this.store.inspect(sourceId)).find((value) => value.positionSeq === positionSeq);
-      if (position === undefined || !position.available) throw new Error(position?.reason ?? "Selected history position has no recoverable state");
-      const next = await this.openApplication(omitUndefined({ resume: false, fork: { sessionId: sourceId, positionSeq },
-        workspace: options.workspace ?? this.workspace, metadata: options.metadata }));
-      if (next.sessionId === sourceId) { await next.close(); throw new Error("Forked Session must have an independent identity"); }
-      const forked = (await next.history())[0];
-      if (forked?.type !== "session.created" || forked.fork?.sessionId !== sourceId || forked.fork.positionSeq !== positionSeq) {
-        await next.close(); throw new Error("Application did not restore the selected Session branch position");
+      const position = readSessionBranchPositions(await this.store.inspect(sourceId)).find(
+        (value) => value.positionSeq === positionSeq,
+      );
+      if (position === undefined || !position.available)
+        throw new Error(position?.reason ?? "Selected history position has no recoverable state");
+      const next = await this.openApplication(
+        omitUndefined({
+          resume: false,
+          fork: { sessionId: sourceId, positionSeq },
+          workspace: options.workspace ?? this.workspace,
+          metadata: options.metadata,
+        }),
+      );
+      if (next.sessionId === sourceId) {
+        await next.close();
+        throw new Error("Forked Session must have an independent identity");
       }
-      try { await this.recordCurrentSession(next, options.workspace ?? this.workspace); }
-      catch (error) {
-        try { await next.close(); }
-        catch (cleanupError) { throw new AggregateError([error, cleanupError], `Forked Session "${next.sessionId}" catalog persistence and cleanup failed`, { cause: error }); }
-        throw new Error(`Forked Session "${next.sessionId}" could not be recorded in the catalog; its history is preserved`, { cause: error });
+      const forked = (await next.history())[0];
+      if (
+        forked?.type !== "session.created" ||
+        forked.fork?.sessionId !== sourceId ||
+        forked.fork.positionSeq !== positionSeq
+      ) {
+        await next.close();
+        throw new Error("Application did not restore the selected Session branch position");
+      }
+      try {
+        await this.recordCurrentSession(next, options.workspace ?? this.workspace);
+      } catch (error) {
+        try {
+          await next.close();
+        } catch (cleanupError) {
+          throw new AggregateError(
+            [error, cleanupError],
+            `Forked Session "${next.sessionId}" catalog persistence and cleanup failed`,
+            { cause: error },
+          );
+        }
+        throw new Error(
+          `Forked Session "${next.sessionId}" could not be recorded in the catalog; its history is preserved`,
+          { cause: error },
+        );
       }
       const previousWorkspace = this.currentWorkspace;
       this.currentWorkspace = options.workspace ?? this.currentWorkspace;
-      try { await this.replaceApplication(next, false); }
-      catch (error) { this.currentWorkspace = previousWorkspace; throw error; }
-      this.eventQueue.push({ type: "session.forked", sessionId: next.sessionId, sourceId, positionSeq, workspace: this.workspace });
+      try {
+        await this.replaceApplication(next, false);
+      } catch (error) {
+        this.currentWorkspace = previousWorkspace;
+        throw error;
+      }
+      this.eventQueue.push({
+        type: "session.forked",
+        sessionId: next.sessionId,
+        sourceId,
+        positionSeq,
+        workspace: this.workspace,
+      });
       return next.sessionId;
     });
   }
@@ -404,14 +407,16 @@ export class AgentWorkspace<
       const next = await this.openApplication({ sessionId, resume: true, workspace: summary.workspace });
       if (next.sessionId !== sessionId) {
         await next.close();
-        throw new Error(
-          `Application resumed unexpected session "${next.sessionId}"; expected "${sessionId}"`,
-        );
+        throw new Error(`Application resumed unexpected session "${next.sessionId}"; expected "${sessionId}"`);
       }
       const previousWorkspace = this.currentWorkspace;
       this.currentWorkspace = summary.workspace;
-      try { await this.replaceApplication(next, true); }
-      catch (error) { this.currentWorkspace = previousWorkspace; throw error; }
+      try {
+        await this.replaceApplication(next, true);
+      } catch (error) {
+        this.currentWorkspace = previousWorkspace;
+        throw error;
+      }
     });
   }
 
@@ -425,7 +430,7 @@ export class AgentWorkspace<
         throw new Error("The active session catalog does not support renaming");
       }
       const summary = (await this.listFamilySessions()).find((session) => session.id === sessionId);
-      if (summary === undefined || !await rename.call(this.catalog, sessionId, summary.workspace, normalized)) {
+      if (summary === undefined || !(await rename.call(this.catalog, sessionId, summary.workspace, normalized))) {
         throw new Error(`Session "${sessionId}" does not exist`);
       }
     });
@@ -448,11 +453,7 @@ export class AgentWorkspace<
       const summary = (await this.listFamilySessions()).find((session) => session.id === sessionId);
       if (summary === undefined) return false;
       const historyRemoved = await removeHistory.call(this.store, sessionId);
-      const catalogRemoved = await removeCatalog.call(
-        this.catalog,
-        sessionId,
-        summary.workspace,
-      );
+      const catalogRemoved = await removeCatalog.call(this.catalog, sessionId, summary.workspace);
       return historyRemoved || catalogRemoved;
     });
   }
@@ -470,9 +471,7 @@ export class AgentWorkspace<
     return this.application.inspectContext();
   }
 
-  compactContext(
-    selection?: CompactionSelection,
-  ): Promise<ContextCompactionResult> {
+  compactContext(selection?: CompactionSelection): Promise<ContextCompactionResult> {
     return this.state.run(async () => {
       this.assertIdle("Cannot compact context while an operation is active");
       return this.application.compactContext(selection);
@@ -491,8 +490,7 @@ export class AgentWorkspace<
     return this.state.run(async () => {
       if (options.requireIdle !== false) {
         this.assertIdle(
-          options.activeOperationMessage ??
-            "Cannot change application state while an operation is active",
+          options.activeOperationMessage ?? "Cannot change application state while an operation is active",
         );
       }
       return operation(this.application);
@@ -517,14 +515,10 @@ export class AgentWorkspace<
       if (next === previous) {
         throw new Error("Application transition must return a new instance");
       }
-      if (
-        options.preserveSession !== false &&
-        next.sessionId !== previous.sessionId
-      ) {
+      if (options.preserveSession !== false && next.sessionId !== previous.sessionId) {
         await next.close();
         throw new Error(
-          `Application transition changed session from "${previous.sessionId}" ` +
-            `to "${next.sessionId}"`,
+          `Application transition changed session from "${previous.sessionId}" ` + `to "${next.sessionId}"`,
         );
       }
       await this.replaceApplication(next);
@@ -550,10 +544,7 @@ export class AgentWorkspace<
     this.eventQueue.close();
   }
 
-  private async replaceApplication(
-    next: Application,
-    resumed?: boolean,
-  ): Promise<void> {
+  private async replaceApplication(next: Application, resumed?: boolean): Promise<void> {
     try {
       await this.application.close();
       await this.eventRelay;
@@ -589,9 +580,11 @@ export class AgentWorkspace<
   }
 
   private async listFamilySessions(): Promise<readonly SessionSummary[]> {
-    const paths = new Set([this.workspace, ...(await this.workspacePaths?.() ?? [])]);
+    const paths = new Set([this.workspace, ...((await this.workspacePaths?.()) ?? [])]);
     const sessions = (await Promise.all([...paths].map((path) => this.catalog.list(path)))).flat();
-    return [...new Map(sessions.map((session) => [session.id, session])).values()].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+    return [...new Map(sessions.map((session) => [session.id, session])).values()].sort(
+      (a, b) => b.lastUsedAt - a.lastUsedAt,
+    );
   }
 
   private withSessionRecord(run: Run): Run {
@@ -601,8 +594,13 @@ export class AgentWorkspace<
         return value;
       },
       async (error: unknown) => {
-        try { await this.recordCurrentSession(); }
-        catch (recordError) { throw new AggregateError([error, recordError], "Run and session catalog recording both failed", { cause: error }); }
+        try {
+          await this.recordCurrentSession();
+        } catch (recordError) {
+          throw new AggregateError([error, recordError], "Run and session catalog recording both failed", {
+            cause: error,
+          });
+        }
         throw error;
       },
     );
@@ -641,14 +639,15 @@ export function summarizeSessionHistory(
     return text === "" ? [] : [text];
   });
   const firstInput = history.find((event) => event.type === "input.submitted");
-  const title = firstInput?.type === "input.submitted"
-    ? firstInput.message.content
-      .filter((part) => part.type === "text")
-      .map((part) => part.text)
-      .join("")
-      .replace(/\s+/gu, " ")
-      .trim()
-    : "";
+  const title =
+    firstInput?.type === "input.submitted"
+      ? firstInput.message.content
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("")
+          .replace(/\s+/gu, " ")
+          .trim()
+      : "";
   const preview = messages.at(-1);
   const turnCount = history.filter((event) => event.type === "input.submitted").length;
   return omitUndefined({
@@ -664,15 +663,15 @@ function truncate(value: string, limit: number): string {
 
 function isDroppableWorkspaceEvent<ApplicationEvent, ExtensionEvent>(
   value: AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>,
-  custom: ((
-    event: AgentWorkspaceEvent<ApplicationEvent, unknown>,
-  ) => boolean) | undefined,
+  custom: ((event: AgentWorkspaceEvent<ApplicationEvent, unknown>) => boolean) | undefined,
 ): boolean {
   if (custom !== undefined) return custom(value);
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as { type?: unknown; event?: unknown };
-  return candidate.type === "run.event" &&
+  return (
+    candidate.type === "run.event" &&
     typeof candidate.event === "object" &&
     candidate.event !== null &&
-    isStreamingMayEvent(candidate.event as import("../core/index.js").MayEvent);
+    isStreamingMayEvent(candidate.event as import("../core/index.js").MayEvent)
+  );
 }

@@ -1,18 +1,13 @@
 import { omitUndefined, type ContextSnapshot, type Message, type SystemMessage } from "../core/index.js";
 
-import type {
-  ContextCompactionOptions,
-  ContextCompactionStrategy,
-} from "./compaction.js";
+import type { ContextCompactionOptions, ContextCompactionStrategy } from "./compaction.js";
 
 export interface HistoryReferenceRequest {
   readonly snapshot: Readonly<ContextSnapshot>;
   readonly signal?: AbortSignal;
 }
 
-export type HistoryReferenceProvider = (
-  request: HistoryReferenceRequest,
-) => string | Promise<string>;
+export type HistoryReferenceProvider = (request: HistoryReferenceRequest) => string | Promise<string>;
 
 export interface HistoryReferenceOptions {
   readonly reference: string | HistoryReferenceProvider;
@@ -30,10 +25,7 @@ export class HistoryReferenceStrategy implements ContextCompactionStrategy {
       throw new Error("history reference cannot be empty");
     }
     this.reference = options.reference;
-    this.keepRecentTurns = positiveInteger(
-      options.keepRecentTurns ?? 1,
-      "keepRecentTurns",
-    );
+    this.keepRecentTurns = positiveInteger(options.keepRecentTurns ?? 1, "keepRecentTurns");
   }
 
   async compact(
@@ -42,20 +34,22 @@ export class HistoryReferenceStrategy implements ContextCompactionStrategy {
   ): Promise<readonly Message[]> {
     throwIfAborted(options.signal);
     const userIndexes = snapshot.messages
-      .map((message, index) => message.role === "user" ? index : undefined)
+      .map((message, index) => (message.role === "user" ? index : undefined))
       .filter((index): index is number => index !== undefined);
     if (userIndexes.length <= this.keepRecentTurns) return snapshot.messages;
 
     const boundary = userIndexes[userIndexes.length - this.keepRecentTurns]!;
-    const reference = (typeof this.reference === "string"
-      ? this.reference
-      : await this.reference({
-        snapshot: {
-          ...snapshot,
-          messages: [...snapshot.messages],
-        },
-        ...omitUndefined({ signal: options.signal }),
-      })).trim();
+    const reference = (
+      typeof this.reference === "string"
+        ? this.reference
+        : await this.reference({
+            snapshot: {
+              ...snapshot,
+              messages: [...snapshot.messages],
+            },
+            ...omitUndefined({ signal: options.signal }),
+          })
+    ).trim();
     throwIfAborted(options.signal);
     if (reference === "") throw new Error("history reference cannot be empty");
 
@@ -63,13 +57,8 @@ export class HistoryReferenceStrategy implements ContextCompactionStrategy {
       role: "system",
       content: [{ type: "text", text: reference }],
     };
-    const compacted: Message[] = [
-      referenceMessage,
-      ...snapshot.messages.slice(boundary),
-    ];
-    return serializedBytes(compacted) < serializedBytes(snapshot.messages)
-      ? compacted
-      : snapshot.messages;
+    const compacted: Message[] = [referenceMessage, ...snapshot.messages.slice(boundary)];
+    return serializedBytes(compacted) < serializedBytes(snapshot.messages) ? compacted : snapshot.messages;
   }
 }
 
@@ -86,11 +75,7 @@ function serializedBytes(messages: readonly Message[]): number {
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted !== true) return;
-  const error = new Error(
-    typeof signal.reason === "string"
-      ? signal.reason
-      : "History-reference compaction cancelled",
-  );
+  const error = new Error(typeof signal.reason === "string" ? signal.reason : "History-reference compaction cancelled");
   error.name = "AbortError";
   throw error;
 }

@@ -29,8 +29,13 @@ async function fixture(t, managed = false, options = {}) {
     await git("config", "user.name", "May integration test");
     await git("config", "user.email", "may-test@example.invalid");
   }
-  const manager = await ProjectGitWorkspace.open({ workspace, deferInitialization: true,
-    dataRoot: join(directory, "records"), worktreesRoot: join(directory, "worktrees"), ...options });
+  const manager = await ProjectGitWorkspace.open({
+    workspace,
+    deferInitialization: true,
+    dataRoot: join(directory, "records"),
+    worktreesRoot: join(directory, "worktrees"),
+    ...options,
+  });
   const request = new GitRequestController(manager);
   t.after(async () => {
     await request.close();
@@ -41,19 +46,28 @@ async function fixture(t, managed = false, options = {}) {
   });
   const tools = createCodingTools({ cwd: workspace });
   const execution = (name, input, signal = new AbortController().signal) => {
-    const tool = tools.find(value => value.name === name);
-    return { tool, input: tool.parse ? tool.parse(input) : input,
-      context: { runId: "run", step: 1, toolCallId: name, idempotencyKey: name, signal, report() {} } };
+    const tool = tools.find((value) => value.name === name);
+    return {
+      tool,
+      input: tool.parse ? tool.parse(input) : input,
+      context: { runId: "run", step: 1, toolCallId: name, idempotencyKey: name, signal, report() {} },
+    };
   };
-  const executor = new PermissionToolExecutor({ policy: () => "allow", executor: {
-    async execute(value) { await request.beforeToolExecute(value); return directToolExecutor.execute(value); },
-  } });
+  const executor = new PermissionToolExecutor({
+    policy: () => "allow",
+    executor: {
+      async execute(value) {
+        await request.beforeToolExecute(value);
+        return directToolExecutor.execute(value);
+      },
+    },
+  });
   t.after(() => executor.close());
   request.begin("session");
   return { directory, workspace, manager, request, git, execution, executor };
 }
 
-test("deferred discovery and read execution preserve an unmanaged directory", async t => {
+test("deferred discovery and read execution preserve an unmanaged directory", async (t) => {
   const f = await fixture(t);
   await writeFile(join(f.workspace, "source.txt"), "original\n");
   assert.equal((await f.manager.summary()).state, "unmanaged");
@@ -63,7 +77,7 @@ test("deferred discovery and read execution preserve an unmanaged directory", as
   assert.equal(existsSync(join(f.directory, "records")), false);
 });
 
-test("permission denial never prepares Git or executes the write", async t => {
+test("permission denial never prepares Git or executes the write", async (t) => {
   const f = await fixture(t);
   const denied = new PermissionToolExecutor({ policy: () => "deny", executor: f.executor });
   t.after(() => denied.close());
@@ -73,39 +87,48 @@ test("permission denial never prepares Git or executes the write", async t => {
   assert.equal(existsSync(join(f.directory, "records")), false);
 });
 
-test("the first approved modification initializes Git before allowing file execution", async t => {
+test("the first approved modification initializes Git before allowing file execution", async (t) => {
   const f = await fixture(t, false, { authorizeCommit: () => false });
   assert.equal(existsSync(join(f.workspace, ".git")), false);
-  await assert.rejects(f.executor.execute(f.execution("write", { path: "blocked.txt", content: "blocked" })), FatalToolExecutionError);
+  await assert.rejects(
+    f.executor.execute(f.execution("write", { path: "blocked.txt", content: "blocked" })),
+    FatalToolExecutionError,
+  );
   assert.equal(existsSync(join(f.workspace, ".git")), true);
   assert.equal(existsSync(join(f.workspace, "blocked.txt")), false);
   assert.equal((await f.manager.summary()).state, "unborn");
 });
 
-test("lazy initialization saves original files and commits a complete modifying request", {
-  skip: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1",
-}, async t => {
-  let f;
-  f = await fixture(t, false, { async authorizeCommit(request) {
-    assert.equal(resolve(request.workspace), resolve(f.workspace));
-    await f.git("config", "user.name", "May integration test");
-    await f.git("config", "user.email", "may-test@example.invalid");
-    return true;
-  } });
-  await writeFile(join(f.workspace, "source.txt"), "original\n");
-  assert.equal(existsSync(join(f.workspace, ".git")), false);
-  await f.executor.execute(f.execution("write", { path: "source.txt", content: "updated\n" }));
-  const lease = await f.request.lease();
-  assert.equal(await f.git("show", `${lease.fromCommit}:source.txt`), "original");
-  assert.equal(await f.git("rev-list", "--count", "HEAD"), "1");
-  const checkpoint = await lease.complete({ outcome: "completed", runId: "run" });
-  assert.equal(checkpoint.status, "committed");
-  assert.equal(await f.git("show", `${checkpoint.commit}:source.txt`), "updated");
-  assert.equal(await f.git("rev-list", "--count", "HEAD"), "2");
-  assert.equal(await f.git("status", "--porcelain"), "");
-});
+test(
+  "lazy initialization saves original files and commits a complete modifying request",
+  {
+    skip: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1",
+  },
+  async (t) => {
+    let f;
+    f = await fixture(t, false, {
+      async authorizeCommit(request) {
+        assert.equal(resolve(request.workspace), resolve(f.workspace));
+        await f.git("config", "user.name", "May integration test");
+        await f.git("config", "user.email", "may-test@example.invalid");
+        return true;
+      },
+    });
+    await writeFile(join(f.workspace, "source.txt"), "original\n");
+    assert.equal(existsSync(join(f.workspace, ".git")), false);
+    await f.executor.execute(f.execution("write", { path: "source.txt", content: "updated\n" }));
+    const lease = await f.request.lease();
+    assert.equal(await f.git("show", `${lease.fromCommit}:source.txt`), "original");
+    assert.equal(await f.git("rev-list", "--count", "HEAD"), "1");
+    const checkpoint = await lease.complete({ outcome: "completed", runId: "run" });
+    assert.equal(checkpoint.status, "committed");
+    assert.equal(await f.git("show", `${checkpoint.commit}:source.txt`), "updated");
+    assert.equal(await f.git("rev-list", "--count", "HEAD"), "2");
+    assert.equal(await f.git("status", "--porcelain"), "");
+  },
+);
 
-test("Run snapshots retain trusted read metadata without exposing it to the model", async t => {
+test("Run snapshots retain trusted read metadata without exposing it to the model", async (t) => {
   const f = await fixture(t);
   const tool = f.execution("read", { path: "source.txt" }).tool;
   const registry = new ToolRegistry([tool]);
@@ -117,7 +140,7 @@ test("Run snapshots retain trusted read metadata without exposing it to the mode
   assert.equal(snapshot.require("read").workspaceEffect, "read");
 });
 
-test("concurrent writes share one real workspace lease", async t => {
+test("concurrent writes share one real workspace lease", async (t) => {
   const f = await fixture(t, true, { autoCommit: false });
   await Promise.all([
     f.executor.execute(f.execution("write", { path: "first.txt", content: "first" })),
@@ -135,31 +158,47 @@ test("concurrent writes share one real workspace lease", async t => {
   await next.close();
 });
 
-test("failed preparation stays failed for the whole request and preserves files", async t => {
+test("failed preparation stays failed for the whole request and preserves files", async (t) => {
   let approvals = 0;
-  const f = await fixture(t, true, { authorizeCommit() { approvals++; return false; } });
+  const f = await fixture(t, true, {
+    authorizeCommit() {
+      approvals++;
+      return false;
+    },
+  });
   await writeFile(join(f.workspace, "source.txt"), "original");
-  await Promise.all(["first", "second"].map(name => assert.rejects(
-    f.executor.execute(f.execution("write", { path: "source.txt", content: name })), FatalToolExecutionError)));
+  await Promise.all(
+    ["first", "second"].map((name) =>
+      assert.rejects(
+        f.executor.execute(f.execution("write", { path: "source.txt", content: name })),
+        FatalToolExecutionError,
+      ),
+    ),
+  );
   assert.equal(approvals, 1);
   assert.equal(await readFile(join(f.workspace, "source.txt"), "utf8"), "original");
   assert.equal(await f.git("diff", "--cached", "--name-only"), "");
   await f.request.close();
   f.request.begin("next");
-  await assert.rejects(f.executor.execute(f.execution("write", { path: "source.txt", content: "next" })), FatalToolExecutionError);
+  await assert.rejects(
+    f.executor.execute(f.execution("write", { path: "source.txt", content: "next" })),
+    FatalToolExecutionError,
+  );
   assert.equal(approvals, 2);
 });
 
-test("cancellation before the first write leaves Git uninitialized", async t => {
+test("cancellation before the first write leaves Git uninitialized", async (t) => {
   const f = await fixture(t);
   const abort = new AbortController();
   abort.abort();
-  await assert.rejects(f.executor.execute(f.execution("write", { path: "cancelled.txt", content: "cancelled" }, abort.signal)));
+  await assert.rejects(
+    f.executor.execute(f.execution("write", { path: "cancelled.txt", content: "cancelled" }, abort.signal)),
+  );
   assert.equal(await f.request.lease(), undefined);
   assert.deepEqual(await readdir(f.workspace), []);
 });
 
-test("summary reads an unborn repository without creating checkpoints or state", async t => {
+test("summary reads an unborn repository without creating checkpoints or state", async (t) => {
   const f = await fixture(t, true);
   assert.equal(await f.git("rev-parse", "--revs-only", "HEAD"), "");
   const state = await f.manager.summary();
@@ -169,7 +208,7 @@ test("summary reads an unborn repository without creating checkpoints or state",
   assert.deepEqual(await f.manager.checkpoints(), []);
 });
 
-test("a later request checks user edits even after the Session has an initial checkpoint", async t => {
+test("a later request checks user edits even after the Session has an initial checkpoint", async (t) => {
   await mkdir(artifacts, { recursive: true });
   const directory = await mkdtemp(join(artifacts, "baseline-"));
   const workspace = join(directory, "project");
@@ -183,16 +222,26 @@ test("a later request checks user edits even after the Session has an initial ch
   await git("config", "user.name", "May integration test");
   await git("config", "user.email", "may-test@example.invalid");
   const approvals = [];
-  const manager = await ProjectGitWorkspace.open({ workspace, deferInitialization: true,
-    dataRoot: join(directory, "records"), worktreesRoot: join(directory, "worktrees"),
-    authorizeCommit(request) { approvals.push(request); return false; } });
+  const manager = await ProjectGitWorkspace.open({
+    workspace,
+    deferInitialization: true,
+    dataRoot: join(directory, "records"),
+    worktreesRoot: join(directory, "worktrees"),
+    authorizeCommit(request) {
+      approvals.push(request);
+      return false;
+    },
+  });
   const original = (await manager.summary()).commit;
   const first = await manager.beginRound({ sessionId: "same-session" });
   await first.complete({ outcome: "completed", runId: "first" });
   await first.close();
   assert.equal(approvals.length, 0);
   await writeFile(join(workspace, "user-between-requests.txt"), "user changes\n");
-  await assert.rejects(manager.beginRound({ sessionId: "same-session", runId: "second" }), /authorization was rejected/);
+  await assert.rejects(
+    manager.beginRound({ sessionId: "same-session", runId: "second" }),
+    /authorization was rejected/,
+  );
   assert.equal(approvals.length, 1);
   assert.equal(approvals[0].initial, true);
   assert.ok(approvals[0].paths.includes("user-between-requests.txt"));

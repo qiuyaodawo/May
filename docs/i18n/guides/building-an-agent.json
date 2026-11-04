@@ -18,8 +18,8 @@
     },
     {
       "heading": "Choose the lifecycle level first",
-      "en": "93208a1fac903c266e436f7e2aa21093853a6d539827f5e3ee7b9a5bf25d9cc6",
-      "zh": "67f4ca187a388c146a9fc44429dedc531d9ddbba3388238f668fe4dcee747918"
+      "en": "198b7f6e4a58ec4fea586d13f021e7827e0baae88658808a6bf5faf32fe9b134",
+      "zh": "6f33e7e6c2a4c6a660e932257320667e154c41d36e5ab9cf4a785d365410b10c"
     },
     {
       "heading": "Required and optional inputs",
@@ -28,8 +28,8 @@
     },
     {
       "heading": "Define behavior once, then open Sessions",
-      "en": "4e62f1bbacaf79cad32533e6eba41b8d9479306fabbcec24b12da4f01f55ab55",
-      "zh": "7d3aa14e356264b0b4a7788ce7fbb394dae59c7a3146332847917930312e4632"
+      "en": "2ed2a5a7004543a18b7a408676dddb0a18c6c468d852aa6584021e0e8919369b",
+      "zh": "21b003d9854788efe3bf908c002b61e3c236955c4e4327de374d2aaf3adc5763"
     },
     {
       "heading": "Make each composition decision explicitly",
@@ -88,8 +88,8 @@
     },
     {
       "heading": "History, Context, events, and Catalog",
-      "en": "63c9c41d063aaa7f4086ef96b8de151dbac3398ada1c77d4f844985852927ab0",
-      "zh": "66a88aa894d7b8a15bb436818b8c6e2462127a74672b46af59a02560f9523997"
+      "en": "5fd59411b285bc50b354c6dec2be8df9cf52a25a7f0b7a2e0981f553b00a5ba8",
+      "zh": "e8cb5291dbd8d51044a5e5216c4e028cdc6279e7adec7502a4a70a5450d23904"
     },
     {
       "heading": "Shutdown and ownership",

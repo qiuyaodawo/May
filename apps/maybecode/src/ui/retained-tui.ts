@@ -13,11 +13,7 @@ import { omitUndefined } from "@sortedyuan/may/core";
 import type { ApprovalRequest } from "@sortedyuan/may/permissions";
 import { userInfo } from "node:os";
 import type { SessionSummary } from "@sortedyuan/may/session/catalog";
-import type {
-  MaybeCodeController,
-  MaybeCodeModelProfile,
-  MaybeCodeReasoningEffortState,
-} from "../controller.js";
+import type { MaybeCodeController, MaybeCodeModelProfile, MaybeCodeReasoningEffortState } from "../controller.js";
 import {
   createMaybeCodeSlashCommandSuggester,
   executeMaybeCodeSlashCommand,
@@ -30,11 +26,7 @@ import type { MaybeCodeEvent } from "../events.js";
 import { presentMcpInteraction } from "../mcp-interaction-ui.js";
 import { MaybeCodeTerminalWeb } from "../terminal-web.js";
 import { formatGoal } from "../goal-commands.js";
-import {
-  delegationOrder,
-  formatDelegationTree,
-  renderDelegationTask,
-} from "../delegation-commands.js";
+import { delegationOrder, formatDelegationTree, renderDelegationTask } from "../delegation-commands.js";
 import type { MaybeCodeKeymapOptions } from "../keymap.js";
 
 export interface RunRetainedTerminalUIOptions {
@@ -53,15 +45,21 @@ export async function runRetainedTerminalUI(
   const renderer = options.renderer ?? new FullscreenRenderer(terminal);
   const store = new TranscriptStore();
   const displayedSteering = new Set<string>();
-  const images = new TerminalImages(undefined, terminal.imageSupport?.protocol, { cellSize: () => terminal.imageSupport?.cellSize });
+  const images = new TerminalImages(undefined, terminal.imageSupport?.protocol, {
+    cellSize: () => terminal.imageSupport?.cellSize,
+  });
   try {
     const history = await app.history();
-    for (const event of history) if (event.type === "assistant.completed" || event.type === "input.submitted") await images.prepare(event.message.content);
-    for (const event of history) if (event.type === "tool.completed" && event.content) await images.prepare(event.content);
+    for (const event of history)
+      if (event.type === "assistant.completed" || event.type === "input.submitted")
+        await images.prepare(event.message.content);
+    for (const event of history)
+      if (event.type === "tool.completed" && event.content) await images.prepare(event.content);
     store.loadHistory(history);
     for (const event of history) {
       if (event.type === "input.submitted" && event.inputId) displayedSteering.add(event.inputId);
-      if (event.type === "input.steering.delivered") for (const inputId of event.inputIds) displayedSteering.add(inputId);
+      if (event.type === "input.steering.delivered")
+        for (const inputId of event.inputIds) displayedSteering.add(inputId);
     }
   } catch (error) {
     await app.close();
@@ -73,16 +71,21 @@ export async function runRetainedTerminalUI(
   let eventFailure: unknown;
   const pendingRuns = new Set<Promise<void>>();
   const observeRun = (result: Promise<unknown>): void => {
-    const pending = result.then(() => undefined, error => {
-      if (!closing && !isCancellation(error)) store.appendNotice("error", errorMessage(error));
-    }).finally(() => {
-      pendingRuns.delete(pending);
-      if (!closing) view.setStatus(app.isRunning ? "Running" : "Ready");
-    });
+    const pending = result
+      .then(
+        () => undefined,
+        (error) => {
+          if (!closing && !isCancellation(error)) store.appendNotice("error", errorMessage(error));
+        },
+      )
+      .finally(() => {
+        pendingRuns.delete(pending);
+        if (!closing) view.setStatus(app.isRunning ? "Running" : "Ready");
+      });
     pendingRuns.add(pending);
   };
   let resolveExit!: () => void;
-  const exited = new Promise<void>((resolve) => resolveExit = resolve);
+  const exited = new Promise<void>((resolve) => (resolveExit = resolve));
   const finish = (): void => {
     if (closing) return;
     closing = true;
@@ -133,15 +136,23 @@ export async function runRetainedTerminalUI(
   void refreshModelLabel(view, app);
   const refreshWorkspace = async () => {
     if (!app.getWorkspaceGit || closing) return;
-    try { view.setWorkspaceGit(await app.getWorkspaceGit()); }
-    catch (error) { view.setWorkspaceGit({ path: app.workspace, status: "error", autoCommit: false, error: errorMessage(error) }); }
+    try {
+      view.setWorkspaceGit(await app.getWorkspaceGit());
+    } catch (error) {
+      view.setWorkspaceGit({ path: app.workspace, status: "error", autoCommit: false, error: errorMessage(error) });
+    }
   };
   await refreshWorkspace();
   let refreshingWorkspace = false;
-  const workspaceTimer = app.getWorkspaceGit ? setInterval(() => {
-    if (refreshingWorkspace || closing) return;
-    refreshingWorkspace = true; void refreshWorkspace().finally(() => { refreshingWorkspace = false; });
-  }, 2_000) : undefined;
+  const workspaceTimer = app.getWorkspaceGit
+    ? setInterval(() => {
+        if (refreshingWorkspace || closing) return;
+        refreshingWorkspace = true;
+        void refreshWorkspace().finally(() => {
+          refreshingWorkspace = false;
+        });
+      }, 2_000)
+    : undefined;
 
   runtime = new TuiRuntime({ terminal, renderer, root: view });
   let eventTask: Promise<void> | undefined;
@@ -184,14 +195,31 @@ async function consumeEvents(
     if (event.type === "run.event") {
       if (event.event.type === "run.started") {
         view.setStatus("Running");
-        const unread = app.application.agent.listSteeringInputs().filter(input => input.status === "delivered" && !displayedSteering.has(input.inputId));
+        const unread = app.application.agent
+          .listSteeringInputs()
+          .filter((input) => input.status === "delivered" && !displayedSteering.has(input.inputId));
         if (unread.length > 0) {
           const history = await app.history();
           const runId = event.event.runId;
-          const runIndex = history.findIndex(item => item.type === "run.started" && item.runId === runId);
-          const submitted = runIndex < 0 ? undefined : history.slice(0, runIndex).reverse().find(item => item.type === "input.submitted");
-          if (submitted?.type === "input.submitted" && submitted.inputId && unread.some(input => input.inputId === submitted.inputId)) {
-            store.appendUser(submitted.message.content.filter(part => part.type === "text").map(part => part.text).join(""));
+          const runIndex = history.findIndex((item) => item.type === "run.started" && item.runId === runId);
+          const submitted =
+            runIndex < 0
+              ? undefined
+              : history
+                  .slice(0, runIndex)
+                  .reverse()
+                  .find((item) => item.type === "input.submitted");
+          if (
+            submitted?.type === "input.submitted" &&
+            submitted.inputId &&
+            unread.some((input) => input.inputId === submitted.inputId)
+          ) {
+            store.appendUser(
+              submitted.message.content
+                .filter((part) => part.type === "text")
+                .map((part) => part.text)
+                .join(""),
+            );
             displayedSteering.add(submitted.inputId);
           }
         }
@@ -202,7 +230,11 @@ async function consumeEvents(
         }
       }
       // 主 Run 让出时子任务还在运行，状态不能显示为 Ready。
-      if (event.event.type === "run.completed" || event.event.type === "run.yielded" || event.event.type === "run.cancelled") {
+      if (
+        event.event.type === "run.completed" ||
+        event.event.type === "run.yielded" ||
+        event.event.type === "run.cancelled"
+      ) {
         view.setStatus(app.isRunning ? "Delegating" : "Ready");
       }
       if (event.event.type === "run.failed") view.setStatus(`Error: ${event.event.error.message}`);
@@ -210,7 +242,8 @@ async function consumeEvents(
     if (event.type === "permission-mode.changed") {
       view.setStatus(event.mode === "yolo" ? "YOLO enabled" : "YOLO disabled");
     }
-    if (event.type === "run.event" && event.event.type === "model.completed") await images.prepare(event.event.message.content);
+    if (event.type === "run.event" && event.event.type === "model.completed")
+      await images.prepare(event.event.message.content);
     if (event.type === "run.event" && event.event.type === "tool.completed") await images.prepare(event.event.content);
     if (event.type === "goal.changed") {
       view.setStatus(`Goal ${event.goal.status}`);
@@ -223,7 +256,8 @@ async function consumeEvents(
     if (event.type === "delegation.started" || event.type === "delegation.finished") {
       if (event.type === "delegation.started") delegationStatus.clear();
       const label = event.type === "delegation.started" ? "Sub-agent request" : "Sub-agent request finished";
-      if (app.delegationNotifications === true) store.appendNotice("info", `${label}\n${formatDelegationTree(event.state)}`);
+      if (app.delegationNotifications === true)
+        store.appendNotice("info", `${label}\n${formatDelegationTree(event.state)}`);
       view.setStatus(event.type === "delegation.started" ? "Delegating" : "Ready");
     } else if (event.type === "delegation.updated") {
       // 同一任务的重复状态不显示。
@@ -231,49 +265,63 @@ async function consumeEvents(
         const previous = delegationStatus.get(task.id);
         delegationStatus.set(task.id, task.status);
         if (app.delegationNotifications !== true || previous === task.status) continue;
-        store.appendNotice(["failed", "cancelled", "recovery-required"].includes(task.status) ? "warning" : "info", renderDelegationTask(task));
+        store.appendNotice(
+          ["failed", "cancelled", "recovery-required"].includes(task.status) ? "warning" : "info",
+          renderDelegationTask(task),
+        );
       }
     }
     applyMaybeCodeEvent(store, event);
     if (event.type === "mcp.interaction.requested") {
       const controller = new AbortController();
       interactions.set(event.request.id, controller);
-      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(Math.max(0, Math.ceil(event.request.expiresAt - Date.now())))]);
-      const task = presentMcpInteraction(event.request, app, (prompt, signal) => view.requestMcpInput(prompt, signal), signal)
-        .catch(() => { if (!isClosing() && !signal.aborted) {
-          store.appendNotice("warning", "MCP interaction could not be completed");
-          app.cancel("User interaction is unavailable");
-        } })
+      const signal = AbortSignal.any([
+        controller.signal,
+        AbortSignal.timeout(Math.max(0, Math.ceil(event.request.expiresAt - Date.now()))),
+      ]);
+      const task = presentMcpInteraction(
+        event.request,
+        app,
+        (prompt, signal) => view.requestMcpInput(prompt, signal),
+        signal,
+      )
+        .catch(() => {
+          if (!isClosing() && !signal.aborted) {
+            store.appendNotice("warning", "MCP interaction could not be completed");
+            app.cancel("User interaction is unavailable");
+          }
+        })
         .finally(() => interactions.delete(event.request.id));
-      approvals.add(task); void task.finally(() => approvals.delete(task));
+      approvals.add(task);
+      void task.finally(() => approvals.delete(task));
     } else if (event.type === "mcp.interaction.settled") interactions.get(event.requestId)?.abort();
     if (event.type === "model.changed") {
       void refreshModelLabel(view, app);
     }
     if (event.type === "session.changed" && event.resumed) {
       const history = await app.history();
-      for (const event of history) if (event.type === "assistant.completed" || event.type === "input.submitted") await images.prepare(event.message.content);
-      for (const event of history) if (event.type === "tool.completed" && event.content) await images.prepare(event.content);
+      for (const event of history)
+        if (event.type === "assistant.completed" || event.type === "input.submitted")
+          await images.prepare(event.message.content);
+      for (const event of history)
+        if (event.type === "tool.completed" && event.content) await images.prepare(event.content);
       store.loadHistory(history);
       displayedSteering.clear();
       for (const event of history) {
         if (event.type === "input.submitted" && event.inputId) displayedSteering.add(event.inputId);
-        if (event.type === "input.steering.delivered") for (const inputId of event.inputIds) displayedSteering.add(inputId);
+        if (event.type === "input.steering.delivered")
+          for (const inputId of event.inputIds) displayedSteering.add(inputId);
       }
       store.appendNotice("info", "Session resumed");
       continue;
     }
-    if (
-      event.type === "permission.event" &&
-      event.event.type === "approval.requested"
-    ) {
+    if (event.type === "permission.event" && event.event.type === "approval.requested") {
       const task = presentApproval(app, view, store, event.event.request, isClosing, approvals);
       approvals.add(task);
       void task.finally(() => approvals.delete(task));
     } else if (
       event.type === "permission.event" &&
-      (event.event.type === "approval.resolved" ||
-        event.event.type === "approval.cancelled")
+      (event.event.type === "approval.resolved" || event.event.type === "approval.cancelled")
     ) {
       view.dismissApproval(event.event.requestId);
     }
@@ -303,21 +351,25 @@ function presentApproval(
   isClosing: () => boolean,
   approvals: Set<Promise<void>>,
 ): Promise<void> {
-  return view.requestApproval(request).then(async (decision) => {
-    if (decision !== undefined && !isClosing()) {
-      await app.resolveApproval(request.id, decision, decision === "allow-persistent" ? { createdBy: `local:${userInfo().username}` } : undefined);
-    }
-  }).catch((error: unknown) => {
-    if (!isClosing()) {
-      store.appendNotice("error", `Approval failed: ${errorMessage(error)}`);
-    }
-  });
+  return view
+    .requestApproval(request)
+    .then(async (decision) => {
+      if (decision !== undefined && !isClosing()) {
+        await app.resolveApproval(
+          request.id,
+          decision,
+          decision === "allow-persistent" ? { createdBy: `local:${userInfo().username}` } : undefined,
+        );
+      }
+    })
+    .catch((error: unknown) => {
+      if (!isClosing()) {
+        store.appendNotice("error", `Approval failed: ${errorMessage(error)}`);
+      }
+    });
 }
 
-function applyMaybeCodeEvent(
-  store: TranscriptStore,
-  event: MaybeCodeEvent,
-): void {
+function applyMaybeCodeEvent(store: TranscriptStore, event: MaybeCodeEvent): void {
   switch (event.type) {
     case "run.event":
       store.applyMayEvent(event.event);
@@ -331,28 +383,15 @@ function applyMaybeCodeEvent(
       store.applyPermissionEvent(event.event);
       break;
     case "change.preview":
-      store.appendChangePreview(
-        event.runId,
-        event.step,
-        event.toolCallId,
-        event.preview,
-      );
+      store.appendChangePreview(event.runId, event.step, event.toolCallId, event.preview);
       break;
     case "session.changed":
       store.reset(event.sessionId);
-      store.appendNotice(
-        "info",
-        `Session ${event.resumed ? "resumed" : "started"}: ${event.sessionId}`,
-      );
+      store.appendNotice("info", `Session ${event.resumed ? "resumed" : "started"}: ${event.sessionId}`);
       break;
     case "model.changed": {
-      const profile = event.model.profile === undefined
-        ? ""
-        : ` profile ${event.model.profile}`;
-      store.appendNotice(
-        "info",
-        `Model switched to${profile}: ${event.model.provider}/${event.model.model}`,
-      );
+      const profile = event.model.profile === undefined ? "" : ` profile ${event.model.profile}`;
+      store.appendNotice("info", `Model switched to${profile}: ${event.model.provider}/${event.model.model}`);
       break;
     }
     case "model.default.changed":
@@ -365,20 +404,13 @@ function applyMaybeCodeEvent(
       store.appendNotice("info", `MCP resource watch closed: ${event.serverId} ${event.uri} (${event.reason})`);
       break;
     case "mcp.server.connected":
-      store.appendNotice(
-        "info",
-        `MCP server connected: ${event.serverId} ` +
-          `(${event.toolNames.length} tools)`,
-      );
+      store.appendNotice("info", `MCP server connected: ${event.serverId} ` + `(${event.toolNames.length} tools)`);
       break;
     case "mcp.server.catalog-updated":
       store.appendNotice("info", `MCP catalog updated: ${event.serverId} (revision ${event.revision})`);
       break;
     case "mcp.server.failed":
-      store.appendNotice(
-        "warning",
-        `MCP server failed: ${event.serverId}: ${event.diagnostic.message}`,
-      );
+      store.appendNotice("warning", `MCP server failed: ${event.serverId}: ${event.diagnostic.message}`);
       break;
     case "mcp.server.disconnected":
       store.appendNotice("info", `MCP server disconnected: ${event.serverId}`);
@@ -391,10 +423,7 @@ function applyMaybeCodeEvent(
       );
       break;
     case "context.compaction.failed":
-      store.appendNotice(
-        "warning",
-        `Context compaction failed with ${event.strategy}: ${event.error.message}`,
-      );
+      store.appendNotice("warning", `Context compaction failed with ${event.strategy}: ${event.error.message}`);
       break;
   }
 }
@@ -409,15 +438,8 @@ async function handleCommand(
   observeRun: (result: Promise<unknown>) => void,
 ): Promise<void> {
   const parsed = parseMaybeCodeSlashCommand(input);
-  if (
-    parsed.type === "command" &&
-    parsed.definition.name === "/compact" &&
-    parsed.arguments.length === 0
-  ) {
-    store.appendNotice(
-      "info",
-      "Pruning old tool results and summarizing context",
-    );
+  if (parsed.type === "command" && parsed.definition.name === "/compact" && parsed.arguments.length === 0) {
+    store.appendNotice("info", "Pruning old tool results and summarizing context");
   }
   const result = await executeMaybeCodeSlashCommand(input, app);
   if (result.type === "web.requested") {
@@ -443,12 +465,8 @@ async function presentCommandResult(
       store.appendNotice(
         "info",
         [
-          ...result.commands.map((command) =>
-            `${command.usage} — ${command.description}`
-          ),
-          ...view.displayCommands.map((command) =>
-            `${command.command} — ${command.description} (display only)`
-          ),
+          ...result.commands.map((command) => `${command.usage} — ${command.description}`),
+          ...view.displayCommands.map((command) => `${command.command} — ${command.description} (display only)`),
         ].join("\n"),
       );
       break;
@@ -509,12 +527,21 @@ async function presentCommandResult(
     }
     case "changes.selection.requested":
       await view.requestChanges(result.diff, {
-        ...(result.diff.runId && app.previewRestore ? { onRestore: async (path: string) => (await app.previewRestore!(result.diff.runId!, [path])).diff } : {}),
+        ...(result.diff.runId && app.previewRestore
+          ? { onRestore: async (path: string) => (await app.previewRestore!(result.diff.runId!, [path])).diff }
+          : {}),
         ...(app.restoreFiles ? { onApply: (previewId: string) => app.restoreFiles!(previewId) } : {}),
       });
       break;
     case "worktrees.display":
-      store.appendNotice("info", result.worktrees.length ? result.worktrees.map(item => `${item.id}\n${item.path}\n${item.branch} · ${item.status} · ${item.commit.slice(0, 12)}`).join("\n\n") : "没有已登记的 worktree。");
+      store.appendNotice(
+        "info",
+        result.worktrees.length
+          ? result.worktrees
+              .map((item) => `${item.id}\n${item.path}\n${item.branch} · ${item.status} · ${item.commit.slice(0, 12)}`)
+              .join("\n\n")
+          : "没有已登记的 worktree。",
+      );
       break;
     case "session.resumed":
       store.appendNotice("info", `Resumed session ${result.sessionId}`);
@@ -526,10 +553,7 @@ async function presentCommandResult(
       await refreshModelLabel(view, app);
       break;
     case "model.not-found":
-      store.appendNotice(
-        "warning",
-        `No model profile starts with: ${result.query}`,
-      );
+      store.appendNotice("warning", `No model profile starts with: ${result.query}`);
       break;
     case "effort.selection.requested":
       if (result.state.status !== "known") {
@@ -543,10 +567,7 @@ async function presentCommandResult(
       store.appendNotice("info", reasoningEffortChanged(result.state));
       break;
     case "effort.not-found":
-      store.appendNotice(
-        "warning",
-        `No reasoning effort starts with: ${result.query}`,
-      );
+      store.appendNotice("warning", `No reasoning effort starts with: ${result.query}`);
       break;
     case "usage":
       store.appendNotice("warning", `Usage: ${result.usage}`);
@@ -566,9 +587,7 @@ async function runEffortDialog(
   const effort = await view.requestReasoningEffortSelection(state);
   if (effort === undefined) return;
   try {
-    const changed = await app.setReasoningEffort(
-      effort === "default" ? undefined : effort,
-    );
+    const changed = await app.setReasoningEffort(effort === "default" ? undefined : effort);
     view.setModel(modelLabel(app, changed));
     store.appendNotice("info", reasoningEffortChanged(changed));
   } catch (error) {
@@ -584,10 +603,7 @@ async function runModelDialog(
 ): Promise<void> {
   let models = initialModels;
   while (true) {
-    const action = await view.requestModelAction(
-      models,
-      app.application.modelInfo?.profile,
-    );
+    const action = await view.requestModelAction(models, app.application.modelInfo?.profile);
     if (action === undefined) return;
     try {
       if (action.type === "switch") {
@@ -627,9 +643,7 @@ async function runSessionDialog(
         const deleted = await app.deleteSession(action.sessionId);
         store.appendNotice(
           deleted ? "info" : "warning",
-          deleted
-            ? `Deleted session ${action.sessionId}`
-            : `Session ${action.sessionId} was not found`,
+          deleted ? `Deleted session ${action.sessionId}` : `Session ${action.sessionId} was not found`,
         );
       }
       sessions = await app.listSessions();
@@ -640,33 +654,21 @@ async function runSessionDialog(
   }
 }
 
-function inspectionText(
-  inspection: Awaited<ReturnType<MaybeCodeController["inspectContext"]>>,
-): string {
+function inspectionText(inspection: Awaited<ReturnType<MaybeCodeController["inspectContext"]>>): string {
   if (inspection === undefined) return "\nContext: unavailable";
-  const window = inspection.contextWindowTokens === undefined
-    ? ""
-    : ` / ${inspection.contextWindowTokens}`;
-  return `\nContext: ~${inspection.effectiveTokens}${window} tokens, ` +
-    `${inspection.messageCount} messages`;
+  const window = inspection.contextWindowTokens === undefined ? "" : ` / ${inspection.contextWindowTokens}`;
+  return `\nContext: ~${inspection.effectiveTokens}${window} tokens, ` + `${inspection.messageCount} messages`;
 }
 
-function modelLabel(
-  app: MaybeCodeController,
-  effort: MaybeCodeReasoningEffortState | "loading" = "loading",
-): string {
+function modelLabel(app: MaybeCodeController, effort: MaybeCodeReasoningEffortState | "loading" = "loading"): string {
   const info = app.application.modelInfo;
   if (info === undefined) return "unknown · effort: unknown";
   const endpoint = `${info.provider}/${info.model}`;
-  const model = info.profile === undefined
-    ? endpoint
-    : `${info.profile} (${endpoint})`;
+  const model = info.profile === undefined ? endpoint : `${info.profile} (${endpoint})`;
   return `${model} · effort: ${reasoningEffortLabel(effort)}`;
 }
 
-function reasoningEffortLabel(
-  state: MaybeCodeReasoningEffortState | "loading",
-): string {
+function reasoningEffortLabel(state: MaybeCodeReasoningEffortState | "loading"): string {
   if (state === "loading") return "…";
   if (state.status === "unsupported") return "n/a";
   if (state.status === "unknown") return "unknown";
@@ -681,10 +683,7 @@ async function resolvedModelLabel(app: MaybeCodeController): Promise<string> {
   }
 }
 
-async function refreshModelLabel(
-  view: MaybeCodeTerminalView,
-  app: MaybeCodeController,
-): Promise<void> {
+async function refreshModelLabel(view: MaybeCodeTerminalView, app: MaybeCodeController): Promise<void> {
   const identity = modelIdentity(app);
   const label = await resolvedModelLabel(app);
   if (identity === modelIdentity(app)) view.setModel(label);
@@ -692,9 +691,7 @@ async function refreshModelLabel(
 
 function modelIdentity(app: MaybeCodeController): string {
   const model = app.application.modelInfo;
-  return model === undefined
-    ? ""
-    : `${model.profile ?? ""}\u0000${model.provider}\u0000${model.model}`;
+  return model === undefined ? "" : `${model.profile ?? ""}\u0000${model.provider}\u0000${model.model}`;
 }
 
 function unknownReasoningEffort(): MaybeCodeReasoningEffortState {
@@ -706,9 +703,7 @@ function unknownReasoningEffort(): MaybeCodeReasoningEffortState {
   };
 }
 
-function reasoningEffortUnavailable(
-  state: MaybeCodeReasoningEffortState,
-): string {
+function reasoningEffortUnavailable(state: MaybeCodeReasoningEffortState): string {
   return state.status === "unsupported"
     ? "The active model does not support effort-based reasoning"
     : "Reasoning effort capability is unknown for the active model";
@@ -720,9 +715,7 @@ function reasoningEffortChanged(state: MaybeCodeReasoningEffortState): string {
 }
 
 function isCancellation(error: unknown): boolean {
-  return error instanceof Error &&
-    (error.name === "AbortError" ||
-      ("code" in error && error.code === "RUN_CANCELLED"));
+  return error instanceof Error && (error.name === "AbortError" || ("code" in error && error.code === "RUN_CANCELLED"));
 }
 
 function errorMessage(error: unknown): string {

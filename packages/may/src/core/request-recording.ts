@@ -18,15 +18,23 @@ export type ModelRequestObservation =
   | { readonly type: "prepared"; readonly record: ModelRequestRecord }
   | { readonly type: "started" }
   | { readonly type: "completed"; readonly durationMs: number; readonly usage?: import("./types.js").Usage }
-  | { readonly type: "failed"; readonly cancelled: boolean; readonly errorName: string; readonly durationMs: number; readonly httpStatus?: number };
+  | {
+      readonly type: "failed";
+      readonly cancelled: boolean;
+      readonly errorName: string;
+      readonly durationMs: number;
+      readonly httpStatus?: number;
+    };
 
 export type ModelRequestRecorder = (event: ModelRequestObservation) => Promise<void>;
 
-export type ModelRequestSink = (event: ModelRequestObservation & {
-  readonly runId: string;
-  readonly step: number;
-  readonly modelCallId: string;
-}) => Promise<void>;
+export type ModelRequestSink = (
+  event: ModelRequestObservation & {
+    readonly runId: string;
+    readonly step: number;
+    readonly modelCallId: string;
+  },
+) => Promise<void>;
 
 /** 在发送请求前等待记录完成，执行时使用同一份序列化内容。 */
 export async function* executeRecordedRequest(
@@ -53,15 +61,21 @@ export async function* executeRecordedRequest(
   await recorder?.(omitUndefined({ type: "completed", durationMs: performance.now() - started, usage }));
 }
 
-export async function executeRecordedOperation<T>(record: ModelRequestRecord, recorder: ModelRequestRecorder | undefined, signal: AbortSignal, execute: (body: string) => Promise<T>): Promise<T> {
+export async function executeRecordedOperation<T>(
+  record: ModelRequestRecord,
+  recorder: ModelRequestRecorder | undefined,
+  signal: AbortSignal,
+  execute: (body: string) => Promise<T>,
+): Promise<T> {
   const body = JSON.stringify(record.body);
   await recorder?.({ type: "prepared", record: snapshotRequestRecord(record) });
   if (recorder !== undefined) signal.throwIfAborted();
   await recorder?.({ type: "started" });
   const started = performance.now();
   let result: T;
-  try { result = await execute(body); }
-  catch (error) {
+  try {
+    result = await execute(body);
+  } catch (error) {
     await recorder?.(requestFailure(error, signal, started));
     throw error;
   }
@@ -69,10 +83,19 @@ export async function executeRecordedOperation<T>(record: ModelRequestRecord, re
   return result;
 }
 
-function requestFailure(error: unknown, signal: AbortSignal, started: number): Extract<ModelRequestObservation, { type: "failed" }> {
+function requestFailure(
+  error: unknown,
+  signal: AbortSignal,
+  started: number,
+): Extract<ModelRequestObservation, { type: "failed" }> {
   const status = error instanceof Error && "status" in error ? error.status : undefined;
-  return { type: "failed", cancelled: signal.aborted, errorName: error instanceof Error ? error.name : "Error", durationMs: performance.now() - started,
-    ...(typeof status === "number" && Number.isInteger(status) ? { httpStatus: status } : {}) };
+  return {
+    type: "failed",
+    cancelled: signal.aborted,
+    errorName: error instanceof Error ? error.name : "Error",
+    durationMs: performance.now() - started,
+    ...(typeof status === "number" && Number.isInteger(status) ? { httpStatus: status } : {}),
+  };
 }
 
 export function requestEndpoint(url: string): string {
@@ -88,12 +111,19 @@ function snapshotRequestRecord(record: ModelRequestRecord): ModelRequestRecord {
     if (value === null || typeof value !== "object") return;
     for (const [key, item] of Object.entries(value)) {
       const location = `${path}/${key}`;
-      if (["url", "image_url", "uri", "fileUri", "file_uri"].includes(key) && typeof item === "string" && URL.canParse(item)) {
+      if (
+        ["url", "image_url", "uri", "fileUri", "file_uri"].includes(key) &&
+        typeof item === "string" &&
+        URL.canParse(item)
+      ) {
         const url = new URL(item);
         if (["http:", "https:"].includes(url.protocol)) {
           externalResourcePaths.push(location);
           if (url.search || url.username || url.password || url.hash) {
-            url.username = ""; url.password = ""; url.search = ""; url.hash = "";
+            url.username = "";
+            url.password = "";
+            url.search = "";
+            url.hash = "";
             (value as Record<string, unknown>)[key] = url.toString();
             omittedPaths.push(location);
           }
@@ -103,30 +133,69 @@ function snapshotRequestRecord(record: ModelRequestRecord): ModelRequestRecord {
   };
   visit(snapshot.request, "/request");
   visit(snapshot.body, "/body");
-  return { ...snapshot, ...(omittedPaths.length === 0 ? {} : { omittedPaths }), ...(externalResourcePaths.length === 0 ? {} : { externalResourcePaths }) };
+  return {
+    ...snapshot,
+    ...(omittedPaths.length === 0 ? {} : { omittedPaths }),
+    ...(externalResourcePaths.length === 0 ? {} : { externalResourcePaths }),
+  };
 }
 
 /** 让应用自行发起的摘要和原生压缩调用使用同一记录通道。 */
 export function withModelRequestRecording(model: Model, sink: ModelRequestSink): Model {
   if (model.supportsRequestRecording !== true) throw new Error("Model does not support complete request recording");
-  const recorder = (runId = "standalone", step = 1, purpose: "generation" | "compaction" = "generation"): ModelRequestRecorder => {
+  const recorder = (
+    runId = "standalone",
+    step = 1,
+    purpose: "generation" | "compaction" = "generation",
+  ): ModelRequestRecorder => {
     const modelCallId = `${runId}:${purpose}:${crypto.randomUUID()}`;
     return async (event) => {
-      try { await sink({ ...event, ...(event.type === "prepared" ? { record: { ...event.record, purpose } } : {}), runId, step, modelCallId }); }
-      catch (error) { throw new RunCheckpointError(error); }
+      try {
+        await sink({
+          ...event,
+          ...(event.type === "prepared" ? { record: { ...event.record, purpose } } : {}),
+          runId,
+          step,
+          modelCallId,
+        });
+      } catch (error) {
+        throw new RunCheckpointError(error);
+      }
     };
   };
   return {
     supportsRequestRecording: true,
-    get configuration() { return model.configuration; },
-    get reportsAttempts() { return model.reportsAttempts; },
-    get capabilityVersion() { return model.capabilityVersion; },
-    get limits() { return model.limits; },
+    get configuration() {
+      return model.configuration;
+    },
+    get reportsAttempts() {
+      return model.reportsAttempts;
+    },
+    get capabilityVersion() {
+      return model.capabilityVersion;
+    },
+    get limits() {
+      return model.limits;
+    },
     ...(model.preflight === undefined ? {} : { preflight: model.preflight.bind(model) }),
-    stream(request, options) { return model.stream(request, { ...options, recordRequest: options.recordRequest ?? recorder(options.runId, options.step, options.purpose) }); },
-    ...(model.contextCompactor === undefined ? {} : { contextCompactor: {
-      name: model.contextCompactor.name,
-      compact(snapshot, options) { return model.contextCompactor!.compact(snapshot, { ...options, recordRequest: options.recordRequest ?? recorder(options.runId, options.step, "compaction") }); },
-    } }),
+    stream(request, options) {
+      return model.stream(request, {
+        ...options,
+        recordRequest: options.recordRequest ?? recorder(options.runId, options.step, options.purpose),
+      });
+    },
+    ...(model.contextCompactor === undefined
+      ? {}
+      : {
+          contextCompactor: {
+            name: model.contextCompactor.name,
+            compact(snapshot, options) {
+              return model.contextCompactor!.compact(snapshot, {
+                ...options,
+                recordRequest: options.recordRequest ?? recorder(options.runId, options.step, "compaction"),
+              });
+            },
+          },
+        }),
   };
 }

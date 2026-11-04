@@ -11,13 +11,21 @@ export interface MaybeCodeRuntimeEnvironment {
 
 export function maybeCodeRuntimeInstructions(environment: MaybeCodeRuntimeEnvironment, tools: Iterable<Tool>): string {
   const { workspace, options } = environment;
-  const shell = [...tools].map(getShellToolInfo).find(info => info !== undefined);
-  return codingRuntimeInstructions(omitUndefined({
-    workspace,
-    shell,
-    agentRole: "main agent",
-    sessionOrigin: environment.historicalBranch ? "historical branch" : options.resume ? "resumed session" : "new session",
-    permissionMode: options.gitWorkspace?.readOnly ? "read-only" : options.permissionModeSource?.() ?? (options.permissionPolicy ? "custom" : "default"),
-    historicalSource: environment.historicalSource,
-  }));
+  const shell = [...tools].map(getShellToolInfo).find((info) => info !== undefined);
+  return codingRuntimeInstructions(
+    omitUndefined({
+      workspace,
+      shell,
+      agentRole: "main agent",
+      sessionOrigin: environment.historicalBranch
+        ? "historical branch"
+        : options.resume
+          ? "resumed session"
+          : "new session",
+      permissionMode: options.gitWorkspace?.readOnly
+        ? "read-only"
+        : (options.permissionModeSource?.() ?? (options.permissionPolicy ? "custom" : "default")),
+      historicalSource: environment.historicalSource,
+    }),
+  );
 }

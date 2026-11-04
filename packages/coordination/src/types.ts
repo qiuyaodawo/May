@@ -2,7 +2,8 @@ import type { AgentApplicationEvent } from "@sortedyuan/may";
 import type { RunBudget, RunBudgetSnapshot, Usage } from "@sortedyuan/may/core";
 import type { ApprovalDecision } from "@sortedyuan/may/permissions";
 
-export type TaskStatus = "queued" | "running" | "waiting" | "cancelling" | "completed" | "failed" | "cancelled" | "recovery-required";
+export type TaskStatus =
+  "queued" | "running" | "waiting" | "cancelling" | "completed" | "failed" | "cancelled" | "recovery-required";
 
 /**
  * 静态图节点或经过宿主校验的子任务。静态依赖必须全部成功。
@@ -159,7 +160,12 @@ export interface TaskExecution {
   readonly dependencies: readonly { readonly taskId: string; readonly output: TaskOutput }[];
   readonly runBudget?: RunBudget;
   readonly messages?: readonly TaskMessage[];
-  readonly wakeResults?: readonly { readonly taskId: string; readonly status: TaskStatus; readonly output?: TaskOutput; readonly detail?: string }[];
+  readonly wakeResults?: readonly {
+    readonly taskId: string;
+    readonly status: TaskStatus;
+    readonly output?: TaskOutput;
+    readonly detail?: string;
+  }[];
 }
 
 export interface TaskExecutionContext {
@@ -172,7 +178,9 @@ export interface TaskExecutionContext {
   handoff?(commandId: string, handoff: HandoffSpec): Promise<{ readonly taskId: string; readonly agent: string }>;
 }
 
-export interface TaskYield { readonly yielded: true }
+export interface TaskYield {
+  readonly yielded: true;
+}
 
 export type TaskRecovery =
   | { readonly status: "not-started" }
@@ -200,20 +208,43 @@ export interface CoordinationPolicy {
   readonly version: string;
   authorize(task: Readonly<TaskSpec>, coordinationId: string): boolean | Promise<boolean>;
   /** Default deny. Approval of a delegation tool does not bypass this policy. */
-  authorizeDelegation?(parent: Readonly<CoordinationTask>, child: Readonly<TaskSpec>, coordinationId: string): boolean | Promise<boolean>;
+  authorizeDelegation?(
+    parent: Readonly<CoordinationTask>,
+    child: Readonly<TaskSpec>,
+    coordinationId: string,
+  ): boolean | Promise<boolean>;
   /** Default deny, independent of the sender's tool permission. */
-  authorizeMessage?(sender: Readonly<CoordinationTask>, recipient: Readonly<CoordinationTask>, message: Readonly<TaskMessageSpec>, coordinationId: string): boolean | Promise<boolean>;
+  authorizeMessage?(
+    sender: Readonly<CoordinationTask>,
+    recipient: Readonly<CoordinationTask>,
+    message: Readonly<TaskMessageSpec>,
+    coordinationId: string,
+  ): boolean | Promise<boolean>;
   /** Default deny; checked at acceptance and before target dispatch. */
-  authorizeHandoff?(source: Readonly<TaskController>, target: Readonly<TaskSpec>, input: string, coordinationId: string): boolean | Promise<boolean>;
+  authorizeHandoff?(
+    source: Readonly<TaskController>,
+    target: Readonly<TaskSpec>,
+    input: string,
+    coordinationId: string,
+  ): boolean | Promise<boolean>;
   /** Default deny. The host explicitly accepts any known effects of the previous attempt. */
-  authorizeRetry?(task: Readonly<CoordinationTask>, finding: string, coordinationId: string): boolean | Promise<boolean>;
+  authorizeRetry?(
+    task: Readonly<CoordinationTask>,
+    finding: string,
+    coordinationId: string,
+  ): boolean | Promise<boolean>;
   /** Default deny. Nodes and the entire resulting graph are validated independently. */
   authorizeGraphRewrite?(change: Readonly<TaskGraphChange>, snapshot: CoordinationSnapshot): boolean | Promise<boolean>;
 }
 
 export type CoordinationEvent =
   | { readonly type: "state.changed"; readonly snapshot: CoordinationSnapshot }
-  | { readonly type: "agent.event"; readonly taskId: string; readonly sessionId: string; readonly event: AgentApplicationEvent }
+  | {
+      readonly type: "agent.event";
+      readonly taskId: string;
+      readonly sessionId: string;
+      readonly event: AgentApplicationEvent;
+    }
   | { readonly type: "runtime.failed"; readonly message: string };
 
 /** One exclusive writer per coordination; acknowledgement must be durable. */

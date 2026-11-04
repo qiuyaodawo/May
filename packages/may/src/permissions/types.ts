@@ -1,7 +1,4 @@
-import type {
-  ToolDefinition,
-  ToolExecutionContext,
-} from "../core/index.js";
+import type { ToolDefinition, ToolExecutionContext } from "../core/index.js";
 import type { PersistentPermissionRule } from "./rules.js";
 
 export interface ScopedPermissionDecision {
@@ -18,11 +15,7 @@ export interface ScopedPermissionAsk extends ScopedPermissionDecision {
   readonly decision: "ask";
 }
 
-export type PermissionDecision =
-  | "allow"
-  | "deny"
-  | "ask"
-  | ScopedPermissionDecision;
+export type PermissionDecision = "allow" | "deny" | "ask" | ScopedPermissionDecision;
 export type ApprovalDecision = "allow" | "allow-session" | "allow-persistent" | "deny";
 
 export interface ApprovalResolveOptions {
@@ -42,9 +35,7 @@ export interface PermissionCheck {
   readonly context: ToolExecutionContext;
 }
 
-export type PermissionPolicy = (
-  check: PermissionCheck,
-) => PermissionDecision | Promise<PermissionDecision>;
+export type PermissionPolicy = (check: PermissionCheck) => PermissionDecision | Promise<PermissionDecision>;
 
 export interface ApprovalRequest extends PermissionCheck {
   readonly id: string;
@@ -81,6 +72,4 @@ export type PermissionEvent = PermissionEventPayload & {
   timestamp: number;
 };
 
-export type PermissionEventSink = (
-  event: PermissionEvent,
-) => void | Promise<void>;
+export type PermissionEventSink = (event: PermissionEvent) => void | Promise<void>;

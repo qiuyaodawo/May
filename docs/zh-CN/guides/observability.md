@@ -27,21 +27,13 @@ Core 导出 `Tracer`、`TraceSpan`、`TraceContext`、属性类型和受保护�
 
 ```ts
 import { defineAgent } from "@sortedyuan/may";
-import {
-  BasicTracer,
-  BatchSpanProcessor,
-  ConsoleSpanExporter,
-  ratioSampler,
-} from "@sortedyuan/observability";
+import { BasicTracer, BatchSpanProcessor, ConsoleSpanExporter, ratioSampler } from "@sortedyuan/observability";
 
-const processor = new BatchSpanProcessor(
-  new ConsoleSpanExporter(),
-  {
-    maxQueueSize: 2_048,
-    maxExportBatchSize: 256,
-    scheduledDelayMs: 2_000,
-  },
-);
+const processor = new BatchSpanProcessor(new ConsoleSpanExporter(), {
+  maxQueueSize: 2_048,
+  maxExportBatchSize: 256,
+  scheduledDelayMs: 2_000,
+});
 
 const tracer = new BasicTracer({
   processor,
@@ -79,18 +71,18 @@ trace context，供 provider、远程工具或上层操作继续建立子 span�
 
 ## 内置 Span
 
-| Span | 作用 |
-| --- | --- |
-| `may.application.open` | 创建/恢复并校验一个 application Session |
-| `may.run` | Core Run 根节点、结果、调用数和聚合 token usage |
-| `may.context.snapshot` | 准备模型可见的 Context snapshot |
-| `may.context.append` | 追加输入、assistant 或工具结果 message |
-| `may.model.call` | 一次模型 stream、usage、工具调用数和 retry event |
-| `may.tools.batch` | 调度一次模型响应产生的工具调用 |
-| `may.tool.call` | 解析、授权并执行一个 Tool |
-| `may.permission.check` | 执行 permission policy |
-| `may.permission.approval_wait` | 等待显式审批决定 |
-| `may.context.compact` | Application 显式请求的 Context 压缩 |
+| Span                           | 作用                                             |
+| ------------------------------ | ------------------------------------------------ |
+| `may.application.open`         | 创建/恢复并校验一个 application Session          |
+| `may.run`                      | Core Run 根节点、结果、调用数和聚合 token usage  |
+| `may.context.snapshot`         | 准备模型可见的 Context snapshot                  |
+| `may.context.append`           | 追加输入、assistant 或工具结果 message           |
+| `may.model.call`               | 一次模型 stream、usage、工具调用数和 retry event |
+| `may.tools.batch`              | 调度一次模型响应产生的工具调用                   |
+| `may.tool.call`                | 解析、授权并执行一个 Tool                        |
+| `may.permission.check`         | 执行 permission policy                           |
+| `may.permission.approval_wait` | 等待显式审批决定                                 |
+| `may.context.compact`          | Application 显式请求的 Context 压缩              |
 
 以下示例数值说明审批等待如何计入工具耗时：
 
@@ -181,7 +173,10 @@ import { BoundedMetrics, DiagnosticsStore } from "@sortedyuan/observability";
 const metrics = new BoundedMetrics({ maxSeries: 1_024 });
 const diagnostics = new DiagnosticsStore({ maxSpans: 2_048, maxActiveSpans: 512 });
 const tracer = new BasicTracer({
-  processor, metrics, observer: diagnostics, sampler: ratioSampler(0.1),
+  processor,
+  metrics,
+  observer: diagnostics,
+  sampler: ratioSampler(0.1),
 });
 const page = diagnostics.getDiagnostics({ sessionId, limit: 100, offset: 0 });
 const snapshot = metrics.getMetrics();
@@ -253,8 +248,11 @@ const telemetry = createOtlpTelemetry({
   serviceName: "example-agent",
   tracesUrl: "http://localhost:4318/v1/traces",
   metricsUrl: "http://localhost:4318/v1/metrics",
-  timeoutMs: 5_000, maxQueueSize: 2_048, maxExportBatchSize: 256,
-  samplingRatio: 0.1, observer: diagnostics,
+  timeoutMs: 5_000,
+  maxQueueSize: 2_048,
+  maxExportBatchSize: 256,
+  samplingRatio: 0.1,
+  observer: diagnostics,
 });
 // Application 使用 telemetry.tracer，全部关闭后释放 SDK。
 await telemetry.forceFlush();
@@ -284,9 +282,13 @@ Core 的版本化 `TelemetryCorrelation` 验证父节点身份与任务、协调
 
 ```ts
 diagnostics.recordAssessment({
-  taskId: "task-123", sessionId: "session-123", coordinationId: "coordination-123",
-  evaluator: "file-checks", evaluatorVersion: "2",
-  result: "passed", configurationVersion: "context-policy-3",
+  taskId: "task-123",
+  sessionId: "session-123",
+  coordinationId: "coordination-123",
+  evaluator: "file-checks",
+  evaluatorVersion: "2",
+  result: "passed",
+  configurationVersion: "context-policy-3",
   evidenceReferences: ["artifact:checks-123"],
 });
 ```

@@ -29,16 +29,16 @@ For example, a runtime plugin can jointly manage an Agent loop and its Context.
 
 `PluginDefinition` contains the following fields:
 
-| Part | Fields | Requirement and purpose |
-| --- | --- | --- |
-| Identity | `id`, `version` | Required; identify the plugin and its Semantic Version |
-| Initialization | `setup(ctx)` | Required; create instances, provide services, register Hooks and cleanup |
-| Lifecycle scope | `scope` | Optional; `host`, `application`, `session` or `run`, defaulting to `application` |
-| Configuration | `config`, `configSchema` | Optional; supply configuration and JSON Schema validation rules |
-| Provided capabilities | `provides` | Optional; declare ServiceTokens whose instances are registered with `ctx.provide()` |
-| Service dependencies | `requires`, `optional` | Optional; declare required and optional services, including version ranges and capabilities |
-| Hook requirements | `requiresHooks` | Optional; declare Hook entry points the host must support |
-| State | `state` | Optional; declares required `version` and `initial`, and optional `schema`, `compatibleVersions` and `migrate` |
+| Part                  | Fields                   | Requirement and purpose                                                                                        |
+| --------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Identity              | `id`, `version`          | Required; identify the plugin and its Semantic Version                                                         |
+| Initialization        | `setup(ctx)`             | Required; create instances, provide services, register Hooks and cleanup                                       |
+| Lifecycle scope       | `scope`                  | Optional; `host`, `application`, `session` or `run`, defaulting to `application`                               |
+| Configuration         | `config`, `configSchema` | Optional; supply configuration and JSON Schema validation rules                                                |
+| Provided capabilities | `provides`               | Optional; declare ServiceTokens whose instances are registered with `ctx.provide()`                            |
+| Service dependencies  | `requires`, `optional`   | Optional; declare required and optional services, including version ranges and capabilities                    |
+| Hook requirements     | `requiresHooks`          | Optional; declare Hook entry points the host must support                                                      |
+| State                 | `state`                  | Optional; declares required `version` and `initial`, and optional `schema`, `compatibleVersions` and `migrate` |
 
 Plugins select the optional fields their functionality needs. Register resource
 cleanup through `ctx.defer()`; `setup()` can also return a synchronous or asynchronous
@@ -49,16 +49,16 @@ cleanup function.
 `PluginHost` creates a `PluginContext` for each plugin instance and passes it
 to `setup(ctx)` during initialization.
 
-| Interface | Purpose |
-| --- | --- |
-| `pluginId`, `pluginOrder`, `scope`, `scopeId` | Identify the plugin, its declaration order and its owning scope instance |
-| `config` | Access a readonly configuration copy after configuration validation |
-| `get()`, `optional()` | Obtain declared required or optional dependency services |
-| `provide()` | Register a declared service instance |
-| `on()` | Register a Hook handler with host-managed ordering, deadlines, cancellation and cleanup |
-| `state.get()`, `state.set()`, `state.update()` | Read a state copy, validate updates and await the configured save callback |
-| `defer()` | Register resource cleanup |
-| `signal` | Receive initialization cancellation, scope shutdown and plugin-unload notifications |
+| Interface                                      | Purpose                                                                                 |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `pluginId`, `pluginOrder`, `scope`, `scopeId`  | Identify the plugin, its declaration order and its owning scope instance                |
+| `config`                                       | Access a readonly configuration copy after configuration validation                     |
+| `get()`, `optional()`                          | Obtain declared required or optional dependency services                                |
+| `provide()`                                    | Register a declared service instance                                                    |
+| `on()`                                         | Register a Hook handler with host-managed ordering, deadlines, cancellation and cleanup |
+| `state.get()`, `state.set()`, `state.update()` | Read a state copy, validate updates and await the configured save callback              |
+| `defer()`                                      | Register resource cleanup                                                               |
+| `signal`                                       | Receive initialization cancellation, scope shutdown and plugin-unload notifications     |
 
 PluginContext manages plugin configuration and lifecycle. The Agent's `Context`
 interface stores and supplies model-visible messages. Each serves that responsibility.
@@ -74,29 +74,37 @@ import { definePlugin, defineService } from "@sortedyuan/may/plugin";
 import { applicationHooks } from "@sortedyuan/may";
 
 const labels = defineService<{ prefix: string }>({
-  id: "example.labels", version: "1.0.0", scope: "application",
+  id: "example.labels",
+  version: "1.0.0",
+  scope: "application",
 });
 
 const labelsPlugin = definePlugin({
-  id: "example.labels", version: "1.0.0", provides: [labels],
+  id: "example.labels",
+  version: "1.0.0",
+  provides: [labels],
   config: { prefix: "Project: " },
   configSchema: {
-    type: "object", required: ["prefix"], additionalProperties: false,
+    type: "object",
+    required: ["prefix"],
+    additionalProperties: false,
     properties: { prefix: { type: "string" } },
   },
-  setup(ctx) { ctx.provide(labels, ctx.config); },
+  setup(ctx) {
+    ctx.provide(labels, ctx.config);
+  },
 });
 
 const inputPlugin = definePlugin({
-  id: "example.input", version: "1.0.0",
+  id: "example.input",
+  version: "1.0.0",
   requires: [{ service: labels, version: "^1.0.0" }],
   requiresHooks: [applicationHooks.inputBeforeSubmit],
   setup(ctx) {
     const label = ctx.get(labels);
     ctx.on(applicationHooks.inputBeforeSubmit, (value) => ({
       ...value,
-      input: typeof value.input === "string"
-        ? label.prefix + value.input : value.input,
+      input: typeof value.input === "string" ? label.prefix + value.input : value.input,
     }));
   },
 });
@@ -158,16 +166,16 @@ cancellation so the host can finish waiting for them.
 `defineHook()` creates a named Hook with `kind: "transform"` or `"observe"`
 and a validator. `runtimeHooks` and `applicationHooks` expose these entry points:
 
-| Area | Hook exports |
-| --- | --- |
-| Application | `beforeCreate`, `created`, `beforeClose`, `closed` |
-| Input | `inputReceived`, `inputBeforeSubmit`, `inputSubmitted` |
-| Run | `runBefore`, `runStarted`, `runBeforeEnd`, `runEnded`, `runFailed` |
-| Step | `stepBefore`, `stepCompleted` |
-| Context | `contextBefore`, `contextAfter`, `compactionBefore`, `compactionCompleted`, `compactionFailed` |
-| Model | `modelBefore`, `modelEvent`, `modelAfter`, `modelFailed` |
-| Tool | `toolBefore`, `toolProgress`, `toolResult`, `toolAfter`, `toolFailed` |
-| Approval and recovery | `approvalRequested`, `approvalResolved`, `recoveryBefore`, `recoveryResolved` |
+| Area                  | Hook exports                                                                                   |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| Application           | `beforeCreate`, `created`, `beforeClose`, `closed`                                             |
+| Input                 | `inputReceived`, `inputBeforeSubmit`, `inputSubmitted`                                         |
+| Run                   | `runBefore`, `runStarted`, `runBeforeEnd`, `runEnded`, `runFailed`                             |
+| Step                  | `stepBefore`, `stepCompleted`                                                                  |
+| Context               | `contextBefore`, `contextAfter`, `compactionBefore`, `compactionCompleted`, `compactionFailed` |
+| Model                 | `modelBefore`, `modelEvent`, `modelAfter`, `modelFailed`                                       |
+| Tool                  | `toolBefore`, `toolProgress`, `toolResult`, `toolAfter`, `toolFailed`                          |
+| Approval and recovery | `approvalRequested`, `approvalResolved`, `recoveryBefore`, `recoveryResolved`                  |
 
 `ctx.on(hook, handler, { order, timeoutMs, failure })` registers a handler.
 Handlers run by ascending `order`, then plugin configuration order, then
@@ -264,23 +272,23 @@ replacement services to the existing Application.
 The catalog lists package and subpath imports. See
 [package import migration](package-subpaths.md) when upgrading existing imports.
 
-| Import path | Factories and responsibility |
-| --- | --- |
-| `@sortedyuan/may/services/runtime` | `createRuntimePlugin`, `createContextPlugin`, `createToolsPlugin`, `createContextWrapperPlugin`; runtime, Context and tool composition |
-| `@sortedyuan/may/services/models` | `createModelPlugin`, `createModelWrapperPlugin`; Model instances and wrappers |
-| `@sortedyuan/may/services/permissions` | `createPermissionPlugin`; PermissionPolicy |
-| `@sortedyuan/may/services/skills` | `createSkillsPlugin`; discovery, activation, instructions, tools and saved state |
-| `@sortedyuan/may/goals/plugin` | `createGoalsPlugin`; persistent goals, budgets and continuation |
-| `@sortedyuan/may/history-memory` | `createHistoryMemoryPlugin`; historical context notes, retrieval and compaction |
-| `@sortedyuan/coordination/delegation` | `createDelegationPlugin`, `createWorkspaceFilesPlugin`; child Agents, shared budgets and workspace file access |
-| `@sortedyuan/mcp/plugin` | `createMcpPlugin`, `createMcpHostPlugin`, `createSharedMcpPlugin`; connections, catalogs, authentication, interactions and task journals |
-| `@sortedyuan/observability/plugin` | application, host and shared observability factories; tracing and exporter shutdown |
-| `@sortedyuan/gateway/delivery` | `createDeliveryPlugin`; durable channel records, registered receivers and single-attempt delivery outcomes |
-| MaybeClaw `src/channels/telegram` | `createTelegramChannelPlugin`; Telegram receiver, routing and attachments |
-| MaybeClaw `src/channels/feishu` | `createFeishuChannelPlugin`; Feishu receiver, routing and attachments |
-| `@sortedyuan/gateway/adapters` | `createAgentAdaptersPlugin`, `createMayAgentAdapter`, `loadAgentAdapter`, RPC adapters; conversation and adapter resource management |
-| `@sortedyuan/coordination/plugin` | `createCoordinationPlugin`; task graph creation, restoration and release |
-| `@sortedyuan/gateway/web-api` | `createWebApiPlugin`; HTTP listener, active requests and connections |
+| Import path                            | Factories and responsibility                                                                                                             |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `@sortedyuan/may/services/runtime`     | `createRuntimePlugin`, `createContextPlugin`, `createToolsPlugin`, `createContextWrapperPlugin`; runtime, Context and tool composition   |
+| `@sortedyuan/may/services/models`      | `createModelPlugin`, `createModelWrapperPlugin`; Model instances and wrappers                                                            |
+| `@sortedyuan/may/services/permissions` | `createPermissionPlugin`; PermissionPolicy                                                                                               |
+| `@sortedyuan/may/services/skills`      | `createSkillsPlugin`; discovery, activation, instructions, tools and saved state                                                         |
+| `@sortedyuan/may/goals/plugin`         | `createGoalsPlugin`; persistent goals, budgets and continuation                                                                          |
+| `@sortedyuan/may/history-memory`       | `createHistoryMemoryPlugin`; historical context notes, retrieval and compaction                                                          |
+| `@sortedyuan/coordination/delegation`  | `createDelegationPlugin`, `createWorkspaceFilesPlugin`; child Agents, shared budgets and workspace file access                           |
+| `@sortedyuan/mcp/plugin`               | `createMcpPlugin`, `createMcpHostPlugin`, `createSharedMcpPlugin`; connections, catalogs, authentication, interactions and task journals |
+| `@sortedyuan/observability/plugin`     | application, host and shared observability factories; tracing and exporter shutdown                                                      |
+| `@sortedyuan/gateway/delivery`         | `createDeliveryPlugin`; durable channel records, registered receivers and single-attempt delivery outcomes                               |
+| MaybeClaw `src/channels/telegram`      | `createTelegramChannelPlugin`; Telegram receiver, routing and attachments                                                                |
+| MaybeClaw `src/channels/feishu`        | `createFeishuChannelPlugin`; Feishu receiver, routing and attachments                                                                    |
+| `@sortedyuan/gateway/adapters`         | `createAgentAdaptersPlugin`, `createMayAgentAdapter`, `loadAgentAdapter`, RPC adapters; conversation and adapter resource management     |
+| `@sortedyuan/coordination/plugin`      | `createCoordinationPlugin`; task graph creation, restoration and release                                                                 |
+| `@sortedyuan/gateway/web-api`          | `createWebApiPlugin`; HTTP listener, active requests and connections                                                                     |
 
 Feature plugins live in their capability packages. Shared tokens, ordered
 registries and component factory subpaths live in `packages/may/src/services/`.
@@ -379,9 +387,7 @@ MaybeClaw's May adapter reads
 
 ```json
 {
-  "plugins": [
-    { "module": "./plugins/project.mjs", "export": "default", "config": {} }
-  ]
+  "plugins": [{ "module": "./plugins/project.mjs", "export": "default", "config": {} }]
 }
 ```
 

@@ -106,10 +106,12 @@ export function serializeError(error: unknown): SerializedError {
 }
 
 export function isStreamingMayEvent(event: MayEvent): boolean {
-  return event.type === "model.text.delta" ||
+  return (
+    event.type === "model.text.delta" ||
     event.type === "model.reasoning.delta" ||
     event.type === "tool.output.delta" ||
-    event.type === "tool.progress";
+    event.type === "tool.progress"
+  );
 }
 
 export interface AsyncEventQueueOptions<T> {
@@ -129,8 +131,7 @@ export class AsyncEventQueue<T> implements AsyncIterable<T> {
   constructor(options: AsyncEventQueueOptions<T> = {}) {
     if (
       options.maxBufferedValues !== undefined &&
-      (!Number.isSafeInteger(options.maxBufferedValues) ||
-        options.maxBufferedValues < 1)
+      (!Number.isSafeInteger(options.maxBufferedValues) || options.maxBufferedValues < 1)
     ) {
       throw new RangeError("maxBufferedValues must be a positive safe integer");
     }
@@ -145,10 +146,7 @@ export class AsyncEventQueue<T> implements AsyncIterable<T> {
     if (waiter) {
       waiter({ value, done: false });
     } else {
-      if (
-        this.maxBufferedValues !== undefined &&
-        this.values.length >= this.maxBufferedValues
-      ) {
+      if (this.maxBufferedValues !== undefined && this.values.length >= this.maxBufferedValues) {
         const droppableIndex = this.values.findIndex(this.isDroppable);
         if (droppableIndex >= 0) {
           this.values.splice(droppableIndex, 1);
@@ -185,7 +183,10 @@ export class AsyncEventQueue<T> implements AsyncIterable<T> {
         }
 
         return new Promise<IteratorResult<T>>((resolve) => {
-          const waiter = (result: IteratorResult<T>) => { pending.delete(waiter); resolve(result); };
+          const waiter = (result: IteratorResult<T>) => {
+            pending.delete(waiter);
+            resolve(result);
+          };
           pending.add(waiter);
           this.waiters.push(waiter);
         });

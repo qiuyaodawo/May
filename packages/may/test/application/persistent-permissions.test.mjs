@@ -15,8 +15,17 @@ import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store"
 
 const execute = promisify(execFile);
 const scopeId = "project:may:agent:writer";
-const tool = { name: "write", description: "Write project Markdown", inputSchema: { type: "object" }, permissionVersion: "1" };
-const policy = () => ({ decision: "ask", grantKey: "docs-markdown", persistent: { scopeId, description: "Modify Markdown files under project docs" } });
+const tool = {
+  name: "write",
+  description: "Write project Markdown",
+  inputSchema: { type: "object" },
+  permissionVersion: "1",
+};
+const policy = () => ({
+  decision: "ask",
+  grantKey: "docs-markdown",
+  persistent: { scopeId, description: "Modify Markdown files under project docs" },
+});
 
 function applicationOptions(store, permissionRuleStore) {
   return {
@@ -28,7 +37,18 @@ function applicationOptions(store, permissionRuleStore) {
 }
 
 function permissionCheck() {
-  return { tool, input: { path: "docs/guide.md" }, context: { runId: "rule-management", step: 1, toolCallId: "write-guide", idempotencyKey: "write-guide", signal: new AbortController().signal, report() {} } };
+  return {
+    tool,
+    input: { path: "docs/guide.md" },
+    context: {
+      runId: "rule-management",
+      step: 1,
+      toolCallId: "write-guide",
+      idempotencyKey: "write-guide",
+      signal: new AbortController().signal,
+      report() {},
+    },
+  };
 }
 
 async function directory(t) {
@@ -36,8 +56,9 @@ async function directory(t) {
   return directory;
 }
 
-test("application rule management persists history and reopens a shared rule store", async t => {
-  const root = await directory(t), store = new FileSessionStore(join(root, "sessions"));
+test("application rule management persists history and reopens a shared rule store", async (t) => {
+  const root = await directory(t),
+    store = new FileSessionStore(join(root, "sessions"));
   const permissionRuleStore = await FilePermissionRuleStore.open({ path: join(root, "permission-rules.json") });
   const app = await AgentApplication.open(applicationOptions(store, permissionRuleStore));
   const sessionId = app.sessionId;
@@ -50,40 +71,66 @@ test("application rule management persists history and reopens a shared rule sto
   await app.close();
   await permissionRuleStore.close();
 
-  const child = await execute(process.execPath, [fileURLToPath(new URL("./persistent-permissions-reader.mjs", import.meta.url)), store.directory, sessionId]);
+  const child = await execute(process.execPath, [
+    fileURLToPath(new URL("./persistent-permissions-reader.mjs", import.meta.url)),
+    store.directory,
+    sessionId,
+  ]);
   assert.deepEqual(JSON.parse(child.stdout), { types: ["session.created", "rule.created"], ruleIds: [rule.id] });
 
   const reopenedRules = await FilePermissionRuleStore.open({ path: join(root, "permission-rules.json") });
-  const reopened = await AgentApplication.open({ ...applicationOptions(store, reopenedRules), sessionId, resume: true });
+  const reopened = await AgentApplication.open({
+    ...applicationOptions(store, reopenedRules),
+    sessionId,
+    resume: true,
+  });
   assert.deepEqual(await reopened.listPermissionRules(), [rule]);
   assert.equal(await reopened.revokePermissionRule(rule.id), true);
   assert.equal(await reopened.revokePermissionRule(rule.id), false);
   assert.deepEqual(await reopened.listPermissionRules(), []);
   const history = await reopened.queryHistory({ types: ["rule.created", "rule.revoked"] });
-  assert.deepEqual(history.events.map(event => event.type), ["rule.created", "rule.revoked"]);
+  assert.deepEqual(
+    history.events.map((event) => event.type),
+    ["rule.created", "rule.revoked"],
+  );
   assert.equal((await reopened.inspectContext()).messageCount, 0);
   await reopened.close();
   await reopenedRules.close();
 });
 
-test("workspace delegates trusted rule management to the current application", async t => {
-  const root = await directory(t), store = new FileSessionStore(join(root, "sessions"));
+test("workspace delegates trusted rule management to the current application", async (t) => {
+  const root = await directory(t),
+    store = new FileSessionStore(join(root, "sessions"));
   const rules = await FilePermissionRuleStore.open({ path: join(root, "permission-rules.json") });
-  const workspace = await AgentWorkspace.open({ workspace: root, store, catalog: new InMemorySessionCatalog(),
-    openApplication: selection => AgentApplication.open({ ...applicationOptions(store, rules), ...selection }),
+  const workspace = await AgentWorkspace.open({
+    workspace: root,
+    store,
+    catalog: new InMemorySessionCatalog(),
+    openApplication: (selection) => AgentApplication.open({ ...applicationOptions(store, rules), ...selection }),
   });
-  const rule = await workspace.createPermissionRule(permissionCheck(), { decision: "deny", createdBy: "local-operator" });
+  const rule = await workspace.createPermissionRule(permissionCheck(), {
+    decision: "deny",
+    createdBy: "local-operator",
+  });
   assert.deepEqual(await workspace.listPermissionRules(scopeId), [rule]);
-  const allowed = await workspace.createPermissionRuleFrom(rule.id, { decision: "allow", createdBy: "second-operator" });
+  const allowed = await workspace.createPermissionRuleFrom(rule.id, {
+    decision: "allow",
+    createdBy: "second-operator",
+  });
   assert.equal(allowed.scopeId, rule.scopeId);
   assert.equal(allowed.definitionKey, rule.definitionKey);
   assert.equal(allowed.grantKey, rule.grantKey);
   assert.equal(allowed.createdBy, "second-operator");
   assert.equal(allowed.decision, "allow");
-  await assert.rejects(workspace.createPermissionRuleFrom("unavailable", { decision: "allow", createdBy: "local-operator" }));
+  await assert.rejects(
+    workspace.createPermissionRuleFrom("unavailable", { decision: "allow", createdBy: "local-operator" }),
+  );
   await workspace.newSession();
   assert.deepEqual(await workspace.listPermissionRules(scopeId), [rule, allowed]);
-  const denied = await workspace.createPermissionRuleFrom(allowed.id, { decision: "deny", createdBy: "local-operator" });
+  const denied = await workspace.createPermissionRuleFrom(allowed.id, {
+    decision: "deny",
+    createdBy: "local-operator",
+  });
   assert.equal(denied.scopeId, allowed.scopeId);
   assert.equal(denied.definitionKey, allowed.definitionKey);
   assert.equal(denied.grantKey, allowed.grantKey);
@@ -96,13 +143,28 @@ test("workspace delegates trusted rule management to the current application", a
   await rules.close();
 });
 
-test("file history validates persistent metadata, approval decisions and rule evidence", async t => {
-  const root = await directory(t), store = new FileSessionStore(root);
+test("file history validates persistent metadata, approval decisions and rule evidence", async (t) => {
+  const root = await directory(t),
+    store = new FileSessionStore(root);
   const sessionId = "persistent-history";
   const base = { sessionId, timestamp: 100 };
   const events = [
     { type: "session.created" },
-    { type: "approval.requested", request: { id: "approval", createdAt: 100, tool, input: { path: "docs/guide.md" }, runId: "run", step: 1, toolCallId: "call", idempotencyKey: "call", grantKey: "docs-markdown", persistent: { scopeId, description: "Project docs Markdown", definitionKey: "v1" } } },
+    {
+      type: "approval.requested",
+      request: {
+        id: "approval",
+        createdAt: 100,
+        tool,
+        input: { path: "docs/guide.md" },
+        runId: "run",
+        step: 1,
+        toolCallId: "call",
+        idempotencyKey: "call",
+        grantKey: "docs-markdown",
+        persistent: { scopeId, description: "Project docs Markdown", definitionKey: "v1" },
+      },
+    },
     { type: "approval.resolved", requestId: "approval", decision: "allow-persistent" },
     { type: "rule.used", ruleId: "rule", scopeId, decision: "allow", runId: "run", toolCallId: "call" },
   ].map((event, index) => ({ ...event, ...base, seq: index + 1 }));

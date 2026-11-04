@@ -36,13 +36,13 @@ MaybeCode 展示了一个产品如何组合这些包。
 
 ## 先选择生命周期层级
 
-| 从这里开始 | 适用场景 | 需要自行负责 |
-| --- | --- | --- |
-| `@sortedyuan/may/core` 的 `May` | 一次性、临时或深度嵌入式执行 | Run 上层的 Context 连续性、持久化、权限与关闭 |
-| `@sortedyuan/may/session` 的 `Session` | 需要持久化对话身份，并自行组装生命周期 | 运行时重建、权限事件持久化、发现和 UI 事件转发 |
-| `@sortedyuan/may` 的 `AgentDefinition` | 多个 Session 要复用同一套行为与策略 | 每次打开时提供存储、身份与元数据 |
-| `@sortedyuan/may` 的 `AgentApplication` | 独立于 UI 的产品需要一个活动、可恢复 Session | 产品模型、工具、指令、策略、存储和事件处理 |
-| `@sortedyuan/may` 的 `AgentWorkspace` | 用户需要创建、列出、恢复、重命名或删除 Session | Application 工厂、`SessionCatalog` 和产品配置迁移 |
+| 从这里开始                              | 适用场景                                       | 需要自行负责                                      |
+| --------------------------------------- | ---------------------------------------------- | ------------------------------------------------- |
+| `@sortedyuan/may/core` 的 `May`         | 一次性、临时或深度嵌入式执行                   | Run 上层的 Context 连续性、持久化、权限与关闭     |
+| `@sortedyuan/may/session` 的 `Session`  | 需要持久化对话身份，并自行组装生命周期         | 运行时重建、权限事件持久化、发现和 UI 事件转发    |
+| `@sortedyuan/may` 的 `AgentDefinition`  | 多个 Session 要复用同一套行为与策略            | 每次打开时提供存储、身份与元数据                  |
+| `@sortedyuan/may` 的 `AgentApplication` | 独立于 UI 的产品需要一个活动、可恢复 Session   | 产品模型、工具、指令、策略、存储和事件处理        |
+| `@sortedyuan/may` 的 `AgentWorkspace`   | 用户需要创建、列出、恢复、重命名或删除 Session | Application 工厂、`SessionCatalog` 和产品配置迁移 |
 
 多数交互产品用 `defineAgent()` 定义行为，再从中打开 Application。一次性或动态组合
 可以直接调用 `AgentApplication.open()`。只需要执行循环时可以直接使用 Core。
@@ -115,10 +115,7 @@ const lookup: Tool<{ key: string }, { value: string | null }> = {
     additionalProperties: false,
   },
   parse(input) {
-    if (
-      typeof input !== "object" || input === null ||
-      !("key" in input) || typeof input.key !== "string"
-    ) {
+    if (typeof input !== "object" || input === null || !("key" in input) || typeof input.key !== "string") {
       throw new TypeError("key must be a string");
     }
     return { key: input.key };
@@ -145,8 +142,7 @@ export function createExampleAgent(model: Model): AgentDefinition {
       "Use lookup when a requested value may exist in the data source.",
       "Do not invent missing values.",
     ].join("\n"),
-    permissionPolicy: ({ tool }) =>
-      tool.name === "lookup" ? "allow" : "deny",
+    permissionPolicy: ({ tool }) => (tool.name === "lookup" ? "allow" : "deny"),
     contextFactory: new InMemoryContextFactory(),
     contextBudget: {
       contextWindowTokens: 64_000,
@@ -464,12 +460,12 @@ Session 上打开替换 Application。模型配置选择等产品状态由产品
 
 四组数据各有用途：
 
-| 数据 | 用途 | 持久化？ | 模型可见？ |
-| --- | --- | --- | --- |
-| 实时应用或 Core 事件 | 流式 UI、进度、审批协议 | 否；有界转发可能丢失增量 | 本身不可见 |
-| Session 历史 | 有序最终事实与可恢复审计记录 | 是，由所选存储决定 | 回放事实重建 Context；显示元数据除外 |
-| Context | 选择或压缩后的当前请求视图 | Application 记录替换检查点时保存 | 是 |
-| Session Catalog | 标识、工作目录、标题、预览、时间戳等发现索引 | 由所选 Catalog 决定 | 否 |
+| 数据                 | 用途                                         | 持久化？                         | 模型可见？                           |
+| -------------------- | -------------------------------------------- | -------------------------------- | ------------------------------------ |
+| 实时应用或 Core 事件 | 流式 UI、进度、审批协议                      | 否；有界转发可能丢失增量         | 本身不可见                           |
+| Session 历史         | 有序最终事实与可恢复审计记录                 | 是，由所选存储决定               | 回放事实重建 Context；显示元数据除外 |
+| Context              | 选择或压缩后的当前请求视图                   | Application 记录替换检查点时保存 | 是                                   |
+| Session Catalog      | 标识、工作目录、标题、预览、时间戳等发现索引 | 由所选 Catalog 决定              | 否                                   |
 
 UI 对话视图是投影，应从持久化历史重建，再应用实时事件。
 

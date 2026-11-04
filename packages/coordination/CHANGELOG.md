@@ -20,6 +20,7 @@
   plugins together. Preserve plugin IDs, service IDs, configuration data and saved
   Session state. MaybeCode carries the consolidated dependencies in its published
   installation; its command names remain unchanged.
+
 - c23ff33: Add durable continuation identities and public Session outcome queries. Attached
   coordination agents preserve each continuation identity across cancellation and
   restart, and record their recovery protocol with dispatch. Existing dispatched
@@ -49,6 +50,7 @@
   interfaces. Application closing, plugin updates and skill activation belong to
   the host. `services.toolSources.snapshot()` returns `Iterable<Tool>`; consumers
   that need catalog methods can construct a `ToolRegistry` from that iterable.
+
 - Updated dependencies [437b090]
 - Updated dependencies [c23ff33]
 - Updated dependencies [437b090]
@@ -69,14 +71,14 @@
 
   这是包路径的破坏性变更。使用方需要更新依赖声明、源码导入及加载这些模块的配置：
 
-  | 原包 | 公开子路径 | 需要安装的包 |
-  | --- | --- | --- |
-  | `@sortedyuan/plugin-models` | `@sortedyuan/plugin-services/models` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-runtime` | `@sortedyuan/plugin-services/runtime` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-permissions` | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-skills` | `@sortedyuan/plugin-services/skills` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin` | `@sortedyuan/coordination` |
-  | `@sortedyuan/session-tools` | `@sortedyuan/session/tools` | `@sortedyuan/session` |
+  | 原包                              | 公开子路径                                | 需要安装的包                  |
+  | --------------------------------- | ----------------------------------------- | ----------------------------- |
+  | `@sortedyuan/plugin-models`       | `@sortedyuan/plugin-services/models`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-runtime`      | `@sortedyuan/plugin-services/runtime`     | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-permissions`  | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-skills`       | `@sortedyuan/plugin-services/skills`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin`         | `@sortedyuan/coordination`    |
+  | `@sortedyuan/session-tools`       | `@sortedyuan/session/tools`               | `@sortedyuan/session`         |
 
   选择包含这些子路径的发布版本，重新安装依赖并编译使用方。六个原包从本仓库的发布清单移除。
   插件 ID、ServiceToken ID、持久状态格式、函数名称及生命周期行为保持不变。
@@ -151,6 +153,7 @@
   增加可选 service 查询、本地诊断与独立指标服务，以及可复用的 UI 诊断面板。宿主可以
   按会话范围查询执行记录、刷新模型能力，并独立管理遥测资源。子 Agent 预算包装保留
   模型配置、能力版本和物理请求观察信息。
+
 - 02789c6: Export `coordinationInput` and `createCoordinationTools` so hosts can compose the existing delegation, messaging, and handoff workflow with their own persistent Agent conversations. Export `validateCoordinationSnapshot` for validating durable state before host-specific recovery decisions. Recovery now recognizes cancelled permission requests as evidence that the corresponding tool did not start.
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
@@ -163,6 +166,7 @@
 
   The TUI package includes the PNG declarations required by its image dependency,
   so consumers can type-check installed declarations with `skipLibCheck: false`.
+
 - 88e7d69: 扩展 Usage 的缓存、reasoning、其他计量、包含关系、完整性与 provider 金额；提供版本化
   价格配置和可替换的计价接口。RunBudget、FileSharedBudget 与遥测使用同一计价结果，
   费用记录保留币种、来源、版本和完整性。保留现有输入输出 USD 单价配置，USD 预算需要
@@ -184,6 +188,7 @@
   Remote CoordinationWorker 将已保存的取消意图发送给分离的外部执行，并通过恢复查询确认结果。
 
   PowerShell shell 工具根据最后执行命令的状态返回 exitCode，失败的 cmdlet 返回非零值。
+
 - 78bde1d: `BatchSpanProcessor` 在 exporter 同步抛出错误后能够完成 `forceFlush()` 和 `shutdown()`，
   并继续导出后续批次。重复调用 `TaskWorkspaceManager.prepare()` 保留目录校验，
   不再追加相同的 workspace 状态记录。
@@ -196,6 +201,7 @@
   in each request, sharing preparation across main and delegated Agents and retaining
   the lease through Goal verification. Startup and read-only requests leave Git state
   unchanged. Each modifying request saves existing user edits before accepting tool writes.
+
 - c8c14c7: Skills 初始提供名称、描述及兼容要求，通过 `skill_read` 按需读取正文与资源；
   保留已激活文档的 Session 持久化行为，并明确指令贡献顺序。
 
@@ -204,6 +210,7 @@
 
   新增基础与项目指令来源、运行前刷新及权限模式 callbacks，使子 Session 按顺序接收
   自己的运行环境、项目规则与任务说明。
+
 - Updated dependencies [0dc3f68]
 - Updated dependencies [88e7d69]
 - Updated dependencies [1e9bdfc]

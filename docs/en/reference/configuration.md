@@ -32,10 +32,10 @@ it when it starts; an invalid value reports `MayConfigValidationError` with the 
 For editor completion of a whole file, associate it with the composed schema of the
 application that uses it:
 
-| Application | Schema |
-| --- | --- |
-| MaybeCode | `@sortedyuan/maybecode/config/schema` (`apps/maybecode/dist/maybecode-config.schema.json`) |
-| MaybeClaw | `apps/maybeclaw/dist/maybeclaw-config.schema.json` |
+| Application | Schema                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| MaybeCode   | `@sortedyuan/maybecode/config/schema` (`apps/maybecode/dist/maybecode-config.schema.json`) |
+| MaybeClaw   | `apps/maybeclaw/dist/maybeclaw-config.schema.json`                                         |
 
 For example, on this Windows checkout after `pnpm build` the user configuration can start with:
 
@@ -55,12 +55,12 @@ validate their entry with `createApplicationConfigValidator(id, section)`.
 
 ## Top-level fields
 
-| Field | Required | Description |
-| --- | --- | --- |
-| `providers` | yes | Named connections containing an adapter, credentials, endpoint, and shared options. |
-| `models` | no | Named model profiles shown by model selectors such as MaybeCode `/model`. |
-| `defaultModel` | no | The model profile selected when no explicit model is supplied; MaybeCode `/model` can update it. |
-| `apps` | no | Application-owned settings. |
+| Field          | Required | Description                                                                                      |
+| -------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `providers`    | yes      | Named connections containing an adapter, credentials, endpoint, and shared options.              |
+| `models`       | no       | Named model profiles shown by model selectors such as MaybeCode `/model`.                        |
+| `defaultModel` | no       | The model profile selected when no explicit model is supplied; MaybeCode `/model` can update it. |
+| `apps`         | no       | Application-owned settings.                                                                      |
 
 Provider fields are `adapter`, `apiKey`, `apiKeyEnv`, `baseURL`, and `options`.
 Do not set both `apiKey` and `apiKeyEnv`. Model fields are `provider`, optional
@@ -101,15 +101,15 @@ the command form `/model <profile-prefix> --default` is used.
 
 `options` is adapter-specific. The built-in registry currently recognizes:
 
-| Adapter | Options |
-| --- | --- |
-| `openai-responses` | `maxOutputTokens`, `reasoningEffort`, `reasoningSummary`, `serverCompactThreshold`, `store`, `responseFormat` |
-| `openai-chat-completions` | `maxOutputTokens`, `reasoningEffort`, `store`, `responseFormat` |
-| `deepseek-chat` | `thinking`, `reasoningEffort`, `maxTokens` |
-| `zhipu-chat` | `thinking`, `clearThinking`, `reasoningEffort`, `maxTokens` |
-| `kimi-chat` | `thinking`, `reasoningEffort`, `maxTokens` |
-| `anthropic-messages` | `thinking`, `reasoningEffort`, `maxTokens`, `apiVersion` |
-| `google-gemini` | `maxOutputTokens`, `reasoningEffort`, `thinkingBudget`, `includeThoughts`, `responseFormat` |
+| Adapter                   | Options                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `openai-responses`        | `maxOutputTokens`, `reasoningEffort`, `reasoningSummary`, `serverCompactThreshold`, `store`, `responseFormat` |
+| `openai-chat-completions` | `maxOutputTokens`, `reasoningEffort`, `store`, `responseFormat`                                               |
+| `deepseek-chat`           | `thinking`, `reasoningEffort`, `maxTokens`                                                                    |
+| `zhipu-chat`              | `thinking`, `clearThinking`, `reasoningEffort`, `maxTokens`                                                   |
+| `kimi-chat`               | `thinking`, `reasoningEffort`, `maxTokens`                                                                    |
+| `anthropic-messages`      | `thinking`, `reasoningEffort`, `maxTokens`, `apiVersion`                                                      |
+| `google-gemini`           | `maxOutputTokens`, `reasoningEffort`, `thinkingBudget`, `includeThoughts`, `responseFormat`                   |
 
 For `google-gemini`, `baseURL` includes the API version and defaults to
 `https://generativelanguage.googleapis.com/v1beta`. A compatible gateway can use
@@ -147,11 +147,11 @@ protocol-level option validation. The resolution order is:
 Every built-in adapter queries its model endpoint at the configured `baseURL`,
 or at the adapter's default service address when `baseURL` is unset:
 
-| Adapter | Request | Authentication |
-| --- | --- | --- |
-| `openai-responses`, `openai-chat-completions`, `deepseek-chat`, `kimi-chat`, `zhipu-chat` | `GET {baseURL}/models?client_version=may` | `Authorization: Bearer` |
-| `anthropic-messages` | `GET {baseURL}/v1/models?limit=1000` | `x-api-key` and `anthropic-version` |
-| `google-gemini` | `GET {baseURL}/models/{model}` | `x-goog-api-key` |
+| Adapter                                                                                   | Request                                   | Authentication                      |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------- |
+| `openai-responses`, `openai-chat-completions`, `deepseek-chat`, `kimi-chat`, `zhipu-chat` | `GET {baseURL}/models?client_version=may` | `Authorization: Bearer`             |
+| `anthropic-messages`                                                                      | `GET {baseURL}/v1/models?limit=1000`      | `x-api-key` and `anthropic-version` |
+| `google-gemini`                                                                           | `GET {baseURL}/models/{model}`            | `x-goog-api-key`                    |
 
 Model lists are matched as `models[]` entries by `slug` (CLIProxyAPI's Codex
 catalog) or `data[]` entries by `id`. May reads reasoning efforts from the
@@ -258,6 +258,7 @@ reservation; unavailable estimates or reservations remain unknown. Native
 Context compaction checks its own capability and input support. Verification
 records state `request-accepted`, `response-validated`, or `failed`, with media
 counts, source forms and observed byte ranges, without storing content.
+
 ### Request and response validation
 
 `Model.preflight` exposes request validation to May and model wrappers before

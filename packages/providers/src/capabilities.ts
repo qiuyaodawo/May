@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { MODEL_CAPABILITY_KEYS, parseMayConfig, type ModelCapabilityDeclaration, type ModelCapabilitiesOverride, type ModelCapabilityKey } from "@sortedyuan/may/config";
+import {
+  MODEL_CAPABILITY_KEYS,
+  parseMayConfig,
+  type ModelCapabilityDeclaration,
+  type ModelCapabilitiesOverride,
+  type ModelCapabilityKey,
+} from "@sortedyuan/may/config";
 import { omitUndefined, type ModelRequest } from "@sortedyuan/may/core";
 import type { ProviderModelSelection } from "./types.js";
 
@@ -12,7 +18,12 @@ export type CapabilityValue<T = ModelCapabilityDeclaration> =
   | { readonly status: "unsupported"; readonly source: Exclude<ModelCapabilitySource, "unknown"> }
   | { readonly status: "unknown"; readonly source: "unknown" };
 export type ReasoningEffortCapabilities =
-  | { readonly status: "known"; readonly source: Exclude<ModelCapabilitySource, "unknown">; readonly efforts: readonly string[]; readonly defaultEffort?: string }
+  | {
+      readonly status: "known";
+      readonly source: Exclude<ModelCapabilitySource, "unknown">;
+      readonly efforts: readonly string[];
+      readonly defaultEffort?: string;
+    }
   | { readonly status: "unsupported"; readonly source: Exclude<ModelCapabilitySource, "unknown"> }
   | { readonly status: "unknown"; readonly source: "unknown" };
 export type ModelCapabilityFields = Readonly<Partial<Record<ModelCapabilityKey, CapabilityValue>>>;
@@ -33,7 +44,10 @@ export interface ModelCapabilities {
 export interface ModelCapabilityDiscovery {
   readonly name?: string;
   discoverReasoningEffort?(selection: ProviderModelSelection): Promise<ReasoningEffortCapabilities | undefined>;
-  discoverCapabilities?(selection: ProviderModelSelection, fields?: readonly ModelCapabilityKey[]): Promise<ModelCapabilityFields | undefined>;
+  discoverCapabilities?(
+    selection: ProviderModelSelection,
+    fields?: readonly ModelCapabilityKey[],
+  ): Promise<ModelCapabilityFields | undefined>;
 }
 export interface ModelCapabilityResolverOptions {
   readonly fetch?: typeof globalThis.fetch;
@@ -82,14 +96,23 @@ export class ModelCapabilityResolver {
     this.adapters = structuredClone(options.adapterCapabilities ?? {});
     for (const fields of Object.values(this.adapters)) assertCapabilityFields(fields);
   }
-  async resolve(selection: ProviderModelSelection, options: ResolveModelCapabilitiesOptions = {}): Promise<ModelCapabilities> {
+  async resolve(
+    selection: ProviderModelSelection,
+    options: ResolveModelCapabilitiesOptions = {},
+  ): Promise<ModelCapabilities> {
     const requested = options.fields ?? MODEL_CAPABILITY_KEYS;
-    for (const field of requested) if (!MODEL_CAPABILITY_KEYS.includes(field)) throw new TypeError(`Unknown capability field ${field}`);
+    for (const field of requested)
+      if (!MODEL_CAPABILITY_KEYS.includes(field)) throw new TypeError(`Unknown capability field ${field}`);
     const explicit = declaredFields(selection.capabilities, "user");
     assertCapabilityFields(explicit);
     const explicitReasoning = declaredReasoning(selection.capabilities, "user");
     if (explicitReasoning !== undefined) assertReasoningCapabilities(explicitReasoning);
-    const discovered = await this.discover(selection, options.refresh === true, explicitReasoning !== undefined, requested);
+    const discovered = await this.discover(
+      selection,
+      options.refresh === true,
+      explicitReasoning !== undefined,
+      requested,
+    );
     const model: Partial<Record<ModelCapabilityKey, CapabilityValue>> = {};
     const adapter = this.adapters[selection.adapter] ?? builtinAdapterCapabilities(selection.adapter);
     const connection = declaredFields(selection.providerConfig.capabilities, "user");
@@ -105,70 +128,150 @@ export class ModelCapabilityResolver {
     const reasoning = explicitReasoning ?? discovered.reasoningEffort ?? builtinReasoningEffort(selection) ?? UNKNOWN;
     const reasoningEffort = intersectReasoning(reasoning, connectionReasoning);
     const layers = { model, adapter, connection };
-    return structuredClone({ reasoningEffort, fields: effective, layers, version: digest({ reasoningEffort, fields: effective, layers }), observedAt: discovered.observedAt, expiresAt: discovered.expiresAt, diagnostics: discovered.diagnostics });
+    return structuredClone({
+      reasoningEffort,
+      fields: effective,
+      layers,
+      version: digest({ reasoningEffort, fields: effective, layers }),
+      observedAt: discovered.observedAt,
+      expiresAt: discovered.expiresAt,
+      diagnostics: discovered.diagnostics,
+    });
   }
   invalidate(selection?: ProviderModelSelection): void {
     if (selection === undefined) {
-      this.cache.clear(); this.pending.clear(); return;
+      this.cache.clear();
+      this.pending.clear();
+      return;
     }
     const prefix = connectionIdentity(selection);
     for (const key of [...this.cache.keys(), ...this.pending.keys()]) {
       if (!key.startsWith(prefix)) continue;
-      this.cache.delete(key); this.pending.delete(key);
+      this.cache.delete(key);
+      this.pending.delete(key);
     }
   }
   verificationRecords(selection?: ProviderModelSelection): readonly ModelCapabilityVerificationRecord[] {
     const connectionId = selection === undefined ? undefined : connectionIdentity(selection);
-    return this.records.filter((record) => connectionId === undefined || (record.connectionId === connectionId && record.model === selection?.model)).map((record) => ({ ...record, parameters: { ...record.parameters } }));
+    return this.records
+      .filter(
+        (record) =>
+          connectionId === undefined || (record.connectionId === connectionId && record.model === selection?.model),
+      )
+      .map((record) => ({ ...record, parameters: { ...record.parameters } }));
   }
-  recordVerification(selection: ProviderModelSelection, request: ModelRequest, success: boolean, responseValidated = false, additionalCapabilities: readonly ModelCapabilityKey[] = []): void {
+  recordVerification(
+    selection: ProviderModelSelection,
+    request: ModelRequest,
+    success: boolean,
+    responseValidated = false,
+    additionalCapabilities: readonly ModelCapabilityKey[] = [],
+  ): void {
     const used = new Set<ModelCapabilityKey>(additionalCapabilities);
-    for (const message of request.messages) for (const part of message.content) {
-      if (part.type === "text" || part.type === "json") used.add("input.text");
-      if (["image", "audio", "file", "resource"].includes(part.type)) used.add(`input.${part.type}` as ModelCapabilityKey);
-    }
+    for (const message of request.messages)
+      for (const part of message.content) {
+        if (part.type === "text" || part.type === "json") used.add("input.text");
+        if (["image", "audio", "file", "resource"].includes(part.type))
+          used.add(`input.${part.type}` as ModelCapabilityKey);
+      }
     if (request.tools.length > 0) used.add("tools");
-    if (request.responseFormat !== undefined) used.add(request.responseFormat.type === "json" ? "structuredOutput.json" : "structuredOutput.jsonSchema");
+    if (request.responseFormat !== undefined)
+      used.add(request.responseFormat.type === "json" ? "structuredOutput.json" : "structuredOutput.jsonSchema");
     const thinking = selection.options.thinking;
-    const activeThinking = thinking !== undefined && thinking !== "disabled" && !(isRecord(thinking) && thinking.type === "disabled");
-    if (selection.options.reasoningEffort !== undefined || activeThinking || selection.options.reasoningSummary !== undefined) used.add("reasoning.modes");
+    const activeThinking =
+      thinking !== undefined && thinking !== "disabled" && !(isRecord(thinking) && thinking.type === "disabled");
+    if (
+      selection.options.reasoningEffort !== undefined ||
+      activeThinking ||
+      selection.options.reasoningSummary !== undefined
+    )
+      used.add("reasoning.modes");
     const parameters: Record<string, string | number | boolean> = {};
-    if (typeof selection.options.reasoningEffort === "string") parameters.reasoningEffort = selection.options.reasoningEffort;
-    for (const key of ["maxTokens", "maxOutputTokens"] as const) if (typeof selection.options[key] === "number") parameters[key] = selection.options[key];
-    if (parameters.maxTokens === undefined && parameters.maxOutputTokens === undefined && selection.limits?.maxOutputTokens !== undefined) {
-      parameters[["deepseek-chat", "kimi-chat", "zhipu-chat", "anthropic-messages"].includes(selection.adapter) ? "maxTokens" : "maxOutputTokens"] = selection.limits.maxOutputTokens;
+    if (typeof selection.options.reasoningEffort === "string")
+      parameters.reasoningEffort = selection.options.reasoningEffort;
+    for (const key of ["maxTokens", "maxOutputTokens"] as const)
+      if (typeof selection.options[key] === "number") parameters[key] = selection.options[key];
+    if (
+      parameters.maxTokens === undefined &&
+      parameters.maxOutputTokens === undefined &&
+      selection.limits?.maxOutputTokens !== undefined
+    ) {
+      parameters[
+        ["deepseek-chat", "kimi-chat", "zhipu-chat", "anthropic-messages"].includes(selection.adapter)
+          ? "maxTokens"
+          : "maxOutputTokens"
+      ] = selection.limits.maxOutputTokens;
     }
-    if (typeof selection.options.reasoningSummary === "string") parameters.reasoningSummary = selection.options.reasoningSummary;
+    if (typeof selection.options.reasoningSummary === "string")
+      parameters.reasoningSummary = selection.options.reasoningSummary;
     if (typeof thinking === "string") parameters.thinkingType = thinking;
     else if (isRecord(thinking)) {
       if (typeof thinking.type === "string") parameters.thinkingType = thinking.type;
       if (typeof thinking.budgetTokens === "number") parameters.thinkingBudgetTokens = thinking.budgetTokens;
     }
-    if (request.responseFormat?.type === "jsonSchema") { parameters.schemaVersion = digest(request.responseFormat.schema); parameters.strict = request.responseFormat.strict ?? false; }
+    if (request.responseFormat?.type === "jsonSchema") {
+      parameters.schemaVersion = digest(request.responseFormat.schema);
+      parameters.strict = request.responseFormat.strict ?? false;
+    }
     for (const capability of used) {
       const observed: Record<string, string | number | boolean> = { ...parameters };
-      const parts = request.messages.flatMap((message) => message.content).filter((part) => capability === "input.text" ? part.type === "text" || part.type === "json" : capability === `input.${part.type}`);
+      const parts = request.messages
+        .flatMap((message) => message.content)
+        .filter((part) =>
+          capability === "input.text"
+            ? part.type === "text" || part.type === "json"
+            : capability === `input.${part.type}`,
+        );
       if (capability.startsWith("input.")) observed.count = parts.length;
       const media = parts.filter((part) => part.type === "image" || part.type === "audio" || part.type === "file");
       if (media.length > 0) {
-        for (const source of ["url", "base64", "file"] as const) observed[`${source}Sources`] = media.filter((part) => part.source.type === source).length;
-        const base64 = media.flatMap((part) => part.source.type === "base64" ? [part.source] : []);
+        for (const source of ["url", "base64", "file"] as const)
+          observed[`${source}Sources`] = media.filter((part) => part.source.type === source).length;
+        const base64 = media.flatMap((part) => (part.source.type === "base64" ? [part.source] : []));
         const bytes = base64.map((source) => Buffer.byteLength(source.data, "base64"));
         observed.knownBytesCount = bytes.length;
-        if (bytes.length > 0) { observed.minObservedBytes = Math.min(...bytes); observed.maxObservedBytes = Math.max(...bytes); }
+        if (bytes.length > 0) {
+          observed.minObservedBytes = Math.min(...bytes);
+          observed.maxObservedBytes = Math.max(...bytes);
+        }
         observed.mediaTypesVersion = digest([...new Set(base64.map((source) => source.mediaType))].sort());
       }
-      if (capability === "tools") { observed.definitions = request.tools.length; observed.definitionsVersion = digest(request.tools); }
-      const evidence = !success ? "failed" : capability.startsWith("structuredOutput.") && responseValidated ? "response-validated" : "request-accepted";
-      this.records.push({ model: selection.model, adapter: selection.adapter, connectionId: connectionIdentity(selection), capability, observedAt: Date.now(), success, evidence, parameters: observed });
+      if (capability === "tools") {
+        observed.definitions = request.tools.length;
+        observed.definitionsVersion = digest(request.tools);
+      }
+      const evidence = !success
+        ? "failed"
+        : capability.startsWith("structuredOutput.") && responseValidated
+          ? "response-validated"
+          : "request-accepted";
+      this.records.push({
+        model: selection.model,
+        adapter: selection.adapter,
+        connectionId: connectionIdentity(selection),
+        capability,
+        observedAt: Date.now(),
+        success,
+        evidence,
+        parameters: observed,
+      });
     }
     if (this.records.length > this.maxRecords) this.records.splice(0, this.records.length - this.maxRecords);
   }
-  private async discover(selection: ProviderModelSelection, refresh: boolean, skipReasoning: boolean, fields: readonly ModelCapabilityKey[]): Promise<DiscoveryResult> {
+  private async discover(
+    selection: ProviderModelSelection,
+    refresh: boolean,
+    skipReasoning: boolean,
+    fields: readonly ModelCapabilityKey[],
+  ): Promise<DiscoveryResult> {
     const key = `${connectionIdentity(selection)}:${digest({ model: selection.model, fields: [...fields].sort(), skipReasoning })}`;
     if (refresh) this.cache.delete(key);
     const cached = this.cache.get(key);
-    if (cached !== undefined && cached.expiresAt > Date.now()) { this.cache.delete(key); this.cache.set(key, cached); return cached; }
+    if (cached !== undefined && cached.expiresAt > Date.now()) {
+      this.cache.delete(key);
+      this.cache.set(key, cached);
+      return cached;
+    }
     this.cache.delete(key);
     const active = this.pending.get(key);
     if (active !== undefined) return active;
@@ -182,9 +285,15 @@ export class ModelCapabilityResolver {
         while (this.cache.size > this.maxEntries) this.cache.delete(this.cache.keys().next().value!);
       }
       return result;
-    } finally { if (this.pending.get(key) === operation) this.pending.delete(key); }
+    } finally {
+      if (this.pending.get(key) === operation) this.pending.delete(key);
+    }
   }
-  private async query(selection: ProviderModelSelection, skipReasoning: boolean, requested: readonly ModelCapabilityKey[]): Promise<DiscoveryResult> {
+  private async query(
+    selection: ProviderModelSelection,
+    skipReasoning: boolean,
+    requested: readonly ModelCapabilityKey[],
+  ): Promise<DiscoveryResult> {
     const fields: Partial<Record<ModelCapabilityKey, CapabilityValue>> = {};
     let reasoningEffort: ReasoningEffortCapabilities | undefined;
     const diagnostics: ModelCapabilityDiagnostic[] = [];
@@ -193,34 +302,68 @@ export class ModelCapabilityResolver {
       let foundReasoning: ReasoningEffortCapabilities | undefined;
       try {
         found = await discovery.discoverCapabilities?.(selection, requested);
-        if (!skipReasoning && reasoningEffort === undefined) foundReasoning = await discovery.discoverReasoningEffort?.(selection);
-      } catch { diagnostics.push({ discovery: discovery.name ?? `discovery-${index + 1}`, code: "DISCOVERY_FAILED", observedAt: Date.now() }); continue; }
+        if (!skipReasoning && reasoningEffort === undefined)
+          foundReasoning = await discovery.discoverReasoningEffort?.(selection);
+      } catch {
+        diagnostics.push({
+          discovery: discovery.name ?? `discovery-${index + 1}`,
+          code: "DISCOVERY_FAILED",
+          observedAt: Date.now(),
+        });
+        continue;
+      }
       if (found !== undefined) assertCapabilityFields(found);
       if (foundReasoning !== undefined) assertReasoningCapabilities(foundReasoning);
-      if (found !== undefined) for (const field of requested) if (fields[field] === undefined && found[field] !== undefined) fields[field] = found[field];
+      if (found !== undefined)
+        for (const field of requested)
+          if (fields[field] === undefined && found[field] !== undefined) fields[field] = found[field];
       reasoningEffort ??= foundReasoning;
     }
     const observedAt = Date.now();
     return omitUndefined({ fields, reasoningEffort, observedAt, expiresAt: observedAt + this.ttl, diagnostics });
   }
 }
-export function createModelCapabilityResolver(options: ModelCapabilityResolverOptions = {}): ModelCapabilityResolver { return new ModelCapabilityResolver(options); }
-export function connectionIdentity(selection: ProviderModelSelection): string { return digest({ provider: selection.provider, adapter: selection.adapter, config: selection.providerConfig }); }
+export function createModelCapabilityResolver(options: ModelCapabilityResolverOptions = {}): ModelCapabilityResolver {
+  return new ModelCapabilityResolver(options);
+}
+export function connectionIdentity(selection: ProviderModelSelection): string {
+  return digest({ provider: selection.provider, adapter: selection.adapter, config: selection.providerConfig });
+}
 const UNKNOWN = { status: "unknown", source: "unknown" } as const;
-function known(value: ModelCapabilityDeclaration, source: Exclude<ModelCapabilitySource, "unknown">): CapabilityValue { return value === false ? { status: "unsupported", source } : { status: "known", source, value }; }
-function declaredFields(overrides: ModelCapabilitiesOverride | undefined, source: Exclude<ModelCapabilitySource, "unknown">): ModelCapabilityFields { return Object.fromEntries(Object.entries(overrides?.fields ?? {}).map(([field, value]) => [field, known(value, source)])); }
+function known(value: ModelCapabilityDeclaration, source: Exclude<ModelCapabilitySource, "unknown">): CapabilityValue {
+  return value === false ? { status: "unsupported", source } : { status: "known", source, value };
+}
+function declaredFields(
+  overrides: ModelCapabilitiesOverride | undefined,
+  source: Exclude<ModelCapabilitySource, "unknown">,
+): ModelCapabilityFields {
+  return Object.fromEntries(
+    Object.entries(overrides?.fields ?? {}).map(([field, value]) => [field, known(value, source)]),
+  );
+}
 function declaredLimit(selection: ProviderModelSelection, field: ModelCapabilityKey): CapabilityValue | undefined {
   if (field !== "contextWindowTokens" && field !== "maxOutputTokens") return undefined;
   const value = selection.limits?.[field];
   return value === undefined ? undefined : known(value, "user");
 }
-function declaredReasoning(overrides: ModelCapabilitiesOverride | undefined, source: Exclude<ModelCapabilitySource, "unknown">): ReasoningEffortCapabilities | undefined {
+function declaredReasoning(
+  overrides: ModelCapabilitiesOverride | undefined,
+  source: Exclude<ModelCapabilitySource, "unknown">,
+): ReasoningEffortCapabilities | undefined {
   const reasoning = overrides?.reasoning;
   if (reasoning === undefined) return undefined;
   if (reasoning === false || reasoning.efforts.length === 0) return { status: "unsupported", source };
-  return omitUndefined({ status: "known", source, efforts: [...reasoning.efforts], defaultEffort: reasoning.defaultEffort });
+  return omitUndefined({
+    status: "known",
+    source,
+    efforts: [...reasoning.efforts],
+    defaultEffort: reasoning.defaultEffort,
+  });
 }
-function intersectReasoning(model: ReasoningEffortCapabilities, connection: ReasoningEffortCapabilities | undefined): ReasoningEffortCapabilities {
+function intersectReasoning(
+  model: ReasoningEffortCapabilities,
+  connection: ReasoningEffortCapabilities | undefined,
+): ReasoningEffortCapabilities {
   if (model.status === "unsupported") return model;
   if (connection?.status === "unsupported") return connection;
   if (model.status !== "known" || connection?.status === "unknown") return UNKNOWN;
@@ -228,61 +371,134 @@ function intersectReasoning(model: ReasoningEffortCapabilities, connection: Reas
   const efforts = model.efforts.filter((effort) => connection.efforts.includes(effort));
   if (efforts.length === 0) return { status: "unsupported", source: connection.source };
   const defaultEffort = connection.defaultEffort ?? model.defaultEffort;
-  return { status: "known", source: connection.source, efforts, ...(defaultEffort !== undefined && efforts.includes(defaultEffort) ? { defaultEffort } : {}) };
+  return {
+    status: "known",
+    source: connection.source,
+    efforts,
+    ...(defaultEffort !== undefined && efforts.includes(defaultEffort) ? { defaultEffort } : {}),
+  };
 }
-function intersectCapability(field: ModelCapabilityKey, values: readonly (CapabilityValue | undefined)[]): CapabilityValue {
+function intersectCapability(
+  field: ModelCapabilityKey,
+  values: readonly (CapabilityValue | undefined)[],
+): CapabilityValue {
   const unsupported = values.find((value) => value?.status === "unsupported");
   if (unsupported !== undefined) return unsupported;
   if (values.some((value) => value?.status === "unknown")) return UNKNOWN;
-  const concrete = values.filter((value): value is Extract<CapabilityValue, { status: "known" }> => value?.status === "known");
+  const concrete = values.filter(
+    (value): value is Extract<CapabilityValue, { status: "known" }> => value?.status === "known",
+  );
   if (concrete.length === 0) return UNKNOWN;
   let value = concrete[0]!.value;
   let source = concrete[0]!.source;
   for (const next of concrete.slice(1)) {
     const previous = JSON.stringify(value);
     if (typeof value === "number" && typeof next.value === "number") value = Math.min(value, next.value);
-    else if (Array.isArray(value) && Array.isArray(next.value)) value = value.filter((item) => (next.value as readonly string[]).includes(item));
-    else if (field === "parameters" || field === "structuredOutput.schemaConstraint") value = { allOf: [value, next.value] };
+    else if (Array.isArray(value) && Array.isArray(next.value))
+      value = value.filter((item) => (next.value as readonly string[]).includes(item));
+    else if (field === "parameters" || field === "structuredOutput.schemaConstraint")
+      value = { allOf: [value, next.value] };
     if (JSON.stringify(value) !== previous) source = next.source;
   }
   if (Array.isArray(value) && value.length === 0) return { status: "unsupported", source: concrete.at(-1)!.source };
   return { status: "known", source, value };
 }
 export function builtinAdapterCapabilities(adapter: string): ModelCapabilityFields {
-  if (adapter === "google-gemini") return Object.fromEntries(Object.entries({
-    "input.text": true, "input.image": true, "input.audio": true, "input.file": true, "input.resource": false,
-    "input.image.sources": ["url", "base64"], "input.audio.sources": ["url", "base64"], "input.file.sources": ["url", "base64"],
-    "output.text": true, "output.image": true, "output.audio": true, tools: true,
-    "structuredOutput.json": true, "structuredOutput.jsonSchema": true,
-    "structuredOutput.schemaDialects": ["draft-07", "2020-12"], contextCompaction: false,
-    "reasoning.modes": ["effort", "budget"],
-  }).map(([field, value]) => [field, known(value, "adapter")]));
-  if (!["openai-responses", "openai-chat-completions", "deepseek-chat", "kimi-chat", "zhipu-chat", "anthropic-messages"].includes(adapter)) return {};
+  if (adapter === "google-gemini")
+    return Object.fromEntries(
+      Object.entries({
+        "input.text": true,
+        "input.image": true,
+        "input.audio": true,
+        "input.file": true,
+        "input.resource": false,
+        "input.image.sources": ["url", "base64"],
+        "input.audio.sources": ["url", "base64"],
+        "input.file.sources": ["url", "base64"],
+        "output.text": true,
+        "output.image": true,
+        "output.audio": true,
+        tools: true,
+        "structuredOutput.json": true,
+        "structuredOutput.jsonSchema": true,
+        "structuredOutput.schemaDialects": ["draft-07", "2020-12"],
+        contextCompaction: false,
+        "reasoning.modes": ["effort", "budget"],
+      }).map(([field, value]) => [field, known(value, "adapter")]),
+    );
+  if (
+    ![
+      "openai-responses",
+      "openai-chat-completions",
+      "deepseek-chat",
+      "kimi-chat",
+      "zhipu-chat",
+      "anthropic-messages",
+    ].includes(adapter)
+  )
+    return {};
   const responses = adapter === "openai-responses";
   const anthropic = adapter === "anthropic-messages";
   const openaiChat = adapter === "openai-chat-completions";
   const values: Partial<Record<ModelCapabilityKey, ModelCapabilityDeclaration>> = {
-    "input.text": true, "input.image": true, "input.audio": false, "input.file": responses || anthropic,
-    "input.resource": false, "input.image.sources": responses || anthropic ? ["url", "base64", "file"] : ["url", "base64"],
+    "input.text": true,
+    "input.image": true,
+    "input.audio": false,
+    "input.file": responses || anthropic,
+    "input.resource": false,
+    "input.image.sources": responses || anthropic ? ["url", "base64", "file"] : ["url", "base64"],
     "input.file.sources": responses || anthropic ? ["url", "base64", "file"] : false,
-    "output.text": true, "output.image": responses, "output.audio": false, tools: true,
-    "structuredOutput.json": responses || openaiChat, "structuredOutput.jsonSchema": responses || openaiChat,
+    "output.text": true,
+    "output.image": responses,
+    "output.audio": false,
+    tools: true,
+    "structuredOutput.json": responses || openaiChat,
+    "structuredOutput.jsonSchema": responses || openaiChat,
     "structuredOutput.schemaDialects": responses || openaiChat ? ["draft-07", "2020-12"] : false,
     contextCompaction: responses,
-    "reasoning.modes": anthropic ? ["effort", "budget", "adaptive"] : responses ? ["effort", "summary"] : openaiChat ? ["effort"] : ["effort", "thinking"],
+    "reasoning.modes": anthropic
+      ? ["effort", "budget", "adaptive"]
+      : responses
+        ? ["effort", "summary"]
+        : openaiChat
+          ? ["effort"]
+          : ["effort", "thinking"],
   };
   return Object.fromEntries(Object.entries(values).map(([field, value]) => [field, known(value, "adapter")]));
 }
-interface CatalogReasoningEffort { readonly efforts: readonly string[]; readonly defaultEffort?: string }
+interface CatalogReasoningEffort {
+  readonly efforts: readonly string[];
+  readonly defaultEffort?: string;
+}
 const BUILTIN_REASONING_EFFORTS = new Map<string, CatalogReasoningEffort>([
-  ...["openai-responses", "openai-chat-completions"].flatMap((adapter) => ["gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"].map((model) => [catalogKey(adapter, model), { efforts: ["none", "low", "medium", "high", "xhigh", "max"], defaultEffort: "medium" }] as const)),
-  ...["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp"].map((model) => [catalogKey("deepseek-chat", model), { efforts: ["low", "high", "max"], defaultEffort: "high" }] as const),
+  ...["openai-responses", "openai-chat-completions"].flatMap((adapter) =>
+    ["gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"].map(
+      (model) =>
+        [
+          catalogKey(adapter, model),
+          { efforts: ["none", "low", "medium", "high", "xhigh", "max"], defaultEffort: "medium" },
+        ] as const,
+    ),
+  ),
+  ...["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp"].map(
+    (model) =>
+      [catalogKey("deepseek-chat", model), { efforts: ["low", "high", "max"], defaultEffort: "high" }] as const,
+  ),
 ]);
 function builtinReasoningEffort(selection: ProviderModelSelection): ReasoningEffortCapabilities | undefined {
   const entry = BUILTIN_REASONING_EFFORTS.get(catalogKey(selection.adapter, selection.model));
-  return entry === undefined ? undefined : omitUndefined({ status: "known", source: "builtin", efforts: [...entry.efforts], defaultEffort: entry.defaultEffort });
+  return entry === undefined
+    ? undefined
+    : omitUndefined({
+        status: "known",
+        source: "builtin",
+        efforts: [...entry.efforts],
+        defaultEffort: entry.defaultEffort,
+      });
 }
-function catalogKey(adapter: string, model: string): string { return `${adapter}\u0000${model}`; }
+function catalogKey(adapter: string, model: string): string {
+  return `${adapter}\u0000${model}`;
+}
 interface ModelEndpoint {
   readonly url: string;
   readonly headers: Record<string, string>;
@@ -296,48 +512,79 @@ const BEARER_DEFAULT_BASE_URLS: Readonly<Record<string, string>> = {
   "kimi-chat": "https://api.moonshot.ai/v1",
   "zhipu-chat": "https://open.bigmodel.cn/api/paas/v4",
 };
-function trimBaseURL(value: string): string { return value.replace(/\/+$/u, ""); }
+function trimBaseURL(value: string): string {
+  return value.replace(/\/+$/u, "");
+}
 /** Finds `models[]` entries by `slug` (CLIProxyAPI's Codex catalog) and `data[]` entries by `id`. */
 function listEntry(model: string): (body: Record<string, unknown>) => unknown {
-  return (body) => Array.isArray(body.models) ? body.models.find((entry) => isRecord(entry) && entry.slug === model)
-    : Array.isArray(body.data) ? body.data.find((entry) => isRecord(entry) && entry.id === model) : undefined;
+  return (body) =>
+    Array.isArray(body.models)
+      ? body.models.find((entry) => isRecord(entry) && entry.slug === model)
+      : Array.isArray(body.data)
+        ? body.data.find((entry) => isRecord(entry) && entry.id === model)
+        : undefined;
 }
 function modelEndpoint(selection: ProviderModelSelection): ModelEndpoint | undefined {
   const { adapter, model, providerConfig, options } = selection;
-  const apiKey = providerConfig.apiKey === undefined || providerConfig.apiKey.trim() === "" ? undefined : providerConfig.apiKey;
+  const apiKey =
+    providerConfig.apiKey === undefined || providerConfig.apiKey.trim() === "" ? undefined : providerConfig.apiKey;
   const bearer = BEARER_DEFAULT_BASE_URLS[adapter];
   if (bearer !== undefined) {
-    return { url: `${trimBaseURL(providerConfig.baseURL ?? bearer)}/models?client_version=may`,
-      headers: apiKey === undefined ? {} : { Authorization: `Bearer ${apiKey}` }, entry: listEntry(model) };
+    return {
+      url: `${trimBaseURL(providerConfig.baseURL ?? bearer)}/models?client_version=may`,
+      headers: apiKey === undefined ? {} : { Authorization: `Bearer ${apiKey}` },
+      entry: listEntry(model),
+    };
   }
   if (adapter === "anthropic-messages") {
-    return { url: `${trimBaseURL(providerConfig.baseURL ?? "https://api.anthropic.com")}/v1/models?limit=1000`,
-      headers: { "anthropic-version": typeof options.apiVersion === "string" ? options.apiVersion : "2023-06-01", ...(apiKey === undefined ? {} : { "x-api-key": apiKey }) },
-      entry: listEntry(model) };
+    return {
+      url: `${trimBaseURL(providerConfig.baseURL ?? "https://api.anthropic.com")}/v1/models?limit=1000`,
+      headers: {
+        "anthropic-version": typeof options.apiVersion === "string" ? options.apiVersion : "2023-06-01",
+        ...(apiKey === undefined ? {} : { "x-api-key": apiKey }),
+      },
+      entry: listEntry(model),
+    };
   }
   if (adapter === "google-gemini") {
-    return { url: `${trimBaseURL(providerConfig.baseURL ?? "https://generativelanguage.googleapis.com/v1beta")}/models/${encodeURIComponent(model)}`,
-      headers: apiKey === undefined ? {} : { "x-goog-api-key": apiKey }, entry: (body) => body };
+    return {
+      url: `${trimBaseURL(providerConfig.baseURL ?? "https://generativelanguage.googleapis.com/v1beta")}/models/${encodeURIComponent(model)}`,
+      headers: apiKey === undefined ? {} : { "x-goog-api-key": apiKey },
+      entry: (body) => body,
+    };
   }
   return undefined;
 }
 function effortNames(levels: readonly unknown[]): string[] {
-  return [...new Set(levels.flatMap((level) => {
-    const effort = typeof level === "string" ? level : isRecord(level) ? level.effort : undefined;
-    return typeof effort === "string" && effort.trim() !== "" ? [effort] : [];
-  }))];
+  return [
+    ...new Set(
+      levels.flatMap((level) => {
+        const effort = typeof level === "string" ? level : isRecord(level) ? level.effort : undefined;
+        return typeof effort === "string" && effort.trim() !== "" ? [effort] : [];
+      }),
+    ),
+  ];
 }
 /** Reads `supported_reasoning_levels`, `reasoning_levels`, `effort.supported_levels` or Gemini's `thinking: false`. */
 function entryReasoningEffort(entry: Record<string, unknown>): ReasoningEffortCapabilities | undefined {
   const effort = isRecord(entry.effort) ? entry.effort : undefined;
-  const levels = Array.isArray(entry.supported_reasoning_levels) ? entry.supported_reasoning_levels
-    : Array.isArray(entry.reasoning_levels) ? entry.reasoning_levels
-      : Array.isArray(effort?.supported_levels) ? effort.supported_levels : undefined;
+  const levels = Array.isArray(entry.supported_reasoning_levels)
+    ? entry.supported_reasoning_levels
+    : Array.isArray(entry.reasoning_levels)
+      ? entry.reasoning_levels
+      : Array.isArray(effort?.supported_levels)
+        ? effort.supported_levels
+        : undefined;
   if (levels === undefined) return entry.thinking === false ? { status: "unsupported", source: "provider" } : undefined;
   const efforts = effortNames(levels);
   if (efforts.length === 0) return undefined;
   const defaultEffort = entry.default_reasoning_level ?? effort?.default_level;
-  return { status: "known", source: "provider", efforts, ...(typeof defaultEffort === "string" && efforts.includes(defaultEffort) ? { defaultEffort } : {}) };
+  return {
+    status: "known",
+    source: "provider",
+    efforts,
+    ...(typeof defaultEffort === "string" && efforts.includes(defaultEffort) ? { defaultEffort } : {}),
+  };
 }
 /** Reads reasoning levels from the model endpoint of every built-in adapter. */
 class ModelListCapabilityDiscovery implements ModelCapabilityDiscovery {
@@ -346,7 +593,10 @@ class ModelListCapabilityDiscovery implements ModelCapabilityDiscovery {
   async discoverReasoningEffort(selection: ProviderModelSelection): Promise<ReasoningEffortCapabilities | undefined> {
     const endpoint = modelEndpoint(selection);
     if (endpoint === undefined) return undefined;
-    const response = await this.fetchImplementation(endpoint.url, { signal: AbortSignal.timeout(10_000), headers: endpoint.headers });
+    const response = await this.fetchImplementation(endpoint.url, {
+      signal: AbortSignal.timeout(10_000),
+      headers: endpoint.headers,
+    });
     if (response.status === 404) return undefined;
     if (!response.ok) throw new Error("Capability catalog request failed");
     const value: unknown = await response.json();
@@ -355,28 +605,51 @@ class ModelListCapabilityDiscovery implements ModelCapabilityDiscovery {
     return isRecord(entry) ? entryReasoningEffort(entry) : undefined;
   }
 }
-function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 function assertCapabilityFields(fields: ModelCapabilityFields): void {
   const declarations: Record<string, ModelCapabilityDeclaration> = {};
   for (const [field, capability] of Object.entries(fields)) {
-    if (!MODEL_CAPABILITY_KEYS.includes(field as ModelCapabilityKey) || !isRecord(capability)) throw new TypeError("Invalid discovered capability field");
+    if (!MODEL_CAPABILITY_KEYS.includes(field as ModelCapabilityKey) || !isRecord(capability))
+      throw new TypeError("Invalid discovered capability field");
     if (capability.status === "unknown" && capability.source === "unknown") continue;
-    if (!["user", "provider", "builtin", "adapter"].includes(String(capability.source))) throw new TypeError("Invalid capability source");
+    if (!["user", "provider", "builtin", "adapter"].includes(String(capability.source)))
+      throw new TypeError("Invalid capability source");
     if (capability.status === "unsupported") declarations[field] = false;
     else if (capability.status === "known") {
       if (capability.value === false) throw new TypeError("False capability declarations require unsupported status");
       declarations[field] = capability.value as ModelCapabilityDeclaration;
-    }
-    else throw new TypeError("Invalid capability status");
+    } else throw new TypeError("Invalid capability status");
   }
-  parseMayConfig({ providers: { metadata: { adapter: "metadata" } }, models: { metadata: { provider: "metadata", model: "metadata", capabilities: { fields: declarations } } } });
+  parseMayConfig({
+    providers: { metadata: { adapter: "metadata" } },
+    models: { metadata: { provider: "metadata", model: "metadata", capabilities: { fields: declarations } } },
+  });
 }
 function assertReasoningCapabilities(capability: ReasoningEffortCapabilities): void {
   if (capability.status === "unknown" && capability.source === "unknown") return;
-  if (!["user", "provider", "builtin", "adapter"].includes(capability.source)) throw new TypeError("Invalid reasoning capability source");
+  if (!["user", "provider", "builtin", "adapter"].includes(capability.source))
+    throw new TypeError("Invalid reasoning capability source");
   if (capability.status === "unsupported") return;
   if (capability.status !== "known") throw new TypeError("Invalid reasoning capability status");
-  parseMayConfig({ providers: { metadata: { adapter: "metadata" } }, models: { metadata: { provider: "metadata", model: "metadata", capabilities: { reasoning: omitUndefined({ efforts: capability.efforts, defaultEffort: capability.defaultEffort }) } } } });
+  parseMayConfig({
+    providers: { metadata: { adapter: "metadata" } },
+    models: {
+      metadata: {
+        provider: "metadata",
+        model: "metadata",
+        capabilities: {
+          reasoning: omitUndefined({ efforts: capability.efforts, defaultEffort: capability.defaultEffort }),
+        },
+      },
+    },
+  });
 }
-function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
-function positive(value: number, field: string): number { if (!Number.isSafeInteger(value) || value < 1) throw new RangeError(`${field} must be a positive safe integer`); return value; }
+function digest(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+function positive(value: number, field: string): number {
+  if (!Number.isSafeInteger(value) || value < 1) throw new RangeError(`${field} must be a positive safe integer`);
+  return value;
+}

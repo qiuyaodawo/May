@@ -23,6 +23,7 @@
   Add provider-neutral JSON and JSON Schema response formats, configuration defaults and Ajv validation of final responses. OpenAI Responses and Chat Completions serialize native structured-output formats. Adapters without response-format transport reject unsupported format requests before sending.
 
   Final response validation errors carry Usage/cost receipts and physical completion through ModelResponseValidationError. Runtime, budgets and retry attempt telemetry retain accounting for failed structured responses; completed validation failures are never retried and error messages exclude response content.
+
 - 0dc3f68: Chat Completions 兼容流检测服务端顶层 `error`，HTTP 200 内的错误不再被忽略。
   `@sortedyuan/provider-openai-compatible` 导出的 `streamOpenAICompatibleResponse` 在遇到带顶层
   `error` 的 chunk 时立即通过 `protocolError` 失败，可见的错误消息保留服务端的 `message`、

@@ -1,11 +1,7 @@
 import { atomicWriteText } from "./atomic-write.js";
 import type { Tool } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
-import {
-  requireObject,
-  requirePositiveIntegerOption,
-  requireString,
-} from "./input.js";
+import { requireObject, requirePositiveIntegerOption, requireString } from "./input.js";
 import { assertTextWithinLimit, readTextFile } from "./text-file.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
 import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
@@ -31,15 +27,8 @@ export interface EditToolOutput {
   readonly replacements: 1;
 }
 
-export function createEditTool(options: EditToolOptions): Tool<
-  EditToolInput,
-  EditToolOutput
-> {
-  const maxBytes = requirePositiveIntegerOption(
-    options.maxBytes,
-    DEFAULT_EDIT_MAX_BYTES,
-    "maxBytes",
-  );
+export function createEditTool(options: EditToolOptions): Tool<EditToolInput, EditToolOutput> {
+  const maxBytes = requirePositiveIntegerOption(options.maxBytes, DEFAULT_EDIT_MAX_BYTES, "maxBytes");
 
   return {
     name: "edit",
@@ -69,18 +58,10 @@ export function createEditTool(options: EditToolOptions): Tool<
         allowHardLinks: options.allowHardLinks === true,
       });
       const edit = async () => {
-        const original = await readTextFile(
-          file.absolute,
-          file.relative,
-          maxBytes,
-          context.signal,
-        );
+        const original = await readTextFile(file.absolute, file.relative, maxBytes, context.signal);
         const occurrences = countOccurrences(original, input.oldText, 2);
         if (occurrences === 0) {
-          throw new CodingToolError(
-            "CODING_TOOL_EDIT_NOT_FOUND",
-            `edit: oldText was not found in ${file.relative}`,
-          );
+          throw new CodingToolError("CODING_TOOL_EDIT_NOT_FOUND", `edit: oldText was not found in ${file.relative}`);
         }
         if (occurrences > 1) {
           throw new CodingToolError(
@@ -97,12 +78,14 @@ export function createEditTool(options: EditToolOptions): Tool<
       };
       if (options.guard === undefined) return (await edit()).output;
       const exists = await assertFileExistence(file, context.signal);
-      return (await options.guard<{ readonly output: EditToolOutput; readonly content: string }>({
-        tool: "edit",
-        path: file,
-        exists,
-        run: edit,
-      })).output;
+      return (
+        await options.guard<{ readonly output: EditToolOutput; readonly content: string }>({
+          tool: "edit",
+          path: file,
+          exists,
+          run: edit,
+        })
+      ).output;
     },
   };
 }

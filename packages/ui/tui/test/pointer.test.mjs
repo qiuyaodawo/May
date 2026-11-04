@@ -3,15 +3,15 @@ import { PassThrough } from "node:stream";
 import test from "node:test";
 import { NodeTerminalDriver } from "../dist/index.js";
 
-test("按下、拖动、释放报告转换为从零开始的坐标和按键编号", t => {
+test("按下、拖动、释放报告转换为从零开始的坐标和按键编号", (t) => {
   const input = new PassThrough();
   const output = new PassThrough();
   const driver = new NodeTerminalDriver({ input, output, requireTTY: false });
   t.after(() => driver.close());
   const pointers = [];
   const keys = [];
-  const remove = driver.onPointer(event => pointers.push(event));
-  driver.onKey(event => keys.push(event));
+  const remove = driver.onPointer((event) => pointers.push(event));
+  driver.onKey((event) => keys.push(event));
   driver.start();
   input.write("\x1b[<0;1;1M");
   assert.deepEqual(pointers, []);
@@ -39,7 +39,7 @@ test("终端生命周期启用拖动报告并完整关闭鼠标模式", () => {
   const input = new PassThrough();
   const output = new PassThrough();
   let content = "";
-  output.on("data", chunk => content += chunk.toString());
+  output.on("data", (chunk) => (content += chunk.toString()));
   const driver = new NodeTerminalDriver({ input, output, requireTTY: false });
   driver.start();
   driver.enterAlternateScreen();

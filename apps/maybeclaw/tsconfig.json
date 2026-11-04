@@ -6,9 +6,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "resolveJsonModule": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
   "references": [
     { "path": "../../packages/may" },
@@ -21,8 +19,5 @@
     { "path": "../../packages/ui/client" },
     { "path": "../../packages/ui/web" }
   ],
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.json"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.json"]
 }

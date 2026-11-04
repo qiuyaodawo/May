@@ -18,10 +18,7 @@ test("edit replaces one exact occurrence", async (t) => {
   });
 
   assert.deepEqual(result, { path: "file.txt", replacements: 1 });
-  assert.equal(
-    await readFile(join(cwd, "file.txt"), "utf8"),
-    "before updated after",
-  );
+  assert.equal(await readFile(join(cwd, "file.txt"), "utf8"), "before updated after");
 });
 
 test("read/edit preserves CRLF and literal dollar sequences; aborted staging preserves the destination", async (t) => {
@@ -30,7 +27,11 @@ test("read/edit preserves CRLF and literal dollar sequences; aborted staging pre
   await writeFile(path, "one\r\ntwo\r\n");
   const { content } = await executeTool(createReadTool({ cwd }), { path: "script.txt" });
   const replacement = "$$ $& $` $' $1\r\n";
-  const preview = await createToolChangePreview(cwd, "edit", { path: "script.txt", oldText: content, newText: replacement });
+  const preview = await createToolChangePreview(cwd, "edit", {
+    path: "script.txt",
+    oldText: content,
+    newText: replacement,
+  });
   assert.equal(preview.status, "ready");
   assert.ok(preview.diff.includes("$$ $& $` $' $1"));
   await executeTool(createEditTool({ cwd }), { path: "script.txt", oldText: content, newText: replacement });

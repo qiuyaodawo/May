@@ -2,8 +2,14 @@ import type { Usage } from "./types.js";
 import { omitUndefined } from "./omit-undefined.js";
 import { resolveUsageTotals } from "./pricing.js";
 import {
-  endTraceSpan, setTraceAttributes, startTraceSpan,
-  type TraceAttributes, type TraceContext, type TraceError, type TraceSpanStatus, type Tracer,
+  endTraceSpan,
+  setTraceAttributes,
+  startTraceSpan,
+  type TraceAttributes,
+  type TraceContext,
+  type TraceError,
+  type TraceSpanStatus,
+  type Tracer,
 } from "./tracing.js";
 
 export interface ModelAttemptEnd {
@@ -34,7 +40,8 @@ export function createModelAttemptObserver(options: {
 }): ModelAttemptObserver {
   return {
     retryWait(durationMs) {
-      if (!Number.isFinite(durationMs) || durationMs < 0) throw new RangeError("Retry wait duration must be a non-negative finite number");
+      if (!Number.isFinite(durationMs) || durationMs < 0)
+        throw new RangeError("Retry wait duration must be a non-negative finite number");
       options.onRetryWait?.(durationMs);
     },
     start(attempt) {
@@ -68,23 +75,26 @@ export function createModelAttemptObserver(options: {
         end(end) {
           if (ended) return;
           ended = true;
-          endTraceSpan(span, omitUndefined({
-            status: end.status,
-            error: end.error,
-            attributes: omitUndefined({
-              "may.model.has_content": content,
-              "may.model.has_text": text,
-              "may.model.completed": end.completed === true,
-              "may.model.usage_available": end.usage !== undefined,
-              "may.model.usage_complete": resolveUsageTotals(end.usage).complete,
-              "may.model.input_tokens": end.usage?.inputTokens,
-              "may.model.output_tokens": end.usage?.outputTokens,
-              "may.model.total_tokens": end.usage?.totalTokens,
-              "may.model.cached_read_tokens": end.usage?.cachedReadTokens,
-              "may.model.cached_write_tokens": end.usage?.cachedWriteTokens,
-              "may.model.reasoning_tokens": end.usage?.reasoningTokens,
+          endTraceSpan(
+            span,
+            omitUndefined({
+              status: end.status,
+              error: end.error,
+              attributes: omitUndefined({
+                "may.model.has_content": content,
+                "may.model.has_text": text,
+                "may.model.completed": end.completed === true,
+                "may.model.usage_available": end.usage !== undefined,
+                "may.model.usage_complete": resolveUsageTotals(end.usage).complete,
+                "may.model.input_tokens": end.usage?.inputTokens,
+                "may.model.output_tokens": end.usage?.outputTokens,
+                "may.model.total_tokens": end.usage?.totalTokens,
+                "may.model.cached_read_tokens": end.usage?.cachedReadTokens,
+                "may.model.cached_write_tokens": end.usage?.cachedWriteTokens,
+                "may.model.reasoning_tokens": end.usage?.reasoningTokens,
+              }),
             }),
-          }));
+          );
         },
       };
     },

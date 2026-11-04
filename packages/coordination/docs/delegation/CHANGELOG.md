@@ -70,6 +70,7 @@
   in each request, sharing preparation across main and delegated Agents and retaining
   the lease through Goal verification. Startup and read-only requests leave Git state
   unchanged. Each modifying request saves existing user edits before accepting tool writes.
+
 - 89bcd8d: Expose existing Agent functionality as reusable plugins with declared services,
   dependencies and managed resource lifecycles. Add shared typed service tokens and
   ordered tool, instruction, Model and Context contribution registries. Application
@@ -104,6 +105,7 @@
   Skills state is saved through versioned plugin state while existing Session
   activation records remain readable. Goals and history-memory retain their existing
   durable state records for migration.
+
 - c8c14c7: Skills 初始提供名称、描述及兼容要求，通过 `skill_read` 按需读取正文与资源；
   保留已激活文档的 Session 持久化行为，并明确指令贡献顺序。
 
@@ -112,6 +114,7 @@
 
   新增基础与项目指令来源、运行前刷新及权限模式 callbacks，使子 Session 按顺序接收
   自己的运行环境、项目规则与任务说明。
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`
@@ -133,11 +136,13 @@
   增加可选 service 查询、本地诊断与独立指标服务，以及可复用的 UI 诊断面板。宿主可以
   按会话范围查询执行记录、刷新模型能力，并独立管理遥测资源。子 Agent 预算包装保留
   模型配置、能力版本和物理请求观察信息。
+
 - 8df2b63: Allow Goal Run handles to finalize host resources after verification and durable goal-state updates. Finalization receives completed, continued, failed or cancelled outcomes and finishes before another Run begins, enabling final file checkpoints and workspace leases that remain active during verification.
 
   Allow delegated model calls to share Goal token accounting, budgets and cancellation while retaining their own task instructions. Apply this wrapper to both default and role-specific child models, so delegated work can execute within an active Goal.
 
   Expose the updated controller through goalsService. Goal cancellation and budget exhaustion cancel the current execution handle, including delegated tools and executions whose handles arrive after cancellation, and await host finalization before finishing.
+
 - Updated dependencies [02789c6]
 - Updated dependencies [02789c6]
 - Updated dependencies [0dc3f68]

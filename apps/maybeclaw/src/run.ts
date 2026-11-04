@@ -16,6 +16,7 @@ export async function runMaybeClaw(args: readonly string[], deps: MaybeClawDepen
     return 0;
   }
   const { runGatewayCommand } = await import("./gateway-run.js");
-  if (args.length === 0 || args[0]!.startsWith("--")) return runGatewayCommand(["serve", ...args], deps, { openBrowser: true });
+  if (args.length === 0 || args[0]!.startsWith("--"))
+    return runGatewayCommand(["serve", ...args], deps, { openBrowser: true });
   return runGatewayCommand(args, deps);
 }

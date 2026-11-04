@@ -10,11 +10,11 @@ import { Text } from "../../dist/index.js";
 
 const require = createRequire(import.meta.url);
 
-test("xterm 续行的 RGB 前景、背景与组合样式保持一致", { timeout: 60000 }, async t => {
+test("xterm 续行的 RGB 前景、背景与组合样式保持一致", { timeout: 60000 }, async (t) => {
   const base = join(testOutputRoot, "tui", "notice-colors");
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "terminal-"));
-  const variables = Object.fromEntries(["TMP", "TEMP", "TMPDIR"].map(key => [key, process.env[key]]));
+  const variables = Object.fromEntries(["TMP", "TEMP", "TMPDIR"].map((key) => [key, process.env[key]]));
   for (const key of Object.keys(variables)) process.env[key] = directory;
   t.after(() => {
     for (const [key, value] of Object.entries(variables)) {
@@ -35,20 +35,39 @@ test("xterm 续行的 RGB 前景、背景与组合样式保持一致", { timeout
     continuationIndent: 2,
     style: { foreground: "#94a3b8", background: "#123456", bold: true, italic: true, underline: true },
   }).render({ width: 24, height: 50 });
-  await page.evaluate(value => new Promise(resolve => window.term.write(value, resolve)), rendered.lines.join("\r\n"));
-  const rows = await page.evaluate(count => Array.from({ length: count }, (_, y) => {
-    const row = window.term.buffer.active.getLine(y);
-    const cells = [];
-    for (let x = 0; x < window.term.cols; x++) {
-      const cell = row.getCell(x);
-      if (cell.getChars().trim()) cells.push({ x, fg: cell.getFgColor(), bg: cell.getBgColor(), bold: !!cell.isBold(), italic: !!cell.isItalic(), underline: !!cell.isUnderline() });
-    }
-    return cells;
-  }), rendered.lines.length);
+  await page.evaluate(
+    (value) => new Promise((resolve) => window.term.write(value, resolve)),
+    rendered.lines.join("\r\n"),
+  );
+  const rows = await page.evaluate(
+    (count) =>
+      Array.from({ length: count }, (_, y) => {
+        const row = window.term.buffer.active.getLine(y);
+        const cells = [];
+        for (let x = 0; x < window.term.cols; x++) {
+          const cell = row.getCell(x);
+          if (cell.getChars().trim())
+            cells.push({
+              x,
+              fg: cell.getFgColor(),
+              bg: cell.getBgColor(),
+              bold: !!cell.isBold(),
+              italic: !!cell.isItalic(),
+              underline: !!cell.isUnderline(),
+            });
+        }
+        return cells;
+      }),
+    rendered.lines.length,
+  );
   assert.ok(rows.length > 2);
   for (const row of rows) {
     if (row.length === 0) continue;
     assert.ok(row[0].x >= 6);
-    for (const cell of row) assert.deepEqual({ ...cell, x: 0 }, { x: 0, fg: 0x94a3b8, bg: 0x123456, bold: true, italic: true, underline: true });
+    for (const cell of row)
+      assert.deepEqual(
+        { ...cell, x: 0 },
+        { x: 0, fg: 0x94a3b8, bg: 0x123456, bold: true, italic: true, underline: true },
+      );
   }
 });

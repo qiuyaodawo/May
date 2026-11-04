@@ -24,7 +24,7 @@
 
 ```ts
 const run = await controller.submit({ input: "Explain this repository" });
-run.cancel("Cancelled in UI");        // 取消此 Run。
+run.cancel("Cancelled in UI"); // 取消此 Run。
 controller.cancel("Cancelled in UI"); // 取消活动 Run 或压缩操作。
 
 await controller.resolveApproval(requestId, "allow");
@@ -46,19 +46,11 @@ const history = await controller.history();
 对话框。函数持续读取事件，直到 controller 关闭；输入和退出操作需要并发处理。
 
 ```ts
-import type {
-  AgentApplicationEvent,
-  AgentController,
-} from "@sortedyuan/may";
-import type {
-  ApprovalDecision,
-  ApprovalRequest,
-} from "@sortedyuan/may/permissions";
+import type { AgentApplicationEvent, AgentController } from "@sortedyuan/may";
+import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/may/permissions";
 import { TranscriptStore } from "@sortedyuan/tui/transcript";
 
-type AskApproval = (
-  request: ApprovalRequest,
-) => Promise<ApprovalDecision>;
+type AskApproval = (request: ApprovalRequest) => Promise<ApprovalDecision>;
 
 export async function projectApplication(
   controller: AgentController<AgentApplicationEvent>,
@@ -110,11 +102,7 @@ Retained TUI 可以使用以下显示配置调用前面的投影函数。`applic
 生命周期；产品还需要提供输入组件和退出处理。
 
 ```ts
-import {
-  FullscreenRenderer,
-  NodeTerminalDriver,
-  TuiRuntime,
-} from "@sortedyuan/tui";
+import { FullscreenRenderer, NodeTerminalDriver, TuiRuntime } from "@sortedyuan/tui";
 import { TranscriptStore, TranscriptView } from "@sortedyuan/tui/transcript";
 
 const store = new TranscriptStore();
@@ -189,7 +177,6 @@ Run 和资源准备期间同时处理这些事件时，才通过
 `openConfiguredMaybeCode({ mcpInteractions: true })` 启用 broker。不要将答案排在
 Session 状态队列之后。展示服务端和可信归属，校验表单并要求检查/同意，在结算或
 截止时关闭提问。不自动打开浏览器，不记录表单答案历史。参阅 [MCP](./mcp.md)。
-
 
 还须处理宿主拥有的 `params.mode === "review"`：`roots`、`sampling.request` 和
 `sampling.response`。将有大小限制的 `data` 作为不可信内容展示。Roots 为只读；

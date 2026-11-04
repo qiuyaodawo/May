@@ -13,18 +13,18 @@
     },
     {
       "heading": "Headless controller boundary",
-      "en": "b00fc39ffeceaff2462bd8431ae7fdbb1bf2f161d55592e3b00fe312bee2c1d4",
-      "zh": "bc6d87b2d26606338d42b714724a37c51d1781e547daa6dacd8cffee883b4832"
+      "en": "9d98751b1b32d16023745c16f13fb2c0fe3b0c5ffbef31e53f905cd185dd4c87",
+      "zh": "3cfefd0a027a83eafadf70f4318bd14fad438269023ea5a12a07041ceb771495"
     },
     {
       "heading": "Projecting application events",
-      "en": "0a4b3347ddd14ca04f38d1ff1380fd09730493a08305c5251d63ed78dc6a28cc",
-      "zh": "15ca8a67cc030bcd3c88df23c912a6fcf4a94e4e3f8840e2b4c527ff6dd967ce"
+      "en": "476768d3be41a1046f8e7c95b15c2ce6738267e8a8f8095a5998fb515061315c",
+      "zh": "1c9d02c7be80527149fc6f04686d4afe11962079ade4a7eff567a9952f695c81"
     },
     {
       "heading": "Retained terminal rendering",
-      "en": "7f8effea68f6a858d26b9e4988f0c909566d11a7608faef1b9abc3ca4ee1b0f6",
-      "zh": "e14a227f0d7b3a8970da449612b4c17c2c7e5a48e19fd23882bccb01b14061fa"
+      "en": "85390a8ff843b85ba6bd0b033072835808b4b510af910b3aa8b45f8f91476046",
+      "zh": "da7d21ebe560f6a1700d24fac6373eedc73f34246b46ec5df9e8d67ee35f3308"
     },
     {
       "heading": "Event consistency",

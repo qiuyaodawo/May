@@ -6,12 +6,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { InMemoryContext, May } from "@sortedyuan/may/core";
-import {
-  BasicTracer,
-  BatchSpanProcessor,
-  InMemorySpanProcessor,
-  JsonlFileSpanExporter,
-} from "../dist/index.js";
+import { BasicTracer, BatchSpanProcessor, InMemorySpanProcessor, JsonlFileSpanExporter } from "../dist/index.js";
 
 test("records a content-free Core trace with explicit parent relationships", async () => {
   const processor = new InMemorySpanProcessor();
@@ -26,15 +21,17 @@ test("records a content-free Core trace with explicit parent relationships", asy
     tracer,
     traceAttributes: { "may.agent.name": "example" },
     context: new InMemoryContext(),
-    tools: [{
-      name: "echo",
-      description: "Echo a value",
-      inputSchema: { type: "object" },
-      async execute(_input, context) {
-        toolTraceContext = context.traceContext;
-        return { privateOutput: "do-not-capture" };
+    tools: [
+      {
+        name: "echo",
+        description: "Echo a value",
+        inputSchema: { type: "object" },
+        async execute(_input, context) {
+          toolTraceContext = context.traceContext;
+          return { privateOutput: "do-not-capture" };
+        },
       },
-    }],
+    ],
     model: {
       async *stream(_request, options) {
         modelCall += 1;
@@ -52,11 +49,13 @@ test("records a content-free Core trace with explicit parent relationships", asy
             message: {
               role: "assistant",
               content: [],
-              toolCalls: [{
-                id: "call_echo",
-                name: "echo",
-                input: { privateInput: "do-not-capture" },
-              }],
+              toolCalls: [
+                {
+                  id: "call_echo",
+                  name: "echo",
+                  input: { privateInput: "do-not-capture" },
+                },
+              ],
             },
             usage: { inputTokens: 2, outputTokens: 1, totalTokens: 3 },
           };
@@ -88,14 +87,20 @@ test("records a content-free Core trace with explicit parent relationships", asy
   assert.ok(modelSpans.every((span) => span.parentSpanId === root.context.spanId));
   assert.equal(batch.parentSpanId, root.context.spanId);
   assert.equal(tool.parentSpanId, batch.context.spanId);
-  assert.deepEqual(modelTraceContexts, modelSpans.map((span) => span.context));
+  assert.deepEqual(
+    modelTraceContexts,
+    modelSpans.map((span) => span.context),
+  );
   assert.deepEqual(toolTraceContext, tool.context);
   assert.equal(root.attributes["service.name"], "trace-test");
   assert.equal(root.attributes["may.agent.name"], "example");
   assert.equal(root.attributes["may.run.input_tokens"], 5);
   assert.equal(root.attributes["may.run.total_tokens"], 7);
   assert.equal(modelSpans[0].events[0].name, "may.model.retry");
-  assert.equal(spans.every((span) => span.durationMs >= 0), true);
+  assert.equal(
+    spans.every((span) => span.durationMs >= 0),
+    true,
+  );
 
   const serialized = JSON.stringify(spans);
   assert.doesNotMatch(serialized, /private prompt|privateInput|privateOutput|private answer/);
@@ -126,17 +131,20 @@ test("tracing and bounded export failures remain off the Agent failure path", as
   });
   const exported = [];
   let calls = 0;
-  const processor = new BatchSpanProcessor({
-    async export(spans) {
-      calls += 1;
-      if (calls === 1) await firstExport;
-      exported.push(...spans);
+  const processor = new BatchSpanProcessor(
+    {
+      async export(spans) {
+        calls += 1;
+        if (calls === 1) await firstExport;
+        exported.push(...spans);
+      },
     },
-  }, {
-    maxQueueSize: 2,
-    maxExportBatchSize: 1,
-    scheduledDelayMs: 60_000,
-  });
+    {
+      maxQueueSize: 2,
+      maxExportBatchSize: 1,
+      scheduledDelayMs: 60_000,
+    },
+  );
   const tracer = new BasicTracer({ processor });
 
   for (let index = 0; index < 4; index++) {
@@ -177,14 +185,8 @@ test("rotates JSONL spans by local date and retains sixty calendar days", async 
     "traces-2026-09-02.jsonl",
     "traces-2026-09-03.jsonl",
   ]);
-  assert.match(
-    await readFile(join(directory, "traces-2026-09-02.jsonl"), "utf8"),
-    /"name":"previous"/u,
-  );
-  assert.match(
-    await readFile(join(directory, "traces-2026-09-03.jsonl"), "utf8"),
-    /"name":"today"/u,
-  );
+  assert.match(await readFile(join(directory, "traces-2026-09-02.jsonl"), "utf8"), /"name":"previous"/u);
+  assert.match(await readFile(join(directory, "traces-2026-09-03.jsonl"), "utf8"), /"name":"today"/u);
 });
 
 test("batch export completes after real synchronous and asynchronous write failures", () => {

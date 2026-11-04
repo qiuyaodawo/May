@@ -8,8 +8,14 @@ test("history tools expose saved model content and withhold raw and legacy tool 
   const reader = new SessionHistoryReader(store);
   await store.append({ sessionId: "s", seq: 1, timestamp: 0, type: "session.created" });
   for (const [index, content] of [[{ type: "text", text: "public-result-marker" }], [], undefined].entries()) {
-    await store.append({ sessionId: "s", seq: index + 2, timestamp: index, type: "tool.completed",
-      runId: "run", step: 1, call: { id: String(index), name: "read", input: {} },
+    await store.append({
+      sessionId: "s",
+      seq: index + 2,
+      timestamp: index,
+      type: "tool.completed",
+      runId: "run",
+      step: 1,
+      call: { id: String(index), name: "read", input: {} },
       output: { content: "raw-result-marker", _meta: { secret: "host-only-marker" } },
       ...(content === undefined ? {} : { content }),
     });
@@ -37,15 +43,23 @@ test("searches beyond previews and reconstructs large Unicode records without tr
   const store = new InMemorySessionStore();
   const reader = new SessionHistoryReader(store);
   await store.append({ sessionId: "s", seq: 1, timestamp: 0, type: "session.created" });
-  const event = { sessionId: "s", seq: 2, timestamp: 0, type: "input.submitted",
-    message: { role: "user", content: [{ type: "text", text: "😀".repeat(6000) + "THE-NEEDLE" }] } };
+  const event = {
+    sessionId: "s",
+    seq: 2,
+    timestamp: 0,
+    type: "input.submitted",
+    message: { role: "user", content: [{ type: "text", text: "😀".repeat(6000) + "THE-NEEDLE" }] },
+  };
   await store.append(event);
-  const tools = createSessionHistoryRetrievalTools({ source: () => ({ queryHistory: (query) => reader.query("s", query) }) });
+  const tools = createSessionHistoryRetrievalTools({
+    source: () => ({ queryHistory: (query) => reader.query("s", query) }),
+  });
   const context = { signal: new AbortController().signal };
   const [search, read] = tools;
   const results = await search.execute(search.parse({ query: "the-needle" }), context);
   assert.equal(results.matches[0].seq, 2);
-  let text = "", offset = 0;
+  let text = "",
+    offset = 0;
   do {
     const chunk = await read.execute(read.parse({ seq: 2, offset, length: 257 }), context);
     assert.ok(Buffer.byteLength(JSON.stringify(chunk)) < 32768);
@@ -64,12 +78,29 @@ test("search is bounded and paginates without losing matches; replacement views 
   const store = new InMemorySessionStore();
   const reader = new SessionHistoryReader(store);
   await store.append({ sessionId: "s", seq: 1, timestamp: 0, type: "session.created" });
-  for (let seq = 2; seq < 24; seq++) await store.append({ sessionId: "s", seq, timestamp: 0,
-    type: "input.submitted", message: { role: "user", content: [{ type: "text", text: "match\u0000".repeat(1000) }] } });
-  await store.append({ sessionId: "s", seq: 24, timestamp: 0, type: "context.compacted", strategy: "test",
+  for (let seq = 2; seq < 24; seq++)
+    await store.append({
+      sessionId: "s",
+      seq,
+      timestamp: 0,
+      type: "input.submitted",
+      message: { role: "user", content: [{ type: "text", text: "match\u0000".repeat(1000) }] },
+    });
+  await store.append({
+    sessionId: "s",
+    seq: 24,
+    timestamp: 0,
+    type: "context.compacted",
+    strategy: "test",
     messages: [{ role: "user", content: [{ type: "text", text: "hidden-replacement" }] }],
-    beforeMessageCount: 22, afterMessageCount: 1, beforeEstimatedTokens: 2000, afterEstimatedTokens: 10 });
-  const [search, read] = createSessionHistoryRetrievalTools({ source: () => ({ queryHistory: (query) => reader.query("s", query) }) });
+    beforeMessageCount: 22,
+    afterMessageCount: 1,
+    beforeEstimatedTokens: 2000,
+    afterEstimatedTokens: 10,
+  });
+  const [search, read] = createSessionHistoryRetrievalTools({
+    source: () => ({ queryHistory: (query) => reader.query("s", query) }),
+  });
   const context = { signal: new AbortController().signal };
   const seqs = [];
   let afterSeq;
@@ -80,7 +111,10 @@ test("search is bounded and paginates without losing matches; replacement views 
     if (!result.hasMore) break;
     afterSeq = result.nextSeq;
   } while (true);
-  assert.deepEqual(seqs, Array.from({ length: 22 }, (_, index) => index + 2));
+  assert.deepEqual(
+    seqs,
+    Array.from({ length: 22 }, (_, index) => index + 2),
+  );
   const result = await read.execute(read.parse({ seq: 24 }), context);
   assert.doesNotMatch(result.text, /hidden-replacement/);
   assert.match(result.text, /replacementMessageCount/);

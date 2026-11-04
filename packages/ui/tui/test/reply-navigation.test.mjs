@@ -30,9 +30,18 @@ test("completion retains streamed reasoning and new input clears the final reply
   const message = { role: "assistant", content: [{ type: "text", text: "final reply" }] };
   store.applyMayEvent({ ...base, seq: 3, type: "model.completed", message, contextMessageCount: 2 });
   assert.equal(store.latestReply, undefined);
-  store.applyMayEvent({ ...base, seq: 4, type: "run.completed", result: {
-    runId: "run-1", steps: 1, modelCalls: 1, toolCalls: 0, message,
-  } });
+  store.applyMayEvent({
+    ...base,
+    seq: 4,
+    type: "run.completed",
+    result: {
+      runId: "run-1",
+      steps: 1,
+      modelCalls: 1,
+      toolCalls: 0,
+      message,
+    },
+  });
   assert.equal(store.latestReply.text, "final reply");
   assert.equal(store.latestReply.reasoning, "streamed thinking");
   store.appendUser("next question");

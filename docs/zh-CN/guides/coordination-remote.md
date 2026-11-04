@@ -29,14 +29,12 @@ const worker = await CoordinationWorker.open({
   directory: "./worker-data/dispatches",
   token,
   agents: { analyst: workerAgent },
-  authorize: ({ agent, execution }) =>
-    agent === "analyst" && execution.coordinationId === "review-1",
+  authorize: ({ agent, execution }) => agent === "analyst" && execution.coordinationId === "review-1",
   maxConcurrent: 2,
   maxJobs: 128,
 });
 const server = createServer(worker.handle);
 server.listen(8787, "127.0.0.1");
-
 ```
 
 服务期间保持进程运行。关闭时，通过 `server.close()` 停止接受 HTTP 请求，

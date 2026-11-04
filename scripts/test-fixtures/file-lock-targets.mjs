@@ -20,8 +20,17 @@ import { applyTeamPatch, createTeamPatch } from "../../apps/maybecode/dist/team-
 
 const run = promisify(execFile);
 export const targetNames = [
-  "session", "permissions", "coordination", "resource", "worker",
-  "gateway", "setup", "verification", "git", "config", "patch",
+  "session",
+  "permissions",
+  "coordination",
+  "resource",
+  "worker",
+  "gateway",
+  "setup",
+  "verification",
+  "git",
+  "config",
+  "patch",
 ];
 export const configuration = {
   providers: { local: { adapter: "openai-responses" } },
@@ -34,46 +43,76 @@ export async function targetFor(name, directory, initialize = false) {
   if (initialize) await mkdir(directory, { recursive: true });
   if (name === "session") {
     const lockPath = join(directory, "owner.lock");
-    return { lockPath, async acquire() {
-      const lock = await acquireFileLock(lockPath);
-      return { close: () => lock.release() };
-    } };
+    return {
+      lockPath,
+      async acquire() {
+        const lock = await acquireFileLock(lockPath);
+        return { close: () => lock.release() };
+      },
+    };
   }
-  if (name === "permissions") return {
-    lockPath: `${path}.lock`, failurePath: path,
-    acquire: () => FilePermissionRuleStore.open({ path }),
-  };
-  if (name === "coordination") return {
-    lockPath: join(directory, "dGFzaw.lock"), failurePath: join(directory, "dGFzaw.jsonl"),
-    acquire: () => new FileCoordinationStore(directory).acquire("task"),
-  };
-  if (name === "resource") return {
-    lockPath: `${path}.lock`, failurePath: path,
-    acquire: () => ResourceJournal.open(path, { format: 1, revision: 0 }, value => {
-      assert.equal(value.format, 1);
-      assert.ok(Number.isSafeInteger(value.revision) && value.revision >= 0);
-    }),
-  };
-  if (name === "worker") return {
-    lockPath: join(directory, "worker.lock"), failurePath: join(directory, "worker.jsonl"),
-    acquire: () => CoordinationWorker.open({
-      directory, token: "local-lock-verification-token-0123456789", agents: {}, authorize: () => false,
-    }),
-  };
-  if (name === "gateway") return {
-    lockPath: join(directory, "host.lock"), failurePath: join(directory, "gateway.sqlite"),
-    acquire: async () => { const store = GatewayStore.open(directory); return { close: async () => store.close() }; },
-  };
-  if (name === "setup") return {
-    lockPath: `${path}.initialize.lock`, failurePath: path,
-    acquire: () => startGatewaySetup({
-      path, port: 0, activate: async () => { throw new Error("This setup process does not activate a gateway"); },
-    }),
-  };
-  if (name === "verification") return {
-    lockPath: join(directory, "verification.jsonl.lock"), failurePath: join(directory, "verification.jsonl"),
-    acquire: () => TeamVerificationStore.open({ directory }),
-  };
+  if (name === "permissions")
+    return {
+      lockPath: `${path}.lock`,
+      failurePath: path,
+      acquire: () => FilePermissionRuleStore.open({ path }),
+    };
+  if (name === "coordination")
+    return {
+      lockPath: join(directory, "dGFzaw.lock"),
+      failurePath: join(directory, "dGFzaw.jsonl"),
+      acquire: () => new FileCoordinationStore(directory).acquire("task"),
+    };
+  if (name === "resource")
+    return {
+      lockPath: `${path}.lock`,
+      failurePath: path,
+      acquire: () =>
+        ResourceJournal.open(path, { format: 1, revision: 0 }, (value) => {
+          assert.equal(value.format, 1);
+          assert.ok(Number.isSafeInteger(value.revision) && value.revision >= 0);
+        }),
+    };
+  if (name === "worker")
+    return {
+      lockPath: join(directory, "worker.lock"),
+      failurePath: join(directory, "worker.jsonl"),
+      acquire: () =>
+        CoordinationWorker.open({
+          directory,
+          token: "local-lock-verification-token-0123456789",
+          agents: {},
+          authorize: () => false,
+        }),
+    };
+  if (name === "gateway")
+    return {
+      lockPath: join(directory, "host.lock"),
+      failurePath: join(directory, "gateway.sqlite"),
+      acquire: async () => {
+        const store = GatewayStore.open(directory);
+        return { close: async () => store.close() };
+      },
+    };
+  if (name === "setup")
+    return {
+      lockPath: `${path}.initialize.lock`,
+      failurePath: path,
+      acquire: () =>
+        startGatewaySetup({
+          path,
+          port: 0,
+          activate: async () => {
+            throw new Error("This setup process does not activate a gateway");
+          },
+        }),
+    };
+  if (name === "verification")
+    return {
+      lockPath: join(directory, "verification.jsonl.lock"),
+      failurePath: join(directory, "verification.jsonl"),
+      acquire: () => TeamVerificationStore.open({ directory }),
+    };
   if (name === "git") {
     const workspace = join(directory, "project");
     if (initialize) {
@@ -81,19 +120,26 @@ export async function targetFor(name, directory, initialize = false) {
       await run("git", ["init", workspace], { windowsHide: true });
     }
     const manager = await ProjectGitWorkspace.open({
-      workspace, dataRoot: join(directory, "records"), worktreesRoot: join(directory, "worktrees"), autoCommit: false,
+      workspace,
+      dataRoot: join(directory, "records"),
+      worktreesRoot: join(directory, "worktrees"),
+      autoCommit: false,
     });
     const scope = createHash("sha256").update(manager.repository).digest("hex").slice(0, 24);
     const base = join(directory, "records", manager.projectId, scope);
     return {
-      lockPath: `${base}.lock`, failurePath: `${base}.intent.json`,
+      lockPath: `${base}.lock`,
+      failurePath: `${base}.intent.json`,
       acquire: () => manager.beginRound({ sessionId: "file-lock-verification" }),
     };
   }
   if (name === "config") {
     if (initialize) await writeFile(path, JSON.stringify(configuration));
     return {
-      lockPath: `${path}.lock`, failurePath: path, oneShot: true, dataPath: path,
+      lockPath: `${path}.lock`,
+      failurePath: path,
+      oneShot: true,
+      dataPath: path,
       async acquire() {
         await updateDefaultMayModel(path, "second");
         return { close: async () => {} };
@@ -114,14 +160,18 @@ export async function targetFor(name, directory, initialize = false) {
         await writeFile(join(task.directory, "value.txt"), "after\n");
         const patch = await createTeamPatch({ directory: teamDirectory, workspaces, taskIds: ["worker"] });
         await writeFile(descriptorPath, JSON.stringify({ patchId: patch.id, confirmDigest: patch.digest }));
-      } finally { await workspaces.close(); }
+      } finally {
+        await workspaces.close();
+      }
     }
     const descriptor = JSON.parse(await readFile(descriptorPath, "utf8"));
     const lockDirectory = join(homedir(), ".may", "maybecode", "apply-locks");
     if (initialize) await mkdir(lockDirectory, { recursive: true });
     const lockPath = join(lockDirectory, `${createHash("sha256").update(sourceDirectory).digest("hex")}.lock`);
     return {
-      lockPath, oneShot: true, cleanupFiles: [lockPath, `${lockPath}.owner`],
+      lockPath,
+      oneShot: true,
+      cleanupFiles: [lockPath, `${lockPath}.owner`],
       failurePath: join(teamDirectory, "patches", "applications", descriptor.patchId, "apply.jsonl"),
       async acquire() {
         const workspaces = await TaskWorkspaceManager.open(workspaceOptions);
@@ -130,7 +180,9 @@ export async function targetFor(name, directory, initialize = false) {
           assert.equal(result.status, "applied", result.detail);
           assert.equal(await readFile(join(sourceDirectory, "value.txt"), "utf8"), "after\n");
           return { close: async () => {} };
-        } finally { await workspaces.close(); }
+        } finally {
+          await workspaces.close();
+        }
       },
     };
   }

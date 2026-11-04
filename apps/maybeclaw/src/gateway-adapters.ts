@@ -7,7 +7,12 @@ import { loadMayConfig } from "@sortedyuan/may/config";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { createReadTool, resolveExistingWorkspacePath, resolveWritableWorkspacePath } from "@sortedyuan/coding-tools";
 import type { PermissionPolicy, PermissionRuleStore } from "@sortedyuan/may/permissions";
-import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver, selectProviderModel, type ModelCapabilities } from "@sortedyuan/providers";
+import {
+  createBuiltinProviderAdapterRegistry,
+  createModelCapabilityResolver,
+  selectProviderModel,
+  type ModelCapabilities,
+} from "@sortedyuan/providers";
 import { observabilityService } from "@sortedyuan/observability/plugin";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { loadPluginModules, type AnyPlugin } from "@sortedyuan/may/plugin";
@@ -32,8 +37,15 @@ export async function loadGatewayAdapter(options: MayAdapterOptions): Promise<Ga
   if (options.agent.adapter === "may") {
     if (!options.definition) {
       const config = await loadMayConfig({ path: options.configPath });
-      const plugins = options.plugins ?? await loadPluginModules(options.agent.plugins ?? [], config.path);
-      if (!plugins.some(plugin => plugin.provides?.some(service => service.id === services.model.id && service.scope === services.model.scope))) selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {});
+      const plugins = options.plugins ?? (await loadPluginModules(options.agent.plugins ?? [], config.path));
+      if (
+        !plugins.some((plugin) =>
+          plugin.provides?.some(
+            (service) => service.id === services.model.id && service.scope === services.model.scope,
+          ),
+        )
+      )
+        selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {});
       return createMayAdapter({ ...options, plugins });
     }
     return createMayAdapter(options);
@@ -44,51 +56,103 @@ export async function loadGatewayAdapter(options: MayAdapterOptions): Promise<Ga
 export function createMayAdapter(options: MayAdapterOptions): GatewayAgentAdapter {
   const resolver = createModelCapabilityResolver();
   const registry = createBuiltinProviderAdapterRegistry({ resolver });
-  const adapter = createMayAgentAdapter({ agentId: options.agent.id,
-    diagnostics: (application, query) => application.getOptionalService(observabilityService)?.diagnostics?.getDiagnostics({ ...query, sessionId: application.sessionId }),
+  const adapter = createMayAgentAdapter({
+    agentId: options.agent.id,
+    diagnostics: (application, query) =>
+      application
+        .getOptionalService(observabilityService)
+        ?.diagnostics?.getDiagnostics({ ...query, sessionId: application.sessionId }),
     store: new FileSessionStore(join(options.directory, "agents", options.agent.id, "sessions")),
     ...(options.agent.media ? { media: options.agent.media } : {}),
-    metadata: conversationId => ({ maybeclaw: { agentId: options.agent.id, conversationId } }),
-    definition: options.definition ?? (async (source, context) => {
-      const config = await loadMayConfig({ path: options.configPath });
-      const selected = options.plugins ?? await loadPluginModules(options.agent.plugins ?? [], config.path);
-      const defaults = [
-        createModelPlugin({ create: () => registry.create(selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {})) }),
-        createPermissionPlugin({ create: () => createGatewayPermissionPolicy(options, () => context()?.permissionScope) }),
-        createToolsPlugin({ id: "maybeclaw.tools", create: () => {
-          const tools = options.agent.readDirectory ? [createReadTool({ cwd: options.agent.readDirectory })] : [];
-          return () => [...tools, ...source()];
-        } }),
-      ];
-      const ids = new Set(selected.map(plugin => plugin.id));
-      const provided = new Set(selected.flatMap(plugin => plugin.provides?.map(service => `${service.scope}:${service.id}`) ?? []));
-      return defineAgent({
-        requestRecording: options.agent.requestRecording ?? "required",
-        providerBodyRecording: options.agent.providerBodyRecording,
-        plugins: [...defaults.filter(plugin => !ids.has(plugin.id) && !plugin.provides?.some(service => provided.has(`${service.scope}:${service.id}`))), ...selected],
-        ...omitUndefined({ permissionRuleStore: options.permissionRuleStore, instructions: options.agent.instructions }),
-        ...(options.agent.runBudget ? { runBudget: options.agent.runBudget } : {}),
-      });
-    }),
+    metadata: (conversationId) => ({ maybeclaw: { agentId: options.agent.id, conversationId } }),
+    definition:
+      options.definition ??
+      (async (source, context) => {
+        const config = await loadMayConfig({ path: options.configPath });
+        const selected = options.plugins ?? (await loadPluginModules(options.agent.plugins ?? [], config.path));
+        const defaults = [
+          createModelPlugin({
+            create: () =>
+              registry.create(selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {})),
+          }),
+          createPermissionPlugin({
+            create: () => createGatewayPermissionPolicy(options, () => context()?.permissionScope),
+          }),
+          createToolsPlugin({
+            id: "maybeclaw.tools",
+            create: () => {
+              const tools = options.agent.readDirectory ? [createReadTool({ cwd: options.agent.readDirectory })] : [];
+              return () => [...tools, ...source()];
+            },
+          }),
+        ];
+        const ids = new Set(selected.map((plugin) => plugin.id));
+        const provided = new Set(
+          selected.flatMap((plugin) => plugin.provides?.map((service) => `${service.scope}:${service.id}`) ?? []),
+        );
+        return defineAgent({
+          requestRecording: options.agent.requestRecording ?? "required",
+          providerBodyRecording: options.agent.providerBodyRecording,
+          plugins: [
+            ...defaults.filter(
+              (plugin) =>
+                !ids.has(plugin.id) &&
+                !plugin.provides?.some((service) => provided.has(`${service.scope}:${service.id}`)),
+            ),
+            ...selected,
+          ],
+          ...omitUndefined({
+            permissionRuleStore: options.permissionRuleStore,
+            instructions: options.agent.instructions,
+          }),
+          ...(options.agent.runBudget ? { runBudget: options.agent.runBudget } : {}),
+        });
+      }),
   });
   if (options.modelCapabilities !== undefined) return { ...adapter, modelCapabilities: options.modelCapabilities };
-  if (options.definition !== undefined || options.plugins?.some(plugin => plugin.provides?.some(service => service.id === services.model.id && service.scope === services.model.scope))) return adapter;
-  return { ...adapter, modelCapabilities: async (refresh = false) => {
-    const config = await loadMayConfig({ path: options.configPath });
-    const selected = options.plugins ?? await loadPluginModules(options.agent.plugins ?? [], config.path);
-    if (selected.some(plugin => plugin.provides?.some(service => service.id === services.model.id))) {
-      throw new Error("自定义 Model 插件需要自行提供模型能力查询。");
-    }
-    return resolver.resolve(selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {}), { refresh });
-  } };
+  if (
+    options.definition !== undefined ||
+    options.plugins?.some((plugin) =>
+      plugin.provides?.some((service) => service.id === services.model.id && service.scope === services.model.scope),
+    )
+  )
+    return adapter;
+  return {
+    ...adapter,
+    modelCapabilities: async (refresh = false) => {
+      const config = await loadMayConfig({ path: options.configPath });
+      const selected = options.plugins ?? (await loadPluginModules(options.agent.plugins ?? [], config.path));
+      if (selected.some((plugin) => plugin.provides?.some((service) => service.id === services.model.id))) {
+        throw new Error("自定义 Model 插件需要自行提供模型能力查询。");
+      }
+      return resolver.resolve(selectProviderModel(config, options.agent.model ? { model: options.agent.model } : {}), {
+        refresh,
+      });
+    },
+  };
 }
 
-export function createGatewayPermissionPolicy(options: Pick<MayAdapterOptions, "agent" | "directory" | "permissionRuleStore">, scope: () => string | undefined): PermissionPolicy {
-  return async check => {
+export function createGatewayPermissionPolicy(
+  options: Pick<MayAdapterOptions, "agent" | "directory" | "permissionRuleStore">,
+  scope: () => string | undefined,
+): PermissionPolicy {
+  return async (check) => {
     const configured = options.agent.permissions?.[check.tool.name];
-    const decision = configured ?? (["list_agents", "delegate_tasks", "send_message", "wait_for_messages", "handoff_task", "read"].includes(check.tool.name) ? "allow" : "ask");
+    const decision =
+      configured ??
+      (["list_agents", "delegate_tasks", "send_message", "wait_for_messages", "handoff_task", "read"].includes(
+        check.tool.name,
+      )
+        ? "allow"
+        : "ask");
     if (decision === "deny" || options.permissionRuleStore === undefined) return decision;
-    if (["read", "write", "edit"].includes(check.tool.name) && check.input && typeof check.input === "object" && "path" in check.input && typeof check.input.path === "string") {
+    if (
+      ["read", "write", "edit"].includes(check.tool.name) &&
+      check.input &&
+      typeof check.input === "object" &&
+      "path" in check.input &&
+      typeof check.input.path === "string"
+    ) {
       const root = options.agent.readDirectory ?? process.cwd();
       const target = await resolveWritableWorkspacePath(root, check.input.path);
       const protectedPath = join(await realpath(options.directory), "permission-rules.json");
@@ -98,12 +162,21 @@ export function createGatewayPermissionPolicy(options: Pick<MayAdapterOptions, "
     }
     if (configured === undefined && (check.tool.name !== "read" || !options.agent.readDirectory)) return decision;
     const actorScope = scope();
-    if (typeof actorScope !== "string" || actorScope.trim().length === 0) throw new Error("持久权限检查需要宿主提供当前发起者身份。");
+    if (typeof actorScope !== "string" || actorScope.trim().length === 0)
+      throw new Error("持久权限检查需要宿主提供当前发起者身份。");
     let grantKey: string;
     let description: string;
     if (check.tool.name === "read" && options.agent.readDirectory) {
-      if (!check.input || typeof check.input !== "object" || !("path" in check.input) || typeof check.input.path !== "string") throw new TypeError("read 权限检查需要文件 path。");
-      const file = await resolveExistingWorkspacePath(options.agent.readDirectory, check.input.path, { allowHardLinks: false });
+      if (
+        !check.input ||
+        typeof check.input !== "object" ||
+        !("path" in check.input) ||
+        typeof check.input.path !== "string"
+      )
+        throw new TypeError("read 权限检查需要文件 path。");
+      const file = await resolveExistingWorkspacePath(options.agent.readDirectory, check.input.path, {
+        allowHardLinks: false,
+      });
       grantKey = JSON.stringify(["read-file-v1", file.absolute]);
       description = `Agent：${options.agent.id}；身份：${actorScope}；操作：读取文件 ${file.absolute}。`;
     } else {
@@ -113,12 +186,24 @@ export function createGatewayPermissionPolicy(options: Pick<MayAdapterOptions, "
       if (!isDeepStrictEqual(restored, check.input)) {
         throw new TypeError("持久权限参数必须能够通过 JSON 无损保存与读取。");
       }
-      grantKey = `exact-input-v1:${createHash("sha256").update(JSON.stringify([check.tool.name, restored])).digest("hex")}`;
+      grantKey = `exact-input-v1:${createHash("sha256")
+        .update(JSON.stringify([check.tool.name, restored]))
+        .digest("hex")}`;
       description = `Agent：${options.agent.id}；身份：${actorScope}；工具：${check.tool.name}；范围：与当前审批相同的工具参数。`;
     }
-    return { decision, grantKey, persistent: {
-      scopeId: JSON.stringify(["maybeclaw-v1", resolve(options.directory), options.agent.id, options.agent.readDirectory ? await realpath(options.agent.readDirectory) : null, actorScope]),
-      description,
-    } };
+    return {
+      decision,
+      grantKey,
+      persistent: {
+        scopeId: JSON.stringify([
+          "maybeclaw-v1",
+          resolve(options.directory),
+          options.agent.id,
+          options.agent.readDirectory ? await realpath(options.agent.readDirectory) : null,
+          actorScope,
+        ]),
+        description,
+      },
+    };
   };
 }

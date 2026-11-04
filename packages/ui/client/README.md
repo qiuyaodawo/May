@@ -87,7 +87,6 @@ Snapshot reads always return the current session; history and field reads use
 safe store inspection. Task hosts retain independent selection. Upgrade this
 preview's host and client together when adopting these selection semantics.
 
-
 Execution evidence uses `UiBlockStatus`, `UiDiagnostic`, `UiApprovalRecord` and
 `UiPresentation`. Blocks can carry run/call IDs and bounded live progress. A
 cancelled run does not prove a started tool had no effects: without a final
@@ -126,7 +125,6 @@ The confirmation displays the complete range and deny precedence.
 adds a permissions panel with a rule-list action while preserving product
 panels. The Web shell applies the same confirmation, pending-state and command
 availability handling used for command-output actions.
-
 
 ## Read-only history
 

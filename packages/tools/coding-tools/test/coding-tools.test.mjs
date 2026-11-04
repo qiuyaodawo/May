@@ -20,11 +20,13 @@ test("registers a created read tool in a May tool loop", async (t) => {
           message: {
             role: "assistant",
             content: [],
-            toolCalls: [{
-              id: "call_read",
-              name: "read",
-              input: { path: "message.txt" },
-            }],
+            toolCalls: [
+              {
+                id: "call_read",
+                name: "read",
+                input: { path: "message.txt" },
+              },
+            ],
           },
         };
         return;
@@ -50,5 +52,8 @@ test("registers a created read tool in a May tool loop", async (t) => {
 
   assert.equal(result.steps, 2);
   assert.equal(result.message.content[0].text, "hello from the workspace");
-  assert.deepEqual(requests[0].tools.map((tool) => tool.name), ["read"]);
+  assert.deepEqual(
+    requests[0].tools.map((tool) => tool.name),
+    ["read"],
+  );
 });

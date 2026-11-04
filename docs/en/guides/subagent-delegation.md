@@ -40,9 +40,12 @@ Session input and an active host event consumer for approvals:
 
 ```ts
 const run = await controller.submit({ input });
-const result = await run.result;               // 最终汇总结果
-const runs = await run.runs();                 // 本请求内每个真实 Run 的身份与结果
-console.log(run.requestId, runs.map((item) => `${item.turn}:${item.runId}`));
+const result = await run.result; // 最终汇总结果
+const runs = await run.runs(); // 本请求内每个真实 Run 的身份与结果
+console.log(
+  run.requestId,
+  runs.map((item) => `${item.turn}:${item.runId}`),
+);
 ```
 
 Goal runs and steering runs are requests too, so delegation is available in every
@@ -64,14 +67,14 @@ effort. These are example limits; defaults are listed after the fragment.
           "worker": {
             "instructions": "Inspect and change only the assigned files.",
             "tools": ["read", "shell", "edit", "write"],
-            "delegateTo": ["worker"]
+            "delegateTo": ["worker"],
           },
           "reviewer": {
             "model": "deepseek-v4-flash",
             "reasoningEffort": "high",
             "tools": ["read"],
-            "delegateTo": []
-          }
+            "delegateTo": [],
+          },
         },
         "defaultRole": "worker",
         "limits": {
@@ -79,15 +82,15 @@ effort. These are example limits; defaults are listed after the fragment.
           "maxTasks": 24,
           "maxDepth": 3,
           "maxTaskTurns": 6,
-          "maxDurationMs": 900000
+          "maxDurationMs": 900000,
         },
         "runBudget": { "maxSteps": 24, "maxModelCalls": 24, "maxToolCalls": 48 },
         "maxModelCalls": 128,
         "maxTotalTokens": 200000,
-        "reservationTokens": 32768
-      }
-    }
-  }
+        "reservationTokens": 32768,
+      },
+    },
+  },
 }
 ```
 

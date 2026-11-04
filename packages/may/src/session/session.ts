@@ -37,16 +37,8 @@ import { sessionToolResultContent } from "./events.js";
 import { readSessionBranchPositions, type SessionBranchPosition } from "./branch.js";
 import { SessionSteeringQueue, type SessionSteerOptions, type SessionSteeringInput } from "./steering.js";
 import { inspectSessionRunOutcome, type SessionRunOutcome, type SessionRunSelector } from "./outcome.js";
-import {
-  SessionHistoryReader,
-  type SessionHistoryQuery,
-  type SessionHistoryPage,
-} from "./history.js";
-import {
-  InMemorySessionStore,
-  type SessionStore,
-  validateSessionHistory,
-} from "./store.js";
+import { SessionHistoryReader, type SessionHistoryQuery, type SessionHistoryPage } from "./history.js";
+import { InMemorySessionStore, type SessionStore, validateSessionHistory } from "./store.js";
 
 export interface SessionOptions {
   providerBodyRecording?: boolean | undefined;
@@ -64,10 +56,7 @@ export interface ResumeSessionOptions {
   id: string;
   store: SessionStore;
   deferBranchPositions?: boolean;
-  createRuntime(
-    messages: Message[],
-    info: SessionRuntimeInfo,
-  ): AgentRuntime | Promise<AgentRuntime>;
+  createRuntime(messages: Message[], info: SessionRuntimeInfo): AgentRuntime | Promise<AgentRuntime>;
 }
 
 export interface SessionForkOptions extends Omit<ResumeSessionOptions, "id"> {
@@ -164,14 +153,16 @@ export class Session {
     this.historyReader = new SessionHistoryReader(store);
     this.metadata = metadata === undefined ? undefined : { ...metadata };
     const created = history[0];
-    this.forkOrigin = created?.type === "session.created" && created.fork !== undefined ? structuredClone(created.fork) : undefined;
+    this.forkOrigin =
+      created?.type === "session.created" && created.fork !== undefined ? structuredClone(created.fork) : undefined;
     this.seq = seq;
     this.deferBranchPositions = deferBranchPositions;
     this.steering = new SessionSteeringQueue((event) => this.record(event), history);
     for (const event of history) {
       if (event.type === "model.request.defined") this.requestDefinitions.add(event.id);
       if (event.type === "model.request.prepared") this.requestAttempts.set(event.modelCallId, event.attempt);
-      if (!event.type.startsWith("model.") && "runId" in event && typeof event.runId === "string") this.latestRunId = event.runId;
+      if (!event.type.startsWith("model.") && "runId" in event && typeof event.runId === "string")
+        this.latestRunId = event.runId;
       if (event.type === "input.submitted" && event.inputId !== undefined) this.submittedInputIds.add(event.inputId);
     }
   }
@@ -185,23 +176,18 @@ export class Session {
       throw new Error(`Session "${id}" already exists`);
     }
 
-    const session = new Session(
-      id,
-      options.runtime,
-      store,
-      options.metadata,
-      0,
-      [],
-      options.deferBranchPositions,
-    );
+    const session = new Session(id, options.runtime, store, options.metadata, 0, [], options.deferBranchPositions);
     const runtime = options.runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
     session.requestRecording = requestRecordingMode(options.requestRecording);
     session.providerBodyRecording = options.providerBodyRecording ?? false;
-    if (session.requestRecording === "required" && options.runtime.supportsRequestRecording !== true) throw new Error("Runtime does not support complete request recording");
+    if (session.requestRecording === "required" && options.runtime.supportsRequestRecording !== true)
+      throw new Error("Runtime does not support complete request recording");
     validateRuntimeDescriptor(runtime);
-    const initialState = options.runtime.saveState === undefined ? undefined : await snapshotRuntimeState(options.runtime);
+    const initialState =
+      options.runtime.saveState === undefined ? undefined : await snapshotRuntimeState(options.runtime);
     const created: SessionEventPayload = {
-      type: "session.created", runtime: { ...runtime },
+      type: "session.created",
+      runtime: { ...runtime },
       ...(session.metadata === undefined ? {} : { metadata: { ...session.metadata } }),
     };
     await session.record(created);
@@ -212,9 +198,7 @@ export class Session {
   }
 
   static async resume(options: ResumeSessionOptions): Promise<Session> {
-    const events = await new SessionHistoryReader(options.store).readAll(
-      options.id,
-    );
+    const events = await new SessionHistoryReader(options.store).readAll(options.id);
     if (events.length === 0) {
       throw new Error(`Session "${options.id}" does not exist`);
     }
@@ -242,15 +226,24 @@ export class Session {
     const runtime = await options.createRuntime(replay.messages, replay.info);
     try {
       const currentDescriptor = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
-      const { state: runtimeState, migrated } = await adoptRuntimeState(runtime, replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR, replay.info.runtimeState);
+      const { state: runtimeState, migrated } = await adoptRuntimeState(
+        runtime,
+        replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR,
+        replay.info.runtimeState,
+      );
       for (const event of repairs) await options.store.append(event);
       if (migrated || !jsonEqual(runtimeState, replay.info.runtimeState)) {
         const change: SessionEvent = {
           ...(migrated
-            ? { type: "runtime.changed", ...(runtimeState === undefined ? {} : { state: structuredClone(runtimeState) }) }
+            ? {
+                type: "runtime.changed",
+                ...(runtimeState === undefined ? {} : { state: structuredClone(runtimeState) }),
+              }
             : { type: "runtime.state.saved", state: structuredClone(runtimeState) }),
           runtime: { ...currentDescriptor },
-          sessionId: options.id, seq: recoveredEvents.length + 1, timestamp: Date.now(),
+          sessionId: options.id,
+          seq: recoveredEvents.length + 1,
+          timestamp: Date.now(),
         };
         await options.store.append(change);
         recoveredEvents.push(change);
@@ -266,7 +259,8 @@ export class Session {
       );
       session.requestRecording = requestRecordingMode(options.requestRecording);
       session.providerBodyRecording = options.providerBodyRecording ?? false;
-      if (session.requestRecording === "required" && runtime.supportsRequestRecording !== true) throw new Error("Runtime does not support complete request recording");
+      if (session.requestRecording === "required" && runtime.supportsRequestRecording !== true)
+        throw new Error("Runtime does not support complete request recording");
       for (const event of recoveredEvents) {
         if (event.type === "run.interrupted") {
           for (const recovery of event.recoveries) {
@@ -274,9 +268,25 @@ export class Session {
           }
         } else if (event.type === "recovery.resolved") session.recoveries.delete(event.recoveryId);
       }
-      for (const runId of new Set(session.steering.list().filter((input) => input.status === "pending").map((input) => input.runId!))) {
-        const terminal = [...recoveredEvents].reverse().find((event) => "runId" in event && event.runId === runId && ["run.completed", "run.yielded", "run.cancelled", "run.failed", "run.interrupted"].includes(event.type));
-        await session.steering.finish(runId, terminal?.type === "run.completed" || terminal?.type === "run.yielded" ? "idle" : "cancelled", terminal?.type ?? "interrupted");
+      for (const runId of new Set(
+        session.steering
+          .list()
+          .filter((input) => input.status === "pending")
+          .map((input) => input.runId!),
+      )) {
+        const terminal = [...recoveredEvents]
+          .reverse()
+          .find(
+            (event) =>
+              "runId" in event &&
+              event.runId === runId &&
+              ["run.completed", "run.yielded", "run.cancelled", "run.failed", "run.interrupted"].includes(event.type),
+          );
+        await session.steering.finish(
+          runId,
+          terminal?.type === "run.completed" || terminal?.type === "run.yielded" ? "idle" : "cancelled",
+          terminal?.type ?? "interrupted",
+        );
       }
       return session;
     } catch (error) {
@@ -288,44 +298,96 @@ export class Session {
     if (options.store.inspect === undefined) throw new Error("Session forking requires read-only store inspection");
     const source = await options.store.inspect(options.sourceId);
     validateSessionHistory(options.sourceId, source);
-    const selected = readSessionBranchPositions(source).find((position) => position.positionSeq === options.positionSeq);
-    if (selected === undefined || !selected.available) throw new Error(selected?.reason ?? "Selected history position has no recoverable state");
+    const selected = readSessionBranchPositions(source).find(
+      (position) => position.positionSeq === options.positionSeq,
+    );
+    if (selected === undefined || !selected.available)
+      throw new Error(selected?.reason ?? "Selected history position has no recoverable state");
     const id = options.id ?? createSessionId();
-    if (id === options.sourceId || (await options.store.read(id)).length > 0) throw new Error(`Session "${id}" already exists`);
+    if (id === options.sourceId || (await options.store.read(id)).length > 0)
+      throw new Error(`Session "${id}" already exists`);
     const stateKeys = new Set(options.stateKeys ?? []);
     const queued = new Map<string, UserMessage>();
     const history: SessionEvent[] = [];
-    const append = (event: SessionEventPayload, timestamp: number) => history.push({ ...structuredClone(event), sessionId: id, seq: history.length + 1, timestamp });
+    const append = (event: SessionEventPayload, timestamp: number) =>
+      history.push({ ...structuredClone(event), sessionId: id, seq: history.length + 1, timestamp });
     const created = source[0];
     if (created?.type !== "session.created") throw new Error("Source Session has no creation event");
-    append({ type: "session.created", ...(created.runtime === undefined ? {} : { runtime: created.runtime }),
-      ...((options.metadata ?? created.metadata) === undefined ? {} : { metadata: { ...(options.metadata ?? created.metadata) } }),
-      fork: { sessionId: options.sourceId, positionSeq: options.positionSeq, runId: selected.runId } }, Date.now());
+    append(
+      {
+        type: "session.created",
+        ...(created.runtime === undefined ? {} : { runtime: created.runtime }),
+        ...((options.metadata ?? created.metadata) === undefined
+          ? {}
+          : { metadata: { ...(options.metadata ?? created.metadata) } }),
+        fork: { sessionId: options.sourceId, positionSeq: options.positionSeq, runId: selected.runId },
+      },
+      Date.now(),
+    );
     for (const event of source.slice(1, options.positionSeq)) {
-      if (event.type.startsWith("approval.") || event.type.startsWith("rule.")) { append({ type: "history.omitted", reason: "permission" }, event.timestamp); continue; }
-      if (event.type === "session.fork.ready") { append({ type: "history.omitted", reason: "fork-initialization" }, event.timestamp); continue; }
+      if (event.type.startsWith("approval.") || event.type.startsWith("rule.")) {
+        append({ type: "history.omitted", reason: "permission" }, event.timestamp);
+        continue;
+      }
+      if (event.type === "session.fork.ready") {
+        append({ type: "history.omitted", reason: "fork-initialization" }, event.timestamp);
+        continue;
+      }
       if (event.type === "state.updated") {
-        if (stateKeys.has(event.key)) append({ type: "state.updated", key: event.key,
-          value: options.transformState === undefined ? event.value : options.transformState(event.key, structuredClone(event.value)) }, event.timestamp);
+        if (stateKeys.has(event.key))
+          append(
+            {
+              type: "state.updated",
+              key: event.key,
+              value:
+                options.transformState === undefined
+                  ? event.value
+                  : options.transformState(event.key, structuredClone(event.value)),
+            },
+            event.timestamp,
+          );
         else append({ type: "history.omitted", reason: "application-state" }, event.timestamp);
         continue;
       }
-      if (event.type === "input.steering.queued") { queued.set(event.input.inputId, event.input.message); append({ type: "history.omitted", reason: "unconsumed-input" }, event.timestamp); continue; }
-      if (event.type === "input.steering.finished") { append({ type: "history.omitted", reason: "unconsumed-input" }, event.timestamp); continue; }
+      if (event.type === "input.steering.queued") {
+        queued.set(event.input.inputId, event.input.message);
+        append({ type: "history.omitted", reason: "unconsumed-input" }, event.timestamp);
+        continue;
+      }
+      if (event.type === "input.steering.finished") {
+        append({ type: "history.omitted", reason: "unconsumed-input" }, event.timestamp);
+        continue;
+      }
       if (event.type === "input.steering.delivered") {
         const messages = event.inputIds.map((inputId) => {
           const message = queued.get(inputId);
           if (message === undefined) throw new Error(`Delivered input has no saved content: ${inputId}`);
           return message;
         });
-        append({ type: "input.generated", runId: event.runId, step: event.step, messages, reason: "Inherited delivered input" }, event.timestamp);
+        append(
+          {
+            type: "input.generated",
+            runId: event.runId,
+            step: event.step,
+            messages,
+            reason: "Inherited delivered input",
+          },
+          event.timestamp,
+        );
         continue;
       }
-      if (event.type === "input.submitted") { append({ type: "input.submitted", message: event.message }, event.timestamp); continue; }
-      if (event.type === "continuation.submitted") { append({ type: "history.omitted", reason: "execution-identity" }, event.timestamp); continue; }
+      if (event.type === "input.submitted") {
+        append({ type: "input.submitted", message: event.message }, event.timestamp);
+        continue;
+      }
+      if (event.type === "continuation.submitted") {
+        append({ type: "history.omitted", reason: "execution-identity" }, event.timestamp);
+        continue;
+      }
       if (event.type === "run.started" && event.continuationId !== undefined) {
         const { continuationId: _identity, ...started } = event;
-        append(started, event.timestamp); continue;
+        append(started, event.timestamp);
+        continue;
       }
       append(event, event.timestamp);
     }
@@ -333,21 +395,48 @@ export class Session {
     const runtime = await options.createRuntime(replay.messages, replay.info);
     try {
       const currentDescriptor = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
-      const { state, migrated } = await adoptRuntimeState(runtime, replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR, replay.info.runtimeState);
-      if (migrated || state !== undefined) append(omitUndefined({ type: migrated ? "runtime.changed" : "runtime.state.saved",
-        runtime: { ...currentDescriptor }, state }) as SessionEventPayload, Date.now());
+      const { state, migrated } = await adoptRuntimeState(
+        runtime,
+        replay.info.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR,
+        replay.info.runtimeState,
+      );
+      if (migrated || state !== undefined)
+        append(
+          omitUndefined({
+            type: migrated ? "runtime.changed" : "runtime.state.saved",
+            runtime: { ...currentDescriptor },
+            state,
+          }) as SessionEventPayload,
+          Date.now(),
+        );
       for (const event of history) await options.store.append(event);
       if (options.deferForkReady !== true) {
-        const ready: SessionEvent = { type: "session.fork.ready", sessionId: id, seq: history.length + 1, timestamp: Date.now() };
+        const ready: SessionEvent = {
+          type: "session.fork.ready",
+          sessionId: id,
+          seq: history.length + 1,
+          timestamp: Date.now(),
+        };
         await options.store.append(ready);
         history.push(ready);
       }
-      const session = new Session(id, runtime, options.store, options.metadata ?? created.metadata, history.length, history, options.deferBranchPositions);
+      const session = new Session(
+        id,
+        runtime,
+        options.store,
+        options.metadata ?? created.metadata,
+        history.length,
+        history,
+        options.deferBranchPositions,
+      );
       session.requestRecording = requestRecordingMode(options.requestRecording);
       session.providerBodyRecording = options.providerBodyRecording ?? false;
-      if (session.requestRecording === "required" && runtime.supportsRequestRecording !== true) throw new Error("Runtime does not support complete request recording");
+      if (session.requestRecording === "required" && runtime.supportsRequestRecording !== true)
+        throw new Error("Runtime does not support complete request recording");
       return session;
-    } catch (error) { return closeRejectedRuntime(runtime, error); }
+    } catch (error) {
+      return closeRejectedRuntime(runtime, error);
+    }
   }
 
   async branchPositions(): Promise<readonly SessionBranchPosition[]> {
@@ -359,21 +448,31 @@ export class Session {
     if (this.runtimeClosed) throw new Error("Session runtime is closed");
     this.assertIdleRuntime();
     if (this.persistenceFailed) throw new Error("Session persistence failed before branch initialization completed");
-    if ((await this.history()).some(event => event.type === "session.fork.ready")) return;
+    if ((await this.history()).some((event) => event.type === "session.fork.ready")) return;
     await this.record({ type: "session.fork.ready" });
   }
 
-  async saveBranchPosition(runId: string, options: import("./branch.js").SessionBranchCompletionOptions = {}): Promise<void> {
+  async saveBranchPosition(
+    runId: string,
+    options: import("./branch.js").SessionBranchCompletionOptions = {},
+  ): Promise<void> {
     if (this.persistenceFailed) throw new Error("Session persistence failed; reopen the Session before branching");
-    if (this.activeRun !== undefined || this.activeRunObservations.size > 0 || this.settlingRuns > 0 || this.runtimeMutation) {
+    if (
+      this.activeRun !== undefined ||
+      this.activeRunObservations.size > 0 ||
+      this.settlingRuns > 0 ||
+      this.runtimeMutation
+    ) {
       throw new Error("Branch positions require completed tool execution and saved Runtime state");
     }
     const history = await this.history();
     const latestStarted = [...history].reverse().find((event) => event.type === "run.started");
-    if (latestStarted?.type !== "run.started" || latestStarted.runId !== runId) throw new Error("Only the latest completed Run can save a branch position");
+    if (latestStarted?.type !== "run.started" || latestStarted.runId !== runId)
+      throw new Error("Only the latest completed Run can save a branch position");
     if (history.some((event) => event.type === "run.settled" && event.runId === runId)) return;
     const completed = history.some((event) => event.type === "run.completed" && event.runId === runId);
-    const hostCompleted = options.allowYielded === true && history.some((event) => event.type === "run.yielded" && event.runId === runId);
+    const hostCompleted =
+      options.allowYielded === true && history.some((event) => event.type === "run.yielded" && event.runId === runId);
     if (!completed && !hostCompleted) return;
     await this.record({ type: "run.settled", runId, ...(hostCompleted ? { hostCompleted: true as const } : {}) });
   }
@@ -385,7 +484,8 @@ export class Session {
 
   async steer(options: SessionSteerOptions): Promise<SessionSteeringInput> {
     this.assertRecovered();
-    if (options.inputId !== undefined && this.submittedInputIds.has(options.inputId)) throw new Error(`Input already submitted: ${options.inputId}`);
+    if (options.inputId !== undefined && this.submittedInputIds.has(options.inputId))
+      throw new Error(`Input already submitted: ${options.inputId}`);
     return this.steering.enqueue(options, this.activeRun?.id);
   }
 
@@ -397,7 +497,10 @@ export class Session {
     return this.steering.cancel(reason);
   }
 
-  startSteeringInput(inputId: string, options: Omit<SessionSubmitOptions, "input" | "inputId"> = {}): Promise<RunHandle> {
+  startSteeringInput(
+    inputId: string,
+    options: Omit<SessionSubmitOptions, "input" | "inputId"> = {},
+  ): Promise<RunHandle> {
     assertSessionInputOptions(options);
     const input = this.steering.idle(inputId);
     return this.submit({ ...options, input: input.message, inputId });
@@ -414,13 +517,16 @@ export class Session {
     if (this.suspendedRuntime !== undefined) throw new Error("Session runtime is suspended");
     if (this.runtimeMutation) throw new Error("Session runtime is changing");
     this.pendingStarts += 1;
-    const started = this.tail.then(operation).then((run) => {
-      this.pendingStarts -= 1;
-      return run;
-    }, (error: unknown) => {
-      this.pendingStarts -= 1;
-      throw error;
-    });
+    const started = this.tail.then(operation).then(
+      (run) => {
+        this.pendingStarts -= 1;
+        return run;
+      },
+      (error: unknown) => {
+        this.pendingStarts -= 1;
+        throw error;
+      },
+    );
     return this.queue(started);
   }
 
@@ -446,8 +552,11 @@ export class Session {
   async getRuntimeInfo(): Promise<{ readonly messages: Message[]; readonly info: SessionRuntimeInfo }> {
     this.assertIdleRuntime();
     this.runtimeMutation = true;
-    try { return replaySession(await this.history()); }
-    finally { this.runtimeMutation = false; }
+    try {
+      return replaySession(await this.history());
+    } finally {
+      this.runtimeMutation = false;
+    }
   }
 
   async suspendRuntime(): Promise<void> {
@@ -459,9 +568,10 @@ export class Session {
     try {
       const descriptor = structuredClone(this.runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR);
       validateRuntimeDescriptor(descriptor);
-      const state = this.runtime.saveState === undefined
-        ? replaySession(await this.history()).info.runtimeState
-        : await snapshotRuntimeState(this.runtime);
+      const state =
+        this.runtime.saveState === undefined
+          ? replaySession(await this.history()).info.runtimeState
+          : await snapshotRuntimeState(this.runtime);
       if (state !== undefined) {
         if (descriptor.stateVersion === undefined) throw new Error("Stateful runtime requires a versioned descriptor");
         await this.record({ type: "runtime.state.saved", runtime: descriptor, state: structuredClone(state) });
@@ -479,27 +589,39 @@ export class Session {
     let accepted = false;
     let changing = false;
     try {
-      if (this.requestRecording === "required" && runtime.supportsRequestRecording !== true) throw new Error("Runtime does not support complete request recording");
+      if (this.requestRecording === "required" && runtime.supportsRequestRecording !== true)
+        throw new Error("Runtime does not support complete request recording");
       this.assertIdleRuntime();
       this.assertRecovered(true);
       this.runtimeMutation = true;
       changing = true;
       const suspended = this.suspendedRuntime;
       if (suspended !== undefined) await suspended.closing;
-      if (suspended !== undefined && runtime === previous) throw new Error("A suspended runtime requires a new replacement instance");
+      if (suspended !== undefined && runtime === previous)
+        throw new Error("A suspended runtime requires a new replacement instance");
       const savedDescriptor = suspended?.descriptor ?? this.runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
       const currentDescriptor = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
-      const saved = suspended === undefined
-        ? this.runtime.saveState === undefined
-          ? replaySession(await this.history()).info.runtimeState
-          : await snapshotRuntimeState(this.runtime)
-        : structuredClone(suspended.state);
+      const saved =
+        suspended === undefined
+          ? this.runtime.saveState === undefined
+            ? replaySession(await this.history()).info.runtimeState
+            : await snapshotRuntimeState(this.runtime)
+          : structuredClone(suspended.state);
       const { state, migrated } = await adoptRuntimeState(runtime, savedDescriptor, saved);
       if (migrated) {
-        await this.record({ type: "runtime.changed", runtime: { ...currentDescriptor }, ...(state === undefined ? {} : { state: structuredClone(state) }) });
+        await this.record({
+          type: "runtime.changed",
+          runtime: { ...currentDescriptor },
+          ...(state === undefined ? {} : { state: structuredClone(state) }),
+        });
       } else if (state !== undefined) {
-        if (currentDescriptor.stateVersion === undefined) throw new Error("Stateful runtime requires a versioned descriptor");
-        await this.record({ type: "runtime.state.saved", runtime: { ...currentDescriptor }, state: structuredClone(state) });
+        if (currentDescriptor.stateVersion === undefined)
+          throw new Error("Stateful runtime requires a versioned descriptor");
+        await this.record({
+          type: "runtime.state.saved",
+          runtime: { ...currentDescriptor },
+          state: structuredClone(state),
+        });
       }
       this.runtime = runtime;
       this.suspendedRuntime = undefined;
@@ -515,12 +637,16 @@ export class Session {
 
   async closeRuntime(): Promise<void> {
     if (this.runtimeClosing !== undefined) return this.runtimeClosing;
-    if (this.activeRun !== undefined || this.activeRunObservations.size > 0 || this.settlingRuns > 0 || this.runtimeMutation) {
+    if (
+      this.activeRun !== undefined ||
+      this.activeRunObservations.size > 0 ||
+      this.settlingRuns > 0 ||
+      this.runtimeMutation
+    ) {
       throw new Error("Cannot close a runtime during execution or state changes");
     }
     this.runtimeClosed = true;
-    this.runtimeClosing = this.suspendedRuntime?.closing
-      ?? Promise.resolve().then(() => this.runtime.close?.());
+    this.runtimeClosing = this.suspendedRuntime?.closing ?? Promise.resolve().then(() => this.runtime.close?.());
     return this.runtimeClosing;
   }
 
@@ -529,12 +655,21 @@ export class Session {
     if (this.runtimeClosed) throw new Error("Session runtime is closed");
     if (this.suspendedRuntime !== undefined) return this.suspendedRuntime.closing;
     this.runtimeMutation = true;
-    try { await this.persistRuntimeState(); }
-    finally { this.runtimeMutation = false; }
+    try {
+      await this.persistRuntimeState();
+    } finally {
+      this.runtimeMutation = false;
+    }
   }
 
   private assertIdleRuntime(): void {
-    if (this.activeRun !== undefined || this.pendingStarts > 0 || this.activeRunObservations.size > 0 || this.settlingRuns > 0 || this.runtimeMutation) {
+    if (
+      this.activeRun !== undefined ||
+      this.pendingStarts > 0 ||
+      this.activeRunObservations.size > 0 ||
+      this.settlingRuns > 0 ||
+      this.runtimeMutation
+    ) {
       throw new Error("Session runtime requires an idle boundary with no queued Runs");
     }
   }
@@ -542,12 +677,14 @@ export class Session {
   private async persistRuntimeState(): Promise<void> {
     if (this.runtime.saveState === undefined) return;
     const state = await snapshotRuntimeState(this.runtime);
-    await this.record({ type: "runtime.state.saved", runtime: { ...this.runtime.descriptor! }, state: structuredClone(state) });
+    await this.record({
+      type: "runtime.state.saved",
+      runtime: { ...this.runtime.descriptor! },
+      state: structuredClone(state),
+    });
   }
 
-  async queryHistory(
-    query: SessionHistoryQuery = {},
-  ): Promise<SessionHistoryPage> {
+  async queryHistory(query: SessionHistoryQuery = {}): Promise<SessionHistoryPage> {
     await this.records.idle();
     return this.historyReader.query(this.id, query);
   }
@@ -557,27 +694,23 @@ export class Session {
       return this.record(toPermissionSessionEvent(event), event.timestamp);
     }
     if (event.type === "approval.requested") {
-      const operation = this.waitForModelCompletion(
-        event.request.context.runId,
-        event.request.context.step,
-      ).then(() =>
-        this.record(toPermissionSessionEvent(event), event.timestamp)
+      const operation = this.waitForModelCompletion(event.request.context.runId, event.request.context.step).then(() =>
+        this.record(toPermissionSessionEvent(event), event.timestamp),
       );
       this.approvalRecords.set(event.request.id, operation);
       return operation;
     }
 
-    const previous = this.approvalRecords.get(event.requestId) ??
-      Promise.resolve();
-    const operation = previous.then(() =>
-      this.record(toPermissionSessionEvent(event), event.timestamp)
-    );
+    const previous = this.approvalRecords.get(event.requestId) ?? Promise.resolve();
+    const operation = previous.then(() => this.record(toPermissionSessionEvent(event), event.timestamp));
     this.approvalRecords.set(event.requestId, operation);
-    void operation.finally(() => {
-      if (this.approvalRecords.get(event.requestId) === operation) {
-        this.approvalRecords.delete(event.requestId);
-      }
-    }).catch(() => undefined);
+    void operation
+      .finally(() => {
+        if (this.approvalRecords.get(event.requestId) === operation) {
+          this.approvalRecords.delete(event.requestId);
+        }
+      })
+      .catch(() => undefined);
     return operation;
   }
 
@@ -599,9 +732,7 @@ export class Session {
     });
   }
 
-  async recordToolPresentation(
-    presentation: SessionToolPresentation,
-  ): Promise<void> {
+  async recordToolPresentation(presentation: SessionToolPresentation): Promise<void> {
     validateToolPresentation(presentation);
     const snapshot = JSON.parse(JSON.stringify(presentation)) as SessionToolPresentation;
     await this.record({ type: "tool.presentation", ...snapshot });
@@ -610,13 +741,16 @@ export class Session {
   private async start(options: SessionSubmitOptions): Promise<RunHandle> {
     this.assertRecovered();
     if (options.inputId !== undefined) {
-      if (options.inputId.length === 0 || options.inputId.length > 256) throw new TypeError("inputId must be a non-empty string of at most 256 characters");
-      if ((await this.history()).some((event) => event.type === "input.submitted" && event.inputId === options.inputId)) throw new Error(`Input already submitted: ${options.inputId}`);
+      if (options.inputId.length === 0 || options.inputId.length > 256)
+        throw new TypeError("inputId must be a non-empty string of at most 256 characters");
+      if ((await this.history()).some((event) => event.type === "input.submitted" && event.inputId === options.inputId))
+        throw new Error(`Input already submitted: ${options.inputId}`);
       const steeringInput = this.steering.get(options.inputId);
       if (steeringInput !== undefined) {
         this.steering.idle(options.inputId);
         const message = typeof options.input === "string" ? userMessage(options.input) : options.input;
-        if (JSON.stringify(message) !== JSON.stringify(steeringInput.message)) throw new Error("Steering input content cannot change when starting execution");
+        if (JSON.stringify(message) !== JSON.stringify(steeringInput.message))
+          throw new Error("Steering input content cannot change when starting execution");
       }
     }
     const runtimeOptions: RunOptions = {
@@ -629,9 +763,7 @@ export class Session {
         "may.session.id": this.id,
       },
     };
-    const input: UserMessage = typeof options.input === "string"
-      ? userMessage(options.input)
-      : options.input;
+    const input: UserMessage = typeof options.input === "string" ? userMessage(options.input) : options.input;
     if (options.signal?.aborted === true) {
       return this.wrapRun(this.runtime.run(runtimeOptions));
     }
@@ -659,8 +791,7 @@ export class Session {
       forwardAbort();
     } else {
       externalSignal.addEventListener("abort", forwardAbort, { once: true });
-      const removeListener = () =>
-        externalSignal.removeEventListener("abort", forwardAbort);
+      const removeListener = () => externalSignal.removeEventListener("abort", forwardAbort);
       void run.result.then(removeListener, removeListener);
     }
     return run;
@@ -674,49 +805,59 @@ export class Session {
       if (continuationId.trim() === "" || continuationId.length > 256) {
         throw new TypeError("continuationId must be a nonempty string of at most 256 characters");
       }
-      if ((await this.history()).some(event => event.type === "continuation.submitted" && event.continuationId === continuationId)) {
+      if (
+        (await this.history()).some(
+          (event) => event.type === "continuation.submitted" && event.continuationId === continuationId,
+        )
+      ) {
         throw new Error(`Continuation already submitted: ${continuationId}`);
       }
       await this.record({ type: "continuation.submitted", continuationId });
     }
     this.assertRecovered();
-    return this.wrapRun(this.runtime.continue({
-      ...runtimeOptions,
-      ...recordingOptions,
-      checkpoint: (event) => this.checkpoint(event, options.checkpoint, continuationId),
-      stepInputSource: ({ runId, step, signal }) => this.steering.deliver(runId, step, signal),
-      traceAttributes: {
-        ...(options.traceAttributes ?? {}),
-        "may.session.id": this.id,
-        ...(this.latestRunId === undefined ? {} : { "may.run.resumed_from": this.latestRunId }),
-      },
-    }), continuationId);
+    return this.wrapRun(
+      this.runtime.continue({
+        ...runtimeOptions,
+        ...recordingOptions,
+        checkpoint: (event) => this.checkpoint(event, options.checkpoint, continuationId),
+        stepInputSource: ({ runId, step, signal }) => this.steering.deliver(runId, step, signal),
+        traceAttributes: {
+          ...(options.traceAttributes ?? {}),
+          "may.session.id": this.id,
+          ...(this.latestRunId === undefined ? {} : { "may.run.resumed_from": this.latestRunId }),
+        },
+      }),
+      continuationId,
+    );
   }
 
   private wrapRun(run: RunHandle, continuationId?: string): RunHandle {
     this.latestRunId = run.id;
     this.activeRun = run;
-    const completion = run.result.then(async (value) => {
-      this.settlingRuns += 1;
-      try {
-        if (this.activeRun === run) this.activeRun = undefined;
-        await this.persistRuntimeState();
-        await this.steering.finish(run.id, "idle", value.finishReason === "yielded" ? "yielded" : "completed");
-        return value;
-      } finally {
-        this.settlingRuns -= 1;
-      }
-    }, async (error: unknown) => {
-      this.settlingRuns += 1;
-      try {
-        if (this.activeRun === run) this.activeRun = undefined;
-        await this.persistRuntimeState();
-        await this.steering.finish(run.id, "cancelled", error instanceof Error ? error.message : "Run failed");
-        throw error;
-      } finally {
-        this.settlingRuns -= 1;
-      }
-    });
+    const completion = run.result.then(
+      async (value) => {
+        this.settlingRuns += 1;
+        try {
+          if (this.activeRun === run) this.activeRun = undefined;
+          await this.persistRuntimeState();
+          await this.steering.finish(run.id, "idle", value.finishReason === "yielded" ? "yielded" : "completed");
+          return value;
+        } finally {
+          this.settlingRuns -= 1;
+        }
+      },
+      async (error: unknown) => {
+        this.settlingRuns += 1;
+        try {
+          if (this.activeRun === run) this.activeRun = undefined;
+          await this.persistRuntimeState();
+          await this.steering.finish(run.id, "cancelled", error instanceof Error ? error.message : "Run failed");
+          throw error;
+        } finally {
+          this.settlingRuns -= 1;
+        }
+      },
+    );
     void completion.catch(() => undefined);
     const events = new AsyncEventQueue<MayEvent>({
       maxBufferedValues: 1024,
@@ -748,18 +889,14 @@ export class Session {
     };
   }
 
-  private async observeRun(
-    run: RunHandle,
-    events: AsyncEventQueue<MayEvent>,
-    continuationId?: string,
-  ): Promise<void> {
+  private async observeRun(run: RunHandle, events: AsyncEventQueue<MayEvent>, continuationId?: string): Promise<void> {
     let observationError: unknown;
     try {
       for await (const event of run.events) {
         if (event.type === "run.failed" && event.error.code === "RUN_CHECKPOINT_FAILED") this.persistenceFailed = true;
         const recorded = toSessionEvent(event);
-        const payload = recorded?.type === "run.started" && continuationId !== undefined
-          ? { ...recorded, continuationId } : recorded;
+        const payload =
+          recorded?.type === "run.started" && continuationId !== undefined ? { ...recorded, continuationId } : recorded;
         if (payload !== undefined && !this.checkpointed.delete(checkpointKey(event))) {
           await this.record(payload, event.timestamp);
         }
@@ -775,14 +912,14 @@ export class Session {
       observationError = error;
       throw error;
     } finally {
-      const terminalError = observationError ?? new Error(
-        `Run "${run.id}" ended before the requested event was observed`,
-      );
+      const terminalError =
+        observationError ?? new Error(`Run "${run.id}" ended before the requested event was observed`);
       this.activeRunObservations.delete(run.id);
       this.finishedRunObservationErrors.set(run.id, terminalError);
       this.rejectModelCompletionWaiters(run.id, terminalError);
       this.clearModelCompletionState(run.id);
-      for (const key of this.checkpointed) if ((JSON.parse(key) as unknown[])[1] === run.id) this.checkpointed.delete(key);
+      for (const key of this.checkpointed)
+        if ((JSON.parse(key) as unknown[])[1] === run.id) this.checkpointed.delete(key);
       events.close();
     }
   }
@@ -865,17 +1002,11 @@ export class Session {
     }
   }
 
-  private record(
-    payload: SessionEventPayload,
-    timestamp = Date.now(),
-  ): Promise<void> {
+  private record(payload: SessionEventPayload, timestamp = Date.now()): Promise<void> {
     return this.records.run(() => this.recordNow(payload, timestamp));
   }
 
-  private async recordNow(
-    payload: SessionEventPayload,
-    timestamp: number,
-  ): Promise<void> {
+  private async recordNow(payload: SessionEventPayload, timestamp: number): Promise<void> {
     const seq = this.seq + 1;
     const event: SessionEvent = {
       ...payload,
@@ -883,8 +1014,12 @@ export class Session {
       seq,
       timestamp,
     };
-    try { await this.store.append(event); }
-    catch (error) { this.persistenceFailed = true; throw error; }
+    try {
+      await this.store.append(event);
+    } catch (error) {
+      this.persistenceFailed = true;
+      throw error;
+    }
     this.seq = seq;
   }
 
@@ -906,11 +1041,16 @@ export class Session {
       if (this.persistenceFailed) throw new Error("Session persistence failed; reopen the session before recovery");
       const recovery = this.recoveries.get(id);
       if (recovery === undefined) throw new Error(`Unknown recovery: ${id}`);
-      if (finding.trim() === "" || finding.length > 32768) throw new Error("Recovery finding must contain 1-32768 characters");
+      if (finding.trim() === "" || finding.length > 32768)
+        throw new Error("Recovery finding must contain 1-32768 characters");
       const message = userMessage(`Verified recovery of tool call ${id} (${recovery.call.name}):\n${finding}`);
       await this.record({ type: "recovery.resolved", recoveryId: id, message });
-      try { await this.runtime.appendMessages([message]); }
-      catch (error) { this.persistenceFailed = true; throw error; }
+      try {
+        await this.runtime.appendMessages([message]);
+      } catch (error) {
+        this.persistenceFailed = true;
+        throw error;
+      }
       this.recoveries.delete(id);
     });
     this.tail = operation.catch(() => undefined);
@@ -924,11 +1064,16 @@ export class Session {
     if (this.recoveries.size > 0) throw new SessionRecoveryRequiredError(this.listRecoveries());
   }
 
-  private async checkpoint(event: RunCheckpointEvent, extra?: (event: RunCheckpointEvent) => Promise<void>, continuationId?: string): Promise<void> {
+  private async checkpoint(
+    event: RunCheckpointEvent,
+    extra?: (event: RunCheckpointEvent) => Promise<void>,
+    continuationId?: string,
+  ): Promise<void> {
     const live = { ...event, timestamp: Date.now(), seq: 0 };
-    const payload = event.type === "run.started"
-      ? { ...event, checkpointVersion: 1 as const, ...omitUndefined({ continuationId }) }
-      : toSessionEvent(live);
+    const payload =
+      event.type === "run.started"
+        ? { ...event, checkpointVersion: 1 as const, ...omitUndefined({ continuationId }) }
+        : toSessionEvent(live);
     if (payload !== undefined) {
       await this.record(payload, live.timestamp);
       this.checkpointed.add(checkpointKey(event));
@@ -936,11 +1081,17 @@ export class Session {
     await extra?.(event);
   }
 
-  async listModelRequests(options: { afterSeq?: number; limit?: number } = {}): Promise<readonly RecordedModelRequest[]> {
+  async listModelRequests(
+    options: { afterSeq?: number; limit?: number } = {},
+  ): Promise<readonly RecordedModelRequest[]> {
     const limit = options.limit ?? 50;
-    if (options.afterSeq !== undefined && (!Number.isSafeInteger(options.afterSeq) || options.afterSeq < 0)) throw new RangeError("afterSeq must be a nonnegative integer");
-    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new RangeError("limit must be between 1 and 1000");
-    return readRecordedModelRequests(await this.history()).filter((request) => request.seq > (options.afterSeq ?? 0)).slice(0, limit);
+    if (options.afterSeq !== undefined && (!Number.isSafeInteger(options.afterSeq) || options.afterSeq < 0))
+      throw new RangeError("afterSeq must be a nonnegative integer");
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000)
+      throw new RangeError("limit must be between 1 and 1000");
+    return readRecordedModelRequests(await this.history())
+      .filter((request) => request.seq > (options.afterSeq ?? 0))
+      .slice(0, limit);
   }
 
   async getModelRequest(modelCallId: string): Promise<readonly RecordedModelRequest[]> {
@@ -951,23 +1102,62 @@ export class Session {
     const operation = this.requestRecords.run(async () => {
       const identity = { runId: observation.runId, step: observation.step, modelCallId: observation.modelCallId };
       if (observation.type === "prepared") {
-        if (new TextEncoder().encode(JSON.stringify({ ...observation.record, body: this.providerBodyRecording ? observation.record.body : undefined })).byteLength > 64 * 1024 * 1024) throw new RangeError("Model request record exceeds 64 MiB");
+        if (
+          new TextEncoder().encode(
+            JSON.stringify({
+              ...observation.record,
+              body: this.providerBodyRecording ? observation.record.body : undefined,
+            }),
+          ).byteLength >
+          64 * 1024 * 1024
+        )
+          throw new RangeError("Model request record exceeds 64 MiB");
         const definitions = new Set(this.requestDefinitions);
         const added: Array<{ id: string; value: unknown }> = [];
         const define = (value: unknown): string => {
           const id = requestValueId(value);
-          if (!definitions.has(id)) { definitions.add(id); added.push({ id, value }); }
+          if (!definitions.has(id)) {
+            definitions.add(id);
+            added.push({ id, value });
+          }
           return id;
         };
         const record = observation.record;
-        if (this.providerBodyRecording && (typeof record.body !== "object" || record.body === null || Array.isArray(record.body))) throw new TypeError("Recorded request body must be an object");
+        if (
+          this.providerBodyRecording &&
+          (typeof record.body !== "object" || record.body === null || Array.isArray(record.body))
+        )
+          throw new TypeError("Recorded request body must be an object");
         const request = requestReferences({ ...record.request }, define);
-        const body = this.providerBodyRecording ? requestReferences(record.body as Record<string, unknown>, define) : undefined;
-        const batch: SessionEventPayload[] = added.map((definition) => ({ type: "model.request.defined", ...definition }));
+        const body = this.providerBodyRecording
+          ? requestReferences(record.body as Record<string, unknown>, define)
+          : undefined;
+        const batch: SessionEventPayload[] = added.map((definition) => ({
+          type: "model.request.defined",
+          ...definition,
+        }));
         const attempt = (this.requestAttempts.get(observation.modelCallId) ?? 0) + 1;
-        batch.push({ type: "model.request.prepared", version: 1, ...identity, attempt, adapter: record.adapter, purpose: record.purpose, request, body, ...omitUndefined({ endpoint: record.endpoint, protocol: record.protocol, omittedPaths: record.omittedPaths, externalResourcePaths: record.externalResourcePaths }) });
+        batch.push({
+          type: "model.request.prepared",
+          version: 1,
+          ...identity,
+          attempt,
+          adapter: record.adapter,
+          purpose: record.purpose,
+          request,
+          body,
+          ...omitUndefined({
+            endpoint: record.endpoint,
+            protocol: record.protocol,
+            omittedPaths: record.omittedPaths,
+            externalResourcePaths: record.externalResourcePaths,
+          }),
+        });
         await this.records.run(async () => {
-          const events = batch.map((payload, index) => ({ ...payload, sessionId: this.id, seq: this.seq + index + 1, timestamp: Date.now() }) as SessionEvent);
+          const events = batch.map(
+            (payload, index) =>
+              ({ ...payload, sessionId: this.id, seq: this.seq + index + 1, timestamp: Date.now() }) as SessionEvent,
+          );
           if (this.store.appendBatch) await this.store.appendBatch(events);
           else for (const event of events) await this.store.append(event);
           this.seq += events.length;
@@ -977,13 +1167,33 @@ export class Session {
       } else {
         const attempt = this.requestAttempts.get(observation.modelCallId) ?? 0;
         if (attempt === 0) throw new Error("Model outcome has no prepared request");
-        await this.record(observation.type === "started" ? { type: "model.attempt.started", ...identity, attempt }
-          : observation.type === "completed"
-          ? omitUndefined({ type: "model.attempt.completed", ...identity, attempt, durationMs: observation.durationMs, usage: observation.usage })
-          : omitUndefined({ type: "model.attempt.failed", ...identity, attempt, cancelled: observation.cancelled, errorName: observation.errorName, durationMs: observation.durationMs, httpStatus: observation.httpStatus }));
+        await this.record(
+          observation.type === "started"
+            ? { type: "model.attempt.started", ...identity, attempt }
+            : observation.type === "completed"
+              ? omitUndefined({
+                  type: "model.attempt.completed",
+                  ...identity,
+                  attempt,
+                  durationMs: observation.durationMs,
+                  usage: observation.usage,
+                })
+              : omitUndefined({
+                  type: "model.attempt.failed",
+                  ...identity,
+                  attempt,
+                  cancelled: observation.cancelled,
+                  errorName: observation.errorName,
+                  durationMs: observation.durationMs,
+                  httpStatus: observation.httpStatus,
+                }),
+        );
       }
     });
-    return operation.catch((error) => { this.persistenceFailed = true; throw error; });
+    return operation.catch((error) => {
+      this.persistenceFailed = true;
+      throw error;
+    });
   };
 }
 
@@ -1012,7 +1222,11 @@ function interruptedRuns(events: readonly SessionEvent[]): SessionEventPayload[]
     if (event.type === "approval.requested") approvals.add(event.request.id);
     if (event.type === "approval.resolved" || event.type === "approval.cancelled") approvals.delete(event.requestId);
     if (event.type === "run.started") {
-      runs.set(event.runId, { ...omitUndefined({ version: event.checkpointVersion }), pending: new Map(), started: new Set() });
+      runs.set(event.runId, {
+        ...omitUndefined({ version: event.checkpointVersion }),
+        pending: new Map(),
+        started: new Set(),
+      });
     } else if (event.type === "assistant.completed") {
       const run = runs.get(event.runId);
       for (const call of event.message.toolCalls ?? []) {
@@ -1023,18 +1237,34 @@ function interruptedRuns(events: readonly SessionEvent[]): SessionEventPayload[]
       runs.get(event.runId)?.started.add(`${event.runId}:${event.step}:${event.call.id}`);
     } else if (event.type === "tool.completed" || event.type === "tool.failed") {
       runs.get(event.runId)?.pending.delete(`${event.runId}:${event.step}:${event.call.id}`);
-    } else if (event.type === "run.completed" || event.type === "run.yielded" || event.type === "run.cancelled" || event.type === "run.interrupted") {
+    } else if (
+      event.type === "run.completed" ||
+      event.type === "run.yielded" ||
+      event.type === "run.cancelled" ||
+      event.type === "run.interrupted"
+    ) {
       runs.delete(event.runId);
     } else if (event.type === "run.failed") {
       // A failure can leave unclosed calls (e.g. a failed persistence barrier).
       if (runs.get(event.runId)?.pending.size === 0) runs.delete(event.runId);
     }
   }
-  const repairs: SessionEventPayload[] = [...runs].map(([runId, run]) => ({ type: "run.interrupted", runId,
-    recoveries: [...run.pending.values()].map((item) => ({ ...item,
-      status: run.version === 1 && !run.started.has(item.id) ? "not-started" : "unknown" })),
+  const repairs: SessionEventPayload[] = [...runs].map(([runId, run]) => ({
+    type: "run.interrupted",
+    runId,
+    recoveries: [...run.pending.values()].map((item) => ({
+      ...item,
+      status: run.version === 1 && !run.started.has(item.id) ? "not-started" : "unknown",
+    })),
   }));
-  return [...repairs, ...[...approvals].map((requestId) => ({ type: "approval.cancelled" as const, requestId, reason: "Process interrupted; approval was not restored" }))];
+  return [
+    ...repairs,
+    ...[...approvals].map((requestId) => ({
+      type: "approval.cancelled" as const,
+      requestId,
+      reason: "Process interrupted; approval was not restored",
+    })),
+  ];
 }
 
 interface Deferred<T> {
@@ -1057,9 +1287,7 @@ function modelStepKey(runId: string, step: number): string {
   return `${runId}:${step}`;
 }
 
-function validateToolPresentation(
-  presentation: SessionToolPresentation,
-): void {
+function validateToolPresentation(presentation: SessionToolPresentation): void {
   requireNonEmpty(presentation.runId, "runId");
   requireNonEmpty(presentation.toolCallId, "toolCallId");
   requireNonEmpty(presentation.kind, "kind");
@@ -1102,7 +1330,12 @@ function replaySession(events: readonly SessionEvent[]): {
       case "runtime.state.saved":
         if (runtime === undefined) throw new Error("Runtime state requires Session creation metadata");
         validateRuntimeDescriptor(event.runtime);
-        if (runtime.id !== event.runtime.id || runtime.version !== event.runtime.version || runtime.stateVersion !== event.runtime.stateVersion) throw new Error("Saved runtime state has an incompatible descriptor");
+        if (
+          runtime.id !== event.runtime.id ||
+          runtime.version !== event.runtime.version ||
+          runtime.stateVersion !== event.runtime.stateVersion
+        )
+          throw new Error("Saved runtime state has an incompatible descriptor");
         runtimeState = structuredClone(event.state);
         break;
       case "input.generated":
@@ -1113,11 +1346,24 @@ function replaySession(events: readonly SessionEvent[]): {
         break;
       case "run.interrupted":
         for (const recovery of event.recoveries) {
-          const error = recovery.status === "not-started"
-            ? { code: "TOOL_NOT_EXECUTED", message: "The process stopped before this tool's execution checkpoint. The tool was not executed." }
-            : { code: "TOOL_OUTCOME_UNKNOWN", message: "The process stopped without a durable outcome. External effects may have occurred. Do not repeat this operation without verified recovery findings." };
-          messages.push({ role: "tool", name: recovery.call.name, toolCallId: recovery.call.id,
-            isError: true, content: [{ type: "json", value: error }] });
+          const error =
+            recovery.status === "not-started"
+              ? {
+                  code: "TOOL_NOT_EXECUTED",
+                  message: "The process stopped before this tool's execution checkpoint. The tool was not executed.",
+                }
+              : {
+                  code: "TOOL_OUTCOME_UNKNOWN",
+                  message:
+                    "The process stopped without a durable outcome. External effects may have occurred. Do not repeat this operation without verified recovery findings.",
+                };
+          messages.push({
+            role: "tool",
+            name: recovery.call.name,
+            toolCallId: recovery.call.id,
+            isError: true,
+            content: [{ type: "json", value: error }],
+          });
         }
         break;
       case "recovery.resolved":
@@ -1138,19 +1384,13 @@ function replaySession(events: readonly SessionEvent[]): {
         break;
       case "assistant.completed":
         messages.push(event.message);
-        if (
-          event.message.toolCalls !== undefined &&
-          event.message.toolCalls.length > 0
-        ) {
+        if (event.message.toolCalls !== undefined && event.message.toolCalls.length > 0) {
           pendingTools.set(
             modelStepKey(event.runId, event.step),
             new Map(event.message.toolCalls.map((call) => [call.id, call])),
           );
         }
-        if (
-          event.usage?.inputTokens !== undefined &&
-          event.contextMessageCount !== undefined
-        ) {
+        if (event.usage?.inputTokens !== undefined && event.contextMessageCount !== undefined) {
           latestModelMeasurement = {
             inputTokens: event.usage.inputTokens,
             contextMessageCount: event.contextMessageCount,
@@ -1184,11 +1424,7 @@ function replaySession(events: readonly SessionEvent[]): {
       case "run.cancelled":
         for (const [key, calls] of pendingTools) {
           if (!key.startsWith(`${event.runId}:`)) continue;
-          messages.push(
-            ...[...calls.values()].map((call) =>
-              toolCancellationMessage(call, event.reason)
-            ),
-          );
+          messages.push(...[...calls.values()].map((call) => toolCancellationMessage(call, event.reason)));
           pendingTools.delete(key);
         }
         break;
@@ -1203,13 +1439,21 @@ function replaySession(events: readonly SessionEvent[]): {
     let end = index + 1;
     while (messages[end]?.role === "tool") end++;
     const results = messages.slice(index + 1, end);
-    results.sort((a, b) => (a.role === "tool" ? order.get(a.toolCallId) ?? Infinity : Infinity) - (b.role === "tool" ? order.get(b.toolCallId) ?? Infinity : Infinity));
+    results.sort(
+      (a, b) =>
+        (a.role === "tool" ? (order.get(a.toolCallId) ?? Infinity) : Infinity) -
+        (b.role === "tool" ? (order.get(b.toolCallId) ?? Infinity) : Infinity),
+    );
     messages.splice(index + 1, results.length, ...results);
   }
   return {
     messages,
-    info: omitUndefined({ latestModelMeasurement, runtime, runtimeState,
-      state: Object.keys(state).length === 0 ? undefined : state }),
+    info: omitUndefined({
+      latestModelMeasurement,
+      runtime,
+      runtimeState,
+      state: Object.keys(state).length === 0 ? undefined : state,
+    }),
   };
 }
 
@@ -1226,12 +1470,18 @@ function resolvePendingTool(
   if (calls.size === 0) pending.delete(key);
 }
 
-function toPermissionSessionEvent(
-  event: RecordablePermissionEvent,
-): SessionEventPayload {
+function toPermissionSessionEvent(event: RecordablePermissionEvent): SessionEventPayload {
   if (event.type === "rule.created") return { type: event.type, rule: structuredClone(event.rule) };
   if (event.type === "rule.revoked") return { type: event.type, ruleId: event.ruleId, scopeId: event.scopeId };
-  if (event.type === "rule.used") return { type: event.type, ruleId: event.ruleId, scopeId: event.scopeId, decision: event.decision, runId: event.runId, toolCallId: event.toolCallId };
+  if (event.type === "rule.used")
+    return {
+      type: event.type,
+      ruleId: event.ruleId,
+      scopeId: event.scopeId,
+      decision: event.decision,
+      runId: event.runId,
+      toolCallId: event.toolCallId,
+    };
   if (event.type === "approval.requested") {
     const request: SessionApprovalRequest = {
       id: event.request.id,
@@ -1260,11 +1510,30 @@ function toPermissionSessionEvent(
 function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
   switch (event.type) {
     case "input.generated":
-      return { type: event.type, runId: event.runId, step: event.step, messages: [...event.messages], reason: event.reason };
+      return {
+        type: event.type,
+        runId: event.runId,
+        step: event.step,
+        messages: [...event.messages],
+        reason: event.reason,
+      };
     case "run.budget.exceeded":
-      return { type: event.type, runId: event.runId, dimension: event.dimension, limit: event.limit, consumed: event.consumed, budget: event.budget };
+      return {
+        type: event.type,
+        runId: event.runId,
+        dimension: event.dimension,
+        limit: event.limit,
+        consumed: event.consumed,
+        budget: event.budget,
+      };
     case "tool.started":
-      return omitUndefined({ type: "tool.started", runId: event.runId, step: event.step, call: event.call, input: event.input });
+      return omitUndefined({
+        type: "tool.started",
+        runId: event.runId,
+        step: event.step,
+        call: event.call,
+        input: event.input,
+      });
     case "run.started":
       return event.continuation === true
         ? { type: "run.started", runId: event.runId, continuation: true }
@@ -1317,7 +1586,8 @@ function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
 }
 
 function assertSessionInputOptions(options: { readonly stepInputSource?: unknown }): void {
-  if (options.stepInputSource !== undefined) throw new TypeError("Session manages step input through steer(); custom stepInputSource is unsupported");
+  if (options.stepInputSource !== undefined)
+    throw new TypeError("Session manages step input through steer(); custom stepInputSource is unsupported");
 }
 
 export function createSessionId(): string {
@@ -1326,7 +1596,8 @@ export function createSessionId(): string {
 
 async function snapshotRuntimeState(runtime: AgentRuntime): Promise<unknown> {
   const descriptor = runtime.descriptor;
-  if (descriptor === undefined || descriptor.stateVersion === undefined) throw new Error("Stateful runtime requires a versioned descriptor");
+  if (descriptor === undefined || descriptor.stateVersion === undefined)
+    throw new Error("Stateful runtime requires a versioned descriptor");
   validateRuntimeDescriptor(descriptor);
   const state = await runtime.saveState!();
   if (state === undefined) throw new Error("Stateful runtime must save an explicit state value");
@@ -1334,14 +1605,20 @@ async function snapshotRuntimeState(runtime: AgentRuntime): Promise<unknown> {
 }
 
 /** Migrate, restore and re-snapshot saved runtime state for a newly created runtime instance. */
-async function adoptRuntimeState(runtime: AgentRuntime, saved: RuntimeDescriptor, savedState: unknown): Promise<{ state: unknown; migrated: boolean }> {
+async function adoptRuntimeState(
+  runtime: AgentRuntime,
+  saved: RuntimeDescriptor,
+  savedState: unknown,
+): Promise<{ state: unknown; migrated: boolean }> {
   const current = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
   validateRuntimeDescriptor(current);
   const migrated = !runtimeDescriptorsEqual(saved, current);
   let state = savedState;
   if (migrated) {
     if (runtime.migrateState === undefined) {
-      throw new Error(`Session runtime ${saved.id}@${saved.version} is incompatible with ${current.id}@${current.version}`);
+      throw new Error(
+        `Session runtime ${saved.id}@${saved.version} is incompatible with ${current.id}@${current.version}`,
+      );
     }
     state = await runtime.migrateState(saved, state);
   }
@@ -1354,7 +1631,10 @@ async function adoptRuntimeState(runtime: AgentRuntime, saved: RuntimeDescriptor
 }
 
 async function closeRejectedRuntime(runtime: AgentRuntime, error: unknown): Promise<never> {
-  try { await runtime.close?.(); }
-  catch (cleanupError) { throw new AggregateError([error, cleanupError], "Runtime initialization and cleanup both failed", { cause: error }); }
+  try {
+    await runtime.close?.();
+  } catch (cleanupError) {
+    throw new AggregateError([error, cleanupError], "Runtime initialization and cleanup both failed", { cause: error });
+  }
   throw error;
 }

@@ -1,41 +1,87 @@
-import { ROOT_CONTEXT, SpanStatusCode, TraceFlags, trace, type Attributes, type Meter, type Tracer as OtelTracer } from "@opentelemetry/api";
-import { BasicTracerProvider, BatchSpanProcessor as OtelBatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace-base";
+import {
+  ROOT_CONTEXT,
+  SpanStatusCode,
+  TraceFlags,
+  trace,
+  type Attributes,
+  type Meter,
+  type Tracer as OtelTracer,
+} from "@opentelemetry/api";
+import {
+  BasicTracerProvider,
+  BatchSpanProcessor as OtelBatchSpanProcessor,
+  ParentBasedSampler,
+  TraceIdRatioBasedSampler,
+} from "@opentelemetry/sdk-trace-base";
 import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import { omitUndefined, type MetricRecord, type TraceAttributes, type TraceSpan, type TraceSpanStartOptions, type Tracer } from "@sortedyuan/may/core";
+import {
+  omitUndefined,
+  type MetricRecord,
+  type TraceAttributes,
+  type TraceSpan,
+  type TraceSpanStartOptions,
+  type Tracer,
+} from "@sortedyuan/may/core";
 import { boundedAttributes, telemetryLimits, type TelemetryLimits } from "./limits.js";
 import { metricAttributes, SpanMetrics } from "./metrics.js";
-import type { FinishedTraceSpan, MetricRecorder, ObservabilityErrorHandler, SpanObserver, TraceSpanEventData } from "./types.js";
+import type {
+  FinishedTraceSpan,
+  MetricRecorder,
+  ObservabilityErrorHandler,
+  SpanObserver,
+  TraceSpanEventData,
+} from "./types.js";
 
 export class OpenTelemetryMetricRecorder implements MetricRecorder {
-  private readonly instruments = new Map<string, { record: MetricRecord; instrument: ReturnType<Meter["createCounter"]> | ReturnType<Meter["createHistogram"]> | ReturnType<Meter["createGauge"]> }>();
+  private readonly instruments = new Map<
+    string,
+    {
+      record: MetricRecord;
+      instrument:
+        ReturnType<Meter["createCounter"]> | ReturnType<Meter["createHistogram"]> | ReturnType<Meter["createGauge"]>;
+    }
+  >();
   private readonly series = new Set<string>();
   private overflow = 0;
-  constructor(private readonly meter: Meter, private readonly maxSeries = 1_024) {
+  constructor(
+    private readonly meter: Meter,
+    private readonly maxSeries = 1_024,
+  ) {
     if (!Number.isSafeInteger(maxSeries) || maxSeries < 1) throw new RangeError("maxSeries must be positive");
   }
-  get droppedSeries(): number { return this.overflow; }
+  get droppedSeries(): number {
+    return this.overflow;
+  }
   record(record: MetricRecord): void {
     if (!Number.isFinite(record.value)) throw new TypeError("Metric value must be finite");
     const attributes = metricAttributes(record.attributes ?? {});
     const series = JSON.stringify([record.name, Object.entries(attributes).sort(([a], [b]) => a.localeCompare(b))]);
     if (!this.series.has(series)) {
-      if (this.series.size >= this.maxSeries) { this.overflow += 1; return; }
+      if (this.series.size >= this.maxSeries) {
+        this.overflow += 1;
+        return;
+      }
       this.series.add(series);
     }
     let entry = this.instruments.get(record.name);
     if (entry === undefined) {
       const options = omitUndefined({ unit: record.unit });
-      const instrument = record.kind === "counter" ? this.meter.createCounter(record.name, options)
-        : record.kind === "updown" ? this.meter.createUpDownCounter(record.name, options)
-        : record.kind === "gauge" ? this.meter.createGauge(record.name, options)
-        : this.meter.createHistogram(record.name, options);
+      const instrument =
+        record.kind === "counter"
+          ? this.meter.createCounter(record.name, options)
+          : record.kind === "updown"
+            ? this.meter.createUpDownCounter(record.name, options)
+            : record.kind === "gauge"
+              ? this.meter.createGauge(record.name, options)
+              : this.meter.createHistogram(record.name, options);
       entry = { record, instrument };
       this.instruments.set(record.name, entry);
     }
-    if (entry.record.kind !== record.kind || entry.record.unit !== record.unit) throw new TypeError("Metric instrument kind and unit must remain consistent");
+    if (entry.record.kind !== record.kind || entry.record.unit !== record.unit)
+      throw new TypeError("Metric instrument kind and unit must remain consistent");
     if ("add" in entry.instrument) entry.instrument.add(record.value, otelAttributes(attributes));
     else entry.instrument.record(record.value, otelAttributes(attributes));
   }
@@ -55,26 +101,47 @@ export class OpenTelemetryTracer implements Tracer {
   private readonly observers: readonly SpanObserver[];
   constructor(private readonly options: OpenTelemetryTracerOptions) {
     this.limits = telemetryLimits(options.limits);
-    this.observers = [options.observer, options.metrics === undefined ? undefined : new SpanMetrics(options.metrics)].filter((value): value is SpanObserver => value !== undefined);
+    this.observers = [
+      options.observer,
+      options.metrics === undefined ? undefined : new SpanMetrics(options.metrics),
+    ].filter((value): value is SpanObserver => value !== undefined);
   }
-  recordMetric(record: MetricRecord): void { this.options.metrics?.record(record); }
+  recordMetric(record: MetricRecord): void {
+    this.options.metrics?.record(record);
+  }
   startSpan(name: string, options: TraceSpanStartOptions = {}): TraceSpan {
     if (!name || name.length > 128) throw new TypeError("Invalid span name");
     let attributes = boundedAttributes({ ...this.options.resourceAttributes, ...options.attributes }, this.limits);
     const parent = options.parent;
-    const parentContext = parent === undefined ? ROOT_CONTEXT : trace.setSpanContext(ROOT_CONTEXT, { traceId: parent.traceId, spanId: parent.spanId, traceFlags: parent.sampled === false ? TraceFlags.NONE : TraceFlags.SAMPLED, isRemote: true });
+    const parentContext =
+      parent === undefined
+        ? ROOT_CONTEXT
+        : trace.setSpanContext(ROOT_CONTEXT, {
+            traceId: parent.traceId,
+            spanId: parent.spanId,
+            traceFlags: parent.sampled === false ? TraceFlags.NONE : TraceFlags.SAMPLED,
+            isRemote: true,
+          });
     const startTime = Date.now();
     const monotonicStart = performance.now();
-    const native = this.options.tracer.startSpan(name, { attributes: otelAttributes(attributes), startTime }, parentContext);
+    const native = this.options.tracer.startSpan(
+      name,
+      { attributes: otelAttributes(attributes), startTime },
+      parentContext,
+    );
     const identity = native.spanContext();
-    const context = Object.freeze({ traceId: identity.traceId, spanId: identity.spanId, sampled: (identity.traceFlags & TraceFlags.SAMPLED) !== 0 });
+    const context = Object.freeze({
+      traceId: identity.traceId,
+      spanId: identity.spanId,
+      sampled: (identity.traceFlags & TraceFlags.SAMPLED) !== 0,
+    });
     const events: TraceSpanEventData[] = [];
     const start = { name, context, startTime, attributes, ...omitUndefined({ parentSpanId: parent?.spanId }) };
-    this.observe(observer => observer.onStart(start));
+    this.observe((observer) => observer.onStart(start));
     let ended = false;
     return {
       context,
-      setAttributes: values => {
+      setAttributes: (values) => {
         if (ended) return;
         attributes = boundedAttributes({ ...attributes, ...values }, this.limits);
         native.setAttributes(otelAttributes(attributes));
@@ -90,27 +157,50 @@ export class OpenTelemetryTracer implements Tracer {
       },
       end: (end = {}) => {
         if (ended) return;
-        if (end.attributes !== undefined) attributes = boundedAttributes({ ...attributes, ...end.attributes }, this.limits);
+        if (end.attributes !== undefined)
+          attributes = boundedAttributes({ ...attributes, ...end.attributes }, this.limits);
         ended = true;
         const endTime = Date.now();
         const status = end.status ?? (end.error === undefined ? "ok" : "error");
-        native.setAttributes(otelAttributes({ ...attributes, "may.status": status, ...omitUndefined({ "error.type": end.error?.name, "error.code": end.error?.code }) }));
-        native.setStatus({ code: status === "error" ? SpanStatusCode.ERROR : status === "ok" ? SpanStatusCode.OK : SpanStatusCode.UNSET });
+        native.setAttributes(
+          otelAttributes({
+            ...attributes,
+            "may.status": status,
+            ...omitUndefined({ "error.type": end.error?.name, "error.code": end.error?.code }),
+          }),
+        );
+        native.setStatus({
+          code: status === "error" ? SpanStatusCode.ERROR : status === "ok" ? SpanStatusCode.OK : SpanStatusCode.UNSET,
+        });
         native.end(endTime);
-        const finished: FinishedTraceSpan = Object.freeze({ ...start, attributes, endTime, durationMs: performance.now() - monotonicStart, status, events: Object.freeze([...events]), ...omitUndefined({ error: end.error }) });
-        this.observe(observer => observer.onEnd(finished));
+        const finished: FinishedTraceSpan = Object.freeze({
+          ...start,
+          attributes,
+          endTime,
+          durationMs: performance.now() - monotonicStart,
+          status,
+          events: Object.freeze([...events]),
+          ...omitUndefined({ error: end.error }),
+        });
+        this.observe((observer) => observer.onEnd(finished));
       },
     };
   }
   private observe(callback: (observer: SpanObserver) => void): void {
     for (const observer of this.observers) {
-      try { callback(observer); } catch (error) { this.options.onError?.(error); }
+      try {
+        callback(observer);
+      } catch (error) {
+        this.options.onError?.(error);
+      }
     }
   }
 }
 
 function otelAttributes(attributes: TraceAttributes): Attributes {
-  return Object.fromEntries(Object.entries(attributes).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value])) as Attributes;
+  return Object.fromEntries(
+    Object.entries(attributes).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+  ) as Attributes;
 }
 
 export interface OtlpTelemetryOptions {
@@ -141,33 +231,57 @@ class ExportFailureTracker {
   private readonly pending = new Set<(error: Error) => void>();
   constructor(private readonly report: (error: unknown) => void) {}
   track(callback: Parameters<OTLPTraceExporter["export"]>[1]): Parameters<OTLPTraceExporter["export"]>[1] {
-    const fail = (error: Error) => { if (this.pending.delete(fail)) this.report(error); };
+    const fail = (error: Error) => {
+      if (this.pending.delete(fail)) this.report(error);
+    };
     this.pending.add(fail);
-    return result => {
+    return (result) => {
       if (result.code !== 0) fail(result.error ?? new Error("OTLP export failed"));
       else this.pending.delete(fail);
       callback(result);
     };
   }
-  expire(error: Error): void { for (const fail of this.pending) fail(error); }
+  expire(error: Error): void {
+    for (const fail of this.pending) fail(error);
+  }
 }
 
 class ReportingTraceExporter extends OTLPTraceExporter {
-  private readonly failures = new ExportFailureTracker(error => this.report(error));
-  constructor(config: ConstructorParameters<typeof OTLPTraceExporter>[0], private readonly report: (error: unknown) => void) { super(config); }
-  override export(spans: Parameters<OTLPTraceExporter["export"]>[0], callback: Parameters<OTLPTraceExporter["export"]>[1]): void {
+  private readonly failures = new ExportFailureTracker((error) => this.report(error));
+  constructor(
+    config: ConstructorParameters<typeof OTLPTraceExporter>[0],
+    private readonly report: (error: unknown) => void,
+  ) {
+    super(config);
+  }
+  override export(
+    spans: Parameters<OTLPTraceExporter["export"]>[0],
+    callback: Parameters<OTLPTraceExporter["export"]>[1],
+  ): void {
     super.export(spans, this.failures.track(callback));
   }
-  expire(error: Error): void { this.failures.expire(error); }
+  expire(error: Error): void {
+    this.failures.expire(error);
+  }
 }
 
 class ReportingMetricExporter extends OTLPMetricExporter {
-  private readonly failures = new ExportFailureTracker(error => this.report(error));
-  constructor(config: ConstructorParameters<typeof OTLPMetricExporter>[0], private readonly report: (error: unknown) => void) { super(config); }
-  override export(metrics: Parameters<OTLPMetricExporter["export"]>[0], callback: Parameters<OTLPMetricExporter["export"]>[1]): void {
+  private readonly failures = new ExportFailureTracker((error) => this.report(error));
+  constructor(
+    config: ConstructorParameters<typeof OTLPMetricExporter>[0],
+    private readonly report: (error: unknown) => void,
+  ) {
+    super(config);
+  }
+  override export(
+    metrics: Parameters<OTLPMetricExporter["export"]>[0],
+    callback: Parameters<OTLPMetricExporter["export"]>[1],
+  ): void {
     super.export(metrics, this.failures.track(callback));
   }
-  expire(error: Error): void { this.failures.expire(error); }
+  expire(error: Error): void {
+    this.failures.expire(error);
+  }
 }
 
 export function createOtlpTelemetry(options: OtlpTelemetryOptions): {
@@ -183,37 +297,95 @@ export function createOtlpTelemetry(options: OtlpTelemetryOptions): {
   if (maxExportBatchSize > maxQueueSize) throw new RangeError("Batch size exceeds queue limit");
   const ratio = options.samplingRatio ?? 1;
   if (!Number.isFinite(ratio) || ratio < 0 || ratio > 1) throw new RangeError("Invalid samplingRatio");
-  for (const url of [options.tracesUrl, options.metricsUrl]) if (!["http:", "https:"].includes(new URL(url).protocol)) throw new TypeError("OTLP requires an HTTP URL");
-  const resourceAttributes = omitUndefined({ "service.name": options.serviceName, "service.version": options.serviceVersion });
+  for (const url of [options.tracesUrl, options.metricsUrl])
+    if (!["http:", "https:"].includes(new URL(url).protocol)) throw new TypeError("OTLP requires an HTTP URL");
+  const resourceAttributes = omitUndefined({
+    "service.name": options.serviceName,
+    "service.version": options.serviceVersion,
+  });
   boundedAttributes(resourceAttributes);
   const resource = resourceFromAttributes(resourceAttributes);
   let traceFailures = 0;
   let metricFailures = 0;
   let lifecycleFailures = 0;
-  const report = (error: unknown): void => { try { options.onError?.(error); } catch { /* 保持遥测错误与 Agent 执行独立。 */ } };
-  const traceExporter = new ReportingTraceExporter(omitUndefined({ url: options.tracesUrl, headers: options.headers, timeoutMillis: timeoutMs, concurrencyLimit: 1 }), error => { traceFailures += 1; report(error); });
-  const metricExporter = new ReportingMetricExporter(omitUndefined({ url: options.metricsUrl, headers: options.headers, timeoutMillis: timeoutMs, concurrencyLimit: 1 }), error => { metricFailures += 1; report(error); });
-  const traceProvider = new BasicTracerProvider({ resource, sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(ratio) }), spanProcessors: [new OtelBatchSpanProcessor(traceExporter, { maxQueueSize, maxExportBatchSize, exportTimeoutMillis: timeoutMs })] });
-  const metricProvider = new MeterProvider({ resource, readers: [new PeriodicExportingMetricReader({ exporter: metricExporter, exportIntervalMillis: positive(options.exportIntervalMs ?? 60_000), exportTimeoutMillis: timeoutMs })] });
-  const metrics = new OpenTelemetryMetricRecorder(metricProvider.getMeter("@sortedyuan/observability"), options.maxMetricSeries ?? 1_024);
-  const tracer = new OpenTelemetryTracer(omitUndefined({ tracer: traceProvider.getTracer("@sortedyuan/observability"), metrics, observer: options.observer, onError: options.onError }));
+  const report = (error: unknown): void => {
+    try {
+      options.onError?.(error);
+    } catch {
+      /* 保持遥测错误与 Agent 执行独立。 */
+    }
+  };
+  const traceExporter = new ReportingTraceExporter(
+    omitUndefined({ url: options.tracesUrl, headers: options.headers, timeoutMillis: timeoutMs, concurrencyLimit: 1 }),
+    (error) => {
+      traceFailures += 1;
+      report(error);
+    },
+  );
+  const metricExporter = new ReportingMetricExporter(
+    omitUndefined({ url: options.metricsUrl, headers: options.headers, timeoutMillis: timeoutMs, concurrencyLimit: 1 }),
+    (error) => {
+      metricFailures += 1;
+      report(error);
+    },
+  );
+  const traceProvider = new BasicTracerProvider({
+    resource,
+    sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(ratio) }),
+    spanProcessors: [
+      new OtelBatchSpanProcessor(traceExporter, { maxQueueSize, maxExportBatchSize, exportTimeoutMillis: timeoutMs }),
+    ],
+  });
+  const metricProvider = new MeterProvider({
+    resource,
+    readers: [
+      new PeriodicExportingMetricReader({
+        exporter: metricExporter,
+        exportIntervalMillis: positive(options.exportIntervalMs ?? 60_000),
+        exportTimeoutMillis: timeoutMs,
+      }),
+    ],
+  });
+  const metrics = new OpenTelemetryMetricRecorder(
+    metricProvider.getMeter("@sortedyuan/observability"),
+    options.maxMetricSeries ?? 1_024,
+  );
+  const tracer = new OpenTelemetryTracer(
+    omitUndefined({
+      tracer: traceProvider.getTracer("@sortedyuan/observability"),
+      metrics,
+      observer: options.observer,
+      onError: options.onError,
+    }),
+  );
   let closed = false;
   const lifecycle = async (action: () => Promise<unknown>): Promise<void> => {
     try {
-      await withTimeout(action(), Math.min(timeoutMs * 2, 2_147_483_647), error => {
+      await withTimeout(action(), Math.min(timeoutMs * 2, 2_147_483_647), (error) => {
         traceExporter.expire(error);
         metricExporter.expire(error);
       });
-    } catch (error) { lifecycleFailures += 1; report(error); }
+    } catch (error) {
+      lifecycleFailures += 1;
+      report(error);
+    }
   };
   return {
-    tracer, metrics,
-    getDiagnostics: () => ({ traceExportFailures: traceFailures, metricExportFailures: metricFailures, lifecycleFailures, droppedMetricSeries: metrics.droppedSeries, closed }),
-    forceFlush: () => lifecycle(async () => {
-      const providers = await Promise.allSettled([traceProvider.forceFlush(), metricProvider.forceFlush()]);
-      const exporters = await Promise.allSettled([traceExporter.forceFlush(), metricExporter.forceFlush()]);
-      throwRejectedOperations([...providers, ...exporters]);
+    tracer,
+    metrics,
+    getDiagnostics: () => ({
+      traceExportFailures: traceFailures,
+      metricExportFailures: metricFailures,
+      lifecycleFailures,
+      droppedMetricSeries: metrics.droppedSeries,
+      closed,
     }),
+    forceFlush: () =>
+      lifecycle(async () => {
+        const providers = await Promise.allSettled([traceProvider.forceFlush(), metricProvider.forceFlush()]);
+        const exporters = await Promise.allSettled([traceExporter.forceFlush(), metricExporter.forceFlush()]);
+        throwRejectedOperations([...providers, ...exporters]);
+      }),
     shutdown: async () => {
       if (closed) return;
       closed = true;
@@ -223,22 +395,27 @@ export function createOtlpTelemetry(options: OtlpTelemetryOptions): {
 }
 
 function positive(value: number): number {
-  if (!Number.isSafeInteger(value) || value < 1 || value > 2_147_483_647) throw new RangeError("Invalid telemetry limit");
+  if (!Number.isSafeInteger(value) || value < 1 || value > 2_147_483_647)
+    throw new RangeError("Invalid telemetry limit");
   return value;
 }
 
 async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, onTimeout: (error: Error) => void): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await Promise.race([operation, new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => {
-        const error = new Error("Telemetry lifecycle timed out");
-        onTimeout(error);
-        reject(error);
-      }, timeoutMs);
-    })]);
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          const error = new Error("Telemetry lifecycle timed out");
+          onTimeout(error);
+          reject(error);
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
-  finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
 async function settleOperations(operations: readonly Promise<unknown>[]): Promise<void> {
@@ -247,6 +424,8 @@ async function settleOperations(operations: readonly Promise<unknown>[]): Promis
 }
 
 function throwRejectedOperations(settled: readonly PromiseSettledResult<unknown>[]): void {
-  const errors = settled.filter((value): value is PromiseRejectedResult => value.status === "rejected").map(value => value.reason);
+  const errors = settled
+    .filter((value): value is PromiseRejectedResult => value.status === "rejected")
+    .map((value) => value.reason);
   if (errors.length > 0) throw new AggregateError(errors, "Telemetry lifecycle failed");
 }

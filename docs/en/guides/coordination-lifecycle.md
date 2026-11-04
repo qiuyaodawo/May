@@ -22,8 +22,7 @@ import type { CoordinationPolicy } from "@sortedyuan/coordination";
 const policy: CoordinationPolicy = {
   version: "team-policy-v2",
   authorize: (task) => task.agent === "analyst",
-  authorizeRetry: (task, finding) =>
-    ["failed", "cancelled"].includes(task.status) && finding.trim().length > 0,
+  authorizeRetry: (task, finding) => ["failed", "cancelled"].includes(task.status) && finding.trim().length > 0,
 };
 ```
 
@@ -95,9 +94,7 @@ but never executes the task again.
 ```ts
 const authorizeGraphRewrite: NonNullable<CoordinationPolicy["authorizeGraphRewrite"]> = (change, snapshot) =>
   snapshot.tasks.length < 128 &&
-  [...(change.add ?? []), ...(change.update ?? [])].every(
-    (task) => task.agent === "analyst",
-  );
+  [...(change.add ?? []), ...(change.update ?? [])].every((task) => task.agent === "analyst");
 const graphPolicy: CoordinationPolicy = { ...policy, authorizeGraphRewrite };
 ```
 
@@ -110,12 +107,8 @@ Pass `graphPolicy` as the runtime's `policy` option.
 
 ```ts
 await runtime.rewriteGraph("expand-plan-1", {
-  add: [
-    { id: "second-check", agent: "analyst", input: "Check the first result.", dependsOn: ["first"] },
-  ],
-  update: [
-    { id: "summary", agent: "analyst", input: "Summarize both checks.", dependsOn: ["first", "second-check"] },
-  ],
+  add: [{ id: "second-check", agent: "analyst", input: "Check the first result.", dependsOn: ["first"] }],
+  update: [{ id: "summary", agent: "analyst", input: "Summarize both checks.", dependsOn: ["first", "second-check"] }],
   remove: ["unused-check"],
 });
 ```

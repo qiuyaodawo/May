@@ -47,7 +47,10 @@ test("default mode retains its summary and fails instead of resetting history", 
   await assert.rejects(run.result, /Automatic context compaction exhausted/);
   assert.equal(requests.length, 0);
   const checkpoints = (await app.history()).filter((event) => event.type === "context.compacted");
-  assert.deepEqual(checkpoints.map((event) => event.strategy), ["summary-tail"]);
+  assert.deepEqual(
+    checkpoints.map((event) => event.strategy),
+    ["summary-tail"],
+  );
   assert.match(checkpoints[0].messages[0].content[0].text, /Earlier conversation summary/);
   assert.ok(checkpoints[0].messages.some((item) => item.content[0]?.text === "recent request"));
 });
@@ -55,12 +58,20 @@ test("default mode retains its summary and fails instead of resetting history", 
 test("history-reference mode refuses to reset without saved work notes", async (t) => {
   const { app, requests } = await open(t, {
     autoCompactionMode: "history-reference",
-    contextSummarizer: { summarize() { assert.fail("summary must not run"); } },
+    contextSummarizer: {
+      summarize() {
+        assert.fail("summary must not run");
+      },
+    },
   });
-  await assert.rejects((await app.submit({ input: "current request" })).result,
-    (error) => error.failures?.[0]?.error.message.includes("fresh context_notes"));
+  await assert.rejects((await app.submit({ input: "current request" })).result, (error) =>
+    error.failures?.[0]?.error.message.includes("fresh context_notes"),
+  );
   assert.equal(requests.length, 0);
-  assert.equal((await app.history()).some((event) => event.type === "context.compacted"), false);
+  assert.equal(
+    (await app.history()).some((event) => event.type === "context.compacted"),
+    false,
+  );
 });
 
 test("native mode receives untouched history and fails without other modes", async (t) => {
@@ -76,13 +87,25 @@ test("native mode receives untouched history and fails without other modes", asy
           throw new Error("native unavailable");
         },
       },
-      async *stream() { assert.fail("model must not run"); },
+      async *stream() {
+        assert.fail("model must not run");
+      },
     },
-    contextSummarizer: { summarize() { assert.fail("summary must not run"); } },
+    contextSummarizer: {
+      summarize() {
+        assert.fail("summary must not run");
+      },
+    },
   });
-  await assert.rejects((await app.submit({ input: "current request" })).result, /Automatic context compaction exhausted/);
+  await assert.rejects(
+    (await app.submit({ input: "current request" })).result,
+    /Automatic context compaction exhausted/,
+  );
   assert.equal(nativeCalls, 1);
-  assert.equal((await app.history()).some((event) => event.type === "context.compacted"), false);
+  assert.equal(
+    (await app.history()).some((event) => event.type === "context.compacted"),
+    false,
+  );
 });
 
 test("manual native command is available independently of the default automatic mode", async (t) => {
@@ -96,7 +119,9 @@ test("manual native command is available independently of the default automatic 
           return { messages: [message("system", "native state")], effectiveTokens: 10 };
         },
       },
-      async *stream() { assert.fail("summary must not run"); },
+      async *stream() {
+        assert.fail("summary must not run");
+      },
     },
   });
   const suggestions = await createMaybeCodeSlashCommandSuggester(app)("/compact p");
@@ -114,6 +139,11 @@ test("unsupported native mode reports an error; explicit strategies still overri
   await assert.rejects(open(t, { autoCompactionMode: "provider-native" }), /does not support provider-native/);
   const { app } = await open(t, { autoCompactionMode: "provider-native", autoCompactionStrategies: [] });
   assert.throws(() => app.compactContext("provider-native"), /does not support provider-native/);
-  await (await app.submit({ input: "current request" })).result;
-  assert.equal((await app.history()).some((event) => event.type === "context.compacted"), false);
+  await (
+    await app.submit({ input: "current request" })
+  ).result;
+  assert.equal(
+    (await app.history()).some((event) => event.type === "context.compacted"),
+    false,
+  );
 });

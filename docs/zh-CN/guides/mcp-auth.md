@@ -45,11 +45,11 @@ OAuth 建立远程账户身份，应用单独检查每次工具执行权限。St
 网络访问策略；MCP headers 不转发给 OAuth。静态 `Authorization` 与 OAuth
 不能同时配置。
 
-| 注册配置 | 使用要求 |
-| --- | --- |
+| 注册配置                       | 使用要求                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------- |
 | `clientId` 与 `expectedIssuer` | 预注册的公共原生客户端，issuer 精确匹配；采用客户端秘密的机器认证需要其他集成 |
-| `clientMetadataUrl` | 带文档路径的公开 HTTPS Client ID Metadata Document，服务端需要支持 CIMD |
-| 省略上述配置 | 服务端声明支持时，由 SDK 使用 Dynamic Client Registration |
+| `clientMetadataUrl`            | 带文档路径的公开 HTTPS Client ID Metadata Document，服务端需要支持 CIMD       |
+| 省略上述配置                   | 服务端声明支持时，由 SDK 使用 Dynamic Client Registration                     |
 
 两种 client ID 配置不能同时使用。`callbackPort` 接受 0–65535，默认 `0` 选择
 未占用端口。已保存 DCR 注册不允许新的回调 URL 时重新注册。预注册客户端和
@@ -127,12 +127,12 @@ MaybeCode 默认使用 `~/.may/maybecode/mcp-credentials`，程序嵌入时位�
 
 ## 故障检查
 
-| 现象 | 检查与处理 |
-| --- | --- |
-| OAuth 来源被拒绝 | 在 `authorizationOrigins` 添加身份服务的精确可信来源 |
-| 回调无法完成 | 检查注册回调地址和本地端口，在五分钟期限内重新登录 |
-| 凭据存储不可用 | 解锁或配置系统钥匙串，或者提供安全 `McpCredentialStore` |
-| 崩溃后存在锁文件 | 验证其中 PID 已退出，再删除那个明确的 `.lock` 文件 |
-| `MCP_AUTHENTICATION_REQUIRED` | 完成追加 scope 的明确登录，重连后启动新 Run |
+| 现象                          | 检查与处理                                              |
+| ----------------------------- | ------------------------------------------------------- |
+| OAuth 来源被拒绝              | 在 `authorizationOrigins` 添加身份服务的精确可信来源    |
+| 回调无法完成                  | 检查注册回调地址和本地端口，在五分钟期限内重新登录      |
+| 凭据存储不可用                | 解锁或配置系统钥匙串，或者提供安全 `McpCredentialStore` |
+| 崩溃后存在锁文件              | 验证其中 PID 已退出，再删除那个明确的 `.lock` 文件      |
+| `MCP_AUTHENTICATION_REQUIRED` | 完成追加 scope 的明确登录，重连后启动新 Run             |
 
 连接和归属限制参阅[MCP 能力参考](../reference/mcp-capabilities.md)。

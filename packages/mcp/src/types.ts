@@ -1,11 +1,16 @@
 import type { McpAppSession, McpAppsHostOptions, McpAppOpenOptions } from "./apps.js";
-import type { CompleteRequestParams, CompleteResult, GetPromptResult, ReadResourceResult, Prompt, Resource, ResourceTemplateType, ServerCapabilities, Tool as ProtocolTool } from "@modelcontextprotocol/client";
 import type {
-  Tool,
-  TraceAttributes,
-  TraceContext,
-  Tracer,
-} from "@sortedyuan/may/core";
+  CompleteRequestParams,
+  CompleteResult,
+  GetPromptResult,
+  ReadResourceResult,
+  Prompt,
+  Resource,
+  ResourceTemplateType,
+  ServerCapabilities,
+  Tool as ProtocolTool,
+} from "@modelcontextprotocol/client";
+import type { Tool, TraceAttributes, TraceContext, Tracer } from "@sortedyuan/may/core";
 import type { McpOAuthManager, McpOAuthOptions } from "./oauth.js";
 import type { McpInteractionBroker, McpInteractionOwner } from "./interactions.js";
 import type { McpHostServices, McpServerHostOptions } from "./host-services.js";
@@ -88,11 +93,7 @@ export interface McpDiagnostic {
   readonly stderr?: string;
 }
 
-export type McpServerConnectionState =
-  | "connected"
-  | "auth-required"
-  | "failed"
-  | "disconnected";
+export type McpServerConnectionState = "connected" | "auth-required" | "failed" | "disconnected";
 
 export interface McpServerStatus {
   readonly serverId: string;
@@ -128,22 +129,22 @@ export interface McpServerCatalog {
 }
 
 export type McpClientEvent =
-  | McpClientEventBase & {
+  | (McpClientEventBase & {
       readonly type: "mcp.server.connected";
       readonly toolNames: readonly string[];
-    }
-  | McpClientEventBase & {
+    })
+  | (McpClientEventBase & {
       readonly type: "mcp.server.catalog-updated";
       readonly revision: number;
       readonly toolNames: readonly string[];
-    }
-  | McpClientEventBase & {
+    })
+  | (McpClientEventBase & {
       readonly type: "mcp.server.failed";
       readonly diagnostic: McpDiagnostic;
-    }
-  | McpClientEventBase & {
+    })
+  | (McpClientEventBase & {
       readonly type: "mcp.server.disconnected";
-    };
+    });
 
 export interface McpOperationOptions {
   readonly owner?: McpInteractionOwner;
@@ -198,8 +199,18 @@ export interface McpClientPool {
   reconnect(serverId: string, signal?: AbortSignal): Promise<void>;
   /** Host/user operations, not automatically exported to the model as tools. */
   readResource(serverId: string, uri: string, options?: McpReadOptions): Promise<McpResourceRead>;
-  readResourceTemplate(serverId: string, template: string, variables: Readonly<Record<string, string | string[]>>, options?: McpReadOptions): Promise<McpResourceRead>;
-  getPrompt(serverId: string, name: string, args?: Readonly<Record<string, string>>, options?: McpOperationOptions): Promise<McpPromptExpansion>;
+  readResourceTemplate(
+    serverId: string,
+    template: string,
+    variables: Readonly<Record<string, string | string[]>>,
+    options?: McpReadOptions,
+  ): Promise<McpResourceRead>;
+  getPrompt(
+    serverId: string,
+    name: string,
+    args?: Readonly<Record<string, string>>,
+    options?: McpOperationOptions,
+  ): Promise<McpPromptExpansion>;
   complete(serverId: string, params: McpCompletionParams, options?: McpOperationOptions): Promise<McpCompletion>;
   subscribeResource(serverId: string, uri: string, options?: McpOperationOptions): Promise<McpResourceSubscription>;
   openApp(serverId: string, toolName: string, options: McpAppOpenOptions): Promise<McpAppSession>;
@@ -207,7 +218,11 @@ export interface McpClientPool {
   listTasks(owner: McpInteractionOwner): Promise<readonly McpTaskRecord[]>;
   getTask(serverId: string, id: string, options?: McpOperationOptions): Promise<McpTaskSnapshot>;
   /** Fulfill current outstanding requests through the normal interaction broker/services. */
-  updateTask(serverId: string, id: string, options?: McpOperationOptions & McpTaskUpdateOptions): Promise<McpTaskSnapshot>;
+  updateTask(
+    serverId: string,
+    id: string,
+    options?: McpOperationOptions & McpTaskUpdateOptions,
+  ): Promise<McpTaskSnapshot>;
   cancelTask(serverId: string, id: string, options?: McpOperationOptions): Promise<McpTaskRecord>;
   waitTask(serverId: string, id: string, options?: McpOperationOptions & McpTaskWaitOptions): Promise<McpTaskSnapshot>;
   forgetTask(serverId: string, id: string, owner: McpInteractionOwner): Promise<void>;

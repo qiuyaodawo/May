@@ -9,18 +9,19 @@
 
   这是包路径的破坏性变更。使用方需要更新依赖声明、源码导入及加载这些模块的配置：
 
-  | 原包 | 公开子路径 | 需要安装的包 |
-  | --- | --- | --- |
-  | `@sortedyuan/plugin-models` | `@sortedyuan/plugin-services/models` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-runtime` | `@sortedyuan/plugin-services/runtime` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-permissions` | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-skills` | `@sortedyuan/plugin-services/skills` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin` | `@sortedyuan/coordination` |
-  | `@sortedyuan/session-tools` | `@sortedyuan/session/tools` | `@sortedyuan/session` |
+  | 原包                              | 公开子路径                                | 需要安装的包                  |
+  | --------------------------------- | ----------------------------------------- | ----------------------------- |
+  | `@sortedyuan/plugin-models`       | `@sortedyuan/plugin-services/models`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-runtime`      | `@sortedyuan/plugin-services/runtime`     | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-permissions`  | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-skills`       | `@sortedyuan/plugin-services/skills`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin`         | `@sortedyuan/coordination`    |
+  | `@sortedyuan/session-tools`       | `@sortedyuan/session/tools`               | `@sortedyuan/session`         |
 
   选择包含这些子路径的发布版本，重新安装依赖并编译使用方。六个原包从本仓库的发布清单移除。
   插件 ID、ServiceToken ID、持久状态格式、函数名称及生命周期行为保持不变。
   迁移说明见 `docs/zh-CN/guides/package-subpaths.md` 和 `docs/en/guides/package-subpaths.md`。
+
 - Updated dependencies
   - @sortedyuan/plugin-services@0.3.0
   - @sortedyuan/session@0.5.0
@@ -84,6 +85,7 @@
   `AgentRun`（或应用自己的 Run 类型），例如
   `AgentWorkspace<Event, Extension, Compaction, AgentRun, Application>`。
   `AgentWorkspace.open` 的显式类型参数采用相同顺序。
+
 - 88e7d69: 增加经过验证的版本化执行关联信息，连接 scheduler、coordination、Agent adapter、
   Session、Run 与模型请求。Session 继续执行记录先前 Run 身份；远程业务去重独立于
   trace parent。Scheduler 可选启用遥测，并依赖 Core 的公开接口。
@@ -91,9 +93,11 @@
   增加可选 service 查询、本地诊断与独立指标服务，以及可复用的 UI 诊断面板。宿主可以
   按会话范围查询执行记录、刷新模型能力，并独立管理遥测资源。子 Agent 预算包装保留
   模型配置、能力版本和物理请求观察信息。
+
 - 8df2b63: Add durable Session branches at complete request boundaries, preserving the selected Context, runtime state and explicitly transferable application state. Expose branch history trees and workspace-family lifecycle APIs while creating independent permissions and input queues for each branch.
 
   Hosts can explicitly confirm a scheduler-yielded Run as completed after validation and final state persistence, saving a durable host-confirmed branch boundary.
+
 - 02789c6: Add durable FIFO steering input at complete Step boundaries. AgentApplication and
   Session expose steering status and explicit follow-up execution without
   interrupting current tools or approvals. Preserve delivery identities through
@@ -107,6 +111,7 @@
   the custom-source API.
   Keep GoalAgent compatible with Session-backed applications by excluding custom
   Step sources from the options passed by the goal scheduler.
+
 - 8df2b63: Add the Node-only application/git-workspace entry point for project Git checkpoints, coordinated request commits, persistent worktree management and reviewed file restoration. Add shared workspace status, reply fork and checkpoint diff data to UI hosts and clients, with keyboard history and diff components for terminal applications.
 - 2a44905: Add independently composed durable goal execution, continuation with optional budgets, model tools,
   usage accounting and recovery. Expose general AgentApplication.continue() without
@@ -119,6 +124,7 @@
   enforced and previously saved budgets retain their values. Breaking SDK type change:
   GoalState.budget.maxRuns and maxDurationMs are optional; SDK consumers must handle
   undefined values as unlimited budgets.
+
 - 422e404: Add trusted Tool.workspaceEffect metadata, an approved-tool execution check, deferred
   Git workspace initialization, and lightweight repository summaries. Delegated Agents
   can share the host's execution check. Built-in file readers and session coordination
@@ -128,6 +134,7 @@
   in each request, sharing preparation across main and delegated Agents and retaining
   the lease through Goal verification. Startup and read-only requests leave Git state
   unchanged. Each modifying request saves existing user edits before accepting tool writes.
+
 - 5d3b04a: Add opt-in persistent allow and deny rules with trusted scope, tool-definition
   binding, creator identity, expiry and revocation. Provide a versioned file store
   with atomic replacement and a single writer lock through
@@ -158,6 +165,7 @@
   exists. Supply a trusted `createdBy` identity when resolving it. Existing policy
   return values and existing Session histories remain supported. Readers of
   histories containing rule events must use the updated Session package.
+
 - 89bcd8d: Expose existing Agent functionality as reusable plugins with declared services,
   dependencies and managed resource lifecycles. Add shared typed service tokens and
   ordered tool, instruction, Model and Context contribution registries. Application
@@ -192,6 +200,7 @@
   Skills state is saved through versioned plugin state while existing Session
   activation records remain readable. Goals and history-memory retain their existing
   durable state records for migration.
+
 - 89bcd8d: Add scoped plugin composition with typed versioned services, validated dependencies,
   configuration and state schemas, lifecycle Hooks, state migration, resource cleanup
   and serialized replacement. Agent definitions and applications accept plugins;
@@ -213,6 +222,7 @@
   argument boundary; use ordinary data objects and arrays to represent those values.
   Custom parsed instances retain their prototypes and methods and must protect any
   mutable internal state themselves.
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`
@@ -236,6 +246,7 @@
   Remote CoordinationWorker 将已保存的取消意图发送给分离的外部执行，并通过恢复查询确认结果。
 
   PowerShell shell 工具根据最后执行命令的状态返回 exitCode，失败的 cmdlet 返回非零值。
+
 - c8c14c7: 组装的动态提示词发生变化时，使对应 Context 的 provider token 计量失效，后续检查
   根据当前提示词估计用量，直到 provider 提供新的 usage。
 - e3736f6: 加快 MaybeCode 启动：CLI 使用按功能加载的 JavaScript 打包文件，图片处理和 Web 服务在使用时加载。Git 初始化合并仓库身份与操作状态查询，并在 checkpoint 操作内复用状态结果，保留初始 checkpoint 和写入前检查。

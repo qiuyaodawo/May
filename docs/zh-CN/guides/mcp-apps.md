@@ -13,18 +13,18 @@ May 为 MCP Apps 扩展 `io.modelcontextprotocol/ui` 提供后端 App 会话、�
 连接协议。支持的操作与限制见下文。
 
 1. 在图形宿主中向 `openMcpClientPool` 传入 `apps: { executor, approve }`。
-`executor` 必须是正常权限执行器；`approve` 必须明确审阅打开资源及后续每次资源
-读取，并遵守 signal。没有默认允许策略。这会声明 `io.modelcontextprotocol/ui`
-及 `text/html;profile=mcp-app`。用户明确操作后调用
-`pool.openApp(serverId, remoteToolName, { owner, signal })`。owner 来自可信 Host
-workspace/Session，不能取自 App 参数。
+   `executor` 必须是正常权限执行器；`approve` 必须明确审阅打开资源及后续每次资源
+   读取，并遵守 signal。没有默认允许策略。这会声明 `io.modelcontextprotocol/ui`
+   及 `text/html;profile=mcp-app`。用户明确操作后调用
+   `pool.openApp(serverId, remoteToolName, { owner, signal })`。owner 来自可信 Host
+   workspace/Session，不能取自 App 参数。
 
 2. 用户同意后，将返回的 `McpAppSession` 保存在后端。它提供 `resource`、
    `receive(message)`、`notification(kind, params)` 和 `close()`。只绑定一条认证渲染通道，
-不要暴露池、执行器、凭据、任意 RPC 转发或 Session 历史。传入在 Session 切换、
-退出登录和 UI 销毁时中止的生命周期 signal。默认视图十分钟，最长一小时；每连接
-最多 16 个打开/打开中的视图，每视图四个并发请求、256 个唯一请求 id。重复 id
-关闭视图，不重放动作。重连、失效、目录或认证变化及池关闭使旧视图不能继续操作。
+   不要暴露池、执行器、凭据、任意 RPC 转发或 Session 历史。传入在 Session 切换、
+   退出登录和 UI 销毁时中止的生命周期 signal。默认视图十分钟，最长一小时；每连接
+   最多 16 个打开/打开中的视图，每视图四个并发请求、256 个唯一请求 id。重复 id
+   关闭视图，不重放动作。重连、失效、目录或认证变化及池关闭使旧视图不能继续操作。
 
 ## 浏览器集成
 
@@ -42,7 +42,7 @@ HTTP headers 和正文。该来源不能保存 cookie、凭据或其他应用路
 import { mountMcpApp } from "@sortedyuan/mcp/apps-browser";
 const view = mountMcpApp(container, trustedSandboxUrl, {
   resource: { html: backendAppResource.html },
-  receive: message => authenticatedChannel.request(message),
+  receive: (message) => authenticatedChannel.request(message),
   close: () => authenticatedChannel.close(),
   signal: viewLifetimeSignal,
 });

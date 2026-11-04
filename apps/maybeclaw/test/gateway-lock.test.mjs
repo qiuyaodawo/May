@@ -15,7 +15,7 @@ async function directory(t) {
   const path = await mkdtemp(join(root, "case-"));
   children.set(path, []);
   t.after(async () => {
-    await Promise.all(children.get(path).map(stop => stop()));
+    await Promise.all(children.get(path).map((stop) => stop()));
     children.delete(path);
     await rm(path, { recursive: true, force: true });
   });
@@ -23,9 +23,14 @@ async function directory(t) {
 }
 
 async function child(path) {
-  const process = fork(new URL("fixtures/gateway-lock-child.mjs", import.meta.url), [path], { stdio: ["ignore", "ignore", "pipe", "ipc"], windowsHide: true });
+  const process = fork(new URL("fixtures/gateway-lock-child.mjs", import.meta.url), [path], {
+    stdio: ["ignore", "ignore", "pipe", "ipc"],
+    windowsHide: true,
+  });
   let ended = false;
-  process.on("exit", () => { ended = true; });
+  process.on("exit", () => {
+    ended = true;
+  });
   const stop = async () => {
     if (ended) return;
     const exit = once(process, "exit");
@@ -34,11 +39,20 @@ async function child(path) {
   };
   children.get(path).push(stop);
   assert.deepEqual((await once(process, "message"))[0], { ready: true });
-  return { process, stop, open() { const result = once(process, "message"); process.send("open"); return result.then(([value]) => value); } };
+  return {
+    process,
+    stop,
+    open() {
+      const result = once(process, "message");
+      process.send("open");
+      return result.then(([value]) => value);
+    },
+  };
 }
 
-test("forced termination releases ownership and preserves saved data", { timeout: 15000 }, async t => {
-  const path = await directory(t), owner = await child(path);
+test("forced termination releases ownership and preserves saved data", { timeout: 15000 }, async (t) => {
+  const path = await directory(t),
+    owner = await child(path);
   assert.equal((await owner.open()).opened, true);
   assert.throws(() => GatewayStore.open(path), /already in use/);
   await owner.stop();
@@ -46,36 +60,44 @@ test("forced termination releases ownership and preserves saved data", { timeout
   try {
     assert.deepEqual(store.get("sessions", "saved"), { text: "persisted" });
     assert.throws(() => GatewayStore.open(path), /already in use/);
-  } finally { store.close(); }
+  } finally {
+    store.close();
+  }
   GatewayStore.open(path).close();
 });
 
 for (const abandoned of [false, true]) {
-  test(`concurrent processes admit one owner; abandoned=${abandoned}`, { timeout: 15000 }, async t => {
+  test(`concurrent processes admit one owner; abandoned=${abandoned}`, { timeout: 15000 }, async (t) => {
     const path = await directory(t);
     if (abandoned) {
       const previous = await child(path);
       assert.equal((await previous.open()).opened, true);
       await previous.stop();
     }
-    const first = await child(path), second = await child(path);
+    const first = await child(path),
+      second = await child(path);
     const results = await Promise.all([first.open(), second.open()]);
-    assert.equal(results.filter(result => result.opened).length, 1);
-    assert.match(results.find(result => !result.opened).error, /already in use/);
+    assert.equal(results.filter((result) => result.opened).length, 1);
+    assert.match(results.find((result) => !result.opened).error, /already in use/);
   });
 }
 
-test("directory aliases cannot acquire a second owner", async t => {
-  const path = await directory(t), alias = `${path}-alias`;
+test("directory aliases cannot acquire a second owner", async (t) => {
+  const path = await directory(t),
+    alias = `${path}-alias`;
   await symlink(path, alias, process.platform === "win32" ? "junction" : "dir");
   t.after(() => rm(alias));
   const store = GatewayStore.open(path);
-  try { assert.throws(() => GatewayStore.open(alias), /already in use/); }
-  finally { store.close(); }
+  try {
+    assert.throws(() => GatewayStore.open(alias), /already in use/);
+  } finally {
+    store.close();
+  }
 });
 
-test("database open failure releases ownership for the next attempt", async t => {
-  const path = await directory(t), database = join(path, "gateway.sqlite");
+test("database open failure releases ownership for the next attempt", async (t) => {
+  const path = await directory(t),
+    database = join(path, "gateway.sqlite");
   await mkdir(database);
   assert.throws(() => GatewayStore.open(path));
   await rm(database, { recursive: true });

@@ -12,21 +12,37 @@ import { KeyringMcpCredentialStore } from "../../dist/credentials.js";
 const [operation, directory, key] = process.argv.slice(2);
 assert.ok(process.send);
 const store = new KeyringMcpCredentialStore(directory);
-const released = new Promise(resolve => process.once("message", resolve));
+const released = new Promise((resolve) => process.once("message", resolve));
 const path = join(directory, `${createHash("sha256").update(key).digest("hex")}.lock`);
 
 if (operation === "pending-delete") {
   await withFileAccess(path, "exclusive", async () => {
     await writeFile(path, JSON.stringify({ pid: process.pid }), { flag: "wx" });
-    const child = spawn("powershell.exe", [
-      "-NoProfile", "-NonInteractive", "-File",
-      fileURLToPath(new URL("./pending-delete.ps1", import.meta.url)), "-TargetPath", path,
-    ], { windowsHide: true, stdio: ["pipe", "pipe", "inherit"] });
+    const child = spawn(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        fileURLToPath(new URL("./pending-delete.ps1", import.meta.url)),
+        "-TargetPath",
+        path,
+      ],
+      { windowsHide: true, stdio: ["pipe", "pipe", "inherit"] },
+    );
     const closed = once(child, "close");
     const lines = createInterface({ input: child.stdout });
     try {
       const ready = once(lines, "line").then(([line]) => line);
-      assert.equal(await Promise.race([ready, closed.then(result => { throw new Error(`Delete helper exited: ${result}`); })]), "delete-pending");
+      assert.equal(
+        await Promise.race([
+          ready,
+          closed.then((result) => {
+            throw new Error(`Delete helper exited: ${result}`);
+          }),
+        ]),
+        "delete-pending",
+      );
       process.send({ type: "acquired" });
       await released;
     } finally {

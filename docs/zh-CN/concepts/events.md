@@ -62,8 +62,8 @@ type ApplicationEventShape =
   | { type: "run.event"; event: MayEvent }
   | { type: "permission.event"; event: PermissionEvent }
   | { type: "tool.presentation"; presentation: SessionToolPresentation }
-  | { type: "context.compacted"; /* 自动压缩成功；省略结果字段。 */ }
-  | { type: "context.compaction.failed"; /* 自动压缩失败；省略错误字段。 */ };
+  | { type: "context.compacted" /* 自动压缩成功；省略结果字段。 */ }
+  | { type: "context.compaction.failed" /* 自动压缩失败；省略错误字段。 */ };
 ```
 
 该片段展示事件分类；完整字段通过 `@sortedyuan/may` 导出的 `AgentApplicationEvent` 查询。
@@ -145,12 +145,12 @@ Core、Session、AgentApplication 与 AgentWorkspace 使用有界事件转发队
 
 根据消费者需要选择信息位置：
 
-| 信息 | 保存位置 |
-| --- | --- |
-| 动画和进度 | 实时事件 |
-| 恢复需要的对话事实 | Session 事件 |
-| Session 发现 | Catalog 投影 |
-| 模型可见状态 | Context，替换时保存持久化检查点 |
+| 信息               | 保存位置                        |
+| ------------------ | ------------------------------- |
+| 动画和进度         | 实时事件                        |
+| 恢复需要的对话事实 | Session 事件                    |
+| Session 发现       | Catalog 投影                    |
+| 模型可见状态       | Context，替换时保存持久化检查点 |
 
 <a id="关闭与-stream-结束"></a>
 

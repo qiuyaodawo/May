@@ -48,6 +48,7 @@
   增加可选 service 查询、本地诊断与独立指标服务，以及可复用的 UI 诊断面板。宿主可以
   按会话范围查询执行记录、刷新模型能力，并独立管理遥测资源。子 Agent 预算包装保留
   模型配置、能力版本和物理请求观察信息。
+
 - 5d3b04a: Add opt-in persistent allow and deny rules with trusted scope, tool-definition
   binding, creator identity, expiry and revocation. Provide a versioned file store
   with atomic replacement and a single writer lock through
@@ -78,6 +79,7 @@
   exists. Supply a trusted `createdBy` identity when resolving it. Existing policy
   return values and existing Session histories remain supported. Readers of
   histories containing rule events must use the updated Session package.
+
 - 89bcd8d: Expose existing Agent functionality as reusable plugins with declared services,
   dependencies and managed resource lifecycles. Add shared typed service tokens and
   ordered tool, instruction, Model and Context contribution registries. Application
@@ -112,6 +114,7 @@
   Skills state is saved through versioned plugin state while existing Session
   activation records remain readable. Goals and history-memory retain their existing
   durable state records for migration.
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`

@@ -6,46 +6,50 @@ import { createTestDirectory } from "@sortedyuan/test-support";
 import { simpleGit } from "simple-git";
 import { ProjectGitWorkspace, GitCheckpointError } from "@sortedyuan/may/application/git-workspace";
 
-test("post-commit Hook edits are reported as a partial checkpoint and survive recovery", { skip: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1" }, async t => {
-  const root = await createTestDirectory(t, "may/git-workspace-post-commit");
-  const workspace = join(root, "project");
-  await mkdir(workspace);
-  const git = simpleGit({ baseDir: workspace });
-  await git.init();
-  assert.equal(await git.revparse(["--show-toplevel"]), workspace.replaceAll("\\", "/"));
-  await git.addConfig("user.name", "May integration test");
-  await git.addConfig("user.email", "may-test@example.invalid");
-  await git.addConfig("core.autocrlf", "false");
-  const options = { workspace, dataRoot: join(root, "records"), worktreesRoot: join(root, "worktrees") };
-  const manager = await ProjectGitWorkspace.open(options);
-  await writeFile(join(workspace, "source.txt"), "initial\n");
-  const initial = await manager.prepare("session");
-  const round = await manager.beginRound({ sessionId: "session", runId: "run" });
-  await writeFile(join(workspace, "source.txt"), "request version\n");
-  const hook = join(workspace, ".git", "hooks", "post-commit");
-  await writeFile(hook, "#!/bin/sh\nprintf 'Hook-written version\\n' > source.txt\n", { mode: 0o755 });
-  let failed;
-  await assert.rejects(round.complete({ outcome: "completed" }), error => {
-    assert.ok(error instanceof GitCheckpointError);
-    failed = error.checkpoint;
-    assert.equal(failed.status, "failed");
-    assert.notEqual(failed.commit, initial.commit);
-    assert.match(failed.error, /created commit is partial/u);
-    return true;
-  });
-  assert.equal(await readFile(join(workspace, "source.txt"), "utf8"), "Hook-written version\n");
-  assert.equal(await git.show([`${failed.commit}:source.txt`]), "request version\n");
-  assert.equal((await git.log()).total, 2);
-  assert.equal((await git.revparse([`refs/may/checkpoints/${failed.id}`])).trim(), failed.commit);
-  assert.equal((await git.revparse([`refs/may/checkpoint-starts/${failed.id}`])).trim(), initial.commit);
-  await rm(hook);
-  const reopened = await ProjectGitWorkspace.open(options);
-  const continued = await reopened.beginRound({ sessionId: "session", runId: "continued" });
-  assert.equal((await reopened.checkpoint(failed.id)).status, "failed");
-  assert.notEqual(continued.fromCommit, failed.commit);
-  assert.equal(await git.show([`${continued.fromCommit}:source.txt`]), "Hook-written version\n");
-  assert.equal((await git.revparse([`${continued.fromCommit}^`])).trim(), failed.commit);
-  await continued.complete({ outcome: "cancelled" });
-  assert.equal((await git.log()).total, 3);
-  assert.equal(await readFile(join(workspace, "source.txt"), "utf8"), "Hook-written version\n");
-});
+test(
+  "post-commit Hook edits are reported as a partial checkpoint and survive recovery",
+  { skip: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "1" },
+  async (t) => {
+    const root = await createTestDirectory(t, "may/git-workspace-post-commit");
+    const workspace = join(root, "project");
+    await mkdir(workspace);
+    const git = simpleGit({ baseDir: workspace });
+    await git.init();
+    assert.equal(await git.revparse(["--show-toplevel"]), workspace.replaceAll("\\", "/"));
+    await git.addConfig("user.name", "May integration test");
+    await git.addConfig("user.email", "may-test@example.invalid");
+    await git.addConfig("core.autocrlf", "false");
+    const options = { workspace, dataRoot: join(root, "records"), worktreesRoot: join(root, "worktrees") };
+    const manager = await ProjectGitWorkspace.open(options);
+    await writeFile(join(workspace, "source.txt"), "initial\n");
+    const initial = await manager.prepare("session");
+    const round = await manager.beginRound({ sessionId: "session", runId: "run" });
+    await writeFile(join(workspace, "source.txt"), "request version\n");
+    const hook = join(workspace, ".git", "hooks", "post-commit");
+    await writeFile(hook, "#!/bin/sh\nprintf 'Hook-written version\\n' > source.txt\n", { mode: 0o755 });
+    let failed;
+    await assert.rejects(round.complete({ outcome: "completed" }), (error) => {
+      assert.ok(error instanceof GitCheckpointError);
+      failed = error.checkpoint;
+      assert.equal(failed.status, "failed");
+      assert.notEqual(failed.commit, initial.commit);
+      assert.match(failed.error, /created commit is partial/u);
+      return true;
+    });
+    assert.equal(await readFile(join(workspace, "source.txt"), "utf8"), "Hook-written version\n");
+    assert.equal(await git.show([`${failed.commit}:source.txt`]), "request version\n");
+    assert.equal((await git.log()).total, 2);
+    assert.equal((await git.revparse([`refs/may/checkpoints/${failed.id}`])).trim(), failed.commit);
+    assert.equal((await git.revparse([`refs/may/checkpoint-starts/${failed.id}`])).trim(), initial.commit);
+    await rm(hook);
+    const reopened = await ProjectGitWorkspace.open(options);
+    const continued = await reopened.beginRound({ sessionId: "session", runId: "continued" });
+    assert.equal((await reopened.checkpoint(failed.id)).status, "failed");
+    assert.notEqual(continued.fromCommit, failed.commit);
+    assert.equal(await git.show([`${continued.fromCommit}:source.txt`]), "Hook-written version\n");
+    assert.equal((await git.revparse([`${continued.fromCommit}^`])).trim(), failed.commit);
+    await continued.complete({ outcome: "cancelled" });
+    assert.equal((await git.log()).total, 3);
+    assert.equal(await readFile(join(workspace, "source.txt"), "utf8"), "Hook-written version\n");
+  },
+);

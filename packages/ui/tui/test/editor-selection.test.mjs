@@ -177,10 +177,12 @@ test("Shift 上下选择不会切换输入历史", () => {
 });
 
 test("快捷键覆盖可以替换默认动作和已有按键", () => {
-  const input = editor("text", { keybindings: [
-    { context: "editor", keys: "ctrl+q", action: EDITOR_ACTIONS.selectAll },
-    { context: "editor", keys: "home", action: EDITOR_ACTIONS.lineEnd },
-  ] });
+  const input = editor("text", {
+    keybindings: [
+      { context: "editor", keys: "ctrl+q", action: EDITOR_ACTIONS.selectAll },
+      { context: "editor", keys: "home", action: EDITOR_ACTIONS.lineEnd },
+    ],
+  });
   assert.equal(input.handleKey(keyStroke("a", { ctrl: true })), false);
   input.handleKey(keyStroke("q", { ctrl: true }));
   assert.equal(input.selectedText, "text");
@@ -188,15 +190,16 @@ test("快捷键覆盖可以替换默认动作和已有按键", () => {
   assert.equal(input.cursor, 0);
   input.handleKey(keyStroke("home"));
   assert.equal(input.cursor, 4);
-  assert.throws(() => editor("", { keybindings: [
-    { context: "other", keys: "ctrl+q", action: EDITOR_ACTIONS.selectAll },
-  ] }), /Unknown editor keybinding context/u);
+  assert.throws(
+    () => editor("", { keybindings: [{ context: "other", keys: "ctrl+q", action: EDITOR_ACTIONS.selectAll }] }),
+    /Unknown editor keybinding context/u,
+  );
 });
 
 test("焦点变化和选择上下文变化清除未完成的连续组合键", () => {
-  const input = editor("text", { keybindings: [
-    { context: "editor", keys: "ctrl+q a", action: EDITOR_ACTIONS.selectAll },
-  ] });
+  const input = editor("text", {
+    keybindings: [{ context: "editor", keys: "ctrl+q a", action: EDITOR_ACTIONS.selectAll }],
+  });
   input.handleKey(keyStroke("q", { ctrl: true }));
   input.setFocused(false);
   input.setFocused(true);

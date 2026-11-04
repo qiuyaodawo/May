@@ -24,10 +24,22 @@ export class KimiModel extends OpenAICompatibleChatModel {
     const { thinking, maxTokens, ...shared } = options;
     const configured = thinking === undefined ? undefined : { ...thinking };
     super(omitUndefined({ ...shared, maxOutputTokens: maxTokens }), {
-      provider: "Kimi", adapter: "kimi-chat", errorCodePrefix: "KIMI",
-      defaultBaseURL: "https://api.moonshot.ai/v1", maxTokensField: "max_completion_tokens",
-      streamUsage: true, includeToolName: true, requireDone: true, supportsResponseFormat: false,
-      ...(configured === undefined ? {} : { extendRequest: (body) => { body.thinking = { ...configured }; } }),
+      provider: "Kimi",
+      adapter: "kimi-chat",
+      errorCodePrefix: "KIMI",
+      defaultBaseURL: "https://api.moonshot.ai/v1",
+      maxTokensField: "max_completion_tokens",
+      streamUsage: true,
+      includeToolName: true,
+      requireDone: true,
+      supportsResponseFormat: false,
+      ...(configured === undefined
+        ? {}
+        : {
+            extendRequest: (body) => {
+              body.thinking = { ...configured };
+            },
+          }),
     });
   }
 }

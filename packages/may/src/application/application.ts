@@ -142,10 +142,12 @@ export interface AgentApplicationOptions {
   readonly runBudget?: RunBudget;
   readonly responseFormat?: import("../core/index.js").ModelResponseFormat;
   /** Add the bounded session_history tool with these optional limits. */
-  readonly sessionHistory?: false | (Omit<SessionHistoryToolOptions, "source"> & {
-    /** Also expose bounded content search and chunked record reads. */
-    readonly retrieval?: boolean;
-  });
+  readonly sessionHistory?:
+    | false
+    | (Omit<SessionHistoryToolOptions, "source"> & {
+        /** Also expose bounded content search and chunked record reads. */
+        readonly retrieval?: boolean;
+      });
   /**
    * Produce durable, model-invisible display metadata before permission policy
    * evaluation. Coding diffs are one possible use; the application owns data.
@@ -154,9 +156,7 @@ export interface AgentApplicationOptions {
     check: PermissionCheck,
   ) => AgentToolPresentation | undefined | Promise<AgentToolPresentation | undefined>;
   /** Validate metadata after a session is created or resumed. */
-  readonly validateSession?: (
-    metadata: Readonly<Record<string, unknown>> | undefined,
-  ) => void | Promise<void>;
+  readonly validateSession?: (metadata: Readonly<Record<string, unknown>> | undefined) => void | Promise<void>;
   readonly closeReason?: string;
 }
 
@@ -190,8 +190,7 @@ export class AgentApplication implements SteerableAgentController {
   private readonly tracer: Tracer | undefined;
   private readonly eventQueue = new AsyncEventQueue<AgentApplicationEvent>({
     maxBufferedValues: 1024,
-    isDroppable: (value) =>
-      value.type === "run.event" && isStreamingMayEvent(value.event),
+    isDroppable: (value) => value.type === "run.event" && isStreamingMayEvent(value.event),
   });
   private readonly permissionRelay: Promise<void>;
   private readonly runRelays = new Set<Promise<void>>();
@@ -259,22 +258,39 @@ export class AgentApplication implements SteerableAgentController {
 
   static async open(options: AgentApplicationOptions): Promise<AgentApplication> {
     const sessionId = options.sessionId ?? createSessionId();
-    if (options.resume === true && options.sessionId === undefined) throw new Error("sessionId is required when resuming a session");
-    if (options.resume === true && options.fork !== undefined) throw new Error("Session resume and fork cannot be combined");
-    const forkPluginIds = ["may.skills", ...(options.forkPluginIds ?? []), ...(options.plugins ?? [])
-      .filter((plugin) => plugin.provides?.some((service) => service.id === applicationServices.skills.id && service.scope === applicationServices.skills.scope))
-      .map((plugin) => plugin.id)];
+    if (options.resume === true && options.sessionId === undefined)
+      throw new Error("sessionId is required when resuming a session");
+    if (options.resume === true && options.fork !== undefined)
+      throw new Error("Session resume and fork cannot be combined");
+    const forkPluginIds = [
+      "may.skills",
+      ...(options.forkPluginIds ?? []),
+      ...(options.plugins ?? [])
+        .filter((plugin) =>
+          plugin.provides?.some(
+            (service) =>
+              service.id === applicationServices.skills.id && service.scope === applicationServices.skills.scope,
+          ),
+        )
+        .map((plugin) => plugin.id),
+    ];
     const transformForkState = (key: string, value: unknown): unknown => {
-      const selected = key === PLUGIN_STATE_KEY ? filterForkPluginState(readApplicationPluginState(value), forkPluginIds) : value;
+      const selected =
+        key === PLUGIN_STATE_KEY ? filterForkPluginState(readApplicationPluginState(value), forkPluginIds) : value;
       return options.forkStateTransform === undefined ? selected : options.forkStateTransform(key, selected);
     };
     let pluginState = readApplicationPluginState(undefined);
     if (options.resume === true || options.fork !== undefined) {
-      const history = options.fork === undefined ? await options.store.read(sessionId) :
-        await inspectForkHistory(options.store, options.fork);
-      const event = [...history].reverse().find((event) => event.type === "state.updated" && event.key === PLUGIN_STATE_KEY);
+      const history =
+        options.fork === undefined
+          ? await options.store.read(sessionId)
+          : await inspectForkHistory(options.store, options.fork);
+      const event = [...history]
+        .reverse()
+        .find((event) => event.type === "state.updated" && event.key === PLUGIN_STATE_KEY);
       if (event?.type === "state.updated") pluginState = readApplicationPluginState(event.value);
-      if (options.fork !== undefined) pluginState = readApplicationPluginState(transformForkState(PLUGIN_STATE_KEY, pluginState));
+      if (options.fork !== undefined)
+        pluginState = readApplicationPluginState(transformForkState(PLUGIN_STATE_KEY, pluginState));
     }
     let application: AgentApplication | undefined;
     let contextController: ContextController | undefined;
@@ -287,8 +303,16 @@ export class AgentApplication implements SteerableAgentController {
         if (historySource === undefined) pendingPluginState = true;
         else await historySource.recordState(PLUGIN_STATE_KEY, candidate);
         if (scope === "application") {
-          const owner = configuredPlugins.find((plugin) => plugin.provides?.some((service) => service.id === applicationServices.skills.id && service.scope === applicationServices.skills.scope));
-          if (owner !== undefined && JSON.stringify(pluginState.application[owner.id]?.value) !== JSON.stringify(snapshot[owner.id]?.value)) {
+          const owner = configuredPlugins.find((plugin) =>
+            plugin.provides?.some(
+              (service) =>
+                service.id === applicationServices.skills.id && service.scope === applicationServices.skills.scope,
+            ),
+          );
+          if (
+            owner !== undefined &&
+            JSON.stringify(pluginState.application[owner.id]?.value) !== JSON.stringify(snapshot[owner.id]?.value)
+          ) {
             contextController?.invalidateMeasurement?.();
           }
         }
@@ -299,14 +323,17 @@ export class AgentApplication implements SteerableAgentController {
       if (application.stateRecordingClosed) throw new Error("Agent application is closed");
       return application;
     });
-    const composePlugins = (plugins: readonly AnyPlugin[]) => composeApplicationPlugins(plugins, options, access, () => options.instructions ?? "");
+    const composePlugins = (plugins: readonly AnyPlugin[]) =>
+      composeApplicationPlugins(plugins, options, access, () => options.instructions ?? "");
     let configuredPlugins = composePlugins(options.plugins ?? []);
-    const pluginHost = await PluginHost.create(omitUndefined({
-      plugins: configuredPlugins,
-      hooks: [...RUNTIME_HOOKS, ...APPLICATION_HOOKS],
-      timeoutMs: options.pluginHookTimeoutMs,
-      onHookError: options.onPluginHookError,
-    }));
+    const pluginHost = await PluginHost.create(
+      omitUndefined({
+        plugins: configuredPlugins,
+        hooks: [...RUNTIME_HOOKS, ...APPLICATION_HOOKS],
+        timeoutMs: options.pluginHookTimeoutMs,
+        onHookError: options.onPluginHookError,
+      }),
+    );
     let applicationScope: ApplicationPluginScope;
     let sessionScope: ApplicationPluginScope;
     try {
@@ -320,24 +347,35 @@ export class AgentApplication implements SteerableAgentController {
         state: pluginState.session,
         onStateChange: (snapshot) => persistPluginState("session", snapshot),
       });
-      const opening = await sessionScope.transform(applicationHooks.beforeCreate, omitUndefined({
-        sessionId,
-        resume: options.resume === true,
-        metadata: options.metadata,
-        contextMetadata: options.contextMetadata,
-        instructions: options.instructions,
-      }), { signal: new AbortController().signal, sessionId });
-      if (opening.sessionId !== sessionId || opening.resume !== (options.resume === true)) throw new Error("Application identity cannot be modified by a Hook");
+      const opening = await sessionScope.transform(
+        applicationHooks.beforeCreate,
+        omitUndefined({
+          sessionId,
+          resume: options.resume === true,
+          metadata: options.metadata,
+          contextMetadata: options.contextMetadata,
+          instructions: options.instructions,
+        }),
+        { signal: new AbortController().signal, sessionId },
+      );
+      if (opening.sessionId !== sessionId || opening.resume !== (options.resume === true))
+        throw new Error("Application identity cannot be modified by a Hook");
       options = { ...options, ...opening };
       sessionScope.get(applicationServices.model);
       sessionScope.get(applicationServices.permissionPolicy);
     } catch (error) {
-      try { await pluginHost.close(); }
-      catch (cleanupError) { throw new AggregateError([error, cleanupError], "Application plugin initialization and cleanup failed", { cause: error }); }
+      try {
+        await pluginHost.close();
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], "Application plugin initialization and cleanup failed", {
+          cause: error,
+        });
+      }
       throw error;
     }
     const hooks: HookDispatcher = {
-      transform: (hook, value, context) => (application?.activeRunScope ?? sessionScope).transform(hook, value, { ...context, sessionId }),
+      transform: (hook, value, context) =>
+        (application?.activeRunScope ?? sessionScope).transform(hook, value, { ...context, sessionId }),
       observe: async (hook, value, context) => {
         if (hook.name === "run.before") await application?.runStartBarrier;
         await (application?.activeRunScope ?? sessionScope).observe(hook, value, { ...context, sessionId });
@@ -348,224 +386,305 @@ export class AgentApplication implements SteerableAgentController {
     let openedSession: Session | undefined;
     let openSpan: ReturnType<typeof startTraceSpan>;
     try {
-    const configuredTools = new ToolRegistry();
-    if (options.sessionHistory !== false && options.sessionHistory !== undefined) {
-      const historyTool = createSessionHistoryTool({
-        ...options.sessionHistory,
-        source: () => {
-          if (historySource === undefined) {
-            throw new Error("Session history is unavailable before session creation");
-          }
-          return historySource;
-        },
-      });
-      if (configuredTools.has(historyTool.name)) {
-        throw new Error(`Tool name "${historyTool.name}" is reserved by AgentApplication`);
-      }
-      configuredTools.register(historyTool);
-      for (const tool of options.sessionHistory.retrieval === true
-        ? createSessionHistoryRetrievalTools({ source: () => historySource! }) : []) {
-        if (configuredTools.has(tool.name)) throw new Error(`Tool name "${tool.name}" is reserved by AgentApplication`);
-        configuredTools.register(tool);
-      }
-    }
-
-    const validateToolCatalog = () => {
-      ToolRegistry.compose(configuredTools, sessionScope.get(applicationServices.toolSources).snapshot(),
-        sessionScope.provides(applicationServices.tools) ? sessionScope.get(applicationServices.tools) : []);
-    };
-    const tracer: Tracer = {
-      startSpan: (name, traceOptions) => sessionScope.get(applicationServices.tracer).startSpan(name, traceOptions),
-      recordMetric: record => {
-        if (sessionScope.provides(applicationServices.tracer)) sessionScope.get(applicationServices.tracer).recordMetric?.(record);
-      },
-    };
-    const permissions = new PermissionToolExecutor({
-      ...omitUndefined({ ruleStore: options.permissionRuleStore }),
-      beforeCheck: async (check) => {
-        const presentation = await options.createToolPresentation?.(check);
-        if (presentation !== undefined) {
-          if (application === undefined) {
-            throw new Error("Tool presentation requested before session creation");
-          }
-          await application.recordToolPresentation(check, presentation);
+      const configuredTools = new ToolRegistry();
+      if (options.sessionHistory !== false && options.sessionHistory !== undefined) {
+        const historyTool = createSessionHistoryTool({
+          ...options.sessionHistory,
+          source: () => {
+            if (historySource === undefined) {
+              throw new Error("Session history is unavailable before session creation");
+            }
+            return historySource;
+          },
+        });
+        if (configuredTools.has(historyTool.name)) {
+          throw new Error(`Tool name "${historyTool.name}" is reserved by AgentApplication`);
         }
-      },
-      policy: (check) => sessionScope.get(applicationServices.permissionPolicy)(check),
-      executor: { execute: async (execution) => {
-        await options.beforeToolExecute?.(execution);
-        execution.context.signal.throwIfAborted();
-        return (sessionScope.provides(applicationServices.toolExecutor)
-          ? sessionScope.get(applicationServices.toolExecutor) : directToolExecutor).execute(execution);
-      } },
-      tracer,
-    });
-    cleanupPermissions = permissions;
-
-    let contextOptions: ContextOptions = {};
-    const createRuntime = async (
-      messages: Message[] = [],
-      runtimeInfo: SessionRuntimeInfo = {},
-    ) => {
-      const configuredModel = sessionScope.get(applicationServices.modelWrappers).apply(sessionScope.get(applicationServices.model));
-      const model = options.requestRecording !== "off"
-        ? withModelRequestRecording(configuredModel, (event) => {
-          if (historySource === undefined) throw new Error("Session is not ready for request recording");
-          return historySource.recordModelRequest(event);
-        }) : configuredModel;
-      const contextFactory = sessionScope.get(applicationServices.contextWrappers).apply(sessionScope.get(applicationServices.contextFactory));
-      const configuredContext = sessionScope.provides(applicationServices.contextOptions) ? sessionScope.get(applicationServices.contextOptions) : {};
-      contextOptions = typeof configuredContext === "function" ? configuredContext(model) : configuredContext;
-      if (typeof contextOptions !== "object" || contextOptions === null) throw new TypeError("Context options source must return an object");
-      const nativeCompactionStrategy = contextOptions.providerNativeAutoCompaction === true && model.contextCompactor !== undefined
-        ? new ModelContextCompactionStrategy(model.contextCompactor) : undefined;
-      const autoCompactionStrategies = contextOptions.autoCompactionStrategies ??
-        (nativeCompactionStrategy === undefined ? [] : [nativeCompactionStrategy]);
-      const hookStrategy = (strategy: ContextCompactionStrategy): ContextCompactionStrategy => ({
-        name: strategy.name,
-        async compact(snapshot, compactionOptions = {}) {
-          const context: HookContext = omitUndefined({ signal: compactionOptions.signal ?? new AbortController().signal, sessionId,
-            runId: compactionOptions.runId, step: compactionOptions.step });
-          let selected;
-          try {
-            selected = await hooks.transform(applicationHooks.compactionBefore, { strategy: strategy.name, automatic: true }, context);
-          } catch (error) { throw new HookExecutionError(error, applicationHooks.compactionBefore.name); }
-          const target = [strategy, ...autoCompactionStrategies, ...(contextOptions.compactionStrategy === undefined ? [] : [contextOptions.compactionStrategy])]
-            .find((candidate) => candidate.name === selected.strategy);
-          if (target === undefined || selected.automatic !== true) throw new HookExecutionError(new Error(`Unsupported compaction selection: ${selected.strategy}`), applicationHooks.compactionBefore.name);
-          return target.compact(snapshot, compactionOptions);
-        },
-      });
-      const skills = sessionScope.provides(applicationServices.skills) ? sessionScope.get(applicationServices.skills) : undefined;
-      if (skills !== undefined && skills.listActive().length === 0) skills.restore(runtimeInfo.state?.[SKILL_STATE_KEY]);
-      let measuredInstructions: string | undefined;
-      let instructionController: ContextController | undefined;
-      const instructionsSource = () => {
-        const current = sessionScope.get(applicationServices.instructionSources).snapshot();
-        if (measuredInstructions !== undefined && current !== measuredInstructions) {
-          instructionController?.invalidateMeasurement?.();
+        configuredTools.register(historyTool);
+        for (const tool of options.sessionHistory.retrieval === true
+          ? createSessionHistoryRetrievalTools({ source: () => historySource! })
+          : []) {
+          if (configuredTools.has(tool.name))
+            throw new Error(`Tool name "${tool.name}" is reserved by AgentApplication`);
+          configuredTools.register(tool);
         }
-        measuredInstructions = current;
-        return current;
+      }
+
+      const validateToolCatalog = () => {
+        ToolRegistry.compose(
+          configuredTools,
+          sessionScope.get(applicationServices.toolSources).snapshot(),
+          sessionScope.provides(applicationServices.tools) ? sessionScope.get(applicationServices.tools) : [],
+        );
       };
-      const contextMetadata = options.contextMetadata ?? options.metadata;
-      const skillsInUse = skills !== undefined && (skills.registry.list().length > 0 || skills.listActive().length > 0);
-      const managedContext = await contextFactory.create(omitUndefined({
-        instructions: instructionsSource(), instructionsSource,
-        messages,
-        metadata: contextMetadata,
-        budget: contextOptions.budget,
-        measurement: skillsInUse ? undefined : runtimeInfo.latestModelMeasurement,
-        compactionStrategy: contextOptions.compactionStrategy,
-        autoCompactionStrategies: autoCompactionStrategies.map(hookStrategy),
-      }));
-      contextController = managedContext.controller;
-      instructionController = managedContext.controller;
-      const modelInfo = sessionScope.provides(applicationServices.modelInfo) ? sessionScope.get(applicationServices.modelInfo) : undefined;
-      const runtimeTraceAttributes: Record<string, import("../core/index.js").TraceAttributeValue> = { ...(options.traceAttributes ?? {}), "may.session.id": sessionId };
-      for (const key of ["may.model.provider", "may.model.name", "may.model.adapter", "may.model.profile"]) delete runtimeTraceAttributes[key];
-      if (modelInfo !== undefined) {
-        Object.assign(runtimeTraceAttributes, omitUndefined({
-          "may.model.provider": modelInfo.provider,
-          "may.model.name": modelInfo.model,
-          "may.model.adapter": modelInfo.adapter,
-          "may.model.profile": modelInfo.profile,
-        }));
-      }
-      const runtimeOptions: MayOptions = {
-        model,
-        tools: configuredTools,
-        toolScope: () => ({ ...options.toolScope, sessionId }),
-        toolSource: () => [...sessionScope.get(applicationServices.toolSources).snapshot(), ...(sessionScope.provides(applicationServices.tools) ? sessionScope.get(applicationServices.tools) : [])],
-        context: managedContext.context,
-        hooks,
-        toolExecutor: permissions,
+      const tracer: Tracer = {
+        startSpan: (name, traceOptions) => sessionScope.get(applicationServices.tracer).startSpan(name, traceOptions),
+        recordMetric: (record) => {
+          if (sessionScope.provides(applicationServices.tracer))
+            sessionScope.get(applicationServices.tracer).recordMetric?.(record);
+        },
+      };
+      const permissions = new PermissionToolExecutor({
+        ...omitUndefined({ ruleStore: options.permissionRuleStore }),
+        beforeCheck: async (check) => {
+          const presentation = await options.createToolPresentation?.(check);
+          if (presentation !== undefined) {
+            if (application === undefined) {
+              throw new Error("Tool presentation requested before session creation");
+            }
+            await application.recordToolPresentation(check, presentation);
+          }
+        },
+        policy: (check) => sessionScope.get(applicationServices.permissionPolicy)(check),
+        executor: {
+          execute: async (execution) => {
+            await options.beforeToolExecute?.(execution);
+            execution.context.signal.throwIfAborted();
+            return (
+              sessionScope.provides(applicationServices.toolExecutor)
+                ? sessionScope.get(applicationServices.toolExecutor)
+                : directToolExecutor
+            ).execute(execution);
+          },
+        },
         tracer,
-        ...omitUndefined({
-          responseFormat: options.responseFormat,
-          traceAttributes: Object.keys(runtimeTraceAttributes).length === 0 ? undefined : runtimeTraceAttributes,
-          toolScheduler: sessionScope.provides(applicationServices.toolScheduler) ? sessionScope.get(applicationServices.toolScheduler) : undefined,
-          maxSteps: options.maxSteps,
-          runBudget: options.runBudget,
-        }),
-      };
-      validateToolCatalog();
-      const runtime = await sessionScope.get(applicationServices.runtimeFactory)(runtimeOptions);
-      if (openedSession === undefined) pendingRuntime = runtime;
-      const supportedHooks = new Set(runtime.supportedHooks?.map((hook) => hook.name) ?? []);
-      for (const plugin of configuredPlugins) {
-        for (const required of plugin.requiresHooks ?? []) {
-          if (RUNTIME_HOOKS.some((hook) => hook.name === required.name) && !supportedHooks.has(required.name)) {
-            await runtime.close?.();
-            pendingRuntime = undefined;
-            throw new Error(`Runtime does not support Hook "${required.name}" required by "${plugin.id}"`);
+      });
+      cleanupPermissions = permissions;
+
+      let contextOptions: ContextOptions = {};
+      const createRuntime = async (messages: Message[] = [], runtimeInfo: SessionRuntimeInfo = {}) => {
+        const configuredModel = sessionScope
+          .get(applicationServices.modelWrappers)
+          .apply(sessionScope.get(applicationServices.model));
+        const model =
+          options.requestRecording !== "off"
+            ? withModelRequestRecording(configuredModel, (event) => {
+                if (historySource === undefined) throw new Error("Session is not ready for request recording");
+                return historySource.recordModelRequest(event);
+              })
+            : configuredModel;
+        const contextFactory = sessionScope
+          .get(applicationServices.contextWrappers)
+          .apply(sessionScope.get(applicationServices.contextFactory));
+        const configuredContext = sessionScope.provides(applicationServices.contextOptions)
+          ? sessionScope.get(applicationServices.contextOptions)
+          : {};
+        contextOptions = typeof configuredContext === "function" ? configuredContext(model) : configuredContext;
+        if (typeof contextOptions !== "object" || contextOptions === null)
+          throw new TypeError("Context options source must return an object");
+        const nativeCompactionStrategy =
+          contextOptions.providerNativeAutoCompaction === true && model.contextCompactor !== undefined
+            ? new ModelContextCompactionStrategy(model.contextCompactor)
+            : undefined;
+        const autoCompactionStrategies =
+          contextOptions.autoCompactionStrategies ??
+          (nativeCompactionStrategy === undefined ? [] : [nativeCompactionStrategy]);
+        const hookStrategy = (strategy: ContextCompactionStrategy): ContextCompactionStrategy => ({
+          name: strategy.name,
+          async compact(snapshot, compactionOptions = {}) {
+            const context: HookContext = omitUndefined({
+              signal: compactionOptions.signal ?? new AbortController().signal,
+              sessionId,
+              runId: compactionOptions.runId,
+              step: compactionOptions.step,
+            });
+            let selected;
+            try {
+              selected = await hooks.transform(
+                applicationHooks.compactionBefore,
+                { strategy: strategy.name, automatic: true },
+                context,
+              );
+            } catch (error) {
+              throw new HookExecutionError(error, applicationHooks.compactionBefore.name);
+            }
+            const target = [
+              strategy,
+              ...autoCompactionStrategies,
+              ...(contextOptions.compactionStrategy === undefined ? [] : [contextOptions.compactionStrategy]),
+            ].find((candidate) => candidate.name === selected.strategy);
+            if (target === undefined || selected.automatic !== true)
+              throw new HookExecutionError(
+                new Error(`Unsupported compaction selection: ${selected.strategy}`),
+                applicationHooks.compactionBefore.name,
+              );
+            return target.compact(snapshot, compactionOptions);
+          },
+        });
+        const skills = sessionScope.provides(applicationServices.skills)
+          ? sessionScope.get(applicationServices.skills)
+          : undefined;
+        if (skills !== undefined && skills.listActive().length === 0)
+          skills.restore(runtimeInfo.state?.[SKILL_STATE_KEY]);
+        let measuredInstructions: string | undefined;
+        let instructionController: ContextController | undefined;
+        const instructionsSource = () => {
+          const current = sessionScope.get(applicationServices.instructionSources).snapshot();
+          if (measuredInstructions !== undefined && current !== measuredInstructions) {
+            instructionController?.invalidateMeasurement?.();
+          }
+          measuredInstructions = current;
+          return current;
+        };
+        const contextMetadata = options.contextMetadata ?? options.metadata;
+        const skillsInUse =
+          skills !== undefined && (skills.registry.list().length > 0 || skills.listActive().length > 0);
+        const managedContext = await contextFactory.create(
+          omitUndefined({
+            instructions: instructionsSource(),
+            instructionsSource,
+            messages,
+            metadata: contextMetadata,
+            budget: contextOptions.budget,
+            measurement: skillsInUse ? undefined : runtimeInfo.latestModelMeasurement,
+            compactionStrategy: contextOptions.compactionStrategy,
+            autoCompactionStrategies: autoCompactionStrategies.map(hookStrategy),
+          }),
+        );
+        contextController = managedContext.controller;
+        instructionController = managedContext.controller;
+        const modelInfo = sessionScope.provides(applicationServices.modelInfo)
+          ? sessionScope.get(applicationServices.modelInfo)
+          : undefined;
+        const runtimeTraceAttributes: Record<string, import("../core/index.js").TraceAttributeValue> = {
+          ...(options.traceAttributes ?? {}),
+          "may.session.id": sessionId,
+        };
+        for (const key of ["may.model.provider", "may.model.name", "may.model.adapter", "may.model.profile"])
+          delete runtimeTraceAttributes[key];
+        if (modelInfo !== undefined) {
+          Object.assign(
+            runtimeTraceAttributes,
+            omitUndefined({
+              "may.model.provider": modelInfo.provider,
+              "may.model.name": modelInfo.model,
+              "may.model.adapter": modelInfo.adapter,
+              "may.model.profile": modelInfo.profile,
+            }),
+          );
+        }
+        const runtimeOptions: MayOptions = {
+          model,
+          tools: configuredTools,
+          toolScope: () => ({ ...options.toolScope, sessionId }),
+          toolSource: () => [
+            ...sessionScope.get(applicationServices.toolSources).snapshot(),
+            ...(sessionScope.provides(applicationServices.tools) ? sessionScope.get(applicationServices.tools) : []),
+          ],
+          context: managedContext.context,
+          hooks,
+          toolExecutor: permissions,
+          tracer,
+          ...omitUndefined({
+            responseFormat: options.responseFormat,
+            traceAttributes: Object.keys(runtimeTraceAttributes).length === 0 ? undefined : runtimeTraceAttributes,
+            toolScheduler: sessionScope.provides(applicationServices.toolScheduler)
+              ? sessionScope.get(applicationServices.toolScheduler)
+              : undefined,
+            maxSteps: options.maxSteps,
+            runBudget: options.runBudget,
+          }),
+        };
+        validateToolCatalog();
+        const runtime = await sessionScope.get(applicationServices.runtimeFactory)(runtimeOptions);
+        if (openedSession === undefined) pendingRuntime = runtime;
+        const supportedHooks = new Set(runtime.supportedHooks?.map((hook) => hook.name) ?? []);
+        for (const plugin of configuredPlugins) {
+          for (const required of plugin.requiresHooks ?? []) {
+            if (RUNTIME_HOOKS.some((hook) => hook.name === required.name) && !supportedHooks.has(required.name)) {
+              await runtime.close?.();
+              pendingRuntime = undefined;
+              throw new Error(`Runtime does not support Hook "${required.name}" required by "${plugin.id}"`);
+            }
           }
         }
-      }
-      return runtime;
-    };
+        return runtime;
+      };
 
-    openSpan = startTraceSpan(tracer, "may.application.open", {
-      attributes: {
-        ...(options.traceAttributes ?? {}),
-        "may.application.resume": options.resume === true,
-        ...(options.sessionId === undefined
-          ? {}
-          : { "may.session.id": options.sessionId }),
-      },
-    });
-      const session = options.fork !== undefined
-        ? await Session.fork({ sourceId: options.fork.sessionId, positionSeq: options.fork.positionSeq,
-            requestRecording: options.requestRecording ?? "required",
-            providerBodyRecording: options.providerBodyRecording,
-            id: sessionId, store: options.store, deferBranchPositions: true, deferForkReady: true,
-            stateKeys: [SKILL_STATE_KEY, PLUGIN_STATE_KEY, ...(options.forkStateKeys ?? [])],
-            transformState: transformForkState,
-            ...omitUndefined({ metadata: options.metadata === undefined ? undefined : { ...options.metadata } }),
-            createRuntime: async (messages, info) => {
-              const runtime = await createRuntime(messages, info); pendingRuntime = undefined; return runtime;
-            } })
-        : options.resume === true
-        ? await resumeSession(options, async (messages, info) => {
-            const runtime = await createRuntime(messages, info);
-            pendingRuntime = undefined;
-            return runtime;
-          })
-        : await Session.create({
-            requestRecording: options.requestRecording ?? "required",
-            providerBodyRecording: options.providerBodyRecording,
-            runtime: await createRuntime(),
-            store: options.store,
-            deferBranchPositions: true,
-            ...omitUndefined({
-              metadata: options.metadata === undefined ? undefined : { ...options.metadata },
-              id: options.sessionId,
-            }),
-          });
+      openSpan = startTraceSpan(tracer, "may.application.open", {
+        attributes: {
+          ...(options.traceAttributes ?? {}),
+          "may.application.resume": options.resume === true,
+          ...(options.sessionId === undefined ? {} : { "may.session.id": options.sessionId }),
+        },
+      });
+      const session =
+        options.fork !== undefined
+          ? await Session.fork({
+              sourceId: options.fork.sessionId,
+              positionSeq: options.fork.positionSeq,
+              requestRecording: options.requestRecording ?? "required",
+              providerBodyRecording: options.providerBodyRecording,
+              id: sessionId,
+              store: options.store,
+              deferBranchPositions: true,
+              deferForkReady: true,
+              stateKeys: [SKILL_STATE_KEY, PLUGIN_STATE_KEY, ...(options.forkStateKeys ?? [])],
+              transformState: transformForkState,
+              ...omitUndefined({ metadata: options.metadata === undefined ? undefined : { ...options.metadata } }),
+              createRuntime: async (messages, info) => {
+                const runtime = await createRuntime(messages, info);
+                pendingRuntime = undefined;
+                return runtime;
+              },
+            })
+          : options.resume === true
+            ? await resumeSession(options, async (messages, info) => {
+                const runtime = await createRuntime(messages, info);
+                pendingRuntime = undefined;
+                return runtime;
+              })
+            : await Session.create({
+                requestRecording: options.requestRecording ?? "required",
+                providerBodyRecording: options.providerBodyRecording,
+                runtime: await createRuntime(),
+                store: options.store,
+                deferBranchPositions: true,
+                ...omitUndefined({
+                  metadata: options.metadata === undefined ? undefined : { ...options.metadata },
+                  id: options.sessionId,
+                }),
+              });
       historySource = session;
       openedSession = session;
       pendingRuntime = undefined;
-      try { await options.validateSession?.(session.metadata); }
-      catch (error) {
+      try {
+        await options.validateSession?.(session.metadata);
+      } catch (error) {
         if (options.resume !== true && options.fork === undefined) await options.store?.delete?.(session.id);
         throw error;
       }
       permissions.setEventSink(async (event) => {
         await session.recordPermissionEvent(event);
-        const payload = event.type === "approval.requested" ? {
-          ...event,
-          request: { ...event.request, context: omitUndefined({
-            runId: event.request.context.runId,
-            step: event.request.context.step,
-            toolCallId: event.request.context.toolCallId,
-            idempotencyKey: event.request.context.idempotencyKey,
-            scope: event.request.context.scope,
-            traceContext: event.request.context.traceContext,
-          }) },
-        } : event;
-        if (event.type === "approval.requested" || event.type === "approval.resolved" || event.type === "approval.cancelled") {
-          await hooks.observe(event.type === "approval.requested" ? applicationHooks.approvalRequested : applicationHooks.approvalResolved,
-            payload, { signal: new AbortController().signal, sessionId });
+        const payload =
+          event.type === "approval.requested"
+            ? {
+                ...event,
+                request: {
+                  ...event.request,
+                  context: omitUndefined({
+                    runId: event.request.context.runId,
+                    step: event.request.context.step,
+                    toolCallId: event.request.context.toolCallId,
+                    idempotencyKey: event.request.context.idempotencyKey,
+                    scope: event.request.context.scope,
+                    traceContext: event.request.context.traceContext,
+                  }),
+                },
+              }
+            : event;
+        if (
+          event.type === "approval.requested" ||
+          event.type === "approval.resolved" ||
+          event.type === "approval.cancelled"
+        ) {
+          await hooks.observe(
+            event.type === "approval.requested"
+              ? applicationHooks.approvalRequested
+              : applicationHooks.approvalResolved,
+            payload,
+            { signal: new AbortController().signal, sessionId },
+          );
         }
       });
       application = new AgentApplication(
@@ -588,7 +707,11 @@ export class AgentApplication implements SteerableAgentController {
         (plugins) => applicationScope.validatePlugins(composePlugins(plugins)),
         validateToolCatalog,
       );
-      if (pendingPluginState || Object.keys(applicationScope.snapshotState()).length > 0 || Object.keys(sessionScope.snapshotState()).length > 0) {
+      if (
+        pendingPluginState ||
+        Object.keys(applicationScope.snapshotState()).length > 0 ||
+        Object.keys(sessionScope.snapshotState()).length > 0
+      ) {
         await session.recordState(PLUGIN_STATE_KEY, {
           version: 1,
           application: applicationScope.snapshotState(),
@@ -596,10 +719,10 @@ export class AgentApplication implements SteerableAgentController {
         });
       }
       contextController?.setAutoCompactionSink?.((result, compactionOptions) =>
-        application!.recordAutomaticCompaction(result, compactionOptions)
+        application!.recordAutomaticCompaction(result, compactionOptions),
       );
       contextController?.setAutoCompactionFailureSink?.((failure) =>
-        application!.recordAutomaticCompactionFailure(failure)
+        application!.recordAutomaticCompactionFailure(failure),
       );
       await sessionScope.observe(applicationHooks.created, { sessionId: session.id }, application.hookContext());
       validateToolCatalog();
@@ -616,8 +739,11 @@ export class AgentApplication implements SteerableAgentController {
       endTraceSpan(openSpan, { status: "error", error: traceError(error) });
       const failures: unknown[] = [error];
       const cleanup = async (operation: () => void | Promise<void>) => {
-        try { await operation(); }
-        catch (cleanupError) { failures.push(cleanupError); }
+        try {
+          await operation();
+        } catch (cleanupError) {
+          failures.push(cleanupError);
+        }
       };
       if (application !== undefined) await cleanup(() => application!.close());
       else {
@@ -626,19 +752,22 @@ export class AgentApplication implements SteerableAgentController {
         await cleanup(() => pendingRuntime?.close?.());
         await cleanup(() => pluginHost.close());
       }
-      if (failures.length > 1) throw new AggregateError(failures, "Agent application initialization and cleanup failed", { cause: error });
+      if (failures.length > 1)
+        throw new AggregateError(failures, "Agent application initialization and cleanup failed", { cause: error });
       throw error;
     }
   }
 
   get isRunning(): boolean {
-    return this.starting || this.changingPlugins ||
-      this.currentRun !== undefined ||
-      this.activeCompaction !== undefined;
+    return (
+      this.starting || this.changingPlugins || this.currentRun !== undefined || this.activeCompaction !== undefined
+    );
   }
 
   get skills(): SkillSession | undefined {
-    return this.sessionScope.provides(applicationServices.skills) ? this.sessionScope.get(applicationServices.skills) : undefined;
+    return this.sessionScope.provides(applicationServices.skills)
+      ? this.sessionScope.get(applicationServices.skills)
+      : undefined;
   }
 
   /** Persist application-owned session memory; available during tool execution. */
@@ -646,26 +775,56 @@ export class AgentApplication implements SteerableAgentController {
     if (this.stateRecordingClosed) throw new Error("Agent application is closed");
     const writing = this.session.recordState(key, value);
     this.pendingStateWrites.add(writing);
-    void writing.then(() => this.pendingStateWrites.delete(writing), () => this.pendingStateWrites.delete(writing));
+    void writing.then(
+      () => this.pendingStateWrites.delete(writing),
+      () => this.pendingStateWrites.delete(writing),
+    );
     return writing;
   }
 
   submit(options: SessionSubmitOptions): Promise<AgentRun> {
     assertSessionInputOptions(options);
     let input: InputHook;
-    return this.startRun(async () => {
-      input = await this.prepareInput(omitUndefined({ input: options.input, inputId: options.inputId }), options.signal);
-      return this.session.submit({ ...options, input: input.input, signal: this.hookContext(options.signal).signal,
-        ...(input.inputId === undefined ? {} : { inputId: input.inputId }) });
-    }, (run) => this.hookScope().observe(applicationHooks.inputSubmitted, { ...input, runId: run.id }, this.hookContext(options.signal)), options.signal);
+    return this.startRun(
+      async () => {
+        input = await this.prepareInput(
+          omitUndefined({ input: options.input, inputId: options.inputId }),
+          options.signal,
+        );
+        return this.session.submit({
+          ...options,
+          input: input.input,
+          signal: this.hookContext(options.signal).signal,
+          ...(input.inputId === undefined ? {} : { inputId: input.inputId }),
+        });
+      },
+      (run) =>
+        this.hookScope().observe(
+          applicationHooks.inputSubmitted,
+          { ...input, runId: run.id },
+          this.hookContext(options.signal),
+        ),
+      options.signal,
+    );
   }
 
   async steer(options: SessionSteerOptions): Promise<SessionSteeringInput> {
     this.throwIfClosed();
-    if (this.starting || this.changingPlugins || this.activeCompaction !== undefined) throw new Error("Cannot steer while an agent operation is starting or compacting context");
-    const input = await this.prepareInput(omitUndefined({ input: options.input, steering: true, inputId: options.inputId }));
-    const result = await this.session.steer({ ...options, input: input.input, ...(input.inputId === undefined ? {} : { inputId: input.inputId }) });
-    await this.hookScope().observe(applicationHooks.inputSubmitted, { ...input, inputId: result.inputId }, this.hookContext());
+    if (this.starting || this.changingPlugins || this.activeCompaction !== undefined)
+      throw new Error("Cannot steer while an agent operation is starting or compacting context");
+    const input = await this.prepareInput(
+      omitUndefined({ input: options.input, steering: true, inputId: options.inputId }),
+    );
+    const result = await this.session.steer({
+      ...options,
+      input: input.input,
+      ...(input.inputId === undefined ? {} : { inputId: input.inputId }),
+    });
+    await this.hookScope().observe(
+      applicationHooks.inputSubmitted,
+      { ...input, inputId: result.inputId },
+      this.hookContext(),
+    );
     return result;
   }
 
@@ -678,32 +837,52 @@ export class AgentApplication implements SteerableAgentController {
     return this.session.cancelSteeringInputs(reason);
   }
 
-  startSteeringInput(inputId: string, options: Omit<SessionSubmitOptions, "input" | "inputId"> = {}): Promise<AgentRun> {
+  startSteeringInput(
+    inputId: string,
+    options: Omit<SessionSubmitOptions, "input" | "inputId"> = {},
+  ): Promise<AgentRun> {
     assertSessionInputOptions(options);
-    return this.startRun(() => this.session.startSteeringInput(inputId, { ...options, signal: this.hookContext(options.signal).signal }), undefined, options.signal);
+    return this.startRun(
+      () => this.session.startSteeringInput(inputId, { ...options, signal: this.hookContext(options.signal).signal }),
+      undefined,
+      options.signal,
+    );
   }
 
   /** 在当前上下文中继续执行，沿用运行互斥和保存流程。 */
   continue(options: SessionContinueOptions = {}): Promise<AgentRun> {
     assertSessionInputOptions(options);
-    return this.startRun(() => this.session.continue({ ...options, signal: this.hookContext(options.signal).signal }), undefined, options.signal);
+    return this.startRun(
+      () => this.session.continue({ ...options, signal: this.hookContext(options.signal).signal }),
+      undefined,
+      options.signal,
+    );
   }
 
-  listRecoveries() { return this.session.listRecoveries(); }
+  listRecoveries() {
+    return this.session.listRecoveries();
+  }
 
   async activateSkill(name: string) {
     this.throwIfClosed();
     if (this.isRunning) throw new Error("Cannot activate a skill while an operation is active");
     if (!this.skills) throw new Error("Skills are disabled");
     this.starting = true;
-    try { return await this.skills.activate(name); }
-    finally { this.starting = false; }
+    try {
+      return await this.skills.activate(name);
+    } finally {
+      this.starting = false;
+    }
   }
 
   async resolveRecovery(id: string, finding: string): Promise<void> {
     this.throwIfClosed();
     if (this.isRunning) throw new Error("Cannot resolve recovery while an operation is active");
-    const result = await this.sessionScope.transform(applicationHooks.recoveryBefore, { id, finding }, this.hookContext());
+    const result = await this.sessionScope.transform(
+      applicationHooks.recoveryBefore,
+      { id, finding },
+      this.hookContext(),
+    );
     if (result.id !== id) throw new Error("Recovery identity cannot be changed by a Hook");
     await this.session.resolveRecovery(result.id, result.finding);
     await this.sessionScope.observe(applicationHooks.recoveryResolved, result, this.hookContext());
@@ -719,25 +898,40 @@ export class AgentApplication implements SteerableAgentController {
     });
   }
 
-  private async startRun(start: () => Promise<RunHandle>, afterStart?: (run: RunHandle) => Promise<void>, signal?: AbortSignal): Promise<AgentRun> {
+  private async startRun(
+    start: () => Promise<RunHandle>,
+    afterStart?: (run: RunHandle) => Promise<void>,
+    signal?: AbortSignal,
+  ): Promise<AgentRun> {
     this.throwIfClosed();
-    if (this.pluginFailure !== undefined) throw new Error("Plugin configuration is unavailable; update plugins before starting a Run", { cause: this.pluginFailure });
+    if (this.pluginFailure !== undefined)
+      throw new Error("Plugin configuration is unavailable; update plugins before starting a Run", {
+        cause: this.pluginFailure,
+      });
     if (this.isRunning) throw new Error("An agent operation is already active");
 
     this.starting = true;
     this.startingController = new AbortController();
     let finishStart!: () => void;
-    this.currentStart = new Promise<void>((resolve) => { finishStart = resolve; });
+    this.currentStart = new Promise<void>((resolve) => {
+      finishStart = resolve;
+    });
     let runScope: ApplicationPluginScope | undefined;
     let acquiredRun: RunHandle | undefined;
     let releaseBarrier: (() => void) | undefined;
     let rejectBarrier: ((error: unknown) => void) | undefined;
     if (afterStart !== undefined) {
-      this.runStartBarrier = new Promise<void>((resolve, reject) => { releaseBarrier = resolve; rejectBarrier = reject; });
+      this.runStartBarrier = new Promise<void>((resolve, reject) => {
+        releaseBarrier = resolve;
+        rejectBarrier = reject;
+      });
       void this.runStartBarrier.catch(() => undefined);
     }
     try {
-      runScope = await this.sessionScope.createScope("run", { id: `run-${randomUUID()}`, signal: this.hookContext(signal).signal });
+      runScope = await this.sessionScope.createScope("run", {
+        id: `run-${randomUUID()}`,
+        signal: this.hookContext(signal).signal,
+      });
       this.activeRunScope = runScope;
       const run = await start();
       acquiredRun = run;
@@ -752,14 +946,19 @@ export class AgentApplication implements SteerableAgentController {
       }
       const relay = this.relayRunEvents(run.events);
       this.runRelays.add(relay);
-      void relay.then(() => this.runRelays.delete(relay), () => this.runRelays.delete(relay));
+      void relay.then(
+        () => this.runRelays.delete(relay),
+        () => this.runRelays.delete(relay),
+      );
 
-      const result = runScope.use(() => relay.then(() => run.result), { cancel: () => run.cancel("Plugin configuration is changing") })
+      const result = runScope
+        .use(() => relay.then(() => run.result), { cancel: () => run.cancel("Plugin configuration is changing") })
         .finally(async () => {
           if (this.activeRunScope === runScope) this.activeRunScope = undefined;
           await runScope!.close();
           await Promise.all(this.pendingStateWrites);
-        }).then(async (value) => {
+        })
+        .then(async (value) => {
           await this.session.saveBranchPosition(run.id);
           return value;
         });
@@ -782,8 +981,13 @@ export class AgentApplication implements SteerableAgentController {
       acquiredRun?.cancel("Agent Run initialization failed");
       await acquiredRun?.result.catch(() => undefined);
       if (this.activeRunScope === runScope) this.activeRunScope = undefined;
-      try { await runScope?.close(); }
-      catch (cleanupError) { throw new AggregateError([error, cleanupError], "Agent Run initialization and cleanup failed", { cause: error }); }
+      try {
+        await runScope?.close();
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], "Agent Run initialization and cleanup failed", {
+          cause: error,
+        });
+      }
       this.throwIfClosed();
       throw error;
     } finally {
@@ -840,17 +1044,30 @@ export class AgentApplication implements SteerableAgentController {
       }
     });
     this.pluginChangeTail = operation.then(
-      () => { this.pendingPluginChanges -= 1; this.changingPlugins = this.pendingPluginChanges > 0; },
-      () => { this.pendingPluginChanges -= 1; this.changingPlugins = this.pendingPluginChanges > 0; },
+      () => {
+        this.pendingPluginChanges -= 1;
+        this.changingPlugins = this.pendingPluginChanges > 0;
+      },
+      () => {
+        this.pendingPluginChanges -= 1;
+        this.changingPlugins = this.pendingPluginChanges > 0;
+      },
     );
     return operation;
   }
 
   private async prepareInput(value: InputHook, signal?: AbortSignal): Promise<InputHook> {
     await this.hookScope().observe(applicationHooks.inputReceived, value, this.hookContext(signal));
-    const result = await this.hookScope().transform(applicationHooks.inputBeforeSubmit, value, this.hookContext(signal));
+    const result = await this.hookScope().transform(
+      applicationHooks.inputBeforeSubmit,
+      value,
+      this.hookContext(signal),
+    );
     if (result.inputId !== value.inputId || result.steering !== value.steering) {
-      throw new HookExecutionError(new Error("Input identity and delivery mode cannot be modified"), applicationHooks.inputBeforeSubmit.name);
+      throw new HookExecutionError(
+        new Error("Input identity and delivery mode cannot be modified"),
+        applicationHooks.inputBeforeSubmit.name,
+      );
     }
     return result;
   }
@@ -860,13 +1077,21 @@ export class AgentApplication implements SteerableAgentController {
   }
 
   private hookContext(signal = new AbortController().signal): HookContext {
-    return omitUndefined({ signal: AbortSignal.any([signal, this.lifecycleController.signal,
-      ...(this.startingController === undefined ? [] : [this.startingController.signal])]), sessionId: this.sessionId,
-      runId: this.currentRun?.id });
+    return omitUndefined({
+      signal: AbortSignal.any([
+        signal,
+        this.lifecycleController.signal,
+        ...(this.startingController === undefined ? [] : [this.startingController.signal]),
+      ]),
+      sessionId: this.sessionId,
+      runId: this.currentRun?.id,
+    });
   }
 
   private connectCompactionSinks(): void {
-    this.contextController?.setAutoCompactionSink?.((result, options) => this.recordAutomaticCompaction(result, options));
+    this.contextController?.setAutoCompactionSink?.((result, options) =>
+      this.recordAutomaticCompaction(result, options),
+    );
     this.contextController?.setAutoCompactionFailureSink?.((failure) => this.recordAutomaticCompactionFailure(failure));
   }
 
@@ -887,11 +1112,7 @@ export class AgentApplication implements SteerableAgentController {
     return false;
   }
 
-  resolveApproval(
-    requestId: string,
-    decision: ApprovalDecision,
-    options?: ApprovalResolveOptions,
-  ): Promise<boolean> {
+  resolveApproval(requestId: string, decision: ApprovalDecision, options?: ApprovalResolveOptions): Promise<boolean> {
     this.throwIfClosed();
     return this.permissions.resolve(requestId, decision, options);
   }
@@ -901,7 +1122,10 @@ export class AgentApplication implements SteerableAgentController {
     return this.permissions.listRules(scopeId);
   }
 
-  createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule> {
+  createPermissionRule(
+    check: PermissionCheck,
+    options: CreatePermissionRuleOptions,
+  ): Promise<PersistentPermissionRule> {
     this.throwIfClosed();
     return this.permissions.createRule(check, options);
   }
@@ -924,7 +1148,10 @@ export class AgentApplication implements SteerableAgentController {
     return this.session.branchPositions();
   }
 
-  async saveBranchPosition(runId: string, options: import("../session/index.js").SessionBranchCompletionOptions = {}): Promise<void> {
+  async saveBranchPosition(
+    runId: string,
+    options: import("../session/index.js").SessionBranchCompletionOptions = {},
+  ): Promise<void> {
     if (this.isRunning) throw new Error("Branch positions require a settled application Run");
     await Promise.all(this.pendingStateWrites);
     await this.session.saveBranchPosition(runId, options);
@@ -947,9 +1174,7 @@ export class AgentApplication implements SteerableAgentController {
     return this.contextController?.inspect();
   }
 
-  async compactContext(
-    strategy = this.readCompactionStrategy(),
-  ): Promise<ContextCompactionResult> {
+  async compactContext(strategy = this.readCompactionStrategy()): Promise<ContextCompactionResult> {
     this.throwIfClosed();
     if (this.isRunning) {
       throw new Error("Cannot compact context while an operation is active");
@@ -1002,9 +1227,13 @@ export class AgentApplication implements SteerableAgentController {
     signal: AbortSignal,
   ): Promise<ContextCompactionResult> {
     try {
-      const selection = await this.sessionScope.transform(applicationHooks.compactionBefore,
-        omitUndefined({ strategy: strategy?.name, automatic: false }), this.hookContext(signal));
-      if (selection.strategy !== strategy?.name) throw new Error(`Unsupported compaction strategy: ${selection.strategy}`);
+      const selection = await this.sessionScope.transform(
+        applicationHooks.compactionBefore,
+        omitUndefined({ strategy: strategy?.name, automatic: false }),
+        this.hookContext(signal),
+      );
+      if (selection.strategy !== strategy?.name)
+        throw new Error(`Unsupported compaction strategy: ${selection.strategy}`);
       const result = await this.contextController!.compact!(strategy, { signal });
       if (result.changed) {
         try {
@@ -1015,11 +1244,18 @@ export class AgentApplication implements SteerableAgentController {
           throw error;
         }
       }
-      await this.sessionScope.observe(applicationHooks.compactionCompleted, { ...result, automatic: false }, this.hookContext(signal));
+      await this.sessionScope.observe(
+        applicationHooks.compactionCompleted,
+        { ...result, automatic: false },
+        this.hookContext(signal),
+      );
       return result;
     } catch (error) {
-      await this.sessionScope.observe(applicationHooks.compactionFailed,
-        omitUndefined({ strategy: strategy?.name, automatic: false, error: serializeError(error) }), this.hookContext(signal));
+      await this.sessionScope.observe(
+        applicationHooks.compactionFailed,
+        omitUndefined({ strategy: strategy?.name, automatic: false, error: serializeError(error) }),
+        this.hookContext(signal),
+      );
       throw error;
     }
   }
@@ -1030,7 +1266,11 @@ export class AgentApplication implements SteerableAgentController {
   ): Promise<void> {
     await this.persistCompaction(result, options);
     this.contextController?.commitCompaction?.(result);
-    await this.hookScope().observe(applicationHooks.compactionCompleted, { ...result, automatic: true }, this.hookContext(options.signal));
+    await this.hookScope().observe(
+      applicationHooks.compactionCompleted,
+      { ...result, automatic: true },
+      this.hookContext(options.signal),
+    );
     this.eventQueue.push({
       type: "context.compacted",
       strategy: result.strategy,
@@ -1039,11 +1279,12 @@ export class AgentApplication implements SteerableAgentController {
     });
   }
 
-  private async recordAutomaticCompactionFailure(
-    failure: ContextCompactionFailure,
-  ): Promise<void> {
-    await this.hookScope().observe(applicationHooks.compactionFailed,
-      { strategy: failure.strategy, automatic: true, error: serializeError(failure.error) }, this.hookContext());
+  private async recordAutomaticCompactionFailure(failure: ContextCompactionFailure): Promise<void> {
+    await this.hookScope().observe(
+      applicationHooks.compactionFailed,
+      { strategy: failure.strategy, automatic: true, error: serializeError(failure.error) },
+      this.hookContext(),
+    );
     this.eventQueue.push({
       type: "context.compaction.failed",
       strategy: failure.strategy,
@@ -1058,9 +1299,10 @@ export class AgentApplication implements SteerableAgentController {
     result: ContextCompactionResult,
     ordering?: Pick<ContextCompactionOptions, "runId" | "step">,
   ): Promise<void> {
-    const afterRunStep = ordering?.runId === undefined || ordering.step === undefined
-      ? undefined
-      : { runId: ordering.runId, step: ordering.step };
+    const afterRunStep =
+      ordering?.runId === undefined || ordering.step === undefined
+        ? undefined
+        : { runId: ordering.runId, step: ordering.step };
     return this.session.recordContextCompaction(
       {
         strategy: result.strategy,
@@ -1074,10 +1316,7 @@ export class AgentApplication implements SteerableAgentController {
     );
   }
 
-  private async recordToolPresentation(
-    check: PermissionCheck,
-    value: AgentToolPresentation,
-  ): Promise<void> {
+  private async recordToolPresentation(check: PermissionCheck, value: AgentToolPresentation): Promise<void> {
     const presentation: SessionToolPresentation = {
       runId: check.context.runId,
       step: check.context.step,
@@ -1099,11 +1338,16 @@ export class AgentApplication implements SteerableAgentController {
     this.closed = true;
     const errors: unknown[] = [];
     const cleanup = async (operation: () => void | Promise<void>) => {
-      try { await operation(); }
-      catch (error) { errors.push(error); }
+      try {
+        await operation();
+      } catch (error) {
+        errors.push(error);
+      }
     };
     try {
-      await cleanup(() => this.sessionScope.observe(applicationHooks.beforeClose, { sessionId: this.sessionId }, this.hookContext()));
+      await cleanup(() =>
+        this.sessionScope.observe(applicationHooks.beforeClose, { sessionId: this.sessionId }, this.hookContext()),
+      );
       this.lifecycleController.abort(this.closeReason);
       this.startingRun?.cancel(this.closeReason);
       await this.startingRun?.result.catch(() => undefined);
@@ -1114,11 +1358,15 @@ export class AgentApplication implements SteerableAgentController {
       compaction?.controller.abort(this.closeReason);
       await compaction?.result.catch(() => undefined);
       await cleanup(() => this.permissions.close(this.closeReason));
-      await cleanup(async () => { await Promise.all([...this.runRelays]); });
+      await cleanup(async () => {
+        await Promise.all([...this.runRelays]);
+      });
       await cleanup(() => this.permissionRelay);
       await cleanup(() => this.pluginChangeTail);
       await cleanup(() => this.session.closeRuntime());
-      await cleanup(() => this.sessionScope.observe(applicationHooks.closed, { sessionId: this.sessionId }, this.hookContext()));
+      await cleanup(() =>
+        this.sessionScope.observe(applicationHooks.closed, { sessionId: this.sessionId }, this.hookContext()),
+      );
       await cleanup(() => this.pluginHost.close());
     } finally {
       this.stateRecordingClosed = true;
@@ -1134,10 +1382,7 @@ export class AgentApplication implements SteerableAgentController {
   private async relayRunEvents(events: AsyncIterable<import("../core/index.js").MayEvent>) {
     for await (const event of events) {
       if (event.type === "model.completed" && event.usage !== undefined) {
-        this.contextController?.recordModelUsage?.(
-          event.usage,
-          event.contextMessageCount,
-        );
+        this.contextController?.recordModelUsage?.(event.usage, event.contextMessageCount);
       }
       this.eventQueue.push({ type: "run.event", event });
     }
@@ -1160,10 +1405,7 @@ export class AgentApplication implements SteerableAgentController {
 
 async function resumeSession(
   options: AgentApplicationOptions,
-  createRuntime: (
-    messages?: Message[],
-    runtimeInfo?: SessionRuntimeInfo,
-  ) => Promise<AgentRuntime>,
+  createRuntime: (messages?: Message[], runtimeInfo?: SessionRuntimeInfo) => Promise<AgentRuntime>,
 ): Promise<Session> {
   if (options.sessionId === undefined) {
     throw new Error("sessionId is required when resuming a session");
@@ -1185,10 +1427,17 @@ function composeApplicationPlugins(
   instructions: () => string,
 ): readonly AnyPlugin[] {
   const composition: AnyPlugin[] = [...plugins];
-  const provided = (service: ServiceToken) => composition.some((plugin) => plugin.provides?.some((token) => token.id === service.id && token.scope === service.scope));
+  const provided = (service: ServiceToken) =>
+    composition.some((plugin) =>
+      plugin.provides?.some((token) => token.id === service.id && token.scope === service.scope),
+    );
   const valuePlugin = <T>(service: ServiceToken<T>, value: T): AnyPlugin => ({
-    id: `may.supplied.${service.id}`, version: "1.0.0", provides: [service],
-    setup(context) { context.provide(service, value); },
+    id: `may.supplied.${service.id}`,
+    version: "1.0.0",
+    provides: [service],
+    setup(context) {
+      context.provide(service, value);
+    },
   });
   composition.push(valuePlugin(applicationServices.sessionStore, options.store));
   composition.push(valuePlugin(applicationServices.application, access.application));
@@ -1196,33 +1445,72 @@ function composeApplicationPlugins(
   composition.push(valuePlugin(applicationServices.history, access.history));
   composition.push(valuePlugin(applicationServices.state, access.state));
   if (options.model !== undefined) composition.push(createModelPlugin({ create: () => options.model! }));
-  if (options.permissionPolicy !== undefined) composition.push(createPermissionPlugin({ create: () => options.permissionPolicy! }));
-  else if (!provided(applicationServices.permissionPolicy)) composition.push(createPermissionPlugin({ create: () => () => { throw new TypeError("permissionPolicy is required for tool execution"); } }));
+  if (options.permissionPolicy !== undefined)
+    composition.push(createPermissionPlugin({ create: () => options.permissionPolicy! }));
+  else if (!provided(applicationServices.permissionPolicy))
+    composition.push(
+      createPermissionPlugin({
+        create: () => () => {
+          throw new TypeError("permissionPolicy is required for tool execution");
+        },
+      }),
+    );
   if (options.contextFactory !== undefined || !provided(applicationServices.contextFactory)) {
-    composition.push(createContextPlugin({ ...(options.contextFactory === undefined ? {} : { create: () => options.contextFactory! }) }));
+    composition.push(
+      createContextPlugin({
+        ...(options.contextFactory === undefined ? {} : { create: () => options.contextFactory! }),
+      }),
+    );
   }
-  if ([options.contextBudget, options.compactionStrategy, options.autoCompactionStrategies, options.providerNativeAutoCompaction].some((value) => value !== undefined)) {
-    composition.push(valuePlugin(applicationServices.contextOptions, omitUndefined({
-      budget: options.contextBudget,
-      compactionStrategy: options.compactionStrategy,
-      autoCompactionStrategies: options.autoCompactionStrategies,
-      providerNativeAutoCompaction: options.providerNativeAutoCompaction,
-    })));
+  if (
+    [
+      options.contextBudget,
+      options.compactionStrategy,
+      options.autoCompactionStrategies,
+      options.providerNativeAutoCompaction,
+    ].some((value) => value !== undefined)
+  ) {
+    composition.push(
+      valuePlugin(
+        applicationServices.contextOptions,
+        omitUndefined({
+          budget: options.contextBudget,
+          compactionStrategy: options.compactionStrategy,
+          autoCompactionStrategies: options.autoCompactionStrategies,
+          providerNativeAutoCompaction: options.providerNativeAutoCompaction,
+        }),
+      ),
+    );
   }
-  if (options.toolExecutor !== undefined) composition.push(valuePlugin(applicationServices.toolExecutor, options.toolExecutor));
-  if (options.toolScheduler !== undefined) composition.push(valuePlugin(applicationServices.toolScheduler, options.toolScheduler));
+  if (options.toolExecutor !== undefined)
+    composition.push(valuePlugin(applicationServices.toolExecutor, options.toolExecutor));
+  if (options.toolScheduler !== undefined)
+    composition.push(valuePlugin(applicationServices.toolScheduler, options.toolScheduler));
   if (options.tracer !== undefined) composition.push(valuePlugin(applicationServices.tracer, options.tracer));
   if (options.skills !== undefined) composition.push(createSkillsPlugin({ create: () => options.skills! }));
   if (options.tools !== undefined || options.toolSource !== undefined) {
     const tools = new ToolRegistry(options.tools);
-    composition.push(createToolsPlugin({ id: "may.supplied.tools", order: -100,
-      create: () => () => [...tools, ...(options.toolSource?.() ?? [])],
-    }));
+    composition.push(
+      createToolsPlugin({
+        id: "may.supplied.tools",
+        order: -100,
+        create: () => () => [...tools, ...(options.toolSource?.() ?? [])],
+      }),
+    );
   }
-  composition.push({ id: "may.supplied.instructions", version: "1.0.0", requires: [{ service: applicationServices.instructionSources }],
-    setup(context) { context.defer(context.get(applicationServices.instructionSources).add(instructions, {
-      id: context.pluginId, order: -100, pluginOrder: context.pluginOrder,
-    })); },
+  composition.push({
+    id: "may.supplied.instructions",
+    version: "1.0.0",
+    requires: [{ service: applicationServices.instructionSources }],
+    setup(context) {
+      context.defer(
+        context.get(applicationServices.instructionSources).add(instructions, {
+          id: context.pluginId,
+          order: -100,
+          pluginOrder: context.pluginOrder,
+        }),
+      );
+    },
   });
   if (!provided(applicationServices.runtimeFactory)) composition.push(defaultRuntimePlugin);
   composition.push(createCompositionPlugin(composition), applicationInfrastructurePlugin);
@@ -1248,11 +1536,17 @@ async function inspectForkHistory(store: SessionStore, fork: AgentApplicationFor
   return history.slice(0, fork.positionSeq);
 }
 
-function filterForkPluginState(state: ApplicationPluginState, pluginIds: readonly string[] = []): ApplicationPluginState {
+function filterForkPluginState(
+  state: ApplicationPluginState,
+  pluginIds: readonly string[] = [],
+): ApplicationPluginState {
   const allowed = new Set(["may.skills", ...pluginIds]);
-  const select = (snapshot: ApplicationPluginState["application"]) => Object.fromEntries(
-    Object.entries(snapshot).filter(([id]) => allowed.has(id)).map(([id, value]) => [id, structuredClone(value)]),
-  );
+  const select = (snapshot: ApplicationPluginState["application"]) =>
+    Object.fromEntries(
+      Object.entries(snapshot)
+        .filter(([id]) => allowed.has(id))
+        .map(([id, value]) => [id, structuredClone(value)]),
+    );
   return { version: 1, application: select(state.application), session: select(state.session) };
 }
 
@@ -1266,7 +1560,8 @@ export function contextBudgetFromModel(model: Model): ContextBudget | undefined 
 }
 
 function assertSessionInputOptions(options: { readonly stepInputSource?: unknown }): void {
-  if (options.stepInputSource !== undefined) throw new TypeError("Session manages step input through steer(); custom stepInputSource is unsupported");
+  if (options.stepInputSource !== undefined)
+    throw new TypeError("Session manages step input through steer(); custom stepInputSource is unsupported");
 }
 
 /** Add a default automatic-compaction threshold without overriding callers. */

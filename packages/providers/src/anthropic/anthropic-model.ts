@@ -1,23 +1,9 @@
 import { executeRecordedRequest, requestEndpoint } from "@sortedyuan/may/core";
-import type {
-  Message,
-  Model,
-  ModelEvent,
-  ModelRequest,
-  ModelStreamOptions,
-} from "@sortedyuan/may/core";
+import type { Message, Model, ModelEvent, ModelRequest, ModelStreamOptions } from "@sortedyuan/may/core";
 import { parseRetryAfterMs } from "../openai-compatible/http.js";
-import {
-  toAnthropicRequestParts,
-  toAnthropicThinking,
-  toAnthropicTools,
-} from "./convert.js";
+import { toAnthropicRequestParts, toAnthropicThinking, toAnthropicTools } from "./convert.js";
 import { AnthropicApiError } from "./errors.js";
-import type {
-  AnthropicMessagesRequest,
-  AnthropicReasoningEffort,
-  AnthropicThinkingConfig,
-} from "./protocol.js";
+import type { AnthropicMessagesRequest, AnthropicReasoningEffort, AnthropicThinkingConfig } from "./protocol.js";
 import { streamAnthropicResponse } from "./stream.js";
 
 export interface AnthropicModelOptions {
@@ -56,32 +42,21 @@ export class AnthropicModel implements Model {
     if (!Number.isSafeInteger(maxTokens) || maxTokens < 1) {
       throw new RangeError("maxTokens must be a positive safe integer");
     }
-    if (
-      options.apiVersion !== undefined &&
-      options.apiVersion.trim() === ""
-    ) {
+    if (options.apiVersion !== undefined && options.apiVersion.trim() === "") {
       throw new TypeError("apiVersion must not be empty");
     }
     if (options.thinking?.type === "enabled") {
-      if (
-        !Number.isSafeInteger(options.thinking.budgetTokens) ||
-        options.thinking.budgetTokens < 1024
-      ) {
-        throw new RangeError(
-          "thinking.budgetTokens must be a safe integer of at least 1024",
-        );
+      if (!Number.isSafeInteger(options.thinking.budgetTokens) || options.thinking.budgetTokens < 1024) {
+        throw new RangeError("thinking.budgetTokens must be a safe integer of at least 1024");
       }
       if (options.thinking.budgetTokens >= maxTokens) {
-        throw new RangeError(
-          "thinking.budgetTokens must be less than maxTokens",
-        );
+        throw new RangeError("thinking.budgetTokens must be less than maxTokens");
       }
     }
 
     this.apiKey = options.apiKey;
     this.model = options.model;
-    this.baseURL = (options.baseURL ?? "https://api.anthropic.com")
-      .replace(/\/+$/, "");
+    this.baseURL = (options.baseURL ?? "https://api.anthropic.com").replace(/\/+$/, "");
     this.apiVersion = options.apiVersion ?? "2023-06-01";
     this.maxTokens = maxTokens;
     this.thinking = cloneThinking(options.thinking);
@@ -89,13 +64,26 @@ export class AnthropicModel implements Model {
     this.fetchImplementation = options.fetch ?? globalThis.fetch;
   }
 
-  async *stream(
-    request: ModelRequest,
-    options: ModelStreamOptions,
-  ): AsyncIterable<ModelEvent> {
+  async *stream(request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     if (request.responseFormat !== undefined) throw new TypeError("Anthropic adapter does not support responseFormat");
     const body = this.createRequest(request);
-    yield* executeRecordedRequest({ version: 1, adapter: "anthropic-messages", purpose: "generation", endpoint: requestEndpoint(`${this.baseURL}/v1/messages`), request, body, protocol: { "anthropic-version": this.apiVersion, ...(usesFileId(request.messages) ? { "anthropic-beta": FILES_API_BETA } : {}) } }, options.recordRequest, options.signal, (body) => this.execute(body, request, options));
+    yield* executeRecordedRequest(
+      {
+        version: 1,
+        adapter: "anthropic-messages",
+        purpose: "generation",
+        endpoint: requestEndpoint(`${this.baseURL}/v1/messages`),
+        request,
+        body,
+        protocol: {
+          "anthropic-version": this.apiVersion,
+          ...(usesFileId(request.messages) ? { "anthropic-beta": FILES_API_BETA } : {}),
+        },
+      },
+      options.recordRequest,
+      options.signal,
+      (body) => this.execute(body, request, options),
+    );
   }
 
   private async *execute(body: string, request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
@@ -107,15 +95,12 @@ export class AnthropicModel implements Model {
     if (usesFileId(request.messages)) {
       headers["anthropic-beta"] = FILES_API_BETA;
     }
-    const response = await this.fetchImplementation(
-      `${this.baseURL}/v1/messages`,
-      {
-        method: "POST",
-        headers,
-        body,
-        signal: options.signal,
-      },
-    );
+    const response = await this.fetchImplementation(`${this.baseURL}/v1/messages`, {
+      method: "POST",
+      headers,
+      body,
+      signal: options.signal,
+    });
 
     if (!response.ok) throw await createApiError(response);
     yield* streamAnthropicResponse(response, options.signal);
@@ -145,15 +130,12 @@ export class AnthropicModel implements Model {
 }
 
 function usesFileId(messages: readonly Message[]): boolean {
-  return messages.some((message) => message.content.some((part) =>
-    (part.type === "image" || part.type === "file") &&
-    part.source.type === "file"
-  ));
+  return messages.some((message) =>
+    message.content.some((part) => (part.type === "image" || part.type === "file") && part.source.type === "file"),
+  );
 }
 
-function cloneThinking(
-  thinking: Readonly<AnthropicThinkingConfig> | undefined,
-): AnthropicThinkingConfig | undefined {
+function cloneThinking(thinking: Readonly<AnthropicThinkingConfig> | undefined): AnthropicThinkingConfig | undefined {
   return thinking === undefined ? undefined : { ...thinking };
 }
 

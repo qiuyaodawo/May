@@ -7,12 +7,21 @@ import { PassThrough } from "node:stream";
 import test from "node:test";
 import { FileMediaStore } from "@sortedyuan/media";
 import { imageSource } from "../../../media/test/fixture.mjs";
-import { TerminalImages, FullscreenRenderer, Stack, ScrollView, Text, TranscriptStore, TranscriptView } from "../dist/index.js";
+import {
+  TerminalImages,
+  FullscreenRenderer,
+  Stack,
+  ScrollView,
+  Text,
+  TranscriptStore,
+  TranscriptView,
+} from "../dist/index.js";
 
 test("真实图片的 Terminal 布局、滚动、清除及纯文本输出", async () => {
   const base = join(testOutputRoot, "tui", "images");
   await mkdir(base, { recursive: true });
-  const source = await imageSource(), media = new FileMediaStore(await mkdtemp(join(base, "terminal-")));
+  const source = await imageSource(),
+    media = new FileMediaStore(await mkdtemp(join(base, "terminal-")));
   const images = new TerminalImages(media, "kitty");
   await images.prepare([{ type: "image", source }]);
   const view = new Stack([new Text("before"), images.component(source), new Text("after")]);
@@ -20,7 +29,8 @@ test("真实图片的 Terminal 布局、滚动、清除及纯文本输出", asyn
   assert.equal(rendered.images.length, 1);
   assert.ok(rendered.images[0].y > rendered.lines.indexOf("before"));
   assert.ok(rendered.lines.indexOf("after") >= rendered.images[0].y + rendered.images[0].rows);
-  const output = new PassThrough(); output.setEncoding("utf8");
+  const output = new PassThrough();
+  output.setEncoding("utf8");
   const renderer = new FullscreenRenderer(output);
   renderer.render(rendered, { width: 80, height: 40 });
   assert.match(output.read(), /\x1b_Ga=T/);
@@ -29,9 +39,12 @@ test("真实图片的 Terminal 布局、滚动、清除及纯文本输出", asyn
   const scroll = new ScrollView(view);
   const clipped = scroll.render({ width: 80, height: 5 });
   assert.ok(!clipped.images?.length);
-  const textImages = new TerminalImages(media, "none"); await textImages.prepare([{ type: "image", source }]);
+  const textImages = new TerminalImages(media, "none");
+  await textImages.prepare([{ type: "image", source }]);
   const text = textImages.render(source, { width: 180, height: 10 });
-  assert.match(text.lines.join("\n"), /64×32/); assert.match(text.lines.join("\n"), /\.png/); assert.equal(text.images, undefined);
+  assert.match(text.lines.join("\n"), /64×32/);
+  assert.match(text.lines.join("\n"), /\.png/);
+  assert.equal(text.images, undefined);
   const store = new TranscriptStore();
   const message = { role: "assistant", content: [{ type: "image", source }] };
   store.applyMayEvent({ type: "model.completed", seq: 1, runId: "image", step: 1, timestamp: 1, message });

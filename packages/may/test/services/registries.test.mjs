@@ -4,21 +4,27 @@ import test from "node:test";
 import { ContextWrappers, InstructionSources, ToolSources } from "@sortedyuan/may/services";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
 
-test("ordered tool contributions execute actual file resources and snapshots retain their catalog", async t => {
+test("ordered tool contributions execute actual file resources and snapshots retain their catalog", async (t) => {
   const file = await open(new URL("../../../../README.md", import.meta.url), "r");
   t.after(() => file.close());
   const sources = new ToolSources();
-  const tool = name => ({ name, description: "Read repository documentation", inputSchema: { type: "object" },
-    async execute() { return (await file.stat()).size; },
+  const tool = (name) => ({
+    name,
+    description: "Read repository documentation",
+    inputSchema: { type: "object" },
+    async execute() {
+      return (await file.stat()).size;
+    },
   });
   const removeLater = sources.add(() => [tool("later")], { id: "later", pluginOrder: 20 });
   sources.add(() => [tool("earlier")], { id: "earlier", pluginOrder: 10 });
   sources.add(() => [tool("ordered")], { id: "ordered", order: -1, pluginOrder: 30 });
   const snapshot = sources.snapshot();
   assert.deepEqual(snapshot.names(), ["ordered", "earlier", "later"]);
-  removeLater(); removeLater();
+  removeLater();
+  removeLater();
   assert.deepEqual(sources.snapshot().names(), ["ordered", "earlier"]);
-  assert.ok(await snapshot.require("later").execute({}, { signal: new AbortController().signal }) > 0);
+  assert.ok((await snapshot.require("later").execute({}, { signal: new AbortController().signal })) > 0);
   assert.throws(() => sources.add(() => [], { id: "earlier" }), /Duplicate contribution/);
   const removeDuplicate = sources.add(() => [tool("earlier")], { id: "duplicate" });
   assert.throws(() => sources.snapshot(), /Duplicate tool name/);
@@ -44,10 +50,12 @@ test("instructions execute in deterministic order and reject invalid content", (
 test("Context wrappers apply in declaration order and create independent real contexts", async () => {
   const wrappers = new ContextWrappers();
   const observed = [];
-  const wrap = name => factory => ({ create(options) {
-    observed.push(name);
-    return factory.create({ ...options, instructions: `${options.instructions ?? ""}:${name}` });
-  } });
+  const wrap = (name) => (factory) => ({
+    create(options) {
+      observed.push(name);
+      return factory.create({ ...options, instructions: `${options.instructions ?? ""}:${name}` });
+    },
+  });
   wrappers.add(wrap("later"), { id: "later", pluginOrder: 20 });
   const remove = wrappers.add(wrap("earlier"), { id: "earlier", pluginOrder: 10 });
   const base = new InMemoryContextFactory();

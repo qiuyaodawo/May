@@ -15,10 +15,7 @@ export async function readTextFile(
 ): Promise<string> {
   const information = await stat(path);
   if (!information.isFile()) {
-    throw new CodingToolError(
-      "CODING_TOOL_NOT_A_FILE",
-      `Path is not a file: ${displayPath}`,
-    );
+    throw new CodingToolError("CODING_TOOL_NOT_A_FILE", `Path is not a file: ${displayPath}`);
   }
   if (information.size > maxBytes) {
     throw fileTooLarge(displayPath, information.size, maxBytes);
@@ -31,29 +28,17 @@ export async function readTextFile(
   try {
     return UTF8_DECODER.decode(contents);
   } catch (error) {
-    throw new CodingToolError(
-      "CODING_TOOL_NOT_TEXT",
-      `File is not valid UTF-8 text: ${displayPath}`,
-      { cause: error },
-    );
+    throw new CodingToolError("CODING_TOOL_NOT_TEXT", `File is not valid UTF-8 text: ${displayPath}`, { cause: error });
   }
 }
 
-export function assertTextWithinLimit(
-  text: string,
-  displayPath: string,
-  maxBytes: number,
-): number {
+export function assertTextWithinLimit(text: string, displayPath: string, maxBytes: number): number {
   const bytes = Buffer.byteLength(text, "utf8");
   if (bytes > maxBytes) throw fileTooLarge(displayPath, bytes, maxBytes);
   return bytes;
 }
 
-function fileTooLarge(
-  path: string,
-  actualBytes: number,
-  maxBytes: number,
-): CodingToolError {
+function fileTooLarge(path: string, actualBytes: number, maxBytes: number): CodingToolError {
   return new CodingToolError(
     "CODING_TOOL_FILE_TOO_LARGE",
     `File exceeds the ${maxBytes} byte limit: ${path} (${actualBytes} bytes)`,

@@ -24,16 +24,16 @@ Agent 执行循环与配套 Context。
 
 `PluginDefinition` 包含以下字段：
 
-| 部分 | 字段 | 要求及作用 |
-| --- | --- | --- |
-| 身份 | `id`、`version` | 必需；标识插件及 Semantic Version |
-| 初始化 | `setup(ctx)` | 必需；创建实例、提供服务、注册 Hooks 和清理方法 |
-| 生命周期范围 | `scope` | 可选；`host`、`application`、`session` 或 `run`，默认 `application` |
-| 配置 | `config`、`configSchema` | 可选；提供配置及 JSON Schema 验证规则 |
-| 提供的能力 | `provides` | 可选；声明提供的 ServiceToken，通过 `ctx.provide()` 注册实例 |
-| 服务依赖 | `requires`、`optional` | 可选；声明必需及可选服务，可以要求版本范围和能力 |
-| Hook 要求 | `requiresHooks` | 可选；声明宿主需要支持的 Hook 入口 |
-| 状态 | `state` | 可选；声明必需的 `version`、`initial`，以及可选 `schema`、`compatibleVersions`、`migrate` |
+| 部分         | 字段                     | 要求及作用                                                                                |
+| ------------ | ------------------------ | ----------------------------------------------------------------------------------------- |
+| 身份         | `id`、`version`          | 必需；标识插件及 Semantic Version                                                         |
+| 初始化       | `setup(ctx)`             | 必需；创建实例、提供服务、注册 Hooks 和清理方法                                           |
+| 生命周期范围 | `scope`                  | 可选；`host`、`application`、`session` 或 `run`，默认 `application`                       |
+| 配置         | `config`、`configSchema` | 可选；提供配置及 JSON Schema 验证规则                                                     |
+| 提供的能力   | `provides`               | 可选；声明提供的 ServiceToken，通过 `ctx.provide()` 注册实例                              |
+| 服务依赖     | `requires`、`optional`   | 可选；声明必需及可选服务，可以要求版本范围和能力                                          |
+| Hook 要求    | `requiresHooks`          | 可选；声明宿主需要支持的 Hook 入口                                                        |
+| 状态         | `state`                  | 可选；声明必需的 `version`、`initial`，以及可选 `schema`、`compatibleVersions`、`migrate` |
 
 插件根据自身功能选择可选字段。资源可以通过 `ctx.defer()` 登记清理方法，
 `setup()` 也可以返回一个同步或异步清理方法。
@@ -42,16 +42,16 @@ Agent 执行循环与配套 Context。
 
 `PluginHost` 为每个插件实例创建 `PluginContext`，初始化时传给 `setup(ctx)`。
 
-| 接口 | 作用 |
-| --- | --- |
-| `pluginId`、`pluginOrder`、`scope`、`scopeId` | 标识当前插件、声明顺序及其所属范围实例 |
-| `config` | 取得经过配置验证的只读配置副本 |
-| `get()`、`optional()` | 取得已声明的必需或可选依赖服务 |
-| `provide()` | 注册已声明的服务实例 |
-| `on()` | 注册 Hook handler，宿主管理顺序、超时、取消和清理 |
-| `state.get()`、`state.set()`、`state.update()` | 读取状态副本，验证更新并等待保存方法完成 |
-| `defer()` | 登记资源清理方法 |
-| `signal` | 接收初始化取消、范围关闭及插件卸载通知 |
+| 接口                                           | 作用                                              |
+| ---------------------------------------------- | ------------------------------------------------- |
+| `pluginId`、`pluginOrder`、`scope`、`scopeId`  | 标识当前插件、声明顺序及其所属范围实例            |
+| `config`                                       | 取得经过配置验证的只读配置副本                    |
+| `get()`、`optional()`                          | 取得已声明的必需或可选依赖服务                    |
+| `provide()`                                    | 注册已声明的服务实例                              |
+| `on()`                                         | 注册 Hook handler，宿主管理顺序、超时、取消和清理 |
+| `state.get()`、`state.set()`、`state.update()` | 读取状态副本，验证更新并等待保存方法完成          |
+| `defer()`                                      | 登记资源清理方法                                  |
+| `signal`                                       | 接收初始化取消、范围关闭及插件卸载通知            |
 
 PluginContext 用于插件配置和生命周期管理。Agent 的 `Context` 接口负责保存和
 提供模型可见的消息，两者分别承担这些职责。
@@ -66,29 +66,37 @@ import { definePlugin, defineService } from "@sortedyuan/may/plugin";
 import { applicationHooks } from "@sortedyuan/may";
 
 const labels = defineService<{ prefix: string }>({
-  id: "example.labels", version: "1.0.0", scope: "application",
+  id: "example.labels",
+  version: "1.0.0",
+  scope: "application",
 });
 
 const labelsPlugin = definePlugin({
-  id: "example.labels", version: "1.0.0", provides: [labels],
+  id: "example.labels",
+  version: "1.0.0",
+  provides: [labels],
   config: { prefix: "Project: " },
   configSchema: {
-    type: "object", required: ["prefix"], additionalProperties: false,
+    type: "object",
+    required: ["prefix"],
+    additionalProperties: false,
     properties: { prefix: { type: "string" } },
   },
-  setup(ctx) { ctx.provide(labels, ctx.config); },
+  setup(ctx) {
+    ctx.provide(labels, ctx.config);
+  },
 });
 
 const inputPlugin = definePlugin({
-  id: "example.input", version: "1.0.0",
+  id: "example.input",
+  version: "1.0.0",
   requires: [{ service: labels, version: "^1.0.0" }],
   requiresHooks: [applicationHooks.inputBeforeSubmit],
   setup(ctx) {
     const label = ctx.get(labels);
     ctx.on(applicationHooks.inputBeforeSubmit, (value) => ({
       ...value,
-      input: typeof value.input === "string"
-        ? label.prefix + value.input : value.input,
+      input: typeof value.input === "string" ? label.prefix + value.input : value.input,
     }));
   },
 });
@@ -143,16 +151,16 @@ try {
 `defineHook()` 创建具名 Hook，声明 `kind: "transform"` 或 `"observe"`
 及验证方法。`runtimeHooks` 和 `applicationHooks` 提供以下入口：
 
-| 范围 | Hook 导出 |
-| --- | --- |
-| Application | `beforeCreate`、`created`、`beforeClose`、`closed` |
-| 输入 | `inputReceived`、`inputBeforeSubmit`、`inputSubmitted` |
-| Run | `runBefore`、`runStarted`、`runBeforeEnd`、`runEnded`、`runFailed` |
-| Step | `stepBefore`、`stepCompleted` |
-| Context | `contextBefore`、`contextAfter`、`compactionBefore`、`compactionCompleted`、`compactionFailed` |
-| 模型 | `modelBefore`、`modelEvent`、`modelAfter`、`modelFailed` |
-| 工具 | `toolBefore`、`toolProgress`、`toolResult`、`toolAfter`、`toolFailed` |
-| 审批和恢复 | `approvalRequested`、`approvalResolved`、`recoveryBefore`、`recoveryResolved` |
+| 范围        | Hook 导出                                                                                      |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| Application | `beforeCreate`、`created`、`beforeClose`、`closed`                                             |
+| 输入        | `inputReceived`、`inputBeforeSubmit`、`inputSubmitted`                                         |
+| Run         | `runBefore`、`runStarted`、`runBeforeEnd`、`runEnded`、`runFailed`                             |
+| Step        | `stepBefore`、`stepCompleted`                                                                  |
+| Context     | `contextBefore`、`contextAfter`、`compactionBefore`、`compactionCompleted`、`compactionFailed` |
+| 模型        | `modelBefore`、`modelEvent`、`modelAfter`、`modelFailed`                                       |
+| 工具        | `toolBefore`、`toolProgress`、`toolResult`、`toolAfter`、`toolFailed`                          |
+| 审批和恢复  | `approvalRequested`、`approvalResolved`、`recoveryBefore`、`recoveryResolved`                  |
 
 `ctx.on(hook, handler, { order, timeoutMs, failure })` 注册 handler。
 执行顺序依次由升序 `order`、插件配置顺序、注册顺序决定。每个 handler 获得复制后
@@ -232,23 +240,23 @@ provider、model、adapter 和 profile。仅提供 `model` 的插件将未知名
 目录列出插件的包名和子路径导入。升级已有导入时参阅
 [公开子路径迁移](package-subpaths.md)。
 
-| 导入路径 | 工厂及职责 |
-| --- | --- |
-| `@sortedyuan/may/services/runtime` | `createRuntimePlugin`、`createContextPlugin`、`createToolsPlugin`、`createContextWrapperPlugin`；组合 runtime、Context 和工具 |
-| `@sortedyuan/may/services/models` | `createModelPlugin`、`createModelWrapperPlugin`；Model 实例及包装 |
-| `@sortedyuan/may/services/permissions` | `createPermissionPlugin`；PermissionPolicy |
-| `@sortedyuan/may/services/skills` | `createSkillsPlugin`；发现、激活、指令、工具及状态保存 |
-| `@sortedyuan/may/goals/plugin` | `createGoalsPlugin`；持久目标、预算及继续执行 |
-| `@sortedyuan/may/history-memory` | `createHistoryMemoryPlugin`；历史 Context 笔记、查询和压缩 |
-| `@sortedyuan/coordination/delegation` | `createDelegationPlugin`、`createWorkspaceFilesPlugin`；子 Agent、共享预算及工作区文件访问 |
-| `@sortedyuan/mcp/plugin` | `createMcpPlugin`、`createMcpHostPlugin`、`createSharedMcpPlugin`；连接、工具目录、认证、交互及任务日志 |
-| `@sortedyuan/observability/plugin` | application、host 和共享资源工厂；tracing 及 exporter 关闭 |
-| `@sortedyuan/gateway/delivery` | `createDeliveryPlugin`；持久渠道记录、接收方登记及单次投递结果 |
-| MaybeClaw `src/channels/telegram` | `createTelegramChannelPlugin`；Telegram 接收、路由及附件 |
-| MaybeClaw `src/channels/feishu` | `createFeishuChannelPlugin`；Feishu 接收、路由及附件 |
-| `@sortedyuan/gateway/adapters` | `createAgentAdaptersPlugin`、`createMayAgentAdapter`、`loadAgentAdapter` 和 RPC adapters；对话及 adapter 资源管理 |
-| `@sortedyuan/coordination/plugin` | `createCoordinationPlugin`；任务图创建、恢复和释放 |
-| `@sortedyuan/gateway/web-api` | `createWebApiPlugin`；HTTP 监听、活动请求及连接 |
+| 导入路径                               | 工厂及职责                                                                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `@sortedyuan/may/services/runtime`     | `createRuntimePlugin`、`createContextPlugin`、`createToolsPlugin`、`createContextWrapperPlugin`；组合 runtime、Context 和工具 |
+| `@sortedyuan/may/services/models`      | `createModelPlugin`、`createModelWrapperPlugin`；Model 实例及包装                                                             |
+| `@sortedyuan/may/services/permissions` | `createPermissionPlugin`；PermissionPolicy                                                                                    |
+| `@sortedyuan/may/services/skills`      | `createSkillsPlugin`；发现、激活、指令、工具及状态保存                                                                        |
+| `@sortedyuan/may/goals/plugin`         | `createGoalsPlugin`；持久目标、预算及继续执行                                                                                 |
+| `@sortedyuan/may/history-memory`       | `createHistoryMemoryPlugin`；历史 Context 笔记、查询和压缩                                                                    |
+| `@sortedyuan/coordination/delegation`  | `createDelegationPlugin`、`createWorkspaceFilesPlugin`；子 Agent、共享预算及工作区文件访问                                    |
+| `@sortedyuan/mcp/plugin`               | `createMcpPlugin`、`createMcpHostPlugin`、`createSharedMcpPlugin`；连接、工具目录、认证、交互及任务日志                       |
+| `@sortedyuan/observability/plugin`     | application、host 和共享资源工厂；tracing 及 exporter 关闭                                                                    |
+| `@sortedyuan/gateway/delivery`         | `createDeliveryPlugin`；持久渠道记录、接收方登记及单次投递结果                                                                |
+| MaybeClaw `src/channels/telegram`      | `createTelegramChannelPlugin`；Telegram 接收、路由及附件                                                                      |
+| MaybeClaw `src/channels/feishu`        | `createFeishuChannelPlugin`；Feishu 接收、路由及附件                                                                          |
+| `@sortedyuan/gateway/adapters`         | `createAgentAdaptersPlugin`、`createMayAgentAdapter`、`loadAgentAdapter` 和 RPC adapters；对话及 adapter 资源管理             |
+| `@sortedyuan/coordination/plugin`      | `createCoordinationPlugin`；任务图创建、恢复和释放                                                                            |
+| `@sortedyuan/gateway/web-api`          | `createWebApiPlugin`；HTTP 监听、活动请求及连接                                                                               |
 
 功能插件位于对应能力包中。共享服务标识、有序贡献登记和组件工厂子路径
 位于 `packages/may/src/services/`，Coordination 工厂位于
@@ -330,9 +338,7 @@ MaybeClaw 的 May adapter 读取
 
 ```json
 {
-  "plugins": [
-    { "module": "./plugins/project.mjs", "export": "default", "config": {} }
-  ]
+  "plugins": [{ "module": "./plugins/project.mjs", "export": "default", "config": {} }]
 }
 ```
 

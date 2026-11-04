@@ -92,10 +92,7 @@ const application = await agent.open({ store });
 注册表保留注册顺序，并在实例内保证名字唯一。以下 API 片段中的其他工具由宿主提供：
 
 ```ts
-import {
-  DuplicateToolNameError,
-  ToolRegistry,
-} from "@sortedyuan/may/core";
+import { DuplicateToolNameError, ToolRegistry } from "@sortedyuan/may/core";
 
 const tools = new ToolRegistry([addTool]);
 tools.register(subtractTool);
@@ -103,7 +100,7 @@ tools.registerAll([multiplyTool, divideTool]);
 
 console.log(tools.size);
 console.log(tools.has("add"));
-console.log(tools.get("missing"));       // undefined
+console.log(tools.get("missing")); // undefined
 console.log(tools.require("add").name); // "add"
 
 for (const tool of tools) {
@@ -119,20 +116,20 @@ const combined = ToolRegistry.compose(coreTools, productTools);
 
 API 语义如下：
 
-| API | 行为 |
-| --- | --- |
-| `new ToolRegistry(tools?)` | 从一个可迭代对象注册初始工具 |
-| `register(tool)` | 原子注册单个工具并返回同一注册表 |
-| `registerAll(tools)` | 原子注册整批工具并返回同一注册表 |
-| `size`、`has(name)` | 查询数量或名字是否存在 |
-| `get(name)` | 返回工具或 `undefined` |
-| `require(name)` | 返回工具；缺失时抛出 `ToolNotFoundError` |
-| `names()`、`values()` | 返回注册顺序的数组快照 |
-| `definitions()` | 返回不含解析或执行回调的模型侧定义快照 |
-| `snapshot()` | 为一次 Run 冻结工具定义、Schema 和回调 |
-| `clone()` | 创建可独立继续注册的新注册表 |
-| `[Symbol.iterator]()` | 按注册顺序迭代工具 |
-| `ToolRegistry.compose(...sources)` | 按输入顺序组合多个可迭代对象 |
+| API                                | 行为                                     |
+| ---------------------------------- | ---------------------------------------- |
+| `new ToolRegistry(tools?)`         | 从一个可迭代对象注册初始工具             |
+| `register(tool)`                   | 原子注册单个工具并返回同一注册表         |
+| `registerAll(tools)`               | 原子注册整批工具并返回同一注册表         |
+| `size`、`has(name)`                | 查询数量或名字是否存在                   |
+| `get(name)`                        | 返回工具或 `undefined`                   |
+| `require(name)`                    | 返回工具；缺失时抛出 `ToolNotFoundError` |
+| `names()`、`values()`              | 返回注册顺序的数组快照                   |
+| `definitions()`                    | 返回不含解析或执行回调的模型侧定义快照   |
+| `snapshot()`                       | 为一次 Run 冻结工具定义、Schema 和回调   |
+| `clone()`                          | 创建可独立继续注册的新注册表             |
+| `[Symbol.iterator]()`              | 按注册顺序迭代工具                       |
+| `ToolRegistry.compose(...sources)` | 按输入顺序组合多个可迭代对象             |
 
 `registerAll()` 会先完整消费并校验输入。若工具无效、与现有名字重复，或同一批输入中
 出现重名，它会抛出 `TypeError` 或 `DuplicateToolNameError`，且**不注册该批中的任何

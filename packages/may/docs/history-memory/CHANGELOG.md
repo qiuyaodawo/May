@@ -55,6 +55,7 @@
   plugins must provide applicationServices.instructionSources. AgentApplication
   already supplies this registry. Add an InstructionSources registry service to
   custom hosts before loading these plugins.
+
 - 89bcd8d: Expose existing Agent functionality as reusable plugins with declared services,
   dependencies and managed resource lifecycles. Add shared typed service tokens and
   ordered tool, instruction, Model and Context contribution registries. Application
@@ -89,6 +90,7 @@
   Skills state is saved through versioned plugin state while existing Session
   activation records remain readable. Goals and history-memory retain their existing
   durable state records for migration.
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`
@@ -112,6 +114,7 @@
   in each request, sharing preparation across main and delegated Agents and retaining
   the lease through Goal verification. Startup and read-only requests leave Git state
   unchanged. Each modifying request saves existing user edits before accepting tool writes.
+
 - Updated dependencies [0dc3f68]
 - Updated dependencies [88e7d69]
 - Updated dependencies [1e9bdfc]

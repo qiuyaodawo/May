@@ -11,9 +11,21 @@ test("Responses 图片转换保留图文顺序及 provider state", async () => {
     { type: "message", role: "assistant", content: [{ type: "output_text", text: "after" }] },
   ];
   const { message } = parseCompletedOpenAIResponse({ output });
-  assert.deepEqual(message.content.map(part => part.type), ["text", "image", "text"]);
+  assert.deepEqual(
+    message.content.map((part) => part.type),
+    ["text", "image", "text"],
+  );
   assert.deepEqual(message.content[1].source, source);
   assert.equal(message.modelState.data.items, output);
-  assert.deepEqual(openAIResponseContent({ ...message, content: [{ type: "text", text: "beforeafter" }] }), message.content);
-  assert.throws(() => parseCompletedOpenAIResponse({ output: [{ type: "image_generation_call", result: source.data, output_format: "svg" }] }), /format/);
+  assert.deepEqual(
+    openAIResponseContent({ ...message, content: [{ type: "text", text: "beforeafter" }] }),
+    message.content,
+  );
+  assert.throws(
+    () =>
+      parseCompletedOpenAIResponse({
+        output: [{ type: "image_generation_call", result: source.data, output_format: "svg" }],
+      }),
+    /format/,
+  );
 });

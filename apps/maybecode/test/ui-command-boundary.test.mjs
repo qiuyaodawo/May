@@ -14,13 +14,24 @@ async function openWorkspace(t) {
   await mkdir(parent, { recursive: true });
   const workspace = await mkdtemp(join(parent, "ui-command-"));
   const dataDirectory = join(workspace, "data");
-  const model = new RetryingModel(createBuiltinProviderModel({
-    profile: "review", provider: "review", adapter: "openai-chat-completions", model: "gpt-4o",
-    providerConfig: { adapter: "openai-chat-completions", apiKey: "unused-offline-probe" }, options: {},
-    capabilities: { fields: { "input.text": false } },
-  }));
+  const model = new RetryingModel(
+    createBuiltinProviderModel({
+      profile: "review",
+      provider: "review",
+      adapter: "openai-chat-completions",
+      model: "gpt-4o",
+      providerConfig: { adapter: "openai-chat-completions", apiKey: "unused-offline-probe" },
+      options: {},
+      capabilities: { fields: { "input.text": false } },
+    }),
+  );
   const app = await MaybeCodeWorkspace.open({
-    git: false, workspace, model, skills: false, goals: false, subagents: false,
+    git: false,
+    workspace,
+    model,
+    skills: false,
+    goals: false,
+    subagents: false,
     store: new FileSessionStore(join(dataDirectory, "sessions")),
     catalog: new FileSessionCatalog(join(dataDirectory, "catalog.json")),
   });
@@ -31,13 +42,18 @@ async function openWorkspace(t) {
     await rm(workspace, { recursive: true, force: true });
   });
   const command = (name, args = {}, targetId = app.sessionId) => ({
-    version: 1, hostId: host.hostId, requestId: crypto.randomUUID(), name, args,
-    targetId, expectedActiveId: app.sessionId,
+    version: 1,
+    hostId: host.hostId,
+    requestId: crypto.randomUUID(),
+    name,
+    args,
+    targetId,
+    expectedActiveId: app.sessionId,
   });
   return { app, host, command, dataDirectory };
 }
 
-test("Web commands remain available when another Session journal cannot be read", async t => {
+test("Web commands remain available when another Session journal cannot be read", async (t) => {
   const { app, host, command, dataDirectory } = await openWorkspace(t);
   const previousId = app.sessionId;
   await app.renameSession(previousId, "Previous session");
@@ -51,11 +67,21 @@ test("Web commands remain available when another Session journal cannot be read"
     const unavailable = assert.rejects(host.snapshot(), { code: "EISDIR" });
     await host.execute(command("session.rename", { title: "Current session remains editable" }));
     await unavailable;
-    assert.equal((await app.listSessions()).find(session => session.id === activeId).title, "Current session remains editable");
-    await assert.rejects(host.execute({ ...command("session.rename", { title: "Untrusted request" }), hostId: "previous-host" }), { status: 409 });
+    assert.equal(
+      (await app.listSessions()).find((session) => session.id === activeId).title,
+      "Current session remains editable",
+    );
+    await assert.rejects(
+      host.execute({ ...command("session.rename", { title: "Untrusted request" }), hostId: "previous-host" }),
+      { status: 409 },
+    );
     await host.execute(command("session.new"));
-    await assert.rejects(host.execute(command("session.rename", { title: "Stale request" }, activeId)), { status: 409 });
-    await assert.rejects(host.execute({ ...command("session.activate", {}, activeId), expectedActiveId: activeId }), { status: 409 });
+    await assert.rejects(host.execute(command("session.rename", { title: "Stale request" }, activeId)), {
+      status: 409,
+    });
+    await assert.rejects(host.execute({ ...command("session.activate", {}, activeId), expectedActiveId: activeId }), {
+      status: 409,
+    });
     assert.notEqual(app.sessionId, activeId);
   } finally {
     await rmdir(journal);
@@ -64,7 +90,7 @@ test("Web commands remain available when another Session journal cannot be read"
   assert.equal((await host.snapshot()).selectedId, app.sessionId);
 });
 
-test("Web host shutdown rejects new commands and settles queued commands", async t => {
+test("Web host shutdown rejects new commands and settles queued commands", async (t) => {
   const { app, host, command } = await openWorkspace(t);
   const activeId = app.sessionId;
   const queued = host.execute(command("session.new"));

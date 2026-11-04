@@ -25,12 +25,16 @@ export interface HookDispatcher {
 }
 
 export function defineHook<T>(definition: HookDefinition<T>): HookDefinition<T> {
-  if (typeof definition.name !== "string" || definition.name.trim() === "") throw new TypeError("Hook name cannot be empty");
+  if (typeof definition.name !== "string" || definition.name.trim() === "")
+    throw new TypeError("Hook name cannot be empty");
   if (definition.kind !== "transform" && definition.kind !== "observe") throw new TypeError("Invalid Hook kind");
   if (typeof definition.validate !== "function") throw new TypeError("Hook requires a validator");
-  if (definition.failure !== undefined && definition.failure !== "propagate" && definition.failure !== "isolate") throw new TypeError("Invalid Hook failure policy");
-  if (definition.allowAborted !== undefined && typeof definition.allowAborted !== "boolean") throw new TypeError("allowAborted must be boolean");
-  if (definition.kind === "transform" && definition.failure === "isolate") throw new TypeError("Transform Hook failures must propagate");
+  if (definition.failure !== undefined && definition.failure !== "propagate" && definition.failure !== "isolate")
+    throw new TypeError("Invalid Hook failure policy");
+  if (definition.allowAborted !== undefined && typeof definition.allowAborted !== "boolean")
+    throw new TypeError("allowAborted must be boolean");
+  if (definition.kind === "transform" && definition.failure === "isolate")
+    throw new TypeError("Transform Hook failures must propagate");
   return Object.freeze({ ...definition });
 }
 
@@ -76,21 +80,61 @@ export const runtimeHooks = Object.freeze({
   runBefore: defineHook<RunStartHook>({ name: "run.before", kind: "observe", validate: validateRunStart }),
   runStarted: defineHook<RunStartHook>({ name: "run.started", kind: "observe", validate: validateRunStart }),
   runBeforeEnd: defineHook<RunSettleHook>({ name: "run.beforeEnd", kind: "transform", validate: validateRunSettle }),
-  runEnded: defineHook<RunResult>({ name: "run.ended", kind: "observe", validate: validateRunResult, allowAborted: true }),
-  runFailed: defineHook<HookFailure>({ name: "run.failed", kind: "observe", validate: validateFailure, allowAborted: true }),
+  runEnded: defineHook<RunResult>({
+    name: "run.ended",
+    kind: "observe",
+    validate: validateRunResult,
+    allowAborted: true,
+  }),
+  runFailed: defineHook<HookFailure>({
+    name: "run.failed",
+    kind: "observe",
+    validate: validateFailure,
+    allowAborted: true,
+  }),
   stepBefore: defineHook<{ readonly step: number }>({ name: "step.before", kind: "observe", validate: validateStep }),
-  stepCompleted: defineHook<{ readonly step: number }>({ name: "step.completed", kind: "observe", validate: validateStep }),
-  contextBefore: defineHook<{ readonly step: number }>({ name: "context.before", kind: "observe", validate: validateStep }),
-  contextAfter: defineHook<ContextSnapshot>({ name: "context.after", kind: "transform", validate: validateContextSnapshot }),
+  stepCompleted: defineHook<{ readonly step: number }>({
+    name: "step.completed",
+    kind: "observe",
+    validate: validateStep,
+  }),
+  contextBefore: defineHook<{ readonly step: number }>({
+    name: "context.before",
+    kind: "observe",
+    validate: validateStep,
+  }),
+  contextAfter: defineHook<ContextSnapshot>({
+    name: "context.after",
+    kind: "transform",
+    validate: validateContextSnapshot,
+  }),
   modelBefore: defineHook<ModelRequest>({ name: "model.before", kind: "transform", validate: validateModelRequest }),
   modelEvent: defineHook<ModelEvent>({ name: "model.event", kind: "observe", validate: validateModelEvent }),
-  modelAfter: defineHook<{ readonly message: Message }>({ name: "model.after", kind: "observe", validate: validateMessageEnvelope }),
-  modelFailed: defineHook<HookFailure>({ name: "model.failed", kind: "observe", validate: validateFailure, allowAborted: true }),
+  modelAfter: defineHook<{ readonly message: Message }>({
+    name: "model.after",
+    kind: "observe",
+    validate: validateMessageEnvelope,
+  }),
+  modelFailed: defineHook<HookFailure>({
+    name: "model.failed",
+    kind: "observe",
+    validate: validateFailure,
+    allowAborted: true,
+  }),
   toolBefore: defineHook<ToolInputHook>({ name: "tool.before", kind: "transform", validate: validateToolInput }),
-  toolProgress: defineHook<ToolProgressHook>({ name: "tool.progress", kind: "observe", validate: validateToolProgress }),
+  toolProgress: defineHook<ToolProgressHook>({
+    name: "tool.progress",
+    kind: "observe",
+    validate: validateToolProgress,
+  }),
   toolResult: defineHook<ToolResultHook>({ name: "tool.result", kind: "transform", validate: validateToolResult }),
   toolAfter: defineHook<ToolOutcomeHook>({ name: "tool.after", kind: "observe", validate: validateToolOutcome }),
-  toolFailed: defineHook<ToolFailureHook>({ name: "tool.failed", kind: "observe", validate: validateToolFailure, allowAborted: true }),
+  toolFailed: defineHook<ToolFailureHook>({
+    name: "tool.failed",
+    kind: "observe",
+    validate: validateToolFailure,
+    allowAborted: true,
+  }),
 });
 
 export const RUNTIME_HOOKS: readonly HookDefinition<unknown>[] = Object.freeze(Object.values(runtimeHooks));
@@ -127,7 +171,8 @@ export function validateMessages(value: unknown): asserts value is readonly Mess
     const message = validateMessage(item);
     if (message.role === "tool") {
       const call = pending.get(message.toolCallId);
-      if (call === undefined || call.name !== message.name) throw new TypeError("Tool message must match an unresolved assistant call");
+      if (call === undefined || call.name !== message.name)
+        throw new TypeError("Tool message must match an unresolved assistant call");
       pending.delete(message.toolCallId);
     } else {
       if (pending.size > 0) throw new TypeError("Tool calls require results before the next conversation message");
@@ -141,7 +186,8 @@ export function validateMessages(value: unknown): asserts value is readonly Mess
 
 export function validateMessage(value: unknown): Message {
   const data = record(value, "Message");
-  if (!["system", "user", "assistant", "tool"].includes(data.role as string)) throw new TypeError("Invalid message role");
+  if (!["system", "user", "assistant", "tool"].includes(data.role as string))
+    throw new TypeError("Invalid message role");
   validateContent(data.content);
   if (data.role === "tool") {
     nonEmpty(data.toolCallId, "toolCallId");
@@ -192,11 +238,13 @@ export function validateContent(value: unknown): asserts value is readonly Conte
           nonEmpty(source.mediaType, "Media mediaType");
           if (typeof source.data !== "string") throw new TypeError("Media data must be a string");
         } else throw new TypeError("Invalid media source");
-        if (part.detail !== undefined && !["auto", "low", "high"].includes(part.detail as string)) throw new TypeError("Invalid image detail");
+        if (part.detail !== undefined && !["auto", "low", "high"].includes(part.detail as string))
+          throw new TypeError("Invalid image detail");
         optionalString(part.name, "File name");
         break;
       }
-      default: throw new TypeError("Invalid content part type");
+      default:
+        throw new TypeError("Invalid content part type");
     }
   }
 }
@@ -211,7 +259,8 @@ function validateRunSettle(value: unknown): RunSettleHook {
   const data = record(value, "Run settlement");
   validateRunResult(data.result);
   validateMessages(data.continueMessages);
-  if ((data.continueMessages as Message[]).some((message) => message.role !== "user")) throw new TypeError("Continuation messages must be user messages");
+  if ((data.continueMessages as Message[]).some((message) => message.role !== "user"))
+    throw new TypeError("Continuation messages must be user messages");
   optionalString(data.reason, "Continuation reason");
   if ((data.continueMessages as Message[]).length > 0) nonEmpty(data.reason, "Continuation reason");
   return value as RunSettleHook;
@@ -221,7 +270,8 @@ function validateRunResult(value: unknown): RunResult {
   const data = record(value, "Run result");
   nonEmpty(data.runId, "runId");
   for (const name of ["steps", "modelCalls", "toolCalls"]) {
-    if (!Number.isSafeInteger(data[name]) || (data[name] as number) < 0) throw new TypeError(`${name} must be a non-negative safe integer`);
+    if (!Number.isSafeInteger(data[name]) || (data[name] as number) < 0)
+      throw new TypeError(`${name} must be a non-negative safe integer`);
   }
   if (validateMessage(data.message).role !== "assistant") throw new TypeError("Run result requires assistant message");
   if (data.finishReason !== undefined && data.finishReason !== "yielded") throw new TypeError("Invalid finishReason");
@@ -230,7 +280,8 @@ function validateRunResult(value: unknown): RunResult {
 
 function validateStep(value: unknown): { readonly step: number } {
   const data = record(value, "Step");
-  if (!Number.isSafeInteger(data.step) || (data.step as number) < 1) throw new TypeError("step must be a positive safe integer");
+  if (!Number.isSafeInteger(data.step) || (data.step as number) < 1)
+    throw new TypeError("step must be a positive safe integer");
   return value as { readonly step: number };
 }
 
@@ -278,7 +329,8 @@ function validateModelEvent(value: unknown): ModelEvent {
   if (data.type === "text.delta" || data.type === "reasoning.delta") {
     if (typeof data.delta !== "string") throw new TypeError("Model delta must be a string");
   } else if (data.type === "response.completed") {
-    if (validateMessage(data.message).role !== "assistant") throw new TypeError("Model response requires assistant message");
+    if (validateMessage(data.message).role !== "assistant")
+      throw new TypeError("Model response requires assistant message");
   } else if (data.type === "retrying") {
     for (const name of ["attempt", "maxAttempts", "delayMs"]) {
       if (!Number.isSafeInteger(data[name]) || (data[name] as number) < 0) throw new TypeError(`Invalid ${name}`);
@@ -310,7 +362,8 @@ function validateCall(value: unknown): asserts value is ToolCall {
 }
 
 function record(value: unknown, name: string): Record<string, unknown> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new TypeError(`${name} must be an object`);
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    throw new TypeError(`${name} must be an object`);
   return value as Record<string, unknown>;
 }
 

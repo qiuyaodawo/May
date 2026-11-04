@@ -1,9 +1,6 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { omitUndefined } from "@sortedyuan/may/core";
-import {
-  getDefaultEnvironment,
-  StdioClientTransport,
-} from "@modelcontextprotocol/client/stdio";
+import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
 import { McpConfigurationError, McpContentError } from "./errors.js";
 import { assertMcpServerId } from "./names.js";
@@ -34,15 +31,22 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
         const headers = new Headers(init?.headers);
         if (init?.method === "POST" && typeof init.body === "string") {
           const rpc = JSON.parse(init.body) as { id?: unknown; method?: string; params?: { taskId?: unknown } };
-          if (typeof rpc.id === "string" && rpc.id.startsWith("may-task:") && ["tasks/get", "tasks/update", "tasks/cancel"].includes(rpc.method ?? "") && typeof rpc.params?.taskId === "string") headers.set("mcp-name", taskHeaderValue(rpc.params.taskId));
+          if (
+            typeof rpc.id === "string" &&
+            rpc.id.startsWith("may-task:") &&
+            ["tasks/get", "tasks/update", "tasks/cancel"].includes(rpc.method ?? "") &&
+            typeof rpc.params?.taskId === "string"
+          )
+            headers.set("mcp-name", taskHeaderValue(rpc.params.taskId));
         }
         // Also bound legacy session DELETE cleanup, which has no RPC timeout.
-        const signal = init?.method === "DELETE"
-          ? AbortSignal.any([
-              ...(init.signal ? [init.signal] : []),
-              AbortSignal.timeout(Math.ceil(Math.min(options.requestTimeoutMs ?? 5_000, 5_000))),
-            ])
-          : init?.signal;
+        const signal =
+          init?.method === "DELETE"
+            ? AbortSignal.any([
+                ...(init.signal ? [init.signal] : []),
+                AbortSignal.timeout(Math.ceil(Math.min(options.requestTimeoutMs ?? 5_000, 5_000))),
+              ])
+            : init?.signal;
         const response = await fetch(input, {
           ...init,
           headers,
@@ -50,22 +54,26 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
           redirect: "error",
         });
         if (response.status === 403 && options.auth !== undefined) {
-          try { await oauth!.requireConsent(options, response); }
-          catch (error) { await response.body?.cancel().catch(() => {}); throw error; }
+          try {
+            await oauth!.requireConsent(options, response);
+          } catch (error) {
+            await response.body?.cancel().catch(() => {});
+            throw error;
+          }
         }
         return boundMcpResponse(response);
       },
     });
   }
-  return orderedStdio(new StdioClientTransport({
-    command: options.command,
-    ...(options.args === undefined ? {} : { args: [...options.args] }),
-    ...(options.env === undefined
-      ? {}
-      : { env: { ...getDefaultEnvironment(), ...options.env } }),
-    ...omitUndefined({ cwd: options.cwd, maxBufferSize: options.maxBufferSize }),
-    stderr: "pipe",
-  }));
+  return orderedStdio(
+    new StdioClientTransport({
+      command: options.command,
+      ...(options.args === undefined ? {} : { args: [...options.args] }),
+      ...(options.env === undefined ? {} : { env: { ...getDefaultEnvironment(), ...options.env } }),
+      ...omitUndefined({ cwd: options.cwd, maxBufferSize: options.maxBufferSize }),
+      stderr: "pipe",
+    }),
+  );
 }
 
 /** Validate before starting any endpoint, including optional endpoints. */
@@ -75,18 +83,25 @@ export function validateMcpServerOptions(options: McpServerOptions): void {
   if (options.required !== undefined && typeof options.required !== "boolean") {
     invalid(options, "required must be a boolean");
   }
-  if (options.protocolMode !== undefined &&
-      options.protocolMode !== "legacy" && options.protocolMode !== "auto") {
+  if (options.protocolMode !== undefined && options.protocolMode !== "legacy" && options.protocolMode !== "auto") {
     invalid(options, 'protocolMode must be "legacy" or "auto"');
   }
   positiveNumber(options.requestTimeoutMs, options, "requestTimeoutMs");
   positiveNumber(options.maxTotalTimeoutMs, options, "maxTotalTimeoutMs");
   if (options.host !== undefined) {
-    if (options.host === null || typeof options.host !== "object" || Array.isArray(options.host) ||
-        Object.keys(options.host).some((key) => !["roots", "sampling", "legacyRequests"].includes(key))) invalid(options, "host contains invalid compatibility options");
-    if (options.host.roots !== undefined && typeof options.host.roots !== "boolean" ||
-        options.host.sampling !== undefined && typeof options.host.sampling !== "boolean" ||
-        options.host.legacyRequests !== undefined && options.host.legacyRequests !== "isolated") invalid(options, "host requires boolean roots/sampling and optional legacyRequests=isolated");
+    if (
+      options.host === null ||
+      typeof options.host !== "object" ||
+      Array.isArray(options.host) ||
+      Object.keys(options.host).some((key) => !["roots", "sampling", "legacyRequests"].includes(key))
+    )
+      invalid(options, "host contains invalid compatibility options");
+    if (
+      (options.host.roots !== undefined && typeof options.host.roots !== "boolean") ||
+      (options.host.sampling !== undefined && typeof options.host.sampling !== "boolean") ||
+      (options.host.legacyRequests !== undefined && options.host.legacyRequests !== "isolated")
+    )
+      invalid(options, "host requires boolean roots/sampling and optional legacyRequests=isolated");
   }
   if (options.transport === "streamable-http") {
     rejectFields(options, ["command", "args", "cwd", "env", "maxBufferSize", "stderrMaxBytes"]);
@@ -100,14 +115,19 @@ export function validateMcpServerOptions(options: McpServerOptions): void {
     if (url.username || url.password || url.hash) {
       invalid(options, "url must not contain credentials or a fragment; use headers for authentication");
     }
-    if (url.protocol !== "https:" && !(url.protocol === "http:" &&
-        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) {
+    if (
+      url.protocol !== "https:" &&
+      !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
+    ) {
       invalid(options, "url must use HTTPS (HTTP is loopback-only)");
     }
     validateStringMap(options.headers, options, "headers");
     if (options.auth !== undefined) {
-      try { validateMcpOAuthOptions(options.auth); }
-      catch { invalid(options, "auth contains invalid OAuth options (clientId requires expectedIssuer)"); }
+      try {
+        validateMcpOAuthOptions(options.auth);
+      } catch {
+        invalid(options, "auth contains invalid OAuth options (clientId requires expectedIssuer)");
+      }
       if (Object.keys(options.headers ?? {}).some((name) => name.toLowerCase() === "authorization")) {
         invalid(options, "OAuth and a static Authorization header cannot be combined");
       }
@@ -117,10 +137,22 @@ export function validateMcpServerOptions(options: McpServerOptions): void {
       const key = name.toLowerCase();
       if (seen.has(key)) invalid(options, "headers must not contain duplicate names");
       seen.add(key);
-      if (key.startsWith("mcp-") || [
-        "host", "connection", "content-length", "transfer-encoding", "upgrade",
-        "accept", "content-type", "origin", "cookie", "proxy-authorization",
-      ].includes(key)) invalid(options, "headers must not override protocol or transport headers");
+      if (
+        key.startsWith("mcp-") ||
+        [
+          "host",
+          "connection",
+          "content-length",
+          "transfer-encoding",
+          "upgrade",
+          "accept",
+          "content-type",
+          "origin",
+          "cookie",
+          "proxy-authorization",
+        ].includes(key)
+      )
+        invalid(options, "headers must not override protocol or transport headers");
       try {
         new Headers({ [name]: value });
       } catch {
@@ -136,8 +168,10 @@ export function validateMcpServerOptions(options: McpServerOptions): void {
   if (typeof options.command !== "string" || options.command.trim() === "") {
     invalid(options, "command must be a non-empty string");
   }
-  if (options.args !== undefined && (!Array.isArray(options.args) ||
-      options.args.some((argument) => typeof argument !== "string"))) {
+  if (
+    options.args !== undefined &&
+    (!Array.isArray(options.args) || options.args.some((argument) => typeof argument !== "string"))
+  ) {
     invalid(options, "arguments must be strings");
   }
   if (options.cwd !== undefined && (typeof options.cwd !== "string" || options.cwd.trim() === "")) {
@@ -153,12 +187,21 @@ export function safeMcpTransportError(error: unknown, options: McpServerOptions)
   if (options.transport !== "streamable-http") return error;
   if (error instanceof McpAuthenticationError || error instanceof McpCredentialStoreError) return error;
   const data = error instanceof Error && "data" in error ? error.data : undefined;
-  const status = typeof data === "object" && data !== null && "status" in data
-    && typeof data.status === "number" && Number.isInteger(data.status)
-    && data.status >= 100 && data.status <= 599 ? data.status : undefined;
-  return new Error(status === undefined
-    ? "HTTP MCP operation failed (endpoint and response details withheld)"
-    : `HTTP MCP operation failed with status ${status}`);
+  const status =
+    typeof data === "object" &&
+    data !== null &&
+    "status" in data &&
+    typeof data.status === "number" &&
+    Number.isInteger(data.status) &&
+    data.status >= 100 &&
+    data.status <= 599
+      ? data.status
+      : undefined;
+  return new Error(
+    status === undefined
+      ? "HTTP MCP operation failed (endpoint and response details withheld)"
+      : `HTTP MCP operation failed with status ${status}`,
+  );
 }
 
 function invalid(options: McpServerOptions, detail: string): never {
@@ -179,8 +222,12 @@ function positiveNumber(value: number | undefined, options: McpServerOptions, fi
 
 function validateStringMap(value: unknown, options: McpServerOptions, field: string): void {
   if (value === undefined) return;
-  if (typeof value !== "object" || value === null || Array.isArray(value) ||
-      Object.entries(value).some(([name, item]) => name === "" || typeof item !== "string")) {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value) ||
+    Object.entries(value).some(([name, item]) => name === "" || typeof item !== "string")
+  ) {
     invalid(options, `${field} entries must be string pairs`);
   }
 }
@@ -192,21 +239,24 @@ function boundMcpResponse(response: Response): Response {
   const maximum = 10 * 1024 * 1024;
   let bytes = 0;
   let lineBytes = 0;
-  const body = response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      if (!sse) bytes += chunk.byteLength;
-      else for (const byte of chunk) {
-        bytes++;
+  const body = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        if (!sse) bytes += chunk.byteLength;
+        else
+          for (const byte of chunk) {
+            bytes++;
+            if (bytes > maximum) throw new McpContentError("MCP protocol frame exceeds 10 MiB");
+            if (byte === 10) {
+              if (lineBytes === 0) bytes = 0;
+              lineBytes = 0;
+            } else if (byte !== 13) lineBytes++;
+          }
         if (bytes > maximum) throw new McpContentError("MCP protocol frame exceeds 10 MiB");
-        if (byte === 10) {
-          if (lineBytes === 0) bytes = 0;
-          lineBytes = 0;
-        } else if (byte !== 13) lineBytes++;
-      }
-      if (bytes > maximum) throw new McpContentError("MCP protocol frame exceeds 10 MiB");
-      controller.enqueue(chunk);
-    },
-  }));
+        controller.enqueue(chunk);
+      },
+    }),
+  );
   return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
 }
 
@@ -218,10 +268,18 @@ function orderedStdio(transport: StdioClientTransport): StdioClientTransport {
     configurable: true,
     get: () => receiver,
     set: (handler: StdioClientTransport["onmessage"]) => {
-      receiver = handler === undefined ? undefined : (...args) => {
-        delivery = delivery.then(() => { handler(...args); })
-          .catch((error: unknown) => transport.onerror?.(error instanceof Error ? error : new Error("MCP message delivery failed")));
-      };
+      receiver =
+        handler === undefined
+          ? undefined
+          : (...args) => {
+              delivery = delivery
+                .then(() => {
+                  handler(...args);
+                })
+                .catch((error: unknown) =>
+                  transport.onerror?.(error instanceof Error ? error : new Error("MCP message delivery failed")),
+                );
+            };
     },
   });
   return transport;

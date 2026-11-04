@@ -60,17 +60,10 @@ export interface ContextController {
   invalidateMeasurement?(): void;
   inspect(): Promise<ContextInspection>;
   recordModelUsage?(usage: Usage, contextMessageCount: number): void;
-  compact?(
-    strategy?: ContextCompactionStrategy,
-    options?: ContextCompactionOptions,
-  ): Promise<ContextCompactionResult>;
-  prepareForModel?(
-    options?: ContextCompactionOptions,
-  ): Promise<readonly ContextCompactionResult[]>;
+  compact?(strategy?: ContextCompactionStrategy, options?: ContextCompactionOptions): Promise<ContextCompactionResult>;
+  prepareForModel?(options?: ContextCompactionOptions): Promise<readonly ContextCompactionResult[]>;
   setAutoCompactionSink?(sink: ContextCompactionSink | undefined): void;
-  setAutoCompactionFailureSink?(
-    sink: ContextCompactionFailureSink | undefined,
-  ): void;
+  setAutoCompactionFailureSink?(sink: ContextCompactionFailureSink | undefined): void;
 }
 
 export interface SnapshotContextControllerOptions {
@@ -90,23 +83,26 @@ interface RequestedCompaction {
 }
 
 export class SnapshotContextController implements ContextController {
-  invalidateMeasurement(): void { this.measurement = undefined; }
+  invalidateMeasurement(): void {
+    this.measurement = undefined;
+  }
   private readonly budget: ContextBudget | undefined;
   private readonly compactionStrategy: ContextCompactionStrategy | undefined;
-  private readonly replaceMessages: SnapshotContextControllerOptions[
-    "replaceMessages"
-  ];
+  private readonly replaceMessages: SnapshotContextControllerOptions["replaceMessages"];
   private readonly autoCompactionStrategies: readonly ContextCompactionStrategy[];
   private autoCompactionSink: ContextCompactionSink | undefined;
   private autoCompactionFailureSink: ContextCompactionFailureSink | undefined;
   private measurement: ContextMeasurement | undefined;
   private compactionQueue: Promise<void> = Promise.resolve();
   private requestedCompaction: RequestedCompaction | undefined;
-  private readonly replacements = new WeakMap<ContextCompactionResult, {
-    messages: readonly Message[];
-    measurement: ContextMeasurement | undefined;
-    requestedCompaction: RequestedCompaction | undefined;
-  }>();
+  private readonly replacements = new WeakMap<
+    ContextCompactionResult,
+    {
+      messages: readonly Message[];
+      measurement: ContextMeasurement | undefined;
+      requestedCompaction: RequestedCompaction | undefined;
+    }
+  >();
 
   requestCompaction(strategy: ContextCompactionStrategy | undefined): void {
     this.requestedCompaction = strategy === undefined ? undefined : { strategy };
@@ -125,9 +121,10 @@ export class SnapshotContextController implements ContextController {
     if (previous === undefined) return;
     const current = await this.context.snapshot();
     const tail = appendedTail(result.messages, current.messages);
-    if (tail === undefined || await this.replaceMessages!(
-      [...previous.messages, ...tail], current.messages,
-    ) === false) {
+    if (
+      tail === undefined ||
+      (await this.replaceMessages!([...previous.messages, ...tail], current.messages)) === false
+    ) {
       throw new Error("Cannot restore context after checkpoint failure: context changed");
     }
     this.measurement = previous.measurement;
@@ -138,17 +135,11 @@ export class SnapshotContextController implements ContextController {
     private readonly context: Context,
     options: SnapshotContextControllerOptions = {},
   ) {
-    this.budget = options.budget === undefined
-      ? undefined
-      : validateBudget(options.budget);
-    this.measurement = options.measurement === undefined
-      ? undefined
-      : validateMeasurement(options.measurement);
+    this.budget = options.budget === undefined ? undefined : validateBudget(options.budget);
+    this.measurement = options.measurement === undefined ? undefined : validateMeasurement(options.measurement);
     this.compactionStrategy = options.compactionStrategy;
     this.replaceMessages = options.replaceMessages;
-    this.autoCompactionStrategies = [
-      ...(options.autoCompactionStrategies ?? []),
-    ];
+    this.autoCompactionStrategies = [...(options.autoCompactionStrategies ?? [])];
   }
 
   async inspect(): Promise<ContextInspection> {
@@ -167,25 +158,18 @@ export class SnapshotContextController implements ContextController {
     this.autoCompactionSink = sink;
   }
 
-  setAutoCompactionFailureSink(
-    sink: ContextCompactionFailureSink | undefined,
-  ): void {
+  setAutoCompactionFailureSink(sink: ContextCompactionFailureSink | undefined): void {
     this.autoCompactionFailureSink = sink;
   }
 
-  async prepareForModel(
-    options: ContextCompactionOptions = {},
-  ): Promise<readonly ContextCompactionResult[]> {
+  async prepareForModel(options: ContextCompactionOptions = {}): Promise<readonly ContextCompactionResult[]> {
     const requested = this.requestedCompaction;
     const strategies = requested === undefined ? this.autoCompactionStrategies : [requested.strategy];
     if (strategies.length === 0) return [];
     throwIfAborted(options.signal);
 
     const snapshot = await this.context.snapshot();
-    const inspection = inspectContextSnapshot(
-      snapshot,
-      this.inspectionOptions(),
-    );
+    const inspection = inspectContextSnapshot(snapshot, this.inspectionOptions());
     if (requested === undefined && inspection.shouldCompact !== true) return [];
 
     const results: ContextCompactionResult[] = [];
@@ -197,7 +181,11 @@ export class SnapshotContextController implements ContextController {
         result = await this.enqueueCompaction(strategy, options, requested);
       } catch (error) {
         throwIfAborted(options.signal);
-        if (error instanceof HookExecutionError || error instanceof Error && "code" in error && error.code === "RUN_CHECKPOINT_FAILED") throw error;
+        if (
+          error instanceof HookExecutionError ||
+          (error instanceof Error && "code" in error && error.code === "RUN_CHECKPOINT_FAILED")
+        )
+          throw error;
         if (isAbortError(error)) throw error;
         const failure: ContextCompactionFailure = {
           strategy: strategy.name,
@@ -241,8 +229,11 @@ export class SnapshotContextController implements ContextController {
     strategy = this.compactionStrategy,
     options: ContextCompactionOptions = {},
   ): Promise<ContextCompactionResult> {
-    return this.enqueueCompaction(strategy, options,
-      this.requestedCompaction?.strategy === strategy ? this.requestedCompaction : undefined);
+    return this.enqueueCompaction(
+      strategy,
+      options,
+      this.requestedCompaction?.strategy === strategy ? this.requestedCompaction : undefined,
+    );
   }
 
   private enqueueCompaction(
@@ -250,9 +241,7 @@ export class SnapshotContextController implements ContextController {
     options: ContextCompactionOptions,
     requestedCompaction: RequestedCompaction | undefined,
   ): Promise<ContextCompactionResult> {
-    const result = this.compactionQueue.then(() =>
-      this.compactExclusive(strategy, options, requestedCompaction)
-    );
+    const result = this.compactionQueue.then(() => this.compactExclusive(strategy, options, requestedCompaction));
     this.compactionQueue = result.then(
       () => undefined,
       () => undefined,
@@ -277,19 +266,18 @@ export class SnapshotContextController implements ContextController {
     }
 
     let sourceSnapshot = await this.context.snapshot();
-    let before = inspectContextSnapshot(
-      sourceSnapshot,
-      this.inspectionOptions(),
-    );
+    let before = inspectContextSnapshot(sourceSnapshot, this.inspectionOptions());
 
     while (true) {
-      const output = normalizeCompactionOutput(await strategy.compact(
-        {
-          ...sourceSnapshot,
-          messages: [...sourceSnapshot.messages],
-        },
-        options,
-      ));
+      const output = normalizeCompactionOutput(
+        await strategy.compact(
+          {
+            ...sourceSnapshot,
+            messages: [...sourceSnapshot.messages],
+          },
+          options,
+        ),
+      );
       throwIfAborted(options.signal);
 
       let conflicts = 0;
@@ -302,10 +290,7 @@ export class SnapshotContextController implements ContextController {
           // Another replacement won the race. Re-run the strategy against that
           // history instead of overwriting it with a stale result.
           sourceSnapshot = latestSnapshot;
-          before = inspectContextSnapshot(
-            sourceSnapshot,
-            this.inspectionOptions(),
-          );
+          before = inspectContextSnapshot(sourceSnapshot, this.inspectionOptions());
           break;
         }
 
@@ -314,15 +299,9 @@ export class SnapshotContextController implements ContextController {
         const changed = !messagesEqual(messages, latestSnapshot.messages);
         if (!changed) {
           if (output.effectiveTokens !== undefined) {
-            this.applyCompactionMeasurement(
-              output.effectiveTokens,
-              compactedMessages.length,
-            );
+            this.applyCompactionMeasurement(output.effectiveTokens, compactedMessages.length);
           }
-          const after = inspectContextSnapshot(
-            latestSnapshot,
-            this.inspectionOptions(),
-          );
+          const after = inspectContextSnapshot(latestSnapshot, this.inspectionOptions());
           return {
             strategy: strategy.name,
             changed,
@@ -333,22 +312,13 @@ export class SnapshotContextController implements ContextController {
           };
         }
 
-        const replaced = await this.replaceMessages(
-          messages,
-          latestSnapshot.messages,
-        );
+        const replaced = await this.replaceMessages(messages, latestSnapshot.messages);
         if (replaced === false) continue;
 
         const previousMeasurement = this.measurement;
-        this.applyCompactionMeasurement(
-          output.effectiveTokens,
-          compactedMessages.length,
-        );
+        this.applyCompactionMeasurement(output.effectiveTokens, compactedMessages.length);
         const afterSnapshot = await this.context.snapshot();
-        const after = inspectContextSnapshot(
-          afterSnapshot,
-          this.inspectionOptions(),
-        );
+        const after = inspectContextSnapshot(afterSnapshot, this.inspectionOptions());
         const result: ContextCompactionResult = {
           strategy: strategy.name,
           changed,
@@ -367,16 +337,14 @@ export class SnapshotContextController implements ContextController {
     }
   }
 
-  private applyCompactionMeasurement(
-    effectiveTokens: number | undefined,
-    compactedMessageCount: number,
-  ): void {
-    this.measurement = effectiveTokens === undefined
-      ? undefined
-      : validateMeasurement({
-          inputTokens: effectiveTokens,
-          contextMessageCount: compactedMessageCount,
-        });
+  private applyCompactionMeasurement(effectiveTokens: number | undefined, compactedMessageCount: number): void {
+    this.measurement =
+      effectiveTokens === undefined
+        ? undefined
+        : validateMeasurement({
+            inputTokens: effectiveTokens,
+            contextMessageCount: compactedMessageCount,
+          });
   }
 
   private inspectionOptions(): {
@@ -387,10 +355,7 @@ export class SnapshotContextController implements ContextController {
   }
 }
 
-function appendedTail(
-  source: readonly Message[],
-  latest: readonly Message[],
-): readonly Message[] | undefined {
+function appendedTail(source: readonly Message[], latest: readonly Message[]): readonly Message[] | undefined {
   if (latest.length < source.length) return undefined;
   for (let index = 0; index < source.length; index++) {
     if (!messagesEqual([source[index]!], [latest[index]!])) return undefined;
@@ -398,23 +363,13 @@ function appendedTail(
   return latest.slice(source.length);
 }
 
-function messagesEqual(
-  left: readonly Message[],
-  right: readonly Message[],
-): boolean {
+function messagesEqual(left: readonly Message[], right: readonly Message[]): boolean {
   return jsonEqual(left, right);
 }
 
-function normalizeCompactionOutput(
-  output: ContextCompactionOutput,
-): ContextCompactionDetails {
+function normalizeCompactionOutput(output: ContextCompactionOutput): ContextCompactionDetails {
   if (Array.isArray(output)) return { messages: output };
-  if (
-    typeof output !== "object" ||
-    output === null ||
-    !("messages" in output) ||
-    !Array.isArray(output.messages)
-  ) {
+  if (typeof output !== "object" || output === null || !("messages" in output) || !Array.isArray(output.messages)) {
     throw new TypeError("Context compaction strategy must return messages");
   }
   if (
@@ -440,12 +395,8 @@ export function inspectContextSnapshot(
     readonly measurement?: ContextMeasurement;
   } = {},
 ): ContextInspection {
-  const budget = options.budget === undefined
-    ? undefined
-    : validateBudget(options.budget);
-  const measurement = options.measurement === undefined
-    ? undefined
-    : validateMeasurement(options.measurement);
+  const budget = options.budget === undefined ? undefined : validateBudget(options.budget);
+  const measurement = options.measurement === undefined ? undefined : validateMeasurement(options.measurement);
   const messagesByRole: Record<Message["role"], number> = {
     system: 0,
     user: 0,
@@ -463,20 +414,13 @@ export function inspectContextSnapshot(
   const totalBytes = instructionsBytes + messageBytes;
   const estimatedTokens = Math.ceil(totalBytes / 4);
   let effectiveTokens = estimatedTokens;
-  let measurementDetails: Pick<
-    ContextInspection,
-    "measurementMethod"
-  > | Pick<
-    ContextInspection,
-    "measurementMethod" | "measuredInputTokens" | "estimatedTailTokens"
-  > = { measurementMethod: "estimated" };
-  if (
-    measurement !== undefined &&
-    measurement.contextMessageCount <= snapshot.messages.length
-  ) {
-    const estimatedTailTokens = estimateMessageTokens(
-      snapshot.messages.slice(measurement.contextMessageCount),
-    );
+  let measurementDetails:
+    | Pick<ContextInspection, "measurementMethod">
+    | Pick<ContextInspection, "measurementMethod" | "measuredInputTokens" | "estimatedTailTokens"> = {
+    measurementMethod: "estimated",
+  };
+  if (measurement !== undefined && measurement.contextMessageCount <= snapshot.messages.length) {
+    const estimatedTailTokens = estimateMessageTokens(snapshot.messages.slice(measurement.contextMessageCount));
     effectiveTokens = measurement.inputTokens + estimatedTailTokens;
     measurementDetails = {
       measurementMethod: "measured+estimated",
@@ -484,23 +428,22 @@ export function inspectContextSnapshot(
       estimatedTailTokens,
     };
   }
-  const budgetDetails: Pick<
-    ContextInspection,
-    | "contextWindowTokens"
-    | "remainingTokens"
-    | "usageRatio"
-    | "reservedTokens"
-    | "inputBudgetTokens"
-    | "remainingInputTokens"
-    | "compactTriggerTokens"
-    | "shouldCompact"
-  > | Record<string, never> = budget?.contextWindowTokens === undefined
-    ? {}
-    : createBudgetInspection(
-      budget,
-      budget.contextWindowTokens,
-      effectiveTokens,
-    );
+  const budgetDetails:
+    | Pick<
+        ContextInspection,
+        | "contextWindowTokens"
+        | "remainingTokens"
+        | "usageRatio"
+        | "reservedTokens"
+        | "inputBudgetTokens"
+        | "remainingInputTokens"
+        | "compactTriggerTokens"
+        | "shouldCompact"
+      >
+    | Record<string, never> =
+    budget?.contextWindowTokens === undefined
+      ? {}
+      : createBudgetInspection(budget, budget.contextWindowTokens, effectiveTokens);
   return {
     instructionsBytes,
     messageBytes,
@@ -531,25 +474,16 @@ function createBudgetInspection(
   | "compactTriggerTokens"
   | "shouldCompact"
 > {
-  const reservedTokens = (budget.outputReserveTokens ?? 0) +
-    (budget.toolReserveTokens ?? 0) +
-    (budget.safetyMarginTokens ?? 0);
-  const inputBudgetTokens = Math.max(
-    0,
-    contextWindowTokens - reservedTokens,
-  );
-  const triggerTokens = budget.compactTriggerRatio === undefined
-    ? undefined
-    : Math.floor(Math.min(
-      contextWindowTokens * budget.compactTriggerRatio,
-      inputBudgetTokens,
-    ));
+  const reservedTokens =
+    (budget.outputReserveTokens ?? 0) + (budget.toolReserveTokens ?? 0) + (budget.safetyMarginTokens ?? 0);
+  const inputBudgetTokens = Math.max(0, contextWindowTokens - reservedTokens);
+  const triggerTokens =
+    budget.compactTriggerRatio === undefined
+      ? undefined
+      : Math.floor(Math.min(contextWindowTokens * budget.compactTriggerRatio, inputBudgetTokens));
   return {
     contextWindowTokens,
-    remainingTokens: Math.max(
-      0,
-      contextWindowTokens - effectiveTokens,
-    ),
+    remainingTokens: Math.max(0, contextWindowTokens - effectiveTokens),
     usageRatio: effectiveTokens / contextWindowTokens,
     reservedTokens,
     inputBudgetTokens,
@@ -570,54 +504,32 @@ function estimateMessageTokens(messages: readonly Message[]): number {
 }
 
 function validateBudget(budget: ContextBudget): ContextBudget {
-  validateOptionalInteger(
-    budget.contextWindowTokens,
-    "contextWindowTokens",
-    1,
-  );
+  validateOptionalInteger(budget.contextWindowTokens, "contextWindowTokens", 1);
   validateOptionalInteger(budget.outputReserveTokens, "outputReserveTokens", 0);
   validateOptionalInteger(budget.toolReserveTokens, "toolReserveTokens", 0);
-  validateOptionalInteger(
-    budget.safetyMarginTokens,
-    "safetyMarginTokens",
-    0,
-  );
+  validateOptionalInteger(budget.safetyMarginTokens, "safetyMarginTokens", 0);
   if (
     budget.compactTriggerRatio !== undefined &&
-    (!Number.isFinite(budget.compactTriggerRatio) ||
-      budget.compactTriggerRatio <= 0 ||
-      budget.compactTriggerRatio >= 1)
+    (!Number.isFinite(budget.compactTriggerRatio) || budget.compactTriggerRatio <= 0 || budget.compactTriggerRatio >= 1)
   ) {
     throw new RangeError("compactTriggerRatio must be greater than 0 and less than 1");
   }
   return { ...budget };
 }
 
-function validateMeasurement(
-  measurement: ContextMeasurement,
-): ContextMeasurement {
+function validateMeasurement(measurement: ContextMeasurement): ContextMeasurement {
   validateInteger(measurement.inputTokens, "inputTokens", 0);
-  validateInteger(
-    measurement.contextMessageCount,
-    "contextMessageCount",
-    0,
-  );
+  validateInteger(measurement.contextMessageCount, "contextMessageCount", 0);
   return { ...measurement };
 }
 
-function validateOptionalInteger(
-  value: number | undefined,
-  name: string,
-  minimum: number,
-): void {
+function validateOptionalInteger(value: number | undefined, name: string, minimum: number): void {
   if (value !== undefined) validateInteger(value, name, minimum);
 }
 
 function validateInteger(value: number, name: string, minimum: number): void {
   if (!Number.isSafeInteger(value) || value < minimum) {
-    throw new RangeError(
-      `${name} must be a safe integer greater than or equal to ${minimum}`,
-    );
+    throw new RangeError(`${name} must be a safe integer greater than or equal to ${minimum}`);
   }
 }
 
@@ -627,9 +539,7 @@ function utf8Bytes(value: string): number {
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted !== true) return;
-  const error = new Error(
-    typeof signal.reason === "string" ? signal.reason : "Context compaction cancelled",
-  );
+  const error = new Error(typeof signal.reason === "string" ? signal.reason : "Context compaction cancelled");
   error.name = "AbortError";
   throw error;
 }

@@ -14,13 +14,15 @@ import { ToolRegistry } from "@sortedyuan/may/core";
 import { openMcpClientPool } from "@sortedyuan/mcp";
 
 const mcp = await openMcpClientPool({
-  servers: [{
-    id: "workspace",
-    command: "node",
-    args: ["./server.mjs"],
-    cwd: process.cwd(),
-    required: false,
-  }],
+  servers: [
+    {
+      id: "workspace",
+      command: "node",
+      args: ["./server.mjs"],
+      cwd: process.cwd(),
+      required: false,
+    },
+  ],
   tracer,
 });
 
@@ -61,13 +63,15 @@ HTTP endpoints use `McpHttpServerOptions` (part of `McpServerOptions`):
 
 ```ts
 const remote = await openMcpClientPool({
-  servers: [{
-    id: "remote",
-    transport: "streamable-http",
-    url: "https://mcp.example.com/mcp",
-    headers: { Authorization: `Bearer ${process.env.MCP_ACCESS_TOKEN!}` },
-    protocolMode: "auto",
-  }],
+  servers: [
+    {
+      id: "remote",
+      transport: "streamable-http",
+      url: "https://mcp.example.com/mcp",
+      headers: { Authorization: `Bearer ${process.env.MCP_ACCESS_TOKEN!}` },
+      protocolMode: "auto",
+    },
+  ],
 });
 // Compose remote.tools into the application's registry; close after use.
 await remote.close();
@@ -142,7 +146,6 @@ Modern MRTR form/URL elicitation is opt-in with the pool-owned
 validates reviewed responses, bounds waiting and refuses cross-owner/late answers.
 Unscoped legacy push requests decline; explicit isolated channels support interaction. See the bilingual
 [interaction guide](../../docs/en/guides/mcp.md#scoped-user-interaction-modern-mrtr).
-
 
 Enable `tasks: true` with `taskJournal: new McpTaskJournal(secureStore)` for the
 2026-07-28 Tasks extension. The pool exposes local listing and explicit

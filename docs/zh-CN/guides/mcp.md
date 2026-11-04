@@ -45,14 +45,16 @@ import { defineAgent } from "@sortedyuan/may";
 import { openMcpClientPool } from "@sortedyuan/mcp";
 
 const mcp = await openMcpClientPool({
-  servers: [{
-    id: "workspace",
-    command: "node",
-    args: ["./mcp-server.mjs"],
-    cwd: process.cwd(),
-    required: false,
-    requestTimeoutMs: 60_000,
-  }],
+  servers: [
+    {
+      id: "workspace",
+      command: "node",
+      args: ["./mcp-server.mjs"],
+      cwd: process.cwd(),
+      required: false,
+      requestTimeoutMs: 60_000,
+    },
+  ],
   tracer,
 });
 
@@ -82,12 +84,12 @@ try {
 记录失败状态，允许其他端点继续启动。`close()` 可以重复调用，始终尝试关闭全部
 连接，也负责终止 stdio 传输创建的子进程。
 
-| 配置 | 含义和默认值 |
-| --- | --- |
-| `requestTimeoutMs` | 请求不活动超时，默认 60 秒；进度通知可以重置计时 |
+| 配置                | 含义和默认值                                           |
+| ------------------- | ------------------------------------------------------ |
+| `requestTimeoutMs`  | 请求不活动超时，默认 60 秒；进度通知可以重置计时       |
 | `maxTotalTimeoutMs` | 整个请求的绝对期限，包含持续进度和交互等待；默认未设置 |
-| `maxBufferSize` | 单条 stdio 协议消息上限，默认 10 MiB |
-| `stderrMaxBytes` | 保留的 stdio stderr 末尾片段，默认 16 KiB |
+| `maxBufferSize`     | 单条 stdio 协议消息上限，默认 10 MiB                   |
+| `stderrMaxBytes`    | 保留的 stdio stderr 末尾片段，默认 16 KiB              |
 
 `pool.status()` 返回即时连接状态、协议版本、工具名称、目录版本、最新诊断和近期
 stderr。`pool.events` 发布连接、目录更新、失败和断开事件。stderr 经处理后保留
@@ -200,12 +202,12 @@ Span 不包含 HTTP headers 或 URL，HTTP 端点没有 stderr。
 
 ## Tracing 与安全
 
-| Span | 含义 |
-| --- | --- |
-| `may.mcp.connect` | 建立传输和协商协议 |
-| `may.mcp.tools.list` | 首次及刷新能力目录 |
-| `may.mcp.tool.call` | 远程调用，父节点为 Core 工具 span |
-| `may.mcp.disconnect` | 关闭连接和子进程 |
+| Span                 | 含义                              |
+| -------------------- | --------------------------------- |
+| `may.mcp.connect`    | 建立传输和协商协议                |
+| `may.mcp.tools.list` | 首次及刷新能力目录                |
+| `may.mcp.tool.call`  | 远程调用，父节点为 Core 工具 span |
+| `may.mcp.disconnect` | 关闭连接和子进程                  |
 
 内置追踪记录端点身份、传输类型、工具名称、数量、状态和耗时，不记录命令参数、
 环境值、请求输入、响应内容、提示词或模型消息。本地 stdio 程序拥有启动用户的
@@ -225,11 +227,11 @@ Roots/Sampling、Tasks 和 Apps 需要明确宿主配置。独立服务端使用
 来源。新目录影响下一次 Run 或继续执行；当前 Run 保留自己的快照。工具定义变化、
 移除或目录失效时，旧快照通过 `MCP_STALE_TOOL` 拒绝发送请求。
 
-| 操作 | 行为 |
-| --- | --- |
-| `mcp.catalog()` | 返回深度冻结的版本、能力、工具、资源、模板和提示模板元数据 |
-| `mcp.refresh(serverId?, signal?)` | 重新获取已声明目录；省略 `serverId` 时刷新全部端点 |
-| `mcp.reconnect(serverId, signal?)` | 关闭并替换一个端点，包括启动失败的可选端点 |
+| 操作                               | 行为                                                       |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `mcp.catalog()`                    | 返回深度冻结的版本、能力、工具、资源、模板和提示模板元数据 |
+| `mcp.refresh(serverId?, signal?)`  | 重新获取已声明目录；省略 `serverId` 时刷新全部端点         |
+| `mcp.reconnect(serverId, signal?)` | 关闭并替换一个端点，包括启动失败的可选端点                 |
 
 刷新只发布完整候选目录：每个列表最多 64 页，重复游标或身份使刷新失败，全部
 列表合计最多 4,096 项、8 MiB。期限为 `maxTotalTimeoutMs`，未配置时为 60 秒。
@@ -259,14 +261,16 @@ Roots/Sampling、Tasks 和 Apps 需要明确宿主配置。独立服务端使用
 
 ```ts
 const read = await mcp.readResource("workspace", "project:///README", { signal });
-const expanded = await mcp.readResourceTemplate(
-  "workspace", "project:///{path}", { path: "README" }, { signal },
-);
+const expanded = await mcp.readResourceTemplate("workspace", "project:///{path}", { path: "README" }, { signal });
 const prompt = await mcp.getPrompt("workspace", "review", { file: "main.ts" }, { signal });
-const suggestions = await mcp.complete("workspace", {
-  ref: { type: "ref/prompt", name: "review" },
-  argument: { name: "file", value: "ma" },
-}, { signal });
+const suggestions = await mcp.complete(
+  "workspace",
+  {
+    ref: { type: "ref/prompt", name: "review" },
+    argument: { name: "file", value: "ma" },
+  },
+  { signal },
+);
 const watch = await mcp.subscribeResource("workspace", read.uri, { signal });
 // watch.events 提供更新通知；需要内容时明确重新读取。
 await watch.close(); // watch.closed 也报告远端或连接关闭。
@@ -292,14 +296,14 @@ await watch.close(); // watch.closed 也报告远端或连接关闭。
 标签和资源链接作为数据呈现；不会下载链接、读取本地文件或追加任意角色历史。
 订阅通知不会改变模型 Context。
 
-| 项目 | 限制 |
-| --- | --- |
-| 内容结果 | 128 个内容块、8 MiB；验证 base64 和 MIME |
-| 终端预览 | 16,000 字符，二进制显示标签 |
-| 补全 | 每次 100 项、64 KiB，每连接每秒十次 |
-| 资源缓存 | 每连接 32 项、16 MiB，正 TTL 最多五分钟，缺少 TTL 不复用 |
-| 资源订阅 | 每连接 64 个 handle，每个 handle 缓冲 32 条通知 |
-| HTTP JSON 和 SSE frame | SDK 解析前限制为 10 MiB |
+| 项目                   | 限制                                                     |
+| ---------------------- | -------------------------------------------------------- |
+| 内容结果               | 128 个内容块、8 MiB；验证 base64 和 MIME                 |
+| 终端预览               | 16,000 字符，二进制显示标签                              |
+| 补全                   | 每次 100 项、64 KiB，每连接每秒十次                      |
+| 资源缓存               | 每连接 32 项、16 MiB，正 TTL 最多五分钟，缺少 TTL 不复用 |
+| 资源订阅               | 每连接 64 个 handle，每个 handle 缓冲 32 条通知          |
+| HTTP JSON 和 SSE frame | SDK 解析前限制为 10 MiB                                  |
 
 超限内容拒绝返回。媒体转换为 provider 无关的 base64 内容，模型不支持时抛出
 `UnsupportedContentError`。`Tool.resultContent` 生成模型内容，原始工具事件保留
@@ -425,11 +429,11 @@ stdio 进程或 HTTP 连接/session，每端点最多八个并发子连接。发
 
 ## 故障检查
 
-| 现象 | 检查与处理 |
-| --- | --- |
-| 连接前启动失败 | 检查环境引用、传输专用字段、命令路径及必需端点诊断 |
-| `auth-required` | 完成 [OAuth 登录](mcp-auth.md)，重连后启动新 Run |
-| `MCP_STALE_TOOL` | 刷新或重连，再通过当前目录启动新 Run |
-| 资源订阅结束 | 检查 `watch.closed` 和端点状态，明确刷新或重连后创建新订阅 |
-| 交互过期 | 检查 UI 是否并发消费事件，以及请求期限是否允许用户审阅；重新发起授权操作 |
-| 远程调用结果未知 | 核查远程效果后决定是否发起新调用，参阅[恢复](recovery.md) |
+| 现象             | 检查与处理                                                               |
+| ---------------- | ------------------------------------------------------------------------ |
+| 连接前启动失败   | 检查环境引用、传输专用字段、命令路径及必需端点诊断                       |
+| `auth-required`  | 完成 [OAuth 登录](mcp-auth.md)，重连后启动新 Run                         |
+| `MCP_STALE_TOOL` | 刷新或重连，再通过当前目录启动新 Run                                     |
+| 资源订阅结束     | 检查 `watch.closed` 和端点状态，明确刷新或重连后创建新订阅               |
+| 交互过期         | 检查 UI 是否并发消费事件，以及请求期限是否允许用户审阅；重新发起授权操作 |
+| 远程调用结果未知 | 核查远程效果后决定是否发起新调用，参阅[恢复](recovery.md)                |

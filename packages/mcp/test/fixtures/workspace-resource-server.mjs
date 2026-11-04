@@ -11,11 +11,11 @@ serveStdio(() => {
   server.registerCapabilities({ resources: { subscribe: true } });
   server.setRequestHandler("resources/list", async () => ({ resources: [{ uri, name: "value.txt" }] }));
   server.setRequestHandler("resources/templates/list", async () => ({ resourceTemplates: [] }));
-  server.setRequestHandler("resources/read", async request => {
+  server.setRequestHandler("resources/read", async (request) => {
     if (request.params.uri !== uri) throw new Error("Resource URI is unavailable");
     return { contents: [{ uri, text: await readFile(path, "utf8") }], ttlMs: 0, cacheScope: "private" };
   });
-  server.setRequestHandler("resources/subscribe", async request => {
+  server.setRequestHandler("resources/subscribe", async (request) => {
     if (request.params.uri !== uri) throw new Error("Resource URI is unavailable");
     return {};
   });

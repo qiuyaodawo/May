@@ -33,10 +33,7 @@ test("summarizes messages with a tool-free model request", async () => {
   assert.deepEqual(captured.request.tools, []);
   assert.equal(captured.request.messages[0].role, "system");
   assert.equal(captured.request.messages[1].content[0].text, "old request");
-  assert.match(
-    captured.request.messages.at(-1).content[0].text,
-    /continuation summary/u,
-  );
+  assert.match(captured.request.messages.at(-1).content[0].text, /continuation summary/u);
 });
 
 function userMessage(text) {

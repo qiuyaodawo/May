@@ -1,7 +1,20 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { Column, Dialog, Editor, EditorHistory, FocusManager, Markdown, NodeTerminalDriver, ScreenBuffer, ScrollView, SelectList, Text, sanitizeTerminalText } from "../dist/index.js";
+import {
+  Column,
+  Dialog,
+  Editor,
+  EditorHistory,
+  FocusManager,
+  Markdown,
+  NodeTerminalDriver,
+  ScreenBuffer,
+  ScrollView,
+  SelectList,
+  Text,
+  sanitizeTerminalText,
+} from "../dist/index.js";
 import { keyStroke } from "@sortedyuan/tui/keybindings";
 
 test("neutralizes 7-bit and 8-bit terminal control sequences", () => {
@@ -10,10 +23,7 @@ test("neutralizes 7-bit and 8-bit terminal control sequences", () => {
 });
 
 test("clips rendered lines and cursors to the screen", () => {
-  const buffer = ScreenBuffer.from(
-    { lines: ["中文abc"], cursor: { x: 20, y: 20 } },
-    { width: 5, height: 2 },
-  );
+  const buffer = ScreenBuffer.from({ lines: ["中文abc"], cursor: { x: 20, y: 20 } }, { width: 5, height: 2 });
   assert.equal(buffer.lines[0], "中文a");
   assert.deepEqual(buffer.cursor, { x: 4, y: 1, visible: true });
 });
@@ -63,7 +73,7 @@ test("decodes bracketed paste as one terminal input operation", async (t) => {
   output.columns = 80;
   output.rows = 24;
   let terminalOutput = "";
-  output.on("data", (chunk) => terminalOutput += chunk.toString());
+  output.on("data", (chunk) => (terminalOutput += chunk.toString()));
 
   const driver = new NodeTerminalDriver({ input, output });
   t.after(() => driver.close());
@@ -104,7 +114,10 @@ test("moves focus and dispatches only to the active target", () => {
   const calls = [];
   const target = (name) => ({
     setFocused: (focused) => calls.push(`${name}:${focused}`),
-    handleKey: () => { calls.push(`${name}:key`); return true; },
+    handleKey: () => {
+      calls.push(`${name}:key`);
+      return true;
+    },
   });
   const focus = new FocusManager();
   focus.register("one", target("one"));
@@ -138,15 +151,15 @@ test("anchors column regions and routes modal input", () => {
     { flex: 1, component: new Text("body") },
     { height: 1, component: new Text("footer") },
   ]);
-  assert.deepEqual(
-    column.render({ width: 10, height: 5 }).lines,
-    ["header", "body", "", "", "footer"],
-  );
+  assert.deepEqual(column.render({ width: 10, height: 5 }).lines, ["header", "body", "", "", "footer"]);
 
   const calls = [];
   const component = (name) => ({
     render: () => ({ lines: [name] }),
-    handleKey: () => { calls.push(name); return true; },
+    handleKey: () => {
+      calls.push(name);
+      return true;
+    },
   });
   const dialog = new Dialog(component("base"), component("modal"), { open: true });
   dialog.handleKey(keyStroke("enter"));
@@ -156,15 +169,10 @@ test("anchors column regions and routes modal input", () => {
 });
 
 test("renders Markdown without emitting embedded terminal controls", () => {
-  const result = new Markdown(
-    "# Title\n\n- **bold**\n- `code`\n\n\x1b[2Jdanger",
-    { colors: false },
-  ).render({ width: 40, height: 10 });
-  assert.deepEqual(result.lines.slice(0, 4), [
-    "# Title",
-    "",
-    "• bold",
-    "• code",
-  ]);
+  const result = new Markdown("# Title\n\n- **bold**\n- `code`\n\n\x1b[2Jdanger", { colors: false }).render({
+    width: 40,
+    height: 10,
+  });
+  assert.deepEqual(result.lines.slice(0, 4), ["# Title", "", "• bold", "• code"]);
   assert.match(result.lines.join("\n"), /␛\[2Jdanger/u);
 });

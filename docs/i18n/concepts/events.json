@@ -38,8 +38,8 @@
     },
     {
       "heading": "AgentApplicationEvent",
-      "en": "f3d648136bc31febdd95dc299c1e910b4585990944a05243587a6c6795398bad",
-      "zh": "808dcdb9b8d9245fcee926dd1eef6d039a00366c0dbf03eced3fbdf99badb6b4"
+      "en": "1024bee429d64a08c9dac8035ccfd9c8067907050cfc5a946810b1316c0e19a9",
+      "zh": "4ef94e07e5537086dc490bd9fb39e8311d200d86251fc6918949f3bb117d0f56"
     },
     {
       "heading": "AgentWorkspaceEvent",
@@ -63,8 +63,8 @@
     },
     {
       "heading": "Live events do not become durable automatically",
-      "en": "2e5ffce952ef56cf7d3e76344065e8c886a3d8fddd1f1a1cf345a86cbaacbe81",
-      "zh": "ad5a4c2a654cca982f65005210c87259b558bcfa819499f1bcd03fd6b175d823"
+      "en": "7b462c27044e760974e7df807254f431df02e49e94a1ca65fdce13e81f20a462",
+      "zh": "61310b725516b0f72d65ac81783155b11a5e31a7f50e7a9ed17f91c872048452"
     },
     {
       "heading": "Shutdown and the end of a stream",

@@ -37,10 +37,11 @@ const counterPlugin = definePlugin({
   setup(ctx) {
     ctx.provide(counter, {
       read: () => ctx.state.get<{ count: number }>().count,
-      increment: () => ctx.state.update((value) => {
-        const state = value as { count: number };
-        return { count: state.count + 1 };
-      }),
+      increment: () =>
+        ctx.state.update((value) => {
+          const state = value as { count: number };
+          return { count: state.count + 1 };
+        }),
     });
   },
 });
@@ -58,7 +59,7 @@ await host.close();
 Services are typed tokens with a stable `id`, interface `version`, `scope`, and capability names. Tokens default to an exact interface version. A dependency can select a compatible version range:
 
 ```ts
-requires: [{ service: counter, version: "^1.0.0", capabilities: ["increment"] }]
+requires: [{ service: counter, version: "^1.0.0", capabilities: ["increment"] }];
 ```
 
 `ctx.get(counter)` accesses a declared required or optional dependency. `ctx.optional(counter)` accesses a declared optional dependency and returns `undefined` when absent. Available optional dependencies undergo the same version, capability, and scope validation as required dependencies. `ctx.provide()` only registers services declared in `provides`.
@@ -90,10 +91,14 @@ const instructions = definePlugin({
   version: "1.0.0",
   requiresHooks: [runtimeHooks.contextAfter],
   setup(ctx) {
-    ctx.on(runtimeHooks.contextAfter, (snapshot) => ({
-      ...snapshot,
-      instructions: `${snapshot.instructions ?? ""}\nUse the project formatter.`,
-    }), { order: 10, timeoutMs: 5_000 });
+    ctx.on(
+      runtimeHooks.contextAfter,
+      (snapshot) => ({
+        ...snapshot,
+        instructions: `${snapshot.instructions ?? ""}\nUse the project formatter.`,
+      }),
+      { order: 10, timeoutMs: 5_000 },
+    );
   },
 });
 

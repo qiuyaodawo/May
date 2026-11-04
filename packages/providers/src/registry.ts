@@ -2,15 +2,14 @@ import type { Model } from "@sortedyuan/may/core";
 
 import { ProviderAdapterRegistryError } from "./errors.js";
 import { createCapabilityValidatedModel, type CapabilityValidatedModelOptions } from "./capability-validated-model.js";
-import type {
-  ProviderAdapterFactory,
-  ProviderModelSelection,
-} from "./types.js";
+import type { ProviderAdapterFactory, ProviderModelSelection } from "./types.js";
 
 export class ProviderAdapterRegistry {
   private readonly factories = new Map<string, ProviderAdapterFactory>();
 
-  constructor(private readonly validationOptions: CapabilityValidatedModelOptions & { readonly validateRequests?: boolean } = {}) {}
+  constructor(
+    private readonly validationOptions: CapabilityValidatedModelOptions & { readonly validateRequests?: boolean } = {},
+  ) {}
 
   register(name: string, factory: ProviderAdapterFactory): this {
     validateAdapterName(name);
@@ -21,9 +20,7 @@ export class ProviderAdapterRegistry {
       throw new TypeError("adapter factory must define create(selection)");
     }
     if (this.factories.has(name)) {
-      throw new ProviderAdapterRegistryError(
-        `Adapter "${name}" is already registered`,
-      );
+      throw new ProviderAdapterRegistryError(`Adapter "${name}" is already registered`);
     }
     this.factories.set(name, factory);
     return this;
@@ -43,9 +40,7 @@ export class ProviderAdapterRegistry {
       const available = this.names();
       throw new ProviderAdapterRegistryError(
         `Unsupported adapter "${selection.adapter}"` +
-          (available.length === 0
-            ? "; no adapters are registered"
-            : `; available adapters: ${available.join(", ")}`),
+          (available.length === 0 ? "; no adapters are registered" : `; available adapters: ${available.join(", ")}`),
       );
     }
     const model = factory.create(selection);

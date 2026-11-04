@@ -16,13 +16,16 @@ const host = await DurableTaskHost.open(join(directory, "host"));
 const scheduler = await Scheduler.open({
   store: await SqliteSchedulerStore.open(join(directory, "scheduler.sqlite")),
   dispatcher: host,
-  onError(error) { throw error; },
+  onError(error) {
+    throw error;
+  },
 });
-const displayTime = (time) => new Intl.DateTimeFormat("zh-CN", {
-  timeZone: "Asia/Shanghai",
-  dateStyle: "full",
-  timeStyle: "long",
-}).format(new Date(time));
+const displayTime = (time) =>
+  new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    dateStyle: "full",
+    timeStyle: "long",
+  }).format(new Date(time));
 
 try {
   const startedAt = new Date().toISOString();
@@ -38,16 +41,22 @@ try {
     },
     misfire: { policy: "latest", graceMs: 15_000 },
   });
-  console.log(JSON.stringify({
-    phase: "scheduled",
-    timezone: "Asia/Shanghai",
-    startedAt,
-    startedAtDisplay: displayTime(startedAt),
-    scheduledAt,
-    scheduledAtDisplay: displayTime(scheduledAt),
-    intervalMs: Date.parse(scheduledAt) - Date.parse(startedAt),
-    directory,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        phase: "scheduled",
+        timezone: "Asia/Shanghai",
+        startedAt,
+        startedAtDisplay: displayTime(startedAt),
+        scheduledAt,
+        scheduledAtDisplay: displayTime(scheduledAt),
+        intervalMs: Date.parse(scheduledAt) - Date.parse(startedAt),
+        directory,
+      },
+      null,
+      2,
+    ),
+  );
   await scheduler.start();
   const [receipt] = await accepted;
   await scheduler.stop();

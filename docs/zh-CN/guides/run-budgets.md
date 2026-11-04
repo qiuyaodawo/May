@@ -37,14 +37,14 @@ MaybeCode 的主 Run 默认为 32，子 Agent 的子 Run 默认为 24。
 
 可用限制字段如下：
 
-| 字段 | 单位与统计边界 |
-| --- | --- |
-| `maxDurationMs` | 当前 Run 的毫秒数 |
-| `maxSteps` | 获准进入的 Agent 循环步骤 |
-| `maxModelCalls` | 获准模型调用，Provider HTTP 重试独立计算 |
-| `maxToolCalls` | 预留工具调用，包括下一个完整批次 |
+| 字段             | 单位与统计边界                               |
+| ---------------- | -------------------------------------------- |
+| `maxDurationMs`  | 当前 Run 的毫秒数                            |
+| `maxSteps`       | 获准进入的 Agent 循环步骤                    |
+| `maxModelCalls`  | 获准模型调用，Provider HTTP 重试独立计算     |
+| `maxToolCalls`   | 预留工具调用，包括下一个完整批次             |
 | `maxTotalTokens` | Provider 报告的 token 用量，在响应返回时检查 |
-| `maxCostUsd` | 完整 USD 费用，在响应返回时检查 |
+| `maxCostUsd`     | 完整 USD 费用，在响应返回时检查              |
 
 ## 为费用限制配置价格
 

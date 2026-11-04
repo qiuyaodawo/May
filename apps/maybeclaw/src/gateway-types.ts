@@ -2,12 +2,23 @@ import { createHash } from "node:crypto";
 import type { ContentPart, RunBudget } from "@sortedyuan/may/core";
 import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/may/permissions";
 import type { PluginModuleSelection } from "@sortedyuan/may/plugin";
-import type { AgentAdapter as GatewayAgentAdapter, AgentAdapterContext as GatewayAdapterContext, AgentCapabilities as GatewayCapabilities, AgentTaskStatus as GatewayTaskStatus } from "@sortedyuan/gateway/adapters";
+import type {
+  AgentAdapter as GatewayAgentAdapter,
+  AgentAdapterContext as GatewayAdapterContext,
+  AgentCapabilities as GatewayCapabilities,
+  AgentTaskStatus as GatewayTaskStatus,
+} from "@sortedyuan/gateway/adapters";
 export type { GatewayAgentAdapter, GatewayAdapterContext, GatewayCapabilities, GatewayTaskStatus };
 
-export type GatewayActor = { kind: "operator"; id: string } | {
-  kind: "platform"; account: string; userId: string; conversation: string; threadId?: string;
-};
+export type GatewayActor =
+  | { kind: "operator"; id: string }
+  | {
+      kind: "platform";
+      account: string;
+      userId: string;
+      conversation: string;
+      threadId?: string;
+    };
 export interface GatewayEntry {
   account: string;
   conversation: string;
@@ -139,14 +150,20 @@ export function entryKey(entry: Pick<GatewayEntry, "account" | "conversation" | 
 }
 
 export function digest(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(canonical(value)))
+    .digest("hex");
 }
 
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)]));
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== undefined)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => [k, canonical(v)]),
+    );
   }
   return value;
 }

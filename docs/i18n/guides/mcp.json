@@ -18,8 +18,8 @@
     },
     {
       "heading": "Package API",
-      "en": "ccd71057cb921a322144fd4bfc399278dbe3bcda29e0fbc8820c826097407a73",
-      "zh": "8d095749dd667caa0f8055dd2c2eb51c4e497e34f5e85c3fd6b41b539aa2b0db"
+      "en": "3eb0d77035e6115b08f57f4a371bc41d201ea99565396e455ffeb7ec43b24c0b",
+      "zh": "5280fcccc6bc5d1a77e684b4d82d1ce635e033c4ebcff4ddb73509c6052cb966"
     },
     {
       "heading": "Names and collisions",
@@ -38,8 +38,8 @@
     },
     {
       "heading": "Tracing and security",
-      "en": "04d500355145a1ea20eb613c2448ee7f67a388bdb9ad516ac12f13781dd6b2f3",
-      "zh": "98a55868bd2c0642873c658aaf173f30b50fcacd990b772b0d5d602a70571b07"
+      "en": "01138c2e8b6aca796ea3b11c59e39a1049345dfb274f495b770424f9666a368b",
+      "zh": "0e00b8fd1e7079c2f768fbbb512b3a7f21a4494b4903d3b07e469878d983607c"
     },
     {
       "heading": "Current scope",
@@ -48,13 +48,13 @@
     },
     {
       "heading": "Dynamic catalogs and endpoint recovery",
-      "en": "12bb2333081154de871965d84bfc1ef668c53272766bf6e05bc2c9b355ceeef3",
-      "zh": "ca40957087082bab5f47f29070a381b5e564bbcff7618ad1ac208c3d7b4df62e"
+      "en": "2abc23a4602569acbd367a3f460e3377aefb45516db5f703a5d0422c89093e2e",
+      "zh": "fb67c8793e64ebc583368619fd409c78607dae0d088f395f17aae571b9279e63"
     },
     {
       "heading": "Resources, prompts, completion and attachments",
-      "en": "1d1b9f6395f06c899389e27d1449d16133d60ffb5dce52740cb47b8686333d36",
-      "zh": "83860b97a435f9f8c1b84419476a8fb418b460cc915058dabc46420a119393b8"
+      "en": "a2cff39e2c7a4e025e988c8e78936d3752364563d9cad9772bc4d2232e65a4a5",
+      "zh": "9962d28c246e4ba7a20da91507532afcf275334016cc8061f07a3a52d87b2117"
     },
     {
       "heading": "Scoped user interaction (modern MRTR)",
@@ -68,8 +68,8 @@
     },
     {
       "heading": "Troubleshooting",
-      "en": "6db0322ec32630444630a1b05e42b6b55ce55e83b69b0ef85d4910096b0f6203",
-      "zh": "8064db7d59d16ae87cd82d85f54ae8c3773eb09cad8f0c360f70a00d7ac4e8f4"
+      "en": "d255163c366f6135a3dbff4af34e3c942f7de06d123c3d5fce5d815a42a1d744",
+      "zh": "b976ae577ed07d2d17674dbacae9238a032d1effcca211def7a00d69851f1352"
     }
   ]
 }

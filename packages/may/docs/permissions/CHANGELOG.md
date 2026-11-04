@@ -40,6 +40,7 @@
   exists. Supply a trusted `createdBy` identity when resolving it. Existing policy
   return values and existing Session histories remain supported. Readers of
   histories containing rule events must use the updated Session package.
+
 - 89bcd8d: Add scoped plugin composition with typed versioned services, validated dependencies,
   configuration and state schemas, lifecycle Hooks, state migration, resource cleanup
   and serialized replacement. Agent definitions and applications accept plugins;
@@ -61,6 +62,7 @@
   argument boundary; use ordinary data objects and arrays to represent those values.
   Custom parsed instances retain their prototypes and methods and must protect any
   mutable internal state themselves.
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`

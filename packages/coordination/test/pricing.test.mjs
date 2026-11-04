@@ -4,15 +4,29 @@ import { createTestDirectory } from "@sortedyuan/test-support";
 import { priceUsage, resolveRunBudget, RunBudgetMeter } from "@sortedyuan/may/core";
 import { FileSharedBudget } from "../dist/index.js";
 
-const pricing = { id: "host", version: "2026-10-05", currency: "USD", source: "configuration", effectiveAt: "2026-10-05T00:00:00Z",
-  inputPerMillion: 2, outputPerMillion: 8, cachedReadPerMillion: 0.2 };
-const usage = { inputTokens: 100, outputTokens: 20, totalTokens: 120, cachedReadTokens: 80, tokenRelations: { cachedRead: "input" } };
+const pricing = {
+  id: "host",
+  version: "2026-10-05",
+  currency: "USD",
+  source: "configuration",
+  effectiveAt: "2026-10-05T00:00:00Z",
+  inputPerMillion: 2,
+  outputPerMillion: 8,
+  cachedReadPerMillion: 0.2,
+};
+const usage = {
+  inputTokens: 100,
+  outputTokens: 20,
+  totalTokens: 120,
+  cachedReadTokens: 80,
+  tokenRelations: { cachedRead: "input" },
+};
 
 function directory(t) {
   return createTestDirectory(t, "coordination/pricing");
 }
 
-test("shared and Run budgets use identical versioned pricing and durable cost receipts", async t => {
+test("shared and Run budgets use identical versioned pricing and durable cost receipts", async (t) => {
   const root = await directory(t);
   const limits = { maxModelCalls: 4, maxCostUsd: 1, pricing };
   let shared = await FileSharedBudget.open(root, "prices", limits);
@@ -28,10 +42,13 @@ test("shared and Run budgets use identical versioned pricing and durable cost re
   shared = await FileSharedBudget.open(root, "prices", limits);
   assert.deepEqual((await shared.snapshot()).calls[0].cost, priceUsage(usage, pricing));
   await shared.close();
-  await assert.rejects(FileSharedBudget.open(root, "prices", { ...limits, pricing: { ...pricing, version: "changed" } }), /changed limits/);
+  await assert.rejects(
+    FileSharedBudget.open(root, "prices", { ...limits, pricing: { ...pricing, version: "changed" } }),
+    /changed limits/,
+  );
 });
 
-test("shared budgets reject incomplete required prices and preserve estimated reservations", async t => {
+test("shared budgets reject incomplete required prices and preserve estimated reservations", async (t) => {
   const root = await directory(t);
   const shared = await FileSharedBudget.open(root, "missing", { maxModelCalls: 4, maxCostUsd: 1, pricing });
   await shared.reserveCall("partial", { totalTokens: 200, costUsd: 0.1 });
@@ -47,13 +64,20 @@ test("shared budgets reject incomplete required prices and preserve estimated re
   await shared.close();
 });
 
-test("shared budgets preserve custom pricing receipts without calling the pricer during journal validation", async t => {
+test("shared budgets preserve custom pricing receipts without calling the pricer during journal validation", async (t) => {
   const root = await directory(t);
   const limits = { maxModelCalls: 4, maxCostUsd: 1, pricing };
   let calls = 0;
   const usagePricer = (_usage, rates) => {
     calls += 1;
-    return { amount: calls / 100, currency: "USD", kind: "estimated", complete: true, missingReasons: [], pricingVersion: rates.version };
+    return {
+      amount: calls / 100,
+      currency: "USD",
+      kind: "estimated",
+      complete: true,
+      missingReasons: [],
+      pricingVersion: rates.version,
+    };
   };
   let shared = await FileSharedBudget.open(root, "custom", limits, { usagePricer });
   await shared.reserveCall("one", { totalTokens: 200, costUsd: 0.1 });
@@ -69,7 +93,7 @@ test("shared budgets preserve custom pricing receipts without calling the pricer
   await shared.close();
 });
 
-test("shared and Run budgets preserve provider receipts and reject non-USD settlement", async t => {
+test("shared and Run budgets preserve provider receipts and reject non-USD settlement", async (t) => {
   const root = await directory(t);
   const shared = await FileSharedBudget.open(root, "provider-receipt", { maxModelCalls: 4, maxCostUsd: 1, pricing });
   const receipt = { totalTokens: 5, reportedCost: { amount: 0.03, currency: "USD", source: "provider receipt" } };
@@ -85,7 +109,8 @@ test("shared and Run budgets preserve provider receipts and reject non-USD settl
   await assert.rejects(shared.settleCall("eur", foreign), /unavailable/);
   assert.throws(() => meter.recordUsage(foreign), { code: "RUN_BUDGET_USAGE_UNAVAILABLE" });
   await shared.markCallUnknown("eur");
-  const snapshot = await shared.snapshot(), totals = await shared.totals();
+  const snapshot = await shared.snapshot(),
+    totals = await shared.totals();
   assert.equal(snapshot.calls[1].status, "unknown");
   assert.equal(snapshot.calls[1].cost, undefined);
   assert.equal(totals.costUsd, 0.13);

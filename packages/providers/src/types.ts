@@ -1,7 +1,4 @@
-import type {
-  ModelCapabilitiesOverride,
-  ProviderConfig,
-} from "@sortedyuan/may/config";
+import type { ModelCapabilitiesOverride, ProviderConfig } from "@sortedyuan/may/config";
 import type { Model, ModelLimits } from "@sortedyuan/may/core";
 
 export interface ModelProfileSelector {

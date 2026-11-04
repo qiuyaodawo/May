@@ -28,7 +28,7 @@ provide live view updates; reload history when reconnecting.
 
 ```ts
 const run = await controller.submit({ input: "Explain this repository" });
-run.cancel("Cancelled in UI");        // 取消此 Run。
+run.cancel("Cancelled in UI"); // 取消此 Run。
 controller.cancel("Cancelled in UI"); // 取消活动 Run 或压缩操作。
 
 await controller.resolveApproval(requestId, "allow");
@@ -52,19 +52,11 @@ and `@sortedyuan/tui` in the consuming project. The function observes
 events until the controller closes; run input and exit handling concurrently.
 
 ```ts
-import type {
-  AgentApplicationEvent,
-  AgentController,
-} from "@sortedyuan/may";
-import type {
-  ApprovalDecision,
-  ApprovalRequest,
-} from "@sortedyuan/may/permissions";
+import type { AgentApplicationEvent, AgentController } from "@sortedyuan/may";
+import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/may/permissions";
 import { TranscriptStore } from "@sortedyuan/tui/transcript";
 
-type AskApproval = (
-  request: ApprovalRequest,
-) => Promise<ApprovalDecision>;
+type AskApproval = (request: ApprovalRequest) => Promise<ApprovalDecision>;
 
 export async function projectApplication(
   controller: AgentController<AgentApplicationEvent>,
@@ -119,11 +111,7 @@ projection function. `application` is the open controller and
 view lifecycle; your product also needs an input component and an exit handler.
 
 ```ts
-import {
-  FullscreenRenderer,
-  NodeTerminalDriver,
-  TuiRuntime,
-} from "@sortedyuan/tui";
+import { FullscreenRenderer, NodeTerminalDriver, TuiRuntime } from "@sortedyuan/tui";
 import { TranscriptStore, TranscriptView } from "@sortedyuan/tui/transcript";
 
 const store = new TranscriptStore();
@@ -210,7 +198,6 @@ these events concurrently with Runs and resource preparation. Never place answer
 behind the Session transition queue. Show the server and trusted owner, validate
 forms, require review/consent, and dismiss questions on settlement/deadline. No
 automatic browser navigation or form-answer history. See [MCP](./mcp.md#scoped-user-interaction-modern-mrtr).
-
 
 Also handle host-owned `params.mode === "review"`: `roots`, `sampling.request`,
 and `sampling.response`. Display the bounded `data` document as untrusted content.

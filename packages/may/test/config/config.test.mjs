@@ -4,32 +4,45 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { loadMayConfig, MayConfigFileError, MayConfigParseError, MayConfigResolutionError, MayConfigValidationError, parseMayConfig, resolveModelProfile, resolveProviderConfig, updateDefaultMayModel } from "@sortedyuan/may/config";
+import {
+  loadMayConfig,
+  MayConfigFileError,
+  MayConfigParseError,
+  MayConfigResolutionError,
+  MayConfigValidationError,
+  parseMayConfig,
+  resolveModelProfile,
+  resolveProviderConfig,
+  updateDefaultMayModel,
+} from "@sortedyuan/may/config";
 
 test("parses provider connections and model profiles", () => {
-  const config = parseMayConfig({
-    providers: {
-      gateway: {
-        adapter: "openai-responses",
-        apiKey: "test-key",
-        baseURL: "https://example.test",
-        options: { store: false },
+  const config = parseMayConfig(
+    {
+      providers: {
+        gateway: {
+          adapter: "openai-responses",
+          apiKey: "test-key",
+          baseURL: "https://example.test",
+          options: { store: false },
+        },
       },
-    },
-    models: {
-      chat: {
-        provider: "gateway",
-        adapter: "openai-chat-completions",
-        model: "test-model",
-        capabilities: {
-          reasoning: {
-            efforts: ["low", "high"],
-            defaultEffort: "high",
+      models: {
+        chat: {
+          provider: "gateway",
+          adapter: "openai-chat-completions",
+          model: "test-model",
+          capabilities: {
+            reasoning: {
+              efforts: ["low", "high"],
+              defaultEffort: "high",
+            },
           },
         },
       },
     },
-  }, "memory.json");
+    "memory.json",
+  );
 
   assert.equal(config.path, "memory.json");
   assert.deepEqual(config.models.chat, {
@@ -149,11 +162,7 @@ test("resolves apiKeyEnv lazily", () => {
 test("rejects invalid config shapes", async (t) => {
   const cases = [
     ["non-object root", null, "config"],
-    [
-      "unknown root field",
-      { providers: {}, defaultModal: "typo" },
-      "config.defaultModal",
-    ],
+    ["unknown root field", { providers: {}, defaultModal: "typo" }, "config.defaultModal"],
     [
       "two API key sources",
       { providers: { deepseek: { adapter: "deepseek-chat", apiKey: "key", apiKeyEnv: "KEY" } } },
@@ -167,11 +176,7 @@ test("rejects invalid config shapes", async (t) => {
       },
       "models.reasoner.provider",
     ],
-    [
-      "unknown default model",
-      { providers: {}, models: {}, defaultModel: "toString" },
-      "defaultModel",
-    ],
+    ["unknown default model", { providers: {}, models: {}, defaultModel: "toString" }, "defaultModel"],
   ];
 
   for (const [name, value, field] of cases) {
@@ -193,29 +198,23 @@ test("rejects invalid config shapes", async (t) => {
 test("rejects unknown provider and model selections", () => {
   const config = parseMayConfig({ providers: {} });
 
-  assert.throws(
-    () => resolveProviderConfig(config, "toString"),
-    /Unknown provider "toString"/,
-  );
-  assert.throws(
-    () => resolveModelProfile(config),
-    /defaultModel is not configured/,
-  );
-  assert.throws(
-    () => resolveModelProfile(config, "toString"),
-    /Unknown model "toString"/,
-  );
+  assert.throws(() => resolveProviderConfig(config, "toString"), /Unknown provider "toString"/);
+  assert.throws(() => resolveModelProfile(config), /defaultModel is not configured/);
+  assert.throws(() => resolveModelProfile(config, "toString"), /Unknown model "toString"/);
 });
 
 test("loads a config from a custom path", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "may-config-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, "config.json");
-  await writeFile(path, JSON.stringify({
-    providers: {
-      deepseek: { adapter: "deepseek-chat", apiKey: "test-key" },
-    },
-  }));
+  await writeFile(
+    path,
+    JSON.stringify({
+      providers: {
+        deepseek: { adapter: "deepseek-chat", apiKey: "test-key" },
+      },
+    }),
+  );
 
   const config = await loadMayConfig({ path });
 
@@ -227,16 +226,21 @@ test("atomically updates only the default model with existing formatting", async
   const directory = await mkdtemp(join(tmpdir(), "may-config-update-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, "config.json");
-  const source = JSON.stringify({
-    providers: {
-      local: { adapter: "openai-responses", apiKey: "test" },
-    },
-    models: {
-      first: { provider: "local", model: "first-model" },
-      second: { provider: "local", model: "second-model" },
-    },
-    defaultModel: "first",
-  }, null, 4).replace(/\n/gu, "\r\n") + "\r\n";
+  const source =
+    JSON.stringify(
+      {
+        providers: {
+          local: { adapter: "openai-responses", apiKey: "test" },
+        },
+        models: {
+          first: { provider: "local", model: "first-model" },
+          second: { provider: "local", model: "second-model" },
+        },
+        defaultModel: "first",
+      },
+      null,
+      4,
+    ).replace(/\n/gu, "\r\n") + "\r\n";
   await writeFile(path, source);
 
   const updated = await updateDefaultMayModel(path, "second");
@@ -255,37 +259,34 @@ test("distinguishes file and JSON parsing failures", async (t) => {
   const invalidPath = join(directory, "invalid.json");
   await writeFile(invalidPath, "{");
 
-  await assert.rejects(
-    loadMayConfig({ path: missingPath }),
-    (error) => {
-      assert.ok(error instanceof MayConfigFileError);
-      assert.equal(error.code, "MAY_CONFIG_FILE_ERROR");
-      assert.equal(error.path, missingPath);
-      assert.ok(error.cause instanceof Error);
-      return true;
-    },
-  );
-  await assert.rejects(
-    loadMayConfig({ path: invalidPath }),
-    (error) => {
-      assert.ok(error instanceof MayConfigParseError);
-      assert.equal(error.code, "MAY_CONFIG_PARSE_ERROR");
-      assert.equal(error.path, invalidPath);
-      assert.ok(error.cause instanceof Error);
-      return true;
-    },
-  );
+  await assert.rejects(loadMayConfig({ path: missingPath }), (error) => {
+    assert.ok(error instanceof MayConfigFileError);
+    assert.equal(error.code, "MAY_CONFIG_FILE_ERROR");
+    assert.equal(error.path, missingPath);
+    assert.ok(error.cause instanceof Error);
+    return true;
+  });
+  await assert.rejects(loadMayConfig({ path: invalidPath }), (error) => {
+    assert.ok(error instanceof MayConfigParseError);
+    assert.equal(error.code, "MAY_CONFIG_PARSE_ERROR");
+    assert.equal(error.path, invalidPath);
+    assert.ok(error.cause instanceof Error);
+    return true;
+  });
 });
 
 test("configuration readers and default model updates share file access", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "may-config-concurrent-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, "config.json");
-  await writeFile(path, JSON.stringify({
-    providers: { local: { adapter: "custom-test-adapter", options: { payload: "x".repeat(64 * 1024) } } },
-    models: { first: { provider: "local", model: "first" }, second: { provider: "local", model: "second" } },
-    defaultModel: "first",
-  }));
+  await writeFile(
+    path,
+    JSON.stringify({
+      providers: { local: { adapter: "custom-test-adapter", options: { payload: "x".repeat(64 * 1024) } } },
+      models: { first: { provider: "local", model: "first" }, second: { provider: "local", model: "second" } },
+      defaultModel: "first",
+    }),
+  );
   await loadMayConfig({ path });
   const readers = Array.from({ length: 8 }, async () => {
     for (let index = 0; index < 64; index++) {

@@ -105,12 +105,12 @@ registry.registerAll(featureTools);
 
 registry.size;
 registry.has("add");
-registry.get("add");       // 返回 Tool 或 undefined。
-registry.require("add");   // 缺少工具时抛出 ToolNotFoundError。
-registry.names();          // 按注册顺序返回名称快照。
-registry.values();         // 按注册顺序返回 Tool 快照。
-registry.definitions();    // 返回模型可见定义。
-registry.snapshot();       // 为一次 Run 冻结定义与回调。
+registry.get("add"); // 返回 Tool 或 undefined。
+registry.require("add"); // 缺少工具时抛出 ToolNotFoundError。
+registry.names(); // 按注册顺序返回名称快照。
+registry.values(); // 按注册顺序返回 Tool 快照。
+registry.definitions(); // 返回模型可见定义。
+registry.snapshot(); // 为一次 Run 冻结定义与回调。
 
 const independent = registry.clone();
 const composed = ToolRegistry.compose(baseTools, featureTools);
@@ -121,20 +121,20 @@ for (const registeredTool of composed) {
 
 The constructor and registration methods validate the Tool shape.
 
-| API | Behavior |
-| --- | --- |
-| `new ToolRegistry(tools?)` | Register initial tools from an iterable |
-| `register(tool)` | Atomically register one tool and return this registry |
-| `registerAll(tools)` | Atomically register a group and return this registry |
-| `size`, `has(name)` | Query count or membership |
-| `get(name)` | Return the tool or `undefined` |
-| `require(name)` | Return the tool or throw `ToolNotFoundError` |
-| `names()`, `values()` | Return snapshots in registration order |
-| `definitions()` | Return model-facing definitions |
-| `snapshot()` | Freeze definitions, schemas and callbacks for a Run |
-| `clone()` | Create an independent registry |
-| `[Symbol.iterator]()` | Iterate in registration order |
-| `ToolRegistry.compose(...sources)` | Compose input iterables in order |
+| API                                | Behavior                                              |
+| ---------------------------------- | ----------------------------------------------------- |
+| `new ToolRegistry(tools?)`         | Register initial tools from an iterable               |
+| `register(tool)`                   | Atomically register one tool and return this registry |
+| `registerAll(tools)`               | Atomically register a group and return this registry  |
+| `size`, `has(name)`                | Query count or membership                             |
+| `get(name)`                        | Return the tool or `undefined`                        |
+| `require(name)`                    | Return the tool or throw `ToolNotFoundError`          |
+| `names()`, `values()`              | Return snapshots in registration order                |
+| `definitions()`                    | Return model-facing definitions                       |
+| `snapshot()`                       | Freeze definitions, schemas and callbacks for a Run   |
+| `clone()`                          | Create an independent registry                        |
+| `[Symbol.iterator]()`              | Iterate in registration order                         |
+| `ToolRegistry.compose(...sources)` | Compose input iterables in order                      |
 
 Duplicate names throw `DuplicateToolNameError`. `registerAll()` is atomic: if any member
 is invalid, repeats another incoming name, or conflicts with an existing name,

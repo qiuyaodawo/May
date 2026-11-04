@@ -2,13 +2,7 @@ import type { KeyStroke } from "./keybindings/index.js";
 import { placeImages } from "./component.js";
 import sliceAnsi from "slice-ansi";
 import stringWidth from "string-width";
-import type {
-  Component,
-  InteractiveComponent,
-  RenderResult,
-  RenderSize,
-  PointerEvent,
-} from "./component.js";
+import type { Component, InteractiveComponent, RenderResult, RenderSize, PointerEvent } from "./component.js";
 import { styleText, type TextStyle } from "./theme.js";
 
 export interface OverlayOptions {
@@ -35,18 +29,10 @@ export class Overlay implements Component {
     const top = alignmentOffset(size.height, height, this.options.vertical ?? "center");
     this.bounds = { left, top, width, height };
     const foreground = this.foreground.render({ width, height });
-    const lines = Array.from({ length: size.height }, (_, row) =>
-      fitLine(base.lines[row] ?? "", size.width)
-    );
+    const lines = Array.from({ length: size.height }, (_, row) => fitLine(base.lines[row] ?? "", size.width));
 
     for (let row = 0; row < height; row++) {
-      lines[top + row] = replaceColumns(
-        lines[top + row]!,
-        left,
-        width,
-        foreground.lines[row] ?? "",
-        size.width,
-      );
+      lines[top + row] = replaceColumns(lines[top + row]!, left, width, foreground.lines[row] ?? "", size.width);
     }
     return {
       lines,
@@ -66,10 +52,14 @@ export class Overlay implements Component {
     if (event.type === "down") this.captured = false;
     const bounds = this.bounds;
     if (bounds === undefined) return false;
-    const inside = event.x >= bounds.left && event.x < bounds.left + bounds.width &&
-      event.y >= bounds.top && event.y < bounds.top + bounds.height;
+    const inside =
+      event.x >= bounds.left &&
+      event.x < bounds.left + bounds.width &&
+      event.y >= bounds.top &&
+      event.y < bounds.top + bounds.height;
     if (!inside && !this.captured) return false;
-    const handled = this.foreground.handlePointer?.({ ...event, x: event.x - bounds.left, y: event.y - bounds.top }) ?? false;
+    const handled =
+      this.foreground.handlePointer?.({ ...event, x: event.x - bounds.left, y: event.y - bounds.top }) ?? false;
     if (event.type === "down" && handled) this.captured = true;
     if (event.type === "up") this.captured = false;
     return handled;
@@ -97,29 +87,39 @@ export class Panel implements Component {
     }
     const innerWidth = size.width - 2;
     const innerHeight = size.height - 2;
-    const child = innerWidth > 0 && innerHeight > 0
-      ? this.child.render({ width: innerWidth, height: innerHeight })
-      : { lines: [] };
-    const title = this.options.title === undefined
-      ? ""
-      : ` ${singleLine(this.options.title)} `;
+    const child =
+      innerWidth > 0 && innerHeight > 0 ? this.child.render({ width: innerWidth, height: innerHeight }) : { lines: [] };
+    const title = this.options.title === undefined ? "" : ` ${singleLine(this.options.title)} `;
     const top = styleText(`┌${fitLine(title, innerWidth, "─")}┐`, this.options.borderStyle);
     const bottom = styleText(`└${"─".repeat(innerWidth)}┘`, this.options.borderStyle);
     const side = styleText("│", this.options.borderStyle);
-    const body = Array.from({ length: innerHeight }, (_, row) =>
-      `${side}${fitLine(child.lines[row] ?? "", innerWidth)}${side}`
+    const body = Array.from(
+      { length: innerHeight },
+      (_, row) => `${side}${fitLine(child.lines[row] ?? "", innerWidth)}${side}`,
     );
-    const styledTop = title === "" || this.options.titleStyle === undefined
-      ? top
-      : replaceTitleStyle(top, sliceAnsi(title, 0, innerWidth), this.options.titleStyle, this.options.borderStyle);
+    const styledTop =
+      title === "" || this.options.titleStyle === undefined
+        ? top
+        : replaceTitleStyle(top, sliceAnsi(title, 0, innerWidth), this.options.titleStyle, this.options.borderStyle);
     return {
       lines: [styledTop, ...body, bottom],
-      ...(child.textRows === undefined ? {} : { textRows: [undefined,
-        ...Array.from({ length: innerHeight }, (_, index) => {
-          const row = child.textRows?.[index];
-          return row === undefined ? undefined : { ...row, spans: row.spans.map(span => ({ ...span, x: span.x + 1 })) };
-        }), undefined] }),
-      ...(child.images?.length ? { images: placeImages(child.images, 1, size.height - 1).map(image => ({ ...image, x: image.x + 1 })) } : {}),
+      ...(child.textRows === undefined
+        ? {}
+        : {
+            textRows: [
+              undefined,
+              ...Array.from({ length: innerHeight }, (_, index) => {
+                const row = child.textRows?.[index];
+                return row === undefined
+                  ? undefined
+                  : { ...row, spans: row.spans.map((span) => ({ ...span, x: span.x + 1 })) };
+              }),
+              undefined,
+            ],
+          }),
+      ...(child.images?.length
+        ? { images: placeImages(child.images, 1, size.height - 1).map((image) => ({ ...image, x: image.x + 1 })) }
+        : {}),
       ...(child.cursor === undefined
         ? {}
         : { cursor: { ...child.cursor, x: child.cursor.x + 1, y: child.cursor.y + 1 } }),
@@ -138,7 +138,10 @@ export class Panel implements Component {
     return handled;
   }
 
-  dispose(): void { this.captured = false; this.child.dispose?.(); }
+  dispose(): void {
+    this.captured = false;
+    this.child.dispose?.();
+  }
 }
 
 export interface DialogOptions extends OverlayOptions, PanelOptions {
@@ -192,7 +195,7 @@ export class Dialog implements InteractiveComponent {
   }
 
   handlePointer(event: PointerEvent): boolean {
-    return this.opened ? this.overlay.handlePointer(event) : this.base.handlePointer?.(event) ?? false;
+    return this.opened ? this.overlay.handlePointer(event) : (this.base.handlePointer?.(event) ?? false);
   }
 
   dispose(): void {
@@ -200,13 +203,7 @@ export class Dialog implements InteractiveComponent {
   }
 }
 
-function replaceColumns(
-  base: string,
-  start: number,
-  width: number,
-  replacement: string,
-  totalWidth: number,
-): string {
+function replaceColumns(base: string, start: number, width: number, replacement: string, totalWidth: number): string {
   const before = fitLine(sliceAnsi(base, 0, start), start);
   const middle = fitLine(replacement, width);
   const after = sliceAnsi(base, start + width, totalWidth);
@@ -232,12 +229,7 @@ function singleLine(value: string): string {
   return value.replace(/\s+/gu, " ").trim();
 }
 
-function replaceTitleStyle(
-  line: string,
-  title: string,
-  titleStyle: TextStyle,
-  borderStyle?: TextStyle,
-): string {
+function replaceTitleStyle(line: string, title: string, titleStyle: TextStyle, borderStyle?: TextStyle): string {
   const start = 1;
   const before = sliceAnsi(line, 0, start);
   const after = sliceAnsi(line, start + stringWidth(title));

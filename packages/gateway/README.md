@@ -5,14 +5,14 @@
 Agent adapters, durable message delivery and HTTP services for May hosts.
 Requires Node.js 22.16.0 or later.
 
-| Entry | Purpose |
-| --- | --- |
-| `@sortedyuan/gateway` | Adapter, delivery and HTTP exports |
-| `@sortedyuan/gateway/adapters` | Agent adapter interfaces, registry, loading and May integration |
-| `@sortedyuan/gateway/rpc` | JSON-RPC adapters over stdio or sockets |
-| `@sortedyuan/gateway/delivery` | Channel interfaces, journal storage and message delivery |
-| `@sortedyuan/gateway/web-api` | HTTP listener lifecycle through a host plugin |
-| `@sortedyuan/gateway/examples/rpc-file-agent` | Executable file Agent for RPC integration |
+| Entry                                         | Purpose                                                         |
+| --------------------------------------------- | --------------------------------------------------------------- |
+| `@sortedyuan/gateway`                         | Adapter, delivery and HTTP exports                              |
+| `@sortedyuan/gateway/adapters`                | Agent adapter interfaces, registry, loading and May integration |
+| `@sortedyuan/gateway/rpc`                     | JSON-RPC adapters over stdio or sockets                         |
+| `@sortedyuan/gateway/delivery`                | Channel interfaces, journal storage and message delivery        |
+| `@sortedyuan/gateway/web-api`                 | HTTP listener lifecycle through a host plugin                   |
+| `@sortedyuan/gateway/examples/rpc-file-agent` | Executable file Agent for RPC integration                       |
 
 `createAgentAdaptersPlugin()` provides a host registry. The registry creates
 adapters when requested, shares an active creation and closes acquired adapters

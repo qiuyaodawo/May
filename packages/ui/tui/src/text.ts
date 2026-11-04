@@ -22,9 +22,10 @@ export class Text implements Component {
   render(size: RenderSize): RenderResult {
     const value = typeof this.value === "function" ? this.value() : this.value;
     const document = value.split(/\r?\n/u).map((plainLine, index) => {
-      const copy = this.options.copyRanges === undefined
-        ? { start: 0, end: stripVTControlCharacters(plainLine).length }
-        : this.options.copyRanges[index];
+      const copy =
+        this.options.copyRanges === undefined
+          ? { start: 0, end: stripVTControlCharacters(plainLine).length }
+          : this.options.copyRanges[index];
       return { value: styleText(plainLine, this.options.style), ...(copy === undefined ? {} : { copy }) };
     });
     return renderTextDocument(document, size, this.options);
@@ -36,8 +37,5 @@ export function sanitizeTerminalText(value: string): string {
   return value
     .replace(/\r\n?/gu, "\n")
     .replace(/\u001b/gu, "␛")
-    .replace(
-      /[\u0000-\u0008\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f-\u009f]/gu,
-      "�",
-    );
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f-\u009f]/gu, "�");
 }

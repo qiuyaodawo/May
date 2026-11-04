@@ -24,50 +24,81 @@ async function openApplication(t, automatic, completion) {
   const options = {
     sessionId: `verification-${crypto.randomUUID()}`,
     store,
-    model: new OpenAIResponsesModel({ apiKey: "context-verification-local-only", model: "context-verification-local-only" }),
+    model: new OpenAIResponsesModel({
+      apiKey: "context-verification-local-only",
+      model: "context-verification-local-only",
+    }),
     contextBudget: { contextWindowTokens: 1000, compactTriggerRatio: 0.5 },
     compactionStrategy: strategy,
     ...(automatic ? { autoCompactionStrategies: [strategy] } : {}),
     plugins: [
-      createRuntimePlugin(input => { context = input.context; return new May(input); }),
+      createRuntimePlugin((input) => {
+        context = input.context;
+        return new May(input);
+      }),
       definePlugin({
-        id: "verification.compaction-notification", version: "1.0.0",
+        id: "verification.compaction-notification",
+        version: "1.0.0",
         requiresHooks: [applicationHooks.compactionCompleted],
-        setup(pluginContext) { pluginContext.on(applicationHooks.compactionCompleted, completion); },
+        setup(pluginContext) {
+          pluginContext.on(applicationHooks.compactionCompleted, completion);
+        },
       }),
     ],
   };
   application = await AgentApplication.open(options);
   await context.append([
     userMessage("读取仓库指令"),
-    { role: "assistant", content: [], toolCalls: [{ id: "verification.read", name: "read_file", input: { path: source } }] },
-    { role: "tool", name: "read_file", toolCallId: "verification.read", content: [{ type: "text", text: await readFile(source, "utf8") }] },
+    {
+      role: "assistant",
+      content: [],
+      toolCalls: [{ id: "verification.read", name: "read_file", input: { path: source } }],
+    },
+    {
+      role: "tool",
+      name: "read_file",
+      toolCallId: "verification.read",
+      content: [{ type: "text", text: await readFile(source, "utf8") }],
+    },
   ]);
-  return { application, options, store, directory, compact: () => automatic ? context.snapshot() : application.compactContext() };
+  return {
+    application,
+    options,
+    store,
+    directory,
+    compact: () => (automatic ? context.snapshot() : application.compactContext()),
+  };
 }
 
 for (const automatic of [false, true]) {
   const mode = automatic ? "自动" : "手动";
-  test(`${mode}压缩在完成 Hook 失败后保留已经保存的 Context`, async t => {
+  test(`${mode}压缩在完成 Hook 失败后保留已经保存的 Context`, async (t) => {
     const failure = new Error("完成通知失败");
-    const { application, options, compact } = await openApplication(t, automatic, () => { throw failure; });
+    const { application, options, compact } = await openApplication(t, automatic, () => {
+      throw failure;
+    });
     const before = await application.inspectContext();
-    await assert.rejects(compact(), error => error === failure);
+    await assert.rejects(compact(), (error) => error === failure);
     const after = await application.inspectContext();
     assert(after.messageBytes < before.messageBytes);
-    const saved = (await application.history()).find(event => event.type === "context.compacted");
+    const saved = (await application.history()).find((event) => event.type === "context.compacted");
     assert(saved);
     assert.equal(saved.messages.at(-1).content[0].type, "text");
     assert.match(saved.messages.at(-1).content[0].text, /tool result pruned/u);
     await application.close();
     const resumed = await AgentApplication.open({ ...options, resume: true });
-    try { assert.deepEqual(await resumed.inspectContext(), after); }
-    finally { await resumed.close(); }
+    try {
+      assert.deepEqual(await resumed.inspectContext(), after);
+    } finally {
+      await resumed.close();
+    }
   });
 
-  test(`${mode}压缩在真实文件保存失败后恢复 Context`, async t => {
+  test(`${mode}压缩在真实文件保存失败后恢复 Context`, async (t) => {
     let notifications = 0;
-    const { application, store, directory, compact } = await openApplication(t, automatic, () => { notifications++; });
+    const { application, store, directory, compact } = await openApplication(t, automatic, () => {
+      notifications++;
+    });
     const before = await application.inspectContext();
     const files = await readdir(store.directory);
     assert.equal(files.length, 1);
@@ -76,13 +107,16 @@ for (const automatic of [false, true]) {
     await rename(journal, backup);
     await mkdir(journal);
     try {
-      await assert.rejects(compact(), error => error.code === "EISDIR" || error.code === "EPERM");
+      await assert.rejects(compact(), (error) => error.code === "EISDIR" || error.code === "EPERM");
       assert.deepEqual(await application.inspectContext(), before);
       assert.equal(notifications, 0);
     } finally {
       await rm(journal, { recursive: true });
       await rename(backup, journal);
     }
-    assert.equal((await application.history()).some(event => event.type === "context.compacted"), false);
+    assert.equal(
+      (await application.history()).some((event) => event.type === "context.compacted"),
+      false,
+    );
   });
 }

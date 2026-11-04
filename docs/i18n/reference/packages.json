@@ -13,8 +13,8 @@
     },
     {
       "heading": "Choose a package for your task",
-      "en": "f9f1a6fc7bd2a4c576a2ab839b44d996e30713a51faf23e1f2f0599ee3fd0b10",
-      "zh": "7468436bef26965cec9d4cb95132ed20b85e28c0333e35d50227b395f81376c8"
+      "en": "5e7ff48c8c2398462ae1588fa09ce4e7c9bdfeabd6da6ba651be2ef448d7023f",
+      "zh": "22746e2d710536e70d4d4d3579d0b4c38c1791824a7f4d166fa075a92956578a"
     },
     {
       "heading": "Runtime and application",
@@ -38,8 +38,8 @@
     },
     {
       "heading": "@sortedyuan/coordination",
-      "en": "6c8e5d24bd2bd720ccae6ec230b4fc00fb0d676a85293c22ddde5f4e7c860f5c",
-      "zh": "6496622e9d2ebf0daf812730960cd54784eff31e729f2dff93a7abedfa996544"
+      "en": "d692047d292d2c90b21d79ba630fa852422de6cb392d777578ba62ec1cb7f676",
+      "zh": "6b0a4f91a9599e494a5251eab30623b100a97a1a3c1d0e918661ddee85aed9c0"
     },
     {
       "heading": "@sortedyuan/may/goals",
@@ -53,8 +53,8 @@
     },
     {
       "heading": "@sortedyuan/eval",
-      "en": "9f22ac8aa260b63ff851cd4cb887dcd7f75935003d9f13fc335144c2861ef5ec",
-      "zh": "2ece2ccda005114976a0c92f97de6e660a9b5a73b1e3c51bac9e8e8254db5b4d"
+      "en": "b2efb0e21d8e5e7c5bdda7083a4ad15ce17cc629f3a9e2bcd8a5a68ef93da921",
+      "zh": "9079c913dd447790651392f7d14788a4e7d9623c18182a640b62a1242b1a38fe"
     },
     {
       "heading": "@sortedyuan/may/plugin",
@@ -118,8 +118,8 @@
     },
     {
       "heading": "@sortedyuan/providers",
-      "en": "fae48e157c1270ec5ae1562dcb40d74054704cfd84fb8f6ab8cd7fb2d2eef90a",
-      "zh": "485d6b6b75008f331e694f328c2107828ab455fcfcd0fc987f37019988655d45"
+      "en": "42bbce6ca97098984337f8f55d1d2973bdd4a73f195b9532c0e58b0c28a77dd0",
+      "zh": "e226662152728c7b4305af830eadd8b9f1c7baa65b7f8c29b14ddc19c1ef9f00"
     },
     {
       "heading": "Tools and media",
@@ -148,8 +148,8 @@
     },
     {
       "heading": "@sortedyuan/tui",
-      "en": "786c91b6432161ee561099c20c43e899ce06817ba55c1275b3284c647fa6e33e",
-      "zh": "ebea09b06e9fcf62c6cfbb463ab32360ec24fc9b7dcc011f29ea0011fd2c1b82"
+      "en": "9a8cb6c46d81d53708f1287a7e3e9b7073673007b0d49ee85d6134ad84f31864",
+      "zh": "e1fe04683cdca5e87f2a5ef6c5b41337449c6ecfd5c158ee0a953ce6873d14c9"
     },
     {
       "heading": "@sortedyuan/ui-client / @sortedyuan/web-ui",
@@ -163,8 +163,8 @@
     },
     {
       "heading": "Reference products",
-      "en": "a752b6aad45de8187bce6ed7fe656413a54e25835e2ea839bcdb608a2bada878",
-      "zh": "921b959d4b03aeaf2d12936a2ce882908a6f85d6f04d7be175c906b780a2d68a"
+      "en": "4865fe4ece45cf96e0e7f3a867d0acd1531326e62609e8ebc178b7b136980e8d",
+      "zh": "dea56f553cdb165c41a687705287531e2d7a1a6ff3867589dcb51bf547ef27f2"
     }
   ]
 }

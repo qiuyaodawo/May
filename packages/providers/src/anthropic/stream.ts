@@ -1,15 +1,6 @@
-import type {
-  AssistantMessage,
-  ModelEvent,
-  ToolCall,
-  Usage,
-} from "@sortedyuan/may/core";
+import type { AssistantMessage, ModelEvent, ToolCall, Usage } from "@sortedyuan/may/core";
 import { readSseData } from "../openai-compatible/http.js";
-import {
-  AnthropicFinishReasonError,
-  AnthropicProtocolError,
-  AnthropicStreamError,
-} from "./errors.js";
+import { AnthropicFinishReasonError, AnthropicProtocolError, AnthropicStreamError } from "./errors.js";
 import {
   ANTHROPIC_MODEL_STATE_TYPE,
   type AnthropicAssistantContentBlock,
@@ -44,16 +35,9 @@ interface PendingToolUse extends PendingBase {
   partialJson: string;
 }
 
-type PendingBlock =
-  | PendingText
-  | PendingThinking
-  | PendingRedactedThinking
-  | PendingToolUse;
+type PendingBlock = PendingText | PendingThinking | PendingRedactedThinking | PendingToolUse;
 
-export async function* streamAnthropicResponse(
-  response: Response,
-  signal: AbortSignal,
-): AsyncIterable<ModelEvent> {
+export async function* streamAnthropicResponse(response: Response, signal: AbortSignal): AsyncIterable<ModelEvent> {
   const blocks = new Map<number, PendingBlock>();
   let messageId: string | undefined;
   let sawMessageStart = false;
@@ -78,9 +62,7 @@ export async function* streamAnthropicResponse(
 
     if (event.type === "message_start") {
       if (sawMessageStart) {
-        throw new AnthropicProtocolError(
-          "Anthropic emitted more than one message_start event",
-        );
+        throw new AnthropicProtocolError("Anthropic emitted more than one message_start event");
       }
       const message = requireRecord(event.message, "message_start.message");
       messageId = requireString(message.id, "message_start.message.id");
@@ -98,9 +80,7 @@ export async function* streamAnthropicResponse(
       requireActiveMessage(sawMessageStart, sawMessageStop);
       const index = requireIndex(event.index);
       if (blocks.has(index)) {
-        throw new AnthropicProtocolError(
-          `Anthropic started content block ${index} more than once`,
-        );
+        throw new AnthropicProtocolError(`Anthropic started content block ${index} more than once`);
       }
       blocks.set(index, createPendingBlock(event.content_block, index));
       continue;
@@ -111,10 +91,7 @@ export async function* streamAnthropicResponse(
       const index = requireIndex(event.index);
       const block = requirePendingBlock(blocks, index);
       const delta = requireRecord(event.delta, `content block ${index} delta`);
-      const deltaType = requireString(
-        delta.type,
-        `content block ${index} delta.type`,
-      );
+      const deltaType = requireString(delta.type, `content block ${index} delta.type`);
 
       if (deltaType === "text_delta") {
         if (block.kind !== "text") throw mismatchedDelta(index, deltaType);
@@ -126,10 +103,7 @@ export async function* streamAnthropicResponse(
 
       if (deltaType === "thinking_delta") {
         if (block.kind !== "thinking") throw mismatchedDelta(index, deltaType);
-        const thinking = requireString(
-          delta.thinking,
-          `content block ${index} thinking`,
-        );
+        const thinking = requireString(delta.thinking, `content block ${index} thinking`);
         block.block.thinking += thinking;
         if (thinking !== "") {
           yield { type: "reasoning.delta", delta: thinking };
@@ -139,19 +113,13 @@ export async function* streamAnthropicResponse(
 
       if (deltaType === "signature_delta") {
         if (block.kind !== "thinking") throw mismatchedDelta(index, deltaType);
-        block.block.signature += requireString(
-          delta.signature,
-          `content block ${index} signature`,
-        );
+        block.block.signature += requireString(delta.signature, `content block ${index} signature`);
         continue;
       }
 
       if (deltaType === "input_json_delta") {
         if (block.kind !== "tool_use") throw mismatchedDelta(index, deltaType);
-        block.partialJson += requireString(
-          delta.partial_json,
-          `content block ${index} partial_json`,
-        );
+        block.partialJson += requireString(delta.partial_json, `content block ${index} partial_json`);
       }
       // Anthropic may add new delta types; unknown ones are ignored.
       continue;
@@ -172,10 +140,7 @@ export async function* streamAnthropicResponse(
       requireActiveMessage(sawMessageStart, sawMessageStop);
       const delta = requireRecord(event.delta, "message_delta.delta");
       if (delta.stop_reason !== undefined && delta.stop_reason !== null) {
-        stopReason = requireString(
-          delta.stop_reason,
-          "message_delta.delta.stop_reason",
-        );
+        stopReason = requireString(delta.stop_reason, "message_delta.delta.stop_reason");
       }
       const usage = optionalRecord(event.usage);
       inputTokens = optionalTokenCount(usage?.input_tokens) ?? inputTokens;
@@ -194,19 +159,13 @@ export async function* streamAnthropicResponse(
   }
 
   if (!sawMessageStart || messageId === undefined) {
-    throw new AnthropicProtocolError(
-      "Anthropic stream ended without a message_start event",
-    );
+    throw new AnthropicProtocolError("Anthropic stream ended without a message_start event");
   }
   if (!sawMessageStop) {
-    throw new AnthropicProtocolError(
-      "Anthropic stream ended without a message_stop event",
-    );
+    throw new AnthropicProtocolError("Anthropic stream ended without a message_stop event");
   }
   if (stopReason === undefined) {
-    throw new AnthropicProtocolError(
-      "Anthropic stream ended without a stop_reason",
-    );
+    throw new AnthropicProtocolError("Anthropic stream ended without a stop_reason");
   }
   if (stopReason !== "end_turn" && stopReason !== "tool_use") {
     throw new AnthropicFinishReasonError(stopReason);
@@ -216,23 +175,17 @@ export async function* streamAnthropicResponse(
     .sort(([left], [right]) => left - right)
     .map(([index, block]) => {
       if (!block.stopped) {
-        throw new AnthropicProtocolError(
-          `Anthropic content block ${index} did not stop`,
-        );
+        throw new AnthropicProtocolError(`Anthropic content block ${index} did not stop`);
       }
       return block.block;
     });
   const message = toAssistantMessage(messageId, content);
   const calls = message.toolCalls ?? [];
   if (stopReason === "tool_use" && calls.length === 0) {
-    throw new AnthropicProtocolError(
-      "Anthropic stopped for tool_use but emitted no tool calls",
-    );
+    throw new AnthropicProtocolError("Anthropic stopped for tool_use but emitted no tool calls");
   }
   if (stopReason !== "tool_use" && calls.length > 0) {
-    throw new AnthropicProtocolError(
-      `Anthropic emitted tool calls with stop reason "${stopReason}"`,
-    );
+    throw new AnthropicProtocolError(`Anthropic emitted tool calls with stop reason "${stopReason}"`);
   }
 
   const completed: Extract<ModelEvent, { type: "response.completed" }> = {
@@ -252,10 +205,7 @@ function parseEvent(data: string): Record<string, unknown> {
     return record;
   } catch (error) {
     if (error instanceof AnthropicProtocolError) throw error;
-    throw new AnthropicProtocolError(
-      "Anthropic emitted invalid SSE JSON",
-      { cause: error },
-    );
+    throw new AnthropicProtocolError("Anthropic emitted invalid SSE JSON", { cause: error });
   }
 }
 
@@ -279,14 +229,8 @@ function createPendingBlock(value: unknown, index: number): PendingBlock {
       stopped: false,
       block: {
         type,
-        thinking: requireString(
-          block.thinking,
-          `content block ${index}.thinking`,
-        ),
-        signature: requireString(
-          block.signature,
-          `content block ${index}.signature`,
-        ),
+        thinking: requireString(block.thinking, `content block ${index}.thinking`),
+        signature: requireString(block.signature, `content block ${index}.signature`),
       },
     };
   }
@@ -314,15 +258,10 @@ function createPendingBlock(value: unknown, index: number): PendingBlock {
     };
   }
 
-  throw new AnthropicProtocolError(
-    `Anthropic emitted unsupported content block type "${type}"`,
-  );
+  throw new AnthropicProtocolError(`Anthropic emitted unsupported content block type "${type}"`);
 }
 
-function toAssistantMessage(
-  messageId: string,
-  blocks: AnthropicAssistantContentBlock[],
-): AssistantMessage {
+function toAssistantMessage(messageId: string, blocks: AnthropicAssistantContentBlock[]): AssistantMessage {
   const message: AssistantMessage = {
     role: "assistant",
     content: [],
@@ -364,54 +303,37 @@ function createStreamError(event: Record<string, unknown>): AnthropicStreamError
 
 function parseToolInput(input: string, index: number): Record<string, unknown> {
   try {
-    return requireObject(
-      JSON.parse(input),
-      `content block ${index} tool input`,
-    );
+    return requireObject(JSON.parse(input), `content block ${index} tool input`);
   } catch (error) {
     if (error instanceof AnthropicProtocolError) throw error;
-    throw new AnthropicProtocolError(
-      `Anthropic emitted invalid tool input JSON at content block ${index}`,
-      { cause: error },
-    );
+    throw new AnthropicProtocolError(`Anthropic emitted invalid tool input JSON at content block ${index}`, {
+      cause: error,
+    });
   }
 }
 
 function requireActiveMessage(started: boolean, stopped: boolean): void {
   if (!started) {
-    throw new AnthropicProtocolError(
-      "Anthropic emitted content before message_start",
-    );
+    throw new AnthropicProtocolError("Anthropic emitted content before message_start");
   }
   if (stopped) {
-    throw new AnthropicProtocolError(
-      "Anthropic emitted content after message_stop",
-    );
+    throw new AnthropicProtocolError("Anthropic emitted content after message_stop");
   }
 }
 
-function requirePendingBlock(
-  blocks: Map<number, PendingBlock>,
-  index: number,
-): PendingBlock {
+function requirePendingBlock(blocks: Map<number, PendingBlock>, index: number): PendingBlock {
   const block = blocks.get(index);
   if (!block) {
-    throw new AnthropicProtocolError(
-      `Anthropic referenced unknown content block ${index}`,
-    );
+    throw new AnthropicProtocolError(`Anthropic referenced unknown content block ${index}`);
   }
   if (block.stopped) {
-    throw new AnthropicProtocolError(
-      `Anthropic emitted a delta after content block ${index} stopped`,
-    );
+    throw new AnthropicProtocolError(`Anthropic emitted a delta after content block ${index} stopped`);
   }
   return block;
 }
 
 function mismatchedDelta(index: number, deltaType: string): AnthropicProtocolError {
-  return new AnthropicProtocolError(
-    `Anthropic emitted ${deltaType} for incompatible content block ${index}`,
-  );
+  return new AnthropicProtocolError(`Anthropic emitted ${deltaType} for incompatible content block ${index}`);
 }
 
 function requireRecord(value: unknown, name: string): Record<string, unknown> {
@@ -427,7 +349,7 @@ function requireObject(value: unknown, name: string): Record<string, unknown> {
 
 function optionalRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : undefined;
 }
 
@@ -444,16 +366,15 @@ function optionalString(value: unknown): string | undefined {
 
 function requireIndex(value: unknown): number {
   if (!Number.isSafeInteger(value) || (value as number) < 0) {
-    throw new AnthropicProtocolError(
-      "Anthropic content block index must be a non-negative safe integer",
-    );
+    throw new AnthropicProtocolError("Anthropic content block index must be a non-negative safe integer");
   }
   return value as number;
 }
 
 function optionalTokenCount(value: unknown): number | undefined {
   if (value === undefined) return undefined;
-  if (!Number.isSafeInteger(value) || (value as number) < 0) throw new AnthropicProtocolError("Anthropic usage token count must be a non-negative safe integer");
+  if (!Number.isSafeInteger(value) || (value as number) < 0)
+    throw new AnthropicProtocolError("Anthropic usage token count must be a non-negative safe integer");
   return value as number;
 }
 
@@ -464,33 +385,56 @@ function createUsage(
   cachedWriteTokens: number | undefined,
   items: readonly NonNullable<Usage["items"]>[number][],
 ): Usage | undefined {
-  if (inputTokens === undefined && outputTokens === undefined && cachedReadTokens === undefined && cachedWriteTokens === undefined) return undefined;
+  if (
+    inputTokens === undefined &&
+    outputTokens === undefined &&
+    cachedReadTokens === undefined &&
+    cachedWriteTokens === undefined
+  )
+    return undefined;
   const usage: Usage = {};
   if (inputTokens !== undefined) usage.inputTokens = inputTokens;
   if (outputTokens !== undefined) usage.outputTokens = outputTokens;
   if (cachedReadTokens !== undefined) usage.cachedReadTokens = cachedReadTokens;
   if (cachedWriteTokens !== undefined) usage.cachedWriteTokens = cachedWriteTokens;
   if (items.length > 0) usage.items = items;
-  if (cachedReadTokens !== undefined || cachedWriteTokens !== undefined) usage.tokenRelations = {
-    ...(cachedReadTokens === undefined ? {} : { cachedRead: "total" }),
-    ...(cachedWriteTokens === undefined ? {} : { cachedWrite: "total" }),
-  };
+  if (cachedReadTokens !== undefined || cachedWriteTokens !== undefined)
+    usage.tokenRelations = {
+      ...(cachedReadTokens === undefined ? {} : { cachedRead: "total" }),
+      ...(cachedWriteTokens === undefined ? {} : { cachedWrite: "total" }),
+    };
   if (inputTokens !== undefined && outputTokens !== undefined) {
     usage.totalTokens = inputTokens + outputTokens + (cachedReadTokens ?? 0) + (cachedWriteTokens ?? 0);
   }
-  if (inputTokens === undefined || outputTokens === undefined) usage.completeness = { status: "partial", reason: "provider-token-components-missing" };
+  if (inputTokens === undefined || outputTokens === undefined)
+    usage.completeness = { status: "partial", reason: "provider-token-components-missing" };
   return usage;
 }
 
-function collectUsageItems(usage: Record<string, unknown> | undefined, items: Map<string, NonNullable<Usage["items"]>[number]>): void {
+function collectUsageItems(
+  usage: Record<string, unknown> | undefined,
+  items: Map<string, NonNullable<Usage["items"]>[number]>,
+): void {
   if (usage === undefined) return;
-  const cache = usage.cache_creation === undefined || usage.cache_creation === null ? undefined : requireRecord(usage.cache_creation, "usage.cache_creation");
-  for (const [field, id] of [["ephemeral_5m_input_tokens", "cache-write-5m"], ["ephemeral_1h_input_tokens", "cache-write-1h"]] as const) {
+  const cache =
+    usage.cache_creation === undefined || usage.cache_creation === null
+      ? undefined
+      : requireRecord(usage.cache_creation, "usage.cache_creation");
+  for (const [field, id] of [
+    ["ephemeral_5m_input_tokens", "cache-write-5m"],
+    ["ephemeral_1h_input_tokens", "cache-write-1h"],
+  ] as const) {
     const quantity = optionalTokenCount(cache?.[field]);
     if (quantity !== undefined) items.set(id, { id, quantity, unit: "tokens", includedIn: "cachedWrite" });
   }
-  const server = usage.server_tool_use === undefined || usage.server_tool_use === null ? undefined : requireRecord(usage.server_tool_use, "usage.server_tool_use");
-  for (const [field, id] of [["web_search_requests", "web-search"], ["web_fetch_requests", "web-fetch"]] as const) {
+  const server =
+    usage.server_tool_use === undefined || usage.server_tool_use === null
+      ? undefined
+      : requireRecord(usage.server_tool_use, "usage.server_tool_use");
+  for (const [field, id] of [
+    ["web_search_requests", "web-search"],
+    ["web_fetch_requests", "web-fetch"],
+  ] as const) {
     const quantity = optionalTokenCount(server?.[field]);
     if (quantity !== undefined) items.set(id, { id, quantity, unit: "requests", includedIn: "none" });
   }

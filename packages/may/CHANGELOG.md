@@ -20,6 +20,7 @@
   plugins together. Preserve plugin IDs, service IDs, configuration data and saved
   Session state. MaybeCode carries the consolidated dependencies in its published
   installation; its command names remain unchanged.
+
 - c23ff33: Add durable continuation identities and public Session outcome queries. Attached
   coordination agents preserve each continuation identity across cancellation and
   restart, and record their recovery protocol with dispatch. Existing dispatched
@@ -29,11 +30,13 @@
   Preserve the complete Model interface through Goal wrappers, including dynamic
   capabilities and preflight validation before model-call accounting. Locally rejected
   requests keep known usage and produce no physical-attempt record.
+
 - 1dd118f: Add English first-run setup to MaybeCode when its configuration file is missing in an interactive terminal. Guide users through provider, credentials, model settings, optional live connection verification, and saving before continuing into the selected UI. Preserve existing configuration files and report noninteractive setup instructions.
 
   Add password input to `TerminalIO.question` with hidden characters and isolated input history in interactive terminals.
 
   Add `createMayConfig` for validated, coordinated creation of complete configuration files without replacing an existing destination. Publishing requires storage with hard-link support.
+
 - c23ff33: Provide shared local file access, writer ownership and durable replacement through
   the `@sortedyuan/may/storage` entry. Configuration, media, MCP and
   delivery reuse this storage module. Session's file
@@ -43,6 +46,7 @@
   Breaking: TUI tool items now include denied, not-started, and unknown statuses, and assistant items include interrupted. Update exhaustive custom renderers to handle these states.
 
   Validate ApplicationUiHost commands directly from current execution and ownership state. Presentation reads leave commands available, and host shutdown settles accepted work while rejecting later commands.
+
 - c23ff33: Expose structural contribution registries and separate Application execution,
   history and state service interfaces. Application service views preserve identity
   through plugin replacement and reject access before creation or after closure.

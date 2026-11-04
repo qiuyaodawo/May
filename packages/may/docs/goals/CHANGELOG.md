@@ -9,6 +9,7 @@
   Allow delegated model calls to share Goal token accounting, budgets and cancellation while retaining their own task instructions. Apply this wrapper to both default and role-specific child models, so delegated work can execute within an active Goal.
 
   Expose the updated controller through goalsService. Goal cancellation and budget exhaustion cancel the current execution handle, including delegated tools and executions whose handles arrive after cancellation, and await host finalization before finishing.
+
 - 2a44905: Add independently composed durable goal execution, continuation with optional budgets, model tools,
   usage accounting and recovery. Expose general AgentApplication.continue() without
   adding a dependency on goal execution to base Agent packages.
@@ -20,6 +21,7 @@
   enforced and previously saved budgets retain their values. Breaking SDK type change:
   GoalState.budget.maxRuns and maxDurationMs are optional; SDK consumers must handle
   undefined values as unlimited budgets.
+
 - c8c14c7: Compose active Goal and history-reference guidance through ordered instruction
   sources, with concise execution and context-continuity instructions. Goal guidance
   uses order 40 and history-reference guidance uses order 60. Context wrappers retain
@@ -35,6 +37,7 @@
   plugins must provide applicationServices.instructionSources. AgentApplication
   already supplies this registry. Add an InstructionSources registry service to
   custom hosts before loading these plugins.
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`
@@ -62,6 +65,7 @@
   the custom-source API.
   Keep GoalAgent compatible with Session-backed applications by excluding custom
   Step sources from the options passed by the goal scheduler.
+
 - 422e404: Add trusted Tool.workspaceEffect metadata, an approved-tool execution check, deferred
   Git workspace initialization, and lightweight repository summaries. Delegated Agents
   can share the host's execution check. Built-in file readers and session coordination
@@ -71,6 +75,7 @@
   in each request, sharing preparation across main and delegated Agents and retaining
   the lease through Goal verification. Startup and read-only requests leave Git state
   unchanged. Each modifying request saves existing user edits before accepting tool writes.
+
 - Updated dependencies [1e9bdfc]
 - Updated dependencies [02789c6]
 - Updated dependencies [422e404]

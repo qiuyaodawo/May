@@ -52,18 +52,13 @@ export interface SessionHistoryToolOutput {
 export function createSessionHistoryTool(
   options: SessionHistoryToolOptions,
 ): Tool<SessionHistoryToolInput, SessionHistoryToolOutput> {
-  const maxEvents = positiveInteger(
-    options.maxEvents ?? DEFAULT_SESSION_HISTORY_MAX_EVENTS,
-    "maxEvents",
-  );
+  const maxEvents = positiveInteger(options.maxEvents ?? DEFAULT_SESSION_HISTORY_MAX_EVENTS, "maxEvents");
   const maxOutputBytes = positiveInteger(
     options.maxOutputBytes ?? DEFAULT_SESSION_HISTORY_MAX_OUTPUT_BYTES,
     "maxOutputBytes",
   );
   if (maxOutputBytes < MINIMUM_SESSION_HISTORY_OUTPUT_BYTES) {
-    throw new RangeError(
-      `maxOutputBytes must be at least ${MINIMUM_SESSION_HISTORY_OUTPUT_BYTES}`,
-    );
+    throw new RangeError(`maxOutputBytes must be at least ${MINIMUM_SESSION_HISTORY_OUTPUT_BYTES}`);
   }
   const maxEventBytes = positiveInteger(
     options.maxEventBytes ?? DEFAULT_SESSION_HISTORY_MAX_EVENT_BYTES,
@@ -113,9 +108,7 @@ export function createSessionHistoryTool(
     },
     async execute(input, context) {
       throwIfAborted(context.signal);
-      const source = typeof options.source === "function"
-        ? options.source()
-        : options.source;
+      const source = typeof options.source === "function" ? options.source() : options.source;
       const page = await source.queryHistory({
         ...input,
         limit: input.limit ?? maxEvents,
@@ -170,11 +163,7 @@ function parseTypes(value: unknown): readonly SessionEventType[] | undefined {
   return types;
 }
 
-function boundPage(
-  page: SessionHistoryPage,
-  maxOutputBytes: number,
-  maxEventBytes: number,
-): SessionHistoryToolOutput {
+function boundPage(page: SessionHistoryPage, maxOutputBytes: number, maxEventBytes: number): SessionHistoryToolOutput {
   const entries: SessionHistoryEntry[] = [];
   let outputTruncated = false;
   let cursorSeq: number | undefined;
@@ -189,22 +178,11 @@ function boundPage(
         type: event.type,
         truncated: true,
       };
-      const minimalOutput = createOutput(
-        page,
-        [...entries, minimal],
-        index + 1,
-        true,
-      );
+      const minimalOutput = createOutput(page, [...entries, minimal], index + 1, true);
       if (utf8Bytes(JSON.stringify(minimalOutput)) <= maxOutputBytes) {
         entries.push(minimal);
       } else if (entries.length === 0) {
-        const skippedOutput = createOutput(
-          page,
-          entries,
-          entries.length,
-          true,
-          event.seq,
-        );
+        const skippedOutput = createOutput(page, entries, entries.length, true, event.seq);
         if (utf8Bytes(JSON.stringify(skippedOutput)) <= maxOutputBytes) {
           cursorSeq = event.seq;
         }
@@ -215,13 +193,7 @@ function boundPage(
     entries.push(entry);
   }
 
-  const output = createOutput(
-    page,
-    entries,
-    entries.length,
-    outputTruncated,
-    cursorSeq,
-  );
+  const output = createOutput(page, entries, entries.length, outputTruncated, cursorSeq);
   if (utf8Bytes(JSON.stringify(output)) > maxOutputBytes) {
     throw new Error("session_history output exceeded its configured byte limit");
   }
@@ -241,9 +213,7 @@ function createOutput(
   return {
     events: entries,
     hasMore,
-    ...(hasMore && nextSeq !== undefined
-      ? { nextSeq }
-      : {}),
+    ...(hasMore && nextSeq !== undefined ? { nextSeq } : {}),
     outputTruncated,
   };
 }
@@ -321,9 +291,7 @@ function utf8Bytes(value: string): number {
 
 function throwIfAborted(signal: AbortSignal): void {
   if (!signal.aborted) return;
-  const error = new Error(
-    typeof signal.reason === "string" ? signal.reason : "session_history cancelled",
-  );
+  const error = new Error(typeof signal.reason === "string" ? signal.reason : "session_history cancelled");
   error.name = "AbortError";
   throw error;
 }

@@ -12,41 +12,63 @@ import { gatewaySettings } from "./gateway-settings.js";
 import { hashAdministratorPassword } from "./gateway-auth.js";
 
 async function source(path: string): Promise<string | undefined> {
-  try { return await readFile(path, "utf8"); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
 }
 
 export async function inspectGatewaySetup(path: string) {
   let original: string | undefined;
-  try { original = await withFileAccess(path, "shared", () => source(path)); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  try {
+    original = await withFileAccess(path, "shared", () => source(path));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
   return parseGatewaySetup(path, original);
 }
 
 function parseGatewaySetup(path: string, original: string | undefined) {
   let config: Record<string, any> = { providers: {} };
   if (original !== undefined) {
-    try { config = JSON.parse(original); }
-    catch { throw new Error("配置文件需要有效的 JSON。"); }
+    try {
+      config = JSON.parse(original);
+    } catch {
+      throw new Error("配置文件需要有效的 JSON。");
+    }
   }
   const parsed = parseMayConfig(config, path);
   const raw = parsed.apps?.maybeclaw;
-  if (raw && Object.keys(raw).length && raw.version !== 2) throw new Error("MaybeClaw 配置需要 version: 2。原配置保持不变。");
+  if (raw && Object.keys(raw).length && raw.version !== 2)
+    throw new Error("MaybeClaw 配置需要 version: 2。原配置保持不变。");
   const candidate: Record<string, any> = { version: 2, agents: [], ...raw };
   gatewaySettings({ ...parsed, apps: { ...parsed.apps, maybeclaw: candidate } });
   const needsSetup = candidate.server === undefined || (candidate.server as Record<string, unknown>).auth === undefined;
   return { original, config, candidate, needsSetup };
 }
 
-export async function startGatewaySetup(options: { path: string; port?: number; activate: (server: Server) => Promise<void> }) {
+export async function startGatewaySetup(options: {
+  path: string;
+  port?: number;
+  activate: (server: Server) => Promise<void>;
+}) {
   const path = resolve(options.path);
   await mkdir(dirname(path), { recursive: true });
   const lock = await acquireFileLock(`${path}.initialize.lock`);
   const launchPath = `${path}.${randomUUID()}.initialize.html`;
   const token = randomBytes(32).toString("base64url");
-  let busy = false, consumed = false, transferred = false, released = false, closing: Promise<void> | undefined;
+  let busy = false,
+    consumed = false,
+    transferred = false,
+    released = false,
+    closing: Promise<void> | undefined;
   let complete!: () => void, fail!: (error: unknown) => void;
-  const completed = new Promise<void>((resolve, reject) => { complete = resolve; fail = reject; });
+  const completed = new Promise<void>((resolve, reject) => {
+    complete = resolve;
+    fail = reject;
+  });
   void completed.catch(() => {});
   let origin = "";
   const requests = new Set<Promise<void>>();
@@ -54,21 +76,46 @@ export async function startGatewaySetup(options: { path: string; port?: number; 
     const work = (async () => {
       secureHeaders(res);
       if (!trustedRequest(req, origin)) throw new UiError(403, "请求来源无效。");
-      if (req.method === "GET" && req.url === "/") { res.setHeader("content-type", "text/html; charset=utf-8"); res.end(page); return; }
-      if (req.method === "GET" && req.url === "/setup.js") { res.setHeader("content-type", "text/javascript; charset=utf-8"); res.end(script); return; }
-      if (req.method === "GET" && req.url === "/setup.css") { res.setHeader("content-type", "text/css; charset=utf-8"); res.end(style); return; }
+      if (req.method === "GET" && req.url === "/") {
+        res.setHeader("content-type", "text/html; charset=utf-8");
+        res.end(page);
+        return;
+      }
+      if (req.method === "GET" && req.url === "/setup.js") {
+        res.setHeader("content-type", "text/javascript; charset=utf-8");
+        res.end(script);
+        return;
+      }
+      if (req.method === "GET" && req.url === "/setup.css") {
+        res.setHeader("content-type", "text/css; charset=utf-8");
+        res.end(style);
+        return;
+      }
       if (req.method !== "POST" || req.url !== "/api/setup") throw new UiError(404, "接口不存在。");
       if (consumed || !authorized(req, token)) throw new UiError(403, "初始化凭据无效或已经使用，请重新启动服务。");
       if (busy) throw new UiError(409, "初始化正在进行。");
       busy = true;
       try {
         if (req.headers["content-type"] !== "application/json") throw new UiError(400, "需要 JSON 请求。");
-        const chunks: Buffer[] = []; let size = 0;
-        for await (const chunk of req) { size += chunk.length; if (size > 16384) throw new UiError(413, "请求过大。"); chunks.push(Buffer.from(chunk)); }
+        const chunks: Buffer[] = [];
+        let size = 0;
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size > 16384) throw new UiError(413, "请求过大。");
+          chunks.push(Buffer.from(chunk));
+        }
         let data;
-        try { data = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
-        catch { throw new UiError(400, "需要有效的 JSON 请求。"); }
-        if (!data || Object.keys(data).some(key => !["password", "confirmation"].includes(key)) || data.password !== data.confirmation) throw new UiError(400, "两次输入的密码需要一致。");
+        try {
+          data = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        } catch {
+          throw new UiError(400, "需要有效的 JSON 请求。");
+        }
+        if (
+          !data ||
+          Object.keys(data).some((key) => !["password", "confirmation"].includes(key)) ||
+          data.password !== data.confirmation
+        )
+          throw new UiError(400, "两次输入的密码需要一致。");
         const passwordHash = await hashAdministratorPassword(data.password);
         if (closing) throw new UiError(503, "初始化服务正在关闭。");
         await withFileAccess(path, "exclusive", async () => {
@@ -76,41 +123,96 @@ export async function startGatewaySetup(options: { path: string; port?: number; 
           const current = parseGatewaySetup(path, await source(path));
           if (!current.needsSetup) throw new UiError(409, "管理员密码已经配置，禁止重复初始化。");
           const config = current.config;
-          config.apps = { ...config.apps, maybeclaw: { ...current.candidate, server: { ...current.candidate.server as object, auth: { passwordHash } } } };
+          config.apps = {
+            ...config.apps,
+            maybeclaw: {
+              ...current.candidate,
+              server: { ...(current.candidate.server as object), auth: { passwordHash } },
+            },
+          };
           gatewaySettings(parseMayConfig(config, path));
           const temporary = `${path}.${randomUUID()}.pending`;
           try {
             await writeFile(temporary, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600 });
-            if (await source(path) !== current.original) throw new UiError(409, "配置已被其他操作修改，请重试。");
+            if ((await source(path)) !== current.original) throw new UiError(409, "配置已被其他操作修改，请重试。");
             await rename(temporary, path);
-          } finally { await rm(temporary, { force: true }); }
+          } finally {
+            await rm(temporary, { force: true });
+          }
         });
         consumed = true;
-        try { await options.activate(server); transferred = true; }
-        catch (error) { fail(error); throw error; }
+        try {
+          await options.activate(server);
+          transferred = true;
+        } catch (error) {
+          fail(error);
+          throw error;
+        }
         await release();
         sendJson(res, 200, { initialized: true });
         complete();
-      } finally { busy = false; }
-    })().catch(error => {
-      if (consumed) fail(error);
-      if (res.headersSent) res.destroy();
-      else sendJson(res, error instanceof UiError ? error.status : 400, { error: error instanceof Error ? error.message : "初始化失败。" });
-    }).finally(() => requests.delete(work));
+      } finally {
+        busy = false;
+      }
+    })()
+      .catch((error) => {
+        if (consumed) fail(error);
+        if (res.headersSent) res.destroy();
+        else
+          sendJson(res, error instanceof UiError ? error.status : 400, {
+            error: error instanceof Error ? error.message : "初始化失败。",
+          });
+      })
+      .finally(() => requests.delete(work));
     requests.add(work);
   });
-  server.requestTimeout = 15000; server.headersTimeout = 10000; server.maxConnections = 16;
-  async function release() { if (released) return; released = true; try { await rm(launchPath, { force: true }); } finally { await lock.release(); } }
+  server.requestTimeout = 15000;
+  server.headersTimeout = 10000;
+  server.maxConnections = 16;
+  async function release() {
+    if (released) return;
+    released = true;
+    try {
+      await rm(launchPath, { force: true });
+    } finally {
+      await lock.release();
+    }
+  }
   try {
     if (!(await inspectGatewaySetup(path)).needsSetup) throw new Error("管理员密码已经配置，请直接启动控制台。");
-    await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(options.port ?? 3939, "127.0.0.1", () => { server.removeListener("error", reject); resolve(); }); });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(options.port ?? 3939, "127.0.0.1", () => {
+        server.removeListener("error", reject);
+        resolve();
+      });
+    });
     origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     const url = `${origin}/#initialize=${token}`;
-    await writeFile(launchPath, `<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="refresh" content="0;url=${url}"><title>MaybeClaw 初始化</title>`, { flag: "wx", mode: 0o600 });
-    return { url, launchPath, completed, close: () => closing ??= (async () => {
-      if (!transferred) { server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); await Promise.allSettled([...requests]); await release(); }
-    })() };
-  } catch (error) { server.close(); await release(); throw error; }
+    await writeFile(
+      launchPath,
+      `<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="refresh" content="0;url=${url}"><title>MaybeClaw 初始化</title>`,
+      { flag: "wx", mode: 0o600 },
+    );
+    return {
+      url,
+      launchPath,
+      completed,
+      close: () =>
+        (closing ??= (async () => {
+          if (!transferred) {
+            server.closeAllConnections();
+            await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+            await Promise.allSettled([...requests]);
+            await release();
+          }
+        })()),
+    };
+  } catch (error) {
+    server.close();
+    await release();
+    throw error;
+  }
 }
 
 const page = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>MaybeClaw 初始化</title><link rel="stylesheet" href="/setup.css"><main><h1>设置 MaybeClaw 管理员密码</h1><p>设置密码后进入控制台，添加 Agent 并创建会话。</p><form><p><label>管理员密码 <input name="password" type="password" minlength="10" maxlength="1024" autocomplete="new-password" required></label></p><p>密码长度为 10 至 1024 个字符。</p><p><label>确认密码 <input name="confirmation" type="password" minlength="10" maxlength="1024" autocomplete="new-password" required></label></p><button>完成初始化</button><p role="alert"></p></form></main><script src="/setup.js"></script></html>`;

@@ -1,10 +1,5 @@
 import type { KeyStroke } from "./keybindings/index.js";
-import type {
-  InteractiveComponent,
-  PointerEvent,
-  RenderResult,
-  RenderSize,
-} from "./component.js";
+import type { InteractiveComponent, PointerEvent, RenderResult, RenderSize } from "./component.js";
 import type { TerminalWriter } from "./renderer.js";
 import type { TerminalImageSupport } from "./image-support.js";
 
@@ -52,9 +47,13 @@ export class TuiRuntime {
     this.renderer = options.renderer;
     this.root = options.root;
     this.alternateScreen = options.alternateScreen ?? true;
-    this.onError = options.onError ?? ((error) => {
-      queueMicrotask(() => { throw error; });
-    });
+    this.onError =
+      options.onError ??
+      ((error) => {
+        queueMicrotask(() => {
+          throw error;
+        });
+      });
   }
 
   get isRunning(): boolean {
@@ -109,7 +108,8 @@ export class TuiRuntime {
   }
 
   private assertActive(): void {
-    if (this.disposed) throw new Error("TuiRuntime has stopped. Create a new runtime and root component to start again.");
+    if (this.disposed)
+      throw new Error("TuiRuntime has stopped. Create a new runtime and root component to start again.");
   }
 
   private release(terminalStarted: boolean): void {
@@ -127,15 +127,15 @@ export class TuiRuntime {
     } finally {
       try {
         if (terminalStarted) this.renderer.dispose();
-      } finally { this.terminal.close(); }
+      } finally {
+        this.terminal.close();
+      }
     }
   }
 
   private readonly handleKey = (stroke: KeyStroke): void => {
     try {
-      const redraw = this.root.handleKeyResult
-        ? this.root.handleKeyResult(stroke).redraw
-        : this.root.handleKey(stroke);
+      const redraw = this.root.handleKeyResult ? this.root.handleKeyResult(stroke).redraw : this.root.handleKey(stroke);
       if (redraw) this.requestRender();
     } catch (error) {
       this.fail(error);

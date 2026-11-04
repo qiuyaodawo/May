@@ -33,8 +33,8 @@
     },
     {
       "heading": "MaybeCode commands and interactions",
-      "en": "2849e01f0a8e06201b189e9d595051fd09216be1e0f5893d4906e0378c616c5e",
-      "zh": "dc1f749eb45ff39ac36a7c40d409c904a5cf42c14440021c2736839b8c9c54a3"
+      "en": "d54a6fdf5043d93910493c8d6b28fbf3d750c0bd80e90206101272125d125cd5",
+      "zh": "493b09ca5f753e2a4ea0c042e61e0edbe3c3be3d3a8ee599b8aed0c280eb5a1f"
     },
     {
       "heading": "Session forks and file versions",
@@ -58,18 +58,18 @@
     },
     {
       "heading": "Integrate a custom host",
-      "en": "26befac14c3629fc00175444117ff541360282b99a70b512aff7196fd03c3fc4",
-      "zh": "728306f9d0988ca30d152f085d8e8c82537f680b838dcc87e8f963efeb56f4e5"
+      "en": "65d8ba863b277395a2c25162454cdf246f5a647f54d8bdf1fc29ec3bf183fcb4",
+      "zh": "47e5ae6da438d2139353f4d82ee3d1d53c50c6e44f0b0df956da74318efa3596"
     },
     {
       "heading": "Protocol v1 and limits",
-      "en": "c4183be1f245a8138a04aeb1b4695aa4e478b527f5c3d077525dbc44c18b0d6d",
-      "zh": "e93c8731d6e961d23185775b0c6288cfbdc837c90b53eb15183a03f1548c712c"
+      "en": "5dfda8dd9731dffc05e90ea297ab6b775f366e571a6ab5d08ce71680de83b57f",
+      "zh": "4b6ca2354e7cc8b64b1ec1bfb4e7fd9c2a88017b1e74400c75faf4c00115105a"
     },
     {
       "heading": "Verification",
-      "en": "3a7b951c35cad26e2022c0bc8cc0095e3a93883c5c3c6af985e3a982fb4cd285",
-      "zh": "162ae19fe7104d36248bd1fdf033ef17bcfaeb7127f828aea7c9122830d25aa6"
+      "en": "14cb9066203b2ddabe15d8017c8d87b1685a42cb4c24f5c2ced0e7ac832ca5ec",
+      "zh": "38b46eb04289e30d5afc30e1e1f605292a2b79b1b5fa433a590dfc816e76400a"
     }
   ]
 }

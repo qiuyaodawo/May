@@ -10,14 +10,19 @@ export class InMemorySpanExporter implements SpanExporter {
   constructor(private readonly maxSpans = 2_048) {
     if (!Number.isSafeInteger(maxSpans) || maxSpans < 1) throw new RangeError("maxSpans must be positive");
   }
-  get droppedSpans(): number { return this.dropped; }
+  get droppedSpans(): number {
+    return this.dropped;
+  }
 
   export(spans: readonly FinishedTraceSpan[]): void {
     const omitted = Math.max(0, spans.length - this.maxSpans);
     this.dropped += omitted;
     this.spans.push(...spans.slice(omitted));
     const excess = Math.max(0, this.spans.length - this.maxSpans);
-    if (excess > 0) { this.spans.splice(0, excess); this.dropped += excess; }
+    if (excess > 0) {
+      this.spans.splice(0, excess);
+      this.dropped += excess;
+    }
   }
 
   getFinishedSpans(): readonly FinishedTraceSpan[] {
@@ -125,8 +130,7 @@ export class JsonlFileSpanExporter implements SpanExporter {
   }
 
   private async prepareDirectory(): Promise<void> {
-    this.directoryReady ??= mkdir(dirname(this.path), { recursive: true })
-      .then(() => undefined);
+    this.directoryReady ??= mkdir(dirname(this.path), { recursive: true }).then(() => undefined);
     await this.directoryReady;
   }
 
@@ -142,10 +146,7 @@ export class JsonlFileSpanExporter implements SpanExporter {
     const extension = extname(this.path);
     const name = basename(this.path);
     const stem = extension === "" ? name : name.slice(0, -extension.length);
-    const pattern = new RegExp(
-      `^${escapeRegExp(stem)}-(\\d{4}-\\d{2}-\\d{2})${escapeRegExp(extension)}$`,
-      "u",
-    );
+    const pattern = new RegExp(`^${escapeRegExp(stem)}-(\\d{4}-\\d{2}-\\d{2})${escapeRegExp(extension)}$`, "u");
     const entries = await readdir(dirname(this.path), { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isFile()) continue;
@@ -161,10 +162,7 @@ export class JsonlFileSpanExporter implements SpanExporter {
   }
 }
 
-async function appendSpans(
-  path: string,
-  spans: readonly FinishedTraceSpan[],
-): Promise<void> {
+async function appendSpans(path: string, spans: readonly FinishedTraceSpan[]): Promise<void> {
   const payload = `${spans.map((span) => JSON.stringify(span)).join("\n")}\n`;
   await appendFile(path, payload, "utf8");
 }

@@ -15,8 +15,7 @@ export async function startHttpFixture(t) {
       return;
     }
     if (request.url === "/unavailable" || request.url === "/unauthorized") {
-      response.writeHead(request.url === "/unauthorized" ? 401 : 503)
-        .end("sensitive-response-body Bearer test-secret");
+      response.writeHead(request.url === "/unauthorized" ? 401 : 503).end("sensitive-response-body Bearer test-secret");
       return;
     }
     if (request.method === "GET") {
@@ -30,35 +29,45 @@ export async function startHttpFixture(t) {
     const modern = request.url === "/modern";
     const reply = (result) => {
       response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({
-        jsonrpc: "2.0", id: message.id,
-        result: modern ? { resultType: "complete", ...result } : result,
-      }));
+      response.end(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: modern ? { resultType: "complete", ...result } : result,
+        }),
+      );
     };
     if (message.method === "server/discover") {
       if (modern) {
         reply({
-          supportedVersions: ["2026-07-28"], capabilities: { tools: {} },
+          supportedVersions: ["2026-07-28"],
+          capabilities: { tools: {} },
           _meta: { "io.modelcontextprotocol/serverInfo": { name: "http-fixture", version: "1" } },
         });
       } else {
-        response.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({
-          jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Method not found" },
-        }));
+        response.writeHead(400, { "content-type": "application/json" }).end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: message.id,
+            error: { code: -32601, message: "Method not found" },
+          }),
+        );
       }
       return;
     }
     if (message.method === "initialize") {
       response.setHeader("mcp-session-id", "fixture-session");
       reply({
-        protocolVersion: "2025-11-25", capabilities: { tools: {} },
+        protocolVersion: "2025-11-25",
+        capabilities: { tools: {} },
         serverInfo: { name: "http-fixture", version: "1" },
       });
       return;
     }
     if (message.method === "tools/list") {
       reply({
-        ttlMs: 0, cacheScope: "private",
+        ttlMs: 0,
+        cacheScope: "private",
         tools: [{ name: "echo", inputSchema: { type: "object" } }],
       });
       return;
@@ -77,14 +86,17 @@ export async function startHttpFixture(t) {
       response.writeHead(200, { "content-type": "text/event-stream" });
       const emit = (entry) => response.write(`event: message\ndata: ${JSON.stringify(entry)}\n\n`);
       emit({
-        jsonrpc: "2.0", method: "notifications/progress",
+        jsonrpc: "2.0",
+        method: "notifications/progress",
         params: { progressToken: message.params._meta.progressToken, progress: 1, message: "http progress" },
       });
       emit({
-        jsonrpc: "2.0", id: message.id,
+        jsonrpc: "2.0",
+        id: message.id,
         result: {
           ...(modern ? { resultType: "complete" } : {}),
-          content: [{ type: "text", text: value }], structuredContent: { echoed: value },
+          content: [{ type: "text", text: value }],
+          structuredContent: { echoed: value },
         },
       });
       response.end();
@@ -94,9 +106,12 @@ export async function startHttpFixture(t) {
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  t.after(() => new Promise((resolve) => {
-    server.close(resolve);
-    server.closeAllConnections();
-  }));
+  t.after(
+    () =>
+      new Promise((resolve) => {
+        server.close(resolve);
+        server.closeAllConnections();
+      }),
+  );
   return { url: `http://127.0.0.1:${server.address().port}`, requests };
 }

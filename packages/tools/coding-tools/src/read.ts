@@ -1,11 +1,6 @@
 import { omitUndefined, type Tool } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
-import {
-  optionalPositiveInteger,
-  requireObject,
-  requirePositiveIntegerOption,
-  requireString,
-} from "./input.js";
+import { optionalPositiveInteger, requireObject, requirePositiveIntegerOption, requireString } from "./input.js";
 import { readTextFile } from "./text-file.js";
 import { resolveExistingWorkspacePath, type WorkspacePath } from "./workspace-path.js";
 import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
@@ -38,20 +33,9 @@ export interface ReadToolOutput {
   readonly truncated: boolean;
 }
 
-export function createReadTool(options: ReadToolOptions): Tool<
-  ReadToolInput,
-  ReadToolOutput
-> {
-  const maxBytes = requirePositiveIntegerOption(
-    options.maxBytes,
-    DEFAULT_READ_MAX_BYTES,
-    "maxBytes",
-  );
-  const maxLines = requirePositiveIntegerOption(
-    options.maxLines,
-    DEFAULT_READ_MAX_LINES,
-    "maxLines",
-  );
+export function createReadTool(options: ReadToolOptions): Tool<ReadToolInput, ReadToolOutput> {
+  const maxBytes = requirePositiveIntegerOption(options.maxBytes, DEFAULT_READ_MAX_BYTES, "maxBytes");
+  const maxLines = requirePositiveIntegerOption(options.maxLines, DEFAULT_READ_MAX_LINES, "maxLines");
 
   return {
     name: "read",
@@ -73,10 +57,7 @@ export function createReadTool(options: ReadToolOptions): Tool<
       const offset = optionalPositiveInteger(value.offset, "read", "offset");
       const limit = optionalPositiveInteger(value.limit, "read", "limit");
       if (limit !== undefined && limit > maxLines) {
-        throw new CodingToolError(
-          "CODING_TOOL_INVALID_INPUT",
-          `read: limit must not exceed ${maxLines}`,
-        );
+        throw new CodingToolError("CODING_TOOL_INVALID_INPUT", `read: limit must not exceed ${maxLines}`);
       }
       return omitUndefined({ path, offset, limit });
     },
@@ -85,12 +66,7 @@ export function createReadTool(options: ReadToolOptions): Tool<
         allowHardLinks: options.allowHardLinks !== false,
       });
       const read = async () => {
-        const text = await readTextFile(
-          file.absolute,
-          file.relative,
-          maxBytes,
-          context.signal,
-        );
+        const text = await readTextFile(file.absolute, file.relative, maxBytes, context.signal);
         const lines = text === "" ? [] : text.split(/(?<=\n)|(?<=\r)(?!\n)/u);
         if (/[\r\n]$/u.test(text)) lines.push("");
         const offset = input.offset ?? 1;
@@ -106,8 +82,11 @@ export function createReadTool(options: ReadToolOptions): Tool<
         return {
           output: {
             path: file.relative,
-            content: selected.join("").replace(/[\r\n]+$/u, (ending) =>
-              endLine === lines.length ? ending : ending.replace(/(?:\r\n|\r|\n)$/u, "")),
+            content: selected
+              .join("")
+              .replace(/[\r\n]+$/u, (ending) =>
+                endLine === lines.length ? ending : ending.replace(/(?:\r\n|\r|\n)$/u, ""),
+              ),
             startLine,
             endLine,
             totalLines: lines.length,
@@ -119,12 +98,14 @@ export function createReadTool(options: ReadToolOptions): Tool<
       };
       return options.guard === undefined
         ? (await read()).output
-        : (await options.guard<{ readonly output: ReadToolOutput; readonly content: string }>({
-            tool: "read",
-            path: file,
-            exists: true,
-            run: read,
-          })).output;
+        : (
+            await options.guard<{ readonly output: ReadToolOutput; readonly content: string }>({
+              tool: "read",
+              path: file,
+              exists: true,
+              run: read,
+            })
+          ).output;
     },
   };
 }

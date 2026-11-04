@@ -57,40 +57,50 @@ export class BasicTracer implements Tracer {
     }
     this.processor = options.processor;
     this.limits = telemetryLimits(options.limits);
-    this.resourceAttributes = snapshotAttributes(
-      options.resourceAttributes ?? {},
-    );
+    this.resourceAttributes = snapshotAttributes(options.resourceAttributes ?? {});
     this.sampler = options.sampler ?? alwaysOnSampler;
     this.clock = options.clock ?? Date.now;
     this.idGenerator = options.idGenerator ?? randomTraceIdGenerator;
     this.onError = options.onError;
     this.metrics = options.metrics;
-    this.observers = [options.observer, options.metrics === undefined ? undefined : new SpanMetrics(options.metrics)].filter((value): value is SpanObserver => value !== undefined);
+    this.observers = [
+      options.observer,
+      options.metrics === undefined ? undefined : new SpanMetrics(options.metrics),
+    ].filter((value): value is SpanObserver => value !== undefined);
   }
 
-  recordMetric(record: import("@sortedyuan/may/core").MetricRecord): void { this.metrics?.record(record); }
+  recordMetric(record: import("@sortedyuan/may/core").MetricRecord): void {
+    this.metrics?.record(record);
+  }
 
   startSpan(name: string, options: TraceSpanStartOptions = {}): TraceSpan {
     if (typeof name !== "string" || name.trim() === "") {
       throw new TypeError("span name must be a non-empty string");
     }
     if (name.length > 128) throw new RangeError("Span name exceeds limit");
-    const attributes = boundedAttributes({
-      ...this.resourceAttributes,
-      ...(options.attributes ?? {}),
-    }, this.limits);
+    const attributes = boundedAttributes(
+      {
+        ...this.resourceAttributes,
+        ...(options.attributes ?? {}),
+      },
+      this.limits,
+    );
     const traceId = options.parent?.traceId ?? this.idGenerator.generateTraceId();
     const spanId = this.idGenerator.generateSpanId();
     const samplingContext: TraceContext = { traceId, spanId };
     const context: TraceContext = Object.freeze({
       traceId,
       spanId,
-      sampled: options.parent?.sampled ?? this.sampler(omitUndefined({
-        name,
-        context: samplingContext,
-        parent: options.parent,
-        attributes,
-      })),
+      sampled:
+        options.parent?.sampled ??
+        this.sampler(
+          omitUndefined({
+            name,
+            context: samplingContext,
+            parent: options.parent,
+            attributes,
+          }),
+        ),
     });
     const sampled = context.sampled === true;
     return new BasicTraceSpan({
@@ -149,8 +159,19 @@ class BasicTraceSpan implements TraceSpan {
     this.observers = options.observers;
     this.limits = options.limits;
     for (const observer of this.observers) {
-      try { observer.onStart(omitUndefined({ name: this.name, context: this.context, startTime: this.startTime, attributes: options.attributes, parentSpanId: this.parentSpanId })); }
-      catch (error) { reportError(this.onError, error); }
+      try {
+        observer.onStart(
+          omitUndefined({
+            name: this.name,
+            context: this.context,
+            startTime: this.startTime,
+            attributes: options.attributes,
+            parentSpanId: this.parentSpanId,
+          }),
+        );
+      } catch (error) {
+        reportError(this.onError, error);
+      }
     }
   }
 
@@ -164,11 +185,13 @@ class BasicTraceSpan implements TraceSpan {
     if (typeof name !== "string" || name.trim() === "" || name.length > 128) {
       throw new TypeError("span event name must be a non-empty string");
     }
-    this.events.push(Object.freeze({
-      name,
-      timestamp: this.clock(),
-      attributes: boundedAttributes(attributes, this.limits),
-    }));
+    this.events.push(
+      Object.freeze({
+        name,
+        timestamp: this.clock(),
+        attributes: boundedAttributes(attributes, this.limits),
+      }),
+    );
     if (this.events.length > this.limits.maxEvents) this.events.shift();
   }
 
@@ -184,22 +207,22 @@ class BasicTraceSpan implements TraceSpan {
     const span: FinishedTraceSpan = Object.freeze({
       name: this.name,
       context: this.context,
-      ...(this.parentSpanId === undefined
-        ? {}
-        : { parentSpanId: this.parentSpanId }),
+      ...(this.parentSpanId === undefined ? {} : { parentSpanId: this.parentSpanId }),
       startTime: this.startTime,
       endTime,
       durationMs: Math.max(0, endTime - this.startTime),
       status,
       attributes: snapshotAttributes(this.attributes),
       events: Object.freeze([...this.events]),
-      ...(options.error === undefined
-        ? {}
-        : { error: Object.freeze({ ...options.error }) }),
+      ...(options.error === undefined ? {} : { error: Object.freeze({ ...options.error }) }),
     });
 
     for (const observer of this.observers) {
-      try { observer.onEnd(span); } catch (error) { reportError(this.onError, error); }
+      try {
+        observer.onEnd(span);
+      } catch (error) {
+        reportError(this.onError, error);
+      }
     }
     if (!this.sampled) return;
     try {
@@ -247,10 +270,7 @@ function snapshotAttributes(attributes: TraceAttributes): TraceAttributes {
   return Object.freeze(result);
 }
 
-function reportError(
-  handler: ObservabilityErrorHandler | undefined,
-  error: unknown,
-): void {
+function reportError(handler: ObservabilityErrorHandler | undefined, error: unknown): void {
   try {
     handler?.(error);
   } catch {

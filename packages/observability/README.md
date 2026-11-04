@@ -11,17 +11,9 @@ implement that port without making telemetry a required Core dependency.
 
 ```ts
 import { defineAgent } from "@sortedyuan/may/application";
-import {
-  BasicTracer,
-  BatchSpanProcessor,
-  ConsoleSpanExporter,
-  ratioSampler,
-} from "@sortedyuan/observability";
+import { BasicTracer, BatchSpanProcessor, ConsoleSpanExporter, ratioSampler } from "@sortedyuan/observability";
 
-const processor = new BatchSpanProcessor(
-  new ConsoleSpanExporter(),
-  { maxQueueSize: 2_048, maxExportBatchSize: 256 },
-);
+const processor = new BatchSpanProcessor(new ConsoleSpanExporter(), { maxQueueSize: 2_048, maxExportBatchSize: 256 });
 const tracer = new BasicTracer({
   processor,
   sampler: ratioSampler(0.1),

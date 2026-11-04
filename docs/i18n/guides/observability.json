@@ -18,13 +18,13 @@
     },
     {
       "heading": "Configure a tracer",
-      "en": "b24e881f626d5652831e0814cdd3bc5f2feacaaaf19f0bea74d9f92649e526f2",
-      "zh": "a41782389bc0553595fe8743ee4b8b559d6cf86d06009c97a99bc7aa04e41e79"
+      "en": "c988de04aa3523c950a1c9ea430099bed372411b8e017706c538deeab17d9d1c",
+      "zh": "ebc63ef36ca56ce9296cb2ce7f0dc6ddb1fb85ca0dd8d0d25da2b98a0c968b2a"
     },
     {
       "heading": "Built-in spans",
-      "en": "8c604205eaf1013516986aef7299c3747460002c70904d62c7f3bd8f8cbbbef0",
-      "zh": "6e34d249cb14a060e0ef75ad739f24bdf36759ea10c529c1a07e1e0227f4ce44"
+      "en": "2adeec93e811a84bc50e12a978b68d539549249e23ba49a30a48cdf4948690b6",
+      "zh": "955ece2f338ae287355ca382e066e19a8fc833e7d48607779a0bcdade85e75f0"
     },
     {
       "heading": "Processors, exporters, and sampling",
@@ -43,8 +43,8 @@
     },
     {
       "heading": "Independent metrics and local diagnostics",
-      "en": "70dfacfef63b111c67ef072a7d248de8c3661d45c96ba370d9476151d38ea05b",
-      "zh": "8faedda909842b8c61f016ead3c1df63e1821a4d92a6c8848c678a76fe96c3c8"
+      "en": "7afb940df5598cdd8afbc5d66b098dfaf7cbfb8655b9edbc09d11c56b9909256",
+      "zh": "90dfafb9fa2634d321f89b1c8815b6c9ff70078dfb888afa812d133d87565ec8"
     },
     {
       "heading": "Model calls and attempts",
@@ -53,13 +53,13 @@
     },
     {
       "heading": "OpenTelemetry and OTLP",
-      "en": "8a26478565e477b28dbb505bc0fa14a8b5938e5b000292a6df490619b3b65a55",
-      "zh": "9bcdb744c7cc010dd80d8e8c68d3ffacd72afa2e7c62e9c7331b0652bd584058"
+      "en": "39c75207559d40eff1458d781f12e82d1ebd9ae89e490b33b3041ef24ae5b3ea",
+      "zh": "64b1cf7fbf09a429381b98fedd73aa5ab597be6526d64c25ee1a9f60b15e9d38"
     },
     {
       "heading": "Correlation and acceptance",
-      "en": "47723853c4a2acb679ee09250138cdab49e77dcf0df97a5020bbadf469fe0897",
-      "zh": "584fcc177b3a48be409fa8d9d0301d49d2473271b6d8adc1a15e0cb399b15991"
+      "en": "05f16ebde37d3ad00befa7d1e18d47fa7ea45ce209040f3ba0c84baec38ab278",
+      "zh": "9c76ce6e9995841aa8f9b084823ff7b3b0bd479fed0ea724faca3551c69a1694"
     },
     {
       "heading": "Limits and delivery diagnostics",

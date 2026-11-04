@@ -16,6 +16,7 @@ Create `.agents/skills/research/SKILL.md`:
 name: research
 description: Research a topic using primary sources and provide cited findings.
 ---
+
 Read references/guide.md. Compare primary evidence and explain uncertainty.
 ```
 
@@ -111,7 +112,9 @@ const definition = defineAgent({ model, tools, skills, permissionPolicy });
 const app = await definition.open({ store });
 try {
   await app.activateSkill("research");
-  await (await app.submit({ input: "Research the topic" })).result;
+  await (
+    await app.submit({ input: "Research the topic" })
+  ).result;
 } finally {
   await app.close();
 }

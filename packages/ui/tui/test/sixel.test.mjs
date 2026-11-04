@@ -10,13 +10,26 @@ import { Jimp } from "jimp";
 import { FileMediaStore } from "@sortedyuan/media";
 import { imageSource } from "../../../media/test/fixture.mjs";
 import { multicolorImage } from "./fixtures/multicolor-image.mjs";
-import { TerminalImages, encodeImage, Stack, ScrollView, Text, TranscriptStore, TranscriptView } from "../dist/index.js";
+import {
+  TerminalImages,
+  encodeImage,
+  Stack,
+  ScrollView,
+  Text,
+  TranscriptStore,
+  TranscriptView,
+} from "../dist/index.js";
 
 function decodeFrame(frame) {
   const decoder = new Decoder({ memoryLimit: 8 * 1024 * 1024 });
   const parser = new AnsiParser({
-    inst_H(_collected, _params, flag) { assert.equal(flag, "q"); decoder.init(); },
-    inst_P(data) { decoder.decodeString(data); },
+    inst_H(_collected, _params, flag) {
+      assert.equal(flag, "q");
+      decoder.init();
+    },
+    inst_P(data) {
+      decoder.decodeString(data);
+    },
     inst_U() {},
   });
   parser.parse(encodeImage(frame));
@@ -43,7 +56,8 @@ test("Sixel 编码保持像素、图文顺序，并按字符尺寸缩放", async
   assert.equal(placement.rows, 12);
   assert.ok(frame.lines.indexOf("after") >= placement.y + placement.rows);
   for (let offset = 0; offset < decoded.data.length; offset += 4) {
-    for (const [channel, expected] of [32, 120, 210, 255].entries()) assert.ok(Math.abs(decoded.data[offset + channel] - expected) <= 5);
+    for (const [channel, expected] of [32, 120, 210, 255].entries())
+      assert.ok(Math.abs(decoded.data[offset + channel] - expected) <= 5);
   }
   const narrow = images.render(source, { width: 15, height: 40 }).images[0];
   const small = decodeFrame(narrow);
@@ -81,7 +95,10 @@ test("透明图片使用白色预览背景，并完整保存原始文件", async
 test("多色图片在编码、缓存和尺寸变化后保持逐像素位置", async () => {
   const media = await mediaStore();
   const images = new TerminalImages(media, "sixel", { cellSize: () => ({ width: 10, height: 20 }) });
-  for (const [width, height] of [[61, 37], [7, 5]]) {
+  for (const [width, height] of [
+    [61, 37],
+    [7, 5],
+  ]) {
     const fixture = await multicolorImage(width, height);
     await images.prepare([{ type: "image", source: fixture.source }]);
     const first = images.render(fixture.source, { width: 80, height: 30 }).images[0];
@@ -92,8 +109,14 @@ test("多色图片在编码、缓存和尺寸变化后保持逐像素位置", as
     const decoded = decodeFrame(restored);
     assert.deepEqual([decoded.width, decoded.height], [width, height]);
     for (let index = 0; index < fixture.pixels.length; index++) {
-      assert.ok(Math.abs(decoded.data[index] - fixture.pixels[index]) <= 3, `${width}x${height}: pixel ${Math.floor(index / 4)}, channel ${index % 4}: ${decoded.data[index]} expected ${fixture.pixels[index]}`);
+      assert.ok(
+        Math.abs(decoded.data[index] - fixture.pixels[index]) <= 3,
+        `${width}x${height}: pixel ${Math.floor(index / 4)}, channel ${index % 4}: ${decoded.data[index]} expected ${fixture.pixels[index]}`,
+      );
     }
-    assert.deepEqual(await readFile((await media.save(fixture.source)).path), Buffer.from(fixture.source.data, "base64"));
+    assert.deepEqual(
+      await readFile((await media.save(fixture.source)).path),
+      Buffer.from(fixture.source.data, "base64"),
+    );
   }
 });

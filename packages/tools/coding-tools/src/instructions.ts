@@ -12,11 +12,10 @@ export interface CodingInstructionSectionLabels {
   readonly project: string;
 }
 
-export const DEFAULT_CODING_INSTRUCTION_SECTION_LABELS:
-  CodingInstructionSectionLabels = {
-    runtime: "Runtime environment",
-    project: "Project instructions",
-  };
+export const DEFAULT_CODING_INSTRUCTION_SECTION_LABELS: CodingInstructionSectionLabels = {
+  runtime: "Runtime environment",
+  project: "Project instructions",
+};
 
 export type CodingInstructionSource =
   | { readonly type: "built-in" }
@@ -50,19 +49,18 @@ export interface CodingRuntimeInstructionsOptions {
   readonly historicalSource?: string;
 }
 
-export function codingRuntimeInstructions(
-  options: Readonly<CodingRuntimeInstructionsOptions>,
-): string {
+export function codingRuntimeInstructions(options: Readonly<CodingRuntimeInstructionsOptions>): string {
   if (options.workspace.trim() === "") {
     throw invalidOption("workspace must not be empty");
   }
-  const operatingSystem = process.platform === "win32"
-    ? "Windows"
-    : process.platform === "darwin"
-    ? "macOS"
-    : process.platform === "linux"
-    ? "Linux"
-    : process.platform;
+  const operatingSystem =
+    process.platform === "win32"
+      ? "Windows"
+      : process.platform === "darwin"
+        ? "macOS"
+        : process.platform === "linux"
+          ? "Linux"
+          : process.platform;
   const sessionOrigin = options.sessionOrigin ?? "new session";
   const lines = [
     `Workspace: ${resolve(options.workspace)}`,
@@ -138,11 +136,7 @@ export type CodingInstructionsErrorCode =
 export class CodingInstructionsError extends Error {
   readonly code: CodingInstructionsErrorCode;
 
-  constructor(
-    code: CodingInstructionsErrorCode,
-    message: string,
-    options?: ErrorOptions,
-  ) {
+  constructor(code: CodingInstructionsErrorCode, message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "CodingInstructionsError";
     this.code = code;
@@ -160,39 +154,25 @@ export async function loadCodingInstructions(
   throwIfAborted(options.signal);
 
   const workspace = await resolveWorkspace(options.workspace);
-  const system = options.systemInstructions !== undefined
-    ? textDocument(
-        options.systemInstructions,
-        "explicit",
-        "Explicit instructions",
-        settings.maxBytes,
-      )
-    : options.instructionsDirectory !== undefined
-    ? await loadRequiredFile(
-        options.instructionsDirectory,
-        settings.systemFilename,
-        "System instructions",
-        settings.maxBytes,
-        options.signal,
-      )
-    : textDocument(
-        options.defaultSystemInstructions,
-        "built-in",
-        "Default system instructions",
-        settings.maxBytes,
-      );
+  const system =
+    options.systemInstructions !== undefined
+      ? textDocument(options.systemInstructions, "explicit", "Explicit instructions", settings.maxBytes)
+      : options.instructionsDirectory !== undefined
+        ? await loadRequiredFile(
+            options.instructionsDirectory,
+            settings.systemFilename,
+            "System instructions",
+            settings.maxBytes,
+            options.signal,
+          )
+        : textDocument(options.defaultSystemInstructions, "built-in", "Default system instructions", settings.maxBytes);
 
-  const runtime = options.runtimeInstructions === undefined
-    ? undefined
-    : textDocument(
-        options.runtimeInstructions,
-        "runtime",
-        "Runtime instructions",
-        settings.maxBytes,
-      );
-  const projects = settings.projectFilename === false
-    ? []
-    : await loadProjectInstructions(workspace, settings, options.signal);
+  const runtime =
+    options.runtimeInstructions === undefined
+      ? undefined
+      : textDocument(options.runtimeInstructions, "runtime", "Runtime instructions", settings.maxBytes);
+  const projects =
+    settings.projectFilename === false ? [] : await loadProjectInstructions(workspace, settings, options.signal);
   const project = projects.at(-1);
 
   const sections = [system.content];
@@ -225,10 +205,12 @@ export function formatCodingProjectInstructions(
     );
   }
   for (const project of projects) {
-    const source = project.source.type === "file"
-      ? `Source: ${project.source.path}\n` +
-        (projects.length > 1 ? `Scope: ${dirname(project.source.path)}\n` : "") + "\n"
-      : "";
+    const source =
+      project.source.type === "file"
+        ? `Source: ${project.source.path}\n` +
+          (projects.length > 1 ? `Scope: ${dirname(project.source.path)}\n` : "") +
+          "\n"
+        : "";
     sections.push(`${source}${project.content}`);
   }
   return sections.join("\n\n");
@@ -243,9 +225,7 @@ interface ValidatedOptions {
   readonly labels: CodingInstructionSectionLabels;
 }
 
-function validateOptions(
-  options: Readonly<LoadCodingInstructionsOptions>,
-): ValidatedOptions {
+function validateOptions(options: Readonly<LoadCodingInstructionsOptions>): ValidatedOptions {
   if (options.workspace.trim() === "") {
     throw invalidOption("workspace must not be empty");
   }
@@ -258,22 +238,20 @@ function validateOptions(
     options.systemInstructionsFilename ?? DEFAULT_SYSTEM_INSTRUCTIONS_FILENAME,
     "systemInstructionsFilename",
   );
-  const projectFilename = options.projectInstructionsFilename === false
-    ? false
-    : instructionFilename(
-        options.projectInstructionsFilename ??
-          DEFAULT_PROJECT_INSTRUCTIONS_FILENAME,
-        "projectInstructionsFilename",
-      );
+  const projectFilename =
+    options.projectInstructionsFilename === false
+      ? false
+      : instructionFilename(
+          options.projectInstructionsFilename ?? DEFAULT_PROJECT_INSTRUCTIONS_FILENAME,
+          "projectInstructionsFilename",
+        );
   const labels = {
     runtime: sectionLabel(
-      options.sectionLabels?.runtime ??
-        DEFAULT_CODING_INSTRUCTION_SECTION_LABELS.runtime,
+      options.sectionLabels?.runtime ?? DEFAULT_CODING_INSTRUCTION_SECTION_LABELS.runtime,
       "sectionLabels.runtime",
     ),
     project: sectionLabel(
-      options.sectionLabels?.project ??
-        DEFAULT_CODING_INSTRUCTION_SECTION_LABELS.project,
+      options.sectionLabels?.project ?? DEFAULT_CODING_INSTRUCTION_SECTION_LABELS.project,
       "sectionLabels.project",
     ),
   };
@@ -281,25 +259,30 @@ function validateOptions(
     options.projectInstructionsFallbackFilenames ?? [],
     "projectInstructionsFallbackFilenames",
   );
-  const projectRootMarkers = instructionFilenames(
-    options.projectRootMarkers ?? [".git"],
-    "projectRootMarkers",
-  );
+  const projectRootMarkers = instructionFilenames(options.projectRootMarkers ?? [".git"], "projectRootMarkers");
   return { maxBytes, systemFilename, projectFilename, projectFallbackFilenames, projectRootMarkers, labels };
 }
 
 function instructionFilenames(values: readonly string[], option: string): readonly string[] {
   if (!Array.isArray(values)) throw invalidOption(`${option} must be an array of filenames`);
-  return [...new Set(values.map(value => {
-    if (typeof value !== "string") throw invalidOption(`${option} must contain filenames`);
-    return instructionFilename(value, option);
-  }))];
+  return [
+    ...new Set(
+      values.map((value) => {
+        if (typeof value !== "string") throw invalidOption(`${option} must contain filenames`);
+        return instructionFilename(value, option);
+      }),
+    ),
+  ];
 }
 
 function instructionFilename(value: string, option: string): string {
   if (
-    value.trim() === "" || value === "." || value === ".." ||
-    value.includes("/") || value.includes("\\") || value.includes("\0")
+    value.trim() === "" ||
+    value === "." ||
+    value === ".." ||
+    value.includes("/") ||
+    value.includes("\\") ||
+    value.includes("\0")
   ) {
     throw invalidOption(`${option} must be a single non-empty filename`);
   }
@@ -345,10 +328,7 @@ function textDocument(
   maxBytes: number,
 ): CodingInstructionDocument {
   if (content.trim() === "") {
-    throw new CodingInstructionsError(
-      "CODING_INSTRUCTIONS_EMPTY",
-      `${label} must not be empty`,
-    );
+    throw new CodingInstructionsError("CODING_INSTRUCTIONS_EMPTY", `${label} must not be empty`);
   }
   assertSize(Buffer.byteLength(content, "utf8"), label, maxBytes);
   return { source: { type: source }, content };
@@ -391,7 +371,7 @@ async function loadProjectInstructions(
   const directories = [workspace];
   if (settings.projectRootMarkers.length > 0) {
     let current = workspace;
-    while (!await hasProjectRootMarker(current, settings.projectRootMarkers, signal)) {
+    while (!(await hasProjectRootMarker(current, settings.projectRootMarkers, signal))) {
       const parent = dirname(current);
       if (parent === current) {
         directories.splice(1);
@@ -401,11 +381,13 @@ async function loadProjectInstructions(
       current = parent;
     }
   }
-  const filenames = [...new Set([
-    "AGENTS.override.md",
-    ...(settings.projectFilename === false ? [] : [settings.projectFilename]),
-    ...settings.projectFallbackFilenames,
-  ])];
+  const filenames = [
+    ...new Set([
+      "AGENTS.override.md",
+      ...(settings.projectFilename === false ? [] : [settings.projectFilename]),
+      ...settings.projectFallbackFilenames,
+    ]),
+  ];
   const documents: CodingInstructionDocument[] = [];
   let bytes = 0;
   for (const directory of directories.reverse()) {
@@ -450,13 +432,7 @@ async function loadOptionalProjectFile(
   signal: AbortSignal | undefined,
 ): Promise<CodingInstructionDocument | undefined> {
   try {
-    const document = await loadSafeFile(
-      workspace,
-      filename,
-      "Project instructions",
-      maxBytes,
-      signal,
-    );
+    const document = await loadSafeFile(workspace, filename, "Project instructions", maxBytes, signal);
     return document.content.trim() === "" ? undefined : document;
   } catch (error) {
     if (
@@ -500,10 +476,7 @@ async function loadSafeFile(
     assertInside(root, target, candidate);
     const information = await stat(target);
     if (!information.isFile()) {
-      throw new CodingInstructionsError(
-        "CODING_INSTRUCTIONS_NOT_A_FILE",
-        `${label} path is not a file: ${candidate}`,
-      );
+      throw new CodingInstructionsError("CODING_INSTRUCTIONS_NOT_A_FILE", `${label} path is not a file: ${candidate}`);
     }
     assertSize(information.size, `${label} at ${candidate}`, maxBytes);
   } catch (error) {
@@ -518,9 +491,7 @@ async function loadSafeFile(
 
   let contents: Buffer;
   try {
-    contents = signal === undefined
-      ? await readFile(target)
-      : await readFile(target, { signal });
+    contents = signal === undefined ? await readFile(target) : await readFile(target, { signal });
   } catch (error) {
     if (isAbortError(error, signal)) throw error;
     throw new CodingInstructionsError(
@@ -542,20 +513,14 @@ async function loadSafeFile(
     );
   }
   if (label === "System instructions" && content.trim() === "") {
-    throw new CodingInstructionsError(
-      "CODING_INSTRUCTIONS_EMPTY",
-      `${label} at ${candidate} must not be empty`,
-    );
+    throw new CodingInstructionsError("CODING_INSTRUCTIONS_EMPTY", `${label} at ${candidate} must not be empty`);
   }
   return { source: { type: "file", path: target }, content };
 }
 
 function assertInside(root: string, target: string, displayPath: string): void {
   const pathFromRoot = relative(root, target);
-  if (
-    pathFromRoot === ".." || pathFromRoot.startsWith(`..${sep}`) ||
-    isAbsolute(pathFromRoot)
-  ) {
+  if (pathFromRoot === ".." || pathFromRoot.startsWith(`..${sep}`) || isAbsolute(pathFromRoot)) {
     throw new CodingInstructionsError(
       "CODING_INSTRUCTIONS_OUTSIDE_WORKSPACE",
       `Instruction path resolves outside its root: ${displayPath}`,
@@ -572,10 +537,7 @@ function assertSize(size: number, label: string, maxBytes: number): void {
 }
 
 function invalidOption(message: string): CodingInstructionsError {
-  return new CodingInstructionsError(
-    "CODING_INSTRUCTIONS_INVALID_OPTION",
-    message,
-  );
+  return new CodingInstructionsError("CODING_INSTRUCTIONS_INVALID_OPTION", message);
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
@@ -583,11 +545,9 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 }
 
 function isAbortError(error: unknown, signal: AbortSignal | undefined): boolean {
-  return signal?.aborted === true ||
-    (error instanceof Error && error.name === "AbortError");
+  return signal?.aborted === true || (error instanceof Error && error.name === "AbortError");
 }
 
 function isMissingPathError(error: unknown): boolean {
-  return error instanceof Error && "code" in error &&
-    (error.code === "ENOENT" || error.code === "ENOTDIR");
+  return error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR");
 }

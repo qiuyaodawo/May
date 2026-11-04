@@ -38,12 +38,7 @@ physical `absolute` path and display `relative` path, and enforce the same works
 file tools. Use these results when deriving persistent file permission ranges.
 
 ```ts
-import {
-  createEditTool,
-  createReadTool,
-  createShellTool,
-  createWriteTool,
-} from "@sortedyuan/coding-tools";
+import { createEditTool, createReadTool, createShellTool, createWriteTool } from "@sortedyuan/coding-tools";
 
 const read = createReadTool({ cwd: process.cwd(), maxBytes: 2_000_000 });
 ```
@@ -75,10 +70,7 @@ directory-scoped project instruction documents without coupling prompt policy to
 specific agent product:
 
 ```ts
-import {
-  codingRuntimeInstructions,
-  loadCodingInstructions,
-} from "@sortedyuan/coding-tools/instructions";
+import { codingRuntimeInstructions, loadCodingInstructions } from "@sortedyuan/coding-tools/instructions";
 import { createShellTool, getShellToolInfo } from "@sortedyuan/coding-tools";
 
 const shell = createShellTool({ cwd: process.cwd() });

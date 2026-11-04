@@ -23,45 +23,49 @@ async function collect(iterable) {
 function sseResponse(values, options = {}) {
   const lineBreak = options.lineBreak ?? "\n";
   const source = values
-    .map((value) =>
-      `data: ${typeof value === "string" ? value : JSON.stringify(value)}` +
-      lineBreak + lineBreak
-    )
+    .map((value) => `data: ${typeof value === "string" ? value : JSON.stringify(value)}` + lineBreak + lineBreak)
     .join("");
   const bytes = new TextEncoder().encode(source);
   const chunkSize = options.chunkSize ?? bytes.length;
 
-  return new Response(new ReadableStream({
-    start(controller) {
-      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-        controller.enqueue(bytes.slice(offset, offset + chunkSize));
-      }
-      controller.close();
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+          controller.enqueue(bytes.slice(offset, offset + chunkSize));
+        }
+        controller.close();
+      },
+    }),
+    {
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
     },
-  }), {
-    status: 200,
-    headers: { "content-type": "text/event-stream" },
-  });
+  );
 }
 
 function completionChunks({ reasoning = "", text = "", usage = true } = {}) {
   const chunks = [];
   if (reasoning) {
     chunks.push({
-      choices: [{
-        index: 0,
-        delta: { reasoning_content: reasoning },
-        finish_reason: null,
-      }],
+      choices: [
+        {
+          index: 0,
+          delta: { reasoning_content: reasoning },
+          finish_reason: null,
+        },
+      ],
     });
   }
   if (text) {
     chunks.push({
-      choices: [{
-        index: 0,
-        delta: { content: text },
-        finish_reason: null,
-      }],
+      choices: [
+        {
+          index: 0,
+          delta: { content: text },
+          finish_reason: null,
+        },
+      ],
     });
   }
   chunks.push({
@@ -87,10 +91,7 @@ test("streams reasoning, text, usage, and sends DeepSeek configuration", async (
   const fetch = async (url, init) => {
     capturedUrl = url;
     capturedInit = init;
-    return sseResponse(
-      completionChunks({ reasoning: "Think.", text: "Answer." }),
-      { lineBreak: "\r\n", chunkSize: 7 },
-    );
+    return sseResponse(completionChunks({ reasoning: "Think.", text: "Answer." }), { lineBreak: "\r\n", chunkSize: 7 });
   };
   const model = new DeepSeekModel({
     apiKey: "secret",
@@ -103,9 +104,11 @@ test("streams reasoning, text, usage, and sends DeepSeek configuration", async (
   });
   const controller = new AbortController();
 
-  const events = await collect(model.stream(emptyRequest, {
-    signal: controller.signal,
-  }));
+  const events = await collect(
+    model.stream(emptyRequest, {
+      signal: controller.signal,
+    }),
+  );
 
   assert.equal(capturedUrl, "https://example.test/chat/completions");
   assert.equal(capturedInit.method, "POST");
@@ -144,47 +147,59 @@ test("round-trips reasoning_content through a May tool-call loop", async () => {
   const responses = [
     sseResponse([
       {
-        choices: [{
-          index: 0,
-          delta: { reasoning_content: "I need the add tool." },
-          finish_reason: null,
-        }],
+        choices: [
+          {
+            index: 0,
+            delta: { reasoning_content: "I need the add tool." },
+            finish_reason: null,
+          },
+        ],
       },
       {
-        choices: [{
-          index: 0,
-          delta: {
-            tool_calls: [{
-              index: 0,
-              id: "call_add",
-              type: "function",
-              function: { name: "add", arguments: "{\"a\":2" },
-            }],
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "call_add",
+                  type: "function",
+                  function: { name: "add", arguments: '{"a":2' },
+                },
+              ],
+            },
+            finish_reason: null,
           },
-          finish_reason: null,
-        }],
+        ],
       },
       {
-        choices: [{
-          index: 0,
-          delta: {
-            tool_calls: [{
-              index: 0,
-              function: { arguments: ",\"b\":3}" },
-            }],
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  function: { arguments: ',"b":3}' },
+                },
+              ],
+            },
+            finish_reason: null,
           },
-          finish_reason: null,
-        }],
+        ],
       },
       {
         choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
       },
       "[DONE]",
     ]),
-    sseResponse(completionChunks({
-      reasoning: "The tool returned five.",
-      text: "2 + 3 = 5",
-    })),
+    sseResponse(
+      completionChunks({
+        reasoning: "The tool returned five.",
+        text: "2 + 3 = 5",
+      }),
+    ),
   ];
   const fetch = async (_url, init) => {
     requests.push(JSON.parse(init.body));
@@ -220,10 +235,7 @@ test("round-trips reasoning_content through a May tool-call loop", async () => {
   const events = await eventPromise;
 
   assert.equal(result.steps, 2);
-  assert.equal(
-    result.message.content.find((part) => part.type === "text").text,
-    "2 + 3 = 5",
-  );
+  assert.equal(result.message.content.find((part) => part.type === "text").text, "2 + 3 = 5");
   assert.equal(requests.length, 2);
   assert.deepEqual(requests[0].tools[0], {
     type: "function",
@@ -235,78 +247,84 @@ test("round-trips reasoning_content through a May tool-call loop", async () => {
   });
 
   const secondMessages = requests[1].messages;
-  assert.deepEqual(secondMessages.map((message) => message.role), [
-    "user",
-    "assistant",
-    "tool",
-  ]);
+  assert.deepEqual(
+    secondMessages.map((message) => message.role),
+    ["user", "assistant", "tool"],
+  );
   assert.equal(secondMessages[1].reasoning_content, "I need the add tool.");
   assert.equal(secondMessages[1].content, "");
-  assert.deepEqual(secondMessages[1].tool_calls, [{
-    id: "call_add",
-    type: "function",
-    function: { name: "add", arguments: "{\"a\":2,\"b\":3}" },
-  }]);
+  assert.deepEqual(secondMessages[1].tool_calls, [
+    {
+      id: "call_add",
+      type: "function",
+      function: { name: "add", arguments: '{"a":2,"b":3}' },
+    },
+  ]);
   assert.equal(secondMessages[2].tool_call_id, "call_add");
   assert.equal(secondMessages[2].content, "5");
   assert.deepEqual(
-    events
-      .filter((event) => event.type === "model.reasoning.delta")
-      .map((event) => event.delta),
+    events.filter((event) => event.type === "model.reasoning.delta").map((event) => event.delta),
     ["I need the add tool.", "The tool returned five."],
   );
 });
 
 test("assembles multiple interleaved tool calls in index order", async () => {
-  const fetch = async () => sseResponse([
-    {
-      choices: [{
-        index: 0,
-        delta: {
-          tool_calls: [
-            {
-              index: 1,
-              id: "call_b",
-              type: "function",
-              function: { name: "second", arguments: '"not-' },
+  const fetch = async () =>
+    sseResponse([
+      {
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                {
+                  index: 1,
+                  id: "call_b",
+                  type: "function",
+                  function: { name: "second", arguments: '"not-' },
+                },
+                {
+                  index: 0,
+                  id: "call_a",
+                  type: "function",
+                  function: { name: "first", arguments: '{"x":' },
+                },
+              ],
             },
-            {
-              index: 0,
-              id: "call_a",
-              type: "function",
-              function: { name: "first", arguments: "{\"x\":" },
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                { index: 0, function: { arguments: "1}" } },
+                { index: 1, function: { arguments: 'json"' } },
+              ],
             },
-          ],
-        },
-        finish_reason: null,
-      }],
-    },
-    {
-      choices: [{
-        index: 0,
-        delta: {
-          tool_calls: [
-            { index: 0, function: { arguments: "1}" } },
-            { index: 1, function: { arguments: 'json"' } },
-          ],
-        },
-        finish_reason: null,
-      }],
-    },
-    {
-      choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
-    },
-    "[DONE]",
-  ]);
+            finish_reason: null,
+          },
+        ],
+      },
+      {
+        choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
+      },
+      "[DONE]",
+    ]);
   const model = new DeepSeekModel({
     apiKey: "secret",
     model: "model",
     fetch,
   });
 
-  const events = await collect(model.stream(emptyRequest, {
-    signal: new AbortController().signal,
-  }));
+  const events = await collect(
+    model.stream(emptyRequest, {
+      signal: new AbortController().signal,
+    }),
+  );
   const completed = events.at(-1);
 
   assert.deepEqual(completed.message.toolCalls, [
@@ -320,19 +338,23 @@ test("preserves an explicitly empty reasoning_content for tool continuation", as
   const responses = [
     sseResponse([
       {
-        choices: [{
-          index: 0,
-          delta: {
-            reasoning_content: "",
-            tool_calls: [{
-              index: 0,
-              id: "call_ping",
-              type: "function",
-              function: { name: "ping", arguments: "{}" },
-            }],
+        choices: [
+          {
+            index: 0,
+            delta: {
+              reasoning_content: "",
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "call_ping",
+                  type: "function",
+                  function: { name: "ping", arguments: "{}" },
+                },
+              ],
+            },
+            finish_reason: null,
           },
-          finish_reason: null,
-        }],
+        ],
       },
       {
         choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
@@ -351,41 +373,44 @@ test("preserves an explicitly empty reasoning_content for tool continuation", as
   });
   const run = new May({
     model,
-    tools: [{
-      name: "ping",
-      description: "Return pong",
-      inputSchema: { type: "object", properties: {} },
-      async execute() {
-        return "pong";
+    tools: [
+      {
+        name: "ping",
+        description: "Return pong",
+        inputSchema: { type: "object", properties: {} },
+        async execute() {
+          return "pong";
+        },
       },
-    }],
+    ],
     context: new InMemoryContext(),
   }).run({ input: "ping" });
 
   await run.result;
 
   const assistant = requests[1].messages[1];
-  assert.equal(
-    Object.hasOwn(assistant, "reasoning_content"),
-    true,
-  );
+  assert.equal(Object.hasOwn(assistant, "reasoning_content"), true);
   assert.equal(assistant.reasoning_content, "");
 });
 
 test("surfaces structured DeepSeek HTTP errors", async () => {
-  const fetch = async () => new Response(JSON.stringify({
-    error: {
-      message: "Authentication failed",
-      type: "authentication_error",
-      code: "invalid_api_key",
-    },
-  }), {
-    status: 401,
-    headers: {
-      "content-type": "application/json",
-      "retry-after": "1.5",
-    },
-  });
+  const fetch = async () =>
+    new Response(
+      JSON.stringify({
+        error: {
+          message: "Authentication failed",
+          type: "authentication_error",
+          code: "invalid_api_key",
+        },
+      }),
+      {
+        status: 401,
+        headers: {
+          "content-type": "application/json",
+          "retry-after": "1.5",
+        },
+      },
+    );
   const model = new DeepSeekModel({
     apiKey: "bad",
     model: "model",
@@ -393,9 +418,11 @@ test("surfaces structured DeepSeek HTTP errors", async () => {
   });
 
   await assert.rejects(
-    collect(model.stream(emptyRequest, {
-      signal: new AbortController().signal,
-    })),
+    collect(
+      model.stream(emptyRequest, {
+        signal: new AbortController().signal,
+      }),
+    ),
     (error) => {
       assert.ok(error instanceof OpenAICompatibleApiError);
       assert.equal(error.provider, "DeepSeek");
@@ -418,42 +445,56 @@ test("rejects malformed and incomplete DeepSeek streams", async (t) => {
       fetch: async () => sseResponse(values),
     });
     await assert.rejects(
-      collect(model.stream(emptyRequest, {
-        signal: new AbortController().signal,
-      })),
+      collect(
+        model.stream(emptyRequest, {
+          signal: new AbortController().signal,
+        }),
+      ),
       (error) => error instanceof ErrorType && error.code === code,
     );
   }
 
-  await t.test("invalid JSON", () =>
-    rejectStream(["{"], OpenAICompatibleProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+  await t.test("invalid JSON", () => rejectStream(["{"], OpenAICompatibleProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
   await t.test("missing finish reason", () =>
-    rejectStream([
-      { choices: [{ index: 0, delta: { content: "partial" } }] },
-      "[DONE]",
-    ], OpenAICompatibleProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+    rejectStream(
+      [{ choices: [{ index: 0, delta: { content: "partial" } }] }, "[DONE]"],
+      OpenAICompatibleProtocolError,
+      "DEEPSEEK_PROTOCOL_ERROR",
+    ),
+  );
   await t.test("length finish reason", () =>
-    rejectStream([
-      { choices: [{ index: 0, delta: {}, finish_reason: "length" }] },
-      "[DONE]",
-    ], OpenAICompatibleFinishReasonError, "DEEPSEEK_INCOMPLETE_RESPONSE"));
+    rejectStream(
+      [{ choices: [{ index: 0, delta: {}, finish_reason: "length" }] }, "[DONE]"],
+      OpenAICompatibleFinishReasonError,
+      "DEEPSEEK_INCOMPLETE_RESPONSE",
+    ),
+  );
   await t.test("tool finish without calls", () =>
-    rejectStream([
-      { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
-      "[DONE]",
-    ], OpenAICompatibleProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+    rejectStream(
+      [{ choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] }, "[DONE]"],
+      OpenAICompatibleProtocolError,
+      "DEEPSEEK_PROTOCOL_ERROR",
+    ),
+  );
   await t.test("incomplete tool call", () =>
-    rejectStream([
-      {
-        choices: [{
-          index: 0,
-          delta: { tool_calls: [{ index: 0, id: "call_missing_name" }] },
-          finish_reason: null,
-        }],
-      },
-      { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
-      "[DONE]",
-    ], OpenAICompatibleProtocolError, "DEEPSEEK_PROTOCOL_ERROR"));
+    rejectStream(
+      [
+        {
+          choices: [
+            {
+              index: 0,
+              delta: { tool_calls: [{ index: 0, id: "call_missing_name" }] },
+              finish_reason: null,
+            },
+          ],
+        },
+        { choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] },
+        "[DONE]",
+      ],
+      OpenAICompatibleProtocolError,
+      "DEEPSEEK_PROTOCOL_ERROR",
+    ),
+  );
 });
 
 test("passes AbortSignal to fetch and propagates cancellation", async () => {
@@ -477,9 +518,11 @@ test("passes AbortSignal to fetch and propagates cancellation", async () => {
     fetch,
   });
   const controller = new AbortController();
-  const collecting = collect(model.stream(emptyRequest, {
-    signal: controller.signal,
-  }));
+  const collecting = collect(
+    model.stream(emptyRequest, {
+      signal: controller.signal,
+    }),
+  );
 
   await started;
   const reason = new Error("stop request");
@@ -489,4 +532,3 @@ test("passes AbortSignal to fetch and propagates cancellation", async () => {
   assert.equal(receivedSignal, controller.signal);
   assert.equal(receivedSignal.reason, reason);
 });
-

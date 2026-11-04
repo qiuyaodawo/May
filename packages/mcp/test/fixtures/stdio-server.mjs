@@ -2,10 +2,7 @@ import { writeSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 if (process.argv.includes("--fail")) {
-  writeSync(
-    process.stderr.fd,
-    `\u001b[31m${"x".repeat(200)}STARTUP_DIAGNOSTIC\u001b[0m\n`,
-  );
+  writeSync(process.stderr.fd, `\u001b[31m${"x".repeat(200)}STARTUP_DIAGNOSTIC\u001b[0m\n`);
   process.exit(2);
 }
 
@@ -64,10 +61,12 @@ input.on("line", (line) => {
       return;
     }
     reply(message.id, {
-      content: [{
-        type: "text",
-        text: `echo:${message.params.arguments?.value ?? ""}`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `echo:${message.params.arguments?.value ?? ""}`,
+        },
+      ],
       structuredContent: { echoed: message.params.arguments?.value ?? "" },
     });
   }

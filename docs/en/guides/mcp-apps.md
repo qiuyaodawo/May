@@ -15,23 +15,23 @@ The UI protocol is pinned to `2026-01-26`, independently of the MCP connection.
 The supported operations and limits are listed below.
 
 1. Pass `apps: { executor, approve }` to `openMcpClientPool` in the graphical Host.
-`executor` must be your normal permission executor. `approve` must explicitly
-review opening the resource and each subsequent resource read, and honor its
-signal. No default allow policy is supplied. This advertises
-`io.modelcontextprotocol/ui` with `text/html;profile=mcp-app`. After an explicit
-user action, call `pool.openApp(serverId, remoteToolName, { owner, signal })`.
-The owner comes from your authenticated Host workspace/Session, never App params.
+   `executor` must be your normal permission executor. `approve` must explicitly
+   review opening the resource and each subsequent resource read, and honor its
+   signal. No default allow policy is supplied. This advertises
+   `io.modelcontextprotocol/ui` with `text/html;profile=mcp-app`. After an explicit
+   user action, call `pool.openApp(serverId, remoteToolName, { owner, signal })`.
+   The owner comes from your authenticated Host workspace/Session, never App params.
 
 2. After consent, keep the returned `McpAppSession` on the backend. It has
    `resource`, `receive(message)`,
    `notification(kind, params)` and `close()`. Connect only
-one authenticated renderer channel to it; do not expose the pool, executor,
-credentials, general RPC forwarding or Session history. Pass a lifetime signal
-that aborts on Session switch, logout and UI disposal. The default view lifetime
-is ten minutes (maximum one hour), with at most 16 open/opening views per connection,
-four concurrent requests and 256 unique request ids per view. Duplicate ids close
-the view. Reconnect, invalidation, changed catalogs
-or authorization and pool shutdown revoke use of old views.
+   one authenticated renderer channel to it; do not expose the pool, executor,
+   credentials, general RPC forwarding or Session history. Pass a lifetime signal
+   that aborts on Session switch, logout and UI disposal. The default view lifetime
+   is ten minutes (maximum one hour), with at most 16 open/opening views per connection,
+   four concurrent requests and 256 unique request ids per view. Duplicate ids close
+   the view. Reconnect, invalidation, changed catalogs
+   or authorization and pool shutdown revoke use of old views.
 
 ## Browser integration
 
@@ -50,7 +50,7 @@ loopback HTTP. The sandbox URL is trusted host configuration, not `_meta.ui.doma
 import { mountMcpApp } from "@sortedyuan/mcp/apps-browser";
 const view = mountMcpApp(container, trustedSandboxUrl, {
   resource: { html: backendAppResource.html },
-  receive: message => authenticatedChannel.request(message),
+  receive: (message) => authenticatedChannel.request(message),
   close: () => authenticatedChannel.close(),
   signal: viewLifetimeSignal,
 });

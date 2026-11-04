@@ -1,16 +1,37 @@
-import type { ComponentReference, EvalComponent, EvalEnvironmentAdapter, EvalEvaluator, EvalExecutionAdapter } from "./types.js";
+import type {
+  ComponentReference,
+  EvalComponent,
+  EvalEnvironmentAdapter,
+  EvalEvaluator,
+  EvalExecutionAdapter,
+} from "./types.js";
 
 export class EvalRegistry {
   private readonly environments = new Map<string, EvalEnvironmentAdapter>();
   private readonly executions = new Map<string, EvalExecutionAdapter>();
   private readonly evaluators = new Map<string, EvalEvaluator>();
 
-  registerEnvironment(adapter: EvalEnvironmentAdapter): this { this.register(this.environments, adapter); return this; }
-  registerExecution(adapter: EvalExecutionAdapter): this { this.register(this.executions, adapter); return this; }
-  registerEvaluator(evaluator: EvalEvaluator): this { this.register(this.evaluators, evaluator); return this; }
-  environment(reference: ComponentReference): EvalEnvironmentAdapter { return this.resolve(this.environments, reference, "environment"); }
-  execution(reference: ComponentReference): EvalExecutionAdapter { return this.resolve(this.executions, reference, "execution"); }
-  evaluator(reference: ComponentReference): EvalEvaluator { return this.resolve(this.evaluators, reference, "evaluator"); }
+  registerEnvironment(adapter: EvalEnvironmentAdapter): this {
+    this.register(this.environments, adapter);
+    return this;
+  }
+  registerExecution(adapter: EvalExecutionAdapter): this {
+    this.register(this.executions, adapter);
+    return this;
+  }
+  registerEvaluator(evaluator: EvalEvaluator): this {
+    this.register(this.evaluators, evaluator);
+    return this;
+  }
+  environment(reference: ComponentReference): EvalEnvironmentAdapter {
+    return this.resolve(this.environments, reference, "environment");
+  }
+  execution(reference: ComponentReference): EvalExecutionAdapter {
+    return this.resolve(this.executions, reference, "execution");
+  }
+  evaluator(reference: ComponentReference): EvalEvaluator {
+    return this.resolve(this.evaluators, reference, "evaluator");
+  }
 
   private register<T extends EvalComponent>(map: Map<string, T>, component: T): void {
     if (!component.id || !component.version) throw new TypeError("Component id and version are required");

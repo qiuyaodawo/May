@@ -14,12 +14,12 @@ May 将持久化对话历史与 Session 发现分开：
 
 ## 选择存储后端
 
-| 要求 | 后端 |
-| --- | --- |
-| 进程内历史 | `@sortedyuan/may/session` 的 `InMemorySessionStore` |
-| 跨重启本地历史 | `@sortedyuan/may/session/file-store` 的 `FileSessionStore` |
-| 本地 Session 发现 | `@sortedyuan/may/session/catalog` 的 `FileSessionCatalog` |
-| 数据库、加密或跨进程协调 | 实现本文的存储接口 |
+| 要求                     | 后端                                                       |
+| ------------------------ | ---------------------------------------------------------- |
+| 进程内历史               | `@sortedyuan/may/session` 的 `InMemorySessionStore`        |
+| 跨重启本地历史           | `@sortedyuan/may/session/file-store` 的 `FileSessionStore` |
+| 本地 Session 发现        | `@sortedyuan/may/session/catalog` 的 `FileSessionCatalog`  |
+| 数据库、加密或跨进程协调 | 实现本文的存储接口                                         |
 
 使用文件存储时可以直接阅读[内置本地存储](#内置本地存储)。
 数据库适配器必须提供持久写入和顺序一致的读取。
@@ -60,11 +60,7 @@ Run 已经成功完成。
 才能创建存储。`appendIfCurrentSequence` 必须在同一事务中检查当前最大序号并插入记录。
 
 ```ts
-import {
-  validateSessionHistory,
-  type SessionEvent,
-  type SessionStore,
-} from "@sortedyuan/may/session";
+import { validateSessionHistory, type SessionEvent, type SessionStore } from "@sortedyuan/may/session";
 
 export interface SessionEventTable {
   appendIfCurrentSequence(input: {
@@ -89,9 +85,7 @@ export class DatabaseSessionStore implements SessionStore {
       json: JSON.stringify(event),
     });
     if (!committed) {
-      throw new Error(
-        `Session ${event.sessionId} is no longer at sequence ${event.seq - 1}`,
-      );
+      throw new Error(`Session ${event.sessionId} is no longer at sequence ${event.seq - 1}`);
     }
   }
 
@@ -119,12 +113,17 @@ function decodeEvent(source: string, row: number): SessionEvent {
     throw new Error(`Invalid session event JSON in row ${row}`);
   }
   if (
-    typeof value !== "object" || value === null ||
-    !("type" in value) || typeof value.type !== "string" ||
-    !("sessionId" in value) || typeof value.sessionId !== "string" ||
-    !("seq" in value) || typeof value.seq !== "number" ||
+    typeof value !== "object" ||
+    value === null ||
+    !("type" in value) ||
+    typeof value.type !== "string" ||
+    !("sessionId" in value) ||
+    typeof value.sessionId !== "string" ||
+    !("seq" in value) ||
+    typeof value.seq !== "number" ||
     !Number.isSafeInteger(value.seq) ||
-    !("timestamp" in value) || typeof value.timestamp !== "number"
+    !("timestamp" in value) ||
+    typeof value.timestamp !== "number"
   ) {
     throw new Error(`Invalid session event in row ${row}`);
   }
@@ -176,14 +175,15 @@ const workspace = await AgentWorkspace.open({
   workspace: process.cwd(),
   store,
   catalog,
-  openApplication: ({ sessionId, resume }) => AgentApplication.open({
-    model,
-    tools,
-    permissionPolicy,
-    store,
-    resume,
-    ...(sessionId === undefined ? {} : { sessionId }),
-  }),
+  openApplication: ({ sessionId, resume }) =>
+    AgentApplication.open({
+      model,
+      tools,
+      permissionPolicy,
+      store,
+      resume,
+      ...(sessionId === undefined ? {} : { sessionId }),
+    }),
 });
 
 try {
@@ -219,12 +219,9 @@ await withFileAccess(path, "exclusive", async () => {
   await writeFile(temporary, JSON.stringify({ revision: 1 }));
   await rename(temporary, path);
 });
-const state = await withFileAccess(
-  path,
-  "shared",
-  async () => JSON.parse(await readFile(path, "utf8")),
-  { initialize: false },
-);
+const state = await withFileAccess(path, "shared", async () => JSON.parse(await readFile(path, "utf8")), {
+  initialize: false,
+});
 console.log(state.revision);
 ```
 

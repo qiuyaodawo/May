@@ -36,7 +36,8 @@ export class SessionSteeringQueue {
       if (event.type === "input.steering.finished") {
         for (const inputId of event.inputIds) this.update(inputId, event.status, event.reason);
       }
-      if (event.type === "input.submitted" && event.inputId !== undefined && this.inputs.has(event.inputId)) this.update(event.inputId, "delivered");
+      if (event.type === "input.submitted" && event.inputId !== undefined && this.inputs.has(event.inputId))
+        this.update(event.inputId, "delivered");
     }
   }
 
@@ -46,8 +47,10 @@ export class SessionSteeringQueue {
 
   enqueue(options: SessionSteerOptions, activeRunId?: string): Promise<SessionSteeringInput> {
     const inputId = options.inputId ?? `steer_${crypto.randomUUID()}`;
-    if (inputId.length === 0 || inputId.length > 256) throw new TypeError("inputId must be a non-empty string of at most 256 characters");
-    if (options.runId !== undefined && options.runId !== activeRunId) throw new Error("The target run is no longer active");
+    if (inputId.length === 0 || inputId.length > 256)
+      throw new TypeError("inputId must be a non-empty string of at most 256 characters");
+    if (options.runId !== undefined && options.runId !== activeRunId)
+      throw new Error("The target run is no longer active");
     if (this.inputIds.has(inputId)) return Promise.reject(new Error(`Steering input already exists: ${inputId}`));
     const input: SessionSteeringInput = {
       inputId,
@@ -55,7 +58,8 @@ export class SessionSteeringQueue {
       ...omitUndefined({ runId: activeRunId }),
       status: activeRunId === undefined ? "idle" : "pending",
     };
-    if (input.message.role !== "user" || !Array.isArray(input.message.content)) throw new TypeError("Steering input must be a user message");
+    if (input.message.role !== "user" || !Array.isArray(input.message.content))
+      throw new TypeError("Steering input must be a user message");
     this.inputIds.add(inputId);
     return this.serialize(async () => {
       await this.record({ type: "input.steering.queued", input });
@@ -69,7 +73,12 @@ export class SessionSteeringQueue {
       if (signal.aborted) return [];
       const inputs = [...this.inputs.values()].filter((input) => input.runId === runId && input.status === "pending");
       if (inputs.length === 0) return [];
-      await this.record({ type: "input.steering.delivered", runId, step, inputIds: inputs.map((input) => input.inputId) });
+      await this.record({
+        type: "input.steering.delivered",
+        runId,
+        step,
+        inputIds: inputs.map((input) => input.inputId),
+      });
       for (const input of inputs) this.update(input.inputId, "delivered");
       return structuredClone(inputs.map((input) => input.message));
     });
@@ -77,7 +86,9 @@ export class SessionSteeringQueue {
 
   finish(runId: string, status: "idle" | "cancelled", reason: string): Promise<void> {
     return this.serialize(async () => {
-      const inputIds = [...this.inputs.values()].filter((input) => input.runId === runId && input.status === "pending").map((input) => input.inputId);
+      const inputIds = [...this.inputs.values()]
+        .filter((input) => input.runId === runId && input.status === "pending")
+        .map((input) => input.inputId);
       if (inputIds.length === 0) return;
       await this.record({ type: "input.steering.finished", inputIds, status, reason });
       for (const inputId of inputIds) this.update(inputId, status, reason);
@@ -90,7 +101,9 @@ export class SessionSteeringQueue {
 
   cancel(reason: string): Promise<void> {
     return this.serialize(async () => {
-      const inputIds = [...this.inputs.values()].filter(input => input.status === "pending" || input.status === "idle").map(input => input.inputId);
+      const inputIds = [...this.inputs.values()]
+        .filter((input) => input.status === "pending" || input.status === "idle")
+        .map((input) => input.inputId);
       if (!inputIds.length) return;
       await this.record({ type: "input.steering.finished", inputIds, status: "cancelled", reason });
       for (const inputId of inputIds) this.update(inputId, "cancelled", reason);
@@ -98,7 +111,8 @@ export class SessionSteeringQueue {
   }
 
   get(inputId: string): SessionSteeringInput | undefined {
-    if (this.inputIds.has(inputId) && !this.inputs.has(inputId)) throw new Error(`Steering input acceptance is still in progress: ${inputId}`);
+    if (this.inputIds.has(inputId) && !this.inputs.has(inputId))
+      throw new Error(`Steering input acceptance is still in progress: ${inputId}`);
     const input = this.inputs.get(inputId);
     return input === undefined ? undefined : structuredClone(input);
   }

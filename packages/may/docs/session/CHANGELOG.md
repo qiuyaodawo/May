@@ -9,14 +9,14 @@
 
   这是包路径的破坏性变更。使用方需要更新依赖声明、源码导入及加载这些模块的配置：
 
-  | 原包 | 公开子路径 | 需要安装的包 |
-  | --- | --- | --- |
-  | `@sortedyuan/plugin-models` | `@sortedyuan/plugin-services/models` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-runtime` | `@sortedyuan/plugin-services/runtime` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-permissions` | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-skills` | `@sortedyuan/plugin-services/skills` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin` | `@sortedyuan/coordination` |
-  | `@sortedyuan/session-tools` | `@sortedyuan/session/tools` | `@sortedyuan/session` |
+  | 原包                              | 公开子路径                                | 需要安装的包                  |
+  | --------------------------------- | ----------------------------------------- | ----------------------------- |
+  | `@sortedyuan/plugin-models`       | `@sortedyuan/plugin-services/models`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-runtime`      | `@sortedyuan/plugin-services/runtime`     | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-permissions`  | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-skills`       | `@sortedyuan/plugin-services/skills`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin`         | `@sortedyuan/coordination`    |
+  | `@sortedyuan/session-tools`       | `@sortedyuan/session/tools`               | `@sortedyuan/session`         |
 
   选择包含这些子路径的发布版本，重新安装依赖并编译使用方。六个原包从本仓库的发布清单移除。
   插件 ID、ServiceToken ID、持久状态格式、函数名称及生命周期行为保持不变。
@@ -49,9 +49,11 @@
   增加可选 service 查询、本地诊断与独立指标服务，以及可复用的 UI 诊断面板。宿主可以
   按会话范围查询执行记录、刷新模型能力，并独立管理遥测资源。子 Agent 预算包装保留
   模型配置、能力版本和物理请求观察信息。
+
 - 8df2b63: Add durable Session branches at complete request boundaries, preserving the selected Context, runtime state and explicitly transferable application state. Expose branch history trees and workspace-family lifecycle APIs while creating independent permissions and input queues for each branch.
 
   Hosts can explicitly confirm a scheduler-yielded Run as completed after validation and final state persistence, saving a durable host-confirmed branch boundary.
+
 - 02789c6: Add durable FIFO steering input at complete Step boundaries. AgentApplication and
   Session expose steering status and explicit follow-up execution without
   interrupting current tools or approvals. Preserve delivery identities through
@@ -65,6 +67,7 @@
   the custom-source API.
   Keep GoalAgent compatible with Session-backed applications by excluding custom
   Step sources from the options passed by the goal scheduler.
+
 - 5d3b04a: Add opt-in persistent allow and deny rules with trusted scope, tool-definition
   binding, creator identity, expiry and revocation. Provide a versioned file store
   with atomic replacement and a single writer lock through
@@ -95,6 +98,7 @@
   exists. Supply a trusted `createdBy` identity when resolving it. Existing policy
   return values and existing Session histories remain supported. Readers of
   histories containing rule events must use the updated Session package.
+
 - 78bde1d: 保存工具执行时的模型可见 `content`，在 Session 恢复及历史工具查询时使用该内容。
   host 历史接口继续保留原始 `output`。`@sortedyuan/session` 提供 `sessionToolResultContent`。
 
@@ -102,6 +106,7 @@
   其值应当来自工具执行后生成的 `ToolMessage.content`。自定义 Session 存储应保留此字段。
   已有记录缺少 `content` 时，模型收到内容不可用提示；需要恢复具体内容的 host 应根据
   可信的历史记录补充模型可见内容。工具不会自动重新执行。
+
 - 89bcd8d: Add scoped plugin composition with typed versioned services, validated dependencies,
   configuration and state schemas, lifecycle Hooks, state migration, resource cleanup
   and serialized replacement. Agent definitions and applications accept plugins;
@@ -123,6 +128,7 @@
   argument boundary; use ordinary data objects and arrays to represent those values.
   Custom parsed instances retain their prototypes and methods and must protect any
   mutable internal state themselves.
+
 - 0dc3f68: `SessionStore` 新增可选的 `directory` 字段。持久化存储返回自己的目录，内存存储为
   `undefined`，宿主可以用它选择同一目录树下的记录位置，例如按请求保存协调记录与
   额度账本。既有实现无需修改。
@@ -149,6 +155,7 @@
   Remote CoordinationWorker 将已保存的取消意图发送给分离的外部执行，并通过恢复查询确认结果。
 
   PowerShell shell 工具根据最后执行命令的状态返回 exitCode，失败的 cmdlet 返回非零值。
+
 - Updated dependencies [02789c6]
 - Updated dependencies [422e404]
 - Updated dependencies [88e7d69]

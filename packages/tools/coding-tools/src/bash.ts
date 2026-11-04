@@ -23,10 +23,7 @@ export type BashToolOutput = ShellToolOutput;
  *
  * @deprecated Prefer `createShellTool`, which selects PowerShell on Windows.
  */
-export function createBashTool(options: BashToolOptions): Tool<
-  BashToolInput,
-  BashToolOutput
-> {
+export function createBashTool(options: BashToolOptions): Tool<BashToolInput, BashToolOutput> {
   const { executable, ...shellOptions } = options;
   const tool = createShellTool({
     ...shellOptions,
@@ -35,7 +32,6 @@ export function createBashTool(options: BashToolOptions): Tool<
   return {
     ...tool,
     name: "bash",
-    description: "Execute a Bash command in the workspace. Use Bash syntax. " +
-      "This is not a sandbox.",
+    description: "Execute a Bash command in the workspace. Use Bash syntax. " + "This is not a sandbox.",
   };
 }

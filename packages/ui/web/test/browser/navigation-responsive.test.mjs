@@ -107,7 +107,7 @@ const sidebarContainsFocus = () => Boolean(document.getElementById("may-sidebar"
 
 describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => {
   const base = join(testOutputRoot, "web-ui", "browser");
-  const temporaryVariables = Object.fromEntries(["TMP", "TEMP", "TMPDIR"].map(key => [key, process.env[key]]));
+  const temporaryVariables = Object.fromEntries(["TMP", "TEMP", "TMPDIR"].map((key) => [key, process.env[key]]));
   const errors = [];
   let directory, app, server, browser, page;
 
@@ -117,23 +117,45 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
     for (const key of Object.keys(temporaryVariables)) process.env[key] = directory;
     const store = new InMemorySessionStore();
     const definition = defineAgent({
-      model: new OpenAIResponsesModel({ apiKey: randomBytes(32).toString("hex"), model: "gpt-4.1", baseURL: "http://127.0.0.1:1/v1" }),
-      permissionPolicy: () => "deny", sessionHistory: false, providerNativeAutoCompaction: false, autoCompactionStrategies: [],
+      model: new OpenAIResponsesModel({
+        apiKey: randomBytes(32).toString("hex"),
+        model: "gpt-4.1",
+        baseURL: "http://127.0.0.1:1/v1",
+      }),
+      permissionPolicy: () => "deny",
+      sessionHistory: false,
+      providerNativeAutoCompaction: false,
+      autoCompactionStrategies: [],
     });
     app = await AgentWorkspace.open({
-      workspace: directory, store, catalog: new InMemorySessionCatalog(),
-      openApplication: selection => definition.open({ ...selection, store }),
+      workspace: directory,
+      store,
+      catalog: new InMemorySessionCatalog(),
+      openApplication: (selection) => definition.open({ ...selection, store }),
     });
     await app.renameSession(app.sessionId, "测试初始会话");
     const host = new ApplicationUiHost(app, {
-      product: { id: "responsive-test", title: "响应式验证", subtitle: "测试多视口与导航扩展", resourceKind: "session", suggestions: ["建议1"] },
+      product: {
+        id: "responsive-test",
+        title: "响应式验证",
+        subtitle: "测试多视口与导航扩展",
+        resourceKind: "session",
+        suggestions: ["建议1"],
+      },
     });
     const assets = new Map(await webUiAssets("响应式验证", "session", { browserLogin: true }));
     assets.set("/app.js", { type: "text/javascript; charset=utf-8", body: appScript });
-    server = await startUiServer({ host, assets, token: randomBytes(32).toString("hex"), browserLogin: true, port: 0, close: () => host.close() });
+    server = await startUiServer({
+      host,
+      assets,
+      token: randomBytes(32).toString("hex"),
+      browserLogin: true,
+      port: 0,
+      close: () => host.close(),
+    });
     browser = await chromium.launch({ headless: true, artifactsDir: directory, downloadsPath: directory });
     page = await browser.newPage();
-    page.on("pageerror", error => errors.push(error.message));
+    page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(server.createLoginUrl());
     await page.locator(".workbench").waitFor({ state: "visible" });
   });
@@ -143,7 +165,8 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
     await server?.close();
     await app?.close();
     for (const [key, value] of Object.entries(temporaryVariables)) {
-      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
     }
     if (directory !== undefined) {
       const child = relative(base, directory);
@@ -182,16 +205,24 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
 
   for (const mode of ["sync", "async"]) {
     test(`onNew ${mode === "sync" ? "同步抛出" : "异步拒绝"}的错误显示在浮层中，Escape 关闭浮层`, async () => {
-      await page.evaluate(value => { window.__triggerOnNewError = value; }, mode);
+      await page.evaluate((value) => {
+        window.__triggerOnNewError = value;
+      }, mode);
       try {
         await page.getByRole("button", { name: "新建测试会话", exact: true }).click();
         const banner = page.locator(".error-banner");
         await banner.waitFor({ state: "visible" });
-        assert.ok((await banner.textContent()).includes(mode === "sync" ? "测试 onNew 同步抛出错误" : "测试 onNew 异步拒绝错误"));
+        assert.ok(
+          (await banner.textContent()).includes(
+            mode === "sync" ? "测试 onNew 同步抛出错误" : "测试 onNew 异步拒绝错误",
+          ),
+        );
         await page.keyboard.press("Escape");
         await banner.waitFor({ state: "hidden" });
       } finally {
-        await page.evaluate(() => { window.__triggerOnNewError = null; });
+        await page.evaluate(() => {
+          window.__triggerOnNewError = null;
+        });
       }
     });
   }
@@ -211,10 +242,14 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
 
     test(`${viewport.name}隐藏的侧栏不可聚焦`, async () => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      assert.equal(await page.evaluate(() => {
-        const sidebar = document.getElementById("may-sidebar");
-        return Boolean(sidebar?.inert && sidebar?.getAttribute("aria-hidden") === "true");
-      }), true, "移动端隐藏侧栏时缺少 inert 或 aria-hidden");
+      assert.equal(
+        await page.evaluate(() => {
+          const sidebar = document.getElementById("may-sidebar");
+          return Boolean(sidebar?.inert && sidebar?.getAttribute("aria-hidden") === "true");
+        }),
+        true,
+        "移动端隐藏侧栏时缺少 inert 或 aria-hidden",
+      );
       await page.keyboard.press("Tab");
       assert.equal(await page.evaluate(sidebarContainsFocus), false, "移动端侧栏隐藏时焦点误入侧栏控件");
     });
@@ -222,43 +257,80 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
     test(`${viewport.name}展开的侧栏把 Tab 焦点限制在侧栏内`, async () => {
       await page.locator(".icon-button[aria-label='切换侧边栏']").click();
       await page.waitForTimeout(50);
-      assert.equal(await page.evaluate(() => Boolean(document.getElementById("may-sidebar")?.inert)), false, "展开侧栏后 inert 属性未清除");
+      assert.equal(
+        await page.evaluate(() => Boolean(document.getElementById("may-sidebar")?.inert)),
+        false,
+        "展开侧栏后 inert 属性未清除",
+      );
       assert.equal(await page.evaluate(sidebarContainsFocus), true, "展开侧栏后键盘焦点未移入侧栏");
       await page.keyboard.press("Tab");
       assert.equal(await page.evaluate(sidebarContainsFocus), true, "侧栏内 Tab 键移动后焦点脱离侧栏");
       await page.keyboard.press("Shift+Tab");
       assert.equal(await page.evaluate(sidebarContainsFocus), true, "侧栏内 Shift+Tab 键移动后焦点脱离侧栏");
       const firstControl = await page.evaluate(() => {
-        const controls = Array.from(document.querySelectorAll("#may-sidebar button, #may-sidebar input, #may-sidebar [tabindex]")).filter(control => control.tabIndex >= 0 && !control.matches(":disabled") && control.getClientRects().length > 0);
+        const controls = Array.from(
+          document.querySelectorAll("#may-sidebar button, #may-sidebar input, #may-sidebar [tabindex]"),
+        ).filter(
+          (control) => control.tabIndex >= 0 && !control.matches(":disabled") && control.getClientRects().length > 0,
+        );
         controls.at(-1).focus();
         return controls[0].outerHTML;
       });
       await page.keyboard.press("Tab");
-      assert.equal(await page.evaluate(() => document.activeElement.outerHTML), firstControl, "Tab 应从侧栏最后一个控件返回第一个控件");
+      assert.equal(
+        await page.evaluate(() => document.activeElement.outerHTML),
+        firstControl,
+        "Tab 应从侧栏最后一个控件返回第一个控件",
+      );
       await page.keyboard.press("Shift+Tab");
-      assert.equal(await page.evaluate(() => {
-        const controls = Array.from(document.querySelectorAll("#may-sidebar button, #may-sidebar input, #may-sidebar [tabindex]")).filter(control => control.tabIndex >= 0 && !control.matches(":disabled") && control.getClientRects().length > 0);
-        return document.activeElement === controls.at(-1);
-      }), true, "Shift+Tab 应从侧栏第一个控件返回最后一个控件");
+      assert.equal(
+        await page.evaluate(() => {
+          const controls = Array.from(
+            document.querySelectorAll("#may-sidebar button, #may-sidebar input, #may-sidebar [tabindex]"),
+          ).filter(
+            (control) => control.tabIndex >= 0 && !control.matches(":disabled") && control.getClientRects().length > 0,
+          );
+          return document.activeElement === controls.at(-1);
+        }),
+        true,
+        "Shift+Tab 应从侧栏第一个控件返回最后一个控件",
+      );
     });
 
     test(`${viewport.name}侧栏遮罩挡住正文控件`, async () => {
-      assert.equal(await page.evaluate(() => {
-        const backdrop = document.querySelector(".mobile-backdrop");
-        return Boolean(backdrop && !backdrop.hidden);
-      }), true, "移动端侧栏打开时遮罩未呈现");
+      assert.equal(
+        await page.evaluate(() => {
+          const backdrop = document.querySelector(".mobile-backdrop");
+          return Boolean(backdrop && !backdrop.hidden);
+        }),
+        true,
+        "移动端侧栏打开时遮罩未呈现",
+      );
       const hitClassName = await page.evaluate(() => {
         const rect = document.querySelector(".icon-button[aria-label='显示或隐藏详情']")?.getBoundingClientRect();
         return rect && document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)?.className;
       });
-      assert.ok(hitClassName?.includes("mobile-backdrop") || hitClassName?.includes("sidebar"), "遮罩未成功覆盖在正文上方阻断穿透");
+      assert.ok(
+        hitClassName?.includes("mobile-backdrop") || hitClassName?.includes("sidebar"),
+        "遮罩未成功覆盖在正文上方阻断穿透",
+      );
     });
 
     test(`${viewport.name}Escape 关闭侧栏并把焦点还给切换按钮`, async () => {
       await page.keyboard.press("Escape");
       await page.waitForTimeout(50);
-      assert.equal(await page.evaluate(() => !document.querySelector(".workbench")?.classList.contains("sidebar-open")), true, "按 Escape 未关闭移动端侧栏");
-      assert.equal(await page.evaluate(() => document.activeElement === document.querySelector(".icon-button[aria-label='切换侧边栏']")), true, "关闭侧栏后焦点未恢复至切换按钮");
+      assert.equal(
+        await page.evaluate(() => !document.querySelector(".workbench")?.classList.contains("sidebar-open")),
+        true,
+        "按 Escape 未关闭移动端侧栏",
+      );
+      assert.equal(
+        await page.evaluate(
+          () => document.activeElement === document.querySelector(".icon-button[aria-label='切换侧边栏']"),
+        ),
+        true,
+        "关闭侧栏后焦点未恢复至切换按钮",
+      );
     });
   }
 
@@ -266,10 +338,20 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.locator(".icon-button[aria-label='显示或隐藏详情']").click();
     await page.locator(".workbench.details-open").waitFor({ state: "visible" });
-    assert.equal(await page.evaluate(() => Boolean(document.querySelector(".details-panel")?.contains(document.activeElement))), true, "展开详情面板后键盘焦点未移入面板");
+    assert.equal(
+      await page.evaluate(() => Boolean(document.querySelector(".details-panel")?.contains(document.activeElement))),
+      true,
+      "展开详情面板后键盘焦点未移入面板",
+    );
     await page.keyboard.press("Escape");
     await page.locator(".workbench:not(.details-open)").waitFor({ state: "visible" });
-    assert.equal(await page.evaluate(() => document.activeElement === document.querySelector(".icon-button[aria-label='显示或隐藏详情']")), true, "关闭详情抽屉后焦点未恢复至详情按钮");
+    assert.equal(
+      await page.evaluate(
+        () => document.activeElement === document.querySelector(".icon-button[aria-label='显示或隐藏详情']"),
+      ),
+      true,
+      "关闭详情抽屉后焦点未恢复至详情按钮",
+    );
   });
 
   test("重复卸载只调用一次 navigation dispose", async () => {
@@ -277,7 +359,11 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
       window.__unmountWebUI();
       window.__unmountWebUI();
     });
-    assert.equal((await page.evaluate(() => window.__testNavStats())).disposeCalls, 1, "navigation.render 返回的 dispose 应当被调用且仅调用一次");
+    assert.equal(
+      (await page.evaluate(() => window.__testNavStats())).disposeCalls,
+      1,
+      "navigation.render 返回的 dispose 应当被调用且仅调用一次",
+    );
   });
 
   test("页面没有未捕获的异常", () => {

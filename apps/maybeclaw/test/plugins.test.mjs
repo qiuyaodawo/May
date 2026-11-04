@@ -28,6 +28,15 @@ test("May Agent plugin selections preserve configuration and initialize real plu
 
 test("Agent configuration validates plugin fields before loading modules", () => {
   assert.throws(() => gatewaySettings(configuration([{ id: "invalid", adapter: "may", plugins: [{}] }])), /module/);
-  assert.throws(() => gatewaySettings(configuration([{ id: "invalid", adapter: "may", plugins: [{ module: "unused", enabled: "false" }] }])), /boolean/);
-  assert.throws(() => gatewaySettings(configuration([{ id: "invalid", adapter: "module", module: "unused", plugins: [] }])), /plugins/);
+  assert.throws(
+    () =>
+      gatewaySettings(
+        configuration([{ id: "invalid", adapter: "may", plugins: [{ module: "unused", enabled: "false" }] }]),
+      ),
+    /boolean/,
+  );
+  assert.throws(
+    () => gatewaySettings(configuration([{ id: "invalid", adapter: "module", module: "unused", plugins: [] }])),
+    /plugins/,
+  );
 });

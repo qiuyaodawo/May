@@ -74,10 +74,7 @@ test("combines measured input usage with an estimated context tail", async () =>
   assert.equal(inspection.usageRatio, inspection.effectiveTokens / 1000);
   assert.equal(inspection.reservedTokens, 175);
   assert.equal(inspection.inputBudgetTokens, 825);
-  assert.equal(
-    inspection.remainingInputTokens,
-    825 - inspection.effectiveTokens,
-  );
+  assert.equal(inspection.remainingInputTokens, 825 - inspection.effectiveTokens);
   assert.equal(inspection.compactTriggerTokens, 825);
   assert.equal(inspection.shouldCompact, false);
 });
@@ -92,10 +89,7 @@ test("updates the measurement from model usage", async () => {
   const inspection = await managed.controller.inspect();
   assert.equal(inspection.measurementMethod, "measured+estimated");
   assert.equal(inspection.measuredInputTokens, 80);
-  assert.equal(
-    inspection.effectiveTokens,
-    80 + Math.ceil(byteLength(message("new tail")) / 4),
-  );
+  assert.equal(inspection.effectiveTokens, 80 + Math.ceil(byteLength(message("new tail")) / 4));
 });
 
 test("prunes old tool results and resets stale measurements", async () => {
@@ -153,10 +147,7 @@ test("summarizes complete old turns and retains the recent tail", async () => {
   assert.equal(result.changed, true);
   assert.equal(result.strategy, "summary-tail");
   assert.deepEqual(captured[0], messages.slice(0, 5));
-  assert.match(
-    result.messages[0].content[0].text,
-    /Earlier conversation summary/u,
-  );
+  assert.match(result.messages[0].content[0].text, /Earlier conversation summary/u);
   assert.deepEqual(result.messages.slice(1), messages.slice(5));
   assert.ok(result.after.estimatedTokens < result.before.estimatedTokens);
 });
@@ -182,12 +173,7 @@ test("does not summarize when there are too few turns", async () => {
 });
 
 test("does not apply a summary that would increase context size", async () => {
-  const messages = [
-    message("one"),
-    assistantMessage("one"),
-    message("two"),
-    assistantMessage("two"),
-  ];
+  const messages = [message("one"), assistantMessage("one"), message("two"), assistantMessage("two")];
   const managed = new InMemoryContextFactory().create({
     messages,
     compactionStrategy: new SummaryTailStrategy({
@@ -206,11 +192,7 @@ test("does not apply a summary that would increase context size", async () => {
 });
 
 test("rejects an empty summary without changing context", async () => {
-  const messages = [
-    message("one"),
-    assistantMessage("answer"),
-    message("two"),
-  ];
+  const messages = [message("one"), assistantMessage("answer"), message("two")];
   const managed = new InMemoryContextFactory().create({
     messages,
     compactionStrategy: new SummaryTailStrategy({
@@ -219,10 +201,7 @@ test("rejects an empty summary without changing context", async () => {
     }),
   });
 
-  await assert.rejects(
-    managed.controller.compact(),
-    /empty summary/u,
-  );
+  await assert.rejects(managed.controller.compact(), /empty summary/u);
   assert.deepEqual((await managed.context.snapshot()).messages, messages);
 });
 
@@ -268,10 +247,10 @@ test("supports dynamic history references and cancellation", async () => {
   const controller = new AbortController();
   controller.abort("stop reference");
 
-  await assert.rejects(
-    managed.controller.compact(undefined, { signal: controller.signal }),
-    { name: "AbortError", message: "stop reference" },
-  );
+  await assert.rejects(managed.controller.compact(undefined, { signal: controller.signal }), {
+    name: "AbortError",
+    message: "stop reference",
+  });
   assert.equal(called, false);
   assert.equal((await managed.controller.inspect()).messageCount, 3);
 });
@@ -326,24 +305,23 @@ test("throws an explicit error when automatic compaction cannot clear pressure",
       contextWindowTokens: 100,
       compactTriggerRatio: 0.5,
     },
-    autoCompactionStrategies: [{
-      name: "no-op",
-      compact(snapshot) {
-        calls += 1;
-        return snapshot.messages;
+    autoCompactionStrategies: [
+      {
+        name: "no-op",
+        compact(snapshot) {
+          calls += 1;
+          return snapshot.messages;
+        },
       },
-    }],
+    ],
   });
 
-  await assert.rejects(
-    managed.context.snapshot(),
-    (error) => {
-      assert.equal(error instanceof ContextCompactionExhaustedError, true);
-      assert.equal(error.inspection.shouldCompact, true);
-      assert.deepEqual(error.failures, []);
-      return true;
-    },
-  );
+  await assert.rejects(managed.context.snapshot(), (error) => {
+    assert.equal(error instanceof ContextCompactionExhaustedError, true);
+    assert.equal(error.inspection.shouldCompact, true);
+    assert.deepEqual(error.failures, []);
+    return true;
+  });
   assert.equal(calls, 1);
 });
 
@@ -440,10 +418,7 @@ test("preserves messages appended while an asynchronous compaction is running", 
 
   const result = await compaction;
   assert.deepEqual(result.messages, [compacted, appended]);
-  assert.deepEqual((await managed.context.snapshot()).messages, [
-    compacted,
-    appended,
-  ]);
+  assert.deepEqual((await managed.context.snapshot()).messages, [compacted, appended]);
 });
 
 test("cancels automatic compaction without replacing context", async () => {
@@ -465,11 +440,15 @@ test("cancels automatic compaction without replacing context", async () => {
         compact(_snapshot, { signal }) {
           started();
           return new Promise((_resolve, reject) => {
-            signal.addEventListener("abort", () => {
-              const error = new Error("stopped");
-              error.name = "AbortError";
-              reject(error);
-            }, { once: true });
+            signal.addEventListener(
+              "abort",
+              () => {
+                const error = new Error("stopped");
+                error.name = "AbortError";
+                reject(error);
+              },
+              { once: true },
+            );
           });
         },
       },

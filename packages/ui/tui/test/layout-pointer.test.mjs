@@ -7,7 +7,10 @@ const pointer = (type, x, y) => ({ type, x, y, button: 0, ctrl: false, alt: fals
 test("新的鼠标按下会选择当前组件，之前未收到释放的拖动不占用后续事件", () => {
   const first = new Editor({ value: "first", prompt: "" });
   const second = new Editor({ value: "second", prompt: "" });
-  const layout = new Column([{ height: 1, component: first }, { height: 1, component: second }]);
+  const layout = new Column([
+    { height: 1, component: first },
+    { height: 1, component: second },
+  ]);
   layout.render({ width: 20, height: 2 });
   layout.handlePointer(pointer("down", 0, 0));
   first.setFocused(false);

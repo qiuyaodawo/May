@@ -1,6 +1,15 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { correlationTraceAttributes, omitUndefined, validateTelemetryCorrelation, startTraceSpan, endTraceSpan, traceError, type TelemetryCorrelation, type Tracer } from "@sortedyuan/may/core";
+import {
+  correlationTraceAttributes,
+  omitUndefined,
+  validateTelemetryCorrelation,
+  startTraceSpan,
+  endTraceSpan,
+  traceError,
+  type TelemetryCorrelation,
+  type Tracer,
+} from "@sortedyuan/may/core";
 
 import { latestTime, nextTime } from "./triggers.js";
 import {
@@ -92,67 +101,84 @@ export class Scheduler {
     this.telemetry = options.telemetry === undefined ? undefined : validateTelemetryCorrelation(options.telemetry);
     this.maxConcurrentSubmissions = concurrency;
     this.onError = options.onError;
-    this.storage(() => this.store.transaction(() => {
-      const schema = this.store.get<{ version: number }>("meta", "schema");
-      if (schema !== undefined && schema.version !== 1) {
-        throw new Error("Unsupported scheduler storage schema");
-      }
-      if (schema === undefined) {
-        if (["jobs", "executions", "events"].some((collection) => this.store.list(collection).length > 0)) {
-          throw new Error("Scheduler storage has records without schema metadata");
+    this.storage(() =>
+      this.store.transaction(() => {
+        const schema = this.store.get<{ version: number }>("meta", "schema");
+        if (schema !== undefined && schema.version !== 1) {
+          throw new Error("Unsupported scheduler storage schema");
         }
-        this.store.put("meta", "schema", { version: 1 });
-        this.store.put("meta", "sequence", { value: 0 });
-      }
-      const sequence = this.store.get<{ value: number }>("meta", "sequence");
-      if (sequence === undefined || !Number.isSafeInteger(sequence.value) || sequence.value < 0) {
-        throw new Error("Invalid scheduler execution sequence");
-      }
-      for (const job of this.store.list<ScheduledJob>("jobs")) {
-        this.validateStoredJob(job);
-      }
-      const seenSequences = new Set<number>();
-      for (const record of this.store.list<ExecutionRecord>("executions")) {
-        if (!Number.isSafeInteger(record.seq) || record.seq < 1 || record.seq > sequence.value || seenSequences.has(record.seq)) {
-          throw new Error("Invalid stored execution sequence");
-        }
-        validateId(record.id);
-        validateTimestamp(record.createdAt);
-        validateTimestamp(record.updatedAt);
-        this.validateStoredJob(record.job);
-        if (!["pending", "dispatching", "submitted", "failed", "skipped"].includes(record.status)) {
-          throw new Error("Invalid stored execution status");
-        }
-        if (record.status === "submitted") validateId(record.taskId);
-        else if (record.taskId !== undefined) throw new Error("Unsubmitted execution has a task identifier");
-        if (record.detail !== undefined && typeof record.detail !== "string") throw new Error("Invalid execution detail");
-        if (record.event !== undefined) {
-          validateEvent(record.event);
-          if (record.scheduledAt !== undefined || record.job.trigger.type !== "event"
-            || record.job.trigger.topic !== record.event.topic) throw new Error("Invalid execution event");
-          const identity = executionIdentity(["event", record.event.source, record.event.id]);
-          const event = this.store.get<StoredEvent>("events", identity);
-          if (event === undefined || !event.executionIds.includes(record.id) || !isDeepStrictEqual(event.event, record.event)) {
-            throw new Error("Execution event metadata is inconsistent");
+        if (schema === undefined) {
+          if (["jobs", "executions", "events"].some((collection) => this.store.list(collection).length > 0)) {
+            throw new Error("Scheduler storage has records without schema metadata");
           }
-        } else {
-          validateTimestamp(record.scheduledAt);
-          if (record.job.trigger.type === "event") throw new Error("Event execution is missing event content");
+          this.store.put("meta", "schema", { version: 1 });
+          this.store.put("meta", "sequence", { value: 0 });
         }
-        seenSequences.add(record.seq);
-      }
-      for (const event of this.store.list<StoredEvent>("events")) {
-        validateEvent(event.event);
-        if (!Array.isArray(event.executionIds) || new Set(event.executionIds).size !== event.executionIds.length) {
-          throw new Error("Invalid event execution references");
+        const sequence = this.store.get<{ value: number }>("meta", "sequence");
+        if (sequence === undefined || !Number.isSafeInteger(sequence.value) || sequence.value < 0) {
+          throw new Error("Invalid scheduler execution sequence");
         }
-        for (const id of event.executionIds) {
-          validateId(id);
-          const record = this.store.get<ExecutionRecord>("executions", id);
-          if (record === undefined || !isDeepStrictEqual(record.event, event.event)) throw new Error("Event execution reference is inconsistent");
+        for (const job of this.store.list<ScheduledJob>("jobs")) {
+          this.validateStoredJob(job);
         }
-      }
-    }));
+        const seenSequences = new Set<number>();
+        for (const record of this.store.list<ExecutionRecord>("executions")) {
+          if (
+            !Number.isSafeInteger(record.seq) ||
+            record.seq < 1 ||
+            record.seq > sequence.value ||
+            seenSequences.has(record.seq)
+          ) {
+            throw new Error("Invalid stored execution sequence");
+          }
+          validateId(record.id);
+          validateTimestamp(record.createdAt);
+          validateTimestamp(record.updatedAt);
+          this.validateStoredJob(record.job);
+          if (!["pending", "dispatching", "submitted", "failed", "skipped"].includes(record.status)) {
+            throw new Error("Invalid stored execution status");
+          }
+          if (record.status === "submitted") validateId(record.taskId);
+          else if (record.taskId !== undefined) throw new Error("Unsubmitted execution has a task identifier");
+          if (record.detail !== undefined && typeof record.detail !== "string")
+            throw new Error("Invalid execution detail");
+          if (record.event !== undefined) {
+            validateEvent(record.event);
+            if (
+              record.scheduledAt !== undefined ||
+              record.job.trigger.type !== "event" ||
+              record.job.trigger.topic !== record.event.topic
+            )
+              throw new Error("Invalid execution event");
+            const identity = executionIdentity(["event", record.event.source, record.event.id]);
+            const event = this.store.get<StoredEvent>("events", identity);
+            if (
+              event === undefined ||
+              !event.executionIds.includes(record.id) ||
+              !isDeepStrictEqual(event.event, record.event)
+            ) {
+              throw new Error("Execution event metadata is inconsistent");
+            }
+          } else {
+            validateTimestamp(record.scheduledAt);
+            if (record.job.trigger.type === "event") throw new Error("Event execution is missing event content");
+          }
+          seenSequences.add(record.seq);
+        }
+        for (const event of this.store.list<StoredEvent>("events")) {
+          validateEvent(event.event);
+          if (!Array.isArray(event.executionIds) || new Set(event.executionIds).size !== event.executionIds.length) {
+            throw new Error("Invalid event execution references");
+          }
+          for (const id of event.executionIds) {
+            validateId(id);
+            const record = this.store.get<ExecutionRecord>("executions", id);
+            if (record === undefined || !isDeepStrictEqual(record.event, event.event))
+              throw new Error("Event execution reference is inconsistent");
+          }
+        }
+      }),
+    );
     activeStores.add(this.store);
   }
 
@@ -160,26 +186,30 @@ export class Scheduler {
     this.assertUsable();
     validateJobInput(input);
     const copied = cloneJson(input);
-    const job = await this.enqueue(() => this.storage(() => this.store.transaction(() => {
-      if (this.store.get("meta", executionIdentity(["job", copied.id])) !== undefined) {
-        throw new SchedulerConflictError(`Job identifier has already been used: ${copied.id}`);
-      }
-      const now = Date.now();
-      const timestamp = new Date(now).toISOString();
-      const nextAt = copied.enabled
-        ? nextTime(copied.trigger, copied.trigger.type === "at" ? Number.NEGATIVE_INFINITY : now)
-        : undefined;
-      const result: ScheduledJob = {
-        ...copied,
-        revision: 1,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        ...omitUndefined({ nextAt }),
-      };
-      this.store.put("jobs", result.id, result);
-      this.store.put("meta", executionIdentity(["job", result.id]), { createdAt: timestamp });
-      return result;
-    })));
+    const job = await this.enqueue(() =>
+      this.storage(() =>
+        this.store.transaction(() => {
+          if (this.store.get("meta", executionIdentity(["job", copied.id])) !== undefined) {
+            throw new SchedulerConflictError(`Job identifier has already been used: ${copied.id}`);
+          }
+          const now = Date.now();
+          const timestamp = new Date(now).toISOString();
+          const nextAt = copied.enabled
+            ? nextTime(copied.trigger, copied.trigger.type === "at" ? Number.NEGATIVE_INFINITY : now)
+            : undefined;
+          const result: ScheduledJob = {
+            ...copied,
+            revision: 1,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            ...omitUndefined({ nextAt }),
+          };
+          this.store.put("jobs", result.id, result);
+          this.store.put("meta", executionIdentity(["job", result.id]), { createdAt: timestamp });
+          return result;
+        }),
+      ),
+    );
     this.wake();
     return cloneJson(job);
   }
@@ -190,24 +220,28 @@ export class Scheduler {
     validateRevision(expectedRevision);
     validateJobUpdate(input);
     const copied = cloneJson(input);
-    const job = await this.enqueue(() => this.storage(() => this.store.transaction(() => {
-      const current = this.requireJob(id, expectedRevision);
-      if (!Number.isSafeInteger(current.revision + 1)) throw new RangeError("Job revision exhausted");
-      const now = Date.now();
-      const { nextAt: previousNext, ...definition } = current;
-      const merged = { ...definition, ...copied };
-      const reset = copied.trigger !== undefined || (!current.enabled && merged.enabled);
-      const after = copied.trigger?.type === "at" ? Number.NEGATIVE_INFINITY : now;
-      const nextAt = !merged.enabled ? undefined : reset ? nextTime(merged.trigger, after) : previousNext;
-      const result: ScheduledJob = {
-        ...merged,
-        revision: current.revision + 1,
-        updatedAt: new Date(now).toISOString(),
-        ...omitUndefined({ nextAt }),
-      };
-      this.store.put("jobs", id, result);
-      return result;
-    })));
+    const job = await this.enqueue(() =>
+      this.storage(() =>
+        this.store.transaction(() => {
+          const current = this.requireJob(id, expectedRevision);
+          if (!Number.isSafeInteger(current.revision + 1)) throw new RangeError("Job revision exhausted");
+          const now = Date.now();
+          const { nextAt: previousNext, ...definition } = current;
+          const merged = { ...definition, ...copied };
+          const reset = copied.trigger !== undefined || (!current.enabled && merged.enabled);
+          const after = copied.trigger?.type === "at" ? Number.NEGATIVE_INFINITY : now;
+          const nextAt = !merged.enabled ? undefined : reset ? nextTime(merged.trigger, after) : previousNext;
+          const result: ScheduledJob = {
+            ...merged,
+            revision: current.revision + 1,
+            updatedAt: new Date(now).toISOString(),
+            ...omitUndefined({ nextAt }),
+          };
+          this.store.put("jobs", id, result);
+          return result;
+        }),
+      ),
+    );
     this.wake();
     return cloneJson(job);
   }
@@ -216,16 +250,23 @@ export class Scheduler {
     this.assertUsable();
     validateId(id);
     validateRevision(expectedRevision);
-    await this.enqueue(() => this.storage(() => this.store.transaction(() => {
-      this.requireJob(id, expectedRevision);
-      this.store.delete("jobs", id);
-    })));
+    await this.enqueue(() =>
+      this.storage(() =>
+        this.store.transaction(() => {
+          this.requireJob(id, expectedRevision);
+          this.store.delete("jobs", id);
+        }),
+      ),
+    );
     this.wake();
   }
 
   async listJobs(): Promise<readonly ScheduledJob[]> {
-    return this.enqueue(() => cloneJson(this.storage(() => this.store.list<ScheduledJob>("jobs")))
-      .sort((left, right) => left.id.localeCompare(right.id)));
+    return this.enqueue(() =>
+      cloneJson(this.storage(() => this.store.list<ScheduledJob>("jobs"))).sort((left, right) =>
+        left.id.localeCompare(right.id),
+      ),
+    );
   }
 
   async publish(event: SchedulerEvent): Promise<readonly ExecutionRecord[]> {
@@ -241,9 +282,12 @@ export class Scheduler {
     const copied = cloneJson(query);
     return this.enqueue(() => {
       const records = this.storage(() => this.store.list<ExecutionRecord>("executions"))
-        .filter((record) => (copied.jobId === undefined || record.job.id === copied.jobId)
-          && (copied.status === undefined || record.status === copied.status)
-          && record.seq > (copied.afterSeq ?? 0))
+        .filter(
+          (record) =>
+            (copied.jobId === undefined || record.job.id === copied.jobId) &&
+            (copied.status === undefined || record.status === copied.status) &&
+            record.seq > (copied.afterSeq ?? 0),
+        )
         .sort((left, right) => left.seq - right.seq);
       const selected = records.slice(0, copied.limit ?? 100);
       const last = selected.at(-1);
@@ -260,7 +304,9 @@ export class Scheduler {
     if (this.stopOperation !== undefined) throw new Error("Scheduler is stopping");
     this.accepting = true;
     this.manualTicks++;
-    const operation = this.runTick().finally(() => { this.manualTicks--; });
+    const operation = this.runTick().finally(() => {
+      this.manualTicks--;
+    });
     return this.track(operation);
   }
 
@@ -289,8 +335,12 @@ export class Scheduler {
     const operation = this.drain();
     this.stopOperation = operation;
     void operation.then(
-      () => { this.stopOperation = undefined; },
-      () => { this.stopOperation = undefined; },
+      () => {
+        this.stopOperation = undefined;
+      },
+      () => {
+        this.stopOperation = undefined;
+      },
     );
     return operation;
   }
@@ -313,26 +363,28 @@ export class Scheduler {
   private async publishEvent(event: SchedulerEvent): Promise<readonly ExecutionRecord[]> {
     const ids = await this.enqueue(() => {
       this.assertAccepting();
-      return this.storage(() => this.store.transaction(() => {
-        const identity = executionIdentity(["event", event.source, event.id]);
-        const existing = this.store.get<StoredEvent>("events", identity);
-        if (existing !== undefined) {
-          if (!isDeepStrictEqual(existing.event, event)) {
-            throw new SchedulerConflictError("Event identity already exists with different content");
+      return this.storage(() =>
+        this.store.transaction(() => {
+          const identity = executionIdentity(["event", event.source, event.id]);
+          const existing = this.store.get<StoredEvent>("events", identity);
+          if (existing !== undefined) {
+            if (!isDeepStrictEqual(existing.event, event)) {
+              throw new SchedulerConflictError("Event identity already exists with different content");
+            }
+            return existing.executionIds;
           }
-          return existing.executionIds;
-        }
-        const timestamp = new Date().toISOString();
-        const executionIds: string[] = [];
-        for (const job of this.store.list<ScheduledJob>("jobs")) {
-          if (!job.enabled || job.trigger.type !== "event" || job.trigger.topic !== event.topic) continue;
-          const id = executionIdentity(["event", job.id, job.revision, event.source, event.id]);
-          this.createExecution(job, id, timestamp, "pending", undefined, event);
-          executionIds.push(id);
-        }
-        this.store.put("events", identity, { event, executionIds });
-        return executionIds;
-      }));
+          const timestamp = new Date().toISOString();
+          const executionIds: string[] = [];
+          for (const job of this.store.list<ScheduledJob>("jobs")) {
+            if (!job.enabled || job.trigger.type !== "event" || job.trigger.topic !== event.topic) continue;
+            const id = executionIdentity(["event", job.id, job.revision, event.source, event.id]);
+            this.createExecution(job, id, timestamp, "pending", undefined, event);
+            executionIds.push(id);
+          }
+          this.store.put("events", identity, { event, executionIds });
+          return executionIds;
+        }),
+      );
     });
     const candidates = await this.reserve(ids);
     const reportToBackground = this.running;
@@ -374,15 +426,33 @@ export class Scheduler {
       const expired = now - Date.parse(selected) > job.misfire.graceMs;
       if (job.misfire.policy === "latest" && latest !== job.nextAt) {
         const oldId = executionIdentity(["time", job.id, job.revision, job.nextAt]);
-        if (this.createExecution(job, oldId, timestamp, "skipped", job.nextAt, undefined,
-          `Earlier occurrences before ${latest} were skipped`)) {
+        if (
+          this.createExecution(
+            job,
+            oldId,
+            timestamp,
+            "skipped",
+            job.nextAt,
+            undefined,
+            `Earlier occurrences before ${latest} were skipped`,
+          )
+        ) {
           created++;
           skipped++;
         }
       }
       const id = executionIdentity(["time", job.id, job.revision, selected]);
-      if (this.createExecution(job, id, timestamp, expired ? "skipped" : "pending", selected, undefined,
-        expired ? `Occurrence outside grace period; considered through ${latest}` : undefined)) {
+      if (
+        this.createExecution(
+          job,
+          id,
+          timestamp,
+          expired ? "skipped" : "pending",
+          selected,
+          undefined,
+          expired ? `Occurrence outside grace period; considered through ${latest}` : undefined,
+        )
+      ) {
         created++;
         if (expired) skipped++;
       }
@@ -390,8 +460,11 @@ export class Scheduler {
       const nextAt = nextTime(job.trigger, now);
       this.store.put("jobs", job.id, { ...definition, ...omitUndefined({ nextAt }) });
     }
-    const ids = this.store.list<ExecutionRecord>("executions")
-      .filter((record) => (record.status === "pending" || record.status === "dispatching") && !this.reserved.has(record.id))
+    const ids = this.store
+      .list<ExecutionRecord>("executions")
+      .filter(
+        (record) => (record.status === "pending" || record.status === "dispatching") && !this.reserved.has(record.id),
+      )
       .sort((left, right) => left.seq - right.seq)
       .map((record) => record.id);
     for (const id of ids) this.reserved.add(id);
@@ -441,7 +514,11 @@ export class Scheduler {
     const outcomes = await Promise.allSettled(ids.map((id) => this.submitRecord(id)));
     const errors = outcomes.filter((outcome): outcome is PromiseRejectedResult => outcome.status === "rejected");
     if (errors.length === 1) throw errors[0]!.reason;
-    if (errors.length > 1) throw new AggregateError(errors.map((error) => error.reason), "Scheduler submissions failed");
+    if (errors.length > 1)
+      throw new AggregateError(
+        errors.map((error) => error.reason),
+        "Scheduler submissions failed",
+      );
     return outcomes.map((outcome) => (outcome as PromiseFulfilledResult<ExecutionRecord>).value);
   }
 
@@ -460,17 +537,25 @@ export class Scheduler {
       const correlation: TelemetryCorrelation = { ...this.telemetry, version: 1, schedulerExecutionId: id };
       const span = startTraceSpan(this.tracer, "may.scheduler.submit", {
         ...omitUndefined({ parent: correlation.parent }),
-        attributes: { ...correlationTraceAttributes(correlation), "may.scheduler.job_id": record.job.id, "may.scheduler.job_revision": record.job.revision },
+        attributes: {
+          ...correlationTraceAttributes(correlation),
+          "may.scheduler.job_id": record.job.id,
+          "may.scheduler.job_revision": record.job.revision,
+        },
       });
       let taskId: string;
       try {
-        const result = await this.dispatcher.submit(cloneJson({
-          executionId: id,
-          handler: record.job.task.handler,
-          payload: record.job.task.payload,
-          ...(this.tracer === undefined && this.telemetry === undefined ? {} : { telemetry: { ...correlation, ...omitUndefined({ parent: span?.context }) } }),
-          ...omitUndefined({ scheduledAt: record.scheduledAt, event: record.event }),
-        }));
+        const result = await this.dispatcher.submit(
+          cloneJson({
+            executionId: id,
+            handler: record.job.task.handler,
+            payload: record.job.task.payload,
+            ...(this.tracer === undefined && this.telemetry === undefined
+              ? {}
+              : { telemetry: { ...correlation, ...omitUndefined({ parent: span?.context }) } }),
+            ...omitUndefined({ scheduledAt: record.scheduledAt, event: record.event }),
+          }),
+        );
         validateId(result.taskId);
         taskId = result.taskId;
         endTraceSpan(span, { status: "ok", attributes: { "may.task.id": taskId } });
@@ -494,7 +579,12 @@ export class Scheduler {
         }, true);
       }
       return await this.enqueue(() => {
-        const submitted: ExecutionRecord = { ...record, status: "submitted", taskId, updatedAt: new Date().toISOString() };
+        const submitted: ExecutionRecord = {
+          ...record,
+          status: "submitted",
+          taskId,
+          updatedAt: new Date().toISOString(),
+        };
         this.storage(() => this.store.put("executions", id, submitted));
         return submitted;
       }, true);
@@ -509,7 +599,9 @@ export class Scheduler {
       this.submissionCount++;
       return;
     }
-    await new Promise<void>((resolve) => { this.slotWaiters.push(resolve); });
+    await new Promise<void>((resolve) => {
+      this.slotWaiters.push(resolve);
+    });
   }
 
   private releaseSlot(): void {
@@ -553,9 +645,17 @@ export class Scheduler {
     this.clearTimer();
     if (!this.running || !this.accepting || this.closing || this.closed) return;
     const next = this.storage(() => {
-      if (this.store.list<ExecutionRecord>("executions").some((record) =>
-        (record.status === "pending" || record.status === "dispatching") && !this.reserved.has(record.id))) return Date.now();
-      const times = this.store.list<ScheduledJob>("jobs")
+      if (
+        this.store
+          .list<ExecutionRecord>("executions")
+          .some(
+            (record) =>
+              (record.status === "pending" || record.status === "dispatching") && !this.reserved.has(record.id),
+          )
+      )
+        return Date.now();
+      const times = this.store
+        .list<ScheduledJob>("jobs")
         .filter((job) => job.enabled && job.nextAt !== undefined)
         .map((job) => Date.parse(job.nextAt!));
       return times.length === 0 ? undefined : Math.min(...times);
@@ -567,7 +667,9 @@ export class Scheduler {
   private fireBackground(): void {
     this.timer = undefined;
     void this.track(this.runBackground(false)).catch((error) => {
-      queueMicrotask(() => { throw error; });
+      queueMicrotask(() => {
+        throw error;
+      });
     });
   }
 
@@ -594,7 +696,8 @@ export class Scheduler {
     } else if (job.enabled && job.trigger.type === "cron") {
       throw new Error("Enabled cron job is missing nextAt");
     }
-    if (this.store.get("meta", executionIdentity(["job", job.id])) === undefined) throw new Error("Stored job lacks identity metadata");
+    if (this.store.get("meta", executionIdentity(["job", job.id])) === undefined)
+      throw new Error("Stored job lacks identity metadata");
   }
 
   private reportError(error: unknown): void {
@@ -616,7 +719,10 @@ export class Scheduler {
       else if (this.hasFatalError) throw this.fatalError;
       return operation();
     });
-    this.mutationQueue = result.then(() => undefined, () => undefined);
+    this.mutationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
     return result;
   }
 
@@ -637,8 +743,12 @@ export class Scheduler {
   private track<T>(operation: Promise<T>): Promise<T> {
     this.operations.add(operation);
     void operation.then(
-      () => { this.operations.delete(operation); },
-      () => { this.operations.delete(operation); },
+      () => {
+        this.operations.delete(operation);
+      },
+      () => {
+        this.operations.delete(operation);
+      },
     );
     return operation;
   }

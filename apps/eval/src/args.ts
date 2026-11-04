@@ -24,10 +24,15 @@ export interface CliCommand {
   readonly options: Readonly<Record<string, string>>;
 }
 
-const commandOptions: Readonly<Record<CliCommand["command"], {
-  readonly required: readonly string[];
-  readonly optional?: readonly string[];
-}>> = {
+const commandOptions: Readonly<
+  Record<
+    CliCommand["command"],
+    {
+      readonly required: readonly string[];
+      readonly optional?: readonly string[];
+    }
+  >
+> = {
   validate: { required: ["suite"] },
   run: { required: ["suite", "output"] },
   resume: { required: ["suite", "experiment"] },
@@ -46,7 +51,7 @@ export function parseCliArgs(args: readonly string[]): CliCommand | undefined {
   const allowed = [...definition.required, ...(definition.optional ?? [])];
   const parsed = parseArgs({
     args: args.slice(1),
-    options: Object.fromEntries(allowed.map(key => [key, { type: "string" as const }])),
+    options: Object.fromEntries(allowed.map((key) => [key, { type: "string" as const }])),
     strict: true,
     allowPositionals: false,
     tokens: true,

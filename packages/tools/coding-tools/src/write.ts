@@ -2,11 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { atomicWriteText } from "./atomic-write.js";
 import { dirname } from "node:path";
 import type { Tool } from "@sortedyuan/may/core";
-import {
-  requireObject,
-  requirePositiveIntegerOption,
-  requireString,
-} from "./input.js";
+import { requireObject, requirePositiveIntegerOption, requireString } from "./input.js";
 import { assertTextWithinLimit } from "./text-file.js";
 import { resolveWritableWorkspacePath } from "./workspace-path.js";
 import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
@@ -31,15 +27,8 @@ export interface WriteToolOutput {
   readonly bytesWritten: number;
 }
 
-export function createWriteTool(options: WriteToolOptions): Tool<
-  WriteToolInput,
-  WriteToolOutput
-> {
-  const maxBytes = requirePositiveIntegerOption(
-    options.maxBytes,
-    DEFAULT_WRITE_MAX_BYTES,
-    "maxBytes",
-  );
+export function createWriteTool(options: WriteToolOptions): Tool<WriteToolInput, WriteToolOutput> {
+  const maxBytes = requirePositiveIntegerOption(options.maxBytes, DEFAULT_WRITE_MAX_BYTES, "maxBytes");
 
   return {
     name: "write",
@@ -66,11 +55,7 @@ export function createWriteTool(options: WriteToolOptions): Tool<
       const file = await resolveWritableWorkspacePath(options.cwd, input.path, {
         allowHardLinks: options.allowHardLinks === true,
       });
-      const bytesWritten = assertTextWithinLimit(
-        input.content,
-        file.relative,
-        maxBytes,
-      );
+      const bytesWritten = assertTextWithinLimit(input.content, file.relative, maxBytes);
       const write = async () => {
         context.signal.throwIfAborted();
         await mkdir(dirname(file.absolute), { recursive: true });
@@ -80,12 +65,14 @@ export function createWriteTool(options: WriteToolOptions): Tool<
       };
       if (options.guard === undefined) return (await write()).output;
       const exists = await assertFileExistence(file, context.signal);
-      return (await options.guard<{ readonly output: WriteToolOutput; readonly content: string }>({
-        tool: "write",
-        path: file,
-        exists,
-        run: write,
-      })).output;
+      return (
+        await options.guard<{ readonly output: WriteToolOutput; readonly content: string }>({
+          tool: "write",
+          path: file,
+          exists,
+          run: write,
+        })
+      ).output;
     },
   };
 }

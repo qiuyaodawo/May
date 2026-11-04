@@ -7,7 +7,16 @@ import { test } from "node:test";
 test("preserves configuration, Service and Hook types", async () => {
   const result = await promisify(execFile)(process.execPath, [
     fileURLToPath(new URL("../../../../node_modules/typescript/bin/tsc", import.meta.url)),
-    "--ignoreConfig", "--noEmit", "--strict", "--skipLibCheck", "--module", "NodeNext", "--moduleResolution", "NodeNext", "--target", "ES2022",
+    "--ignoreConfig",
+    "--noEmit",
+    "--strict",
+    "--skipLibCheck",
+    "--module",
+    "NodeNext",
+    "--moduleResolution",
+    "NodeNext",
+    "--target",
+    "ES2022",
     fileURLToPath(new URL("types.ts", import.meta.url)),
   ]);
   assert.equal(result.stderr, "");

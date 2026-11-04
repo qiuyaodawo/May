@@ -26,10 +26,7 @@ export interface RunCommand {
 export type CliCommand = HelpCommand | RunCommand;
 
 export function parseCliArgs(args: readonly string[]): CliCommand {
-  if (
-    args.length === 0 || args[0] === "help" || args[0] === "--help" ||
-    args[0] === "-h"
-  ) {
+  if (args.length === 0 || args[0] === "help" || args[0] === "--help" || args[0] === "-h") {
     return { type: "help" };
   }
   if (args[0] !== "run") {
@@ -51,19 +48,11 @@ export function parseCliArgs(args: readonly string[]): CliCommand {
       return { type: "help" };
     }
     if (parseOptions && argument === "--config") {
-      configPath = setOption(
-        "--config",
-        configPath,
-        readOptionValue(args, ++index, "--config"),
-      );
+      configPath = setOption("--config", configPath, readOptionValue(args, ++index, "--config"));
       continue;
     }
     if (parseOptions && argument === "--model") {
-      model = setOption(
-        "--model",
-        model,
-        readOptionValue(args, ++index, "--model"),
-      );
+      model = setOption("--model", model, readOptionValue(args, ++index, "--model"));
       continue;
     }
     if (parseOptions && argument.startsWith("-")) {
@@ -80,35 +69,21 @@ export function parseCliArgs(args: readonly string[]): CliCommand {
   return createRunCommand(input, configPath, model);
 }
 
-function readOptionValue(
-  args: readonly string[],
-  index: number,
-  option: string,
-): string {
+function readOptionValue(args: readonly string[], index: number, option: string): string {
   const value = args[index];
-  if (
-    value === undefined || value.trim() === "" || value.startsWith("-")
-  ) {
+  if (value === undefined || value.trim() === "" || value.startsWith("-")) {
     throw new CliUsageError(`${option} requires a value`);
   }
   return value;
 }
 
-function setOption(
-  option: string,
-  current: string | undefined,
-  value: string,
-): string {
+function setOption(option: string, current: string | undefined, value: string): string {
   if (current !== undefined) {
     throw new CliUsageError(`${option} may only be specified once`);
   }
   return value;
 }
 
-function createRunCommand(
-  prompt: string,
-  configPath: string | undefined,
-  model: string | undefined,
-): RunCommand {
+function createRunCommand(prompt: string, configPath: string | undefined, model: string | undefined): RunCommand {
   return omitUndefined({ type: "run", prompt, configPath, model });
 }

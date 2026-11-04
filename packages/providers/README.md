@@ -16,10 +16,7 @@ and configuration loading by `@sortedyuan/may/config`.
 - `google-gemini` → [`@sortedyuan/providers/gemini`](docs/gemini/README.md)
 
 ```ts
-import {
-  createBuiltinProviderAdapterRegistry,
-  selectProviderModel,
-} from "@sortedyuan/providers";
+import { createBuiltinProviderAdapterRegistry, selectProviderModel } from "@sortedyuan/providers";
 
 const selection = selectProviderModel(config, { model: "reasoner" });
 const model = createBuiltinProviderAdapterRegistry().create(selection);

@@ -39,14 +39,14 @@ counts admitted loop steps, not provider HTTP retries.
 
 The available limit fields are:
 
-| Field | Unit and accounting boundary |
-| --- | --- |
-| `maxDurationMs` | Milliseconds in the current Run |
-| `maxSteps` | Admitted Agent loop steps |
-| `maxModelCalls` | Admitted model calls, excluding provider HTTP retries |
-| `maxToolCalls` | Reserved tool calls, including the complete next batch |
+| Field            | Unit and accounting boundary                               |
+| ---------------- | ---------------------------------------------------------- |
+| `maxDurationMs`  | Milliseconds in the current Run                            |
+| `maxSteps`       | Admitted Agent loop steps                                  |
+| `maxModelCalls`  | Admitted model calls, excluding provider HTTP retries      |
+| `maxToolCalls`   | Reserved tool calls, including the complete next batch     |
 | `maxTotalTokens` | Provider-reported token use checked at response boundaries |
-| `maxCostUsd` | Complete USD cost checked at response boundaries |
+| `maxCostUsd`     | Complete USD cost checked at response boundaries           |
 
 ## Configure prices for a cost limit
 

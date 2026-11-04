@@ -51,7 +51,9 @@ test("memory rule store copies rules, isolates scopes, and revokes exact ids", a
   assert.equal(rules[0].description, rule().description);
   assert.ok(Object.isFrozen(rules));
   assert.ok(Object.isFrozen(rules[0]));
-  assert.throws(() => { rules[0].decision = "deny"; }, TypeError);
+  assert.throws(() => {
+    rules[0].decision = "deny";
+  }, TypeError);
   await assert.rejects(store.create(rule()), /already exists/);
   assert.equal(await store.revoke("missing"), false);
   assert.equal(await store.revoke(original.id), true);
@@ -62,12 +64,20 @@ test("memory rule store copies rules, isolates scopes, and revokes exact ids", a
 test("rule validation rejects unsupported fields, accessors, invalid ids, decisions, and timestamps", async () => {
   const store = new InMemoryPermissionRuleStore();
   const invalid = [
-    null, [], "rule",
-    rule({ extra: true }), rule({ decision: "ask" }),
-    rule({ createdAt: NaN }), rule({ createdAt: Infinity }),
-    rule({ createdAt: Number.MAX_SAFE_INTEGER + 1 }), rule({ createdAt: -1 }),
-    rule({ createdAt: 1.5 }), rule({ expiresAt: undefined }),
-    rule({ expiresAt: NaN }), rule({ expiresAt: -1 }), rule({ expiresAt: 2.5 }),
+    null,
+    [],
+    "rule",
+    rule({ extra: true }),
+    rule({ decision: "ask" }),
+    rule({ createdAt: NaN }),
+    rule({ createdAt: Infinity }),
+    rule({ createdAt: Number.MAX_SAFE_INTEGER + 1 }),
+    rule({ createdAt: -1 }),
+    rule({ createdAt: 1.5 }),
+    rule({ expiresAt: undefined }),
+    rule({ expiresAt: NaN }),
+    rule({ expiresAt: -1 }),
+    rule({ expiresAt: 2.5 }),
   ];
   for (const field of ["id", "scopeId", "toolName", "definitionKey", "grantKey", "description", "createdBy"]) {
     invalid.push(rule({ [field]: " " }), rule({ [field]: 1 }));
@@ -79,7 +89,11 @@ test("rule validation rejects unsupported fields, accessors, invalid ids, decisi
   delete missingDecision.decision;
   invalid.push(missingDecision, rule({ [Symbol("unknown")]: true }));
   const accessor = rule();
-  Object.defineProperty(accessor, "description", { get() { throw new Error("Accessor was invoked"); } });
+  Object.defineProperty(accessor, "description", {
+    get() {
+      throw new Error("Accessor was invoked");
+    },
+  });
   invalid.push(accessor);
   for (const value of invalid) await assert.rejects(store.create(value), TypeError);
   assert.deepEqual(await store.list(), []);
@@ -109,20 +123,31 @@ test("file store serializes mutations and persists immutable snapshots after reo
     assert.equal(await store.revoke("rule_other"), true);
     const disk = JSON.parse(await readFile(path, "utf8"));
     assert.deepEqual(disk, { version: 1, rules: [rule()] });
-    assert.deepEqual((await readdir(join(root, "nested"))).sort(), ["permission-rules.json", "permission-rules.json.lock", "permission-rules.json.lock.owner"]);
-  } finally { await store.close(); }
+    assert.deepEqual((await readdir(join(root, "nested"))).sort(), [
+      "permission-rules.json",
+      "permission-rules.json.lock",
+      "permission-rules.json.lock.owner",
+    ]);
+  } finally {
+    await store.close();
+  }
   await assert.rejects(store.list(), /closed/);
   await assert.rejects(store.create(rule({ id: "after_close" })), /closed/);
   const reopened = await FilePermissionRuleStore.open({ path });
-  try { assert.deepEqual(await reopened.list(), [rule()]); }
-  finally { await reopened.close(); }
+  try {
+    assert.deepEqual(await reopened.list(), [rule()]);
+  } finally {
+    await reopened.close();
+  }
 });
 
 test("separate processes create, reload, and revoke committed permission rules", async (t) => {
   const path = join(await directory(t), "permission-rules.json");
   for (const [command, input, expected] of [
-    ["create", rule(), ""], ["list", undefined, JSON.stringify([rule()])],
-    ["revoke", rule().id, "true"], ["list", undefined, "[]"],
+    ["create", rule(), ""],
+    ["list", undefined, JSON.stringify([rule()])],
+    ["revoke", rule().id, "true"],
+    ["list", undefined, "[]"],
   ]) {
     const child = run(command, path, input);
     assert.equal(child.status, 0, child.stderr);
@@ -140,7 +165,9 @@ test("single writer lock rejects competing processes and is released only on clo
     await assert.rejects(FilePermissionRuleStore.open({ path }), { code: "ELOCKED" });
     assert.ok((await lstat(`${path}.lock`)).isFile());
     await store.create(rule());
-  } finally { await store.close(); }
+  } finally {
+    await store.close();
+  }
   const child = run("list", path);
   assert.equal(child.status, 0, child.stderr);
   assert.deepEqual(JSON.parse(child.stdout), [rule()]);
@@ -152,14 +179,18 @@ test("terminated writer keeps committed rules and releases ownership", async (t)
   assert.equal(child.status, 23, child.stderr);
   assert.deepEqual(JSON.parse(await readFile(path, "utf8")).rules, [rule()]);
   const store = await FilePermissionRuleStore.open({ path });
-  try { assert.deepEqual(await store.list(), [rule()]); }
-  finally { await store.close(); }
+  try {
+    assert.deepEqual(await store.list(), [rule()]);
+  } finally {
+    await store.close();
+  }
 });
 
 test("corrupt or unsupported files fail on open and release the newly acquired lock", async (t) => {
   const root = await directory(t);
   const invalid = [
-    "{", JSON.stringify({ version: 2, rules: [] }),
+    "{",
+    JSON.stringify({ version: 2, rules: [] }),
     JSON.stringify({ version: 1, rules: [], extra: true }),
     JSON.stringify({ version: 1, rules: [rule(), rule()] }),
     JSON.stringify({ version: 1, rules: [rule({ decision: "ask" })] }),
@@ -181,12 +212,17 @@ test("read errors poison every subsequent operation even if the file is repaired
     await store.create(rule());
     await writeFile(path, "{");
     let failure;
-    await assert.rejects(store.list(), (error) => { failure = error; return error instanceof SyntaxError; });
+    await assert.rejects(store.list(), (error) => {
+      failure = error;
+      return error instanceof SyntaxError;
+    });
     await writeFile(path, JSON.stringify({ version: 1, rules: [rule()] }));
     await assert.rejects(store.list(), (error) => error === failure);
     await assert.rejects(store.create(rule({ id: "another" })), (error) => error === failure);
     await assert.rejects(store.revoke(rule().id), (error) => error === failure);
-  } finally { await store.close(); }
+  } finally {
+    await store.close();
+  }
 });
 
 test("deleted rule files fail subsequent checks and mutations", async (t) => {
@@ -198,7 +234,9 @@ test("deleted rule files fail subsequent checks and mutations", async (t) => {
     await assert.rejects(store.list(), { code: "ENOENT" });
     await assert.rejects(store.revoke(rule().id), { code: "ENOENT" });
     await assert.rejects(store.create(rule({ id: "another" })), { code: "ENOENT" });
-  } finally { await store.close(); }
+  } finally {
+    await store.close();
+  }
 });
 
 test("actual filesystem write denial prevents revocation and poisons later checks", async (t) => {

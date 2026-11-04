@@ -7,17 +7,39 @@ import { fileURLToPath } from "node:url";
 import { InMemoryPermissionRuleStore, PermissionToolExecutor } from "@sortedyuan/may/permissions";
 import { TranscriptStore, TranscriptView } from "../dist/agent/transcript.js";
 
-test("terminal transcript retains persistent approval range from real permission events", async t => {
+test("terminal transcript retains persistent approval range from real permission events", async (t) => {
   const verificationDirectory = join(testOutputRoot, "tui", "persistent-permissions");
   await mkdir(verificationDirectory, { recursive: true });
   const root = await mkdtemp(join(verificationDirectory, "run-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const path = join(root, "guide.md"), description = "Modify Markdown files under project docs", scopeId = "project:may:agent:writer";
-  const permissions = new PermissionToolExecutor({ ruleStore: new InMemoryPermissionRuleStore(), policy: () => ({ decision: "ask", grantKey: "docs-markdown", persistent: { scopeId, description } }) });
+  const path = join(root, "guide.md"),
+    description = "Modify Markdown files under project docs",
+    scopeId = "project:may:agent:writer";
+  const permissions = new PermissionToolExecutor({
+    ruleStore: new InMemoryPermissionRuleStore(),
+    policy: () => ({ decision: "ask", grantKey: "docs-markdown", persistent: { scopeId, description } }),
+  });
   t.after(() => permissions.close());
   const events = permissions.events[Symbol.asyncIterator]();
-  const operation = permissions.execute({ tool: { name: "write", description: "Write Markdown", inputSchema: { type: "object" }, async execute(input) { await writeFile(path, input.text); return path; } }, input: { text: "# Rules\n" },
-    context: { runId: "file-write", step: 1, toolCallId: "call", idempotencyKey: "call", signal: new AbortController().signal, report() {} },
+  const operation = permissions.execute({
+    tool: {
+      name: "write",
+      description: "Write Markdown",
+      inputSchema: { type: "object" },
+      async execute(input) {
+        await writeFile(path, input.text);
+        return path;
+      },
+    },
+    input: { text: "# Rules\n" },
+    context: {
+      runId: "file-write",
+      step: 1,
+      toolCallId: "call",
+      idempotencyKey: "call",
+      signal: new AbortController().signal,
+      report() {},
+    },
   });
   const request = (await events.next()).value;
   assert.equal(request.type, "approval.requested");

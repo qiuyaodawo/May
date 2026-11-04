@@ -1,6 +1,15 @@
 import { type AnyPlugin, type PluginHost } from "@sortedyuan/may/plugin";
-import { createMcpHostPlugin, createSharedMcpPlugin, mcpHostService, type McpPluginOptions } from "@sortedyuan/mcp/plugin";
-import { createObservabilityHostPlugin, createSharedObservabilityPlugin, observabilityHostService } from "@sortedyuan/observability/plugin";
+import {
+  createMcpHostPlugin,
+  createSharedMcpPlugin,
+  mcpHostService,
+  type McpPluginOptions,
+} from "@sortedyuan/mcp/plugin";
+import {
+  createObservabilityHostPlugin,
+  createSharedObservabilityPlugin,
+  observabilityHostService,
+} from "@sortedyuan/observability/plugin";
 import type { MaybeCodeObservabilityOptions } from "../configured.js";
 import { composeMaybeCodePlugins } from "./application.js";
 
@@ -10,21 +19,34 @@ export function createMaybeCodeResourcePlugins(options: {
   readonly mcp: false | McpPluginOptions;
 }): AnyPlugin[] {
   return [
-    ...(options.observability === false ? [] : [createObservabilityHostPlugin({
-      ...options.observability,
-      dataDirectory: options.dataDirectory,
-      resourceAttributes: { "service.name": "maybecode" },
-    })]),
-    ...(options.mcp === false || options.mcp.servers.length === 0 ? [] : [createMcpHostPlugin({
-      ...options.mcp,
-      dataDirectory: options.dataDirectory,
-    })]),
+    ...(options.observability === false
+      ? []
+      : [
+          createObservabilityHostPlugin({
+            ...options.observability,
+            dataDirectory: options.dataDirectory,
+            resourceAttributes: { "service.name": "maybecode" },
+          }),
+        ]),
+    ...(options.mcp === false || options.mcp.servers.length === 0
+      ? []
+      : [
+          createMcpHostPlugin({
+            ...options.mcp,
+            dataDirectory: options.dataDirectory,
+          }),
+        ]),
   ];
 }
 
 export function createMaybeCodeSharedPlugins(host: PluginHost, selected: readonly AnyPlugin[]): AnyPlugin[] {
-  return composeMaybeCodePlugins([
-    ...(host.provides(mcpHostService) ? [createSharedMcpPlugin(host.get(mcpHostService))] : []),
-    ...(host.provides(observabilityHostService) ? [createSharedObservabilityPlugin(host.get(observabilityHostService))] : []),
-  ], selected);
+  return composeMaybeCodePlugins(
+    [
+      ...(host.provides(mcpHostService) ? [createSharedMcpPlugin(host.get(mcpHostService))] : []),
+      ...(host.provides(observabilityHostService)
+        ? [createSharedObservabilityPlugin(host.get(observabilityHostService))]
+        : []),
+    ],
+    selected,
+  );
 }

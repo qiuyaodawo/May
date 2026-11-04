@@ -24,10 +24,10 @@ MaybeCode 在[首次启动配置](../guides/maybecode.md#首次启动配置)中�
 每个应用持有自己 `apps.<id>` 部分的 schema，并在启动时校验；取值无效时报告带有字段路径的
 `MayConfigValidationError`。为了在编辑器中补全整个文件，请把文件关联到使用它的应用的组合 schema：
 
-| 应用 | Schema |
-| --- | --- |
+| 应用      | Schema                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------- |
 | MaybeCode | `@sortedyuan/maybecode/config/schema`（`apps/maybecode/dist/maybecode-config.schema.json`） |
-| MaybeClaw | `apps/maybeclaw/dist/maybeclaw-config.schema.json` |
+| MaybeClaw | `apps/maybeclaw/dist/maybeclaw-config.schema.json`                                          |
 
 例如，仓库位于 `E:/code/May` 并已运行 `pnpm build` 时，可以使用以下配置：
 
@@ -46,12 +46,12 @@ MaybeCode 在[首次启动配置](../guides/maybecode.md#首次启动配置)中�
 
 ## 顶层字段
 
-| 字段 | 必需 | 说明 |
-| --- | --- | --- |
-| `providers` | 是 | 命名连接，包含 Adapter、凭据、端点和共享选项。 |
-| `models` | 否 | 供 MaybeCode `/model` 等模型选择器展示的命名配置。 |
-| `defaultModel` | 否 | 未明确指定模型时选用的配置；MaybeCode `/model` 可以更新它。 |
-| `apps` | 否 | 应用自有设置。 |
+| 字段           | 必需 | 说明                                                        |
+| -------------- | ---- | ----------------------------------------------------------- |
+| `providers`    | 是   | 命名连接，包含 Adapter、凭据、端点和共享选项。              |
+| `models`       | 否   | 供 MaybeCode `/model` 等模型选择器展示的命名配置。          |
+| `defaultModel` | 否   | 未明确指定模型时选用的配置；MaybeCode `/model` 可以更新它。 |
+| `apps`         | 否   | 应用自有设置。                                              |
 
 Provider 字段包括 `adapter`、`apiKey`、`apiKeyEnv`、`baseURL` 和 `options`。
 不要同时设置 `apiKey` 与 `apiKeyEnv`。Model 字段包括 `provider`、可选
@@ -92,15 +92,15 @@ MaybeCode 的模型选择器可以持久化新的 `defaultModel`。它会重新�
 
 `options` 由 Adapter 定义，内置注册表识别以下选项：
 
-| Adapter | 选项 |
-| --- | --- |
-| `openai-responses` | `maxOutputTokens`、`reasoningEffort`、`reasoningSummary`、`serverCompactThreshold`、`store`、`responseFormat` |
-| `openai-chat-completions` | `maxOutputTokens`、`reasoningEffort`、`store`、`responseFormat` |
-| `deepseek-chat` | `thinking`、`reasoningEffort`、`maxTokens` |
-| `zhipu-chat` | `thinking`、`clearThinking`、`reasoningEffort`、`maxTokens` |
-| `kimi-chat` | `thinking`、`reasoningEffort`、`maxTokens` |
-| `anthropic-messages` | `thinking`、`reasoningEffort`、`maxTokens`、`apiVersion` |
-| `google-gemini` | `maxOutputTokens`、`reasoningEffort`、`thinkingBudget`、`includeThoughts`、`responseFormat` |
+| Adapter                   | 选项                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `openai-responses`        | `maxOutputTokens`、`reasoningEffort`、`reasoningSummary`、`serverCompactThreshold`、`store`、`responseFormat` |
+| `openai-chat-completions` | `maxOutputTokens`、`reasoningEffort`、`store`、`responseFormat`                                               |
+| `deepseek-chat`           | `thinking`、`reasoningEffort`、`maxTokens`                                                                    |
+| `zhipu-chat`              | `thinking`、`clearThinking`、`reasoningEffort`、`maxTokens`                                                   |
+| `kimi-chat`               | `thinking`、`reasoningEffort`、`maxTokens`                                                                    |
+| `anthropic-messages`      | `thinking`、`reasoningEffort`、`maxTokens`、`apiVersion`                                                      |
+| `google-gemini`           | `maxOutputTokens`、`reasoningEffort`、`thinkingBudget`、`includeThoughts`、`responseFormat`                   |
 
 `google-gemini` 的 `baseURL` 包含 API 版本，默认使用
 `https://generativelanguage.googleapis.com/v1beta`。兼容服务可以使用
@@ -134,11 +134,11 @@ May 分别处理模型能力与 Adapter 协议级选项校验。模型能力按�
 每个内置 Adapter 都会请求模型端点。地址使用配置的 `baseURL`；没有设置 `baseURL` 时，
 使用该 Adapter 默认的服务地址：
 
-| Adapter | 请求 | 认证 |
-| --- | --- | --- |
-| `openai-responses`、`openai-chat-completions`、`deepseek-chat`、`kimi-chat`、`zhipu-chat` | `GET {baseURL}/models?client_version=may` | `Authorization: Bearer` |
-| `anthropic-messages` | `GET {baseURL}/v1/models?limit=1000` | `x-api-key` 和 `anthropic-version` |
-| `google-gemini` | `GET {baseURL}/models/{model}` | `x-goog-api-key` |
+| Adapter                                                                                   | 请求                                      | 认证                               |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------- |
+| `openai-responses`、`openai-chat-completions`、`deepseek-chat`、`kimi-chat`、`zhipu-chat` | `GET {baseURL}/models?client_version=may` | `Authorization: Bearer`            |
+| `anthropic-messages`                                                                      | `GET {baseURL}/v1/models?limit=1000`      | `x-api-key` 和 `anthropic-version` |
+| `google-gemini`                                                                           | `GET {baseURL}/models/{model}`            | `x-goog-api-key`                   |
 
 模型列表按 `slug` 匹配 `models[]` 中的条目（CLIProxyAPI 的 Codex 目录），或者按 `id`
 匹配 `data[]` 中的条目。May 从匹配条目的 `supported_reasoning_levels`、
@@ -241,6 +241,7 @@ Ajv 验证 draft-07 和 2020-12，最终响应也需要通过验证。工具调�
 压缩在执行前检查压缩能力和输入支持。验证记录区分 `request-accepted`、
 `response-validated` 和 `failed`，保存媒体数量、来源形式与已观测的字节范围，
 不会保存正文。
+
 ### 请求与响应校验
 
 `Model.preflight` 让 May 和 Model 封装在实际请求尝试和预算预留前执行请求

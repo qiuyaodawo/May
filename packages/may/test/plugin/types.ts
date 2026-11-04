@@ -2,12 +2,20 @@ import { definePlugin, defineService, type PluginDefinition } from "@sortedyuan/
 import { defineHook } from "@sortedyuan/may/core";
 
 const service = defineService<{ read(): number }>({ id: "typed", version: "1.0.0", scope: "application" });
-const hook = defineHook<{ count: number }>({ name: "typed", kind: "transform", validate(value) {
-  if (!value || typeof value !== "object" || !("count" in value) || typeof value.count !== "number") throw new Error("Invalid count");
-  return { count: value.count };
-} });
+const hook = defineHook<{ count: number }>({
+  name: "typed",
+  kind: "transform",
+  validate(value) {
+    if (!value || typeof value !== "object" || !("count" in value) || typeof value.count !== "number")
+      throw new Error("Invalid count");
+    return { count: value.count };
+  },
+});
 const plugin = definePlugin({
-  id: "typed", version: "1.0.0", config: { label: "counter" }, provides: [service],
+  id: "typed",
+  version: "1.0.0",
+  config: { label: "counter" },
+  provides: [service],
   setup(ctx) {
     const label: string = ctx.config.label;
     ctx.provide(service, { read: () => label.length });

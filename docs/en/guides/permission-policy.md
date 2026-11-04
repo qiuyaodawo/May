@@ -79,23 +79,13 @@ in the same consumer or explicitly distribute them to separate queues:
 
 ```ts
 import type { AgentApplication } from "@sortedyuan/may";
-import type {
-  ApprovalDecision,
-  ApprovalRequest,
-} from "@sortedyuan/may/permissions";
+import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/may/permissions";
 
 type Choose = (request: ApprovalRequest) => Promise<ApprovalDecision>;
 
-export async function serveApprovals(
-  application: AgentApplication,
-  choose: Choose,
-  createdBy: string,
-): Promise<void> {
+export async function serveApprovals(application: AgentApplication, choose: Choose, createdBy: string): Promise<void> {
   for await (const event of application.events) {
-    if (
-      event.type !== "permission.event" ||
-      event.event.type !== "approval.requested"
-    ) {
+    if (event.type !== "permission.event" || event.event.type !== "approval.requested") {
       continue;
     }
 

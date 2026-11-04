@@ -25,8 +25,8 @@ export function renderMarkdownExcerpt(source: string, options: MarkdownExcerptOp
     lines.push(value);
   }
   while (lines.at(-1) === "") lines.pop();
-  const segments = Array.from(graphemes.segment(lines.join("\n")), part => part.segment);
-  const visibleCount = segments.filter(value => value !== "\n").length;
+  const segments = Array.from(graphemes.segment(lines.join("\n")), (part) => part.segment);
+  const visibleCount = segments.filter((value) => value !== "\n").length;
   if (visibleCount <= maxCharacters && lines.length <= maxLines) return lines.join("\n");
 
   let result = "";
@@ -46,81 +46,96 @@ export function renderMarkdownExcerpt(source: string, options: MarkdownExcerptOp
 }
 
 function blocks(tokens: readonly Token[]): string {
-  return tokens.map(token => {
-    switch (token.type) {
-      case "space":
-      case "def":
-      case "hr":
-      case "checkbox":
-        return "";
-      case "heading":
-      case "paragraph":
-        return inline((token as Tokens.Heading | Tokens.Paragraph).tokens);
-      case "text": {
-        const text = token as Tokens.Text;
-        return text.tokens === undefined ? text.text : inline(text.tokens);
+  return tokens
+    .map((token) => {
+      switch (token.type) {
+        case "space":
+        case "def":
+        case "hr":
+        case "checkbox":
+          return "";
+        case "heading":
+        case "paragraph":
+          return inline((token as Tokens.Heading | Tokens.Paragraph).tokens);
+        case "text": {
+          const text = token as Tokens.Text;
+          return text.tokens === undefined ? text.text : inline(text.tokens);
+        }
+        case "code":
+          return (token as Tokens.Code).text;
+        case "html":
+          return (token as Tokens.HTML).text;
+        case "blockquote":
+          return blocks((token as Tokens.Blockquote).tokens);
+        case "list": {
+          const list = token as Tokens.List;
+          const start = typeof list.start === "number" ? list.start : 1;
+          return list.items
+            .map((item, index) => {
+              const prefix = `${list.ordered ? `${start + index}.` : "•"} ${item.task ? `[${item.checked ? "x" : " "}] ` : ""}`;
+              return blocks(item.tokens)
+                .split("\n")
+                .map((line, lineIndex) => `${lineIndex === 0 ? prefix : " ".repeat(prefix.length)}${line}`)
+                .join("\n");
+            })
+            .join("\n");
+        }
+        case "table": {
+          const table = token as Tokens.Table;
+          const headers = table.header.map((cell) => inline(cell.tokens).replace(/\n/gu, " "));
+          if (table.rows.length === 0) return headers.join("; ");
+          return table.rows
+            .map((row) =>
+              row
+                .map((cell, index) => {
+                  const value = inline(cell.tokens).replace(/\n/gu, " ");
+                  return headers[index] ? `${headers[index]}: ${value}` : value;
+                })
+                .join("; "),
+            )
+            .join("\n");
+        }
+        default:
+          throw new Error(`Unsupported Markdown block: ${token.type}`);
       }
-      case "code":
-        return (token as Tokens.Code).text;
-      case "html":
-        return (token as Tokens.HTML).text;
-      case "blockquote":
-        return blocks((token as Tokens.Blockquote).tokens);
-      case "list": {
-        const list = token as Tokens.List;
-        const start = typeof list.start === "number" ? list.start : 1;
-        return list.items.map((item, index) => {
-          const prefix = `${list.ordered ? `${start + index}.` : "•"} ${item.task ? `[${item.checked ? "x" : " "}] ` : ""}`;
-          return blocks(item.tokens).split("\n")
-            .map((line, lineIndex) => `${lineIndex === 0 ? prefix : " ".repeat(prefix.length)}${line}`).join("\n");
-        }).join("\n");
-      }
-      case "table": {
-        const table = token as Tokens.Table;
-        const headers = table.header.map(cell => inline(cell.tokens).replace(/\n/gu, " "));
-        if (table.rows.length === 0) return headers.join("; ");
-        return table.rows.map(row => row.map((cell, index) => {
-          const value = inline(cell.tokens).replace(/\n/gu, " ");
-          return headers[index] ? `${headers[index]}: ${value}` : value;
-        }).join("; ")).join("\n");
-      }
-      default:
-        throw new Error(`Unsupported Markdown block: ${token.type}`);
-    }
-  }).filter(value => value !== "").join("\n\n");
+    })
+    .filter((value) => value !== "")
+    .join("\n\n");
 }
 
 function inline(tokens: readonly Token[]): string {
-  return tokens.map(token => {
-    switch (token.type) {
-      case "text": {
-        const text = token as Tokens.Text;
-        return text.tokens === undefined ? text.text : inline(text.tokens);
+  return tokens
+    .map((token) => {
+      switch (token.type) {
+        case "text": {
+          const text = token as Tokens.Text;
+          return text.tokens === undefined ? text.text : inline(text.tokens);
+        }
+        case "escape":
+        case "codespan":
+        case "html":
+          return (token as Tokens.Escape | Tokens.Codespan | Tokens.Tag).text;
+        case "strong":
+        case "em":
+        case "del":
+          return inline((token as Tokens.Strong | Tokens.Em | Tokens.Del).tokens);
+        case "br":
+          return "\n";
+        case "checkbox":
+          return "";
+        case "link": {
+          const link = token as Tokens.Link;
+          const label = inline(link.tokens);
+          return label === link.href ? label : `${label} (${link.href})`;
+        }
+        case "image": {
+          const image = token as Tokens.Image;
+          const label = inline(image.tokens);
+          return label ? `${label} (${image.href})` : image.href;
+        }
+        default:
+          throw new Error(`Unsupported Markdown inline token: ${token.type}`);
       }
-      case "escape":
-      case "codespan":
-      case "html":
-        return (token as Tokens.Escape | Tokens.Codespan | Tokens.Tag).text;
-      case "strong":
-      case "em":
-      case "del":
-        return inline((token as Tokens.Strong | Tokens.Em | Tokens.Del).tokens);
-      case "br":
-        return "\n";
-      case "checkbox":
-        return "";
-      case "link": {
-        const link = token as Tokens.Link;
-        const label = inline(link.tokens);
-        return label === link.href ? label : `${label} (${link.href})`;
-      }
-      case "image": {
-        const image = token as Tokens.Image;
-        const label = inline(image.tokens);
-        return label ? `${label} (${image.href})` : image.href;
-      }
-      default:
-        throw new Error(`Unsupported Markdown inline token: ${token.type}`);
-    }
-  }).join("");
+    })
+    .join("");
 }

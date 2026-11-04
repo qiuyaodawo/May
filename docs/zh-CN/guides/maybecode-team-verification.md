@@ -49,8 +49,22 @@
 
 ```json
 [
-  { "id": "divisor", "taskId": "implementation", "type": "file-contains", "path": "average.mjs", "text": "total / values.length" },
-  { "id": "tests", "taskId": "implementation", "type": "command", "command": "node", "args": ["--test", "average.test.mjs"], "timeoutMs": 30000, "maxOutputBytes": 65536 }
+  {
+    "id": "divisor",
+    "taskId": "implementation",
+    "type": "file-contains",
+    "path": "average.mjs",
+    "text": "total / values.length"
+  },
+  {
+    "id": "tests",
+    "taskId": "implementation",
+    "type": "command",
+    "command": "node",
+    "args": ["--test", "average.test.mjs"],
+    "timeoutMs": 30000,
+    "maxOutputBytes": 65536
+  }
 ]
 ```
 

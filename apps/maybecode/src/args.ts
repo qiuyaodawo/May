@@ -88,7 +88,8 @@ export interface MaybeCodeTeamCommand {
   readonly confirm?: string;
 }
 
-export type MaybeCodeCommand = MaybeCodeHelpCommand | MaybeCodeStartCommand | MaybeCodeMcpCommand | MaybeCodeTeamCommand;
+export type MaybeCodeCommand =
+  MaybeCodeHelpCommand | MaybeCodeStartCommand | MaybeCodeMcpCommand | MaybeCodeTeamCommand;
 
 export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   if (args[0] === "mcp") return parseMcpCommand(args.slice(1));
@@ -118,27 +119,17 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
       continue;
     }
     if (argument === "--config") {
-      configPath = setOption(
-        "--config",
-        configPath,
-        readValue(args, ++index, "--config"),
-      );
+      configPath = setOption("--config", configPath, readValue(args, ++index, "--config"));
       continue;
     }
     if (argument === "--model") {
-      model = setOption(
-        "--model",
-        model,
-        readValue(args, ++index, "--model"),
-      );
+      model = setOption("--model", model, readValue(args, ++index, "--model"));
       continue;
     }
     if (argument === "--ui") {
       const value = readValue(args, ++index, "--ui");
       if (value !== "retained" && value !== "web") {
-        throw new MaybeCodeUsageError(
-          '--ui must be "retained" or "web"',
-        );
+        throw new MaybeCodeUsageError('--ui must be "retained" or "web"');
       }
       if (ui !== undefined) {
         throw new MaybeCodeUsageError("--ui may only be specified once");
@@ -148,19 +139,13 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
     }
     if (argument === "--port") {
       const value = readValue(args, ++index, "--port");
-      if (port !== undefined || !/^\d+$/.test(value) || Number(value) > 65535) throw new MaybeCodeUsageError("--port requires one integer from 0 to 65535");
-      port = Number(value); continue;
+      if (port !== undefined || !/^\d+$/.test(value) || Number(value) > 65535)
+        throw new MaybeCodeUsageError("--port requires one integer from 0 to 65535");
+      port = Number(value);
+      continue;
     }
-    if (
-      argument === "--resume" ||
-      argument === "-r" ||
-      argument === "--session"
-    ) {
-      sessionId = setOption(
-        "--resume",
-        sessionId,
-        readValue(args, ++index, "--resume"),
-      );
+    if (argument === "--resume" || argument === "-r" || argument === "--session") {
+      sessionId = setOption("--resume", sessionId, readValue(args, ++index, "--resume"));
       continue;
     }
     if (argument.startsWith("-")) {
@@ -173,9 +158,7 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
   }
 
   if (continueLatest && sessionId !== undefined) {
-    throw new MaybeCodeUsageError(
-      "--continue and --resume cannot be used together",
-    );
+    throw new MaybeCodeUsageError("--continue and --resume cannot be used together");
   }
   if (port !== undefined && ui !== "web") throw new MaybeCodeUsageError("--port requires --ui web");
 
@@ -195,7 +178,11 @@ export function parseMaybeCodeArgs(args: readonly string[]): MaybeCodeCommand {
 function parseTeamCommand(args: readonly string[]): MaybeCodeTeamCommand | MaybeCodeHelpCommand {
   if (args.includes("--help") || args.includes("-h")) return { type: "help" };
   const [action, value] = args;
-  if (!["run", "resume", "status", "cancel", "verify", "retry", "reconcile", "diff", "apply"].includes(action ?? "") || !value?.trim() || value.startsWith("--")) {
+  if (
+    !["run", "resume", "status", "cancel", "verify", "retry", "reconcile", "diff", "apply"].includes(action ?? "") ||
+    !value?.trim() ||
+    value.startsWith("--")
+  ) {
     throw new MaybeCodeUsageError("Use team run <prompt> or a team control command with <id>; see --help");
   }
   if (action !== "run" && !/^[A-Za-z0-9_-]{1,128}$/u.test(value)) throw new MaybeCodeUsageError("Invalid team id");
@@ -206,43 +193,77 @@ function parseTeamCommand(args: readonly string[]): MaybeCodeTeamCommand | Maybe
     const option = args[index]!;
     if (option === "--allow-checks" && action === "run") {
       if (allowChecks) throw new MaybeCodeUsageError("--allow-checks may only be specified once");
-      allowChecks = true; continue;
+      allowChecks = true;
+      continue;
     }
     const options: Record<string, readonly [string, readonly string[]]> = {
-      "--workspace": ["workspace", ["run"]], "--config": ["configPath", ["run"]], "--model": ["model", ["run"]],
-      "--data-directory": ["dataDirectory", [action!]], "--preset": ["preset", ["run"]], "--plan": ["planPath", ["run"]],
-      "--mode": ["mode", ["run"]], "--task": ["task", ["retry"]], "--tasks": ["tasks", ["diff"]],
-      "--finding": ["finding", ["retry"]], "--resolution": ["resolutionPath", ["reconcile"]],
-      "--patch": ["patch", ["apply"]], "--confirm": ["confirm", ["retry", "reconcile", "apply"]],
+      "--workspace": ["workspace", ["run"]],
+      "--config": ["configPath", ["run"]],
+      "--model": ["model", ["run"]],
+      "--data-directory": ["dataDirectory", [action!]],
+      "--preset": ["preset", ["run"]],
+      "--plan": ["planPath", ["run"]],
+      "--mode": ["mode", ["run"]],
+      "--task": ["task", ["retry"]],
+      "--tasks": ["tasks", ["diff"]],
+      "--finding": ["finding", ["retry"]],
+      "--resolution": ["resolutionPath", ["reconcile"]],
+      "--patch": ["patch", ["apply"]],
+      "--confirm": ["confirm", ["retry", "reconcile", "apply"]],
     };
     const [key, actions] = options[option] ?? [];
     if (key && actions?.includes(action!)) {
       strings[key] = setOption(option, strings[key], readValue(args, ++index, option));
       continue;
     }
-    const numericKey = ({ "--max-model-calls": "maxModelCalls", "--max-total-tokens": "maxTotalTokens", "--max-concurrent": "maxConcurrent" } as Record<string, string>)[option];
+    const numericKey = (
+      {
+        "--max-model-calls": "maxModelCalls",
+        "--max-total-tokens": "maxTotalTokens",
+        "--max-concurrent": "maxConcurrent",
+      } as Record<string, string>
+    )[option];
     if (numericKey && action === "run") {
       if (numbers[numericKey] !== undefined) throw new MaybeCodeUsageError(`${option} may only be specified once`);
       const raw = readValue(args, ++index, option);
       const number = Number(raw);
-      if (!/^\d+$/u.test(raw) || !Number.isSafeInteger(number) || number < 1 || (numericKey === "maxConcurrent" && number > 8)) {
-        throw new MaybeCodeUsageError(`${option} requires a positive integer${numericKey === "maxConcurrent" ? " no greater than 8" : ""}`);
+      if (
+        !/^\d+$/u.test(raw) ||
+        !Number.isSafeInteger(number) ||
+        number < 1 ||
+        (numericKey === "maxConcurrent" && number > 8)
+      ) {
+        throw new MaybeCodeUsageError(
+          `${option} requires a positive integer${numericKey === "maxConcurrent" ? " no greater than 8" : ""}`,
+        );
       }
       numbers[numericKey] = number;
       continue;
     }
     throw new MaybeCodeUsageError(`Unsupported team option "${option}"`);
   }
-  if (strings.preset && !["supervisor", "pipeline", "parallel"].includes(strings.preset)) throw new MaybeCodeUsageError("Unknown team preset");
-  if (strings.mode && !["read-only", "coding"].includes(strings.mode)) throw new MaybeCodeUsageError("--mode requires read-only or coding");
+  if (strings.preset && !["supervisor", "pipeline", "parallel"].includes(strings.preset))
+    throw new MaybeCodeUsageError("Unknown team preset");
+  if (strings.mode && !["read-only", "coding"].includes(strings.mode))
+    throw new MaybeCodeUsageError("--mode requires read-only or coding");
   if (strings.preset && strings.planPath) throw new MaybeCodeUsageError("--preset and --plan cannot be combined");
-  if (action === "retry" && (!strings.task || !strings.finding)) throw new MaybeCodeUsageError("retry requires --task and --finding");
-  if (action === "reconcile" && !strings.resolutionPath) throw new MaybeCodeUsageError("reconcile requires --resolution");
+  if (action === "retry" && (!strings.task || !strings.finding))
+    throw new MaybeCodeUsageError("retry requires --task and --finding");
+  if (action === "reconcile" && !strings.resolutionPath)
+    throw new MaybeCodeUsageError("reconcile requires --resolution");
   if (action === "diff" && !strings.tasks) throw new MaybeCodeUsageError("diff requires --tasks");
-  if (action === "apply" && (!strings.patch || !strings.confirm)) throw new MaybeCodeUsageError("apply requires --patch and --confirm");
-  if (strings.confirm && !/^[a-f0-9]{64}$/u.test(strings.confirm)) throw new MaybeCodeUsageError("--confirm requires the exact SHA256 review digest");
-  return { type: "team", action: action as MaybeCodeTeamCommand["action"], value, ...strings, ...numbers,
-    ...(allowChecks ? { allowChecks } : {}) } as MaybeCodeTeamCommand;
+  if (action === "apply" && (!strings.patch || !strings.confirm))
+    throw new MaybeCodeUsageError("apply requires --patch and --confirm");
+  if (strings.confirm && !/^[a-f0-9]{64}$/u.test(strings.confirm))
+    throw new MaybeCodeUsageError("--confirm requires the exact SHA256 review digest");
+  return {
+    type: "team",
+    action: action as MaybeCodeTeamCommand["action"],
+    value,
+    ...strings,
+    ...numbers,
+    ...(allowChecks ? { allowChecks } : {}),
+  } as MaybeCodeTeamCommand;
 }
 
 function parseMcpCommand(args: readonly string[]): MaybeCodeMcpCommand | MaybeCodeHelpCommand {
@@ -262,31 +283,23 @@ function parseMcpCommand(args: readonly string[]): MaybeCodeMcpCommand | MaybeCo
     else throw new MaybeCodeUsageError(`Unsupported MCP option "${name}"`);
   }
   return {
-    type: "mcp", action: action as MaybeCodeMcpCommand["action"], serverId,
+    type: "mcp",
+    action: action as MaybeCodeMcpCommand["action"],
+    serverId,
     ...omitUndefined({ configPath, workspace }),
     ...(scopes.length === 0 ? {} : { scopes }),
   };
 }
 
-function readValue(
-  args: readonly string[],
-  index: number,
-  option: string,
-): string {
+function readValue(args: readonly string[], index: number, option: string): string {
   const value = args[index];
-  if (
-    value === undefined || value.trim() === "" || value.startsWith("-")
-  ) {
+  if (value === undefined || value.trim() === "" || value.startsWith("-")) {
     throw new MaybeCodeUsageError(`${option} requires a value`);
   }
   return value;
 }
 
-function setOption(
-  option: string,
-  current: string | undefined,
-  value: string,
-): string {
+function setOption(option: string, current: string | undefined, value: string): string {
   if (current !== undefined) {
     throw new MaybeCodeUsageError(`${option} may only be specified once`);
   }

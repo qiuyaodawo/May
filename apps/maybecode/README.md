@@ -295,6 +295,7 @@ resets budgets. Existing v1 teams keep their original read-only
 `resume`/`status`/`cancel` behavior without a silent authority upgrade.
 
 Guides:
+
 - Teams: [English](../../docs/en/guides/maybecode-team.md) / [简体中文](../../docs/zh-CN/guides/maybecode-team.md)
 - Plans: [English](../../docs/en/guides/maybecode-team-plan.md) / [简体中文](../../docs/zh-CN/guides/maybecode-team-plan.md)
 - Verification: [English](../../docs/en/guides/maybecode-team-verification.md) / [简体中文](../../docs/zh-CN/guides/maybecode-team-verification.md)
@@ -308,10 +309,7 @@ or remote UI sends user actions through its methods and renders its
 `AsyncIterable<MaybeCodeEvent>` stream:
 
 ```ts
-import {
-  openConfiguredMaybeCode,
-  type MaybeCodeController,
-} from "@sortedyuan/maybecode";
+import { openConfiguredMaybeCode, type MaybeCodeController } from "@sortedyuan/maybecode";
 
 const controller: MaybeCodeController = await openConfiguredMaybeCode();
 
@@ -321,7 +319,9 @@ const observation = (async () => {
   }
 })();
 
-await (await controller.submit({ input: "Inspect this workspace." })).result;
+await (
+  await controller.submit({ input: "Inspect this workspace." })
+).result;
 await controller.close();
 await observation;
 ```

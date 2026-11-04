@@ -12,7 +12,7 @@ async function detached(f, execution) {
   assert.equal((await f.remote.recover(execution)).status, "recovery-required");
 }
 
-test("Worker 将持久化取消意图发送至仍在运行的真实 RPC 任务", { timeout: 10_000 }, async t => {
+test("Worker 将持久化取消意图发送至仍在运行的真实 RPC 任务", { timeout: 10_000 }, async (t) => {
   const f = await fixture(t);
   const execution = await f.task();
   await detached(f, execution);
@@ -23,11 +23,11 @@ test("Worker 将持久化取消意图发送至仍在运行的真实 RPC 任务",
   assert.equal(saved.cancelRequested, true);
   assert.equal(saved.outcome.status, "cancelled");
   const controls = await f.controls();
-  assert.ok(controls.some(record => record.method === "cancel" && record.cancelRequested));
-  assert.ok(controls.some(record => record.method === "recover" && record.cancelRequested));
+  assert.ok(controls.some((record) => record.method === "cancel" && record.cancelRequested));
+  assert.ok(controls.some((record) => record.method === "recover" && record.cancelRequested));
 });
 
-test("active 执行在取消期间断开传输后立即继续发送外部取消", { timeout: 10_000 }, async t => {
+test("active 执行在取消期间断开传输后立即继续发送外部取消", { timeout: 10_000 }, async (t) => {
   const f = await fixture(t, { disconnectOnAbort: true });
   const execution = await f.task();
   const rejected = assert.rejects(f.remote.execute(execution, context()), /cancelled|outcome reconciliation/u);
@@ -37,10 +37,10 @@ test("active 执行在取消期间断开传输后立即继续发送外部取消"
   await until(async () => (await f.taskRecord(execution))?.status === "cancelled");
   await until(async () => (await f.journal()).outcome?.status === "cancelled");
   assert.equal((await f.journal()).outcome.status, "cancelled");
-  assert.ok((await f.controls()).some(record => record.method === "cancel" && record.cancelRequested));
+  assert.ok((await f.controls()).some((record) => record.method === "cancel" && record.cancelRequested));
 });
 
-test("Worker 保存发送失败的取消请求，并在重新打开后继续取消真实外部任务", { timeout: 15_000 }, async t => {
+test("Worker 保存发送失败的取消请求，并在重新打开后继续取消真实外部任务", { timeout: 15_000 }, async (t) => {
   const f = await fixture(t);
   const execution = await f.task();
   await detached(f, execution);
@@ -59,7 +59,7 @@ test("Worker 保存发送失败的取消请求，并在重新打开后继续取�
   assert.equal((await f.journal()).cancelRequested, true);
 });
 
-test("Worker 在网络恢复后的查询中重试保存的取消请求", { timeout: 10_000 }, async t => {
+test("Worker 在网络恢复后的查询中重试保存的取消请求", { timeout: 10_000 }, async (t) => {
   const f = await fixture(t);
   const execution = await f.task();
   await detached(f, execution);
@@ -70,7 +70,7 @@ test("Worker 在网络恢复后的查询中重试保存的取消请求", { timeo
   assert.equal((await f.taskRecord(execution)).status, "cancelled");
 });
 
-test("取消能力不足时保留不确定结果，外部完成证据仍能确定终态", { timeout: 10_000 }, async t => {
+test("取消能力不足时保留不确定结果，外部完成证据仍能确定终态", { timeout: 10_000 }, async (t) => {
   const f = await fixture(t, { cancelSupported: false });
   const execution = await f.task();
   await detached(f, execution);
@@ -84,7 +84,7 @@ test("取消能力不足时保留不确定结果，外部完成证据仍能确�
   assert.match(recovered.output.text, /File is available/u);
 });
 
-test("没有 Worker 派发记录时保存取消意图并取消已有的外部执行", { timeout: 10_000 }, async t => {
+test("没有 Worker 派发记录时保存取消意图并取消已有的外部执行", { timeout: 10_000 }, async (t) => {
   const f = await fixture(t);
   const execution = await f.task();
   const rejected = assert.rejects(f.bridge.execute(execution, context()));
@@ -97,7 +97,7 @@ test("没有 Worker 派发记录时保存取消意图并取消已有的外部执
   await assert.rejects(f.remote.execute(execution, context()), /outcome reconciliation/u);
 });
 
-test("派发前取消请求经过 Worker 重启后继续阻止执行", { timeout: 10_000 }, async t => {
+test("派发前取消请求经过 Worker 重启后继续阻止执行", { timeout: 10_000 }, async (t) => {
   const f = await fixture(t);
   const execution = await f.task();
   await f.remote.cancel(execution);
@@ -108,7 +108,7 @@ test("派发前取消请求经过 Worker 重启后继续阻止执行", { timeout
   assert.equal(await f.taskRecord(execution), undefined);
 });
 
-test("Worker 关闭期间重试已经保存且结果不确定的取消请求", { timeout: 10_000 }, async t => {
+test("Worker 关闭期间重试已经保存且结果不确定的取消请求", { timeout: 10_000 }, async (t) => {
   const f = await fixture(t);
   const execution = await f.task();
   await detached(f, execution);
@@ -120,10 +120,13 @@ test("Worker 关闭期间重试已经保存且结果不确定的取消请求", {
   assert.equal((await f.journal()).outcome.status, "cancelled");
 });
 
-test("Worker 关闭 active 执行时发送持久化取消，并保存外部终态", { timeout: 10_000 }, async t => {
+test("Worker 关闭 active 执行时发送持久化取消，并保存外部终态", { timeout: 10_000 }, async (t) => {
   const f = await fixture(t, { disconnectOnAbort: true });
   const execution = await f.task();
-  const rejected = assert.rejects(f.remote.execute(execution, context()), /rejected request \(503\)|outcome reconciliation/u);
+  const rejected = assert.rejects(
+    f.remote.execute(execution, context()),
+    /rejected request \(503\)|outcome reconciliation/u,
+  );
   await until(async () => (await f.taskRecord(execution))?.status === "running");
   await f.closeWorker({ keepServer: true });
   await rejected;

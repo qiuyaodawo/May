@@ -8,7 +8,9 @@ import type { SkillDescriptor, SkillDocument } from "@sortedyuan/may/skills";
 import type { MaybeCodePermissionMode } from "./policy.js";
 import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@sortedyuan/ui-client";
 
-export interface MaybeCodeSkillInfo extends SkillDescriptor { readonly active: boolean }
+export interface MaybeCodeSkillInfo extends SkillDescriptor {
+  readonly active: boolean;
+}
 
 export interface MaybeCodeModelInfo {
   readonly profile?: string;
@@ -36,20 +38,12 @@ export interface MaybeCodeReasoningEffortState {
   readonly overridden: boolean;
 }
 
-export type MaybeCodeAutoCompactionMode =
-  | "prune-summary"
-  | "history-reference"
-  | "provider-native";
+export type MaybeCodeAutoCompactionMode = "prune-summary" | "history-reference" | "provider-native";
 
 export type MaybeCodeCompactionStrategyName =
-  | "prune-old-tool-results"
-  | "summary-tail"
-  | "history-reference"
-  | "provider-native";
+  "prune-old-tool-results" | "summary-tail" | "history-reference" | "provider-native";
 
-export type MaybeCodeCompactionSelection =
-  | MaybeCodeCompactionStrategyName
-  | ContextCompactionStrategy;
+export type MaybeCodeCompactionSelection = MaybeCodeCompactionStrategyName | ContextCompactionStrategy;
 
 /**
  * Headless MaybeCode control surface for terminal, graphical, or remote UIs.
@@ -73,17 +67,20 @@ type MaybeCodeProductEvent = Extract<
   | { type: "mcp.server.disconnected" }
 >;
 
-export interface MaybeCodeController extends Omit<AgentWorkspaceController<
-  MaybeCodeSessionEvent,
-  MaybeCodeProductEvent,
-  MaybeCodeCompactionSelection,
-  MaybeCodeRun
->, "forkSession"> {
+export interface MaybeCodeController extends Omit<
+  AgentWorkspaceController<MaybeCodeSessionEvent, MaybeCodeProductEvent, MaybeCodeCompactionSelection, MaybeCodeRun>,
+  "forkSession"
+> {
   /** Application of the active Session; a Session change replaces it. */
   readonly application: MaybeCodeApplication;
   /** Run a state change on the Session queue of the active application. */
-  transition<T>(action: (application: MaybeCodeApplication) => T | Promise<T>, options?: AgentStateTransitionOptions): Promise<T>;
-  steer?(options: import("@sortedyuan/may/session").SessionSteerOptions): Promise<import("@sortedyuan/may/session").SessionSteeringInput>;
+  transition<T>(
+    action: (application: MaybeCodeApplication) => T | Promise<T>,
+    options?: AgentStateTransitionOptions,
+  ): Promise<T>;
+  steer?(
+    options: import("@sortedyuan/may/session").SessionSteerOptions,
+  ): Promise<import("@sortedyuan/may/session").SessionSteeringInput>;
   getForkPoints?(sessionId?: string): Promise<readonly UiForkPoint[]>;
   forkSession?(pointId: string, mode: "current" | "worktree"): Promise<string>;
   getWorkspaceGit?(): Promise<UiWorkspaceGit>;
@@ -93,7 +90,11 @@ export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   deleteWorktree?(id: string): Promise<void>;
   previewRestore?(runId: string, paths: readonly string[]): Promise<{ previewId: string; diff: UiWorkspaceDiff }>;
   restoreFiles?(previewId: string): Promise<void>;
-  getChanges?(query: { readonly scope: "run" | "session" | "workspace"; readonly runId?: string; readonly commit?: string }): Promise<UiWorkspaceDiff>;
+  getChanges?(query: {
+    readonly scope: "run" | "session" | "workspace";
+    readonly runId?: string;
+    readonly commit?: string;
+  }): Promise<UiWorkspaceDiff>;
   readonly permissionMode: MaybeCodePermissionMode;
   readonly delegationNotifications?: boolean;
   setDelegationNotifications?(enabled: boolean): void;
@@ -135,17 +136,24 @@ export interface MaybeCodeController extends Omit<AgentWorkspaceController<
   watchMcpResource?(serverId: string, uri: string): Promise<McpResourceSubscription>;
   unwatchMcpResource?(serverId: string, uri: string): Promise<void>;
   submitMcpResource?(serverId: string, uri: string, instruction?: string): Promise<import("./events.js").MaybeCodeRun>;
-  submitMcpPrompt?(serverId: string, name: string, args?: Readonly<Record<string, string>>): Promise<import("./events.js").MaybeCodeRun>;
+  submitMcpPrompt?(
+    serverId: string,
+    name: string,
+    args?: Readonly<Record<string, string>>,
+  ): Promise<import("./events.js").MaybeCodeRun>;
   listModels(): Promise<readonly MaybeCodeModelProfile[]>;
-  getModelCapabilities?(profile?: string, refresh?: boolean): Promise<import("@sortedyuan/providers").ModelCapabilities>;
+  getModelCapabilities?(
+    profile?: string,
+    refresh?: boolean,
+  ): Promise<import("@sortedyuan/providers").ModelCapabilities>;
   readonly modelCapabilitiesAvailable?: boolean;
-  getTelemetry?(query?: import("@sortedyuan/observability").DiagnosticQuery): import("@sortedyuan/observability").DiagnosticResult | undefined;
+  getTelemetry?(
+    query?: import("@sortedyuan/observability").DiagnosticQuery,
+  ): import("@sortedyuan/observability").DiagnosticResult | undefined;
   switchModel(profile: string): Promise<MaybeCodeModelInfo>;
   /** Persist the profile used by future launches without switching models. */
   setDefaultModel(profile: string): Promise<void>;
   getReasoningEffort(): Promise<MaybeCodeReasoningEffortState>;
   /** Set an active-profile override, or clear it with undefined. */
-  setReasoningEffort(
-    effort?: string,
-  ): Promise<MaybeCodeReasoningEffortState>;
+  setReasoningEffort(effort?: string): Promise<MaybeCodeReasoningEffortState>;
 }

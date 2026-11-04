@@ -1,12 +1,5 @@
 import { lstat, realpath, stat } from "node:fs/promises";
-import {
-  basename,
-  dirname,
-  isAbsolute,
-  relative,
-  resolve,
-  sep,
-} from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { CodingToolError } from "./errors.js";
 
 export interface WorkspacePath {
@@ -62,10 +55,7 @@ async function resolveWorkspacePath(
     return { absolute: target, relative: displayPath };
   }
   if (mustExist) {
-    throw new CodingToolError(
-      "CODING_TOOL_PATH_NOT_FOUND",
-      `Path not found: ${inputPath}`,
-    );
+    throw new CodingToolError("CODING_TOOL_PATH_NOT_FOUND", `Path not found: ${inputPath}`);
   }
 
   await assertNotUnresolvedSymbolicLink(candidate, inputPath);
@@ -73,11 +63,7 @@ async function resolveWorkspacePath(
   return { absolute: resolve(parent, basename(candidate)), relative: displayPath };
 }
 
-async function assertSafeLinkCount(
-  target: string,
-  inputPath: string,
-  allowHardLinks: boolean,
-): Promise<void> {
+async function assertSafeLinkCount(target: string, inputPath: string, allowHardLinks: boolean): Promise<void> {
   if (allowHardLinks) return;
   const information = await stat(target);
   if (!information.isFile() || information.nlink <= 1) return;
@@ -87,10 +73,7 @@ async function assertSafeLinkCount(
   );
 }
 
-async function assertNotUnresolvedSymbolicLink(
-  candidate: string,
-  inputPath: string,
-): Promise<void> {
+async function assertNotUnresolvedSymbolicLink(candidate: string, inputPath: string): Promise<void> {
   try {
     const information = await lstat(candidate);
     if (information.isSymbolicLink()) {
@@ -110,27 +93,16 @@ async function resolveWorkspaceRoot(cwd: string): Promise<string> {
   try {
     root = await realpath(resolve(cwd));
   } catch (error) {
-    throw new CodingToolError(
-      "CODING_TOOL_INVALID_CWD",
-      `Workspace does not exist: ${cwd}`,
-      { cause: error },
-    );
+    throw new CodingToolError("CODING_TOOL_INVALID_CWD", `Workspace does not exist: ${cwd}`, { cause: error });
   }
   const information = await stat(root);
   if (!information.isDirectory()) {
-    throw new CodingToolError(
-      "CODING_TOOL_INVALID_CWD",
-      `Workspace is not a directory: ${cwd}`,
-    );
+    throw new CodingToolError("CODING_TOOL_INVALID_CWD", `Workspace is not a directory: ${cwd}`);
   }
   return root;
 }
 
-async function assertExistingParentInside(
-  root: string,
-  initialParent: string,
-  inputPath: string,
-): Promise<string> {
+async function assertExistingParentInside(root: string, initialParent: string, inputPath: string): Promise<string> {
   let parent = initialParent;
   while (true) {
     try {
@@ -143,10 +115,7 @@ async function assertExistingParentInside(
 
     const nextParent = dirname(parent);
     if (nextParent === parent) {
-      throw new CodingToolError(
-        "CODING_TOOL_PATH_OUTSIDE_WORKSPACE",
-        `Path is outside the workspace: ${inputPath}`,
-      );
+      throw new CodingToolError("CODING_TOOL_PATH_OUTSIDE_WORKSPACE", `Path is outside the workspace: ${inputPath}`);
     }
     parent = nextParent;
   }
@@ -154,21 +123,13 @@ async function assertExistingParentInside(
 
 function assertInside(root: string, target: string, inputPath: string): void {
   const pathFromRoot = relative(root, target);
-  if (
-    pathFromRoot === ".." ||
-    pathFromRoot.startsWith(`..${sep}`) ||
-    isAbsolute(pathFromRoot)
-  ) {
-    throw new CodingToolError(
-      "CODING_TOOL_PATH_OUTSIDE_WORKSPACE",
-      `Path is outside the workspace: ${inputPath}`,
-    );
+  if (pathFromRoot === ".." || pathFromRoot.startsWith(`..${sep}`) || isAbsolute(pathFromRoot)) {
+    throw new CodingToolError("CODING_TOOL_PATH_OUTSIDE_WORKSPACE", `Path is outside the workspace: ${inputPath}`);
   }
 }
 
 function isMissingPathError(error: unknown): boolean {
-  return error instanceof Error && "code" in error &&
-    (error.code === "ENOENT" || error.code === "ENOTDIR");
+  return error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR");
 }
 
 function toDisplayPath(path: string): string {

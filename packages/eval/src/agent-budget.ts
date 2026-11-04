@@ -1,7 +1,19 @@
 import { randomUUID } from "node:crypto";
 import {
-  FatalToolExecutionError, MayError, ModelResponseValidationError, RunBudgetMeter, RunBudgetExceededError, directToolExecutor, omitUndefined, priceUsage, resolveUsageTotals,
-  type Model, type ModelEvent, type RunBudget, type Tool, type ToolExecutor,
+  FatalToolExecutionError,
+  MayError,
+  ModelResponseValidationError,
+  RunBudgetMeter,
+  RunBudgetExceededError,
+  directToolExecutor,
+  omitUndefined,
+  priceUsage,
+  resolveUsageTotals,
+  type Model,
+  type ModelEvent,
+  type RunBudget,
+  type Tool,
+  type ToolExecutor,
 } from "@sortedyuan/may/core";
 import type { EvalTelemetryCollector } from "./telemetry.js";
 
@@ -15,12 +27,19 @@ export class EvalTrialBudget {
   private readonly guardedTools = new Set<string>();
   private readonly executedTools = new Set<string>();
 
-  constructor(readonly limits: Readonly<RunBudget>, private readonly telemetry: EvalTelemetryCollector) {
+  constructor(
+    readonly limits: Readonly<RunBudget>,
+    private readonly telemetry: EvalTelemetryCollector,
+  ) {
     this.meter = new RunBudgetMeter(limits);
   }
 
-  get error(): unknown { return this.failure; }
-  snapshot() { return this.meter.snapshot(); }
+  get error(): unknown {
+    return this.failure;
+  }
+  snapshot() {
+    return this.meter.snapshot();
+  }
   start(): void {
     if (this.started) throw new Error("Evaluation trial budget already started");
     this.started = true;
@@ -29,15 +48,19 @@ export class EvalTrialBudget {
 
   assertBound(): void {
     if (this.boundModels === 0) throw new Error("Evaluation factory must bind its Models through budget.wrapModel");
-    if (this.limits.maxToolCalls !== undefined && this.boundTools === 0) throw new Error("Evaluation factory must bind its Tools through budget.wrapTools or budget.wrapToolExecutor");
+    if (this.limits.maxToolCalls !== undefined && this.boundTools === 0)
+      throw new Error("Evaluation factory must bind its Tools through budget.wrapTools or budget.wrapToolExecutor");
   }
 
   assertCanStartModel(): void {
     this.meter.checkTime();
     const snapshot = this.meter.snapshot();
-    for (const [dimension, limit, consumed] of [["modelCalls", this.limits.maxModelCalls, snapshot.modelCalls],
-      ["steps", this.limits.maxSteps, snapshot.steps], ["totalTokens", this.limits.maxTotalTokens, snapshot.totalTokens],
-      ["costUsd", this.limits.maxCostUsd, snapshot.costUsd]] as const) {
+    for (const [dimension, limit, consumed] of [
+      ["modelCalls", this.limits.maxModelCalls, snapshot.modelCalls],
+      ["steps", this.limits.maxSteps, snapshot.steps],
+      ["totalTokens", this.limits.maxTotalTokens, snapshot.totalTokens],
+      ["costUsd", this.limits.maxCostUsd, snapshot.costUsd],
+    ] as const) {
       if (limit !== undefined && consumed >= limit) {
         const error = new RunBudgetExceededError(dimension, limit, consumed);
         this.failure = error;
@@ -48,10 +71,17 @@ export class EvalTrialBudget {
 
   verifyCoverage(): void {
     const trackedModels = this.telemetry.modelCallIds();
-    const missedModel = trackedModels.find(id => !this.guardedModels.has(id));
-    const missedTool = this.telemetry.successfulToolCallIds().find(id => !this.guardedTools.has(id));
-    if (missedModel !== undefined || missedTool !== undefined || this.meter.snapshot().modelCalls > 0 && trackedModels.length === 0) {
-      this.failure = new MayError("EVAL_BUDGET_INSTRUMENTATION_INCOMPLETE", "Evaluation factory must use the supplied tracer and guard all model/tool executions");
+    const missedModel = trackedModels.find((id) => !this.guardedModels.has(id));
+    const missedTool = this.telemetry.successfulToolCallIds().find((id) => !this.guardedTools.has(id));
+    if (
+      missedModel !== undefined ||
+      missedTool !== undefined ||
+      (this.meter.snapshot().modelCalls > 0 && trackedModels.length === 0)
+    ) {
+      this.failure = new MayError(
+        "EVAL_BUDGET_INSTRUMENTATION_INCOMPLETE",
+        "Evaluation factory must use the supplied tracer and guard all model/tool executions",
+      );
       this.telemetry.markIncomplete("budget-instrumentation-incomplete");
     }
   }
@@ -60,41 +90,70 @@ export class EvalTrialBudget {
     this.boundModels += 1;
     const budget = this;
     return {
-      get limits() { return model.limits; }, reportsAttempts: true,
-      get supportsRequestRecording() { return model.supportsRequestRecording === true; },
-      get capabilityVersion() { return model.capabilityVersion; }, get configuration() { return model.configuration; },
+      get limits() {
+        return model.limits;
+      },
+      reportsAttempts: true,
+      get supportsRequestRecording() {
+        return model.supportsRequestRecording === true;
+      },
+      get capabilityVersion() {
+        return model.capabilityVersion;
+      },
+      get configuration() {
+        return model.configuration;
+      },
       async preflight(request, options) {
         if (options.modelCallId === undefined) throw new Error("Evaluation trial requires a stable modelCallId");
         budget.guardedModels.add(options.modelCallId);
         budget.assertCanStartModel();
         await model.preflight?.(request, options);
       },
-      ...(model.contextCompactor === undefined ? {} : { contextCompactor: {
-        name: model.contextCompactor.name,
-        async compact(snapshot, options) {
-          budget.startModel();
-          const callId = `${options.runId ?? "compaction"}:compact:${randomUUID()}`;
-          budget.guardedModels.add(callId);
-          const span = budget.telemetry.tracer.startSpan("may.model.call", { attributes: {
-            "may.model.call_id": callId, "may.model.attempts_complete": false,
-          } });
-          try {
-            const result = await model.contextCompactor!.compact(snapshot, options);
-            const cost = priceUsage(result.usage, budget.limits.pricing ?? budget.limits.tokenPrices, budget.limits.usagePricer);
-            budget.telemetry.recordModelReceipt(callId, result.usage, cost);
-            span.setAttributes(omitUndefined({ "may.model.usage_complete": resolveUsageTotals(result.usage).complete,
-              "may.model.input_tokens": result.usage?.inputTokens,
-              "may.model.output_tokens": result.usage?.outputTokens,
-              "may.model.total_tokens": result.usage?.totalTokens,
-              "may.model.currency": cost.currency, "may.model.cost_kind": cost.kind, "may.model.cost_complete": cost.complete,
-              "may.model.cost": cost.amount,
-            }));
-            budget.accountUsage(result.usage, cost);
-            span.end();
-            return result;
-          } catch (error) { span.end({ status: "error" }); throw error; }
-        },
-      } }),
+      ...(model.contextCompactor === undefined
+        ? {}
+        : {
+            contextCompactor: {
+              name: model.contextCompactor.name,
+              async compact(snapshot, options) {
+                budget.startModel();
+                const callId = `${options.runId ?? "compaction"}:compact:${randomUUID()}`;
+                budget.guardedModels.add(callId);
+                const span = budget.telemetry.tracer.startSpan("may.model.call", {
+                  attributes: {
+                    "may.model.call_id": callId,
+                    "may.model.attempts_complete": false,
+                  },
+                });
+                try {
+                  const result = await model.contextCompactor!.compact(snapshot, options);
+                  const cost = priceUsage(
+                    result.usage,
+                    budget.limits.pricing ?? budget.limits.tokenPrices,
+                    budget.limits.usagePricer,
+                  );
+                  budget.telemetry.recordModelReceipt(callId, result.usage, cost);
+                  span.setAttributes(
+                    omitUndefined({
+                      "may.model.usage_complete": resolveUsageTotals(result.usage).complete,
+                      "may.model.input_tokens": result.usage?.inputTokens,
+                      "may.model.output_tokens": result.usage?.outputTokens,
+                      "may.model.total_tokens": result.usage?.totalTokens,
+                      "may.model.currency": cost.currency,
+                      "may.model.cost_kind": cost.kind,
+                      "may.model.cost_complete": cost.complete,
+                      "may.model.cost": cost.amount,
+                    }),
+                  );
+                  budget.accountUsage(result.usage, cost);
+                  span.end();
+                  return result;
+                } catch (error) {
+                  span.end({ status: "error" });
+                  throw error;
+                }
+              },
+            },
+          }),
       async *stream(request, options): AsyncIterable<ModelEvent> {
         if (options.modelCallId === undefined) throw new Error("Evaluation trial requires a stable modelCallId");
         budget.guardedModels.add(options.modelCallId);
@@ -110,24 +169,48 @@ export class EvalTrialBudget {
               settled = true;
               if ((event.message.toolCalls?.length ?? 0) > 0) attempt?.content("tool");
               attempt?.end(omitUndefined({ status: "ok", completed: true, usage: event.usage }));
-              const cost = event.cost ?? priceUsage(event.usage, budget.limits.pricing ?? budget.limits.tokenPrices, budget.limits.usagePricer);
+              const cost =
+                event.cost ??
+                priceUsage(event.usage, budget.limits.pricing ?? budget.limits.tokenPrices, budget.limits.usagePricer);
               budget.telemetry.recordModelReceipt(options.modelCallId, event.usage, cost);
-              try { budget.accountUsage(event.usage, cost); }
-              catch (error) { throw new EvalBudgetResponseError(error, event.usage, cost); }
-              try { budget.reserveToolRequests((event.message.toolCalls ?? []).map(call => `${options.runId}:${options.step}:${call.id}`)); }
-              catch (error) { throw new EvalBudgetResponseError(error, event.usage, cost); }
+              try {
+                budget.accountUsage(event.usage, cost);
+              } catch (error) {
+                throw new EvalBudgetResponseError(error, event.usage, cost);
+              }
+              try {
+                budget.reserveToolRequests(
+                  (event.message.toolCalls ?? []).map((call) => `${options.runId}:${options.step}:${call.id}`),
+                );
+              } catch (error) {
+                throw new EvalBudgetResponseError(error, event.usage, cost);
+              }
               yield { ...event, cost };
             } else yield event;
           }
         } catch (error) {
-          attempt?.end({ status: options.signal.aborted ? "cancelled" : "error",
-            ...(error instanceof Error ? { error: { name: error.name, ...( "code" in error && typeof error.code === "string" ? { code: error.code } : {}) } } : {}),
-            ...(error instanceof ModelResponseValidationError ? omitUndefined({ completed: true, usage: error.usage }) : {}) });
+          attempt?.end({
+            status: options.signal.aborted ? "cancelled" : "error",
+            ...(error instanceof Error
+              ? {
+                  error: {
+                    name: error.name,
+                    ...("code" in error && typeof error.code === "string" ? { code: error.code } : {}),
+                  },
+                }
+              : {}),
+            ...(error instanceof ModelResponseValidationError
+              ? omitUndefined({ completed: true, usage: error.usage })
+              : {}),
+          });
           if (!settled && error instanceof ModelResponseValidationError) {
             settled = true;
             budget.telemetry.recordModelReceipt(options.modelCallId, error.usage, error.cost);
-            try { budget.accountUsage(error.usage, error.cost); }
-            catch (accountingError) { throw new EvalBudgetResponseError(accountingError, error.usage, error.cost); }
+            try {
+              budget.accountUsage(error.usage, error.cost);
+            } catch (accountingError) {
+              throw new EvalBudgetResponseError(accountingError, error.usage, error.cost);
+            }
           }
           throw error;
         } finally {
@@ -139,13 +222,17 @@ export class EvalTrialBudget {
 
   wrapTools(tools: Iterable<Tool>): readonly Tool[] {
     const executor = this.wrapToolExecutor();
-    return [...tools].map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema,
+    return [...tools].map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
       ...omitUndefined({
         permissionVersion: tool.permissionVersion,
         parse: tool.parse?.bind(tool),
         resultContent: tool.resultContent?.bind(tool),
       }),
-      execute: (input, context) => executor.execute({ tool, input, context }) }));
+      execute: (input, context) => executor.execute({ tool, input, context }),
+    }));
   }
 
   wrapToolExecutor(executor: ToolExecutor = directToolExecutor): ToolExecutor {
@@ -155,13 +242,16 @@ export class EvalTrialBudget {
       async execute(execution) {
         const id = `${execution.context.runId}:${execution.context.step}:${execution.context.toolCallId}`;
         try {
-          if (budget.executedTools.has(id)) throw new MayError("EVAL_TOOL_EXECUTION_DUPLICATE", "Evaluation tool execution identity was already used");
+          if (budget.executedTools.has(id))
+            throw new MayError("EVAL_TOOL_EXECUTION_DUPLICATE", "Evaluation tool execution identity was already used");
           budget.reserveToolRequests([id]);
           budget.executedTools.add(id);
-        }
-        catch (error) {
+        } catch (error) {
           budget.failure = error;
-          throw new FatalToolExecutionError("Evaluation trial tool budget exceeded", { code: code(error), cause: error });
+          throw new FatalToolExecutionError("Evaluation trial tool budget exceeded", {
+            code: code(error),
+            cause: error,
+          });
         }
         return executor.execute(execution);
       },
@@ -170,31 +260,52 @@ export class EvalTrialBudget {
 
   private startModel(): void {
     if (!this.started) throw new Error("Evaluation trial budget has not started");
-    try { this.meter.startModel(this.meter.snapshot().modelCalls + 1); }
-    catch (error) { this.failure = error; throw error; }
+    try {
+      this.meter.startModel(this.meter.snapshot().modelCalls + 1);
+    } catch (error) {
+      this.failure = error;
+      throw error;
+    }
   }
 
   private reserveToolRequests(ids: readonly string[]): void {
-    const newIds = ids.filter(id => !this.guardedTools.has(id));
-    if (new Set(newIds).size !== newIds.length) throw new MayError("EVAL_TOOL_REQUEST_DUPLICATE", "Model returned duplicate tool request identities");
+    const newIds = ids.filter((id) => !this.guardedTools.has(id));
+    if (new Set(newIds).size !== newIds.length)
+      throw new MayError("EVAL_TOOL_REQUEST_DUPLICATE", "Model returned duplicate tool request identities");
     if (newIds.length === 0) return;
-    try { this.meter.reserveTools(newIds.length); }
-    catch (error) { this.failure = error; throw error; }
+    try {
+      this.meter.reserveTools(newIds.length);
+    } catch (error) {
+      this.failure = error;
+      throw error;
+    }
     for (const id of newIds) this.guardedTools.add(id);
   }
 
   private accountUsage(...arguments_: Parameters<RunBudgetMeter["recordUsage"]>): void {
-    try { this.meter.recordUsage(...arguments_); }
-    catch (error) { this.failure = error; throw error; }
+    try {
+      this.meter.recordUsage(...arguments_);
+    } catch (error) {
+      this.failure = error;
+      throw error;
+    }
   }
 }
 
 class EvalBudgetResponseError extends ModelResponseValidationError {
   override readonly code: string;
-  constructor(error: unknown, usage: import("@sortedyuan/may/core").Usage | undefined, cost: import("@sortedyuan/may/core").UsageCost | undefined) {
+  constructor(
+    error: unknown,
+    usage: import("@sortedyuan/may/core").Usage | undefined,
+    cost: import("@sortedyuan/may/core").UsageCost | undefined,
+  ) {
     super("Evaluation trial model budget stopped execution", omitUndefined({ cause: error, usage, cost }));
     this.code = code(error);
   }
 }
 
-function code(error: unknown) { return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "EVAL_BUDGET_FAILED"; }
+function code(error: unknown) {
+  return error instanceof Error && "code" in error && typeof error.code === "string"
+    ? error.code
+    : "EVAL_BUDGET_FAILED";
+}

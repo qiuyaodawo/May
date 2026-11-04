@@ -17,12 +17,12 @@ export const mayConfigSchema = require("../../may-config.schema.json") as JsonSc
  * definitions, so the section may reference core definitions such as
  * `#/$defs/runBudget` and its own definitions with the same `#/$defs/` prefix.
  */
-export function createApplicationConfigSchema(
-  id: string,
-  section: JsonSchemaObject,
-  title: string,
-): JsonSchemaObject {
-  const { $defs: sectionDefinitions = {}, $schema: _schema, ...root } = section as {
+export function createApplicationConfigSchema(id: string, section: JsonSchemaObject, title: string): JsonSchemaObject {
+  const {
+    $defs: sectionDefinitions = {},
+    $schema: _schema,
+    ...root
+  } = section as {
     readonly $defs?: Readonly<Record<string, unknown>>;
     readonly $schema?: unknown;
   };
@@ -85,14 +85,25 @@ function mostSpecificError(errors: readonly ErrorObject[]): ErrorObject {
 }
 
 function validationError(error: ErrorObject, path: string, root: string): MayConfigValidationError {
-  const segments = error.instancePath.split("/").slice(1).map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"));
+  const segments = error.instancePath
+    .split("/")
+    .slice(1)
+    .map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"));
   const prefix = root === "config" ? segments : [root, ...segments];
   const location = prefix.length === 0 ? root : prefix.join(".");
   if (error.keyword === "additionalProperties") {
-    return new MayConfigValidationError(path, `${location}.${String(error.params.additionalProperty)}`, "is not supported");
+    return new MayConfigValidationError(
+      path,
+      `${location}.${String(error.params.additionalProperty)}`,
+      "is not supported",
+    );
   }
   if (error.keyword === "required") {
-    return new MayConfigValidationError(path, [...prefix, String(error.params.missingProperty)].join("."), "is required");
+    return new MayConfigValidationError(
+      path,
+      [...prefix, String(error.params.missingProperty)].join("."),
+      "is required",
+    );
   }
   return new MayConfigValidationError(path, location, error.message!);
 }

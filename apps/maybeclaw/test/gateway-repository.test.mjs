@@ -11,7 +11,7 @@ import { inboxId } from "../dist/channel-store.js";
 const base = join(testOutputRoot, "maybeclaw", "gateway-repository");
 const operator = { kind: "operator", id: "administrator" };
 
-test("Gateway queries isolate actors and repository state survives reopen and session deletion", async t => {
+test("Gateway queries isolate actors and repository state survives reopen and session deletion", async (t) => {
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, "records-"));
   const settings = gatewaySettings({ apps: { maybeclaw: { version: 2, agents: [{ id: "reader", adapter: "may" }] } } });
@@ -25,7 +25,11 @@ test("Gateway queries isolate actors and repository state survives reopen and se
   const entry = { account: "telegram:42", conversation: "7", kind: "private", owner: "7" };
   const actor = { kind: "platform", account: entry.account, conversation: entry.conversation, userId: entry.owner };
   const session = gateway.createSession(operator, "Report", ["reader"], [], entry);
-  const other = gateway.createSession(operator, "Other report", ["reader"], [], { ...entry, conversation: "8", owner: "8" });
+  const other = gateway.createSession(operator, "Other report", ["reader"], [], {
+    ...entry,
+    conversation: "8",
+    owner: "8",
+  });
   const message = gateway.record(session, { kind: "assistant", text: "Report complete", agentId: "reader" });
   gateway.record(other, { kind: "assistant", text: "Other report complete", agentId: "reader" });
   const deliveries = gateway.deliveries(actor);
@@ -39,12 +43,23 @@ test("Gateway queries isolate actors and repository state survives reopen and se
   configuration.agents.length = 0;
   assert.equal(gateway.configuration(operator).agents.length, 1);
 
-  const input = { account: entry.account, sender: entry.owner, conversation: entry.conversation, eventId: "report-command", messageId: "source-message", text: "/status" };
+  const input = {
+    account: entry.account,
+    sender: entry.owner,
+    conversation: entry.conversation,
+    eventId: "report-command",
+    messageId: "source-message",
+    text: "/status",
+  };
   const id = inboxId(input);
   gateway.channels.acceptInput(input);
   assert.equal(gateway.channels.beginInput(id), true);
-  gateway.channels.finishInput(id, { text: "Report status", sessionId: session.id }, ["Report status"],
-    (change, sessionId) => gateway.recordChannelChange(change.input, change.originalState, sessionId));
+  gateway.channels.finishInput(
+    id,
+    { text: "Report status", sessionId: session.id },
+    ["Report status"],
+    (change, sessionId) => gateway.recordChannelChange(change.input, change.originalState, sessionId),
+  );
   const reply = gateway.channels.replies()[0];
   gateway.channels.commitDelivery("reply", reply.id, "sending");
   gateway.channels.commitDelivery("reply", reply.id, "sent", { messageId: "reply-message" });

@@ -1,10 +1,4 @@
-import type {
-  Component,
-  CursorPosition,
-  RenderResult,
-  RenderSize,
-  PointerEvent,
-} from "./component.js";
+import type { Component, CursorPosition, RenderResult, RenderSize, PointerEvent } from "./component.js";
 import { placeImages, type ImagePlacement } from "./component.js";
 import type { TextRow } from "./text-selection.js";
 
@@ -46,13 +40,16 @@ export class Column implements Component {
 
   setItems(items: readonly ColumnItem[]): void {
     for (const item of items) {
-      if (item.height !== undefined && item.flex !== undefined) throw new Error("A column item cannot define both height and flex");
+      if (item.height !== undefined && item.flex !== undefined)
+        throw new Error("A column item cannot define both height and flex");
       if (item.height !== undefined) integer(item.height, "Column item height");
       if (item.minHeight !== undefined) integer(item.minHeight, "Column item minHeight");
-      if (item.flex !== undefined && (!Number.isFinite(item.flex) || item.flex <= 0)) throw new RangeError("Column item flex must be positive");
+      if (item.flex !== undefined && (!Number.isFinite(item.flex) || item.flex <= 0))
+        throw new RangeError("Column item flex must be positive");
     }
     this.items = items;
-    if (this.captured !== undefined && !items.some(item => item.component === this.captured)) this.captured = undefined;
+    if (this.captured !== undefined && !items.some((item) => item.component === this.captured))
+      this.captured = undefined;
   }
 
   render(size: RenderSize): RenderResult {
@@ -89,16 +86,18 @@ export class Column implements Component {
     return {
       lines: lines.slice(0, size.height),
       ...(images.length ? { images } : {}),
-      ...(textRows.some(row => row !== undefined) ? { textRows: textRows.slice(0, size.height) } : {}),
+      ...(textRows.some((row) => row !== undefined) ? { textRows: textRows.slice(0, size.height) } : {}),
       ...(cursor === undefined ? {} : { cursor }),
     };
   }
 
   handlePointer(event: PointerEvent): boolean {
     if (event.type === "down") this.captured = undefined;
-    const region = this.regions.find(region => this.captured === undefined
-      ? event.y >= region.y && event.y < region.y + region.height
-      : region.component === this.captured);
+    const region = this.regions.find((region) =>
+      this.captured === undefined
+        ? event.y >= region.y && event.y < region.y + region.height
+        : region.component === this.captured,
+    );
     if (region === undefined) {
       if (event.type === "up") this.captured = undefined;
       return false;
@@ -120,8 +119,9 @@ function allocateHeights(items: readonly ColumnItem[], available: number): numbe
   let remaining = available - heights.reduce((sum, value) => sum + value, 0);
 
   if (remaining < 0) {
-    const order = items.map((_, index) => index).sort((a, b) =>
-      Number(items[a]!.height !== undefined) - Number(items[b]!.height !== undefined) || a - b);
+    const order = items
+      .map((_, index) => index)
+      .sort((a, b) => Number(items[a]!.height !== undefined) - Number(items[b]!.height !== undefined) || a - b);
     for (const index of order) {
       if (remaining >= 0) break;
       const reduction = Math.min(heights[index]!, -remaining);
@@ -132,13 +132,11 @@ function allocateHeights(items: readonly ColumnItem[], available: number): numbe
   }
 
   const flexItems = items
-    .map((item, index) => ({ index, weight: item.height === undefined ? item.flex ?? 1 : 0 }))
+    .map((item, index) => ({ index, weight: item.height === undefined ? (item.flex ?? 1) : 0 }))
     .filter((item) => item.weight > 0);
   let totalWeight = flexItems.reduce((sum, item) => sum + item.weight, 0);
   for (const item of flexItems) {
-    const share = totalWeight === item.weight
-      ? remaining
-      : Math.floor(remaining * item.weight / totalWeight);
+    const share = totalWeight === item.weight ? remaining : Math.floor((remaining * item.weight) / totalWeight);
     heights[item.index] = heights[item.index]! + share;
     remaining -= share;
     totalWeight -= item.weight;

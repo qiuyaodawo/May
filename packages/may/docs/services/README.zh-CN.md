@@ -4,12 +4,12 @@
 
 主入口导出服务标识、注册表和工厂元数据。组件工厂通过独立的公开子路径导入：
 
-| 导入路径 | 工厂参考 |
-| --- | --- |
-| `@sortedyuan/may/services/models` | [Model 实例与包装](models.zh-CN.md) |
-| `@sortedyuan/may/services/runtime` | [Runtime、Context 和工具](runtime.zh-CN.md) |
-| `@sortedyuan/may/services/permissions` | [权限策略](permissions.zh-CN.md) |
-| `@sortedyuan/may/services/skills` | [Skill 激活与持久状态](skills.zh-CN.md) |
+| 导入路径                               | 工厂参考                                    |
+| -------------------------------------- | ------------------------------------------- |
+| `@sortedyuan/may/services/models`      | [Model 实例与包装](models.zh-CN.md)         |
+| `@sortedyuan/may/services/runtime`     | [Runtime、Context 和工具](runtime.zh-CN.md) |
+| `@sortedyuan/may/services/permissions` | [权限策略](permissions.zh-CN.md)            |
+| `@sortedyuan/may/services/skills`      | [Skill 激活与持久状态](skills.zh-CN.md)     |
 
 为 `@sortedyuan/may/application` 和组件插件提供带类型的服务标识以及有序组合注册表。
 `services` 中的全部服务使用 application 作用域和 `1.0.0` 版本，每种服务具有一个提供方。
@@ -36,10 +36,9 @@ Model 工厂共同提供实例及对应的元信息。
 贡献移除行为以及每个 Application 的独立状态。
 
 ```ts
-context.defer(context.get(services.toolSources).add(
-  () => tools,
-  { id: context.pluginId, pluginOrder: context.pluginOrder },
-));
+context.defer(
+  context.get(services.toolSources).add(() => tools, { id: context.pluginId, pluginOrder: context.pluginOrder }),
+);
 ```
 
 `ToolSources.snapshot()` 返回保存当前定义和执行函数的 `ToolRegistry`，重复工具名称立即报错。

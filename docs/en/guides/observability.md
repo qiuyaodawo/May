@@ -35,21 +35,13 @@ already configured `model`, `tools`, `permissionPolicy` and `store`.
 
 ```ts
 import { defineAgent } from "@sortedyuan/may";
-import {
-  BasicTracer,
-  BatchSpanProcessor,
-  ConsoleSpanExporter,
-  ratioSampler,
-} from "@sortedyuan/observability";
+import { BasicTracer, BatchSpanProcessor, ConsoleSpanExporter, ratioSampler } from "@sortedyuan/observability";
 
-const processor = new BatchSpanProcessor(
-  new ConsoleSpanExporter(),
-  {
-    maxQueueSize: 2_048,
-    maxExportBatchSize: 256,
-    scheduledDelayMs: 2_000,
-  },
-);
+const processor = new BatchSpanProcessor(new ConsoleSpanExporter(), {
+  maxQueueSize: 2_048,
+  maxExportBatchSize: 256,
+  scheduledDelayMs: 2_000,
+});
 
 const tracer = new BasicTracer({
   processor,
@@ -88,18 +80,18 @@ context for provider, remote-tool, and parent-operation integration.
 
 ## Built-in spans
 
-| Span | Purpose |
-| --- | --- |
-| `may.application.open` | Create/resume and validate one application Session |
-| `may.run` | Root Core Run, outcome, counts, and aggregate token usage |
-| `may.context.snapshot` | Prepare the model-visible Context snapshot |
-| `may.context.append` | Append input, assistant, or tool-result messages |
-| `may.model.call` | One model stream, usage, tool-call count, and retry events |
-| `may.tools.batch` | Schedule one model response's tool calls |
-| `may.tool.call` | Parse, authorize, and execute one Tool |
-| `may.permission.check` | Evaluate the permission policy |
-| `may.permission.approval_wait` | Wait for an explicit approval decision |
-| `may.context.compact` | Explicit application-requested compaction |
+| Span                           | Purpose                                                    |
+| ------------------------------ | ---------------------------------------------------------- |
+| `may.application.open`         | Create/resume and validate one application Session         |
+| `may.run`                      | Root Core Run, outcome, counts, and aggregate token usage  |
+| `may.context.snapshot`         | Prepare the model-visible Context snapshot                 |
+| `may.context.append`           | Append input, assistant, or tool-result messages           |
+| `may.model.call`               | One model stream, usage, tool-call count, and retry events |
+| `may.tools.batch`              | Schedule one model response's tool calls                   |
+| `may.tool.call`                | Parse, authorize, and execute one Tool                     |
+| `may.permission.check`         | Evaluate the permission policy                             |
+| `may.permission.approval_wait` | Wait for an explicit approval decision                     |
+| `may.context.compact`          | Explicit application-requested compaction                  |
 
 The following illustrative timings show how an approval wait contributes to a
 tool's duration. They are example values:
@@ -199,7 +191,10 @@ import { BoundedMetrics, DiagnosticsStore } from "@sortedyuan/observability";
 const metrics = new BoundedMetrics({ maxSeries: 1_024 });
 const diagnostics = new DiagnosticsStore({ maxSpans: 2_048, maxActiveSpans: 512 });
 const tracer = new BasicTracer({
-  processor, metrics, observer: diagnostics, sampler: ratioSampler(0.1),
+  processor,
+  metrics,
+  observer: diagnostics,
+  sampler: ratioSampler(0.1),
 });
 const page = diagnostics.getDiagnostics({ sessionId, limit: 100, offset: 0 });
 const snapshot = metrics.getMetrics();
@@ -284,8 +279,11 @@ const telemetry = createOtlpTelemetry({
   serviceName: "example-agent",
   tracesUrl: "http://localhost:4318/v1/traces",
   metricsUrl: "http://localhost:4318/v1/metrics",
-  timeoutMs: 5_000, maxQueueSize: 2_048, maxExportBatchSize: 256,
-  samplingRatio: 0.1, observer: diagnostics,
+  timeoutMs: 5_000,
+  maxQueueSize: 2_048,
+  maxExportBatchSize: 256,
+  samplingRatio: 0.1,
+  observer: diagnostics,
 });
 // Application 使用 telemetry.tracer，全部关闭后释放 SDK。
 await telemetry.forceFlush();
@@ -320,9 +318,13 @@ replace the identities, versions and reference with your actual values.
 
 ```ts
 diagnostics.recordAssessment({
-  taskId: "task-123", sessionId: "session-123", coordinationId: "coordination-123",
-  evaluator: "file-checks", evaluatorVersion: "2",
-  result: "passed", configurationVersion: "context-policy-3",
+  taskId: "task-123",
+  sessionId: "session-123",
+  coordinationId: "coordination-123",
+  evaluator: "file-checks",
+  evaluatorVersion: "2",
+  result: "passed",
+  configurationVersion: "context-policy-3",
   evidenceReferences: ["artifact:checks-123"],
 });
 ```

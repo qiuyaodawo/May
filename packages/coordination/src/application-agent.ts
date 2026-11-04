@@ -2,7 +2,13 @@ import type { AgentApplication, AgentDefinition } from "@sortedyuan/may";
 import { correlationTraceAttributes, omitUndefined, type Tool } from "@sortedyuan/may/core";
 import type { SessionStore } from "@sortedyuan/may/session";
 import type { CoordinationAgent, TaskExecution, TaskExecutionContext } from "./types.js";
-import { coordinationInput, inspectTaskSession, taskIdentity, taskOutputFromResult, taskTurnInputId } from "./application-session.js";
+import {
+  coordinationInput,
+  inspectTaskSession,
+  taskIdentity,
+  taskOutputFromResult,
+  taskTurnInputId,
+} from "./application-session.js";
 import { name } from "./validation.js";
 import { delegationTool } from "./delegation-tool.js";
 import { messagingTools } from "./messaging-tools.js";
@@ -10,7 +16,9 @@ import { handoffTool } from "./handoff-tool.js";
 
 export interface ApplicationAgentOptions {
   readonly version: string;
-  readonly definition: AgentDefinition | ((bindings: { readonly tools: readonly Tool[]; readonly execution: TaskExecution }) => AgentDefinition);
+  readonly definition:
+    | AgentDefinition
+    | ((bindings: { readonly tools: readonly Tool[]; readonly execution: TaskExecution }) => AgentDefinition);
   /** Requires a definition factory that explicitly includes the supplied tool. */
   readonly delegation?: boolean;
   /** Opt into send_message and wait_for_messages through the definition factory. */
@@ -30,7 +38,8 @@ export function createApplicationAgent(options: ApplicationAgentOptions): Coordi
   const delegation = options.delegation === true;
   const messaging = options.messaging === true;
   const handoff = options.handoff === true;
-  if ((delegation || messaging || handoff) && typeof definition !== "function") throw new Error("Coordination tools require a definition factory to include their scoped tools");
+  if ((delegation || messaging || handoff) && typeof definition !== "function")
+    throw new Error("Coordination tools require a definition factory to include their scoped tools");
   const active = new Map<string, AgentApplication>();
   return {
     version,
@@ -44,39 +53,63 @@ export function createApplicationAgent(options: ApplicationAgentOptions): Coordi
       }
       context.signal.throwIfAborted();
       let delegated = false;
-      const yielded = () => { delegated = true; };
-      const tools = [...(delegation ? [delegationTool(context, yielded)] : []), ...(messaging ? messagingTools(context, yielded) : []), ...(handoff ? [handoffTool(context, yielded)] : [])];
+      const yielded = () => {
+        delegated = true;
+      };
+      const tools = [
+        ...(delegation ? [delegationTool(context, yielded)] : []),
+        ...(messaging ? messagingTools(context, yielded) : []),
+        ...(handoff ? [handoffTool(context, yielded)] : []),
+      ];
       const selected = typeof definition === "function" ? definition({ tools, execution }) : definition;
-      const app = await selected.open({ store, sessionId, resume: history.length > 0,
+      const app = await selected.open({
+        store,
+        sessionId,
+        resume: history.length > 0,
         metadata: { coordination: taskIdentity(execution) },
       });
       active.set(sessionId, app);
-      const relay = (async () => { for await (const event of app.events) context.report(event); })();
+      const relay = (async () => {
+        for await (const event of app.events) context.report(event);
+      })();
       // 观察 relay 失败：宿主回调抛错不能留下仍在运行的 Run。
       void relay.catch(() => app.cancel("Event relay failed"));
       try {
         options.onOpen?.(app, execution);
         context.signal.throwIfAborted();
-        const run = await app.submit({ input: coordinationInput(execution), inputId: taskTurnInputId(execution), signal: context.signal,
+        const run = await app.submit({
+          input: coordinationInput(execution),
+          inputId: taskTurnInputId(execution),
+          signal: context.signal,
           ...omitUndefined({ traceContext: execution.telemetry?.parent, runBudget: execution.runBudget }),
           shouldYield: () => delegated,
-          traceAttributes: { ...(execution.telemetry === undefined ? {} : correlationTraceAttributes(execution.telemetry)), "may.coordination.id": execution.coordinationId, "may.task.id": execution.task.id, "may.dispatch.id": execution.task.dispatchId,
-            "may.task.attempt": execution.task.attempt ?? 0 },
+          traceAttributes: {
+            ...(execution.telemetry === undefined ? {} : correlationTraceAttributes(execution.telemetry)),
+            "may.coordination.id": execution.coordinationId,
+            "may.task.id": execution.task.id,
+            "may.dispatch.id": execution.task.dispatchId,
+            "may.task.attempt": execution.task.attempt ?? 0,
+          },
         });
         const result = await run.result;
         if (delegated && result.finishReason === "yielded") return { yielded: true };
         return taskOutputFromResult(result);
       } finally {
-        try { await app.close(); await relay; }
-        finally { active.delete(sessionId); }
+        try {
+          await app.close();
+          await relay;
+        } finally {
+          active.delete(sessionId);
+        }
       }
     },
     async recover(execution) {
-      if (active.has(execution.task.sessionId)) return { status: "recovery-required", detail: "Task Session is still active" };
+      if (active.has(execution.task.sessionId))
+        return { status: "recovery-required", detail: "Task Session is still active" };
       return inspectTaskSession(await store.read(execution.task.sessionId), execution);
     },
     async resolveApproval(sessionId, requestId, decision) {
-      return await active.get(sessionId)?.resolveApproval(requestId, decision) ?? false;
+      return (await active.get(sessionId)?.resolveApproval(requestId, decision)) ?? false;
     },
   };
 }

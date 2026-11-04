@@ -1,10 +1,4 @@
-import type {
-  ContentPart,
-  MediaSource,
-  Message,
-  ModelState,
-  ToolDefinition,
-} from "@sortedyuan/may/core";
+import type { ContentPart, MediaSource, Message, ModelState, ToolDefinition } from "@sortedyuan/may/core";
 import { UnsupportedContentError } from "@sortedyuan/may/core";
 import { AnthropicProtocolError } from "./errors.js";
 import {
@@ -26,9 +20,7 @@ export interface AnthropicRequestParts {
   system?: string;
 }
 
-export function toAnthropicRequestParts(
-  messages: readonly Message[],
-): AnthropicRequestParts {
+export function toAnthropicRequestParts(messages: readonly Message[]): AnthropicRequestParts {
   const system: string[] = [];
   const converted: AnthropicRequestMessage[] = [];
 
@@ -68,14 +60,10 @@ export function toAnthropicRequestParts(
       continue;
     }
 
-    const content: AnthropicAssistantContentBlock[] = [
-      ...toAssistantTextBlocks(message.content),
-    ];
+    const content: AnthropicAssistantContentBlock[] = [...toAssistantTextBlocks(message.content)];
     for (const call of message.toolCalls ?? []) {
       if (!isRecord(call.input)) {
-        throw new AnthropicProtocolError(
-          `Anthropic tool call "${call.name}" input must be an object`,
-        );
+        throw new AnthropicProtocolError(`Anthropic tool call "${call.name}" input must be an object`);
       }
       content.push({
         type: "tool_use",
@@ -92,9 +80,7 @@ export function toAnthropicRequestParts(
   return result;
 }
 
-export function toAnthropicTools(
-  tools: readonly ToolDefinition[],
-): AnthropicToolDefinition[] {
+export function toAnthropicTools(tools: readonly ToolDefinition[]): AnthropicToolDefinition[] {
   return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
@@ -106,10 +92,7 @@ export function toAnthropicThinking(
   thinking: AnthropicThinkingConfig,
 ): NonNullable<AnthropicMessagesRequest["thinking"]> {
   if (thinking.type === "enabled") {
-    const converted: Extract<
-      NonNullable<AnthropicMessagesRequest["thinking"]>,
-      { type: "enabled" }
-    > = {
+    const converted: Extract<NonNullable<AnthropicMessagesRequest["thinking"]>, { type: "enabled" }> = {
       type: "enabled",
       budget_tokens: thinking.budgetTokens,
     };
@@ -118,10 +101,9 @@ export function toAnthropicThinking(
   }
 
   if (thinking.type === "adaptive") {
-    const converted: Extract<
-      NonNullable<AnthropicMessagesRequest["thinking"]>,
-      { type: "adaptive" }
-    > = { type: "adaptive" };
+    const converted: Extract<NonNullable<AnthropicMessagesRequest["thinking"]>, { type: "adaptive" }> = {
+      type: "adaptive",
+    };
     if (thinking.display !== undefined) converted.display = thinking.display;
     return converted;
   }
@@ -129,9 +111,7 @@ export function toAnthropicThinking(
   return { type: "disabled" };
 }
 
-function getAnthropicStateContent(
-  state: ModelState | undefined,
-): AnthropicAssistantContentBlock[] | undefined {
+function getAnthropicStateContent(state: ModelState | undefined): AnthropicAssistantContentBlock[] | undefined {
   if (state?.type !== ANTHROPIC_MODEL_STATE_TYPE) return undefined;
   if (!isRecord(state.data) || !Array.isArray(state.data.content)) {
     throw new AnthropicProtocolError("Anthropic model state is malformed");
@@ -146,10 +126,12 @@ function toAssistantTextBlocks(content: ContentPart[]): AnthropicTextBlock[] {
     if (part.type !== "text" && part.type !== "json") {
       throw new UnsupportedContentError("Anthropic adapter", part.type, "assistant");
     }
-    return [{
-      type: "text" as const,
-      text: part.type === "text" ? part.text : serializeJson(part.value),
-    }];
+    return [
+      {
+        type: "text" as const,
+        text: part.type === "text" ? part.text : serializeJson(part.value),
+      },
+    ];
   });
 }
 
@@ -170,10 +152,7 @@ function toUserBlocks(content: ContentPart[]): AnthropicUserContentBlock[] {
   });
 }
 
-function serializeVisibleContent(
-  content: ContentPart[],
-  role: Message["role"] = "system",
-): string {
+function serializeVisibleContent(content: ContentPart[], role: Message["role"] = "system"): string {
   return content
     .filter((part) => part.type !== "reasoning")
     .map((part) => {

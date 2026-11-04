@@ -20,8 +20,11 @@ observability 插件管理 processor，并在应用关闭时完成资源清理�
 ```ts
 import { defineAgent } from "@sortedyuan/may";
 import { loadMayConfig } from "@sortedyuan/may/config";
-import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver,
-  selectProviderModel } from "@sortedyuan/providers";
+import {
+  createBuiltinProviderAdapterRegistry,
+  createModelCapabilityResolver,
+  selectProviderModel,
+} from "@sortedyuan/providers";
 import { createObservabilityPlugin, observabilityService } from "@sortedyuan/observability/plugin";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 

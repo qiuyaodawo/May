@@ -241,11 +241,12 @@ const workspace = await AgentWorkspace.open({
   store,
   catalog,
   autoResume: true,
-  openApplication: ({ sessionId, resume }) => agent.open({
-    store,
-    metadata: { workspace: process.cwd() },
-    ...(sessionId === undefined ? {} : { sessionId }),
-    ...(resume ? { resume: true } : {}),
-  }),
+  openApplication: ({ sessionId, resume }) =>
+    agent.open({
+      store,
+      metadata: { workspace: process.cwd() },
+      ...(sessionId === undefined ? {} : { sessionId }),
+      ...(resume ? { resume: true } : {}),
+    }),
 });
 ```

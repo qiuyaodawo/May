@@ -6,36 +6,36 @@
 当前 workspace 提供下列子路径；从 registry 安装时，需要选择已经包含这些导出的
 发布版本。升级之前检查目标包的 changelog。
 
-| 原包 | 公开导入路径 | 安装依赖 |
-| --- | --- | --- |
-| `@sortedyuan/application` | `@sortedyuan/may` 或 `@sortedyuan/may/application` | `@sortedyuan/may` |
-| `@sortedyuan/core` | `@sortedyuan/may/core` | `@sortedyuan/may` |
-| `@sortedyuan/context` | `@sortedyuan/may/context` | `@sortedyuan/may` |
-| `@sortedyuan/session` | `@sortedyuan/may/session` | `@sortedyuan/may` |
-| `@sortedyuan/permissions` | `@sortedyuan/may/permissions` | `@sortedyuan/may` |
-| `@sortedyuan/config` | `@sortedyuan/may/config` | `@sortedyuan/may` |
-| `@sortedyuan/skills` | `@sortedyuan/may/skills` | `@sortedyuan/may` |
-| `@sortedyuan/file-storage` | `@sortedyuan/may/storage` | `@sortedyuan/may` |
-| `@sortedyuan/plugin` | `@sortedyuan/may/plugin` | `@sortedyuan/may` |
-| `@sortedyuan/plugin-services` | `@sortedyuan/may/services` | `@sortedyuan/may` |
-| `@sortedyuan/goal` | `@sortedyuan/may/goals` | `@sortedyuan/may` |
-| `@sortedyuan/plugin-goals` | `@sortedyuan/may/goals/plugin` | `@sortedyuan/may` |
-| `@sortedyuan/plugin-history-memory` | `@sortedyuan/may/history-memory` | `@sortedyuan/may` |
-| `@sortedyuan/provider-<protocol>` | `@sortedyuan/providers/<protocol>` | `@sortedyuan/providers` |
-| `@sortedyuan/plugin-delegation` | `@sortedyuan/coordination/delegation` | `@sortedyuan/coordination` |
-| `@sortedyuan/plugin-mcp` | `@sortedyuan/mcp/plugin` | `@sortedyuan/mcp` |
-| `@sortedyuan/plugin-observability` | `@sortedyuan/observability/plugin` | `@sortedyuan/observability` |
-| `@sortedyuan/plugin-agent-adapters` | `@sortedyuan/gateway/adapters` | `@sortedyuan/gateway` |
-| `@sortedyuan/plugin-agent-adapters/rpc` | `@sortedyuan/gateway/rpc` | `@sortedyuan/gateway` |
-| `@sortedyuan/plugin-delivery` | `@sortedyuan/gateway/delivery` | `@sortedyuan/gateway` |
-| `@sortedyuan/plugin-web-api` | `@sortedyuan/gateway/web-api` | `@sortedyuan/gateway` |
-| `@sortedyuan/keybindings` | `@sortedyuan/tui/keybindings` | `@sortedyuan/tui` |
-| `@sortedyuan/plugin-models` | `@sortedyuan/may/services/models` | `@sortedyuan/may` |
-| `@sortedyuan/plugin-runtime` | `@sortedyuan/may/services/runtime` | `@sortedyuan/may` |
-| `@sortedyuan/plugin-permissions` | `@sortedyuan/may/services/permissions` | `@sortedyuan/may` |
-| `@sortedyuan/plugin-skills` | `@sortedyuan/may/services/skills` | `@sortedyuan/may` |
-| `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin` | `@sortedyuan/coordination` |
-| `@sortedyuan/session-tools` | `@sortedyuan/may/session/tools` | `@sortedyuan/may` |
+| 原包                                    | 公开导入路径                                       | 安装依赖                    |
+| --------------------------------------- | -------------------------------------------------- | --------------------------- |
+| `@sortedyuan/application`               | `@sortedyuan/may` 或 `@sortedyuan/may/application` | `@sortedyuan/may`           |
+| `@sortedyuan/core`                      | `@sortedyuan/may/core`                             | `@sortedyuan/may`           |
+| `@sortedyuan/context`                   | `@sortedyuan/may/context`                          | `@sortedyuan/may`           |
+| `@sortedyuan/session`                   | `@sortedyuan/may/session`                          | `@sortedyuan/may`           |
+| `@sortedyuan/permissions`               | `@sortedyuan/may/permissions`                      | `@sortedyuan/may`           |
+| `@sortedyuan/config`                    | `@sortedyuan/may/config`                           | `@sortedyuan/may`           |
+| `@sortedyuan/skills`                    | `@sortedyuan/may/skills`                           | `@sortedyuan/may`           |
+| `@sortedyuan/file-storage`              | `@sortedyuan/may/storage`                          | `@sortedyuan/may`           |
+| `@sortedyuan/plugin`                    | `@sortedyuan/may/plugin`                           | `@sortedyuan/may`           |
+| `@sortedyuan/plugin-services`           | `@sortedyuan/may/services`                         | `@sortedyuan/may`           |
+| `@sortedyuan/goal`                      | `@sortedyuan/may/goals`                            | `@sortedyuan/may`           |
+| `@sortedyuan/plugin-goals`              | `@sortedyuan/may/goals/plugin`                     | `@sortedyuan/may`           |
+| `@sortedyuan/plugin-history-memory`     | `@sortedyuan/may/history-memory`                   | `@sortedyuan/may`           |
+| `@sortedyuan/provider-<protocol>`       | `@sortedyuan/providers/<protocol>`                 | `@sortedyuan/providers`     |
+| `@sortedyuan/plugin-delegation`         | `@sortedyuan/coordination/delegation`              | `@sortedyuan/coordination`  |
+| `@sortedyuan/plugin-mcp`                | `@sortedyuan/mcp/plugin`                           | `@sortedyuan/mcp`           |
+| `@sortedyuan/plugin-observability`      | `@sortedyuan/observability/plugin`                 | `@sortedyuan/observability` |
+| `@sortedyuan/plugin-agent-adapters`     | `@sortedyuan/gateway/adapters`                     | `@sortedyuan/gateway`       |
+| `@sortedyuan/plugin-agent-adapters/rpc` | `@sortedyuan/gateway/rpc`                          | `@sortedyuan/gateway`       |
+| `@sortedyuan/plugin-delivery`           | `@sortedyuan/gateway/delivery`                     | `@sortedyuan/gateway`       |
+| `@sortedyuan/plugin-web-api`            | `@sortedyuan/gateway/web-api`                      | `@sortedyuan/gateway`       |
+| `@sortedyuan/keybindings`               | `@sortedyuan/tui/keybindings`                      | `@sortedyuan/tui`           |
+| `@sortedyuan/plugin-models`             | `@sortedyuan/may/services/models`                  | `@sortedyuan/may`           |
+| `@sortedyuan/plugin-runtime`            | `@sortedyuan/may/services/runtime`                 | `@sortedyuan/may`           |
+| `@sortedyuan/plugin-permissions`        | `@sortedyuan/may/services/permissions`             | `@sortedyuan/may`           |
+| `@sortedyuan/plugin-skills`             | `@sortedyuan/may/services/skills`                  | `@sortedyuan/may`           |
+| `@sortedyuan/plugin-coordination`       | `@sortedyuan/coordination/plugin`                  | `@sortedyuan/coordination`  |
+| `@sortedyuan/session-tools`             | `@sortedyuan/may/session/tools`                    | `@sortedyuan/may`           |
 
 Application、Session、Context、权限和配置的已有导出后缀保持不变，例如
 `@sortedyuan/may/application/git-workspace`、`@sortedyuan/may/session/file-store`

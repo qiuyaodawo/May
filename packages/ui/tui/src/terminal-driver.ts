@@ -75,14 +75,15 @@ export class NodeTerminalDriver implements TerminalWriter {
 
   start(): void {
     if (this.started) return;
-    if (this.requireTTY &&
-      (this.input.isTTY !== true || this.output.isTTY !== true)) {
+    if (this.requireTTY && (this.input.isTTY !== true || this.output.isTTY !== true)) {
       throw new Error("The TUI requires an interactive terminal");
     }
     this.previousRawMode = this.input.isRaw === true;
     this.inputWasPaused = this.input.isPaused();
     if (!this.keypressInitialized) {
-      emitKeypressEvents(this.decodedInput, { escapeCodeTimeout: 30 } as unknown as Parameters<typeof emitKeypressEvents>[1]);
+      emitKeypressEvents(this.decodedInput, { escapeCodeTimeout: 30 } as unknown as Parameters<
+        typeof emitKeypressEvents
+      >[1]);
       this.keypressInitialized = true;
     }
     this.inputDecoder.reset();
@@ -166,10 +167,7 @@ export class NodeTerminalDriver implements TerminalWriter {
     this.started = false;
   }
 
-  private readonly handleKeypress = (
-    value: string | undefined,
-    key: NodeKey = {},
-  ): void => {
+  private readonly handleKeypress = (value: string | undefined, key: NodeKey = {}): void => {
     const stroke = toKeyStroke(value, key);
     for (const listener of this.keyListeners) listener(stroke);
   };
@@ -215,8 +213,7 @@ interface NodeKey {
 function toKeyStroke(value: string | undefined, key: NodeKey): KeyStroke {
   if (value === "\n") return keyStroke("j", { ctrl: true });
   const name = key.name ?? value ?? "unknown";
-  const printable = value !== undefined && value.length > 0 &&
-    key.ctrl !== true && key.meta !== true;
+  const printable = value !== undefined && value.length > 0 && key.ctrl !== true && key.meta !== true;
   return keyStroke(name, {
     ctrl: key.ctrl === true,
     alt: key.meta === true && name !== "escape",
@@ -238,9 +235,7 @@ class BracketedPasteDecoder {
   push(value: Buffer | string): void {
     this.clearPrefixTimer();
     const incoming = Buffer.from(value);
-    this.pending = this.pending.length === 0
-      ? incoming
-      : Buffer.concat([this.pending, incoming]);
+    this.pending = this.pending.length === 0 ? incoming : Buffer.concat([this.pending, incoming]);
     this.process();
   }
 
@@ -252,9 +247,7 @@ class BracketedPasteDecoder {
 
   private process(): void {
     while (this.pending.length > 0) {
-      const marker = this.paste
-        ? BRACKETED_PASTE_END
-        : BRACKETED_PASTE_START;
+      const marker = this.paste ? BRACKETED_PASTE_END : BRACKETED_PASTE_START;
       const markerIndex = this.pending.indexOf(marker);
       if (markerIndex >= 0) {
         this.emit(this.pending.subarray(0, markerIndex));

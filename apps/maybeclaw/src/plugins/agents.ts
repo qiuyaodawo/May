@@ -5,12 +5,35 @@ import type { GatewaySettings } from "../gateway-types.js";
 import { omitUndefined } from "@sortedyuan/may/core";
 import type { PermissionRuleStore } from "@sortedyuan/may/permissions";
 
-export function createGatewayAgentPlugins(options: { directory: string; configPath: string; settings: GatewaySettings; permissionRuleStore?: () => Promise<PermissionRuleStore | undefined> }) {
-  return [createAgentAdaptersPlugin({ factories: () => Object.fromEntries(options.settings.agents.map(agent => [agent.id,
-    async () => {
-      const ruleStore = options.settings.persistentRules && agent.adapter === "may" ? await options.permissionRuleStore?.() : undefined;
-      return loadGatewayAdapter(omitUndefined({ directory: options.directory, configPath: options.configPath, agent,
-        permissionRuleStore: ruleStore }));
-    },
-  ])) }), createCoordinationPlugin()];
+export function createGatewayAgentPlugins(options: {
+  directory: string;
+  configPath: string;
+  settings: GatewaySettings;
+  permissionRuleStore?: () => Promise<PermissionRuleStore | undefined>;
+}) {
+  return [
+    createAgentAdaptersPlugin({
+      factories: () =>
+        Object.fromEntries(
+          options.settings.agents.map((agent) => [
+            agent.id,
+            async () => {
+              const ruleStore =
+                options.settings.persistentRules && agent.adapter === "may"
+                  ? await options.permissionRuleStore?.()
+                  : undefined;
+              return loadGatewayAdapter(
+                omitUndefined({
+                  directory: options.directory,
+                  configPath: options.configPath,
+                  agent,
+                  permissionRuleStore: ruleStore,
+                }),
+              );
+            },
+          ]),
+        ),
+    }),
+    createCoordinationPlugin(),
+  ];
 }

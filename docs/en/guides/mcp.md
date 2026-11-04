@@ -53,14 +53,16 @@ import { defineAgent } from "@sortedyuan/may";
 import { openMcpClientPool } from "@sortedyuan/mcp";
 
 const mcp = await openMcpClientPool({
-  servers: [{
-    id: "workspace",
-    command: "node",
-    args: ["./mcp-server.mjs"],
-    cwd: process.cwd(),
-    required: false,
-    requestTimeoutMs: 60_000,
-  }],
+  servers: [
+    {
+      id: "workspace",
+      command: "node",
+      args: ["./mcp-server.mjs"],
+      cwd: process.cwd(),
+      required: false,
+      requestTimeoutMs: 60_000,
+    },
+  ],
   tracer,
 });
 
@@ -93,12 +95,12 @@ remaining servers start. `close()` is idempotent, visits every connection even
 if one close fails, and owns termination of the child processes spawned by the
 stdio transport.
 
-| Configuration | Meaning and default |
-| --- | --- |
-| `requestTimeoutMs` | Inactivity timeout, 60 seconds; progress can reset it |
+| Configuration       | Meaning and default                                                            |
+| ------------------- | ------------------------------------------------------------------------------ |
+| `requestTimeoutMs`  | Inactivity timeout, 60 seconds; progress can reset it                          |
 | `maxTotalTimeoutMs` | Absolute request deadline including progress and interaction; unset by default |
-| `maxBufferSize` | One stdio message, 10 MiB |
-| `stderrMaxBytes` | Retained stderr tail, 16 KiB |
+| `maxBufferSize`     | One stdio message, 10 MiB                                                      |
+| `stderrMaxBytes`    | Retained stderr tail, 16 KiB                                                   |
 
 `pool.status()` returns a point-in-time view of every configured server,
 including its connection state, discovered tool names, latest diagnostic, and
@@ -253,12 +255,12 @@ delete remote user data. No remote session is created by the modern protocol.
 
 With a tracer, the adapter emits:
 
-| Span | Meaning |
-| --- | --- |
-| `may.mcp.connect` | transport setup and protocol negotiation |
-| `may.mcp.tools.list` | initial and refreshed capability discovery |
-| `may.mcp.tool.call` | one remote call, parented to the Core tool span |
-| `may.mcp.disconnect` | client and process shutdown |
+| Span                 | Meaning                                         |
+| -------------------- | ----------------------------------------------- |
+| `may.mcp.connect`    | transport setup and protocol negotiation        |
+| `may.mcp.tools.list` | initial and refreshed capability discovery      |
+| `may.mcp.tool.call`  | one remote call, parented to the Core tool span |
+| `may.mcp.disconnect` | client and process shutdown                     |
 
 Attributes include server id, transport, exposed and remote tool names, ids,
 counts, status, and duration through the tracer. Built-in instrumentation does
@@ -288,35 +290,35 @@ an in-progress Run. Old snapshots reject with `MCP_STALE_TOOL` if a definition
 changed/disappeared or the catalog became untrustworthy. The wire request is not
 sent. A reconnect closes the old connection, so its snapshots cannot execute.
 
-| Operation | Behavior |
-| --- | --- |
-| `mcp.catalog()` | Return frozen catalog metadata |
-| `mcp.refresh(serverId?, signal?)` | Refresh advertised catalogs for one or all endpoints |
+| Operation                          | Behavior                                                   |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `mcp.catalog()`                    | Return frozen catalog metadata                             |
+| `mcp.refresh(serverId?, signal?)`  | Refresh advertised catalogs for one or all endpoints       |
 | `mcp.reconnect(serverId, signal?)` | Replace an endpoint, including an optional failed endpoint |
 
 `mcp.catalog()` returns deeply frozen per-server metadata: revision,
-  capabilities, tools, resources, resource templates and prompts. Only advertised
-  capabilities are queried; resources-only endpoints are valid. Metadata is
-  untrusted server data, not permission to load URIs or execute prompts.
+capabilities, tools, resources, resource templates and prompts. Only advertised
+capabilities are queried; resources-only endpoints are valid. Metadata is
+untrusted server data, not permission to load URIs or execute prompts.
 `await mcp.refresh(serverId?, signal?)` explicitly refetches all advertised lists
-  and publishes only a complete candidate. Each list has a 64-page cap, repeated
-  cursors/duplicate identities fail closed, and retained candidate data is capped
-  at 4,096 descriptors/8 MiB across lists. The refresh deadline is 60 seconds or
-  `maxTotalTimeoutMs`. The Host separately manages HTTP-body memory limits.
+and publishes only a complete candidate. Each list has a 64-page cap, repeated
+cursors/duplicate identities fail closed, and retained candidate data is capped
+at 4,096 descriptors/8 MiB across lists. The refresh deadline is 60 seconds or
+`maxTotalTimeoutMs`. The Host separately manages HTTP-body memory limits.
 Advertised list-change notifications invalidate tools immediately and schedule
-  one coalesced refresh. Modern endpoints use `subscriptions/listen`, legacy
-  endpoints use notification handlers. Concurrent invalidations allow at most
-  three discovery attempts; failure preserves the prior metadata as stale and
-  removes its tools from new Runs. No content is automatically read or attached.
+one coalesced refresh. Modern endpoints use `subscriptions/listen`, legacy
+endpoints use notification handlers. Concurrent invalidations allow at most
+three discovery attempts; failure preserves the prior metadata as stale and
+removes its tools from new Runs. No content is automatically read or attached.
 `await mcp.reconnect(serverId, signal?)` replaces only that configured endpoint,
-  including optional endpoints that failed startup. In-flight tool calls make
-  reconnect fail. Old Run
-  snapshots must be abandoned; the new connection gets new permission identity.
+including optional endpoints that failed startup. In-flight tool calls make
+reconnect fail. Old Run
+snapshots must be abandoned; the new connection gets new permission identity.
 `/mcp refresh [server-id]` and `/mcp reconnect <server-id>` expose these actions
-  in both terminal UIs. `/mcp` shows revision/staleness and notification coverage
-  (`active`, `partial`, `unavailable`, `legacy`, `not-advertised`). Lost modern
-  subscription streams are visible failures, not silent healthy subscriptions;
-  refresh/reconnect is explicit. `mcp.server.catalog-updated` signals publication.
+in both terminal UIs. `/mcp` shows revision/staleness and notification coverage
+(`active`, `partial`, `unavailable`, `legacy`, `not-advertised`). Lost modern
+subscription streams are visible failures, not silent healthy subscriptions;
+refresh/reconnect is explicit. `mcp.server.catalog-updated` signals publication.
 
 Tool grant identity includes the complete remote definition (including output
 schema/annotations), endpoint/account configuration and a connection generation,
@@ -339,14 +341,16 @@ Replace the URI, template and prompt names with entries from `mcp.catalog()`.
 
 ```ts
 const read = await mcp.readResource("workspace", "project:///README", { signal });
-const expanded = await mcp.readResourceTemplate(
-  "workspace", "project:///{path}", { path: "README" }, { signal },
-);
+const expanded = await mcp.readResourceTemplate("workspace", "project:///{path}", { path: "README" }, { signal });
 const prompt = await mcp.getPrompt("workspace", "review", { file: "main.ts" }, { signal });
-const suggestions = await mcp.complete("workspace", {
-  ref: { type: "ref/prompt", name: "review" },
-  argument: { name: "file", value: "ma" },
-}, { signal });
+const suggestions = await mcp.complete(
+  "workspace",
+  {
+    ref: { type: "ref/prompt", name: "review" },
+    argument: { name: "file", value: "ma" },
+  },
+  { signal },
+);
 const watch = await mcp.subscribeResource("workspace", read.uri, { signal });
 // watch.events 提供更新通知；需要内容时明确重新读取。
 await watch.close(); // watch.closed 也报告远端或连接关闭。
@@ -375,14 +379,14 @@ Remote prompt role labels remain data, not actual assistant/system history.
 provenance. Resource links stay inert JSON: neither local file reads nor automatic
 URL downloads. Watch notices never change the model Context.
 
-| Item | Limit |
-| --- | --- |
-| Content results | 128 blocks, 8 MiB; validate base64 and MIME |
-| Terminal preview | 16,000 characters; binary content uses labels |
-| Completion | 100 items, 64 KiB; ten calls per second per connection |
-| Resource cache | 32 entries, 16 MiB per connection; positive TTL up to five minutes |
-| Resource subscriptions | 64 handles per connection; 32 notices per handle |
-| HTTP JSON and SSE frame | 10 MiB before SDK parsing |
+| Item                    | Limit                                                              |
+| ----------------------- | ------------------------------------------------------------------ |
+| Content results         | 128 blocks, 8 MiB; validate base64 and MIME                        |
+| Terminal preview        | 16,000 characters; binary content uses labels                      |
+| Completion              | 100 items, 64 KiB; ten calls per second per connection             |
+| Resource cache          | 32 entries, 16 MiB per connection; positive TTL up to five minutes |
+| Resource subscriptions  | 64 handles per connection; 32 notices per handle                   |
+| HTTP JSON and SSE frame | 10 MiB before SDK parsing                                          |
 
 Results allow 128 blocks/8 MiB, validating base64/MIME; oversize results fail rather
 than silently truncating structured data/binary. Terminal previews allow 16,000
@@ -483,7 +487,6 @@ server can still return supplied data as normal resource/tool output. Unscoped l
 can interact as described below. Roots and Sampling are explicit compatibility
 options, never enabled merely by installing a server. Tasks are separately opt-in; independent server export is separately opt-in; this feature does not claim complete MCP conformance.
 
-
 ## Roots, Sampling and legacy compatibility
 
 Roots and Sampling are explicit compatibility features, **off by default**.
@@ -554,7 +557,6 @@ operations**; opt in only for servers supporting independent sessions. Shared
 legacy tools still work without this option, but unsolicited/startup callbacks
 never acquire an owner: elicitation declines, roots are empty and sampling fails.
 
-
 Opt-in modern Tasks support durable handles, explicit get/update/wait/cancel,
 restart recovery and user-controlled completed-result attachment. Enable `tasks: true`
 with a journal; see [long-running tasks](mcp-tasks.md) for version, UI and safety boundaries.
@@ -566,11 +568,11 @@ See [server authoring](mcp-server.md).
 
 ## Troubleshooting
 
-| Symptom | Check and action |
-| --- | --- |
-| Startup fails before connecting | Check environment references, transport-specific fields, command path and required endpoint diagnostics |
-| Endpoint reports `auth-required` | Complete [OAuth login](mcp-auth.md), reconnect the endpoint and start a new Run |
-| `MCP_STALE_TOOL` | Refresh or reconnect the endpoint, then start a new Run with the current catalog |
-| Resource watch closes | Inspect `watch.closed` and endpoint status; explicitly refresh or reconnect before creating a new watch |
-| An interaction expires | Confirm the UI consumes broker events concurrently and the request timeout permits user review; start a new authorized operation |
-| Remote call has an unknown outcome | Verify the remote effect before creating another call; consult [recovery](recovery.md) |
+| Symptom                            | Check and action                                                                                                                 |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Startup fails before connecting    | Check environment references, transport-specific fields, command path and required endpoint diagnostics                          |
+| Endpoint reports `auth-required`   | Complete [OAuth login](mcp-auth.md), reconnect the endpoint and start a new Run                                                  |
+| `MCP_STALE_TOOL`                   | Refresh or reconnect the endpoint, then start a new Run with the current catalog                                                 |
+| Resource watch closes              | Inspect `watch.closed` and endpoint status; explicitly refresh or reconnect before creating a new watch                          |
+| An interaction expires             | Confirm the UI consumes broker events concurrently and the request timeout permits user review; start a new authorized operation |
+| Remote call has an unknown outcome | Verify the remote effect before creating another call; consult [recovery](recovery.md)                                           |

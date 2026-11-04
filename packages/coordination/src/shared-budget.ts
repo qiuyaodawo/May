@@ -2,7 +2,18 @@ import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { Model, ModelEvent, Usage } from "@sortedyuan/may/core";
-import { ModelResponseValidationError, omitUndefined, priceUsage, resolvePriceSchedule, resolveUsageTotals, validateUsageCost, type TokenPrices, type TokenPriceSchedule, type UsageCost, type UsagePricer } from "@sortedyuan/may/core";
+import {
+  ModelResponseValidationError,
+  omitUndefined,
+  priceUsage,
+  resolvePriceSchedule,
+  resolveUsageTotals,
+  validateUsageCost,
+  type TokenPrices,
+  type TokenPriceSchedule,
+  type UsageCost,
+  type UsagePricer,
+} from "@sortedyuan/may/core";
 import { ResourceJournal, amount, count, resourceId } from "./resource-journal.js";
 
 export interface SharedBudgetLimits {
@@ -13,10 +24,15 @@ export interface SharedBudgetLimits {
   readonly pricing?: TokenPriceSchedule;
 }
 
-export interface SharedBudgetOptions { readonly usagePricer?: UsagePricer }
+export interface SharedBudgetOptions {
+  readonly usagePricer?: UsagePricer;
+}
 
 /** Host-selected upper estimate. Provider output limits must be configured separately. */
-export interface ModelReservation { readonly totalTokens: number; readonly costUsd?: number }
+export interface ModelReservation {
+  readonly totalTokens: number;
+  readonly costUsd?: number;
+}
 
 export interface SharedBudgetCall {
   readonly id: string;
@@ -66,35 +82,71 @@ export interface ExternalCallResult {
 export class FileSharedBudget {
   private readonly active = new Set<string>();
   private failed = false;
-  private constructor(private readonly journal: ResourceJournal<SharedBudgetSnapshot>, readonly limits: SharedBudgetLimits, private readonly usagePricer?: UsagePricer) {}
+  private constructor(
+    private readonly journal: ResourceJournal<SharedBudgetSnapshot>,
+    readonly limits: SharedBudgetLimits,
+    private readonly usagePricer?: UsagePricer,
+  ) {}
 
   /** Monitoring only: pending calls remain pending, no lock stealing or reconciliation. */
-  static inspect(directory: string, id: string, limits: SharedBudgetLimits, options: SharedBudgetOptions = {}): Promise<SharedBudgetSnapshot | undefined> {
-    resourceId(id, "shared budget id"); validateLimits(limits, options);
-    return ResourceJournal.inspect(join(resolve(directory), `${createHash("sha256").update(id).digest("hex")}.budget.jsonl`),
-      (state: SharedBudgetSnapshot) => validate(state, id, limits, options.usagePricer));
+  static inspect(
+    directory: string,
+    id: string,
+    limits: SharedBudgetLimits,
+    options: SharedBudgetOptions = {},
+  ): Promise<SharedBudgetSnapshot | undefined> {
+    resourceId(id, "shared budget id");
+    validateLimits(limits, options);
+    return ResourceJournal.inspect(
+      join(resolve(directory), `${createHash("sha256").update(id).digest("hex")}.budget.jsonl`),
+      (state: SharedBudgetSnapshot) => validate(state, id, limits, options.usagePricer),
+    );
   }
 
-  static async open(directory: string, id: string, limits: SharedBudgetLimits, options: SharedBudgetOptions = {}): Promise<FileSharedBudget> {
-    resourceId(id, "shared budget id"); validateLimits(limits, options);
-    const frozen = Object.freeze({ ...limits, ...(limits.tokenPrices ? { tokenPrices: Object.freeze({ ...limits.tokenPrices }) } : {}),
-      ...(limits.pricing === undefined ? {} : { pricing: resolvePriceSchedule(limits.pricing) as TokenPriceSchedule }) });
+  static async open(
+    directory: string,
+    id: string,
+    limits: SharedBudgetLimits,
+    options: SharedBudgetOptions = {},
+  ): Promise<FileSharedBudget> {
+    resourceId(id, "shared budget id");
+    validateLimits(limits, options);
+    const frozen = Object.freeze({
+      ...limits,
+      ...(limits.tokenPrices ? { tokenPrices: Object.freeze({ ...limits.tokenPrices }) } : {}),
+      ...(limits.pricing === undefined ? {} : { pricing: resolvePriceSchedule(limits.pricing) as TokenPriceSchedule }),
+    });
     const initial: SharedBudgetSnapshot = { format: 1, revision: 0, id, limits: frozen, calls: [] };
-    const journal = await ResourceJournal.open(join(resolve(directory), `${createHash("sha256").update(id).digest("hex")}.budget.jsonl`), initial,
-      (state) => validate(state, id, frozen, options.usagePricer));
+    const journal = await ResourceJournal.open(
+      join(resolve(directory), `${createHash("sha256").update(id).digest("hex")}.budget.jsonl`),
+      initial,
+      (state) => validate(state, id, frozen, options.usagePricer),
+    );
     try {
       const snapshot = await journal.snapshot();
       // A reservation surviving process ownership has unknown provider effects, even if no result was saved.
       if (snapshot.calls.some((call) => call.status === "pending")) {
-        await journal.transact((state) => ({ ...state, calls: state.calls.map((call) => call.status === "pending" ? { ...call, status: "unknown" as const } : call) }));
+        await journal.transact((state) => ({
+          ...state,
+          calls: state.calls.map((call) =>
+            call.status === "pending" ? { ...call, status: "unknown" as const } : call,
+          ),
+        }));
       }
       return new FileSharedBudget(journal, frozen, options.usagePricer);
-    } catch (error) { await journal.close(); throw error; }
+    } catch (error) {
+      await journal.close();
+      throw error;
+    }
   }
 
-  snapshot(): Promise<SharedBudgetSnapshot> { return this.journal.snapshot(); }
+  snapshot(): Promise<SharedBudgetSnapshot> {
+    return this.journal.snapshot();
+  }
 
-  async totals(): Promise<SharedBudgetTotals> { return sharedBudgetTotals(await this.snapshot()); }
+  async totals(): Promise<SharedBudgetTotals> {
+    return sharedBudgetTotals(await this.snapshot());
+  }
 
   /** Place at the physical request boundary, inside retry wrappers; hidden retries are not accounted. */
   wrapModel(model: Model, options: { readonly reservation: ModelReservation }): Model {
@@ -102,11 +154,21 @@ export class FileSharedBudget {
     validateReservation(reservation, this.limits);
     const budget = this;
     return {
-      get limits() { return model.limits; },
-      get reportsAttempts() { return model.reportsAttempts; },
-      get supportsRequestRecording() { return model.supportsRequestRecording === true; },
-      get capabilityVersion() { return model.capabilityVersion; },
-      get configuration() { return model.configuration; },
+      get limits() {
+        return model.limits;
+      },
+      get reportsAttempts() {
+        return model.reportsAttempts;
+      },
+      get supportsRequestRecording() {
+        return model.supportsRequestRecording === true;
+      },
+      get capabilityVersion() {
+        return model.capabilityVersion;
+      },
+      get configuration() {
+        return model.configuration;
+      },
       ...omitUndefined({ preflight: model.preflight?.bind(model) }),
       // Native compaction would be a hidden provider call without usage; deliberately not forwarded.
       async *stream(request, streamOptions): AsyncIterable<ModelEvent> {
@@ -119,16 +181,30 @@ export class FileSharedBudget {
         let reserved = false;
         let validationError: ModelResponseValidationError | undefined;
         try {
-          await budget.reserve(id, reservation); reserved = true;
+          await budget.reserve(id, reservation);
+          reserved = true;
           streamOptions.signal.throwIfAborted();
           for await (const event of model.stream(request, streamOptions)) {
             if (event.type === "response.completed") {
-              if (settled) { settled = false; throw new Error("Model emitted multiple completion events"); }
+              if (settled) {
+                settled = false;
+                throw new Error("Model emitted multiple completion events");
+              }
               const snapshot = await budget.settle(id, event.usage);
               settled = true;
-              if (sharedBudgetTotals(snapshot).blocked) throw new Error("Shared budget exceeded; model result was not released to tools");
-              const cost = snapshot.calls.find(call => call.id === id)?.cost;
-              if (cost !== undefined && (budget.limits.pricing !== undefined || budget.limits.tokenPrices !== undefined || budget.usagePricer !== undefined || event.usage?.reportedCost !== undefined)) { yield { ...event, cost }; continue; }
+              if (sharedBudgetTotals(snapshot).blocked)
+                throw new Error("Shared budget exceeded; model result was not released to tools");
+              const cost = snapshot.calls.find((call) => call.id === id)?.cost;
+              if (
+                cost !== undefined &&
+                (budget.limits.pricing !== undefined ||
+                  budget.limits.tokenPrices !== undefined ||
+                  budget.usagePricer !== undefined ||
+                  event.usage?.reportedCost !== undefined)
+              ) {
+                yield { ...event, cost };
+                continue;
+              }
             }
             yield event;
           }
@@ -138,15 +214,26 @@ export class FileSharedBudget {
             validationError = error;
             if (reserved && !settled && error.usage !== undefined) {
               let cost = error.cost;
-              const priced = budget.limits.pricing !== undefined || budget.limits.tokenPrices !== undefined || budget.usagePricer !== undefined || error.usage.reportedCost !== undefined;
+              const priced =
+                budget.limits.pricing !== undefined ||
+                budget.limits.tokenPrices !== undefined ||
+                budget.usagePricer !== undefined ||
+                error.usage.reportedCost !== undefined;
               try {
-                const preparedCost = priced ? cost ?? priceUsage(error.usage, budget.limits.pricing ?? budget.limits.tokenPrices, budget.usagePricer) : undefined;
+                const preparedCost = priced
+                  ? (cost ??
+                    priceUsage(error.usage, budget.limits.pricing ?? budget.limits.tokenPrices, budget.usagePricer))
+                  : undefined;
                 cost = preparedCost ?? cost;
                 const snapshot = await budget.settle(id, error.usage, false, preparedCost);
                 settled = true;
-                if (priced) cost = snapshot.calls.find(call => call.id === id)?.cost;
-                validationError = new ModelResponseValidationError(error.message, omitUndefined({ cause: error, usage: error.usage, cost }));
-                if (sharedBudgetTotals(snapshot).blocked) throw new Error("Shared budget exceeded after an invalid model response");
+                if (priced) cost = snapshot.calls.find((call) => call.id === id)?.cost;
+                validationError = new ModelResponseValidationError(
+                  error.message,
+                  omitUndefined({ cause: error, usage: error.usage, cost }),
+                );
+                if (sharedBudgetTotals(snapshot).blocked)
+                  throw new Error("Shared budget exceeded after an invalid model response");
               } catch (accountingError) {
                 validationError = validationAccountingError(error, accountingError, cost);
               }
@@ -157,10 +244,18 @@ export class FileSharedBudget {
         } finally {
           try {
             if (reserved && !settled) {
-              try { await budget.markUnknown(id); }
-              catch (error) { budget.failed = true; throw validationError === undefined ? error : validationAccountingError(validationError, error, validationError.cost); }
+              try {
+                await budget.markUnknown(id);
+              } catch (error) {
+                budget.failed = true;
+                throw validationError === undefined
+                  ? error
+                  : validationAccountingError(validationError, error, validationError.cost);
+              }
             }
-          } finally { budget.active.delete(id); }
+          } finally {
+            budget.active.delete(id);
+          }
         }
       },
     };
@@ -178,7 +273,10 @@ export class FileSharedBudget {
    * 下一个调用会在发出前失败。
    */
   async settleCall(id: string, usage: Usage | undefined, preparedCost?: UsageCost): Promise<void> {
-    if (usage === undefined) { await this.markUnknown(id); return; }
+    if (usage === undefined) {
+      await this.markUnknown(id);
+      return;
+    }
     await this.settle(id, usage, false, preparedCost);
   }
 
@@ -222,20 +320,36 @@ export class FileSharedBudget {
 
   /** Host-only verified accounting. Never retries a provider request or releases a tool result. */
   async reconcile(callId: string, usage: Usage, evidence: string): Promise<void> {
-    resourceId(callId, "model call id"); resourceId(evidence, "reconciliation evidence");
+    resourceId(callId, "model call id");
+    resourceId(evidence, "reconciliation evidence");
     if (this.active.has(callId)) throw new Error("Cannot reconcile an active model call");
     const actual = usageTotals(usage, this.limits, this.usagePricer);
     await this.journal.transact((state) => {
       const call = state.calls.find((candidate) => candidate.id === callId);
-      if (!call || (call.status !== "unknown" && !call.exceededReservation)) throw new Error("Only unknown usage or an exceeded reservation can be reconciled");
-      return { ...state, calls: state.calls.map((candidate) => candidate.id === callId
-        ? { ...candidate, status: "settled" as const, usage: { ...usage }, ...actual,
-          estimated: false, exceededReservation: false, reconciliation: evidence } : candidate) };
+      if (!call || (call.status !== "unknown" && !call.exceededReservation))
+        throw new Error("Only unknown usage or an exceeded reservation can be reconciled");
+      return {
+        ...state,
+        calls: state.calls.map((candidate) =>
+          candidate.id === callId
+            ? {
+                ...candidate,
+                status: "settled" as const,
+                usage: { ...usage },
+                ...actual,
+                estimated: false,
+                exceededReservation: false,
+                reconciliation: evidence,
+              }
+            : candidate,
+        ),
+      };
     });
   }
 
   close(): Promise<void> {
-    if (this.active.size > 0) return Promise.reject(new Error("Cannot close a shared budget while model or external calls are active"));
+    if (this.active.size > 0)
+      return Promise.reject(new Error("Cannot close a shared budget while model or external calls are active"));
     return this.journal.close();
   }
 
@@ -243,46 +357,86 @@ export class FileSharedBudget {
     if (this.failed) throw new Error("Shared budget write outcome unknown; reopen before continuing");
     resourceId(id, "model call id");
     await this.journal.transact((state) => {
-      if (state.calls.some((call) => call.id === id)) throw new Error("Model call already reserved; inspect/reconcile instead of replaying it");
+      if (state.calls.some((call) => call.id === id))
+        throw new Error("Model call already reserved; inspect/reconcile instead of replaying it");
       const totals = sharedBudgetTotals(state);
       if (totals.blocked) throw new Error(budgetBlockedMessage(state, totals));
-      if (totals.modelCalls + 1 > state.limits.maxModelCalls ||
-        (state.limits.maxTotalTokens !== undefined && totals.totalTokens + reservation.totalTokens > state.limits.maxTotalTokens) ||
-        (state.limits.maxCostUsd !== undefined && totals.costUsd + reservation.costUsd! > state.limits.maxCostUsd)) throw new Error("Shared budget has insufficient unreserved capacity");
+      if (
+        totals.modelCalls + 1 > state.limits.maxModelCalls ||
+        (state.limits.maxTotalTokens !== undefined &&
+          totals.totalTokens + reservation.totalTokens > state.limits.maxTotalTokens) ||
+        (state.limits.maxCostUsd !== undefined && totals.costUsd + reservation.costUsd! > state.limits.maxCostUsd)
+      )
+        throw new Error("Shared budget has insufficient unreserved capacity");
       return { ...state, calls: [...state.calls, { id, status: "pending", reservation }] };
     });
   }
 
-  private settle(id: string, usage?: Usage, estimated = false, preparedCost?: UsageCost): Promise<SharedBudgetSnapshot> {
-    return this.journal.transact((state) => ({ ...state, calls: state.calls.map((call) => {
-      if (call.id !== id) return call;
-      const actual = estimated ? estimatedTotals(call.reservation) : usageTotals(usage, this.limits, this.usagePricer, preparedCost);
-      return { ...call, status: "settled" as const, usage: { ...usage }, ...actual,
-        ...(estimated ? { estimated: true } : {}),
-        exceededReservation: actual.totalTokens > call.reservation.totalTokens ||
-          (call.reservation.costUsd !== undefined && actual.costUsd > call.reservation.costUsd) };
-    }) }));
+  private settle(
+    id: string,
+    usage?: Usage,
+    estimated = false,
+    preparedCost?: UsageCost,
+  ): Promise<SharedBudgetSnapshot> {
+    return this.journal.transact((state) => ({
+      ...state,
+      calls: state.calls.map((call) => {
+        if (call.id !== id) return call;
+        const actual = estimated
+          ? estimatedTotals(call.reservation)
+          : usageTotals(usage, this.limits, this.usagePricer, preparedCost);
+        return {
+          ...call,
+          status: "settled" as const,
+          usage: { ...usage },
+          ...actual,
+          ...(estimated ? { estimated: true } : {}),
+          exceededReservation:
+            actual.totalTokens > call.reservation.totalTokens ||
+            (call.reservation.costUsd !== undefined && actual.costUsd > call.reservation.costUsd),
+        };
+      }),
+    }));
   }
 
   private async markUnknown(id: string): Promise<void> {
-    await this.journal.transact((state) => ({ ...state, calls: state.calls.map((call) => call.id === id ? { ...call, status: "unknown" as const } : call) }));
+    await this.journal.transact((state) => ({
+      ...state,
+      calls: state.calls.map((call) => (call.id === id ? { ...call, status: "unknown" as const } : call)),
+    }));
   }
 }
 
 export function sharedBudgetTotals(snapshot: SharedBudgetSnapshot): SharedBudgetTotals {
   // 预留超出只在账本设有 token 或成本上限时才阻塞：没有上限时真实用量就是事实。
   const bounded = snapshot.limits.maxTotalTokens !== undefined || snapshot.limits.maxCostUsd !== undefined;
-  const totals = snapshot.calls.reduce((sum, call) => ({ modelCalls: sum.modelCalls + 1,
-    totalTokens: sum.totalTokens + (call.status === "settled" ? call.totalTokens! : call.reservation.totalTokens),
-    costUsd: sum.costUsd + (call.status === "settled" ? call.costUsd! : call.reservation.costUsd ?? 0),
-    blocked: sum.blocked || call.status === "unknown" || (bounded && call.exceededReservation === true) }),
-  { modelCalls: 0, totalTokens: 0, costUsd: 0, blocked: false });
-  return { ...totals,
-    usageComplete: snapshot.calls.every((call) => call.status === "settled" && call.estimated !== true && resolveUsageTotals(call.usage).complete),
-    costComplete: snapshot.calls.every((call) => call.status === "settled" && call.estimated !== true && call.cost?.complete === true && call.cost.currency === "USD"),
-    blocked: totals.blocked || totals.modelCalls > snapshot.limits.maxModelCalls ||
-    (snapshot.limits.maxTotalTokens !== undefined && totals.totalTokens > snapshot.limits.maxTotalTokens) ||
-    (snapshot.limits.maxCostUsd !== undefined && totals.costUsd > snapshot.limits.maxCostUsd) };
+  const totals = snapshot.calls.reduce(
+    (sum, call) => ({
+      modelCalls: sum.modelCalls + 1,
+      totalTokens: sum.totalTokens + (call.status === "settled" ? call.totalTokens! : call.reservation.totalTokens),
+      costUsd: sum.costUsd + (call.status === "settled" ? call.costUsd! : (call.reservation.costUsd ?? 0)),
+      blocked: sum.blocked || call.status === "unknown" || (bounded && call.exceededReservation === true),
+    }),
+    { modelCalls: 0, totalTokens: 0, costUsd: 0, blocked: false },
+  );
+  return {
+    ...totals,
+    usageComplete: snapshot.calls.every(
+      (call) => call.status === "settled" && call.estimated !== true && resolveUsageTotals(call.usage).complete,
+    ),
+    costComplete: snapshot.calls.every(
+      (call) =>
+        call.status === "settled" &&
+        call.estimated !== true &&
+        call.cost?.complete === true &&
+        call.cost.currency === "USD",
+    ),
+    blocked:
+      totals.blocked ||
+      totals.modelCalls > snapshot.limits.maxModelCalls ||
+      (snapshot.limits.maxTotalTokens !== undefined && totals.totalTokens > snapshot.limits.maxTotalTokens) ||
+      (snapshot.limits.maxCostUsd !== undefined && totals.costUsd > snapshot.limits.maxCostUsd),
+  };
 }
 
 function budgetBlockedMessage(state: SharedBudgetSnapshot, totals: SharedBudgetTotals): string {
@@ -302,68 +456,126 @@ function validateLimits(limits: SharedBudgetLimits, options: SharedBudgetOptions
   count(limits.maxModelCalls, "maxModelCalls");
   if (limits.maxModelCalls > 10_000) throw new RangeError("maxModelCalls exceeds the local ledger bound of 10000");
   if (limits.maxTotalTokens !== undefined) count(limits.maxTotalTokens, "maxTotalTokens");
-  if (limits.tokenPrices !== undefined && limits.pricing !== undefined) throw new TypeError("Configure pricing or tokenPrices independently");
+  if (limits.tokenPrices !== undefined && limits.pricing !== undefined)
+    throw new TypeError("Configure pricing or tokenPrices independently");
   const pricing = resolvePriceSchedule(limits.pricing ?? limits.tokenPrices);
-  if (options.usagePricer !== undefined && typeof options.usagePricer !== "function") throw new TypeError("usagePricer must be a function");
+  if (options.usagePricer !== undefined && typeof options.usagePricer !== "function")
+    throw new TypeError("usagePricer must be a function");
   if (limits.maxCostUsd !== undefined) {
     amount(limits.maxCostUsd, "maxCostUsd");
-    if (pricing === undefined && options.usagePricer === undefined) throw new Error("A shared cost budget requires explicit pricing, tokenPrices, or usagePricer");
-    if (pricing !== undefined && pricing.currency !== "USD") throw new Error("A shared cost budget requires USD pricing");
+    if (pricing === undefined && options.usagePricer === undefined)
+      throw new Error("A shared cost budget requires explicit pricing, tokenPrices, or usagePricer");
+    if (pricing !== undefined && pricing.currency !== "USD")
+      throw new Error("A shared cost budget requires USD pricing");
   }
 }
 
 function validateReservation(reservation: ModelReservation, limits: SharedBudgetLimits): void {
   count(reservation.totalTokens, "reservation.totalTokens");
   if (reservation.costUsd !== undefined) amount(reservation.costUsd, "reservation.costUsd");
-  if (limits.maxCostUsd !== undefined && reservation.costUsd === undefined) throw new Error("A shared cost budget requires a per-call cost reservation");
+  if (limits.maxCostUsd !== undefined && reservation.costUsd === undefined)
+    throw new Error("A shared cost budget requires a per-call cost reservation");
 }
 
-function usageTotals(usage: Usage | undefined, limits: SharedBudgetLimits, pricer?: UsagePricer, preparedCost?: UsageCost): { totalTokens: number; costUsd: number; cost: UsageCost } {
+function usageTotals(
+  usage: Usage | undefined,
+  limits: SharedBudgetLimits,
+  pricer?: UsagePricer,
+  preparedCost?: UsageCost,
+): { totalTokens: number; costUsd: number; cost: UsageCost } {
   const totals = resolveUsageTotals(usage);
   const totalTokens = totals.totalTokens;
-  if (totalTokens === undefined || !totals.complete) throw new Error("Shared budget usage is unavailable; host reconciliation is required");
-  const cost = preparedCost === undefined ? priceUsage(usage, limits.pricing ?? limits.tokenPrices, pricer) : validateUsageCost(preparedCost);
+  if (totalTokens === undefined || !totals.complete)
+    throw new Error("Shared budget usage is unavailable; host reconciliation is required");
+  const cost =
+    preparedCost === undefined
+      ? priceUsage(usage, limits.pricing ?? limits.tokenPrices, pricer)
+      : validateUsageCost(preparedCost);
   const priced = cost.complete && cost.currency === "USD" && cost.amount !== undefined;
-  if (limits.maxCostUsd !== undefined && !priced) throw new Error("Shared cost budget usage is unavailable; complete USD accounting is required");
+  if (limits.maxCostUsd !== undefined && !priced)
+    throw new Error("Shared cost budget usage is unavailable; complete USD accounting is required");
   const costUsd = priced ? cost.amount! : 0;
   amount(costUsd, "model cost");
   return { totalTokens, costUsd, cost };
 }
 
-function validationAccountingError(error: ModelResponseValidationError, accountingError: unknown, cost?: UsageCost): ModelResponseValidationError {
-  return new ModelResponseValidationError(error.message, omitUndefined({ cause: new AggregateError([error, accountingError], "Model response validation and budget accounting failed"),
-    usage: error.usage, cost }));
+function validationAccountingError(
+  error: ModelResponseValidationError,
+  accountingError: unknown,
+  cost?: UsageCost,
+): ModelResponseValidationError {
+  return new ModelResponseValidationError(
+    error.message,
+    omitUndefined({
+      cause: new AggregateError([error, accountingError], "Model response validation and budget accounting failed"),
+      usage: error.usage,
+      cost,
+    }),
+  );
 }
 
 function estimatedTotals(reservation: ModelReservation): { totalTokens: number; costUsd: number; cost: UsageCost } {
-  return { totalTokens: reservation.totalTokens, costUsd: reservation.costUsd ?? 0,
-    cost: omitUndefined({ amount: reservation.costUsd, currency: "USD", kind: "estimated", complete: false, source: "reservation", missingReasons: ["provider-usage-missing"] }) };
+  return {
+    totalTokens: reservation.totalTokens,
+    costUsd: reservation.costUsd ?? 0,
+    cost: omitUndefined({
+      amount: reservation.costUsd,
+      currency: "USD",
+      kind: "estimated",
+      complete: false,
+      source: "reservation",
+      missingReasons: ["provider-usage-missing"],
+    }),
+  };
 }
 
 function validate(state: SharedBudgetSnapshot, id: string, limits: SharedBudgetLimits, pricer?: UsagePricer): void {
-  if (!state || state.format !== 1 || !Number.isSafeInteger(state.revision) || state.revision < 0 || state.id !== id ||
-    !isDeepStrictEqual(state.limits, limits) || !Array.isArray(state.calls) || state.calls.length > limits.maxModelCalls) throw new Error("Invalid shared budget journal or changed limits");
+  if (
+    !state ||
+    state.format !== 1 ||
+    !Number.isSafeInteger(state.revision) ||
+    state.revision < 0 ||
+    state.id !== id ||
+    !isDeepStrictEqual(state.limits, limits) ||
+    !Array.isArray(state.calls) ||
+    state.calls.length > limits.maxModelCalls
+  )
+    throw new Error("Invalid shared budget journal or changed limits");
   const ids = new Set<string>();
   for (const call of state.calls) {
-    resourceId(call.id, "model call id"); validateReservation(call.reservation, limits);
-    if (ids.has(call.id) || !["pending", "settled", "unknown"].includes(call.status)) throw new Error("Invalid shared budget call");
+    resourceId(call.id, "model call id");
+    validateReservation(call.reservation, limits);
+    if (ids.has(call.id) || !["pending", "settled", "unknown"].includes(call.status))
+      throw new Error("Invalid shared budget call");
     if (call.estimated !== undefined && (typeof call.estimated !== "boolean" || call.status !== "settled")) {
       throw new Error("Invalid shared budget estimate");
     }
     ids.add(call.id);
     if (call.status === "settled") {
-      const actual = call.estimated === true ? estimatedTotals(call.reservation) : pricer === undefined ? usageTotals(call.usage, limits) : storedUsageTotals(call, limits);
-      if (call.totalTokens !== actual.totalTokens || call.costUsd !== actual.costUsd) throw new Error("Inconsistent shared budget usage");
-      if (call.cost !== undefined && !isDeepStrictEqual(call.cost, actual.cost)) throw new Error("Inconsistent shared budget pricing result");
+      const actual =
+        call.estimated === true
+          ? estimatedTotals(call.reservation)
+          : pricer === undefined
+            ? usageTotals(call.usage, limits)
+            : storedUsageTotals(call, limits);
+      if (call.totalTokens !== actual.totalTokens || call.costUsd !== actual.costUsd)
+        throw new Error("Inconsistent shared budget usage");
+      if (call.cost !== undefined && !isDeepStrictEqual(call.cost, actual.cost))
+        throw new Error("Inconsistent shared budget pricing result");
     }
   }
 }
 
-function storedUsageTotals(call: SharedBudgetCall, limits: SharedBudgetLimits): { totalTokens: number; costUsd: number; cost: UsageCost } {
+function storedUsageTotals(
+  call: SharedBudgetCall,
+  limits: SharedBudgetLimits,
+): { totalTokens: number; costUsd: number; cost: UsageCost } {
   const totals = resolveUsageTotals(call.usage);
-  if (!totals.complete || totals.totalTokens === undefined || call.cost === undefined) throw new Error("Shared budget custom pricing receipt is unavailable");
+  if (!totals.complete || totals.totalTokens === undefined || call.cost === undefined)
+    throw new Error("Shared budget custom pricing receipt is unavailable");
   const cost = validateUsageCost(call.cost);
   const priced = cost.complete && cost.currency === "USD" && cost.amount !== undefined;
-  if (limits.maxCostUsd !== undefined && !priced) throw new Error("Shared cost budget requires complete USD accounting");
+  if (limits.maxCostUsd !== undefined && !priced)
+    throw new Error("Shared cost budget requires complete USD accounting");
   return { totalTokens: totals.totalTokens, costUsd: priced ? cost.amount! : 0, cost };
 }

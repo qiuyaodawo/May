@@ -7,8 +7,8 @@ import { ClipboardUnavailableError, SystemClipboard, createTerminalClipboard } f
 test("OSC 52 写入 Unicode 文字并明确报告不支持读取", async () => {
   const output = new PassThrough();
   const commands = [];
-  const parser = new AnsiParser({ inst_o: data => commands.push(data) });
-  output.on("data", value => parser.parse(value.toString()));
+  const parser = new AnsiParser({ inst_o: (data) => commands.push(data) });
+  output.on("data", (value) => parser.parse(value.toString()));
   const clipboard = createTerminalClipboard({ mode: "osc52", output });
   const text = "中文 🧑‍💻\n  code\n";
   await clipboard.writeText(text);

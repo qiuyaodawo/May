@@ -6,7 +6,7 @@ const [operation, path, mode = "shared"] = process.argv.slice(2);
 assert.ok(process.send);
 
 if (operation === "hold") {
-  const released = new Promise(resolve => process.once("message", resolve));
+  const released = new Promise((resolve) => process.once("message", resolve));
   await withFileAccess(path, mode, async () => {
     process.send({ type: "acquired" });
     await released;
@@ -16,7 +16,9 @@ if (operation === "hold") {
   let stopped = false;
   let reads = 0;
   let previousRevision = -1;
-  process.on("message", () => { stopped = true; });
+  process.on("message", () => {
+    stopped = true;
+  });
   while (!stopped) {
     await withFileAccess(path, "shared", async () => {
       const file = await open(path, "r");
@@ -26,7 +28,9 @@ if (operation === "hold") {
         assert.equal(value.payload, String(value.revision).repeat(4096));
         previousRevision = value.revision;
         reads += 1;
-      } finally { await file.close(); }
+      } finally {
+        await file.close();
+      }
     });
     if (reads === 1) process.send({ type: "acquired" });
   }

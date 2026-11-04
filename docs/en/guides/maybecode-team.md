@@ -16,12 +16,13 @@ lifecycle. Plans, acceptance, recovery and coding have dedicated guides below.
 1. In the repository root, run the following command. Replace the workspace with
    the source directory you want the team to inspect:
 
-```powershell
-pnpm maybecode team run "Review this module for correctness risks; cite files and propose a minimal fix without changing files." --workspace C:\work\example --max-concurrent 2 --max-model-calls 16 --max-total-tokens 262144
-```
+   ```powershell
+   pnpm maybecode team run "Review this module for correctness risks; cite files and propose a minimal fix without changing files." --workspace C:\work\example --max-concurrent 2 --max-model-calls 16 --max-total-tokens 262144
+   ```
 
    With an installed build, replace `pnpm maybecode` with `maybecode`. The remaining
    commands use the installed executable; repository users retain the `pnpm` prefix.
+
 2. Record the team ID and records directory printed by the command. Inspect the
    task statuses, result text and acceptance status when it finishes.
 3. To inspect the same team later, run `maybecode team status <id>`. Use the
@@ -35,11 +36,11 @@ outside the team manifest.
 
 Preset defaults are:
 
-| Scope | Default limits |
-| --- | --- |
-| Task graph | 2 concurrent tasks, 8 total tasks, delegation depth 2, 4 turns per task, 10-minute deadline |
-| Shared model allowance | 32 physical calls, 524,288 tokens, 32,768 tokens reserved per call |
-| Each Run | 10 steps/model calls, 24 tool calls, 3-minute deadline |
+| Scope                  | Default limits                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| Task graph             | 2 concurrent tasks, 8 total tasks, delegation depth 2, 4 turns per task, 10-minute deadline |
+| Shared model allowance | 32 physical calls, 524,288 tokens, 32,768 tokens reserved per call                          |
+| Each Run               | 10 steps/model calls, 24 tool calls, 3-minute deadline                                      |
 
 Stricter configured budgets apply. Custom plans can select bounded graph limits
 and tighten per-role Run budgets. `--max-concurrent` accepts 1–8; an explicit CLI

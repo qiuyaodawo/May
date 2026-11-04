@@ -8,7 +8,7 @@ import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { OpenAIResponsesModel } from "@sortedyuan/providers/openai";
 import { createMayAgentAdapter } from "../../dist/adapters/index.js";
 
-test("May adapter owns its execution context during history inspection and releases failed attempts", async t => {
+test("May adapter owns its execution context during history inspection and releases failed attempts", async (t) => {
   const executions = [];
   let adapter;
   t.after(async () => {
@@ -31,14 +31,17 @@ test("May adapter owns its execution context during history inspection and relea
   });
   const conversationId = await adapter.createConversation("concurrent-inputs");
   const cancelled = new Error("Execution cancelled before model access");
-  const context = inputId => ({
-    conversationId, inputId,
+  const context = (inputId) => ({
+    conversationId,
+    inputId,
     input: { role: "user", content: [{ type: "text", text: inputId }] },
-    signal: AbortSignal.abort(cancelled), tools: [], shouldYield: () => false,
+    signal: AbortSignal.abort(cancelled),
+    tools: [],
+    shouldYield: () => false,
     report() {},
   });
   const first = context("first-input");
-  const firstRejected = assert.rejects(adapter.execute(first), error => error === cancelled);
+  const firstRejected = assert.rejects(adapter.execute(first), (error) => error === cancelled);
   executions.push(firstRejected);
   await Promise.resolve();
   assert.equal(currentContext(), first);
@@ -46,7 +49,10 @@ test("May adapter owns its execution context during history inspection and relea
   assert.equal(currentContext(), first);
   await firstRejected;
   assert.equal(currentContext(), undefined);
-  assert.equal((await store.inspect(conversationId)).some(event => event.type === "input.submitted"), false);
+  assert.equal(
+    (await store.inspect(conversationId)).some((event) => event.type === "input.submitted"),
+    false,
+  );
 
   const journal = join(directory, `${Buffer.from(conversationId).toString("base64url")}.jsonl`);
   const saved = await readFile(journal);
@@ -54,7 +60,7 @@ test("May adapter owns its execution context during history inspection and relea
   await assert.rejects(adapter.execute(context("inspection-failure")), /Invalid session event JSON/);
   assert.equal(currentContext(), undefined);
   await writeFile(journal, saved);
-  await assert.rejects(adapter.execute(context("after-repair")), error => error === cancelled);
+  await assert.rejects(adapter.execute(context("after-repair")), (error) => error === cancelled);
   assert.equal(currentContext(), undefined);
   await adapter.release(conversationId);
 });

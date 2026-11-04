@@ -70,8 +70,8 @@ type ApplicationEventShape =
   | { type: "run.event"; event: MayEvent }
   | { type: "permission.event"; event: PermissionEvent }
   | { type: "tool.presentation"; presentation: SessionToolPresentation }
-  | { type: "context.compacted"; /* 自动压缩成功；省略结果字段。 */ }
-  | { type: "context.compaction.failed"; /* 自动压缩失败；省略错误字段。 */ };
+  | { type: "context.compacted" /* 自动压缩成功；省略结果字段。 */ }
+  | { type: "context.compaction.failed" /* 自动压缩失败；省略错误字段。 */ };
 ```
 
 This excerpt shows the event categories; import `AgentApplicationEvent` from
@@ -174,12 +174,12 @@ but treats `data` as opaque and never injects it into Context.
 
 Choose the destination according to the consumer:
 
-| Information | Destination |
-| --- | --- |
-| Animation and progress | Live event |
-| Conversation facts needed for recovery | Session event |
-| Session discovery | Catalog projection |
-| Model-visible state | Context, with a durable checkpoint on replacement |
+| Information                            | Destination                                       |
+| -------------------------------------- | ------------------------------------------------- |
+| Animation and progress                 | Live event                                        |
+| Conversation facts needed for recovery | Session event                                     |
+| Session discovery                      | Catalog projection                                |
+| Model-visible state                    | Context, with a durable checkpoint on replacement |
 
 ## Shutdown and the end of a stream
 

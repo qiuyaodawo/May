@@ -14,12 +14,12 @@ export function inspectDocument(source) {
     if (["list", "listItem", "blockquote", "table"].includes(node.type)) structure.push(["begin", node.type]);
     if (node.type === "heading") structure.push(["heading", node.depth]);
     if (node.type === "list") structure.push(["list", node.ordered, node.start, node.children.length]);
-    if (node.type === "table") structure.push(["table", node.children.map(row => row.children.length)]);
+    if (node.type === "table") structure.push(["table", node.children.map((row) => row.children.length)]);
     if (node.type === "code") structure.push(["code", node.lang, node.meta]);
     for (const child of node.children ?? []) visit(child);
     if (["list", "listItem", "blockquote", "table"].includes(node.type)) structure.push(["end", node.type]);
   };
-  const label = node => node.value ?? (node.children ?? []).map(label).join("");
+  const label = (node) => node.value ?? (node.children ?? []).map(label).join("");
   for (const node of tree.children) {
     if (node.type === "heading") {
       section = { heading: label(node), blocks: [] };

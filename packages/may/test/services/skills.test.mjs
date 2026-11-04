@@ -8,16 +8,26 @@ import { PluginHost } from "@sortedyuan/may/plugin";
 import { services, ToolSources, InstructionSources } from "@sortedyuan/may/services";
 import { SkillRegistry } from "@sortedyuan/may/skills";
 
-test("Skills plugin activates actual skill files, persists state and restores an independent instance", async t => {
+test("Skills plugin activates actual skill files, persists state and restores an independent instance", async (t) => {
   const directory = await createTestDirectory(t, "may/skills-plugin");
   await mkdir(join(directory, "verification"));
-  await writeFile(join(directory, "verification", "SKILL.md"), "---\nname: verification\ndescription: Read verification files\n---\nRead the actual documentation.");
+  await writeFile(
+    join(directory, "verification", "SKILL.md"),
+    "---\nname: verification\ndescription: Read verification files\n---\nRead the actual documentation.",
+  );
   const registry = await SkillRegistry.discover([directory]);
   const plugin = createSkillsPlugin({ create: () => registry });
-  const tools = new ToolSources(), instructions = new InstructionSources();
+  const tools = new ToolSources(),
+    instructions = new InstructionSources();
   instructions.add(() => "# Current environment\n\nWorkspace: " + directory, { id: "environment", order: -80 });
   instructions.add(() => "# Context continuity", { id: "continuity", order: 60 });
-  const host = await PluginHost.create({ plugins: [plugin], services: [{ service: services.toolSources, value: tools }, { service: services.instructionSources, value: instructions }] });
+  const host = await PluginHost.create({
+    plugins: [plugin],
+    services: [
+      { service: services.toolSources, value: tools },
+      { service: services.instructionSources, value: instructions },
+    ],
+  });
   t.after(() => host.close());
   const scope = await host.createScope("application", { id: "first" });
   const initial = instructions.snapshot();
@@ -32,7 +42,10 @@ test("Skills plugin activates actual skill files, persists state and restores an
   await scope.close();
   assert.equal(tools.snapshot().size, 0);
   assert.doesNotMatch(instructions.snapshot(), /# Available skills|# Active skills/u);
-  await writeFile(join(directory, "verification", "SKILL.md"), "---\nname: verification\ndescription: Read verification files\n---\nUpdated instructions.");
+  await writeFile(
+    join(directory, "verification", "SKILL.md"),
+    "---\nname: verification\ndescription: Read verification files\n---\nUpdated instructions.",
+  );
   const resumed = await host.createScope("application", { id: "resumed", state });
   assert.equal(resumed.get(services.skills).listActive()[0].name, "verification");
   assert.match(instructions.snapshot(), /Read the actual documentation/u);

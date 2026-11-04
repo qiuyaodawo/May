@@ -1,12 +1,6 @@
 import type { KeyStroke } from "./keybindings/index.js";
 
-export type ListNavigationAction =
-  | "up"
-  | "down"
-  | "page-up"
-  | "page-down"
-  | "home"
-  | "end";
+export type ListNavigationAction = "up" | "down" | "page-up" | "page-down" | "home" | "end";
 
 export interface ListSelectionOptions<Item> {
   readonly initialIndex?: number;
@@ -113,9 +107,7 @@ export function resolveListInput<Item>(
 
 export function printableKeyText(stroke: KeyStroke): string | undefined {
   if (stroke.ctrl || stroke.alt || stroke.meta) return undefined;
-  return stroke.text !== undefined && stroke.text.length > 0
-    ? stroke.text
-    : undefined;
+  return stroke.text !== undefined && stroke.text.length > 0 ? stroke.text : undefined;
 }
 
 export function clampListIndex(index: number, count: number): number {

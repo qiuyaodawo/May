@@ -16,10 +16,10 @@ policy. [Configure Session storage](custom-storage.md) explains storage setup.
 `Session.resume()` records unfinished Runs as `run.interrupted` and preserves
 completed outcomes. It marks calls as follows:
 
-| Saved evidence | Recovery result |
-| --- | --- |
-| No tool-start checkpoint | `TOOL_NOT_EXECUTED` |
-| Tool started with no saved outcome | `TOOL_OUTCOME_UNKNOWN` |
+| Saved evidence                                     | Recovery result                  |
+| -------------------------------------------------- | -------------------------------- |
+| No tool-start checkpoint                           | `TOOL_NOT_EXECUTED`              |
+| Tool started with no saved outcome                 | `TOOL_OUTCOME_UNKNOWN`           |
 | Legacy history without checkpoint version metadata | All unfinished calls are unknown |
 
 Recovery reconstructs conversation state without executing tools or calling a

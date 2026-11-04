@@ -9,7 +9,8 @@ export const testOutputRoot = fileURLToPath(new URL("../../.test-output/", impor
 export function selectLiveModelProfile(config) {
   const profile = process.env.MAY_LIVE_MODEL || config.defaultModel;
   if (profile === undefined) throw new Error(`Set MAY_LIVE_MODEL or defaultModel in ${config.path}`);
-  if (!Object.hasOwn(config.models, profile)) throw new Error(`Model profile "${profile}" is not configured in ${config.path}`);
+  if (!Object.hasOwn(config.models, profile))
+    throw new Error(`Model profile "${profile}" is not configured in ${config.path}`);
   return profile;
 }
 

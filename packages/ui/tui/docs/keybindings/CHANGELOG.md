@@ -15,6 +15,7 @@
 
   The TUI package includes the PNG declarations required by its image dependency,
   so consumers can type-check installed declarations with `skipLibCheck: false`.
+
 - 81d6852: Add reusable mouse text selection, clipboard adapters, semantic component
   bindings, pointer routing and selection-aware editing. Preserve text positions
   through wrapping, conversation updates and resizing. Add clipboardy for local

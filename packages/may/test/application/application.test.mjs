@@ -15,17 +15,32 @@ function assistant(text) {
 
 test("close during input persistence cancels the acquired run", async () => {
   let release, entered;
-  const inputWritten = new Promise((resolve) => { entered = resolve; });
-  const pending = new Promise((resolve) => { release = resolve; });
+  const inputWritten = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const pending = new Promise((resolve) => {
+    release = resolve;
+  });
   const backing = new InMemorySessionStore();
   let modelCalls = 0;
   const app = await AgentApplication.open({
     requestRecording: "off",
-    store: { read: (id) => backing.read(id), async append(event) {
-      if (event.type === "input.submitted") { entered(); await pending; }
-      await backing.append(event);
-    } },
-    model: { async *stream() { modelCalls++; yield { type: "response.completed", message: assistant("unexpected") }; } },
+    store: {
+      read: (id) => backing.read(id),
+      async append(event) {
+        if (event.type === "input.submitted") {
+          entered();
+          await pending;
+        }
+        await backing.append(event);
+      },
+    },
+    model: {
+      async *stream() {
+        modelCalls++;
+        yield { type: "response.completed", message: assistant("unexpected") };
+      },
+    },
     permissionPolicy: () => "allow",
   });
   const submitting = app.submit({ input: "hi" });
@@ -70,27 +85,16 @@ test("AgentApplication owns durable run, retry, and event lifecycles", async () 
   assert.equal(result.message.content[0].text, "recovered");
 
   const history = await application.history();
-  assert.equal(
-    history.filter((event) => event.type === "input.submitted").length,
-    1,
-  );
-  assert.equal(
-    history.filter((event) => event.type === "run.started")[1].continuation,
-    true,
-  );
+  assert.equal(history.filter((event) => event.type === "input.submitted").length, 1);
+  assert.equal(history.filter((event) => event.type === "run.started")[1].continuation, true);
   assert.deepEqual(
-    (await application.queryHistory({ types: ["run.failed"] })).events.map(
-      (event) => event.type,
-    ),
+    (await application.queryHistory({ types: ["run.failed"] })).events.map((event) => event.type),
     ["run.failed"],
   );
 
   await application.close();
   await relay;
-  assert.equal(
-    events.filter((event) => event.type === "run.event").at(-1).event.type,
-    "run.completed",
-  );
+  assert.equal(events.filter((event) => event.type === "run.event").at(-1).event.type, "run.completed");
 });
 
 test("AgentWorkspace records summaries and serializes session replacement", async () => {
@@ -102,15 +106,16 @@ test("AgentWorkspace records summaries and serializes session replacement", asyn
       yield { type: "response.completed", message: assistant(`reply: ${input}`) };
     },
   };
-  const openApplication = ({ sessionId, resume }) => AgentApplication.open({
-    requestRecording: "off",
-    model,
-    store,
-    permissionPolicy: () => "allow",
-    metadata: { workspace: "/work" },
-    ...(sessionId === undefined ? {} : { sessionId }),
-    ...(resume ? { resume: true } : {}),
-  });
+  const openApplication = ({ sessionId, resume }) =>
+    AgentApplication.open({
+      requestRecording: "off",
+      model,
+      store,
+      permissionPolicy: () => "allow",
+      metadata: { workspace: "/work" },
+      ...(sessionId === undefined ? {} : { sessionId }),
+      ...(resume ? { resume: true } : {}),
+    });
   const workspace = await AgentWorkspace.open({
     workspace: "/work",
     store,
@@ -119,7 +124,9 @@ test("AgentWorkspace records summaries and serializes session replacement", asyn
   });
 
   const firstId = workspace.sessionId;
-  await (await workspace.submit({ input: "first question" })).result;
+  await (
+    await workspace.submit({ input: "first question" })
+  ).result;
   const secondId = await workspace.newSession();
   assert.notEqual(secondId, firstId);
   await workspace.resumeSession(firstId);
@@ -127,14 +134,9 @@ test("AgentWorkspace records summaries and serializes session replacement", asyn
 
   const summaries = await workspace.listSessions();
   assert.equal(summaries.length, 2);
-  assert.equal(
-    summaries.find((summary) => summary.id === firstId)?.title,
-    "first question",
-  );
+  assert.equal(summaries.find((summary) => summary.id === firstId)?.title, "first question");
 
-  await workspace.transitionApplication(({ sessionId }) =>
-    openApplication({ sessionId, resume: true })
-  );
+  await workspace.transitionApplication(({ sessionId }) => openApplication({ sessionId, resume: true }));
   assert.equal(workspace.sessionId, firstId);
   await workspace.close();
 });
@@ -159,13 +161,15 @@ test("AgentApplication persists presentation metadata before approval", async ()
     requestRecording: "off",
     model,
     store: new InMemorySessionStore(),
-    tools: [{
-      name: "change",
-      description: "Change a value",
-      inputSchema: { type: "object" },
-      parse: (input) => input,
-      execute: async () => ({ changed: true }),
-    }],
+    tools: [
+      {
+        name: "change",
+        description: "Change a value",
+        inputSchema: { type: "object" },
+        parse: (input) => input,
+        execute: async () => ({ changed: true }),
+      },
+    ],
     permissionPolicy: () => ({ decision: "ask", grantKey: "change" }),
     createToolPresentation: () => ({
       kind: "example.change",
@@ -177,30 +181,21 @@ test("AgentApplication persists presentation metadata before approval", async ()
   const relay = (async () => {
     for await (const event of application.events) {
       seen.push(event);
-      if (
-        event.type === "permission.event" &&
-        event.event.type === "approval.requested"
-      ) {
+      if (event.type === "permission.event" && event.event.type === "approval.requested") {
         await application.resolveApproval(event.event.request.id, "allow");
       }
     }
   })();
 
-  await (await application.submit({ input: "change it" })).result;
+  await (
+    await application.submit({ input: "change it" })
+  ).result;
   const history = await application.history();
-  const presentationIndex = history.findIndex((event) =>
-    event.type === "tool.presentation"
-  );
-  const approvalIndex = history.findIndex((event) =>
-    event.type === "approval.requested"
-  );
+  const presentationIndex = history.findIndex((event) => event.type === "tool.presentation");
+  const approvalIndex = history.findIndex((event) => event.type === "approval.requested");
   assert.ok(presentationIndex >= 0);
   assert.ok(presentationIndex < approvalIndex);
-  assert.equal(
-    seen.find((event) => event.type === "tool.presentation")
-      ?.presentation.kind,
-    "example.change",
-  );
+  assert.equal(seen.find((event) => event.type === "tool.presentation")?.presentation.kind, "example.change");
 
   await application.close();
   await relay;
@@ -232,18 +227,26 @@ test("AgentWorkspace rejects input without starting a Run when the session catal
     workspace: "/work",
     store,
     catalog: new FileSessionCatalog(catalogPath),
-    openApplication: ({ sessionId, resume }) => AgentApplication.open({
-      requestRecording: "off",
-      model: { async *stream() { yield { type: "response.completed", message: assistant("unexpected") }; } },
-      store,
-      permissionPolicy: () => "allow",
-      ...(sessionId === undefined ? {} : { sessionId }),
-      ...(resume ? { resume: true } : {}),
-    }),
+    openApplication: ({ sessionId, resume }) =>
+      AgentApplication.open({
+        requestRecording: "off",
+        model: {
+          async *stream() {
+            yield { type: "response.completed", message: assistant("unexpected") };
+          },
+        },
+        store,
+        permissionPolicy: () => "allow",
+        ...(sessionId === undefined ? {} : { sessionId }),
+        ...(resume ? { resume: true } : {}),
+      }),
   });
   t.after(() => workspace.close());
   await rm(`${catalogPath}.operations`, { recursive: true, force: true });
   await writeFile(`${catalogPath}.operations`, "occupied");
   await assert.rejects(workspace.submit({ input: "question" }));
-  assert.equal((await store.read(workspace.sessionId)).some((event) => event.type === "run.started"), false);
+  assert.equal(
+    (await store.read(workspace.sessionId)).some((event) => event.type === "run.started"),
+    false,
+  );
 });

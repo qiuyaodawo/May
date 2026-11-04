@@ -6,7 +6,12 @@ export function pipeline(tasks: readonly Omit<TaskSpec, "dependsOn">[]): TaskSpe
 }
 
 /** All workers must succeed. Their explicit answers become the reducer's input. */
-export function parallelTasks(workers: readonly Omit<TaskSpec, "dependsOn">[],
-  reducer: Omit<TaskSpec, "dependsOn">): TaskSpec[] {
-  return [...workers.map((task) => ({ ...task, dependsOn: [] })), { ...reducer, dependsOn: workers.map((task) => task.id) }];
+export function parallelTasks(
+  workers: readonly Omit<TaskSpec, "dependsOn">[],
+  reducer: Omit<TaskSpec, "dependsOn">,
+): TaskSpec[] {
+  return [
+    ...workers.map((task) => ({ ...task, dependsOn: [] })),
+    { ...reducer, dependsOn: workers.map((task) => task.id) },
+  ];
 }

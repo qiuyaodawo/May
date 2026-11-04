@@ -11,7 +11,7 @@ import { SqliteSchedulerStore } from "@sortedyuan/scheduler/sqlite-store";
 const scheduler = Scheduler.open({
   store: SqliteSchedulerStore.open("./data/scheduler.sqlite"),
   dispatcher: taskService,
-  onError: error => console.error(error),
+  onError: (error) => console.error(error),
 });
 
 await scheduler.createJob({

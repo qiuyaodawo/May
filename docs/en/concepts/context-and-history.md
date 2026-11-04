@@ -14,15 +14,15 @@ package ownership.
 
 ## Two different views
 
-| Concern | Context | Session history |
-| --- | --- | --- |
-| Primary consumer | Model request | Resume, audit, UI, history tools |
-| Minimal interface | `snapshot()` and `append()` | `SessionStore.append()` and `read()` |
-| Contents | Instructions, selected messages, request metadata | Durable `SessionEvent` facts |
-| May be compacted | Yes | Existing events are retained |
-| Must contain streaming deltas | No | No |
-| Owns Session identity | No | Yes |
-| Recreates tools/model/policy | No | No |
+| Concern                       | Context                                           | Session history                      |
+| ----------------------------- | ------------------------------------------------- | ------------------------------------ |
+| Primary consumer              | Model request                                     | Resume, audit, UI, history tools     |
+| Minimal interface             | `snapshot()` and `append()`                       | `SessionStore.append()` and `read()` |
+| Contents                      | Instructions, selected messages, request metadata | Durable `SessionEvent` facts         |
+| May be compacted              | Yes                                               | Existing events are retained         |
+| Must contain streaming deltas | No                                                | No                                   |
+| Owns Session identity         | No                                                | Yes                                  |
+| Recreates tools/model/policy  | No                                                | No                                   |
 
 The minimal `@sortedyuan/may/core` `Context` interface has no persistence dependency. Core
 asks for a snapshot before each model call and appends user, assistant, and tool

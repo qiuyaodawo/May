@@ -1,56 +1,95 @@
-import { acquireFileLock, hasErrorCode, replaceJournalFile, withFileAccess, type FileLock } from "@sortedyuan/may/storage";
+import {
+  acquireFileLock,
+  hasErrorCode,
+  replaceJournalFile,
+  withFileAccess,
+  type FileLock,
+} from "@sortedyuan/may/storage";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, type FileHandle } from "node:fs/promises";
 import { dirname } from "node:path";
 import { AsyncStateSerializer } from "@sortedyuan/may/core";
 
-interface Revision { readonly format: 1; readonly revision: number }
+interface Revision {
+  readonly format: 1;
+  readonly revision: number;
+}
 
 /** Internal, exclusive-writer snapshot journal. No recovery operation replays effects. */
 export class ResourceJournal<T extends Revision> {
   private readonly serial = new AsyncStateSerializer();
   private failed = false;
   private closing: Promise<void> | undefined;
-  private constructor(private file: FileHandle, private readonly path: string, private readonly lock: FileLock,
-    private current: T, private size: number,
-    private readonly validate: (value: T) => void, private readonly maxBytes: number) {}
+  private constructor(
+    private file: FileHandle,
+    private readonly path: string,
+    private readonly lock: FileLock,
+    private current: T,
+    private size: number,
+    private readonly validate: (value: T) => void,
+    private readonly maxBytes: number,
+  ) {}
 
   /** 查询保持日志内容不变；首次访问会创建协调文件，读取时持有共享访问锁。 */
-  static async inspect<T extends Revision>(path: string, validate: (value: T) => void, maxBytes = 67_108_864): Promise<T | undefined> {
+  static async inspect<T extends Revision>(
+    path: string,
+    validate: (value: T) => void,
+    maxBytes = 67_108_864,
+  ): Promise<T | undefined> {
     await lstat(path);
     return withFileAccess(path, "shared", async () => {
       if ((await lstat(path)).isSymbolicLink()) throw new Error("Resource journal must not be a symbolic link");
       const file = await open(path, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
       try {
         const stat = await file.stat();
-        if (!stat.isFile() || stat.size > maxBytes) throw new Error("Resource journal exceeds its byte limit or is not a file");
+        if (!stat.isFile() || stat.size > maxBytes)
+          throw new Error("Resource journal exceeds its byte limit or is not a file");
         const bytes = await file.readFile();
         if (bytes.length > maxBytes) throw new Error("Resource journal exceeds its byte limit");
         const end = bytes.lastIndexOf(10) + 1;
         let state: T | undefined;
         for (const line of bytes.subarray(0, end).toString("utf8").split("\n").slice(0, -1)) {
           const record = JSON.parse(line) as T | { checkpoint: T };
-          const next = "checkpoint" in record ? record.checkpoint : record; validate(next);
-          if (!(state === undefined && "checkpoint" in record) && next.revision !== (state?.revision ?? 0) + 1) throw new Error("Invalid resource journal sequence");
+          const next = "checkpoint" in record ? record.checkpoint : record;
+          validate(next);
+          if (!(state === undefined && "checkpoint" in record) && next.revision !== (state?.revision ?? 0) + 1)
+            throw new Error("Invalid resource journal sequence");
           state = next;
         }
         return state;
-      } finally { await file.close(); }
+      } finally {
+        await file.close();
+      }
     });
   }
 
-  static async open<T extends Revision>(path: string, initial: T, validate: (value: T) => void,
-    maxBytes = 67_108_864): Promise<ResourceJournal<T>> {
+  static async open<T extends Revision>(
+    path: string,
+    initial: T,
+    validate: (value: T) => void,
+    maxBytes = 67_108_864,
+  ): Promise<ResourceJournal<T>> {
     await mkdir(dirname(path), { recursive: true });
     const lock = await acquireFileLock(`${path}.lock`);
     let file: FileHandle | undefined;
     try {
       const journal = await withFileAccess(path, "exclusive", async () => {
-        try { if ((await lstat(path)).isSymbolicLink()) throw new Error("Resource journal must not be a symbolic link"); }
-        catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; }
-        file = await open(path, constants.O_CREAT | constants.O_APPEND | constants.O_RDWR | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW), 0o600);
+        try {
+          if ((await lstat(path)).isSymbolicLink()) throw new Error("Resource journal must not be a symbolic link");
+        } catch (error) {
+          if (!hasErrorCode(error, "ENOENT")) throw error;
+        }
+        file = await open(
+          path,
+          constants.O_CREAT |
+            constants.O_APPEND |
+            constants.O_RDWR |
+            (process.platform === "win32" ? 0 : constants.O_NOFOLLOW),
+          0o600,
+        );
         const stat = await file.stat();
-        if (!stat.isFile() || stat.size > maxBytes) throw new Error("Resource journal exceeds its byte limit or is not a file");
+        if (!stat.isFile() || stat.size > maxBytes)
+          throw new Error("Resource journal exceeds its byte limit or is not a file");
         const bytes = await file.readFile();
         const committed = bytes.length === 0 || bytes.at(-1) === 10 ? bytes.length : bytes.lastIndexOf(10) + 1;
         let current = initial;
@@ -59,25 +98,38 @@ export class ResourceJournal<T extends Revision> {
           const record = JSON.parse(line) as T | { checkpoint: T };
           const next = "checkpoint" in record ? record.checkpoint : record;
           validate(next);
-          if (!(current === initial && "checkpoint" in record) && next.revision !== current.revision + 1) throw new Error("Invalid resource journal sequence");
+          if (!(current === initial && "checkpoint" in record) && next.revision !== current.revision + 1)
+            throw new Error("Invalid resource journal sequence");
           current = next;
         }
         if (committed !== bytes.length) {
           const repair = await open(path, "r+");
-          try { await repair.truncate(committed); await repair.sync(); } finally { await repair.close(); }
+          try {
+            await repair.truncate(committed);
+            await repair.sync();
+          } finally {
+            await repair.close();
+          }
         }
         return new ResourceJournal(file, path, lock, current, committed, validate, maxBytes);
       });
       if (journal.size === 0) await journal.transact((state) => ({ ...state }));
       return journal;
     } catch (error) {
-      try { await file?.close(); } finally { await lock.release(); }
+      try {
+        await file?.close();
+      } finally {
+        await lock.release();
+      }
       throw error;
     }
   }
 
   snapshot(): Promise<T> {
-    return this.serial.run(() => { this.check(); return structuredClone(this.current); });
+    return this.serial.run(() => {
+      this.check();
+      return structuredClone(this.current);
+    });
   }
 
   transact(update: (state: T) => T | undefined | Promise<T | undefined>): Promise<T> {
@@ -91,26 +143,38 @@ export class ResourceJournal<T extends Revision> {
       const size = Buffer.byteLength(line);
       const compact = this.size + size > this.maxBytes;
       const checkpoint = `${JSON.stringify({ checkpoint: next })}\n`;
-      if (size > this.maxBytes || compact && Buffer.byteLength(checkpoint) > this.maxBytes) throw new Error("Resource snapshot exceeds its byte limit");
+      if (size > this.maxBytes || (compact && Buffer.byteLength(checkpoint) > this.maxBytes))
+        throw new Error("Resource snapshot exceeds its byte limit");
       try {
         if (compact) {
           const previous = this.file;
           await previous.close();
           this.file = await replaceJournalFile(this.path, checkpoint);
         } else {
-          await withFileAccess(this.path, "exclusive", async () => { await this.file.writeFile(line, "utf8"); await this.file.sync(); });
+          await withFileAccess(this.path, "exclusive", async () => {
+            await this.file.writeFile(line, "utf8");
+            await this.file.sync();
+          });
         }
+      } catch (error) {
+        this.failed = true;
+        throw error;
       }
-      catch (error) { this.failed = true; throw error; }
-      this.current = next; this.size = compact ? Buffer.byteLength(checkpoint) : this.size + size;
+      this.current = next;
+      this.size = compact ? Buffer.byteLength(checkpoint) : this.size + size;
       return structuredClone(next);
     });
   }
 
   close(): Promise<void> {
-    return this.closing ??= (async () => {
-      await this.serial.close(); try { await this.file.close(); } finally { await this.lock.release(); }
-    })();
+    return (this.closing ??= (async () => {
+      await this.serial.close();
+      try {
+        await this.file.close();
+      } finally {
+        await this.lock.release();
+      }
+    })());
   }
 
   private check(): void {
@@ -119,7 +183,8 @@ export class ResourceJournal<T extends Revision> {
 }
 
 export function resourceId(value: string, label: string): void {
-  if (typeof value !== "string" || value.length < 1 || value.length > 256 || /[\u0000-\u001f]/u.test(value)) throw new TypeError(`Invalid ${label}`);
+  if (typeof value !== "string" || value.length < 1 || value.length > 256 || /[\u0000-\u001f]/u.test(value))
+    throw new TypeError(`Invalid ${label}`);
 }
 
 export function count(value: number, label: string): void {

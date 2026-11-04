@@ -24,10 +24,7 @@ import type {
   TranscriptStore,
   UserTranscriptItem,
 } from "./transcript-store.js";
-import {
-  createCodingToolRendererRegistry,
-  type ToolRendererRegistry,
-} from "./tool-renderers.js";
+import { createCodingToolRendererRegistry, type ToolRendererRegistry } from "./tool-renderers.js";
 
 export interface TranscriptViewOptions {
   readonly keybindings?: readonly KeyBindingDefinition[];
@@ -71,20 +68,23 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   private replyAnchor: ScrollRegion | undefined;
   private readonly theme: TuiTheme;
   private readonly toolRenderers: ToolRendererRegistry;
-  private tailCache = new WeakMap<TranscriptItem, {
-    key: string;
-    lines: readonly string[];
-    images?: readonly ImagePlacement[];
-    replyStart?: number;
-    textRows?: readonly (TextRow | undefined)[];
-  }>();
+  private tailCache = new WeakMap<
+    TranscriptItem,
+    {
+      key: string;
+      lines: readonly string[];
+      images?: readonly ImagePlacement[];
+      replyStart?: number;
+      textRows?: readonly (TextRow | undefined)[];
+    }
+  >();
 
   constructor(
     private readonly store: TranscriptStore,
     private readonly options: TranscriptViewOptions = {},
   ) {
     this.keymap = new Keymap(mergeKeyBindings(TRANSCRIPT_KEYBINDINGS, options.keybindings), {
-      actions: TRANSCRIPT_KEYBINDINGS.map(binding => binding.action),
+      actions: TRANSCRIPT_KEYBINDINGS.map((binding) => binding.action),
     });
     this.reasoningVisible = options.showReasoning ?? true;
     this.toolDetailsVisible = options.showToolDetails ?? false;
@@ -103,11 +103,14 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   get selectedText(): string {
     const range = this.selectionRange();
     if (range === undefined) return "";
-    return range.sources.slice(range.startIndex, range.endIndex + 1).map((source, index) => {
-      const start = index === 0 ? range.start.offset : 0;
-      const end = index === range.endIndex - range.startIndex ? range.end.offset : source.source.length;
-      return source.source.slice(start, end);
-    }).join("\n\n");
+    return range.sources
+      .slice(range.startIndex, range.endIndex + 1)
+      .map((source, index) => {
+        const start = index === 0 ? range.start.offset : 0;
+        const end = index === range.endIndex - range.startIndex ? range.end.offset : source.source.length;
+        return source.source.slice(start, end);
+      })
+      .join("\n\n");
   }
 
   clearSelection(): void {
@@ -152,9 +155,7 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   }
 
   get selectedToolAnchor(): ScrollRegion | undefined {
-    return this.selectedToolId === undefined
-      ? undefined
-      : this.toolAnchors.get(this.selectedToolId);
+    return this.selectedToolId === undefined ? undefined : this.toolAnchors.get(this.selectedToolId);
   }
 
   /** 最近一次渲染中，当前最终回复正文的第一行。 */
@@ -230,16 +231,21 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
   }
 
   private selectionRange() {
-    const sources = this.store.items.flatMap(item => this.sources.get(item.id) ?? []);
+    const sources = this.store.items.flatMap((item) => this.sources.get(item.id) ?? []);
     const first = this.selectionStart;
     const last = this.selectionEnd;
     if (first === undefined || last === undefined) return undefined;
-    const firstIndex = sources.findIndex(row => row.sourceId === first.sourceId);
-    const lastIndex = sources.findIndex(row => row.sourceId === last.sourceId);
+    const firstIndex = sources.findIndex((row) => row.sourceId === first.sourceId);
+    const lastIndex = sources.findIndex((row) => row.sourceId === last.sourceId);
     if (firstIndex < 0 || lastIndex < 0) return undefined;
     const forward = firstIndex < lastIndex || (firstIndex === lastIndex && first.offset <= last.offset);
-    return { sources, start: forward ? first : last, end: forward ? last : first,
-      startIndex: forward ? firstIndex : lastIndex, endIndex: forward ? lastIndex : firstIndex };
+    return {
+      sources,
+      start: forward ? first : last,
+      end: forward ? last : first,
+      startIndex: forward ? firstIndex : lastIndex,
+      endIndex: forward ? lastIndex : firstIndex,
+    };
   }
 
   private rememberSources(item: TranscriptItem, result: RenderResult): void {
@@ -249,10 +255,16 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
       const current = unique.get(previous.sourceId);
       if (current === undefined || current.source.startsWith(previous.source)) continue;
       const range = this.selectionRange();
-      if (range === undefined || (this.selectionStart?.sourceId !== current.sourceId && this.selectionEnd?.sourceId !== current.sourceId)) continue;
+      if (
+        range === undefined ||
+        (this.selectionStart?.sourceId !== current.sourceId && this.selectionEnd?.sourceId !== current.sourceId)
+      )
+        continue;
       const changes = diffChars(previous.source, current.source);
-      const update = (anchor: TextAnchor | undefined): TextAnchor | undefined => anchor?.sourceId !== current.sourceId ? anchor
-        : { ...anchor, offset: changedOffset(changes, anchor.offset, anchor === range.start ? "right" : "left") };
+      const update = (anchor: TextAnchor | undefined): TextAnchor | undefined =>
+        anchor?.sourceId !== current.sourceId
+          ? anchor
+          : { ...anchor, offset: changedOffset(changes, anchor.offset, anchor === range.start ? "right" : "left") };
       this.selectionStart = update(this.selectionStart);
       this.selectionEnd = update(this.selectionEnd);
     }
@@ -261,18 +273,31 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
 
   private highlightSelection(result: RenderResult): RenderResult {
     this.textRows = result.textRows ?? [];
-    const ids = new Set(this.store.items.map(item => item.id));
+    const ids = new Set(this.store.items.map((item) => item.id));
     for (const id of this.sources.keys()) if (!ids.has(id)) this.sources.delete(id);
     const range = this.selectionRange();
     if (range === undefined) return result;
     const sources = new Map(range.sources.map((source, index) => [source.sourceId, index]));
-    return { ...result, lines: result.lines.map((line, index) => {
-      const row = this.textRows[index];
-      const sourceIndex = row === undefined ? undefined : sources.get(row.sourceId);
-      if (row === undefined || sourceIndex === undefined || sourceIndex < range.startIndex || sourceIndex > range.endIndex) return line;
-      return highlightTextRow(line, row, sourceIndex === range.startIndex ? range.start.offset : 0,
-        sourceIndex === range.endIndex ? range.end.offset : row.source.length);
-    }) };
+    return {
+      ...result,
+      lines: result.lines.map((line, index) => {
+        const row = this.textRows[index];
+        const sourceIndex = row === undefined ? undefined : sources.get(row.sourceId);
+        if (
+          row === undefined ||
+          sourceIndex === undefined ||
+          sourceIndex < range.startIndex ||
+          sourceIndex > range.endIndex
+        )
+          return line;
+        return highlightTextRow(
+          line,
+          row,
+          sourceIndex === range.startIndex ? range.start.offset : 0,
+          sourceIndex === range.endIndex ? range.end.offset : row.source.length,
+        );
+      }),
+    };
   }
 
   private renderItems(size: RenderSize, retainTail: boolean): RenderResult {
@@ -290,32 +315,27 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     const textRows: Array<TextRow | undefined> = [];
     for (const item of this.store.items) {
       if (lines.length >= size.height) break;
-      if (lines.length > 0) { lines.push(""); textRows.push(undefined); }
+      if (lines.length > 0) {
+        lines.push("");
+        textRows.push(undefined);
+      }
       if (lines.length >= size.height) break;
       const start = lines.length;
       const selected = item.kind === "tool" && this.focused && item.id === this.selectedToolId;
       const result = new TranscriptItemView(item, {
         ...(this.options.images ? { images: this.options.images } : {}),
         showReasoning: this.reasoningVisible,
-        showToolDetails: item.kind === "tool"
-          ? this.isToolExpanded(item.id)
-          : this.toolDetailsVisible,
+        showToolDetails: item.kind === "tool" ? this.isToolExpanded(item.id) : this.toolDetailsVisible,
         selected,
         maximumToolOutputCharacters: this.options.maximumToolOutputCharacters ?? 8_000,
         theme: this.theme,
         toolRenderers: this.toolRenderers,
-        ...(this.options.assistantLabel === undefined
-          ? {}
-          : { assistantLabel: this.options.assistantLabel }),
-        ...(this.options.userLabel === undefined
-          ? {}
-          : { userLabel: this.options.userLabel }),
+        ...(this.options.assistantLabel === undefined ? {} : { assistantLabel: this.options.assistantLabel }),
+        ...(this.options.userLabel === undefined ? {} : { userLabel: this.options.userLabel }),
         ...(this.options.selectedToolDetailsHint === undefined
           ? {}
           : { selectedToolDetailsHint: this.options.selectedToolDetailsHint }),
-        ...(this.options.toolDetailsHint === undefined
-          ? {}
-          : { toolDetailsHint: this.options.toolDetailsHint }),
+        ...(this.options.toolDetailsHint === undefined ? {} : { toolDetailsHint: this.options.toolDetailsHint }),
       }).render({ width: size.width, height: size.height - lines.length });
       lines.push(...result.lines.slice(0, size.height - lines.length));
       textRows.push(...result.lines.map((_, index) => result.textRows?.[index]));
@@ -338,9 +358,10 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     }> = [];
     let remaining = size.height;
     const latestReply = this.store.latestReply;
-    const revealedIndex = latestReply?.id === this.revealedReplyId
-      ? this.store.items.findIndex((item) => item.id === this.revealedReplyId)
-      : -1;
+    const revealedIndex =
+      latestReply?.id === this.revealedReplyId
+        ? this.store.items.findIndex((item) => item.id === this.revealedReplyId)
+        : -1;
     for (let index = this.store.items.length - 1; index >= 0; index--) {
       const item = this.store.items[index]!;
       const separator = chunks.length === 0 ? 0 : 1;
@@ -355,23 +376,36 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
         this.rememberSources(item, result);
         const lines = result.lines;
         const bodyLines = revealReply
-          ? item.kind === "assistant" && item.content?.some(part => part.type === "image")
+          ? item.kind === "assistant" && item.content?.some((part) => part.type === "image")
             ? this.renderItem({ ...item, reasoning: "" }, size.width, Number.MAX_SAFE_INTEGER).lines.length - 1
-            : new Markdown(item.text, { theme: this.theme.markdown }).render({ width: size.width, height: Number.MAX_SAFE_INTEGER }).lines.length
+            : new Markdown(item.text, { theme: this.theme.markdown }).render({
+                width: size.width,
+                height: Number.MAX_SAFE_INTEGER,
+              }).lines.length
           : undefined;
-        cached = { key, lines, ...(result.images ? { images: result.images } : {}),
+        cached = {
+          key,
+          lines,
+          ...(result.images ? { images: result.images } : {}),
           ...(result.textRows ? { textRows: result.textRows } : {}),
-          ...(bodyLines === undefined ? {} : { replyStart: lines.length - bodyLines }) };
+          ...(bodyLines === undefined ? {} : { replyStart: lines.length - bodyLines }),
+        };
         this.tailCache.set(item, cached);
       }
       const rendered = cached.lines;
       const replyStart = cached.replyStart;
-      const cut = keepForReply && !revealReply ? 0
-        : Math.max(0, Math.min(rendered.length - available, replyStart ?? rendered.length));
+      const cut =
+        keepForReply && !revealReply
+          ? 0
+          : Math.max(0, Math.min(rendered.length - available, replyStart ?? rendered.length));
       const visible = rendered.slice(cut);
-      chunks.unshift({ item, lines: visible, ...(cached.images ? { images: placeImages(cached.images, -cut, visible.length) } : {}),
+      chunks.unshift({
+        item,
+        lines: visible,
+        ...(cached.images ? { images: placeImages(cached.images, -cut, visible.length) } : {}),
         ...(cached.textRows ? { textRows: cached.textRows.slice(cut) } : {}),
-        ...(replyStart === undefined ? {} : { replyStart: replyStart - cut }) });
+        ...(replyStart === undefined ? {} : { replyStart: replyStart - cut }),
+      });
       remaining -= visible.length + separator;
       if (visible.length < rendered.length && (revealedIndex < 0 || index <= revealedIndex)) break;
     }
@@ -380,7 +414,10 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     const images: ImagePlacement[] = [];
     const textRows: Array<TextRow | undefined> = [];
     for (const chunk of chunks) {
-      if (lines.length > 0) { lines.push(""); textRows.push(undefined); }
+      if (lines.length > 0) {
+        lines.push("");
+        textRows.push(undefined);
+      }
       const start = lines.length;
       lines.push(...chunk.lines);
       textRows.push(...chunk.lines.map((_, index) => chunk.textRows?.[index]));
@@ -395,36 +432,22 @@ export class TranscriptView implements InteractiveComponent, FocusTarget {
     return { lines, textRows, ...(images.length ? { images } : {}) };
   }
 
-  private renderItem(
-    item: TranscriptItem,
-    width: number,
-    height: number,
-  ): RenderResult {
-    const selected = item.kind === "tool" && this.focused &&
-      item.id === this.selectedToolId;
+  private renderItem(item: TranscriptItem, width: number, height: number): RenderResult {
+    const selected = item.kind === "tool" && this.focused && item.id === this.selectedToolId;
     return new TranscriptItemView(item, {
       ...(this.options.images ? { images: this.options.images } : {}),
       showReasoning: this.reasoningVisible,
-      showToolDetails: item.kind === "tool"
-        ? this.isToolExpanded(item.id)
-        : this.toolDetailsVisible,
+      showToolDetails: item.kind === "tool" ? this.isToolExpanded(item.id) : this.toolDetailsVisible,
       selected,
-      maximumToolOutputCharacters: this.options.maximumToolOutputCharacters ??
-        8_000,
+      maximumToolOutputCharacters: this.options.maximumToolOutputCharacters ?? 8_000,
       theme: this.theme,
       toolRenderers: this.toolRenderers,
-      ...(this.options.assistantLabel === undefined
-        ? {}
-        : { assistantLabel: this.options.assistantLabel }),
-      ...(this.options.userLabel === undefined
-        ? {}
-        : { userLabel: this.options.userLabel }),
+      ...(this.options.assistantLabel === undefined ? {} : { assistantLabel: this.options.assistantLabel }),
+      ...(this.options.userLabel === undefined ? {} : { userLabel: this.options.userLabel }),
       ...(this.options.selectedToolDetailsHint === undefined
         ? {}
         : { selectedToolDetailsHint: this.options.selectedToolDetailsHint }),
-      ...(this.options.toolDetailsHint === undefined
-        ? {}
-        : { toolDetailsHint: this.options.toolDetailsHint }),
+      ...(this.options.toolDetailsHint === undefined ? {} : { toolDetailsHint: this.options.toolDetailsHint }),
     }).render({ width, height });
   }
 
@@ -508,28 +531,42 @@ export class TranscriptItemView implements Component {
           selected: options.selected,
           maximumOutputCharacters: options.maximumToolOutputCharacters,
           theme: options.theme,
-          detailsHint: options.selected
-            ? options.selectedToolDetailsHint
-            : options.toolDetailsHint,
+          detailsHint: options.selected ? options.selectedToolDetailsHint : options.toolDetailsHint,
         });
         const description: Component = {
-          render: size => renderTextDocument(descriptionDocument, size, { sourceId: `${this.item.id}:tool` }),
+          render: (size) => renderTextDocument(descriptionDocument, size, { sourceId: `${this.item.id}:tool` }),
         };
-        const images = this.item.content?.filter(part => part.type === "image") ?? [];
-        return new Stack([description, ...images.map((part, index) => options.images?.component(part.source, `${this.item.id}:image:${index}`) ?? new Text("图片附件：宿主未配置 TerminalImages。"))]).render(size);
+        const images = this.item.content?.filter((part) => part.type === "image") ?? [];
+        return new Stack([
+          description,
+          ...images.map(
+            (part, index) =>
+              options.images?.component(part.source, `${this.item.id}:image:${index}`) ??
+              new Text("图片附件：宿主未配置 TerminalImages。"),
+          ),
+        ]).render(size);
       }
       case "user":
         return new Text(renderUser(this.item, options), {
           sourceId: `${this.item.id}:user`,
-          copyRanges: [undefined, ...sanitizeTerminalText(this.item.text).split("\n").map(line => ({ start: 2, end: line.length + 2 }))],
+          copyRanges: [
+            undefined,
+            ...sanitizeTerminalText(this.item.text)
+              .split("\n")
+              .map((line) => ({ start: 2, end: line.length + 2 })),
+          ],
         }).render(size);
       case "approval":
-        return new Text(renderApproval(this.item, options.theme), { sourceId: `${this.item.id}:approval` }).render(size);
+        return new Text(renderApproval(this.item, options.theme), { sourceId: `${this.item.id}:approval` }).render(
+          size,
+        );
       case "notice":
         return new Text(renderNotice(this.item, options.theme), {
           continuationIndent: 2,
           sourceId: `${this.item.id}:notice`,
-          copyRanges: sanitizeTerminalText(this.item.text).split("\n").map((line, index) => ({ start: index === 0 ? 2 : 0, end: line.length + (index === 0 ? 2 : 0) })),
+          copyRanges: sanitizeTerminalText(this.item.text)
+            .split("\n")
+            .map((line, index) => ({ start: index === 0 ? 2 : 0, end: line.length + (index === 0 ? 2 : 0) })),
         }).render(size);
     }
   }
@@ -559,25 +596,35 @@ function renderAssistantView(
   const children: Component[] = [];
   if (options.showReasoning && item.reasoning !== "") {
     children.push(new Text("thinking", { style: options.theme.thinking }));
-    children.push(new Text(indent(sanitizeTerminalText(item.reasoning)), {
-      style: options.theme.thinking,
-      sourceId: `${item.id}:reasoning`,
-      copyRanges: sanitizeTerminalText(item.reasoning).split("\n").map(line => ({ start: 2, end: line.length + 2 })),
-    }));
+    children.push(
+      new Text(indent(sanitizeTerminalText(item.reasoning)), {
+        style: options.theme.thinking,
+        sourceId: `${item.id}:reasoning`,
+        copyRanges: sanitizeTerminalText(item.reasoning)
+          .split("\n")
+          .map((line) => ({ start: 2, end: line.length + 2 })),
+      }),
+    );
   }
   const value = item.text === "" && item.status === "streaming" ? "…" : item.text;
-  if (value !== "" || item.content?.some(part => part.type === "image")) {
-    children.push(new Text(
-      `${styleText("◆", options.theme.accent)} ` +
-        styleText(
-          sanitizeTerminalText(options.assistantLabel),
-          options.theme.assistantLabel,
-        ),
-    ));
-    if (item.content?.some(part => part.type === "image")) {
+  if (value !== "" || item.content?.some((part) => part.type === "image")) {
+    children.push(
+      new Text(
+        `${styleText("◆", options.theme.accent)} ` +
+          styleText(sanitizeTerminalText(options.assistantLabel), options.theme.assistantLabel),
+      ),
+    );
+    if (item.content?.some((part) => part.type === "image")) {
       for (const [index, part] of item.content.entries()) {
-        if (part.type === "text") children.push(new Markdown(part.text, { theme: options.theme.markdown, sourceId: `${item.id}:text:${index}` }));
-        else if (part.type === "image") children.push(options.images?.component(part.source, `${item.id}:image:${index}`) ?? new Text("图片附件：宿主未配置 TerminalImages。"));
+        if (part.type === "text")
+          children.push(
+            new Markdown(part.text, { theme: options.theme.markdown, sourceId: `${item.id}:text:${index}` }),
+          );
+        else if (part.type === "image")
+          children.push(
+            options.images?.component(part.source, `${item.id}:image:${index}`) ??
+              new Text("图片附件：宿主未配置 TerminalImages。"),
+          );
       }
     } else children.push(new Markdown(value, { theme: options.theme.markdown, sourceId: `${item.id}:text:0` }));
   }
@@ -585,44 +632,54 @@ function renderAssistantView(
   return new Stack(children).render(size);
 }
 
-function renderUser(
-  item: UserTranscriptItem,
-  options: TranscriptItemViewOptions,
-): string {
+function renderUser(item: UserTranscriptItem, options: TranscriptItemViewOptions): string {
   const safe = sanitizeTerminalText(item.text);
   const label = sanitizeTerminalText(options.userLabel);
-  return `${styleText("›", options.theme.accent)} ` +
+  return (
+    `${styleText("›", options.theme.accent)} ` +
     `${styleText(label, options.theme.userMessage)}\n` +
-    styleLines(indent(safe), options.theme.text);
+    styleLines(indent(safe), options.theme.text)
+  );
 }
 
 function renderApproval(item: ApprovalTranscriptItem, theme: TuiTheme): string {
-  const scope = item.scopeDescription === undefined ? "" : `\n持续授权范围：${sanitizeTerminalText(item.scopeDescription)}${item.scopeId === undefined ? "" : `\n范围身份：${sanitizeTerminalText(item.scopeId)}`}`;
+  const scope =
+    item.scopeDescription === undefined
+      ? ""
+      : `\n持续授权范围：${sanitizeTerminalText(item.scopeDescription)}${item.scopeId === undefined ? "" : `\n范围身份：${sanitizeTerminalText(item.scopeId)}`}`;
   if (item.status === "pending") {
-    return `${styleText("?", theme.warning)} Approval required for ` +
-      styleText(sanitizeTerminalText(item.toolName), theme.toolTitle) + scope;
+    return (
+      `${styleText("?", theme.warning)} Approval required for ` +
+      styleText(sanitizeTerminalText(item.toolName), theme.toolTitle) +
+      scope
+    );
   }
   if (item.status === "resolved") {
     return `${styleText("✓", theme.success)} Permission: ${item.decision ?? "resolved"}` + scope;
   }
-  return `${styleText("!", theme.warning)} Permission cancelled` +
-    (item.reason === undefined ? "" : `: ${sanitizeTerminalText(item.reason)}`) + scope;
+  return (
+    `${styleText("!", theme.warning)} Permission cancelled` +
+    (item.reason === undefined ? "" : `: ${sanitizeTerminalText(item.reason)}`) +
+    scope
+  );
 }
 
 function renderNotice(item: NoticeTranscriptItem, theme: TuiTheme): string {
   const marker = item.level === "error" ? "✗" : item.level === "warning" ? "!" : "•";
-  const markerStyle = item.level === "error"
-    ? theme.error
-    : item.level === "warning"
-    ? theme.warning
-    : theme.accent;
+  const markerStyle = item.level === "error" ? theme.error : item.level === "warning" ? theme.warning : theme.accent;
   return `${styleText(marker, markerStyle)} ${styleLines(sanitizeTerminalText(item.text), theme.muted)}`;
 }
 
 function indent(value: string): string {
-  return value.split("\n").map((line) => `  ${line}`).join("\n");
+  return value
+    .split("\n")
+    .map((line) => `  ${line}`)
+    .join("\n");
 }
 
 function styleLines(value: string, style: TuiTheme["text"]): string {
-  return value.split("\n").map((line) => styleText(line, style)).join("\n");
+  return value
+    .split("\n")
+    .map((line) => styleText(line, style))
+    .join("\n");
 }

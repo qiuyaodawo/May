@@ -8,25 +8,46 @@ import { InMemoryCoordinationStore } from "@sortedyuan/coordination";
 import { PluginHost } from "@sortedyuan/may/plugin";
 import { createCoordinationPlugin, coordinationService } from "@sortedyuan/coordination/plugin";
 
-test("coordination plugin executes real file hashes and releases writer ownership across repeated cleanup", async t => {
+test("coordination plugin executes real file hashes and releases writer ownership across repeated cleanup", async (t) => {
   const directory = await createTestDirectory(t, "coordination/plugin-graph");
-  const path = join(directory, "document.txt"), text = "Coordination file evidence";
+  const path = join(directory, "document.txt"),
+    text = "Coordination file evidence";
   await writeFile(path, text);
-  const store = new InMemoryCoordinationStore(), host = await PluginHost.create({ plugins: [createCoordinationPlugin()] });
+  const store = new InMemoryCoordinationStore(),
+    host = await PluginHost.create({ plugins: [createCoordinationPlugin()] });
   t.after(() => host.close());
   const service = host.get(coordinationService);
-  const agents = { reader: {
-    version: "file-sha256-v1",
-    async execute(execution) {
-      const output = { text: createHash("sha256").update(await readFile(execution.task.input)).digest("hex") };
-      await writeFile(join(directory, execution.task.dispatchId + ".json"), JSON.stringify(output)); return output;
+  const agents = {
+    reader: {
+      version: "file-sha256-v1",
+      async execute(execution) {
+        const output = {
+          text: createHash("sha256")
+            .update(await readFile(execution.task.input))
+            .digest("hex"),
+        };
+        await writeFile(join(directory, execution.task.dispatchId + ".json"), JSON.stringify(output));
+        return output;
+      },
+      async recover(execution) {
+        try {
+          return {
+            status: "completed",
+            output: JSON.parse(await readFile(join(directory, execution.task.dispatchId + ".json"), "utf8")),
+          };
+        } catch (error) {
+          if (error.code === "ENOENT") return { status: "not-started" };
+          throw error;
+        }
+      },
     },
-    async recover(execution) {
-      try { return { status: "completed", output: JSON.parse(await readFile(join(directory, execution.task.dispatchId + ".json"), "utf8")) }; }
-      catch (error) { if (error.code === "ENOENT") return { status: "not-started" }; throw error; }
+  };
+  const policy = {
+    version: "document-access-v1",
+    authorize(task) {
+      return task.agent === "reader" && task.input === path;
     },
-  } };
-  const policy = { version: "document-access-v1", authorize(task) { return task.agent === "reader" && task.input === path; } };
+  };
   const options = { id: "document-graph", store, agents, policy };
   const runtime = await service.create({ ...options, tasks: [{ id: "read-document", agent: "reader", input: path }] });
   await runtime.start();
@@ -37,5 +58,6 @@ test("coordination plugin executes real file hashes and releases writer ownershi
   const reopened = await service.resume(options);
   assert.equal(reopened.snapshot().tasks[0].status, "completed");
   await host.close();
-  const writer = await store.acquire(options.id); await writer.close();
+  const writer = await store.acquire(options.id);
+  await writer.close();
 });

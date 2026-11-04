@@ -25,11 +25,12 @@ const scheduler = Scheduler.open({
   store: SqliteSchedulerStore.open("./data/scheduler.sqlite"),
   dispatcher: taskService,
   maxConcurrentSubmissions: 4,
-  onError: error => console.error(error),
+  onError: (error) => console.error(error),
 });
 
 await scheduler.createJob({
-  id: "daily-ai-brief", enabled: true,
+  id: "daily-ai-brief",
+  enabled: true,
   trigger: { type: "cron", expression: "0 8 * * *", timezone: "Asia/Shanghai" },
   task: {
     handler: "ai-brief",
@@ -107,7 +108,9 @@ await scheduler.createJob({
   misfire: { policy: "skip", graceMs: 0 },
 });
 const records = await scheduler.publish({
-  source: "github", id: "delivery-123", topic: "issue.opened",
+  source: "github",
+  id: "delivery-123",
+  topic: "issue.opened",
   occurredAt: "2026-10-04T10:00:00+08:00",
   payload: { repository: "example/project", issue: 123 },
 });

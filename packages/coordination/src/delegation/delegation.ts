@@ -25,12 +25,7 @@ export interface MaybeCodeDelegationTask {
 }
 
 export type MaybeCodeDelegationStatus =
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "recovery-required"
-  | "interrupted";
+  "running" | "completed" | "failed" | "cancelled" | "recovery-required" | "interrupted";
 
 /** 整次请求的状态：主 Run、全部子任务与请求用量。 */
 export interface MaybeCodeDelegationState {

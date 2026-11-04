@@ -52,10 +52,7 @@ export interface RetryingModelOptions {
   readonly maxDelayMs?: number;
   /** Random variation applied to calculated delays. Defaults to 0.2. */
   readonly jitterRatio?: number;
-  readonly shouldRetry?: (
-    error: unknown,
-    context: ModelRetryContext,
-  ) => boolean;
+  readonly shouldRetry?: (error: unknown, context: ModelRetryContext) => boolean;
   /** Test or host hook for delay scheduling. */
   readonly sleep?: (delayMs: number, signal: AbortSignal) => Promise<void>;
   /** Test or host hook for jitter. Must return a value from 0 through 1. */
@@ -69,11 +66,19 @@ export interface RetryingModelOptions {
  * because the model stream has no reset or retraction event.
  */
 export class RetryingModel implements Model {
-  get supportsRequestRecording(): boolean { return this.model.supportsRequestRecording === true; }
+  get supportsRequestRecording(): boolean {
+    return this.model.supportsRequestRecording === true;
+  }
   readonly reportsAttempts = true;
-  get capabilityVersion(): string | undefined { return this.model.capabilityVersion; }
-  get configuration(): NonNullable<Model["configuration"]> { return this.model.configuration ?? {}; }
-  get limits(): ModelLimits | undefined { return this.model.limits; }
+  get capabilityVersion(): string | undefined {
+    return this.model.capabilityVersion;
+  }
+  get configuration(): NonNullable<Model["configuration"]> {
+    return this.model.configuration ?? {};
+  }
+  get limits(): ModelLimits | undefined {
+    return this.model.limits;
+  }
   readonly contextCompactor?: ModelContextCompactor;
   private readonly maxAttempts: number;
   private readonly baseDelayMs: number;
@@ -106,10 +111,7 @@ export class RetryingModel implements Model {
     await this.model.preflight?.(request, options);
   }
 
-  async *stream(
-    request: ModelRequest,
-    options: ModelStreamOptions,
-  ): AsyncIterable<ModelEvent> {
+  async *stream(request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     await this.preflight(request, options);
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       let completed = false;
@@ -130,9 +132,10 @@ export class RetryingModel implements Model {
             if (completed) throw new ModelProtocolError("Model emitted more than one response.completed event");
             completed = true;
             usage = event.usage;
-            if (event.message.content.some((part) => part.type === "text" && part.text.length > 0)) telemetry?.content("text");
+            if (event.message.content.some((part) => part.type === "text" && part.text.length > 0))
+              telemetry?.content("text");
             if ((event.message.toolCalls?.length ?? 0) > 0) telemetry?.content("tool");
-            if (event.message.content.some(part => part.type !== "text")) telemetry?.content("other");
+            if (event.message.content.some((part) => part.type !== "text")) telemetry?.content("other");
           }
           yield event;
         }
@@ -141,13 +144,18 @@ export class RetryingModel implements Model {
         return;
       } catch (error) {
         if (error instanceof Error && "code" in error && error.code === "RUN_CHECKPOINT_FAILED") throw error;
-        if (error instanceof ModelResponseValidationError) { completed = error.responseCompleted; usage = error.usage; }
-        telemetry?.end(omitUndefined({
-          status: options.signal.aborted ? "cancelled" : "error",
-          error: traceError(error),
-          completed,
-          usage,
-        }));
+        if (error instanceof ModelResponseValidationError) {
+          completed = error.responseCompleted;
+          usage = error.usage;
+        }
+        telemetry?.end(
+          omitUndefined({
+            status: options.signal.aborted ? "cancelled" : "error",
+            error: traceError(error),
+            completed,
+            usage,
+          }),
+        );
         const context: ModelRetryContext = {
           attempt,
           maxAttempts: this.maxAttempts,
@@ -191,10 +199,7 @@ export class RetryingModel implements Model {
       return requested;
     }
 
-    const exponential = Math.min(
-      this.baseDelayMs * 2 ** (failedAttempt - 1),
-      this.maxDelayMs,
-    );
+    const exponential = Math.min(this.baseDelayMs * 2 ** (failedAttempt - 1), this.maxDelayMs);
     if (exponential === 0 || this.jitterRatio === 0) return exponential;
 
     const random = this.random();
@@ -206,10 +211,7 @@ export class RetryingModel implements Model {
   }
 }
 
-export function withModelRetry(
-  model: Model,
-  options: RetryingModelOptions = {},
-): Model {
+export function withModelRetry(model: Model, options: RetryingModelOptions = {}): Model {
   return new RetryingModel(model, options);
 }
 
@@ -258,9 +260,7 @@ function classifyRetryable(error: unknown, seen: Set<unknown>): boolean {
 function retryAfterMs(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   const value = (error as { retryAfterMs?: unknown }).retryAfterMs;
-  return typeof value === "number" && Number.isFinite(value) && value >= 0
-    ? value
-    : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
 function abortableSleep(delayMs: number, signal: AbortSignal): Promise<void> {

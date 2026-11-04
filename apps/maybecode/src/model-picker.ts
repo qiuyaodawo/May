@@ -1,15 +1,8 @@
 import type { KeyStroke } from "@sortedyuan/tui/keybindings";
 import { sanitizeTerminalText } from "@sortedyuan/tui";
-import {
-  ListSelectionModel,
-  resolveListInput,
-  type ListNavigationAction,
-} from "@sortedyuan/tui/list-selection";
+import { ListSelectionModel, resolveListInput, type ListNavigationAction } from "@sortedyuan/tui/list-selection";
 
-import type {
-  MaybeCodeController,
-  MaybeCodeModelProfile,
-} from "./controller.js";
+import type { MaybeCodeController, MaybeCodeModelProfile } from "./controller.js";
 import { createMaybeCodeKeymap, type MaybeCodeKeyAction } from "./keymap.js";
 import type { TerminalIO } from "@sortedyuan/tui/node-terminal";
 
@@ -26,9 +19,7 @@ export interface ModelPickerOptions {
   readonly question: (prompt: string) => Promise<string>;
 }
 
-export async function runModelPicker(
-  options: ModelPickerOptions,
-): Promise<ModelPickerResult> {
+export async function runModelPicker(options: ModelPickerOptions): Promise<ModelPickerResult> {
   if (options.models.length === 0) return { type: "empty" };
   if (
     options.terminal.interactive !== true ||
@@ -43,23 +34,18 @@ export async function runModelPicker(
   const selection = new ListSelectionModel(options.models, {
     initialIndex: Math.max(
       0,
-      options.models.findIndex((model) =>
-        model.name === options.controller.application.modelInfo?.profile
-      ),
+      options.models.findIndex((model) => model.name === options.controller.application.modelInfo?.profile),
     ),
     pageSize: 10,
   });
   try {
     while (true) {
-      options.terminal.renderView(sanitizeTerminalText(renderModelPicker(
-        options.models,
-        selection.selectedIndex,
-        options.controller.application.modelInfo?.profile,
-      )));
-      const action = resolvePickerAction(
-        keymap,
-        await options.terminal.readKey(),
+      options.terminal.renderView(
+        sanitizeTerminalText(
+          renderModelPicker(options.models, selection.selectedIndex, options.controller.application.modelInfo?.profile),
+        ),
       );
+      const action = resolvePickerAction(keymap, await options.terminal.readKey());
       if (action === "app.interrupt" || action === "list.cancel") {
         return { type: "cancelled" };
       }
@@ -80,16 +66,13 @@ export async function runModelPicker(
   }
 }
 
-async function runLineModelPicker(
-  options: ModelPickerOptions,
-): Promise<ModelPickerResult> {
-  options.terminal.write(sanitizeTerminalText(`\n${renderLineModelList(
-    options.models,
-    options.controller.application.modelInfo?.profile,
-  )}`));
-  const answer = (await options.question(
-    "Select a model number/name, or d <selection> to set default (Enter to cancel): ",
-  )).trim();
+async function runLineModelPicker(options: ModelPickerOptions): Promise<ModelPickerResult> {
+  options.terminal.write(
+    sanitizeTerminalText(`\n${renderLineModelList(options.models, options.controller.application.modelInfo?.profile)}`),
+  );
+  const answer = (
+    await options.question("Select a model number/name, or d <selection> to set default (Enter to cancel): ")
+  ).trim();
   if (answer === "") return { type: "cancelled" };
   const defaultMatch = /^d\s+(.+)$/iu.exec(answer);
   const selection = defaultMatch?.[1] ?? answer;
@@ -108,14 +91,10 @@ function resolvePickerAction(
   stroke: KeyStroke,
 ): MaybeCodeKeyAction | undefined {
   const result = keymap.resolve(stroke, ["global", "modelPicker", "select"]);
-  return result.type === "action"
-    ? result.action as MaybeCodeKeyAction
-    : undefined;
+  return result.type === "action" ? (result.action as MaybeCodeKeyAction) : undefined;
 }
 
-function navigationAction(
-  action: MaybeCodeKeyAction | undefined,
-): ListNavigationAction | undefined {
+function navigationAction(action: MaybeCodeKeyAction | undefined): ListNavigationAction | undefined {
   switch (action) {
     case "list.up":
       return "up";
@@ -147,21 +126,21 @@ function renderModelPicker(
     const selected = index === selectedIndex ? ">" : " ";
     const current = model.name === currentProfile ? " [current]" : "";
     const defaultModel = model.isDefault ? " [default]" : "";
-    output += `${selected} ${model.name}${current}${defaultModel}\n` +
+    output +=
+      `${selected} ${model.name}${current}${defaultModel}\n` +
       `    ${model.provider}/${model.model} · ${model.adapter}\n`;
   }
   return output + "\n↑↓ move · Enter select · D set default · Esc close\n";
 }
 
-function renderLineModelList(
-  models: readonly MaybeCodeModelProfile[],
-  currentProfile: string | undefined,
-): string {
+function renderLineModelList(models: readonly MaybeCodeModelProfile[], currentProfile: string | undefined): string {
   const lines = models.map((model, index) => {
     const current = model.name === currentProfile ? " [current]" : "";
     const defaultModel = model.isDefault ? " [default]" : "";
-    return `  ${index + 1}. ${model.name}${current}${defaultModel}\n` +
-      `     ${model.provider}/${model.model} · ${model.adapter}`;
+    return (
+      `  ${index + 1}. ${model.name}${current}${defaultModel}\n` +
+      `     ${model.provider}/${model.model} · ${model.adapter}`
+    );
   });
   return `Models:\n${lines.join("\n")}\n`;
 }

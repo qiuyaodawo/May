@@ -180,12 +180,13 @@ reusable definition's `open()` method for the initial application and every
 new or resumed Session:
 
 ```ts
-openApplication: ({ sessionId, resume }) => agent.open({
-  store,
-  metadata: { workspace },
-  ...(sessionId === undefined ? {} : { sessionId }),
-  ...(resume ? { resume: true } : {}),
-})
+openApplication: ({ sessionId, resume }) =>
+  agent.open({
+    store,
+    metadata: { workspace },
+    ...(sessionId === undefined ? {} : { sessionId }),
+    ...(resume ? { resume: true } : {}),
+  });
 ```
 
 The workspace itself does not choose a provider, tools, prompt, permission

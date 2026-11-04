@@ -48,12 +48,6 @@ test("read validates line limits and ranges", async (t) => {
   await writeFile(join(cwd, "one.txt"), "one");
   const tool = createReadTool({ cwd, maxLines: 2 });
 
-  assert.throws(
-    () => tool.parse({ path: "one.txt", limit: 3 }),
-    assertErrorCode("CODING_TOOL_INVALID_INPUT"),
-  );
-  await assert.rejects(
-    executeTool(tool, { path: "one.txt", offset: 2 }),
-    assertErrorCode("CODING_TOOL_READ_RANGE"),
-  );
+  assert.throws(() => tool.parse({ path: "one.txt", limit: 3 }), assertErrorCode("CODING_TOOL_INVALID_INPUT"));
+  await assert.rejects(executeTool(tool, { path: "one.txt", offset: 2 }), assertErrorCode("CODING_TOOL_READ_RANGE"));
 });

@@ -1,8 +1,13 @@
 import { applicationHooks, applicationServices } from "../application/index.js";
 import {
-  ModelContextCompactionStrategy, PruneOldToolResultsStrategy, SummaryTailStrategy,
-  type ContextBudget, type ContextCompactionOptions, type ContextCompactionOutput,
-  type ContextCompactionStrategy, type ContextSummarizer,
+  ModelContextCompactionStrategy,
+  PruneOldToolResultsStrategy,
+  SummaryTailStrategy,
+  type ContextBudget,
+  type ContextCompactionOptions,
+  type ContextCompactionOutput,
+  type ContextCompactionStrategy,
+  type ContextSummarizer,
 } from "../context/index.js";
 import { omitUndefined, type ContextSnapshot, type Model } from "../core/index.js";
 import { definePlugin, defineService } from "../plugin/index.js";
@@ -19,7 +24,9 @@ export interface HistoryMemoryService {
 }
 
 export const historyMemoryService = defineService<HistoryMemoryService>({
-  id: "may.history-memory", version: "1.0.0", scope: "application",
+  id: "may.history-memory",
+  version: "1.0.0",
+  scope: "application",
 });
 
 export interface HistoryMemoryPluginOptions {
@@ -33,34 +40,60 @@ export interface HistoryMemoryPluginOptions {
 export function createHistoryMemoryPlugin(options: HistoryMemoryPluginOptions = {}) {
   const mode = options.mode ?? "prune-summary";
   return definePlugin({
-    id: "may.history-memory", version: "1.0.0", scope: "application",
+    id: "may.history-memory",
+    version: "1.0.0",
+    scope: "application",
     provides: [historyMemoryService, applicationServices.contextOptions],
     requires: [
-      { service: applicationServices.history }, { service: applicationServices.state }, { service: applicationServices.model },
-      { service: applicationServices.modelWrappers }, { service: applicationServices.contextWrappers },
+      { service: applicationServices.history },
+      { service: applicationServices.state },
+      { service: applicationServices.model },
+      { service: applicationServices.modelWrappers },
+      { service: applicationServices.contextWrappers },
       { service: applicationServices.toolSources },
       { service: applicationServices.instructionSources },
     ],
     requiresHooks: [applicationHooks.created, applicationHooks.inputReceived, applicationHooks.beforeClose],
     state: { version: 1, initial: { notes: null } },
     setup(context) {
-      const memory = new HistoryReferenceMemory(mode === "history-reference" && options.autoCompactionStrategies === undefined);
+      const memory = new HistoryReferenceMemory(
+        mode === "history-reference" && options.autoCompactionStrategies === undefined,
+      );
       let strategies: HistoryMemoryService | undefined;
       const current = (effectiveModel?: Model): HistoryMemoryService => {
         if (strategies !== undefined) return strategies;
-        const model = effectiveModel ?? context.get(applicationServices.modelWrappers).apply(context.get(applicationServices.model));
-        const summary = new SummaryTailStrategy({ summarizer: options.summarizer ?? createModelContextSummarizer(model) });
+        const model =
+          effectiveModel ??
+          context.get(applicationServices.modelWrappers).apply(context.get(applicationServices.model));
+        const summary = new SummaryTailStrategy({
+          summarizer: options.summarizer ?? createModelContextSummarizer(model),
+        });
         strategies = {
-          memory, summary, manual: options.compactionStrategy ?? new PruneAndSummaryTailStrategy(summary),
+          memory,
+          summary,
+          manual: options.compactionStrategy ?? new PruneAndSummaryTailStrategy(summary),
           historyReference: memory.strategy,
-          native: model.contextCompactor === undefined ? undefined : new ModelContextCompactionStrategy(model.contextCompactor),
+          native:
+            model.contextCompactor === undefined
+              ? undefined
+              : new ModelContextCompactionStrategy(model.contextCompactor),
         };
         return strategies;
       };
       context.provide(historyMemoryService, {
         memory,
-        get manual() { return current().manual; }, get summary() { return current().summary; },
-        get historyReference() { return current().historyReference; }, get native() { return current().native; },
+        get manual() {
+          return current().manual;
+        },
+        get summary() {
+          return current().summary;
+        },
+        get historyReference() {
+          return current().historyReference;
+        },
+        get native() {
+          return current().native;
+        },
       });
       context.provide(applicationServices.contextOptions, (effectiveModel: Model) => {
         const budget = typeof options.budget === "function" ? options.budget(effectiveModel) : options.budget;
@@ -71,30 +104,54 @@ export function createHistoryMemoryPlugin(options: HistoryMemoryPluginOptions = 
             const value = current(effectiveModel);
             if (mode === "history-reference") return [value.historyReference];
             if (mode === "provider-native") {
-              if (value.native === undefined) throw new Error("The active model does not support provider-native context compaction");
+              if (value.native === undefined)
+                throw new Error("The active model does not support provider-native context compaction");
               return [value.native];
             }
             return [new PruneOldToolResultsStrategy(), value.summary];
           },
         };
       });
-      context.defer(context.get(applicationServices.contextWrappers).add(
-        factory => memory.wrap(factory, { includeInstructions: false }), { id: context.pluginId, order: 20, pluginOrder: context.pluginOrder },
-      ));
-      context.defer(context.get(applicationServices.instructionSources).add(
-        () => memory.instructions(), { id: context.pluginId, order: 60, pluginOrder: context.pluginOrder },
-      ));
-      context.defer(context.get(applicationServices.toolSources).add(
-        () => memory.tools(), { id: context.pluginId, pluginOrder: context.pluginOrder },
-      ));
-      context.on(applicationHooks.created, async () => {
-        const history = context.get(applicationServices.history).get();
-        const state = context.get(applicationServices.state).get();
-        const saved = context.state.get<{ notes: SavedNotes | null }>().notes;
-        const event = [...await history.history()].reverse().find(item => item.type === "state.updated" && item.key === "maybecode.context-notes");
-        if (event === undefined && saved !== null) await state.recordState("maybecode.context-notes", saved);
-        memory.attach({ history: () => history.history(), listRecoveries: () => history.listRecoveries(), recordState: (key, value) => state.recordState(key, value) }, notes => context.state.set({ notes }));
-      }, { order: 0 });
+      context.defer(
+        context
+          .get(applicationServices.contextWrappers)
+          .add((factory) => memory.wrap(factory, { includeInstructions: false }), {
+            id: context.pluginId,
+            order: 20,
+            pluginOrder: context.pluginOrder,
+          }),
+      );
+      context.defer(
+        context
+          .get(applicationServices.instructionSources)
+          .add(() => memory.instructions(), { id: context.pluginId, order: 60, pluginOrder: context.pluginOrder }),
+      );
+      context.defer(
+        context
+          .get(applicationServices.toolSources)
+          .add(() => memory.tools(), { id: context.pluginId, pluginOrder: context.pluginOrder }),
+      );
+      context.on(
+        applicationHooks.created,
+        async () => {
+          const history = context.get(applicationServices.history).get();
+          const state = context.get(applicationServices.state).get();
+          const saved = context.state.get<{ notes: SavedNotes | null }>().notes;
+          const event = [...(await history.history())]
+            .reverse()
+            .find((item) => item.type === "state.updated" && item.key === "maybecode.context-notes");
+          if (event === undefined && saved !== null) await state.recordState("maybecode.context-notes", saved);
+          memory.attach(
+            {
+              history: () => history.history(),
+              listRecoveries: () => history.listRecoveries(),
+              recordState: (key, value) => state.recordState(key, value),
+            },
+            (notes) => context.state.set({ notes }),
+          );
+        },
+        { order: 0 },
+      );
       context.on(applicationHooks.inputReceived, () => memory.cancelRequest());
       context.on(applicationHooks.beforeClose, () => memory.cancelRequest());
       context.defer(() => memory.cancelRequest());
@@ -106,7 +163,10 @@ export class PruneAndSummaryTailStrategy implements ContextCompactionStrategy {
   readonly name = "prune+summary-tail";
   private readonly prune = new PruneOldToolResultsStrategy();
   constructor(private readonly summary: ContextCompactionStrategy) {}
-  async compact(snapshot: Readonly<ContextSnapshot>, options: ContextCompactionOptions = {}): Promise<ContextCompactionOutput> {
+  async compact(
+    snapshot: Readonly<ContextSnapshot>,
+    options: ContextCompactionOptions = {},
+  ): Promise<ContextCompactionOutput> {
     return this.summary.compact({ ...snapshot, messages: [...this.prune.compact(snapshot)] }, options);
   }
 }

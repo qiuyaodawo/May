@@ -1,5 +1,14 @@
 import type { AgentApplicationEvent } from "@sortedyuan/may";
-import { omitUndefined, priceUsage, resolveUsageTotals, validateUsageCost, type RunBudget, type Usage, type UsageCost, type TraceAttributes } from "@sortedyuan/may/core";
+import {
+  omitUndefined,
+  priceUsage,
+  resolveUsageTotals,
+  validateUsageCost,
+  type RunBudget,
+  type Usage,
+  type UsageCost,
+  type TraceAttributes,
+} from "@sortedyuan/may/core";
 import {
   BasicTracer,
   type FinishedTraceSpan,
@@ -51,10 +60,21 @@ export interface EvalApprovalEvidence {
 
 const scopeKeys = ["may.session.id", "may.run.id", "may.task.id", "may.coordination.id"] as const;
 const safeAttributes = new Set([
-  ...scopeKeys, "may.model.call_id", "may.model.attempt_id", "may.model.attempt",
-  "may.model.input_tokens", "may.model.output_tokens", "may.model.total_tokens",
-  "may.model.usage_complete", "may.model.cost", "may.model.currency", "may.model.cost_kind",
-  "may.model.cost_complete", "may.model.pricing_id", "may.model.pricing_version", "may.model.completed",
+  ...scopeKeys,
+  "may.model.call_id",
+  "may.model.attempt_id",
+  "may.model.attempt",
+  "may.model.input_tokens",
+  "may.model.output_tokens",
+  "may.model.total_tokens",
+  "may.model.usage_complete",
+  "may.model.cost",
+  "may.model.currency",
+  "may.model.cost_kind",
+  "may.model.cost_complete",
+  "may.model.pricing_id",
+  "may.model.pricing_version",
+  "may.model.completed",
   "may.tool.call_id",
   "may.step",
   "may.model.attempts_complete",
@@ -86,30 +106,52 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
   private exceededRecords = false;
   private readonly coverageErrors = new Set<string>();
 
-  constructor(private readonly runBudget: Readonly<RunBudget> = {}, private readonly maxRecords = 100_000) {
-    if (!Number.isSafeInteger(maxRecords) || maxRecords < 1) throw new RangeError("Telemetry maxRecords must be a positive safe integer");
+  constructor(
+    private readonly runBudget: Readonly<RunBudget> = {},
+    private readonly maxRecords = 100_000,
+  ) {
+    if (!Number.isSafeInteger(maxRecords) || maxRecords < 1)
+      throw new RangeError("Telemetry maxRecords must be a positive safe integer");
     this.tracer = new BasicTracer({ processor: this, observer: this });
   }
 
   onStart(span: StartedTraceSpan): void {
-    if (this.scopes.size >= this.maxRecords) { this.exceededRecords = true; return; }
-    const inherited = span.parentSpanId === undefined ? {} : this.scopes.get(span.parentSpanId) ?? {};
-    const scope = Object.fromEntries(scopeKeys.flatMap(key => {
-      const value = span.attributes[key] ?? inherited[key];
-      return typeof value === "string" ? [[key, value]] : [];
-    }));
+    if (this.scopes.size >= this.maxRecords) {
+      this.exceededRecords = true;
+      return;
+    }
+    const inherited = span.parentSpanId === undefined ? {} : (this.scopes.get(span.parentSpanId) ?? {});
+    const scope = Object.fromEntries(
+      scopeKeys.flatMap((key) => {
+        const value = span.attributes[key] ?? inherited[key];
+        return typeof value === "string" ? [[key, value]] : [];
+      }),
+    );
     this.scopes.set(span.context.spanId, scope);
     this.track({ ...span.attributes, ...scope }, span.context.traceId);
   }
 
   onEnd(span: FinishedTraceSpan): void {
     if (this.spans.has(span.context.spanId)) return;
-    if (this.spans.size >= this.maxRecords) { this.exceededRecords = true; this.scopes.delete(span.context.spanId); return; }
-    const attributes = Object.fromEntries(Object.entries({ ...this.scopes.get(span.context.spanId), ...span.attributes })
-      .filter(([key]) => safeAttributes.has(key)));
+    if (this.spans.size >= this.maxRecords) {
+      this.exceededRecords = true;
+      this.scopes.delete(span.context.spanId);
+      return;
+    }
+    const attributes = Object.fromEntries(
+      Object.entries({ ...this.scopes.get(span.context.spanId), ...span.attributes }).filter(([key]) =>
+        safeAttributes.has(key),
+      ),
+    );
     const sanitized: FinishedTraceSpan = {
-      name: span.name, context: span.context, startTime: span.startTime, endTime: span.endTime,
-      durationMs: span.durationMs, status: span.status, attributes, events: [],
+      name: span.name,
+      context: span.context,
+      startTime: span.startTime,
+      endTime: span.endTime,
+      durationMs: span.durationMs,
+      status: span.status,
+      attributes,
+      events: [],
       ...omitUndefined({
         parentSpanId: span.parentSpanId,
         error: span.error === undefined ? undefined : omitUndefined({ name: span.error.name, code: span.error.code }),
@@ -122,24 +164,38 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
       const identity = text(attributes, "may.model.call_id") ?? span.context.spanId;
       this.calls.set(identity, sanitized);
     }
-    if (span.name === "may.model.attempt") this.attempts.add(text(attributes, "may.model.attempt_id") ?? span.context.spanId);
-    if (span.name === "may.tool.call") this.tools.set(`${text(attributes, "may.run.id") ?? span.context.traceId}:${numeric(attributes, "may.step")}:${text(attributes, "may.tool.call_id") ?? span.context.spanId}`, span.status === "error");
+    if (span.name === "may.model.attempt")
+      this.attempts.add(text(attributes, "may.model.attempt_id") ?? span.context.spanId);
+    if (span.name === "may.tool.call")
+      this.tools.set(
+        `${text(attributes, "may.run.id") ?? span.context.traceId}:${numeric(attributes, "may.step")}:${text(attributes, "may.tool.call_id") ?? span.context.spanId}`,
+        span.status === "error",
+      );
   }
 
   observe(event: AgentApplicationEvent, sessionId: string): void {
     this.sessions.add(sessionId);
-    if (event.type === "context.compacted") { this.compactions += 1; return; }
+    if (event.type === "context.compacted") {
+      this.compactions += 1;
+      return;
+    }
     if (event.type === "run.event") {
       const value = event.event;
-      if (["model.text.delta", "model.reasoning.delta", "tool.output.delta", "tool.progress"].includes(value.type)) return;
+      if (["model.text.delta", "model.reasoning.delta", "tool.output.delta", "tool.progress"].includes(value.type))
+        return;
       const id = `${sessionId}:${value.runId}:${value.seq}`;
       if (this.events.has(id)) return;
-      if (this.events.size >= this.maxRecords) { this.exceededRecords = true; return; }
+      if (this.events.size >= this.maxRecords) {
+        this.exceededRecords = true;
+        return;
+      }
       this.events.add(id);
       this.runs.add(value.runId);
       if (value.type === "model.retrying") this.retryWait += value.delayMs;
-      if (value.type === "model.retrying") this.pendingEvents.set(id, { id, type: "retry-wait", durationMs: value.delayMs });
-      if (value.type === "model.completed" && value.usage !== undefined) this.usage.set(`${value.runId}:model:${value.step}`, value.usage);
+      if (value.type === "model.retrying")
+        this.pendingEvents.set(id, { id, type: "retry-wait", durationMs: value.delayMs });
+      if (value.type === "model.completed" && value.usage !== undefined)
+        this.usage.set(`${value.runId}:model:${value.step}`, value.usage);
       if (value.type === "tool.started") this.tools.set(`${value.runId}:${value.step}:${value.call.id}`, false);
       if (value.type === "tool.failed") this.tools.set(`${value.runId}:${value.step}:${value.call.id}`, true);
       return;
@@ -148,11 +204,19 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
     const value = event.event;
     if (value.type === "approval.requested") {
       const id = `${sessionId}:${value.request.id}`;
-      if (this.seenApprovals.size >= this.maxRecords) { this.exceededRecords = true; return; }
+      if (this.seenApprovals.size >= this.maxRecords) {
+        this.exceededRecords = true;
+        return;
+      }
       if (!this.seenApprovals.has(id)) {
         this.seenApprovals.add(id);
         this.approvals.set(id, value.timestamp);
-        this.approvalRecords.set(id, { requestId: value.request.id, sessionId, requestedAt: value.timestamp, status: "pending" });
+        this.approvalRecords.set(id, {
+          requestId: value.request.id,
+          sessionId,
+          requestedAt: value.timestamp,
+          status: "pending",
+        });
       }
     } else if (value.type === "approval.resolved" || value.type === "approval.cancelled") {
       const id = `${sessionId}:${value.requestId}`;
@@ -160,17 +224,25 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
       if (started !== undefined) {
         this.approvalWait += Math.max(0, value.timestamp - started);
         this.approvals.delete(id);
-        this.approvalRecords.set(id, { ...this.approvalRecords.get(id)!, resolvedAt: value.timestamp,
+        this.approvalRecords.set(id, {
+          ...this.approvalRecords.get(id)!,
+          resolvedAt: value.timestamp,
           status: value.type === "approval.resolved" ? "resolved" : "cancelled",
-          ...(value.type === "approval.resolved" ? { decision: value.decision } : {}) });
+          ...(value.type === "approval.resolved" ? { decision: value.decision } : {}),
+        });
       }
     }
   }
 
-  recordHumanIntervention(): void { this.human += 1; }
+  recordHumanIntervention(): void {
+    this.human += 1;
+  }
 
   recordModelReceipt(callId: string, usage: Usage | undefined, cost: UsageCost | undefined): void {
-    if (this.receiptCosts.size >= this.maxRecords || this.usage.size >= this.maxRecords) { this.exceededRecords = true; return; }
+    if (this.receiptCosts.size >= this.maxRecords || this.usage.size >= this.maxRecords) {
+      this.exceededRecords = true;
+      return;
+    }
     if (usage !== undefined) this.usage.set(callId, structuredClone(usage));
     if (cost !== undefined) this.receiptCosts.set(callId, validateUsageCost(cost));
   }
@@ -188,35 +260,71 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
       if (failed) await emit({ id: `${id}:failed`, type: "tool-failure", scope });
     }
     for (const event of this.pendingEvents.values()) await emit({ ...event, scope });
-    for (let index = 0; index < this.compactions; index++) await emit({ id: `compaction:${index}`, type: "context-compaction", scope });
-    for (let index = 0; index < this.human; index++) await emit({ id: `human:${index}`, type: "human-intervention", scope });
+    for (let index = 0; index < this.compactions; index++)
+      await emit({ id: `compaction:${index}`, type: "context-compaction", scope });
+    for (let index = 0; index < this.human; index++)
+      await emit({ id: `human:${index}`, type: "human-intervention", scope });
     await emit({ id: "approval-wait", type: "approval-wait", scope, durationMs: this.metrics().approvalWaitMs });
     await emit({ id: "identities", type: "identity", scope, identities: this.identities() });
   }
 
   identities(): EvalAgentIdentities {
-    return { sessionIds: [...this.sessions], runIds: [...this.runs], taskIds: [...this.tasks],
-      coordinationIds: [...this.coordinations], traceIds: [...this.traces] };
+    return {
+      sessionIds: [...this.sessions],
+      runIds: [...this.runs],
+      taskIds: [...this.tasks],
+      coordinationIds: [...this.coordinations],
+      traceIds: [...this.traces],
+    };
   }
 
-  evidence(): readonly FinishedTraceSpan[] { return [...this.spans.values()]; }
-  approvalEvidence(): readonly EvalApprovalEvidence[] { return [...this.approvalRecords.values()]; }
-  modelCallIds(): readonly string[] { return [...this.calls.keys()]; }
-  successfulToolCallIds(): readonly string[] {
-    return [...this.spans.values()].filter(span => span.name === "may.tool.call" && span.status === "ok")
-      .map(span => `${text(span.attributes, "may.run.id") ?? span.context.traceId}:${numeric(span.attributes, "may.step")}:${text(span.attributes, "may.tool.call_id") ?? span.context.spanId}`);
+  evidence(): readonly FinishedTraceSpan[] {
+    return [...this.spans.values()];
   }
-  markIncomplete(reason: string): void { this.coverageErrors.add(reason); }
+  approvalEvidence(): readonly EvalApprovalEvidence[] {
+    return [...this.approvalRecords.values()];
+  }
+  modelCallIds(): readonly string[] {
+    return [...this.calls.keys()];
+  }
+  successfulToolCallIds(): readonly string[] {
+    return [...this.spans.values()]
+      .filter((span) => span.name === "may.tool.call" && span.status === "ok")
+      .map(
+        (span) =>
+          `${text(span.attributes, "may.run.id") ?? span.context.traceId}:${numeric(span.attributes, "may.step")}:${text(span.attributes, "may.tool.call_id") ?? span.context.spanId}`,
+      );
+  }
+  markIncomplete(reason: string): void {
+    this.coverageErrors.add(reason);
+  }
 
   metrics(now = Date.now()): EvalAgentMetrics {
     const missing = new Set<string>();
     const totals: Record<string, number> = {};
-    const costs = new Map<string, { amount?: number; currency: string; kind: "estimated" | "provider"; complete: boolean; missingReasons: string[]; pricingId?: string; pricingVersion?: string; source?: string; effectiveAt?: string }>();
+    const costs = new Map<
+      string,
+      {
+        amount?: number;
+        currency: string;
+        kind: "estimated" | "provider";
+        complete: boolean;
+        missingReasons: string[];
+        pricingId?: string;
+        pricingVersion?: string;
+        source?: string;
+        effectiveAt?: string;
+      }
+    >();
     for (const [callId, span] of this.calls) {
       const attributes = span.attributes;
       const receipt = this.usage.get(callId) ?? spanUsage(attributes);
       const usageTotals = resolveUsageTotals(receipt);
-      for (const [field, key] of [["inputTokens", "input_tokens"], ["outputTokens", "output_tokens"], ["totalTokens", "total_tokens"]]) {
+      for (const [field, key] of [
+        ["inputTokens", "input_tokens"],
+        ["outputTokens", "output_tokens"],
+        ["totalTokens", "total_tokens"],
+      ]) {
         const value = field === "totalTokens" ? usageTotals.totalTokens : numeric(attributes, `may.model.${key}`);
         if (value !== undefined) totals[field!] = (totals[field!] ?? 0) + value;
         else missing.add(`${field}-missing`);
@@ -225,8 +333,18 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
       const receiptCost = this.cost(span, receipt);
       const { currency, kind, pricingId, pricingVersion } = receiptCost;
       const key = JSON.stringify([currency, kind, pricingId, pricingVersion]);
-      const cost = costs.get(key) ?? { currency, kind, complete: true, missingReasons: [],
-        ...omitUndefined({ pricingId, pricingVersion, source: receiptCost.source, effectiveAt: receiptCost.effectiveAt }) };
+      const cost = costs.get(key) ?? {
+        currency,
+        kind,
+        complete: true,
+        missingReasons: [],
+        ...omitUndefined({
+          pricingId,
+          pricingVersion,
+          source: receiptCost.source,
+          effectiveAt: receiptCost.effectiveAt,
+        }),
+      };
       const amount = receiptCost.amount;
       if (amount !== undefined) cost.amount = (cost.amount ?? 0) + amount;
       if (!receiptCost.complete || amount === undefined) {
@@ -239,14 +357,22 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
     if (this.exceededRecords) missing.add("telemetry-entry-limit");
     for (const reason of this.coverageErrors) missing.add(reason);
     return {
-      modelCalls: this.calls.size, modelAttempts: this.attempts.size,
-      modelAttemptsComplete: [...this.calls.values()].every(span => span.attributes["may.model.attempts_complete"] !== false),
+      modelCalls: this.calls.size,
+      modelAttempts: this.attempts.size,
+      modelAttemptsComplete: [...this.calls.values()].every(
+        (span) => span.attributes["may.model.attempts_complete"] !== false,
+      ),
       coverageComplete: !this.exceededRecords && this.coverageErrors.size === 0,
       coverageMissingReasons: [...(this.exceededRecords ? ["telemetry-entry-limit"] : []), ...this.coverageErrors],
-      toolCalls: this.tools.size, toolFailures: [...this.tools.values()].filter(Boolean).length,
-      retryWaitMs: this.retryWait, contextCompactions: this.compactions, humanInterventions: this.human,
-      approvalWaitMs: this.approvalWait + [...this.approvals.values()].reduce((sum, started) => sum + Math.max(0, now - started), 0),
-      tokens: { ...totals, complete: missing.size === 0, missingReasons: [...missing] }, costs: [...costs.values()],
+      toolCalls: this.tools.size,
+      toolFailures: [...this.tools.values()].filter(Boolean).length,
+      retryWaitMs: this.retryWait,
+      contextCompactions: this.compactions,
+      humanInterventions: this.human,
+      approvalWaitMs:
+        this.approvalWait + [...this.approvals.values()].reduce((sum, started) => sum + Math.max(0, now - started), 0),
+      tokens: { ...totals, complete: missing.size === 0, missingReasons: [...missing] },
+      costs: [...costs.values()],
     };
   }
 
@@ -254,53 +380,104 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
     const id = text(span.attributes, "may.model.call_id");
     const recorded = id === undefined ? undefined : this.receiptCosts.get(id);
     if (recorded !== undefined) return recorded;
-    const calculated = priceUsage(receipt, this.runBudget.pricing ?? this.runBudget.tokenPrices, this.runBudget.usagePricer);
+    const calculated = priceUsage(
+      receipt,
+      this.runBudget.pricing ?? this.runBudget.tokenPrices,
+      this.runBudget.usagePricer,
+    );
     const amount = numeric(span.attributes, "may.model.cost");
     if (amount === undefined) return calculated;
     const complete = span.attributes["may.model.cost_complete"] === true;
     const pricingId = text(span.attributes, "may.model.pricing_id");
     const pricingVersion = text(span.attributes, "may.model.pricing_version");
-    return { ...calculated, amount, currency: text(span.attributes, "may.model.currency") ?? calculated.currency,
-      kind: span.attributes["may.model.cost_kind"] === "provider" ? "provider" : "estimated", complete,
+    return {
+      ...calculated,
+      amount,
+      currency: text(span.attributes, "may.model.currency") ?? calculated.currency,
+      kind: span.attributes["may.model.cost_kind"] === "provider" ? "provider" : "estimated",
+      complete,
       ...omitUndefined({ pricingId, pricingVersion }),
-      missingReasons: complete ? [] : calculated.missingReasons.length ? calculated.missingReasons : ["model-cost-incomplete"] };
+      missingReasons: complete
+        ? []
+        : calculated.missingReasons.length
+          ? calculated.missingReasons
+          : ["model-cost-incomplete"],
+    };
   }
 
   private track(attributes: TraceAttributes, traceId: string): void {
     this.traces.add(traceId);
-    for (const [key, values] of [["may.session.id", this.sessions], ["may.run.id", this.runs],
-      ["may.task.id", this.tasks], ["may.coordination.id", this.coordinations]] as const) {
+    for (const [key, values] of [
+      ["may.session.id", this.sessions],
+      ["may.run.id", this.runs],
+      ["may.task.id", this.tasks],
+      ["may.coordination.id", this.coordinations],
+    ] as const) {
       const value = text(attributes, key);
       if (value !== undefined) values.add(value);
     }
   }
 }
 
-export function evalIdentities(identities: EvalAgentIdentities): EvalIdentities { return identities; }
+export function evalIdentities(identities: EvalAgentIdentities): EvalIdentities {
+  return identities;
+}
 
 export function evalMetrics(metrics: EvalAgentMetrics): Partial<EvalMetrics> {
   const costGroups = metrics.costs;
-  const currencies = new Set(costGroups.map(cost => cost.currency));
-  const known = costGroups.filter(cost => cost.amount !== undefined);
-  const complete = metrics.coverageComplete && costGroups.length > 0 && currencies.size === 1 && costGroups.every(cost => cost.complete);
-  const missingReasons = [...new Set(costGroups.flatMap(cost => cost.missingReasons))];
+  const currencies = new Set(costGroups.map((cost) => cost.currency));
+  const known = costGroups.filter((cost) => cost.amount !== undefined);
+  const complete =
+    metrics.coverageComplete &&
+    costGroups.length > 0 &&
+    currencies.size === 1 &&
+    costGroups.every((cost) => cost.complete);
+  const missingReasons = [...new Set(costGroups.flatMap((cost) => cost.missingReasons))];
   if (costGroups.length === 0) missingReasons.push("model-cost-telemetry-missing");
   if (currencies.size > 1) missingReasons.push("multiple-currencies");
   if (!metrics.coverageComplete) missingReasons.push(...metrics.coverageMissingReasons);
-  const kinds = new Set(costGroups.map(cost => cost.kind));
+  const kinds = new Set(costGroups.map((cost) => cost.kind));
   const single = costGroups.length === 1 ? costGroups[0] : undefined;
-  const count = (value: number): MeasuredValue => ({ value, complete: metrics.coverageComplete, missingReasons: metrics.coverageMissingReasons });
+  const count = (value: number): MeasuredValue => ({
+    value,
+    complete: metrics.coverageComplete,
+    missingReasons: metrics.coverageMissingReasons,
+  });
   return {
-    approvalWaitMs: count(metrics.approvalWaitMs), modelCalls: count(metrics.modelCalls),
-    modelAttempts: { ...count(metrics.modelAttempts), complete: metrics.coverageComplete && metrics.modelAttemptsComplete,
-      missingReasons: [...metrics.coverageMissingReasons, ...(metrics.modelAttemptsComplete ? [] : ["native-compaction-attempt-count-unavailable"])] }, retryWaitMs: count(metrics.retryWaitMs),
-    toolCalls: count(metrics.toolCalls), toolFailures: count(metrics.toolFailures),
-    contextCompactions: count(metrics.contextCompactions), humanInterventions: count(metrics.humanInterventions),
-    totalTokens: { ...omitUndefined({ value: metrics.tokens.totalTokens }), complete: metrics.tokens.complete, missingReasons: metrics.tokens.missingReasons },
-    cost: { ...(known.length === 0 || currencies.size !== 1 ? {} : { amount: known.reduce((sum, cost) => sum + cost.amount!, 0) }),
-      currency: currencies.size === 1 ? costGroups[0]!.currency : "USD", kind: kinds.size === 1 ? costGroups[0]!.kind : "estimated",
-      complete, missingReasons,
-      ...omitUndefined({ pricingId: single?.pricingId, pricingVersion: single?.pricingVersion, source: single?.source, effectiveAt: single?.effectiveAt }),
+    approvalWaitMs: count(metrics.approvalWaitMs),
+    modelCalls: count(metrics.modelCalls),
+    modelAttempts: {
+      ...count(metrics.modelAttempts),
+      complete: metrics.coverageComplete && metrics.modelAttemptsComplete,
+      missingReasons: [
+        ...metrics.coverageMissingReasons,
+        ...(metrics.modelAttemptsComplete ? [] : ["native-compaction-attempt-count-unavailable"]),
+      ],
+    },
+    retryWaitMs: count(metrics.retryWaitMs),
+    toolCalls: count(metrics.toolCalls),
+    toolFailures: count(metrics.toolFailures),
+    contextCompactions: count(metrics.contextCompactions),
+    humanInterventions: count(metrics.humanInterventions),
+    totalTokens: {
+      ...omitUndefined({ value: metrics.tokens.totalTokens }),
+      complete: metrics.tokens.complete,
+      missingReasons: metrics.tokens.missingReasons,
+    },
+    cost: {
+      ...(known.length === 0 || currencies.size !== 1
+        ? {}
+        : { amount: known.reduce((sum, cost) => sum + cost.amount!, 0) }),
+      currency: currencies.size === 1 ? costGroups[0]!.currency : "USD",
+      kind: kinds.size === 1 ? costGroups[0]!.kind : "estimated",
+      complete,
+      missingReasons,
+      ...omitUndefined({
+        pricingId: single?.pricingId,
+        pricingVersion: single?.pricingVersion,
+        source: single?.source,
+        effectiveAt: single?.effectiveAt,
+      }),
     },
   };
 }
@@ -316,10 +493,12 @@ export function createEvalTaskAssessment(options: {
   readonly timestamp?: number;
 }): TaskAssessment {
   const identities = options.identities;
-  const only = (values: readonly string[] | undefined) => values?.length === 1 ? values[0] : undefined;
+  const only = (values: readonly string[] | undefined) => (values?.length === 1 ? values[0] : undefined);
   return {
     taskId: only(identities?.taskIds) ?? options.trialId,
-    evaluator: options.evaluatorId, evaluatorVersion: options.evaluatorVersion, result: options.verdict,
+    evaluator: options.evaluatorId,
+    evaluatorVersion: options.evaluatorVersion,
+    result: options.verdict,
     ...omitUndefined({
       configurationVersion: options.configurationVersion,
       sessionId: only(identities?.sessionIds),
@@ -348,6 +527,8 @@ function spanUsage(attributes: TraceAttributes): Usage | undefined {
   const totalTokens = numeric(attributes, "may.model.total_tokens");
   if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined) return undefined;
   const complete = attributes["may.model.usage_complete"] === true;
-  return { ...omitUndefined({ inputTokens, outputTokens, totalTokens }),
-    completeness: complete ? { status: "complete" } : { status: "partial", reason: "model-call-usage-incomplete" } };
+  return {
+    ...omitUndefined({ inputTokens, outputTokens, totalTokens }),
+    completeness: complete ? { status: "complete" } : { status: "partial", reason: "model-call-usage-incomplete" },
+  };
 }

@@ -1,4 +1,10 @@
-import { Keymap, formatKeySequence, mergeKeyBindings, parseKeySequence, type KeyBindingDefinition } from "@sortedyuan/tui/keybindings";
+import {
+  Keymap,
+  formatKeySequence,
+  mergeKeyBindings,
+  parseKeySequence,
+  type KeyBindingDefinition,
+} from "@sortedyuan/tui/keybindings";
 import { DEFAULT_EDITOR_KEYBINDINGS } from "@sortedyuan/tui";
 
 export const MAYBECODE_KEY_ACTIONS = [
@@ -38,7 +44,7 @@ export const MAYBECODE_KEY_ACTIONS = [
   "request.scrollDown",
 ] as const;
 
-export type MaybeCodeKeyAction = typeof MAYBECODE_KEY_ACTIONS[number];
+export type MaybeCodeKeyAction = (typeof MAYBECODE_KEY_ACTIONS)[number];
 
 export const MAYBECODE_EDITOR_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   { context: "editor", keys: "ctrl+j", action: "editor.newline" },
@@ -110,8 +116,11 @@ export function createMaybeCodeKeymap(options: MaybeCodeKeymapOptions = {}): Key
     throw new Error("MaybeCode leader must be one modified key, for example ctrl+g");
   }
   const leaderKey = formatKeySequence(sequence);
-  if (mergeKeyBindings(DEFAULT_EDITOR_KEYBINDINGS, MAYBECODE_EDITOR_KEYBINDINGS).some(binding =>
-    formatKeySequence(parseKeySequence(binding.keys)) === leaderKey)) {
+  if (
+    mergeKeyBindings(DEFAULT_EDITOR_KEYBINDINGS, MAYBECODE_EDITOR_KEYBINDINGS).some(
+      (binding) => formatKeySequence(parseKeySequence(binding.keys)) === leaderKey,
+    )
+  ) {
     throw new Error("MaybeCode leader conflicts with a text editing shortcut");
   }
   return new Keymap(mergeKeyBindings(MAYBECODE_DEFAULT_KEYBINDINGS, options.bindings, { leader }), {

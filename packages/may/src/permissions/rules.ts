@@ -18,8 +18,15 @@ export interface PermissionRuleStore {
 }
 
 const requiredFields = [
-  "id", "scopeId", "toolName", "definitionKey", "grantKey", "description",
-  "decision", "createdAt", "createdBy",
+  "id",
+  "scopeId",
+  "toolName",
+  "definitionKey",
+  "grantKey",
+  "description",
+  "decision",
+  "createdAt",
+  "createdBy",
 ] as const;
 const allowedFields: readonly string[] = [...requiredFields, "expiresAt"];
 
@@ -30,14 +37,20 @@ export function validateRuleIdentifier(value: unknown, field: string): asserts v
 }
 
 export function copyPermissionRule(value: unknown): PersistentPermissionRule {
-  if (value === null || typeof value !== "object" || Array.isArray(value) ||
-      (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
+  ) {
     throw new TypeError("Permission rule must be a plain object");
   }
   const rule = value as Record<string, unknown>;
-  if (Reflect.ownKeys(rule).some((field) => typeof field !== "string" || !allowedFields.includes(field)) ||
-      requiredFields.some((field) => !Object.hasOwn(rule, field)) ||
-      Object.values(Object.getOwnPropertyDescriptors(rule)).some((field) => !("value" in field))) {
+  if (
+    Reflect.ownKeys(rule).some((field) => typeof field !== "string" || !allowedFields.includes(field)) ||
+    requiredFields.some((field) => !Object.hasOwn(rule, field)) ||
+    Object.values(Object.getOwnPropertyDescriptors(rule)).some((field) => !("value" in field))
+  ) {
     throw new TypeError("Permission rule has invalid fields");
   }
   for (const field of ["id", "scopeId", "toolName", "definitionKey", "grantKey", "description", "createdBy"] as const) {
@@ -71,9 +84,11 @@ export class InMemoryPermissionRuleStore implements PermissionRuleStore {
 
   async list(scopeId?: string): Promise<readonly PersistentPermissionRule[]> {
     if (scopeId !== undefined) validateRuleIdentifier(scopeId, "scopeId");
-    return Object.freeze([...this.rules.values()]
-      .filter((rule) => scopeId === undefined || rule.scopeId === scopeId)
-      .map(copyPermissionRule));
+    return Object.freeze(
+      [...this.rules.values()]
+        .filter((rule) => scopeId === undefined || rule.scopeId === scopeId)
+        .map(copyPermissionRule),
+    );
   }
 
   async create(rule: PersistentPermissionRule): Promise<void> {

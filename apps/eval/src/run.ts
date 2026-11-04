@@ -26,24 +26,44 @@ export interface EvalSuite {
   readonly registry: EvalRegistry;
 }
 
-export async function runCli(args: readonly string[], options: {
-  readonly signal?: AbortSignal;
-  readonly stdout?: (text: string) => void;
-} = {}): Promise<number> {
+export async function runCli(
+  args: readonly string[],
+  options: {
+    readonly signal?: AbortSignal;
+    readonly stdout?: (text: string) => void;
+  } = {},
+): Promise<number> {
   const command = parseCliArgs(args);
-  const output = options.stdout ?? (value => process.stdout.write(`${value}\n`));
-  if (command === undefined) { output(CLI_USAGE); return 0; }
+  const output = options.stdout ?? ((value) => process.stdout.write(`${value}\n`));
+  if (command === undefined) {
+    output(CLI_USAGE);
+    return 0;
+  }
   const values = command.options;
   if (command.command === "validate" || command.command === "run") {
     const suite = await loadSuite(values.suite!);
     const store = new FileEvalStore({ directory: resolve(values.output ?? ".eval-results") });
-    const runner = new EvalRunner({ registry: suite.registry, store, ...(options.signal === undefined ? {} : { signal: options.signal }) });
+    const runner = new EvalRunner({
+      registry: suite.registry,
+      store,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+    });
     runner.validate(suite.experiment);
-    if (command.command === "validate") { output(`Validated ${suite.experiment.id}`); return 0; }
+    if (command.command === "validate") {
+      output(`Validated ${suite.experiment.id}`);
+      return 0;
+    }
     const location = resolve(store.directory, suite.experiment.id);
     await preserveFailureReport(() => runner.run(suite.experiment), store, suite.experiment.id, location);
     const report = await exportReport(store, suite.experiment.id, location);
-    output(JSON.stringify({ experimentId: report.experimentId, directory: location, planned: report.planned, variants: report.variants }));
+    output(
+      JSON.stringify({
+        experimentId: report.experimentId,
+        directory: location,
+        planned: report.planned,
+        variants: report.variants,
+      }),
+    );
     return successfulReport(report) ? 0 : 1;
   }
   if (command.command === "resume") {
@@ -53,7 +73,11 @@ export async function runCli(args: readonly string[], options: {
     if (fingerprint(serializableExperiment(suite.experiment)) !== fingerprint(plan.experiment)) {
       throw new Error("Suite configuration differs from the accepted experiment plan");
     }
-    const runner = new EvalRunner({ registry: suite.registry, store, ...(options.signal === undefined ? {} : { signal: options.signal }) });
+    const runner = new EvalRunner({
+      registry: suite.registry,
+      store,
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+    });
     await preserveFailureReport(() => runner.resume(experimentId, suite.experiment), store, experimentId, directory);
     const report = await exportReport(store, experimentId, directory);
     output(JSON.stringify({ experimentId, directory, variants: report.variants }));
@@ -61,18 +85,29 @@ export async function runCli(args: readonly string[], options: {
   }
   if (command.command === "report") {
     const { store, experimentId, directory } = experimentStore(values.experiment!);
-    const report = await exportReport(store, experimentId, values.output === undefined ? directory : resolve(values.output));
+    const report = await exportReport(
+      store,
+      experimentId,
+      values.output === undefined ? directory : resolve(values.output),
+    );
     output(renderEvalReportMarkdown(report));
     return 0;
   }
   if (command.command === "grade") {
     const { store, experimentId, directory } = experimentStore(values.experiment!);
-    const result = await readJsonFile(values.result!) as EvaluationResult;
+    const result = (await readJsonFile(values.result!)) as EvaluationResult;
     const suite = values.suite === undefined ? undefined : await loadSuite(values.suite);
     const runner = new EvalRunner({ registry: new EvalRegistry(), store });
     const state = await runner.grade(experimentId, values.trial!, values.evaluator!, result, suite?.experiment);
     await exportReport(store, experimentId, directory);
-    output(JSON.stringify({ trialId: state.trial.id, taskVerdict: state.taskVerdict, awaitingReview: state.awaitingReview, evaluations: state.evaluations }));
+    output(
+      JSON.stringify({
+        trialId: state.trial.id,
+        taskVerdict: state.taskVerdict,
+        awaitingReview: state.awaitingReview,
+        evaluations: state.evaluations,
+      }),
+    );
     return state.taskVerdict === "passed" && !state.awaitingReview ? 0 : 1;
   }
   const baselineLocation = experimentStore(values.baseline!);
@@ -87,20 +122,26 @@ export async function runCli(args: readonly string[], options: {
   const release = await candidateLocation.store.acquire(candidateLocation.experimentId);
   try {
     await atomicWrite(join(candidateLocation.directory, "comparison.json"), JSON.stringify(comparison, null, 2));
-  } finally { await release(); }
+  } finally {
+    await release();
+  }
   output(JSON.stringify(comparison, null, 2));
   return comparison.passed ? 0 : 1;
 }
 
 async function loadSuite(path: string): Promise<EvalSuite> {
-  const value = await import(pathToFileURL(resolve(path)).href) as Partial<EvalSuite>;
+  const value = (await import(pathToFileURL(resolve(path)).href)) as Partial<EvalSuite>;
   if (typeof value.experiment !== "object" || value.experiment === null || !(value.registry instanceof EvalRegistry)) {
     throw new TypeError("A suite must export experiment and an EvalRegistry instance");
   }
   return { experiment: value.experiment, registry: value.registry };
 }
 
-function experimentStore(path: string): { readonly store: FileEvalStore; readonly experimentId: string; readonly directory: string } {
+function experimentStore(path: string): {
+  readonly store: FileEvalStore;
+  readonly experimentId: string;
+  readonly directory: string;
+} {
   const directory = resolve(path);
   return { store: new FileEvalStore({ directory: dirname(directory) }), experimentId: basename(directory), directory };
 }
@@ -118,13 +159,27 @@ async function exportReport(store: FileEvalStore, experimentId: string, director
     await atomicWrite(join(directory, "report.json"), JSON.stringify(report, null, 2));
     await atomicWrite(join(directory, "report.md"), renderEvalReportMarkdown(report));
     return report;
-  } finally { await release(); }
+  } finally {
+    await release();
+  }
 }
 
-async function preserveFailureReport(operation: () => Promise<unknown>, store: FileEvalStore, experimentId: string, directory: string): Promise<void> {
-  try { await operation(); } catch (error) {
-    try { await exportReport(store, experimentId, directory); } catch (reportError) {
-      throw new AggregateError([error, reportError], `Execution failed: ${formatCliError(error)}. Report persistence failed: ${formatCliError(reportError)}`);
+async function preserveFailureReport(
+  operation: () => Promise<unknown>,
+  store: FileEvalStore,
+  experimentId: string,
+  directory: string,
+): Promise<void> {
+  try {
+    await operation();
+  } catch (error) {
+    try {
+      await exportReport(store, experimentId, directory);
+    } catch (reportError) {
+      throw new AggregateError(
+        [error, reportError],
+        `Execution failed: ${formatCliError(error)}. Report persistence failed: ${formatCliError(reportError)}`,
+      );
     }
     throw error;
   }
@@ -133,8 +188,18 @@ async function preserveFailureReport(operation: () => Promise<unknown>, store: F
 async function atomicWrite(path: string, content: string): Promise<void> {
   const temporary = `${path}.${randomUUID()}.writing`;
   const handle = await open(temporary, "wx");
-  try { await handle.writeFile(`${content}\n`); await handle.sync(); } finally { await handle.close(); }
-  try { await rename(temporary, path); } catch (error) { await unlink(temporary); throw error; }
+  try {
+    await handle.writeFile(`${content}\n`);
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  try {
+    await rename(temporary, path);
+  } catch (error) {
+    await unlink(temporary);
+    throw error;
+  }
 }
 
 async function readJsonFile(path: string): Promise<unknown> {
@@ -147,9 +212,15 @@ async function readJsonFile(path: string): Promise<unknown> {
 
 async function readThresholds(path: string): Promise<EvalComparisonThresholds> {
   const value = await readJsonFile(path);
-  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new TypeError("Thresholds must be a JSON object");
-  for (const key of Object.keys(value)) if (!["minimumSuccessRate", "allowedRegressedCases", "maxCostIncreaseRatio"].includes(key)) throw new TypeError(`Unknown comparison threshold: ${key}`);
-  if ("allowedRegressedCases" in value && (!Array.isArray(value.allowedRegressedCases) || !value.allowedRegressedCases.every(id => typeof id === "string"))) {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new TypeError("Thresholds must be a JSON object");
+  for (const key of Object.keys(value))
+    if (!["minimumSuccessRate", "allowedRegressedCases", "maxCostIncreaseRatio"].includes(key))
+      throw new TypeError(`Unknown comparison threshold: ${key}`);
+  if (
+    "allowedRegressedCases" in value &&
+    (!Array.isArray(value.allowedRegressedCases) || !value.allowedRegressedCases.every((id) => typeof id === "string"))
+  ) {
     throw new TypeError("allowedRegressedCases must contain case identifiers");
   }
   return value as EvalComparisonThresholds;

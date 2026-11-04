@@ -19,11 +19,11 @@ maybecode team run "Review the proposed approach in stages" --preset pipeline --
 maybecode team run "Compare independent findings" --preset parallel --workspace C:\work\example
 ```
 
-| Preset | Initial graph | Dynamic delegation |
-| --- | --- | --- |
-| `supervisor` (default) | `analysis` and `review` run independently, then `summary` | Supervisor may delegate to `worker` |
-| `pipeline` | `analysis` → `review` → `summary`; summary receives both reports | Disabled |
-| `parallel` | `analysis` and `review` run independently, then `summary` | Disabled |
+| Preset                 | Initial graph                                                    | Dynamic delegation                  |
+| ---------------------- | ---------------------------------------------------------------- | ----------------------------------- |
+| `supervisor` (default) | `analysis` and `review` run independently, then `summary`        | Supervisor may delegate to `worker` |
+| `pipeline`             | `analysis` → `review` → `summary`; summary receives both reports | Disabled                            |
+| `parallel`             | `analysis` and `review` run independently, then `summary`        | Disabled                            |
 
 Dependencies transfer explicit reports, **not workspace changes**. Every task starts from its own copy of the same filtered baseline, including pipeline stages. A reviewer must not assume a preceding task's edits exist in its copy. The coding workflow exports reviewable changes separately; plans never automatically merge them.
 
@@ -55,7 +55,12 @@ Dependencies transfer explicit reports, **not workspace changes**. Every task st
   },
   "tasks": [
     { "id": "inspect", "agent": "reader", "input": "Inspect README.md and explain the module contract." },
-    { "id": "final", "agent": "summarizer", "input": "Summarize the supplied inspection report.", "dependsOn": ["inspect"] }
+    {
+      "id": "final",
+      "agent": "summarizer",
+      "input": "Summarize the supplied inspection report.",
+      "dependsOn": ["inspect"]
+    }
   ],
   "resultTaskId": "final",
   "limits": { "maxConcurrent": 2, "maxTasks": 4, "maxDurationMs": 300000 },

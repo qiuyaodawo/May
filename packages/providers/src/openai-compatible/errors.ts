@@ -17,13 +17,17 @@ export class OpenAICompatibleApiError extends OpenAICompatibleError {
   readonly providerCode: string | number | undefined;
   readonly retryAfterMs: number | undefined;
 
-  constructor(provider: string, codePrefix: string, options: {
-    status: number;
-    message: string;
-    providerType?: string;
-    providerCode?: string | number;
-    retryAfterMs?: number;
-  }) {
+  constructor(
+    provider: string,
+    codePrefix: string,
+    options: {
+      status: number;
+      message: string;
+      providerType?: string;
+      providerCode?: string | number;
+      retryAfterMs?: number;
+    },
+  ) {
     super(provider, `${codePrefix}_API_ERROR`, options.message);
     this.status = options.status;
     this.providerType = options.providerType;

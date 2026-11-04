@@ -7,10 +7,6 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "types": ["node"]
   },
-  "references": [
-    { "path": "../may" },
-    { "path": "../coordination" },
-    { "path": "../observability" }
-  ],
+  "references": [{ "path": "../may" }, { "path": "../coordination" }, { "path": "../observability" }],
   "include": ["src/**/*.ts"]
 }

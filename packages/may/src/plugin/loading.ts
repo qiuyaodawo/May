@@ -53,19 +53,25 @@ export async function loadPluginModules(
     const specifier = isAbsolute(entry.module) ? pathToFileURL(entry.module).href : entry.module;
     const resolved = new URL(resolve(specifier, base.href));
     if (resolved.protocol !== "file:") throw new TypeError("Plugin modules must resolve to local files");
-    const exports = await import(resolved.href) as Record<string, unknown>;
+    const exports = (await import(resolved.href)) as Record<string, unknown>;
     const definition = exports[entry.export ?? "default"];
     if (definition === null || typeof definition !== "object" || Array.isArray(definition)) {
       throw new TypeError("Plugin module must export a PluginDefinition object");
     }
     const candidate = definition as AnyPlugin;
-    if (typeof candidate.id !== "string" || typeof candidate.version !== "string" || typeof candidate.setup !== "function") {
+    if (
+      typeof candidate.id !== "string" ||
+      typeof candidate.version !== "string" ||
+      typeof candidate.setup !== "function"
+    ) {
       throw new TypeError("Plugin module has an incomplete definition");
     }
-    loaded.push(Object.freeze({
-      ...candidate,
-      ...(entry.config === undefined ? {} : { config: structuredClone(entry.config) }),
-    }));
+    loaded.push(
+      Object.freeze({
+        ...candidate,
+        ...(entry.config === undefined ? {} : { config: structuredClone(entry.config) }),
+      }),
+    );
   }
   return Object.freeze(loaded);
 }

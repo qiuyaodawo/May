@@ -17,10 +17,7 @@ export interface CodingToolsOptions {
   readonly guard?: WorkspaceFileGuard;
 }
 
-export function createCodingTool(
-  name: CodingToolName,
-  options: CodingToolsOptions,
-): Tool {
+export function createCodingTool(name: CodingToolName, options: CodingToolsOptions): Tool {
   switch (name) {
     case "read":
       return createReadTool({ cwd: options.cwd, ...options.read, ...guardOf(options) });

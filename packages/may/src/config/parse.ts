@@ -14,7 +14,11 @@ export function parseMayConfig(value: unknown, path = "<inline>"): MayConfig {
   }
   for (const [name, model] of Object.entries(models)) {
     if (!Object.hasOwn(providers, model.provider)) {
-      throw new MayConfigValidationError(path, `models.${name}.provider`, `references unknown provider "${model.provider}"`);
+      throw new MayConfigValidationError(
+        path,
+        `models.${name}.provider`,
+        `references unknown provider "${model.provider}"`,
+      );
     }
     checkDefaultEffort(model.capabilities, path, `models.${name}.capabilities`);
   }
@@ -27,6 +31,7 @@ export function parseMayConfig(value: unknown, path = "<inline>"): MayConfig {
 
 function checkDefaultEffort(capabilities: ModelCapabilitiesOverride | undefined, path: string, field: string): void {
   const reasoning = capabilities?.reasoning;
-  if (!reasoning || reasoning.defaultEffort === undefined || reasoning.efforts.includes(reasoning.defaultEffort)) return;
+  if (!reasoning || reasoning.defaultEffort === undefined || reasoning.efforts.includes(reasoning.defaultEffort))
+    return;
   throw new MayConfigValidationError(path, `${field}.reasoning.defaultEffort`, "must be listed in efforts");
 }

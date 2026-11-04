@@ -28,10 +28,14 @@ test("项目规则从最近 Git 根目录组合到启动目录", async (t) => {
 
   const loaded = await load(workspace);
 
-  assert.deepEqual(loaded.projects.map((entry) => entry.source.path), paths);
-  assert.deepEqual(loaded.projects.map((entry) => entry.content), [
-    "Use pnpm.", "Keep package dependencies explicit.", "Verify browser behavior.",
-  ]);
+  assert.deepEqual(
+    loaded.projects.map((entry) => entry.source.path),
+    paths,
+  );
+  assert.deepEqual(
+    loaded.projects.map((entry) => entry.content),
+    ["Use pnpm.", "Keep package dependencies explicit.", "Verify browser behavior."],
+  );
   assert.strictEqual(loaded.project, loaded.projects[2]);
   assert.doesNotMatch(loaded.effective, /Outside project|Sibling guidance|Descendant guidance/u);
   assert.match(loaded.effective, /Each document applies to its directory and descendants\./u);
@@ -68,7 +72,10 @@ test("最近嵌套 Git 标记限制规则搜索范围", async (t) => {
 
   const loaded = await load(workspace);
 
-  assert.deepEqual(loaded.projects.map((entry) => entry.source.path), [nestedPath, workspacePath]);
+  assert.deepEqual(
+    loaded.projects.map((entry) => entry.source.path),
+    [nestedPath, workspacePath],
+  );
   assert.doesNotMatch(loaded.effective, /Outer repository guidance/u);
 });
 
@@ -81,7 +88,10 @@ test("worktree 的 Git 标记文件可以确定项目根目录", async (t) => {
 
   const loaded = await load(workspace);
 
-  assert.deepEqual(loaded.projects.map((entry) => entry.source.path), [rootPath]);
+  assert.deepEqual(
+    loaded.projects.map((entry) => entry.source.path),
+    [rootPath],
+  );
   assert.equal(loaded.project.content, "Worktree guidance.");
 });
 
@@ -93,7 +103,10 @@ test("缺失项目标记时只读取启动目录规则", async (t) => {
 
   const loaded = await load(workspace, { projectRootMarkers: ["absent-instruction-chain-marker"] });
 
-  assert.deepEqual(loaded.projects.map((entry) => entry.source.path), [path]);
+  assert.deepEqual(
+    loaded.projects.map((entry) => entry.source.path),
+    [path],
+  );
   assert.doesNotMatch(loaded.effective, /Parent guidance/u);
 });
 
@@ -112,7 +125,10 @@ test("空标记列表只读取启动目录且没有规则时返回空列表", as
 
   const path = await document(workspace, "AGENTS.md", "Local guidance.");
   const loaded = await load(workspace, { projectRootMarkers: [] });
-  assert.deepEqual(loaded.projects.map((entry) => entry.source.path), [path]);
+  assert.deepEqual(
+    loaded.projects.map((entry) => entry.source.path),
+    [path],
+  );
 });
 
 test("每个目录优先选择非空 override 并跳过空文档", async (t) => {
@@ -128,7 +144,10 @@ test("每个目录优先选择非空 override 并跳过空文档", async (t) => 
 
   const loaded = await load(workspace, { projectInstructionsFallbackFilenames: ["PROJECT.md"] });
 
-  assert.deepEqual(loaded.projects.map((entry) => entry.source.path), [rootPath, workspacePath]);
+  assert.deepEqual(
+    loaded.projects.map((entry) => entry.source.path),
+    [rootPath, workspacePath],
+  );
   assert.doesNotMatch(loaded.effective, /Root ordinary|fallback guidance/u);
 });
 
@@ -145,7 +164,10 @@ test("fallback 按配置顺序选择非空文档并去除重复名称", async (t
     projectInstructionsFallbackFilenames: ["AGENTS.md", "EMPTY.md", "FIRST.md", "FIRST.md", "SECOND.md"],
   });
 
-  assert.deepEqual(loaded.projects.map((entry) => entry.source.path), [path]);
+  assert.deepEqual(
+    loaded.projects.map((entry) => entry.source.path),
+    [path],
+  );
   assert.equal(loaded.project.content, "First fallback guidance.");
 });
 
@@ -165,7 +187,10 @@ test("自定义规则名称和多个项目标记使用最近目录", async (t) =
     projectRootMarkers: ["ROOT.marker", "NEAREST.marker"],
   });
 
-  assert.deepEqual(loaded.projects.map((entry) => entry.source.path), [rootPath, workspacePath]);
+  assert.deepEqual(
+    loaded.projects.map((entry) => entry.source.path),
+    [rootPath, workspacePath],
+  );
   assert.doesNotMatch(loaded.effective, /Outer guidance|Unselected ordinary/u);
 });
 

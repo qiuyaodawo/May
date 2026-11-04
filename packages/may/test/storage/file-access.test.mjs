@@ -16,16 +16,20 @@ async function setup(t) {
     for (const worker of workers) {
       if (worker.child.exitCode === null && worker.child.signalCode === null) worker.child.kill();
     }
-    await Promise.all(workers.map(worker => worker.closed));
+    await Promise.all(workers.map((worker) => worker.closed));
   });
   const directory = await createTestDirectory(t, "may/file-access");
   return {
     directory,
     path: join(directory, "state.json"),
     start(operation, path, mode) {
-      const child = fork(workerPath, [operation, path, mode ?? "shared"], { stdio: ["ignore", "inherit", "inherit", "ipc"] });
+      const child = fork(workerPath, [operation, path, mode ?? "shared"], {
+        stdio: ["ignore", "inherit", "inherit", "ipc"],
+      });
       const messages = [];
-      child.on("message", message => { messages.push(message); });
+      child.on("message", (message) => {
+        messages.push(message);
+      });
       const closed = once(child, "close");
       const first = once(child, "message").then(([message]) => message);
       const worker = { child, messages, closed, first };
@@ -35,7 +39,7 @@ async function setup(t) {
   };
 }
 
-test("shared readers coexist and an exclusive writer waits for every reader", async t => {
+test("shared readers coexist and an exclusive writer waits for every reader", async (t) => {
   const { path, start } = await setup(t);
   const first = start("hold", path, "shared");
   const second = start("hold", path, "shared");
@@ -43,7 +47,9 @@ test("shared readers coexist and an exclusive writer waits for every reader", as
   assert.equal((await second.first).type, "acquired");
   await withFileAccess(path, "shared", async () => {});
   let entered = false;
-  const writer = withFileAccess(path, "exclusive", async () => { entered = true; });
+  const writer = withFileAccess(path, "exclusive", async () => {
+    entered = true;
+  });
   await delay(100);
   assert.equal(entered, false);
   first.child.send("release");
@@ -56,7 +62,7 @@ test("shared readers coexist and an exclusive writer waits for every reader", as
   assert.equal(entered, true);
 });
 
-test("process termination releases exclusive access for another process", async t => {
+test("process termination releases exclusive access for another process", async (t) => {
   const { path, start } = await setup(t);
   const holder = start("hold", path, "exclusive");
   await holder.first;
@@ -71,50 +77,74 @@ test("process termination releases exclusive access for another process", async 
   await withFileAccess(path, "exclusive", async () => {});
 });
 
-test("action errors release ownership and recursive access rejects immediately", async t => {
+test("action errors release ownership and recursive access rejects immediately", async (t) => {
   const { path } = await setup(t);
   const failure = new Error("action failed");
-  await assert.rejects(withFileAccess(path, "exclusive", async () => { throw failure; }), error => error === failure);
+  await assert.rejects(
+    withFileAccess(path, "exclusive", async () => {
+      throw failure;
+    }),
+    (error) => error === failure,
+  );
   await withFileAccess(path, "exclusive", async () => {
-    await assert.rejects(withFileAccess(path, "shared", async () => {}), { code: "FILE_ACCESS_REENTRANT" });
+    await assert.rejects(
+      withFileAccess(path, "shared", async () => {}),
+      { code: "FILE_ACCESS_REENTRANT" },
+    );
   });
   assert.equal(await withFileAccess(path, "shared", async () => 42), 42);
 });
 
-test("read-only access requires initialized markers and preserves their contents", async t => {
+test("read-only access requires initialized markers and preserves their contents", async (t) => {
   const { path, directory } = await setup(t);
-  await assert.rejects(withFileAccess(path, "shared", async () => {}, { initialize: false }), { code: "FILE_ACCESS_NOT_INITIALIZED" });
+  await assert.rejects(
+    withFileAccess(path, "shared", async () => {}, { initialize: false }),
+    { code: "FILE_ACCESS_NOT_INITIALIZED" },
+  );
   assert.deepEqual(await readdir(directory), []);
   await withFileAccess(path, "shared", async () => {});
   const markers = [`${path}.access`, `${path}.access.gate`];
-  const before = await Promise.all(markers.map(marker => lstat(marker, { bigint: true })));
-  await Promise.all(markers.map(marker => chmod(marker, 0o444)));
+  const before = await Promise.all(markers.map((marker) => lstat(marker, { bigint: true })));
+  await Promise.all(markers.map((marker) => chmod(marker, 0o444)));
   try {
     await withFileAccess(path, "shared", async () => {}, { initialize: false });
-    const after = await Promise.all(markers.map(marker => lstat(marker, { bigint: true })));
-    assert.deepEqual(after.map(info => [info.ino, info.size, info.mtimeNs]), before.map(info => [info.ino, info.size, info.mtimeNs]));
-    assert.deepEqual(await Promise.all(markers.map(marker => readFile(marker, "utf8"))), ["", ""]);
-  } finally { await Promise.all(markers.map(marker => chmod(marker, 0o600))); }
+    const after = await Promise.all(markers.map((marker) => lstat(marker, { bigint: true })));
+    assert.deepEqual(
+      after.map((info) => [info.ino, info.size, info.mtimeNs]),
+      before.map((info) => [info.ino, info.size, info.mtimeNs]),
+    );
+    assert.deepEqual(await Promise.all(markers.map((marker) => readFile(marker, "utf8"))), ["", ""]);
+  } finally {
+    await Promise.all(markers.map((marker) => chmod(marker, 0o600)));
+  }
 });
 
-test("directory markers and symbolic links fail before the action", async t => {
+test("directory markers and symbolic links fail before the action", async (t) => {
   const { path, directory } = await setup(t);
   await mkdir(`${path}.access`);
   let actions = 0;
-  await assert.rejects(withFileAccess(path, "shared", async () => { actions += 1; }));
+  await assert.rejects(
+    withFileAccess(path, "shared", async () => {
+      actions += 1;
+    }),
+  );
   const target = join(directory, "target");
   await mkdir(target);
   const linkedPath = join(directory, "linked.json");
   await symlink(target, `${linkedPath}.access`, process.platform === "win32" ? "junction" : "dir");
-  await assert.rejects(withFileAccess(linkedPath, "shared", async () => { actions += 1; }));
+  await assert.rejects(
+    withFileAccess(linkedPath, "shared", async () => {
+      actions += 1;
+    }),
+  );
   assert.equal(actions, 0);
 });
 
-test("continuous readers allow 300 atomic replacements and see complete content", { timeout: 60_000 }, async t => {
+test("continuous readers allow 300 atomic replacements and see complete content", { timeout: 60_000 }, async (t) => {
   const { path, start } = await setup(t);
   await writeFile(path, JSON.stringify({ revision: 0, payload: "0".repeat(4096) }));
   const readers = Array.from({ length: 16 }, () => start("read-loop", path));
-  await Promise.all(readers.map(reader => reader.first));
+  await Promise.all(readers.map((reader) => reader.first));
   for (let revision = 1; revision <= 300; revision += 1) {
     await withFileAccess(path, "exclusive", async () => {
       const temporary = `${path}.tmp`;
@@ -125,18 +155,23 @@ test("continuous readers allow 300 atomic replacements and see complete content"
   for (const reader of readers) reader.child.send("stop");
   for (const reader of readers) {
     assert.deepEqual(await reader.closed, [0, null]);
-    assert.ok(reader.messages.find(message => message.type === "stopped")?.reads > 0);
+    assert.ok(reader.messages.find((message) => message.type === "stopped")?.reads > 0);
   }
   assert.equal(JSON.parse(await readFile(path, "utf8")).revision, 300);
 });
 
-test("a timed-out writer releases the entrance gate for later access", { timeout: 45_000 }, async t => {
+test("a timed-out writer releases the entrance gate for later access", { timeout: 45_000 }, async (t) => {
   const { path, start } = await setup(t);
   const reader = start("hold", path, "shared");
   await reader.first;
   const started = performance.now();
   let actions = 0;
-  await assert.rejects(withFileAccess(path, "exclusive", async () => { actions += 1; }), { code: "ETIMEDOUT" });
+  await assert.rejects(
+    withFileAccess(path, "exclusive", async () => {
+      actions += 1;
+    }),
+    { code: "ETIMEDOUT" },
+  );
   assert.ok(performance.now() - started >= 30_000);
   assert.equal(actions, 0);
   await withFileAccess(path, "shared", async () => {});
@@ -145,17 +180,34 @@ test("a timed-out writer releases the entrance gate for later access", { timeout
   await withFileAccess(path, "exclusive", async () => {});
 });
 
-test("custom timeout and cancellation release the entrance gate", { timeout: 10_000 }, async t => {
+test("custom timeout and cancellation release the entrance gate", { timeout: 10_000 }, async (t) => {
   const { path, start } = await setup(t);
   const reader = start("hold", path, "shared");
   await reader.first;
   let actions = 0;
   const started = performance.now();
-  await assert.rejects(withFileAccess(path, "exclusive", async () => { actions += 1; }, { timeoutMs: 80 }), { code: "ETIMEDOUT" });
+  await assert.rejects(
+    withFileAccess(
+      path,
+      "exclusive",
+      async () => {
+        actions += 1;
+      },
+      { timeoutMs: 80 },
+    ),
+    { code: "ETIMEDOUT" },
+  );
   assert.ok(performance.now() - started >= 80);
   await withFileAccess(path, "shared", async () => {}, { timeoutMs: 500 });
   const controller = new AbortController();
-  const waiting = withFileAccess(path, "exclusive", async () => { actions += 1; }, { signal: controller.signal });
+  const waiting = withFileAccess(
+    path,
+    "exclusive",
+    async () => {
+      actions += 1;
+    },
+    { signal: controller.signal },
+  );
   const rejected = assert.rejects(waiting, { name: "AbortError" });
   await delay(100);
   controller.abort();
@@ -167,31 +219,47 @@ test("custom timeout and cancellation release the entrance gate", { timeout: 10_
   await withFileAccess(path, "exclusive", async () => {}, { timeoutMs: 500 });
 });
 
-test("cancellation during an action retains ownership until the action settles", async t => {
+test("cancellation during an action retains ownership until the action settles", async (t) => {
   const { path } = await setup(t);
   const controller = new AbortController();
   const entered = Promise.withResolvers();
   const released = Promise.withResolvers();
-  const owner = withFileAccess(path, "exclusive", async () => {
-    entered.resolve();
-    await released.promise;
-    return 42;
-  }, { signal: controller.signal });
+  const owner = withFileAccess(
+    path,
+    "exclusive",
+    async () => {
+      entered.resolve();
+      await released.promise;
+      return 42;
+    },
+    { signal: controller.signal },
+  );
   try {
     await entered.promise;
     controller.abort();
-    await assert.rejects(withFileAccess(path, "exclusive", async () => {}, { timeoutMs: 80 }), { code: "ETIMEDOUT" });
-  } finally { released.resolve(); }
+    await assert.rejects(
+      withFileAccess(path, "exclusive", async () => {}, { timeoutMs: 80 }),
+      { code: "ETIMEDOUT" },
+    );
+  } finally {
+    released.resolve();
+  }
   assert.equal(await owner, 42);
   await withFileAccess(path, "exclusive", async () => {});
 });
 
-test("invalid options and pre-aborted signals fail before creating markers", async t => {
+test("invalid options and pre-aborted signals fail before creating markers", async (t) => {
   const { path, directory } = await setup(t);
   for (const timeoutMs of [0, -1, NaN, Infinity, "100"]) {
-    await assert.rejects(withFileAccess(path, "exclusive", async () => {}, { timeoutMs }), TypeError);
+    await assert.rejects(
+      withFileAccess(path, "exclusive", async () => {}, { timeoutMs }),
+      TypeError,
+    );
   }
   const failure = new Error("cancel before acquisition");
-  await assert.rejects(withFileAccess(path, "exclusive", async () => {}, { signal: AbortSignal.abort(failure) }), error => error === failure);
+  await assert.rejects(
+    withFileAccess(path, "exclusive", async () => {}, { signal: AbortSignal.abort(failure) }),
+    (error) => error === failure,
+  );
   assert.deepEqual(await readdir(directory), []);
 });

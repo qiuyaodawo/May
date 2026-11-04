@@ -14,7 +14,7 @@ test("goal lifecycle requires application access and declared composition servic
   await assert.rejects(PluginHost.create({ plugins: [plugin], hooks: APPLICATION_HOOKS }), /requires missing service/u);
 });
 
-test("Goal and history plugins compose ordered guidance once in a real application Context", async t => {
+test("Goal and history plugins compose ordered guidance once in a real application Context", async (t) => {
   let application;
   let captured;
   let sources;
@@ -23,16 +23,20 @@ test("Goal and history plugins compose ordered guidance once in a real applicati
     store: new InMemorySessionStore(),
     instructions: "Complete the assigned work.",
     plugins: [
-      createHistoryMemoryPlugin({ mode: "history-reference" }), createGoalsPlugin(),
+      createHistoryMemoryPlugin({ mode: "history-reference" }),
+      createGoalsPlugin(),
       definePlugin({
-        id: "verification.goal-instructions", version: "1.0.0",
+        id: "verification.goal-instructions",
+        version: "1.0.0",
         requires: [{ service: applicationServices.instructionSources }],
         requiresHooks: [runtimeHooks.contextAfter],
         setup(context) {
-          context.defer(context.get(applicationServices.instructionSources).add(
-            () => "Between Goal and history guidance.", { id: context.pluginId, order: 50 },
-          ));
-          context.on(runtimeHooks.contextAfter, snapshot => {
+          context.defer(
+            context
+              .get(applicationServices.instructionSources)
+              .add(() => "Between Goal and history guidance.", { id: context.pluginId, order: 50 }),
+          );
+          context.on(runtimeHooks.contextAfter, (snapshot) => {
             captured = snapshot;
             sources = application.getService(applicationServices.instructionSources).snapshot();
             application.getService(goalsService).interrupt("Context verification completed before provider dispatch");

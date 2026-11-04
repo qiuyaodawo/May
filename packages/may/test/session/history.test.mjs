@@ -5,18 +5,18 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
-import {
-  InMemorySessionStore,
-  SessionHistoryReader,
-} from "@sortedyuan/may/session";
+import { InMemorySessionStore, SessionHistoryReader } from "@sortedyuan/may/session";
 
 for (const [name, createStore] of [
   ["in-memory", async () => new InMemorySessionStore()],
-  ["JSONL", async (t) => {
-    const directory = await mkdtemp(join(tmpdir(), "may-history-"));
-    t.after(() => rm(directory, { recursive: true, force: true }));
-    return new FileSessionStore(directory);
-  }],
+  [
+    "JSONL",
+    async (t) => {
+      const directory = await mkdtemp(join(tmpdir(), "may-history-"));
+      t.after(() => rm(directory, { recursive: true, force: true }));
+      return new FileSessionStore(directory);
+    },
+  ],
 ]) {
   test(`queries ${name} session history with stable sequence cursors`, async (t) => {
     const store = await createStore(t);
@@ -27,7 +27,10 @@ for (const [name, createStore] of [
     });
 
     const first = await reader.query("history_query");
-    assert.deepEqual(first.events.map((event) => event.seq), [1, 2]);
+    assert.deepEqual(
+      first.events.map((event) => event.seq),
+      [1, 2],
+    );
     assert.equal(first.hasMore, true);
     assert.equal(first.nextSeq, 2);
 
@@ -35,7 +38,10 @@ for (const [name, createStore] of [
       afterSeq: first.nextSeq,
       limit: 2,
     });
-    assert.deepEqual(second.events.map((event) => event.seq), [3, 4]);
+    assert.deepEqual(
+      second.events.map((event) => event.seq),
+      [3, 4],
+    );
     assert.equal(second.hasMore, true);
 
     const filtered = await reader.query("history_query", {
@@ -44,7 +50,10 @@ for (const [name, createStore] of [
       limit: 2,
       types: ["input.submitted", "assistant.completed"],
     });
-    assert.deepEqual(filtered.events.map((event) => event.seq), [4, 2]);
+    assert.deepEqual(
+      filtered.events.map((event) => event.seq),
+      [4, 2],
+    );
     assert.equal(filtered.hasMore, false);
   });
 }
@@ -56,18 +65,9 @@ test("validates history query boundaries and limits", async () => {
   });
 
   await assert.rejects(reader.query("session", { limit: 3 }), /cannot exceed 2/u);
-  await assert.rejects(
-    reader.query("session", { afterSeq: 2, beforeSeq: 2 }),
-    /less than beforeSeq/u,
-  );
-  await assert.rejects(
-    reader.query("session", { types: [] }),
-    /types cannot be empty/u,
-  );
-  await assert.rejects(
-    reader.query("session", { types: ["unknown"] }),
-    /Unknown session event type/u,
-  );
+  await assert.rejects(reader.query("session", { afterSeq: 2, beforeSeq: 2 }), /less than beforeSeq/u);
+  await assert.rejects(reader.query("session", { types: [] }), /types cannot be empty/u);
+  await assert.rejects(reader.query("session", { types: ["unknown"] }), /Unknown session event type/u);
 });
 
 function events(sessionId) {

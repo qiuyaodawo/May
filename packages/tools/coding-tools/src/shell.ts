@@ -3,12 +3,7 @@ import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { omitUndefined, type Tool, type ToolProgressUpdate } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
-import {
-  optionalPositiveInteger,
-  requireObject,
-  requirePositiveIntegerOption,
-  requireString,
-} from "./input.js";
+import { optionalPositiveInteger, requireObject, requirePositiveIntegerOption, requireString } from "./input.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
 
 export const DEFAULT_SHELL_TIMEOUT_MS = 120_000;
@@ -58,22 +53,16 @@ export interface ShellToolOutput {
 
 const shellToolInfo = Symbol("may.coding-tools.shell-info");
 
-export function createDefaultShellProfile(
-  platform: NodeJS.Platform = process.platform,
-): ShellProfile {
-  return platform === "win32"
-    ? createPowerShellProfile()
-    : createBashShellProfile();
+export function createDefaultShellProfile(platform: NodeJS.Platform = process.platform): ShellProfile {
+  return platform === "win32" ? createPowerShellProfile() : createBashShellProfile();
 }
 
 export function createPowerShellProfile(
   options: { readonly executable?: string; readonly displayName?: string } = {},
 ): ShellProfile {
   const executable = options.executable ?? defaultPowerShellExecutable();
-  const displayName = options.displayName ??
-    (/(?:^|[\\/])pwsh(?:\.exe)?$/iu.test(executable)
-      ? "PowerShell 7"
-      : "Windows PowerShell");
+  const displayName =
+    options.displayName ?? (/(?:^|[\\/])pwsh(?:\.exe)?$/iu.test(executable) ? "PowerShell 7" : "Windows PowerShell");
   return {
     kind: "powershell",
     displayName,
@@ -101,20 +90,13 @@ export function createBashShellProfile(
   };
 }
 
-export function createShellTool(options: ShellToolOptions): Tool<
-  ShellToolInput,
-  ShellToolOutput
-> {
+export function createShellTool(options: ShellToolOptions): Tool<ShellToolInput, ShellToolOutput> {
   const defaultTimeoutMs = requirePositiveIntegerOption(
     options.defaultTimeoutMs,
     DEFAULT_SHELL_TIMEOUT_MS,
     "defaultTimeoutMs",
   );
-  const maxTimeoutMs = requirePositiveIntegerOption(
-    options.maxTimeoutMs,
-    DEFAULT_SHELL_MAX_TIMEOUT_MS,
-    "maxTimeoutMs",
-  );
+  const maxTimeoutMs = requirePositiveIntegerOption(options.maxTimeoutMs, DEFAULT_SHELL_MAX_TIMEOUT_MS, "maxTimeoutMs");
   const maxOutputBytes = requirePositiveIntegerOption(
     options.maxOutputBytes,
     DEFAULT_SHELL_MAX_OUTPUT_BYTES,
@@ -123,9 +105,7 @@ export function createShellTool(options: ShellToolOptions): Tool<
   if (defaultTimeoutMs > maxTimeoutMs) {
     throw new RangeError("defaultTimeoutMs must not exceed maxTimeoutMs");
   }
-  const profile = validateShellProfile(
-    options.profile ?? createDefaultShellProfile(),
-  );
+  const profile = validateShellProfile(options.profile ?? createDefaultShellProfile());
   const info: ShellToolInfo = {
     kind: profile.kind,
     displayName: profile.displayName,
@@ -150,25 +130,15 @@ export function createShellTool(options: ShellToolOptions): Tool<
     parse(input) {
       const value = requireObject(input, "shell");
       const command = requireString(value.command, "shell", "command");
-      const timeoutMs = optionalPositiveInteger(
-        value.timeoutMs,
-        "shell",
-        "timeoutMs",
-      );
+      const timeoutMs = optionalPositiveInteger(value.timeoutMs, "shell", "timeoutMs");
       if (timeoutMs !== undefined && timeoutMs > maxTimeoutMs) {
-        throw new CodingToolError(
-          "CODING_TOOL_INVALID_INPUT",
-          `shell: timeoutMs must not exceed ${maxTimeoutMs}`,
-        );
+        throw new CodingToolError("CODING_TOOL_INVALID_INPUT", `shell: timeoutMs must not exceed ${maxTimeoutMs}`);
       }
       return omitUndefined({ command, timeoutMs });
     },
     async execute(input, context) {
       if (context.signal.aborted) {
-        throw new CodingToolError(
-          "CODING_TOOL_CANCELLED",
-          "shell: command was cancelled",
-        );
+        throw new CodingToolError("CODING_TOOL_CANCELLED", "shell: command was cancelled");
       }
       const workspace = await resolveExistingWorkspacePath(options.cwd, ".");
       return executeCommand(
@@ -193,16 +163,15 @@ export function createShellTool(options: ShellToolOptions): Tool<
 }
 
 export function getShellToolInfo(tool: Tool): ShellToolInfo | undefined {
-  const info = (tool as Tool & { readonly [shellToolInfo]?: ShellToolInfo })[
-    shellToolInfo
-  ];
+  const info = (tool as Tool & { readonly [shellToolInfo]?: ShellToolInfo })[shellToolInfo];
   return info === undefined ? undefined : { ...info };
 }
 
 export function shellRuntimeInstructions(info: ShellToolInfo): string {
   if (info.kind === "powershell") {
-    return "Use PowerShell syntax and cmdlets; do not assume POSIX utilities such " +
-      "as ls, find, or head are installed.";
+    return (
+      "Use PowerShell syntax and cmdlets; do not assume POSIX utilities such " + "as ls, find, or head are installed."
+    );
   }
   if (info.kind === "bash") {
     return "Use Bash syntax.";
@@ -239,8 +208,15 @@ function executeCommand(
       terminateProcessTree(child);
       drainTimer ??= setTimeout(() => {
         child.kill("SIGKILL");
-        child.stdout.destroy(); child.stderr.destroy(); child.unref();
-        fail(new CodingToolError(cancelled ? "CODING_TOOL_CANCELLED" : "CODING_TOOL_COMMAND_TIMEOUT", "shell: command stopped; process-tree termination could not be confirmed"));
+        child.stdout.destroy();
+        child.stderr.destroy();
+        child.unref();
+        fail(
+          new CodingToolError(
+            cancelled ? "CODING_TOOL_CANCELLED" : "CODING_TOOL_COMMAND_TIMEOUT",
+            "shell: command stopped; process-tree termination could not be confirmed",
+          ),
+        );
       }, 1000);
     };
 
@@ -279,28 +255,24 @@ function executeCommand(
     };
 
     child.once("error", (error) => {
-      fail(new CodingToolError(
-        "CODING_TOOL_COMMAND_FAILED",
-        `shell: unable to start ${profile.displayName}: ${error.message}`,
-        { cause: error },
-      ));
+      fail(
+        new CodingToolError(
+          "CODING_TOOL_COMMAND_FAILED",
+          `shell: unable to start ${profile.displayName}: ${error.message}`,
+          { cause: error },
+        ),
+      );
     });
     child.once("close", (exitCode, signal) => {
       if (settled) return;
       settled = true;
       cleanup();
       if (cancelled) {
-        reject(new CodingToolError(
-          "CODING_TOOL_CANCELLED",
-          "shell: command was cancelled",
-        ));
+        reject(new CodingToolError("CODING_TOOL_CANCELLED", "shell: command was cancelled"));
         return;
       }
       if (timedOut) {
-        reject(new CodingToolError(
-          "CODING_TOOL_COMMAND_TIMEOUT",
-          `shell: command exceeded ${timeoutMs}ms`,
-        ));
+        reject(new CodingToolError("CODING_TOOL_COMMAND_TIMEOUT", `shell: command exceeded ${timeoutMs}ms`));
         return;
       }
       resolve({
@@ -316,18 +288,21 @@ function executeCommand(
 }
 
 function powerShellScript(command: string): string {
-  return "$utf8 = [System.Text.UTF8Encoding]::new($false)\n" +
+  return (
+    "$utf8 = [System.Text.UTF8Encoding]::new($false)\n" +
     "[Console]::OutputEncoding = $utf8\n" +
     "$OutputEncoding = $utf8\n" +
     "$global:LASTEXITCODE = $null\n" +
-    command + "\n" +
+    command +
+    "\n" +
     "$maySucceeded = $?\n" +
     "$mayExitCode = $LASTEXITCODE\n" +
     "if (-not $maySucceeded) {\n" +
     "  if (($null -ne $mayExitCode) -and ($mayExitCode -ne 0)) { exit $mayExitCode }\n" +
     "  exit 1\n" +
     "}\n" +
-    "exit 0";
+    "exit 0"
+  );
 }
 
 function defaultPowerShellExecutable(): string {
@@ -358,13 +333,11 @@ function terminateProcessTree(child: ChildProcess): void {
     return;
   }
   if (process.platform === "win32") {
-    const killer = spawn(
-      "taskkill",
-      ["/pid", String(child.pid), "/T", "/F"],
-      { stdio: "ignore", windowsHide: true },
-    );
+    const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
     killer.once("error", () => child.kill("SIGKILL"));
-    killer.once("exit", (code) => { if (code !== 0) child.kill("SIGKILL"); });
+    killer.once("exit", (code) => {
+      if (code !== 0) child.kill("SIGKILL");
+    });
     return;
   }
   try {
@@ -401,15 +374,17 @@ function createOutputCollector(maxBytes: number): OutputCollector {
 }
 
 function shellEnvironment(options: ShellToolOptions): NodeJS.ProcessEnv {
-  const normalize = (key: string) => process.platform === "win32" ? key.toUpperCase() : key;
+  const normalize = (key: string) => (process.platform === "win32" ? key.toUpperCase() : key);
   const allowed = options.envAllowlist?.map(normalize);
   const denied = (options.envDenylist ?? []).map(normalize);
   const result: NodeJS.ProcessEnv = {};
-  if (options.inheritEnv !== false) for (const [key, value] of Object.entries(process.env)) {
-    if (allowed !== undefined && !allowed.includes(normalize(key))) continue;
-    if (denied.includes(normalize(key)) || /(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|APIKEY)/iu.test(key)) continue;
-    result[key] = value;
-  }
+  if (options.inheritEnv !== false)
+    for (const [key, value] of Object.entries(process.env)) {
+      if (allowed !== undefined && !allowed.includes(normalize(key))) continue;
+      if (denied.includes(normalize(key)) || /(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|APIKEY)/iu.test(key))
+        continue;
+      result[key] = value;
+    }
   for (const [key, value] of Object.entries(options.env ?? {})) {
     const old = Object.keys(result).find((entry) => normalize(entry) === normalize(key));
     if (old !== undefined) delete result[old];

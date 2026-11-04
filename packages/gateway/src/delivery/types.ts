@@ -3,14 +3,33 @@ import type { Disposer } from "@sortedyuan/may/plugin";
 import type { ChannelStore, ChannelInput, ChannelAttachment, ChannelDeliveryReceipt, DeliveryRecord } from "./store.js";
 
 export type GroupTrigger = "explicit" | "all";
-export interface EntranceTrigger { conversation: string; threadId?: string; trigger: GroupTrigger }
-export interface ChannelAccessSettings { allowUsers: readonly string[]; allowGroups?: readonly string[]; groupTrigger?: GroupTrigger; entranceTriggers?: readonly EntranceTrigger[] }
-export interface ChannelCapabilities {
-  groups: boolean; threads: boolean; nativeReplies: boolean; messageEdits: boolean; messageDeletes: boolean;
-  maxTextLength: number; maxAttachmentBytes: number;
-  inputAttachments: readonly ChannelAttachment["kind"][]; outputAttachments: readonly ChannelAttachment["kind"][];
+export interface EntranceTrigger {
+  conversation: string;
+  threadId?: string;
+  trigger: GroupTrigger;
 }
-export interface ChannelAttachmentData { data: Uint8Array; name?: string; mediaType?: string }
+export interface ChannelAccessSettings {
+  allowUsers: readonly string[];
+  allowGroups?: readonly string[];
+  groupTrigger?: GroupTrigger;
+  entranceTriggers?: readonly EntranceTrigger[];
+}
+export interface ChannelCapabilities {
+  groups: boolean;
+  threads: boolean;
+  nativeReplies: boolean;
+  messageEdits: boolean;
+  messageDeletes: boolean;
+  maxTextLength: number;
+  maxAttachmentBytes: number;
+  inputAttachments: readonly ChannelAttachment["kind"][];
+  outputAttachments: readonly ChannelAttachment["kind"][];
+}
+export interface ChannelAttachmentData {
+  data: Uint8Array;
+  name?: string;
+  mediaType?: string;
+}
 export type ChannelState = Pick<ChannelStore, "get" | "put" | "values">;
 export interface ChannelAdapter {
   readonly media?: MediaCapabilities;
@@ -24,7 +43,11 @@ export interface ChannelAdapter {
   status(): string;
   run(receive: (input: ChannelInput) => Promise<void>, store: ChannelState, signal: AbortSignal): Promise<void>;
   send(delivery: DeliveryRecord, signal: AbortSignal, image?: ImageData): Promise<ChannelDeliveryReceipt | void>;
-  readAttachment?(input: ChannelInput, attachment: ChannelAttachment, signal: AbortSignal): Promise<ChannelAttachmentData>;
+  readAttachment?(
+    input: ChannelInput,
+    attachment: ChannelAttachment,
+    signal: AbortSignal,
+  ): Promise<ChannelAttachmentData>;
 }
 export interface ChannelIngress {
   readonly store: ChannelState;
@@ -44,5 +67,9 @@ export interface DeliveryAttemptOptions {
   commit(status: "sending" | "sent" | "unknown", receipt?: ChannelDeliveryReceipt): void | Promise<void>;
 }
 export interface DeliveryService {
-  attempt(adapter: ChannelAdapter, delivery: DeliveryRecord, options: DeliveryAttemptOptions): Promise<ChannelDeliveryReceipt | void>;
+  attempt(
+    adapter: ChannelAdapter,
+    delivery: DeliveryRecord,
+    options: DeliveryAttemptOptions,
+  ): Promise<ChannelDeliveryReceipt | void>;
 }

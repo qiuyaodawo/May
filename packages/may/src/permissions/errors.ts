@@ -11,10 +11,7 @@ export class PermissionDeniedError extends MayError {
 
 export class PermissionExecutorClosedError extends FatalToolExecutionError {
   constructor(reason?: string) {
-    super(
-      reason ?? "Permission executor is closed",
-      { code: "PERMISSION_EXECUTOR_CLOSED" },
-    );
+    super(reason ?? "Permission executor is closed", { code: "PERMISSION_EXECUTOR_CLOSED" });
     this.name = "PermissionExecutorClosedError";
   }
 }

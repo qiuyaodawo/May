@@ -50,19 +50,19 @@ socket 配置支持 `{ "transport": "socket", "path": "socket-or-Windows-pipe" }
 
 `media` 支持 `image`、`audio`、`file` 和 `video`。视频使用独立能力声明，输入采用文件 ContentPart 并保留原始 `video/*` MIME 类型。外部 Agent 确认能够处理对应内容后再声明支持。
 
-| 方法 | 参数 | 结果 |
-| --- | --- | --- |
-| `conversation/create` | `requestId` | `{ conversationId }` |
-| `conversation/inspectCreation` | `requestId` | `{ status: "not-started" }`、`{ status: "ready", conversationId }` 或 `{ status: "unknown" }` |
-| `conversation/execute` | `conversationId`、`inputId`、`input`、`tools`、`permissionScope?` | `{ text, runId?, yielded?, content? }` |
-| `conversation/inspect` | `conversationId`、`inputId` | `{ status, text?, detail?, content?, runId? }` |
-| `conversation/cancel` | `conversationId` | 取消完成后返回 `{ cancelled: true }` |
-| `conversation/steer` | `conversationId`、`inputId`、`text` | `{ status }` |
-| `conversation/steeringInputs` | `conversationId` | `[{ inputId, text, status }]` |
-| `conversation/resolveApproval` | `conversationId`、`requestId`、`decision`、`options?` | `{ resolved: boolean }` |
-| `conversation/release` | `conversationId` | `{ released: true }` |
-| `conversation/delete` | `conversationId` | `{ deleted: true }` |
-| `conversation/command` | `conversationId`、`name`、`args` | `{ text }` |
+| 方法                           | 参数                                                              | 结果                                                                                          |
+| ------------------------------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `conversation/create`          | `requestId`                                                       | `{ conversationId }`                                                                          |
+| `conversation/inspectCreation` | `requestId`                                                       | `{ status: "not-started" }`、`{ status: "ready", conversationId }` 或 `{ status: "unknown" }` |
+| `conversation/execute`         | `conversationId`、`inputId`、`input`、`tools`、`permissionScope?` | `{ text, runId?, yielded?, content? }`                                                        |
+| `conversation/inspect`         | `conversationId`、`inputId`                                       | `{ status, text?, detail?, content?, runId? }`                                                |
+| `conversation/cancel`          | `conversationId`                                                  | 取消完成后返回 `{ cancelled: true }`                                                          |
+| `conversation/steer`           | `conversationId`、`inputId`、`text`                               | `{ status }`                                                                                  |
+| `conversation/steeringInputs`  | `conversationId`                                                  | `[{ inputId, text, status }]`                                                                 |
+| `conversation/resolveApproval` | `conversationId`、`requestId`、`decision`、`options?`             | `{ resolved: boolean }`                                                                       |
+| `conversation/release`         | `conversationId`                                                  | `{ released: true }`                                                                          |
+| `conversation/delete`          | `conversationId`                                                  | `{ deleted: true }`                                                                           |
+| `conversation/command`         | `conversationId`、`name`、`args`                                  | `{ text }`                                                                                    |
 
 `input` 使用 May `UserMessage`。支持协作时，`tools` 提供当前执行已经获得授权的协作工具名称、说明和输入 schema。执行状态包括 `not-started`、`queued`、`running`、`waiting`、`cancelling`、`completed`、`failed`、`cancelled` 和 `recovery-required`。
 

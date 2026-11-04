@@ -18,7 +18,9 @@ if (job.kind === "partial-manifest") {
       await once(process, "message");
       await file.write(bytes, split, bytes.length - split, split);
       await file.sync();
-    } finally { await file.close(); }
+    } finally {
+      await file.close();
+    }
   });
 } else {
   process.send({ type: "started" });
@@ -29,7 +31,14 @@ if (job.kind === "partial-manifest") {
       assert.equal(typeof value.requestedAt, "string");
     } else {
       let output = "";
-      assert.equal(await runMaybeCodeTeamCommand(job.command, { write: text => { output += text; } }), job.exitCode);
+      assert.equal(
+        await runMaybeCodeTeamCommand(job.command, {
+          write: (text) => {
+            output += text;
+          },
+        }),
+        job.exitCode,
+      );
       if (job.command.action === "status") {
         assert.ok(output.includes(`Team ${job.command.value}\n`), output);
         if (job.version === "v2" && !job.initialManifest) {

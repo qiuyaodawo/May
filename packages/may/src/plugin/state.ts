@@ -8,10 +8,27 @@ export class StateStore {
   private readonly serial = new AsyncStateSerializer();
   private acceptingWrites = true;
 
-  constructor(snapshot: PluginStateSnapshot, private readonly save?: (snapshot: PluginStateSnapshot) => Promise<void>) {
-    validateSchema({ type: "object", additionalProperties: { type: "object", properties: {
-      pluginVersion: { type: "string" }, stateVersion: { type: "integer", minimum: 1 }, value: {},
-    }, required: ["pluginVersion", "stateVersion", "value"], additionalProperties: false } }, snapshot, "Invalid plugin state snapshot");
+  constructor(
+    snapshot: PluginStateSnapshot,
+    private readonly save?: (snapshot: PluginStateSnapshot) => Promise<void>,
+  ) {
+    validateSchema(
+      {
+        type: "object",
+        additionalProperties: {
+          type: "object",
+          properties: {
+            pluginVersion: { type: "string" },
+            stateVersion: { type: "integer", minimum: 1 },
+            value: {},
+          },
+          required: ["pluginVersion", "stateVersion", "value"],
+          additionalProperties: false,
+        },
+      },
+      snapshot,
+      "Invalid plugin state snapshot",
+    );
     validateJson(snapshot, "Plugin state");
     for (const [id, record] of Object.entries(snapshot)) {
       if (!valid(record.pluginVersion)) throw new Error(`Invalid stored plugin version for ${id}`);
@@ -35,12 +52,21 @@ export class StateStore {
     if (!plugin.state) return;
     const definition = plugin.state;
     const previous = Object.hasOwn(this.entries, plugin.id) ? this.entries[plugin.id] : undefined;
-    const compatible = previous && previous.stateVersion === definition.version &&
+    const compatible =
+      previous &&
+      previous.stateVersion === definition.version &&
       satisfies(previous.pluginVersion, definition.compatibleVersions ?? plugin.version);
-    const value = !previous ? structuredClone(definition.initial) : compatible ? previous.value :
-      definition.migrate ? await definition.migrate(structuredClone(previous)) : undefined;
+    const value = !previous
+      ? structuredClone(definition.initial)
+      : compatible
+        ? previous.value
+        : definition.migrate
+          ? await definition.migrate(structuredClone(previous))
+          : undefined;
     if (previous && !compatible && !definition.migrate) {
-      throw new Error(`Plugin ${plugin.id} cannot restore state version ${previous.stateVersion} from plugin ${previous.pluginVersion}`);
+      throw new Error(
+        `Plugin ${plugin.id} cannot restore state version ${previous.stateVersion} from plugin ${previous.pluginVersion}`,
+      );
     }
     await this.write(plugin, value);
   }
@@ -58,7 +84,10 @@ export class StateStore {
       set: async (value) => {
         ensure();
         this.assertAcceptingWrites();
-        await this.enqueue(() => { ensure(); return this.write(plugin, value); });
+        await this.enqueue(() => {
+          ensure();
+          return this.write(plugin, value);
+        });
       },
       update: async (update) => {
         ensure();
@@ -84,7 +113,11 @@ export class StateStore {
   private async write(plugin: AnyPlugin, value: unknown): Promise<void> {
     validateJson(value, "Plugin state");
     validateSchema(plugin.state!.schema, value, `Invalid state for ${plugin.id}`);
-    const record = { pluginVersion: plugin.version, stateVersion: plugin.state!.version, value: structuredClone(value) };
+    const record = {
+      pluginVersion: plugin.version,
+      stateVersion: plugin.state!.version,
+      value: structuredClone(value),
+    };
     const next = { ...this.entries, [plugin.id]: record };
     await this.save?.(structuredClone(next));
     this.entries = next;

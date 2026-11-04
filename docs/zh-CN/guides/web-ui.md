@@ -69,19 +69,19 @@ HTML 文件。Ctrl+C 停止服务，修改密码使已有登录失效。密码�
 输入框使用终端的斜杠命令注册表。上下方向键选择补全项，Tab 填入内容。未知
 命令和无效参数显示错误。管理输出保存在页面内存中，不进入对话历史。
 
-| 任务 | Web 入口 |
-| --- | --- |
-| 选择模型和默认 profile | 模型下拉菜单；`/model`；`/model profile --default` |
-| 选择 reasoning effort | Effort 下拉菜单；`/effort`；`/effort default` |
-| 管理 Session | 侧栏；`/new`、`/resume [id]`；重命名和确认删除 |
-| 重试和检查执行 | `/retry`、`/instructions`、`/status`、`/context` |
-| 管理目标 | `/goal start`、`status`、`pause`、`resume`、`cancel` |
-| 压缩 Context | `/compact [history-reference\|provider-native]` 或压缩按钮 |
-| 使用 Skills | `/skills`、`/skills show name`、`/skills use name [task]` |
-| 使用 MCP | `/mcp` 的目录、资源、提示模板、订阅和任务命令 |
-| 调查恢复 | `/recovery`、`/recovery resolve id finding` |
-| 阅读详情 | `/details`、`/thinking`、历史搜索和详情面板 |
-| 退出宿主 | `/quit` 或 `/exit`，随后确认 |
+| 任务                   | Web 入口                                                   |
+| ---------------------- | ---------------------------------------------------------- |
+| 选择模型和默认 profile | 模型下拉菜单；`/model`；`/model profile --default`         |
+| 选择 reasoning effort  | Effort 下拉菜单；`/effort`；`/effort default`              |
+| 管理 Session           | 侧栏；`/new`、`/resume [id]`；重命名和确认删除             |
+| 重试和检查执行         | `/retry`、`/instructions`、`/status`、`/context`           |
+| 管理目标               | `/goal start`、`status`、`pause`、`resume`、`cancel`       |
+| 压缩 Context           | `/compact [history-reference\|provider-native]` 或压缩按钮 |
+| 使用 Skills            | `/skills`、`/skills show name`、`/skills use name [task]`  |
+| 使用 MCP               | `/mcp` 的目录、资源、提示模板、订阅和任务命令              |
+| 调查恢复               | `/recovery`、`/recovery resolve id finding`                |
+| 阅读详情               | `/details`、`/thinking`、历史搜索和详情面板                |
+| 退出宿主               | `/quit` 或 `/exit`，随后确认                               |
 
 普通消息取消当前执行，等待取消结束，再启动新请求。`/steer <message>` 按接收
 顺序保存输入，在下一个完整 Step 边界交付，等待其中的工具和审批结束；空闲时
@@ -182,14 +182,14 @@ Session 诊断使用可选 observability 插件。MaybeClaw 提供 `agent.check`
 
 ## 接入自定义宿主
 
-| Package 或层次 | 职责 |
-| --- | --- |
-| Application 与产品宿主 | 执行、权限、预算、持久化、恢复 |
-| `@sortedyuan/ui-client` | JSON 类型，浏览器连接与状态同步 |
-| `@sortedyuan/ui-client/application` | 单活动 Session 工作区适配器 |
-| `@sortedyuan/ui-client/server` | 本地 HTTP、认证、Origin 检查、操作结果记录和 SSE |
-| `@sortedyuan/web-ui` | 工作台及对话、输入、审批、详情组件 |
-| 产品扩展 | 文件差异、任务生命周期、投递及产品展示 |
+| Package 或层次                      | 职责                                             |
+| ----------------------------------- | ------------------------------------------------ |
+| Application 与产品宿主              | 执行、权限、预算、持久化、恢复                   |
+| `@sortedyuan/ui-client`             | JSON 类型，浏览器连接与状态同步                  |
+| `@sortedyuan/ui-client/application` | 单活动 Session 工作区适配器                      |
+| `@sortedyuan/ui-client/server`      | 本地 HTTP、认证、Origin 检查、操作结果记录和 SSE |
+| `@sortedyuan/web-ui`                | 工作台及对话、输入、审批、详情组件               |
+| 产品扩展                            | 文件差异、任务生命周期、投递及产品展示           |
 
 实现 `UiHost`，或者将 `ApplicationUiHost` 接入 `AgentWorkspaceController`。
 浏览器使用适合浏览器的导出，Node 适配器由宿主使用。静态模块通过固定资源表提供。
@@ -237,12 +237,12 @@ Escape 或遮罩关闭面板，焦点返回按钮；Tab/Shift+Tab 在开放面�
 
 ## 协议 v1 与限制
 
-| 接口 | 用途 |
-| --- | --- |
-| `GET /api/ui/snapshot?selected=<id>` | 能力、资源、当前对话、交互和面板 |
-| `GET /api/ui/events` | 认证 SSE 失效通知 |
-| `POST /api/ui/commands` | `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }` |
-| `GET /api/ui/complete` | 绑定宿主和 Session 的认证补全 |
+| 接口                                 | 用途                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| `GET /api/ui/snapshot?selected=<id>` | 能力、资源、当前对话、交互和面板                                          |
+| `GET /api/ui/events`                 | 认证 SSE 失效通知                                                         |
+| `POST /api/ui/commands`              | `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }` |
+| `GET /api/ui/complete`               | 绑定宿主和 Session 的认证补全                                             |
 
 连接、失效通知和重连时重新读取快照。两秒心跳观察其他执行者，实时变化按
 120 ms 合并。慢事件连接会关闭，客户端等待后重连。旧响应不能覆盖新状态，
@@ -279,11 +279,11 @@ pnpm --filter @sortedyuan/web-ui test:browser
 这些检查包含资源分页与搜索、新增、删除、重命名、已加载页面状态及过期游标。
 浏览器工作文件保存在被忽略的 `.test-output/web-ui/`。需要已配置 Provider 的检查具有以下要求：
 
-| 检查 | 必需环境与命令 |
-| --- | --- |
+| 检查                          | 必需环境与命令                                                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | MaybeCode 控制及终端/Web 共享 | `MAYBECODE_WEB_LIVE=1`；`pnpm --filter @sortedyuan/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs` |
-| 工作区文件版本 | `MAY_LIVE_PROVIDER_UI_TESTS=1`；`node --test packages/ui/web/test/browser/workspace-versions.test.mjs` |
-| Session 分支与隔离测试提交 | `MAY_LIVE_PROVIDER_UI_TESTS=1` 和 `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`；`node --test packages/ui/web/test/browser/workspace-session-fork.test.mjs` |
+| 工作区文件版本                | `MAY_LIVE_PROVIDER_UI_TESTS=1`；`node --test packages/ui/web/test/browser/workspace-versions.test.mjs`                                                       |
+| Session 分支与隔离测试提交    | `MAY_LIVE_PROVIDER_UI_TESTS=1` 和 `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`；`node --test packages/ui/web/test/browser/workspace-session-fork.test.mjs`            |
 
 工作区文件版本检查初始化配置的 Model 并检查 Git 和页面；发送消息的检查使用
 已配置凭据并消耗 Provider 配额。工作区检查使用 `MAY_LIVE_MODEL` 指定的模型配置，

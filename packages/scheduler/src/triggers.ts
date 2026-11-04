@@ -34,8 +34,12 @@ export function validateTrigger(trigger: Trigger): void {
     }
     case "event": {
       requireKeys(trigger, ["type", "topic"]);
-      if (typeof trigger.topic !== "string" || trigger.topic.length > 256
-        || trigger.topic.trim().length === 0 || /[\u0000-\u001f\u007f]/u.test(trigger.topic)) {
+      if (
+        typeof trigger.topic !== "string" ||
+        trigger.topic.length > 256 ||
+        trigger.topic.trim().length === 0 ||
+        /[\u0000-\u001f\u007f]/u.test(trigger.topic)
+      ) {
         throw new TypeError("event.topic must contain 1-256 characters without control characters and cannot be blank");
       }
       break;

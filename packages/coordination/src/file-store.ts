@@ -1,5 +1,11 @@
 import { constants } from "node:fs";
-import { acquireFileLock, hasErrorCode, replaceJournalFile, withFileAccess, type FileLock } from "@sortedyuan/may/storage";
+import {
+  acquireFileLock,
+  hasErrorCode,
+  replaceJournalFile,
+  withFileAccess,
+  type FileLock,
+} from "@sortedyuan/may/storage";
 import { lstat, mkdir, open, readFile, type FileHandle } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { AsyncStateSerializer } from "@sortedyuan/may/core";
@@ -9,7 +15,10 @@ import { copy, name, positive, validateSnapshot } from "./validation.js";
 /** Local single-writer JSONL journal. */
 export class FileCoordinationStore implements CoordinationStore {
   readonly directory: string;
-  constructor(directory: string, readonly maxJournalBytes = 67_108_864) {
+  constructor(
+    directory: string,
+    readonly maxJournalBytes = 67_108_864,
+  ) {
     this.directory = resolve(directory);
     positive(maxJournalBytes, "maxJournalBytes");
   }
@@ -25,19 +34,28 @@ export class FileCoordinationStore implements CoordinationStore {
         const file = await open(path, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
         try {
           const stat = await file.stat();
-          if (!stat.isFile() || stat.size > this.maxJournalBytes) throw new Error("Coordination journal exceeds maxJournalBytes");
+          if (!stat.isFile() || stat.size > this.maxJournalBytes)
+            throw new Error("Coordination journal exceeds maxJournalBytes");
           const bytes = await file.readFile();
           if (bytes.length > this.maxJournalBytes) throw new Error("Coordination journal exceeds maxJournalBytes");
           let current: CoordinationSnapshot | undefined;
-          for (const line of bytes.subarray(0, bytes.lastIndexOf(10) + 1).toString("utf8").split("\n").slice(0, -1)) {
+          for (const line of bytes
+            .subarray(0, bytes.lastIndexOf(10) + 1)
+            .toString("utf8")
+            .split("\n")
+            .slice(0, -1)) {
             const record = JSON.parse(line) as CoordinationSnapshot | { checkpoint: CoordinationSnapshot };
             const next = "checkpoint" in record ? record.checkpoint : record;
-            const checkpoint = "checkpoint" in record && current === undefined; validateSnapshot(next, id);
-            if (!checkpoint && next.revision !== (current?.revision ?? 0) + 1) throw new Error("Invalid coordination journal sequence");
+            const checkpoint = "checkpoint" in record && current === undefined;
+            validateSnapshot(next, id);
+            if (!checkpoint && next.revision !== (current?.revision ?? 0) + 1)
+              throw new Error("Invalid coordination journal sequence");
             current = next;
           }
           return current === undefined ? undefined : copy(current);
-        } finally { await file.close(); }
+        } finally {
+          await file.close();
+        }
       });
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
@@ -55,10 +73,21 @@ export class FileCoordinationStore implements CoordinationStore {
     try {
       const path = join(this.directory, `${filename}.jsonl`);
       return await withFileAccess(path, "exclusive", async () => {
-        try { if ((await lstat(path)).isSymbolicLink()) throw new Error("Coordination journal must not be a symbolic link"); }
-        catch (error) { if (!hasErrorCode(error, "ENOENT")) throw error; }
-        file = await open(path, constants.O_CREAT | constants.O_APPEND | constants.O_RDWR | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW), 0o600);
-        if ((await file.stat()).size > this.maxJournalBytes) throw new Error("Coordination journal exceeds maxJournalBytes");
+        try {
+          if ((await lstat(path)).isSymbolicLink()) throw new Error("Coordination journal must not be a symbolic link");
+        } catch (error) {
+          if (!hasErrorCode(error, "ENOENT")) throw error;
+        }
+        file = await open(
+          path,
+          constants.O_CREAT |
+            constants.O_APPEND |
+            constants.O_RDWR |
+            (process.platform === "win32" ? 0 : constants.O_NOFOLLOW),
+          0o600,
+        );
+        if ((await file.stat()).size > this.maxJournalBytes)
+          throw new Error("Coordination journal exceeds maxJournalBytes");
         const bytes = await readFile(path);
         const committedLength = bytes.length === 0 || bytes.at(-1) === 10 ? bytes.length : bytes.lastIndexOf(10) + 1;
         // 仅修复尚未结束的末尾记录，完整记录损坏时立即失败。
@@ -69,57 +98,92 @@ export class FileCoordinationStore implements CoordinationStore {
           const next = "checkpoint" in record ? record.checkpoint : record;
           const checkpoint = "checkpoint" in record && current === undefined;
           validateSnapshot(next, id);
-          if (!checkpoint && next.revision !== (current?.revision ?? 0) + 1) throw new Error("Invalid coordination journal sequence");
+          if (!checkpoint && next.revision !== (current?.revision ?? 0) + 1)
+            throw new Error("Invalid coordination journal sequence");
           current = next;
         }
         if (committedLength !== bytes.length) {
           const repair = await open(path, "r+");
-          try { await repair.truncate(committedLength); await repair.sync(); }
-          finally { await repair.close(); }
+          try {
+            await repair.truncate(committedLength);
+            await repair.sync();
+          } finally {
+            await repair.close();
+          }
         }
         return journal(file, path, lock, id, current, committedLength, this.maxJournalBytes);
       });
     } catch (error) {
-      try { await file?.close(); } finally { await lock.release(); }
+      try {
+        await file?.close();
+      } finally {
+        await lock.release();
+      }
       throw error;
     }
   }
 }
 
-function journal(file: FileHandle, path: string, lock: FileLock, id: string,
-  initial: CoordinationSnapshot | undefined, initialSize: number, maxBytes: number): CoordinationJournal {
+function journal(
+  file: FileHandle,
+  path: string,
+  lock: FileLock,
+  id: string,
+  initial: CoordinationSnapshot | undefined,
+  initialSize: number,
+  maxBytes: number,
+): CoordinationJournal {
   const serial = new AsyncStateSerializer();
   let current = initial;
   let size = initialSize;
   let failed = false;
   let closing: Promise<void> | undefined;
   return {
-    read: () => serial.run(() => { if (failed) throw new Error("Journal write outcome is unknown; reopen before continuing"); return current === undefined ? undefined : copy(current); }),
+    read: () =>
+      serial.run(() => {
+        if (failed) throw new Error("Journal write outcome is unknown; reopen before continuing");
+        return current === undefined ? undefined : copy(current);
+      }),
     commit: (snapshot, expectedRevision) => {
       const next = copy(snapshot);
       return serial.run(async () => {
         if (failed) throw new Error("Journal write outcome is unknown; reopen before continuing");
         validateSnapshot(next, id);
-        if ((current?.revision ?? 0) !== expectedRevision || next.revision !== expectedRevision + 1) throw new Error("Coordination revision conflict");
+        if ((current?.revision ?? 0) !== expectedRevision || next.revision !== expectedRevision + 1)
+          throw new Error("Coordination revision conflict");
         const line = `${JSON.stringify(next)}\n`;
         const length = Buffer.byteLength(line);
         const compact = size + length > maxBytes;
         const checkpoint = `${JSON.stringify({ checkpoint: next })}\n`;
-        if (length > maxBytes || compact && Buffer.byteLength(checkpoint) > maxBytes) throw new Error("Coordination snapshot exceeds maxJournalBytes");
+        if (length > maxBytes || (compact && Buffer.byteLength(checkpoint) > maxBytes))
+          throw new Error("Coordination snapshot exceeds maxJournalBytes");
         try {
           if (compact) {
             const previous = file;
             await previous.close();
             file = await replaceJournalFile(path, checkpoint);
-          } else { await withFileAccess(path, "exclusive", async () => { await file.writeFile(line, "utf8"); await file.sync(); }); }
+          } else {
+            await withFileAccess(path, "exclusive", async () => {
+              await file.writeFile(line, "utf8");
+              await file.sync();
+            });
+          }
+        } catch (error) {
+          failed = true;
+          throw error;
         }
-        catch (error) { failed = true; throw error; }
-        current = next; size = compact ? Buffer.byteLength(checkpoint) : size + length;
+        current = next;
+        size = compact ? Buffer.byteLength(checkpoint) : size + length;
       });
     },
-    close: () => closing ??= (async () => {
-      await serial.close();
-      try { await file.close(); } finally { await lock.release(); }
-    })(),
+    close: () =>
+      (closing ??= (async () => {
+        await serial.close();
+        try {
+          await file.close();
+        } finally {
+          await lock.release();
+        }
+      })()),
   };
 }

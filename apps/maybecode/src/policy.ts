@@ -1,8 +1,4 @@
-import type {
-  PermissionCheck,
-  PermissionDecision,
-  PermissionPolicy,
-} from "@sortedyuan/may/permissions";
+import type { PermissionCheck, PermissionDecision, PermissionPolicy } from "@sortedyuan/may/permissions";
 import { resolveWritableWorkspacePath } from "@sortedyuan/coding-tools";
 import { realpath } from "node:fs/promises";
 import { relative } from "node:path";
@@ -14,15 +10,31 @@ export function parsePermissionMode(value: unknown): MaybeCodePermissionMode {
   throw new TypeError('permissionMode must be "default" or "yolo"');
 }
 
-export function createCodingPermissionPolicy(options: {
-  readonly mode?: () => MaybeCodePermissionMode;
-  readonly readOnly?: boolean;
-  readonly policy?: PermissionPolicy;
-  readonly persistent?: { readonly workspace: string; readonly scopeId: string };
-} = {}): PermissionPolicy {
+export function createCodingPermissionPolicy(
+  options: {
+    readonly mode?: () => MaybeCodePermissionMode;
+    readonly readOnly?: boolean;
+    readonly policy?: PermissionPolicy;
+    readonly persistent?: { readonly workspace: string; readonly scopeId: string };
+  } = {},
+): PermissionPolicy {
   const policy = options.policy ?? defaultCodingPermission;
   return async (check) => {
-    if (options.readOnly && !["read", "skill_read", "session_history", "session_history_search", "session_history_read", "get_context_remaining", "context_notes", "new_context", "get_goal"].includes(check.tool.name)) return "deny";
+    if (
+      options.readOnly &&
+      ![
+        "read",
+        "skill_read",
+        "session_history",
+        "session_history_search",
+        "session_history_read",
+        "get_context_remaining",
+        "context_notes",
+        "new_context",
+        "get_goal",
+      ].includes(check.tool.name)
+    )
+      return "deny";
     let decision = await policy(check);
     if (options.persistent && ["read", "edit", "write"].includes(check.tool.name)) {
       const path = stringField(check.input, "path");
@@ -35,19 +47,32 @@ export function createCodingPermissionPolicy(options: {
         const rulesRelative = relative(root, rules.absolute).replace(/\\/gu, "/");
         const rulesKey = process.platform === "win32" ? rulesRelative.toLowerCase() : rulesRelative;
         if (key === rulesKey || key.startsWith(`${rulesKey}.`)) return "deny";
-        if (options.policy === undefined && check.tool.name !== "read" && decision !== "deny" && !(typeof decision === "object" && decision.decision === "deny")) {
+        if (
+          options.policy === undefined &&
+          check.tool.name !== "read" &&
+          decision !== "deny" &&
+          !(typeof decision === "object" && decision.decision === "deny")
+        ) {
           const scoped = typeof decision === "object" ? decision : { decision };
           const persistent = typeof decision === "object" ? decision.persistent : undefined;
           decision = {
             ...scoped,
             grantKey: persistent && typeof decision === "object" ? decision.grantKey : `${check.tool.name}:${key}`,
-            persistent: persistent ?? { scopeId: options.persistent.scopeId, description: `${check.tool.name} · ${root} · ${key}` },
+            persistent: persistent ?? {
+              scopeId: options.persistent.scopeId,
+              description: `${check.tool.name} · ${root} · ${key}`,
+            },
           };
         }
       }
     }
-    const asks = decision === "ask" || (typeof decision === "object" && decision !== null &&
-      decision.decision === "ask" && typeof decision.grantKey === "string" && decision.grantKey.trim() !== "");
+    const asks =
+      decision === "ask" ||
+      (typeof decision === "object" &&
+        decision !== null &&
+        decision.decision === "ask" &&
+        typeof decision.grantKey === "string" &&
+        decision.grantKey.trim() !== "");
     if (options.mode?.() === "yolo" && asks && !(typeof decision === "object" && decision.requireApproval)) {
       return typeof decision === "object" ? { ...decision, decision: "allow" } : "allow";
     }
@@ -56,9 +81,21 @@ export function createCodingPermissionPolicy(options: {
 }
 
 function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
-  if (["read", "skill_read", "session_history", "session_history_search", "session_history_read",
-    "get_context_remaining", "context_notes", "new_context", "get_goal", "update_goal",
-    "delegate_tasks"].includes(check.tool.name)) {
+  if (
+    [
+      "read",
+      "skill_read",
+      "session_history",
+      "session_history_search",
+      "session_history_read",
+      "get_context_remaining",
+      "context_notes",
+      "new_context",
+      "get_goal",
+      "update_goal",
+      "delegate_tasks",
+    ].includes(check.tool.name)
+  ) {
     // 委派是否被允许由宿主的角色授权决定：只有已注册且宿主授权的角色能被创建，
     // 超出授权范围的委派会在工具执行时失败。显式提供 deny 的自定义策略依然有效。
     return "allow";
@@ -66,9 +103,7 @@ function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
 
   if (check.tool.name === "shell" || check.tool.name === "bash") {
     const command = stringField(check.input, "command");
-    return command === undefined
-      ? "ask"
-      : { decision: "ask", grantKey: `${check.tool.name}:${command}` };
+    return command === undefined ? "ask" : { decision: "ask", grantKey: `${check.tool.name}:${command}` };
   }
 
   if (check.tool.name === "edit" || check.tool.name === "write") {

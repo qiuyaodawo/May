@@ -3,7 +3,21 @@ import { readEmbeddedImage, type MediaReader } from "@sortedyuan/media";
 import type { AgentApplicationEvent, AgentWorkspaceController } from "@sortedyuan/may";
 import { AsyncStateSerializer } from "@sortedyuan/may/core";
 import type { PersistentPermissionRule } from "@sortedyuan/may/permissions";
-import { commandArgs, UiError, type UiCommand, type UiHost, type UiPanel, type UiProduct, type UiReceipt, type UiSnapshot, type UiChoice, type UiPageRequest, type UiFieldRequest, type UiControls, type UiCompletion } from "./protocol.js";
+import {
+  commandArgs,
+  UiError,
+  type UiCommand,
+  type UiHost,
+  type UiPanel,
+  type UiProduct,
+  type UiReceipt,
+  type UiSnapshot,
+  type UiChoice,
+  type UiPageRequest,
+  type UiFieldRequest,
+  type UiControls,
+  type UiCompletion,
+} from "./protocol.js";
 import { UiProjection } from "./projection.js";
 import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";
 
@@ -52,72 +66,129 @@ export class ApplicationUiHost implements UiHost {
   private closed = false;
   private closing: Promise<void> | undefined;
   private fault: string | undefined;
-  constructor(private readonly app: UiApplication, private readonly options: ApplicationUiOptions) {
+  constructor(
+    private readonly app: UiApplication,
+    private readonly options: ApplicationUiOptions,
+  ) {
     this.iterator = (options.events ?? app.events)[Symbol.asyncIterator]();
-    this.relay = this.consume().catch(() => { this.fault = "运行事件连接已停止。请检查宿主后重新启动。"; this.changed(); });
+    this.relay = this.consume().catch(() => {
+      this.fault = "运行事件连接已停止。请检查宿主后重新启动。";
+      this.changed();
+    });
   }
-  subscribe(listener: () => void): () => void { this.assertOpen(); this.listeners.add(listener); return () => this.listeners.delete(listener); }
-  changed(): void { this.revision++; for (const listener of this.listeners) { try { listener(); } catch { /* A view cannot stop the relay. */ } } }
+  subscribe(listener: () => void): () => void {
+    this.assertOpen();
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  changed(): void {
+    this.revision++;
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch {
+        /* A view cannot stop the relay. */
+      }
+    }
+  }
   private async consume(): Promise<void> {
     while (true) {
-      const next = await this.iterator.next(); if (next.done) return;
+      const next = await this.iterator.next();
+      if (next.done) return;
       if (next.value.type === "session.changed") this.projection = new UiProjection();
       else this.projection.event(next.value as AgentApplicationEvent);
       this.changed();
     }
   }
-  snapshot(_selectedId?: string): Promise<UiSnapshot> { return this.queuedSnapshot(); }
+  snapshot(_selectedId?: string): Promise<UiSnapshot> {
+    return this.queuedSnapshot();
+  }
   private queuedSnapshot(selectedId?: string, all = false): Promise<UiSnapshot> {
     this.assertOpen();
     return this.mutations.idle().then(() => this.buildSnapshot(selectedId, 0, all));
   }
   private commandNames(viewingActive = true): string[] {
     if (this.closed || this.fault) return [];
-    const running = this.app.isRunning, commands: string[] = [];
+    const running = this.app.isRunning,
+      commands: string[] = [];
     if (!running) commands.push("session.new", "session.activate", "session.delete");
     if (viewingActive) {
-      commands.push(...(running ? ["run.cancel", ...(this.projection.interactions.size ? ["approval.resolve"] : [])]
-        : ["message.submit", "session.rename", "context.compact", ...(this.options.commands ?? [])]));
+      commands.push(
+        ...(running
+          ? ["run.cancel", ...(this.projection.interactions.size ? ["approval.resolve"] : [])]
+          : ["message.submit", "session.rename", "context.compact", ...(this.options.commands ?? [])]),
+      );
       commands.push(...(this.options.concurrentCommands ?? []));
       if (this.options.permissionRules !== undefined) commands.push("permission.rules.list", "permission.rules.revoke");
       if (this.options.permissionRules?.create !== undefined) commands.push("permission.rules.create");
     }
-    return this.options.available ? commands.filter(name => this.options.available!(name)) : commands;
+    return this.options.available ? commands.filter((name) => this.options.available!(name)) : commands;
   }
   private assertOpen(): void {
     if (this.closed) throw new UiError(503, "宿主正在关闭。");
   }
   private async buildSnapshot(selectedId?: string, attempt = 0, all = false): Promise<UiSnapshot> {
     this.assertOpen();
-    const revision = this.revision, activeId = this.app.sessionId, running = this.app.isRunning;
-    const viewingId = selectedId ?? activeId, viewingActive = viewingId === activeId;
+    const revision = this.revision,
+      activeId = this.app.sessionId,
+      running = this.app.isRunning;
+    const viewingId = selectedId ?? activeId,
+      viewingActive = viewingId === activeId;
     const sessions = await this.app.listSessions();
-    if (!sessions.some(session => session.id === viewingId)) throw new UiError(404, "会话不存在或不属于当前工作区。");
+    if (!sessions.some((session) => session.id === viewingId)) throw new UiError(404, "会话不存在或不属于当前工作区。");
     if (!viewingActive && !this.app.readSessionHistory) throw new UiError(409, "当前宿主不支持只读历史浏览。");
     const history = viewingActive ? await this.app.history() : await this.app.readSessionHistory!(viewingId);
     // Keep the selected/active entries available even beyond the recent-resource limit.
-    const visibleSessions = sessions.filter((session, index) => index < 500 || session.id === viewingId || session.id === activeId);
-    const resources = visibleSessions.map(s => ({ id: s.id, kind: "session" as const, title: s.title ?? s.preview?.slice(0, 72) ?? "新会话", status: s.id === activeId && running ? "running" : "idle", updatedAt: s.lastUsedAt }));
-    const resourcesVersion = createHash("sha256").update(JSON.stringify([...sessions]
-      .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))
-      .map(s => [s.id, s.createdAt, s.title ?? s.preview?.slice(0, 72) ?? "新会话"]))).digest("hex");
-    const projected = new UiProjection(Infinity); projected.history(history);
+    const visibleSessions = sessions.filter(
+      (session, index) => index < 500 || session.id === viewingId || session.id === activeId,
+    );
+    const resources = visibleSessions.map((s) => ({
+      id: s.id,
+      kind: "session" as const,
+      title: s.title ?? s.preview?.slice(0, 72) ?? "新会话",
+      status: s.id === activeId && running ? "running" : "idle",
+      updatedAt: s.lastUsedAt,
+    }));
+    const resourcesVersion = createHash("sha256")
+      .update(
+        JSON.stringify(
+          [...sessions]
+            .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))
+            .map((s) => [s.id, s.createdAt, s.title ?? s.preview?.slice(0, 72) ?? "新会话"]),
+        ),
+      )
+      .digest("hex");
+    const projected = new UiProjection(Infinity);
+    projected.history(history);
     if (viewingActive) {
       // Durable completed blocks win; only the execution owner's live deltas fill gaps.
-      for (const [id, block] of this.projection.blocks) if (!projected.blocks.has(id) || ["running", "streaming", "awaiting-approval"].includes(projected.blocks.get(id)?.status ?? "")) projected.blocks.set(id, block);
+      for (const [id, block] of this.projection.blocks)
+        if (
+          !projected.blocks.has(id) ||
+          ["running", "streaming", "awaiting-approval"].includes(projected.blocks.get(id)?.status ?? "")
+        )
+          projected.blocks.set(id, block);
     }
     if (!viewingActive || !running || this.fault) projected.settle();
-    const interactions = viewingActive && running && !this.fault ? [...this.projection.interactions.values()].map(interaction => ({
-      ...interaction,
-      choices: this.options.permissionActor === undefined ? interaction.choices.filter(choice => choice.value !== "allow-persistent") : interaction.choices,
-    })) : [];
+    const interactions =
+      viewingActive && running && !this.fault
+        ? [...this.projection.interactions.values()].map((interaction) => ({
+            ...interaction,
+            choices:
+              this.options.permissionActor === undefined
+                ? interaction.choices.filter((choice) => choice.value !== "allow-persistent")
+                : interaction.choices,
+          }))
+        : [];
     const commands = this.commandNames(viewingActive);
-    const panels = viewingActive ? await this.options.panels?.() ?? [] : [];
-    const choices = viewingActive ? await this.options.choices?.() ?? [] : [];
+    const panels = viewingActive ? ((await this.options.panels?.()) ?? []) : [];
+    const choices = viewingActive ? ((await this.options.choices?.()) ?? []) : [];
     const workspace = await this.options.workspace?.();
     const rawForkPoints = await this.options.forkPoints?.(viewingId);
-    const forkPoints = rawForkPoints?.map(point => {
-      const reply = [...projected.blocks.values()].reverse().find(block => block.kind === "assistant" && block.runId === point.runId);
+    const forkPoints = rawForkPoints?.map((point) => {
+      const reply = [...projected.blocks.values()]
+        .reverse()
+        .find((block) => block.kind === "assistant" && block.runId === point.runId);
       return reply ? { ...point, blockId: reply.id } : point;
     });
     const checkpoints = await this.options.checkpoints?.(viewingId);
@@ -128,43 +199,100 @@ export class ApplicationUiHost implements UiHost {
       throw new UiError(409, "运行会话状态已改变，请刷新后重试。");
     }
     const page = historyPage(this.hostId, viewingId, [...projected.blocks.values()]);
-    return { version: 1, hostId: this.hostId, revision, product: this.options.product, resources, resourcesVersion,
-      ...(workspace ? { workspace } : {}), ...(forkPoints ? { forkPoints } : {}),
-      ...(checkpoints ? { checkpoints } : {}), ...(worktrees ? { worktrees } : {}),
+    return {
+      version: 1,
+      hostId: this.hostId,
+      revision,
+      product: this.options.product,
+      resources,
+      resourcesVersion,
+      ...(workspace ? { workspace } : {}),
+      ...(forkPoints ? { forkPoints } : {}),
+      ...(checkpoints ? { checkpoints } : {}),
+      ...(worktrees ? { worktrees } : {}),
       ...(this.options.badges ? { badges: this.options.badges() } : {}),
-      selectedId: viewingId, activeId, blocks: all ? [...projected.blocks.values()] : page.items,
-      historyPage: { nextCursor: page.nextCursor, total: page.total }, reads: { resources: true, history: Boolean(this.app.readSessionHistory), fields: Boolean(this.app.readSessionHistory) },
-      interactions, commands,
-      panels: [{ id: "workspace", title: "工作区", fields: [{ label: "目录", value: this.app.workspace }, { label: "当前会话", value: viewingId }, { label: "执行状态", value: running ? "运行中" : "空闲" }] }, ...panels,
-        ...(viewingActive && this.options.permissionRules !== undefined ? [{ id: "permission-rules", title: "持久权限规则", fields: [], actions: [{ label: "查看和管理规则", command: "permission.rules.list", args: {} }] }] : [])],
+      selectedId: viewingId,
+      activeId,
+      blocks: all ? [...projected.blocks.values()] : page.items,
+      historyPage: { nextCursor: page.nextCursor, total: page.total },
+      reads: {
+        resources: true,
+        history: Boolean(this.app.readSessionHistory),
+        fields: Boolean(this.app.readSessionHistory),
+      },
+      interactions,
+      commands,
+      panels: [
+        {
+          id: "workspace",
+          title: "工作区",
+          fields: [
+            { label: "目录", value: this.app.workspace },
+            { label: "当前会话", value: viewingId },
+            { label: "执行状态", value: running ? "运行中" : "空闲" },
+          ],
+        },
+        ...panels,
+        ...(viewingActive && this.options.permissionRules !== undefined
+          ? [
+              {
+                id: "permission-rules",
+                title: "持久权限规则",
+                fields: [],
+                actions: [{ label: "查看和管理规则", command: "permission.rules.list", args: {} }],
+              },
+            ]
+          : []),
+      ],
       choices,
       ...(viewingActive && this.options.controls ? { controls: this.options.controls() } : {}),
-      notice: this.fault ?? "选择会话后即可继续对话，终端和已连接页面同步切换。执行或等待交互期间，请先完成或取消当前操作。",
+      notice:
+        this.fault ?? "选择会话后即可继续对话，终端和已连接页面同步切换。执行或等待交互期间，请先完成或取消当前操作。",
     };
   }
   async resources(request: UiPageRequest) {
     this.assertOpen();
-    const sessions = [...await this.app.listSessions()].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
-    const items = sessions.map(s => ({ id: s.id, kind: "session" as const, title: s.title ?? s.preview?.slice(0, 72) ?? "新会话", status: s.id === this.app.sessionId && this.app.isRunning ? "running" : "idle", updatedAt: s.lastUsedAt }));
-    return readPage(this.hostId, "resources", items, request, (item, query) => item.title.toLocaleLowerCase().includes(query));
+    const sessions = [...(await this.app.listSessions())].sort(
+      (a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id),
+    );
+    const items = sessions.map((s) => ({
+      id: s.id,
+      kind: "session" as const,
+      title: s.title ?? s.preview?.slice(0, 72) ?? "新会话",
+      status: s.id === this.app.sessionId && this.app.isRunning ? "running" : "idle",
+      updatedAt: s.lastUsedAt,
+    }));
+    return readPage(this.hostId, "resources", items, request, (item, query) =>
+      item.title.toLocaleLowerCase().includes(query),
+    );
   }
   async media(selectedId: string, id: string) {
     this.assertOpen();
-    if (!(await this.app.listSessions()).some(session => session.id === selectedId)) throw new UiError(404, "会话不存在或不属于当前工作区。");
-    const events = selectedId === this.app.sessionId ? await this.app.history() : await this.app.readSessionHistory?.(selectedId);
+    if (!(await this.app.listSessions()).some((session) => session.id === selectedId))
+      throw new UiError(404, "会话不存在或不属于当前工作区。");
+    const events =
+      selectedId === this.app.sessionId ? await this.app.history() : await this.app.readSessionHistory?.(selectedId);
     if (!events) throw new UiError(404, "会话历史不可用。");
-    const projection = new UiProjection(Infinity); projection.history(events);
+    const projection = new UiProjection(Infinity);
+    projection.history(events);
     const source = projection.mediaSources.get(id);
     if (!source) throw new UiError(404, "图片不属于此会话。");
     return (this.options.readMedia ?? readEmbeddedImage)(source);
   }
   async history(selectedId: string, request: UiPageRequest) {
     if (!this.app.readSessionHistory) throw new UiError(409, "宿主不支持只读历史。");
-    return historyPage(this.hostId, selectedId, (await this.queuedSnapshot(selectedId, true)).blocks, request, searchHistory(await this.app.readSessionHistory(selectedId), request.query));
+    return historyPage(
+      this.hostId,
+      selectedId,
+      (await this.queuedSnapshot(selectedId, true)).blocks,
+      request,
+      searchHistory(await this.app.readSessionHistory(selectedId), request.query),
+    );
   }
   async field(selectedId: string, request: UiFieldRequest) {
     if (!this.app.readSessionHistory) throw new UiError(409, "宿主不支持只读详情。");
-    const snapshot = await this.queuedSnapshot(selectedId, true), block = snapshot.blocks.find(b => b.id === request.blockId);
+    const snapshot = await this.queuedSnapshot(selectedId, true),
+      block = snapshot.blocks.find((b) => b.id === request.blockId);
     if (!block) throw new UiError(404, "该记录不属于当前资源或已不可用。");
     const events = await this.app.readSessionHistory(selectedId);
     return fieldPage(this.hostId, selectedId, request, recordedField(events, block, request.field));
@@ -172,9 +300,14 @@ export class ApplicationUiHost implements UiHost {
   execute(command: UiCommand): Promise<UiReceipt> {
     if (this.closed) return Promise.reject(new UiError(503, "宿主正在关闭。"));
     const concurrent = this.options.concurrentCommands?.includes(command.name) === true;
-    const work = concurrent ? Promise.resolve().then(() => this.apply(command)) : this.mutations.run(() => this.apply(command));
+    const work = concurrent
+      ? Promise.resolve().then(() => this.apply(command))
+      : this.mutations.run(() => this.apply(command));
     this.pendingCommands.add(work);
-    void work.then(() => this.pendingCommands.delete(work), () => this.pendingCommands.delete(work));
+    void work.then(
+      () => this.pendingCommands.delete(work),
+      () => this.pendingCommands.delete(work),
+    );
     return work;
   }
   async complete(selectedId: string, text: string) {
@@ -183,11 +316,16 @@ export class ApplicationUiHost implements UiHost {
     return { hostId: this.hostId, items: await this.options.complete(text) };
   }
   private async apply(command: UiCommand): Promise<UiReceipt> {
-    const transition = command.name === "session.activate" || command.name === "session.new" || command.name === "session.delete";
+    const transition =
+      command.name === "session.activate" || command.name === "session.new" || command.name === "session.delete";
     if (!command.targetId) throw new UiError(409, "请指定会话。");
     const assertCurrent = () => {
       this.assertOpen();
-      if (command.hostId !== this.hostId || (transition ? command.expectedActiveId !== this.app.sessionId : command.targetId !== this.app.sessionId)) throw new UiError(409, "当前会话已改变，请检查当前状态后重试。");
+      if (
+        command.hostId !== this.hostId ||
+        (transition ? command.expectedActiveId !== this.app.sessionId : command.targetId !== this.app.sessionId)
+      )
+        throw new UiError(409, "当前会话已改变，请检查当前状态后重试。");
     };
     const assertAllowed = () => {
       assertCurrent();
@@ -210,81 +348,147 @@ export class ApplicationUiHost implements UiHost {
         void run.result.catch(() => {}).finally(() => this.changed());
         break;
       }
-      case "run.cancel": commandArgs(command, []); this.app.cancel("Cancelled by operator"); break;
+      case "run.cancel":
+        commandArgs(command, []);
+        this.app.cancel("Cancelled by operator");
+        break;
       case "approval.resolve": {
         commandArgs(command, ["id", "decision"]);
         const decision = command.args.decision;
-        if (decision !== "allow" && decision !== "allow-session" && decision !== "allow-persistent" && decision !== "deny") throw new UiError(400, "无效的审批决定。");
+        if (
+          decision !== "allow" &&
+          decision !== "allow-session" &&
+          decision !== "allow-persistent" &&
+          decision !== "deny"
+        )
+          throw new UiError(400, "无效的审批决定。");
         const request = this.projection.interactions.get(command.args.id!);
-        if (!request?.choices.some(choice => choice.value === decision)) throw new UiError(409, "审批已失效或该选项不可用。请刷新后检查。");
+        if (!request?.choices.some((choice) => choice.value === decision))
+          throw new UiError(409, "审批已失效或该选项不可用。请刷新后检查。");
         const actor = decision === "allow-persistent" ? this.options.permissionActor?.() : undefined;
         if (decision === "allow-persistent" && !actor?.trim()) throw new UiError(409, "宿主没有提供权限管理身份。");
-        if (!await this.app.resolveApproval(command.args.id!, decision, actor === undefined ? undefined : { createdBy: actor })) throw new UiError(409, "此审批已经结束或失效。");
+        if (
+          !(await this.app.resolveApproval(
+            command.args.id!,
+            decision,
+            actor === undefined ? undefined : { createdBy: actor },
+          ))
+        )
+          throw new UiError(409, "此审批已经结束或失效。");
         break;
       }
       case "permission.rules.list": {
         commandArgs(command, []);
         const rules = await this.options.permissionRules!.list();
         assertAllowed();
-        return { selectedId: this.app.sessionId, output: { title: "持久权限规则", text: rules.length === 0 ? "当前没有持久权限规则。" : rules.map(rule => `${rule.decision === "allow" ? "允许" : "禁止"} · ${rule.toolName}\n${rule.description}\n范围：${rule.scopeId}\n创建者：${rule.createdBy}\n有效期：${rule.expiresAt === undefined ? "持续有效" : new Date(rule.expiresAt).toISOString()}\n规则 ID：${rule.id}`).join("\n\n"),
-          actions: rules.flatMap(rule => [
-            { label: `撤销 ${rule.description}`, command: "permission.rules.revoke", args: { id: rule.id }, confirm: `确认撤销规则 ${rule.id}？后续工具调用将重新检查权限。` },
-            ...(this.options.permissionRules!.create === undefined ? [] : (["allow", "deny"] as const).map(decision => ({ label: `按此范围创建${decision === "allow" ? "允许" : "禁止"}规则`, command: "permission.rules.create", args: { sourceId: rule.id, decision }, confirm: `确认${decision === "allow" ? "持续允许" : "持续禁止"}：${rule.description}？范围：${rule.scopeId}。禁止规则优先于允许规则。` }))),
-          ]) } };
+        return {
+          selectedId: this.app.sessionId,
+          output: {
+            title: "持久权限规则",
+            text:
+              rules.length === 0
+                ? "当前没有持久权限规则。"
+                : rules
+                    .map(
+                      (rule) =>
+                        `${rule.decision === "allow" ? "允许" : "禁止"} · ${rule.toolName}\n${rule.description}\n范围：${rule.scopeId}\n创建者：${rule.createdBy}\n有效期：${rule.expiresAt === undefined ? "持续有效" : new Date(rule.expiresAt).toISOString()}\n规则 ID：${rule.id}`,
+                    )
+                    .join("\n\n"),
+            actions: rules.flatMap((rule) => [
+              {
+                label: `撤销 ${rule.description}`,
+                command: "permission.rules.revoke",
+                args: { id: rule.id },
+                confirm: `确认撤销规则 ${rule.id}？后续工具调用将重新检查权限。`,
+              },
+              ...(this.options.permissionRules!.create === undefined
+                ? []
+                : (["allow", "deny"] as const).map((decision) => ({
+                    label: `按此范围创建${decision === "allow" ? "允许" : "禁止"}规则`,
+                    command: "permission.rules.create",
+                    args: { sourceId: rule.id, decision },
+                    confirm: `确认${decision === "allow" ? "持续允许" : "持续禁止"}：${rule.description}？范围：${rule.scopeId}。禁止规则优先于允许规则。`,
+                  }))),
+            ]),
+          },
+        };
       }
       case "permission.rules.create": {
         commandArgs(command, ["sourceId", "decision"]);
         const decision = command.args.decision;
         if (decision !== "allow" && decision !== "deny") throw new UiError(400, "无效的规则决定。");
-        if (!(await this.options.permissionRules!.list()).some(rule => rule.id === command.args.sourceId)) throw new UiError(404, "规则不属于当前权限范围。");
+        if (!(await this.options.permissionRules!.list()).some((rule) => rule.id === command.args.sourceId))
+          throw new UiError(404, "规则不属于当前权限范围。");
         assertAllowed();
         await this.options.permissionRules!.create!(command.args.sourceId!, decision);
         break;
       }
       case "permission.rules.revoke": {
         commandArgs(command, ["id"]);
-        if (!(await this.options.permissionRules!.list()).some(rule => rule.id === command.args.id)) throw new UiError(404, "规则不属于当前权限范围。");
+        if (!(await this.options.permissionRules!.list()).some((rule) => rule.id === command.args.id))
+          throw new UiError(404, "规则不属于当前权限范围。");
         assertAllowed();
-        if (!await this.options.permissionRules!.revoke(command.args.id!)) throw new UiError(404, "规则已经撤销。");
+        if (!(await this.options.permissionRules!.revoke(command.args.id!))) throw new UiError(404, "规则已经撤销。");
         break;
       }
-      case "session.new": commandArgs(command, []); await this.app.newSession(); this.projection = new UiProjection(); break;
+      case "session.new":
+        commandArgs(command, []);
+        await this.app.newSession();
+        this.projection = new UiProjection();
+        break;
       case "session.activate": {
         commandArgs(command, []);
-        if (!(await this.app.listSessions()).some(session => session.id === command.targetId)) throw new UiError(404, "会话不属于当前工作区。");
+        if (!(await this.app.listSessions()).some((session) => session.id === command.targetId))
+          throw new UiError(404, "会话不属于当前工作区。");
         assertAllowed();
-        await this.app.resumeSession(command.targetId); this.projection = new UiProjection(); break;
+        await this.app.resumeSession(command.targetId);
+        this.projection = new UiProjection();
+        break;
       }
       case "session.delete": {
         commandArgs(command, []);
         if (command.targetId === this.app.sessionId) throw new UiError(409, "无法删除当前会话，请先切换到其它会话。");
         const sessions = await this.app.listSessions();
-        if (!sessions.some(session => session.id === command.targetId)) throw new UiError(404, "会话不属于当前工作区。");
+        if (!sessions.some((session) => session.id === command.targetId))
+          throw new UiError(404, "会话不属于当前工作区。");
         assertAllowed();
-        if (!await this.app.deleteSession(command.targetId)) throw new UiError(404, "会话已不存在。");
+        if (!(await this.app.deleteSession(command.targetId))) throw new UiError(404, "会话已不存在。");
         break;
       }
-      case "session.rename": commandArgs(command, ["title"]); await this.app.renameSession(this.app.sessionId, command.args.title!.slice(0, 160)); break;
-      case "context.compact": commandArgs(command, []); await this.app.compactContext(); break;
+      case "session.rename":
+        commandArgs(command, ["title"]);
+        await this.app.renameSession(this.app.sessionId, command.args.title!.slice(0, 160));
+        break;
+      case "context.compact":
+        commandArgs(command, []);
+        await this.app.compactContext();
+        break;
       default: {
         if (!this.options.execute) throw new UiError(400, "命令没有实现。");
-        const receipt = await this.options.execute(command); this.changed(); return receipt;
+        const receipt = await this.options.execute(command);
+        this.changed();
+        return receipt;
       }
     }
-    this.changed(); return { selectedId: this.app.sessionId };
+    this.changed();
+    return { selectedId: this.app.sessionId };
   }
   close(): Promise<void> {
     if (this.closing) return this.closing;
     this.closed = true;
-    return this.closing = this.closeOnce();
+    return (this.closing = this.closeOnce());
   }
   private async closeOnce(): Promise<void> {
     const [applicationClosing] = await Promise.allSettled([
       this.options.closeApplication === false ? Promise.resolve() : Promise.resolve().then(() => this.app.close()),
       ...this.pendingCommands,
     ]);
-    try { await this.iterator.return?.(); await this.relay; }
-    finally { this.listeners.clear(); }
+    try {
+      await this.iterator.return?.();
+      await this.relay;
+    } finally {
+      this.listeners.clear();
+    }
     if (applicationClosing?.status === "rejected") throw applicationClosing.reason;
   }
 }

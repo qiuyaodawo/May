@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { TaskWorkspaceManager } from "@sortedyuan/coordination";
-import { applyTeamPatch, cleanupTeamPatchTemporaries, createTeamPatch, readTeamPatchApplication, renderTeamPatchDiff } from "../dist/team-patches.js";
+import {
+  applyTeamPatch,
+  cleanupTeamPatchTemporaries,
+  createTeamPatch,
+  readTeamPatchApplication,
+  renderTeamPatchDiff,
+} from "../dist/team-patches.js";
 
 async function fixture(t) {
   // Match the CLI's canonical root before invoking the link-rejecting patch APIs.
@@ -14,8 +20,14 @@ async function fixture(t) {
   await mkdir(source);
   await writeFile(join(source, "a.txt"), "before-a\n");
   await writeFile(join(source, "b.txt"), "before-b\n");
-  const workspaces = await TaskWorkspaceManager.open({ sourceDirectory: source, directory: join(directory, "workspaces") });
-  t.after(async () => { await workspaces.close(); await rm(root, { recursive: true, force: true }); });
+  const workspaces = await TaskWorkspaceManager.open({
+    sourceDirectory: source,
+    directory: join(directory, "workspaces"),
+  });
+  t.after(async () => {
+    await workspaces.close();
+    await rm(root, { recursive: true, force: true });
+  });
   return { source, directory, workspaces };
 }
 
@@ -36,20 +48,36 @@ test("review bundles deduplicate identical edits, expose conflicts, and reject d
   bundle = await createTeamPatch({ ...setup, taskIds: ["a", "b"] });
   assert.deepEqual(bundle.files.find((file) => file.path === "a.txt").taskIds, ["a", "b"]);
   assert.match(renderTeamPatchDiff(bundle), /No newline at end of file/u);
-  await assert.rejects(applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: "not-reviewed" }), /exact digest/u);
+  await assert.rejects(
+    applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: "not-reviewed" }),
+    /exact digest/u,
+  );
   await writeFile(join(setup.source, "b.txt"), "concurrent user change\n");
-  await assert.rejects(applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest }), /Source changed/u);
-  assert.equal(await readFile(join(setup.source, "a.txt"), "utf8"), "before-a\n", "later-file conflicts must prevent earlier writes");
+  await assert.rejects(
+    applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest }),
+    /Source changed/u,
+  );
+  assert.equal(
+    await readFile(join(setup.source, "a.txt"), "utf8"),
+    "before-a\n",
+    "later-file conflicts must prevent earlier writes",
+  );
   await writeFile(join(setup.source, "b.txt"), "before-b\n");
   await writeFile(join(b.directory, "b.txt"), "task changed after review\n");
-  await assert.rejects(applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest }), /snapshot changed/u);
+  await assert.rejects(
+    applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest }),
+    /snapshot changed/u,
+  );
   await writeFile(join(b.directory, "b.txt"), "before-b\n");
   const applied = await applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest });
   assert.equal(applied.status, "applied", applied.detail);
   assert.equal(await readFile(join(setup.source, "a.txt"), "utf8"), "after-a\n");
   assert.equal(await readFile(join(setup.source, "nested", "new.txt"), "utf8"), "added without newline");
   await assert.rejects(readFile(join(setup.source, "b.txt")), { code: "ENOENT" });
-  assert.equal((await applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest })).alreadyApplied, true);
+  assert.equal(
+    (await applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest })).alreadyApplied,
+    true,
+  );
 });
 
 test("partial application is durable unknown and is never automatically replayed or rolled back", async (t) => {
@@ -58,21 +86,45 @@ test("partial application is durable unknown and is never automatically replayed
   await writeFile(join(task.directory, "a.txt"), "after-a\n");
   await writeFile(join(task.directory, "b.txt"), "after-b\n");
   const bundle = await createTeamPatch({ ...setup, taskIds: ["worker"] });
-  const result = await applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest,
-    onProgress() { throw new Error("simulated host failure after first durable result"); } });
+  const result = await applyTeamPatch({
+    ...setup,
+    patchId: bundle.id,
+    confirmDigest: bundle.digest,
+    onProgress() {
+      throw new Error("simulated host failure after first durable result");
+    },
+  });
   assert.equal(result.status, "unknown");
   assert.deepEqual(result.appliedPaths, ["a.txt"], result.detail);
   assert.deepEqual(result.uncertainPaths, ["b.txt"]);
   assert.equal(await readFile(join(setup.source, "a.txt"), "utf8"), "after-a\n");
   assert.equal(await readFile(join(setup.source, "b.txt"), "utf8"), "before-b\n");
   assert.equal((await readTeamPatchApplication(setup.directory, bundle.id)).status, "unknown");
-  assert.equal((await applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest })).status, "unknown");
-  assert.equal(await readFile(join(setup.source, "b.txt"), "utf8"), "before-b\n", "unknown is evidence, not a retry instruction");
+  assert.equal(
+    (await applyTeamPatch({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest })).status,
+    "unknown",
+  );
+  assert.equal(
+    await readFile(join(setup.source, "b.txt"), "utf8"),
+    "before-b\n",
+    "unknown is evidence, not a retry instruction",
+  );
   const entries = (await readFile(result.journalPath, "utf8")).trim().split("\n").map(JSON.parse);
   const staged = join(setup.source, entries.find((entry) => entry.temporary).temporary);
   await writeFile(staged, "partial staging bytes");
-  await assert.rejects(cleanupTeamPatchTemporaries({ ...setup, patchId: bundle.id, confirmDigest: "wrong", confirmHostsStopped: true }), /exact patch digest/);
-  assert.deepEqual(await cleanupTeamPatchTemporaries({ ...setup, patchId: bundle.id, confirmDigest: bundle.digest, confirmHostsStopped: true }), [staged]);
+  await assert.rejects(
+    cleanupTeamPatchTemporaries({ ...setup, patchId: bundle.id, confirmDigest: "wrong", confirmHostsStopped: true }),
+    /exact patch digest/,
+  );
+  assert.deepEqual(
+    await cleanupTeamPatchTemporaries({
+      ...setup,
+      patchId: bundle.id,
+      confirmDigest: bundle.digest,
+      confirmHostsStopped: true,
+    }),
+    [staged],
+  );
   await assert.rejects(readFile(staged), { code: "ENOENT" });
   assert.equal((await readTeamPatchApplication(setup.directory, bundle.id)).status, "unknown");
 });

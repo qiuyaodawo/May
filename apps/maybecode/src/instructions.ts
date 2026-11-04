@@ -15,12 +15,9 @@ import type { MayConfig } from "@sortedyuan/may/config";
 import { MaybeCodeConfigError } from "./errors.js";
 import { readMaybeCodeSettings } from "./settings.js";
 
-export const SYSTEM_INSTRUCTIONS_FILENAME =
-  DEFAULT_SYSTEM_INSTRUCTIONS_FILENAME;
-export const PROJECT_INSTRUCTIONS_FILENAME =
-  DEFAULT_PROJECT_INSTRUCTIONS_FILENAME;
-export const MAX_INSTRUCTIONS_BYTES =
-  DEFAULT_CODING_INSTRUCTIONS_MAX_BYTES;
+export const SYSTEM_INSTRUCTIONS_FILENAME = DEFAULT_SYSTEM_INSTRUCTIONS_FILENAME;
+export const PROJECT_INSTRUCTIONS_FILENAME = DEFAULT_PROJECT_INSTRUCTIONS_FILENAME;
+export const MAX_INSTRUCTIONS_BYTES = DEFAULT_CODING_INSTRUCTIONS_MAX_BYTES;
 
 export const DEFAULT_MAYBE_CODE_INSTRUCTIONS = `You are MaybeCode, a coding agent.
 You help users understand, implement, debug, review, and verify code.
@@ -68,9 +65,7 @@ export interface LoadMaybeCodeInstructionsOptions {
   readonly runtimeInstructions?: string;
 }
 
-export function resolveMaybeCodeInstructionsDirectory(
-  config: MayConfig,
-): string | undefined {
+export function resolveMaybeCodeInstructionsDirectory(config: MayConfig): string | undefined {
   const value = readMaybeCodeSettings(config).instructionsDirectory;
   if (value === undefined) return undefined;
   const expanded = expandHome(value);
@@ -92,15 +87,9 @@ export async function loadMaybeCodeInstructions(
         project: "Project instructions",
       },
       maxBytes: MAX_INSTRUCTIONS_BYTES,
-      ...(options.instructions === undefined
-        ? {}
-        : { systemInstructions: options.instructions }),
-      ...(options.instructionsDirectory === undefined
-        ? {}
-        : { instructionsDirectory: options.instructionsDirectory }),
-      ...(options.runtimeInstructions === undefined
-        ? {}
-        : { runtimeInstructions: options.runtimeInstructions }),
+      ...(options.instructions === undefined ? {} : { systemInstructions: options.instructions }),
+      ...(options.instructionsDirectory === undefined ? {} : { instructionsDirectory: options.instructionsDirectory }),
+      ...(options.runtimeInstructions === undefined ? {} : { runtimeInstructions: options.runtimeInstructions }),
     });
   } catch (error) {
     if (error instanceof CodingInstructionsError) {
@@ -115,7 +104,10 @@ export class MaybeCodeInstructionState {
   private value: MaybeCodeInstructions;
   runtimeInstructions: (() => string) | undefined;
 
-  constructor(readonly workspace: string, instructions: MaybeCodeInstructions) {
+  constructor(
+    readonly workspace: string,
+    instructions: MaybeCodeInstructions,
+  ) {
     this.value = instructions;
   }
 
@@ -126,7 +118,8 @@ export class MaybeCodeInstructionState {
       ...this.value,
       runtime: { source: { type: "runtime" }, content },
       effective: [this.value.system.content, `# Current environment\n\n${content}`, this.projectInstructions()]
-        .filter(Boolean).join("\n\n"),
+        .filter(Boolean)
+        .join("\n\n"),
     };
   }
 
@@ -141,7 +134,6 @@ export class MaybeCodeInstructionState {
   projectInstructions(): string {
     return formatCodingProjectInstructions(this.value.projects);
   }
-
 }
 
 function expandHome(path: string): string {

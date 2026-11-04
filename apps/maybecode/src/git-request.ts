@@ -1,13 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { FatalToolExecutionError, RunCancelledError, type ToolExecution } from "@sortedyuan/may/core";
-import { GitCheckpointError, type GitCheckpoint, type GitRoundLease, type ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
+import {
+  GitCheckpointError,
+  type GitCheckpoint,
+  type GitRoundLease,
+  type ProjectGitWorkspace,
+} from "@sortedyuan/may/application/git-workspace";
 import type { AgentRun } from "@sortedyuan/may";
 import type { GoalRun, GoalRunOutcome } from "@sortedyuan/may/goals";
 import type { SessionEvent } from "@sortedyuan/may/session";
 import { defineService } from "@sortedyuan/may/plugin";
 
 export const gitRequestService = defineService<GitRequestController>({
-  id: "maybecode.git-request", version: "1.0.0", scope: "application",
+  id: "maybecode.git-request",
+  version: "1.0.0",
+  scope: "application",
 });
 
 /** 一个请求的主 Agent、子 Agent 和 Goal 验证共用准备状态。 */
@@ -33,16 +40,27 @@ export class GitRequestController {
       }
       return this.workspace!.beginRound({ sessionId: request.sessionId, runId: request.runId });
     })();
-    try { await request.preparation; }
-    catch (error) { throw new FatalToolExecutionError("Git checkpoint preparation failed", { cause: error }); }
+    try {
+      await request.preparation;
+    } catch (error) {
+      throw new FatalToolExecutionError("Git checkpoint preparation failed", { cause: error });
+    }
     execution.context.signal.throwIfAborted();
   };
 
-  async lease(): Promise<GitRoundLease | undefined> { return this.active?.preparation; }
+  async lease(): Promise<GitRoundLease | undefined> {
+    return this.active?.preparation;
+  }
 
   async close(): Promise<void> {
-    try { await this.active?.preparation?.then(lease => lease?.close(), () => undefined); }
-    finally { this.active = undefined; }
+    try {
+      await this.active?.preparation?.then(
+        (lease) => lease?.close(),
+        () => undefined,
+      );
+    } finally {
+      this.active = undefined;
+    }
   }
 }
 
@@ -58,34 +76,55 @@ export async function startGitRequest<Run extends AgentRun>(
   const git = request.workspace;
   request.begin(sessionId);
   let run: Run;
-  try { run = await start(); }
-  catch (error) { await request.close(); throw error; }
-  const result = run.result.then(async value => {
-    try {
-      const lease = await request.lease();
-      if (!lease) return value;
-      const identity = await checkpointIdentity(run.id, mainRunIds);
-      const saved = await lease.complete({ outcome: value.finishReason === "yielded" ? "failed" : "completed",
-        ...identity });
-      const checkpoint = await bindPosition(git!, saved, position);
-      changed(checkpoint);
-      return value;
-    } catch (error) {
-      if (error instanceof GitCheckpointError) changed(error.checkpoint);
-      throw error;
-    } finally { await request.close(); }
-  }, async error => {
-    try {
-      const lease = await request.lease();
-      if (lease) changed(await bindPosition(git!, await lease.complete({ outcome: error instanceof RunCancelledError ? "cancelled" : "failed", ...await checkpointIdentity(run.id, mainRunIds) }), position));
-    }
-    catch (checkpointError) {
-      if (checkpointError instanceof GitCheckpointError) changed(checkpointError.checkpoint);
-      throw new AggregateError([error, checkpointError], "Agent request and Git checkpoint failed", { cause: error });
-    }
-    finally { await request.close(); }
+  try {
+    run = await start();
+  } catch (error) {
+    await request.close();
     throw error;
-  });
+  }
+  const result = run.result.then(
+    async (value) => {
+      try {
+        const lease = await request.lease();
+        if (!lease) return value;
+        const identity = await checkpointIdentity(run.id, mainRunIds);
+        const saved = await lease.complete({
+          outcome: value.finishReason === "yielded" ? "failed" : "completed",
+          ...identity,
+        });
+        const checkpoint = await bindPosition(git!, saved, position);
+        changed(checkpoint);
+        return value;
+      } catch (error) {
+        if (error instanceof GitCheckpointError) changed(error.checkpoint);
+        throw error;
+      } finally {
+        await request.close();
+      }
+    },
+    async (error) => {
+      try {
+        const lease = await request.lease();
+        if (lease)
+          changed(
+            await bindPosition(
+              git!,
+              await lease.complete({
+                outcome: error instanceof RunCancelledError ? "cancelled" : "failed",
+                ...(await checkpointIdentity(run.id, mainRunIds)),
+              }),
+              position,
+            ),
+          );
+      } catch (checkpointError) {
+        if (checkpointError instanceof GitCheckpointError) changed(checkpointError.checkpoint);
+        throw new AggregateError([error, checkpointError], "Agent request and Git checkpoint failed", { cause: error });
+      } finally {
+        await request.close();
+      }
+      throw error;
+    },
+  );
   return { ...run, result };
 }
 
@@ -102,42 +141,59 @@ export async function startGitGoalRequest<Run extends AgentRun>(
   const git = request.workspace;
   request.begin(sessionId);
   let run: Run;
-  try { run = await start(); }
-  catch (error) { await request.close(); throw error; }
+  try {
+    run = await start();
+  } catch (error) {
+    await request.close();
+    throw error;
+  }
   let finalization: Promise<void> | undefined;
-  const finalize = (outcome: GoalRunOutcome): Promise<void> => finalization ??= (async () => {
-    try {
-      const value = outcome === "completed" || outcome === "continued" ? await run.result : undefined;
-      const lease = await request.lease();
-      if (lease) {
-        const saved = await lease.complete({
-          outcome: outcome === "completed" || outcome === "continued" && value?.finishReason !== "yielded" ? "completed" : outcome === "cancelled" ? "cancelled" : "failed",
-          ...await checkpointIdentity(run.id, mainRunIds),
-        });
-        if (outcome === "completed" && value?.finishReason === "yielded") {
-          try { await hostCompleted(value.runId); }
-          catch (error) { changed(saved); throw error; }
-        }
-        changed(await bindPosition(git!, saved, position));
+  const finalize = (outcome: GoalRunOutcome): Promise<void> =>
+    (finalization ??= (async () => {
+      try {
+        const value = outcome === "completed" || outcome === "continued" ? await run.result : undefined;
+        const lease = await request.lease();
+        if (lease) {
+          const saved = await lease.complete({
+            outcome:
+              outcome === "completed" || (outcome === "continued" && value?.finishReason !== "yielded")
+                ? "completed"
+                : outcome === "cancelled"
+                  ? "cancelled"
+                  : "failed",
+            ...(await checkpointIdentity(run.id, mainRunIds)),
+          });
+          if (outcome === "completed" && value?.finishReason === "yielded") {
+            try {
+              await hostCompleted(value.runId);
+            } catch (error) {
+              changed(saved);
+              throw error;
+            }
+          }
+          changed(await bindPosition(git!, saved, position));
+        } else if (outcome === "completed" && value?.finishReason === "yielded") await hostCompleted(value.runId);
+      } catch (error) {
+        if (error instanceof GitCheckpointError) changed(error.checkpoint);
+        throw error;
+      } finally {
+        await request.close();
       }
-      else if (outcome === "completed" && value?.finishReason === "yielded") await hostCompleted(value.runId);
-    } catch (error) {
-      if (error instanceof GitCheckpointError) changed(error.checkpoint);
-      throw error;
-    } finally { await request.close(); }
-  })();
+    })());
   return { ...run, finalize };
 }
 
 /** Session history 保留失败和取消的主 Run 身份。 */
 export function requestMainRunIds(history: readonly SessionEvent[], firstRunId: string): readonly string[] {
-  const first = history.findIndex(event => event.type === "run.started" && event.runId === firstRunId);
+  const first = history.findIndex((event) => event.type === "run.started" && event.runId === firstRunId);
   if (first < 0) throw new Error("The request's first main Run is missing from Session history");
-  return history.slice(first).flatMap(event => event.type === "run.started" ? [event.runId] : []);
+  return history.slice(first).flatMap((event) => (event.type === "run.started" ? [event.runId] : []));
 }
 
-async function checkpointIdentity(firstRunId: string,
-  read: ((firstRunId: string) => Promise<readonly string[]>) | undefined): Promise<{ runId: string; runIds: readonly string[] }> {
+async function checkpointIdentity(
+  firstRunId: string,
+  read: ((firstRunId: string) => Promise<readonly string[]>) | undefined,
+): Promise<{ runId: string; runIds: readonly string[] }> {
   const runIds = read ? await read(firstRunId) : [firstRunId];
   if (!runIds.length || runIds[0] !== firstRunId || new Set(runIds).size !== runIds.length) {
     throw new Error("The request's main Run identities are invalid");
@@ -145,8 +201,11 @@ async function checkpointIdentity(firstRunId: string,
   return { runId: runIds[runIds.length - 1]!, runIds };
 }
 
-async function bindPosition(git: ProjectGitWorkspace, checkpoint: GitCheckpoint,
-  position: ((runId: string) => Promise<number | undefined>) | undefined): Promise<GitCheckpoint> {
+async function bindPosition(
+  git: ProjectGitWorkspace,
+  checkpoint: GitCheckpoint,
+  position: ((runId: string) => Promise<number | undefined>) | undefined,
+): Promise<GitCheckpoint> {
   if (!position || !checkpoint.runId) return checkpoint;
   const historyPosition = await position(checkpoint.runId);
   return historyPosition === undefined ? checkpoint : git.bindCheckpoint(checkpoint.id, historyPosition);

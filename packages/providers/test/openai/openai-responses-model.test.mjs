@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  OpenAIResponsesError,
-  OpenAIResponsesModel,
-  OpenAIResponsesProtocolError,
-} from "../../dist/openai/index.js";
+import { OpenAIResponsesError, OpenAIResponsesModel, OpenAIResponsesProtocolError } from "../../dist/openai/index.js";
 
 const emptyRequest = {
   messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
@@ -20,31 +16,34 @@ async function collect(iterable) {
 
 function sseResponse(values, { chunkSize, lineBreak = "\n" } = {}) {
   const source = values
-    .map((value) =>
-      `data: ${typeof value === "string" ? value : JSON.stringify(value)}` +
-      lineBreak + lineBreak
-    )
+    .map((value) => `data: ${typeof value === "string" ? value : JSON.stringify(value)}` + lineBreak + lineBreak)
     .join("");
   const bytes = new TextEncoder().encode(source);
   const size = chunkSize ?? bytes.length;
-  return new Response(new ReadableStream({
-    start(controller) {
-      for (let offset = 0; offset < bytes.length; offset += size) {
-        controller.enqueue(bytes.slice(offset, offset + size));
-      }
-      controller.close();
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        for (let offset = 0; offset < bytes.length; offset += size) {
+          controller.enqueue(bytes.slice(offset, offset + size));
+        }
+        controller.close();
+      },
+    }),
+    {
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
     },
-  }), {
-    status: 200,
-    headers: { "content-type": "text/event-stream" },
-  });
+  );
 }
 
-function completedResponse(output, usage = {
-  input_tokens: 12,
-  output_tokens: 7,
-  total_tokens: 19,
-}) {
+function completedResponse(
+  output,
+  usage = {
+    input_tokens: 12,
+    output_tokens: 7,
+    total_tokens: 19,
+  },
+) {
   return {
     id: "resp_1",
     object: "response",
@@ -76,19 +75,22 @@ test("maps Responses requests, streaming deltas, output, tools, and usage", asyn
       type: "function_call",
       call_id: "call_lookup",
       name: "lookup",
-      arguments: "{\"q\":1}",
+      arguments: '{"q":1}',
       status: "completed",
     },
   ];
   const fetch = async (url, init) => {
     capturedUrl = url;
     capturedInit = init;
-    return sseResponse([
-      { type: "response.reasoning_summary_text.delta", delta: "Think." },
-      { type: "response.output_text.delta", delta: "Answer." },
-      { type: "response.completed", response: completedResponse(output) },
-      "[DONE]",
-    ], { chunkSize: 5, lineBreak: "\r\n" });
+    return sseResponse(
+      [
+        { type: "response.reasoning_summary_text.delta", delta: "Think." },
+        { type: "response.output_text.delta", delta: "Answer." },
+        { type: "response.completed", response: completedResponse(output) },
+        "[DONE]",
+      ],
+      { chunkSize: 5, lineBreak: "\r\n" },
+    );
   };
   const model = new OpenAIResponsesModel({
     apiKey: "secret",
@@ -126,15 +128,17 @@ test("maps Responses requests, streaming deltas, output, tools, and usage", asyn
         ],
       },
     ],
-    tools: [{
-      name: "lookup",
-      description: "Look up a value",
-      inputSchema: {
-        type: "object",
-        properties: { q: { type: "number" } },
-        required: ["q"],
+    tools: [
+      {
+        name: "lookup",
+        description: "Look up a value",
+        inputSchema: {
+          type: "object",
+          properties: { q: { type: "number" } },
+          required: ["q"],
+        },
       },
-    }],
+    ],
   };
 
   const events = await collect(model.stream(request, { signal }));
@@ -146,30 +150,34 @@ test("maps Responses requests, streaming deltas, output, tools, and usage", asyn
   const body = JSON.parse(capturedInit.body);
   assert.equal(body.model, "gpt-5.4");
   assert.equal(body.instructions, "Be concise.");
-  assert.deepEqual(body.input, [{
-    role: "user",
-    content: [
-      { type: "input_text", text: "Find this" },
-      { type: "input_text", text: "{\"id\":1}" },
-      {
-        type: "input_image",
-        image_url: "https://example.test/image.png",
-        detail: "high",
-      },
-      {
-        type: "input_file",
-        filename: "notes.pdf",
-        file_data: "data:application/pdf;base64,cGRm",
-      },
-    ],
-  }]);
-  assert.deepEqual(body.tools, [{
-    type: "function",
-    name: "lookup",
-    description: "Look up a value",
-    parameters: request.tools[0].inputSchema,
-    strict: false,
-  }]);
+  assert.deepEqual(body.input, [
+    {
+      role: "user",
+      content: [
+        { type: "input_text", text: "Find this" },
+        { type: "input_text", text: '{"id":1}' },
+        {
+          type: "input_image",
+          image_url: "https://example.test/image.png",
+          detail: "high",
+        },
+        {
+          type: "input_file",
+          filename: "notes.pdf",
+          file_data: "data:application/pdf;base64,cGRm",
+        },
+      ],
+    },
+  ]);
+  assert.deepEqual(body.tools, [
+    {
+      type: "function",
+      name: "lookup",
+      description: "Look up a value",
+      parameters: request.tools[0].inputSchema,
+      strict: false,
+    },
+  ]);
   assert.equal(body.stream, true);
   assert.equal(body.store, false);
   assert.deepEqual(body.include, ["reasoning.encrypted_content"]);
@@ -178,10 +186,12 @@ test("maps Responses requests, streaming deltas, output, tools, and usage", asyn
     effort: "high",
     generate_summary: "auto",
   });
-  assert.deepEqual(body.context_management, [{
-    type: "compaction",
-    compact_threshold: 100_000,
-  }]);
+  assert.deepEqual(body.context_management, [
+    {
+      type: "compaction",
+      compact_threshold: 100_000,
+    },
+  ]);
 
   assert.deepEqual(events.slice(0, 2), [
     { type: "reasoning.delta", delta: "Think." },
@@ -196,38 +206,48 @@ test("maps Responses requests, streaming deltas, output, tools, and usage", asyn
     { type: "reasoning", text: "Think." },
     { type: "text", text: "Answer." },
   ]);
-  assert.deepEqual(events[2].message.toolCalls, [{
-    id: "call_lookup",
-    name: "lookup",
-    input: { q: 1 },
-  }]);
+  assert.deepEqual(events[2].message.toolCalls, [
+    {
+      id: "call_lookup",
+      name: "lookup",
+      input: { q: 1 },
+    },
+  ]);
   assert.deepEqual(events[2].message.modelState.data.items, output);
 });
 
 test("round-trips native Responses output through a tool-result request", async () => {
   const requests = [];
-  const firstOutput = [{
-    type: "function_call",
-    id: "fc_1",
-    call_id: "call_add",
-    name: "add",
-    arguments: "{\"a\":2,\"b\":3}",
-    status: "completed",
-  }];
+  const firstOutput = [
+    {
+      type: "function_call",
+      id: "fc_1",
+      call_id: "call_add",
+      name: "add",
+      arguments: '{"a":2,"b":3}',
+      status: "completed",
+    },
+  ];
   const responses = [
-    sseResponse([{
-      type: "response.completed",
-      response: completedResponse(firstOutput),
-    }]),
-    sseResponse([{
-      type: "response.completed",
-      response: completedResponse([{
-        type: "message",
-        role: "assistant",
-        status: "completed",
-        content: [{ type: "output_text", text: "5", annotations: [] }],
-      }]),
-    }]),
+    sseResponse([
+      {
+        type: "response.completed",
+        response: completedResponse(firstOutput),
+      },
+    ]),
+    sseResponse([
+      {
+        type: "response.completed",
+        response: completedResponse([
+          {
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "5", annotations: [] }],
+          },
+        ]),
+      },
+    ]),
   ];
   const model = new OpenAIResponsesModel({
     apiKey: "secret",
@@ -241,18 +261,23 @@ test("round-trips native Responses output through a tool-result request", async 
   const first = await collect(model.stream(emptyRequest, { signal }));
   const assistant = first.at(-1).message;
 
-  await collect(model.stream({
-    messages: [
-      ...emptyRequest.messages,
-      assistant,
+  await collect(
+    model.stream(
       {
-        role: "tool",
-        toolCallId: "call_add",
-        content: [{ type: "json", value: 5 }],
+        messages: [
+          ...emptyRequest.messages,
+          assistant,
+          {
+            role: "tool",
+            toolCallId: "call_add",
+            content: [{ type: "json", value: 5 }],
+          },
+        ],
+        tools: [],
       },
-    ],
-    tools: [],
-  }, { signal }));
+      { signal },
+    ),
+  );
 
   assert.deepEqual(requests[1].input, [
     requests[0].input[0],
@@ -263,13 +288,15 @@ test("round-trips native Responses output through a tool-result request", async 
 
 test("streams refusal text and preserves its native continuation state", async () => {
   const requests = [];
-  const refusalOutput = [{
-    id: "msg_refusal",
-    type: "message",
-    role: "assistant",
-    status: "completed",
-    content: [{ type: "refusal", refusal: "I cannot help with that." }],
-  }];
+  const refusalOutput = [
+    {
+      id: "msg_refusal",
+      type: "message",
+      role: "assistant",
+      status: "completed",
+      content: [{ type: "refusal", refusal: "I cannot help with that." }],
+    },
+  ];
   const responses = [
     sseResponse([
       { type: "response.refusal.delta", delta: "I cannot help with that." },
@@ -278,15 +305,19 @@ test("streams refusal text and preserves its native continuation state", async (
         response: completedResponse(refusalOutput),
       },
     ]),
-    sseResponse([{
-      type: "response.completed",
-      response: completedResponse([{
-        type: "message",
-        role: "assistant",
-        status: "completed",
-        content: [{ type: "output_text", text: "Okay.", annotations: [] }],
-      }]),
-    }]),
+    sseResponse([
+      {
+        type: "response.completed",
+        response: completedResponse([
+          {
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "Okay.", annotations: [] }],
+          },
+        ]),
+      },
+    ]),
   ];
   const model = new OpenAIResponsesModel({
     apiKey: "secret",
@@ -304,19 +335,26 @@ test("streams refusal text and preserves its native continuation state", async (
     type: "text.delta",
     delta: "I cannot help with that.",
   });
-  assert.deepEqual(assistant.content, [{
-    type: "text",
-    text: "I cannot help with that.",
-  }]);
+  assert.deepEqual(assistant.content, [
+    {
+      type: "text",
+      text: "I cannot help with that.",
+    },
+  ]);
 
-  await collect(model.stream({
-    messages: [
-      ...emptyRequest.messages,
-      assistant,
-      { role: "user", content: [{ type: "text", text: "Understood." }] },
-    ],
-    tools: [],
-  }, { signal }));
+  await collect(
+    model.stream(
+      {
+        messages: [
+          ...emptyRequest.messages,
+          assistant,
+          { role: "user", content: [{ type: "text", text: "Understood." }] },
+        ],
+        tools: [],
+      },
+      { signal },
+    ),
+  );
   assert.deepEqual(requests[1].input, [
     requests[0].input[0],
     refusalOutput[0],
@@ -331,20 +369,27 @@ test("compacts context natively and reuses the opaque compacted output", async (
     { type: "compaction", id: "cmp_1", encrypted_content: "opaque-context" },
   ];
   const responses = [
-    new Response(JSON.stringify({
-      object: "response.compaction",
-      output: compactedOutput,
-      usage: { input_tokens: 900, output_tokens: 55, total_tokens: 955 },
-    }), { status: 200, headers: { "content-type": "application/json" } }),
-    sseResponse([{
-      type: "response.completed",
-      response: completedResponse([{
-        type: "message",
-        role: "assistant",
-        status: "completed",
-        content: [{ type: "output_text", text: "continued", annotations: [] }],
-      }]),
-    }]),
+    new Response(
+      JSON.stringify({
+        object: "response.compaction",
+        output: compactedOutput,
+        usage: { input_tokens: 900, output_tokens: 55, total_tokens: 955 },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    ),
+    sseResponse([
+      {
+        type: "response.completed",
+        response: completedResponse([
+          {
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "continued", annotations: [] }],
+          },
+        ]),
+      },
+    ]),
   ];
   const model = new OpenAIResponsesModel({
     apiKey: "secret",
@@ -355,22 +400,29 @@ test("compacts context natively and reuses the opaque compacted output", async (
     },
   });
   const signal = new AbortController().signal;
-  const result = await model.contextCompactor.compact({
-    instructions: "Continue carefully.",
-    messages: [{
-      role: "user",
-      content: [{ type: "text", text: "old input" }],
-    }],
-    metadata: {},
-  }, { signal, runId: "run-1", step: 3 });
+  const result = await model.contextCompactor.compact(
+    {
+      instructions: "Continue carefully.",
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: "old input" }],
+        },
+      ],
+      metadata: {},
+    },
+    { signal, runId: "run-1", step: 3 },
+  );
 
   assert.equal(requests[0].url, "https://api.openai.com/v1/responses/compact");
   assert.deepEqual(requests[0].body, {
     model: "gpt-5.4",
-    input: [{
-      role: "user",
-      content: [{ type: "input_text", text: "old input" }],
-    }],
+    input: [
+      {
+        role: "user",
+        content: [{ type: "input_text", text: "old input" }],
+      },
+    ],
     instructions: "Continue carefully.",
   });
   assert.equal(result.effectiveTokens, 55);
@@ -378,9 +430,14 @@ test("compacts context natively and reuses the opaque compacted output", async (
   assert.equal(result.messages[0].modelState.type, "openai.responses.output.v1");
   assert.deepEqual(result.messages[0].modelState.data.items, compactedOutput);
 
-  await collect(model.stream({ messages: [...result.messages], tools: [] }, {
-    signal,
-  }));
+  await collect(
+    model.stream(
+      { messages: [...result.messages], tools: [] },
+      {
+        signal,
+      },
+    ),
+  );
   assert.deepEqual(requests[1].body.input, compactedOutput);
 });
 
@@ -388,17 +445,23 @@ test("surfaces HTTP and malformed-stream failures", async () => {
   const apiModel = new OpenAIResponsesModel({
     apiKey: "secret",
     model: "gpt-5.4",
-    fetch: async () => new Response(JSON.stringify({
-      error: { message: "rate limited", type: "rate_limit_error" },
-    }), {
-      status: 429,
-      headers: { "x-request-id": "req_123", "retry-after": "2" },
-    }),
+    fetch: async () =>
+      new Response(
+        JSON.stringify({
+          error: { message: "rate limited", type: "rate_limit_error" },
+        }),
+        {
+          status: 429,
+          headers: { "x-request-id": "req_123", "retry-after": "2" },
+        },
+      ),
   });
   await assert.rejects(
-    collect(apiModel.stream(emptyRequest, {
-      signal: new AbortController().signal,
-    })),
+    collect(
+      apiModel.stream(emptyRequest, {
+        signal: new AbortController().signal,
+      }),
+    ),
     (error) => {
       assert.ok(error instanceof OpenAIResponsesError);
       assert.equal(error.status, 429);
@@ -412,34 +475,41 @@ test("surfaces HTTP and malformed-stream failures", async () => {
   const malformed = new OpenAIResponsesModel({
     apiKey: "secret",
     model: "gpt-5.4",
-    fetch: async () => sseResponse([{
-      type: "response.output_text.delta",
-      delta: "unfinished",
-    }]),
+    fetch: async () =>
+      sseResponse([
+        {
+          type: "response.output_text.delta",
+          delta: "unfinished",
+        },
+      ]),
   });
   await assert.rejects(
-    collect(malformed.stream(emptyRequest, {
-      signal: new AbortController().signal,
-    })),
+    collect(
+      malformed.stream(emptyRequest, {
+        signal: new AbortController().signal,
+      }),
+    ),
     OpenAIResponsesProtocolError,
   );
 
   const streamFailure = new OpenAIResponsesModel({
     apiKey: "secret",
     model: "gpt-5.4",
-    fetch: async () => sseResponse([{
-      type: "error",
-      code: "server_error",
-      message: "retryable failure",
-    }]),
+    fetch: async () =>
+      sseResponse([
+        {
+          type: "error",
+          code: "server_error",
+          message: "retryable failure",
+        },
+      ]),
   });
   await assert.rejects(
-    collect(streamFailure.stream(emptyRequest, {
-      signal: new AbortController().signal,
-    })),
-    (error) =>
-      error instanceof OpenAIResponsesError &&
-      error.providerType === "server_error",
+    collect(
+      streamFailure.stream(emptyRequest, {
+        signal: new AbortController().signal,
+      }),
+    ),
+    (error) => error instanceof OpenAIResponsesError && error.providerType === "server_error",
   );
 });
-

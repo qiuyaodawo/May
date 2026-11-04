@@ -35,16 +35,21 @@ const server = createMayMcpServer({
   authenticate: async () => undefined, // 示例拒绝 HTTP 访问。
   authorize: async ({ principal }) => principal.id === "local-launcher",
   executor,
-  tools: [{
-    tool: {
-      name: "echo", description: "Echo a provided message",
-      inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
-      async execute(input) { return input; },
+  tools: [
+    {
+      tool: {
+        name: "echo",
+        description: "Echo a provided message",
+        inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
+        async execute(input) {
+          return input;
+        },
+      },
+      result: (output) => ({ content: [{ type: "text", text: JSON.stringify(output) }] }),
     },
-    result: output => ({ content: [{ type: "text", text: JSON.stringify(output) }] }),
-  }],
+  ],
 });
-const stopped = new Promise<void>(resolve => process.once("SIGINT", () => resolve()));
+const stopped = new Promise<void>((resolve) => process.once("SIGINT", () => resolve()));
 try {
   server.serveStdio({ id: "local-launcher", workspaceId });
   await stopped;

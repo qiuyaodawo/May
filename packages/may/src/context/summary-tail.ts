@@ -1,9 +1,6 @@
 import { omitUndefined, type ContextSnapshot, type Message, type SystemMessage } from "../core/index.js";
 
-import type {
-  ContextCompactionOptions,
-  ContextCompactionStrategy,
-} from "./compaction.js";
+import type { ContextCompactionOptions, ContextCompactionStrategy } from "./compaction.js";
 
 export interface ContextSummaryRequest {
   readonly messages: readonly Message[];
@@ -32,14 +29,8 @@ export class SummaryTailStrategy implements ContextCompactionStrategy {
 
   constructor(options: SummaryTailOptions) {
     this.summarizer = options.summarizer;
-    this.keepRecentTurns = positiveInteger(
-      options.keepRecentTurns ?? 2,
-      "keepRecentTurns",
-    );
-    this.minimumPrefixMessages = positiveInteger(
-      options.minimumPrefixMessages ?? 1,
-      "minimumPrefixMessages",
-    );
+    this.keepRecentTurns = positiveInteger(options.keepRecentTurns ?? 2, "keepRecentTurns");
+    this.minimumPrefixMessages = positiveInteger(options.minimumPrefixMessages ?? 1, "minimumPrefixMessages");
   }
 
   async compact(
@@ -47,7 +38,7 @@ export class SummaryTailStrategy implements ContextCompactionStrategy {
     options: ContextCompactionOptions = {},
   ): Promise<readonly Message[]> {
     const userIndexes = snapshot.messages
-      .map((message, index) => message.role === "user" ? index : undefined)
+      .map((message, index) => (message.role === "user" ? index : undefined))
       .filter((index): index is number => index !== undefined);
     if (userIndexes.length <= this.keepRecentTurns) return snapshot.messages;
 
@@ -55,31 +46,31 @@ export class SummaryTailStrategy implements ContextCompactionStrategy {
     const prefix = snapshot.messages.slice(0, boundary);
     if (prefix.length < this.minimumPrefixMessages) return snapshot.messages;
 
-    const summary = (await this.summarizer.summarize(omitUndefined({
-      messages: prefix,
-      signal: options.signal,
-      runId: options.runId,
-      step: options.step,
-    })))
-      .trim();
+    const summary = (
+      await this.summarizer.summarize(
+        omitUndefined({
+          messages: prefix,
+          signal: options.signal,
+          runId: options.runId,
+          step: options.step,
+        }),
+      )
+    ).trim();
     if (summary === "") {
       throw new Error("Context summarizer returned an empty summary");
     }
 
     const summaryMessage: SystemMessage = {
       role: "system",
-      content: [{
-        type: "text",
-        text: `Earlier conversation summary:\n\n${summary}`,
-      }],
+      content: [
+        {
+          type: "text",
+          text: `Earlier conversation summary:\n\n${summary}`,
+        },
+      ],
     };
-    const compacted: Message[] = [
-      summaryMessage,
-      ...snapshot.messages.slice(boundary),
-    ];
-    return serializedBytes(compacted) < serializedBytes(snapshot.messages)
-      ? compacted
-      : snapshot.messages;
+    const compacted: Message[] = [summaryMessage, ...snapshot.messages.slice(boundary)];
+    return serializedBytes(compacted) < serializedBytes(snapshot.messages) ? compacted : snapshot.messages;
   }
 }
 

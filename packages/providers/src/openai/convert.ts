@@ -1,17 +1,8 @@
-import type {
-  ContentPart,
-  MediaSource,
-  Message,
-  ModelState,
-  ToolDefinition,
-} from "@sortedyuan/may/core";
+import type { ContentPart, MediaSource, Message, ModelState, ToolDefinition } from "@sortedyuan/may/core";
 import { UnsupportedContentError, omitUndefined } from "@sortedyuan/may/core";
 
 import { OpenAIResponsesProtocolError } from "./errors.js";
-import {
-  OPENAI_RESPONSES_MODEL_STATE_TYPE,
-  type OpenAIResponsesModelStateData,
-} from "./protocol.js";
+import { OPENAI_RESPONSES_MODEL_STATE_TYPE, type OpenAIResponsesModelStateData } from "./protocol.js";
 
 export interface OpenAIResponsesRequestParts {
   readonly input: unknown[];
@@ -78,15 +69,11 @@ export function toOpenAIResponsesRequestParts(
 
   return {
     input,
-    ...(instructions.length === 0
-      ? {}
-      : { instructions: instructions.join("\n\n") }),
+    ...(instructions.length === 0 ? {} : { instructions: instructions.join("\n\n") }),
   };
 }
 
-export function toOpenAIResponsesTools(
-  tools: readonly ToolDefinition[],
-): unknown[] {
+export function toOpenAIResponsesTools(tools: readonly ToolDefinition[]): unknown[] {
   return tools.map((tool) => ({
     type: "function",
     name: tool.name,
@@ -99,17 +86,12 @@ export function toOpenAIResponsesTools(
 function nativeItems(state: ModelState | undefined): unknown[] | undefined {
   if (state?.type !== OPENAI_RESPONSES_MODEL_STATE_TYPE) return undefined;
   if (!isRecord(state.data) || !Array.isArray(state.data.items)) {
-    throw new OpenAIResponsesProtocolError(
-      "OpenAI Responses model state is malformed",
-    );
+    throw new OpenAIResponsesProtocolError("OpenAI Responses model state is malformed");
   }
   return [...(state.data as unknown as OpenAIResponsesModelStateData).items];
 }
 
-function toInputContent(
-  content: readonly ContentPart[],
-  role: "user" | "tool",
-): unknown[] {
+function toInputContent(content: readonly ContentPart[], role: "user" | "tool"): unknown[] {
   return content.flatMap<unknown>((part) => {
     if (part.type === "reasoning") return [];
     if (part.type === "text") {
@@ -120,11 +102,13 @@ function toInputContent(
     }
     if (part.type === "image") {
       const source = toOpenAIImageSource(part.source);
-      return [omitUndefined({
-        type: "input_image",
-        ...source,
-        detail: part.detail,
-      })];
+      return [
+        omitUndefined({
+          type: "input_image",
+          ...source,
+          detail: part.detail,
+        }),
+      ];
     }
     if (part.type === "file") {
       return [{ type: "input_file", ...toOpenAIFileSource(part.source, part.name) }];
@@ -133,10 +117,7 @@ function toInputContent(
   });
 }
 
-function visibleText(
-  content: readonly ContentPart[],
-  role: Message["role"] = "system",
-): string {
+function visibleText(content: readonly ContentPart[], role: Message["role"] = "system"): string {
   return content
     .filter((part) => part.type !== "reasoning")
     .map((part) => {
@@ -151,9 +132,7 @@ function hasMedia(content: readonly ContentPart[]): boolean {
   return content.some((part) => part.type === "image" || part.type === "file");
 }
 
-function toOpenAIImageSource(
-  source: MediaSource,
-): { image_url: string } | { file_id: string } {
+function toOpenAIImageSource(source: MediaSource): { image_url: string } | { file_id: string } {
   if (source.type === "url") return { image_url: source.url };
   if (source.type === "file") return { file_id: source.fileId };
   return {
@@ -164,10 +143,13 @@ function toOpenAIImageSource(
 function toOpenAIFileSource(
   source: MediaSource,
   name: string | undefined,
-): { file_url: string } | { file_id: string } | {
-  filename: string;
-  file_data: string;
-} {
+):
+  | { file_url: string }
+  | { file_id: string }
+  | {
+      filename: string;
+      file_data: string;
+    } {
   if (source.type === "url") return { file_url: source.url };
   if (source.type === "file") return { file_id: source.fileId };
   return {

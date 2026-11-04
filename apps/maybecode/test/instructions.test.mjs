@@ -5,7 +5,12 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { MaybeCodeConfigError } from "../dist/index.js";
-import { DEFAULT_MAYBE_CODE_INSTRUCTIONS, loadMaybeCodeInstructions, MaybeCodeInstructionState, resolveMaybeCodeInstructionsDirectory } from "../dist/instructions.js";
+import {
+  DEFAULT_MAYBE_CODE_INSTRUCTIONS,
+  loadMaybeCodeInstructions,
+  MaybeCodeInstructionState,
+  resolveMaybeCodeInstructionsDirectory,
+} from "../dist/instructions.js";
 
 test("uses the built-in system prompt when no override is configured", async (t) => {
   const workspace = await temporaryDirectory(t);
@@ -55,19 +60,25 @@ test("combines startup ancestor rules while keeping the configured workspace", a
   await writeFile(join(workspace, "src", "AGENTS.md"), "Deeper guidance.");
 
   const instructions = await loadMaybeCodeInstructions({ workspace });
-  assert.deepEqual(instructions.projects.map(document => document.content), [
-    "Repository guidance.", "Package guidance.", "Web guidance.",
-  ]);
+  assert.deepEqual(
+    instructions.projects.map((document) => document.content),
+    ["Repository guidance.", "Package guidance.", "Web guidance."],
+  );
   assert.equal(instructions.project, instructions.projects.at(-1));
   for (const document of instructions.projects) {
     assert.ok(instructions.effective.includes(`Source: ${document.source.path}`));
   }
-  assert.ok(instructions.effective.indexOf("Repository guidance.") < instructions.effective.indexOf("Package guidance."));
+  assert.ok(
+    instructions.effective.indexOf("Repository guidance.") < instructions.effective.indexOf("Package guidance."),
+  );
   assert.ok(instructions.effective.indexOf("Package guidance.") < instructions.effective.indexOf("Web guidance."));
   assert.doesNotMatch(instructions.effective, /Inactive web guidance|Deeper guidance/u);
   const state = new MaybeCodeInstructionState(workspace, instructions);
   assert.equal(state.workspace, workspace);
-  assert.equal(state.projectInstructions(), instructions.effective.slice(instructions.effective.indexOf("# Project instructions")));
+  assert.equal(
+    state.projectInstructions(),
+    instructions.effective.slice(instructions.effective.indexOf("# Project instructions")),
+  );
 });
 
 test("refreshes the entire ancestor chain and override selection", async (t) => {
@@ -83,14 +94,20 @@ test("refreshes the entire ancestor chain and override selection", async (t) => 
   await writeFile(join(repository, "AGENTS.md"), "Root updated.");
   await writeFile(join(repository, "AGENTS.override.md"), "Root override.");
   await state.refreshProject();
-  assert.deepEqual(state.current.projects.map(document => document.content), ["Root override.", "Web original."]);
+  assert.deepEqual(
+    state.current.projects.map((document) => document.content),
+    ["Root override.", "Web original."],
+  );
   assert.equal(state.current.system, system);
   assert.doesNotMatch(state.projectInstructions(), /Root original|Root updated/u);
 
   await rm(join(repository, "AGENTS.override.md"));
   await rm(join(workspace, "AGENTS.md"));
   await state.refreshProject();
-  assert.deepEqual(state.current.projects.map(document => document.content), ["Root updated."]);
+  assert.deepEqual(
+    state.current.projects.map((document) => document.content),
+    ["Root updated."],
+  );
   assert.equal(state.current.project.source.path, await realpath(join(repository, "AGENTS.md")));
   state.runtimeInstructions = () => `Workspace: ${workspace}`;
   assert.ok(state.current.effective.includes(`Workspace: ${workspace}`));
@@ -122,18 +139,16 @@ test("resolves the maybecode instruction directory from config", () => {
     },
   });
 
-  assert.equal(
-    relative,
-    join(process.cwd(), "config", "instructions", "maybecode"),
-  );
+  assert.equal(relative, join(process.cwd(), "config", "instructions", "maybecode"));
   assert.equal(home, join(homedir(), ".may", "instructions", "maybecode"));
   assert.throws(
-    () => resolveMaybeCodeInstructionsDirectory({
-      path: configPath,
-      providers: {},
-      models: {},
-      apps: { maybecode: { instructionsDirectory: 42 } },
-    }),
+    () =>
+      resolveMaybeCodeInstructionsDirectory({
+        path: configPath,
+        providers: {},
+        models: {},
+        apps: { maybecode: { instructionsDirectory: 42 } },
+      }),
     /apps\.maybecode\.instructionsDirectory must be string/u,
   );
 });
@@ -143,14 +158,11 @@ test("rejects invalid or missing system instructions", async (t) => {
   const directory = join(workspace, "instructions");
   await mkdir(directory);
 
-  await assert.rejects(
-    loadMaybeCodeInstructions({ workspace, instructionsDirectory: directory }),
-    (error) => {
-      assert.ok(error instanceof MaybeCodeConfigError);
-      assert.match(error.message, /Unable to read system instructions/u);
-      return true;
-    },
-  );
+  await assert.rejects(loadMaybeCodeInstructions({ workspace, instructionsDirectory: directory }), (error) => {
+    assert.ok(error instanceof MaybeCodeConfigError);
+    assert.match(error.message, /Unable to read system instructions/u);
+    return true;
+  });
 
   await writeFile(join(directory, "system.md"), "   ", "utf8");
   await assert.rejects(

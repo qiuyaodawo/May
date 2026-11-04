@@ -110,8 +110,7 @@ import { FileArtifactStore } from "@sortedyuan/coordination";
 
 const artifacts = await FileArtifactStore.open(artifactDirectory, coordinationId, {
   policyVersion: "review-team-v1",
-  authorizeRead: (requester, artifact) =>
-    requester === "manager" && artifact.ownerTaskId === "worker",
+  authorizeRead: (requester, artifact) => requester === "manager" && artifact.ownerTaskId === "worker",
 });
 const workerArtifacts = artifacts.forTask("worker");
 const reference = await workerArtifacts.publish("dispatch-1:turn-0:final", {

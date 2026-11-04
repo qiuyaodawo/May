@@ -1,29 +1,18 @@
-import type {
-  AssistantMessage,
-  ContentPart,
-  MayEvent,
-  ToolCall,
-  UserMessage,
-} from "@sortedyuan/may/core";
+import type { AssistantMessage, ContentPart, MayEvent, ToolCall, UserMessage } from "@sortedyuan/may/core";
 import { omitUndefined } from "@sortedyuan/may/core";
-import type {
-  ApprovalDecision,
-  ApprovalRequest,
-  PermissionEvent,
-} from "@sortedyuan/may/permissions";
-import { isSessionRunTerminalEvent, SessionTranscriptReader, sessionToolFailureStatus,
-  type SessionEvent, type SessionToolStatus, type SessionTranscriptEntry } from "@sortedyuan/may/session";
+import type { ApprovalDecision, ApprovalRequest, PermissionEvent } from "@sortedyuan/may/permissions";
 import {
-  decodeToolChangePreviewPresentation,
-  type ToolChangePreview,
-} from "@sortedyuan/coding-tools/change-preview";
+  isSessionRunTerminalEvent,
+  SessionTranscriptReader,
+  sessionToolFailureStatus,
+  type SessionEvent,
+  type SessionToolStatus,
+  type SessionTranscriptEntry,
+} from "@sortedyuan/may/session";
+import { decodeToolChangePreviewPresentation, type ToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
 
 export type TranscriptItem =
-  | UserTranscriptItem
-  | AssistantTranscriptItem
-  | ToolTranscriptItem
-  | ApprovalTranscriptItem
-  | NoticeTranscriptItem;
+  UserTranscriptItem | AssistantTranscriptItem | ToolTranscriptItem | ApprovalTranscriptItem | NoticeTranscriptItem;
 
 export interface UserTranscriptItem {
   readonly id: string;
@@ -104,7 +93,10 @@ export class TranscriptStore {
   /** 当前轮次完成后可供阅读的最终正文。 */
   get latestReply(): AssistantTranscriptItem | undefined {
     const item = this.values.find((item) => item.id === this.latestReplyId);
-    return item?.kind === "assistant" && (item.text.trim() !== "" || item.content?.some(part => part.type === "image")) ? item : undefined;
+    return item?.kind === "assistant" &&
+      (item.text.trim() !== "" || item.content?.some((part) => part.type === "image"))
+      ? item
+      : undefined;
   }
 
   get items(): readonly TranscriptItem[] {
@@ -132,9 +124,7 @@ export class TranscriptStore {
 
   appendUser(message: string | UserMessage, timestamp = Date.now()): void {
     this.latestReplyId = undefined;
-    const text = typeof message === "string"
-      ? message
-      : contentText(message.content, "text");
+    const text = typeof message === "string" ? message : contentText(message.content, "text");
     this.append({
       id: `user:local:${++this.localSequence}`,
       kind: "user",
@@ -144,17 +134,8 @@ export class TranscriptStore {
     this.changed();
   }
 
-  appendNotice(
-    level: NoticeTranscriptItem["level"],
-    text: string,
-    timestamp = Date.now(),
-  ): void {
-    this.appendNoticeItem(
-      `notice:local:${++this.localSequence}`,
-      level,
-      text,
-      timestamp,
-    );
+  appendNotice(level: NoticeTranscriptItem["level"], text: string, timestamp = Date.now()): void {
+    this.appendNoticeItem(`notice:local:${++this.localSequence}`, level, text, timestamp);
     this.changed();
   }
 
@@ -235,8 +216,7 @@ export class TranscriptStore {
         this.appendNoticeItem(
           `retry:${event.runId}:${event.seq}`,
           "warning",
-          `Model request failed: ${event.error.message}; retrying ` +
-            `${event.attempt}/${event.maxAttempts}`,
+          `Model request failed: ${event.error.message}; retrying ` + `${event.attempt}/${event.maxAttempts}`,
           event.timestamp,
         );
         break;
@@ -244,31 +224,59 @@ export class TranscriptStore {
         this.ensureTool(event.runId, event.step, event.call, event.timestamp);
         break;
       case "tool.output.delta":
-        this.updateTool(event.runId, event.call.id, (item) => ({
-          ...item,
-          streamedOutput: (item.streamedOutput + event.delta).slice(-65_536).replace(/^[\uDC00-\uDFFF]/u, ""),
-        }), event.step, event.call, event.timestamp);
+        this.updateTool(
+          event.runId,
+          event.call.id,
+          (item) => ({
+            ...item,
+            streamedOutput: (item.streamedOutput + event.delta).slice(-65_536).replace(/^[\uDC00-\uDFFF]/u, ""),
+          }),
+          event.step,
+          event.call,
+          event.timestamp,
+        );
         break;
       case "tool.progress":
-        this.updateTool(event.runId, event.call.id, (item) => ({
-          ...item,
-          progress: [...item.progress.slice(-63), event.message.slice(0, 4096)],
-        }), event.step, event.call, event.timestamp);
+        this.updateTool(
+          event.runId,
+          event.call.id,
+          (item) => ({
+            ...item,
+            progress: [...item.progress.slice(-63), event.message.slice(0, 4096)],
+          }),
+          event.step,
+          event.call,
+          event.timestamp,
+        );
         break;
       case "tool.completed":
-        this.updateTool(event.runId, event.call.id, (item) => ({
-          ...item,
-          status: "completed",
-          output: event.output,
-          content: event.content,
-        }), event.step, event.call, event.timestamp);
+        this.updateTool(
+          event.runId,
+          event.call.id,
+          (item) => ({
+            ...item,
+            status: "completed",
+            output: event.output,
+            content: event.content,
+          }),
+          event.step,
+          event.call,
+          event.timestamp,
+        );
         break;
       case "tool.failed":
-        this.updateTool(event.runId, event.call.id, (item) => ({
-          ...item,
-          status: sessionToolFailureStatus(event.error, this.cancelledApprovals.has(item.id)),
-          error: event.error.message,
-        }), event.step, event.call, event.timestamp);
+        this.updateTool(
+          event.runId,
+          event.call.id,
+          (item) => ({
+            ...item,
+            status: sessionToolFailureStatus(event.error, this.cancelledApprovals.has(item.id)),
+            error: event.error.message,
+          }),
+          event.step,
+          event.call,
+          event.timestamp,
+        );
         this.cancelledApprovals.delete(toolId(event.runId, event.call.id));
         break;
       case "run.failed":
@@ -319,7 +327,7 @@ export class TranscriptStore {
     timestamp: number,
   ): void {
     const id = toolId(runId, toolCallId);
-    if (!this.replace(id, (item) => item.kind === "tool" ? { ...item, preview } : item)) {
+    if (!this.replace(id, (item) => (item.kind === "tool" ? { ...item, preview } : item))) {
       this.append({
         id,
         kind: "tool",
@@ -339,8 +347,12 @@ export class TranscriptStore {
     for (const entry of this.transcriptReader.read(event)) {
       if (entry.type === "user-message") {
         this.latestReplyId = undefined;
-        this.append({ id: entry.source === "steering" ? entry.id : `history:${entry.seq}`, kind: "user",
-          text: contentText(entry.message.content, "text"), timestamp: entry.timestamp });
+        this.append({
+          id: entry.source === "steering" ? entry.id : `history:${entry.seq}`,
+          kind: "user",
+          text: contentText(entry.message.content, "text"),
+          timestamp: entry.timestamp,
+        });
       } else this.projectRecordedEvent(entry.event);
     }
   }
@@ -356,10 +368,31 @@ export class TranscriptStore {
       case "run.interrupted":
         this.settle(event.runId);
         for (const item of event.recoveries) {
-          this.appendHistoryTool(historyTool({ ...event, type: "tool.failed", step: item.step, call: item.call,
-            error: { name: "InterruptedToolError", message: item.status === "unknown" ? "Outcome unknown; inspect /recovery before continuing" : "Not executed before interruption" } }, item.status));
+          this.appendHistoryTool(
+            historyTool(
+              {
+                ...event,
+                type: "tool.failed",
+                step: item.step,
+                call: item.call,
+                error: {
+                  name: "InterruptedToolError",
+                  message:
+                    item.status === "unknown"
+                      ? "Outcome unknown; inspect /recovery before continuing"
+                      : "Not executed before interruption",
+                },
+              },
+              item.status,
+            ),
+          );
         }
-        this.appendNoticeItem(`history:${event.seq}`, "warning", "Run interrupted. Inspect /recovery for unresolved tool outcomes.", event.timestamp);
+        this.appendNoticeItem(
+          `history:${event.seq}`,
+          "warning",
+          "Run interrupted. Inspect /recovery for unresolved tool outcomes.",
+          event.timestamp,
+        );
         break;
       case "assistant.completed": {
         const content = assistantContent(event.message);
@@ -383,23 +416,18 @@ export class TranscriptStore {
         this.appendHistoryTool(historyTool(event, "completed"));
         break;
       case "tool.failed":
-        this.appendHistoryTool(historyTool(event, sessionToolFailureStatus(event.error, this.cancelledApprovals.has(toolId(event.runId, event.call.id)))));
+        this.appendHistoryTool(
+          historyTool(
+            event,
+            sessionToolFailureStatus(event.error, this.cancelledApprovals.has(toolId(event.runId, event.call.id))),
+          ),
+        );
         this.cancelledApprovals.delete(toolId(event.runId, event.call.id));
         break;
       case "tool.presentation": {
-        const preview = decodeToolChangePreviewPresentation(
-          event.kind,
-          event.version,
-          event.data,
-        );
+        const preview = decodeToolChangePreviewPresentation(event.kind, event.version, event.data);
         if (preview !== undefined) {
-          this.projectChangePreview(
-            event.runId,
-            event.step,
-            event.toolCallId,
-            preview,
-            event.timestamp,
-          );
+          this.projectChangePreview(event.runId, event.step, event.toolCallId, preview, event.timestamp);
         }
         break;
       }
@@ -411,7 +439,9 @@ export class TranscriptStore {
           requestId: event.request.id,
           toolName: event.request.tool.name,
           input: event.request.input,
-          ...(event.request.persistent === undefined ? {} : { scopeDescription: event.request.persistent.description, scopeId: event.request.persistent.scopeId }),
+          ...(event.request.persistent === undefined
+            ? {}
+            : { scopeDescription: event.request.persistent.description, scopeId: event.request.persistent.scopeId }),
           status: "pending",
           timestamp: event.timestamp,
         });
@@ -430,12 +460,7 @@ export class TranscriptStore {
         );
         break;
       case "run.failed":
-        this.appendNoticeItem(
-          `history:${event.seq}`,
-          "error",
-          `Run failed: ${event.error.message}`,
-          event.timestamp,
-        );
+        this.appendNoticeItem(`history:${event.seq}`, "error", `Run failed: ${event.error.message}`, event.timestamp);
         break;
       case "run.cancelled":
         this.appendNoticeItem(
@@ -453,7 +478,7 @@ export class TranscriptStore {
   }
 
   private settle(runId: string): void {
-    this.values = this.values.flatMap(item => {
+    this.values = this.values.flatMap((item) => {
       if ((item.kind !== "tool" && item.kind !== "assistant") || item.runId !== runId) return [item];
       if (item.kind === "tool") return [item.status === "running" ? { ...item, status: "unknown" as const } : item];
       if (item.status !== "streaming") return [item];
@@ -482,7 +507,12 @@ export class TranscriptStore {
   private appendSteering(runId: string, step: number, messages: readonly UserMessage[], timestamp: number): void {
     this.latestReplyId = undefined;
     for (const [index, message] of messages.entries()) {
-      this.append({ id: `steering:${runId}:${step}:${index}`, kind: "user", text: contentText(message.content, "text"), timestamp });
+      this.append({
+        id: `steering:${runId}:${step}:${index}`,
+        kind: "user",
+        text: contentText(message.content, "text"),
+        timestamp,
+      });
     }
   }
 
@@ -519,17 +549,10 @@ export class TranscriptStore {
     update: (item: AssistantTranscriptItem) => AssistantTranscriptItem,
   ): void {
     this.ensureAssistant(event);
-    this.replace(assistantId(event.runId, event.step), (item) =>
-      item.kind === "assistant" ? update(item) : item
-    );
+    this.replace(assistantId(event.runId, event.step), (item) => (item.kind === "assistant" ? update(item) : item));
   }
 
-  private ensureTool(
-    runId: string,
-    step: number,
-    call: ToolCall,
-    timestamp: number,
-  ): void {
+  private ensureTool(runId: string, step: number, call: ToolCall, timestamp: number): void {
     const id = toolId(runId, call.id);
     if (this.values.some((item) => item.id === id)) return;
     this.append({
@@ -554,26 +577,17 @@ export class TranscriptStore {
     timestamp: number,
   ): void {
     this.ensureTool(runId, step, call, timestamp);
-    this.replace(toolId(runId, callId), (item) =>
-      item.kind === "tool" ? update(item) : item
-    );
+    this.replace(toolId(runId, callId), (item) => (item.kind === "tool" ? update(item) : item));
   }
 
-  private appendNoticeItem(
-    id: string,
-    level: NoticeTranscriptItem["level"],
-    text: string,
-    timestamp: number,
-  ): void {
+  private appendNoticeItem(id: string, level: NoticeTranscriptItem["level"], text: string, timestamp: number): void {
     this.append({ id, kind: "notice", level, text, timestamp });
   }
 
   private appendHistoryTool(item: ToolTranscriptItem): void {
     const existing = this.values.find((value) => value.id === item.id);
     this.append(
-      existing?.kind === "tool" && existing.preview !== undefined
-        ? { ...item, preview: existing.preview }
-        : item,
+      existing?.kind === "tool" && existing.preview !== undefined ? { ...item, preview: existing.preview } : item,
     );
   }
 
@@ -583,10 +597,7 @@ export class TranscriptStore {
     else this.values.push(item);
   }
 
-  private replace(
-    id: string,
-    update: (item: TranscriptItem) => TranscriptItem,
-  ): boolean {
+  private replace(id: string, update: (item: TranscriptItem) => TranscriptItem): boolean {
     const index = this.values.findIndex((item) => item.id === id);
     if (index < 0) return false;
     this.values[index] = update(this.values[index]!);
@@ -605,7 +616,9 @@ function approvalItem(request: ApprovalRequest, timestamp: number): ApprovalTran
     requestId: request.id,
     toolName: request.tool.name,
     input: request.input,
-    ...(request.persistent === undefined ? {} : { scopeDescription: request.persistent.description, scopeId: request.persistent.scopeId }),
+    ...(request.persistent === undefined
+      ? {}
+      : { scopeDescription: request.persistent.description, scopeId: request.persistent.scopeId }),
     status: "pending",
     timestamp,
   };
@@ -643,11 +656,8 @@ function assistantContent(message: AssistantMessage): {
   };
 }
 
-function contentText(
-  content: readonly ContentPart[],
-  type: "text" | "reasoning",
-): string {
-  return content.flatMap((part) => part.type === type ? [part.text] : []).join("");
+function contentText(content: readonly ContentPart[], type: "text" | "reasoning"): string {
+  return content.flatMap((part) => (part.type === type ? [part.text] : [])).join("");
 }
 
 function assistantId(runId: string, step: number): string {

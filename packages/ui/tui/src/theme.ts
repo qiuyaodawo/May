@@ -124,10 +124,7 @@ export function styleText(value: string, style: TextStyle | undefined): string {
   return `\x1b[${open.join(";")}m${value}\x1b[${[...new Set(close.reverse())].join(";")}m`;
 }
 
-export function mergeTextStyles(
-  base: TextStyle,
-  overrides: TextStyle,
-): TextStyle {
+export function mergeTextStyles(base: TextStyle, overrides: TextStyle): TextStyle {
   return { ...base, ...overrides };
 }
 
@@ -143,12 +140,7 @@ function appendEffect(
   close.push(closeCode);
 }
 
-function appendColor(
-  open: number[],
-  close: number[],
-  color: TerminalColor | undefined,
-  background: boolean,
-): void {
+function appendColor(open: number[], close: number[], color: TerminalColor | undefined, background: boolean): void {
   if (color === undefined || color === "") return;
   const prefix = background ? 48 : 38;
   const reset = background ? 49 : 39;
@@ -169,11 +161,13 @@ function appendColor(
   close.push(reset);
 }
 
-function parseHexColor(value: string): {
-  readonly red: number;
-  readonly green: number;
-  readonly blue: number;
-} | undefined {
+function parseHexColor(value: string):
+  | {
+      readonly red: number;
+      readonly green: number;
+      readonly blue: number;
+    }
+  | undefined {
   const short = /^#([\da-f])([\da-f])([\da-f])$/iu.exec(value);
   if (short !== null) {
     return {

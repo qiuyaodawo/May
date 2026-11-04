@@ -17,9 +17,7 @@ export interface TerminalSuggestion {
 
 export type TerminalSuggestionProvider = (
   input: string,
-) =>
-  | readonly TerminalSuggestion[]
-  | Promise<readonly TerminalSuggestion[]>;
+) => readonly TerminalSuggestion[] | Promise<readonly TerminalSuggestion[]>;
 
 export interface TerminalQuestionOptions {
   readonly signal?: AbortSignal;
@@ -68,9 +66,7 @@ export interface NodeTerminalOptions {
 }
 
 /** Create a readline-backed, line-oriented Node terminal adapter. */
-export function createNodeTerminal(
-  options: NodeTerminalOptions = {},
-): TerminalIO {
+export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalIO {
   const source: TerminalInput = options.input ?? process.stdin;
   source.ref?.();
   const output = options.output ?? process.stdout;
@@ -82,10 +78,15 @@ export function createNodeTerminal(
   const endFilteredInput = () => filtered?.end();
   if (filtered && reports) {
     const terminalSource = source as NodeJS.ReadStream;
-    Object.assign(filtered, { isTTY: terminalSource.isTTY, setRawMode: (enabled: boolean) => terminalSource.setRawMode?.(enabled) });
-    reports.on("keypress", key => filtered.write(key.sequence));
-    reports.on("paste", text => filtered.write(`\x1b[200~${text}\x1b[201~`));
-    reports.on("unknownSequence", sequence => { if (!imageSupport.consume(sequence)) filtered.write(sequence); });
+    Object.assign(filtered, {
+      isTTY: terminalSource.isTTY,
+      setRawMode: (enabled: boolean) => terminalSource.setRawMode?.(enabled),
+    });
+    reports.on("keypress", (key) => filtered.write(key.sequence));
+    reports.on("paste", (text) => filtered.write(`\x1b[200~${text}\x1b[201~`));
+    reports.on("unknownSequence", (sequence) => {
+      if (!imageSupport.consume(sequence)) filtered.write(sequence);
+    });
     source.on("end", endFilteredInput);
   }
   const historySize = 200;
@@ -105,15 +106,19 @@ export function createNodeTerminal(
   const lifetime = new AbortController();
   const interruptListeners = new Set<() => void>();
   const onReadlineClose = () => lifetime.abort(new Error("Terminal closed"));
-  const createReadline = (size: number) => createInterface({
-    input,
-    output: readlineOutput,
-    terminal: interactive,
-    historySize: size,
-    removeHistoryDuplicates: true,
-    escapeCodeTimeout: 100,
-  }).on("SIGINT", () => { for (const listener of interruptListeners) listener(); })
-    .on("close", onReadlineClose);
+  const createReadline = (size: number) =>
+    createInterface({
+      input,
+      output: readlineOutput,
+      terminal: interactive,
+      historySize: size,
+      removeHistoryDuplicates: true,
+      escapeCodeTimeout: 100,
+    })
+      .on("SIGINT", () => {
+        for (const listener of interruptListeners) listener();
+      })
+      .on("close", onReadlineClose);
   let readline = createReadline(historySize);
   let history = (readline as unknown as { readonly history: string[] }).history;
   const replaceReadline = async (size: number) => {
@@ -138,15 +143,26 @@ export function createNodeTerminal(
   let closed = false;
   let questionReserved = false;
   const inputWaiters = new Set<() => void>();
-  const wakeInputWaiters = () => { for (const wake of [...inputWaiters]) wake(); };
+  const wakeInputWaiters = () => {
+    for (const wake of [...inputWaiters]) wake();
+  };
   const waitForInput = async (signal?: AbortSignal): Promise<void> => {
     while (activePrompt !== undefined || activeKeyRead !== undefined || viewActive || questionReserved) {
       if (closed) throw new Error("Terminal closed");
       signal?.throwIfAborted();
       await new Promise<void>((resolve, reject) => {
-        const cleanup = () => { inputWaiters.delete(wake); signal?.removeEventListener("abort", abort); };
-        const wake = () => { cleanup(); resolve(); };
-        const abort = () => { cleanup(); reject(abortError(signal?.reason)); };
+        const cleanup = () => {
+          inputWaiters.delete(wake);
+          signal?.removeEventListener("abort", abort);
+        };
+        const wake = () => {
+          cleanup();
+          resolve();
+        };
+        const abort = () => {
+          cleanup();
+          reject(abortError(signal?.reason));
+        };
         inputWaiters.add(wake);
         signal?.addEventListener("abort", abort, { once: true });
       });
@@ -186,10 +202,7 @@ export function createNodeTerminal(
     cursorTo(output, inputColumn());
   };
 
-  const replaceSuggestions = (
-    suggestions: readonly TerminalSuggestion[],
-    inputValue: string,
-  ): void => {
+  const replaceSuggestions = (suggestions: readonly TerminalSuggestion[], inputValue: string): void => {
     eraseSuggestionRows();
     activeSuggestions = suggestions;
     activeSuggestionInput = inputValue;
@@ -233,17 +246,14 @@ export function createNodeTerminal(
     return true;
   };
 
-  const onKeypress = (
-    value: string | undefined,
-    key: NodeKey = {},
-  ): void => {
+  const onKeypress = (value: string | undefined, key: NodeKey = {}): void => {
     if (activeKeyRead !== undefined) {
       const read = activeKeyRead;
       activeKeyRead = undefined;
       read.cleanup();
       if (key.ctrl === true && key.name === "c") {
         suppressInterrupt = true;
-        setImmediate(() => suppressInterrupt = false);
+        setImmediate(() => (suppressInterrupt = false));
       }
       read.resolve(toKeyStroke(value, key));
       wakeInputWaiters();
@@ -270,21 +280,14 @@ export function createNodeTerminal(
           readline.write(expected);
         }
         void refreshSuggestions().then(() => {
-          if (
-            !completed && activePrompt !== undefined &&
-            readline.line === line
-          ) {
+          if (!completed && activePrompt !== undefined && readline.line === line) {
             completeActiveSuggestion(line);
           }
         });
       });
       return;
     }
-    if (
-      key.name === "return" ||
-      key.name === "enter" ||
-      (key.ctrl === true && key.name === "c")
-    ) {
+    if (key.name === "return" || key.name === "enter" || (key.ctrl === true && key.name === "c")) {
       suggestionVersion += 1;
       eraseSuggestionRows();
       activeSuggestions = [];
@@ -293,7 +296,10 @@ export function createNodeTerminal(
     queueMicrotask(() => void refreshSuggestions());
   };
   if (interactive) input.prependListener("keypress", onKeypress);
-  const updateImageSize = () => { imageSupport.query(); readlineOutput.emit("resize"); };
+  const updateImageSize = () => {
+    imageSupport.query();
+    readlineOutput.emit("resize");
+  };
   output.on("resize", updateImageSize);
 
   return {
@@ -301,8 +307,12 @@ export function createNodeTerminal(
     colors: options.colors ?? interactive,
     interactive,
     async question(prompt, questionOptions = {}) {
-      const signal = questionOptions.signal === undefined ? lifetime.signal : AbortSignal.any([lifetime.signal, questionOptions.signal]);
-      if (activePrompt !== undefined || activeKeyRead !== undefined || viewActive || questionReserved) await waitForInput(signal);
+      const signal =
+        questionOptions.signal === undefined
+          ? lifetime.signal
+          : AbortSignal.any([lifetime.signal, questionOptions.signal]);
+      if (activePrompt !== undefined || activeKeyRead !== undefined || viewActive || questionReserved)
+        await waitForInput(signal);
       try {
         if (closed) throw new Error("Terminal closed");
         signal.throwIfAborted();
@@ -312,10 +322,13 @@ export function createNodeTerminal(
         if (questionOptions.password && questionOptions.suggestions !== undefined) {
           throw new Error("Password input does not support suggestions");
         }
-      } catch (error) { questionReserved = false; wakeInputWaiters(); throw error; }
-      const previousHistory = interactive && (questionOptions.history === false || questionOptions.password)
-        ? [...history]
-        : undefined;
+      } catch (error) {
+        questionReserved = false;
+        wakeInputWaiters();
+        throw error;
+      }
+      const previousHistory =
+        interactive && (questionOptions.history === false || questionOptions.password) ? [...history] : undefined;
       passwordActive = questionOptions.password === true;
       if (passwordActive) {
         // 密码使用独立 readline，输入历史和删除缓冲区随问题结束清除。
@@ -358,15 +371,17 @@ export function createNodeTerminal(
       activePrompt = prompt;
       readline.setPrompt(prompt.replace(/^\r?\n/u, ""));
       if (interactive) readline.prompt(true);
-      if (passwordActive) { clearLine(output, 0); cursorTo(output, 0); output.write(prompt); }
+      if (passwordActive) {
+        clearLine(output, 0);
+        cursorTo(output, 0);
+        output.write(prompt);
+      }
       drawSuggestionRows();
     },
     readKey({ signal } = {}) {
       signal = signal === undefined ? lifetime.signal : AbortSignal.any([lifetime.signal, signal]);
       if (!interactive) {
-        return Promise.reject(
-          new Error("Key input requires an interactive terminal"),
-        );
+        return Promise.reject(new Error("Key input requires an interactive terminal"));
       }
       if (activePrompt !== undefined || activeKeyRead !== undefined || questionReserved) {
         return Promise.reject(new Error("The terminal input is already active"));
@@ -447,7 +462,9 @@ export function createNodeTerminal(
         listener();
       };
       interruptListeners.add(wrapped);
-      return () => { interruptListeners.delete(wrapped); };
+      return () => {
+        interruptListeners.delete(wrapped);
+      };
     },
     close() {
       closed = true;
@@ -486,8 +503,7 @@ interface KeyRead {
 function toKeyStroke(value: string | undefined, key: NodeKey): KeyStroke {
   const name = key.name ?? value ?? "unknown";
   const standaloneEscape = name === "escape";
-  const printable = value !== undefined && value.length > 0 &&
-    key.ctrl !== true && key.meta !== true;
+  const printable = value !== undefined && value.length > 0 && key.ctrl !== true && key.meta !== true;
   return keyStroke(name, {
     ctrl: key.ctrl === true,
     alt: key.meta === true && !standaloneEscape,
@@ -496,13 +512,8 @@ function toKeyStroke(value: string | undefined, key: NodeKey): KeyStroke {
   });
 }
 
-function commonSuggestionPrefix(
-  input: string,
-  suggestions: readonly TerminalSuggestion[],
-): string | undefined {
-  const values = suggestions
-    .map((suggestion) => suggestion.value)
-    .filter((value) => value.startsWith(input));
+function commonSuggestionPrefix(input: string, suggestions: readonly TerminalSuggestion[]): string | undefined {
+  const values = suggestions.map((suggestion) => suggestion.value).filter((value) => value.startsWith(input));
   const first = values[0];
   if (first === undefined) return undefined;
   let length = first.length;
@@ -516,21 +527,14 @@ function commonSuggestionPrefix(
 }
 
 function abortError(reason: unknown): Error {
-  const error = new Error(
-    typeof reason === "string" ? reason : "The operation was aborted",
-  );
+  const error = new Error(typeof reason === "string" ? reason : "The operation was aborted");
   error.name = "AbortError";
   return error;
 }
 
-function formatSuggestion(
-  suggestion: TerminalSuggestion,
-  columns: number | undefined,
-): string {
+function formatSuggestion(suggestion: TerminalSuggestion, columns: number | undefined): string {
   const label = singleLine(suggestion.label ?? suggestion.value);
-  const description = suggestion.description === undefined
-    ? ""
-    : `  ${singleLine(suggestion.description)}`;
+  const description = suggestion.description === undefined ? "" : `  ${singleLine(suggestion.description)}`;
   const value = `  ${label}${description}`;
   const limit = columns === undefined ? 120 : Math.max(20, columns - 1);
   return value.length <= limit ? value : `${value.slice(0, limit - 1)}…`;

@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node demo.mjs" },
-  "dependencies": { "@sortedyuan/may": "workspace:*", "@sortedyuan/ui-client": "workspace:*", "@sortedyuan/web-ui": "workspace:*" }
+  "scripts": {
+    "start": "node demo.mjs"
+  },
+  "dependencies": {
+    "@sortedyuan/may": "workspace:*",
+    "@sortedyuan/ui-client": "workspace:*",
+    "@sortedyuan/web-ui": "workspace:*"
+  }
 }

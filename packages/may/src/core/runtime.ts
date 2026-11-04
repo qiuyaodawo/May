@@ -29,8 +29,10 @@ export const defaultRuntimeFactory: RuntimeFactory = (options) => new May(option
 
 export function validateRuntimeDescriptor(value: RuntimeDescriptor): void {
   if (typeof value.id !== "string" || value.id.trim() === "") throw new TypeError("Runtime id cannot be empty");
-  if (typeof value.version !== "string" || value.version.trim() === "") throw new TypeError("Runtime version cannot be empty");
-  if (value.stateVersion !== undefined && (!Number.isSafeInteger(value.stateVersion) || value.stateVersion < 1)) throw new TypeError("Runtime stateVersion must be a positive safe integer");
+  if (typeof value.version !== "string" || value.version.trim() === "")
+    throw new TypeError("Runtime version cannot be empty");
+  if (value.stateVersion !== undefined && (!Number.isSafeInteger(value.stateVersion) || value.stateVersion < 1))
+    throw new TypeError("Runtime stateVersion must be a positive safe integer");
 }
 
 export function runtimeDescriptorsEqual(left: RuntimeDescriptor, right: RuntimeDescriptor): boolean {

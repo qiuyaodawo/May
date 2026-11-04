@@ -44,11 +44,9 @@ export const TOOL_CHANGE_PREVIEW_PRESENTATION_KIND = "maybecode.change-preview";
 export const TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION = 1;
 
 /** @deprecated Use `TOOL_CHANGE_PREVIEW_PRESENTATION_KIND`. */
-export const MAYBECODE_CHANGE_PREVIEW_PRESENTATION_KIND =
-  TOOL_CHANGE_PREVIEW_PRESENTATION_KIND;
+export const MAYBECODE_CHANGE_PREVIEW_PRESENTATION_KIND = TOOL_CHANGE_PREVIEW_PRESENTATION_KIND;
 /** @deprecated Use `TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION`. */
-export const MAYBECODE_CHANGE_PREVIEW_PRESENTATION_VERSION =
-  TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION;
+export const MAYBECODE_CHANGE_PREVIEW_PRESENTATION_VERSION = TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION;
 
 export function decodeToolChangePreviewPresentation(
   kind: string,
@@ -76,9 +74,7 @@ export async function createToolChangePreview(
   try {
     if (path === "<unknown>") throw new Error("path is missing");
     const file = await resolvePreviewPath(workspace, path);
-    const original = file.exists
-      ? await readPreviewText(file.absolute, file.relative)
-      : undefined;
+    const original = file.exists ? await readPreviewText(file.absolute, file.relative) : undefined;
 
     let updated: string;
     if (toolName === "write") {
@@ -103,12 +99,7 @@ export async function createToolChangePreview(
 
     assertTextShape(updated, "updated content");
 
-    return createFileChangePreview(
-      toolName,
-      file.relative,
-      original,
-      updated,
-    );
+    return createFileChangePreview(toolName, file.relative, original, updated);
   } catch (error) {
     return {
       status: "unavailable",
@@ -128,17 +119,9 @@ function createFileChangePreview(
   const before = toLines(original ?? "");
   const after = toLines(updated);
   const operations = diffLines(before, after);
-  const additions = operations.filter((operation) =>
-    operation.type === "add"
-  ).length;
-  const deletions = operations.filter((operation) =>
-    operation.type === "delete"
-  ).length;
-  const kind: FileChangeKind = original === undefined
-    ? "create"
-    : original === updated
-    ? "no-change"
-    : "update";
+  const additions = operations.filter((operation) => operation.type === "add").length;
+  const deletions = operations.filter((operation) => operation.type === "delete").length;
+  const kind: FileChangeKind = original === undefined ? "create" : original === updated ? "no-change" : "update";
 
   return {
     status: "ready",
@@ -147,9 +130,7 @@ function createFileChangePreview(
     kind,
     additions,
     deletions,
-    diff: kind === "no-change"
-      ? ""
-      : renderUnifiedDiff(path, original === undefined, operations),
+    diff: kind === "no-change" ? "" : renderUnifiedDiff(path, original === undefined, operations),
   };
 }
 
@@ -159,10 +140,7 @@ interface PreviewPath {
   readonly exists: boolean;
 }
 
-async function resolvePreviewPath(
-  workspace: string,
-  inputPath: string,
-): Promise<PreviewPath> {
+async function resolvePreviewPath(workspace: string, inputPath: string): Promise<PreviewPath> {
   const file = await resolveWritableWorkspacePath(workspace, inputPath);
   try {
     await stat(file.absolute);
@@ -204,13 +182,8 @@ function assertTextShape(text: string, label: string): void {
     if (index !== text.length && character !== "\n" && character !== "\r") {
       continue;
     }
-    if (
-      Buffer.byteLength(text.slice(lineStart, index), "utf8") >
-        MAX_PREVIEW_LINE_BYTES
-    ) {
-      throw new Error(
-        `${label} contains a line exceeding the ${MAX_PREVIEW_LINE_BYTES} byte limit`,
-      );
+    if (Buffer.byteLength(text.slice(lineStart, index), "utf8") > MAX_PREVIEW_LINE_BYTES) {
+      throw new Error(`${label} contains a line exceeding the ${MAX_PREVIEW_LINE_BYTES} byte limit`);
     }
     if (character === "\r" && text[index + 1] === "\n") index += 1;
     lineStart = index + 1;
@@ -232,15 +205,9 @@ type DiffOperation =
   | { readonly type: "add"; readonly line: string }
   | { readonly type: "delete"; readonly line: string };
 
-function renderUnifiedDiff(
-  path: string,
-  created: boolean,
-  operations: readonly DiffOperation[],
-): string {
+function renderUnifiedDiff(path: string, created: boolean, operations: readonly DiffOperation[]): string {
   const records = positionOperations(operations);
-  const changed = records.flatMap((record, index) =>
-    record.operation.type === "equal" ? [] : [index]
-  );
+  const changed = records.flatMap((record, index) => (record.operation.type === "equal" ? [] : [index]));
   const hunks: Array<{ start: number; end: number }> = [];
   for (const index of changed) {
     const start = Math.max(0, index - CONTEXT_LINES);
@@ -259,16 +226,9 @@ function renderUnifiedDiff(
     const slice = records.slice(hunk.start, hunk.end);
     const oldCount = slice.filter((record) => record.operation.type !== "add").length;
     const newCount = slice.filter((record) => record.operation.type !== "delete").length;
-    body.push(
-      `@@ -${formatRange(first.oldBefore, oldCount)} ` +
-        `+${formatRange(first.newBefore, newCount)} @@`,
-    );
+    body.push(`@@ -${formatRange(first.oldBefore, oldCount)} ` + `+${formatRange(first.newBefore, newCount)} @@`);
     for (const record of slice) {
-      const prefix = record.operation.type === "equal"
-        ? " "
-        : record.operation.type === "add"
-        ? "+"
-        : "-";
+      const prefix = record.operation.type === "equal" ? " " : record.operation.type === "add" ? "+" : "-";
       const line = decodeDiffLine(record.operation.line);
       body.push(limitDiffLine(`${prefix}${renderDiffText(line.text)}`));
       if (record.operation.type !== "equal") {
@@ -281,17 +241,10 @@ function renderUnifiedDiff(
     }
   }
 
-  return limitDiff([
-    `--- ${created ? "/dev/null" : `a/${path}`}`,
-    `+++ b/${path}`,
-    ...truncateBody(body),
-  ]);
+  return limitDiff([`--- ${created ? "/dev/null" : `a/${path}`}`, `+++ b/${path}`, ...truncateBody(body)]);
 }
 
-function diffLines(
-  before: readonly string[],
-  after: readonly string[],
-): DiffOperation[] {
+function diffLines(before: readonly string[], after: readonly string[]): DiffOperation[] {
   const exact = myersDiff(before, after);
   if (exact !== undefined) return exact;
 
@@ -300,10 +253,7 @@ function diffLines(
   return patienceDiff(before, after);
 }
 
-function patienceDiff(
-  before: readonly string[],
-  after: readonly string[],
-): DiffOperation[] {
+function patienceDiff(before: readonly string[], after: readonly string[]): DiffOperation[] {
   const output: DiffOperation[] = [];
   diffPatienceRange(before, 0, before.length, after, 0, after.length, output);
   return output;
@@ -318,19 +268,18 @@ function diffPatienceRange(
   afterEnd: number,
   output: DiffOperation[],
 ): void {
-  while (
-    beforeStart < beforeEnd && afterStart < afterEnd &&
-    before[beforeStart] === after[afterStart]
-  ) {
+  while (beforeStart < beforeEnd && afterStart < afterEnd && before[beforeStart] === after[afterStart]) {
     output.push({ type: "equal", line: before[beforeStart]! });
     beforeStart += 1;
     afterStart += 1;
   }
   let suffix = 0;
   while (
-    beforeStart < beforeEnd - suffix && afterStart < afterEnd - suffix &&
+    beforeStart < beforeEnd - suffix &&
+    afterStart < afterEnd - suffix &&
     before[beforeEnd - suffix - 1] === after[afterEnd - suffix - 1]
-  ) suffix += 1;
+  )
+    suffix += 1;
   const middleBeforeEnd = beforeEnd - suffix;
   const middleAfterEnd = afterEnd - suffix;
 
@@ -343,21 +292,11 @@ function diffPatienceRange(
       output.push({ type: "delete", line: before[index]! });
     }
   } else {
-    const exact = myersDiff(
-      before.slice(beforeStart, middleBeforeEnd),
-      after.slice(afterStart, middleAfterEnd),
-    );
+    const exact = myersDiff(before.slice(beforeStart, middleBeforeEnd), after.slice(afterStart, middleAfterEnd));
     if (exact !== undefined) {
       output.push(...exact);
     } else {
-      const anchors = patienceAnchors(
-        before,
-        beforeStart,
-        middleBeforeEnd,
-        after,
-        afterStart,
-        middleAfterEnd,
-      );
+      const anchors = patienceAnchors(before, beforeStart, middleBeforeEnd, after, afterStart, middleAfterEnd);
       if (anchors.length === 0) {
         for (let index = beforeStart; index < middleBeforeEnd; index++) {
           output.push({ type: "delete", line: before[index]! });
@@ -369,28 +308,12 @@ function diffPatienceRange(
         let previousBefore = beforeStart;
         let previousAfter = afterStart;
         for (const anchor of anchors) {
-          diffPatienceRange(
-            before,
-            previousBefore,
-            anchor.before,
-            after,
-            previousAfter,
-            anchor.after,
-            output,
-          );
+          diffPatienceRange(before, previousBefore, anchor.before, after, previousAfter, anchor.after, output);
           output.push({ type: "equal", line: before[anchor.before]! });
           previousBefore = anchor.before + 1;
           previousAfter = anchor.after + 1;
         }
-        diffPatienceRange(
-          before,
-          previousBefore,
-          middleBeforeEnd,
-          after,
-          previousAfter,
-          middleAfterEnd,
-          output,
-        );
+        diffPatienceRange(before, previousBefore, middleBeforeEnd, after, previousAfter, middleAfterEnd, output);
       }
     }
   }
@@ -466,30 +389,21 @@ function uniqueLinePositions(
   return positions;
 }
 
-function myersDiff(
-  before: readonly string[],
-  after: readonly string[],
-): DiffOperation[] | undefined {
+function myersDiff(before: readonly string[], after: readonly string[]): DiffOperation[] | undefined {
   const maximum = before.length + after.length;
   const frontier = new Map<number, number>([[1, 0]]);
   const trace: Map<number, number>[] = [];
-  for (
-    let distance = 0;
-    distance <= Math.min(maximum, MAX_EXACT_EDIT_DISTANCE);
-    distance++
-  ) {
+  for (let distance = 0; distance <= Math.min(maximum, MAX_EXACT_EDIT_DISTANCE); distance++) {
     trace.push(new Map(frontier));
     for (let diagonal = -distance; diagonal <= distance; diagonal += 2) {
       const fromDelete = frontier.get(diagonal - 1) ?? Number.NEGATIVE_INFINITY;
       const fromAdd = frontier.get(diagonal + 1) ?? Number.NEGATIVE_INFINITY;
-      let x = diagonal === -distance ||
-          (diagonal !== distance && fromDelete < fromAdd)
-        ? Math.max(0, fromAdd)
-        : Math.max(0, fromDelete + 1);
+      let x =
+        diagonal === -distance || (diagonal !== distance && fromDelete < fromAdd)
+          ? Math.max(0, fromAdd)
+          : Math.max(0, fromDelete + 1);
       let y = x - diagonal;
-      while (
-        x < before.length && y < after.length && before[x] === after[y]
-      ) {
+      while (x < before.length && y < after.length && before[x] === after[y]) {
         x += 1;
         y += 1;
       }
@@ -516,10 +430,8 @@ function backtrackMyers(
     const diagonal = x - y;
     const fromDelete = frontier.get(diagonal - 1) ?? Number.NEGATIVE_INFINITY;
     const fromAdd = frontier.get(diagonal + 1) ?? Number.NEGATIVE_INFINITY;
-    const previousDiagonal = diagonal === -distance ||
-        (diagonal !== distance && fromDelete < fromAdd)
-      ? diagonal + 1
-      : diagonal - 1;
+    const previousDiagonal =
+      diagonal === -distance || (diagonal !== distance && fromDelete < fromAdd) ? diagonal + 1 : diagonal - 1;
     const previousX = Math.max(0, frontier.get(previousDiagonal) ?? 0);
     const previousY = previousX - previousDiagonal;
     while (x > previousX && y > previousY) {
@@ -545,9 +457,7 @@ interface PositionedOperation {
   readonly newBefore: number;
 }
 
-function positionOperations(
-  operations: readonly DiffOperation[],
-): PositionedOperation[] {
+function positionOperations(operations: readonly DiffOperation[]): PositionedOperation[] {
   let oldBefore = 0;
   let newBefore = 0;
   return operations.map((operation) => {
@@ -562,11 +472,7 @@ function truncateBody(lines: readonly string[]): string[] {
   if (lines.length <= MAX_DIFF_BODY_LINES) return [...lines];
   const keptAtEachEnd = Math.floor((MAX_DIFF_BODY_LINES - 1) / 2);
   const omitted = lines.length - keptAtEachEnd * 2;
-  return [
-    ...lines.slice(0, keptAtEachEnd),
-    ` … ${omitted} diff lines omitted …`,
-    ...lines.slice(-keptAtEachEnd),
-  ];
+  return [...lines.slice(0, keptAtEachEnd), ` … ${omitted} diff lines omitted …`, ...lines.slice(-keptAtEachEnd)];
 }
 
 function limitDiffLine(line: string): string {
@@ -577,8 +483,7 @@ function limitDiff(lines: readonly string[]): string {
   const visible: string[] = [];
   let bytes = 0;
   for (const line of lines) {
-    const next = bytes + Buffer.byteLength(line, "utf8") +
-      (visible.length === 0 ? 0 : 1);
+    const next = bytes + Buffer.byteLength(line, "utf8") + (visible.length === 0 ? 0 : 1);
     if (next > MAX_DIFF_BYTES) {
       const separatorBytes = visible.length === 0 ? 0 : 1;
       const remaining = MAX_DIFF_BYTES - bytes - separatorBytes;
@@ -620,11 +525,7 @@ function toLines(text: string): string[] {
   const endings = /\r\n|\r|\n/gu;
   let start = 0;
   for (const match of text.matchAll(endings)) {
-    const ending = match[0] === "\r\n"
-      ? "crlf"
-      : match[0] === "\r"
-      ? "cr"
-      : "lf";
+    const ending = match[0] === "\r\n" ? "crlf" : match[0] === "\r" ? "cr" : "lf";
     lines.push(JSON.stringify([text.slice(start, match.index), ending]));
     start = match.index + match[0].length;
   }
@@ -643,9 +544,7 @@ function decodeDiffLine(line: string): {
 }
 
 function renderDiffText(text: string): string {
-  return text.startsWith("\uFEFF")
-    ? `⟦UTF-8 BOM⟧${text.slice(1)}`
-    : text;
+  return text.startsWith("\uFEFF") ? `⟦UTF-8 BOM⟧${text.slice(1)}` : text;
 }
 
 function countOccurrences(source: string, search: string, stopAt: number): number {
@@ -672,22 +571,19 @@ function stringField(value: unknown, name: string): string | undefined {
 function isToolChangePreview(value: unknown): value is ToolChangePreview {
   if (typeof value !== "object" || value === null) return false;
   const preview = value as Record<string, unknown>;
-  if (
-    (preview.tool !== "edit" && preview.tool !== "write") ||
-    typeof preview.path !== "string"
-  ) {
+  if ((preview.tool !== "edit" && preview.tool !== "write") || typeof preview.path !== "string") {
     return false;
   }
   if (preview.status === "unavailable") {
     return typeof preview.reason === "string";
   }
-  return preview.status === "ready" &&
-    (preview.kind === "create" ||
-      preview.kind === "update" ||
-      preview.kind === "no-change") &&
+  return (
+    preview.status === "ready" &&
+    (preview.kind === "create" || preview.kind === "update" || preview.kind === "no-change") &&
     isNonNegativeInteger(preview.additions) &&
     isNonNegativeInteger(preview.deletions) &&
-    typeof preview.diff === "string";
+    typeof preview.diff === "string"
+  );
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -695,8 +591,7 @@ function isNonNegativeInteger(value: unknown): value is number {
 }
 
 function isMissingPathError(error: unknown): boolean {
-  return error instanceof Error && "code" in error &&
-    (error.code === "ENOENT" || error.code === "ENOTDIR");
+  return error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR");
 }
 
 function errorMessage(error: unknown): string {

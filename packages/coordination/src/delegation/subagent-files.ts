@@ -49,9 +49,7 @@ export class SharedWorkspaceFileGuard {
     readonly files?: readonly string[];
     readonly requireRead: boolean;
   }): SubagentFileGuard {
-    const scope = options.files === undefined
-      ? undefined
-      : new Set(options.files.map(normalizeRelative));
+    const scope = options.files === undefined ? undefined : new Set(options.files.map(normalizeRelative));
     const versions = new Map<string, string>();
     const changed = new Set<string>();
 
@@ -59,9 +57,14 @@ export class SharedWorkspaceFileGuard {
     const serialize = <T>(key: string, operation: () => Promise<T>): Promise<T> => {
       const previous = this.locks.get(key) ?? Promise.resolve();
       const result = previous.then(operation, operation);
-      const tail = result.then(() => undefined, () => undefined);
+      const tail = result.then(
+        () => undefined,
+        () => undefined,
+      );
       this.locks.set(key, tail);
-      void tail.then(() => { if (this.locks.get(key) === tail) this.locks.delete(key); });
+      void tail.then(() => {
+        if (this.locks.get(key) === tail) this.locks.delete(key);
+      });
       return result;
     };
 
@@ -71,8 +74,10 @@ export class SharedWorkspaceFileGuard {
       // 声明的文件只约束修改；读取在工作区内不受限制。
       if (operation.tool !== "read" && scope !== undefined && !scope.has(relative)) {
         throw new Error(
-          (scope.size === 0 ? "File conflict: this task may not modify files; " : `File conflict: this task may only modify ${[...scope].join(", ")}; `) +
-          `${relative} is outside its assigned files. Ask the main agent for a different assignment.`,
+          (scope.size === 0
+            ? "File conflict: this task may not modify files; "
+            : `File conflict: this task may only modify ${[...scope].join(", ")}; `) +
+            `${relative} is outside its assigned files. Ask the main agent for a different assignment.`,
         );
       }
       return serialize(key, async () => {
@@ -87,13 +92,13 @@ export class SharedWorkspaceFileGuard {
         if (options.requireRead && known === undefined && current !== MISSING) {
           throw new Error(
             `File conflict: ${relative} exists and this task has not read it. ` +
-            "Read it first, then decide whether to change it.",
+              "Read it first, then decide whether to change it.",
           );
         }
         if (known !== undefined && known !== current) {
           throw new Error(
             `File conflict: ${relative} changed after this task read it. ` +
-            "Re-read the file and redo the change against the current content.",
+              "Re-read the file and redo the change against the current content.",
           );
         }
         const value = await operation.run();
@@ -104,15 +109,13 @@ export class SharedWorkspaceFileGuard {
     };
 
     return {
-      tools: options.names.map((name) => createCodingTool(
-        name as CodingToolName,
-        { cwd: this.workspace, guard },
-      )),
+      tools: options.names.map((name) => createCodingTool(name as CodingToolName, { cwd: this.workspace, guard })),
       changedFiles: () => [...changed],
-      note: () => changed.size === 0
-        ? ""
-        : `\n\nHost record: this task changed these workspace files through the file tools: ${[...changed].join(", ")}. ` +
-          "Another task may have changed them since; read a file before editing it.",
+      note: () =>
+        changed.size === 0
+          ? ""
+          : `\n\nHost record: this task changed these workspace files through the file tools: ${[...changed].join(", ")}. ` +
+            "Another task may have changed them since; read a file before editing it.",
     };
   }
 }

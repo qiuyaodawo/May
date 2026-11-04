@@ -34,15 +34,33 @@ export function readSessionBranchPositions(history: readonly SessionEvent[]): re
     if (event.type === "input.submitted") request = messageText(event.message);
     if (event.type === "run.started") response = "";
     if (event.type === "assistant.completed") response = messageText(event.message);
-    if (event.type === "run.completed" || event.type === "run.yielded" || event.type === "run.failed" || event.type === "run.cancelled" || event.type === "run.interrupted") {
+    if (
+      event.type === "run.completed" ||
+      event.type === "run.yielded" ||
+      event.type === "run.failed" ||
+      event.type === "run.cancelled" ||
+      event.type === "run.interrupted"
+    ) {
       if (event.type === "run.completed") completedRuns.add(event.runId);
       else completedRuns.delete(event.runId);
       if (event.type === "run.yielded") yieldedRuns.add(event.runId);
       else yieldedRuns.delete(event.runId);
-      const reason = event.type === "run.completed" ? "Recoverable state has not been saved" :
-        event.type === "run.yielded" ? "The request is waiting for continuation" : "The request did not complete successfully";
-      positions.set(event.runId, { sessionId: event.sessionId, runId: event.runId,
-        positionSeq: event.seq, timestamp: event.timestamp, request, response, available: false, reason });
+      const reason =
+        event.type === "run.completed"
+          ? "Recoverable state has not been saved"
+          : event.type === "run.yielded"
+            ? "The request is waiting for continuation"
+            : "The request did not complete successfully";
+      positions.set(event.runId, {
+        sessionId: event.sessionId,
+        runId: event.runId,
+        positionSeq: event.seq,
+        timestamp: event.timestamp,
+        request,
+        response,
+        available: false,
+        reason,
+      });
     }
     if (event.type === "run.settled") {
       const previous = positions.get(event.runId);
@@ -50,24 +68,42 @@ export function readSessionBranchPositions(history: readonly SessionEvent[]): re
       if (!completedRuns.has(event.runId) && !(event.hostCompleted === true && yieldedRuns.has(event.runId))) {
         throw new Error(`Branch position requires a successful completed Run: ${event.runId}`);
       }
-      positions.set(event.runId, { sessionId: previous.sessionId, runId: previous.runId,
-        positionSeq: event.seq, timestamp: event.timestamp, request: previous.request, response: previous.response, available: true });
+      positions.set(event.runId, {
+        sessionId: previous.sessionId,
+        runId: previous.runId,
+        positionSeq: event.seq,
+        timestamp: event.timestamp,
+        request: previous.request,
+        response: previous.response,
+        available: true,
+      });
     }
   }
   const created = history[0];
-  const incompleteFork = created?.type === "session.created" && created.fork !== undefined &&
+  const incompleteFork =
+    created?.type === "session.created" &&
+    created.fork !== undefined &&
     !history.some((event) => event.type === "session.fork.ready");
-  return [...positions.values()].map((position) => incompleteFork ? { ...position, available: false,
-    reason: "Session branch initialization has not completed" } : position);
+  return [...positions.values()].map((position) =>
+    incompleteFork
+      ? { ...position, available: false, reason: "Session branch initialization has not completed" }
+      : position,
+  );
 }
 
 export function readSessionBranchNode(history: readonly SessionEvent[]): SessionBranchNode {
   const created = history[0];
   if (created?.type !== "session.created") throw new Error("Session history has no creation event");
-  return { sessionId: created.sessionId, ...(created.fork === undefined ? {} : { fork: structuredClone(created.fork) }),
-    positions: readSessionBranchPositions(history) };
+  return {
+    sessionId: created.sessionId,
+    ...(created.fork === undefined ? {} : { fork: structuredClone(created.fork) }),
+    positions: readSessionBranchPositions(history),
+  };
 }
 
 function messageText(message: Message): string {
-  return message.content.filter((part) => part.type === "text").map((part) => part.text).join("");
+  return message.content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("");
 }

@@ -18,10 +18,7 @@ const add = {
     required: ["a", "b"],
   },
   parse(input) {
-    if (
-      typeof input !== "object" || input === null ||
-      typeof input.a !== "number" || typeof input.b !== "number"
-    ) {
+    if (typeof input !== "object" || input === null || typeof input.a !== "number" || typeof input.b !== "number") {
       throw new TypeError("a and b must be numbers");
     }
     return input;

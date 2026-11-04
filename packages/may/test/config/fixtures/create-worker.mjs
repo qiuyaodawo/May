@@ -7,6 +7,8 @@ process.once("message", async () => {
   } catch (error) {
     if (error.code !== "MAY_CONFIG_WRITE_ERROR") throw error;
     process.exitCode = 1;
-  } finally { process.disconnect(); }
+  } finally {
+    process.disconnect();
+  }
 });
 process.send("ready");

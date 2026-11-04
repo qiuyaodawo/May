@@ -5,12 +5,12 @@
 The root entry exports service tokens, registries and factory metadata. Component
 factories are available through separate public subpaths:
 
-| Import path | Factory reference |
-| --- | --- |
-| `@sortedyuan/may/services/models` | [Model instances and wrappers](models.md) |
-| `@sortedyuan/may/services/runtime` | [Runtime, Context and tools](runtime.md) |
-| `@sortedyuan/may/services/permissions` | [Permission policies](permissions.md) |
-| `@sortedyuan/may/services/skills` | [Skill activation and persisted state](skills.md) |
+| Import path                            | Factory reference                                 |
+| -------------------------------------- | ------------------------------------------------- |
+| `@sortedyuan/may/services/models`      | [Model instances and wrappers](models.md)         |
+| `@sortedyuan/may/services/runtime`     | [Runtime, Context and tools](runtime.md)          |
+| `@sortedyuan/may/services/permissions` | [Permission policies](permissions.md)             |
+| `@sortedyuan/may/services/skills`      | [Skill activation and persisted state](skills.md) |
 
 Typed service tokens and ordered contribution registries used by `@sortedyuan/may/application`
 and component plugins. All exported `services` tokens have application scope and
@@ -41,10 +41,9 @@ The default `ToolSources`, `InstructionSources`, `ModelWrappers` and
 ordering, contribution removal and independent state for each Application.
 
 ```ts
-context.defer(context.get(services.toolSources).add(
-  () => tools,
-  { id: context.pluginId, pluginOrder: context.pluginOrder },
-));
+context.defer(
+  context.get(services.toolSources).add(() => tools, { id: context.pluginId, pluginOrder: context.pluginOrder }),
+);
 ```
 
 `ToolSources.snapshot()` returns a `ToolRegistry` with captured definitions and

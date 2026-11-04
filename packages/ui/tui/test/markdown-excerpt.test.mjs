@@ -6,8 +6,12 @@ import { renderMarkdownExcerpt, TranscriptStore, TranscriptView } from "../dist/
 const full = { maxCharacters: 10000, maxLines: 100 };
 
 test("Markdown 节选保留标题、列表、链接和引用内容", () => {
-  const source = "### Commands\n\n**Run** *read* ~~old~~ `a*b|#c`\n\n3. [Guide](https://example.com/guide)\n4. second\n   - child\n\n> quoted\n\n---";
-  assert.equal(renderMarkdownExcerpt(source, full), "Commands\n\nRun read old a*b|#c\n\n3. Guide (https://example.com/guide)\n4. second\n\n   • child\n\nquoted");
+  const source =
+    "### Commands\n\n**Run** *read* ~~old~~ `a*b|#c`\n\n3. [Guide](https://example.com/guide)\n4. second\n   - child\n\n> quoted\n\n---";
+  assert.equal(
+    renderMarkdownExcerpt(source, full),
+    "Commands\n\nRun read old a*b|#c\n\n3. Guide (https://example.com/guide)\n4. second\n\n   • child\n\nquoted",
+  );
   assert.equal(renderMarkdownExcerpt("<https://example.com>"), "https://example.com");
   assert.equal(renderMarkdownExcerpt("![说明](image.png)"), "说明 (image.png)");
   assert.equal(renderMarkdownExcerpt("- [x] done\n- [ ] next"), "• [x] done\n• [ ] next");
@@ -48,7 +52,10 @@ test("终端控制字符在节选中不可执行，HTML 作为字面文本保留
 
 test("真实 TranscriptView 在窄窗口显示并复制多行节选", () => {
   const excerpt = renderMarkdownExcerpt("### Commands\n\n- **读取文件** `read`\n- [说明](https://example.com)");
-  const notice = `request [main] completed\n    result:\n${excerpt.split("\n").map(line => `      ${line}`).join("\n")}`;
+  const notice = `request [main] completed\n    result:\n${excerpt
+    .split("\n")
+    .map((line) => `      ${line}`)
+    .join("\n")}`;
   const store = new TranscriptStore();
   store.appendNotice("info", notice);
   const view = new TranscriptView(store);

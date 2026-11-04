@@ -2,9 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ModelProtocolError, RunCancelledError } from "@sortedyuan/may/core";
-import {
-  createModelContextSummarizer,
-} from "@sortedyuan/may/context/model-summarizer";
+import { createModelContextSummarizer } from "@sortedyuan/may/context/model-summarizer";
 
 const options = {
   instructions: "Summarize facts for a later request.",
@@ -14,23 +12,26 @@ const options = {
 test("creates a parameterized, tool-free model summary", async () => {
   let captured;
   const controller = new AbortController();
-  const summarizer = createModelContextSummarizer({
-    async *stream(request, streamOptions) {
-      captured = { request, streamOptions };
-      yield { type: "reasoning.delta", delta: "thinking" };
-      yield {
-        type: "response.completed",
-        message: {
-          role: "assistant",
-          content: [
-            { type: "reasoning", text: "not returned" },
-            { type: "text", text: "  first" },
-            { type: "text", text: " summary  " },
-          ],
-        },
-      };
+  const summarizer = createModelContextSummarizer(
+    {
+      async *stream(request, streamOptions) {
+        captured = { request, streamOptions };
+        yield { type: "reasoning.delta", delta: "thinking" };
+        yield {
+          type: "response.completed",
+          message: {
+            role: "assistant",
+            content: [
+              { type: "reasoning", text: "not returned" },
+              { type: "text", text: "  first" },
+              { type: "text", text: " summary  " },
+            ],
+          },
+        };
+      },
     },
-  }, options);
+    options,
+  );
 
   const result = await summarizer.summarize({
     messages: [userMessage("source conversation")],
@@ -103,26 +104,25 @@ test("turns an aborted summary into RunCancelledError", async () => {
   const controller = new AbortController();
   controller.abort("stop summary");
   let called = false;
-  const summarizer = createModelContextSummarizer({
-    async *stream() {
-      called = true;
+  const summarizer = createModelContextSummarizer(
+    {
+      async *stream() {
+        called = true;
+      },
     },
-  }, options);
-
-  await assert.rejects(
-    summarizer.summarize({ messages: [], signal: controller.signal }),
-    (error) => {
-      assert.ok(error instanceof RunCancelledError);
-      assert.equal(error.message, "stop summary");
-      return true;
-    },
+    options,
   );
+
+  await assert.rejects(summarizer.summarize({ messages: [], signal: controller.signal }), (error) => {
+    assert.ok(error instanceof RunCancelledError);
+    assert.equal(error.message, "stop summary");
+    return true;
+  });
   assert.equal(called, false);
 });
 
 async function summarizeWith(stream) {
-  return createModelContextSummarizer({ stream }, options)
-    .summarize({ messages: [] });
+  return createModelContextSummarizer({ stream }, options).summarize({ messages: [] });
 }
 
 function completion(text) {

@@ -27,6 +27,7 @@
   in each request, sharing preparation across main and delegated Agents and retaining
   the lease through Goal verification. Startup and read-only requests leave Git state
   unchanged. Each modifying request saves existing user edits before accepting tool writes.
+
 - c8c14c7: Skills 初始提供名称、描述及兼容要求，通过 `skill_read` 按需读取正文与资源；
   保留已激活文档的 Session 持久化行为，并明确指令贡献顺序。
 
@@ -35,6 +36,7 @@
 
   新增基础与项目指令来源、运行前刷新及权限模式 callbacks，使子 Session 按顺序接收
   自己的运行环境、项目规则与任务说明。
+
 - Updated dependencies [02789c6]
 - Updated dependencies [422e404]
 - Updated dependencies [88e7d69]

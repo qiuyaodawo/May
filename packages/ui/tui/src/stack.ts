@@ -1,10 +1,4 @@
-import type {
-  Component,
-  CursorPosition,
-  RenderResult,
-  RenderSize,
-  PointerEvent,
-} from "./component.js";
+import type { Component, CursorPosition, RenderResult, RenderSize, PointerEvent } from "./component.js";
 import { placeImages, type ImagePlacement } from "./component.js";
 import type { TextRow } from "./text-selection.js";
 
@@ -60,18 +54,20 @@ export class Stack implements Component {
 
     return {
       lines,
-      ...(textRows.some(row => row !== undefined) ? { textRows } : {}),
+      ...(textRows.some((row) => row !== undefined) ? { textRows } : {}),
       ...(images.length ? { images } : {}),
       ...(cursor === undefined ? {} : { cursor }),
     };
   }
 
   handlePointer(event: PointerEvent): boolean {
-    const target = event.type === "down"
-      ? this.bounds.find(bound => event.y >= bound.y && event.y < bound.y + bound.height)
-      : this.bounds.find(bound => bound.child === this.captured?.child);
+    const target =
+      event.type === "down"
+        ? this.bounds.find((bound) => event.y >= bound.y && event.y < bound.y + bound.height)
+        : this.bounds.find((bound) => bound.child === this.captured?.child);
     if (event.type === "down") this.captured = undefined;
-    if (target === undefined || !("handlePointer" in target.child) || typeof target.child.handlePointer !== "function") return false;
+    if (target === undefined || !("handlePointer" in target.child) || typeof target.child.handlePointer !== "function")
+      return false;
     const consumed = target.child.handlePointer({ ...event, y: event.y - target.y }) as boolean;
     if (event.type === "down" && consumed) this.captured = { child: target.child, y: target.y };
     if (event.type === "up") this.captured = undefined;

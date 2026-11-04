@@ -11,11 +11,7 @@ export class McpConnectionError extends MayError {
   readonly summary: string;
   readonly stderr: string | undefined;
 
-  constructor(
-    serverId: string,
-    message: string,
-    options?: ErrorOptions & { readonly stderr?: string },
-  ) {
+  constructor(serverId: string, message: string, options?: ErrorOptions & { readonly stderr?: string }) {
     super(
       "MCP_CONNECTION_FAILED",
       formatDiagnosticMessage(`MCP server "${serverId}": ${message}`, options?.stderr),
@@ -32,11 +28,7 @@ export class McpToolsListError extends MayError {
   readonly summary: string;
   readonly stderr: string | undefined;
 
-  constructor(
-    serverId: string,
-    message: string,
-    options?: ErrorOptions & { readonly stderr?: string },
-  ) {
+  constructor(serverId: string, message: string, options?: ErrorOptions & { readonly stderr?: string }) {
     super(
       "MCP_TOOLS_LIST_FAILED",
       formatDiagnosticMessage(`MCP server "${serverId}": ${message}`, options?.stderr),
@@ -52,17 +44,8 @@ export class McpToolCallError extends MayError {
   readonly serverId: string;
   readonly remoteToolName: string;
 
-  constructor(
-    serverId: string,
-    remoteToolName: string,
-    message: string,
-    options?: ErrorOptions,
-  ) {
-    super(
-      "MCP_TOOL_CALL_FAILED",
-      `MCP tool "${serverId}/${remoteToolName}" failed: ${message}`,
-      options,
-    );
+  constructor(serverId: string, remoteToolName: string, message: string, options?: ErrorOptions) {
+    super("MCP_TOOL_CALL_FAILED", `MCP tool "${serverId}/${remoteToolName}" failed: ${message}`, options);
     this.serverId = serverId;
     this.remoteToolName = remoteToolName;
   }
@@ -73,10 +56,7 @@ export class McpToolReportedError extends MayError {
   readonly remoteToolName: string;
 
   constructor(serverId: string, remoteToolName: string, detail: string) {
-    super(
-      "MCP_TOOL_ERROR",
-      `MCP tool "${serverId}/${remoteToolName}" reported an error: ${detail}`,
-    );
+    super("MCP_TOOL_ERROR", `MCP tool "${serverId}/${remoteToolName}" reported an error: ${detail}`);
     this.serverId = serverId;
     this.remoteToolName = remoteToolName;
   }
@@ -89,9 +69,7 @@ export class McpClientPoolClosedError extends MayError {
 }
 
 function formatDiagnosticMessage(message: string, stderr?: string): string {
-  return stderr === undefined || stderr === ""
-    ? message
-    : `${message}\nRecent stderr:\n${stderr}`;
+  return stderr === undefined || stderr === "" ? message : `${message}\nRecent stderr:\n${stderr}`;
 }
 
 export class McpCatalogError extends MayError {
@@ -113,5 +91,7 @@ export class McpCapabilityError extends MayError {
 }
 
 export class McpContentError extends MayError {
-  constructor(message: string) { super("MCP_CONTENT_ERROR", message); }
+  constructor(message: string) {
+    super("MCP_CONTENT_ERROR", message);
+  }
 }

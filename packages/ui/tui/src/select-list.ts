@@ -1,13 +1,7 @@
 import { Keymap, mergeKeyBindings, type KeyStroke, type KeyBindingDefinition } from "./keybindings/index.js";
 import sliceAnsi from "slice-ansi";
 import stringWidth from "string-width";
-import type {
-  FocusTarget,
-  InteractiveComponent,
-  RenderResult,
-  RenderSize,
-  PointerEvent,
-} from "./component.js";
+import type { FocusTarget, InteractiveComponent, RenderResult, RenderSize, PointerEvent } from "./component.js";
 import { styleText, type TextStyle } from "./theme.js";
 import { sanitizeTerminalText } from "./text.js";
 
@@ -41,8 +35,7 @@ export const SELECT_LIST_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   { context: "select", keys: "escape", action: "list.cancel" },
 ];
 
-export class SelectList<T = string>
-  implements InteractiveComponent, FocusTarget {
+export class SelectList<T = string> implements InteractiveComponent, FocusTarget {
   private items: readonly SelectItem<T>[];
   private index: number;
   private offset = 0;
@@ -57,7 +50,7 @@ export class SelectList<T = string>
     this.items = [...items];
     this.index = firstEnabled(this.items, options.selectedIndex ?? 0);
     this.keymap = new Keymap(mergeKeyBindings(SELECT_LIST_KEYBINDINGS, options.keybindings), {
-      actions: SELECT_LIST_KEYBINDINGS.map(binding => binding.action),
+      actions: SELECT_LIST_KEYBINDINGS.map((binding) => binding.action),
     });
   }
 
@@ -89,12 +82,24 @@ export class SelectList<T = string>
 
   performAction(action: string): boolean {
     switch (action) {
-      case "list.up": this.move(-1); return true;
-      case "list.down": this.move(1); return true;
-      case "list.pageUp": this.move(-this.pageSize); return true;
-      case "list.pageDown": this.move(this.pageSize); return true;
-      case "list.home": this.moveTo(firstEnabled(this.items, 0)); return true;
-      case "list.end": this.moveTo(lastEnabled(this.items)); return true;
+      case "list.up":
+        this.move(-1);
+        return true;
+      case "list.down":
+        this.move(1);
+        return true;
+      case "list.pageUp":
+        this.move(-this.pageSize);
+        return true;
+      case "list.pageDown":
+        this.move(this.pageSize);
+        return true;
+      case "list.home":
+        this.moveTo(firstEnabled(this.items, 0));
+        return true;
+      case "list.end":
+        this.moveTo(lastEnabled(this.items));
+        return true;
       case "list.accept": {
         const item = this.selectedItem;
         if (item === undefined) return false;
@@ -120,11 +125,7 @@ export class SelectList<T = string>
   render(size: RenderSize): RenderResult {
     if (this.items.length === 0) {
       return {
-        lines: [sliceAnsi(
-          sanitizeTerminalText(this.options.emptyLabel ?? "No items"),
-          0,
-          size.width,
-        )],
+        lines: [sliceAnsi(sanitizeTerminalText(this.options.emptyLabel ?? "No items"), 0, size.width)],
       };
     }
     this.pageSize = size.height;
@@ -138,32 +139,25 @@ export class SelectList<T = string>
     this.offset = clamp(this.offset, 0, maximumOffset);
 
     return {
-      lines: this.items
-        .slice(this.offset, this.offset + size.height)
-        .map((item, relativeIndex) => {
-          const index = this.offset + relativeIndex;
-          const marker = index === this.index ? (this.focused ? "> " : "· ") : "  ";
-          const disabled = item.disabled === true ? " (disabled)" : "";
-          const plainDescription = item.description === undefined
-            ? ""
-            : ` — ${singleLine(item.description)}`;
-          if (index === this.index) {
-            const clipped = sliceAnsi(
-              `${marker}${singleLine(item.label)}${disabled}${plainDescription}`,
-              0,
-              size.width,
-            );
-            const padded = `${clipped}${" ".repeat(Math.max(0, size.width - stringWidth(clipped)))}`;
-            return styleText(padded, this.options.selectedStyle);
-          }
-          const description = styleText(plainDescription, this.options.descriptionStyle);
-          const line = `${styleText(marker, this.options.markerStyle)}` +
-            `${singleLine(item.label)}${disabled}${description}`;
-          return sliceAnsi(styleText(
-            line,
-            item.disabled === true ? this.options.disabledStyle : undefined,
-          ), 0, size.width);
-        }),
+      lines: this.items.slice(this.offset, this.offset + size.height).map((item, relativeIndex) => {
+        const index = this.offset + relativeIndex;
+        const marker = index === this.index ? (this.focused ? "> " : "· ") : "  ";
+        const disabled = item.disabled === true ? " (disabled)" : "";
+        const plainDescription = item.description === undefined ? "" : ` — ${singleLine(item.description)}`;
+        if (index === this.index) {
+          const clipped = sliceAnsi(`${marker}${singleLine(item.label)}${disabled}${plainDescription}`, 0, size.width);
+          const padded = `${clipped}${" ".repeat(Math.max(0, size.width - stringWidth(clipped)))}`;
+          return styleText(padded, this.options.selectedStyle);
+        }
+        const description = styleText(plainDescription, this.options.descriptionStyle);
+        const line =
+          `${styleText(marker, this.options.markerStyle)}` + `${singleLine(item.label)}${disabled}${description}`;
+        return sliceAnsi(
+          styleText(line, item.disabled === true ? this.options.disabledStyle : undefined),
+          0,
+          size.width,
+        );
+      }),
     };
   }
 
@@ -205,11 +199,7 @@ function lastEnabled<T>(items: readonly SelectItem<T>[]): number {
   return -1;
 }
 
-function nextEnabled<T>(
-  items: readonly SelectItem<T>[],
-  current: number,
-  direction: -1 | 1,
-): number {
+function nextEnabled<T>(items: readonly SelectItem<T>[], current: number, direction: -1 | 1): number {
   for (let index = current + direction; index >= 0 && index < items.length; index += direction) {
     if (items[index]!.disabled !== true) return index;
   }

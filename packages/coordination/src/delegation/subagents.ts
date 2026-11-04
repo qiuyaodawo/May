@@ -69,18 +69,25 @@ const DEFAULT_LIMITS: MaybeCodeSubagentLimits = {
 /** 子 Run 缺省的步数上限；自定义子 Agent 预算省略 maxSteps 时使用。 */
 export const SUBAGENT_DEFAULT_MAX_STEPS = 24;
 
-const DEFAULT_RUN_BUDGET: RunBudget = { maxSteps: SUBAGENT_DEFAULT_MAX_STEPS, maxModelCalls: 24, maxToolCalls: 48, maxDurationMs: 300_000 };
+const DEFAULT_RUN_BUDGET: RunBudget = {
+  maxSteps: SUBAGENT_DEFAULT_MAX_STEPS,
+  maxModelCalls: 24,
+  maxToolCalls: 48,
+  maxDurationMs: 300_000,
+};
 
 export const DEFAULT_SUBAGENT_ROLE = "worker";
 
 /** worker 角色始终注册，因此不配置也能进行委派。 */
 export function defaultSubagentConfiguration(): MaybeCodeSubagentConfiguration {
   return Object.freeze({
-    roles: Object.freeze([Object.freeze({
-      name: DEFAULT_SUBAGENT_ROLE,
-      tools: Object.freeze([...SUBAGENT_TOOL_NAMES]) as readonly SubagentToolName[],
-      delegateTo: Object.freeze([DEFAULT_SUBAGENT_ROLE]) as readonly string[],
-    })]),
+    roles: Object.freeze([
+      Object.freeze({
+        name: DEFAULT_SUBAGENT_ROLE,
+        tools: Object.freeze([...SUBAGENT_TOOL_NAMES]) as readonly SubagentToolName[],
+        delegateTo: Object.freeze([DEFAULT_SUBAGENT_ROLE]) as readonly string[],
+      }),
+    ]),
     defaultRole: DEFAULT_SUBAGENT_ROLE,
     limits: Object.freeze({ ...DEFAULT_LIMITS }),
     runBudget: DEFAULT_RUN_BUDGET,
@@ -90,19 +97,29 @@ export function defaultSubagentConfiguration(): MaybeCodeSubagentConfiguration {
 }
 
 /** 由已校验的 `apps.maybecode.subagents` 得到委派配置；false 完全关闭委派。 */
-export function resolveSubagentConfiguration(settings: false | MaybeCodeSubagentSettings | undefined): false | MaybeCodeSubagentConfiguration {
+export function resolveSubagentConfiguration(
+  settings: false | MaybeCodeSubagentSettings | undefined,
+): false | MaybeCodeSubagentConfiguration {
   if (settings === false || settings?.enabled === false) return false;
   const base = defaultSubagentConfiguration();
   if (settings === undefined) return base;
   const field = "apps.maybecode.subagents";
-  const roles = settings.roles === undefined ? base.roles : Object.freeze(Object.entries(settings.roles).map(([name, role]) =>
-    Object.freeze({
-      ...role,
-      name,
-      tools: Object.freeze([...(role.tools ?? SUBAGENT_TOOL_NAMES)]),
-      delegateTo: Object.freeze([...(role.delegateTo ?? [])]),
-      ...(role.runBudget === undefined ? {} : { runBudget: runBudget(role.runBudget, `${field}.roles.${name}.runBudget`) }),
-    })));
+  const roles =
+    settings.roles === undefined
+      ? base.roles
+      : Object.freeze(
+          Object.entries(settings.roles).map(([name, role]) =>
+            Object.freeze({
+              ...role,
+              name,
+              tools: Object.freeze([...(role.tools ?? SUBAGENT_TOOL_NAMES)]),
+              delegateTo: Object.freeze([...(role.delegateTo ?? [])]),
+              ...(role.runBudget === undefined
+                ? {}
+                : { runBudget: runBudget(role.runBudget, `${field}.roles.${name}.runBudget`) }),
+            }),
+          ),
+        );
   const defaultRole = settings.defaultRole ?? base.defaultRole;
   if (!roles.some((role) => role.name === defaultRole)) {
     throw new MaybeCodeConfigError(`${field}.defaultRole must name a registered role`);
@@ -118,15 +135,18 @@ export function resolveSubagentConfiguration(settings: false | MaybeCodeSubagent
   if (settings.maxTotalTokens !== undefined && settings.maxTotalTokens < reservationTokens) {
     throw new MaybeCodeConfigError(`${field}.maxTotalTokens must hold at least reservationTokens`);
   }
-  return Object.freeze(omitUndefined({
-    roles,
-    defaultRole,
-    limits: Object.freeze({ ...base.limits, ...settings.limits }),
-    runBudget: settings.runBudget === undefined ? base.runBudget : runBudget(settings.runBudget, `${field}.runBudget`),
-    maxModelCalls: settings.maxModelCalls ?? base.maxModelCalls,
-    maxTotalTokens: settings.maxTotalTokens,
-    reservationTokens,
-  }));
+  return Object.freeze(
+    omitUndefined({
+      roles,
+      defaultRole,
+      limits: Object.freeze({ ...base.limits, ...settings.limits }),
+      runBudget:
+        settings.runBudget === undefined ? base.runBudget : runBudget(settings.runBudget, `${field}.runBudget`),
+      maxModelCalls: settings.maxModelCalls ?? base.maxModelCalls,
+      maxTotalTokens: settings.maxTotalTokens,
+      reservationTokens,
+    }),
+  );
 }
 
 function runBudget(value: RunBudget, field: string): RunBudget {

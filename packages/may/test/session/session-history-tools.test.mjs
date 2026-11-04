@@ -94,10 +94,12 @@ test("strictly includes envelope and cursor fields in the output byte limit", as
     source: {
       async queryHistory() {
         return {
-          events: [event(123456, {
-            type: "input.submitted",
-            message: user("large"),
-          })],
+          events: [
+            event(123456, {
+              type: "input.submitted",
+              message: user("large"),
+            }),
+          ],
           hasMore: true,
           nextSeq: 123456,
         };
@@ -126,10 +128,7 @@ test("validates tool input and cancellation", async () => {
 
   const controller = new AbortController();
   controller.abort("stop history");
-  await assert.rejects(
-    tool.execute({}, context(controller.signal)),
-    { name: "AbortError", message: "stop history" },
-  );
+  await assert.rejects(tool.execute({}, context(controller.signal)), { name: "AbortError", message: "stop history" });
 });
 
 function event(seq, payload) {

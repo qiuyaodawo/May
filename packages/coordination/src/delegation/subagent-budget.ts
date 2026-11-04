@@ -54,11 +54,7 @@ export class SubagentRequestLedger {
   }
 
   /** 打开请求账本；同一 id 的历史账本会被读取，并保持它记录的阻塞状态。 */
-  static async open(
-    directory: string,
-    id: string,
-    limits: SubagentBudgetLimits,
-  ): Promise<SubagentRequestLedger> {
+  static async open(directory: string, id: string, limits: SubagentBudgetLimits): Promise<SubagentRequestLedger> {
     const { reservationTokens, ...shared } = limits;
     const budget = await FileSharedBudget.open(join(directory, "budget"), id, shared);
     return new SubagentRequestLedger(budget, reservationTokens);
@@ -74,10 +70,7 @@ export class SubagentRequestLedger {
    *
    * 预留等待期间计入在途调用，预留失败时同样完整释放，请求目录的写入者可以正常关闭。
    */
-  async *account(
-    options: ModelStreamOptions,
-    events: AsyncIterable<ModelEvent>,
-  ): AsyncIterable<ModelEvent> {
+  async *account(options: ModelStreamOptions, events: AsyncIterable<ModelEvent>): AsyncIterable<ModelEvent> {
     if (this.closed) throw new Error("The request budget is closed");
     const reservation = { totalTokens: this.reservationTokens };
     const callId = attemptCallId(options, 1);
@@ -117,18 +110,31 @@ export class SubagentRequestLedger {
           let failure = error;
           if (!concluded && error.usage !== undefined) {
             try {
-              const priced = this.budget.limits.pricing !== undefined || this.budget.limits.tokenPrices !== undefined || error.usage.reportedCost !== undefined;
-              const preparedCost = priced ? cost ?? priceUsage(error.usage, this.budget.limits.pricing ?? this.budget.limits.tokenPrices) : undefined;
+              const priced =
+                this.budget.limits.pricing !== undefined ||
+                this.budget.limits.tokenPrices !== undefined ||
+                error.usage.reportedCost !== undefined;
+              const preparedCost = priced
+                ? (cost ?? priceUsage(error.usage, this.budget.limits.pricing ?? this.budget.limits.tokenPrices))
+                : undefined;
               cost = preparedCost ?? cost;
               await this.budget.settleCall(current, error.usage, preparedCost);
               concluded = true;
-              if (priced) cost = (await this.budget.snapshot()).calls.find(call => call.id === current)?.cost;
-              failure = new ModelResponseValidationError(error.message, omitUndefined({ cause: error, usage: error.usage, cost }));
-            } catch (accountingError) { failure = validationAccountingError(error, accountingError, cost); }
+              if (priced) cost = (await this.budget.snapshot()).calls.find((call) => call.id === current)?.cost;
+              failure = new ModelResponseValidationError(
+                error.message,
+                omitUndefined({ cause: error, usage: error.usage, cost }),
+              );
+            } catch (accountingError) {
+              failure = validationAccountingError(error, accountingError, cost);
+            }
           }
           if (!concluded) {
-            try { await this.budget.markCallUnknown(current); }
-            catch (accountingError) { throw validationAccountingError(failure, accountingError, cost); }
+            try {
+              await this.budget.markCallUnknown(current);
+            } catch (accountingError) {
+              throw validationAccountingError(failure, accountingError, cost);
+            }
           }
           throw failure;
         }
@@ -148,9 +154,9 @@ export class SubagentRequestLedger {
   external<T extends ExternalCallResult>(id: string, operation: () => Promise<T>): Promise<T> {
     if (this.closed) throw new Error("The request budget is closed");
     this.active += 1;
-    return this.budget
-      .runExternal(id, { totalTokens: this.reservationTokens }, operation)
-      .finally(() => { this.active -= 1; });
+    return this.budget.runExternal(id, { totalTokens: this.reservationTokens }, operation).finally(() => {
+      this.active -= 1;
+    });
   }
 
   async totals(): Promise<SharedBudgetTotals> {
@@ -172,9 +178,22 @@ export class SubagentRequestLedger {
   }
 }
 
-function validationAccountingError(error: ModelResponseValidationError, accountingError: unknown, cost?: UsageCost): ModelResponseValidationError {
-  return new ModelResponseValidationError(error.message, omitUndefined({ cause: new AggregateError([error, accountingError], "Model response validation and request budget accounting failed"),
-    usage: error.usage, cost }));
+function validationAccountingError(
+  error: ModelResponseValidationError,
+  accountingError: unknown,
+  cost?: UsageCost,
+): ModelResponseValidationError {
+  return new ModelResponseValidationError(
+    error.message,
+    omitUndefined({
+      cause: new AggregateError(
+        [error, accountingError],
+        "Model response validation and request budget accounting failed",
+      ),
+      usage: error.usage,
+      cost,
+    }),
+  );
 }
 
 /**
@@ -202,15 +221,11 @@ function attemptCallId(options: ModelStreamOptions, attempt: number): string {
  * name、message、code 与失败 attempt 的调用身份都保留下来：宿主只把 name、message、
  * code 写进持久化的 `run.failed`，message 里另外写明账本阻塞的原因。
  */
-function budgetRefusedRetry(
-  refusal: unknown,
-  callId: string,
-  provider: SerializedError,
-): Error {
+function budgetRefusedRetry(refusal: unknown, callId: string, provider: SerializedError): Error {
   const reason = refusal instanceof Error ? refusal.message : String(refusal);
   const error = new Error(
     `Request budget refused the retry of model call ${callId} after ${provider.name}: ` +
-    `${provider.message}${provider.code === undefined ? "" : ` (code ${provider.code})`}; ${reason}`,
+      `${provider.message}${provider.code === undefined ? "" : ` (code ${provider.code})`}; ${reason}`,
     { cause: refusal },
   );
   error.name = provider.name;
@@ -230,30 +245,38 @@ function compactionCallId(options: { readonly runId?: string; readonly step?: nu
  *
  * 主会话模型与子 Agent 模型都使用这个包装，因此两者的调用计入同一本账。
  */
-export function withRequestBudget(
-  model: Model,
-  ledger: () => SubagentRequestLedger | undefined,
-): Model {
+export function withRequestBudget(model: Model, ledger: () => SubagentRequestLedger | undefined): Model {
   const compactor = model.contextCompactor;
   return {
-    get limits() { return model.limits; },
-    get reportsAttempts() { return model.reportsAttempts; },
-    get supportsRequestRecording() { return model.supportsRequestRecording === true; },
-    get capabilityVersion() { return model.capabilityVersion; },
-    get configuration() { return model.configuration; },
+    get limits() {
+      return model.limits;
+    },
+    get reportsAttempts() {
+      return model.reportsAttempts;
+    },
+    get supportsRequestRecording() {
+      return model.supportsRequestRecording === true;
+    },
+    get capabilityVersion() {
+      return model.capabilityVersion;
+    },
+    get configuration() {
+      return model.configuration;
+    },
     ...omitUndefined({ preflight: model.preflight?.bind(model) }),
-    ...(compactor === undefined ? {} : { contextCompactor: {
-      name: compactor.name,
-      async compact(snapshot, options) {
-        const active = ledger();
-        if (active === undefined) return await compactor.compact(snapshot, options);
-        // provider 上报的 usage 随结果一起计账；没有 usage 时按预留值计账并标记为估计值。
-        return await active.external(
-          compactionCallId(options),
-          () => compactor.compact(snapshot, options),
-        );
-      },
-    } }),
+    ...(compactor === undefined
+      ? {}
+      : {
+          contextCompactor: {
+            name: compactor.name,
+            async compact(snapshot, options) {
+              const active = ledger();
+              if (active === undefined) return await compactor.compact(snapshot, options);
+              // provider 上报的 usage 随结果一起计账；没有 usage 时按预留值计账并标记为估计值。
+              return await active.external(compactionCallId(options), () => compactor.compact(snapshot, options));
+            },
+          },
+        }),
     async *stream(request, options) {
       const active = ledger();
       if (active === undefined) {

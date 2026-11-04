@@ -20,8 +20,14 @@ test("durable steering inputs retain FIFO order and delivery through reopening",
   assert.equal((await first).status, "pending");
   assert.equal((await second).status, "pending");
   const messages = await queue.deliver("run-1", 2, new AbortController().signal);
-  assert.deepEqual(messages.map((message) => message.content[0].text), ["检查错误处理", "检查权限"]);
-  assert.deepEqual(queue.list().map((input) => input.status), ["delivered", "delivered"]);
+  assert.deepEqual(
+    messages.map((message) => message.content[0].text),
+    ["检查错误处理", "检查权限"],
+  );
+  assert.deepEqual(
+    queue.list().map((input) => input.status),
+    ["delivered", "delivered"],
+  );
   const reopened = new SessionSteeringQueue(record, await store.read("steering"));
   assert.deepEqual(reopened.list(), queue.list());
   const history = await new SessionHistoryReader(store).query("steering", { types: ["input.steering.delivered"] });
@@ -53,7 +59,10 @@ test("completed and yielded runs retain ordered inputs for explicit subsequent r
   queue.submitted(first.inputId);
   assert.equal(queue.idle("second").inputId, "second");
   const reopened = new SessionSteeringQueue(record, await store.read("steering"));
-  assert.deepEqual(reopened.list().map((input) => input.status), ["delivered", "idle"]);
+  assert.deepEqual(
+    reopened.list().map((input) => input.status),
+    ["delivered", "idle"],
+  );
 });
 
 test("idle inputs have no target run and request identities remain unique", async (t) => {
@@ -70,7 +79,7 @@ test("idle inputs have no target run and request identities remain unique", asyn
   assert.equal(queue.list()[0].message.content[0].text, "独立输入");
 });
 
-test("explicit stop durably cancels idle and pending input while preserving delivered input", async t => {
+test("explicit stop durably cancels idle and pending input while preserving delivered input", async (t) => {
   const { queue, store, record } = await openQueue(t);
   await queue.enqueue({ inputId: "delivered", input: "已交付" }, "first");
   await queue.deliver("first", 1, new AbortController().signal);
@@ -78,7 +87,10 @@ test("explicit stop durably cancels idle and pending input while preserving deli
   await queue.enqueue({ inputId: "pending", input: "等待步骤" }, "second");
   await queue.cancel("用户明确停止");
   const reopened = new SessionSteeringQueue(record, await store.read("steering"));
-  assert.deepEqual(reopened.list().map(input => input.status), ["delivered", "cancelled", "cancelled"]);
+  assert.deepEqual(
+    reopened.list().map((input) => input.status),
+    ["delivered", "cancelled", "cancelled"],
+  );
   assert.deepEqual(await reopened.deliver("second", 1, new AbortController().signal), []);
   assert.throws(() => reopened.idle("idle"), /not available/);
 });
@@ -90,7 +102,13 @@ test("a terminal transition follows all accepted inputs while a new run remains 
   const current = queue.enqueue({ inputId: "current", input: "新执行补充" }, "run-2");
   await Promise.all([acceptance, finished, current]);
   const messages = await queue.deliver("run-2", 1, new AbortController().signal);
-  assert.deepEqual(messages.map((message) => message.content[0].text), ["新执行补充"]);
+  assert.deepEqual(
+    messages.map((message) => message.content[0].text),
+    ["新执行补充"],
+  );
   const reopened = new SessionSteeringQueue(record, await store.read("steering"));
-  assert.deepEqual(reopened.list().map((input) => input.status), ["cancelled", "delivered"]);
+  assert.deepEqual(
+    reopened.list().map((input) => input.status),
+    ["cancelled", "delivered"],
+  );
 });

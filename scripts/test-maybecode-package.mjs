@@ -1,14 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import {
-  access,
-  mkdir,
-  readFile,
-  readdir,
-  realpath,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { access, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,9 +15,11 @@ const consumerDirectory = join(directory, "consumer");
 const workspaceDirectory = join(consumerDirectory, "workspace");
 const homeDirectory = join(consumerDirectory, "home");
 const pnpm = resolvePnpmCommand();
-const repositoryStore = (await runPnpm(["store", "path"], {
-  cwd: repository,
-})).stdout.trim();
+const repositoryStore = (
+  await runPnpm(["store", "path"], {
+    cwd: repository,
+  })
+).stdout.trim();
 
 await resetSmokeDirectory(directory);
 await mkdir(packsDirectory, { recursive: true });
@@ -38,14 +32,10 @@ await rm(join(repository, "apps", "maybecode", "dist"), {
   force: true,
 });
 await runPnpm(["run", "build"], { cwd: repository, inherit: true });
-const packedOutput = await runPnpm([
-  "--filter-prod",
-  "@sortedyuan/maybecode...",
-  "pack",
-  "--pack-destination",
-  packsDirectory,
-  "--json",
-], { cwd: repository });
+const packedOutput = await runPnpm(
+  ["--filter-prod", "@sortedyuan/maybecode...", "pack", "--pack-destination", packsDirectory, "--json"],
+  { cwd: repository },
+);
 const packed = parsePackedOutput(packedOutput.stdout);
 assert.equal(
   packed.some((entry) => entry.files.some((file) => file.path.endsWith(".tsbuildinfo"))),
@@ -56,17 +46,14 @@ const application = packed.find((entry) => entry.name === "@sortedyuan/maybecode
 assert.ok(application, "@sortedyuan/maybecode was not packed");
 const applicationPaths = application.files.map((file) => file.path);
 assert.ok(applicationPaths.includes("dist/bin.js"), "packed bin is missing");
-assert.ok(applicationPaths.some(path => path.startsWith("dist/cli/") && path.endsWith(".js")), "packed CLI chunks are missing");
+assert.ok(
+  applicationPaths.some((path) => path.startsWith("dist/cli/") && path.endsWith(".js")),
+  "packed CLI chunks are missing",
+);
 assert.ok(applicationPaths.includes("dist/index.js"), "packed entry point is missing");
-const retiredModules = [
-  "dist/ui/tool-renderers",
-  "dist/ui/transcript-store",
-  "dist/ui/transcript-view",
-];
+const retiredModules = ["dist/ui/tool-renderers", "dist/ui/transcript-store", "dist/ui/transcript-view"];
 assert.equal(
-  applicationPaths.some((path) => retiredModules.some((module) =>
-    path === module || path.startsWith(`${module}.`)
-  )),
+  applicationPaths.some((path) => retiredModules.some((module) => path === module || path.startsWith(`${module}.`))),
   false,
   "retired MaybeCode TUI implementations leaked into the package",
 );
@@ -79,33 +66,44 @@ assert.equal(
 const packages = await reachableWorkspacePackages("@sortedyuan/maybecode");
 assert.equal(packages.length, packed.length, "the packed dependency graph is incomplete");
 assert.equal(
-  packages.filter((pkg) => pkg.private === true).map((pkg) => pkg.name).join(","),
+  packages
+    .filter((pkg) => pkg.private === true)
+    .map((pkg) => pkg.name)
+    .join(","),
   "",
   "all packed runtime dependencies must be public",
 );
 await mkdir(workspaceDirectory, { recursive: true });
 await mkdir(homeDirectory, { recursive: true });
-await writeFile(join(homeDirectory, ".gitconfig"),
-  '[user]\n\tname = May package smoke test\n\temail = may-package-smoke@example.invalid\n',
+await writeFile(
+  join(homeDirectory, ".gitconfig"),
+  "[user]\n\tname = May package smoke test\n\temail = may-package-smoke@example.invalid\n",
   "utf8",
 );
 
-const localTarballs = Object.fromEntries(packages.map((pkg) => [
-  pkg.name,
-  toFileSpecifier(consumerDirectory, join(
-    packsDirectory,
-    tarballName(pkg.name, pkg.version),
-  )),
-]));
-await writeFile(join(consumerDirectory, "package.json"), JSON.stringify({
-  name: "maybecode-package-smoke",
-  private: true,
-  type: "module",
-  dependencies: {
-    "@sortedyuan/maybecode": localTarballs["@sortedyuan/maybecode"],
-    "@sortedyuan/mcp": localTarballs["@sortedyuan/mcp"],
-  },
-}, null, 2) + "\n", "utf8");
+const localTarballs = Object.fromEntries(
+  packages.map((pkg) => [
+    pkg.name,
+    toFileSpecifier(consumerDirectory, join(packsDirectory, tarballName(pkg.name, pkg.version))),
+  ]),
+);
+await writeFile(
+  join(consumerDirectory, "package.json"),
+  JSON.stringify(
+    {
+      name: "maybecode-package-smoke",
+      private: true,
+      type: "module",
+      dependencies: {
+        "@sortedyuan/maybecode": localTarballs["@sortedyuan/maybecode"],
+        "@sortedyuan/mcp": localTarballs["@sortedyuan/mcp"],
+      },
+    },
+    null,
+    2,
+  ) + "\n",
+  "utf8",
+);
 await writeFile(
   join(consumerDirectory, "pnpm-workspace.yaml"),
   `packages:\n  - "."\noverrides:\n${Object.entries(localTarballs)
@@ -113,33 +111,35 @@ await writeFile(
     .join("\n")}\n`,
   "utf8",
 );
-await writeFile(join(consumerDirectory, "config.json"), JSON.stringify({
-  apps: { maybecode: { git: { autoCommit: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "0" } } },
-  defaultModel: "deepseek",
-  providers: {
-    deepseek: {
-      adapter: "deepseek-chat",
-      apiKey: "package-smoke-key",
+await writeFile(
+  join(consumerDirectory, "config.json"),
+  JSON.stringify(
+    {
+      apps: { maybecode: { git: { autoCommit: process.env.MAY_GIT_CHECKPOINT_TEST_COMMITS !== "0" } } },
+      defaultModel: "deepseek",
+      providers: {
+        deepseek: {
+          adapter: "deepseek-chat",
+          apiKey: "package-smoke-key",
+        },
+      },
+      models: {
+        deepseek: {
+          provider: "deepseek",
+          model: "deepseek-chat",
+        },
+      },
     },
-  },
-  models: {
-    deepseek: {
-      provider: "deepseek",
-      model: "deepseek-chat",
-    },
-  },
-}, null, 2) + "\n", "utf8");
+    null,
+    2,
+  ) + "\n",
+  "utf8",
+);
 
 // A fresh consumer resolves external dependency ranges independently of the
 // workspace lockfile. Reuse cached packages, but allow missing versions to be
 // downloaded on clean CI runners. All May packages still come from local tarballs.
-await runPnpm([
-  "install",
-  "--prefer-offline",
-  "--ignore-scripts",
-  "--store-dir",
-  repositoryStore,
-], {
+await runPnpm(["install", "--prefer-offline", "--ignore-scripts", "--store-dir", repositoryStore], {
   cwd: consumerDirectory,
   inherit: true,
 });
@@ -157,47 +157,54 @@ const help = await runPnpm(["exec", "maybecode", "--help"], {
 assert.match(help.stdout, /Usage:\s+maybecode/u);
 
 // Verify both optional MCP entry points from the installed tarballs, not workspace dist.
-await writeFile(join(consumerDirectory, "mcp-subpaths.mjs"), `
+await writeFile(
+  join(consumerDirectory, "mcp-subpaths.mjs"),
+  `
 import assert from "node:assert/strict";
 const server = await import("@sortedyuan/mcp/server");
 const browser = await import("@sortedyuan/mcp/apps-browser");
 assert.equal(typeof server.createMayMcpServer, "function");
 assert.equal(typeof server.createMayMcpBearerAuthenticator, "function");
 assert.equal(typeof browser.mountMcpApp, "function");
-`, "utf8");
+`,
+  "utf8",
+);
 await runPnpm(["exec", "node", "mcp-subpaths.mjs"], { cwd: consumerDirectory });
 
-const launched = await launchUntil([
-  "exec",
-  "maybecode",
-  "--ui",
-  "web",
-  "--port",
-  "0",
-  "--config",
-  join(consumerDirectory, "config.json"),
-  workspaceDirectory,
-], {
-  cwd: consumerDirectory,
-  env: {
-    ...process.env,
-    HOME: homeDirectory,
-    USERPROFILE: homeDirectory,
-    APPDATA: join(homeDirectory, "AppData", "Roaming"),
-    LOCALAPPDATA: join(homeDirectory, "AppData", "Local"),
-    GIT_CEILING_DIRECTORIES: consumerDirectory,
-    MAYBECODE_CONTROL_TOKEN: "package-smoke-test-control-token-0123456789",
+const launched = await launchUntil(
+  [
+    "exec",
+    "maybecode",
+    "--ui",
+    "web",
+    "--port",
+    "0",
+    "--config",
+    join(consumerDirectory, "config.json"),
+    workspaceDirectory,
+  ],
+  {
+    cwd: consumerDirectory,
+    env: {
+      ...process.env,
+      HOME: homeDirectory,
+      USERPROFILE: homeDirectory,
+      APPDATA: join(homeDirectory, "AppData", "Roaming"),
+      LOCALAPPDATA: join(homeDirectory, "AppData", "Local"),
+      GIT_CEILING_DIRECTORIES: consumerDirectory,
+      MAYBECODE_CONTROL_TOKEN: "package-smoke-test-control-token-0123456789",
+    },
   },
-}, /MaybeCode Web UI: (http:\/\/\S+)/u, async ([, url]) => {
-  const page = await fetch(url);
-  assert.equal(page.status, 200);
-  assert.match(await page.text(), /MaybeCode/u);
-});
+  /MaybeCode Web UI: (http:\/\/\S+)/u,
+  async ([, url]) => {
+    const page = await fetch(url);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /MaybeCode/u);
+  },
+);
 assert.doesNotMatch(launched.stdout + launched.stderr, /Error:/u);
 
-process.stdout.write(
-  `MaybeCode package smoke test passed outside the repository:\n${consumerDirectory}\n`,
-);
+process.stdout.write(`MaybeCode package smoke test passed outside the repository:\n${consumerDirectory}\n`);
 
 function resolveSmokeParent(args) {
   let value;
@@ -233,8 +240,7 @@ async function resetSmokeDirectory(target) {
 
 function isInside(candidate, parent) {
   const path = relative(parent, candidate);
-  return path !== "" && path !== ".." && !path.startsWith(`..${sep}`) &&
-    !isAbsolute(path);
+  return path !== "" && path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path);
 }
 
 async function reachableWorkspacePackages(rootName) {
@@ -304,9 +310,7 @@ function resolvePnpmCommand() {
 }
 
 function runPnpm(args, options = {}) {
-  return /\.[cm]?js$/iu.test(pnpm)
-    ? run(process.execPath, [pnpm, ...args], options)
-    : run(pnpm, args, options);
+  return /\.[cm]?js$/iu.test(pnpm) ? run(process.execPath, [pnpm, ...args], options) : run(pnpm, args, options);
 }
 
 function run(command, args, options = {}) {
@@ -319,10 +323,16 @@ function run(command, args, options = {}) {
     });
     const timer = setTimeout(() => {
       if (process.platform === "win32" && child.pid !== undefined) {
-        const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+        const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+          stdio: "ignore",
+          windowsHide: true,
+        });
         killer.on("error", () => child.kill("SIGKILL"));
       } else child.kill("SIGKILL");
-      child.stdin?.destroy(); child.stdout?.destroy(); child.stderr?.destroy(); child.unref();
+      child.stdin?.destroy();
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      child.unref();
       reject(new Error(`${command} timed out after ${options.timeoutMs ?? 120_000}ms`));
     }, options.timeoutMs ?? 120_000);
     child.once("exit", () => clearTimeout(timer));
@@ -350,7 +360,7 @@ function run(command, args, options = {}) {
       stdout += chunk;
       if (options.inputAfter?.test(stdout) === true) sendInput();
     });
-    child.stderr.on("data", (chunk) => stderr += chunk);
+    child.stderr.on("data", (chunk) => (stderr += chunk));
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (code === 0) resolvePromise({ stdout, stderr });
@@ -364,28 +374,50 @@ function run(command, args, options = {}) {
 function launchUntil(args, options, pattern, check) {
   const [command, commandArgs] = /\.[cm]?js$/iu.test(pnpm) ? [process.execPath, [pnpm, ...args]] : [pnpm, args];
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, commandArgs, { cwd: options.cwd, env: options.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
-    let stdout = "", stderr = "", matched = false;
+    const child = spawn(command, commandArgs, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let stdout = "",
+      stderr = "",
+      matched = false;
     const stop = () => {
       if (process.platform === "win32" && child.pid !== undefined) {
         spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
       } else child.kill("SIGINT");
     };
-    const timer = setTimeout(() => { stop(); reject(new Error(`${command} did not report its URL in time:\n${stdout}${stderr}`)); }, 120_000);
+    const timer = setTimeout(() => {
+      stop();
+      reject(new Error(`${command} did not report its URL in time:\n${stdout}${stderr}`));
+    }, 120_000);
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk) => stderr += chunk);
+    child.stderr.on("data", (chunk) => (stderr += chunk));
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
       const match = matched ? null : pattern.exec(stdout);
       if (match === null) return;
       matched = true;
       clearTimeout(timer);
-      check(match).then(() => { stop(); resolvePromise({ stdout, stderr }); }, (error) => { stop(); reject(error); });
+      check(match).then(
+        () => {
+          stop();
+          resolvePromise({ stdout, stderr });
+        },
+        (error) => {
+          stop();
+          reject(error);
+        },
+      );
     });
     child.once("error", reject);
     child.once("exit", (code, signal) => {
-      if (!matched) { clearTimeout(timer); reject(commandError(command, commandArgs, code, signal, stdout + stderr)); }
+      if (!matched) {
+        clearTimeout(timer);
+        reject(commandError(command, commandArgs, code, signal, stdout + stderr));
+      }
     });
   });
 }

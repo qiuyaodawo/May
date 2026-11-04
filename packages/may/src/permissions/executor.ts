@@ -14,10 +14,7 @@ import {
   type Tracer,
 } from "../core/index.js";
 
-import {
-  PermissionDeniedError,
-  PermissionExecutorClosedError,
-} from "./errors.js";
+import { PermissionDeniedError, PermissionExecutorClosedError } from "./errors.js";
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -75,9 +72,7 @@ export class PermissionToolExecutor implements ToolExecutor {
     this.events = this.eventQueue;
   }
 
-  async execute<TInput, TOutput>(
-    execution: ToolExecution<TInput, TOutput>,
-  ): Promise<TOutput> {
+  async execute<TInput, TOutput>(execution: ToolExecution<TInput, TOutput>): Promise<TOutput> {
     try {
       this.throwIfClosed();
       throwIfAborted(execution.context.signal);
@@ -98,8 +93,10 @@ export class PermissionToolExecutor implements ToolExecutor {
       await this.rejectDenied(check, outcome, rules);
       if (outcome.decision === "ask") {
         const allowedRule = outcome.requireApproval ? undefined : rules.find((rule) => rule.decision === "allow");
-        const granted = !outcome.requireApproval && outcome.grantKey !== undefined
-          && this.sessionGrants.get(outcome.grantKey)?.has(sessionDefinitionKey(outcome, definitionKey)) === true;
+        const granted =
+          !outcome.requireApproval &&
+          outcome.grantKey !== undefined &&
+          this.sessionGrants.get(outcome.grantKey)?.has(sessionDefinitionKey(outcome, definitionKey)) === true;
         if (allowedRule !== undefined) {
           await this.useRule(allowedRule, check);
           await this.recheckRule(check, outcome, definitionKey, allowedRule.id);
@@ -133,9 +130,7 @@ export class PermissionToolExecutor implements ToolExecutor {
 
   private async evaluatePolicy(check: PermissionCheck): Promise<NormalizedDecision> {
     const span = startTraceSpan(this.tracer, "may.permission.check", {
-      ...(check.context.traceContext === undefined
-        ? {}
-        : { parent: check.context.traceContext }),
+      ...(check.context.traceContext === undefined ? {} : { parent: check.context.traceContext }),
       attributes: {
         "may.step": check.context.step,
         "may.tool.name": check.tool.name,
@@ -161,9 +156,7 @@ export class PermissionToolExecutor implements ToolExecutor {
     definitionKey: string,
   ): Promise<ApprovalResolution> {
     const span = startTraceSpan(this.tracer, "may.permission.approval_wait", {
-      ...(check.context.traceContext === undefined
-        ? {}
-        : { parent: check.context.traceContext }),
+      ...(check.context.traceContext === undefined ? {} : { parent: check.context.traceContext }),
       attributes: {
         "may.step": check.context.step,
         "may.tool.name": check.tool.name,
@@ -187,65 +180,52 @@ export class PermissionToolExecutor implements ToolExecutor {
     this.eventSink = sink;
   }
 
-  async resolve(
-    requestId: string,
-    decision: ApprovalDecision,
-    options?: ApprovalResolveOptions,
-  ): Promise<boolean> {
+  async resolve(requestId: string, decision: ApprovalDecision, options?: ApprovalResolveOptions): Promise<boolean> {
     if (
-      decision !== "allow"
-      && decision !== "allow-session"
-      && decision !== "allow-persistent"
-      && decision !== "deny"
+      decision !== "allow" &&
+      decision !== "allow-session" &&
+      decision !== "allow-persistent" &&
+      decision !== "deny"
     ) {
       throw new TypeError(`Invalid approval decision: ${String(decision)}`);
     }
 
     const pending = this.pending.get(requestId);
     if (pending === undefined || pending.resolving) return false;
-    const sessionGrantKey = decision === "allow-session"
-      ? pending.request.grantKey
-      : undefined;
+    const sessionGrantKey = decision === "allow-session" ? pending.request.grantKey : undefined;
     if (decision === "allow-session" && sessionGrantKey === undefined) {
-      throw new TypeError(
-        `Approval request "${requestId}" does not define a session grant key`,
-      );
+      throw new TypeError(`Approval request "${requestId}" does not define a session grant key`);
     }
     if (decision === "allow-persistent") {
       if (pending.request.persistent === undefined) {
         throw new TypeError(`Approval request "${requestId}" does not allow persistent rules`);
       }
       validateRuleOptions(options);
-      options = Object.freeze(omitUndefined({
-        createdBy: options!.createdBy,
-        expiresAt: options!.expiresAt,
-      }));
+      options = Object.freeze(
+        omitUndefined({
+          createdBy: options!.createdBy,
+          expiresAt: options!.expiresAt,
+        }),
+      );
     }
 
     pending.resolving = true;
-    return this.resolvePending(
-      requestId,
-      decision,
-      sessionGrantKey,
-      pending,
-      options,
-    );
+    return this.resolvePending(requestId, decision, sessionGrantKey, pending, options);
   }
 
-  async createRule(
-    check: PermissionCheck,
-    options: CreatePermissionRuleOptions,
-  ): Promise<PersistentPermissionRule> {
+  async createRule(check: PermissionCheck, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule> {
     this.checkExecution(check);
     validateRuleOptions(options);
     if (options.decision !== "allow" && options.decision !== "deny") {
       throw new TypeError("Invalid persistent rule decision");
     }
-    options = Object.freeze(omitUndefined({
-      decision: options.decision,
-      createdBy: options.createdBy,
-      expiresAt: options.expiresAt,
-    }));
+    options = Object.freeze(
+      omitUndefined({
+        decision: options.decision,
+        createdBy: options.createdBy,
+        expiresAt: options.expiresAt,
+      }),
+    );
     const store = this.requireRuleStore();
     const immutable = immutableCheck(check);
     const outcome = await this.evaluatePolicy(immutable);
@@ -269,37 +249,38 @@ export class PermissionToolExecutor implements ToolExecutor {
     return this.requireRuleStore().list(scopeId);
   }
 
-  async createRuleFrom(
-    sourceId: string,
-    options: CreatePermissionRuleOptions,
-  ): Promise<PersistentPermissionRule> {
+  async createRuleFrom(sourceId: string, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule> {
     this.throwIfClosed();
     validateRuleOptions(options);
     if (options.decision !== "allow" && options.decision !== "deny") {
       throw new TypeError("Invalid persistent rule decision");
     }
-    options = Object.freeze(omitUndefined({
-      decision: options.decision,
-      createdBy: options.createdBy,
-      expiresAt: options.expiresAt,
-    }));
+    options = Object.freeze(
+      omitUndefined({
+        decision: options.decision,
+        createdBy: options.createdBy,
+        expiresAt: options.expiresAt,
+      }),
+    );
     const store = this.requireRuleStore();
     const source = (await store.list()).find((rule) => rule.id === sourceId);
     this.throwIfClosed();
     if (source === undefined) throw new TypeError(`Persistent permission rule does not exist: ${sourceId}`);
     validateRuleOptions(options);
-    const rule = Object.freeze(omitUndefined({
-      id: `permission_rule_${crypto.randomUUID()}`,
-      scopeId: source.scopeId,
-      toolName: source.toolName,
-      definitionKey: source.definitionKey,
-      grantKey: source.grantKey,
-      description: source.description,
-      decision: options.decision,
-      createdAt: Date.now(),
-      createdBy: options.createdBy,
-      expiresAt: options.expiresAt,
-    }));
+    const rule = Object.freeze(
+      omitUndefined({
+        id: `permission_rule_${crypto.randomUUID()}`,
+        scopeId: source.scopeId,
+        toolName: source.toolName,
+        definitionKey: source.definitionKey,
+        grantKey: source.grantKey,
+        description: source.description,
+        decision: options.decision,
+        createdAt: Date.now(),
+        createdBy: options.createdBy,
+        expiresAt: options.expiresAt,
+      }),
+    );
     await store.create(rule);
     this.throwIfClosed();
     await this.emit({ type: "rule.created", rule });
@@ -312,7 +293,7 @@ export class PermissionToolExecutor implements ToolExecutor {
     const store = this.requireRuleStore();
     const rule = (await store.list()).find((candidate) => candidate.id === ruleId);
     this.throwIfClosed();
-    if (rule === undefined || !await store.revoke(ruleId)) return false;
+    if (rule === undefined || !(await store.revoke(ruleId))) return false;
     await this.emit({ type: "rule.revoked", ruleId, scopeId: rule.scopeId });
     return true;
   }
@@ -343,9 +324,11 @@ export class PermissionToolExecutor implements ToolExecutor {
       id: createApprovalId(),
       createdAt: Date.now(),
       ...(outcome.grantKey === undefined || outcome.requireApproval ? {} : { grantKey: outcome.grantKey }),
-      ...(this.ruleStore === undefined || outcome.persistent === undefined || outcome.requireApproval ? {} : {
-        persistent: Object.freeze({ ...outcome.persistent, definitionKey }),
-      }),
+      ...(this.ruleStore === undefined || outcome.persistent === undefined || outcome.requireApproval
+        ? {}
+        : {
+            persistent: Object.freeze({ ...outcome.persistent, definitionKey }),
+          }),
     });
 
     let pending: PendingApproval | undefined;
@@ -355,13 +338,11 @@ export class PermissionToolExecutor implements ToolExecutor {
 
         check.context.signal.removeEventListener("abort", onAbort);
         const reason = toReason(check.context.signal.reason);
-        const payload: PermissionEventPayload = reason === undefined
-          ? { type: "approval.cancelled", requestId: request.id }
-          : { type: "approval.cancelled", requestId: request.id, reason };
-        void this.emit(payload).then(
-          () => reject(new RunCancelledError(reason)),
-          reject,
-        );
+        const payload: PermissionEventPayload =
+          reason === undefined
+            ? { type: "approval.cancelled", requestId: request.id }
+            : { type: "approval.cancelled", requestId: request.id, reason };
+        void this.emit(payload).then(() => reject(new RunCancelledError(reason)), reject);
       };
       pending = {
         request,
@@ -380,10 +361,7 @@ export class PermissionToolExecutor implements ToolExecutor {
     });
 
     try {
-      const [, result] = await Promise.all([
-        this.emit({ type: "approval.requested", request }),
-        approval,
-      ]);
+      const [, result] = await Promise.all([this.emit({ type: "approval.requested", request }), approval]);
       return result;
     } catch (error) {
       if (this.pending.delete(request.id)) {
@@ -445,17 +423,15 @@ export class PermissionToolExecutor implements ToolExecutor {
     }
   }
 
-  private async closePending(
-    approvals: Array<[string, PendingApproval]>,
-    reason: string | undefined,
-  ): Promise<void> {
+  private async closePending(approvals: Array<[string, PendingApproval]>, reason: string | undefined): Promise<void> {
     let failed = false;
     let failure: unknown;
 
     for (const [requestId, pending] of approvals) {
-      const payload: PermissionEventPayload = reason === undefined
-        ? { type: "approval.cancelled", requestId }
-        : { type: "approval.cancelled", requestId, reason };
+      const payload: PermissionEventPayload =
+        reason === undefined
+          ? { type: "approval.cancelled", requestId }
+          : { type: "approval.cancelled", requestId, reason };
       try {
         await this.emit(payload);
         pending.reject(new PermissionExecutorClosedError(reason));
@@ -480,11 +456,14 @@ export class PermissionToolExecutor implements ToolExecutor {
     if (this.ruleStore === undefined || outcome.persistent === undefined) return [];
     const rules = await this.ruleStore.list(outcome.persistent.scopeId);
     const now = Date.now();
-    return rules.filter((rule) => rule.scopeId === outcome.persistent!.scopeId
-      && rule.toolName === check.tool.name
-      && rule.definitionKey === definitionKey
-      && rule.grantKey === outcome.grantKey
-      && (rule.expiresAt === undefined || rule.expiresAt > now));
+    return rules.filter(
+      (rule) =>
+        rule.scopeId === outcome.persistent!.scopeId &&
+        rule.toolName === check.tool.name &&
+        rule.definitionKey === definitionKey &&
+        rule.grantKey === outcome.grantKey &&
+        (rule.expiresAt === undefined || rule.expiresAt > now),
+    );
   }
 
   private async rejectDenied(
@@ -523,8 +502,11 @@ export class PermissionToolExecutor implements ToolExecutor {
     const rules = await this.matchingRules(check, current, definitionKey);
     this.checkExecution(check);
     await this.rejectDenied(check, current, rules);
-    if (current.requireApproval || !sameScope(approved, current)
-      || !rules.some((rule) => rule.id === ruleId && rule.decision === "allow")) {
+    if (
+      current.requireApproval ||
+      !sameScope(approved, current) ||
+      !rules.some((rule) => rule.id === ruleId && rule.decision === "allow")
+    ) {
       throw new PermissionDeniedError(check.tool.name);
     }
   }
@@ -601,9 +583,9 @@ function normalizeDecision(value: PermissionDecision): NormalizedDecision {
     return { decision: value, requireApproval: false };
   }
   if (
-    typeof value === "object"
-    && value !== null
-    && (value.decision === "ask" || value.decision === "allow" || value.decision === "deny")
+    typeof value === "object" &&
+    value !== null &&
+    (value.decision === "ask" || value.decision === "allow" || value.decision === "deny")
   ) {
     if (typeof value.grantKey !== "string" || value.grantKey.trim() === "") {
       throw new TypeError("Invalid session grant key");
@@ -615,9 +597,14 @@ function normalizeDecision(value: PermissionDecision): NormalizedDecision {
       throw new TypeError("requireApproval is only valid for an ask decision");
     }
     if (value.persistent !== undefined) {
-      if (typeof value.persistent !== "object" || value.persistent === null
-        || typeof value.persistent.scopeId !== "string" || value.persistent.scopeId.trim() === ""
-        || typeof value.persistent.description !== "string" || value.persistent.description.trim() === "") {
+      if (
+        typeof value.persistent !== "object" ||
+        value.persistent === null ||
+        typeof value.persistent.scopeId !== "string" ||
+        value.persistent.scopeId.trim() === "" ||
+        typeof value.persistent.description !== "string" ||
+        value.persistent.description.trim() === ""
+      ) {
         throw new TypeError("Invalid persistent permission scope");
       }
     }
@@ -625,10 +612,14 @@ function normalizeDecision(value: PermissionDecision): NormalizedDecision {
       decision: value.decision,
       grantKey: value.grantKey,
       requireApproval: value.requireApproval === true,
-      ...(value.persistent === undefined ? {} : { persistent: Object.freeze({
-        scopeId: value.persistent.scopeId,
-        description: value.persistent.description,
-      }) }),
+      ...(value.persistent === undefined
+        ? {}
+        : {
+            persistent: Object.freeze({
+              scopeId: value.persistent.scopeId,
+              description: value.persistent.description,
+            }),
+          }),
     };
   }
   throw new TypeError(`Invalid permission decision: ${String(value)}`);
@@ -660,41 +651,40 @@ function errorMessage(error: unknown): string {
   return typeof error === "string" ? error : "Unknown permission error";
 }
 
-function endPermissionSpan(
-  span: TraceSpan | undefined,
-  error: unknown,
-  signal: AbortSignal,
-): void {
+function endPermissionSpan(span: TraceSpan | undefined, error: unknown, signal: AbortSignal): void {
   endTraceSpan(span, {
-    status: signal.aborted || error instanceof RunCancelledError
-      ? "cancelled"
-      : "error",
+    status: signal.aborted || error instanceof RunCancelledError ? "cancelled" : "error",
     error: traceError(error),
   });
 }
 
 export function permissionDefinitionKey(tool: PermissionCheck["tool"]): string {
   // 递归排序，使属性顺序不同的等价 JSON Schema 使用相同 identity。
-  const canonical = JSON.stringify(omitUndefined({
-    name: tool.name,
-    description: tool.description,
-    inputSchema: tool.inputSchema,
-    permissionVersion: tool.permissionVersion,
-  }), (_key, value: unknown) => {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
-    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
-  });
+  const canonical = JSON.stringify(
+    omitUndefined({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      permissionVersion: tool.permissionVersion,
+    }),
+    (_key, value: unknown) => {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+      return Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    },
+  );
   return canonical;
 }
 
 function immutableCheck(check: PermissionCheck): PermissionCheck {
   return Object.freeze({
-    tool: freezeToolInput(omitUndefined({
-      name: check.tool.name,
-      description: check.tool.description,
-      inputSchema: structuredClone(check.tool.inputSchema),
-      permissionVersion: check.tool.permissionVersion,
-    })),
+    tool: freezeToolInput(
+      omitUndefined({
+        name: check.tool.name,
+        description: check.tool.description,
+        inputSchema: structuredClone(check.tool.inputSchema),
+        permissionVersion: check.tool.permissionVersion,
+      }),
+    ),
     input: freezeToolInput(structuredClone(check.input)),
     context: check.context,
   });
@@ -704,8 +694,10 @@ function validateRuleOptions(options: ApprovalResolveOptions | undefined): asser
   if (options === undefined || options.createdBy.trim() === "") {
     throw new TypeError("Persistent permission rules require a trusted createdBy identity");
   }
-  if (options.expiresAt !== undefined
-    && (!Number.isSafeInteger(options.expiresAt) || options.expiresAt <= Date.now())) {
+  if (
+    options.expiresAt !== undefined &&
+    (!Number.isSafeInteger(options.expiresAt) || options.expiresAt <= Date.now())
+  ) {
     throw new TypeError("Persistent permission rule expiry must be a future timestamp");
   }
 }
@@ -716,24 +708,28 @@ function makeRule(
   definitionKey: string,
   options: CreatePermissionRuleOptions,
 ): PersistentPermissionRule {
-  return Object.freeze(omitUndefined({
-    id: `permission_rule_${crypto.randomUUID()}`,
-    scopeId: outcome.persistent!.scopeId,
-    toolName: check.tool.name,
-    definitionKey,
-    grantKey: outcome.grantKey!,
-    description: outcome.persistent!.description,
-    decision: options.decision,
-    createdAt: Date.now(),
-    createdBy: options.createdBy,
-    expiresAt: options.expiresAt,
-  }));
+  return Object.freeze(
+    omitUndefined({
+      id: `permission_rule_${crypto.randomUUID()}`,
+      scopeId: outcome.persistent!.scopeId,
+      toolName: check.tool.name,
+      definitionKey,
+      grantKey: outcome.grantKey!,
+      description: outcome.persistent!.description,
+      decision: options.decision,
+      createdAt: Date.now(),
+      createdBy: options.createdBy,
+      expiresAt: options.expiresAt,
+    }),
+  );
 }
 
 function sameScope(left: NormalizedDecision, right: NormalizedDecision): boolean {
-  return left.grantKey === right.grantKey
-    && left.persistent?.scopeId === right.persistent?.scopeId
-    && left.requireApproval === right.requireApproval;
+  return (
+    left.grantKey === right.grantKey &&
+    left.persistent?.scopeId === right.persistent?.scopeId &&
+    left.requireApproval === right.requireApproval
+  );
 }
 
 function sessionDefinitionKey(outcome: NormalizedDecision, definitionKey: string): string {

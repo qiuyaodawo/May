@@ -19,25 +19,25 @@ retain their own packages. The release list contains 14 packages.
 
 ## Choose a package for your task
 
-| Goal | Start with | Usually add |
-| --- | --- | --- |
-| Run a model/tool loop in memory | `@sortedyuan/may/core` | A provider adapter |
-| Define reusable Agent behavior and policy | `defineAgent()` from `@sortedyuan/may` | `ToolRegistry` from `@sortedyuan/may/core` |
-| Build a durable single-session Agent | `AgentDefinition.open()` or `AgentApplication.open()` | `@sortedyuan/may/session`, `@sortedyuan/may/context`, permissions and tools |
-| Manage several Sessions | `AgentWorkspace` from `@sortedyuan/may` | `SessionCatalog` from `@sortedyuan/may/session/catalog` |
-| Coordinate teams and remote workers | `@sortedyuan/coordination` | Agent definitions, durable stores and host policies |
-| Continue work toward a durable goal | `@sortedyuan/may/goals` | A host Agent and bounded continuation policy |
-| Trigger tasks on a schedule or event | `@sortedyuan/scheduler` | SQLite storage and an idempotent dispatcher |
-| Evaluate task results across configurations | `@sortedyuan/eval` | Execution adapters, isolated environments, evaluators and reports |
-| Extend an application with lifecycle Hooks | `@sortedyuan/may/plugin` | `@sortedyuan/may/services` and reusable plugins |
-| Build a terminal Agent | An application controller | `@sortedyuan/tui` and its `keybindings` subpath |
-| Build a browser Agent | `UiHost` or `ApplicationUiHost` | `@sortedyuan/ui-client` and `@sortedyuan/web-ui` |
-| Build a coding Agent | An application controller | `@sortedyuan/coding-tools` and an execution isolation policy |
-| Select models from configuration | `@sortedyuan/may/config` | `@sortedyuan/providers` |
-| Read durable history through a tool | `@sortedyuan/may/session/tools` | An active `Session` or `AgentApplication` |
-| Validate and store image replies | `@sortedyuan/media` | A host `MediaReader` for URL or file sources |
-| Trace execution and inspect diagnostics | Core's `Tracer` interface | `@sortedyuan/observability` |
-| Consume or expose MCP capabilities | `@sortedyuan/mcp` | Permissions and reviewed host services |
+| Goal                                        | Start with                                            | Usually add                                                                 |
+| ------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| Run a model/tool loop in memory             | `@sortedyuan/may/core`                                | A provider adapter                                                          |
+| Define reusable Agent behavior and policy   | `defineAgent()` from `@sortedyuan/may`                | `ToolRegistry` from `@sortedyuan/may/core`                                  |
+| Build a durable single-session Agent        | `AgentDefinition.open()` or `AgentApplication.open()` | `@sortedyuan/may/session`, `@sortedyuan/may/context`, permissions and tools |
+| Manage several Sessions                     | `AgentWorkspace` from `@sortedyuan/may`               | `SessionCatalog` from `@sortedyuan/may/session/catalog`                     |
+| Coordinate teams and remote workers         | `@sortedyuan/coordination`                            | Agent definitions, durable stores and host policies                         |
+| Continue work toward a durable goal         | `@sortedyuan/may/goals`                               | A host Agent and bounded continuation policy                                |
+| Trigger tasks on a schedule or event        | `@sortedyuan/scheduler`                               | SQLite storage and an idempotent dispatcher                                 |
+| Evaluate task results across configurations | `@sortedyuan/eval`                                    | Execution adapters, isolated environments, evaluators and reports           |
+| Extend an application with lifecycle Hooks  | `@sortedyuan/may/plugin`                              | `@sortedyuan/may/services` and reusable plugins                             |
+| Build a terminal Agent                      | An application controller                             | `@sortedyuan/tui` and its `keybindings` subpath                             |
+| Build a browser Agent                       | `UiHost` or `ApplicationUiHost`                       | `@sortedyuan/ui-client` and `@sortedyuan/web-ui`                            |
+| Build a coding Agent                        | An application controller                             | `@sortedyuan/coding-tools` and an execution isolation policy                |
+| Select models from configuration            | `@sortedyuan/may/config`                              | `@sortedyuan/providers`                                                     |
+| Read durable history through a tool         | `@sortedyuan/may/session/tools`                       | An active `Session` or `AgentApplication`                                   |
+| Validate and store image replies            | `@sortedyuan/media`                                   | A host `MediaReader` for URL or file sources                                |
+| Trace execution and inspect diagnostics     | Core's `Tracer` interface                             | `@sortedyuan/observability`                                                 |
+| Consume or expose MCP capabilities          | `@sortedyuan/mcp`                                     | Permissions and reviewed host services                                      |
 
 For a complete application lifecycle with Sessions, approvals, Context management
 and shutdown, start with [Building an Agent](../guides/building-an-agent.md).
@@ -129,11 +129,11 @@ Delegation, messaging and handoff policies default to denial. Recovery reconcile
 unknown effects before scheduling more work. `resolveRecovery()` also accepts
 queued and waiting tasks before the runtime starts, when no execution is active.
 
-| Import path | Purpose |
-| --- | --- |
-| `@sortedyuan/coordination` | Runtime, graph builders, Agent adapters, policies and resource interfaces |
-| `@sortedyuan/coordination/file-store` | `FileCoordinationStore` local single-writer coordination journal |
-| `@sortedyuan/coordination/remote` | Remote leaf Worker, durable receipts and authenticated transport |
+| Import path                           | Purpose                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------- |
+| `@sortedyuan/coordination`            | Runtime, graph builders, Agent adapters, policies and resource interfaces |
+| `@sortedyuan/coordination/file-store` | `FileCoordinationStore` local single-writer coordination journal          |
+| `@sortedyuan/coordination/remote`     | Remote leaf Worker, durable receipts and authenticated transport          |
 
 The main `@sortedyuan/coordination` entry exports `FileSharedBudget` for shared usage
 reservations and `FileArtifactStore` for
@@ -170,12 +170,12 @@ misfire policies and recovery.
 executes them in isolated environments, runs independent evaluators and produces
 durable Reports. Runtime outcome and task verdict are separate report fields.
 
-| Import path | Purpose |
-| --- | --- |
-| `@sortedyuan/eval` | Types, registry, validation, runner, environments, evaluators, reports, commands and telemetry |
-| `@sortedyuan/eval/application` | `createApplicationExecutionAdapter()` for fresh application Sessions |
-| `@sortedyuan/eval/coordination` | `createCoordinationExecutionAdapter()` and `EvalTrialBudget` for fresh task graphs |
-| `@sortedyuan/eval/file-store` | `FileEvalStore` for exclusive local experiment storage |
+| Import path                     | Purpose                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `@sortedyuan/eval`              | Types, registry, validation, runner, environments, evaluators, reports, commands and telemetry |
+| `@sortedyuan/eval/application`  | `createApplicationExecutionAdapter()` for fresh application Sessions                           |
+| `@sortedyuan/eval/coordination` | `createCoordinationExecutionAdapter()` and `EvalTrialBudget` for fresh task graphs             |
+| `@sortedyuan/eval/file-store`   | `FileEvalStore` for exclusive local experiment storage                                         |
 
 Adapters require a version, fresh execution resources and bound trial budgets.
 Suite modules and command evaluators execute trusted host code. Cancellation and
@@ -309,15 +309,15 @@ Third-party applications validate their own application section. See
 configured model selection and capability resolution. Protocol implementations
 are also independently consumable:
 
-| Import path | Protocol |
-| --- | --- |
-| `@sortedyuan/providers/openai` | OpenAI Responses API and native compaction |
-| `@sortedyuan/providers/openai-compatible` | Shared Chat Completions-compatible helpers |
-| `@sortedyuan/providers/anthropic` | Anthropic Messages API |
-| `@sortedyuan/providers/deepseek` | DeepSeek Chat |
-| `@sortedyuan/providers/zhipu` | Zhipu GLM Chat |
-| `@sortedyuan/providers/kimi` | Kimi Chat |
-| `@sortedyuan/providers/gemini` | Native Google Gemini streaming GenerateContent |
+| Import path                               | Protocol                                       |
+| ----------------------------------------- | ---------------------------------------------- |
+| `@sortedyuan/providers/openai`            | OpenAI Responses API and native compaction     |
+| `@sortedyuan/providers/openai-compatible` | Shared Chat Completions-compatible helpers     |
+| `@sortedyuan/providers/anthropic`         | Anthropic Messages API                         |
+| `@sortedyuan/providers/deepseek`          | DeepSeek Chat                                  |
+| `@sortedyuan/providers/zhipu`             | Zhipu GLM Chat                                 |
+| `@sortedyuan/providers/kimi`              | Kimi Chat                                      |
+| `@sortedyuan/providers/gemini`            | Native Google Gemini streaming GenerateContent |
 
 `google-gemini` uses `GeminiModel` from `@sortedyuan/providers/gemini`. It supports
 system instructions, media inputs, tool calls/results and structured output.
@@ -387,14 +387,14 @@ host-provided `MediaReader`.
 
 Terminal primitives and Agent-aware projections use these import paths:
 
-| Export | Purpose |
-| --- | --- |
-| `@sortedyuan/tui` | Components, renderer, editor, focus, scroll and terminal driver |
-| `@sortedyuan/tui/node-terminal` | Line-oriented Node terminal adapter |
-| `@sortedyuan/tui/transcript` | Session/live-event transcript store and retained view |
-| `@sortedyuan/tui/tool-renderers` | Instance-owned tool presentation renderers |
-| `@sortedyuan/tui/slash-commands` | Command parsing and completion state |
-| `@sortedyuan/tui/list-selection` | Filtered list and picker state |
+| Export                           | Purpose                                                         |
+| -------------------------------- | --------------------------------------------------------------- |
+| `@sortedyuan/tui`                | Components, renderer, editor, focus, scroll and terminal driver |
+| `@sortedyuan/tui/node-terminal`  | Line-oriented Node terminal adapter                             |
+| `@sortedyuan/tui/transcript`     | Session/live-event transcript store and retained view           |
+| `@sortedyuan/tui/tool-renderers` | Instance-owned tool presentation renderers                      |
+| `@sortedyuan/tui/slash-commands` | Command parsing and completion state                            |
+| `@sortedyuan/tui/list-selection` | Filtered list and picker state                                  |
 
 `createNodeTerminal()` from `@sortedyuan/tui/node-terminal` returns a `TerminalIO`.
 Call `question(prompt, { password: true, signal })` to read hidden input. Both input
@@ -432,12 +432,12 @@ MaybeCode is included in the [14-package release list](../../../scripts/release-
 MaybeClaw, CLI and Eval CLI remain private workspace packages. See the
 [release guide](../guides/npm-release.md) for verification and publication steps.
 
-| Package | Purpose | Guide |
-| --- | --- | --- |
-| `@sortedyuan/maybecode` | Coding Agent, terminal/Web UI host, delegated sub-agents and reviewed team workflows | [MaybeCode](../guides/maybecode.md) |
-| `@sortedyuan/maybeclaw` | Gateway for durable conversations, Agent adapters, event routing and channel delivery | [MaybeClaw](../guides/maybeclaw.md) |
-| `@sortedyuan/cli` | Small application demonstrating direct Core usage | [Getting started](../getting-started.md) |
-| `@sortedyuan/eval-cli` | Trusted-suite evaluation commands, reports, resume and comparison | [Evaluation](../guides/eval.md) |
+| Package                 | Purpose                                                                               | Guide                                    |
+| ----------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `@sortedyuan/maybecode` | Coding Agent, terminal/Web UI host, delegated sub-agents and reviewed team workflows  | [MaybeCode](../guides/maybecode.md)      |
+| `@sortedyuan/maybeclaw` | Gateway for durable conversations, Agent adapters, event routing and channel delivery | [MaybeClaw](../guides/maybeclaw.md)      |
+| `@sortedyuan/cli`       | Small application demonstrating direct Core usage                                     | [Getting started](../getting-started.md) |
+| `@sortedyuan/eval-cli`  | Trusted-suite evaluation commands, reports, resume and comparison                     | [Evaluation](../guides/eval.md)          |
 
 MaybeCode teams use local Agents and default to read-only. Coding mode edits
 private copies; the host reviews and applies patches to source files. Configured

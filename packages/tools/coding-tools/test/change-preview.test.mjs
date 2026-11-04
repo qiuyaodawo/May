@@ -17,16 +17,7 @@ test("previews a newly written file as a unified diff", async (t) => {
   assert.equal(preview.kind, "create");
   assert.equal(preview.additions, 2);
   assert.equal(preview.deletions, 0);
-  assert.equal(
-    preview.diff,
-    [
-      "--- /dev/null",
-      "+++ b/new.txt",
-      "@@ -0,0 +1,2 @@",
-      "+one",
-      "+two",
-    ].join("\n"),
-  );
+  assert.equal(preview.diff, ["--- /dev/null", "+++ b/new.txt", "@@ -0,0 +1,2 @@", "+one", "+two"].join("\n"));
 });
 
 test("previews write updates with context and a modification summary", async (t) => {
@@ -56,10 +47,7 @@ test("previews an exact edit and detects unchanged content", async (t) => {
   });
   assert.equal(edited.status, "ready");
   assert.equal(edited.kind, "update");
-  assert.match(
-    edited.diff,
-    /-before value after\n\\ No newline at end of file\n\+before updated after/u,
-  );
+  assert.match(edited.diff, /-before value after\n\\ No newline at end of file\n\+before updated after/u);
 
   const unchanged = await createToolChangePreview(workspace, "write", {
     path: "file.txt",
@@ -98,8 +86,7 @@ test("reports an ambiguous edit without blocking the permission flow", async (t)
 
 test("bounds large diff output", async (t) => {
   const workspace = await temporaryDirectory(t);
-  const content = Array.from({ length: 400 }, (_value, index) => `line ${index}`)
-    .join("\n");
+  const content = Array.from({ length: 400 }, (_value, index) => `line ${index}`).join("\n");
   const preview = await createToolChangePreview(workspace, "write", {
     path: "large.txt",
     content,

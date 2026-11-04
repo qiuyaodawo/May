@@ -9,6 +9,7 @@
   Add provider-neutral JSON and JSON Schema response formats, configuration defaults and Ajv validation of final responses. OpenAI Responses and Chat Completions serialize native structured-output formats. Adapters without response-format transport reject unsupported format requests before sending.
 
   Final response validation errors carry Usage/cost receipts and physical completion through ModelResponseValidationError. Runtime, budgets and retry attempt telemetry retain accounting for failed structured responses; completed validation failures are never retried and error messages exclude response content.
+
 - 2a44905: Preserve ordered image replies from OpenAI Responses and expose reusable raster
   attachment validation, storage and reading. Terminal views support Kitty/iTerm2
   graphics and saved-file information; Web UI provides session-scoped authenticated
@@ -21,6 +22,7 @@
   `ContextSummaryRequest` 新增 `runId` 与 `step`，`SummaryTailStrategy` 把触发压缩的
   Run 身份传给摘要器，可复用的模型摘要器再把它交给 `Model.stream`。使用同一个模型的
   计账方因此可以为 Run 内的摘要调用给出可追踪的调用身份。
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`
@@ -32,6 +34,7 @@
 
   The TUI package includes the PNG declarations required by its image dependency,
   so consumers can type-check installed declarations with `skipLibCheck: false`.
+
 - 88e7d69: 扩展 Usage 的缓存、reasoning、其他计量、包含关系、完整性与 provider 金额；提供版本化
   价格配置和可替换的计价接口。RunBudget、FileSharedBudget 与遥测使用同一计价结果，
   费用记录保留币种、来源、版本和完整性。保留现有输入输出 USD 单价配置，USD 预算需要

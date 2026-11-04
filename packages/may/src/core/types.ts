@@ -1,9 +1,7 @@
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
 export type MediaSource =
-  | { type: "url"; url: string }
-  | { type: "base64"; mediaType: string; data: string }
-  | { type: "file"; fileId: string };
+  { type: "url"; url: string } | { type: "base64"; mediaType: string; data: string } | { type: "file"; fileId: string };
 
 export type ContentPart =
   | { type: "text"; text: string }
@@ -63,11 +61,7 @@ export interface ToolMessage {
   isError?: boolean;
 }
 
-export type Message =
-  | SystemMessage
-  | UserMessage
-  | AssistantMessage
-  | ToolMessage;
+export type Message = SystemMessage | UserMessage | AssistantMessage | ToolMessage;
 
 export interface Usage {
   inputTokens?: number;
@@ -111,22 +105,21 @@ export function userMessage(text: string): UserMessage {
 }
 
 /** Close a provider tool call when its run is cancelled before execution ends. */
-export function toolCancellationMessage(
-  call: Readonly<ToolCall>,
-  reason?: string,
-): ToolMessage {
+export function toolCancellationMessage(call: Readonly<ToolCall>, reason?: string): ToolMessage {
   return {
     role: "tool",
     toolCallId: call.id,
     name: call.name,
     isError: true,
-    content: [{
-      type: "json",
-      value: {
-        name: "RunCancelledError",
-        message: reason ?? "Run was cancelled",
-        code: "RUN_CANCELLED",
+    content: [
+      {
+        type: "json",
+        value: {
+          name: "RunCancelledError",
+          message: reason ?? "Run was cancelled",
+          code: "RUN_CANCELLED",
+        },
       },
-    }],
+    ],
   };
 }

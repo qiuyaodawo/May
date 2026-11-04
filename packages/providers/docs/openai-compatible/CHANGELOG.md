@@ -9,6 +9,7 @@
   Add provider-neutral JSON and JSON Schema response formats, configuration defaults and Ajv validation of final responses. OpenAI Responses and Chat Completions serialize native structured-output formats. Adapters without response-format transport reject unsupported format requests before sending.
 
   Final response validation errors carry Usage/cost receipts and physical completion through ModelResponseValidationError. Runtime, budgets and retry attempt telemetry retain accounting for failed structured responses; completed validation failures are never retried and error messages exclude response content.
+
 - 78bde1d: 提供 `@sortedyuan/provider-openai-compatible/http`，共用 SSE 读取与 `Retry-After` 处理。
   SSE 使用 `eventsource-parser`，支持 UTF-8 分段、LF/CRLF/CR、流结束及中止后的连接释放。
   各个 provider 保留其协议完成条件与错误类型。
@@ -23,6 +24,7 @@
 
   The TUI package includes the PNG declarations required by its image dependency,
   so consumers can type-check installed declarations with `skipLibCheck: false`.
+
 - 88e7d69: 扩展 Usage 的缓存、reasoning、其他计量、包含关系、完整性与 provider 金额；提供版本化
   价格配置和可替换的计价接口。RunBudget、FileSharedBudget 与遥测使用同一计价结果，
   费用记录保留币种、来源、版本和完整性。保留现有输入输出 USD 单价配置，USD 预算需要

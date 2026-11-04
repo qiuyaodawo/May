@@ -8,7 +8,13 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import treeKill from "tree-kill";
-import { createLocalDirectoryEnvironment, readFileManifest, startEvalProcess, nodeEvalCommand, createCommandExecutionAdapter } from "../dist/index.js";
+import {
+  createLocalDirectoryEnvironment,
+  readFileManifest,
+  startEvalProcess,
+  nodeEvalCommand,
+  createCommandExecutionAdapter,
+} from "../dist/index.js";
 
 const parent = join(testOutputRoot, "eval", "process-environment");
 const workload = fileURLToPath(new URL("./fixtures/workload.mjs", import.meta.url));
@@ -18,7 +24,10 @@ async function setup() {
   const source = join(root, "source");
   await mkdir(source);
   await writeFile(join(source, "initial.txt"), "original");
-  const environment = createLocalDirectoryEnvironment({ sourceDirectory: source, rootDirectory: join(root, "environments") });
+  const environment = createLocalDirectoryEnvironment({
+    sourceDirectory: source,
+    rootDirectory: join(root, "environments"),
+  });
   return { root, source, environment };
 }
 function context(id) {
@@ -47,11 +56,21 @@ test("independent workspaces and retained frozen evidence preserve source", asyn
 
 test("snapshot limits, source overlap and recovery paths fail safely", async () => {
   const { root, source } = await setup();
-  const limited = createLocalDirectoryEnvironment({ sourceDirectory: source, rootDirectory: join(root, "limited"), maxBytes: 1 });
+  const limited = createLocalDirectoryEnvironment({
+    sourceDirectory: source,
+    rootDirectory: join(root, "limited"),
+    maxBytes: 1,
+  });
   await assert.rejects(limited.prepare(context("limited")), /limit/);
-  const overlapping = createLocalDirectoryEnvironment({ sourceDirectory: source, rootDirectory: join(source, "output") });
+  const overlapping = createLocalDirectoryEnvironment({
+    sourceDirectory: source,
+    rootDirectory: join(source, "output"),
+  });
   await assert.rejects(overlapping.prepare(context("overlap")), /overlap/);
-  const recovering = createLocalDirectoryEnvironment({ sourceDirectory: source, rootDirectory: join(root, "recovering") });
+  const recovering = createLocalDirectoryEnvironment({
+    sourceDirectory: source,
+    rootDirectory: join(root, "recovering"),
+  });
   const prepared = await recovering.prepare(context("interrupted"));
   await recovering.recover(context("interrupted"));
   await assert.rejects(access(prepared.executionTarget.workspacePath));
@@ -60,7 +79,11 @@ test("snapshot limits, source overlap and recovery paths fail safely", async () 
 
 test("real subprocess success, errors, bounded output and environment filtering", async () => {
   const { root } = await setup();
-  const run = mode => startEvalProcess({ executable: process.execPath, args: [workload, mode], cwd: root, maxOutputBytes: 1024 }, new AbortController().signal).result;
+  const run = (mode) =>
+    startEvalProcess(
+      { executable: process.execPath, args: [workload, mode], cwd: root, maxOutputBytes: 1024 },
+      new AbortController().signal,
+    ).result;
   assert.equal((await run("write")).exitCode, 0);
   assert.equal((await run("check")).exitCode, 0);
   assert.notEqual((await run("fail")).exitCode, 0);
@@ -69,16 +92,30 @@ test("real subprocess success, errors, bounded output and environment filtering"
   assert.equal(output.stdout.length, 1024);
   assert.equal(output.stderr.length, 1024);
   process.env.EVAL_PRIVATE_CREDENTIAL = "test-scope-only";
-  try { assert.equal(JSON.parse((await run("env")).stdout).credentialVisible, false); }
-  finally { delete process.env.EVAL_PRIVATE_CREDENTIAL; }
-  await assert.rejects(startEvalProcess({ executable: join(root, "missing-executable"), args: [], cwd: root }, new AbortController().signal).result);
-  assert.throws(() => startEvalProcess({ executable: process.execPath, args: [workload, "write"] }, new AbortController().signal), /cwd/);
+  try {
+    assert.equal(JSON.parse((await run("env")).stdout).credentialVisible, false);
+  } finally {
+    delete process.env.EVAL_PRIVATE_CREDENTIAL;
+  }
+  await assert.rejects(
+    startEvalProcess(
+      { executable: join(root, "missing-executable"), args: [], cwd: root },
+      new AbortController().signal,
+    ).result,
+  );
+  assert.throws(
+    () => startEvalProcess({ executable: process.execPath, args: [workload, "write"] }, new AbortController().signal),
+    /cwd/,
+  );
 });
 
 test("cancellation stops a real child process tree", async () => {
   const { root } = await setup();
   const controller = new AbortController();
-  const running = startEvalProcess({ executable: process.execPath, args: [workload, "tree"], cwd: root }, controller.signal);
+  const running = startEvalProcess(
+    { executable: process.execPath, args: [workload, "tree"], cwd: root },
+    controller.signal,
+  );
   const pids = await waitForTree(root);
   controller.abort();
   assert.equal(await running.cancel(), true);
@@ -95,12 +132,23 @@ test("Node execution permissions refuse child processes and runtime overrides", 
   assert.notEqual(outcome.exitCode, 0);
   assert.match(outcome.stderr, /ERR_ACCESS_DENIED/);
   assert.equal(outcome.processTerminationConfirmed, true);
-  assert.throws(() => nodeEvalCommand({ script: workload, cwd: root, env: { NODE_OPTIONS: "--allow-child-process" } }), /runtime options/);
+  assert.throws(
+    () => nodeEvalCommand({ script: workload, cwd: root, env: { NODE_OPTIONS: "--allow-child-process" } }),
+    /runtime options/,
+  );
 });
 
 test("a completed parent cannot confirm a detached child without host supervision", async () => {
   const { root } = await setup();
-  const adapter = createCommandExecutionAdapter({ id: "unconfirmed", version: "1", command: context => ({ executable: process.execPath, args: [workload, "orphan"], cwd: context.target.workspacePath }) });
+  const adapter = createCommandExecutionAdapter({
+    id: "unconfirmed",
+    version: "1",
+    command: (context) => ({
+      executable: process.execPath,
+      args: [workload, "orphan"],
+      cwd: context.target.workspacePath,
+    }),
+  });
   const execution = await adapter.create({ target: { workspacePath: root }, signal: new AbortController().signal });
   const outcome = await execution.execute(new AbortController().signal);
   const { child } = JSON.parse(outcome.output.stdout);
@@ -111,7 +159,7 @@ test("a completed parent cannot confirm a detached child without host supervisio
     assert.equal((await execution.cancel(new AbortController().signal)).confirmed, false);
     await assert.rejects(execution.close(new AbortController().signal), /termination/);
   } finally {
-    await new Promise((accept, reject) => treeKill(child, "SIGKILL", error => error ? reject(error) : accept()));
+    await new Promise((accept, reject) => treeKill(child, "SIGKILL", (error) => (error ? reject(error) : accept())));
   }
   await waitForProcessTermination(child);
 });
@@ -119,8 +167,11 @@ test("a completed parent cannot confirm a detached child without host supervisio
 async function waitForTree(root) {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
-    try { return JSON.parse(await readFile(join(root, "tree.json"), "utf8")); }
-    catch (error) { if (error.code !== "ENOENT") throw error; }
+    try {
+      return JSON.parse(await readFile(join(root, "tree.json"), "utf8"));
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
     await delay(25);
   }
   throw new Error("Timed out waiting for the process tree to start");
@@ -129,12 +180,20 @@ async function waitForTree(root) {
 async function waitForProcessTermination(pid) {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
-    try { process.kill(pid, 0); }
-    catch (error) { if (error.code === "ESRCH") return; throw error; }
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if (error.code === "ESRCH") return;
+      throw error;
+    }
     if (process.platform !== "win32") {
       let status;
-      try { status = (await promisify(execFile)("ps", ["-o", "stat=", "-p", String(pid)])).stdout.trim(); }
-      catch (error) { if (error.code === 1 && error.stdout.trim() === "") return; throw error; }
+      try {
+        status = (await promisify(execFile)("ps", ["-o", "stat=", "-p", String(pid)])).stdout.trim();
+      } catch (error) {
+        if (error.code === 1 && error.stdout.trim() === "") return;
+        throw error;
+      }
       // 已终止的进程可能仍等待系统清理其 PID。
       if (status.startsWith("Z")) return;
     }

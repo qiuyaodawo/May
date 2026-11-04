@@ -31,7 +31,9 @@ export class SqliteSchedulerStore implements SchedulerStore {
     this.#ownership = ownership;
     this.#get = database.prepare("SELECT value FROM scheduler_records WHERE collection = ? AND id = ?");
     this.#list = database.prepare("SELECT value FROM scheduler_records WHERE collection = ? ORDER BY id");
-    this.#put = database.prepare("INSERT INTO scheduler_records (collection, id, value) VALUES (?, ?, ?) ON CONFLICT (collection, id) DO UPDATE SET value = excluded.value");
+    this.#put = database.prepare(
+      "INSERT INTO scheduler_records (collection, id, value) VALUES (?, ?, ?) ON CONFLICT (collection, id) DO UPDATE SET value = excluded.value",
+    );
     this.#delete = database.prepare("DELETE FROM scheduler_records WHERE collection = ? AND id = ?");
   }
 
@@ -46,7 +48,8 @@ export class SqliteSchedulerStore implements SchedulerStore {
       try {
         ownership.exec("BEGIN EXCLUSIVE");
       } catch (error) {
-        if (isBusy(error)) throw new Error(`Scheduler storage already has an active owner: ${canonicalPath}`, { cause: error });
+        if (isBusy(error))
+          throw new Error(`Scheduler storage already has an active owner: ${canonicalPath}`, { cause: error });
         throw error;
       }
       validateOwnershipDatabase(ownership);
@@ -58,9 +61,14 @@ export class SqliteSchedulerStore implements SchedulerStore {
       const failures: unknown[] = [error];
       for (const connection of [database, ownership]) {
         if (connection === undefined) continue;
-        try { connection.close(); } catch (cleanupError) { failures.push(cleanupError); }
+        try {
+          connection.close();
+        } catch (cleanupError) {
+          failures.push(cleanupError);
+        }
       }
-      if (failures.length > 1) throw new AggregateError(failures, "Scheduler storage failed to open and release its resources");
+      if (failures.length > 1)
+        throw new AggregateError(failures, "Scheduler storage failed to open and release its resources");
       throw error;
     }
   }
@@ -104,14 +112,21 @@ export class SqliteSchedulerStore implements SchedulerStore {
     this.#transactionDepth += 1;
     try {
       const result = callback();
-      if (result !== null && (typeof result === "object" || typeof result === "function") && "then" in result && typeof result.then === "function") {
+      if (
+        result !== null &&
+        (typeof result === "object" || typeof result === "function") &&
+        "then" in result &&
+        typeof result.then === "function"
+      ) {
         throw new TypeError("Scheduler storage transactions cannot return a Promise");
       }
       this.#database.exec(depth === 0 ? "COMMIT" : `RELEASE SAVEPOINT ${savepoint}`);
       return result;
     } catch (error) {
       try {
-        this.#database.exec(depth === 0 ? "ROLLBACK" : `ROLLBACK TO SAVEPOINT ${savepoint}; RELEASE SAVEPOINT ${savepoint}`);
+        this.#database.exec(
+          depth === 0 ? "ROLLBACK" : `ROLLBACK TO SAVEPOINT ${savepoint}; RELEASE SAVEPOINT ${savepoint}`,
+        );
       } catch (rollbackError) {
         throw new AggregateError([error, rollbackError], "Scheduler storage transaction failed to undo its writes");
       }
@@ -125,7 +140,11 @@ export class SqliteSchedulerStore implements SchedulerStore {
     if (this.#closed) return;
     if (this.#transactionDepth !== 0) throw new Error("Cannot close scheduler storage during a transaction");
     this.#closed = true;
-    try { this.#database.close(); } finally { this.#ownership.close(); }
+    try {
+      this.#database.close();
+    } finally {
+      this.#ownership.close();
+    }
   }
 
   #assertOpen(): void {
@@ -140,12 +159,14 @@ function normalizePath(path: string): string {
   const absolute = resolve(path);
   mkdirSync(dirname(absolute), { recursive: true });
   const existing = lstatSync(absolute, { throwIfNoEntry: false });
-  const canonical = existing !== undefined
-    ? realpathSync.native(absolute)
-    : resolve(realpathSync.native(dirname(absolute)), basename(absolute));
+  const canonical =
+    existing !== undefined
+      ? realpathSync.native(absolute)
+      : resolve(realpathSync.native(dirname(absolute)), basename(absolute));
   if (existing !== undefined) {
     const info = statSync(canonical);
-    if (!info.isFile() || info.nlink !== 1) throw new Error("Scheduler database must be a regular file with one filesystem link");
+    if (!info.isFile() || info.nlink !== 1)
+      throw new Error("Scheduler database must be a regular file with one filesystem link");
   }
   return process.platform === "win32" ? canonical.toLowerCase() : canonical;
 }
@@ -162,7 +183,10 @@ function validateOwnershipDatabase(database: DatabaseSync): void {
   const applicationId = database.prepare("PRAGMA application_id").get()?.application_id;
   const version = database.prepare("PRAGMA user_version").get()?.user_version;
   const objects = database.prepare("SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'").all();
-  if (objects.length !== 0 || !((applicationId === 0 && version === 0) || (applicationId === LOCK_APPLICATION_ID && version === SCHEMA_VERSION))) {
+  if (
+    objects.length !== 0 ||
+    !((applicationId === 0 && version === 0) || (applicationId === LOCK_APPLICATION_ID && version === SCHEMA_VERSION))
+  ) {
     throw new Error("Unsupported scheduler ownership database");
   }
   database.exec(`PRAGMA application_id = ${LOCK_APPLICATION_ID}; PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -173,12 +197,22 @@ function initializeDatabase(database: DatabaseSync): void {
   const version = database.prepare("PRAGMA user_version").get()?.user_version;
   const objects = database.prepare("SELECT name, type, sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'").all();
   if (applicationId === 0 && version === 0 && objects.length === 0) {
-    database.exec(`BEGIN IMMEDIATE; ${SCHEMA_SQL}; PRAGMA application_id = ${APPLICATION_ID}; PRAGMA user_version = ${SCHEMA_VERSION}; COMMIT`);
-  } else if (applicationId !== APPLICATION_ID || version !== SCHEMA_VERSION || objects.length !== 1 || objects[0]?.name !== "scheduler_records" || objects[0]?.type !== "table" || objects[0]?.sql !== SCHEMA_SQL) {
+    database.exec(
+      `BEGIN IMMEDIATE; ${SCHEMA_SQL}; PRAGMA application_id = ${APPLICATION_ID}; PRAGMA user_version = ${SCHEMA_VERSION}; COMMIT`,
+    );
+  } else if (
+    applicationId !== APPLICATION_ID ||
+    version !== SCHEMA_VERSION ||
+    objects.length !== 1 ||
+    objects[0]?.name !== "scheduler_records" ||
+    objects[0]?.type !== "table" ||
+    objects[0]?.sql !== SCHEMA_SQL
+  ) {
     throw new Error("Unsupported scheduler database or schema version");
   }
   const integrity = database.prepare("PRAGMA quick_check").all();
-  if (integrity.length !== 1 || integrity[0]?.quick_check !== "ok") throw new Error("Scheduler database integrity validation failed");
+  if (integrity.length !== 1 || integrity[0]?.quick_check !== "ok")
+    throw new Error("Scheduler database integrity validation failed");
 }
 
 function validateCollection(collection: string): void {

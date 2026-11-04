@@ -16,13 +16,7 @@
 在应用中创建 `audited-context.ts`，将 `@sortedyuan/may` 加入直接依赖：
 
 ```ts
-import type {
-  AppendOptions,
-  Context,
-  ContextSnapshot,
-  Message,
-  SnapshotOptions,
-} from "@sortedyuan/may/core";
+import type { AppendOptions, Context, ContextSnapshot, Message, SnapshotOptions } from "@sortedyuan/may/core";
 import {
   InMemoryContextFactory,
   type ContextFactory,
@@ -30,10 +24,7 @@ import {
   type ManagedContext,
 } from "@sortedyuan/may/context";
 
-type Audit = (entry: {
-  readonly operation: "snapshot" | "append";
-  readonly messageCount: number;
-}) => void;
+type Audit = (entry: { readonly operation: "snapshot" | "append"; readonly messageCount: number }) => void;
 
 class AuditedContext implements Context {
   constructor(
@@ -47,10 +38,7 @@ class AuditedContext implements Context {
     return snapshot;
   }
 
-  async append(
-    messages: Message[],
-    options?: AppendOptions,
-  ): Promise<void> {
+  async append(messages: Message[], options?: AppendOptions): Promise<void> {
     await this.delegate.append(messages, options);
     this.audit({ operation: "append", messageCount: messages.length });
   }
@@ -66,9 +54,7 @@ export class AuditedContextFactory implements ContextFactory {
     const managed = await this.delegate.create(options);
     return {
       context: new AuditedContext(managed.context, this.audit),
-      ...(managed.controller === undefined
-        ? {}
-        : { controller: managed.controller }),
+      ...(managed.controller === undefined ? {} : { controller: managed.controller }),
     };
   }
 }

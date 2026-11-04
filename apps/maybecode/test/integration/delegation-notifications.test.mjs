@@ -10,7 +10,7 @@ import { openConfiguredMaybeCode } from "../../dist/index.js";
 import { executeDelegationCommand } from "../../dist/delegation-commands.js";
 import { executeMaybeCodeSlashCommand } from "../../dist/slash-commands.js";
 
-test("配置文件、命令、Session 切换和重新打开工作区保留正确的通知设置", async t => {
+test("配置文件、命令、Session 切换和重新打开工作区保留正确的通知设置", async (t) => {
   const base = join(testOutputRoot, "maybecode", "delegation-notifications");
   await mkdir(base, { recursive: true });
   const workspace = await mkdtemp(join(base, "settings-"));
@@ -26,15 +26,27 @@ test("配置文件、命令、Session 切换和重新打开工作区保留正确
     else process.env[credentialVariable] = previousCredential;
   });
   const configuration = {
-    providers: { selected: { adapter: selected.adapter, baseURL: selected.providerConfig.baseURL, apiKeyEnv: credentialVariable } },
+    providers: {
+      selected: { adapter: selected.adapter, baseURL: selected.providerConfig.baseURL, apiKeyEnv: credentialVariable },
+    },
     models: { chat: { ...saved.models[selected.name], provider: "selected" } },
     defaultModel: "chat",
     apps: { maybecode: {} },
   };
-  const options = { workspace, configPath, dataDirectory: join(workspace, "data"), git: false, skills: false, mcp: false, observability: false };
+  const options = {
+    workspace,
+    configPath,
+    dataDirectory: join(workspace, "data"),
+    git: false,
+    skills: false,
+    mcp: false,
+    observability: false,
+  };
   const applications = [];
-  t.after(async () => { for (const app of applications) await app.close(); });
-  const open = async extra => {
+  t.after(async () => {
+    for (const app of applications) await app.close();
+  });
+  const open = async (extra) => {
     const app = await openConfiguredMaybeCode({ ...options, ...extra });
     applications.push(app);
     return app;
@@ -42,7 +54,10 @@ test("配置文件、命令、Session 切换和重新打开工作区保留正确
   await writeFile(configPath, JSON.stringify(configuration));
   const app = await open();
   assert.equal(app.delegationNotifications, false);
-  assert.deepEqual(await executeMaybeCodeSlashCommand("/delegations notifications status", app), { type: "display", text: "Delegation notifications: off" });
+  assert.deepEqual(await executeMaybeCodeSlashCommand("/delegations notifications status", app), {
+    type: "display",
+    text: "Delegation notifications: off",
+  });
   assert.equal(await executeDelegationCommand(["notifications", "on"], app), "Delegation notifications: on");
   await app.newSession();
   assert.equal(app.delegationNotifications, true);

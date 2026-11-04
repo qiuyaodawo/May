@@ -23,23 +23,25 @@ processes and requires no model credentials.
    `pnpm install --frozen-lockfile` and `pnpm build`.
 2. Validate the included suite:
 
-```powershell
-pnpm eval validate --suite apps/eval/examples/suite.mjs
-```
+   ```powershell
+   pnpm eval validate --suite apps/eval/examples/suite.mjs
+   ```
 
    The validation command prints `Validated file-artifact` for the unchanged
    default suite. Validation checks configuration without starting trials.
+
 3. Run the experiment and inspect its report:
 
-```powershell
-pnpm eval run --suite apps/eval/examples/suite.mjs --output .eval-results
-pnpm eval report --experiment .eval-results/file-artifact
-```
+   ```powershell
+   pnpm eval run --suite apps/eval/examples/suite.mjs --output .eval-results
+   pnpm eval report --experiment .eval-results/file-artifact
+   ```
 
    The suite plans two trials, writes `result.json` containing an uppercase
    message, and checks the file independently. Inspect execution, acceptance
    and infrastructure outcomes for both trials. Trial IDs and timings vary.
    Reports are saved as `report.json` and `report.md` in the experiment directory.
+
 4. Keep reports and evidence for review. Existing experiment IDs cannot be reused
    for a new run; set `MAY_EVAL_EXAMPLE_ID` to a new ID before repeating the suite.
    To continue interrupted planned work, use the [restart procedure](#restart-and-retry).
@@ -73,7 +75,7 @@ export async function evaluateExperiment(
     registry,
     store: new FileEvalStore({ directory }),
     signal,
-    onTrial: state => console.log(state.trial.id, state.taskVerdict),
+    onTrial: (state) => console.log(state.trial.id, state.taskVerdict),
   });
   runner.validate(experiment);
   return await runner.run(experiment);
@@ -349,14 +351,14 @@ deletion of the plaintext records.
 The same redaction also covers retained output, error messages, evaluation check
 messages and evidence labels.
 
-| Object | Default or fixed limit |
-| --- | --- |
-| Plan and state record | 32 MiB |
-| Telemetry event | 64 KiB |
-| Trial event file | 20,000 events or 16 MiB |
-| In-memory metrics scope | 10,000 unique events |
-| Evidence item | 65,536 bytes by default |
-| Trial evidence | 1,048,576 bytes and 64 items by default |
+| Object                  | Default or fixed limit                  |
+| ----------------------- | --------------------------------------- |
+| Plan and state record   | 32 MiB                                  |
+| Telemetry event         | 64 KiB                                  |
+| Trial event file        | 20,000 events or 16 MiB                 |
+| In-memory metrics scope | 10,000 unique events                    |
+| Evidence item           | 65,536 bytes by default                 |
+| Trial evidence          | 1,048,576 bytes and 64 items by default |
 
 These limits stop work with
 an explicit error. Full execution output is retained only with `retainContent: true`

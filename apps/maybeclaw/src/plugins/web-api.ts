@@ -11,69 +11,132 @@ import { UiError, type UiCommand } from "@sortedyuan/ui-client";
 import { GatewayUiHost, controlActor } from "../gateway-ui.js";
 import type { GatewayServerController } from "../gateway-api.js";
 
-export async function startGatewayServer(options: { gateway: GatewayServerController; port?: number; server?: Server; status?: () => unknown; close?: () => Promise<void> }) {
+export async function startGatewayServer(options: {
+  gateway: GatewayServerController;
+  port?: number;
+  server?: Server;
+  status?: () => unknown;
+  close?: () => Promise<void>;
+}) {
   const publicOrigin = options.gateway.options.settings.publicOrigin;
   const port = options.port ?? 3939;
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
   const assets = new Map(await webUiAssets("MaybeClaw", "session"));
-  assets.set("/gateway-browser.js", { type: "text/javascript; charset=utf-8", body: await readFile(new URL("../gateway-browser.js", import.meta.url), "utf8") });
-  assets.set("/app.js", { type: "text/javascript; charset=utf-8", body: 'import { UiClient } from "/ui/client.js"; import { mountWebUI } from "/webui/index.js"; import { createGatewayManager, gatewayAuthentication } from "/gateway-browser.js"; const client = new UiClient(); const root = document.getElementById("app"); const manager = createGatewayManager(client); const unmount = mountWebUI(root, client, { title: "MaybeClaw", kind: "session", authentication: gatewayAuthentication(), connectionHint: "输入配置的管理员密码。刷新页面后需要重新登录。", onNew: manager.onNew, navigation: manager.navigation }); window.addEventListener("beforeunload", () => { unmount(); manager.dispose(); });' });
+  assets.set("/gateway-browser.js", {
+    type: "text/javascript; charset=utf-8",
+    body: await readFile(new URL("../gateway-browser.js", import.meta.url), "utf8"),
+  });
+  assets.set("/app.js", {
+    type: "text/javascript; charset=utf-8",
+    body: 'import { UiClient } from "/ui/client.js"; import { mountWebUI } from "/webui/index.js"; import { createGatewayManager, gatewayAuthentication } from "/gateway-browser.js"; const client = new UiClient(); const root = document.getElementById("app"); const manager = createGatewayManager(client); const unmount = mountWebUI(root, client, { title: "MaybeClaw", kind: "session", authentication: gatewayAuthentication(), connectionHint: "输入配置的管理员密码。刷新页面后需要重新登录。", onNew: manager.onNew, navigation: manager.navigation }); window.addEventListener("beforeunload", () => { unmount(); manager.dispose(); });',
+  });
   let auth!: GatewayAuth;
   let uiHost!: GatewayUiHost;
   let ui!: ReturnType<typeof createUiRouter>;
   let gatewayClosing: Promise<void> | undefined;
-  const closeGateway = () => gatewayClosing ??= Promise.resolve().then(() => options.close?.() ?? options.gateway.close());
-  const routes = definePlugin({ id: "maybeclaw.web-routes", version: "1.0.0", scope: "host", provides: [gatewayPluginServices.webHandler],
+  const closeGateway = () =>
+    (gatewayClosing ??= Promise.resolve().then(() => options.close?.() ?? options.gateway.close()));
+  const routes = definePlugin({
+    id: "maybeclaw.web-routes",
+    version: "1.0.0",
+    scope: "host",
+    provides: [gatewayPluginServices.webHandler],
     async setup(context) {
       context.defer(closeGateway);
-      const cancel = () => { void closeGateway().catch(() => undefined); };
+      const cancel = () => {
+        void closeGateway().catch(() => undefined);
+      };
       context.signal.addEventListener("abort", cancel, { once: true });
       context.defer(() => context.signal.removeEventListener("abort", cancel));
-      auth = await GatewayAuth.open(options.gateway.options.configPath); context.defer(() => auth.close());
-      uiHost = new GatewayUiHost(options.gateway, options.status); context.defer(() => uiHost.close());
-      ui = createUiRouter(uiHost); context.defer(() => ui.close());
-      context.provide(gatewayPluginServices.webHandler, (req, res, request) => route(req, res, request.origin).catch((error: unknown) => {
-        if (res.headersSent) res.destroy();
-        else sendJson(res, error instanceof UiError ? error.status : 400, { error: error instanceof Error ? error.message : "Gateway operation failed" });
-      }));
+      auth = await GatewayAuth.open(options.gateway.options.configPath);
+      context.defer(() => auth.close());
+      uiHost = new GatewayUiHost(options.gateway, options.status);
+      context.defer(() => uiHost.close());
+      ui = createUiRouter(uiHost);
+      context.defer(() => ui.close());
+      context.provide(gatewayPluginServices.webHandler, (req, res, request) =>
+        route(req, res, request.origin).catch((error: unknown) => {
+          if (res.headersSent) res.destroy();
+          else
+            sendJson(res, error instanceof UiError ? error.status : 400, {
+              error: error instanceof Error ? error.message : "Gateway operation failed",
+            });
+        }),
+      );
     },
   });
 
   async function route(req: IncomingMessage, res: ServerResponse, origin: string): Promise<void> {
     secureHeaders(res);
-    if (!trustedRequest(req, origin) && !(publicOrigin && trustedRequest(req, publicOrigin))) { sendJson(res, 403, { error: "Untrusted origin or host" }); return; }
+    if (!trustedRequest(req, origin) && !(publicOrigin && trustedRequest(req, publicOrigin))) {
+      sendJson(res, 403, { error: "Untrusted origin or host" });
+      return;
+    }
     const url = new URL(req.url ?? "/", origin);
     const asset = assets.get(url.pathname);
-    if (req.method === "GET" && asset) { res.writeHead(200, { "content-type": asset.type }); res.end(asset.body); return; }
+    if (req.method === "GET" && asset) {
+      res.writeHead(200, { "content-type": asset.type });
+      res.end(asset.body);
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/auth/login") {
-      const data = await body(req, 8192); if (Object.keys(data).length !== 1) throw new UiError(400, "需要管理员密码。");
-      sendJson(res, 200, await auth.login(data.password)); return;
+      const data = await body(req, 8192);
+      if (Object.keys(data).length !== 1) throw new UiError(400, "需要管理员密码。");
+      sendJson(res, 200, await auth.login(data.password));
+      return;
     }
     await auth.refresh();
     const login = auth.authorize(req);
-    if (!login) { sendJson(res, 401, { error: "请使用管理员密码登录。" }); return; }
-    if (req.method === "POST" && url.pathname === "/api/auth/logout") { auth.revoke(login); sendJson(res, 200, { loggedOut: true }); return; }
+    if (!login) {
+      sendJson(res, 401, { error: "请使用管理员密码登录。" });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/auth/logout") {
+      auth.revoke(login);
+      sendJson(res, 200, { loggedOut: true });
+      return;
+    }
     if (url.pathname === "/api/ui/events") auth.track(login, res);
     if (await ui.route(req, res)) return;
     const path = url.pathname.replace(/^\/api\/v2(?=\/)/u, "/api");
     if (req.method === "GET") {
-      if (path === "/api/health") { sendJson(res, 200, options.status?.() ?? options.gateway.status()); return; }
-      if (path === "/api/sessions") { sendJson(res, 200, options.gateway.sessions(controlActor)); return; }
-      if (path === "/api/agents") { sendJson(res, 200, options.gateway.configuration(controlActor).agents); return; }
-      if (path === "/api/approvals") { sendJson(res, 200, options.gateway.approvals(controlActor)); return; }
-      if (path === "/api/permission-rules") { sendJson(res, 200, await options.gateway.listPermissionRules(controlActor)); return; }
-      if (path === "/api/tasks") { sendJson(res, 200, { tasks: options.gateway.tasks(controlActor) }); return; }
+      if (path === "/api/health") {
+        sendJson(res, 200, options.status?.() ?? options.gateway.status());
+        return;
+      }
+      if (path === "/api/sessions") {
+        sendJson(res, 200, options.gateway.sessions(controlActor));
+        return;
+      }
+      if (path === "/api/agents") {
+        sendJson(res, 200, options.gateway.configuration(controlActor).agents);
+        return;
+      }
+      if (path === "/api/approvals") {
+        sendJson(res, 200, options.gateway.approvals(controlActor));
+        return;
+      }
+      if (path === "/api/permission-rules") {
+        sendJson(res, 200, await options.gateway.listPermissionRules(controlActor));
+        return;
+      }
+      if (path === "/api/tasks") {
+        sendJson(res, 200, { tasks: options.gateway.tasks(controlActor) });
+        return;
+      }
       const sessionMatch = /^\/api\/sessions\/([^/]+)(?:\/(messages))?$/u.exec(path);
       if (sessionMatch) {
         const session = options.gateway.session(decodeURIComponent(sessionMatch[1]!), controlActor);
-        sendJson(res, 200, sessionMatch[2] ? options.gateway.messages(session.id, controlActor) : session); return;
+        sendJson(res, 200, sessionMatch[2] ? options.gateway.messages(session.id, controlActor) : session);
+        return;
       }
       const taskMatch = /^\/api\/tasks\/([^/]+)$/u.exec(path);
       if (taskMatch) {
         const id = decodeURIComponent(taskMatch[1]!);
         const task = options.gateway.task(id, controlActor);
         if (!task) throw new UiError(404, "Task not found");
-        sendJson(res, 200, { task }); return;
+        sendJson(res, 200, { task });
+        return;
       }
     }
     if (req.method === "POST") {
@@ -82,74 +145,154 @@ export async function startGatewayServer(options: { gateway: GatewayServerContro
       if (!/^[A-Za-z0-9._:-]{1,100}$/u.test(requestId)) throw new UiError(400, "Invalid requestId");
       if (path === "/api/commands") {
         if (typeof data.text !== "string") throw new UiError(400, "需要命令正文。");
-        const result = await execute("gateway.command", data, { text: data.text, ...(data.entry ? { entry: JSON.stringify(data.entry) } : {}) }, requestId);
-        sendJson(res, 200, result); return;
+        const result = await execute(
+          "gateway.command",
+          data,
+          { text: data.text, ...(data.entry ? { entry: JSON.stringify(data.entry) } : {}) },
+          requestId,
+        );
+        sendJson(res, 200, result);
+        return;
       }
       if (path === "/api/sessions") {
-        if (typeof data.name !== "string" || !Array.isArray(data.agents)) throw new UiError(400, "name and agents are required");
-        const result = await execute("session.create", data, { name: data.name, agents: JSON.stringify(data.agents), allowed: JSON.stringify(data.allowedAgents ?? []), ...(data.entry ? { entry: JSON.stringify(data.entry) } : {}) }, requestId);
-        sendJson(res, 201, { ...result, session: options.gateway.session(result.selectedId!, controlActor) }); return;
+        if (typeof data.name !== "string" || !Array.isArray(data.agents))
+          throw new UiError(400, "name and agents are required");
+        const result = await execute(
+          "session.create",
+          data,
+          {
+            name: data.name,
+            agents: JSON.stringify(data.agents),
+            allowed: JSON.stringify(data.allowedAgents ?? []),
+            ...(data.entry ? { entry: JSON.stringify(data.entry) } : {}),
+          },
+          requestId,
+        );
+        sendJson(res, 201, { ...result, session: options.gateway.session(result.selectedId!, controlActor) });
+        return;
       }
       if (path === "/api/tasks") {
-        if (typeof data.sessionId !== "string" || !data.sessionId || typeof data.prompt !== "string" || !data.prompt.trim() || typeof data.requestId !== "string") throw new UiError(400, "sessionId, prompt and requestId are required; use task submit <prompt> --session <id>");
+        if (
+          typeof data.sessionId !== "string" ||
+          !data.sessionId ||
+          typeof data.prompt !== "string" ||
+          !data.prompt.trim() ||
+          typeof data.requestId !== "string"
+        )
+          throw new UiError(
+            400,
+            "sessionId, prompt and requestId are required; use task submit <prompt> --session <id>",
+          );
         const text = typeof data.agent === "string" ? `@${data.agent} -- ${data.prompt}` : data.prompt;
-        const result = await options.gateway.handle(text, controlActor, { requestId: `api:${requestId}`, sessionId: data.sessionId });
-        sendJson(res, 202, result); return;
+        const result = await options.gateway.handle(text, controlActor, {
+          requestId: `api:${requestId}`,
+          sessionId: data.sessionId,
+        });
+        sendJson(res, 202, result);
+        return;
       }
       const taskMatch = /^\/api\/tasks\/([^/]+)\/(cancel|recover|dispatch)$/u.exec(path);
       if (taskMatch) {
         const task = options.gateway.task(decodeURIComponent(taskMatch[1]!), controlActor);
         if (!task) throw new UiError(404, "Gateway task not found");
-        if (taskMatch[2] === "cancel") await options.gateway.stop(options.gateway.session(task.sessionId, controlActor), controlActor, undefined, task.id);
+        if (taskMatch[2] === "cancel")
+          await options.gateway.stop(
+            options.gateway.session(task.sessionId, controlActor),
+            controlActor,
+            undefined,
+            task.id,
+          );
         else if (taskMatch[2] === "recover") await options.gateway.recoverTask(task.id, controlActor);
         else await options.gateway.dispatchTask(task.id, controlActor);
-        sendJson(res, 200, { task: options.gateway.task(task.id, controlActor) }); return;
+        sendJson(res, 200, { task: options.gateway.task(task.id, controlActor) });
+        return;
       }
       const delivery = /^\/api\/deliveries\/([^/]+)\/retry$/u.exec(path);
       if (delivery) {
-        if (data.confirmUnknown !== undefined && typeof data.confirmUnknown !== "boolean") throw new UiError(400, "confirmUnknown must be a boolean");
+        if (data.confirmUnknown !== undefined && typeof data.confirmUnknown !== "boolean")
+          throw new UiError(400, "confirmUnknown must be a boolean");
         const id = decodeURIComponent(delivery[1]!);
-        sendJson(res, 200, { delivery: options.gateway.retryDelivery(id, controlActor, data.confirmUnknown === true) }); return;
+        sendJson(res, 200, { delivery: options.gateway.retryDelivery(id, controlActor, data.confirmUnknown === true) });
+        return;
       }
       if (path === "/api/agents") {
         if (typeof data.id !== "string") throw new UiError(400, "Agent id is required");
-        await execute("agent.save", data, { id: data.id, config: JSON.stringify(data.config) }, requestId); sendJson(res, 200, { updated: data.id }); return;
+        await execute("agent.save", data, { id: data.id, config: JSON.stringify(data.config) }, requestId);
+        sendJson(res, 200, { updated: data.id });
+        return;
       }
       if (path === "/api/approvals") {
-        if (typeof data.id !== "string" || typeof data.decision !== "string") throw new UiError(400, "Approval id and decision are required");
-        await execute("approval.resolve", data, { id: data.id, decision: data.decision }, requestId); sendJson(res, 200, { resolved: data.id }); return;
+        if (typeof data.id !== "string" || typeof data.decision !== "string")
+          throw new UiError(400, "Approval id and decision are required");
+        await execute("approval.resolve", data, { id: data.id, decision: data.decision }, requestId);
+        sendJson(res, 200, { resolved: data.id });
+        return;
       }
       const permissionRule = /^\/api\/permission-rules\/([^/]+)\/revoke$/u.exec(path);
       if (permissionRule) {
         const id = decodeURIComponent(permissionRule[1]!);
-        sendJson(res, 200, { revoked: await options.gateway.revokePermissionRule(id, controlActor) }); return;
+        sendJson(res, 200, { revoked: await options.gateway.revokePermissionRule(id, controlActor) });
+        return;
       }
       if (path === "/api/permission-rules") {
-        if (typeof data.sourceId !== "string" || data.decision !== "allow" && data.decision !== "deny") throw new UiError(400, "sourceId 和 allow 或 deny 决定为必填字段。");
-        if (Object.keys(data).some(key => !["sourceId", "decision", "requestId"].includes(key))) throw new UiError(400, "创建规则只能引用已有规则的授权范围。");
-        sendJson(res, 201, await options.gateway.createPermissionRule(data.sourceId, data.decision, controlActor)); return;
+        if (typeof data.sourceId !== "string" || (data.decision !== "allow" && data.decision !== "deny"))
+          throw new UiError(400, "sourceId 和 allow 或 deny 决定为必填字段。");
+        if (Object.keys(data).some((key) => !["sourceId", "decision", "requestId"].includes(key)))
+          throw new UiError(400, "创建规则只能引用已有规则的授权范围。");
+        sendJson(res, 201, await options.gateway.createPermissionRule(data.sourceId, data.decision, controlActor));
+        return;
       }
     }
     sendJson(res, 404, { error: "Not found" });
   }
   function execute(name: string, data: Record<string, unknown>, args: Record<string, string>, requestId: string) {
-    const command: UiCommand = { version: 1, hostId: uiHost.hostId, requestId, name, targetId: typeof data.sessionId === "string" ? data.sessionId : null, args };
+    const command: UiCommand = {
+      version: 1,
+      hostId: uiHost.hostId,
+      requestId,
+      name,
+      targetId: typeof data.sessionId === "string" ? data.sessionId : null,
+      args,
+    };
     return uiHost.execute(command);
   }
-  const plugins = await PluginHost.create({ plugins: [routes, createWebApiPlugin({ handler: gatewayPluginServices.webHandler, port, ...(options.server ? { server: options.server } : {}) })] });
-  return { url: plugins.get(webApiService).url, ...(publicOrigin ? { publicUrl: publicOrigin } : {}), close: () => {
-    void closeGateway().catch(() => undefined);
-    return plugins.close();
-  } };
+  const plugins = await PluginHost.create({
+    plugins: [
+      routes,
+      createWebApiPlugin({
+        handler: gatewayPluginServices.webHandler,
+        port,
+        ...(options.server ? { server: options.server } : {}),
+      }),
+    ],
+  });
+  return {
+    url: plugins.get(webApiService).url,
+    ...(publicOrigin ? { publicUrl: publicOrigin } : {}),
+    close: () => {
+      void closeGateway().catch(() => undefined);
+      return plugins.close();
+    },
+  };
 }
 
 async function body(req: IncomingMessage, limit = 256 * 1024): Promise<Record<string, unknown>> {
-  if (req.headers["content-type"]?.split(";")[0]?.trim() !== "application/json") throw new UiError(400, "JSON required");
-  const chunks: Buffer[] = []; let size = 0;
-  for await (const chunk of req) { const bytes = Buffer.from(chunk as Uint8Array); size += bytes.length; if (size > limit) throw new UiError(413, "Request too large"); chunks.push(bytes); }
+  if (req.headers["content-type"]?.split(";")[0]?.trim() !== "application/json")
+    throw new UiError(400, "JSON required");
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const bytes = Buffer.from(chunk as Uint8Array);
+    size += bytes.length;
+    if (size > limit) throw new UiError(413, "Request too large");
+    chunks.push(bytes);
+  }
   let value: unknown;
-  try { value = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
-  catch { throw new UiError(400, "Invalid JSON"); }
+  try {
+    value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw new UiError(400, "Invalid JSON");
+  }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new UiError(400, "JSON object required");
   return value as Record<string, unknown>;
 }

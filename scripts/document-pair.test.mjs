@@ -6,7 +6,10 @@ import { fileURLToPath } from "node:url";
 import { inspectDocument, compareStructure } from "./document-pair.mjs";
 
 test("real documentation preserves hashes across Windows line endings", async () => {
-  const text = (await readFile(new URL("../docs/en/getting-started.md", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
+  const text = (await readFile(new URL("../docs/en/getting-started.md", import.meta.url), "utf8")).replaceAll(
+    "\r\n",
+    "\n",
+  );
   assert.deepEqual(inspectDocument(text), inspectDocument(text.replaceAll("\n", "\r\n")));
   const changed = inspectDocument(text.replace("# ", "# Updated "));
   assert.notDeepEqual(changed.sections, inspectDocument(text).sections);
@@ -14,7 +17,10 @@ test("real documentation preserves hashes across Windows line endings", async ()
 
 test("blockquote nesting around an existing page changes its structure", async () => {
   const text = await readFile(new URL("../docs/en/getting-started.md", import.meta.url), "utf8");
-  const quoted = text.split("\n").map(line => `> ${line}`).join("\n");
+  const quoted = text
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
   assert.ok(compareStructure(inspectDocument(text), inspectDocument(quoted)).length > 0);
 });
 
@@ -28,7 +34,9 @@ test("CLI accepts Windows paths and refuses unspecified confirmations", () => {
 });
 
 test("real bilingual pages reject removed structural elements", async () => {
-  const [en, zh] = await Promise.all(["en", "zh-CN"].map(locale => readFile(new URL(`../docs/${locale}/getting-started.md`, import.meta.url), "utf8")));
+  const [en, zh] = await Promise.all(
+    ["en", "zh-CN"].map((locale) => readFile(new URL(`../docs/${locale}/getting-started.md`, import.meta.url), "utf8")),
+  );
   assert.deepEqual(compareStructure(inspectDocument(en), inspectDocument(zh)), []);
   assert.ok(compareStructure(inspectDocument(en), inspectDocument(zh.replace(/^## /m, "### "))).length > 0);
 });

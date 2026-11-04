@@ -15,6 +15,7 @@
 name: research
 description: 使用一手来源研究主题，并提供带引用的结论。
 ---
+
 阅读 references/guide.md。比较一手证据，说明不确定性。
 ```
 
@@ -97,7 +98,9 @@ const definition = defineAgent({ model, tools, skills, permissionPolicy });
 const app = await definition.open({ store });
 try {
   await app.activateSkill("research");
-  await (await app.submit({ input: "研究指定主题" })).result;
+  await (
+    await app.submit({ input: "研究指定主题" })
+  ).result;
 } finally {
   await app.close();
 }

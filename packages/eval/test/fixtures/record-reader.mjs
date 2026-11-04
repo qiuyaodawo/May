@@ -4,7 +4,9 @@ import { FileEvalStore } from "../../dist/file-store.js";
 
 const store = new FileEvalStore({ directory: process.argv[2] });
 let stopped = false;
-process.on("message", message => { if (message === "stop") stopped = true; });
+process.on("message", (message) => {
+  if (message === "stop") stopped = true;
+});
 process.send("ready");
 let reads = 0;
 while (!stopped) {

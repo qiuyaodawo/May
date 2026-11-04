@@ -149,12 +149,13 @@ flowchart TD
 Provider、工具、提示内容、权限策略和模型配置由产品提供。
 
 ```ts
-openApplication: ({ sessionId, resume }) => agent.open({
-  store,
-  metadata: { workspace },
-  ...(sessionId === undefined ? {} : { sessionId }),
-  ...(resume ? { resume: true } : {}),
-})
+openApplication: ({ sessionId, resume }) =>
+  agent.open({
+    store,
+    metadata: { workspace },
+    ...(sessionId === undefined ? {} : { sessionId }),
+    ...(resume ? { resume: true } : {}),
+  });
 ```
 
 打开时显式 `sessionId` 优先。否则，启用 `autoResume` 时，Workspace 从 Catalog 查询

@@ -1,10 +1,7 @@
 import { executeMcpCommand, MCP_COMMAND_USAGE } from "./mcp-commands.js";
 import { executeGoalCommand, GOAL_COMMAND_USAGE } from "./goal-commands.js";
 import { DELEGATION_COMMAND_USAGE, executeDelegationCommand } from "./delegation-commands.js";
-import type {
-  ContextCompactionResult,
-  ContextInspection,
-} from "@sortedyuan/may/context";
+import type { ContextCompactionResult, ContextInspection } from "@sortedyuan/may/context";
 import type { SessionSummary } from "@sortedyuan/may/session/catalog";
 import type { McpServerStatus } from "@sortedyuan/mcp";
 import {
@@ -53,8 +50,7 @@ export type MaybeCodeSlashCommandName =
   | "/help"
   | "/quit";
 
-export type MaybeCodeSlashCommand =
-  SlashCommandDefinition<MaybeCodeSlashCommandName>;
+export type MaybeCodeSlashCommand = SlashCommandDefinition<MaybeCodeSlashCommandName>;
 
 export const MAYBECODE_COMPACTION_STRATEGIES = [
   "history-reference",
@@ -62,18 +58,50 @@ export const MAYBECODE_COMPACTION_STRATEGIES = [
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
-  { name: "/permissions", usage: "/permissions [list|allow <id>|deny <id>|revoke <id>]", description: "查看、创建或撤销持久权限规则" },
-  { name: "/fork", usage: "/fork", description: "Choose a historical reply and fork in this workspace or a new worktree" },
-  { name: "/changes", usage: "/changes [run <run-id>|session|workspace|commit <commit>]", description: "Browse checkpoint and workspace file changes" },
+  {
+    name: "/permissions",
+    usage: "/permissions [list|allow <id>|deny <id>|revoke <id>]",
+    description: "查看、创建或撤销持久权限规则",
+  },
+  {
+    name: "/fork",
+    usage: "/fork",
+    description: "Choose a historical reply and fork in this workspace or a new worktree",
+  },
+  {
+    name: "/changes",
+    usage: "/changes [run <run-id>|session|workspace|commit <commit>]",
+    description: "Browse checkpoint and workspace file changes",
+  },
   { name: "/worktrees", usage: "/worktrees [open|delete <id>]", description: "List, open or delete managed worktrees" },
-  { name: "/steer", usage: "/steer <message>", description: "Deliver additional input after the current Step finishes" },
+  {
+    name: "/steer",
+    usage: "/steer <message>",
+    description: "Deliver additional input after the current Step finishes",
+  },
   { name: "/stop", usage: "/stop", description: "Cancel the current operation" },
-  { name: "/yolo", usage: "/yolo [on|off|status]", description: "Enable automatic tool approval; use off to disable or status to inspect" },
+  {
+    name: "/yolo",
+    usage: "/yolo [on|off|status]",
+    description: "Enable automatic tool approval; use off to disable or status to inspect",
+  },
   { name: "/goal", usage: GOAL_COMMAND_USAGE, description: "Start, inspect, pause, resume, or cancel a durable goal" },
   { name: "/web", usage: "/web", description: "Open the current workspace and session in a browser" },
-  { name: "/skills", usage: "/skills [show <name>|use <name> [task]]", description: "List skills, preview instructions, or activate a skill" },
-  { name: "/recovery", usage: "/recovery [resolve <id> <verified finding>]", description: "Inspect interrupted tools or record verified recovery findings" },
-  { name: "/delegations", usage: DELEGATION_COMMAND_USAGE, description: "Inspect sub-agent requests and tools, and control status notifications" },
+  {
+    name: "/skills",
+    usage: "/skills [show <name>|use <name> [task]]",
+    description: "List skills, preview instructions, or activate a skill",
+  },
+  {
+    name: "/recovery",
+    usage: "/recovery [resolve <id> <verified finding>]",
+    description: "Inspect interrupted tools or record verified recovery findings",
+  },
+  {
+    name: "/delegations",
+    usage: DELEGATION_COMMAND_USAGE,
+    description: "Inspect sub-agent requests and tools, and control status notifications",
+  },
   {
     name: "/new",
     usage: "/new",
@@ -137,11 +165,9 @@ export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
   },
 ];
 
-export type MaybeCodeSlashCommandInvocation =
-  SlashCommandInvocation<MaybeCodeSlashCommand>;
+export type MaybeCodeSlashCommandInvocation = SlashCommandInvocation<MaybeCodeSlashCommand>;
 
-export type MaybeCodeSlashCommandParseResult =
-  SlashCommandParseResult<MaybeCodeSlashCommand>;
+export type MaybeCodeSlashCommandParseResult = SlashCommandParseResult<MaybeCodeSlashCommand>;
 
 export type MaybeCodeSlashCommandResult =
   | { readonly type: "fork.selection.requested"; readonly points: readonly UiForkPoint[] }
@@ -209,16 +235,12 @@ export type MaybeCodeSlashCommandSuggestion = SlashCommandSuggestion;
 
 export type MaybeCodeSlashCommandSuggester = SlashCommandSuggester;
 
-export function formatMaybeCodeMcpStatus(
-  servers: readonly McpServerStatus[],
-): string {
+export function formatMaybeCodeMcpStatus(servers: readonly McpServerStatus[]): string {
   if (servers.length === 0) return "MCP: disabled (no servers configured)";
   const lines = ["MCP servers:"];
   for (const server of servers) {
     const requirement = server.required ? "required" : "optional";
-    lines.push(
-      `- ${server.serverId}: ${server.state} (${requirement}, ${server.transport})`,
-    );
+    lines.push(`- ${server.serverId}: ${server.state} (${requirement}, ${server.transport})`);
     if (server.protocolVersion !== undefined) {
       lines.push(`  protocol: ${server.protocolVersion}`);
     }
@@ -231,15 +253,8 @@ export function formatMaybeCodeMcpStatus(
       lines.push(...server.toolNames.map((name) => `    - ${name}`));
     }
     if (server.diagnostic !== undefined) {
-      const code = server.diagnostic.code === undefined
-        ? ""
-        : ` [${server.diagnostic.code}]`;
-      lines.push(
-        ...indentLines(
-          `  error${code}: `,
-          server.diagnostic.message,
-        ),
-      );
+      const code = server.diagnostic.code === undefined ? "" : ` [${server.diagnostic.code}]`;
+      lines.push(...indentLines(`  error${code}: `, server.diagnostic.message));
     }
     const stderr = server.stderr ?? server.diagnostic?.stderr;
     if (stderr !== undefined) {
@@ -251,15 +266,11 @@ export function formatMaybeCodeMcpStatus(
 
 const maybeCodeSlashCommands = new SlashCommandRegistry(MAYBECODE_SLASH_COMMANDS);
 
-export function parseMaybeCodeSlashCommand(
-  input: string,
-): MaybeCodeSlashCommandParseResult {
+export function parseMaybeCodeSlashCommand(input: string): MaybeCodeSlashCommandParseResult {
   return maybeCodeSlashCommands.parse(input);
 }
 
-export function matchMaybeCodeSlashCommands(
-  prefix: string,
-): readonly MaybeCodeSlashCommandSuggestion[] {
+export function matchMaybeCodeSlashCommands(prefix: string): readonly MaybeCodeSlashCommandSuggestion[] {
   return maybeCodeSlashCommands.match(prefix);
 }
 
@@ -276,10 +287,7 @@ export function createMaybeCodeSlashCommandSuggester(
 
   const sessions = async (): Promise<readonly SessionSummary[]> => {
     const now = Date.now();
-    if (
-      cachedSessions === undefined ||
-      now - cachedAt >= sessionCacheMs
-    ) {
+    if (cachedSessions === undefined || now - cachedAt >= sessionCacheMs) {
       cachedSessions = await controller.listSessions();
       cachedAt = Date.now();
     }
@@ -290,39 +298,56 @@ export function createMaybeCodeSlashCommandSuggester(
     const { definition, invokedAs: command, argumentPrefix } = argumentInput;
     if (definition?.name === "/delegations") {
       const match = /^notifications\s+(\S*)$/u.exec(argumentPrefix);
-      if (match) return ["on", "off", "status"].filter(value => value.startsWith(match[1]!))
-        .map(value => ({ value: `${command} notifications ${value}`, label: value }));
-      return ["show", "notifications", "tools", "resolve"].filter(value => value.startsWith(argumentPrefix))
-        .map(value => ({ value: `${command} ${value}`, label: value }));
+      if (match)
+        return ["on", "off", "status"]
+          .filter((value) => value.startsWith(match[1]!))
+          .map((value) => ({ value: `${command} notifications ${value}`, label: value }));
+      return ["show", "notifications", "tools", "resolve"]
+        .filter((value) => value.startsWith(argumentPrefix))
+        .map((value) => ({ value: `${command} ${value}`, label: value }));
     }
     if (definition?.name === "/yolo") {
-      return ["on", "off", "status"].filter(value => value.startsWith(argumentPrefix))
-        .map(value => ({ value: `${command} ${value}`, label: value, description: "Permission mode" }));
+      return ["on", "off", "status"]
+        .filter((value) => value.startsWith(argumentPrefix))
+        .map((value) => ({ value: `${command} ${value}`, label: value, description: "Permission mode" }));
     }
     if (definition?.name === "/goal") {
-      return ["start", "status", "pause", "resume", "cancel"].filter(verb => verb.startsWith(argumentPrefix))
-        .map(verb => ({ value: `${command} ${verb}`, label: verb }));
+      return ["start", "status", "pause", "resume", "cancel"]
+        .filter((verb) => verb.startsWith(argumentPrefix))
+        .map((verb) => ({ value: `${command} ${verb}`, label: verb }));
     }
     if (definition?.name === "/skills") {
       const match = /^(show|use)\s+(\S*)$/u.exec(argumentPrefix);
-      if (match) return controller.application.listSkills()
-        .filter((skill) => skill.name.startsWith(match[2]!))
-        .map((skill) => ({ value: `${command} ${match[1]} ${skill.name}`, label: skill.name, description: skill.description }));
+      if (match)
+        return controller.application
+          .listSkills()
+          .filter((skill) => skill.name.startsWith(match[2]!))
+          .map((skill) => ({
+            value: `${command} ${match[1]} ${skill.name}`,
+            label: skill.name,
+            description: skill.description,
+          }));
       if (/\s/u.test(argumentPrefix)) return [];
-      return ["show", "use"].filter((verb) => verb.startsWith(argumentPrefix))
-        .map((verb) => ({ value: `${command} ${verb}`, label: verb, description: verb === "show" ? "Preview without activation" : "Activate for the current session" }));
+      return ["show", "use"]
+        .filter((verb) => verb.startsWith(argumentPrefix))
+        .map((verb) => ({
+          value: `${command} ${verb}`,
+          label: verb,
+          description: verb === "show" ? "Preview without activation" : "Activate for the current session",
+        }));
     }
     if (definition?.name === "/compact") {
       if (/\s/u.test(argumentPrefix)) return [];
-      return MAYBECODE_COMPACTION_STRATEGIES
-        .filter((strategy) => strategy.startsWith(argumentPrefix))
-        .map((strategy) => ({
+      return MAYBECODE_COMPACTION_STRATEGIES.filter((strategy) => strategy.startsWith(argumentPrefix)).map(
+        (strategy) => ({
           value: `${command} ${strategy}`,
           label: strategy,
-          description: strategy === "provider-native"
-            ? "Compact with the active model's native compactor"
-            : "Keep the current request and fresh saved work notes",
-        }));
+          description:
+            strategy === "provider-native"
+              ? "Compact with the active model's native compactor"
+              : "Keep the current request and fresh saved work notes",
+        }),
+      );
     }
 
     if (definition?.name === "/resume") {
@@ -332,24 +357,25 @@ export function createMaybeCodeSlashCommandSuggester(
         .map((session) => ({
           value: `${command} ${session.id}`,
           label: session.id,
-          description: session.id === controller.sessionId
-            ? "Current session"
-            : `Last used ${new Date(session.lastUsedAt).toISOString()}`,
+          description:
+            session.id === controller.sessionId
+              ? "Current session"
+              : `Last used ${new Date(session.lastUsedAt).toISOString()}`,
         }));
     }
 
     if (definition?.name === "/model") {
-      const optionInput = /^(\S+)\s+(\S*)$/u.exec(
-        argumentPrefix,
-      );
+      const optionInput = /^(\S+)\s+(\S*)$/u.exec(argumentPrefix);
       if (optionInput !== null) {
         const optionPrefix = optionInput[2]!;
         return "--default".startsWith(optionPrefix)
-          ? [{
-              value: `${command} ${optionInput[1]} --default`,
-              label: "--default",
-              description: "Switch to this profile and make it the default",
-            }]
+          ? [
+              {
+                value: `${command} ${optionInput[1]} --default`,
+                label: "--default",
+                description: "Switch to this profile and make it the default",
+              },
+            ]
           : [];
       }
       if (/\s/u.test(argumentPrefix)) return [];
@@ -359,9 +385,10 @@ export function createMaybeCodeSlashCommandSuggester(
         .map((model) => ({
           value: `${command} ${model.name}`,
           label: model.name,
-          description: model.name === controller.application.modelInfo?.profile
-            ? `Current · ${model.provider}/${model.model}`
-            : `${model.provider}/${model.model} · ${model.adapter}`,
+          description:
+            model.name === controller.application.modelInfo?.profile
+              ? `Current · ${model.provider}/${model.model}`
+              : `${model.provider}/${model.model} · ${model.adapter}`,
         }));
     }
 
@@ -389,35 +416,43 @@ export async function executeMaybeCodeSlashCommand(
 ): Promise<MaybeCodeSlashCommandResult> {
   const parsed = parseMaybeCodeSlashCommand(input);
   if (parsed.type !== "command") {
-    return parsed.type === "unknown"
-      ? parsed
-      : { type: "unknown", command: input };
+    return parsed.type === "unknown" ? parsed : { type: "unknown", command: input };
   }
 
   const { definition, arguments: arguments_ } = parsed;
   switch (definition.name) {
     case "/fork": {
       if (arguments_.length) return { type: "usage", usage: "/fork" };
-      if (!controller.getForkPoints || !controller.forkSession) throw new Error("Session forks are unavailable in this host");
-      if (controller.isRunning) throw new Error("Wait for the current request to finish before creating a Session fork");
+      if (!controller.getForkPoints || !controller.forkSession)
+        throw new Error("Session forks are unavailable in this host");
+      if (controller.isRunning)
+        throw new Error("Wait for the current request to finish before creating a Session fork");
       return { type: "fork.selection.requested", points: await controller.getForkPoints() };
     }
     case "/changes": {
       if (!controller.getChanges) throw new Error("Git checkpoints are unavailable in this host");
       const [scope = "workspace", value] = arguments_;
-      if (arguments_.length > 2 || !["run", "session", "workspace", "commit"].includes(scope) ||
-          (["run", "commit"].includes(scope) && !value) || (["session", "workspace"].includes(scope) && value)) {
+      if (
+        arguments_.length > 2 ||
+        !["run", "session", "workspace", "commit"].includes(scope) ||
+        (["run", "commit"].includes(scope) && !value) ||
+        (["session", "workspace"].includes(scope) && value)
+      ) {
         return { type: "usage", usage: "/changes [run <run-id>|session|workspace|commit <commit>]" };
       }
-      return { type: "changes.selection.requested", diff: await controller.getChanges({
-        scope: scope === "commit" ? "workspace" : scope as "run" | "session" | "workspace",
-        ...(scope === "run" ? { runId: value! } : scope === "commit" ? { commit: value! } : {}),
-      }) };
+      return {
+        type: "changes.selection.requested",
+        diff: await controller.getChanges({
+          scope: scope === "commit" ? "workspace" : (scope as "run" | "session" | "workspace"),
+          ...(scope === "run" ? { runId: value! } : scope === "commit" ? { commit: value! } : {}),
+        }),
+      };
     }
     case "/worktrees": {
       if (!controller.getWorktrees) throw new Error("Worktree management is unavailable in this host");
       if (arguments_.length) {
-        if (arguments_.length !== 2 || !["open", "delete"].includes(arguments_[0]!)) return { type: "usage", usage: "/worktrees [open|delete <id>]" };
+        if (arguments_.length !== 2 || !["open", "delete"].includes(arguments_[0]!))
+          return { type: "usage", usage: "/worktrees [open|delete <id>]" };
         if (arguments_[0] === "open") {
           if (!controller.openWorktree) throw new Error("Opening a worktree is unavailable in this host");
           await controller.openWorktree(arguments_[1]!);
@@ -436,45 +471,85 @@ export async function executeMaybeCodeSlashCommand(
       return { type: "display", text: `Steering input ${result.inputId}: ${result.status}` };
     }
     case "/stop": {
-      const invalid = noArguments(arguments_, definition); if (invalid) return invalid;
-      return { type: "display", text: controller.cancel("Stopped by user") ? "Cancellation requested." : "No active operation." };
+      const invalid = noArguments(arguments_, definition);
+      if (invalid) return invalid;
+      return {
+        type: "display",
+        text: controller.cancel("Stopped by user") ? "Cancellation requested." : "No active operation.",
+      };
     }
     case "/yolo": {
       const action = arguments_[0] ?? "on";
-      if (arguments_.length > 1 || !["on", "off", "status"].includes(action)) return { type: "usage", usage: "/yolo [on|off|status]" };
+      if (arguments_.length > 1 || !["on", "off", "status"].includes(action))
+        return { type: "usage", usage: "/yolo [on|off|status]" };
       if (action !== "status") await controller.setPermissionMode(action === "on" ? "yolo" : "default");
       return { type: "display", text: controller.permissionMode === "yolo" ? "YOLO enabled" : "YOLO disabled" };
     }
     case "/permissions": {
-      if (!controller.application.persistentRulesEnabled || !controller.listPermissionRules || !controller.revokePermissionRule) throw new Error("此宿主没有启用规则管理。");
+      if (
+        !controller.application.persistentRulesEnabled ||
+        !controller.listPermissionRules ||
+        !controller.revokePermissionRule
+      )
+        throw new Error("此宿主没有启用规则管理。");
       const action = arguments_[0] ?? "list";
       if (action === "list" && arguments_.length <= 1) {
         const rules = await controller.listPermissionRules();
-        return { type: "display", text: rules.length === 0 ? "当前没有持久权限规则。" : rules.map(rule =>
-          `${rule.id}\n${rule.decision === "allow" ? "允许" : "禁止"} · ${rule.description}\n范围：${rule.scopeId}\n创建者：${rule.createdBy}\n有效期：${rule.expiresAt === undefined ? "持续有效" : new Date(rule.expiresAt).toISOString()}`,
-        ).join("\n\n") };
+        return {
+          type: "display",
+          text:
+            rules.length === 0
+              ? "当前没有持久权限规则。"
+              : rules
+                  .map(
+                    (rule) =>
+                      `${rule.id}\n${rule.decision === "allow" ? "允许" : "禁止"} · ${rule.description}\n范围：${rule.scopeId}\n创建者：${rule.createdBy}\n有效期：${rule.expiresAt === undefined ? "持续有效" : new Date(rule.expiresAt).toISOString()}`,
+                  )
+                  .join("\n\n"),
+        };
       }
       if (action === "revoke" && arguments_.length === 2) {
-        if (!await controller.revokePermissionRule(arguments_[1]!)) throw new Error("规则不存在。");
+        if (!(await controller.revokePermissionRule(arguments_[1]!))) throw new Error("规则不存在。");
         return { type: "display", text: "已撤销权限规则。" };
       }
       if ((action === "allow" || action === "deny") && arguments_.length === 2) {
         if (!controller.createPermissionRuleFrom) throw new Error("此宿主没有启用规则创建。");
-        const rule = await controller.createPermissionRuleFrom(arguments_[1]!, { decision: action, createdBy: `local:${userInfo().username}` });
-        return { type: "display", text: `已创建${action === "allow" ? "允许" : "禁止"}规则：${rule.id}\n${rule.description}\n范围：${rule.scopeId}\n同范围的禁止规则优先。` };
+        const rule = await controller.createPermissionRuleFrom(arguments_[1]!, {
+          decision: action,
+          createdBy: `local:${userInfo().username}`,
+        });
+        return {
+          type: "display",
+          text: `已创建${action === "allow" ? "允许" : "禁止"}规则：${rule.id}\n${rule.description}\n范围：${rule.scopeId}\n同范围的禁止规则优先。`,
+        };
       }
       return { type: "usage", usage: definition.usage };
     }
-    case "/goal": return { type: "display", text: await executeGoalCommand(arguments_, controller) };
+    case "/goal":
+      return { type: "display", text: await executeGoalCommand(arguments_, controller) };
     case "/web":
       return noArguments(arguments_, definition) ?? { type: "web.requested" };
     case "/skills": {
       if (arguments_.length === 0) {
         const skills = controller.application.listSkills();
         const diagnostics = controller.application.agent.skills?.registry.diagnostics ?? [];
-        const text = skills.length === 0 ? "No skills discovered."
-          : skills.map((skill) => `${skill.name}${skill.active ? " [active]" : ""} — ${skill.description}\n  ${skill.directory}`).join("\n");
-        return { type: "display", text: text + (diagnostics.length === 0 ? "" : "\n\nDiscovery diagnostics:\n" + diagnostics.map((item) => `${item.path}: ${item.message}`).join("\n")) };
+        const text =
+          skills.length === 0
+            ? "No skills discovered."
+            : skills
+                .map(
+                  (skill) =>
+                    `${skill.name}${skill.active ? " [active]" : ""} — ${skill.description}\n  ${skill.directory}`,
+                )
+                .join("\n");
+        return {
+          type: "display",
+          text:
+            text +
+            (diagnostics.length === 0
+              ? ""
+              : "\n\nDiscovery diagnostics:\n" + diagnostics.map((item) => `${item.path}: ${item.message}`).join("\n")),
+        };
       }
       const [verb, name, ...task] = arguments_;
       if (name === undefined || !["show", "use"].includes(verb!)) return usage(definition);
@@ -482,7 +557,10 @@ export async function executeMaybeCodeSlashCommand(
         if (task.length > 0) return usage(definition);
         if (!controller.readSkill) throw new Error("Skills are unsupported by this controller");
         const document = await controller.readSkill(name);
-        return { type: "display", text: `${document.name}\n${document.directory}\nRevision: ${document.revision}\n\n${document.body}` };
+        return {
+          type: "display",
+          text: `${document.name}\n${document.directory}\nRevision: ${document.revision}\n\n${document.body}`,
+        };
       }
       if (task.length > 0) {
         if (!controller.submitSkill) throw new Error("Skill submission is unsupported by this controller");
@@ -495,27 +573,42 @@ export async function executeMaybeCodeSlashCommand(
     case "/recovery": {
       if (arguments_.length === 0) {
         const pending = controller.listRecoveries();
-        return { type: "display", text: pending.length === 0 ? "No unresolved recovery findings."
-          : pending.map((item) => `${item.id} — ${item.call.name}: outcome unknown\nInput: ${JSON.stringify(item.call.input)}`).join("\n\n") + "\nVerify external effects, then use /recovery resolve <id> <verified finding>." };
+        return {
+          type: "display",
+          text:
+            pending.length === 0
+              ? "No unresolved recovery findings."
+              : pending
+                  .map(
+                    (item) =>
+                      `${item.id} — ${item.call.name}: outcome unknown\nInput: ${JSON.stringify(item.call.input)}`,
+                  )
+                  .join("\n\n") + "\nVerify external effects, then use /recovery resolve <id> <verified finding>.",
+        };
       }
       if (arguments_[0] !== "resolve" || arguments_.length < 3) return usage(definition);
       if (!controller.resolveRecovery) throw new Error("Recovery resolution is unsupported");
       await controller.resolveRecovery(arguments_[1]!, arguments_.slice(2).join(" "));
       return { type: "display", text: "Recovery finding recorded. No tools were replayed." };
     }
-    case "/delegations": return { type: "display", text: await executeDelegationCommand(arguments_, controller) };
+    case "/delegations":
+      return { type: "display", text: await executeDelegationCommand(arguments_, controller) };
     case "/quit":
       return noArguments(arguments_, definition) ?? { type: "exit" };
     case "/help":
-      return noArguments(arguments_, definition) ?? {
-        type: "help",
-        commands: MAYBECODE_SLASH_COMMANDS,
-      };
+      return (
+        noArguments(arguments_, definition) ?? {
+          type: "help",
+          commands: MAYBECODE_SLASH_COMMANDS,
+        }
+      );
     case "/instructions":
-      return noArguments(arguments_, definition) ?? {
-        type: "instructions",
-        instructions: controller.application.instructions,
-      };
+      return (
+        noArguments(arguments_, definition) ?? {
+          type: "instructions",
+          instructions: controller.application.instructions,
+        }
+      );
     case "/retry": {
       const invalid = noArguments(arguments_, definition);
       if (invalid !== undefined) return invalid;
@@ -526,7 +619,8 @@ export async function executeMaybeCodeSlashCommand(
       if (invalid !== undefined) return invalid;
       return { type: "status", inspection: await controller.inspectContext() };
     }
-    case "/mcp": return executeMcpCommand(input, controller);
+    case "/mcp":
+      return executeMcpCommand(input, controller);
     case "/context": {
       const invalid = noArguments(arguments_, definition);
       if (invalid !== undefined) return invalid;
@@ -534,10 +628,7 @@ export async function executeMaybeCodeSlashCommand(
     }
     case "/compact": {
       const strategy = arguments_[0];
-      if (
-        arguments_.length > 1 ||
-        (strategy !== undefined && !isCompactionStrategy(strategy))
-      ) {
+      if (arguments_.length > 1 || (strategy !== undefined && !isCompactionStrategy(strategy))) {
         return usage(definition);
       }
       return {
@@ -573,17 +664,11 @@ export async function executeMaybeCodeSlashCommand(
       }
       const query = arguments_[0];
       const setDefault = arguments_[1] === "--default";
-      if (
-        query === undefined ||
-        arguments_.length > 2 ||
-        (arguments_.length === 2 && !setDefault)
-      ) {
+      if (query === undefined || arguments_.length > 2 || (arguments_.length === 2 && !setDefault)) {
         return usage(definition);
       }
       const normalized = query.toLowerCase();
-      const selected = (await controller.listModels()).find((model) =>
-        model.name.toLowerCase().startsWith(normalized)
-      );
+      const selected = (await controller.listModels()).find((model) => model.name.toLowerCase().startsWith(normalized));
       if (selected === undefined) return { type: "model.not-found", query };
       const model = await controller.switchModel(selected.name);
       if (setDefault) await controller.setDefaultModel(selected.name);
@@ -606,30 +691,21 @@ export async function executeMaybeCodeSlashCommand(
         return { type: "effort.selection.requested", state };
       }
       const normalized = query.toLowerCase();
-      const selected = reasoningEffortChoices(state).find((effort) =>
-        effort.toLowerCase().startsWith(normalized)
-      );
+      const selected = reasoningEffortChoices(state).find((effort) => effort.toLowerCase().startsWith(normalized));
       if (selected === undefined) return { type: "effort.not-found", query };
       return {
         type: "effort.changed",
-        state: await controller.setReasoningEffort(
-          selected === "default" ? undefined : selected,
-        ),
+        state: await controller.setReasoningEffort(selected === "default" ? undefined : selected),
       };
     }
   }
 }
 
-function reasoningEffortChoices(
-  state: MaybeCodeReasoningEffortState,
-): readonly string[] {
+function reasoningEffortChoices(state: MaybeCodeReasoningEffortState): readonly string[] {
   return ["default", ...state.efforts];
 }
 
-function reasoningEffortDescription(
-  effort: string,
-  state: MaybeCodeReasoningEffortState,
-): string {
+function reasoningEffortDescription(effort: string, state: MaybeCodeReasoningEffortState): string {
   if (effort === "default") {
     const value = state.defaultEffort ?? "provider/model default";
     return `Clear runtime override · ${value}`;
@@ -645,21 +721,15 @@ function noArguments(
   return arguments_.length === 0 ? undefined : usage(definition);
 }
 
-function usage(
-  definition: MaybeCodeSlashCommand,
-): Extract<MaybeCodeSlashCommandResult, { type: "usage" }> {
+function usage(definition: MaybeCodeSlashCommand): Extract<MaybeCodeSlashCommandResult, { type: "usage" }> {
   return { type: "usage", usage: definition.usage };
 }
 
-function isCompactionStrategy(
-  value: string,
-): value is MaybeCodeCompactionStrategyName {
+function isCompactionStrategy(value: string): value is MaybeCodeCompactionStrategyName {
   return MAYBECODE_COMPACTION_STRATEGIES.some((strategy) => strategy === value);
 }
 
 function indentLines(prefix: string, value: string): readonly string[] {
   const lines = value.split("\n");
-  return lines.map((line, index) =>
-    index === 0 ? `${prefix}${line}` : `    ${line}`
-  );
+  return lines.map((line, index) => (index === 0 ? `${prefix}${line}` : `    ${line}`));
 }

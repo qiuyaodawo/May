@@ -1,21 +1,10 @@
 import assert from "node:assert/strict";
-import {
-  link,
-  mkdir,
-  mkdtemp,
-  realpath,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
+import { link, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import {
-  CodingInstructionsError,
-  loadCodingInstructions,
-} from "../dist/instructions.js";
+import { CodingInstructionsError, loadCodingInstructions } from "../dist/instructions.js";
 
 test("loads configurable system, runtime, and project instruction sections", async (t) => {
   const workspace = await temporaryDirectory(t);
@@ -146,8 +135,7 @@ test("rejects unsafe project instruction filenames and links", async (t) => {
 });
 
 function hasCode(code) {
-  return (error) =>
-    error instanceof CodingInstructionsError && error.code === code;
+  return (error) => error instanceof CodingInstructionsError && error.code === code;
 }
 
 async function temporaryDirectory(t) {

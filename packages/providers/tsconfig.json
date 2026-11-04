@@ -7,8 +7,6 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "types": ["node"]
   },
-  "references": [
-    { "path": "../may" }
-  ],
+  "references": [{ "path": "../may" }],
   "include": ["src/**/*.ts"]
 }

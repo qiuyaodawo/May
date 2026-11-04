@@ -43,6 +43,7 @@
   增加可选 service 查询、本地诊断与独立指标服务，以及可复用的 UI 诊断面板。宿主可以
   按会话范围查询执行记录、刷新模型能力，并独立管理遥测资源。子 Agent 预算包装保留
   模型配置、能力版本和物理请求观察信息。
+
 - 6cec20c: Add opt-in persistent time and event scheduling with timezone-aware cron rules, atomic event deduplication, immutable execution snapshots, restart-safe task submissions, and an exclusive SQLite store. Hosts explicitly start scheduling and provide idempotent task dispatchers.
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to

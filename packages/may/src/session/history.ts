@@ -50,16 +50,14 @@ export class SessionHistoryReader {
     return [...events];
   }
 
-  async query(
-    sessionId: string,
-    query: SessionHistoryQuery = {},
-  ): Promise<SessionHistoryPage> {
+  async query(sessionId: string, query: SessionHistoryQuery = {}): Promise<SessionHistoryPage> {
     const normalized = this.normalizeQuery(query);
     const all = await this.readAll(sessionId);
-    const selected = all.filter((event) =>
-      (normalized.afterSeq === undefined || event.seq > normalized.afterSeq) &&
-      (normalized.beforeSeq === undefined || event.seq < normalized.beforeSeq) &&
-      (normalized.types === undefined || normalized.types.has(event.type))
+    const selected = all.filter(
+      (event) =>
+        (normalized.afterSeq === undefined || event.seq > normalized.afterSeq) &&
+        (normalized.beforeSeq === undefined || event.seq < normalized.beforeSeq) &&
+        (normalized.types === undefined || normalized.types.has(event.type)),
     );
     if (normalized.order === "desc") selected.reverse();
 
@@ -68,9 +66,7 @@ export class SessionHistoryReader {
     return {
       events,
       hasMore,
-      ...(hasMore && events.length > 0
-        ? { nextSeq: events[events.length - 1]!.seq }
-        : {}),
+      ...(hasMore && events.length > 0 ? { nextSeq: events[events.length - 1]!.seq } : {}),
     };
   }
 
@@ -83,25 +79,17 @@ export class SessionHistoryReader {
   } {
     validateOptionalSeq(query.afterSeq, "afterSeq");
     validateOptionalSeq(query.beforeSeq, "beforeSeq");
-    if (
-      query.afterSeq !== undefined &&
-      query.beforeSeq !== undefined &&
-      query.afterSeq >= query.beforeSeq
-    ) {
+    if (query.afterSeq !== undefined && query.beforeSeq !== undefined && query.afterSeq >= query.beforeSeq) {
       throw new RangeError("afterSeq must be less than beforeSeq");
     }
-    const limit = query.limit === undefined
-      ? this.defaultLimit
-      : positiveInteger(query.limit, "limit");
+    const limit = query.limit === undefined ? this.defaultLimit : positiveInteger(query.limit, "limit");
     if (limit > this.maximumLimit) {
       throw new RangeError(`limit cannot exceed ${this.maximumLimit}`);
     }
     if (query.order !== undefined && query.order !== "asc" && query.order !== "desc") {
       throw new TypeError('order must be either "asc" or "desc"');
     }
-    const types = query.types === undefined
-      ? undefined
-      : new Set(query.types);
+    const types = query.types === undefined ? undefined : new Set(query.types);
     if (types?.size === 0) {
       throw new RangeError("types cannot be empty");
     }
@@ -152,9 +140,7 @@ export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "run.cancelled",
 ] as const;
 
-const SESSION_EVENT_TYPE_SET: ReadonlySet<string> = new Set(
-  SESSION_EVENT_TYPES,
-);
+const SESSION_EVENT_TYPE_SET: ReadonlySet<string> = new Set(SESSION_EVENT_TYPES);
 
 function validateEventType(type: SessionEventType): void {
   if (typeof type !== "string" || !SESSION_EVENT_TYPE_SET.has(type)) {

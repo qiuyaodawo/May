@@ -13,9 +13,7 @@ const model = {
         message: {
           role: "assistant",
           content: [],
-          toolCalls: [
-            { id: "call_add", name: "add", input: { a: 20, b: 22 } },
-          ],
+          toolCalls: [{ id: "call_add", name: "add", input: { a: 20, b: 22 } }],
         },
       };
       return;

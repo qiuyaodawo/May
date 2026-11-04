@@ -10,11 +10,7 @@ export interface OpenAICompatibleToolCall {
 }
 
 export type OpenAICompatibleUserContent =
-  | string
-  | Array<
-      | { type: "text"; text: string }
-      | { type: "image_url"; image_url: { url: string; detail?: string } }
-    >;
+  string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string; detail?: string } }>;
 
 export type OpenAICompatibleMessage =
   | { role: "system"; content: string }

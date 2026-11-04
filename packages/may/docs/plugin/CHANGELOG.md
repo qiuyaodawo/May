@@ -38,6 +38,7 @@
   Skills state is saved through versioned plugin state while existing Session
   activation records remain readable. Goals and history-memory retain their existing
   durable state records for migration.
+
 - 89bcd8d: Add scoped plugin composition with typed versioned services, validated dependencies,
   configuration and state schemas, lifecycle Hooks, state migration, resource cleanup
   and serialized replacement. Agent definitions and applications accept plugins;
@@ -59,6 +60,7 @@
   argument boundary; use ordinary data objects and arrays to represent those values.
   Custom parsed instances retain their prototypes and methods and must protect any
   mutable internal state themselves.
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`
@@ -82,6 +84,7 @@
   Remote CoordinationWorker 将已保存的取消意图发送给分离的外部执行，并通过恢复查询确认结果。
 
   PowerShell shell 工具根据最后执行命令的状态返回 exitCode，失败的 cmdlet 返回非零值。
+
 - Updated dependencies [02789c6]
 - Updated dependencies [422e404]
 - Updated dependencies [88e7d69]

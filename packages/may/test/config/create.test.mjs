@@ -11,7 +11,7 @@ function directory(t) {
   return createTestDirectory(t, "may/config-create");
 }
 
-test("creates a readable config in a new directory and preserves existing files", async t => {
+test("creates a readable config in a new directory and preserves existing files", async (t) => {
   const root = await directory(t);
   const path = join(root, "new", "config.json");
   await createMayConfig(path, { providers: {}, models: {} });
@@ -19,10 +19,10 @@ test("creates a readable config in a new directory and preserves existing files"
   const original = await readFile(path, "utf8");
   await assert.rejects(createMayConfig(path, { providers: {} }), /already exists/);
   assert.equal(await readFile(path, "utf8"), original);
-  assert.ok((await readdir(join(root, "new"))).every(name => !name.endsWith(".tmp")));
+  assert.ok((await readdir(join(root, "new"))).every((name) => !name.endsWith(".tmp")));
 });
 
-test("invalid input, cancellation and invalid parent paths leave no config", async t => {
+test("invalid input, cancellation and invalid parent paths leave no config", async (t) => {
   const root = await directory(t);
   const path = join(root, "config.json");
   await assert.rejects(createMayConfig(path, {}));
@@ -33,19 +33,28 @@ test("invalid input, cancellation and invalid parent paths leave no config", asy
   assert.equal(await readFile(join(root, "parent"), "utf8"), "occupied");
 });
 
-test("two processes creating the same config publish exactly one complete file", async t => {
+test("two processes creating the same config publish exactly one complete file", async (t) => {
   const root = await directory(t);
   const path = join(root, "config.json");
-  const children = ["first", "second"].map(name => fork(new URL("fixtures/create-worker.mjs", import.meta.url), [path, name], { silent: true, windowsHide: true }));
-  const exits = children.map(child => new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("exit", code => resolve(code));
-  }));
-  t.after(() => children.forEach(child => { if (child.exitCode === null) child.kill(); }));
-  await Promise.all(children.map(child => new Promise(resolve => child.once("message", resolve))));
-  children.forEach(child => child.send("create"));
+  const children = ["first", "second"].map((name) =>
+    fork(new URL("fixtures/create-worker.mjs", import.meta.url), [path, name], { silent: true, windowsHide: true }),
+  );
+  const exits = children.map(
+    (child) =>
+      new Promise((resolve, reject) => {
+        child.once("error", reject);
+        child.once("exit", (code) => resolve(code));
+      }),
+  );
+  t.after(() =>
+    children.forEach((child) => {
+      if (child.exitCode === null) child.kill();
+    }),
+  );
+  await Promise.all(children.map((child) => new Promise((resolve) => child.once("message", resolve))));
+  children.forEach((child) => child.send("create"));
   assert.deepEqual((await Promise.all(exits)).sort(), [0, 1]);
   const config = await loadMayConfig({ path });
   assert.ok(["first", "second"].includes(config.apps.marker.name));
-  assert.ok((await readdir(root)).every(name => !name.endsWith(".tmp")));
+  assert.ok((await readdir(root)).every((name) => !name.endsWith(".tmp")));
 });

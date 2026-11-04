@@ -17,15 +17,10 @@ export interface WorkspaceFileOperation<T> {
   run(): Promise<T>;
 }
 
-export type WorkspaceFileGuard = <T>(
-  operation: WorkspaceFileOperation<T>,
-) => Promise<T>;
+export type WorkspaceFileGuard = <T>(operation: WorkspaceFileOperation<T>) => Promise<T>;
 
 /** 目标文件当前是否存在；软链接、目录与路径不存在都视为不可用。 */
-export async function assertFileExistence(
-  path: WorkspacePath,
-  signal?: AbortSignal,
-): Promise<boolean> {
+export async function assertFileExistence(path: WorkspacePath, signal?: AbortSignal): Promise<boolean> {
   signal?.throwIfAborted();
   try {
     const information = await stat(path.absolute);

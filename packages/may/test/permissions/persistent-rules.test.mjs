@@ -17,15 +17,17 @@ import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store"
 const dist = fileURLToPath(new URL("../../dist/permissions/", import.meta.url));
 const identity = { project: "may", user: "alice", agent: "writer" };
 
-test("execution preparation runs once while policies are reevaluated", async t => {
+test("execution preparation runs once while policies are reevaluated", async (t) => {
   const f = await fixture(t);
   let preparations = 0;
-  const executor = f.executor({ beforeCheck: async check => {
-    assert.equal(Object.isFrozen(check), true);
-    assert.equal(Object.isFrozen(check.input), true);
-    preparations += 1;
-    await appendFile(join(f.directory, "preparations.txt"), `${check.context.toolCallId}\n`);
-  } });
+  const executor = f.executor({
+    beforeCheck: async (check) => {
+      assert.equal(Object.isFrozen(check), true);
+      assert.equal(Object.isFrozen(check.input), true);
+      preparations += 1;
+      await appendFile(join(f.directory, "preparations.txt"), `${check.context.toolCallId}\n`);
+    },
+  });
   const rule = await executor.createRule(f.execution(), { decision: "allow", createdBy: "local:alice" });
   assert.equal(preparations, 0);
   await executor.revokeRule(rule.id);
@@ -133,19 +135,28 @@ test("persistent approval survives executor and file store reopening", async (t)
   assert.equal(saved[0].createdBy, "local:alice");
   assert.equal(Object.hasOwn(saved[0], "input"), false);
   assert.equal(JSON.stringify(saved).includes(operation.input.path), false);
-  assert.deepEqual(events.map((event) => event.type), [
-    "approval.requested", "rule.created", "approval.resolved", "rule.used",
-  ]);
-  assert.deepEqual(events.map((event) => event.seq), [1, 2, 3, 4]);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["approval.requested", "rule.created", "approval.resolved", "rule.used"],
+  );
+  assert.deepEqual(
+    events.map((event) => event.seq),
+    [1, 2, 3, 4],
+  );
   assert.ok(events.every((event) => Number.isSafeInteger(event.timestamp)));
   await first.close();
   await f.store.close();
   const reopened = await f.openStore();
   const second = f.executor({ ruleStore: reopened });
   const secondEvents = [];
-  second.setEventSink((event) => { secondEvents.push(event); });
+  second.setEventSink((event) => {
+    secondEvents.push(event);
+  });
   assert.equal(await second.execute(f.execution()), "approved\napproved\n");
-  assert.deepEqual(secondEvents.map((event) => event.type), ["rule.used"]);
+  assert.deepEqual(
+    secondEvents.map((event) => event.type),
+    ["rule.used"],
+  );
 });
 
 test("persistent rules require exact user, project, agent, grant, and tool identities", async (t) => {
@@ -175,9 +186,11 @@ test("persistent rules require exact user, project, agent, grant, and tool ident
   const rejected = assert.rejects(pending.result, PermissionDeniedError);
   await otherGrant.resolve(pending.request.id, "deny");
   await rejected;
-  const equivalent = f.execution({ tool: {
-    inputSchema: { properties: { content: { type: "string" }, path: { type: "string" } }, type: "object" },
-  } });
+  const equivalent = f.execution({
+    tool: {
+      inputSchema: { properties: { content: { type: "string" }, path: { type: "string" } }, type: "object" },
+    },
+  });
   assert.equal(await owner.execute(equivalent), "approved\n");
 });
 
@@ -212,9 +225,14 @@ test("revoked and expired grants request approval again", async (t) => {
   await instance.resolve(pending.request.id, "deny");
   await rejected;
   await absent(f.execution().input.path);
-  await assert.rejects(instance.createRule(f.execution(), {
-    decision: "allow", createdBy: "local:alice", expiresAt: Date.now() - 1,
-  }), /future timestamp/);
+  await assert.rejects(
+    instance.createRule(f.execution(), {
+      decision: "allow",
+      createdBy: "local:alice",
+      expiresAt: Date.now() - 1,
+    }),
+    /future timestamp/,
+  );
 });
 
 test("requireApproval requires a fresh one-time decision and still checks deny rules", async (t) => {
@@ -230,10 +248,16 @@ test("requireApproval requires a fresh one-time decision and still checks deny r
   assert.equal(pending.request.grantKey, undefined);
   assert.equal(pending.request.persistent, undefined);
   await assert.rejects(instance.resolve(pending.request.id, "allow-session"), /session grant key/);
-  await assert.rejects(instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }), /does not allow persistent/);
+  await assert.rejects(
+    instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }),
+    /does not allow persistent/,
+  );
   await instance.resolve(pending.request.id, "allow");
   assert.equal(await pending.result, "approved\napproved\n");
-  await assert.rejects(instance.createRule(f.execution(), { decision: "allow", createdBy: "local:alice" }), /does not allow/);
+  await assert.rejects(
+    instance.createRule(f.execution(), { decision: "allow", createdBy: "local:alice" }),
+    /does not allow/,
+  );
   await instance.createRule(f.execution(), { decision: "deny", createdBy: "local:alice" });
   await assert.rejects(instance.execute(f.execution()), PermissionDeniedError);
 });
@@ -244,7 +268,10 @@ test("persistent approval requires a configured store and trusted policy scope",
     const instance = f.executor(options);
     const pending = await request(instance, f.execution());
     assert.equal(pending.request.persistent, undefined);
-    await assert.rejects(instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }), /does not allow persistent/);
+    await assert.rejects(
+      instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }),
+      /does not allow persistent/,
+    );
     await instance.resolve(pending.request.id, "allow");
     await pending.result;
   }
@@ -275,17 +302,22 @@ test("pending approval rechecks policy denials and changed scopes", async (t) =>
   for (const approval of ["allow", "allow-persistent"]) {
     for (const change of ["deny", "scope"]) {
       let changed = false;
-      const instance = f.executor({ policy(check) {
-        if (changed && change === "deny") return "deny";
-        const result = policy(check);
-        if (changed) result.persistent.scopeId = "another-project";
-        return result;
-      } });
+      const instance = f.executor({
+        policy(check) {
+          if (changed && change === "deny") return "deny";
+          const result = policy(check);
+          if (changed) result.persistent.scopeId = "another-project";
+          return result;
+        },
+      });
       const pending = await request(instance, f.execution());
       const rejected = assert.rejects(pending.result, PermissionDeniedError);
       changed = true;
       if (approval === "allow-persistent") {
-        await assert.rejects(instance.resolve(pending.request.id, approval, { createdBy: "local:alice" }), PermissionDeniedError);
+        await assert.rejects(
+          instance.resolve(pending.request.id, approval, { createdBy: "local:alice" }),
+          PermissionDeniedError,
+        );
       } else {
         await instance.resolve(pending.request.id, approval);
       }
@@ -374,25 +406,35 @@ test("a closed rule store prevents pending persistent approval from executing", 
   const pending = await request(instance, f.execution());
   const rejected = assert.rejects(pending.result, /store is closed/);
   await f.store.close();
-  await assert.rejects(instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }), /store is closed/);
+  await assert.rejects(
+    instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }),
+    /store is closed/,
+  );
   await rejected;
   await absent(f.execution().input.path);
 });
 
-test("a readonly Windows rule file prevents persistent approval from executing", { skip: process.platform !== "win32" }, async (t) => {
-  const f = await fixture(t);
-  const instance = f.executor();
-  const pending = await request(instance, f.execution());
-  const rejected = assert.rejects(pending.result, /EPERM|EACCES/);
-  await chmod(f.store.path, 0o444);
-  try {
-    await assert.rejects(instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }), /EPERM|EACCES/);
-    await rejected;
-    await absent(f.execution().input.path);
-  } finally {
-    await chmod(f.store.path, 0o600);
-  }
-});
+test(
+  "a readonly Windows rule file prevents persistent approval from executing",
+  { skip: process.platform !== "win32" },
+  async (t) => {
+    const f = await fixture(t);
+    const instance = f.executor();
+    const pending = await request(instance, f.execution());
+    const rejected = assert.rejects(pending.result, /EPERM|EACCES/);
+    await chmod(f.store.path, 0o444);
+    try {
+      await assert.rejects(
+        instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }),
+        /EPERM|EACCES/,
+      );
+      await rejected;
+      await absent(f.execution().input.path);
+    } finally {
+      await chmod(f.store.path, 0o600);
+    }
+  },
+);
 
 test("rule event persistence failures use actual filesystem errors and prevent execution", async (t) => {
   const f = await fixture(t);
@@ -406,7 +448,10 @@ test("rule event persistence failures use actual filesystem errors and prevent e
     const pending = await request(instance, f.execution());
     const rejected = assert.rejects(pending.result, /Permission event persistence failed/);
     if (phase === "rule.created") {
-      await assert.rejects(instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }), /Permission event persistence failed/);
+      await assert.rejects(
+        instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" }),
+        /Permission event persistence failed/,
+      );
     } else {
       await instance.resolve(pending.request.id, "allow-persistent", { createdBy: "local:alice" });
     }
@@ -448,13 +493,15 @@ test("concurrent resolution stores exactly one rule and snapshots the approver i
   const started = Promise.withResolvers();
   const release = Promise.withResolvers();
   let checks = 0;
-  const instance = f.executor({ async policy(check) {
-    if (++checks === 2) {
-      started.resolve();
-      await release.promise;
-    }
-    return policy(check);
-  } });
+  const instance = f.executor({
+    async policy(check) {
+      if (++checks === 2) {
+        started.resolve();
+        await release.promise;
+      }
+      return policy(check);
+    },
+  });
   const pending = await request(instance, f.execution());
   const options = { createdBy: "local:alice" };
   const first = instance.resolve(pending.request.id, "allow-persistent", options);
@@ -495,9 +542,17 @@ test("host rule creation from an existing source retains only its trusted operat
   await absent(f.execution().input.path);
   await instance.revokeRule(allowed.id);
   await instance.revokeRule(deny.id);
-  await assert.rejects(instance.createRuleFrom(allowed.id, { decision: "allow", createdBy: "local:admin" }), /does not exist/);
+  await assert.rejects(
+    instance.createRuleFrom(allowed.id, { decision: "allow", createdBy: "local:admin" }),
+    /does not exist/,
+  );
   await assert.rejects(instance.createRuleFrom("unknown", { decision: "allow", createdBy: "" }), /trusted createdBy/);
-  await assert.rejects(instance.createRuleFrom("unknown", {
-    decision: "allow", createdBy: "local:admin", expiresAt: Date.now() - 1,
-  }), /future timestamp/);
+  await assert.rejects(
+    instance.createRuleFrom("unknown", {
+      decision: "allow",
+      createdBy: "local:admin",
+      expiresAt: Date.now() - 1,
+    }),
+    /future timestamp/,
+  );
 });

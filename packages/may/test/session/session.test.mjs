@@ -4,17 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import {
-  InMemoryContext,
-  May,
-  RunCancelledError,
-} from "@sortedyuan/may/core";
+import { InMemoryContext, May, RunCancelledError } from "@sortedyuan/may/core";
 import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
-import {
-  InMemorySessionStore,
-  Session,
-} from "@sortedyuan/may/session";
+import { InMemorySessionStore, Session } from "@sortedyuan/may/session";
 
 test("relays live run events and stores only durable session facts", async () => {
   const model = {
@@ -42,29 +35,20 @@ test("relays live run events and stores only durable session facts", async () =>
   assert.ok(events.some((event) => event.type === "model.text.delta"));
   assert.deepEqual(
     (await session.history()).map((event) => event.type),
-    [
-      "session.created",
-      "input.submitted",
-      "run.started",
-      "assistant.completed",
-      "run.completed",
-      "run.settled",
-    ],
+    ["session.created", "input.submitted", "run.started", "assistant.completed", "run.completed", "run.settled"],
   );
 
-  const assistantEvent = (await session.history()).find(
-    (event) => event.type === "assistant.completed",
-  );
+  const assistantEvent = (await session.history()).find((event) => event.type === "assistant.completed");
   assert.deepEqual(assistantEvent.usage, { totalTokens: 2 });
   const page = await session.queryHistory({
     order: "desc",
     limit: 2,
     types: ["input.submitted", "assistant.completed"],
   });
-  assert.deepEqual(page.events.map((event) => event.type), [
-    "assistant.completed",
-    "input.submitted",
-  ]);
+  assert.deepEqual(
+    page.events.map((event) => event.type),
+    ["assistant.completed", "input.submitted"],
+  );
   assert.equal(page.hasMore, false);
 });
 
@@ -119,7 +103,10 @@ test("serializes submissions and preserves context between runs", async () => {
 test("stores successful and failed tool outcomes", async () => {
   const store = new InMemorySessionStore();
   const output = { value: 1, _meta: { owner: "host-only-result" } };
-  const projected = [{ type: "text", text: "Public result" }, { type: "json", value: { value: 1 } }];
+  const projected = [
+    { type: "text", text: "Public result" },
+    { type: "json", value: { value: 1 } },
+  ];
   let step = 0;
   const model = {
     async *stream() {
@@ -159,7 +146,9 @@ test("stores successful and failed tool outcomes", async () => {
           async execute() {
             return output;
           },
-          resultContent() { return projected; },
+          resultContent() {
+            return projected;
+          },
         },
         {
           name: "fail",
@@ -184,19 +173,14 @@ test("stores successful and failed tool outcomes", async () => {
     data: { label: "preview" },
   });
   const history = await session.history();
-  const toolEvents = history.filter(
-    (event) => event.type === "tool.completed" || event.type === "tool.failed",
-  );
+  const toolEvents = history.filter((event) => event.type === "tool.completed" || event.type === "tool.failed");
 
   assert.equal(toolEvents[0].type, "tool.completed");
   assert.deepEqual(toolEvents[0].output, output);
   assert.deepEqual(toolEvents[0].content, projected);
   assert.equal(toolEvents[1].type, "tool.failed");
   assert.equal(toolEvents[1].error.message, "tool failed");
-  assert.deepEqual(
-    history.find((event) => event.type === "tool.presentation").data,
-    { label: "preview" },
-  );
+  assert.deepEqual(history.find((event) => event.type === "tool.presentation").data, { label: "preview" });
 
   let replayed;
   await Session.resume({
@@ -208,13 +192,10 @@ test("stores successful and failed tool outcomes", async () => {
       return createRuntime();
     },
   });
-  assert.deepEqual(replayed.map((message) => message.role), [
-    "user",
-    "assistant",
-    "tool",
-    "tool",
-    "assistant",
-  ]);
+  assert.deepEqual(
+    replayed.map((message) => message.role),
+    ["user", "assistant", "tool", "tool", "assistant"],
+  );
   assert.deepEqual(replayed[2].content, projected);
   assert.doesNotMatch(JSON.stringify(replayed), /host-only-result/);
   assert.equal(replayed[3].isError, true);
@@ -232,9 +213,7 @@ test("records approval decisions before their tool outcomes", async () => {
           message: {
             role: "assistant",
             content: [],
-            toolCalls: [
-              { id: "call_write", name: "write", input: { path: "a.txt" } },
-            ],
+            toolCalls: [{ id: "call_write", name: "write", input: { path: "a.txt" } }],
           },
         };
         return;
@@ -296,10 +275,7 @@ test("records approval decisions before their tool outcomes", async () => {
   assert.equal(approval.request.toolCallId, "call_write");
   assert.equal(approval.request.grantKey, "write:a.txt");
   assert.equal("signal" in approval.request, false);
-  assert.equal(
-    history.find((event) => event.type === "approval.resolved").decision,
-    "allow-session",
-  );
+  assert.equal(history.find((event) => event.type === "approval.resolved").decision, "allow-session");
   await permissions.close();
 });
 
@@ -312,9 +288,7 @@ test("records approval cancellation before run cancellation", async () => {
         message: {
           role: "assistant",
           content: [],
-          toolCalls: [
-            { id: "call_bash", name: "bash", input: { command: "pwd" } },
-          ],
+          toolCalls: [{ id: "call_bash", name: "bash", input: { command: "pwd" } }],
         },
       };
     },
@@ -355,10 +329,7 @@ test("records approval cancellation before run cancellation", async () => {
   );
   const request = history.find((event) => event.type === "approval.requested");
   assert.equal("grantKey" in request.request, false);
-  assert.equal(
-    history.find((event) => event.type === "approval.cancelled").reason,
-    "user stopped",
-  );
+  assert.equal(history.find((event) => event.type === "approval.cancelled").reason, "user stopped");
   let replayed;
   await Session.resume({
     requestRecording: "off",
@@ -369,11 +340,10 @@ test("records approval cancellation before run cancellation", async () => {
       return createRuntime();
     },
   });
-  assert.deepEqual(replayed.map((message) => message.role), [
-    "user",
-    "assistant",
-    "tool",
-  ]);
+  assert.deepEqual(
+    replayed.map((message) => message.role),
+    ["user", "assistant", "tool"],
+  );
   assert.equal(replayed[2].toolCallId, "call_bash");
   assert.equal(replayed[2].isError, true);
   assert.equal(replayed[2].content[0].value.code, "RUN_CANCELLED");
@@ -404,9 +374,7 @@ test("records failures and starts the next queued submission", async () => {
   await assert.rejects(first.result, /model unavailable/);
   const second = await secondSubmission;
   assert.equal((await second.result).message.content[0].text, "recovered");
-  assert.ok(
-    (await session.history()).some((event) => event.type === "run.failed"),
-  );
+  assert.ok((await session.history()).some((event) => event.type === "run.failed"));
 });
 
 test("continues a failed run without recording another user input", async () => {
@@ -428,26 +396,19 @@ test("continues a failed run without recording another user input", async () => 
   });
   const session = await Session.create({ requestRecording: "off", runtime });
 
-  await assert.rejects(
-    (await session.submit({ input: "original input" })).result,
-    /temporary failure/,
-  );
+  await assert.rejects((await session.submit({ input: "original input" })).result, /temporary failure/);
   const retried = await session.continue();
   await retried.result;
 
   assert.equal(modelCalls, 2);
-  assert.deepEqual(continuedRequest.messages.map((message) => message.role), [
-    "user",
-  ]);
-  const history = await session.history();
-  assert.equal(
-    history.filter((event) => event.type === "input.submitted").length,
-    1,
-  );
   assert.deepEqual(
-    history.filter((event) => event.type === "run.started").map((event) =>
-      event.continuation === true
-    ),
+    continuedRequest.messages.map((message) => message.role),
+    ["user"],
+  );
+  const history = await session.history();
+  assert.equal(history.filter((event) => event.type === "input.submitted").length, 1);
+  assert.deepEqual(
+    history.filter((event) => event.type === "run.started").map((event) => event.continuation === true),
     [false, true],
   );
   assert.equal(history.at(-1).type, "run.settled");
@@ -477,9 +438,7 @@ test("preserves cancellation and records its reason", async () => {
   run.cancel("user stopped");
 
   await assert.rejects(run.result, RunCancelledError);
-  const cancelled = (await session.history()).find(
-    (event) => event.type === "run.cancelled",
-  );
+  const cancelled = (await session.history()).find((event) => event.type === "run.cancelled");
   assert.equal(cancelled.reason, "user stopped");
 });
 
@@ -556,16 +515,13 @@ test("keeps durable and live input aligned when cancellation races storage", asy
   const run = await submission;
   await assert.rejects(run.result, RunCancelledError);
 
-  assert.equal(
-    (await session.history()).filter((event) =>
-      event.type === "input.submitted"
-    ).length,
-    1,
-  );
-  assert.deepEqual((await context.snapshot()).messages, [{
-    role: "user",
-    content: [{ type: "text", text: "committed before cancellation" }],
-  }]);
+  assert.equal((await session.history()).filter((event) => event.type === "input.submitted").length, 1);
+  assert.deepEqual((await context.snapshot()).messages, [
+    {
+      role: "user",
+      content: [{ type: "text", text: "committed before cancellation" }],
+    },
+  ]);
 });
 
 test("rejects a duplicate session id in the same store", async () => {
@@ -642,7 +598,9 @@ test("resumes a file session and continues its context and sequence", async (t) 
       },
     }),
   });
-  await (await first.submit({ input: "first question" })).result;
+  await (
+    await first.submit({ input: "first question" })
+  ).result;
 
   let restoredMessages;
   let secondRequest;
@@ -670,31 +628,29 @@ test("resumes a file session and continues its context and sequence", async (t) 
   });
 
   assert.deepEqual(resumed.metadata, { workspace: "/repo" });
-  assert.deepEqual(restoredMessages.map((message) => message.role), [
-    "user",
-    "assistant",
-  ]);
+  assert.deepEqual(
+    restoredMessages.map((message) => message.role),
+    ["user", "assistant"],
+  );
   assert.deepEqual(restoredMessages[1].modelState, {
     type: "test/v1",
     data: { cursor: "abc" },
   });
 
-  await (await resumed.submit({ input: "second question" })).result;
-  assert.deepEqual(secondRequest.messages.map((message) => message.role), [
-    "user",
-    "assistant",
-    "user",
-  ]);
+  await (
+    await resumed.submit({ input: "second question" })
+  ).result;
+  assert.deepEqual(
+    secondRequest.messages.map((message) => message.role),
+    ["user", "assistant", "user"],
+  );
 
   const history = await resumed.history();
   assert.deepEqual(
     history.map((event) => event.seq),
     history.map((_event, index) => index + 1),
   );
-  assert.equal(
-    history.filter((event) => event.type === "session.created").length,
-    1,
-  );
+  assert.equal(history.filter((event) => event.type === "session.created").length, 1);
 });
 
 test("restores the latest model input measurement when resuming", async () => {
@@ -716,7 +672,9 @@ test("restores the latest model input measurement when resuming", async () => {
       },
     }),
   });
-  await (await session.submit({ input: "measure me" })).result;
+  await (
+    await session.submit({ input: "measure me" })
+  ).result;
 
   let runtimeInfo;
   await Session.resume({
@@ -757,10 +715,10 @@ test("replays the latest compacted context without deleting history", async () =
       },
     }),
   });
-  await (await session.submit({ input: "original question" })).result;
-  const compactedMessages = [
-    { role: "user", content: [{ type: "text", text: "compact view" }] },
-  ];
+  await (
+    await session.submit({ input: "original question" })
+  ).result;
+  const compactedMessages = [{ role: "user", content: [{ type: "text", text: "compact view" }] }];
   await session.recordContextCompaction({
     strategy: "test",
     messages: compactedMessages,
@@ -851,7 +809,9 @@ test("requires reopen after a durable append fails and preserves the sequence", 
   await assert.rejects(run.result, /store unavailable/);
   await assert.rejects(session.submit({ input: "retry" }), /reopen/);
   const resumed = await Session.resume({ requestRecording: "off", id: session.id, store, createRuntime });
-  await (await resumed.submit({ input: "retry" })).result;
+  await (
+    await resumed.submit({ input: "retry" })
+  ).result;
   const history = await resumed.history();
   assert.deepEqual(
     history.map((event) => event.seq),

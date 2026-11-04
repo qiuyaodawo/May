@@ -136,11 +136,26 @@ export interface EvidenceReference {
   readonly label?: string;
 }
 export interface EvidenceSink {
-  write(value: { readonly id: string; readonly mediaType: string; readonly content: string; readonly label?: string }): Promise<EvidenceReference>;
+  write(value: {
+    readonly id: string;
+    readonly mediaType: string;
+    readonly content: string;
+    readonly label?: string;
+  }): Promise<EvidenceReference>;
 }
 export interface EvalExecutionEvent {
   readonly id: string;
-  readonly type: "model-call" | "model-attempt" | "retry-wait" | "tool-call" | "tool-failure" | "context-compaction" | "human-intervention" | "approval-wait" | "usage" | "identity";
+  readonly type:
+    | "model-call"
+    | "model-attempt"
+    | "retry-wait"
+    | "tool-call"
+    | "tool-failure"
+    | "context-compaction"
+    | "human-intervention"
+    | "approval-wait"
+    | "usage"
+    | "identity";
   readonly scope?: "agent" | "grader";
   readonly durationMs?: number;
   readonly usage?: Usage;
@@ -201,7 +216,12 @@ export interface ExecutionCreateContext {
 export interface EvalExecutionAdapter extends EvalComponent {
   validateCase?(context: { readonly case: EvalCase; readonly variant: EvalVariant }): void;
   create(context: ExecutionCreateContext): Promise<EvalExecution>;
-  recover?(context: { readonly state: TrialState; readonly case: EvalCase; readonly variant: EvalVariant; readonly signal: AbortSignal }): Promise<{ readonly confirmed: boolean }>;
+  recover?(context: {
+    readonly state: TrialState;
+    readonly case: EvalCase;
+    readonly variant: EvalVariant;
+    readonly signal: AbortSignal;
+  }): Promise<{ readonly confirmed: boolean }>;
 }
 export interface EvalExecution {
   execute(signal: AbortSignal): Promise<EvalExecutionResult>;
@@ -268,7 +288,12 @@ export interface EvalStore {
   readTrial(experimentId: string, trialId: string): Promise<TrialState | undefined>;
   listTrials(experimentId: string): Promise<readonly TrialState[]>;
   appendEvent(experimentId: string, trialId: string, event: EvalExecutionEvent): Promise<void>;
-  writeEvidence(experimentId: string, trialId: string, reference: EvidenceReference, content: string): Promise<EvidenceReference>;
+  writeEvidence(
+    experimentId: string,
+    trialId: string,
+    reference: EvidenceReference,
+    content: string,
+  ): Promise<EvidenceReference>;
   appendTrial(experimentId: string, trial: EvalTrial, fingerprints: EvalFingerprints): Promise<void>;
 }
 export interface EvalRunnerOptions {

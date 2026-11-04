@@ -1,14 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  AgentDefinition,
-  defineAgent,
-} from "@sortedyuan/may";
-import {
-  DuplicateToolNameError,
-  ToolRegistry,
-} from "@sortedyuan/may/core";
+import { AgentDefinition, defineAgent } from "@sortedyuan/may";
+import { DuplicateToolNameError, ToolRegistry } from "@sortedyuan/may/core";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 
 function assistant(text) {
@@ -17,16 +11,27 @@ function assistant(text) {
 
 test("definitions snapshot run budgets and persist budget exhaustion", async () => {
   const runBudget = { maxTotalTokens: 1 };
-  const definition = defineAgent({ requestRecording: "off", runBudget, permissionPolicy: () => "allow", model: {
-    async *stream() { yield { type: "response.completed", message: assistant("ok"), usage: { totalTokens: 2 } }; },
-  }});
+  const definition = defineAgent({
+    requestRecording: "off",
+    runBudget,
+    permissionPolicy: () => "allow",
+    model: {
+      async *stream() {
+        yield { type: "response.completed", message: assistant("ok"), usage: { totalTokens: 2 } };
+      },
+    },
+  });
   runBudget.maxTotalTokens = 999;
   const app = await definition.open({ store: new InMemorySessionStore() });
   try {
-    await assert.rejects((await app.submit({ input: "go", runBudget: { maxTotalTokens: 999 } })).result, { code: "RUN_BUDGET_EXCEEDED" });
+    await assert.rejects((await app.submit({ input: "go", runBudget: { maxTotalTokens: 999 } })).result, {
+      code: "RUN_BUDGET_EXCEEDED",
+    });
     const history = await app.history();
     assert.equal(history.find((event) => event.type === "run.budget.exceeded").budget.totalTokens, 2);
-  } finally { await app.close(); }
+  } finally {
+    await app.close();
+  }
 });
 
 test("AgentDefinition snapshots behavior and reuses it across Sessions", async () => {
@@ -75,15 +80,17 @@ test("AgentDefinition snapshots behavior and reuses it across Sessions", async (
   });
   firstMetadata.tenant = "mutated";
   firstContextMetadata.workspace = "/mutated";
-  await (await first.submit({ input: "one" })).result;
+  await (
+    await first.submit({ input: "one" })
+  ).result;
 
   assert.deepEqual(first.metadata, { tenant: "first" });
   assert.equal(requests[0].messages[0].role, "system");
-  assert.equal(
-    requests[0].messages[0].content[0].text,
-    "Use the lookup tool when needed.",
+  assert.equal(requests[0].messages[0].content[0].text, "Use the lookup tool when needed.");
+  assert.deepEqual(
+    requests[0].tools.map(({ name }) => name),
+    ["lookup"],
   );
-  assert.deepEqual(requests[0].tools.map(({ name }) => name), ["lookup"]);
   assert.deepEqual(requests[0].metadata, { workspace: "/first" });
   await first.close();
 
@@ -92,9 +99,14 @@ test("AgentDefinition snapshots behavior and reuses it across Sessions", async (
     metadata: { tenant: "second" },
     contextMetadata: { workspace: "/second" },
   });
-  await (await second.submit({ input: "two" })).result;
+  await (
+    await second.submit({ input: "two" })
+  ).result;
   assert.deepEqual(second.metadata, { tenant: "second" });
-  assert.deepEqual(requests[1].tools.map(({ name }) => name), ["lookup"]);
+  assert.deepEqual(
+    requests[1].tools.map(({ name }) => name),
+    ["lookup"],
+  );
   assert.deepEqual(requests[1].metadata, { workspace: "/second" });
   await second.close();
 });
@@ -105,32 +117,27 @@ test("AgentDefinition keeps Session-bound values out of reusable options", () =>
     permissionPolicy: () => "allow",
   };
 
+  assert.throws(() => defineAgent({ ...behavior, metadata: { tenant: "wrong layer" } }), /metadata.*Session-bound/u);
+  assert.throws(() => defineAgent({ ...behavior, store: new InMemorySessionStore() }), /store.*Session-bound/u);
   assert.throws(
-    () => defineAgent({ ...behavior, metadata: { tenant: "wrong layer" } }),
-    /metadata.*Session-bound/u,
-  );
-  assert.throws(
-    () => defineAgent({ ...behavior, store: new InMemorySessionStore() }),
-    /store.*Session-bound/u,
-  );
-  assert.throws(
-    () => defineAgent({
-      ...behavior,
-      tools: [
-        {
-          name: "duplicate",
-          description: "first",
-          inputSchema: { type: "object" },
-          async execute() {},
-        },
-        {
-          name: "duplicate",
-          description: "second",
-          inputSchema: { type: "object" },
-          async execute() {},
-        },
-      ],
-    }),
+    () =>
+      defineAgent({
+        ...behavior,
+        tools: [
+          {
+            name: "duplicate",
+            description: "first",
+            inputSchema: { type: "object" },
+            async execute() {},
+          },
+          {
+            name: "duplicate",
+            description: "second",
+            inputSchema: { type: "object" },
+            async execute() {},
+          },
+        ],
+      }),
     DuplicateToolNameError,
   );
 });
@@ -160,14 +167,16 @@ test("AgentDefinition forwards its tool scheduler", async () => {
         };
       },
     },
-    tools: [{
-      name: "ping",
-      description: "Return pong",
-      inputSchema: { type: "object" },
-      async execute() {
-        return "pong";
+    tools: [
+      {
+        name: "ping",
+        description: "Return pong",
+        inputSchema: { type: "object" },
+        async execute() {
+          return "pong";
+        },
       },
-    }],
+    ],
     permissionPolicy: () => "allow",
     toolScheduler: {
       async schedule(operations) {

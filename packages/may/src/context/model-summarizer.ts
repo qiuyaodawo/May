@@ -57,30 +57,28 @@ export function createModelContextSummarizer(
       });
 
       try {
-        for await (const event of model.stream(
-          { messages, tools: [] },
-          streamOptions,
-        )) {
+        for await (const event of model.stream({ messages, tools: [] }, streamOptions)) {
           if (event.type !== "response.completed") continue;
           if (completed !== undefined) {
-            throw new ModelProtocolError(
-              "Summary model emitted more than one completed response",
-            );
+            throw new ModelProtocolError("Summary model emitted more than one completed response");
           }
           completed = event.message;
         }
         throwIfCancelled(signal);
       } catch (error) {
-        if (signal.aborted && (error === signal.reason || error instanceof RunCancelledError || error instanceof Error && error.name === "AbortError")) {
+        if (
+          signal.aborted &&
+          (error === signal.reason ||
+            error instanceof RunCancelledError ||
+            (error instanceof Error && error.name === "AbortError"))
+        ) {
           throw new RunCancelledError(cancellationReason(signal.reason));
         }
         throw error;
       }
 
       if (completed === undefined) {
-        throw new ModelProtocolError(
-          "Summary model ended without a completed response",
-        );
+        throw new ModelProtocolError("Summary model ended without a completed response");
       }
       if ((completed.toolCalls?.length ?? 0) > 0) {
         throw new ModelProtocolError("Summary model attempted to call a tool");

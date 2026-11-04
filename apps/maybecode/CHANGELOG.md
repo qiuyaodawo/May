@@ -20,6 +20,7 @@
   plugins together. Preserve plugin IDs, service IDs, configuration data and saved
   Session state. MaybeCode carries the consolidated dependencies in its published
   installation; its command names remain unchanged.
+
 - 1dd118f: Add English first-run setup to MaybeCode when its configuration file is missing in an interactive terminal. Guide users through provider, credentials, model settings, optional live connection verification, and saving before continuing into the selected UI. Preserve existing configuration files and report noninteractive setup instructions.
 
   Add password input to `TerminalIO.question` with hidden characters and isolated input history in interactive terminals.
@@ -34,6 +35,7 @@
 
   Add an optional onEscape callback to TerminalIO.question for ordinary and password
   input, allowing applications to cancel the current question through its signal.
+
 - c23ff33: Provide shared local file access, writer ownership and durable replacement through
   the `@sortedyuan/may/storage` entry. Configuration, media, MCP and
   delivery reuse this storage module. Session's file
@@ -43,6 +45,7 @@
   Breaking: TUI tool items now include denied, not-started, and unknown statuses, and assistant items include interrupted. Update exhaustive custom renderers to handle these states.
 
   Validate ApplicationUiHost commands directly from current execution and ownership state. Presentation reads leave commands available, and host shutdown settles accepted work while rejecting later commands.
+
 - Updated dependencies [437b090]
 - Updated dependencies [c23ff33]
 - Updated dependencies [437b090]
@@ -71,18 +74,19 @@
 
   这是包路径的破坏性变更。使用方需要更新依赖声明、源码导入及加载这些模块的配置：
 
-  | 原包 | 公开子路径 | 需要安装的包 |
-  | --- | --- | --- |
-  | `@sortedyuan/plugin-models` | `@sortedyuan/plugin-services/models` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-runtime` | `@sortedyuan/plugin-services/runtime` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-permissions` | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-skills` | `@sortedyuan/plugin-services/skills` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin` | `@sortedyuan/coordination` |
-  | `@sortedyuan/session-tools` | `@sortedyuan/session/tools` | `@sortedyuan/session` |
+  | 原包                              | 公开子路径                                | 需要安装的包                  |
+  | --------------------------------- | ----------------------------------------- | ----------------------------- |
+  | `@sortedyuan/plugin-models`       | `@sortedyuan/plugin-services/models`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-runtime`      | `@sortedyuan/plugin-services/runtime`     | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-permissions`  | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-skills`       | `@sortedyuan/plugin-services/skills`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin`         | `@sortedyuan/coordination`    |
+  | `@sortedyuan/session-tools`       | `@sortedyuan/session/tools`               | `@sortedyuan/session`         |
 
   选择包含这些子路径的发布版本，重新安装依赖并编译使用方。六个原包从本仓库的发布清单移除。
   插件 ID、ServiceToken ID、持久状态格式、函数名称及生命周期行为保持不变。
   迁移说明见 `docs/zh-CN/guides/package-subpaths.md` 和 `docs/en/guides/package-subpaths.md`。
+
 - Updated dependencies
   - @sortedyuan/plugin-services@0.3.0
   - @sortedyuan/coordination@0.4.0
@@ -194,11 +198,13 @@
 - a9c8481: Switch models and change reasoning effort through plugin updates within the existing application and Session. Refresh model-dependent services and event subscriptions while preserving conversation history, paused goals, active skills, durable notes, and YOLO approvals. Keep shared MCP resources alive and release application-owned plugin resources during updates.
 
   Expose `MaybeCodeApplication.updateModel()` and `modelUpdateFailed` for hosts that manage model selection. Failed updates stop new input until a successful model-update retry.
+
 - c98ec03: MaybeCode 的两个终端界面支持 `/web`，自动打开浏览器并连接当前工作区与 Session。
   终端和 Web 共享执行状态及审批，退出终端时关闭 Web 服务。
 
   共享 UI 支持独立事件订阅、由外部宿主管理 controller 生命周期，以及短时有效的
   一次性浏览器连接凭据。浏览器自动兑换控制令牌，并在兑换前清除 URL fragment。
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`
@@ -210,6 +216,7 @@
 
   The TUI package includes the PNG declarations required by its image dependency,
   so consumers can type-check installed declarations with `skipLibCheck: false`.
+
 - 095f958: WebUI 侧栏支持确认删除其它会话。垃圾桶图标在鼠标悬停或键盘聚焦时显示，
   触屏设备保持显示。当前会话禁止删除。执行或等待 MCP 交互期间禁用会话切换、
   新建和删除。
@@ -221,6 +228,7 @@
   同步升级；程序调用方通过 select(id) 切换会话，通过 history/field API 读取历史。
   session.delete 使用 targetId 指定删除对象，并要求 expectedActiveId 校验当前会话。
   任务页面保留独立选择。
+
 - 396ffb8: MaybeCode Web UI 支持共享斜杠命令及补全、effort、默认模型、会话管理、
   Skills、MCP、恢复处置和确认退出宿主。MCP 表单、review 和 URL 交互可在
   Web 或 TUI 完成，独立 Web 启动同样启用交互。

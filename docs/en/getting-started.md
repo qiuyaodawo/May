@@ -71,10 +71,14 @@ const add = {
   },
   parse(input) {
     if (
-      typeof input !== "object" || input === null ||
-      !("a" in input) || !("b" in input) ||
-      typeof input.a !== "number" || typeof input.b !== "number" ||
-      !Number.isFinite(input.a) || !Number.isFinite(input.b)
+      typeof input !== "object" ||
+      input === null ||
+      !("a" in input) ||
+      !("b" in input) ||
+      typeof input.a !== "number" ||
+      typeof input.b !== "number" ||
+      !Number.isFinite(input.a) ||
+      !Number.isFinite(input.b)
     ) {
       throw new TypeError("a and b must be finite numbers");
     }
@@ -91,7 +95,7 @@ const agent = defineAgent({
   model: new DeepSeekModel({ apiKey, model: modelName }),
   tools: new ToolRegistry([add]),
   instructions: "Use add for arithmetic and answer with the result.",
-  permissionPolicy: ({ tool }) => tool.name === "add" ? "allow" : "deny",
+  permissionPolicy: ({ tool }) => (tool.name === "add" ? "allow" : "deny"),
   maxSteps: 4,
 });
 
@@ -107,8 +111,7 @@ try {
   console.log(`Answer: ${text}`);
   console.log(`Session: ${sessionId}`);
   const history = await application.history();
-  const addition = history.find(event =>
-    event.type === "tool.completed" && event.call.name === "add");
+  const addition = history.find((event) => event.type === "tool.completed" && event.call.name === "add");
   if (addition?.type !== "tool.completed" || addition.output !== 42) {
     throw new Error("The Run must complete add with output 42");
   }

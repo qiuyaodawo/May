@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  InMemoryContext,
-  May,
-  RunCancelledError,
-} from "@sortedyuan/may/core";
+import { InMemoryContext, May, RunCancelledError } from "@sortedyuan/may/core";
 import {
   PermissionDeniedError,
   PermissionExecutorClosedError,
@@ -31,9 +27,7 @@ test("allows a tool and delegates its parsed input", async () => {
           message: {
             role: "assistant",
             content: [],
-            toolCalls: [
-              { id: "call_add", name: "add", input: { value: "2" } },
-            ],
+            toolCalls: [{ id: "call_add", name: "add", input: { value: "2" } }],
           },
         };
         return;
@@ -78,12 +72,14 @@ test("denies a tool without invoking it", async () => {
   });
 
   await assert.rejects(
-    permissions.execute(createExecution({
-      execute: async () => {
-        executed = true;
-        return "unreachable";
-      },
-    })),
+    permissions.execute(
+      createExecution({
+        execute: async () => {
+          executed = true;
+          return "unreachable";
+        },
+      }),
+    ),
     (error) => {
       assert.ok(error instanceof PermissionDeniedError);
       assert.equal(error.code, "PERMISSION_DENIED");
@@ -126,12 +122,14 @@ test("waits for its event sink before resuming an approved tool", async () => {
     if (event.type === "approval.resolved") await sinkGate;
   });
   const iterator = permissions.events[Symbol.asyncIterator]();
-  const resultPromise = permissions.execute(createExecution({
-    execute: async () => {
-      executed = true;
-      return "executed";
-    },
-  }));
+  const resultPromise = permissions.execute(
+    createExecution({
+      execute: async () => {
+        executed = true;
+        return "executed";
+      },
+    }),
+  );
   const requested = (await iterator.next()).value;
 
   const resolution = permissions.resolve(requested.request.id, "allow");
@@ -153,11 +151,13 @@ test("does not request approval when its event sink fails", async () => {
   });
 
   await assert.rejects(
-    permissions.execute(createExecution({
-      execute: async () => {
-        executed = true;
-      },
-    })),
+    permissions.execute(
+      createExecution({
+        execute: async () => {
+          executed = true;
+        },
+      }),
+    ),
     /request storage failed/,
   );
   assert.equal(executed, false);
@@ -176,10 +176,7 @@ test("does not resume a tool when storing its resolution fails", async () => {
   const requested = (await iterator.next()).value;
   const rejected = assert.rejects(resultPromise, /resolution storage failed/);
 
-  await assert.rejects(
-    permissions.resolve(requested.request.id, "allow"),
-    /resolution storage failed/,
-  );
+  await assert.rejects(permissions.resolve(requested.request.id, "allow"), /resolution storage failed/);
   await rejected;
   await permissions.close();
 });
@@ -196,10 +193,7 @@ test("reports cancellation storage failures while closing", async () => {
   await iterator.next();
   const rejected = assert.rejects(resultPromise, /cancellation storage failed/);
 
-  await assert.rejects(
-    permissions.close("session ended"),
-    /cancellation storage failed/,
-  );
+  await assert.rejects(permissions.close("session ended"), /cancellation storage failed/);
   await rejected;
 });
 
@@ -212,10 +206,7 @@ test("reuses an explicitly scoped session approval", async () => {
   const requested = (await iterator.next()).value;
 
   assert.equal(requested.request.grantKey, "bash:pwd");
-  assert.equal(
-    await permissions.resolve(requested.request.id, "allow-session"),
-    true,
-  );
+  assert.equal(await permissions.resolve(requested.request.id, "allow-session"), true);
   assert.equal(await firstResult, "executed");
   assert.equal((await iterator.next()).value.decision, "allow-session");
 
@@ -249,10 +240,7 @@ test("does not let a session grant override a later denial", async () => {
   await firstResult;
 
   decision = "deny";
-  await assert.rejects(
-    permissions.execute(createExecution()),
-    PermissionDeniedError,
-  );
+  await assert.rejects(permissions.execute(createExecution()), PermissionDeniedError);
   await permissions.close();
 });
 
@@ -294,9 +282,11 @@ test("cancels a pending approval when its run is cancelled", async () => {
   const controller = new AbortController();
   const permissions = new PermissionToolExecutor({ policy: () => "ask" });
   const iterator = permissions.events[Symbol.asyncIterator]();
-  const resultPromise = permissions.execute(createExecution({
-    signal: controller.signal,
-  }));
+  const resultPromise = permissions.execute(
+    createExecution({
+      signal: controller.signal,
+    }),
+  );
   const requested = (await iterator.next()).value;
   const rejected = assert.rejects(resultPromise, RunCancelledError);
 
@@ -323,10 +313,7 @@ test("rejects before policy evaluation when already cancelled", async () => {
     });
     controller.abort(reason);
 
-    await assert.rejects(
-      permissions.execute(createExecution({ signal: controller.signal })),
-      RunCancelledError,
-    );
+    await assert.rejects(permissions.execute(createExecution({ signal: controller.signal })), RunCancelledError);
     assert.equal(checked, false);
     await permissions.close();
   }
@@ -337,10 +324,7 @@ test("closing rejects pending and future approvals and closes events", async () 
   const iterator = permissions.events[Symbol.asyncIterator]();
   const resultPromise = permissions.execute(createExecution());
   const requested = (await iterator.next()).value;
-  const rejected = assert.rejects(
-    resultPromise,
-    PermissionExecutorClosedError,
-  );
+  const rejected = assert.rejects(resultPromise, PermissionExecutorClosedError);
 
   await permissions.close("session ended");
 
@@ -350,10 +334,7 @@ test("closing rejects pending and future approvals and closes events", async () 
   assert.equal(cancelled.requestId, requested.request.id);
   assert.equal(cancelled.reason, "session ended");
   assert.equal((await iterator.next()).done, true);
-  await assert.rejects(
-    permissions.execute(createExecution()),
-    PermissionExecutorClosedError,
-  );
+  await assert.rejects(permissions.execute(createExecution()), PermissionExecutorClosedError);
 });
 
 test("turns a policy denial into a tool failure that the model can recover from", async () => {
@@ -367,9 +348,7 @@ test("turns a policy denial into a tool failure that the model can recover from"
           message: {
             role: "assistant",
             content: [],
-            toolCalls: [
-              { id: "call_bash", name: "bash", input: { command: "pwd" } },
-            ],
+            toolCalls: [{ id: "call_bash", name: "bash", input: { command: "pwd" } }],
           },
         };
         return;
@@ -388,9 +367,7 @@ test("turns a policy denial into a tool failure that the model can recover from"
   });
 
   const result = await may.run({ input: "run pwd" }).result;
-  const toolMessage = requests[1].messages.find(
-    (message) => message.role === "tool",
-  );
+  const toolMessage = requests[1].messages.find((message) => message.role === "tool");
 
   assert.equal(result.message.content[0].text, "I cannot run that command.");
   assert.equal(toolMessage.isError, true);
@@ -403,10 +380,7 @@ test("rejects an invalid approval response without resolving the request", async
   const resultPromise = permissions.execute(createExecution());
   const requested = (await iterator.next()).value;
 
-  await assert.rejects(
-    () => permissions.resolve(requested.request.id, "ask"),
-    /Invalid approval decision: ask/,
-  );
+  await assert.rejects(() => permissions.resolve(requested.request.id, "ask"), /Invalid approval decision: ask/);
   assert.equal(await permissions.resolve(requested.request.id, "allow"), true);
   assert.equal(await resultPromise, "executed");
   await permissions.close();
@@ -450,10 +424,10 @@ test("traces permission checks and approval waits under the tool call", async ()
 
   await permissions.resolve(requested.request.id, "allow");
   assert.equal(await result, "executed");
-  assert.deepEqual(spans.map((span) => span.name), [
-    "may.permission.check",
-    "may.permission.approval_wait",
-  ]);
+  assert.deepEqual(
+    spans.map((span) => span.name),
+    ["may.permission.check", "may.permission.approval_wait"],
+  );
   assert.ok(spans.every((span) => span.parent === parent));
   assert.equal(spans[0].attributes["may.permission.decision"], "ask");
   assert.equal(spans[1].attributes["may.permission.approval"], "allow");
@@ -477,9 +451,7 @@ function createExecution(options = {}) {
       toolCallId: "call_test",
       idempotencyKey: "run_test:1:call_test",
       signal: options.signal ?? controller.signal,
-      ...(options.traceContext === undefined
-        ? {}
-        : { traceContext: options.traceContext }),
+      ...(options.traceContext === undefined ? {} : { traceContext: options.traceContext }),
       report() {},
     },
   };
@@ -495,14 +467,17 @@ test("session grants are definition- and host-version-bound without changing rev
   executor.setEventSink(async (event) => {
     if (event.type !== "approval.requested") return;
     requests++;
-    queueMicrotask(() => { void executor.resolve(event.request.id, "allow-session"); });
+    queueMicrotask(() => {
+      void executor.resolve(event.request.id, "allow-session");
+    });
   });
   const execute = (changes = {}) => {
     const execution = createExecution();
     Object.assign(execution.tool, changes);
     return executor.execute(execution);
   };
-  await execute(); await execute();
+  await execute();
+  await execute();
   assert.equal(requests, 1);
   await execute({ description: "changed" });
   await execute({ inputSchema: { properties: { value: { type: "string" } }, type: "object" } });

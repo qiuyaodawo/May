@@ -19,14 +19,18 @@ test("decodes fragmented and consecutive mouse reports without inserting them as
     input.write(report.slice(0, boundary));
     input.write(report.slice(boundary));
   }
-  assert.deepEqual(strokes.map((stroke) => stroke.key), Array(report.length - 1).fill("wheelup"));
+  assert.deepEqual(
+    strokes.map((stroke) => stroke.key),
+    Array(report.length - 1).fill("wheelup"),
+  );
   strokes.length = 0;
   input.write("a\x1b[<65;120;40M\x1b[<0;2;3M\x1b[<0;2;3m\x1b[<35;2;3M\x1b[<66;2;3Mz");
   input.write(Buffer.from([0x1b, 0x5b, 0x4d, 96, 40, 40]));
   input.write("\x1b[<92;2;3M\x1b[A\x1b[B");
-  assert.deepEqual(strokes.map((stroke) => stroke.key), [
-    "a", "wheeldown", "z", "wheelup", "wheelup", "up", "down",
-  ]);
+  assert.deepEqual(
+    strokes.map((stroke) => stroke.key),
+    ["a", "wheeldown", "z", "wheelup", "wheelup", "up", "down"],
+  );
   assert.deepEqual(strokes[4], keyStroke("wheelup", { ctrl: true, alt: true, shift: true }));
   assert.equal(strokes[1].text, undefined);
 
@@ -43,23 +47,29 @@ test("decodes fragmented and consecutive mouse reports without inserting them as
       unsubscribe();
       resolve();
     });
-    t.after(() => { clearTimeout(timer); unsubscribe(); });
+    t.after(() => {
+      clearTimeout(timer);
+      unsubscribe();
+    });
   });
   input.write("\x1b");
   await escaped;
-  assert.deepEqual(strokes.map(({ key, text }) => ({ key, text })), [
-    { key: "paste", text: pasted },
-    { key: "中", text: "中" },
-    { key: "文", text: "文" },
-    { key: "escape", text: undefined },
-  ]);
+  assert.deepEqual(
+    strokes.map(({ key, text }) => ({ key, text })),
+    [
+      { key: "paste", text: pasted },
+      { key: "中", text: "中" },
+      { key: "文", text: "文" },
+      { key: "escape", text: undefined },
+    ],
+  );
 });
 
 test("restores mouse modes and handles restarting after an incomplete report", async () => {
   const input = new PassThrough();
   const output = new PassThrough();
   let written = "";
-  output.on("data", (chunk) => written += chunk.toString());
+  output.on("data", (chunk) => (written += chunk.toString()));
   const driver = new NodeTerminalDriver({ input, output, requireTTY: false });
   const strokes = [];
   driver.onKey((stroke) => strokes.push(stroke.key));

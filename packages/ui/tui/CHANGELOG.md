@@ -20,17 +20,20 @@
   plugins together. Preserve plugin IDs, service IDs, configuration data and saved
   Session state. MaybeCode carries the consolidated dependencies in its published
   installation; its command names remain unchanged.
+
 - 1dd118f: Add English first-run setup to MaybeCode when its configuration file is missing in an interactive terminal. Guide users through provider, credentials, model settings, optional live connection verification, and saving before continuing into the selected UI. Preserve existing configuration files and report noninteractive setup instructions.
 
   Add password input to `TerminalIO.question` with hidden characters and isolated input history in interactive terminals.
 
   Add `createMayConfig` for validated, coordinated creation of complete configuration files without replacing an existing destination. Publishing requires storage with hard-link support.
+
 - 2724da0: Support pressing Esc to return to the previous individual question throughout first-run setup,
   including custom protocols, credentials, and advanced model settings. Keep the
   wizard on one terminal screen while switching between menus and text inputs.
 
   Add an optional onEscape callback to TerminalIO.question for ordinary and password
   input, allowing applications to cancel the current question through its signal.
+
 - c23ff33: Add shared Session transcript reading for user input, recovery findings, and delivered steering. Web history, search, full-field reads, and retained TUI history preserve these messages and execution outcomes consistently.
 
   Breaking: TUI tool items now include denied, not-started, and unknown statuses, and assistant items include interrupted. Update exhaustive custom renderers to handle these states.
@@ -106,6 +109,7 @@
   MaybeCode supports --yolo, --no-yolo and /yolo [on|off|status], preserves explicit
   policy denials, and displays the current mode in terminal and Web UI sessions.
   The bare /yolo command enables the mode; /yolo status reports it without changes.
+
 - 5d3b04a: Add opt-in persistent allow and deny rules with trusted scope, tool-definition
   binding, creator identity, expiry and revocation. Provide a versioned file store
   with atomic replacement and a single writer lock through
@@ -136,6 +140,7 @@
   exists. Supply a trusted `createdBy` identity when resolving it. Existing policy
   return values and existing Session histories remain supported. Readers of
   histories containing rule events must use the updated Session package.
+
 - 34b2532: 新增 `renderMarkdownExcerpt`，将 Markdown 转换为保留标题文字、列表、代码和链接的纯文本节选，支持可见字符数量与逻辑行数限制，并使用完整的 Unicode 字符和省略号表示截断。
 - 296080a: Support Sixel image previews in retained and readline terminals, including
   Windows Terminal capability and cell-size queries. Resize previews to the
@@ -155,6 +160,7 @@
 
   The TUI package includes the PNG declarations required by its image dependency,
   so consumers can type-check installed declarations with `skipLibCheck: false`.
+
 - 02789c6: Display delivered steering messages consistently in live transcripts and restored
   Session history, preserving FIFO order and stable message identities. Include
   complete steering text in Web history search and field reads while retaining
@@ -193,6 +199,7 @@
   in each request, sharing preparation across main and delegated Agents and retaining
   the lease through Goal verification. Startup and read-only requests leave Git state
   unchanged. Each modifying request saves existing user edits before accepting tool writes.
+
 - e3736f6: 加快 MaybeCode 启动：CLI 使用按功能加载的 JavaScript 打包文件，图片处理和 Web 服务在使用时加载。Git 初始化合并仓库身份与操作状态查询，并在 checkpoint 操作内复用状态结果，保留初始 checkpoint 和写入前检查。
 - 3118666: `NodeTerminalDriver` 将独立 LF 输入识别为 `Ctrl+J`，支持应用绑定换行操作。
   CR 输入继续识别为 `Enter`，bracketed paste 中的换行保留为粘贴文字。

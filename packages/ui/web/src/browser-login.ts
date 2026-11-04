@@ -14,6 +14,13 @@ export async function browserLogin(): Promise<string | undefined> {
   });
   if (!response.ok) throw new Error("连接已失效，请从启动程序重新打开页面。");
   const body: unknown = await response.json();
-  if (!body || typeof body !== "object" || !("token" in body) || typeof body.token !== "string" || !/^[\x21-\x7e]{32,256}$/.test(body.token)) throw new Error("服务返回的连接凭据无效。");
+  if (
+    !body ||
+    typeof body !== "object" ||
+    !("token" in body) ||
+    typeof body.token !== "string" ||
+    !/^[\x21-\x7e]{32,256}$/.test(body.token)
+  )
+    throw new Error("服务返回的连接凭据无效。");
   return body.token;
 }

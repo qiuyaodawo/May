@@ -1,8 +1,6 @@
 import type { Model } from "../core/index.js";
 import type { ContextSummarizer } from "../context/index.js";
-import {
-  createModelContextSummarizer as createReusableModelContextSummarizer,
-} from "../context/model-summarizer.js";
+import { createModelContextSummarizer as createReusableModelContextSummarizer } from "../context/model-summarizer.js";
 
 const SUMMARY_INSTRUCTIONS = `Summarize the preceding coding-agent conversation for continuation.
 Return only a concise, factual working-state summary. Preserve the user's goals

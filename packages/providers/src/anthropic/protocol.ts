@@ -1,7 +1,6 @@
 import type { JsonSchema } from "@sortedyuan/may/core";
 
-export const ANTHROPIC_MODEL_STATE_TYPE =
-  "@may/provider-anthropic/message-v1";
+export const ANTHROPIC_MODEL_STATE_TYPE = "@may/provider-anthropic/message-v1";
 
 /** Provider/model metadata determines concrete supported values. */
 export type AnthropicReasoningEffort = string;
@@ -38,10 +37,7 @@ export interface AnthropicDocumentBlock {
   source: AnthropicMediaSource;
 }
 
-export type AnthropicUserContentBlock =
-  | AnthropicTextBlock
-  | AnthropicImageBlock
-  | AnthropicDocumentBlock;
+export type AnthropicUserContentBlock = AnthropicTextBlock | AnthropicImageBlock | AnthropicDocumentBlock;
 
 export interface AnthropicThinkingBlock {
   type: "thinking";
@@ -62,10 +58,7 @@ export interface AnthropicToolUseBlock {
 }
 
 export type AnthropicAssistantContentBlock =
-  | AnthropicTextBlock
-  | AnthropicThinkingBlock
-  | AnthropicRedactedThinkingBlock
-  | AnthropicToolUseBlock;
+  AnthropicTextBlock | AnthropicThinkingBlock | AnthropicRedactedThinkingBlock | AnthropicToolUseBlock;
 
 export interface AnthropicToolResultBlock {
   type: "tool_result";
@@ -77,10 +70,7 @@ export interface AnthropicToolResultBlock {
 export interface AnthropicRequestMessage {
   role: "user" | "assistant";
   content: Array<
-    | AnthropicAssistantContentBlock
-    | AnthropicToolResultBlock
-    | AnthropicImageBlock
-    | AnthropicDocumentBlock
+    AnthropicAssistantContentBlock | AnthropicToolResultBlock | AnthropicImageBlock | AnthropicDocumentBlock
   >;
 }
 

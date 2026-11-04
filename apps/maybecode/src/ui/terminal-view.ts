@@ -28,17 +28,11 @@ import {
   type SessionForkSelection,
 } from "@sortedyuan/tui";
 import type { UiForkPoint, UiWorkspaceDiff, UiWorkspaceGit } from "@sortedyuan/ui-client";
-import {
-  TranscriptStore,
-  TranscriptView,
-} from "@sortedyuan/tui/transcript";
+import { TranscriptStore, TranscriptView } from "@sortedyuan/tui/transcript";
 import type { ToolRendererRegistry } from "@sortedyuan/tui/tool-renderers";
 import type { MaybeCodeSlashCommandSuggestion } from "../slash-commands.js";
 import type { SessionSummary } from "@sortedyuan/may/session/catalog";
-import type {
-  MaybeCodeModelProfile,
-  MaybeCodeReasoningEffortState,
-} from "../controller.js";
+import type { MaybeCodeModelProfile, MaybeCodeReasoningEffortState } from "../controller.js";
 import { createMaybeCodeKeymap, MAYBECODE_EDITOR_KEYBINDINGS, type MaybeCodeKeymapOptions } from "../keymap.js";
 import { MAYBECODE_DARK_THEME } from "./theme.js";
 import { MaybeCodeUiActionRegistry } from "./actions.js";
@@ -57,13 +51,8 @@ export interface MaybeCodeTerminalViewOptions {
   readonly uiActions?: MaybeCodeUiActionRegistry;
   readonly inputHistory?: EditorHistory;
   readonly recordInput?: (value: string) => boolean;
-  readonly suggestions?: (
-    input: string,
-  ) => Promise<readonly MaybeCodeSlashCommandSuggestion[]>;
-  readonly onSubmit: (
-    value: string,
-    accepted?: () => void,
-  ) => void | Promise<void>;
+  readonly suggestions?: (input: string) => Promise<readonly MaybeCodeSlashCommandSuggestion[]>;
+  readonly onSubmit: (value: string, accepted?: () => void) => void | Promise<void>;
   readonly onCancel?: () => void;
   readonly onInvalidate?: () => void;
 }
@@ -74,8 +63,7 @@ export type SessionDialogAction =
   | { readonly type: "delete"; readonly sessionId: string };
 
 export type ModelDialogAction =
-  | { readonly type: "switch"; readonly profile: string }
-  | { readonly type: "set-default"; readonly profile: string };
+  { readonly type: "switch"; readonly profile: string } | { readonly type: "set-default"; readonly profile: string };
 
 /** Retained MaybeCode view shared by the experimental terminal frontend. */
 export class MaybeCodeTerminalView implements InteractiveComponent {
@@ -107,16 +95,17 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
   private readonly layout = new Column([]);
   private editorSize: RenderSize = { width: 1, height: 1 };
   private readonly editorRegion: Component = {
-    render: size => {
+    render: (size) => {
       this.editorSize = size;
       return new Panel(this.editor, {
         borderStyle: this.focus.focusedId === "editor" ? this.theme.borderAccent : this.theme.border,
       }).render(size);
     },
-    handlePointer: event => {
+    handlePointer: (event) => {
       if (event.type === "down") {
         if (event.button !== 0) return false;
-        if (event.x < 1 || event.x >= this.editorSize.width - 1 || event.y < 1 || event.y >= this.editorSize.height - 1) return false;
+        if (event.x < 1 || event.x >= this.editorSize.width - 1 || event.y < 1 || event.y >= this.editorSize.height - 1)
+          return false;
         this.resetInputContext();
         this.focus.focus("editor");
         this.transcriptView.clearSelection();
@@ -125,8 +114,8 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
     },
   };
   private readonly transcriptRegion: Component = {
-    render: size => this.transcript.render(size),
-    handlePointer: event => {
+    render: (size) => this.transcript.render(size),
+    handlePointer: (event) => {
       if (event.type === "down") {
         if (event.button !== 0) return false;
         this.resetInputContext();
@@ -144,7 +133,7 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
   private readonly baseView: InteractiveComponent = {
     render: (size) => this.renderBase(size),
     handleKey: (stroke) => this.handleBaseKey(stroke),
-    handlePointer: event => this.layout.handlePointer(event),
+    handlePointer: (event) => this.layout.handlePointer(event),
   };
 
   constructor(private readonly options: MaybeCodeTerminalViewOptions) {
@@ -165,27 +154,29 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
       onInvalidate: () => options.onInvalidate?.(),
     });
     this.inputHistory = options.inputHistory ?? new EditorHistory();
-    this.uiActions = options.uiActions ?? new MaybeCodeUiActionRegistry()
-      .register({
-        id: "tools.toggle",
-        command: "/details",
-        description: "Toggle all tool execution details",
-        run: () => {
-          this.preserveSelectedToolPosition();
-          const visible = this.transcriptView.toggleToolDetails();
-          return `Tool details ${visible ? "shown" : "hidden"}`;
-        },
-      })
-      .register({
-        id: "thinking.toggle",
-        command: "/thinking",
-        description: "Toggle reasoning block visibility",
-        run: () => {
-          this.preserveSelectedToolPosition();
-          const visible = this.transcriptView.toggleReasoning();
-          return `Thinking ${visible ? "shown" : "hidden"}`;
-        },
-      });
+    this.uiActions =
+      options.uiActions ??
+      new MaybeCodeUiActionRegistry()
+        .register({
+          id: "tools.toggle",
+          command: "/details",
+          description: "Toggle all tool execution details",
+          run: () => {
+            this.preserveSelectedToolPosition();
+            const visible = this.transcriptView.toggleToolDetails();
+            return `Tool details ${visible ? "shown" : "hidden"}`;
+          },
+        })
+        .register({
+          id: "thinking.toggle",
+          command: "/thinking",
+          description: "Toggle reasoning block visibility",
+          run: () => {
+            this.preserveSelectedToolPosition();
+            const visible = this.transcriptView.toggleReasoning();
+            return `Thinking ${visible ? "shown" : "hidden"}`;
+          },
+        });
     this.editor = new Editor({
       ...this.editorOptions(),
       history: this.inputHistory,
@@ -244,14 +235,23 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
       keybindings: MAYBECODE_EDITOR_KEYBINDINGS,
       ...omitUndefined({ clipboard: this.options.clipboard }),
       onInvalidate: () => this.options.onInvalidate?.(),
-      onError: error => this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`),
+      onError: (error) => this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`),
     };
   }
 
   private shortcutHint(action: string): string {
-    return this.keymap.keysForAction(action)[0]?.split(" ").map(key =>
-      key.split("+").map(part => part.length === 1 ? part.toUpperCase() : part[0]!.toUpperCase() + part.slice(1)).join("+")
-    ).join(" ") ?? "";
+    return (
+      this.keymap
+        .keysForAction(action)[0]
+        ?.split(" ")
+        .map((key) =>
+          key
+            .split("+")
+            .map((part) => (part.length === 1 ? part.toUpperCase() : part[0]!.toUpperCase() + part.slice(1)))
+            .join("+"),
+        )
+        .join(" ") ?? ""
+    );
   }
 
   private resetInputContext(): void {
@@ -289,17 +289,23 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
     return new Promise((resolve) => {
       let settled = false;
       const abort = () => pending.finish();
-      const pending = { prompt, finish: (value?: string) => {
-        if (settled) return;
-        settled = true;
-        signal.removeEventListener("abort", abort);
-        const index = this.mcpQuestions.indexOf(pending);
-        if (index >= 0) this.mcpQuestions.splice(index, 1);
-        if (index === 0 && this.dialogKind === "mcp") {
-          this.dialog = undefined; this.dialogKind = undefined; this.openCurrentApproval();
-        }
-        resolve(value); this.options.onInvalidate?.();
-      } };
+      const pending = {
+        prompt,
+        finish: (value?: string) => {
+          if (settled) return;
+          settled = true;
+          signal.removeEventListener("abort", abort);
+          const index = this.mcpQuestions.indexOf(pending);
+          if (index >= 0) this.mcpQuestions.splice(index, 1);
+          if (index === 0 && this.dialogKind === "mcp") {
+            this.dialog = undefined;
+            this.dialogKind = undefined;
+            this.openCurrentApproval();
+          }
+          resolve(value);
+          this.options.onInvalidate?.();
+        },
+      };
       this.mcpQuestions.push(pending);
       signal.addEventListener("abort", abort, { once: true });
       this.openCurrentApproval();
@@ -307,9 +313,7 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
   }
 
   dismissApproval(requestId: string): boolean {
-    const index = this.approvalQueue.findIndex((item) =>
-      item.request.id === requestId
-    );
+    const index = this.approvalQueue.findIndex((item) => item.request.id === requestId);
     if (index < 0) return false;
     const [approval] = this.approvalQueue.splice(index, 1);
     approval?.resolve(undefined);
@@ -331,15 +335,22 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
     }
     return new Promise((resolve) => {
       this.resolveSessionDialog = resolve;
-      const prompt = new SessionPrompt(sessions, currentSessionId, this.theme, (action) => {
-        this.dialog = undefined;
-        this.dialogKind = undefined;
-        const complete = this.resolveSessionDialog;
-        this.resolveSessionDialog = undefined;
-        complete?.(action);
-        this.openCurrentApproval();
-        this.options.onInvalidate?.();
-      }, this.editorOptions(), this.options.keymap);
+      const prompt = new SessionPrompt(
+        sessions,
+        currentSessionId,
+        this.theme,
+        (action) => {
+          this.dialog = undefined;
+          this.dialogKind = undefined;
+          const complete = this.resolveSessionDialog;
+          this.resolveSessionDialog = undefined;
+          complete?.(action);
+          this.openCurrentApproval();
+          this.options.onInvalidate?.();
+        },
+        this.editorOptions(),
+        this.options.keymap,
+      );
       this.dialog = new Dialog(this.baseView, prompt, {
         open: true,
         title: "Sessions",
@@ -394,29 +405,28 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
     });
   }
 
-  requestReasoningEffortSelection(
-    state: MaybeCodeReasoningEffortState,
-  ): Promise<string | undefined> {
-    if (
-      state.status !== "known" ||
-      this.dialog !== undefined ||
-      this.resolveEffortDialog !== undefined
-    ) {
+  requestReasoningEffortSelection(state: MaybeCodeReasoningEffortState): Promise<string | undefined> {
+    if (state.status !== "known" || this.dialog !== undefined || this.resolveEffortDialog !== undefined) {
       return state.status === "known"
         ? Promise.reject(new Error("Another dialog is already open"))
         : Promise.resolve(undefined);
     }
     return new Promise((resolve) => {
       this.resolveEffortDialog = resolve;
-      const prompt = new EffortPrompt(state, this.theme, (effort) => {
-        this.dialog = undefined;
-        this.dialogKind = undefined;
-        const complete = this.resolveEffortDialog;
-        this.resolveEffortDialog = undefined;
-        complete?.(effort);
-        this.openCurrentApproval();
-        this.options.onInvalidate?.();
-      }, this.options.keymap);
+      const prompt = new EffortPrompt(
+        state,
+        this.theme,
+        (effort) => {
+          this.dialog = undefined;
+          this.dialogKind = undefined;
+          const complete = this.resolveEffortDialog;
+          this.resolveEffortDialog = undefined;
+          complete?.(effort);
+          this.openCurrentApproval();
+          this.options.onInvalidate?.();
+        },
+        this.options.keymap,
+      );
       this.dialog = new Dialog(this.baseView, prompt, {
         open: true,
         title: "Reasoning effort",
@@ -445,30 +455,72 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
     this.options.onInvalidate?.();
   }
 
-  requestForkSelection(points: readonly UiForkPoint[], currentSessionId: string): Promise<SessionForkSelection | undefined> {
+  requestForkSelection(
+    points: readonly UiForkPoint[],
+    currentSessionId: string,
+  ): Promise<SessionForkSelection | undefined> {
     if (this.dialog) return Promise.reject(new Error("Another dialog is already open"));
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.resolveVersionDialog = resolve;
-      const picker = new SessionForkPicker(points, { currentSessionId, theme: this.theme, onComplete: selection => this.completeVersionDialog(selection) });
-      this.dialog = new Dialog(this.baseView, picker, { open: true, title: "Session 分支", width: 100, height: 25, dismissOnEscape: false, borderStyle: this.theme.borderAccent, titleStyle: this.theme.accent });
-      this.dialogKind = "fork"; this.synchronizeDialog(); this.options.onInvalidate?.();
+      const picker = new SessionForkPicker(points, {
+        currentSessionId,
+        theme: this.theme,
+        onComplete: (selection) => this.completeVersionDialog(selection),
+      });
+      this.dialog = new Dialog(this.baseView, picker, {
+        open: true,
+        title: "Session 分支",
+        width: 100,
+        height: 25,
+        dismissOnEscape: false,
+        borderStyle: this.theme.borderAccent,
+        titleStyle: this.theme.accent,
+      });
+      this.dialogKind = "fork";
+      this.synchronizeDialog();
+      this.options.onInvalidate?.();
     });
   }
 
-  requestChanges(diff: UiWorkspaceDiff, operations: { readonly onRestore?: (path: string) => Promise<UiWorkspaceDiff>; readonly onApply?: (previewId: string) => Promise<void> } = {}): Promise<void> {
+  requestChanges(
+    diff: UiWorkspaceDiff,
+    operations: {
+      readonly onRestore?: (path: string) => Promise<UiWorkspaceDiff>;
+      readonly onApply?: (previewId: string) => Promise<void>;
+    } = {},
+  ): Promise<void> {
     if (this.dialog) return Promise.reject(new Error("Another dialog is already open"));
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.resolveVersionDialog = () => resolve();
-      const viewer = new WorkspaceDiffViewer(diff, { theme: this.theme, onClose: () => this.completeVersionDialog(), ...operations, onInvalidate: () => this.options.onInvalidate?.() });
-      this.dialog = new Dialog(this.baseView, viewer, { open: true, title: "文件变化", width: 110, height: 30, dismissOnEscape: false, borderStyle: this.theme.borderAccent, titleStyle: this.theme.accent });
-      this.dialogKind = "changes"; this.synchronizeDialog(); this.options.onInvalidate?.();
+      const viewer = new WorkspaceDiffViewer(diff, {
+        theme: this.theme,
+        onClose: () => this.completeVersionDialog(),
+        ...operations,
+        onInvalidate: () => this.options.onInvalidate?.(),
+      });
+      this.dialog = new Dialog(this.baseView, viewer, {
+        open: true,
+        title: "文件变化",
+        width: 110,
+        height: 30,
+        dismissOnEscape: false,
+        borderStyle: this.theme.borderAccent,
+        titleStyle: this.theme.accent,
+      });
+      this.dialogKind = "changes";
+      this.synchronizeDialog();
+      this.options.onInvalidate?.();
     });
   }
 
   private completeVersionDialog(selection?: SessionForkSelection): void {
-    this.dialog = undefined; this.dialogKind = undefined;
-    const resolve = this.resolveVersionDialog; this.resolveVersionDialog = undefined;
-    resolve?.(selection); this.openCurrentApproval(); this.options.onInvalidate?.();
+    this.dialog = undefined;
+    this.dialogKind = undefined;
+    const resolve = this.resolveVersionDialog;
+    this.resolveVersionDialog = undefined;
+    resolve?.(selection);
+    this.openCurrentApproval();
+    this.options.onInvalidate?.();
   }
 
   setModel(model: string): void {
@@ -510,29 +562,25 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
   }
 
   private renderBase(size: RenderSize): RenderResult {
-    const suggestionHeight = this.suggestionsVisible
-      ? Math.min(7, this.suggestions.length + 2)
-      : 0;
+    const suggestionHeight = this.suggestionsVisible ? Math.min(7, this.suggestions.length + 2) : 0;
     this.layout.setItems([
       {
         height: 3,
-        component: new HeaderView(
-          this.workspace,
-          this.model,
-          this.theme,
-        ),
+        component: new HeaderView(this.workspace, this.model, this.theme),
       },
       { flex: 1, minHeight: 1, component: this.transcriptRegion },
       ...(suggestionHeight === 0
         ? []
-        : [{
-            height: suggestionHeight,
-            component: new Panel(this.suggestionList, {
-              title: " Commands ",
-              borderStyle: this.theme.border,
-              titleStyle: this.theme.accent,
-            }),
-          }]),
+        : [
+            {
+              height: suggestionHeight,
+              component: new Panel(this.suggestionList, {
+                title: " Commands ",
+                borderStyle: this.theme.border,
+                titleStyle: this.theme.accent,
+              }),
+            },
+          ]),
       {
         height: 4,
         component: this.editorRegion,
@@ -562,14 +610,21 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
       this.transcript.scrollBy(stroke.key === "wheelup" ? -3 : 3);
       return true;
     }
-    if (this.focus.focusedId === "editor" && this.editor.hasSelection &&
-      stroke.ctrl && stroke.key === "c" && this.editor.handleKey(stroke)) {
+    if (
+      this.focus.focusedId === "editor" &&
+      this.editor.hasSelection &&
+      stroke.ctrl &&
+      stroke.key === "c" &&
+      this.editor.handleKey(stroke)
+    ) {
       this.keymap.reset();
       this.clearShortcutHint();
       return true;
     }
-    const shortcut = this.keymap.resolve(stroke, this.transcriptView.hasSelection
-      ? ["global", "transcript.selection"] : ["global"]);
+    const shortcut = this.keymap.resolve(
+      stroke,
+      this.transcriptView.hasSelection ? ["global", "transcript.selection"] : ["global"],
+    );
     if (shortcut.type === "pending") {
       this.statusBeforeShortcut ??= this.status;
       this.status = `Shortcut: ${shortcut.completions.join(" / ")}`;
@@ -585,7 +640,7 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
         } else {
           this.pendingClipboard = this.options.clipboard.writeText(text).then(
             () => this.setStatus("Copied"),
-            error => this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`),
+            (error) => this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`),
           );
         }
         return true;
@@ -600,7 +655,8 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
           this.resetInputContext();
           this.transcript.clearPointerSelection();
           this.editor.clearSelection();
-          const changed = shortcut.action === "app.focus.previous" ? this.focus.focusPrevious() : this.focus.focusNext();
+          const changed =
+            shortcut.action === "app.focus.previous" ? this.focus.focusPrevious() : this.focus.focusNext();
           if (this.focus.focusedId === "transcript") this.ensureSelectedToolVisible();
           return changed;
         }
@@ -628,22 +684,41 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
         this.hideSuggestions();
         return true;
       }
-      if (this.suggestionsVisible && isSuggestionNavigation(stroke.key) &&
-        stroke.key !== "home" && stroke.key !== "end" && !stroke.shift && !stroke.ctrl && !stroke.alt) {
+      if (
+        this.suggestionsVisible &&
+        isSuggestionNavigation(stroke.key) &&
+        stroke.key !== "home" &&
+        stroke.key !== "end" &&
+        !stroke.shift &&
+        !stroke.ctrl &&
+        !stroke.alt
+      ) {
         return this.suggestionList.handleKey(stroke);
       }
       if (stroke.key === "tab" && !stroke.shift) {
         this.completeSuggestion(false);
         return true;
       }
-      if (stroke.key === "enter" && this.suggestionsVisible && !stroke.shift && !stroke.ctrl && !stroke.alt && !stroke.meta) {
+      if (
+        stroke.key === "enter" &&
+        this.suggestionsVisible &&
+        !stroke.shift &&
+        !stroke.ctrl &&
+        !stroke.alt &&
+        !stroke.meta
+      ) {
         this.completeSuggestion(true);
         return true;
       }
     }
-    const transcriptInteraction = stroke.key === "j" || stroke.key === "k" ||
-      stroke.key === "enter" || stroke.key === "space" || stroke.text === " ";
-    const togglesSelectedTool = this.focus.focusedId === "transcript" &&
+    const transcriptInteraction =
+      stroke.key === "j" ||
+      stroke.key === "k" ||
+      stroke.key === "enter" ||
+      stroke.key === "space" ||
+      stroke.text === " ";
+    const togglesSelectedTool =
+      this.focus.focusedId === "transcript" &&
       (stroke.key === "enter" || stroke.key === "space" || stroke.text === " ");
     if (togglesSelectedTool) this.preserveSelectedToolPosition();
     const handled = this.focus.dispatch(stroke);
@@ -664,29 +739,30 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
     this.hideSuggestions();
     this.setStatus("Running");
     const epoch = this.submissionEpoch;
-    const submit = () => this.disposed || epoch !== this.submissionEpoch ? undefined : this.resolveSubmission(value, completeCommand, epoch);
+    const submit = () =>
+      this.disposed || epoch !== this.submissionEpoch
+        ? undefined
+        : this.resolveSubmission(value, completeCommand, epoch);
     const previous = this.submissionTail;
     const pending = (previous ? previous.then(submit) : Promise.resolve(submit()))
       .then(
         (status) => {
-          if (epoch === this.submissionEpoch) this.setStatus(status ?? (this.options.isRunning?.() ? "Running" : "Ready"));
+          if (epoch === this.submissionEpoch)
+            this.setStatus(status ?? (this.options.isRunning?.() ? "Running" : "Ready"));
         },
         (error: unknown) => {
           if (this.disposed || epoch !== this.submissionEpoch) return;
           if (this.editor.value === "") this.editor.setValue(value);
           this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`);
         },
-      ).finally(() => {
+      )
+      .finally(() => {
         if (this.submissionTail === pending) this.submissionTail = undefined;
       });
     this.submissionTail = pending;
   }
 
-  private async resolveSubmission(
-    value: string,
-    completeCommand: boolean,
-    epoch: number,
-  ): Promise<string | undefined> {
+  private async resolveSubmission(value: string, completeCommand: boolean, epoch: number): Promise<string | undefined> {
     let submission = value;
     if (completeCommand && value.startsWith("/")) {
       const suggestions = await this.suggestionsFor(value);
@@ -719,13 +795,13 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
       (suggestions) => {
         if (version !== this.suggestionVersion || value !== this.editor.value) return;
         this.suggestions = suggestions;
-        this.suggestionList.setItems(suggestions.map((suggestion) => ({
-          value: suggestion,
-          label: suggestion.label,
-          ...(suggestion.description === undefined
-            ? {}
-            : { description: suggestion.description }),
-        })));
+        this.suggestionList.setItems(
+          suggestions.map((suggestion) => ({
+            value: suggestion,
+            label: suggestion.label,
+            ...(suggestion.description === undefined ? {} : { description: suggestion.description }),
+          })),
+        );
         this.suggestionsVisible = suggestions.length > 0;
         this.options.onInvalidate?.();
       },
@@ -766,24 +842,38 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
       this.dialog = undefined;
       const question = this.mcpQuestions[0];
       if (question !== undefined) {
-        this.dialog = new Dialog(this.baseView, new McpInputPrompt(question.prompt, question.finish, this.editorOptions(), this.options.keymap), {
-          open: true, title: "MCP user interaction — untrusted server", width: 92, height: 24,
-          dismissOnEscape: false, borderStyle: this.theme.warning, titleStyle: this.theme.warning,
-        });
+        this.dialog = new Dialog(
+          this.baseView,
+          new McpInputPrompt(question.prompt, question.finish, this.editorOptions(), this.options.keymap),
+          {
+            open: true,
+            title: "MCP user interaction — untrusted server",
+            width: 92,
+            height: 24,
+            dismissOnEscape: false,
+            borderStyle: this.theme.warning,
+            titleStyle: this.theme.warning,
+          },
+        );
         this.dialogKind = "mcp";
         this.synchronizeDialog();
         this.options.onInvalidate?.();
       }
       return;
     }
-    const prompt = new ApprovalPrompt(pending.request, this.theme, (decision) => {
-      const current = this.approvalQueue.shift();
-      this.dialog = undefined;
-      this.dialogKind = undefined;
-      current?.resolve(decision);
-      this.openCurrentApproval();
-      this.options.onInvalidate?.();
-    }, this.options.keymap);
+    const prompt = new ApprovalPrompt(
+      pending.request,
+      this.theme,
+      (decision) => {
+        const current = this.approvalQueue.shift();
+        this.dialog = undefined;
+        this.dialogKind = undefined;
+        current?.resolve(decision);
+        this.openCurrentApproval();
+        this.options.onInvalidate?.();
+      },
+      this.options.keymap,
+    );
     this.dialog = new Dialog(this.baseView, prompt, {
       open: true,
       title: `Approval: ${sanitizeTerminalText(pending.request.tool.name)}`,
@@ -809,10 +899,7 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
       this.transcript.detachFromEnd();
       return;
     }
-    this.transcript.preserveAnchor(
-      anchor,
-      () => this.transcriptView.selectedToolAnchor,
-    );
+    this.transcript.preserveAnchor(anchor, () => this.transcriptView.selectedToolAnchor);
   }
 
   private executeUiAction(id: string): void {
@@ -820,9 +907,7 @@ export class MaybeCodeTerminalView implements InteractiveComponent {
     if (status !== undefined) this.setStatus(status);
   }
 
-  private async suggestionsFor(
-    value: string,
-  ): Promise<readonly MaybeCodeSlashCommandSuggestion[]> {
+  private async suggestionsFor(value: string): Promise<readonly MaybeCodeSlashCommandSuggestion[]> {
     const local = this.uiActions.suggestions(value);
     const controller = await (this.options.suggestions?.(value) ?? Promise.resolve([]));
     const seen = new Set<string>();
@@ -852,23 +937,23 @@ class ModelPrompt implements InteractiveComponent {
     keymapOptions: MaybeCodeKeymapOptions = {},
   ) {
     this.keymap = createMaybeCodeKeymap(keymapOptions);
-    const currentIndex = models.findIndex((model) =>
-      model.name === currentProfile
+    const currentIndex = models.findIndex((model) => model.name === currentProfile);
+    this.list = new SelectList(
+      models.map((model) => ({
+        value: model,
+        label: `${model.name === currentProfile ? "* " : ""}${model.name}` + `${model.isDefault ? " [default]" : ""}`,
+        description: `${model.provider}/${model.model} · ${model.adapter}`,
+      })),
+      {
+        onSelect: (item) => this.complete({ type: "switch", profile: item.value.name }),
+        onCancel: () => this.complete(undefined),
+        selectedIndex: Math.max(0, currentIndex),
+        selectedStyle: theme.selected,
+        descriptionStyle: theme.muted,
+        markerStyle: theme.accent,
+        emptyLabel: "No model profiles configured",
+      },
     );
-    this.list = new SelectList(models.map((model) => ({
-      value: model,
-      label: `${model.name === currentProfile ? "* " : ""}${model.name}` +
-        `${model.isDefault ? " [default]" : ""}`,
-      description: `${model.provider}/${model.model} · ${model.adapter}`,
-    })), {
-      onSelect: item => this.complete({ type: "switch", profile: item.value.name }),
-      onCancel: () => this.complete(undefined),
-      selectedIndex: Math.max(0, currentIndex),
-      selectedStyle: theme.selected,
-      descriptionStyle: theme.muted,
-      markerStyle: theme.accent,
-      emptyLabel: "No model profiles configured",
-    });
     this.list.setFocused(true);
   }
 
@@ -877,13 +962,17 @@ class ModelPrompt implements InteractiveComponent {
       { flex: 1, minHeight: 1, component: this.list },
       {
         height: 1,
-        component: new Text(`${promptShortcut(this.keymap, "list.accept", "select")} select · ${promptShortcut(this.keymap, "model.default.set", "modelPicker")} set default · ${promptShortcut(this.keymap, "list.cancel", "select")} close`),
+        component: new Text(
+          `${promptShortcut(this.keymap, "list.accept", "select")} select · ${promptShortcut(this.keymap, "model.default.set", "modelPicker")} set default · ${promptShortcut(this.keymap, "list.cancel", "select")} close`,
+        ),
       },
     ]);
     return this.layout.render(size);
   }
 
-  handlePointer(event: PointerEvent): boolean { return this.layout.handlePointer(event); }
+  handlePointer(event: PointerEvent): boolean {
+    return this.layout.handlePointer(event);
+  }
 
   handleKey(stroke: KeyStroke): boolean {
     const result = this.keymap.resolve(stroke, ["select", "modelPicker"]);
@@ -913,35 +1002,44 @@ class EffortPrompt implements InteractiveComponent {
   ) {
     this.keymap = createMaybeCodeKeymap(keymapOptions);
     const efforts = ["default", ...state.efforts];
-    const currentIndex = state.overridden
-      ? efforts.indexOf(state.effectiveEffort ?? "")
-      : 0;
-    this.list = new SelectList(efforts.map((effort) => ({
-      value: effort,
-      label: `${effort === efforts[currentIndex] ? "* " : ""}${effort}`,
-      description: effort === "default"
-        ? `Clear override · default ${state.defaultEffort ?? "is provider-defined"}`
-        : `Capability source: ${state.source}`,
-    })), {
-      onSelect: item => this.complete(item.value),
-      onCancel: () => this.complete(undefined),
-      selectedIndex: Math.max(0, currentIndex),
-      selectedStyle: theme.selected,
-      descriptionStyle: theme.muted,
-      markerStyle: theme.accent,
-    });
+    const currentIndex = state.overridden ? efforts.indexOf(state.effectiveEffort ?? "") : 0;
+    this.list = new SelectList(
+      efforts.map((effort) => ({
+        value: effort,
+        label: `${effort === efforts[currentIndex] ? "* " : ""}${effort}`,
+        description:
+          effort === "default"
+            ? `Clear override · default ${state.defaultEffort ?? "is provider-defined"}`
+            : `Capability source: ${state.source}`,
+      })),
+      {
+        onSelect: (item) => this.complete(item.value),
+        onCancel: () => this.complete(undefined),
+        selectedIndex: Math.max(0, currentIndex),
+        selectedStyle: theme.selected,
+        descriptionStyle: theme.muted,
+        markerStyle: theme.accent,
+      },
+    );
     this.list.setFocused(true);
   }
 
   render(size: RenderSize): RenderResult {
     this.layout.setItems([
       { flex: 1, minHeight: 1, component: this.list },
-      { height: 1, component: new Text(`${promptShortcut(this.keymap, "list.accept", "select")} select · ${promptShortcut(this.keymap, "list.cancel", "select")} close`) },
+      {
+        height: 1,
+        component: new Text(
+          `${promptShortcut(this.keymap, "list.accept", "select")} select · ${promptShortcut(this.keymap, "list.cancel", "select")} close`,
+        ),
+      },
     ]);
     return this.layout.render(size);
   }
 
-  handlePointer(event: PointerEvent): boolean { return this.layout.handlePointer(event); }
+  handlePointer(event: PointerEvent): boolean {
+    return this.layout.handlePointer(event);
+  }
 
   handleKey(stroke: KeyStroke): boolean {
     const result = this.keymap.resolve(stroke, ["select"]);
@@ -961,24 +1059,35 @@ class ApprovalPrompt implements InteractiveComponent {
     keymapOptions: MaybeCodeKeymapOptions = {},
   ) {
     this.keymap = createMaybeCodeKeymap(keymapOptions);
-    this.choices = new SelectList([
-      { value: "allow", label: "Allow once", description: promptShortcut(this.keymap, "approval.allow", "approval") },
-      ...(request.grantKey === undefined
-        ? []
-        : [{
-            value: "allow-session" as const,
-            label: "Allow matching calls for this session",
-            description: promptShortcut(this.keymap, "approval.allowSession", "approval"),
-          }]),
-      { value: "deny", label: "Deny", description: `${promptShortcut(this.keymap, "approval.deny", "approval")} / ${promptShortcut(this.keymap, "list.cancel", "select")}` },
-      ...(request.persistent ? [{ value: "allow-persistent" as const, label: "保存允许规则", description: request.persistent.description }] : []),
-    ], {
-      onSelect: (item) => this.decide(item.value),
-      onCancel: () => this.decide("deny"),
-      selectedStyle: this.theme.selected,
-      descriptionStyle: this.theme.muted,
-      markerStyle: this.theme.accent,
-    });
+    this.choices = new SelectList(
+      [
+        { value: "allow", label: "Allow once", description: promptShortcut(this.keymap, "approval.allow", "approval") },
+        ...(request.grantKey === undefined
+          ? []
+          : [
+              {
+                value: "allow-session" as const,
+                label: "Allow matching calls for this session",
+                description: promptShortcut(this.keymap, "approval.allowSession", "approval"),
+              },
+            ]),
+        {
+          value: "deny",
+          label: "Deny",
+          description: `${promptShortcut(this.keymap, "approval.deny", "approval")} / ${promptShortcut(this.keymap, "list.cancel", "select")}`,
+        },
+        ...(request.persistent
+          ? [{ value: "allow-persistent" as const, label: "保存允许规则", description: request.persistent.description }]
+          : []),
+      ],
+      {
+        onSelect: (item) => this.decide(item.value),
+        onCancel: () => this.decide("deny"),
+        selectedStyle: this.theme.selected,
+        descriptionStyle: this.theme.muted,
+        markerStyle: this.theme.accent,
+      },
+    );
     this.choices.setFocused(true);
   }
 
@@ -987,9 +1096,7 @@ class ApprovalPrompt implements InteractiveComponent {
     this.layout.setItems([
       {
         height: 1,
-        component: new Text(
-          `Tool: ${sanitizeTerminalText(this.request.tool.name)}`,
-        ),
+        component: new Text(`Tool: ${sanitizeTerminalText(this.request.tool.name)}`),
       },
       { flex: 1, minHeight: 1, component: new Text(input) },
       {
@@ -1000,7 +1107,9 @@ class ApprovalPrompt implements InteractiveComponent {
     return this.layout.render(size);
   }
 
-  handlePointer(event: PointerEvent): boolean { return this.layout.handlePointer(event); }
+  handlePointer(event: PointerEvent): boolean {
+    return this.layout.handlePointer(event);
+  }
 
   handleKey(stroke: KeyStroke): boolean {
     const result = this.keymap.resolve(stroke, ["select", "approval"]);
@@ -1034,8 +1143,8 @@ class SessionPrompt implements InteractiveComponent {
   private readonly keymap: Keymap;
   private readonly layout = new Column([], { gap: 1 });
   private readonly listRegion: Component = {
-    render: size => this.list.render(size),
-    handlePointer: event => (this.mode === "browse" || this.mode === "search") && this.list.handlePointer(event),
+    render: (size) => this.list.render(size),
+    handlePointer: (event) => (this.mode === "browse" || this.mode === "search") && this.list.handlePointer(event),
   };
 
   constructor(
@@ -1087,14 +1196,19 @@ class SessionPrompt implements InteractiveComponent {
     return this.layout.render(size);
   }
 
-  handlePointer(event: PointerEvent): boolean { return this.layout.handlePointer(event); }
+  handlePointer(event: PointerEvent): boolean {
+    return this.layout.handlePointer(event);
+  }
 
-  dispose(): void { this.input.dispose(); }
+  dispose(): void {
+    this.input.dispose();
+  }
 
   handleKey(stroke: KeyStroke): boolean {
-    const contexts = this.mode === "browse"
-      ? ["select", "sessionPicker"]
-      : [this.mode === "search" ? "sessionSearch" : this.mode === "rename" ? "sessionRename" : "sessionDelete"];
+    const contexts =
+      this.mode === "browse"
+        ? ["select", "sessionPicker"]
+        : [this.mode === "search" ? "sessionSearch" : this.mode === "rename" ? "sessionRename" : "sessionDelete"];
     const result = this.keymap.resolve(stroke, contexts);
     if (result.type === "pending") return true;
     if (result.type === "action") {
@@ -1103,22 +1217,38 @@ class SessionPrompt implements InteractiveComponent {
           if (this.mode !== "browse") return this.setMode("browse");
           this.complete(undefined);
           return true;
-        case "list.up": case "list.down": case "list.pageUp": case "list.pageDown":
-        case "list.home": case "list.end": case "list.accept":
+        case "list.up":
+        case "list.down":
+        case "list.pageUp":
+        case "list.pageDown":
+        case "list.home":
+        case "list.end":
+        case "list.accept":
           return this.list.performAction(result.action);
         case "search.start":
           this.setMode("search");
           this.status = "Type to filter by id, title, or preview";
           this.input.setValue("");
           return true;
-        case "search.finish": return this.resumeSelected();
-        case "session.rename.start": return this.beginRename();
-        case "session.rename.accept": this.input.performAction("editor.submit"); return true;
-        case "session.delete.request": return this.beginDelete();
-        case "session.delete.cancel": return this.setMode("browse");
-        case "session.delete.accept": return this.deleteSelected();
-        case "text.clear": this.input.setValue(""); return true;
-        case "text.backspace": this.input.performAction("editor.backspace"); return true;
+        case "search.finish":
+          return this.resumeSelected();
+        case "session.rename.start":
+          return this.beginRename();
+        case "session.rename.accept":
+          this.input.performAction("editor.submit");
+          return true;
+        case "session.delete.request":
+          return this.beginDelete();
+        case "session.delete.cancel":
+          return this.setMode("browse");
+        case "session.delete.accept":
+          return this.deleteSelected();
+        case "text.clear":
+          this.input.setValue("");
+          return true;
+        case "text.backspace":
+          this.input.performAction("editor.backspace");
+          return true;
       }
     }
     return (this.mode === "search" || this.mode === "rename") && this.input.handleKey(stroke);
@@ -1127,11 +1257,12 @@ class SessionPrompt implements InteractiveComponent {
   private footer(): InteractiveComponent {
     if (this.mode === "search" || this.mode === "rename") return this.input;
     return {
-      render: (size) => new Text(
-        this.mode === "delete"
-          ? `${this.status}\n${promptShortcut(this.keymap, "session.delete.accept", "sessionDelete")} delete / ${promptShortcut(this.keymap, "session.delete.cancel", "sessionDelete")} cancel`
-          : `${this.status}\n${promptShortcut(this.keymap, "list.accept", "select")} resume · ${promptShortcut(this.keymap, "search.start", "sessionPicker")} search · ${promptShortcut(this.keymap, "session.rename.start", "sessionPicker")} rename · ${promptShortcut(this.keymap, "session.delete.request", "sessionPicker")} delete · ${promptShortcut(this.keymap, "list.cancel", "select")} close`,
-      ).render(size),
+      render: (size) =>
+        new Text(
+          this.mode === "delete"
+            ? `${this.status}\n${promptShortcut(this.keymap, "session.delete.accept", "sessionDelete")} delete / ${promptShortcut(this.keymap, "session.delete.cancel", "sessionDelete")} cancel`
+            : `${this.status}\n${promptShortcut(this.keymap, "list.accept", "select")} resume · ${promptShortcut(this.keymap, "search.start", "sessionPicker")} search · ${promptShortcut(this.keymap, "session.rename.start", "sessionPicker")} rename · ${promptShortcut(this.keymap, "session.delete.request", "sessionPicker")} delete · ${promptShortcut(this.keymap, "list.cancel", "select")} close`,
+        ).render(size),
       handleKey: () => false,
     };
   }
@@ -1145,20 +1276,22 @@ class SessionPrompt implements InteractiveComponent {
 
   private refreshList(): void {
     const query = this.query.trim().toLowerCase();
-    const filtered = query === ""
-      ? this.sessions
-      : this.sessions.filter((session) =>
-        [session.id, session.title, session.preview]
-          .filter((value): value is string => value !== undefined)
-          .some((value) => value.toLowerCase().includes(query))
-      );
-    this.list.setItems(filtered.map((session) => ({
-      value: session,
-      label: `${session.id === this.currentSessionId ? "* " : ""}${session.title ?? session.id}`,
-      description: session.preview ?? (
-        session.turnCount === undefined ? "No recorded turns" : `${session.turnCount} turns`
-      ),
-    })));
+    const filtered =
+      query === ""
+        ? this.sessions
+        : this.sessions.filter((session) =>
+            [session.id, session.title, session.preview]
+              .filter((value): value is string => value !== undefined)
+              .some((value) => value.toLowerCase().includes(query)),
+          );
+    this.list.setItems(
+      filtered.map((session) => ({
+        value: session,
+        label: `${session.id === this.currentSessionId ? "* " : ""}${session.title ?? session.id}`,
+        description:
+          session.preview ?? (session.turnCount === undefined ? "No recorded turns" : `${session.turnCount} turns`),
+      })),
+    );
     this.status = filtered.length === 0 ? "No matching sessions" : this.status;
   }
 
@@ -1224,11 +1357,12 @@ class HeaderView implements Component {
   ) {}
 
   render(size: RenderSize): RenderResult {
-    const title = `${styleText("◆", this.theme.accent)} ` +
+    const title =
+      `${styleText("◆", this.theme.accent)} ` +
       `${styleText("MaybeCode", this.theme.accent)}  ` +
       styleText(sanitizeTerminalText(this.model), this.theme.muted);
-    const workspace = `${styleText("workspace", this.theme.dim)}  ` +
-      styleText(sanitizeTerminalText(this.workspace), this.theme.muted);
+    const workspace =
+      `${styleText("workspace", this.theme.dim)}  ` + styleText(sanitizeTerminalText(this.workspace), this.theme.muted);
     const divider = styleText("─".repeat(size.width), this.theme.border);
     return new Text(`${title}\n${workspace}\n${divider}`, { wrap: false }).render(size);
   }
@@ -1252,9 +1386,11 @@ class FooterView implements Component {
     const statusStyle = /^error/iu.test(this.status)
       ? this.theme.error
       : /running|cancell/iu.test(this.status)
-      ? this.theme.warning
-      : this.theme.success;
-    const value = (this.gitLabel ? `${styleText(this.gitLabel, this.theme.accent)}  ` : "") + (this.yolo ? `${styleText("YOLO · Auto-approve", this.theme.warning)}  ` : "") +
+        ? this.theme.warning
+        : this.theme.success;
+    const value =
+      (this.gitLabel ? `${styleText(this.gitLabel, this.theme.accent)}  ` : "") +
+      (this.yolo ? `${styleText("YOLO · Auto-approve", this.theme.warning)}  ` : "") +
       `${styleText("●", statusStyle)} ${styleText(this.status, statusStyle)}  ` +
       `${styleText(this.focus ?? "none", this.theme.muted)}  ` +
       `${styleText(this.replyHint, this.theme.dim)} reply  ` +
@@ -1284,8 +1420,7 @@ function truncate(value: string, maximum: number): string {
 }
 
 function isSuggestionNavigation(key: string): boolean {
-  return key === "up" || key === "down" || key === "pageup" ||
-    key === "pagedown" || key === "home" || key === "end";
+  return key === "up" || key === "down" || key === "pageup" || key === "pagedown" || key === "home" || key === "end";
 }
 
 function commonPrefix(input: string, values: readonly string[]): string | undefined {
@@ -1309,9 +1444,12 @@ class McpInputPrompt implements InteractiveComponent {
   private readonly layout = new Column([]);
   private readonly keymap: Keymap;
   private reviewPageSize = 1;
-  constructor(prompt: string, private readonly complete: (value?: string) => void,
+  constructor(
+    prompt: string,
+    private readonly complete: (value?: string) => void,
     editorOptions: Pick<EditorOptions, "clipboard" | "onInvalidate" | "onError" | "keybindings">,
-    keymapOptions: MaybeCodeKeymapOptions = {}) {
+    keymapOptions: MaybeCodeKeymapOptions = {},
+  ) {
     this.keymap = createMaybeCodeKeymap(keymapOptions);
     this.body = new ScrollView(new Text(sanitizeTerminalText(prompt)));
     this.body.setFocused(true);
@@ -1323,22 +1461,42 @@ class McpInputPrompt implements InteractiveComponent {
     this.layout.setItems([
       { flex: 1, minHeight: 1, component: this.body },
       { height: 4, component: this.editor },
-      { height: 1, component: new Text(`${promptShortcut(this.keymap, "request.pageUp", "mcpInput")}/${promptShortcut(this.keymap, "request.pageDown", "mcpInput")} review request | Enter continue | ${promptShortcut(this.keymap, "request.cancel", "mcpInput")} cancel`) },
+      {
+        height: 1,
+        component: new Text(
+          `${promptShortcut(this.keymap, "request.pageUp", "mcpInput")}/${promptShortcut(this.keymap, "request.pageDown", "mcpInput")} review request | Enter continue | ${promptShortcut(this.keymap, "request.cancel", "mcpInput")} cancel`,
+        ),
+      },
     ]);
     return this.layout.render(size);
   }
-  handlePointer(event: PointerEvent): boolean { return this.layout.handlePointer(event); }
-  dispose(): void { this.editor.dispose(); this.body.dispose(); }
+  handlePointer(event: PointerEvent): boolean {
+    return this.layout.handlePointer(event);
+  }
+  dispose(): void {
+    this.editor.dispose();
+    this.body.dispose();
+  }
   handleKey(stroke: KeyStroke): boolean {
     const result = this.keymap.resolve(stroke, ["mcpInput"]);
     if (result.type === "pending") return true;
     if (result.type === "action") {
       switch (result.action) {
-        case "request.cancel": this.complete(); return true;
-        case "request.pageUp": this.body.scrollBy(-this.reviewPageSize); return true;
-        case "request.pageDown": this.body.scrollBy(this.reviewPageSize); return true;
-        case "request.scrollUp": this.body.scrollBy(-3); return true;
-        case "request.scrollDown": this.body.scrollBy(3); return true;
+        case "request.cancel":
+          this.complete();
+          return true;
+        case "request.pageUp":
+          this.body.scrollBy(-this.reviewPageSize);
+          return true;
+        case "request.pageDown":
+          this.body.scrollBy(this.reviewPageSize);
+          return true;
+        case "request.scrollUp":
+          this.body.scrollBy(-3);
+          return true;
+        case "request.scrollDown":
+          this.body.scrollBy(3);
+          return true;
       }
     }
     return this.editor.handleKey(stroke);

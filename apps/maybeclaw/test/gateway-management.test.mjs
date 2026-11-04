@@ -17,7 +17,18 @@ const member = { kind: "platform", account: entry.account, conversation: entry.c
 const manager = { ...member, userId: "456" };
 
 function configuration(overrides = {}) {
-  return { apps: { maybeclaw: { version: 2, agents: [{ id: "code", adapter: "may" }, { id: "reviewer", adapter: "may" }], ...overrides } } };
+  return {
+    apps: {
+      maybeclaw: {
+        version: 2,
+        agents: [
+          { id: "code", adapter: "may" },
+          { id: "reviewer", adapter: "may" },
+        ],
+        ...overrides,
+      },
+    },
+  };
 }
 
 async function fixture(t, overrides = {}) {
@@ -48,7 +59,10 @@ test("session managers come from server configuration and shared defaults persis
   settings.access.sessionAdmins[second.id] = [actorKey(manager)];
   assert.equal(gateway.isAdmin(first, manager), true);
   assert.equal(gateway.isAdmin(first, member), false);
-  await assert.rejects(gateway.handle(`/session select ${first.id}`, member, { requestId: "member-select", entry }), /管理员/);
+  await assert.rejects(
+    gateway.handle(`/session select ${first.id}`, member, { requestId: "member-select", entry }),
+    /管理员/,
+  );
   await gateway.handle(`/session select ${first.id}`, manager, { requestId: "manager-select", entry });
   assert.equal(gateway.store.get("defaults", entryKey(entry)).sessionId, first.id);
   await gateway.handle("/agent default reviewer", manager, { requestId: "manager-default", entry });
@@ -64,7 +78,12 @@ test("session managers come from server configuration and shared defaults persis
 test("personal sessions bind one platform identity and group sessions stay within their entrance", async (t) => {
   const { gateway } = await fixture(t);
   const privateEntry = { account: "telegram:42", conversation: "123", kind: "private", owner: "123" };
-  const owner = { kind: "platform", account: privateEntry.account, conversation: privateEntry.conversation, userId: "123" };
+  const owner = {
+    kind: "platform",
+    account: privateEntry.account,
+    conversation: privateEntry.conversation,
+    userId: "123",
+  };
   const personal = gateway.createSession(owner, "个人会话", ["code"], [], privateEntry);
   assert.equal(gateway.canAccess(personal, owner), true);
   assert.equal(gateway.canAccess(personal, { ...owner, userId: "456" }), false);
@@ -82,7 +101,10 @@ test("concurrent retries reject different payloads under the same request ID", a
   const second = gateway.handle('/session create "Beta" --agent code', operator, input);
   await first;
   await assert.rejects(second, /请求 ID|request ID/);
-  assert.deepEqual(gateway.sessions(operator).map(session => session.name), ["Alpha"]);
+  assert.deepEqual(
+    gateway.sessions(operator).map((session) => session.name),
+    ["Alpha"],
+  );
 });
 
 test("completed command receipts survive restart and preserve the original session ID", async (t) => {
@@ -93,7 +115,10 @@ test("completed command receipts survive restart and preserve the original sessi
   const reopened = open();
   assert.deepEqual(await reopened.handle(command, operator, { requestId: "create-once" }), original);
   assert.equal(reopened.sessions(operator).length, 1);
-  await assert.rejects(reopened.handle('/session create "Changed" --agent code', operator, { requestId: "create-once" }), /请求 ID/);
+  await assert.rejects(
+    reopened.handle('/session create "Changed" --agent code', operator, { requestId: "create-once" }),
+    /请求 ID/,
+  );
 });
 
 test("interrupted command admission retains its intent and cannot create a duplicate session", async (t) => {
@@ -107,11 +132,21 @@ import { gatewaySettings } from ${JSON.stringify(settingsUrl)};
 const gateway = new AgentGateway({ directory: process.argv[1], configPath: process.argv[1] + "/may.config.json", settings: gatewaySettings(JSON.parse(process.argv[2])) });
 gateway.observe(() => { if (gateway.store.list("sessions").length === 1) process.exit(7); });
 await gateway.handle(process.argv[3], { kind: "operator", id: "service-admin" }, { requestId: "interrupted-create" });`;
-  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script, directory, JSON.stringify(configuration()), command], { windowsHide: true, encoding: "utf8" });
+  const result = spawnSync(
+    process.execPath,
+    ["--input-type=module", "-e", script, directory, JSON.stringify(configuration()), command],
+    { windowsHide: true, encoding: "utf8" },
+  );
   assert.equal(result.status, 7, result.stderr);
   const reopened = open();
-  await assert.rejects(reopened.handle(command, operator, { requestId: "interrupted-create" }), /未确认|需要核对|尚未确认|尚无确认/);
-  assert.deepEqual(reopened.sessions(operator).map(session => session.name), ["Interrupted"]);
+  await assert.rejects(
+    reopened.handle(command, operator, { requestId: "interrupted-create" }),
+    /未确认|需要核对|尚未确认|尚无确认/,
+  );
+  assert.deepEqual(
+    reopened.sessions(operator).map((session) => session.name),
+    ["Interrupted"],
+  );
 });
 
 test("creation approval is decided by an appointed manager and only once", async (t) => {
@@ -135,7 +170,11 @@ test("approval response checks the initiating member's current access", async (t
   const { gateway, settings } = await fixture(t);
   const session = gateway.createSession(operator, "Review", ["code"], [], entry);
   settings.access.sessionAdmins[session.id] = [actorKey(manager)];
-  await gateway.handle("/agent create reviewer", member, { requestId: "revoked-approval", sessionId: session.id, entry });
+  await gateway.handle("/agent create reviewer", member, {
+    requestId: "revoked-approval",
+    sessionId: session.id,
+    entry,
+  });
   const [approval] = gateway.store.list("approvals");
   settings.access.deniedUsers.push(actorKey(member));
   await assert.rejects(gateway.resolveApproval(approval.id, manager, "allow"), /访问权限已失效/);
@@ -145,9 +184,13 @@ test("approval response checks the initiating member's current access", async (t
 test("expired approvals cannot authorize a conversation and remain visible", async (t) => {
   const { gateway } = await fixture(t, { server: { approvalMs: 5 } });
   const session = gateway.createSession(operator, "Review", ["code"], [], entry);
-  await gateway.handle("/agent create reviewer", member, { requestId: "expired-approval", sessionId: session.id, entry });
+  await gateway.handle("/agent create reviewer", member, {
+    requestId: "expired-approval",
+    sessionId: session.id,
+    entry,
+  });
   const [approval] = gateway.store.list("approvals");
-  await new Promise(resolve => setTimeout(resolve, Math.max(1, approval.expiresAt - Date.now() + 2)));
+  await new Promise((resolve) => setTimeout(resolve, Math.max(1, approval.expiresAt - Date.now() + 2)));
   await gateway.maintain();
   assert.equal(gateway.store.get("approvals", approval.id).status, "expired");
   await assert.rejects(gateway.resolveApproval(approval.id, operator, "allow"), /已经过期/);
@@ -158,18 +201,45 @@ test("archived sessions reject conversation creation before loading an Agent", a
   const { gateway } = await fixture(t);
   const session = gateway.createSession(operator, "Archived", ["code"]);
   await gateway.manageSession(session, operator, "archive");
-  await assert.rejects(gateway.handle("/agent create reviewer", operator, { requestId: "archived-create", sessionId: session.id }), /归档|恢复会话/);
+  await assert.rejects(
+    gateway.handle("/agent create reviewer", operator, { requestId: "archived-create", sessionId: session.id }),
+    /归档|恢复会话/,
+  );
   assert.deepEqual(gateway.store.list("bindings"), []);
 });
 
 test("configuration validates Agent identities, adapter requirements and integer limits", () => {
-  assert.throws(() => gatewaySettings(configuration({ version: 1 })), /apps\.maybeclaw\.version must be equal to constant/);
-  assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "same", adapter: "may" }, { id: "same", adapter: "may" }] })), /重复/);
+  assert.throws(
+    () => gatewaySettings(configuration({ version: 1 })),
+    /apps\.maybeclaw\.version must be equal to constant/,
+  );
+  assert.throws(
+    () =>
+      gatewaySettings(
+        configuration({
+          agents: [
+            { id: "same", adapter: "may" },
+            { id: "same", adapter: "may" },
+          ],
+        }),
+      ),
+    /重复/,
+  );
   assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "external", adapter: "module" }] })), /module/);
-  assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "..\/escape", adapter: "may" }] })), /agents\.0\.id must match pattern/);
+  assert.throws(
+    () => gatewaySettings(configuration({ agents: [{ id: "..\/escape", adapter: "may" }] })),
+    /agents\.0\.id must match pattern/,
+  );
   assert.throws(() => gatewaySettings(configuration({ server: { maxConcurrent: 0 } })), /maxConcurrent/);
-  assert.throws(() => gatewaySettings(configuration({ server: { approvalMs: 1.5 } })), /server\.approvalMs must be integer/);
-  assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", permissions: { read: "sometimes" } }] })), /permissions/);
+  assert.throws(
+    () => gatewaySettings(configuration({ server: { approvalMs: 1.5 } })),
+    /server\.approvalMs must be integer/,
+  );
+  assert.throws(
+    () =>
+      gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", permissions: { read: "sometimes" } }] })),
+    /permissions/,
+  );
 });
 
 test("routing keeps message punctuation, quotes, indentation and line breaks", () => {
@@ -183,8 +253,14 @@ test("routing keeps message punctuation, quotes, indentation and line breaks", (
 });
 
 test("misspelled permission settings fail during configuration validation", () => {
-  assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", permissons: { read: "deny" } }] })), /permissons|未知|Unknown/);
-  assert.throws(() => gatewaySettings(configuration({ access: { deniedUser: [actorKey(member)] } })), /deniedUser|未知|Unknown/);
+  assert.throws(
+    () => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", permissons: { read: "deny" } }] })),
+    /permissons|未知|Unknown/,
+  );
+  assert.throws(
+    () => gatewaySettings(configuration({ access: { deniedUser: [actorKey(member)] } })),
+    /deniedUser|未知|Unknown/,
+  );
 });
 
 test("quoted session names can match command words without becoming commands", async (t) => {
@@ -204,17 +280,47 @@ test("entry and Agent configuration validation rejects ambiguous identities and 
   assert.throws(() => gatewayEntry({ ...entry, owner: "123" }), /owner/);
   assert.throws(() => gatewayEntry({ ...entry, threadId: " 7" }), /首尾空白/);
   assert.throws(() => gatewayEntry({ ...entry, owners: ["123"] }), /未知字段/);
-  assert.throws(() => gatewaySettings(configuration({ access: { allowedAgents: { scope: ["unregistered"] } } })), /未登记/);
-  assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", runBudget: { maxSteps: -1 } }] })), /maxSteps/);
-  assert.throws(() => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", readDirectory: "relative" }] })), /绝对目录/);
-  assert.throws(() => gatewaySettings(configuration({ runBudget: { maxSteps: 1 } })), /apps\.maybeclaw\.runBudget is not supported/);
-  assert.throws(() => gatewaySettings(configuration({ server: { shutdownMs: 2_147_483_648 } })), /server\.shutdownMs must be <= 2147483647/);
+  assert.throws(
+    () => gatewaySettings(configuration({ access: { allowedAgents: { scope: ["unregistered"] } } })),
+    /未登记/,
+  );
+  assert.throws(
+    () => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", runBudget: { maxSteps: -1 } }] })),
+    /maxSteps/,
+  );
+  assert.throws(
+    () => gatewaySettings(configuration({ agents: [{ id: "code", adapter: "may", readDirectory: "relative" }] })),
+    /绝对目录/,
+  );
+  assert.throws(
+    () => gatewaySettings(configuration({ runBudget: { maxSteps: 1 } })),
+    /apps\.maybeclaw\.runBudget is not supported/,
+  );
+  assert.throws(
+    () => gatewaySettings(configuration({ server: { shutdownMs: 2_147_483_648 } })),
+    /server\.shutdownMs must be <= 2147483647/,
+  );
 });
 
 test("public control origin requires canonical HTTPS origin without credentials or URL suffixes", () => {
-  assert.equal(gatewaySettings(configuration({ server: { publicOrigin: "https://control.example.com" } })).publicOrigin, "https://control.example.com");
-  assert.equal(gatewaySettings(configuration({ server: { publicOrigin: "https://control.example.com:8443" } })).publicOrigin, "https://control.example.com:8443");
-  for (const publicOrigin of ["http://control.example.com", "https://control.example.com/", "https://control.example.com/path", "https://control.example.com?key=1", "https://control.example.com#part", "https://user:secret@control.example.com", "https://control.example.com:443", "https://CONTROL.example.com"]) {
+  assert.equal(
+    gatewaySettings(configuration({ server: { publicOrigin: "https://control.example.com" } })).publicOrigin,
+    "https://control.example.com",
+  );
+  assert.equal(
+    gatewaySettings(configuration({ server: { publicOrigin: "https://control.example.com:8443" } })).publicOrigin,
+    "https://control.example.com:8443",
+  );
+  for (const publicOrigin of [
+    "http://control.example.com",
+    "https://control.example.com/",
+    "https://control.example.com/path",
+    "https://control.example.com?key=1",
+    "https://control.example.com#part",
+    "https://user:secret@control.example.com",
+    "https://control.example.com:443",
+    "https://CONTROL.example.com",
+  ]) {
     assert.throws(() => gatewaySettings(configuration({ server: { publicOrigin } })), /publicOrigin/);
   }
 });
@@ -235,7 +341,17 @@ test("gateway with empty agents rejects session creation without residues and al
   assert.equal(gateway.sessions(operator).length, 0);
 
   const adapterPath = fileURLToPath(new URL("../dist/gateway-rpc-adapter.js", import.meta.url));
-  const options = { transport: "stdio", command: process.execPath, args: [fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url)), "--directory", join(directory, "rpc-state"), "--workspace", directory] };
+  const options = {
+    transport: "stdio",
+    command: process.execPath,
+    args: [
+      fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.meta.url)),
+      "--directory",
+      join(directory, "rpc-state"),
+      "--workspace",
+      directory,
+    ],
+  };
   await gateway.updateAgent("code", operator, { id: "code", adapter: "module", module: adapterPath, options });
   assert.equal(gateway.status().agents.length, 1);
   const session = gateway.createSession(operator, "首个会话", ["code"]);
@@ -270,10 +386,7 @@ test("external invalid agents in configuration rejects updateAgent and preserves
   });
   await writeFile(configPath, invalidContent);
 
-  await assert.rejects(
-    gateway.updateAgent("code", operator, { id: "code", adapter: "may" }),
-    /agents 必须为列表/,
-  );
+  await assert.rejects(gateway.updateAgent("code", operator, { id: "code", adapter: "may" }), /agents 必须为列表/);
 
   const preserved = await readFile(configPath, "utf8");
   assert.equal(preserved, invalidContent);

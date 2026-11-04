@@ -7,19 +7,23 @@ import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { SessionSteeringQueue } from "../../../may/dist/session/steering.js";
 import { TranscriptStore, TranscriptView } from "../dist/agent/transcript.js";
 
-test("terminal transcript restores delivered steering from real file history in delivery order", async t => {
+test("terminal transcript restores delivered steering from real file history in delivery order", async (t) => {
   const root = join(testOutputRoot, "tui", "steering");
   await mkdir(root, { recursive: true });
   const directory = await mkdtemp(join(root, "history-"));
-  t.after(async () => { assert.ok(resolve(directory).startsWith(root + sep)); await rm(directory, { recursive: true, force: true }); });
+  t.after(async () => {
+    assert.ok(resolve(directory).startsWith(root + sep));
+    await rm(directory, { recursive: true, force: true });
+  });
   const store = new FileSessionStore(directory);
   let seq = 0;
-  const record = event => store.append({ ...event, sessionId: "steering", seq: ++seq, timestamp: seq });
+  const record = (event) => store.append({ ...event, sessionId: "steering", seq: ++seq, timestamp: seq });
   await record({ type: "session.created" });
   const queue = new SessionSteeringQueue(record);
   await queue.enqueue({ inputId: "first", input: "Check the first requirement" }, "active");
   await queue.enqueue({ inputId: "second", input: "Check the second requirement" }, "active");
-  const pending = new TranscriptStore(); pending.loadHistory(await store.inspect("steering"));
+  const pending = new TranscriptStore();
+  pending.loadHistory(await store.inspect("steering"));
   assert.equal(pending.items.length, 0);
   const messages = await queue.deliver("active", 2, new AbortController().signal);
   const deliveredAt = seq;
@@ -29,12 +33,20 @@ test("terminal transcript restores delivered steering from real file history in 
   await record({ type: "input.submitted", inputId: idle.inputId, message: idle.message });
   queue.submitted(idle.inputId);
   const history = await new FileSessionStore(directory).inspect("steering");
-  const restored = new TranscriptStore(); restored.loadHistory(history);
-  assert.deepEqual(restored.items.map(item => item.text), ["Check the first requirement", "Check the second requirement", "Idle request"]);
-  assert.deepEqual(restored.items.slice(0, 2).map(item => item.id), ["steering:active:2:0", "steering:active:2:1"]);
+  const restored = new TranscriptStore();
+  restored.loadHistory(history);
+  assert.deepEqual(
+    restored.items.map((item) => item.text),
+    ["Check the first requirement", "Check the second requirement", "Idle request"],
+  );
+  assert.deepEqual(
+    restored.items.slice(0, 2).map((item) => item.id),
+    ["steering:active:2:0", "steering:active:2:1"],
+  );
   const live = new TranscriptStore();
   const event = { type: "input.received", runId: "active", step: 2, seq: 1, timestamp: deliveredAt, messages };
-  live.applyMayEvent(event); live.applyMayEvent(event);
+  live.applyMayEvent(event);
+  live.applyMayEvent(event);
   assert.deepEqual(live.items, restored.items.slice(0, 2));
   const rendered = new TranscriptView(restored).render({ width: 80, height: 20 }).lines.join("\n");
   assert.match(rendered, /Check the first requirement/);

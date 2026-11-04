@@ -11,7 +11,9 @@ class ReadInput {
     this.path = fileURLToPath(new URL("../../README.md", import.meta.url));
     this.options = { encoding: "utf8" };
   }
-  getPath() { return this.path; }
+  getPath() {
+    return this.path;
+  }
 }
 
 function readExecution(input, progress) {
@@ -25,7 +27,9 @@ function readExecution(input, progress) {
         assert.equal(arguments_.getPath(), arguments_.path);
         assert.ok(Object.isFrozen(arguments_));
         assert.ok(Object.isFrozen(arguments_.options));
-        assert.throws(() => { arguments_.path = "another.md"; }, TypeError);
+        assert.throws(() => {
+          arguments_.path = "another.md";
+        }, TypeError);
         context.report({ type: "progress", message: "Reading permission documentation" });
         return readFile(arguments_.path, arguments_.options.encoding);
       },
@@ -37,7 +41,9 @@ function readExecution(input, progress) {
       toolCallId: "call_permission_document",
       idempotencyKey: "run_permission_document:1:call_permission_document",
       signal: new AbortController().signal,
-      report(update) { progress.push(update); },
+      report(update) {
+        progress.push(update);
+      },
     },
   };
 }
@@ -56,8 +62,12 @@ test("permission policies and actual file readers receive immutable arguments", 
       assert.ok(Object.isFrozen(check.input.options));
       assert.ok(Object.isFrozen(check.tool));
       assert.ok(Object.isFrozen(check.tool.inputSchema.properties));
-      assert.throws(() => { check.input.options.encoding = "base64"; }, TypeError);
-      assert.throws(() => { check.tool.inputSchema.properties.path.type = "number"; }, TypeError);
+      assert.throws(() => {
+        check.input.options.encoding = "base64";
+      }, TypeError);
+      assert.throws(() => {
+        check.tool.inputSchema.properties.path.type = "number";
+      }, TypeError);
       return "allow";
     },
   });
@@ -74,7 +84,12 @@ test("permission policies and actual file readers receive immutable arguments", 
 
 test("mutable built-in arguments are rejected before permission evaluation", async () => {
   let policyCalls = 0;
-  const permissions = new PermissionToolExecutor({ policy() { policyCalls += 1; return "allow"; } });
+  const permissions = new PermissionToolExecutor({
+    policy() {
+      policyCalls += 1;
+      return "allow";
+    },
+  });
   const progress = [];
   try {
     for (const value of [new Date(), new Map(), new Set()]) {

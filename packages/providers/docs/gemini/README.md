@@ -11,10 +11,13 @@ const model = new GeminiModel({
   apiKey: process.env.GEMINI_API_KEY!,
   model: "gemini-3.8-flash",
 });
-for await (const event of model.stream({
-  messages: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
-  tools: [],
-}, { signal: AbortSignal.timeout(60_000) })) {
+for await (const event of model.stream(
+  {
+    messages: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
+    tools: [],
+  },
+  { signal: AbortSignal.timeout(60_000) },
+)) {
   if (event.type === "text.delta") process.stdout.write(event.delta);
 }
 ```

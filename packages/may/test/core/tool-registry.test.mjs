@@ -1,12 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  DuplicateToolNameError,
-  InMemoryContext,
-  May,
-  ToolRegistry,
-} from "@sortedyuan/may/core";
+import { DuplicateToolNameError, InMemoryContext, May, ToolRegistry } from "@sortedyuan/may/core";
 
 function tool(name, description = `${name} tool`) {
   return {
@@ -51,7 +46,10 @@ test("registers, queries, snapshots, and composes independent registries", async
   const runtime = new May({
     model: {
       async *stream(request) {
-        assert.deepEqual(request.tools.map(({ name }) => name), ["first", "second"]);
+        assert.deepEqual(
+          request.tools.map(({ name }) => name),
+          ["first", "second"],
+        );
         yield {
           type: "response.completed",
           message: { role: "assistant", content: [] },
@@ -79,24 +77,15 @@ test("rejects invalid and duplicate registrations atomically", () => {
   );
   assert.deepEqual(registry.names(), ["existing"]);
 
-  assert.throws(
-    () => ToolRegistry.compose([tool("same")], [tool("same")]),
-    /Duplicate tool name: same/,
-  );
-  assert.throws(
-    () => registry.register(tool(" padded ")),
-    /tool name must not have surrounding whitespace/,
-  );
+  assert.throws(() => ToolRegistry.compose([tool("same")], [tool("same")]), /Duplicate tool name: same/);
+  assert.throws(() => registry.register(tool(" padded ")), /tool name must not have surrounding whitespace/);
   assert.deepEqual(registry.names(), ["existing"]);
 
   const mutable = tool("stable");
   const guarded = new ToolRegistry([mutable]);
   mutable.name = "changed";
   assert.deepEqual(guarded.names(), ["stable"]);
-  assert.throws(
-    () => guarded.values(),
-    /Tool "stable" changed after it was registered/,
-  );
+  assert.throws(() => guarded.values(), /Tool "stable" changed after it was registered/);
 });
 
 test("model-side tool definition mutation does not affect a later step", async () => {
@@ -133,14 +122,17 @@ test("model-side tool definition mutation does not affect a later step", async (
   assert.deepEqual(requests, [["first"], ["first"]]);
 });
 
-
 test("captures a dynamic catalog once per Run, including nested schemas and execution", async () => {
   let sources = 0;
   const scope = { workspaceId: "workspace", sessionId: "first" };
   const scopes = [];
-  let dynamic = { ...tool("remote", "version one"), permissionVersion: "one",
+  let dynamic = {
+    ...tool("remote", "version one"),
+    permissionVersion: "one",
     inputSchema: { type: "object", properties: { value: { type: "string" } } },
-    async execute() { return "one"; },
+    async execute() {
+      return "one";
+    },
   };
   let catalog = [dynamic];
   const outputs = [];
@@ -148,38 +140,61 @@ test("captures a dynamic catalog once per Run, including nested schemas and exec
   const runtime = new May({
     context: new InMemoryContext(),
     toolScope: () => scope,
-    toolSource: () => { sources++; return catalog; },
-    toolExecutor: { async execute({ tool, input, context }) {
-      scopes.push(context.scope.sessionId);
-      assert.equal(Object.isFrozen(context.scope), true);
-      outputs.push([tool.permissionVersion, await tool.execute(input, context)]);
-      return outputs.at(-1);
-    } },
-    model: { async *stream(request, { step }) {
-      seen.push(request.tools[0]?.description);
-      if (sources === 1 && step === 1) {
-        scope.sessionId = "second";
-        // Both catalog publication and external nested mutation happen mid-Run.
-        catalog = [{ ...dynamic, description: "version two", permissionVersion: "two",
-          async execute() { return "two"; } }];
-        dynamic.inputSchema.properties.value.type = "number";
-        dynamic.execute = async () => "tampered";
-        request.tools[0].inputSchema.properties.value.type = "boolean";
-      }
-      if (sources === 1 && step === 2) {
-        assert.equal(request.tools[0].inputSchema.properties.value.type, "string");
-      }
-      yield { type: "response.completed", message: { role: "assistant", content: [],
-        ...(step === 1 ? { toolCalls: [{ id: "remote-call", name: "remote", input: {} }] } : {}),
-      } };
-    } },
+    toolSource: () => {
+      sources++;
+      return catalog;
+    },
+    toolExecutor: {
+      async execute({ tool, input, context }) {
+        scopes.push(context.scope.sessionId);
+        assert.equal(Object.isFrozen(context.scope), true);
+        outputs.push([tool.permissionVersion, await tool.execute(input, context)]);
+        return outputs.at(-1);
+      },
+    },
+    model: {
+      async *stream(request, { step }) {
+        seen.push(request.tools[0]?.description);
+        if (sources === 1 && step === 1) {
+          scope.sessionId = "second";
+          // Both catalog publication and external nested mutation happen mid-Run.
+          catalog = [
+            {
+              ...dynamic,
+              description: "version two",
+              permissionVersion: "two",
+              async execute() {
+                return "two";
+              },
+            },
+          ];
+          dynamic.inputSchema.properties.value.type = "number";
+          dynamic.execute = async () => "tampered";
+          request.tools[0].inputSchema.properties.value.type = "boolean";
+        }
+        if (sources === 1 && step === 2) {
+          assert.equal(request.tools[0].inputSchema.properties.value.type, "string");
+        }
+        yield {
+          type: "response.completed",
+          message: {
+            role: "assistant",
+            content: [],
+            ...(step === 1 ? { toolCalls: [{ id: "remote-call", name: "remote", input: {} }] } : {}),
+          },
+        };
+      },
+    },
   });
   await runtime.run({ input: "first" }).result;
   await runtime.continue().result;
   assert.equal(sources, 2);
   assert.deepEqual(scopes, ["first", "second"]);
   assert.deepEqual(seen, ["version one", "version one", "version two", "version two"]);
-  assert.deepEqual(outputs, [["one", "one"], ["two", "two"]]);
+  assert.deepEqual(outputs, [
+    ["one", "one"],
+    ["two", "two"],
+  ]);
   catalog = [tool("duplicate"), tool("duplicate")];
   assert.throws(() => runtime.run({ input: "invalid" }), DuplicateToolNameError);
   catalog = [];

@@ -13,9 +13,9 @@
 
 1. 启动编码团队：
 
-```powershell
-maybecode team run "在自己的副本中实现所需改动" --mode coding --workspace C:\work\example
-```
+   ```powershell
+   maybecode team run "在自己的副本中实现所需改动" --mode coding --workspace C:\work\example
+   ```
 
    默认编码预设给 `worker` 提供 `write`/`edit`，`supervisor` 保持只读。
    自定义 `--plan <json>` 需要列出编辑工具，两种情况都需要 CLI 的
@@ -23,19 +23,20 @@ maybecode team run "在自己的副本中实现所需改动" --mode coding --wor
 
 2. 记录团队 ID，所选任务停止后导出修改。默认预设包含 `analysis` 和 `review`：
 
-```powershell
-maybecode team diff <team-id> --tasks analysis,review
-```
+   ```powershell
+   maybecode team diff <team-id> --tasks analysis,review
+   ```
 
    命令保存不可变补丁包，显示补丁 ID、确认摘要、任务身份和 unified diff。
    原团队使用自定义目录时，继续使用相同的 `--data-directory`。
+
 3. 审查完整 diff、冲突及所选任务的验收状态。配置了检查时，检查必须当前有效且
    通过；没有配置检查时，编辑保持未经验证、仅经人工审查的状态。
 4. 使用准确摘要应用已审查的补丁：
 
-```powershell
-maybecode team apply <team-id> --patch <patch-id> --confirm <exact-digest>
-```
+   ```powershell
+   maybecode team apply <team-id> --patch <patch-id> --confirm <exact-digest>
+   ```
 
 5. 检查应用结果和源文件。应用完成后返回 `applied`；结果为 `unknown` 时，
    根据下文流程核查结果，随后才可以创建新的应用操作。

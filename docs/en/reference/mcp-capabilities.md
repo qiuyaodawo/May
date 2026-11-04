@@ -29,17 +29,17 @@ MCP dependency. The browser entry point has no Node dependencies.
 
 ## Implemented capabilities
 
-| Capability | Host responsibility | Guide and focused tests |
-| --- | --- | --- |
-| Stdio and Streamable HTTP | Configure trusted processes or endpoints; own pool shutdown | [Connect MCP](../guides/mcp.md); `packages/mcp/test/mcp.test.mjs` |
-| Native OAuth | Configure trusted authorization origins and secure credential storage; complete login | [Authentication](../guides/mcp-auth.md); `oauth.test.mjs` |
-| Dynamic catalogs | Use per-Run tool snapshots; explicitly refresh or reconnect when needed | [Catalogs](../guides/mcp.md#dynamic-catalogs-and-endpoint-recovery); `catalog.test.mjs` |
-| Resources, prompts and completion | Authorize reads and explicitly attach selected content | [Content operations](../guides/mcp.md#resources-prompts-completion-and-attachments); `capabilities.test.mjs` |
-| Form and URL interaction | Consume the broker concurrently and review each response | [Host interaction](../guides/mcp.md#scoped-user-interaction-modern-mrtr); `interactions.test.mjs` |
-| Roots and Sampling compatibility | Enable each service explicitly; review disclosure and enforce provider budgets | [Compatibility](../guides/mcp.md#roots-sampling-and-legacy-compatibility); `host-services.test.mjs` |
-| Long-running Tasks | Supply a journal and trusted owner; explicitly inspect, update, wait or cancel | [Tasks](../guides/mcp-tasks.md); `task-journal.test.mjs`, `task-runtime.test.mjs` |
-| Isolated Apps | Supply consent, an authenticated renderer channel and a dedicated sandbox origin | [Apps](../guides/mcp-apps.md); `apps.test.mjs`, `test/browser/apps.test.mjs` |
-| Independent server exports | Supply authentication, authorization, explicit exports and public result projections | [Server exports](../guides/mcp-server.md); `server.test.mjs` |
+| Capability                        | Host responsibility                                                                   | Guide and focused tests                                                                                      |
+| --------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Stdio and Streamable HTTP         | Configure trusted processes or endpoints; own pool shutdown                           | [Connect MCP](../guides/mcp.md); `packages/mcp/test/mcp.test.mjs`                                            |
+| Native OAuth                      | Configure trusted authorization origins and secure credential storage; complete login | [Authentication](../guides/mcp-auth.md); `oauth.test.mjs`                                                    |
+| Dynamic catalogs                  | Use per-Run tool snapshots; explicitly refresh or reconnect when needed               | [Catalogs](../guides/mcp.md#dynamic-catalogs-and-endpoint-recovery); `catalog.test.mjs`                      |
+| Resources, prompts and completion | Authorize reads and explicitly attach selected content                                | [Content operations](../guides/mcp.md#resources-prompts-completion-and-attachments); `capabilities.test.mjs` |
+| Form and URL interaction          | Consume the broker concurrently and review each response                              | [Host interaction](../guides/mcp.md#scoped-user-interaction-modern-mrtr); `interactions.test.mjs`            |
+| Roots and Sampling compatibility  | Enable each service explicitly; review disclosure and enforce provider budgets        | [Compatibility](../guides/mcp.md#roots-sampling-and-legacy-compatibility); `host-services.test.mjs`          |
+| Long-running Tasks                | Supply a journal and trusted owner; explicitly inspect, update, wait or cancel        | [Tasks](../guides/mcp-tasks.md); `task-journal.test.mjs`, `task-runtime.test.mjs`                            |
+| Isolated Apps                     | Supply consent, an authenticated renderer channel and a dedicated sandbox origin      | [Apps](../guides/mcp-apps.md); `apps.test.mjs`, `test/browser/apps.test.mjs`                                 |
+| Independent server exports        | Supply authentication, authorization, explicit exports and public result projections  | [Server exports](../guides/mcp-server.md); `server.test.mjs`                                                 |
 
 Except for the first path, test filenames in the table are relative to
 `packages/mcp/test/`. Product integration is covered by MaybeCode's configured
@@ -47,14 +47,14 @@ MCP, command and capability tests.
 
 ## Protocol compatibility
 
-| Surface | Supported version or mode |
-| --- | --- |
-| Modern client and server core | `2026-07-28` |
-| Client legacy negotiation | Stdio defaults to `legacy`; HTTP defaults to `auto` |
-| Independent legacy server | Explicit `legacy: "stateless"` |
-| Tasks extension | `io.modelcontextprotocol/tasks`, `2026-07-28` |
-| Apps UI | `2026-01-26`, negotiated independently of core |
-| TypeScript SDK | Client and server 2.0.0 |
+| Surface                       | Supported version or mode                           |
+| ----------------------------- | --------------------------------------------------- |
+| Modern client and server core | `2026-07-28`                                        |
+| Client legacy negotiation     | Stdio defaults to `legacy`; HTTP defaults to `auto` |
+| Independent legacy server     | Explicit `legacy: "stateless"`                      |
+| Tasks extension               | `io.modelcontextprotocol/tasks`, `2026-07-28`       |
+| Apps UI                       | `2026-01-26`, negotiated independently of core      |
+| TypeScript SDK                | Client and server 2.0.0                             |
 
 The Tasks integration uses flat handles and `tasks/get`, `tasks/update` and
 `tasks/cancel`. The 2025 experimental Tasks protocol is unsupported. Task status

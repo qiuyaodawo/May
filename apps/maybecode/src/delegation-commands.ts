@@ -26,20 +26,21 @@ export function formatDelegationRequests(
 }
 
 /** 一个子 Agent Session 的工具记录，按执行顺序。 */
-export async function formatDelegationToolRecords(
-  controller: MaybeCodeController,
-  taskId: string,
-): Promise<string> {
+export async function formatDelegationToolRecords(controller: MaybeCodeController, taskId: string): Promise<string> {
   const records = await controller.application.delegationToolRecords(taskId);
   if (records.records.length === 0) {
     return `Task ${taskId} (${records.sessionId}) has no finished tool records.`;
   }
   return [
     `Task ${taskId} · Session ${records.sessionId}`,
-    ...records.records.map((record) =>
-      `  step ${record.step} ${record.status} ${record.name}: ${record.summary.replace(/\s+/gu, " ").slice(0, 160)}`),
+    ...records.records.map(
+      (record) =>
+        `  step ${record.step} ${record.status} ${record.name}: ${record.summary.replace(/\s+/gu, " ").slice(0, 160)}`,
+    ),
     records.truncated ? "  … more records were omitted" : "",
-  ].filter((line) => line !== "").join("\n");
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
 }
 
 /**
@@ -57,7 +58,8 @@ export async function executeDelegationCommand(
       throw new Error(DELEGATION_COMMAND_USAGE);
     }
     if (mode !== "status") {
-      if (controller.setDelegationNotifications === undefined) throw new Error("Delegation notifications are unavailable");
+      if (controller.setDelegationNotifications === undefined)
+        throw new Error("Delegation notifications are unavailable");
       controller.setDelegationNotifications(mode === "on");
     }
     return `Delegation notifications: ${controller.delegationNotifications === true ? "on" : "off"}`;
@@ -95,9 +97,7 @@ export async function executeDelegationCommand(
 }
 
 /** 按深度和 id 排序的任务列表。 */
-export function delegationOrder(
-  tasks: readonly MaybeCodeDelegationTask[],
-): readonly MaybeCodeDelegationTask[] {
+export function delegationOrder(tasks: readonly MaybeCodeDelegationTask[]): readonly MaybeCodeDelegationTask[] {
   return [...tasks].sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id));
 }
 
@@ -125,16 +125,13 @@ export function formatDelegationTree(state: MaybeCodeDelegationState): string {
   if (state.budget !== undefined) {
     lines.push(
       `request budget: ${state.budget.modelCalls}/${state.budget.maxModelCalls} model calls, ` +
-      `${state.budget.totalTokens} tokens${state.budget.usageComplete ? "" : " (some calls reported no usage or were charged by reservation)"}`,
+        `${state.budget.totalTokens} tokens${state.budget.usageComplete ? "" : " (some calls reported no usage or were charged by reservation)"}`,
     );
   }
   return lines.join("\n");
 }
 
-function renderRequest(
-  request: MaybeCodeDelegationRequest | MaybeCodeDelegationState,
-  label: string,
-): string {
+function renderRequest(request: MaybeCodeDelegationRequest | MaybeCodeDelegationState, label: string): string {
   const lines = [`${label} ${request.requestId} · ${request.status}`];
   if (request instanceof Object && "mainRunIds" in request && request.mainRunIds.length > 0) {
     lines.push(`  main Session Runs: ${request.mainRunIds.join(", ")}`);
@@ -143,8 +140,10 @@ function renderRequest(
     lines.push(`  ${renderDelegationTask(task)}`);
   }
   if ("budget" in request && request.budget !== undefined) {
-    lines.push(`  request budget: ${request.budget.modelCalls}/${request.budget.maxModelCalls} model calls, ` +
-      `${request.budget.totalTokens} tokens${request.budget.usageComplete ? "" : " (some calls reported no usage or were charged by reservation)"}`);
+    lines.push(
+      `  request budget: ${request.budget.modelCalls}/${request.budget.maxModelCalls} model calls, ` +
+        `${request.budget.totalTokens} tokens${request.budget.usageComplete ? "" : " (some calls reported no usage or were charged by reservation)"}`,
+    );
   }
   return lines.join("\n");
 }

@@ -54,6 +54,7 @@
   Add provider-neutral JSON and JSON Schema response formats, configuration defaults and Ajv validation of final responses. OpenAI Responses and Chat Completions serialize native structured-output formats. Adapters without response-format transport reject unsupported format requests before sending.
 
   Final response validation errors carry Usage/cost receipts and physical completion through ModelResponseValidationError. Runtime, budgets and retry attempt telemetry retain accounting for failed structured responses; completed validation failures are never retried and error messages exclude response content.
+
 - 02789c6: Expose optional host status badges in UI snapshots and render them in the fixed
   Web UI header, including on narrow screens. Add the MaybeCode permissionMode
   configuration schema for default approvals and opt-in YOLO auto-approval.
@@ -63,6 +64,7 @@
   MaybeCode supports --yolo, --no-yolo and /yolo [on|off|status], preserves explicit
   policy denials, and displays the current mode in terminal and Web UI sessions.
   The bare /yolo command enables the mode; /yolo status reports it without changes.
+
 - 5d3b04a: Add opt-in persistent allow and deny rules with trusted scope, tool-definition
   binding, creator identity, expiry and revocation. Provide a versioned file store
   with atomic replacement and a single writer lock through
@@ -93,6 +95,7 @@
   exists. Supply a trusted `createdBy` identity when resolving it. Existing policy
   return values and existing Session histories remain supported. Readers of
   histories containing rule events must use the updated Session package.
+
 - 89bcd8d: Add scoped plugin composition with typed versioned services, validated dependencies,
   configuration and state schemas, lifecycle Hooks, state migration, resource cleanup
   and serialized replacement. Agent definitions and applications accept plugins;
@@ -114,6 +117,7 @@
   argument boundary; use ordinary data objects and arrays to represent those values.
   Custom parsed instances retain their prototypes and methods and must protect any
   mutable internal state themselves.
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`
@@ -125,6 +129,7 @@
 
   The TUI package includes the PNG declarations required by its image dependency,
   so consumers can type-check installed declarations with `skipLibCheck: false`.
+
 - 88e7d69: 扩展 Usage 的缓存、reasoning、其他计量、包含关系、完整性与 provider 金额；提供版本化
   价格配置和可替换的计价接口。RunBudget、FileSharedBudget 与遥测使用同一计价结果，
   费用记录保留币种、来源、版本和完整性。保留现有输入输出 USD 单价配置，USD 预算需要

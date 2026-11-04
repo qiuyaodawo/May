@@ -8,17 +8,16 @@ import type {
   ModelStreamOptions,
 } from "@sortedyuan/may/core";
 import { parseRetryAfterMs } from "../openai-compatible/http.js";
-import { executeRecordedRequest, executeRecordedOperation, requestEndpoint, type ModelRequestRecorder } from "@sortedyuan/may/core";
+import {
+  executeRecordedRequest,
+  executeRecordedOperation,
+  requestEndpoint,
+  type ModelRequestRecorder,
+} from "@sortedyuan/may/core";
 import { assertModelResponseFormat, omitUndefined, validateStructuredModelResponse } from "@sortedyuan/may/core";
 
-import {
-  toOpenAIResponsesRequestParts,
-  toOpenAIResponsesTools,
-} from "./convert.js";
-import {
-  OpenAIResponsesError,
-  OpenAIResponsesProtocolError,
-} from "./errors.js";
+import { toOpenAIResponsesRequestParts, toOpenAIResponsesTools } from "./convert.js";
+import { OpenAIResponsesError, OpenAIResponsesProtocolError } from "./errors.js";
 import {
   OPENAI_RESPONSES_MODEL_STATE_TYPE,
   type OpenAIReasoningEffort,
@@ -56,10 +55,7 @@ export class OpenAIResponsesModel implements Model {
     if (options.apiKey.trim() === "") throw new TypeError("apiKey must not be empty");
     if (options.model.trim() === "") throw new TypeError("model must not be empty");
     validateOptionalPositiveInteger(options.maxOutputTokens, "maxOutputTokens");
-    validateOptionalPositiveInteger(
-      options.serverCompactThreshold,
-      "serverCompactThreshold",
-    );
+    validateOptionalPositiveInteger(options.serverCompactThreshold, "serverCompactThreshold");
     this.apiKey = options.apiKey;
     this.model = options.model;
     this.baseURL = (options.baseURL ?? "https://api.openai.com/v1").replace(/\/+$/u, "");
@@ -76,10 +72,7 @@ export class OpenAIResponsesModel implements Model {
     };
   }
 
-  async *stream(
-    request: ModelRequest,
-    options: ModelStreamOptions,
-  ): AsyncIterable<ModelEvent> {
+  async *stream(request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     assertModelResponseFormat(request);
     const parts = toOpenAIResponsesRequestParts(request.messages);
     const body: Record<string, unknown> = {
@@ -93,9 +86,12 @@ export class OpenAIResponsesModel implements Model {
     if (request.tools.length > 0) body.tools = toOpenAIResponsesTools(request.tools);
     if (request.responseFormat !== undefined) {
       const format = request.responseFormat;
-      body.text = { format: format.type === "json"
-        ? { type: "json_object" }
-        : omitUndefined({ type: "json_schema", name: format.name, schema: format.schema, strict: format.strict }) };
+      body.text = {
+        format:
+          format.type === "json"
+            ? { type: "json_object" }
+            : omitUndefined({ type: "json_schema", name: format.name, schema: format.schema, strict: format.strict }),
+      };
     }
     if (this.maxOutputTokens !== undefined) {
       body.max_output_tokens = this.maxOutputTokens;
@@ -103,13 +99,27 @@ export class OpenAIResponsesModel implements Model {
     const reasoning = this.reasoningConfig();
     if (reasoning !== undefined) body.reasoning = reasoning;
     if (this.serverCompactThreshold !== undefined) {
-      body.context_management = [{
-        type: "compaction",
-        compact_threshold: this.serverCompactThreshold,
-      }];
+      body.context_management = [
+        {
+          type: "compaction",
+          compact_threshold: this.serverCompactThreshold,
+        },
+      ];
     }
 
-    yield* executeRecordedRequest({ version: 1, adapter: "openai-responses", purpose: "generation", endpoint: requestEndpoint(`${this.baseURL}/responses`), request, body }, options.recordRequest, options.signal, (body) => this.execute(body, request, options));
+    yield* executeRecordedRequest(
+      {
+        version: 1,
+        adapter: "openai-responses",
+        purpose: "generation",
+        endpoint: requestEndpoint(`${this.baseURL}/responses`),
+        request,
+        body,
+      },
+      options.recordRequest,
+      options.signal,
+      (body) => this.execute(body, request, options),
+    );
   }
 
   private async *execute(body: string, request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
@@ -126,55 +136,64 @@ export class OpenAIResponsesModel implements Model {
     recorder?: ModelRequestRecorder,
   ) {
     const effectiveSignal = signal ?? new AbortController().signal;
-    const parts = toOpenAIResponsesRequestParts(
-      snapshot.messages,
-      snapshot.instructions,
-    );
+    const parts = toOpenAIResponsesRequestParts(snapshot.messages, snapshot.instructions);
     const body: Record<string, unknown> = {
       model: this.model,
       input: parts.input,
     };
     if (parts.instructions !== undefined) body.instructions = parts.instructions;
-    const request: ModelRequest = { messages: snapshot.instructions === undefined ? snapshot.messages : [{ role: "system", content: [{ type: "text", text: snapshot.instructions }] }, ...snapshot.messages], tools: [] };
-    return executeRecordedOperation({ version: 1, adapter: "openai-responses", purpose: "compaction", endpoint: requestEndpoint(`${this.baseURL}/responses/compact`), request, body }, recorder, effectiveSignal, (serialized) => this.executeCompact(serialized, effectiveSignal));
+    const request: ModelRequest = {
+      messages:
+        snapshot.instructions === undefined
+          ? snapshot.messages
+          : [{ role: "system", content: [{ type: "text", text: snapshot.instructions }] }, ...snapshot.messages],
+      tools: [],
+    };
+    return executeRecordedOperation(
+      {
+        version: 1,
+        adapter: "openai-responses",
+        purpose: "compaction",
+        endpoint: requestEndpoint(`${this.baseURL}/responses/compact`),
+        request,
+        body,
+      },
+      recorder,
+      effectiveSignal,
+      (serialized) => this.executeCompact(serialized, effectiveSignal),
+    );
   }
 
   private async executeCompact(body: string, effectiveSignal: AbortSignal) {
     const response = await this.fetch("/responses/compact", body, effectiveSignal);
     const value = await response.json().catch((error) => {
-      throw new OpenAIResponsesProtocolError(
-        "OpenAI Responses compact returned invalid JSON",
-        { cause: error },
-      );
+      throw new OpenAIResponsesProtocolError("OpenAI Responses compact returned invalid JSON", { cause: error });
     });
     const compacted = requireRecord(value, "compacted response");
     if (compacted.object !== "response.compaction") {
-      throw new OpenAIResponsesProtocolError(
-        "OpenAI Responses compact returned an unexpected object",
-      );
+      throw new OpenAIResponsesProtocolError("OpenAI Responses compact returned an unexpected object");
     }
     if (!Array.isArray(compacted.output)) {
-      throw new OpenAIResponsesProtocolError(
-        "OpenAI Responses compact output must be an array",
-      );
+      throw new OpenAIResponsesProtocolError("OpenAI Responses compact output must be an array");
     }
-    if (!compacted.output.some((item) =>
-      typeof item === "object" && item !== null &&
-      "type" in item && item.type === "compaction"
-    )) {
-      throw new OpenAIResponsesProtocolError(
-        "OpenAI Responses compact output has no compaction item",
-      );
+    if (
+      !compacted.output.some(
+        (item) => typeof item === "object" && item !== null && "type" in item && item.type === "compaction",
+      )
+    ) {
+      throw new OpenAIResponsesProtocolError("OpenAI Responses compact output has no compaction item");
     }
     const usage = parseUsage(compacted.usage);
-    const messages: Message[] = [{
-      role: "assistant",
-      content: [],
-      modelState: {
-        type: OPENAI_RESPONSES_MODEL_STATE_TYPE,
-        data: { items: compacted.output },
+    const messages: Message[] = [
+      {
+        role: "assistant",
+        content: [],
+        modelState: {
+          type: OPENAI_RESPONSES_MODEL_STATE_TYPE,
+          data: { items: compacted.output },
+        },
       },
-    }];
+    ];
     return omitUndefined({
       messages,
       // 压缩请求本身就是一次 provider 调用，它的 usage 一并上报给计账方。
@@ -193,11 +212,7 @@ export class OpenAIResponsesModel implements Model {
     });
   }
 
-  private async fetch(
-    path: string,
-    body: Record<string, unknown> | string,
-    signal: AbortSignal,
-  ): Promise<Response> {
+  private async fetch(path: string, body: Record<string, unknown> | string, signal: AbortSignal): Promise<Response> {
     const response = await this.fetchImplementation(`${this.baseURL}${path}`, {
       method: "POST",
       headers: {
@@ -229,13 +244,16 @@ async function createApiError(response: Response): Promise<OpenAIResponsesError>
     // Preserve the HTTP response text when the body is not structured JSON.
   }
   const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
-  return new OpenAIResponsesError(message, omitUndefined({
-    status: response.status,
-    providerType,
-    providerCode,
-    requestId,
-    retryAfterMs,
-  }));
+  return new OpenAIResponsesError(
+    message,
+    omitUndefined({
+      status: response.status,
+      providerType,
+      providerCode,
+      requestId,
+      retryAfterMs,
+    }),
+  );
 }
 
 function requireRecord(value: unknown, field: string): Record<string, unknown> {
@@ -245,10 +263,7 @@ function requireRecord(value: unknown, field: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function validateOptionalPositiveInteger(
-  value: number | undefined,
-  name: string,
-): void {
+function validateOptionalPositiveInteger(value: number | undefined, name: string): void {
   if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) {
     throw new RangeError(`${name} must be a positive safe integer`);
   }

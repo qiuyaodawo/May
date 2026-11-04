@@ -55,10 +55,7 @@ recent tool results and replaces older results of at least 2 KiB with bounded
 placeholders. It preserves message order and tool-call identifiers.
 
 ```ts
-import {
-  InMemoryContextFactory,
-  PruneOldToolResultsStrategy,
-} from "@sortedyuan/may/context";
+import { InMemoryContextFactory, PruneOldToolResultsStrategy } from "@sortedyuan/may/context";
 
 const managed = await new InMemoryContextFactory().create({
   messages,
@@ -142,10 +139,7 @@ const managed = await new InMemoryContextFactory().create({
     outputReserveTokens: 8_192,
     compactTriggerRatio: 0.9,
   },
-  autoCompactionStrategies: [
-    new PruneOldToolResultsStrategy(),
-    strategy,
-  ],
+  autoCompactionStrategies: [new PruneOldToolResultsStrategy(), strategy],
 });
 
 managed.controller?.setAutoCompactionSink?.(async (result) => {

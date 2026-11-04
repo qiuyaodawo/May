@@ -11,21 +11,29 @@ if (mode === "write") {
   const value = JSON.parse(await readFile(join(process.cwd(), "result.json"), "utf8"));
   if (value.answer !== 42) throw new Error("Expected answer 42");
 } else if (mode === "delay") {
-  await new Promise(accept => setTimeout(accept, Number(process.argv[3] ?? 30000)));
+  await new Promise((accept) => setTimeout(accept, Number(process.argv[3] ?? 30000)));
 } else if (mode === "tree") {
-  const child = spawn(process.execPath, [import.meta.filename, "delay", "30000"], { stdio: "inherit", windowsHide: true });
+  const child = spawn(process.execPath, [import.meta.filename, "delay", "30000"], {
+    stdio: "inherit",
+    windowsHide: true,
+  });
   const identity = JSON.stringify({ parent: process.pid, child: child.pid });
   console.log(identity);
   await writeFile("tree.json.pending", identity);
   await rename("tree.json.pending", "tree.json");
-  await new Promise(accept => setTimeout(accept, 30000));
+  await new Promise((accept) => setTimeout(accept, 30000));
 } else if (mode === "orphan") {
-  const child = spawn(process.execPath, [import.meta.filename, "orphan-child"], { stdio: "ignore", detached: true, windowsHide: true, cwd: process.cwd() });
+  const child = spawn(process.execPath, [import.meta.filename, "orphan-child"], {
+    stdio: "ignore",
+    detached: true,
+    windowsHide: true,
+    cwd: process.cwd(),
+  });
   child.unref();
   console.log(JSON.stringify({ child: child.pid }));
 } else if (mode === "orphan-child") {
   await writeFile("orphan.txt", "child remained active");
-  await new Promise(accept => setTimeout(accept, 30000));
+  await new Promise((accept) => setTimeout(accept, 30000));
 } else if (mode === "fail") {
   throw new Error("Workload failure");
 } else if (mode === "output") {

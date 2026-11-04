@@ -6,33 +6,111 @@
   "main": "./dist/application/index.js",
   "types": "./dist/application/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/application/index.d.ts", "import": "./dist/application/index.js" },
-    "./core": { "types": "./dist/core/index.d.ts", "import": "./dist/core/index.js" },
-    "./application": { "types": "./dist/application/index.d.ts", "import": "./dist/application/index.js" },
-    "./application/git-workspace": { "types": "./dist/application/git-workspace.d.ts", "import": "./dist/application/git-workspace.js" },
-    "./context": { "types": "./dist/context/index.d.ts", "import": "./dist/context/index.js" },
-    "./context/model-summarizer": { "types": "./dist/context/model-summarizer.d.ts", "import": "./dist/context/model-summarizer.js" },
-    "./session": { "types": "./dist/session/index.d.ts", "import": "./dist/session/index.js" },
-    "./session/tools": { "types": "./dist/session/tools.d.ts", "import": "./dist/session/tools.js" },
-    "./session/catalog": { "types": "./dist/session/catalog.d.ts", "import": "./dist/session/catalog.js" },
-    "./session/file-store": { "types": "./dist/session/file-store.d.ts", "import": "./dist/session/file-store.js" },
-    "./storage": { "types": "./dist/storage/index.d.ts", "import": "./dist/storage/index.js" },
-    "./permissions": { "types": "./dist/permissions/index.d.ts", "import": "./dist/permissions/index.js" },
-    "./permissions/file-store": { "types": "./dist/permissions/file-store.d.ts", "import": "./dist/permissions/file-store.js" },
-    "./plugin": { "types": "./dist/plugin/index.d.ts", "import": "./dist/plugin/index.js" },
-    "./services": { "types": "./dist/services/index.d.ts", "import": "./dist/services/index.js" },
-    "./services/models": { "types": "./dist/services/models.d.ts", "import": "./dist/services/models.js" },
-    "./services/runtime": { "types": "./dist/services/runtime.d.ts", "import": "./dist/services/runtime.js" },
-    "./services/permissions": { "types": "./dist/services/permissions.d.ts", "import": "./dist/services/permissions.js" },
-    "./services/skills": { "types": "./dist/services/skills.d.ts", "import": "./dist/services/skills.js" },
-    "./config": { "types": "./dist/config/index.d.ts", "import": "./dist/config/index.js" },
+    ".": {
+      "types": "./dist/application/index.d.ts",
+      "import": "./dist/application/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./application": {
+      "types": "./dist/application/index.d.ts",
+      "import": "./dist/application/index.js"
+    },
+    "./application/git-workspace": {
+      "types": "./dist/application/git-workspace.d.ts",
+      "import": "./dist/application/git-workspace.js"
+    },
+    "./context": {
+      "types": "./dist/context/index.d.ts",
+      "import": "./dist/context/index.js"
+    },
+    "./context/model-summarizer": {
+      "types": "./dist/context/model-summarizer.d.ts",
+      "import": "./dist/context/model-summarizer.js"
+    },
+    "./session": {
+      "types": "./dist/session/index.d.ts",
+      "import": "./dist/session/index.js"
+    },
+    "./session/tools": {
+      "types": "./dist/session/tools.d.ts",
+      "import": "./dist/session/tools.js"
+    },
+    "./session/catalog": {
+      "types": "./dist/session/catalog.d.ts",
+      "import": "./dist/session/catalog.js"
+    },
+    "./session/file-store": {
+      "types": "./dist/session/file-store.d.ts",
+      "import": "./dist/session/file-store.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "import": "./dist/storage/index.js"
+    },
+    "./permissions": {
+      "types": "./dist/permissions/index.d.ts",
+      "import": "./dist/permissions/index.js"
+    },
+    "./permissions/file-store": {
+      "types": "./dist/permissions/file-store.d.ts",
+      "import": "./dist/permissions/file-store.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin/index.d.ts",
+      "import": "./dist/plugin/index.js"
+    },
+    "./services": {
+      "types": "./dist/services/index.d.ts",
+      "import": "./dist/services/index.js"
+    },
+    "./services/models": {
+      "types": "./dist/services/models.d.ts",
+      "import": "./dist/services/models.js"
+    },
+    "./services/runtime": {
+      "types": "./dist/services/runtime.d.ts",
+      "import": "./dist/services/runtime.js"
+    },
+    "./services/permissions": {
+      "types": "./dist/services/permissions.d.ts",
+      "import": "./dist/services/permissions.js"
+    },
+    "./services/skills": {
+      "types": "./dist/services/skills.d.ts",
+      "import": "./dist/services/skills.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.js"
+    },
     "./config/schema": "./may-config.schema.json",
-    "./skills": { "types": "./dist/skills/index.d.ts", "import": "./dist/skills/index.js" },
-    "./goals": { "types": "./dist/goals/index.d.ts", "import": "./dist/goals/index.js" },
-    "./goals/plugin": { "types": "./dist/goals/plugin.d.ts", "import": "./dist/goals/plugin.js" },
-    "./history-memory": { "types": "./dist/history-memory/index.d.ts", "import": "./dist/history-memory/index.js" }
+    "./skills": {
+      "types": "./dist/skills/index.d.ts",
+      "import": "./dist/skills/index.js"
+    },
+    "./goals": {
+      "types": "./dist/goals/index.d.ts",
+      "import": "./dist/goals/index.js"
+    },
+    "./goals/plugin": {
+      "types": "./dist/goals/plugin.d.ts",
+      "import": "./dist/goals/plugin.js"
+    },
+    "./history-memory": {
+      "types": "./dist/history-memory/index.d.ts",
+      "import": "./dist/history-memory/index.js"
+    }
   },
-  "files": ["dist", "!dist/.tsbuildinfo", "may-config.schema.json", "docs", "README.zh-CN.md"],
+  "files": [
+    "dist",
+    "!dist/.tsbuildinfo",
+    "may-config.schema.json",
+    "docs",
+    "README.zh-CN.md"
+  ],
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
@@ -53,7 +131,14 @@
     "write-file-atomic": "7.0.1",
     "yaml": "^2.9.0"
   },
-  "devDependencies": { "@sortedyuan/test-support": "workspace:*", "@types/node": "^22.0.0", "@types/semver": "^7.7.0", "@types/write-file-atomic": "4.0.3" },
-  "engines": { "node": ">=22.16.0" },
+  "devDependencies": {
+    "@sortedyuan/test-support": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@types/semver": "^7.7.0",
+    "@types/write-file-atomic": "4.0.3"
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  },
   "license": "MIT"
 }

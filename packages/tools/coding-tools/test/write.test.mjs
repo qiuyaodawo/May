@@ -32,8 +32,5 @@ test("write enforces its byte limit", async (t) => {
     executeTool(tool, { path: "file.txt", content: "1234" }),
     assertErrorCode("CODING_TOOL_FILE_TOO_LARGE"),
   );
-  await assert.rejects(
-    readFile(join(cwd, "file.txt")),
-    (error) => error?.code === "ENOENT",
-  );
+  await assert.rejects(readFile(join(cwd, "file.txt")), (error) => error?.code === "ENOENT");
 });

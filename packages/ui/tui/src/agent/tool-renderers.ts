@@ -13,10 +13,7 @@ export interface ToolTranscriptRenderOptions {
 }
 
 export interface ToolTranscriptRenderer {
-  render(
-    item: ToolTranscriptItem,
-    options: ToolTranscriptRenderOptions,
-  ): string;
+  render(item: ToolTranscriptItem, options: ToolTranscriptRenderOptions): string;
   renderDocument?(item: ToolTranscriptItem, options: ToolTranscriptRenderOptions): readonly TextDocumentLine[];
 }
 
@@ -24,7 +21,9 @@ export interface ToolTranscriptRenderer {
 export class ToolRendererRegistry {
   private readonly renderers = new Map<string, ToolTranscriptRenderer>();
   private generation = 0;
-  get revision(): number { return this.generation; }
+  get revision(): number {
+    return this.generation;
+  }
 
   constructor(private readonly fallback: ToolTranscriptRenderer = genericRenderer) {}
 
@@ -36,16 +35,21 @@ export class ToolRendererRegistry {
     return this;
   }
 
-  render(
-    item: ToolTranscriptItem,
-    options: ToolTranscriptRenderOptions,
-  ): string {
-    return this.renderDocument(item, options).map(line => line.value).join("\n");
+  render(item: ToolTranscriptItem, options: ToolTranscriptRenderOptions): string {
+    return this.renderDocument(item, options)
+      .map((line) => line.value)
+      .join("\n");
   }
 
   renderDocument(item: ToolTranscriptItem, options: ToolTranscriptRenderOptions): readonly TextDocumentLine[] {
     const renderer = this.renderers.get(item.call.name) ?? this.fallback;
-    return renderer.renderDocument?.(item, options) ?? renderer.render(item, options).split("\n").map(line => copyLine(line));
+    return (
+      renderer.renderDocument?.(item, options) ??
+      renderer
+        .render(item, options)
+        .split("\n")
+        .map((line) => copyLine(line))
+    );
   }
 }
 
@@ -60,126 +64,145 @@ export function createCodingToolRendererRegistry(): ToolRendererRegistry {
 }
 
 const shellRenderer = documentRenderer((item, options) => {
-    const command = stringField(item.call.input, "command") ?? inputSummary(item.call.input);
-    const lines = [header(item, options, command)];
-    appendProgress(lines, item, options);
+  const command = stringField(item.call.input, "command") ?? inputSummary(item.call.input);
+  const lines = [header(item, options, command)];
+  appendProgress(lines, item, options);
 
-    const output = objectValue(item.output);
-    const stdout = stringField(output, "stdout") ?? item.streamedOutput;
-    const stderr = stringField(output, "stderr") ?? "";
-    if (stdout !== "") appendOutput(lines, stdout, options);
-    if (stderr !== "") {
-      lines.push(copyLine(styleText("  stderr", options.theme.error), 2));
-      appendOutput(lines, stderr, options, options.theme.error);
-    }
-    if (item.status === "completed") {
-      const exitCode = primitiveField(output, "exitCode");
-      const signal = primitiveField(output, "signal");
-      const result = exitCode === undefined ? "completed" : `exit ${String(exitCode)}`;
-      lines.push(copyLine(styleText(
-        `  └─ ${result}${signal == null ? "" : ` · ${String(signal)}`}`,
-        exitCode === 0 || exitCode === undefined
-          ? options.theme.muted
-          : options.theme.warning,
-      ), 5));
-    }
-    appendFailure(lines, item, options);
-    return lines;
+  const output = objectValue(item.output);
+  const stdout = stringField(output, "stdout") ?? item.streamedOutput;
+  const stderr = stringField(output, "stderr") ?? "";
+  if (stdout !== "") appendOutput(lines, stdout, options);
+  if (stderr !== "") {
+    lines.push(copyLine(styleText("  stderr", options.theme.error), 2));
+    appendOutput(lines, stderr, options, options.theme.error);
+  }
+  if (item.status === "completed") {
+    const exitCode = primitiveField(output, "exitCode");
+    const signal = primitiveField(output, "signal");
+    const result = exitCode === undefined ? "completed" : `exit ${String(exitCode)}`;
+    lines.push(
+      copyLine(
+        styleText(
+          `  └─ ${result}${signal == null ? "" : ` · ${String(signal)}`}`,
+          exitCode === 0 || exitCode === undefined ? options.theme.muted : options.theme.warning,
+        ),
+        5,
+      ),
+    );
+  }
+  appendFailure(lines, item, options);
+  return lines;
 });
 
 const readRenderer = documentRenderer((item, options) => {
-    const inputPath = stringField(item.call.input, "path") ?? "<unknown>";
-    const output = objectValue(item.output);
-    const path = stringField(output, "path") ?? inputPath;
-    const start = numberField(output, "startLine");
-    const end = numberField(output, "endLine");
-    const total = numberField(output, "totalLines");
-    const range = start === undefined || end === undefined ? "" : `:${start}-${end}`;
-    const lines = [header(item, options, `${path}${range}`)];
-    appendProgress(lines, item, options);
-    if (options.expanded) {
-      const content = stringField(output, "content");
-      if (content !== undefined && content !== "") {
-        appendOutput(lines, content, options, options.theme.toolOutput, true, start ?? 1);
-      }
-    } else if (total !== undefined) {
-      const count = start === undefined || end === undefined ? 0 : Math.max(0, end - start + 1);
-      const description = `${count} of ${total} lines`;
-      lines.push(copyLine(styleText(
-        `  └─ ${count} of ${total} lines${options.detailsHint === undefined ? "" : ` · ${options.detailsHint}`}`,
-        options.theme.muted,
-      ), 5, 5 + description.length));
+  const inputPath = stringField(item.call.input, "path") ?? "<unknown>";
+  const output = objectValue(item.output);
+  const path = stringField(output, "path") ?? inputPath;
+  const start = numberField(output, "startLine");
+  const end = numberField(output, "endLine");
+  const total = numberField(output, "totalLines");
+  const range = start === undefined || end === undefined ? "" : `:${start}-${end}`;
+  const lines = [header(item, options, `${path}${range}`)];
+  appendProgress(lines, item, options);
+  if (options.expanded) {
+    const content = stringField(output, "content");
+    if (content !== undefined && content !== "") {
+      appendOutput(lines, content, options, options.theme.toolOutput, true, start ?? 1);
     }
-    appendFailure(lines, item, options);
-    return lines;
+  } else if (total !== undefined) {
+    const count = start === undefined || end === undefined ? 0 : Math.max(0, end - start + 1);
+    const description = `${count} of ${total} lines`;
+    lines.push(
+      copyLine(
+        styleText(
+          `  └─ ${count} of ${total} lines${options.detailsHint === undefined ? "" : ` · ${options.detailsHint}`}`,
+          options.theme.muted,
+        ),
+        5,
+        5 + description.length,
+      ),
+    );
+  }
+  appendFailure(lines, item, options);
+  return lines;
 });
 
 const fileChangeRenderer = documentRenderer((item, options) => {
-    const inputPath = stringField(item.call.input, "path") ?? "<unknown>";
-    const preview = item.preview;
-    const detail = preview?.status === "ready"
-      ? `${preview.path}  +${preview.additions} -${preview.deletions}`
-      : inputPath;
-    const lines = [header(item, options, detail)];
-    appendProgress(lines, item, options);
+  const inputPath = stringField(item.call.input, "path") ?? "<unknown>";
+  const preview = item.preview;
+  const detail =
+    preview?.status === "ready" ? `${preview.path}  +${preview.additions} -${preview.deletions}` : inputPath;
+  const lines = [header(item, options, detail)];
+  appendProgress(lines, item, options);
 
-    if (preview?.status === "ready") {
-      if (options.expanded && preview.diff !== "") {
-        lines.push(...renderDiff(preview.diff, options.theme));
-      } else {
-        const hint = options.detailsHint === undefined ? "" : ` · ${options.detailsHint}`;
-        lines.push(copyLine(styleText(`  └─ ${preview.kind}${hint}`, options.theme.muted), 5, 5 + preview.kind.length));
-      }
-    } else if (preview?.status === "unavailable") {
-      lines.push(copyLine(styleText(
-        `  Diff unavailable: ${sanitizeTerminalText(preview.reason)}`,
-        options.theme.warning,
-      ), 2));
+  if (preview?.status === "ready") {
+    if (options.expanded && preview.diff !== "") {
+      lines.push(...renderDiff(preview.diff, options.theme));
+    } else {
+      const hint = options.detailsHint === undefined ? "" : ` · ${options.detailsHint}`;
+      lines.push(copyLine(styleText(`  └─ ${preview.kind}${hint}`, options.theme.muted), 5, 5 + preview.kind.length));
     }
-    if (item.status === "completed" && preview === undefined) {
-      appendOutput(lines, stringify(item.output), options);
-    }
-    appendFailure(lines, item, options);
-    return lines;
+  } else if (preview?.status === "unavailable") {
+    lines.push(
+      copyLine(styleText(`  Diff unavailable: ${sanitizeTerminalText(preview.reason)}`, options.theme.warning), 2),
+    );
+  }
+  if (item.status === "completed" && preview === undefined) {
+    appendOutput(lines, stringify(item.output), options);
+  }
+  appendFailure(lines, item, options);
+  return lines;
 });
 
 const genericRenderer = documentRenderer((item, options) => {
-    const lines = [header(item, options, inputSummary(item.call.input))];
-    appendProgress(lines, item, options);
-    const output = item.streamedOutput !== ""
-      ? item.streamedOutput
-      : item.status === "completed"
-      ? stringify(item.output)
-      : "";
-    if (output !== "") appendOutput(lines, output, options);
-    appendFailure(lines, item, options);
-    return lines;
+  const lines = [header(item, options, inputSummary(item.call.input))];
+  appendProgress(lines, item, options);
+  const output =
+    item.streamedOutput !== "" ? item.streamedOutput : item.status === "completed" ? stringify(item.output) : "";
+  if (output !== "") appendOutput(lines, output, options);
+  appendFailure(lines, item, options);
+  return lines;
 });
 
 function documentRenderer(
   renderDocument: (item: ToolTranscriptItem, options: ToolTranscriptRenderOptions) => readonly TextDocumentLine[],
 ): ToolTranscriptRenderer {
-  return { renderDocument, render: (item, options) => renderDocument(item, options).map(line => line.value).join("\n") };
+  return {
+    renderDocument,
+    render: (item, options) =>
+      renderDocument(item, options)
+        .map((line) => line.value)
+        .join("\n"),
+  };
 }
 
-function header(
-  item: ToolTranscriptItem,
-  options: ToolTranscriptRenderOptions,
-  detail: string,
-): TextDocumentLine {
-  const marker = item.status === "completed" ? "✓" : item.status === "failed" || item.status === "denied" ? "✗" : item.status === "unknown" ? "?" : item.status === "not-started" ? "○" : "●";
-  const markerStyle = item.status === "completed"
-    ? options.theme.toolSuccess
-    : item.status === "failed" || item.status === "denied"
-    ? options.theme.toolError
-    : item.status === "unknown" || item.status === "not-started" ? options.theme.warning : options.theme.toolPending;
+function header(item: ToolTranscriptItem, options: ToolTranscriptRenderOptions, detail: string): TextDocumentLine {
+  const marker =
+    item.status === "completed"
+      ? "✓"
+      : item.status === "failed" || item.status === "denied"
+        ? "✗"
+        : item.status === "unknown"
+          ? "?"
+          : item.status === "not-started"
+            ? "○"
+            : "●";
+  const markerStyle =
+    item.status === "completed"
+      ? options.theme.toolSuccess
+      : item.status === "failed" || item.status === "denied"
+        ? options.theme.toolError
+        : item.status === "unknown" || item.status === "not-started"
+          ? options.theme.warning
+          : options.theme.toolPending;
   const safeDetail = sanitizeTerminalText(detail).replace(/\s+/gu, " ").trim();
-  const selection = options.selected === true
-    ? styleText("▸", options.theme.accent)
-    : " ";
-  return copyLine(`${selection} ${styleText(marker, markerStyle)} ` +
-    `${styleText(sanitizeTerminalText(item.call.name), options.theme.toolTitle)}` +
-    `${safeDetail === "" ? "" : `  ${safeDetail}`}`, 4);
+  const selection = options.selected === true ? styleText("▸", options.theme.accent) : " ";
+  return copyLine(
+    `${selection} ${styleText(marker, markerStyle)} ` +
+      `${styleText(sanitizeTerminalText(item.call.name), options.theme.toolTitle)}` +
+      `${safeDetail === "" ? "" : `  ${safeDetail}`}`,
+    4,
+  );
 }
 
 function appendProgress(
@@ -209,7 +232,9 @@ function appendOutput(
   const numberWidth = String((numberFrom ?? 1) + allLines.length - 1).length;
   for (const [index, line] of displayed.entries()) {
     const label = numberFrom === undefined ? "" : `${String(numberFrom + index).padStart(numberWidth)} │ `;
-    lines.push(copyLine(`${styleText("  │", options.theme.border)} ${styleText(label + line, outputStyle)}`, 4 + label.length));
+    lines.push(
+      copyLine(`${styleText("  │", options.theme.border)} ${styleText(label + line, outputStyle)}`, 4 + label.length),
+    );
   }
   const omittedLines = allLines.length - displayed.length;
   if (omittedLines > 0) {
@@ -225,24 +250,42 @@ function appendFailure(
   item: ToolTranscriptItem,
   options: ToolTranscriptRenderOptions,
 ): void {
-  const status = item.status === "unknown" ? "Outcome unknown" : item.status === "not-started" ? "Not executed" : item.status === "denied" ? "Permission denied" : undefined;
+  const status =
+    item.status === "unknown"
+      ? "Outcome unknown"
+      : item.status === "not-started"
+        ? "Not executed"
+        : item.status === "denied"
+          ? "Permission denied"
+          : undefined;
   if (status !== undefined) lines.push(copyLine(styleText(`  ${status}`, options.theme.warning), 2));
   if (item.status !== "completed" && item.status !== "running" && item.error !== undefined) {
-    lines.push(copyLine(styleText(`  ${sanitizeTerminalText(item.error)}`, item.status === "failed" ? options.theme.error : options.theme.warning), 2));
+    lines.push(
+      copyLine(
+        styleText(
+          `  ${sanitizeTerminalText(item.error)}`,
+          item.status === "failed" ? options.theme.error : options.theme.warning,
+        ),
+        2,
+      ),
+    );
   }
 }
 
 export function renderDiff(diff: string, theme: TuiTheme): TextDocumentLine[] {
-  return sanitizeTerminalText(diff).split("\n").map((line) => {
-    const style = line.startsWith("+++") || line.startsWith("---") || line.startsWith("@@")
-      ? theme.muted
-      : line.startsWith("+")
-      ? theme.diffAdded
-      : line.startsWith("-")
-      ? theme.diffRemoved
-      : theme.diffContext;
-    return copyLine(`${styleText("  │", theme.border)} ${styleText(line, style)}`, 4);
-  });
+  return sanitizeTerminalText(diff)
+    .split("\n")
+    .map((line) => {
+      const style =
+        line.startsWith("+++") || line.startsWith("---") || line.startsWith("@@")
+          ? theme.muted
+          : line.startsWith("+")
+            ? theme.diffAdded
+            : line.startsWith("-")
+              ? theme.diffRemoved
+              : theme.diffContext;
+      return copyLine(`${styleText("  │", theme.border)} ${styleText(line, style)}`, 4);
+    });
 }
 
 function copyLine(value: string, start = 0, end = stripVTControlCharacters(value).length): TextDocumentLine {
@@ -265,9 +308,7 @@ function stringify(value: unknown): string {
 }
 
 function objectValue(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null
-    ? value as Record<string, unknown>
-    : undefined;
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined;
 }
 
 function stringField(value: unknown, name: string): string | undefined {
@@ -280,14 +321,11 @@ function numberField(value: unknown, name: string): number | undefined {
   return typeof object?.[name] === "number" ? object[name] : undefined;
 }
 
-function primitiveField(
-  value: unknown,
-  name: string,
-): string | number | boolean | null | undefined {
+function primitiveField(value: unknown, name: string): string | number | boolean | null | undefined {
   const object = objectValue(value);
   const field = object?.[name];
   return field === null || ["string", "number", "boolean"].includes(typeof field)
-    ? field as string | number | boolean | null
+    ? (field as string | number | boolean | null)
     : undefined;
 }
 

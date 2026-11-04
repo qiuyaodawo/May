@@ -13,12 +13,17 @@ test("mouse input scrolls the transcript while preserving the editor and reading
     store,
     workspace: "workspace",
     inputHistory: new EditorHistory({ entries: ["previous-command"] }),
-    onSubmit() { assert.fail("scrolling must not submit input"); },
+    onSubmit() {
+      assert.fail("scrolling must not submit input");
+    },
   });
   const input = new PassThrough();
   const output = new PassThrough();
   const driver = new NodeTerminalDriver({ input, output, requireTTY: false });
-  t.after(() => { driver.close(); view.dispose(); });
+  t.after(() => {
+    driver.close();
+    view.dispose();
+  });
   driver.onKey((stroke) => view.handleKey(stroke));
   driver.start();
   driver.enterAlternateScreen();

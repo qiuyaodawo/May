@@ -39,11 +39,18 @@ export class HookRegistry {
       throw new Error(`Invalid hook timeout for ${pluginId}`);
     }
     const entry: HookRegistration = {
-      pluginId, pluginOrder, registrationOrder: this.sequence++, hook,
-      handler: handler as HookHandler<unknown>, options: Object.freeze({ ...options }), signal,
+      pluginId,
+      pluginOrder,
+      registrationOrder: this.sequence++,
+      hook,
+      handler: handler as HookHandler<unknown>,
+      options: Object.freeze({ ...options }),
+      signal,
     };
     this.entries.add(entry);
-    return () => { this.entries.delete(entry); };
+    return () => {
+      this.entries.delete(entry);
+    };
   }
 
   forHook(name: string): readonly HookRegistration[] {
@@ -52,9 +59,12 @@ export class HookRegistry {
 }
 
 export function orderHandlers(entries: readonly HookRegistration[]): readonly HookRegistration[] {
-  return [...entries].sort((left, right) =>
-    (left.options.order ?? 0) - (right.options.order ?? 0) ||
-    left.pluginOrder - right.pluginOrder || left.registrationOrder - right.registrationOrder);
+  return [...entries].sort(
+    (left, right) =>
+      (left.options.order ?? 0) - (right.options.order ?? 0) ||
+      left.pluginOrder - right.pluginOrder ||
+      left.registrationOrder - right.registrationOrder,
+  );
 }
 
 export function asError(error: unknown): Error {
@@ -77,7 +87,10 @@ export async function withDeadline<T>(
     listener = () => reject(signal.reason);
     signal.addEventListener("abort", listener, { once: true });
   });
-  const task = Promise.resolve().then(() => { signal.throwIfAborted(); return operation(signal); });
+  const task = Promise.resolve().then(() => {
+    signal.throwIfAborted();
+    return operation(signal);
+  });
   track(task, () => deadline.abort(new Error(`${label} cancelled`)));
   try {
     return await Promise.race([task, aborted]);

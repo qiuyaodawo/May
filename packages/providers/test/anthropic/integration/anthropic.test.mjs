@@ -20,22 +20,24 @@ test("completes a real Anthropic tool-call loop", { timeout: 120_000 }, async ()
     context: new InMemoryContext({
       instructions: "You are testing May. Follow the user's tool-use instruction exactly.",
     }),
-    tools: [{
-      name: "add",
-      description: "Add two numbers. Use this whenever the user explicitly requests it.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          a: { type: "number" },
-          b: { type: "number" },
+    tools: [
+      {
+        name: "add",
+        description: "Add two numbers. Use this whenever the user explicitly requests it.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            a: { type: "number" },
+            b: { type: "number" },
+          },
+          required: ["a", "b"],
+          additionalProperties: false,
         },
-        required: ["a", "b"],
-        additionalProperties: false,
+        async execute({ a, b }) {
+          return a + b;
+        },
       },
-      async execute({ a, b }) {
-        return a + b;
-      },
-    }],
+    ],
   }).run({
     input: "必须调用 add 工具计算 17 加 25；得到工具结果后，用一句话告诉我答案。",
   });
@@ -52,9 +54,7 @@ test("completes a real Anthropic tool-call loop", { timeout: 120_000 }, async ()
   );
   assert.ok(result.steps >= 2, "the tool loop did not reach a continuation step");
   assert.ok(
-    result.message.content.some(
-      (part) => part.type === "text" && part.text.trim() !== "",
-    ),
+    result.message.content.some((part) => part.type === "text" && part.text.trim() !== ""),
     "Anthropic did not return a final text answer",
   );
 });
@@ -74,8 +74,8 @@ async function readAnthropicConfig() {
 }
 
 function findModelProfile(config, adapter) {
-  const entry = Object.entries(config.models).find(([, profile]) =>
-    (profile.adapter ?? config.providers[profile.provider]?.adapter) === adapter
+  const entry = Object.entries(config.models).find(
+    ([, profile]) => (profile.adapter ?? config.providers[profile.provider]?.adapter) === adapter,
   );
   if (entry === undefined) {
     throw new Error(`Configure a model using adapter ${adapter} in ${config.path}`);

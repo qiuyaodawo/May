@@ -23,11 +23,23 @@ const usage = { inputTokens: 10, outputTokens: 10, totalTokens: 20 };
  * presentMcpInteraction flow, approvals through resolveApproval, and input through submit or slash commands.
  */
 async function drive(app, { answer, approve = () => {}, next }) {
-  const prompts = [], output = [], pending = new Set();
+  const prompts = [],
+    output = [],
+    pending = new Set();
   void (async () => {
     for await (const event of app.events) {
       if (event.type === "mcp.interaction.requested") {
-        pending.add(presentMcpInteraction(event.request, app, async (prompt) => { prompts.push(prompt); return answer(prompt); }, AbortSignal.timeout(5_000)));
+        pending.add(
+          presentMcpInteraction(
+            event.request,
+            app,
+            async (prompt) => {
+              prompts.push(prompt);
+              return answer(prompt);
+            },
+            AbortSignal.timeout(5_000),
+          ),
+        );
       } else if (event.type === "permission.event" && event.event.type === "approval.requested") {
         approve(event.event.request);
         pending.add(app.resolveApproval(event.event.request.id, "allow"));
@@ -40,233 +52,460 @@ async function drive(app, { answer, approve = () => {}, next }) {
       if ("text" in result) output.push(result.text);
       if ("run" in result) await result.run.result;
     } else {
-      await (await app.submit({ input })).result;
+      await (
+        await app.submit({ input })
+      ).result;
     }
     await Promise.all(pending);
   }
   return { prompts, output };
 }
 
-test("configured task tools use normal permissions and terminal controls keep reviewed task input outside Session history", { timeout: 10_000 }, async (t) => {
-  const fixture = await startTaskServer(t); fixture.state.input = true;
-  const directory = await mkdtemp(join(tmpdir(), "may-configured-tasks-")); t.after(() => rm(directory, { recursive: true, force: true }));
-  const config = { path: join(directory, "config.json"), providers: { test: { adapter: "deepseek-chat", apiKey: "host-provider-secret" } },
-    models: { chat: { provider: "test", model: "test-model" } }, defaultModel: "chat",
-    apps: { maybecode: { requestRecording: "off", mcpServers: { jobs: { transport: "streamable-http", url: fixture.url, tasks: true, host: { sampling: true } } } } },
-  };
-  assert.equal(resolveMaybeCodeMcp(config, directory).servers[0].tasks, true);
-  const modelRequests = []; const taskJournal = new McpTaskJournal(new InMemoryMcpCredentialStore());
-  const app = await openConfiguredMaybeCode({ git: false, workspace: directory, dataDirectory: join(directory, "data"),
-    mcpInteractions: true, instructions: "Private Session instruction", retry: false, observability: false,
-  }, { loadConfig: async () => config, openMcp: (options) => { assert.ok(options.taskJournal); return openMcpClientPool({ ...options, taskJournal }); },
-    createModel(selection) {
-      if (selection.options.maxTokens === 32) return { limits: { maxOutputTokens: 32 }, async *stream(request) {
-        assert.equal(request.messages[0].content[0].text, "Task-only input");
-        yield { type: "response.completed", message: { role: "assistant", content: [{ type: "text", text: "private sampled output" }] } };
-      } };
-      return { async *stream(request, { step }) {
-        modelRequests.push(request);
-        const attached = JSON.stringify(request.messages.at(-1)).includes("completed task");
-        yield { type: "response.completed", usage, message: { role: "assistant", content: [], ...(step === 1 && !attached ? {
-          toolCalls: [{ id: "job-call", name: request.tools.find((tool) => tool.name.startsWith("mcp__jobs__")).name, input: {} }],
-        } : {}) } };
-      } };
-    },
-  });
-  t.after(() => app.close());
-  let command = 0; let handle; let approvals = 0;
-  const { prompts, output } = await drive(app, {
-    approve() { approvals++; assert.equal(fixture.state.calls, 0); },
-    answer(prompt) {
-      if (prompt.includes("Enter a JSON object")) return '{"value":"private task form answer"}';
-      if (prompt.includes("Type send")) return "send";
-      if (prompt.includes("Host review:")) return "allow";
-      assert.fail(`Unexpected MCP prompt: ${prompt}`);
-    },
-    async next() {
-      if (command++ === 0) return "Start the long MCP job";
-      handle ??= (await app.listMcpTasks())[0].id;
-      if (command === 2) return "/mcp tasks";
-      if (command === 3) return `/mcp task-update jobs ${handle}`;
-      if (command === 4) return `/mcp task-get jobs ${handle}`;
-      if (command === 5) {
-        assert.doesNotMatch(JSON.stringify(modelRequests), /completed task/u, "preview must not attach");
-        return `/mcp task-attach jobs ${handle} Inspect the completed job`;
-      }
-      if (command === 6) return `/mcp task-forget jobs ${handle}`;
-      return undefined;
-    },
-  });
-  assert.equal(approvals, 1); assert.equal(fixture.state.calls, 1); assert.equal(fixture.state.updates.length, 2);
-  assert.ok(output.join("").includes("completed task"));
-  assert.match(JSON.stringify(modelRequests.at(-1).messages.at(-1)), /completed task/u);
-  assert.equal(modelRequests.at(-1).messages.at(-1).role, "user");
-  assert.doesNotMatch(JSON.stringify(modelRequests), /private task form answer|private sampled output/u);
-  assert.doesNotMatch(JSON.stringify(await app.history()), /private task form answer|private sampled output/u);
-  assert.doesNotMatch(JSON.stringify(prompts), /host-provider-secret/u);
-});
-
-test("MCP user commands preview safely, explicitly attach to one Session, and cancel preparation without context leakage", { timeout: 10_000 }, async (t) => {
-  const fixture = await startCatalogFixture(t);
-  const directory = await mkdtemp(join(tmpdir(), "may-mcp-content-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  const pool = await openMcpClientPool({ servers: [{ id: "remote", transport: "streamable-http", url: `${fixture.url}/modern`, requestTimeoutMs: 1000 }] });
-  const requests = [];
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off", workspace: directory, store: new FileSessionStore(join(directory, "sessions")),
-    catalog: new InMemorySessionCatalog(), mcp: pool, toolSource: () => pool.tools, tools: [], closeOwnedResources: () => pool.close(),
-    model: { async *stream(request) {
-      requests.push(request);
-      yield { type: "response.completed", message: { role: "assistant", content: [] } };
-    } },
-  });
-  t.after(() => app.close());
-  const observed = [];
-  const relay = (async () => { for await (const event of app.events) observed.push(event); })();
-  const command = (input) => executeMaybeCodeSlashCommand(input, app);
-  assert.equal((await command("/mcp catalog remote")).type, "mcp.display");
-  const preview = await command("/mcp read remote test:///image");
-  assert.match(preview.text, /binary attachment/);
-  const promptPreview = await command('/mcp prompt remote review {"file":"a  b.txt"}');
-  assert.match(promptPreview.text, /a  b.txt/);
-  assert.equal(requests.length, 0, "preview never starts a Run");
-  const attached = await command("/mcp attach remote test:///image Inspect this image");
-  await attached.run.result;
-  assert.equal(requests[0].messages.at(-1).role, "user");
-  assert.equal(requests[0].messages.at(-1).content.at(-1).type, "image");
-  const used = await command('/mcp use-prompt remote review {"file":"a  b.txt"}');
-  await used.run.result;
-  const last = requests.at(-1).messages.at(-1);
-  assert.equal(last.role, "user");
-  assert.ok(last.content.some((part) => part.type === "json" && part.value.remoteRole === "assistant"));
-  assert.match((await command('/mcp complete remote {"ref":{"type":"ref/prompt","name":"review"},"argument":{"name":"file","value":"ma"}}')).text, /ma-completed/);
-  await command("/mcp watch remote test:///first");
-  const notice = new Promise((resolve) => {
-    const poll = () => observed.some((event) => event.type === "mcp.resource.updated") ? resolve() : setTimeout(poll, 5);
-    poll();
-  });
-  fixture.update("test:///first"); await notice;
-  assert.equal(requests.length, 2, "notifications never attach changed resources automatically");
-  await command("/mcp unwatch remote test:///first");
-  const oldSession = app.sessionId;
-  const pending = assert.rejects(command("/mcp attach remote test:///hold"));
-  const switched = app.newSession();
-  assert.equal(app.isRunning, true);
-  app.cancel("cancel attachment preparation");
-  await pending; await switched;
-  assert.notEqual(app.sessionId, oldSession);
-  assert.equal(requests.length, 2);
-  await app.close(); await relay;
-});
-
-test("configured Host reviews share only the workspace and use a separately bounded, user-reviewed sampling model", { timeout: 10_000 }, async (t) => {
-  const fixture = await startCatalogFixture(t);
-  fixture.state.input = (m) => {
-    if (m.method === "tools/call" && !m.params.inputResponses) return { resultType: "input_required", requestState: "host", inputRequests: {
-      roots: { method: "roots/list" }, sample: { method: "sampling/createMessage", params: {
-        messages: [{ role: "user", content: { type: "text", text: "server sampling input" } }], maxTokens: 32,
-      } },
-    } };
-  };
-  const directory = await mkdtemp(join(tmpdir(), "may-configured-host-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  const config = { path: join(directory, "config.json"), providers: { test: { adapter: "deepseek-chat", apiKey: "host-only-key" } },
-    models: { chat: { provider: "test", model: "host-model", maxOutputTokens: 4096 } }, defaultModel: "chat",
-    apps: { maybecode: { requestRecording: "off", mcpServers: { remote: { transport: "streamable-http", url: fixture.url + "/modern", host: { roots: true, sampling: true } } } } },
-  };
-  assert.deepEqual(resolveMaybeCodeMcp(config, directory).servers[0].host, { roots: true, sampling: true });
-  const sampled = [];
-  const app = await openConfiguredMaybeCode({ git: false, workspace: directory, dataDirectory: join(directory, "data"),
-    mcpInteractions: true, instructions: "Private Session instructions must not reach the sampler", retry: false, observability: false,
-  }, { loadConfig: async () => config, createModel(selection) {
-    if (selection.options.maxTokens === 32) {
-      assert.equal(selection.options.maxOutputTokens, 32);
-      return { limits: { maxOutputTokens: 32 }, async *stream(request) {
-        sampled.push(request);
-        yield { type: "response.completed", message: { role: "assistant", content: [{ type: "text", text: "sampled output" }] } };
-      } };
-    }
-    return { async *stream(request, { step }) {
-      yield { type: "response.completed", usage, message: { role: "assistant", content: [], ...(step === 1 ? {
-        toolCalls: [{ id: "host-call", name: request.tools.find((tool) => tool.name.startsWith("mcp__remote__")).name, input: {} }],
-      } : {}) } };
-    } };
-  } });
-  t.after(() => app.close());
-  let initial = true; let edited = false;
-  const { prompts } = await drive(app, {
-    answer(prompt) {
-      if (prompt.includes("Host review:")) {
-        if (prompt.includes("Host review: sampling.request") && !edited) { edited = true; return "edit"; }
-        return "allow";
-      }
-      if (prompt.includes("replacement JSON")) return JSON.stringify({ maxTokens: 32, messages: [{ role: "user", content: { type: "text", text: "user reviewed sampling input" } }] });
-      assert.fail(`Unexpected MCP prompt: ${prompt}`);
-    },
-    next() { if (initial) { initial = false; return "Use the MCP tool"; } return undefined; },
-  });
-  assert.equal(sampled.length, 1); assert.deepEqual(sampled[0].tools, []);
-  assert.equal(sampled[0].messages[0].content[0].text, "user reviewed sampling input");
-  assert.equal(JSON.stringify(sampled).includes("Private Session"), false);
-  assert.equal(JSON.stringify(prompts).includes("host-only-key"), false);
-  const response = fixture.requests.find((r) => r.message?.params?.inputResponses)?.message.params.inputResponses;
-  assert.equal(response.roots.roots.length, 1); assert.equal(response.sample.model, "host-model");
-  assert.equal(prompts.filter((p) => p.includes("Host review: sampling.response")).length, 1);
-});
-
-test("MCP terminal forms resolve nested preparation and Run requests outside the Session queue without persisting answers", { timeout: 10_000 }, async (t) => {
-  const fixture = await startCatalogFixture(t);
-  fixture.state.input = (m) => {
-    if (["tools/call", "resources/read"].includes(m.method) && !m.params.inputResponses) return {
-      resultType: "input_required", requestState: "next", inputRequests: { form: { method: "elicitation/create", params: {
-        mode: "form", message: "Untrusted \u001b[2J request", requestedSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
-      } } },
+test(
+  "configured task tools use normal permissions and terminal controls keep reviewed task input outside Session history",
+  { timeout: 10_000 },
+  async (t) => {
+    const fixture = await startTaskServer(t);
+    fixture.state.input = true;
+    const directory = await mkdtemp(join(tmpdir(), "may-configured-tasks-"));
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const config = {
+      path: join(directory, "config.json"),
+      providers: { test: { adapter: "deepseek-chat", apiKey: "host-provider-secret" } },
+      models: { chat: { provider: "test", model: "test-model" } },
+      defaultModel: "chat",
+      apps: {
+        maybecode: {
+          requestRecording: "off",
+          mcpServers: {
+            jobs: { transport: "streamable-http", url: fixture.url, tasks: true, host: { sampling: true } },
+          },
+        },
+      },
     };
-  };
-  const directory = await mkdtemp(join(tmpdir(), "may-mcp-ui-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  const pool = await openMcpClientPool({ interactions: new McpInteractionBroker(), servers: [{ id: "remote", transport: "streamable-http", url: `${fixture.url}/modern` }] });
-  const modelRequests = [];
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off", workspace: directory, store: new FileSessionStore(join(directory, "sessions")),
-    catalog: new InMemorySessionCatalog(), mcp: pool, toolSource: () => pool.tools, tools: [], closeOwnedResources: () => pool.close(),
-    model: { async *stream(request, { step }) {
-      modelRequests.push(request);
-      yield { type: "response.completed", usage, message: { role: "assistant", content: [],
-        ...(step === 1 ? { toolCalls: [{ id: "tool-one", name: pool.tools[0].name, input: {} }] } : {}),
-      } };
-    } },
-  });
-  t.after(() => app.close());
-  const owners = [];
-  let attached = false;
-  const { prompts: questions } = await drive(app, {
-    answer(prompt) {
-      if (prompt.includes("Enter a JSON object")) {
-        owners.push(app.getMcpInteractions()[0].owner);
-        return '{"name":"ephemeral-form-answer"}';
-      }
-      if (prompt.includes("Type send")) return "send";
-      assert.fail(`Unexpected MCP prompt: ${prompt}`);
-    },
-    next() { if (attached) return undefined; attached = true; return "/mcp attach remote test:///first"; },
-  });
-  assert.equal(owners.length, 2);
-  assert.equal(owners[0].workspaceId, directory); assert.equal(owners[0].sessionId, owners[1].sessionId);
-  assert.equal(owners[0].runId, undefined); assert.ok(owners[1].runId); assert.equal(owners[1].toolCallId, "tool-one");
-  assert.equal(JSON.stringify(modelRequests).includes("ephemeral-form-answer"), false);
-  assert.equal(questions.some((q) => q.includes("\u001b[2J")), false);
+    assert.equal(resolveMaybeCodeMcp(config, directory).servers[0].tasks, true);
+    const modelRequests = [];
+    const taskJournal = new McpTaskJournal(new InMemoryMcpCredentialStore());
+    const app = await openConfiguredMaybeCode(
+      {
+        git: false,
+        workspace: directory,
+        dataDirectory: join(directory, "data"),
+        mcpInteractions: true,
+        instructions: "Private Session instruction",
+        retry: false,
+        observability: false,
+      },
+      {
+        loadConfig: async () => config,
+        openMcp: (options) => {
+          assert.ok(options.taskJournal);
+          return openMcpClientPool({ ...options, taskJournal });
+        },
+        createModel(selection) {
+          if (selection.options.maxTokens === 32)
+            return {
+              limits: { maxOutputTokens: 32 },
+              async *stream(request) {
+                assert.equal(request.messages[0].content[0].text, "Task-only input");
+                yield {
+                  type: "response.completed",
+                  message: { role: "assistant", content: [{ type: "text", text: "private sampled output" }] },
+                };
+              },
+            };
+          return {
+            async *stream(request, { step }) {
+              modelRequests.push(request);
+              const attached = JSON.stringify(request.messages.at(-1)).includes("completed task");
+              yield {
+                type: "response.completed",
+                usage,
+                message: {
+                  role: "assistant",
+                  content: [],
+                  ...(step === 1 && !attached
+                    ? {
+                        toolCalls: [
+                          {
+                            id: "job-call",
+                            name: request.tools.find((tool) => tool.name.startsWith("mcp__jobs__")).name,
+                            input: {},
+                          },
+                        ],
+                      }
+                    : {}),
+                },
+              };
+            },
+          };
+        },
+      },
+    );
+    t.after(() => app.close());
+    let command = 0;
+    let handle;
+    let approvals = 0;
+    const { prompts, output } = await drive(app, {
+      approve() {
+        approvals++;
+        assert.equal(fixture.state.calls, 0);
+      },
+      answer(prompt) {
+        if (prompt.includes("Enter a JSON object")) return '{"value":"private task form answer"}';
+        if (prompt.includes("Type send")) return "send";
+        if (prompt.includes("Host review:")) return "allow";
+        assert.fail(`Unexpected MCP prompt: ${prompt}`);
+      },
+      async next() {
+        if (command++ === 0) return "Start the long MCP job";
+        handle ??= (await app.listMcpTasks())[0].id;
+        if (command === 2) return "/mcp tasks";
+        if (command === 3) return `/mcp task-update jobs ${handle}`;
+        if (command === 4) return `/mcp task-get jobs ${handle}`;
+        if (command === 5) {
+          assert.doesNotMatch(JSON.stringify(modelRequests), /completed task/u, "preview must not attach");
+          return `/mcp task-attach jobs ${handle} Inspect the completed job`;
+        }
+        if (command === 6) return `/mcp task-forget jobs ${handle}`;
+        return undefined;
+      },
+    });
+    assert.equal(approvals, 1);
+    assert.equal(fixture.state.calls, 1);
+    assert.equal(fixture.state.updates.length, 2);
+    assert.ok(output.join("").includes("completed task"));
+    assert.match(JSON.stringify(modelRequests.at(-1).messages.at(-1)), /completed task/u);
+    assert.equal(modelRequests.at(-1).messages.at(-1).role, "user");
+    assert.doesNotMatch(JSON.stringify(modelRequests), /private task form answer|private sampled output/u);
+    assert.doesNotMatch(JSON.stringify(await app.history()), /private task form answer|private sampled output/u);
+    assert.doesNotMatch(JSON.stringify(prompts), /host-provider-secret/u);
+  },
+);
 
-  // The retained dialog has no command history; queued questions and cancellation
-  // are ephemeral and do not route through the normal onSubmit callback.
-  const store = new TranscriptStore();
-  const view = new MaybeCodeTerminalView({ store, workspace: directory, onSubmit() { assert.fail("form must not submit an agent turn"); } });
-  const first = new AbortController(); const second = new AbortController();
-  const a = view.requestMcpInput("First MCP form", first.signal);
-  const b = view.requestMcpInput("Second MCP form", second.signal);
-  first.abort(); assert.equal(await a, undefined);
-  assert.match(view.render({ width: 100, height: 28 }).lines.join("\n"), /Second MCP form/);
-  const key = (key, text) => ({ key, text, ctrl: false, alt: false, shift: false, meta: false });
-  for (const ch of "cancel") view.handleKey(key(ch, ch));
-  view.handleKey(key("enter")); assert.equal(await b, "cancel");
-  const c = view.requestMcpInput("Closing form", second.signal);
-  view.dispose(); assert.equal(await c, undefined);
-});
+test(
+  "MCP user commands preview safely, explicitly attach to one Session, and cancel preparation without context leakage",
+  { timeout: 10_000 },
+  async (t) => {
+    const fixture = await startCatalogFixture(t);
+    const directory = await mkdtemp(join(tmpdir(), "may-mcp-content-"));
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const pool = await openMcpClientPool({
+      servers: [{ id: "remote", transport: "streamable-http", url: `${fixture.url}/modern`, requestTimeoutMs: 1000 }],
+    });
+    const requests = [];
+    const app = await MaybeCodeWorkspace.open({
+      git: false,
+      requestRecording: "off",
+      workspace: directory,
+      store: new FileSessionStore(join(directory, "sessions")),
+      catalog: new InMemorySessionCatalog(),
+      mcp: pool,
+      toolSource: () => pool.tools,
+      tools: [],
+      closeOwnedResources: () => pool.close(),
+      model: {
+        async *stream(request) {
+          requests.push(request);
+          yield { type: "response.completed", message: { role: "assistant", content: [] } };
+        },
+      },
+    });
+    t.after(() => app.close());
+    const observed = [];
+    const relay = (async () => {
+      for await (const event of app.events) observed.push(event);
+    })();
+    const command = (input) => executeMaybeCodeSlashCommand(input, app);
+    assert.equal((await command("/mcp catalog remote")).type, "mcp.display");
+    const preview = await command("/mcp read remote test:///image");
+    assert.match(preview.text, /binary attachment/);
+    const promptPreview = await command('/mcp prompt remote review {"file":"a  b.txt"}');
+    assert.match(promptPreview.text, /a  b.txt/);
+    assert.equal(requests.length, 0, "preview never starts a Run");
+    const attached = await command("/mcp attach remote test:///image Inspect this image");
+    await attached.run.result;
+    assert.equal(requests[0].messages.at(-1).role, "user");
+    assert.equal(requests[0].messages.at(-1).content.at(-1).type, "image");
+    const used = await command('/mcp use-prompt remote review {"file":"a  b.txt"}');
+    await used.run.result;
+    const last = requests.at(-1).messages.at(-1);
+    assert.equal(last.role, "user");
+    assert.ok(last.content.some((part) => part.type === "json" && part.value.remoteRole === "assistant"));
+    assert.match(
+      (
+        await command(
+          '/mcp complete remote {"ref":{"type":"ref/prompt","name":"review"},"argument":{"name":"file","value":"ma"}}',
+        )
+      ).text,
+      /ma-completed/,
+    );
+    await command("/mcp watch remote test:///first");
+    const notice = new Promise((resolve) => {
+      const poll = () =>
+        observed.some((event) => event.type === "mcp.resource.updated") ? resolve() : setTimeout(poll, 5);
+      poll();
+    });
+    fixture.update("test:///first");
+    await notice;
+    assert.equal(requests.length, 2, "notifications never attach changed resources automatically");
+    await command("/mcp unwatch remote test:///first");
+    const oldSession = app.sessionId;
+    const pending = assert.rejects(command("/mcp attach remote test:///hold"));
+    const switched = app.newSession();
+    assert.equal(app.isRunning, true);
+    app.cancel("cancel attachment preparation");
+    await pending;
+    await switched;
+    assert.notEqual(app.sessionId, oldSession);
+    assert.equal(requests.length, 2);
+    await app.close();
+    await relay;
+  },
+);
+
+test(
+  "configured Host reviews share only the workspace and use a separately bounded, user-reviewed sampling model",
+  { timeout: 10_000 },
+  async (t) => {
+    const fixture = await startCatalogFixture(t);
+    fixture.state.input = (m) => {
+      if (m.method === "tools/call" && !m.params.inputResponses)
+        return {
+          resultType: "input_required",
+          requestState: "host",
+          inputRequests: {
+            roots: { method: "roots/list" },
+            sample: {
+              method: "sampling/createMessage",
+              params: {
+                messages: [{ role: "user", content: { type: "text", text: "server sampling input" } }],
+                maxTokens: 32,
+              },
+            },
+          },
+        };
+    };
+    const directory = await mkdtemp(join(tmpdir(), "may-configured-host-"));
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const config = {
+      path: join(directory, "config.json"),
+      providers: { test: { adapter: "deepseek-chat", apiKey: "host-only-key" } },
+      models: { chat: { provider: "test", model: "host-model", maxOutputTokens: 4096 } },
+      defaultModel: "chat",
+      apps: {
+        maybecode: {
+          requestRecording: "off",
+          mcpServers: {
+            remote: {
+              transport: "streamable-http",
+              url: fixture.url + "/modern",
+              host: { roots: true, sampling: true },
+            },
+          },
+        },
+      },
+    };
+    assert.deepEqual(resolveMaybeCodeMcp(config, directory).servers[0].host, { roots: true, sampling: true });
+    const sampled = [];
+    const app = await openConfiguredMaybeCode(
+      {
+        git: false,
+        workspace: directory,
+        dataDirectory: join(directory, "data"),
+        mcpInteractions: true,
+        instructions: "Private Session instructions must not reach the sampler",
+        retry: false,
+        observability: false,
+      },
+      {
+        loadConfig: async () => config,
+        createModel(selection) {
+          if (selection.options.maxTokens === 32) {
+            assert.equal(selection.options.maxOutputTokens, 32);
+            return {
+              limits: { maxOutputTokens: 32 },
+              async *stream(request) {
+                sampled.push(request);
+                yield {
+                  type: "response.completed",
+                  message: { role: "assistant", content: [{ type: "text", text: "sampled output" }] },
+                };
+              },
+            };
+          }
+          return {
+            async *stream(request, { step }) {
+              yield {
+                type: "response.completed",
+                usage,
+                message: {
+                  role: "assistant",
+                  content: [],
+                  ...(step === 1
+                    ? {
+                        toolCalls: [
+                          {
+                            id: "host-call",
+                            name: request.tools.find((tool) => tool.name.startsWith("mcp__remote__")).name,
+                            input: {},
+                          },
+                        ],
+                      }
+                    : {}),
+                },
+              };
+            },
+          };
+        },
+      },
+    );
+    t.after(() => app.close());
+    let initial = true;
+    let edited = false;
+    const { prompts } = await drive(app, {
+      answer(prompt) {
+        if (prompt.includes("Host review:")) {
+          if (prompt.includes("Host review: sampling.request") && !edited) {
+            edited = true;
+            return "edit";
+          }
+          return "allow";
+        }
+        if (prompt.includes("replacement JSON"))
+          return JSON.stringify({
+            maxTokens: 32,
+            messages: [{ role: "user", content: { type: "text", text: "user reviewed sampling input" } }],
+          });
+        assert.fail(`Unexpected MCP prompt: ${prompt}`);
+      },
+      next() {
+        if (initial) {
+          initial = false;
+          return "Use the MCP tool";
+        }
+        return undefined;
+      },
+    });
+    assert.equal(sampled.length, 1);
+    assert.deepEqual(sampled[0].tools, []);
+    assert.equal(sampled[0].messages[0].content[0].text, "user reviewed sampling input");
+    assert.equal(JSON.stringify(sampled).includes("Private Session"), false);
+    assert.equal(JSON.stringify(prompts).includes("host-only-key"), false);
+    const response = fixture.requests.find((r) => r.message?.params?.inputResponses)?.message.params.inputResponses;
+    assert.equal(response.roots.roots.length, 1);
+    assert.equal(response.sample.model, "host-model");
+    assert.equal(prompts.filter((p) => p.includes("Host review: sampling.response")).length, 1);
+  },
+);
+
+test(
+  "MCP terminal forms resolve nested preparation and Run requests outside the Session queue without persisting answers",
+  { timeout: 10_000 },
+  async (t) => {
+    const fixture = await startCatalogFixture(t);
+    fixture.state.input = (m) => {
+      if (["tools/call", "resources/read"].includes(m.method) && !m.params.inputResponses)
+        return {
+          resultType: "input_required",
+          requestState: "next",
+          inputRequests: {
+            form: {
+              method: "elicitation/create",
+              params: {
+                mode: "form",
+                message: "Untrusted \u001b[2J request",
+                requestedSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
+              },
+            },
+          },
+        };
+    };
+    const directory = await mkdtemp(join(tmpdir(), "may-mcp-ui-"));
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const pool = await openMcpClientPool({
+      interactions: new McpInteractionBroker(),
+      servers: [{ id: "remote", transport: "streamable-http", url: `${fixture.url}/modern` }],
+    });
+    const modelRequests = [];
+    const app = await MaybeCodeWorkspace.open({
+      git: false,
+      requestRecording: "off",
+      workspace: directory,
+      store: new FileSessionStore(join(directory, "sessions")),
+      catalog: new InMemorySessionCatalog(),
+      mcp: pool,
+      toolSource: () => pool.tools,
+      tools: [],
+      closeOwnedResources: () => pool.close(),
+      model: {
+        async *stream(request, { step }) {
+          modelRequests.push(request);
+          yield {
+            type: "response.completed",
+            usage,
+            message: {
+              role: "assistant",
+              content: [],
+              ...(step === 1 ? { toolCalls: [{ id: "tool-one", name: pool.tools[0].name, input: {} }] } : {}),
+            },
+          };
+        },
+      },
+    });
+    t.after(() => app.close());
+    const owners = [];
+    let attached = false;
+    const { prompts: questions } = await drive(app, {
+      answer(prompt) {
+        if (prompt.includes("Enter a JSON object")) {
+          owners.push(app.getMcpInteractions()[0].owner);
+          return '{"name":"ephemeral-form-answer"}';
+        }
+        if (prompt.includes("Type send")) return "send";
+        assert.fail(`Unexpected MCP prompt: ${prompt}`);
+      },
+      next() {
+        if (attached) return undefined;
+        attached = true;
+        return "/mcp attach remote test:///first";
+      },
+    });
+    assert.equal(owners.length, 2);
+    assert.equal(owners[0].workspaceId, directory);
+    assert.equal(owners[0].sessionId, owners[1].sessionId);
+    assert.equal(owners[0].runId, undefined);
+    assert.ok(owners[1].runId);
+    assert.equal(owners[1].toolCallId, "tool-one");
+    assert.equal(JSON.stringify(modelRequests).includes("ephemeral-form-answer"), false);
+    assert.equal(
+      questions.some((q) => q.includes("\u001b[2J")),
+      false,
+    );
+
+    // The retained dialog has no command history; queued questions and cancellation
+    // are ephemeral and do not route through the normal onSubmit callback.
+    const store = new TranscriptStore();
+    const view = new MaybeCodeTerminalView({
+      store,
+      workspace: directory,
+      onSubmit() {
+        assert.fail("form must not submit an agent turn");
+      },
+    });
+    const first = new AbortController();
+    const second = new AbortController();
+    const a = view.requestMcpInput("First MCP form", first.signal);
+    const b = view.requestMcpInput("Second MCP form", second.signal);
+    first.abort();
+    assert.equal(await a, undefined);
+    assert.match(view.render({ width: 100, height: 28 }).lines.join("\n"), /Second MCP form/);
+    const key = (key, text) => ({ key, text, ctrl: false, alt: false, shift: false, meta: false });
+    for (const ch of "cancel") view.handleKey(key(ch, ch));
+    view.handleKey(key("enter"));
+    assert.equal(await b, "cancel");
+    const c = view.requestMcpInput("Closing form", second.signal);
+    view.dispose();
+    assert.equal(await c, undefined);
+  },
+);

@@ -15,15 +15,31 @@ test("trial tool budget checks a real file writer before additional effects", as
   const workspace = await mkdtemp(join(directory, "tool-budget-"));
   const telemetry = new EvalTelemetryCollector();
   const budget = new EvalTrialBudget({ maxToolCalls: 1 }, telemetry);
-  const [tool] = budget.wrapTools([{
-    name: "write", description: "保存文件", inputSchema: { type: "object" },
-    async execute(input) { await writeFile(join(workspace, "result.txt"), input.text); return { saved: true }; },
-  }]);
+  const [tool] = budget.wrapTools([
+    {
+      name: "write",
+      description: "保存文件",
+      inputSchema: { type: "object" },
+      async execute(input) {
+        await writeFile(join(workspace, "result.txt"), input.text);
+        return { saved: true };
+      },
+    },
+  ]);
   budget.start();
-  const context = { runId: "run", step: 1, toolCallId: "write-1", idempotencyKey: "write-1",
-    signal: new AbortController().signal, report() {} };
+  const context = {
+    runId: "run",
+    step: 1,
+    toolCallId: "write-1",
+    idempotencyKey: "write-1",
+    signal: new AbortController().signal,
+    report() {},
+  };
   assert.deepEqual(await tool.execute({ text: "first" }, context), { saved: true });
-  await assert.rejects(tool.execute({ text: "second" }, { ...context, toolCallId: "write-2" }), error => error.code === "RUN_BUDGET_EXCEEDED");
+  await assert.rejects(
+    tool.execute({ text: "second" }, { ...context, toolCallId: "write-2" }),
+    (error) => error.code === "RUN_BUDGET_EXCEEDED",
+  );
   assert.equal(await readFile(join(workspace, "result.txt"), "utf8"), "first");
   assert.equal(budget.snapshot().toolCalls, 1);
 });
@@ -40,14 +56,31 @@ test("collector observes real permission requests and bounded approval waiting",
   })();
   try {
     const result = await executor.execute({
-      tool: { name: "save", description: "保存文件", inputSchema: { type: "object" },
-        async execute() { await writeFile(join(workspace, "approved.txt"), "approved"); return "saved"; } },
-      input: {}, context: { runId: "permission-run", step: 1, toolCallId: "save-1", idempotencyKey: "save-1",
-        signal: new AbortController().signal, report() {} },
+      tool: {
+        name: "save",
+        description: "保存文件",
+        inputSchema: { type: "object" },
+        async execute() {
+          await writeFile(join(workspace, "approved.txt"), "approved");
+          return "saved";
+        },
+      },
+      input: {},
+      context: {
+        runId: "permission-run",
+        step: 1,
+        toolCallId: "save-1",
+        idempotencyKey: "save-1",
+        signal: new AbortController().signal,
+        report() {},
+      },
     });
     assert.equal(result, "saved");
     assert.equal(await readFile(join(workspace, "approved.txt"), "utf8"), "approved");
-  } finally { await executor.close(); await relay; }
+  } finally {
+    await executor.close();
+    await relay;
+  }
   const metrics = evalMetrics(collector.metrics());
   assert.equal(metrics.approvalWaitMs.complete, true);
   assert.ok(metrics.approvalWaitMs.value >= 0);
@@ -60,15 +93,32 @@ test("collector observes real permission requests and bounded approval waiting",
   assert.equal(collector.approvalEvidence()[0].decision, "allow");
   assert.equal(collector.approvalEvidence()[0].status, "resolved");
   assert.equal(Object.hasOwn(collector.approvalEvidence()[0], "input"), false);
-  assert.ok(collector.evidence().every(span => Object.keys(span.attributes).every(key => !key.includes("input") || key.endsWith("input_tokens"))));
+  assert.ok(
+    collector
+      .evidence()
+      .every((span) =>
+        Object.keys(span.attributes).every((key) => !key.includes("input") || key.endsWith("input_tokens")),
+      ),
+  );
 });
 
 test("assessment keeps unique runtime correlation and avoids selecting one session in a team", () => {
   const diagnostics = new DiagnosticsStore();
-  const assessment = createEvalTaskAssessment({ trialId: "trial", evaluatorId: "files", evaluatorVersion: "1", verdict: "passed",
-    identities: { sessionIds: ["worker-one", "worker-two"], runIds: ["run-one", "run-two"],
-      taskIds: ["task-one", "task-two"], coordinationIds: ["team"], traceIds: ["trace-one", "trace-two"] },
-    evidenceReferences: ["result.json"], configurationVersion: "config-1", timestamp: Date.now(),
+  const assessment = createEvalTaskAssessment({
+    trialId: "trial",
+    evaluatorId: "files",
+    evaluatorVersion: "1",
+    verdict: "passed",
+    identities: {
+      sessionIds: ["worker-one", "worker-two"],
+      runIds: ["run-one", "run-two"],
+      taskIds: ["task-one", "task-two"],
+      coordinationIds: ["team"],
+      traceIds: ["trace-one", "trace-two"],
+    },
+    evidenceReferences: ["result.json"],
+    configurationVersion: "config-1",
+    timestamp: Date.now(),
   });
   assert.equal(assessment.taskId, "trial");
   assert.equal(assessment.sessionId, undefined);

@@ -1,15 +1,8 @@
-import {
-  resolveModelProfile,
-  type MayConfig,
-  type ResolveProviderOptions,
-} from "@sortedyuan/may/config";
+import { resolveModelProfile, type MayConfig, type ResolveProviderOptions } from "@sortedyuan/may/config";
 import { omitUndefined, type ModelLimits } from "@sortedyuan/may/core";
 
 import { ProviderConfigurationError } from "./errors.js";
-import type {
-  ProviderModelSelection,
-  ModelProfileSelector,
-} from "./types.js";
+import type { ProviderModelSelection, ModelProfileSelector } from "./types.js";
 
 export function selectProviderModel(
   config: MayConfig,
@@ -41,14 +34,10 @@ function modelLimits(
 function onlyModel(config: MayConfig): string {
   const models = Object.keys(config.models);
   if (models.length === 0) {
-    throw new ProviderConfigurationError(
-      `No model profiles are configured in ${config.path}`,
-    );
+    throw new ProviderConfigurationError(`No model profiles are configured in ${config.path}`);
   }
   if (models.length > 1) {
-    throw new ProviderConfigurationError(
-      "Select a model with --model or configure defaultModel",
-    );
+    throw new ProviderConfigurationError("Select a model with --model or configure defaultModel");
   }
   return models[0]!;
 }

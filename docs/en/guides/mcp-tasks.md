@@ -29,13 +29,17 @@ resource/prompt requests. Immediate tool results remain supported.
 
 ```json
 {
-  "apps": { "maybecode": { "mcpServers": {
-    "jobs": {
-      "transport": "streamable-http",
-      "url": "https://jobs.example.com/mcp",
-      "tasks": true
+  "apps": {
+    "maybecode": {
+      "mcpServers": {
+        "jobs": {
+          "transport": "streamable-http",
+          "url": "https://jobs.example.com/mcp",
+          "tasks": true
+        }
+      }
     }
-  } } }
+  }
 }
 ```
 
@@ -78,16 +82,16 @@ pipeline. A deferred result gives the model a **local task handle** for later
 management. The Host explicitly controls task management APIs and their exposure
 to the model. Both terminal UIs share these commands:
 
-| Command | Effect |
-| --- | --- |
-| `/mcp tasks [server]` | List this Session's local metadata; no network |
-| `/mcp task-get server local-id` | Fetch and preview current state |
-| `/mcp task-wait server local-id` | Poll while working; stop at input-required or terminal |
-| `/mcp task-update server local-id` | Review and fulfill current unclaimed inputs |
-| `/mcp task-retry-input server local-id` | Explicitly re-review abandoned/expired unacknowledged input |
-| `/mcp task-cancel server local-id` | Send cooperative remote cancellation |
-| `/mcp task-forget server local-id` | Remove local history only |
-| `/mcp task-attach server local-id [question]` | Explicitly attach a completed result to a new Run |
+| Command                                       | Effect                                                      |
+| --------------------------------------------- | ----------------------------------------------------------- |
+| `/mcp tasks [server]`                         | List this Session's local metadata; no network              |
+| `/mcp task-get server local-id`               | Fetch and preview current state                             |
+| `/mcp task-wait server local-id`              | Poll while working; stop at input-required or terminal      |
+| `/mcp task-update server local-id`            | Review and fulfill current unclaimed inputs                 |
+| `/mcp task-retry-input server local-id`       | Explicitly re-review abandoned/expired unacknowledged input |
+| `/mcp task-cancel server local-id`            | Send cooperative remote cancellation                        |
+| `/mcp task-forget server local-id`            | Remove local history only                                   |
+| `/mcp task-attach server local-id [question]` | Explicitly attach a completed result to a new Run           |
 
 Preview, polling and notifications never append results to Context. Attachment
 uses bounded, provenance-labelled user content, preserves multimodal/structured

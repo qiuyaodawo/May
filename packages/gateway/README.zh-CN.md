@@ -5,14 +5,14 @@
 为 May 宿主提供 Agent adapter、持久化消息投递和 HTTP 服务。
 需要 Node.js 22.16.0 或更新版本。
 
-| 入口 | 功能 |
-| --- | --- |
-| `@sortedyuan/gateway` | Adapter、投递与 HTTP 的公开导出 |
-| `@sortedyuan/gateway/adapters` | Agent adapter 接口、注册、加载和 May 接入 |
-| `@sortedyuan/gateway/rpc` | 使用 stdio 或 socket 的 JSON-RPC adapter |
-| `@sortedyuan/gateway/delivery` | 渠道接口、日志存储和消息投递 |
-| `@sortedyuan/gateway/web-api` | 通过宿主插件管理 HTTP listener |
-| `@sortedyuan/gateway/examples/rpc-file-agent` | 用于 RPC 集成的可执行文件 Agent |
+| 入口                                          | 功能                                      |
+| --------------------------------------------- | ----------------------------------------- |
+| `@sortedyuan/gateway`                         | Adapter、投递与 HTTP 的公开导出           |
+| `@sortedyuan/gateway/adapters`                | Agent adapter 接口、注册、加载和 May 接入 |
+| `@sortedyuan/gateway/rpc`                     | 使用 stdio 或 socket 的 JSON-RPC adapter  |
+| `@sortedyuan/gateway/delivery`                | 渠道接口、日志存储和消息投递              |
+| `@sortedyuan/gateway/web-api`                 | 通过宿主插件管理 HTTP listener            |
+| `@sortedyuan/gateway/examples/rpc-file-agent` | 用于 RPC 集成的可执行文件 Agent           |
 
 `createAgentAdaptersPlugin()` 提供宿主注册表。注册表根据请求创建 adapter，
 共享正在执行的创建过程，并在宿主关闭时关闭已获取的 adapter。

@@ -1,8 +1,4 @@
-import type {
-  ContextSnapshot,
-  Message,
-  ModelContextCompactor,
-} from "../core/index.js";
+import type { ContextSnapshot, Message, ModelContextCompactor } from "../core/index.js";
 
 import type { ContextInspection } from "./controller.js";
 
@@ -27,9 +23,7 @@ export interface ContextCompactionDetails {
   readonly terminal?: boolean;
 }
 
-export type ContextCompactionOutput =
-  | readonly Message[]
-  | ContextCompactionDetails;
+export type ContextCompactionOutput = readonly Message[] | ContextCompactionDetails;
 
 export interface ContextCompactionResult {
   readonly strategy: string;
@@ -52,21 +46,17 @@ export interface ContextCompactionFailure {
   readonly continuing: boolean;
 }
 
-export type ContextCompactionFailureSink = (
-  failure: ContextCompactionFailure,
-) => void | Promise<void>;
+export type ContextCompactionFailureSink = (failure: ContextCompactionFailure) => void | Promise<void>;
 
 export class ContextCompactionExhaustedError extends Error {
   readonly inspection: ContextInspection;
   readonly failures: readonly ContextCompactionFailure[];
 
-  constructor(
-    inspection: ContextInspection,
-    failures: readonly ContextCompactionFailure[] = [],
-  ) {
-    const threshold = inspection.compactTriggerTokens === undefined
-      ? "the configured threshold"
-      : `the ~${inspection.compactTriggerTokens}-token threshold`;
+  constructor(inspection: ContextInspection, failures: readonly ContextCompactionFailure[] = []) {
+    const threshold =
+      inspection.compactTriggerTokens === undefined
+        ? "the configured threshold"
+        : `the ~${inspection.compactTriggerTokens}-token threshold`;
     super(
       `Automatic context compaction exhausted all strategies; ` +
         `context remains at ~${inspection.effectiveTokens} tokens at or above ${threshold}`,
@@ -94,9 +84,7 @@ export class ModelContextCompactionStrategy implements ContextCompactionStrategy
     const result = await this.compactor.compact(snapshot, options);
     return {
       messages: result.messages,
-      ...(result.effectiveTokens === undefined
-        ? {}
-        : { effectiveTokens: result.effectiveTokens }),
+      ...(result.effectiveTokens === undefined ? {} : { effectiveTokens: result.effectiveTokens }),
       terminal: true,
     };
   }

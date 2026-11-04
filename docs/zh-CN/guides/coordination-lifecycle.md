@@ -19,8 +19,7 @@ import type { CoordinationPolicy } from "@sortedyuan/coordination";
 const policy: CoordinationPolicy = {
   version: "team-policy-v2",
   authorize: (task) => task.agent === "analyst",
-  authorizeRetry: (task, finding) =>
-    ["failed", "cancelled"].includes(task.status) && finding.trim().length > 0,
+  authorizeRetry: (task, finding) => ["failed", "cancelled"].includes(task.status) && finding.trim().length > 0,
 };
 ```
 
@@ -82,9 +81,7 @@ console.log(snapshot.tasks.find((task) => task.id === "analysis"));
 ```ts
 const authorizeGraphRewrite: NonNullable<CoordinationPolicy["authorizeGraphRewrite"]> = (change, snapshot) =>
   snapshot.tasks.length < 128 &&
-  [...(change.add ?? []), ...(change.update ?? [])].every(
-    (task) => task.agent === "analyst",
-  );
+  [...(change.add ?? []), ...(change.update ?? [])].every((task) => task.agent === "analyst");
 const graphPolicy: CoordinationPolicy = { ...policy, authorizeGraphRewrite };
 ```
 
@@ -97,12 +94,8 @@ const graphPolicy: CoordinationPolicy = { ...policy, authorizeGraphRewrite };
 
 ```ts
 await runtime.rewriteGraph("expand-plan-1", {
-  add: [
-    { id: "second-check", agent: "analyst", input: "核查第一次检查的结果。", dependsOn: ["first"] },
-  ],
-  update: [
-    { id: "summary", agent: "analyst", input: "汇总两次检查。", dependsOn: ["first", "second-check"] },
-  ],
+  add: [{ id: "second-check", agent: "analyst", input: "核查第一次检查的结果。", dependsOn: ["first"] }],
+  update: [{ id: "summary", agent: "analyst", input: "汇总两次检查。", dependsOn: ["first", "second-check"] }],
   remove: ["unused-check"],
 });
 ```

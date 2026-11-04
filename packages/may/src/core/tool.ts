@@ -53,9 +53,7 @@ export interface ToolExecution<TInput = unknown, TOutput = unknown> {
 }
 
 export interface ToolExecutor {
-  execute<TInput, TOutput>(
-    execution: ToolExecution<TInput, TOutput>,
-  ): Promise<TOutput>;
+  execute<TInput, TOutput>(execution: ToolExecution<TInput, TOutput>): Promise<TOutput>;
 }
 
 export function freezeToolInput<T>(input: T): T {
@@ -65,13 +63,20 @@ export function freezeToolInput<T>(input: T): T {
     if (value === null || (typeof value !== "object" && typeof value !== "function")) return;
     if (visited.has(value)) return;
     if (
-      value instanceof Date || value instanceof Map || value instanceof Set ||
-      value instanceof WeakMap || value instanceof WeakSet ||
-      value instanceof ArrayBuffer || ArrayBuffer.isView(value) ||
+      value instanceof Date ||
+      value instanceof Map ||
+      value instanceof Set ||
+      value instanceof WeakMap ||
+      value instanceof WeakSet ||
+      value instanceof ArrayBuffer ||
+      ArrayBuffer.isView(value) ||
       (typeof SharedArrayBuffer !== "undefined" && value instanceof SharedArrayBuffer) ||
-      value instanceof URL || value instanceof URLSearchParams
+      value instanceof URL ||
+      value instanceof URLSearchParams
     ) {
-      throw new TypeError(`Tool input cannot contain mutable built-in ${Object.prototype.toString.call(value)}; use immutable data fields`);
+      throw new TypeError(
+        `Tool input cannot contain mutable built-in ${Object.prototype.toString.call(value)}; use immutable data fields`,
+      );
     }
     visited.add(value);
     values.push(value);
@@ -100,10 +105,7 @@ export interface ToolSchedulingContext {
 }
 
 export interface ToolScheduler {
-  schedule<T>(
-    operations: readonly ToolOperation<T>[],
-    context: ToolSchedulingContext,
-  ): Promise<readonly T[]>;
+  schedule<T>(operations: readonly ToolOperation<T>[], context: ToolSchedulingContext): Promise<readonly T[]>;
 }
 
 export const directToolExecutor: ToolExecutor = {
@@ -113,10 +115,7 @@ export const directToolExecutor: ToolExecutor = {
 };
 
 export const sequentialToolScheduler: ToolScheduler = {
-  async schedule<T>(
-    operations: readonly ToolOperation<T>[],
-    context: ToolSchedulingContext,
-  ): Promise<T[]> {
+  async schedule<T>(operations: readonly ToolOperation<T>[], context: ToolSchedulingContext): Promise<T[]> {
     const results: T[] = [];
     for (const operation of operations) {
       context.signal.throwIfAborted();
@@ -132,6 +131,11 @@ export const sequentialToolScheduler: ToolScheduler = {
 export const parallelToolScheduler: ToolScheduler = {
   async schedule<T>(operations: readonly ToolOperation<T>[], context: ToolSchedulingContext): Promise<T[]> {
     context.signal.throwIfAborted();
-    return Promise.all(operations.map((operation) => { context.signal.throwIfAborted(); return operation.execute(); }));
+    return Promise.all(
+      operations.map((operation) => {
+        context.signal.throwIfAborted();
+        return operation.execute();
+      }),
+    );
   },
 };

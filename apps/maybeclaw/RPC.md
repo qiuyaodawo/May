@@ -50,19 +50,19 @@ Only declare implemented capabilities. `commands` lists the Agent commands that 
 
 `media` accepts `image`, `audio`, `file`, and `video`. Video is an independent capability: its input uses a file content part with the original `video/*` MIME type. Declare support only when the external Agent can process the content.
 
-| Method | Parameters | Result |
-| --- | --- | --- |
-| `conversation/create` | `requestId` | `{ conversationId }` |
-| `conversation/inspectCreation` | `requestId` | `{ status: "not-started" }`, `{ status: "ready", conversationId }`, or `{ status: "unknown" }` |
-| `conversation/execute` | `conversationId`, `inputId`, `input`, `tools`, `permissionScope?` | `{ text, runId?, yielded?, content? }` |
-| `conversation/inspect` | `conversationId`, `inputId` | `{ status, text?, detail?, content?, runId? }` |
-| `conversation/cancel` | `conversationId` | `{ cancelled: true }` after cancellation completes |
-| `conversation/steer` | `conversationId`, `inputId`, `text` | `{ status }` |
-| `conversation/steeringInputs` | `conversationId` | `[{ inputId, text, status }]` |
-| `conversation/resolveApproval` | `conversationId`, `requestId`, `decision`, `options?` | `{ resolved: boolean }` |
-| `conversation/release` | `conversationId` | `{ released: true }` |
-| `conversation/delete` | `conversationId` | `{ deleted: true }` |
-| `conversation/command` | `conversationId`, `name`, `args` | `{ text }` |
+| Method                         | Parameters                                                        | Result                                                                                         |
+| ------------------------------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `conversation/create`          | `requestId`                                                       | `{ conversationId }`                                                                           |
+| `conversation/inspectCreation` | `requestId`                                                       | `{ status: "not-started" }`, `{ status: "ready", conversationId }`, or `{ status: "unknown" }` |
+| `conversation/execute`         | `conversationId`, `inputId`, `input`, `tools`, `permissionScope?` | `{ text, runId?, yielded?, content? }`                                                         |
+| `conversation/inspect`         | `conversationId`, `inputId`                                       | `{ status, text?, detail?, content?, runId? }`                                                 |
+| `conversation/cancel`          | `conversationId`                                                  | `{ cancelled: true }` after cancellation completes                                             |
+| `conversation/steer`           | `conversationId`, `inputId`, `text`                               | `{ status }`                                                                                   |
+| `conversation/steeringInputs`  | `conversationId`                                                  | `[{ inputId, text, status }]`                                                                  |
+| `conversation/resolveApproval` | `conversationId`, `requestId`, `decision`, `options?`             | `{ resolved: boolean }`                                                                        |
+| `conversation/release`         | `conversationId`                                                  | `{ released: true }`                                                                           |
+| `conversation/delete`          | `conversationId`                                                  | `{ deleted: true }`                                                                            |
+| `conversation/command`         | `conversationId`, `name`, `args`                                  | `{ text }`                                                                                     |
 
 `input` is a May `UserMessage`. `tools` contains the names, descriptions and input schemas of the coordination tools authorized for that execution when collaboration is supported. Execution status is `not-started`, `queued`, `running`, `waiting`, `cancelling`, `completed`, `failed`, `cancelled`, or `recovery-required`.
 

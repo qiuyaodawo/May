@@ -3,39 +3,31 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
 
-import {
-  parseRetryAfterMs,
-  readSseData,
-} from "@sortedyuan/providers/openai-compatible/http";
+import { parseRetryAfterMs, readSseData } from "@sortedyuan/providers/openai-compatible/http";
 
 test("readSseData 解析按字节分段的 UTF-8 与 SSE 事件", async (t) => {
   const url = await startServer(t, (_request, response) => {
     response.writeHead(200, { "content-type": "text/event-stream" });
     response.end(
       "\uFEFF: heartbeat\r\nid: 42\r\nevent: delta\r\nretry: 1000\r\n" +
-      "data: 中文 😀\r\ndata: second\r\n\r\n" +
-      "data:  leading space\n\n" +
-      "data: lone CR\r\rdata:\r\rdata\n\n" +
-      "data: final",
+        "data: 中文 😀\r\ndata: second\r\n\r\n" +
+        "data:  leading space\n\n" +
+        "data: lone CR\r\rdata:\r\rdata\n\n" +
+        "data: final",
     );
   });
   const response = await fetch(url);
-  const fragmented = response.body.pipeThrough(new TransformStream({
-    transform(chunk, controller) {
-      for (let index = 0; index < chunk.length; index += 1) {
-        controller.enqueue(chunk.subarray(index, index + 1));
-      }
-    },
-  }));
+  const fragmented = response.body.pipeThrough(
+    new TransformStream({
+      transform(chunk, controller) {
+        for (let index = 0; index < chunk.length; index += 1) {
+          controller.enqueue(chunk.subarray(index, index + 1));
+        }
+      },
+    }),
+  );
   const events = await collect(new Response(fragmented));
-  assert.deepEqual(events, [
-    "中文 😀\nsecond",
-    " leading space",
-    "lone CR",
-    "",
-    "",
-    "final",
-  ]);
+  assert.deepEqual(events, ["中文 😀\nsecond", " leading space", "lone CR", "", "", "final"]);
 });
 
 test("readSseData 在 EOF 完成最后一个事件且不会重复发送", async (t) => {
@@ -155,7 +147,9 @@ async function startServer(t, handler) {
 
 async function openStream(t) {
   let resolveClosed;
-  const closed = new Promise((resolve) => { resolveClosed = resolve; });
+  const closed = new Promise((resolve) => {
+    resolveClosed = resolve;
+  });
   const url = await startServer(t, (_request, response) => {
     response.once("close", resolveClosed);
     response.writeHead(200, { "content-type": "text/event-stream" });
@@ -166,12 +160,7 @@ async function openStream(t) {
 
 async function collect(response) {
   const events = [];
-  for await (const data of readSseData(
-    response,
-    new AbortController().signal,
-    protocolError,
-    "Test",
-  )) {
+  for await (const data of readSseData(response, new AbortController().signal, protocolError, "Test")) {
     events.push(data);
   }
   return events;

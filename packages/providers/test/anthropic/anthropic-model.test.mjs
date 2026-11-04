@@ -19,22 +19,25 @@ async function collect(iterable) {
 
 function sseResponse(events, chunkSize = Infinity) {
   const source = events
-    .map(({ event, data }) =>
-      `event: ${event ?? data.type}\n` +
-      `data: ${typeof data === "string" ? data : JSON.stringify(data)}\n\n`
+    .map(
+      ({ event, data }) =>
+        `event: ${event ?? data.type}\n` + `data: ${typeof data === "string" ? data : JSON.stringify(data)}\n\n`,
     )
     .join("");
   const bytes = new TextEncoder().encode(source);
 
-  return new Response(new ReadableStream({
-    start(controller) {
-      const size = Number.isFinite(chunkSize) ? chunkSize : bytes.length;
-      for (let offset = 0; offset < bytes.length; offset += size) {
-        controller.enqueue(bytes.slice(offset, offset + size));
-      }
-      controller.close();
-    },
-  }), { status: 200 });
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        const size = Number.isFinite(chunkSize) ? chunkSize : bytes.length;
+        for (let offset = 0; offset < bytes.length; offset += size) {
+          controller.enqueue(bytes.slice(offset, offset + size));
+        }
+        controller.close();
+      },
+    }),
+    { status: 200 },
+  );
 }
 
 function simpleResponse(text = "done", stopReason = "end_turn") {
@@ -75,10 +78,15 @@ function simpleResponse(text = "done", stopReason = "end_turn") {
   ]);
 }
 
-function request(messages = [{
-  role: "user",
-  content: [{ type: "text", text: "hello" }],
-}], tools = []) {
+function request(
+  messages = [
+    {
+      role: "user",
+      content: [{ type: "text", text: "hello" }],
+    },
+  ],
+  tools = [],
+) {
   return { messages, tools };
 }
 
@@ -96,93 +104,106 @@ test("streams thinking, text, usage, and sends Anthropic configuration", async (
     async fetch(url, init) {
       capturedUrl = url;
       capturedInit = init;
-      return sseResponse([
-        {
-          data: {
-            type: "message_start",
-            message: {
-              id: "msg_1",
-              content: [],
-              usage: { input_tokens: 12, output_tokens: 1 },
+      return sseResponse(
+        [
+          {
+            data: {
+              type: "message_start",
+              message: {
+                id: "msg_1",
+                content: [],
+                usage: { input_tokens: 12, output_tokens: 1 },
+              },
             },
           },
-        },
-        { event: "future_event", data: { type: "future_event", value: 1 } },
-        {
-          data: {
-            type: "content_block_start",
-            index: 0,
-            content_block: { type: "thinking", thinking: "", signature: "" },
+          { event: "future_event", data: { type: "future_event", value: 1 } },
+          {
+            data: {
+              type: "content_block_start",
+              index: 0,
+              content_block: { type: "thinking", thinking: "", signature: "" },
+            },
           },
-        },
-        {
-          data: {
-            type: "content_block_delta",
-            index: 0,
-            delta: { type: "thinking_delta", thinking: "Think." },
+          {
+            data: {
+              type: "content_block_delta",
+              index: 0,
+              delta: { type: "thinking_delta", thinking: "Think." },
+            },
           },
-        },
-        {
-          data: {
-            type: "content_block_delta",
-            index: 0,
-            delta: { type: "signature_delta", signature: "signature_1" },
+          {
+            data: {
+              type: "content_block_delta",
+              index: 0,
+              delta: { type: "signature_delta", signature: "signature_1" },
+            },
           },
-        },
-        { data: { type: "content_block_stop", index: 0 } },
-        {
-          data: {
-            type: "content_block_start",
-            index: 1,
-            content_block: { type: "text", text: "" },
+          { data: { type: "content_block_stop", index: 0 } },
+          {
+            data: {
+              type: "content_block_start",
+              index: 1,
+              content_block: { type: "text", text: "" },
+            },
           },
-        },
-        {
-          data: {
-            type: "content_block_delta",
-            index: 1,
-            delta: { type: "text_delta", text: "Answer." },
+          {
+            data: {
+              type: "content_block_delta",
+              index: 1,
+              delta: { type: "text_delta", text: "Answer." },
+            },
           },
-        },
-        { data: { type: "content_block_stop", index: 1 } },
-        {
-          data: {
-            type: "message_delta",
-            delta: { stop_reason: "end_turn" },
-            usage: { output_tokens: 7 },
+          { data: { type: "content_block_stop", index: 1 } },
+          {
+            data: {
+              type: "message_delta",
+              delta: { stop_reason: "end_turn" },
+              usage: { output_tokens: 7 },
+            },
           },
-        },
-        { data: { type: "message_stop" } },
-      ], 5);
+          { data: { type: "message_stop" } },
+        ],
+        5,
+      );
     },
   });
   const signal = new AbortController().signal;
-  const events = await collect(model.stream(request([
-    { role: "system", content: [{ type: "text", text: "Be concise." }] },
-    {
-      role: "user",
-      content: [
-        { type: "json", value: { question: 1 } },
-        {
-          type: "image",
-          source: { type: "url", url: "https://example.test/image.png" },
-        },
-        {
-          type: "file",
-          name: "notes.pdf",
-          source: {
-            type: "base64",
-            mediaType: "application/pdf",
-            data: "cGRm",
+  const events = await collect(
+    model.stream(
+      request(
+        [
+          { role: "system", content: [{ type: "text", text: "Be concise." }] },
+          {
+            role: "user",
+            content: [
+              { type: "json", value: { question: 1 } },
+              {
+                type: "image",
+                source: { type: "url", url: "https://example.test/image.png" },
+              },
+              {
+                type: "file",
+                name: "notes.pdf",
+                source: {
+                  type: "base64",
+                  mediaType: "application/pdf",
+                  data: "cGRm",
+                },
+              },
+            ],
           },
-        },
-      ],
-    },
-  ], [{
-    name: "lookup",
-    description: "Look up a value",
-    inputSchema: { type: "object" },
-  }]), { signal }));
+        ],
+        [
+          {
+            name: "lookup",
+            description: "Look up a value",
+            inputSchema: { type: "object" },
+          },
+        ],
+      ),
+      { signal },
+    ),
+  );
 
   assert.equal(capturedUrl, "https://anthropic.test/v1/messages");
   assert.equal(capturedInit.signal, signal);
@@ -194,31 +215,35 @@ test("streams thinking, text, usage, and sends Anthropic configuration", async (
   assert.deepEqual(JSON.parse(capturedInit.body), {
     model: "test-model",
     max_tokens: 8192,
-    messages: [{
-      role: "user",
-      content: [
-        { type: "text", text: "{\"question\":1}" },
-        {
-          type: "image",
-          source: { type: "url", url: "https://example.test/image.png" },
-        },
-        {
-          type: "document",
-          source: {
-            type: "base64",
-            media_type: "application/pdf",
-            data: "cGRm",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: '{"question":1}' },
+          {
+            type: "image",
+            source: { type: "url", url: "https://example.test/image.png" },
           },
-        },
-      ],
-    }],
+          {
+            type: "document",
+            source: {
+              type: "base64",
+              media_type: "application/pdf",
+              data: "cGRm",
+            },
+          },
+        ],
+      },
+    ],
     stream: true,
     system: "Be concise.",
-    tools: [{
-      name: "lookup",
-      description: "Look up a value",
-      input_schema: { type: "object" },
-    }],
+    tools: [
+      {
+        name: "lookup",
+        description: "Look up a value",
+        input_schema: { type: "object" },
+      },
+    ],
     thinking: { type: "adaptive", display: "summarized" },
     output_config: { effort: "high" },
   });
@@ -260,23 +285,36 @@ test("enables the Files API beta only for file-id references", async () => {
     },
   });
 
-  await collect(model.stream(request([{
-    role: "user",
-    content: [{
-      type: "file",
-      name: "notes.pdf",
-      source: { type: "file", fileId: "file_123" },
-    }],
-  }]), { signal: new AbortController().signal }));
+  await collect(
+    model.stream(
+      request([
+        {
+          role: "user",
+          content: [
+            {
+              type: "file",
+              name: "notes.pdf",
+              source: { type: "file", fileId: "file_123" },
+            },
+          ],
+        },
+      ]),
+      { signal: new AbortController().signal },
+    ),
+  );
 
   assert.equal(headers.get("anthropic-beta"), "files-api-2025-04-14");
-  assert.deepEqual(body.messages, [{
-    role: "user",
-    content: [{
-      type: "document",
-      source: { type: "file", file_id: "file_123" },
-    }],
-  }]);
+  assert.deepEqual(body.messages, [
+    {
+      role: "user",
+      content: [
+        {
+          type: "document",
+          source: { type: "file", file_id: "file_123" },
+        },
+      ],
+    },
+  ]);
 });
 
 test("round-trips signed and redacted thinking through a May tool loop", async () => {
@@ -348,14 +386,14 @@ test("round-trips signed and redacted thinking through a May tool loop", async (
             data: {
               type: "content_block_delta",
               index: 2,
-              delta: { type: "input_json_delta", partial_json: "{\"a\":2," },
+              delta: { type: "input_json_delta", partial_json: '{"a":2,' },
             },
           },
           {
             data: {
               type: "content_block_delta",
               index: 2,
-              delta: { type: "input_json_delta", partial_json: "\"b\":3}" },
+              delta: { type: "input_json_delta", partial_json: '"b":3}' },
             },
           },
           { data: { type: "content_block_stop", index: 2 } },
@@ -376,14 +414,16 @@ test("round-trips signed and redacted thinking through a May tool loop", async (
   const run = new May({
     model,
     context,
-    tools: [{
-      name: "add",
-      description: "Add numbers",
-      inputSchema: { type: "object" },
-      async execute({ a, b }) {
-        return a + b;
+    tools: [
+      {
+        name: "add",
+        description: "Add numbers",
+        inputSchema: { type: "object" },
+        async execute({ a, b }) {
+          return a + b;
+        },
       },
-    }],
+    ],
   }).run({ input: "add 2 and 3" });
   const eventPromise = collect(run.events);
   const result = await run.result;
@@ -417,16 +457,17 @@ test("round-trips signed and redacted thinking through a May tool loop", async (
     },
     {
       role: "user",
-      content: [{
-        type: "tool_result",
-        tool_use_id: "toolu_1",
-        content: "5",
-      }],
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: "toolu_1",
+          content: "5",
+        },
+      ],
     },
   ]);
 
-  const firstAssistant = (await context.snapshot()).messages
-    .find((message) => message.role === "assistant");
+  const firstAssistant = (await context.snapshot()).messages.find((message) => message.role === "assistant");
   assert.equal(firstAssistant.modelState.type, ANTHROPIC_MODEL_STATE_TYPE);
   assert.equal(firstAssistant.modelState.data.content[0].signature, "signed");
 });
@@ -441,20 +482,25 @@ test("falls back to normalized content when model state belongs to another adapt
       return simpleResponse();
     },
   });
-  await collect(model.stream(request([
-    {
-      role: "assistant",
-      content: [
-        { type: "reasoning", text: "private reasoning" },
-        { type: "text", text: "visible" },
-      ],
-      modelState: {
-        type: "another.provider/response-v1",
-        data: { responseId: "response_1" },
-      },
-    },
-    { role: "user", content: [{ type: "text", text: "continue" }] },
-  ]), { signal: new AbortController().signal }));
+  await collect(
+    model.stream(
+      request([
+        {
+          role: "assistant",
+          content: [
+            { type: "reasoning", text: "private reasoning" },
+            { type: "text", text: "visible" },
+          ],
+          modelState: {
+            type: "another.provider/response-v1",
+            data: { responseId: "response_1" },
+          },
+        },
+        { role: "user", content: [{ type: "text", text: "continue" }] },
+      ]),
+      { signal: new AbortController().signal },
+    ),
+  );
 
   assert.deepEqual(body.messages, [
     {
@@ -480,21 +526,26 @@ test("converts normalized tool calls and failed tool results", async () => {
       return simpleResponse();
     },
   });
-  await collect(model.stream(request([
-    { role: "user", content: [{ type: "text", text: "look up" }] },
-    {
-      role: "assistant",
-      content: [{ type: "text", text: "Calling." }],
-      toolCalls: [{ id: "toolu_1", name: "lookup", input: { id: 1 } }],
-    },
-    {
-      role: "tool",
-      toolCallId: "toolu_1",
-      name: "lookup",
-      isError: true,
-      content: [{ type: "json", value: { message: "failed" } }],
-    },
-  ]), { signal: new AbortController().signal }));
+  await collect(
+    model.stream(
+      request([
+        { role: "user", content: [{ type: "text", text: "look up" }] },
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "Calling." }],
+          toolCalls: [{ id: "toolu_1", name: "lookup", input: { id: 1 } }],
+        },
+        {
+          role: "tool",
+          toolCallId: "toolu_1",
+          name: "lookup",
+          isError: true,
+          content: [{ type: "json", value: { message: "failed" } }],
+        },
+      ]),
+      { signal: new AbortController().signal },
+    ),
+  );
 
   assert.deepEqual(body.messages.slice(1), [
     {
@@ -511,12 +562,14 @@ test("converts normalized tool calls and failed tool results", async () => {
     },
     {
       role: "user",
-      content: [{
-        type: "tool_result",
-        tool_use_id: "toolu_1",
-        content: "{\"message\":\"failed\"}",
-        is_error: true,
-      }],
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: "toolu_1",
+          content: '{"message":"failed"}',
+          is_error: true,
+        },
+      ],
     },
   ]);
   assert.deepEqual(body.thinking, { type: "disabled" });
@@ -527,14 +580,17 @@ test("surfaces structured Anthropic HTTP errors", async () => {
     apiKey: "test-key",
     model: "test-model",
     async fetch() {
-      return new Response(JSON.stringify({
-        type: "error",
-        error: { type: "invalid_request_error", message: "bad request" },
-        request_id: "req_body",
-      }), {
-        status: 400,
-        headers: { "request-id": "req_header" },
-      });
+      return new Response(
+        JSON.stringify({
+          type: "error",
+          error: { type: "invalid_request_error", message: "bad request" },
+          request_id: "req_body",
+        }),
+        {
+          status: 400,
+          headers: { "request-id": "req_header" },
+        },
+      );
     },
   });
 
@@ -558,104 +614,108 @@ test("rejects malformed and incomplete Anthropic streams", async (t) => {
         return response;
       },
     });
-    await assert.rejects(
-      collect(model.stream(request(), { signal: new AbortController().signal })),
-      predicate,
-    );
+    await assert.rejects(collect(model.stream(request(), { signal: new AbortController().signal })), predicate);
   }
 
   await t.test("invalid JSON", async () => {
-    await rejects(sseResponse([{ event: "message_start", data: "{" }]),
-      (error) =>
-        error instanceof AnthropicProtocolError &&
-        error.message === "Anthropic emitted invalid SSE JSON");
+    await rejects(
+      sseResponse([{ event: "message_start", data: "{" }]),
+      (error) => error instanceof AnthropicProtocolError && error.message === "Anthropic emitted invalid SSE JSON",
+    );
   });
 
   await t.test("missing message_stop", async () => {
-    await rejects(sseResponse([
-      {
-        data: {
-          type: "message_start",
-          message: { id: "msg_1", usage: {} },
+    await rejects(
+      sseResponse([
+        {
+          data: {
+            type: "message_start",
+            message: { id: "msg_1", usage: {} },
+          },
         },
-      },
-      {
-        data: {
-          type: "message_delta",
-          delta: { stop_reason: "end_turn" },
+        {
+          data: {
+            type: "message_delta",
+            delta: { stop_reason: "end_turn" },
+          },
         },
-      },
-    ]), (error) =>
-      error instanceof AnthropicProtocolError &&
-      error.message.includes("without a message_stop"));
+      ]),
+      (error) => error instanceof AnthropicProtocolError && error.message.includes("without a message_stop"),
+    );
   });
 
   await t.test("unsupported stop reason", async () => {
-    await rejects(simpleResponse("partial", "max_tokens"),
-      (error) =>
-        error instanceof AnthropicFinishReasonError &&
-        error.finishReason === "max_tokens");
+    await rejects(
+      simpleResponse("partial", "max_tokens"),
+      (error) => error instanceof AnthropicFinishReasonError && error.finishReason === "max_tokens",
+    );
   });
 
   await t.test("tool stop without a tool call", async () => {
-    await rejects(simpleResponse("", "tool_use"),
-      (error) =>
-        error instanceof AnthropicProtocolError &&
-        error.message.includes("emitted no tool calls"));
+    await rejects(
+      simpleResponse("", "tool_use"),
+      (error) => error instanceof AnthropicProtocolError && error.message.includes("emitted no tool calls"),
+    );
   });
 
   await t.test("invalid tool input JSON", async () => {
-    await rejects(sseResponse([
-      {
-        data: {
-          type: "message_start",
-          message: { id: "msg_tool", usage: {} },
-        },
-      },
-      {
-        data: {
-          type: "content_block_start",
-          index: 0,
-          content_block: {
-            type: "tool_use",
-            id: "toolu_1",
-            name: "lookup",
-            input: {},
+    await rejects(
+      sseResponse([
+        {
+          data: {
+            type: "message_start",
+            message: { id: "msg_tool", usage: {} },
           },
         },
-      },
-      {
-        data: {
-          type: "content_block_delta",
-          index: 0,
-          delta: { type: "input_json_delta", partial_json: "{" },
+        {
+          data: {
+            type: "content_block_start",
+            index: 0,
+            content_block: {
+              type: "tool_use",
+              id: "toolu_1",
+              name: "lookup",
+              input: {},
+            },
+          },
         },
-      },
-      { data: { type: "content_block_stop", index: 0 } },
-    ]), (error) =>
-      error instanceof AnthropicProtocolError &&
-      error.message.includes("invalid tool input JSON"));
+        {
+          data: {
+            type: "content_block_delta",
+            index: 0,
+            delta: { type: "input_json_delta", partial_json: "{" },
+          },
+        },
+        { data: { type: "content_block_stop", index: 0 } },
+      ]),
+      (error) => error instanceof AnthropicProtocolError && error.message.includes("invalid tool input JSON"),
+    );
   });
 
   await t.test("in-stream error", async () => {
-    await rejects(sseResponse([{
-      data: {
-        type: "error",
-        error: { type: "overloaded_error", message: "Overloaded" },
-        request_id: "req_stream",
-      },
-    }]), (error) =>
-      error instanceof AnthropicStreamError &&
-      error.providerType === "overloaded_error" &&
-      error.requestId === "req_stream" &&
-      error.message === "Overloaded");
+    await rejects(
+      sseResponse([
+        {
+          data: {
+            type: "error",
+            error: { type: "overloaded_error", message: "Overloaded" },
+            request_id: "req_stream",
+          },
+        },
+      ]),
+      (error) =>
+        error instanceof AnthropicStreamError &&
+        error.providerType === "overloaded_error" &&
+        error.requestId === "req_stream" &&
+        error.message === "Overloaded",
+    );
   });
 
   await t.test("missing response body", async () => {
-    await rejects(new Response(null, { status: 200 }),
-      (error) =>
-        error instanceof AnthropicProtocolError &&
-        error.message === "Anthropic response has no body");
+    await rejects(
+      new Response(null, { status: 200 }),
+      (error) => error instanceof AnthropicProtocolError && error.message === "Anthropic response has no body",
+    );
   });
 });
 
@@ -669,14 +729,25 @@ test("rejects malformed Anthropic model state before sending a request", async (
       return simpleResponse();
     },
   });
-  await assert.rejects(collect(model.stream(request([{
-    role: "assistant",
-    content: [],
-    modelState: { type: ANTHROPIC_MODEL_STATE_TYPE, data: null },
-  }, {
-    role: "user",
-    content: [{ type: "text", text: "continue" }],
-  }]), { signal: new AbortController().signal })), AnthropicProtocolError);
+  await assert.rejects(
+    collect(
+      model.stream(
+        request([
+          {
+            role: "assistant",
+            content: [],
+            modelState: { type: ANTHROPIC_MODEL_STATE_TYPE, data: null },
+          },
+          {
+            role: "user",
+            content: [{ type: "text", text: "continue" }],
+          },
+        ]),
+        { signal: new AbortController().signal },
+      ),
+    ),
+    AnthropicProtocolError,
+  );
   assert.equal(fetched, false);
 });
 
@@ -694,10 +765,6 @@ test("passes AbortSignal to fetch and propagates cancellation", async () => {
   });
   controller.abort(reason);
 
-  await assert.rejects(
-    collect(model.stream(request(), { signal: controller.signal })),
-    (error) => error === reason,
-  );
+  await assert.rejects(collect(model.stream(request(), { signal: controller.signal })), (error) => error === reason);
   assert.equal(capturedSignal, controller.signal);
 });
-

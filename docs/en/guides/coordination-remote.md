@@ -33,14 +33,12 @@ const worker = await CoordinationWorker.open({
   directory: "./worker-data/dispatches",
   token,
   agents: { analyst: workerAgent },
-  authorize: ({ agent, execution }) =>
-    agent === "analyst" && execution.coordinationId === "review-1",
+  authorize: ({ agent, execution }) => agent === "analyst" && execution.coordinationId === "review-1",
   maxConcurrent: 2,
   maxJobs: 128,
 });
 const server = createServer(worker.handle);
 server.listen(8787, "127.0.0.1");
-
 ```
 
 Keep the process running while it serves requests. During shutdown, stop

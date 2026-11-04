@@ -13,23 +13,23 @@
     },
     {
       "heading": "Create and run a graph",
-      "en": "1a82638a0005de03ab1410db76c4da96cfc0cf2eb8ab413121a0855ad63d75e6",
-      "zh": "82d6c020c6778055850008670f59b0cf9bceae6ec9ca2cd4b8ec98b975916046"
+      "en": "92e57ccc1ed45b024fff90c3359ba07000c92fd795ad0df37b64ea953d64b986",
+      "zh": "6375d2bc0b556d62843b6da6ebcb7316de80e4e80a60a8b4fff926c96eceb12c"
     },
     {
       "heading": "Dynamic delegation, yield and wakeup",
-      "en": "37e43736757cbfa49d253e7290228efe267eaef0a3bde0a1573cd0e8ce96c4bf",
-      "zh": "df2590cebbd7530ac8e29e6e6681a96e4a582f44373362f7096909bd4f2d92ab"
+      "en": "680d787c0445cb0c4056a67b440fd3d3886448fefaa48d056cd19434785f3962",
+      "zh": "3e89a75bc5042ba3ca9130f994dfb7f63282d94a2d99eb1436fff2a7fe8d69a2"
     },
     {
       "heading": "Peer messages and task mailboxes",
-      "en": "f5ad281b82c799fa309877781eafa1d80f5145369a339a81cc89a6a946d41dbb",
-      "zh": "97b582792c2c96ca5a7115625f9509c67f53fa06871b2d2ffc286d827acfd505"
+      "en": "046be3a63b049a63e732b7fd0934dd6aeef9aef1983232ae9f9b9519fec00209",
+      "zh": "132032efac9e91195e76ebe004da79421ce62a70b5c8aaeace6b978646d76d73"
     },
     {
       "heading": "Transfer task control with handoff",
-      "en": "1807e6dd40082a364007bfe8e2d6eb5415dbae2f36fef7ee24573c98ed8c1fc2",
-      "zh": "2ecb693266a38e9167d42e505085b7704eb0251f119f237f83e5fe6dab750ad4"
+      "en": "c863e1649ebe86fdc0f5772c0a91d5ea1c0eb4cab055eb8f5fb099170609f0a9",
+      "zh": "b554caede3e436ee493f6eee98eff38b664cfa83a729d9ee46290eb287216933"
     },
     {
       "heading": "Ownership and input boundaries",
@@ -43,8 +43,8 @@
     },
     {
       "heading": "Durability and recovery",
-      "en": "f7117f30d599d2e869e80c88395721160b337d59ab9e3fbdb699c1bed6aadde0",
-      "zh": "85d508988b4dd370351bc63750966f4b11b11d85cdcdfbf0adcf3daa922de48c"
+      "en": "ab5e39d2e333457a080deb78879468008e133a955c371067b07f317892a8f66c",
+      "zh": "a809963e92d7c5438bacdb2733864fc58967b22999dfb53e4a00c1f82aa58362"
     },
     {
       "heading": "Integrate a custom conversation host",

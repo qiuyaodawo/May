@@ -6,7 +6,22 @@ export interface WebUiNavigationItem {
   readonly label: string;
   readonly title?: string;
   readonly badge?: string;
-  readonly icon?: "plus" | "menu" | "send" | "stop" | "panel" | "search" | "arrow" | "code" | "task" | "trash" | "gear" | "users" | "message" | "check" | "filter";
+  readonly icon?:
+    | "plus"
+    | "menu"
+    | "send"
+    | "stop"
+    | "panel"
+    | "search"
+    | "arrow"
+    | "code"
+    | "task"
+    | "trash"
+    | "gear"
+    | "users"
+    | "message"
+    | "check"
+    | "filter";
   readonly ariaLabel?: string;
   readonly disabled?: boolean | ((state: UiClientState) => boolean);
   action(context: WebUiContext): void | Promise<void>;
@@ -39,7 +54,7 @@ export function createNavigation(
 
   const groups: readonly WebUiNavigationGroup[] = Array.isArray(navigation)
     ? navigation
-    : (navigation as WebUiNavigation).groups ?? [];
+    : ((navigation as WebUiNavigation).groups ?? []);
 
   const itemControls: { control: HTMLButtonElement; item: WebUiNavigationItem }[] = [];
 
@@ -52,21 +67,25 @@ export function createNavigation(
     }
     const itemsContainer = element("div", "sidebar-nav-items");
     for (const item of group.items) {
-      const control = button("", () => {
-        try {
-          const result = item.action(getContext());
-          if (result && typeof (result as Promise<void>).then === "function") {
-            void (result as Promise<void>).catch(error => {
-              if (onError) onError(error);
-              else throw error;
-            });
+      const control = button(
+        "",
+        () => {
+          try {
+            const result = item.action(getContext());
+            if (result && typeof (result as Promise<void>).then === "function") {
+              void (result as Promise<void>).catch((error) => {
+                if (onError) onError(error);
+                else throw error;
+              });
+            }
+          } catch (error) {
+            if (onError) onError(error);
+            else throw error;
           }
-        } catch (error) {
-          if (onError) onError(error);
-          else throw error;
-        }
-        onAfterAction?.();
-      }, "sidebar-nav-item");
+          onAfterAction?.();
+        },
+        "sidebar-nav-item",
+      );
       control.dataset.navId = item.id;
       if (item.title) control.title = item.title;
       control.setAttribute("aria-label", item.ariaLabel ?? item.title ?? item.label);

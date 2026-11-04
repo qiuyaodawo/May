@@ -15,25 +15,45 @@ class InterruptedSessionStore extends FileSessionStore {
 }
 
 const sessions = new InterruptedSessionStore(join(directory, "sessions"));
-const application = await AgentApplication.open({ sessionId: "attached-root", store: sessions,
-  model: createBuiltinProviderModel({ profile: "verification", provider: "verification",
-    adapter: "openai-chat-completions", model: "gpt-4o", options: {},
-    providerConfig: { adapter: "openai-chat-completions", apiKey: "unused-during-local-validation" },
-    capabilities: { fields: { "input.text": false } },
-  }, { resolver: createModelCapabilityResolver({ discoveries: [] }) }),
+const application = await AgentApplication.open({
+  sessionId: "attached-root",
+  store: sessions,
+  model: createBuiltinProviderModel(
+    {
+      profile: "verification",
+      provider: "verification",
+      adapter: "openai-chat-completions",
+      model: "gpt-4o",
+      options: {},
+      providerConfig: { adapter: "openai-chat-completions", apiKey: "unused-during-local-validation" },
+      capabilities: { fields: { "input.text": false } },
+    },
+    { resolver: createModelCapabilityResolver({ discoveries: [] }) },
+  ),
   instructions: "Validate the request before model dispatch",
 });
 const controller = new AbortController();
-const worker = createAttachedApplicationAgent({ version: "v1", mode: "continue", attach: () => application,
-  read: sessionId => sessions.inspect(sessionId),
-  submit: () => ({ input: "Continue", signal: controller.signal, checkpoint: async event => {
-    if (boundary === "run.cancelled" && event.type === "run.started") controller.abort("Cancel before model dispatch");
-  } }),
+const worker = createAttachedApplicationAgent({
+  version: "v1",
+  mode: "continue",
+  attach: () => application,
+  read: (sessionId) => sessions.inspect(sessionId),
+  submit: () => ({
+    input: "Continue",
+    signal: controller.signal,
+    checkpoint: async (event) => {
+      if (boundary === "run.cancelled" && event.type === "run.started")
+        controller.abort("Cancel before model dispatch");
+    },
+  }),
 });
-const runtime = await CoordinationRuntime.create({ id: "attached-recovery",
+const runtime = await CoordinationRuntime.create({
+  id: "attached-recovery",
   store: new FileCoordinationStore(join(directory, "coordination")),
-  agents: { worker }, policy: { version: "v1", authorize: () => true },
-  sessionIds: { root: application.sessionId }, tasks: [{ id: "root", agent: "worker", input: "Continue" }],
+  agents: { worker },
+  policy: { version: "v1", authorize: () => true },
+  sessionIds: { root: application.sessionId },
+  tasks: [{ id: "root", agent: "worker", input: "Continue" }],
 });
 await runtime.wait();
 await runtime.close();

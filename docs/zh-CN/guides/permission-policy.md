@@ -70,23 +70,13 @@ Grant key 表示授权范围。授权单个文件或目录时，使用能够区�
 
 ```ts
 import type { AgentApplication } from "@sortedyuan/may";
-import type {
-  ApprovalDecision,
-  ApprovalRequest,
-} from "@sortedyuan/may/permissions";
+import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/may/permissions";
 
 type Choose = (request: ApprovalRequest) => Promise<ApprovalDecision>;
 
-export async function serveApprovals(
-  application: AgentApplication,
-  choose: Choose,
-  createdBy: string,
-): Promise<void> {
+export async function serveApprovals(application: AgentApplication, choose: Choose, createdBy: string): Promise<void> {
   for await (const event of application.events) {
-    if (
-      event.type !== "permission.event" ||
-      event.event.type !== "approval.requested"
-    ) {
+    if (event.type !== "permission.event" || event.event.type !== "approval.requested") {
       continue;
     }
 

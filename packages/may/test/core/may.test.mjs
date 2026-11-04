@@ -24,9 +24,25 @@ test("unresponsive tools have a bounded drain and cannot silently release execut
   const started = deferred();
   const blocked = deferred();
   const context = new InMemoryContext();
-  const may = new May({ context, toolSettleTimeoutMs: 20,
-    tools: [{ name: "hang", description: "hang", inputSchema: {}, execute() { started.resolve(); return blocked.promise; } }],
-    model: { async *stream() { yield { type: "response.completed", message: assistant("", [{ id: "a", name: "hang", input: {} }]) }; } },
+  const may = new May({
+    context,
+    toolSettleTimeoutMs: 20,
+    tools: [
+      {
+        name: "hang",
+        description: "hang",
+        inputSchema: {},
+        execute() {
+          started.resolve();
+          return blocked.promise;
+        },
+      },
+    ],
+    model: {
+      async *stream() {
+        yield { type: "response.completed", message: assistant("", [{ id: "a", name: "hang", input: {} }]) };
+      },
+    },
   });
   const run = may.run({ input: "go" });
   await started.promise;
@@ -40,13 +56,34 @@ test("unresponsive tools have a bounded drain and cannot silently release execut
 
 test("scheduler errors preserve completed tool outcomes in call order", async () => {
   const context = new InMemoryContext();
-  const may = new May({ context,
+  const may = new May({
+    context,
     tools: [{ name: "work", description: "work", inputSchema: {}, execute: async () => "done" }],
-    model: { async *stream() { yield { type: "response.completed", message: assistant("", [{ id: "a", name: "work", input: {} }, { id: "b", name: "work", input: {} }]) }; } },
-    toolScheduler: { async schedule(operations) { const values = await Promise.all(operations.map((operation) => operation.execute())); return values.reverse(); } },
+    model: {
+      async *stream() {
+        yield {
+          type: "response.completed",
+          message: assistant("", [
+            { id: "a", name: "work", input: {} },
+            { id: "b", name: "work", input: {} },
+          ]),
+        };
+      },
+    },
+    toolScheduler: {
+      async schedule(operations) {
+        const values = await Promise.all(operations.map((operation) => operation.execute()));
+        return values.reverse();
+      },
+    },
   });
   await assert.rejects(may.run({ input: "go" }).result, /call order/);
-  assert.deepEqual((await context.snapshot()).messages.filter((message) => message.role === "tool").map((message) => message.toolCallId), ["a", "b"]);
+  assert.deepEqual(
+    (await context.snapshot()).messages
+      .filter((message) => message.role === "tool")
+      .map((message) => message.toolCallId),
+    ["a", "b"],
+  );
 });
 
 async function collect(iterable) {
@@ -69,19 +106,13 @@ function waitForAbort(signal) {
   }
 
   return new Promise((_, reject) => {
-    signal.addEventListener(
-      "abort",
-      () => reject(new Error("aborted")),
-      { once: true },
-    );
+    signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
   });
 }
 
 function assertSingleTerminalEvent(events, expectedType) {
-  const terminals = events.filter((event) =>
-    event.type === "run.completed" ||
-    event.type === "run.failed" ||
-    event.type === "run.cancelled"
+  const terminals = events.filter(
+    (event) => event.type === "run.completed" || event.type === "run.failed" || event.type === "run.cancelled",
   );
 
   assert.equal(terminals.length, 1);
@@ -128,27 +159,20 @@ test("returns a direct model response and emits ordered events", async () => {
       "run.completed",
     ],
   );
-  assert.equal(
-    events.find((event) => event.type === "model.completed")
-      .contextMessageCount,
-    1,
-  );
+  assert.equal(events.find((event) => event.type === "model.completed").contextMessageCount, 1);
 
   const snapshot = await context.snapshot();
-  assert.deepEqual(snapshot.messages.map((message) => message.role), [
-    "user",
-    "assistant",
-  ]);
+  assert.deepEqual(
+    snapshot.messages.map((message) => message.role),
+    ["user", "assistant"],
+  );
   assert.deepEqual(snapshot.metadata, { tenant: "test" });
 });
 
 test("forwards reasoning deltas and preserves reasoning content", async () => {
   const response = {
     role: "assistant",
-    content: [
-      ...reasoningContent("I should calculate first."),
-      { type: "text", text: "The answer is 42." },
-    ],
+    content: [...reasoningContent("I should calculate first."), { type: "text", text: "The answer is 42." }],
   };
   const model = {
     async *stream() {
@@ -166,9 +190,7 @@ test("forwards reasoning deltas and preserves reasoning content", async () => {
 
   assert.deepEqual(result.message, response);
   assert.deepEqual(
-    events
-      .filter((event) => event.type === "model.reasoning.delta")
-      .map((event) => event.delta),
+    events.filter((event) => event.type === "model.reasoning.delta").map((event) => event.delta),
     ["I should calculate first."],
   );
   assert.deepEqual((await context.snapshot()).messages.at(-1), response);
@@ -195,9 +217,7 @@ test("forwards model retry events with run and step metadata", async () => {
   });
   const eventPromise = collect(run.events);
   await run.result;
-  const retry = (await eventPromise).find((event) =>
-    event.type === "model.retrying"
-  );
+  const retry = (await eventPromise).find((event) => event.type === "model.retrying");
 
   assert.deepEqual(retry, {
     type: "model.retrying",
@@ -237,9 +257,10 @@ test("continues existing context without appending a new user message", async ()
   assert.deepEqual(request.messages, [original]);
   assert.equal(events[0].type, "run.started");
   assert.equal(events[0].continuation, true);
-  assert.deepEqual((await context.snapshot()).messages.map((message) =>
-    message.role
-  ), ["user", "assistant"]);
+  assert.deepEqual(
+    (await context.snapshot()).messages.map((message) => message.role),
+    ["user", "assistant"],
+  );
 });
 
 test("executes a tool and feeds its result back to the model", async () => {
@@ -253,9 +274,7 @@ test("executes a tool and feeds its result back to the model", async () => {
         assert.equal(request.tools[0].name, "add");
         yield {
           type: "response.completed",
-          message: assistant("", [
-            { id: "call_1", name: "add", input: { a: 2, b: 3 } },
-          ]),
+          message: assistant("", [{ id: "call_1", name: "add", input: { a: 2, b: 3 } }]),
           usage: { inputTokens: 10, outputTokens: 2, totalTokens: 12 },
         };
         return;
@@ -281,10 +300,7 @@ test("executes a tool and feeds its result back to the model", async () => {
       required: ["a", "b"],
     },
     parse(input) {
-      if (
-        typeof input !== "object" || input === null ||
-        typeof input.a !== "number" || typeof input.b !== "number"
-      ) {
+      if (typeof input !== "object" || input === null || typeof input.a !== "number" || typeof input.b !== "number") {
         throw new TypeError("a and b must be numbers");
       }
       return input;
@@ -314,22 +330,23 @@ test("executes a tool and feeds its result back to the model", async () => {
   assert.ok(events.some((event) => event.type === "tool.completed"));
   assert.equal(events.find((event) => event.type === "tool.progress").message, "adding");
   assert.equal(events.find((event) => event.type === "tool.output.delta").delta, "5");
-  assert.deepEqual(modelOptions.map((options) => ({
-    runId: options.runId,
-    step: options.step,
-    modelCallId: options.modelCallId,
-  })), [
-    { runId: run.id, step: 1, modelCallId: `${run.id}:model:1` },
-    { runId: run.id, step: 2, modelCallId: `${run.id}:model:2` },
-  ]);
+  assert.deepEqual(
+    modelOptions.map((options) => ({
+      runId: options.runId,
+      step: options.step,
+      modelCallId: options.modelCallId,
+    })),
+    [
+      { runId: run.id, step: 1, modelCallId: `${run.id}:model:1` },
+      { runId: run.id, step: 2, modelCallId: `${run.id}:model:2` },
+    ],
+  );
 
   const snapshot = await context.snapshot();
-  assert.deepEqual(snapshot.messages.map((message) => message.role), [
-    "user",
-    "assistant",
-    "tool",
-    "assistant",
-  ]);
+  assert.deepEqual(
+    snapshot.messages.map((message) => message.role),
+    ["user", "assistant", "tool", "assistant"],
+  );
 });
 
 test("routes parsed tool calls through a custom executor", async () => {
@@ -341,9 +358,7 @@ test("routes parsed tool calls through a custom executor", async () => {
       if (modelStep === 1) {
         yield {
           type: "response.completed",
-          message: assistant("", [
-            { id: "double_call", name: "double", input: { value: "4" } },
-          ]),
+          message: assistant("", [{ id: "double_call", name: "double", input: { value: "4" } }]),
         };
         return;
       }
@@ -388,10 +403,7 @@ test("routes parsed tool calls through a custom executor", async () => {
   assert.deepEqual(observedExecution.input, { value: 4 });
   assert.equal(observedExecution.context.runId, run.id);
   assert.equal(observedExecution.context.step, 1);
-  assert.equal(
-    observedExecution.context.idempotencyKey,
-    `${run.id}:1:double_call`,
-  );
+  assert.equal(observedExecution.context.idempotencyKey, `${run.id}:1:double_call`);
 });
 
 test("preserves opaque model state across steps and runs", async () => {
@@ -412,18 +424,14 @@ test("preserves opaque model state across steps and runs", async () => {
         yield {
           type: "response.completed",
           message: {
-            ...assistant("", [
-              { id: "state_call", name: "noop", input: {} },
-            ]),
+            ...assistant("", [{ id: "state_call", name: "noop", input: {} }]),
             modelState: firstState,
           },
         };
         return;
       }
 
-      const previousAssistant = request.messages
-        .filter((message) => message.role === "assistant")
-        .at(-1);
+      const previousAssistant = request.messages.filter((message) => message.role === "assistant").at(-1);
 
       if (modelCall === 2) {
         assert.deepEqual(previousAssistant.modelState, firstState);
@@ -462,9 +470,7 @@ test("preserves opaque model state across steps and runs", async () => {
 
   assert.deepEqual(firstResult.message.modelState, secondState);
   assert.deepEqual(
-    firstEvents
-      .filter((event) => event.type === "model.completed")
-      .map((event) => event.message.modelState),
+    firstEvents.filter((event) => event.type === "model.completed").map((event) => event.message.modelState),
     [firstState, secondState],
   );
 
@@ -473,8 +479,7 @@ test("preserves opaque model state across steps and runs", async () => {
   await secondRun.result;
   await secondEventsPromise;
 
-  const assistantMessages = (await context.snapshot()).messages
-    .filter((message) => message.role === "assistant");
+  const assistantMessages = (await context.snapshot()).messages.filter((message) => message.role === "assistant");
   assert.deepEqual(assistantMessages[0].modelState, firstState);
   assert.deepEqual(assistantMessages[1].modelState, secondState);
   assert.equal(modelCall, 3);
@@ -500,8 +505,14 @@ test("can schedule tools in parallel while preserving result order", async () =>
       }
 
       const toolMessages = request.messages.slice(-2);
-      assert.deepEqual(toolMessages.map((message) => message.role), ["tool", "tool"]);
-      assert.deepEqual(toolMessages.map((message) => message.name), ["first", "second"]);
+      assert.deepEqual(
+        toolMessages.map((message) => message.role),
+        ["tool", "tool"],
+      );
+      assert.deepEqual(
+        toolMessages.map((message) => message.name),
+        ["first", "second"],
+      );
       assert.deepEqual(
         toolMessages.map((message) => message.content[0].value),
         ["first:1", "second:2"],
@@ -540,20 +551,15 @@ test("can schedule tools in parallel while preserving result order", async () =>
   assert.equal(result.steps, 2);
   assert.deepEqual(executionOrder, ["first", "second"]);
   assert.deepEqual(
-    events
-      .filter((event) => event.type === "tool.completed")
-      .map((event) => event.call.name),
+    events.filter((event) => event.type === "tool.completed").map((event) => event.call.name),
     ["first", "second"],
   );
 
   const snapshot = await context.snapshot();
-  assert.deepEqual(snapshot.messages.map((message) => message.role), [
-    "user",
-    "assistant",
-    "tool",
-    "tool",
-    "assistant",
-  ]);
+  assert.deepEqual(
+    snapshot.messages.map((message) => message.role),
+    ["user", "assistant", "tool", "tool", "assistant"],
+  );
 });
 
 test("turns a tool parse failure into a tool message and continues", async () => {
@@ -565,9 +571,7 @@ test("turns a tool parse failure into a tool message and continues", async () =>
       if (modelStep === 1) {
         yield {
           type: "response.completed",
-          message: assistant("", [
-            { id: "parse_call", name: "strict", input: { value: "wrong" } },
-          ]),
+          message: assistant("", [{ id: "parse_call", name: "strict", input: { value: "wrong" } }]),
         };
         return;
       }
@@ -624,9 +628,7 @@ test("turns a tool execution error into a tool message and continues", async () 
       if (modelStep === 1) {
         yield {
           type: "response.completed",
-          message: assistant("", [
-            { id: "broken_call", name: "broken", input: {} },
-          ]),
+          message: assistant("", [{ id: "broken_call", name: "broken", input: {} }]),
         };
         return;
       }
@@ -685,22 +687,25 @@ test("terminates the run for explicitly fatal tool infrastructure errors", async
   const run = new May({
     model,
     context,
-    tools: [{
-      name: "fatal",
-      description: "fatal infrastructure failure",
-      inputSchema: {},
-      async execute() {
-        throw new FatalToolExecutionError("durability unavailable");
+    tools: [
+      {
+        name: "fatal",
+        description: "fatal infrastructure failure",
+        inputSchema: {},
+        async execute() {
+          throw new FatalToolExecutionError("durability unavailable");
+        },
       },
-    }, {
-      name: "later",
-      description: "must not run after a fatal failure",
-      inputSchema: {},
-      async execute() {
-        laterToolExecuted = true;
-        return "unexpected";
+      {
+        name: "later",
+        description: "must not run after a fatal failure",
+        inputSchema: {},
+        async execute() {
+          laterToolExecuted = true;
+          return "unexpected";
+        },
       },
-    }],
+    ],
   }).run({ input: "fail" });
   const eventPromise = collect(run.events);
 
@@ -708,12 +713,10 @@ test("terminates the run for explicitly fatal tool infrastructure errors", async
   const events = await eventPromise;
 
   assert.equal(modelCalls, 1);
-  assert.equal(events.find((event) => event.type === "tool.failed").error.code,
-    "FATAL_TOOL_EXECUTION");
+  assert.equal(events.find((event) => event.type === "tool.failed").error.code, "FATAL_TOOL_EXECUTION");
   assert.equal(laterToolExecuted, false);
   assert.deepEqual(
-    events.filter((event) => event.type === "tool.started")
-      .map((event) => event.call.id),
+    events.filter((event) => event.type === "tool.started").map((event) => event.call.id),
     ["fatal_call"],
   );
   const toolMessages = (await context.snapshot()).messages.slice(-2);
@@ -731,9 +734,7 @@ test("turns an unknown tool into a tool error so the model can recover", async (
       if (step === 1) {
         yield {
           type: "response.completed",
-          message: assistant("", [
-            { id: "missing_1", name: "missing", input: {} },
-          ]),
+          message: assistant("", [{ id: "missing_1", name: "missing", input: {} }]),
         };
         return;
       }
@@ -766,9 +767,7 @@ test("fails when maxSteps is exceeded", async () => {
     async *stream() {
       yield {
         type: "response.completed",
-        message: assistant("", [
-          { id: `call_${Math.random()}`, name: "noop", input: null },
-        ]),
+        message: assistant("", [{ id: `call_${Math.random()}`, name: "noop", input: null }]),
       };
     },
   };
@@ -839,7 +838,10 @@ test("fails when the model emits response.completed more than once", async () =>
 
   assertSingleTerminalEvent(events, "run.failed");
   const snapshot = await context.snapshot();
-  assert.deepEqual(snapshot.messages.map((message) => message.role), ["user"]);
+  assert.deepEqual(
+    snapshot.messages.map((message) => message.role),
+    ["user"],
+  );
 });
 
 test("emits exactly one failed terminal event when the model throws", async () => {
@@ -928,18 +930,15 @@ test("bounds unconsumed streaming events without losing lifecycle events", async
   await run.result;
   const events = await collect(run.events);
 
-  assert.equal(events.some((event) => event.type === "model.text.delta"), false);
-  assert.deepEqual(events.map((event) => event.type), [
-    "run.started",
-    "step.started",
-    "model.started",
-    "model.completed",
-    "step.completed",
-    "run.completed",
-  ]);
-  assert.ok(events.some((event, index) =>
-    index > 0 && event.seq > events[index - 1].seq + 1
-  ));
+  assert.equal(
+    events.some((event) => event.type === "model.text.delta"),
+    false,
+  );
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["run.started", "step.started", "model.started", "model.completed", "step.completed", "run.completed"],
+  );
+  assert.ok(events.some((event, index) => index > 0 && event.seq > events[index - 1].seq + 1));
 });
 
 test("run.cancel aborts active context preparation before the model call", async () => {
@@ -1015,9 +1014,8 @@ test("run.cancel aborts an active tool without turning it into a tool failure", 
     async *stream(request) {
       modelCall += 1;
       if (modelCall > 1) {
-        const callIndex = request.messages.findIndex((message) =>
-          message.role === "assistant" &&
-          message.toolCalls?.some((call) => call.id === "slow_call")
+        const callIndex = request.messages.findIndex(
+          (message) => message.role === "assistant" && message.toolCalls?.some((call) => call.id === "slow_call"),
         );
         const cancellation = request.messages[callIndex + 1];
         assert.equal(cancellation.role, "tool");
@@ -1032,9 +1030,7 @@ test("run.cancel aborts an active tool without turning it into a tool failure", 
       }
       yield {
         type: "response.completed",
-        message: assistant("", [
-          { id: "slow_call", name: "slow", input: {} },
-        ]),
+        message: assistant("", [{ id: "slow_call", name: "slow", input: {} }]),
       };
     },
   };
@@ -1066,15 +1062,16 @@ test("run.cancel aborts an active tool without turning it into a tool failure", 
 
   assert.equal(toolSignal.aborted, true);
   assert.equal(toolSignal.reason, "stop tool");
-  assert.equal(events.some((event) => event.type === "tool.failed"), false);
-  assertSingleTerminalEvent(events, "run.cancelled");
-  assert.deepEqual((await context.snapshot()).messages.map((message) =>
-    message.role
-  ), ["user", "assistant", "tool"]);
   assert.equal(
-    (await may.run({ input: "continue" }).result).message.content[0].text,
-    "recovered",
+    events.some((event) => event.type === "tool.failed"),
+    false,
   );
+  assertSingleTerminalEvent(events, "run.cancelled");
+  assert.deepEqual(
+    (await context.snapshot()).messages.map((message) => message.role),
+    ["user", "assistant", "tool"],
+  );
+  assert.equal((await may.run({ input: "continue" }).result).message.content[0].text, "recovered");
 });
 
 test("emits a failed terminal event when cancellation context persistence fails", async () => {
@@ -1083,12 +1080,7 @@ test("emits a failed terminal event when cancellation context persistence fails"
   const context = {
     snapshot: (options) => inner.snapshot(options),
     append(messages, options) {
-      if (
-        messages.some((message) =>
-          message.role === "tool" &&
-          message.content[0]?.value?.code === "RUN_CANCELLED"
-        )
-      ) {
+      if (messages.some((message) => message.role === "tool" && message.content[0]?.value?.code === "RUN_CANCELLED")) {
         return Promise.reject(new Error("context write failed"));
       }
       return inner.append(messages, options);
@@ -1104,15 +1096,17 @@ test("emits a failed terminal event when cancellation context persistence fails"
         };
       },
     },
-    tools: [{
-      name: "slow",
-      description: "Wait until cancelled",
-      inputSchema: {},
-      async execute(_input, { signal }) {
-        started.resolve();
-        await waitForAbort(signal);
+    tools: [
+      {
+        name: "slow",
+        description: "Wait until cancelled",
+        inputSchema: {},
+        async execute(_input, { signal }) {
+          started.resolve();
+          await waitForAbort(signal);
+        },
       },
-    }],
+    ],
   }).run({ input: "start" });
   const eventPromise = collect(run.events);
 
@@ -1121,10 +1115,7 @@ test("emits a failed terminal event when cancellation context persistence fails"
 
   await assert.rejects(run.result, /context write failed/u);
   const events = await eventPromise;
-  assert.equal(
-    events.find((event) => event.type === "tool.failed").error.code,
-    "RUN_CANCELLED",
-  );
+  assert.equal(events.find((event) => event.type === "tool.failed").error.code, "RUN_CANCELLED");
   assertSingleTerminalEvent(events, "run.failed");
 });
 
@@ -1145,22 +1136,25 @@ test("cancelling a sequential tool batch preserves completed outcomes", async ()
   const run = new May({
     model,
     context,
-    tools: [{
-      name: "complete",
-      description: "complete before cancellation",
-      inputSchema: {},
-      async execute() {
-        return { sideEffectCommitted: true };
+    tools: [
+      {
+        name: "complete",
+        description: "complete before cancellation",
+        inputSchema: {},
+        async execute() {
+          return { sideEffectCommitted: true };
+        },
       },
-    }, {
-      name: "slow",
-      description: "wait for cancellation",
-      inputSchema: {},
-      async execute(_input, { signal }) {
-        secondStarted.resolve();
-        await waitForAbort(signal);
+      {
+        name: "slow",
+        description: "wait for cancellation",
+        inputSchema: {},
+        async execute(_input, { signal }) {
+          secondStarted.resolve();
+          await waitForAbort(signal);
+        },
       },
-    }],
+    ],
   }).run({ input: "run both" });
   const eventPromise = collect(run.events);
 
@@ -1177,8 +1171,7 @@ test("cancelling a sequential tool batch preserves completed outcomes", async ()
   assert.equal(toolMessages[0].isError, undefined);
   assert.equal(toolMessages[1].content[0].value.code, "RUN_CANCELLED");
   assert.deepEqual(
-    events.filter((event) => event.type === "tool.completed")
-      .map((event) => event.call.id),
+    events.filter((event) => event.type === "tool.completed").map((event) => event.call.id),
     ["completed_call"],
   );
   assertSingleTerminalEvent(events, "run.cancelled");
@@ -1203,30 +1196,35 @@ test("cancelling parallel tools waits for started side effects to settle", async
         };
       },
     },
-    tools: [{
-      name: "abort",
-      description: "Reject on cancellation",
-      inputSchema: {},
-      async execute(_input, { signal }) {
-        await waitForAbort(signal);
+    tools: [
+      {
+        name: "abort",
+        description: "Reject on cancellation",
+        inputSchema: {},
+        async execute(_input, { signal }) {
+          await waitForAbort(signal);
+        },
       },
-    }, {
-      name: "effect",
-      description: "Commit a side effect despite late cancellation",
-      inputSchema: {},
-      async execute() {
-        sideEffectStarted.resolve();
-        await releaseSideEffect.promise;
-        sideEffects += 1;
-        return { sideEffectCommitted: true };
+      {
+        name: "effect",
+        description: "Commit a side effect despite late cancellation",
+        inputSchema: {},
+        async execute() {
+          sideEffectStarted.resolve();
+          await releaseSideEffect.promise;
+          sideEffects += 1;
+          return { sideEffectCommitted: true };
+        },
       },
-    }],
+    ],
   }).run({ input: "run in parallel" });
   const eventPromise = collect(run.events);
   let resultSettled = false;
-  void run.result.finally(() => {
-    resultSettled = true;
-  }).catch(() => undefined);
+  void run.result
+    .finally(() => {
+      resultSettled = true;
+    })
+    .catch(() => undefined);
 
   await sideEffectStarted.promise;
   run.cancel("stop parallel batch");
@@ -1238,8 +1236,7 @@ test("cancelling parallel tools waits for started side effects to settle", async
   const events = await eventPromise;
   assert.equal(sideEffects, 1);
   assert.deepEqual(
-    events.filter((event) => event.type === "tool.completed")
-      .map((event) => event.call.id),
+    events.filter((event) => event.type === "tool.completed").map((event) => event.call.id),
     ["effect_call"],
   );
   const toolMessages = (await context.snapshot()).messages.slice(-2);
@@ -1300,10 +1297,10 @@ test("a pre-aborted external signal cancels before context mutation", async () =
   await assert.rejects(run.result, { code: "RUN_CANCELLED" });
   const events = await eventPromise;
 
-  assert.deepEqual(events.map((event) => event.type), [
-    "run.started",
-    "run.cancelled",
-  ]);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["run.started", "run.cancelled"],
+  );
   assert.equal("reason" in events.at(-1), false);
   assert.deepEqual((await context.snapshot()).messages, []);
   assertSingleTerminalEvent(events, "run.cancelled");

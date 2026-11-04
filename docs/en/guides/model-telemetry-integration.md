@@ -24,8 +24,11 @@ The observability plugin owns its processor and closes it with the application.
 ```ts
 import { defineAgent } from "@sortedyuan/may";
 import { loadMayConfig } from "@sortedyuan/may/config";
-import { createBuiltinProviderAdapterRegistry, createModelCapabilityResolver,
-  selectProviderModel } from "@sortedyuan/providers";
+import {
+  createBuiltinProviderAdapterRegistry,
+  createModelCapabilityResolver,
+  selectProviderModel,
+} from "@sortedyuan/providers";
 import { createObservabilityPlugin, observabilityService } from "@sortedyuan/observability/plugin";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 

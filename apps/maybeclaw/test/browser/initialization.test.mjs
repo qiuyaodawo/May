@@ -10,23 +10,57 @@ import test from "node:test";
 import { chromium } from "playwright";
 import { runMaybeClaw } from "../../dist/run.js";
 
-test("首次启动通过浏览器设置密码、添加 Agent 并创建会话", { timeout: 30000 }, async t => {
+test("首次启动通过浏览器设置密码、添加 Agent 并创建会话", { timeout: 30000 }, async (t) => {
   const base = join(testOutputRoot, "maybeclaw", "browser");
-  await mkdir(base, { recursive: true }); const directory = await mkdtemp(join(base, "init-"));
-  const path = join(directory, "config.json"), controller = new AbortController(), stdout = new PassThrough(), stderr = new PassThrough();
-  let browser, work, output = "", errors = "";
-  stdout.on("data", chunk => { output += chunk; }); stderr.on("data", chunk => { errors += chunk; });
+  await mkdir(base, { recursive: true });
+  const directory = await mkdtemp(join(base, "init-"));
+  const path = join(directory, "config.json"),
+    controller = new AbortController(),
+    stdout = new PassThrough(),
+    stderr = new PassThrough();
+  let browser,
+    work,
+    output = "",
+    errors = "";
+  stdout.on("data", (chunk) => {
+    output += chunk;
+  });
+  stderr.on("data", (chunk) => {
+    errors += chunk;
+  });
   t.after(async () => {
-    await browser?.close(); controller.abort(); await work; stdout.destroy(); stderr.destroy();
-    assert.ok(resolve(directory).startsWith(resolve(base) + sep)); await rm(directory, { recursive: true, force: true });
+    await browser?.close();
+    controller.abort();
+    await work;
+    stdout.destroy();
+    stderr.destroy();
+    assert.ok(resolve(directory).startsWith(resolve(base) + sep));
+    await rm(directory, { recursive: true, force: true });
   });
   const ready = once(stdout, "data", { signal: AbortSignal.timeout(10000) });
-  work = runMaybeClaw(["--no-open", "--config", path, "--data-directory", join(directory, "state"), "--port", "0"], { stdout, stderr, signal: controller.signal });
-  const startup = JSON.parse((await Promise.race([ready, work.then(code => { throw new Error(`启动提前结束 ${code}: ${errors}`); })]))[0].toString());
+  work = runMaybeClaw(["--no-open", "--config", path, "--data-directory", join(directory, "state"), "--port", "0"], {
+    stdout,
+    stderr,
+    signal: controller.signal,
+  });
+  const startup = JSON.parse(
+    (
+      await Promise.race([
+        ready,
+        work.then((code) => {
+          throw new Error(`启动提前结束 ${code}: ${errors}`);
+        }),
+      ])
+    )[0].toString(),
+  );
   assert.equal(startup.initialization, true);
-  browser = await chromium.launch({ headless: true, env: { ...process.env, TEMP: directory, TMP: directory, TMPDIR: directory } });
-  const page = await browser.newPage(), pageErrors = [];
-  page.on("pageerror", error => pageErrors.push(error.message));
+  browser = await chromium.launch({
+    headless: true,
+    env: { ...process.env, TEMP: directory, TMP: directory, TMPDIR: directory },
+  });
+  const page = await browser.newPage(),
+    pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto(pathToFileURL(startup.initializationFile).href);
   await page.getByRole("heading", { name: "设置 MaybeClaw 管理员密码" }).waitFor();
   assert.equal(new URL(page.url()).hash, "");
@@ -42,16 +76,23 @@ test("首次启动通过浏览器设置密码、添加 Agent 并创建会话", {
   await page.getByRole("button", { name: "添加 Agent", exact: true }).click();
   await page.getByLabel("Agent ID", { exact: true }).fill("code");
   await page.getByRole("button", { name: "保存配置", exact: true }).click();
-  const manager = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "Agent 管理", exact: true }) });
+  const manager = page
+    .getByRole("dialog")
+    .filter({ has: page.getByRole("heading", { name: "Agent 管理", exact: true }) });
   await manager.getByRole("button", { name: "关闭", exact: true }).click();
   await page.getByRole("button", { name: "新建会话", exact: true }).click();
-  const creation = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "创建会话", exact: true }) });
+  const creation = page
+    .getByRole("dialog")
+    .filter({ has: page.getByRole("heading", { name: "创建会话", exact: true }) });
   await creation.getByLabel("会话名称", { exact: true }).fill("首次会话");
   await creation.getByRole("group", { name: "默认 Agent（至少一个）" }).getByRole("checkbox").check();
   await creation.getByRole("button", { name: "创建会话", exact: true }).click();
   await creation.waitFor({ state: "detached" });
-  assert.deepEqual(pageErrors, []); assert.equal(errors, ""); assert.equal(output.includes(password), false);
+  assert.deepEqual(pageErrors, []);
+  assert.equal(errors, "");
+  assert.equal(output.includes(password), false);
   const saved = JSON.parse(await readFile(path, "utf8"));
-  assert.equal(saved.apps.maybeclaw.server.auth.password, undefined); assert.ok(saved.apps.maybeclaw.server.auth.passwordHash);
+  assert.equal(saved.apps.maybeclaw.server.auth.password, undefined);
+  assert.ok(saved.apps.maybeclaw.server.auth.passwordHash);
   assert.equal(saved.apps.maybeclaw.agents[0].id, "code");
 });

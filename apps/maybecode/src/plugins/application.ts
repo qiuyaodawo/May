@@ -12,12 +12,21 @@ import { createSkillsPlugin } from "@sortedyuan/may/services/skills";
 import { createContextPlugin, createToolsPlugin } from "@sortedyuan/may/services/runtime";
 import { createGoalsPlugin, goalsService } from "@sortedyuan/may/goals/plugin";
 import { createHistoryMemoryPlugin, historyMemoryService } from "@sortedyuan/may/history-memory";
-import { createDelegationPlugin, createWorkspaceFilesPlugin, delegationService } from "@sortedyuan/coordination/delegation";
+import {
+  createDelegationPlugin,
+  createWorkspaceFilesPlugin,
+  delegationService,
+} from "@sortedyuan/coordination/delegation";
 import { SkillRegistry } from "@sortedyuan/may/skills";
 import type { MaybeCodeApplicationOptions } from "../application.js";
 import { createCodingPermissionPolicy } from "../policy.js";
 import { defaultMaybeCodeSkillDirectories } from "../skills.js";
-import { type GitRequestController, gitRequestService, requestMainRunIds, startGitGoalRequest } from "../git-request.js";
+import {
+  type GitRequestController,
+  gitRequestService,
+  requestMainRunIds,
+  startGitGoalRequest,
+} from "../git-request.js";
 
 export interface MaybeCodePluginComposition {
   readonly plugins: readonly AnyPlugin[];
@@ -45,20 +54,29 @@ export function createMaybeCodePlugins(
   let modelInfo: ModelInfo | undefined;
   let mcp: McpClientPool | undefined;
   const defaults: AnyPlugin[] = [
-    createModelPlugin({ create: () => {
-      if (options.model === undefined) throw new TypeError("MaybeCode requires a Model or an application Model plugin");
-      return options.model;
-    }, ...omitUndefined({ info: options.modelInfo }) }),
-    createPermissionPlugin({ create: () => createCodingPermissionPolicy({
-      ...omitUndefined({ policy: options.permissionPolicy, mode: options.permissionModeSource }),
-      ...(options.gitWorkspace?.readOnly === true ? { readOnly: true } : {}),
-      ...(options.permissionRuleStore === undefined ? {} : { persistent: { workspace, scopeId: options.permissionScopeId ?? `maybecode:${workspace}:main` } }),
-    }) }),
+    createModelPlugin({
+      create: () => {
+        if (options.model === undefined)
+          throw new TypeError("MaybeCode requires a Model or an application Model plugin");
+        return options.model;
+      },
+      ...omitUndefined({ info: options.modelInfo }),
+    }),
+    createPermissionPlugin({
+      create: () =>
+        createCodingPermissionPolicy({
+          ...omitUndefined({ policy: options.permissionPolicy, mode: options.permissionModeSource }),
+          ...(options.gitWorkspace?.readOnly === true ? { readOnly: true } : {}),
+          ...(options.permissionRuleStore === undefined
+            ? {}
+            : { persistent: { workspace, scopeId: options.permissionScopeId ?? `maybecode:${workspace}:main` } }),
+        }),
+    }),
     createContextPlugin({ create: () => options.contextFactory ?? new InMemoryContextFactory() }),
     createWorkspaceFilesPlugin({ workspace, defaultTools: options.tools === undefined }),
     createHistoryMemoryPlugin({
       mode: autoMode,
-      budget: model => withDefaultCompactionThreshold(options.contextBudget ?? contextBudgetFromModel(model)),
+      budget: (model) => withDefaultCompactionThreshold(options.contextBudget ?? contextBudgetFromModel(model)),
       ...omitUndefined({
         summarizer: options.contextSummarizer,
         compactionStrategy: options.compactionStrategy,
@@ -66,65 +84,118 @@ export function createMaybeCodePlugins(
       }),
     }),
   ];
-  if (options.skills !== false) defaults.push(createSkillsPlugin({
-    create: () => options.skills || SkillRegistry.discover(
-      options.skillDirectories ?? defaultMaybeCodeSkillDirectories(workspace, false),
-    ),
-  }));
-  if (options.toolSource !== undefined) defaults.push(createToolsPlugin({
-    id: "maybecode.additional-tools", create: () => options.toolSource!,
-  }));
-  if (options.goals !== false) defaults.push(createGoalsPlugin({
-    validateBudget: budget => {
-      if (budget.maxTotalTokens !== undefined && (autoMode === "provider-native" || options.contextSummarizer !== undefined || options.autoCompactionStrategies !== undefined || options.compactionStrategy !== undefined)) {
-        throw new Error("Goal token budgets require built-in prune-summary or history-reference compaction with the metered model");
-      }
-    },
-    createAgent: application => {
-      const host = hasDelegation ? application.getService(delegationService).get() : undefined;
-      const completed = options.onGitCheckpoint ?? (() => {});
-      return {
-        sessionId: application.sessionId,
-        get isRunning() { return application.isRunning || host?.isRunning === true; },
-        submit: plan => startGitGoalRequest(environment.gitRequest, application.sessionId,
-          () => host ? host.start({ ...plan, record: requestRecord(plan.input) }, "submit") : application.submit(plan), completed,
-          runId => application.saveBranchPosition(runId, { allowYielded: true }),
-          async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
-          async firstRunId => requestMainRunIds(await application.history(), firstRunId)),
-        continue: plan => startGitGoalRequest(environment.gitRequest, application.sessionId,
-          () => host ? host.start({ ...plan, input: "", record: "Continue the active goal" }, "continue") : application.continue(plan), completed,
-          runId => application.saveBranchPosition(runId, { allowYielded: true }),
-          async runId => (await application.branchPositions()).find(position => position.runId === runId)?.positionSeq,
-          async firstRunId => requestMainRunIds(await application.history(), firstRunId)),
-      };
-    },
-  }));
-  if (options.subagents !== false) defaults.push(createDelegationPlugin({
-    workspace, instructions,
-    requestRecording: options.requestRecording ?? "required",
-    providerBodyRecording: options.providerBodyRecording ?? false,
-    ...omitUndefined({
-      instructionsSource: environment.instructionsSource,
-      projectInstructionsSource: environment.projectInstructionsSource,
-      prepareInstructions: environment.prepareInstructions,
-    }),
-    permissionModeSource: () => options.gitWorkspace?.readOnly ? "read-only" : options.permissionModeSource?.() ?? (options.permissionPolicy ? "custom" : "default"),
-    ...(options.subagents ?? {}),
-    beforeToolExecute: environment.gitRequest.beforeToolExecute,
-    ...omitUndefined({
-      toolSource: options.toolSource,
-      contextBudget,
-      compactionStrategy: options.compactionStrategy,
-      maxSteps: options.maxSteps,
-    }),
-    autoCompactionMode: autoMode,
-    traceAttributes: { "may.agent.name": "maybecode" },
-  }));
+  if (options.skills !== false)
+    defaults.push(
+      createSkillsPlugin({
+        create: () =>
+          options.skills ||
+          SkillRegistry.discover(options.skillDirectories ?? defaultMaybeCodeSkillDirectories(workspace, false)),
+      }),
+    );
+  if (options.toolSource !== undefined)
+    defaults.push(
+      createToolsPlugin({
+        id: "maybecode.additional-tools",
+        create: () => options.toolSource!,
+      }),
+    );
+  if (options.goals !== false)
+    defaults.push(
+      createGoalsPlugin({
+        validateBudget: (budget) => {
+          if (
+            budget.maxTotalTokens !== undefined &&
+            (autoMode === "provider-native" ||
+              options.contextSummarizer !== undefined ||
+              options.autoCompactionStrategies !== undefined ||
+              options.compactionStrategy !== undefined)
+          ) {
+            throw new Error(
+              "Goal token budgets require built-in prune-summary or history-reference compaction with the metered model",
+            );
+          }
+        },
+        createAgent: (application) => {
+          const host = hasDelegation ? application.getService(delegationService).get() : undefined;
+          const completed = options.onGitCheckpoint ?? (() => {});
+          return {
+            sessionId: application.sessionId,
+            get isRunning() {
+              return application.isRunning || host?.isRunning === true;
+            },
+            submit: (plan) =>
+              startGitGoalRequest(
+                environment.gitRequest,
+                application.sessionId,
+                () =>
+                  host
+                    ? host.start({ ...plan, record: requestRecord(plan.input) }, "submit")
+                    : application.submit(plan),
+                completed,
+                (runId) => application.saveBranchPosition(runId, { allowYielded: true }),
+                async (runId) =>
+                  (await application.branchPositions()).find((position) => position.runId === runId)?.positionSeq,
+                async (firstRunId) => requestMainRunIds(await application.history(), firstRunId),
+              ),
+            continue: (plan) =>
+              startGitGoalRequest(
+                environment.gitRequest,
+                application.sessionId,
+                () =>
+                  host
+                    ? host.start({ ...plan, input: "", record: "Continue the active goal" }, "continue")
+                    : application.continue(plan),
+                completed,
+                (runId) => application.saveBranchPosition(runId, { allowYielded: true }),
+                async (runId) =>
+                  (await application.branchPositions()).find((position) => position.runId === runId)?.positionSeq,
+                async (firstRunId) => requestMainRunIds(await application.history(), firstRunId),
+              ),
+          };
+        },
+      }),
+    );
+  if (options.subagents !== false)
+    defaults.push(
+      createDelegationPlugin({
+        workspace,
+        instructions,
+        requestRecording: options.requestRecording ?? "required",
+        providerBodyRecording: options.providerBodyRecording ?? false,
+        ...omitUndefined({
+          instructionsSource: environment.instructionsSource,
+          projectInstructionsSource: environment.projectInstructionsSource,
+          prepareInstructions: environment.prepareInstructions,
+        }),
+        permissionModeSource: () =>
+          options.gitWorkspace?.readOnly
+            ? "read-only"
+            : (options.permissionModeSource?.() ?? (options.permissionPolicy ? "custom" : "default")),
+        ...(options.subagents ?? {}),
+        beforeToolExecute: environment.gitRequest.beforeToolExecute,
+        ...omitUndefined({
+          toolSource: options.toolSource,
+          contextBudget,
+          compactionStrategy: options.compactionStrategy,
+          maxSteps: options.maxSteps,
+        }),
+        autoCompactionMode: autoMode,
+        traceAttributes: { "may.agent.name": "maybecode" },
+      }),
+    );
   const plugins = composeMaybeCodePlugins(defaults, options.plugins ?? []);
-  const hasGoals = plugins.some(plugin => plugin.provides?.some(service => service.id === goalsService.id && service.scope === goalsService.scope));
-  hasDelegation = plugins.some(plugin => plugin.provides?.some(service => service.id === delegationService.id && service.scope === delegationService.scope));
+  const hasGoals = plugins.some((plugin) =>
+    plugin.provides?.some((service) => service.id === goalsService.id && service.scope === goalsService.scope),
+  );
+  hasDelegation = plugins.some((plugin) =>
+    plugin.provides?.some(
+      (service) => service.id === delegationService.id && service.scope === delegationService.scope,
+    ),
+  );
   plugins.push({
-    id: "maybecode.product", version: "1.0.0", scope: "application",
+    id: "maybecode.product",
+    version: "1.0.0",
+    scope: "application",
     provides: [gitRequestService],
     requires: [
       { service: historyMemoryService },
@@ -141,19 +212,41 @@ export function createMaybeCodePlugins(
       });
     },
   });
-  return { plugins, hasGoals, hasDelegation, get modelInfo() { return modelInfo; }, get mcp() { return mcp; } };
+  return {
+    plugins,
+    hasGoals,
+    hasDelegation,
+    get modelInfo() {
+      return modelInfo;
+    },
+    get mcp() {
+      return mcp;
+    },
+  };
 }
 
 export function composeMaybeCodePlugins(defaults: readonly AnyPlugin[], selected: readonly AnyPlugin[]): AnyPlugin[] {
-  const ids = new Set(selected.map(plugin => plugin.id));
-  const services = new Set(selected.flatMap(plugin => plugin.provides?.map(service => `${service.scope}:${service.id}`) ?? []));
-  return [...defaults.filter(plugin => !ids.has(plugin.id) && !plugin.provides?.some(service => services.has(`${service.scope}:${service.id}`))), ...selected];
+  const ids = new Set(selected.map((plugin) => plugin.id));
+  const services = new Set(
+    selected.flatMap((plugin) => plugin.provides?.map((service) => `${service.scope}:${service.id}`) ?? []),
+  );
+  return [
+    ...defaults.filter(
+      (plugin) =>
+        !ids.has(plugin.id) && !plugin.provides?.some((service) => services.has(`${service.scope}:${service.id}`)),
+    ),
+    ...selected,
+  ];
 }
 
 /** 请求的持久文本记录；原始输入仍然保存在 Session 中。 */
 export function requestRecord(input: string | UserMessage): string {
-  const text = typeof input === "string"
-    ? input
-    : input.content.filter((part) => part.type === "text").map((part) => part.text).join("");
+  const text =
+    typeof input === "string"
+      ? input
+      : input.content
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("");
   return text.trim() === "" ? "Request without text content" : text;
 }

@@ -5,18 +5,14 @@ export interface SlashCommandDefinition<Name extends string = string> {
   readonly description: string;
 }
 
-export interface SlashCommandInvocation<
-  Definition extends SlashCommandDefinition = SlashCommandDefinition,
-> {
+export interface SlashCommandInvocation<Definition extends SlashCommandDefinition = SlashCommandDefinition> {
   readonly type: "command";
   readonly definition: Definition;
   readonly invokedAs: string;
   readonly arguments: readonly string[];
 }
 
-export type SlashCommandParseResult<
-  Definition extends SlashCommandDefinition = SlashCommandDefinition,
-> =
+export type SlashCommandParseResult<Definition extends SlashCommandDefinition = SlashCommandDefinition> =
   | SlashCommandInvocation<Definition>
   | { readonly type: "not-command" }
   | { readonly type: "unknown"; readonly command: string };
@@ -28,31 +24,21 @@ export interface SlashCommandSuggestion {
   readonly description?: string;
 }
 
-export interface SlashCommandArgumentContext<
-  Definition extends SlashCommandDefinition = SlashCommandDefinition,
-> {
+export interface SlashCommandArgumentContext<Definition extends SlashCommandDefinition = SlashCommandDefinition> {
   readonly input: string;
   readonly invokedAs: string;
   readonly argumentPrefix: string;
   readonly definition: Definition;
 }
 
-export type SlashCommandArgumentSuggester<
-  Definition extends SlashCommandDefinition = SlashCommandDefinition,
-> = (
+export type SlashCommandArgumentSuggester<Definition extends SlashCommandDefinition = SlashCommandDefinition> = (
   context: SlashCommandArgumentContext<Definition>,
-) =>
-  | readonly SlashCommandSuggestion[]
-  | Promise<readonly SlashCommandSuggestion[]>;
+) => readonly SlashCommandSuggestion[] | Promise<readonly SlashCommandSuggestion[]>;
 
-export type SlashCommandSuggester = (
-  input: string,
-) => Promise<readonly SlashCommandSuggestion[]>;
+export type SlashCommandSuggester = (input: string) => Promise<readonly SlashCommandSuggestion[]>;
 
 /** Validated, case-insensitive registry for slash-command parsing and completion. */
-export class SlashCommandRegistry<
-  Definition extends SlashCommandDefinition = SlashCommandDefinition,
-> {
+export class SlashCommandRegistry<Definition extends SlashCommandDefinition = SlashCommandDefinition> {
   readonly definitions: readonly Definition[];
 
   private readonly byName = new Map<string, Definition>();
@@ -99,9 +85,7 @@ export class SlashCommandRegistry<
       }));
   }
 
-  createSuggester(
-    suggestArguments?: SlashCommandArgumentSuggester<Definition>,
-  ): SlashCommandSuggester {
+  createSuggester(suggestArguments?: SlashCommandArgumentSuggester<Definition>): SlashCommandSuggester {
     return async (input) => {
       if (!input.startsWith("/")) return [];
       const argumentInput = splitSlashCommandArgumentInput(input);
@@ -129,14 +113,14 @@ export class SlashCommandRegistry<
   }
 }
 
-export function splitSlashCommandArgumentInput(input: string): {
-  readonly invokedAs: string;
-  readonly argumentPrefix: string;
-} | undefined {
+export function splitSlashCommandArgumentInput(input: string):
+  | {
+      readonly invokedAs: string;
+      readonly argumentPrefix: string;
+    }
+  | undefined {
   const match = /^(\/\S+)\s+(.*)$/u.exec(input);
-  return match === null
-    ? undefined
-    : { invokedAs: match[1]!, argumentPrefix: match[2]! };
+  return match === null ? undefined : { invokedAs: match[1]!, argumentPrefix: match[2]! };
 }
 
 function isCommandName(value: string): boolean {

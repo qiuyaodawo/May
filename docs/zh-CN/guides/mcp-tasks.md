@@ -24,13 +24,17 @@
 
 ```json
 {
-  "apps": { "maybecode": { "mcpServers": {
-    "jobs": {
-      "transport": "streamable-http",
-      "url": "https://jobs.example.com/mcp",
-      "tasks": true
+  "apps": {
+    "maybecode": {
+      "mcpServers": {
+        "jobs": {
+          "transport": "streamable-http",
+          "url": "https://jobs.example.com/mcp",
+          "tasks": true
+        }
+      }
     }
-  } } }
+  }
 }
 ```
 
@@ -67,16 +71,16 @@ const taskJournal = new McpTaskJournal(new KeyringMcpCredentialStore("./data/mcp
 **本地任务句柄**。管理 API 由宿主明确调用，不会自动作为模型
 工具暴露。两个终端 UI 共用以下命令：
 
-| 命令 | 效果 |
-| --- | --- |
-| `/mcp tasks [server]` | 查看当前 Session 本地元数据，不联网 |
-| `/mcp task-get server local-id` | 获取并预览当前状态 |
-| `/mcp task-wait server local-id` | 工作中轮询，遇待输入或终态即返回 |
-| `/mcp task-update server local-id` | 审阅并处理尚未占用的输入 |
-| `/mcp task-retry-input server local-id` | 显式重新审阅已放弃/过期且未确认的输入 |
-| `/mcp task-cancel server local-id` | 请求协作式远端取消 |
-| `/mcp task-forget server local-id` | 仅删除本地记录 |
-| `/mcp task-attach server local-id [question]` | 显式将完成结果附加到新 Run |
+| 命令                                          | 效果                                  |
+| --------------------------------------------- | ------------------------------------- |
+| `/mcp tasks [server]`                         | 查看当前 Session 本地元数据，不联网   |
+| `/mcp task-get server local-id`               | 获取并预览当前状态                    |
+| `/mcp task-wait server local-id`              | 工作中轮询，遇待输入或终态即返回      |
+| `/mcp task-update server local-id`            | 审阅并处理尚未占用的输入              |
+| `/mcp task-retry-input server local-id`       | 显式重新审阅已放弃/过期且未确认的输入 |
+| `/mcp task-cancel server local-id`            | 请求协作式远端取消                    |
+| `/mcp task-forget server local-id`            | 仅删除本地记录                        |
+| `/mcp task-attach server local-id [question]` | 显式将完成结果附加到新 Run            |
 
 预览、轮询和通知不会把结果追加进 Context。附件采用有界且带来源标记的用户内容，
 保留多模态/结构化结果，并校验原始工具输出 schema（`isError` 结果无需满足成功

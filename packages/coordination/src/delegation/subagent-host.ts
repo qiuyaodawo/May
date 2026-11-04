@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
-import { applicationHooks, applicationServices, defineAgent, type ApplicationExecution, type AgentApplicationEvent } from "@sortedyuan/may";
+import {
+  applicationHooks,
+  applicationServices,
+  defineAgent,
+  type ApplicationExecution,
+  type AgentApplicationEvent,
+} from "@sortedyuan/may";
 import { definePlugin } from "@sortedyuan/may/plugin";
 import { AsyncEventQueue, omitUndefined } from "@sortedyuan/may/core";
 import {
@@ -58,11 +64,7 @@ import { SharedWorkspaceFileGuard, type SubagentFileGuard } from "./subagent-fil
 import { SubagentRequestLedger, withRequestBudget } from "./subagent-budget.js";
 import { HistoryReferenceMemory, createModelContextSummarizer } from "@sortedyuan/may/history-memory";
 import type { SharedBudgetTotals as SubagentBudgetTotals } from "../index.js";
-import type {
-  MaybeCodeSubagentConfiguration,
-  MaybeCodeSubagentRole,
-  SubagentToolName,
-} from "./subagents.js";
+import type { MaybeCodeSubagentConfiguration, MaybeCodeSubagentRole, SubagentToolName } from "./subagents.js";
 import { SUBAGENT_DEFAULT_MAX_STEPS } from "./subagents.js";
 
 /** 主会话与子 Agent 共用的自动压缩链构造。 */
@@ -73,12 +75,15 @@ function automaticCompactionStrategies(
   native: ContextCompactionStrategy | undefined,
 ): readonly ContextCompactionStrategy[] {
   switch (mode) {
-    case "prune-summary": return [new PruneOldToolResultsStrategy(), summary];
-    case "history-reference": return [historyReference];
+    case "prune-summary":
+      return [new PruneOldToolResultsStrategy(), summary];
+    case "history-reference":
+      return [historyReference];
     case "provider-native":
       if (native === undefined) throw new Error("This model does not support provider-native context compaction");
       return [native];
-    default: throw new Error(`Unknown automatic compaction mode: ${String(mode)}`);
+    default:
+      throw new Error(`Unknown automatic compaction mode: ${String(mode)}`);
   }
 }
 
@@ -181,10 +186,12 @@ export class SubagentHost {
     const context = this.context;
     const turn = this.turn;
     if (context === undefined || turn === undefined) return [];
-    return [createDelegationTool(context, () => turn.requestYield(), {
-      agents: this.options.configuration.roles.map((role) => role.name),
-      maxInputBytes: this.options.configuration.limits.maxInputBytes,
-    })];
+    return [
+      createDelegationTool(context, () => turn.requestYield(), {
+        agents: this.options.configuration.roles.map((role) => role.name),
+        maxInputBytes: this.options.configuration.limits.maxInputBytes,
+      }),
+    ];
   }
 
   get isRunning(): boolean {
@@ -217,7 +224,7 @@ export class SubagentHost {
 
   /** 读取持久请求索引，并核对被上个进程中断的请求。 */
   async initialize(): Promise<void> {
-    this.requests = [...await this.options.loadRequests()];
+    this.requests = [...(await this.options.loadRequests())];
     await this.reconcile();
   }
 
@@ -255,9 +262,7 @@ export class SubagentHost {
   /** 工作区此刻持有的子 Session，与它自己的 Session 并列。 */
   ownedSessions(): readonly string[] {
     const tasks = this.active?.state?.tasks ?? [];
-    return tasks
-      .filter((task) => task.sessionId !== this.options.sessionId)
-      .map((task) => task.sessionId);
+    return tasks.filter((task) => task.sessionId !== this.options.sessionId).map((task) => task.sessionId);
   }
 
   async toolRecords(taskId: string): Promise<MaybeCodeDelegationToolRecords> {
@@ -293,27 +298,31 @@ export class SubagentHost {
         detail = error instanceof Error ? error.message : String(error);
       }
       const durable = snapshot;
-      reconciled.push(durable === undefined
-        ? {
-            ...request,
-            status: "interrupted",
-            finishedAt: Date.now(),
-            tasks: request.tasks.map((task) => ({
-              ...task,
-              status: "recovery-required",
-              detail: detail ?? "没有留下可读的协调记录，任务结果未知",
-            })),
-          }
-        : {
-            ...request,
-            status: "interrupted",
-            finishedAt: Date.now(),
-            mainRunIds: [...new Set([...request.mainRunIds, ...runIds(durable)])],
-            tasks: durable.tasks.map((task) => interruptedTask(this.projectTask(task, durable, new Map()))),
-          });
+      reconciled.push(
+        durable === undefined
+          ? {
+              ...request,
+              status: "interrupted",
+              finishedAt: Date.now(),
+              tasks: request.tasks.map((task) => ({
+                ...task,
+                status: "recovery-required",
+                detail: detail ?? "没有留下可读的协调记录，任务结果未知",
+              })),
+            }
+          : {
+              ...request,
+              status: "interrupted",
+              finishedAt: Date.now(),
+              mainRunIds: [...new Set([...request.mainRunIds, ...runIds(durable)])],
+              tasks: durable.tasks.map((task) => interruptedTask(this.projectTask(task, durable, new Map()))),
+            },
+      );
     }
-    this.requests = [...reconciled, ...this.requests.filter((request) => request.status !== "running")]
-      .slice(0, MAX_INDEXED_REQUESTS);
+    this.requests = [...reconciled, ...this.requests.filter((request) => request.status !== "running")].slice(
+      0,
+      MAX_INDEXED_REQUESTS,
+    );
     await this.options.saveRequests(this.requests);
   }
 
@@ -357,11 +366,14 @@ export class SubagentHost {
       await runtime.close();
     }
     const snapshot = await store.inspect(requestId);
-    const tasks = snapshot === undefined
-      ? record.tasks.map((task) => task.id === taskId ? { ...task, status: outcome.status, detail: outcome.detail } : task)
-      : snapshot.tasks.map((task) => interruptedTask(this.projectTask(task, snapshot, new Map())));
+    const tasks =
+      snapshot === undefined
+        ? record.tasks.map((task) =>
+            task.id === taskId ? { ...task, status: outcome.status, detail: outcome.detail } : task,
+          )
+        : snapshot.tasks.map((task) => interruptedTask(this.projectTask(task, snapshot, new Map())));
     const updated: MaybeCodeDelegationRequest = { ...record, tasks };
-    this.requests = this.requests.map((request) => request.requestId === requestId ? updated : request);
+    this.requests = this.requests.map((request) => (request.requestId === requestId ? updated : request));
     await this.options.saveRequests(this.requests);
     return structuredClone(updated);
   }
@@ -448,8 +460,8 @@ export class SubagentHost {
     const configuration = this.options.configuration;
     return {
       version: VERSION,
-      authorize: (task: { agent: string }) => task.agent === MAIN_AGENT ||
-        configuration.roles.some((role) => role.name === task.agent),
+      authorize: (task: { agent: string }) =>
+        task.agent === MAIN_AGENT || configuration.roles.some((role) => role.name === task.agent),
       authorizeDelegation: (parent: { agent: string }, child: { agent: string }) =>
         parent.agent === MAIN_AGENT
           ? configuration.roles.some((role) => role.name === child.agent)
@@ -473,7 +485,7 @@ export class SubagentHost {
 
   /** @inline 子 Agent 的模型：角色未声明 profile 时复用主会话模型与 effort。 */
   roleModel(role: MaybeCodeSubagentRole): Model {
-    return role.model === undefined ? this.options.model : this.options.createRoleModel?.(role) ?? this.options.model;
+    return role.model === undefined ? this.options.model : (this.options.createRoleModel?.(role) ?? this.options.model);
   }
 
   private mainAgent(mode: "submit" | "continue"): CoordinationAgent {
@@ -483,7 +495,8 @@ export class SubagentHost {
       mode,
       read: (sessionId) => options.store.read(sessionId),
       // steering 输入已经带有 Session 自己的 inputId，沿用它作为本轮的持久身份。
-      identity: (execution, turn) => (turn.first ? this.active?.inputIdentity() : undefined) ?? taskTurnInputId(execution),
+      identity: (execution, turn) =>
+        (turn.first ? this.active?.inputIdentity() : undefined) ?? taskTurnInputId(execution),
       attach: (execution) => {
         const turn = execution.task.turn ?? 0;
         return {
@@ -522,14 +535,17 @@ export class SubagentHost {
         const request = host.active;
         if (request === undefined) throw new Error("The sub-agent request is no longer active");
         const coding = role.tools;
-        const files = (options.fileGuard ?? new SharedWorkspaceFileGuard(options.workspace)).create(omitUndefined({
-          names: coding,
-          requireRead: true,
-          files: execution.task.files,
-        }));
-        const contextBudget = role.model === undefined
-          ? options.contextBudget
-          : options.contextBudgetFor?.(role) ?? options.contextBudget;
+        const files = (options.fileGuard ?? new SharedWorkspaceFileGuard(options.workspace)).create(
+          omitUndefined({
+            names: coding,
+            requireRead: true,
+            files: execution.task.files,
+          }),
+        );
+        const contextBudget =
+          role.model === undefined
+            ? options.contextBudget
+            : (options.contextBudgetFor?.(role) ?? options.contextBudget);
         const roleBudget = resolveRunBudget(role.runBudget, options.configuration.runBudget);
         // 角色预算与子 Agent 预算取较小的值；两者都省略 maxSteps 时用子 Agent 默认值。
         const maxSteps = roleBudget.maxSteps ?? options.maxSteps ?? SUBAGENT_DEFAULT_MAX_STEPS;
@@ -540,49 +556,98 @@ export class SubagentHost {
         request.registerGuard(execution.task.id, files);
         const childTools = [...files.tools, ...tools, ...memory.tools()];
         const childInstructions = definePlugin({
-          id: "may.delegation.child-instructions", version: "1.0.0",
-          requires: [{ service: applicationServices.instructionSources }, { service: applicationServices.toolSources },
-            { service: applicationServices.contextWrappers }],
+          id: "may.delegation.child-instructions",
+          version: "1.0.0",
+          requires: [
+            { service: applicationServices.instructionSources },
+            { service: applicationServices.toolSources },
+            { service: applicationServices.contextWrappers },
+          ],
           optional: [{ service: applicationServices.tools }],
           requiresHooks: [runtimeHooks.runBefore, applicationHooks.inputReceived],
           async setup(context) {
             const sources = context.get(applicationServices.instructionSources);
             const registration = { pluginOrder: context.pluginOrder };
-            const sessionOrigin = (await options.store.read(execution.task.sessionId)).length > 0 ? "resumed session" : "new session";
-            context.defer(context.get(applicationServices.contextWrappers).add(factory => ({
-              create: async current => {
-                const { measurement: _measurement, ...options } = current;
-                return factory.create(options);
-              },
-            }), { ...registration, id: context.pluginId, order: -100 }));
-            context.defer(sources.add(() => {
-              const shell = [...childTools, ...context.get(applicationServices.toolSources).snapshot(),
-                ...(context.optional(applicationServices.tools) ?? [])]
-                .map(getShellToolInfo).find(info => info !== undefined);
-              return "# Current environment\n\n" + codingRuntimeInstructions(omitUndefined({
-                workspace: options.workspace,
-                shell,
-                agentRole: "sub-agent", assignedRole: role.name, parentTask: execution.task.parentTaskId ?? execution.task.id,
-                sessionOrigin,
-                permissionMode: options.permissionModeSource?.(),
-              }));
-            }, { ...registration, id: `${context.pluginId}.environment`, order: -80 }));
+            const sessionOrigin =
+              (await options.store.read(execution.task.sessionId)).length > 0 ? "resumed session" : "new session";
+            context.defer(
+              context.get(applicationServices.contextWrappers).add(
+                (factory) => ({
+                  create: async (current) => {
+                    const { measurement: _measurement, ...options } = current;
+                    return factory.create(options);
+                  },
+                }),
+                { ...registration, id: context.pluginId, order: -100 },
+              ),
+            );
+            context.defer(
+              sources.add(
+                () => {
+                  const shell = [
+                    ...childTools,
+                    ...context.get(applicationServices.toolSources).snapshot(),
+                    ...(context.optional(applicationServices.tools) ?? []),
+                  ]
+                    .map(getShellToolInfo)
+                    .find((info) => info !== undefined);
+                  return (
+                    "# Current environment\n\n" +
+                    codingRuntimeInstructions(
+                      omitUndefined({
+                        workspace: options.workspace,
+                        shell,
+                        agentRole: "sub-agent",
+                        assignedRole: role.name,
+                        parentTask: execution.task.parentTaskId ?? execution.task.id,
+                        sessionOrigin,
+                        permissionMode: options.permissionModeSource?.(),
+                      }),
+                    )
+                  );
+                },
+                { ...registration, id: `${context.pluginId}.environment`, order: -80 },
+              ),
+            );
             if (options.projectInstructionsSource !== undefined) {
-              context.defer(sources.add(options.projectInstructionsSource, {
-                ...registration, id: `${context.pluginId}.project`, order: -60,
-              }));
+              context.defer(
+                sources.add(options.projectInstructionsSource, {
+                  ...registration,
+                  id: `${context.pluginId}.project`,
+                  order: -60,
+                }),
+              );
             }
-            context.defer(sources.add(() => "# Tool use\n\nUse the available tools according to their descriptions and parameter schemas.", {
-              ...registration, id: `${context.pluginId}.tools`, order: -40,
-            }));
-            context.defer(sources.add(() => subagentInstructions({
-              base: "", role, workspace: options.workspace,
-              files: execution.task.files ?? [],
-              maxDepthReached: host.depthOf(execution.task) >= options.configuration.limits.maxDepth,
-            }), { ...registration, id: `${context.pluginId}.assignment`, order: 20 }));
-            context.defer(sources.add(() => memory.instructions(), {
-              ...registration, id: `${context.pluginId}.continuity`, order: 60,
-            }));
+            context.defer(
+              sources.add(
+                () => "# Tool use\n\nUse the available tools according to their descriptions and parameter schemas.",
+                {
+                  ...registration,
+                  id: `${context.pluginId}.tools`,
+                  order: -40,
+                },
+              ),
+            );
+            context.defer(
+              sources.add(
+                () =>
+                  subagentInstructions({
+                    base: "",
+                    role,
+                    workspace: options.workspace,
+                    files: execution.task.files ?? [],
+                    maxDepthReached: host.depthOf(execution.task) >= options.configuration.limits.maxDepth,
+                  }),
+                { ...registration, id: `${context.pluginId}.assignment`, order: 20 },
+              ),
+            );
+            context.defer(
+              sources.add(() => memory.instructions(), {
+                ...registration,
+                id: `${context.pluginId}.continuity`,
+                order: 60,
+              }),
+            );
             if (options.prepareInstructions !== undefined) {
               context.on(runtimeHooks.runBefore, () => options.prepareInstructions!(), { order: -100 });
               context.on(applicationHooks.inputReceived, () => options.prepareInstructions!(), { order: -100 });
@@ -642,7 +707,7 @@ export class SubagentHost {
       },
       recover: (execution) => scoped.recover(execution),
       resolveApproval: async (sessionId, requestId, decision) =>
-        await scoped.resolveApproval?.(sessionId, requestId, decision) ?? false,
+        (await scoped.resolveApproval?.(sessionId, requestId, decision)) ?? false,
     };
   }
 
@@ -676,7 +741,11 @@ class SubagentRequest {
   runtime: CoordinationRuntime | undefined;
   ledger: SubagentRequestLedger | undefined;
   private totals: SubagentBudgetTotals = {
-    modelCalls: 0, totalTokens: 0, costUsd: 0, blocked: false, usageComplete: true,
+    modelCalls: 0,
+    totalTokens: 0,
+    costUsd: 0,
+    blocked: false,
+    usageComplete: true,
   };
   private budgetReason: string | undefined;
   /** 账本中每一次调用都按 provider 上报的 usage 结账时为 true。 */
@@ -698,7 +767,11 @@ class SubagentRequest {
   private ended = false;
   private cancellingPromise: Promise<boolean> | undefined;
 
-  constructor(readonly host: SubagentHost, private readonly plan: SubagentRequestPlan, private readonly mode: "submit" | "continue") {
+  constructor(
+    readonly host: SubagentHost,
+    private readonly plan: SubagentRequestPlan,
+    private readonly mode: "submit" | "continue",
+  ) {
     this.firstRun = new Promise<string>((resolve, reject) => {
       this.resolveFirstRun = resolve;
       this.rejectFirstRun = reject;
@@ -712,10 +785,14 @@ class SubagentRequest {
     void this.result.catch(() => undefined);
     const self = this;
     this.run = {
-      get id(): string { return self.firstRunId ?? self.requestId; },
+      get id(): string {
+        return self.firstRunId ?? self.requestId;
+      },
       requestId: this.requestId,
       result: this.result,
-      cancel: (reason?: string) => { void this.cancel(reason ?? "Cancelled by user"); },
+      cancel: (reason?: string) => {
+        void this.cancel(reason ?? "Cancelled by user");
+      },
       runs: () => this.mainRuns(),
     };
   }
@@ -754,17 +831,22 @@ class SubagentRequest {
       this.firstRunId = runId;
       this.resolveFirstRun(runId);
     }
-    void result.then(async (value) => {
-      record.settled = { ok: true, value };
-      await this.checkBudget();
-      this.refresh();
-    }, (error: unknown) => {
-      record.settled = { ok: false, error };
-      if (this.failure === undefined && !(error instanceof RunCancelledError)) {
-        this.failure = error instanceof Error ? error : new Error(String(error));
-      }
-      this.refresh();
-    }).catch(() => undefined);
+    void result
+      .then(
+        async (value) => {
+          record.settled = { ok: true, value };
+          await this.checkBudget();
+          this.refresh();
+        },
+        (error: unknown) => {
+          record.settled = { ok: false, error };
+          if (this.failure === undefined && !(error instanceof RunCancelledError)) {
+            this.failure = error instanceof Error ? error : new Error(String(error));
+          }
+          this.refresh();
+        },
+      )
+      .catch(() => undefined);
   }
 
   /** @internal 真实主 Run 的身份，在 Run 启动时捕获。 */
@@ -780,11 +862,20 @@ class SubagentRequest {
   /** 本请求的真实 Run，每个都保留自己的身份与结果。 */
   async mainRuns(): Promise<readonly MaybeCodeRequestRun[]> {
     await Promise.allSettled(this.records.map((record) => record.result));
-    return this.records.flatMap((record) => record.settled === undefined
-      ? []
-      : record.settled.ok
-        ? [{ runId: record.runId, sessionId: this.host.options.sessionId, turn: record.turn, result: record.settled.value }]
-        : []);
+    return this.records.flatMap((record) =>
+      record.settled === undefined
+        ? []
+        : record.settled.ok
+          ? [
+              {
+                runId: record.runId,
+                sessionId: this.host.options.sessionId,
+                turn: record.turn,
+                result: record.settled.value,
+              },
+            ]
+          : [],
+    );
   }
 
   /** 停止请求：主 Run、全部子任务及其后代。 */
@@ -797,11 +888,13 @@ class SubagentRequest {
       this.rejectResult(error);
       return true;
     }
-    this.cancellingPromise ??= runtime.cancel(`cancel-${this.requestId}-${this.cancelCommands++}`)
-      .then(() => true, (error: unknown) => {
+    this.cancellingPromise ??= runtime.cancel(`cancel-${this.requestId}-${this.cancelCommands++}`).then(
+      () => true,
+      (error: unknown) => {
         this.failure ??= error instanceof Error ? error : new Error(String(error));
         return false;
-      });
+      },
+    );
     return this.cancellingPromise;
   }
 
@@ -815,11 +908,12 @@ class SubagentRequest {
     this.usageComplete = totals.usageComplete;
     if (!totals.blocked || this.cancelling !== undefined) return;
     const configuration = this.host.options.configuration;
-    this.budgetReason ??= totals.modelCalls > configuration.maxModelCalls
-      ? `Request model call budget exhausted: ${totals.modelCalls}/${configuration.maxModelCalls}`
-      : configuration.maxTotalTokens !== undefined && totals.totalTokens > configuration.maxTotalTokens
-        ? `Request token budget exhausted: ${totals.totalTokens}/${configuration.maxTotalTokens} tokens`
-        : "Request model usage is unknown; the request stops before the next model call";
+    this.budgetReason ??=
+      totals.modelCalls > configuration.maxModelCalls
+        ? `Request model call budget exhausted: ${totals.modelCalls}/${configuration.maxModelCalls}`
+        : configuration.maxTotalTokens !== undefined && totals.totalTokens > configuration.maxTotalTokens
+          ? `Request token budget exhausted: ${totals.totalTokens}/${configuration.maxTotalTokens} tokens`
+          : "Request model usage is unknown; the request stops before the next model call";
     this.failure ??= new Error(this.budgetReason);
   }
 
@@ -827,11 +921,15 @@ class SubagentRequest {
     const host = this.host;
     const options = host.options;
     const configuration = options.configuration;
-    this.ledger = await SubagentRequestLedger.open(host.directory(this.requestId), this.requestId, omitUndefined({
-      maxModelCalls: configuration.maxModelCalls,
-      maxTotalTokens: configuration.maxTotalTokens,
-      reservationTokens: configuration.reservationTokens,
-    }));
+    this.ledger = await SubagentRequestLedger.open(
+      host.directory(this.requestId),
+      this.requestId,
+      omitUndefined({
+        maxModelCalls: configuration.maxModelCalls,
+        maxTotalTokens: configuration.maxTotalTokens,
+        reservationTokens: configuration.reservationTokens,
+      }),
+    );
     this.totals = await this.ledger.totals();
     await this.checkBudget();
     let runtime: CoordinationRuntime;
@@ -842,11 +940,13 @@ class SubagentRequest {
         agents: host.agents(this.mode),
         policy: host.policy(),
         limits: host.limits(),
-        tasks: [{
-          id: MAIN_TASK_ID,
-          agent: MAIN_AGENT,
-          input: bounded(this.plan.record, configuration.limits.maxInputBytes),
-        }],
+        tasks: [
+          {
+            id: MAIN_TASK_ID,
+            agent: MAIN_AGENT,
+            input: bounded(this.plan.record, configuration.limits.maxInputBytes),
+          },
+        ],
         sessionIds: { [MAIN_TASK_ID]: options.sessionId },
       });
     } catch (error) {
@@ -861,7 +961,9 @@ class SubagentRequest {
     this.relay = this.relayEvents(runtime);
     this.settled = this.settle(runtime);
     void this.settled.catch(() => undefined);
-    void runtime.start().catch((error: unknown) => { this.failure ??= asError(error); });
+    void runtime.start().catch((error: unknown) => {
+      this.failure ??= asError(error);
+    });
     await this.firstRun;
   }
 
@@ -891,8 +993,11 @@ class SubagentRequest {
     } catch (error) {
       outcome = asError(error);
     } finally {
-      try { await this.host.release(this); }
-      catch (error) { outcome = asError(error); }
+      try {
+        await this.host.release(this);
+      } catch (error) {
+        outcome = asError(error);
+      }
     }
     if (outcome instanceof Error) {
       if (this.records.length === 0) this.rejectFirstRun(outcome);
@@ -904,9 +1009,8 @@ class SubagentRequest {
 
   private resultOf(main: CoordinationTask): RunResult | Error {
     const runId = main.output?.runId;
-    const record = runId === undefined
-      ? this.records.at(-1)
-      : [...this.records].reverse().find((entry) => entry.runId === runId);
+    const record =
+      runId === undefined ? this.records.at(-1) : [...this.records].reverse().find((entry) => entry.runId === runId);
     if (record?.settled?.ok !== true) {
       return new Error("The main request Run finished without a durable result");
     }
@@ -989,16 +1093,16 @@ class SubagentRequest {
       mainRunIds: this.state.mainRunIds,
       tasks: this.state.tasks,
     };
-    host.requests = [
-      record,
-      ...host.requests.filter((request) => request.requestId !== this.requestId),
-    ].slice(0, MAX_INDEXED_REQUESTS);
+    host.requests = [record, ...host.requests.filter((request) => request.requestId !== this.requestId)].slice(
+      0,
+      MAX_INDEXED_REQUESTS,
+    );
     await host.options.saveRequests(host.requests);
   }
 }
 
 function runIds(snapshot: CoordinationSnapshot): readonly string[] {
-  return snapshot.tasks.flatMap((task) => task.output?.runId === undefined ? [] : [task.output.runId]);
+  return snapshot.tasks.flatMap((task) => (task.output?.runId === undefined ? [] : [task.output.runId]));
 }
 
 /**
@@ -1039,7 +1143,9 @@ function failure(
   if (main === undefined) return new Error("The request has no main task record");
   if (main.status === "cancelled") return new RunCancelledError(cancelling ?? main.detail ?? "Request cancelled");
   if (main.status === "recovery-required") {
-    return new Error(`Sub-agent work needs verified recovery before it can continue: ${main.detail ?? "unknown interrupted tool effects"}`);
+    return new Error(
+      `Sub-agent work needs verified recovery before it can continue: ${main.detail ?? "unknown interrupted tool effects"}`,
+    );
   }
   return new Error(`The main request task is ${main.status}: ${main.detail ?? "no durable result"}`);
 }
@@ -1060,10 +1166,7 @@ function toolRecords(events: readonly SessionEvent[]): {
       step: event.step,
       name: event.call.name,
       status: event.type === "tool.completed" ? "completed" : "failed",
-      summary: bounded(
-        event.type === "tool.completed" ? describe(event.output) : event.error.message,
-        300,
-      ),
+      summary: bounded(event.type === "tool.completed" ? describe(event.output) : event.error.message, 300),
     });
   }
   return { records, truncated };

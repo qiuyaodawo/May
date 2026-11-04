@@ -20,13 +20,16 @@ let runtime: TuiRuntime;
 class DemoView implements InteractiveComponent {
   private readonly focus = new FocusManager();
   private status = "Ready";
-  private readonly choices = new SelectList([
-    { value: "deepseek", label: "DeepSeek", description: "provider adapter" },
-    { value: "glm", label: "GLM", description: "provider adapter" },
-    { value: "kimi", label: "Kimi", description: "provider adapter" },
-  ], {
-    onSelect: (item) => this.status = `Selected ${item.label}`,
-  });
+  private readonly choices = new SelectList(
+    [
+      { value: "deepseek", label: "DeepSeek", description: "provider adapter" },
+      { value: "glm", label: "GLM", description: "provider adapter" },
+      { value: "kimi", label: "Kimi", description: "provider adapter" },
+    ],
+    {
+      onSelect: (item) => (this.status = `Selected ${item.label}`),
+    },
+  );
   private readonly editor = new Editor({
     placeholder: "Type 中文 or another message…",
     onSubmit: (value) => {
@@ -42,14 +45,17 @@ class DemoView implements InteractiveComponent {
   }
 
   render(size: RenderSize): RenderResult {
-    return new Stack([
-      new Text("May TUI interactive foundation"),
-      new Text("Unicode: 中文 · こんにちは · 🚀"),
-      new Text(() => `Focus: ${this.focus.focusedId} · ${this.status}`),
-      this.choices,
-      this.editor,
-      new Text("Tab/Shift+Tab changes focus · Enter acts · Ctrl+C exits"),
-    ], { gap: 1 }).render(size);
+    return new Stack(
+      [
+        new Text("May TUI interactive foundation"),
+        new Text("Unicode: 中文 · こんにちは · 🚀"),
+        new Text(() => `Focus: ${this.focus.focusedId} · ${this.status}`),
+        this.choices,
+        this.editor,
+        new Text("Tab/Shift+Tab changes focus · Enter acts · Ctrl+C exits"),
+      ],
+      { gap: 1 },
+    ).render(size);
   }
 
   handleKey(stroke: KeyStroke): boolean {

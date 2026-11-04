@@ -28,6 +28,7 @@
   Breaking: TUI tool items now include denied, not-started, and unknown statuses, and assistant items include interrupted. Update exhaustive custom renderers to handle these states.
 
   Validate ApplicationUiHost commands directly from current execution and ownership state. Presentation reads leave commands available, and host shutdown settles accepted work while rejecting later commands.
+
 - Updated dependencies [437b090]
 - Updated dependencies [c23ff33]
 - Updated dependencies [437b090]
@@ -87,12 +88,14 @@
   增加可选 service 查询、本地诊断与独立指标服务，以及可复用的 UI 诊断面板。宿主可以
   按会话范围查询执行记录、刷新模型能力，并独立管理遥测资源。子 Agent 预算包装保留
   模型配置、能力版本和物理请求观察信息。
+
 - 8df2b63: Add the Node-only application/git-workspace entry point for project Git checkpoints, coordinated request commits, persistent worktree management and reviewed file restoration. Add shared workspace status, reply fork and checkpoint diff data to UI hosts and clients, with keyboard history and diff components for terminal applications.
 - c98ec03: MaybeCode 的两个终端界面支持 `/web`，自动打开浏览器并连接当前工作区与 Session。
   终端和 Web 共享执行状态及审批，退出终端时关闭 Web 服务。
 
   共享 UI 支持独立事件订阅、由外部宿主管理 controller 生命周期，以及短时有效的
   一次性浏览器连接凭据。浏览器自动兑换控制令牌，并在兑换前清除 URL fragment。
+
 - 2a44905: Preserve ordered image replies from OpenAI Responses and expose reusable raster
   attachment validation, storage and reading. Terminal views support Kitty/iTerm2
   graphics and saved-file information; Web UI provides session-scoped authenticated
@@ -107,6 +110,7 @@
   MaybeCode supports --yolo, --no-yolo and /yolo [on|off|status], preserves explicit
   policy denials, and displays the current mode in terminal and Web UI sessions.
   The bare /yolo command enables the mode; /yolo status reports it without changes.
+
 - 5d3b04a: Add opt-in persistent allow and deny rules with trusted scope, tool-definition
   binding, creator identity, expiry and revocation. Provide a versioned file store
   with atomic replacement and a single writer lock through
@@ -137,6 +141,7 @@
   exists. Supply a trusted `createdBy` identity when resolving it. Existing policy
   return values and existing Session histories remain supported. Readers of
   histories containing rule events must use the updated Session package.
+
 - 78bde1d: `UiSnapshot` 增加可选的 `resourcesVersion`。资源成员、分页顺序或搜索文本变化时，
   Web UI 保留搜索条件及已加载页数，重新读取资源列表。支持完整目录中的新增、删除和重命名。
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
@@ -150,6 +155,7 @@
 
   The TUI package includes the PNG declarations required by its image dependency,
   so consumers can type-check installed declarations with `skipLibCheck: false`.
+
 - 02789c6: Display delivered steering messages consistently in live transcripts and restored
   Session history, preserving FIFO order and stable message identities. Include
   complete steering text in Web history search and field reads while retaining
@@ -165,6 +171,7 @@
   同步升级；程序调用方通过 select(id) 切换会话，通过 history/field API 读取历史。
   session.delete 使用 targetId 指定删除对象，并要求 expectedActiveId 校验当前会话。
   任务页面保留独立选择。
+
 - 396ffb8: MaybeCode Web UI 支持共享斜杠命令及补全、effort、默认模型、会话管理、
   Skills、MCP、恢复处置和确认退出宿主。MCP 表单、review 和 URL 交互可在
   Web 或 TUI 完成，独立 Web 启动同样启用交互。

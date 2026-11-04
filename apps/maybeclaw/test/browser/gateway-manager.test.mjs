@@ -40,16 +40,35 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
       apps: {
         maybeclaw: {
           version: 2,
-          agents: [{
-            id: "file-agent", name: "文件计算助手", adapter: "module", enabled: true,
-            module: fileURLToPath(new URL("../../dist/gateway-rpc-adapter.js", import.meta.url)),
-            options: {
-              transport: "stdio", command: process.execPath,
-              args: [fileURLToPath(new URL("../../examples/rpc-file-agent.mjs", import.meta.url)), "--directory", join(directory, "rpc-state"), "--workspace", directory],
+          agents: [
+            {
+              id: "file-agent",
+              name: "文件计算助手",
+              adapter: "module",
+              enabled: true,
+              module: fileURLToPath(new URL("../../dist/gateway-rpc-adapter.js", import.meta.url)),
+              options: {
+                transport: "stdio",
+                command: process.execPath,
+                args: [
+                  fileURLToPath(new URL("../../examples/rpc-file-agent.mjs", import.meta.url)),
+                  "--directory",
+                  join(directory, "rpc-state"),
+                  "--workspace",
+                  directory,
+                ],
+              },
             },
-          }],
+          ],
           access: { creators: [], deniedUsers: [], sessionAdmins: {}, allowedAgents: {} },
-          server: { maxConcurrent: 4, approvalMs: 60000, idleMs: 120000, shutdownMs: 15000, auth: { password }, publicOrigin: "https://gateway.example.com" },
+          server: {
+            maxConcurrent: 4,
+            approvalMs: 60000,
+            idleMs: 120000,
+            shutdownMs: 15000,
+            auth: { password },
+            publicOrigin: "https://gateway.example.com",
+          },
         },
       },
     };
@@ -59,19 +78,25 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
     session = gateway.createSession(operator, "真实文件计算会话", ["file-agent"]);
     await gateway.handle(inputMessage, operator, { requestId: "req-compute-1", sessionId: session.id });
     for (let attempt = 0; attempt < 100 && completedTask === undefined; attempt++) {
-      completedTask = gateway.store.list("tasks").find(task => task.sessionId === session.id && task.status === "completed");
-      if (completedTask === undefined) await new Promise(resolve => setTimeout(resolve, 50));
+      completedTask = gateway.store
+        .list("tasks")
+        .find((task) => task.sessionId === session.id && task.status === "completed");
+      if (completedTask === undefined) await new Promise((resolve) => setTimeout(resolve, 50));
     }
     server = await startGatewayServer({ gateway, port: 0 });
-    browser = await chromium.launch({ headless: true, env: { ...process.env, TEMP: directory, TMP: directory, TMPDIR: directory } });
+    browser = await chromium.launch({
+      headless: true,
+      env: { ...process.env, TEMP: directory, TMP: directory, TMPDIR: directory },
+    });
     page = await browser.newPage();
-    page.on("pageerror", error => errors.push(error.message));
+    page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(server.url);
   });
 
   after(async () => {
     await browser?.close();
-    if (server) await server.close(); else await gateway?.close();
+    if (server) await server.close();
+    else await gateway?.close();
     if (directory !== undefined) {
       const child = relative(base, directory);
       assert.ok(child && !child.startsWith(".."));
@@ -83,13 +108,18 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
     assert.ok(completedTask, "真实子进程 Agent 任务应当在超时前执行完成");
     assert.equal(completedTask.agentId, "file-agent");
     const expectedHash = createHash("sha256").update(testFileContent).digest("hex");
-    assert.ok(gateway.messages(session.id, operator).some(message => message.text.includes(expectedHash)), "真实子进程应当计算并返回正确的 sha256 摘要结果");
+    assert.ok(
+      gateway.messages(session.id, operator).some((message) => message.text.includes(expectedHash)),
+      "真实子进程应当计算并返回正确的 sha256 摘要结果",
+    );
   });
 
   test("管理员登录后不预选会话", async () => {
     await page.locator(".connection-button").click();
     await page.getByLabel("管理员密码", { exact: true }).fill(password);
-    const snapshot = page.waitForResponse(response => new URL(response.url()).pathname === "/api/ui/snapshot" && response.status() === 200);
+    const snapshot = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/ui/snapshot" && response.status() === 200,
+    );
     await page.getByRole("button", { name: "连接", exact: true }).click();
     await page.waitForFunction(() => !document.querySelector(".new-button")?.disabled);
     assert.equal((await (await snapshot).json()).selectedId, null);
@@ -107,10 +137,15 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
   });
 
   test("/status 命令返回任务状态且不创建任务", async () => {
-    const initialTaskIds = gateway.store.list("tasks").map(task => task.id).sort();
+    const initialTaskIds = gateway.store
+      .list("tasks")
+      .map((task) => task.id)
+      .sort();
     const statusText = `/status ${completedTask.id}`;
     await composer().fill(statusText);
-    const pending = page.waitForResponse(response => new URL(response.url()).pathname === "/api/ui/commands" && response.request().method() === "POST");
+    const pending = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/ui/commands" && response.request().method() === "POST",
+    );
     await sendButton().click();
     const response = await pending;
     assert.equal(response.status(), 200);
@@ -122,7 +157,13 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
     assert.ok(receipt.output.text.includes(completedTask.id));
     assert.ok(receipt.output.text.includes("completed"));
     assert.equal(receipt.selectedId, session.id);
-    assert.deepEqual(gateway.store.list("tasks").map(task => task.id).sort(), initialTaskIds);
+    assert.deepEqual(
+      gateway.store
+        .list("tasks")
+        .map((task) => task.id)
+        .sort(),
+      initialTaskIds,
+    );
     await page.waitForFunction(() => document.querySelector("textarea[aria-label='消息输入']")?.value === "");
   });
 
@@ -146,7 +187,9 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
     await tasksDialog.getByRole("button", { name: "切换到该会话", exact: true }).first().click();
     await tasksDialog.waitFor({ state: "detached" });
     await page.waitForFunction((sessionName) => {
-      const active = document.querySelector(".sidebar-item.selected, .sidebar-item.active, .resource-item.selected, .resource-item.active");
+      const active = document.querySelector(
+        ".sidebar-item.selected, .sidebar-item.active, .resource-item.selected, .resource-item.active",
+      );
       return active?.textContent?.includes(sessionName);
     }, session.name);
   });
@@ -205,7 +248,9 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
     test(`${size.name}的服务设置表单可以滚动到关闭按钮`, async () => {
       await page.setViewportSize({ width: size.width, height: size.height });
       await page.waitForTimeout(100);
-      const sidebarVisible = await page.locator(".sidebar").evaluate(element => !element.inert && !element.hasAttribute("aria-hidden"));
+      const sidebarVisible = await page
+        .locator(".sidebar")
+        .evaluate((element) => !element.inert && !element.hasAttribute("aria-hidden"));
       if (!sidebarVisible) {
         await page.getByRole("button", { name: "切换侧边栏" }).click();
         await page.waitForFunction(() => document.querySelector(".workbench")?.classList.contains("sidebar-open"));
@@ -214,10 +259,14 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
       await navigationButton.waitFor({ state: "visible" });
       await navigationButton.scrollIntoViewIfNeeded();
       await navigationButton.click();
-      const dialog = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "服务设置", exact: true }) });
+      const dialog = page
+        .getByRole("dialog")
+        .filter({ has: page.getByRole("heading", { name: "服务设置", exact: true }) });
       await dialog.waitFor({ state: "visible" });
-      const scroll = await dialog.locator(".gateway-dialog-form").evaluate(element => ({
-        clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: window.getComputedStyle(element).overflowY,
+      const scroll = await dialog.locator(".gateway-dialog-form").evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        overflowY: window.getComputedStyle(element).overflowY,
       }));
       assert.ok(scroll.scrollHeight >= scroll.clientHeight, "表单内部内容高度异常");
       assert.equal(scroll.overflowY, "auto", "表单未配置竖向自动滚动");

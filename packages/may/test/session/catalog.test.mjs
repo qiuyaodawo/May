@@ -36,7 +36,10 @@ test("persists and updates session summaries", async (t) => {
   assert.deepEqual(await first.list(directory), beforeCompaction);
   const reopened = new FileSessionCatalog(path);
   const sessions = await reopened.list(directory);
-  assert.deepEqual(sessions.map((session) => session.id), ["one", "two"]);
+  assert.deepEqual(
+    sessions.map((session) => session.id),
+    ["one", "two"],
+  );
   assert.equal(sessions[0].createdAt, 1);
   assert.equal(sessions[0].lastUsedAt, 5);
   assert.equal(sessions[0].preview, "first preview");
@@ -55,10 +58,7 @@ test("rejects corrupt session catalog data", async (t) => {
   const path = join(directory, "catalog.json");
   await writeFile(path, "not-json", "utf8");
 
-  await assert.rejects(
-    new FileSessionCatalog(path).list(directory),
-    /Invalid May session catalog JSON/,
-  );
+  await assert.rejects(new FileSessionCatalog(path).list(directory), /Invalid May session catalog JSON/);
 });
 
 test("does not lose concurrent updates from separate catalog instances", async (t) => {
@@ -69,14 +69,16 @@ test("does not lose concurrent updates from separate catalog instances", async (
   const originalNow = Date.now;
   Date.now = () => 1_900_000_000_000;
   try {
-    await Promise.all(Array.from({ length: 40 }, (_, index) =>
-      (index % 2 === 0 ? first : second).record({
-        id: `session-${index}`,
-        workspace: directory,
-        createdAt: index,
-        lastUsedAt: index,
-      })
-    ));
+    await Promise.all(
+      Array.from({ length: 40 }, (_, index) =>
+        (index % 2 === 0 ? first : second).record({
+          id: `session-${index}`,
+          workspace: directory,
+          createdAt: index,
+          lastUsedAt: index,
+        }),
+      ),
+    );
     await first.record({
       id: "rename-me",
       workspace: directory,

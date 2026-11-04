@@ -7,26 +7,46 @@
     "git": {
       "oneOf": [
         { "const": false },
-        { "type": "object", "properties": {
-          "autoCommit": { "type": "boolean", "default": true },
-          "readOnly": { "type": "boolean", "default": false },
-          "dataRoot": { "$ref": "#/$defs/nonEmptyString" },
-          "worktreesRoot": { "$ref": "#/$defs/nonEmptyString" },
-          "excludedPaths": { "type": "array", "items": { "$ref": "#/$defs/nonEmptyString" } }
-        }, "additionalProperties": false }
+        {
+          "type": "object",
+          "properties": {
+            "autoCommit": { "type": "boolean", "default": true },
+            "readOnly": { "type": "boolean", "default": false },
+            "dataRoot": { "$ref": "#/$defs/nonEmptyString" },
+            "worktreesRoot": { "$ref": "#/$defs/nonEmptyString" },
+            "excludedPaths": { "type": "array", "items": { "$ref": "#/$defs/nonEmptyString" } }
+          },
+          "additionalProperties": false
+        }
       ]
     },
     "plugins": { "$ref": "#/$defs/pluginSelections" },
-    "permissionMode": { "enum": ["default", "yolo"], "default": "default", "description": "Tool approval mode. yolo auto-approves requests while preserving explicit policy denials." },
-    "persistentRules": { "type": "boolean", "default": false, "description": "Enable project-scoped persistent file permissions in .may/permission-rules.json." },
-    "delegationNotifications": { "type": "boolean", "default": false, "description": "Show a notice when a sub-agent task finishes." },
+    "permissionMode": {
+      "enum": ["default", "yolo"],
+      "default": "default",
+      "description": "Tool approval mode. yolo auto-approves requests while preserving explicit policy denials."
+    },
+    "persistentRules": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable project-scoped persistent file permissions in .may/permission-rules.json."
+    },
+    "delegationNotifications": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show a notice when a sub-agent task finishes."
+    },
     "instructionsDirectory": { "$ref": "#/$defs/nonEmptyString" },
     "skills": {
       "oneOf": [
         { "const": false },
-        { "type": "object", "properties": {
+        {
+          "type": "object",
+          "properties": {
             "directories": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/nonEmptyString" } }
-          }, "additionalProperties": false }
+          },
+          "additionalProperties": false
+        }
       ]
     },
     "runBudget": { "$ref": "#/$defs/runBudget" },
@@ -36,7 +56,11 @@
         {
           "type": "object",
           "properties": {
-            "enabled": { "type": "boolean", "default": true, "description": "Sub-agent delegation for ordinary requests. Enabled by default." },
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Sub-agent delegation for ordinary requests. Enabled by default."
+            },
             "roles": {
               "type": "object",
               "minProperties": 1,
@@ -59,8 +83,17 @@
               "additionalProperties": false
             },
             "runBudget": { "$ref": "#/$defs/runBudget", "description": "Per child Run budget." },
-            "maxModelCalls": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 128, "description": "Model calls reserved across the main Run, child Runs and compaction of one request." },
-            "maxTotalTokens": { "$ref": "#/$defs/positiveInteger", "description": "Optional token ceiling checked against per-call reservations." },
+            "maxModelCalls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 128,
+              "description": "Model calls reserved across the main Run, child Runs and compaction of one request."
+            },
+            "maxTotalTokens": {
+              "$ref": "#/$defs/positiveInteger",
+              "description": "Optional token ceiling checked against per-call reservations."
+            },
             "reservationTokens": { "type": "integer", "minimum": 1, "maximum": 10000000, "default": 32768 }
           },
           "additionalProperties": false
@@ -71,7 +104,7 @@
       "type": "object",
       "properties": {
         "mode": {
-          "enum":["prune-summary", "history-reference", "provider-native"],
+          "enum": ["prune-summary", "history-reference", "provider-native"],
           "default": "prune-summary"
         }
       },
@@ -124,10 +157,7 @@
           "type": "object",
           "propertyNames": { "pattern": "^[A-Za-z0-9_-]+$" },
           "additionalProperties": {
-            "oneOf": [
-              { "$ref": "#/$defs/mcpStdioServer" },
-              { "$ref": "#/$defs/mcpHttpServer" }
-            ]
+            "oneOf": [{ "$ref": "#/$defs/mcpStdioServer" }, { "$ref": "#/$defs/mcpHttpServer" }]
           }
         }
       ]
@@ -143,7 +173,10 @@
     "subagentRole": {
       "type": "object",
       "properties": {
-        "model": { "$ref": "#/$defs/subagentIdentifier", "description": "Model profile name. Without it the role inherits the main Session model and reasoning effort." },
+        "model": {
+          "$ref": "#/$defs/subagentIdentifier",
+          "description": "Model profile name. Without it the role inherits the main Session model and reasoning effort."
+        },
         "reasoningEffort": { "type": "string", "pattern": "\\S", "maxLength": 64 },
         "instructions": { "type": "string", "pattern": "^[^\\u0000]*\\S[^\\u0000]*$", "maxLength": 16384 },
         "tools": {
@@ -170,7 +203,11 @@
         "transport": { "const": "stdio", "default": "stdio" },
         "protocolMode": { "enum": ["legacy", "auto"], "default": "legacy" },
         "host": { "$ref": "#/$defs/mcpHostOptions" },
-        "tasks": { "type": "boolean", "default": false, "description": "Enable the modern Tasks extension with durable encrypted handles." },
+        "tasks": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the modern Tasks extension with durable encrypted handles."
+        },
         "command": { "$ref": "#/$defs/nonEmptyString" },
         "args": {
           "type": "array",
@@ -206,19 +243,27 @@
         "enabled": { "type": "boolean", "default": true },
         "required": { "type": "boolean", "default": true },
         "transport": { "const": "streamable-http" },
-        "url": { "$ref": "#/$defs/nonEmptyString", "description": "HTTPS endpoint (HTTP only on loopback); redirects and URL credentials are refused at runtime." },
-        "headers": { "type": "object", "propertyNames": { "minLength": 1 }, "additionalProperties": { "type": "string" } },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "HTTPS endpoint (HTTP only on loopback); redirects and URL credentials are refused at runtime."
+        },
+        "headers": {
+          "type": "object",
+          "propertyNames": { "minLength": 1 },
+          "additionalProperties": { "type": "string" }
+        },
         "auth": { "$ref": "#/$defs/mcpOAuthOptions" },
         "protocolMode": { "enum": ["legacy", "auto"], "default": "auto" },
         "host": { "$ref": "#/$defs/mcpHostOptions" },
-        "tasks": { "type": "boolean", "default": false, "description": "Enable the modern Tasks extension with durable encrypted handles." },
+        "tasks": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the modern Tasks extension with durable encrypted handles."
+        },
         "requestTimeoutMs": { "$ref": "#/$defs/positiveInteger" },
         "maxTotalTimeoutMs": { "$ref": "#/$defs/positiveInteger" }
       },
-      "anyOf": [
-        { "required": ["enabled"], "properties": { "enabled": { "const": false } } },
-        { "required": ["url"] }
-      ],
+      "anyOf": [{ "required": ["enabled"], "properties": { "enabled": { "const": false } } }, { "required": ["url"] }],
       "additionalProperties": false
     },
     "mcpHostOptions": {
@@ -227,7 +272,10 @@
       "properties": {
         "roots": { "type": "boolean", "default": false },
         "sampling": { "type": "boolean", "default": false },
-        "legacyRequests": { "const": "isolated", "description": "Use a fresh process/session for each legacy interactive operation, never shared or reused." }
+        "legacyRequests": {
+          "const": "isolated",
+          "description": "Use a fresh process/session for each legacy interactive operation, never shared or reused."
+        }
       },
       "additionalProperties": false
     },

@@ -33,29 +33,67 @@ export function delegationTool(
       ...(agents.length === 0 ? [] : [`Currently authorized roles: ${agents.join(", ")}.`]),
       ...(options.guidance === undefined ? [] : [options.guidance]),
     ].join(" "),
-    inputSchema: { type: "object", additionalProperties: false, required: ["tasks"], properties: {
-      tasks: { type: "array", minItems: 1, maxItems: MAX_CHILDREN, items: { type: "object", additionalProperties: false,
-        required: ["id", "agent", "input"], properties: {
-          id: { type: "string", description: "Graph-unique task id" },
-          agent: { type: "string", description: "One authorized role" },
-          input: { type: "string", description: "Complete standalone brief for this child" },
-          files: { type: "array", maxItems: 128, items: { type: "string" },
-            description: "Workspace-relative files this child may modify; an empty list allows no file modifications" },
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["tasks"],
+      properties: {
+        tasks: {
+          type: "array",
+          minItems: 1,
+          maxItems: MAX_CHILDREN,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "agent", "input"],
+            properties: {
+              id: { type: "string", description: "Graph-unique task id" },
+              agent: { type: "string", description: "One authorized role" },
+              input: { type: "string", description: "Complete standalone brief for this child" },
+              files: {
+                type: "array",
+                maxItems: 128,
+                items: { type: "string" },
+                description:
+                  "Workspace-relative files this child may modify; an empty list allows no file modifications",
+              },
+            },
+          },
         },
-      } },
-    } },
+      },
+    },
     parse(value: unknown): { tasks: TaskSpec[] } {
-      if (typeof value !== "object" || value === null || Array.isArray(value) || Object.keys(value).some((key) => key !== "tasks")) throw new TypeError("Expected only a tasks array");
+      if (
+        typeof value !== "object" ||
+        value === null ||
+        Array.isArray(value) ||
+        Object.keys(value).some((key) => key !== "tasks")
+      )
+        throw new TypeError("Expected only a tasks array");
       const tasks = (value as { tasks?: unknown }).tasks;
-      if (!Array.isArray(tasks) || tasks.length === 0 || tasks.length > MAX_CHILDREN) throw new TypeError(`Between 1 and ${MAX_CHILDREN} child tasks are required`);
-      return { tasks: tasks.map((task) => {
-        if (!task || typeof task !== "object" || Array.isArray(task) || Object.keys(task).some((key) => !["id", "agent", "input", "files"].includes(key)) ||
-          [task.id, task.agent, task.input].some((value) => typeof value !== "string")) throw new TypeError("Each child needs only id, agent and input strings, plus optional files");
-        if (Buffer.byteLength(task.input, "utf8") > (options.maxInputBytes ?? 65_536)) throw new RangeError(`Each child brief is limited to ${options.maxInputBytes ?? 65_536} bytes`);
-        if (task.files !== undefined) validateTaskFiles(task.files as string[]);
-        return { id: task.id, agent: task.agent, input: task.input,
-          ...(task.files === undefined ? {} : { files: [...(task.files as string[])] }) };
-      }) };
+      if (!Array.isArray(tasks) || tasks.length === 0 || tasks.length > MAX_CHILDREN)
+        throw new TypeError(`Between 1 and ${MAX_CHILDREN} child tasks are required`);
+      return {
+        tasks: tasks.map((task) => {
+          if (
+            !task ||
+            typeof task !== "object" ||
+            Array.isArray(task) ||
+            Object.keys(task).some((key) => !["id", "agent", "input", "files"].includes(key)) ||
+            [task.id, task.agent, task.input].some((value) => typeof value !== "string")
+          )
+            throw new TypeError("Each child needs only id, agent and input strings, plus optional files");
+          if (Buffer.byteLength(task.input, "utf8") > (options.maxInputBytes ?? 65_536))
+            throw new RangeError(`Each child brief is limited to ${options.maxInputBytes ?? 65_536} bytes`);
+          if (task.files !== undefined) validateTaskFiles(task.files as string[]);
+          return {
+            id: task.id,
+            agent: task.agent,
+            input: task.input,
+            ...(task.files === undefined ? {} : { files: [...(task.files as string[])] }),
+          };
+        }),
+      };
     },
     async execute(input, call) {
       call.signal.throwIfAborted();

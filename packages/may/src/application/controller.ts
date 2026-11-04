@@ -1,9 +1,11 @@
+import type { ContextCompactionResult, ContextCompactionStrategy, ContextInspection } from "../context/index.js";
 import type {
-  ContextCompactionResult,
-  ContextCompactionStrategy,
-  ContextInspection,
-} from "../context/index.js";
-import type { ApprovalDecision, ApprovalResolveOptions, CreatePermissionRuleOptions, PermissionCheck, PersistentPermissionRule } from "../permissions/index.js";
+  ApprovalDecision,
+  ApprovalResolveOptions,
+  CreatePermissionRuleOptions,
+  PermissionCheck,
+  PersistentPermissionRule,
+} from "../permissions/index.js";
 import type {
   SessionEvent,
   SessionContinueOptions,
@@ -20,11 +22,7 @@ import type { SessionSummary } from "../session/catalog.js";
 import type { AnyPlugin } from "../plugin/index.js";
 import type { PluginUpdateOptions } from "./plugins.js";
 
-import type {
-  AgentApplicationEvent,
-  AgentRun,
-  AgentWorkspaceEvent,
-} from "./events.js";
+import type { AgentApplicationEvent, AgentRun, AgentWorkspaceEvent } from "./events.js";
 
 /**
  * UI-independent control surface for one active May session.
@@ -44,13 +42,12 @@ export interface AgentController<
   submit(options: SessionSubmitOptions): Promise<Run>;
   retry(): Promise<Run>;
   cancel(reason?: string): boolean;
-  resolveApproval(
-    requestId: string,
-    decision: ApprovalDecision,
-    options?: ApprovalResolveOptions,
-  ): Promise<boolean>;
+  resolveApproval(requestId: string, decision: ApprovalDecision, options?: ApprovalResolveOptions): Promise<boolean>;
   listPermissionRules?(scopeId?: string): Promise<readonly PersistentPermissionRule[]>;
-  createPermissionRule?(check: PermissionCheck, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule>;
+  createPermissionRule?(
+    check: PermissionCheck,
+    options: CreatePermissionRuleOptions,
+  ): Promise<PersistentPermissionRule>;
   createPermissionRuleFrom?(sourceId: string, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule>;
   revokePermissionRule?(id: string): Promise<boolean>;
   history(): Promise<readonly SessionEvent[]>;
@@ -59,9 +56,7 @@ export interface AgentController<
   listRecoveries(): readonly SessionRecovery[];
   resolveRecovery?(id: string, finding: string): Promise<void>;
   inspectContext(): Promise<ContextInspection | undefined>;
-  compactContext(
-    selection?: CompactionSelection,
-  ): Promise<ContextCompactionResult>;
+  compactContext(selection?: CompactionSelection): Promise<ContextCompactionResult>;
   close(): Promise<void>;
   updatePlugins?(plugins: readonly AnyPlugin[], options?: PluginUpdateOptions): Promise<void>;
 }
@@ -72,18 +67,18 @@ export interface AgentWorkspaceController<
   ExtensionEvent = never,
   CompactionSelection = ContextCompactionStrategy,
   Run extends AgentRun = AgentRun,
-> extends AgentController<
-    AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>,
-    CompactionSelection,
-    Run
-  > {
+> extends AgentController<AgentWorkspaceEvent<ApplicationEvent, ExtensionEvent>, CompactionSelection, Run> {
   readonly workspace: string;
 
   listSessions(): Promise<readonly SessionSummary[]>;
   /** Optional read-only history access; must not activate or repair the session. */
   readSessionHistory?(sessionId: string): Promise<readonly SessionEvent[]>;
   readSessionBranchTree?(): Promise<readonly SessionBranchNode[]>;
-  forkSession?(sourceId: string, positionSeq: number, options?: import("./workspace.js").AgentWorkspaceForkOptions): Promise<string>;
+  forkSession?(
+    sourceId: string,
+    positionSeq: number,
+    options?: import("./workspace.js").AgentWorkspaceForkOptions,
+  ): Promise<string>;
   newSession(): Promise<string>;
   resumeSession(sessionId: string): Promise<void>;
   renameSession(sessionId: string, title: string): Promise<void>;

@@ -12,11 +12,7 @@ export class MayConfigFileError extends MayConfigError {
   readonly path: string;
 
   constructor(path: string, options?: ErrorOptions) {
-    super(
-      "MAY_CONFIG_FILE_ERROR",
-      `Unable to read May config at ${path}`,
-      options,
-    );
+    super("MAY_CONFIG_FILE_ERROR", `Unable to read May config at ${path}`, options);
     this.path = path;
   }
 }
@@ -27,9 +23,7 @@ export class MayConfigWriteError extends MayConfigError {
   constructor(path: string, problem?: string, options?: ErrorOptions) {
     super(
       "MAY_CONFIG_WRITE_ERROR",
-      `Unable to update May config at ${path}${
-        problem === undefined ? "" : `: ${problem}`
-      }`,
+      `Unable to update May config at ${path}${problem === undefined ? "" : `: ${problem}`}`,
       options,
     );
     this.path = path;
@@ -40,11 +34,7 @@ export class MayConfigParseError extends MayConfigError {
   readonly path: string;
 
   constructor(path: string, options?: ErrorOptions) {
-    super(
-      "MAY_CONFIG_PARSE_ERROR",
-      `May config at ${path} is not valid JSON`,
-      options,
-    );
+    super("MAY_CONFIG_PARSE_ERROR", `May config at ${path} is not valid JSON`, options);
     this.path = path;
   }
 }
@@ -54,10 +44,7 @@ export class MayConfigValidationError extends MayConfigError {
   readonly field: string;
 
   constructor(path: string, field: string, problem: string) {
-    super(
-      "MAY_CONFIG_VALIDATION_ERROR",
-      `Invalid May config at ${path}: ${field} ${problem}`,
-    );
+    super("MAY_CONFIG_VALIDATION_ERROR", `Invalid May config at ${path}: ${field} ${problem}`);
     this.path = path;
     this.field = field;
   }

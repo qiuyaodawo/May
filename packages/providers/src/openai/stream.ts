@@ -1,26 +1,11 @@
-import type {
-  AssistantMessage,
-  ContentPart,
-  ModelEvent,
-  ToolCall,
-  Usage,
-} from "@sortedyuan/may/core";
+import type { AssistantMessage, ContentPart, ModelEvent, ToolCall, Usage } from "@sortedyuan/may/core";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { readSseData } from "../openai-compatible/http.js";
 
-import {
-  OpenAIResponsesError,
-  OpenAIResponsesProtocolError,
-} from "./errors.js";
-import {
-  OPENAI_RESPONSES_MODEL_STATE_TYPE,
-  type OpenAIResponsesUsage,
-} from "./protocol.js";
+import { OpenAIResponsesError, OpenAIResponsesProtocolError } from "./errors.js";
+import { OPENAI_RESPONSES_MODEL_STATE_TYPE, type OpenAIResponsesUsage } from "./protocol.js";
 
-export async function* streamOpenAIResponse(
-  response: Response,
-  signal: AbortSignal,
-): AsyncIterable<ModelEvent> {
+export async function* streamOpenAIResponse(response: Response, signal: AbortSignal): AsyncIterable<ModelEvent> {
   let completed: unknown;
   for await (const data of readSseData(
     response,
@@ -48,9 +33,7 @@ export async function* streamOpenAIResponse(
     }
     if (type === "response.completed") {
       if (completed !== undefined) {
-        throw new OpenAIResponsesProtocolError(
-          "OpenAI Responses emitted more than one response.completed event",
-        );
+        throw new OpenAIResponsesProtocolError("OpenAI Responses emitted more than one response.completed event");
       }
       completed = event.response;
       continue;
@@ -61,9 +44,7 @@ export async function* streamOpenAIResponse(
     if (type === "error") throw streamError(event);
   }
   if (completed === undefined) {
-    throw new OpenAIResponsesProtocolError(
-      "OpenAI Responses stream ended without response.completed",
-    );
+    throw new OpenAIResponsesProtocolError("OpenAI Responses stream ended without response.completed");
   }
   const parsed = parseCompletedOpenAIResponse(completed);
   yield omitUndefined({ type: "response.completed", message: parsed.message, usage: parsed.usage });
@@ -83,7 +64,8 @@ export function parseCompletedOpenAIResponse(value: unknown): {
     const type = requireString(item.type, "response.output item.type");
     if (type === "image_generation_call" && item.result != null) {
       const format = item.output_format ?? "png";
-      if (format !== "png" && format !== "jpeg" && format !== "webp") throw new OpenAIResponsesProtocolError("Unsupported generated image format");
+      if (format !== "png" && format !== "jpeg" && format !== "webp")
+        throw new OpenAIResponsesProtocolError("Unsupported generated image format");
       const data = requireString(item.result, "image_generation_call.result");
       if (data === "") throw new OpenAIResponsesProtocolError("Generated image is empty");
       content.push({ type: "image", source: { type: "base64", mediaType: `image/${format}`, data } });
@@ -117,10 +99,7 @@ export function parseCompletedOpenAIResponse(value: unknown): {
     if (type === "function_call") {
       const id = requireString(item.call_id, "function_call.call_id");
       const name = requireString(item.name, "function_call.name");
-      const argumentsJson = requireString(
-        item.arguments,
-        "function_call.arguments",
-      );
+      const argumentsJson = requireString(item.arguments, "function_call.arguments");
       toolCalls.push({ id, name, input: parseArguments(argumentsJson, id) });
     }
   }
@@ -139,10 +118,19 @@ export function parseCompletedOpenAIResponse(value: unknown): {
 }
 
 export function openAIResponseContent(message: AssistantMessage): readonly ContentPart[] {
-  if (message.content.some(part => part.type === "image") || message.modelState?.type !== OPENAI_RESPONSES_MODEL_STATE_TYPE) return message.content;
+  if (
+    message.content.some((part) => part.type === "image") ||
+    message.modelState?.type !== OPENAI_RESPONSES_MODEL_STATE_TYPE
+  )
+    return message.content;
   const state = requireRecord(message.modelState.data, "modelState.data");
   const items = requireArray(state.items, "modelState.data.items");
-  if (!items.some(item => typeof item === "object" && item !== null && "type" in item && item.type === "image_generation_call")) return message.content;
+  if (
+    !items.some(
+      (item) => typeof item === "object" && item !== null && "type" in item && item.type === "image_generation_call",
+    )
+  )
+    return message.content;
   return parseCompletedOpenAIResponse({ output: items }).message.content;
 }
 
@@ -156,7 +144,13 @@ export function parseUsage(value: unknown): Usage | undefined {
   const outputDetails = optionalRecord(usage.output_tokens_details);
   const cachedReadTokens = optionalTokenCount(inputDetails?.cached_tokens, "input_tokens_details.cached_tokens");
   const reasoningTokens = optionalTokenCount(outputDetails?.reasoning_tokens, "output_tokens_details.reasoning_tokens");
-  if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined && cachedReadTokens === undefined && reasoningTokens === undefined) {
+  if (
+    inputTokens === undefined &&
+    outputTokens === undefined &&
+    totalTokens === undefined &&
+    cachedReadTokens === undefined &&
+    reasoningTokens === undefined
+  ) {
     return undefined;
   }
   return omitUndefined({
@@ -165,11 +159,17 @@ export function parseUsage(value: unknown): Usage | undefined {
     totalTokens,
     cachedReadTokens,
     reasoningTokens,
-    ...(cachedReadTokens === undefined && reasoningTokens === undefined ? {} : { tokenRelations: {
-      ...(cachedReadTokens === undefined ? {} : { cachedRead: "input" as const }),
-      ...(reasoningTokens === undefined ? {} : { reasoning: "output" as const }),
-    } }),
-    ...(inputTokens === undefined || outputTokens === undefined ? { completeness: { status: "partial" as const, reason: "provider-token-components-missing" } } : {}),
+    ...(cachedReadTokens === undefined && reasoningTokens === undefined
+      ? {}
+      : {
+          tokenRelations: {
+            ...(cachedReadTokens === undefined ? {} : { cachedRead: "input" as const }),
+            ...(reasoningTokens === undefined ? {} : { reasoning: "output" as const }),
+          },
+        }),
+    ...(inputTokens === undefined || outputTokens === undefined
+      ? { completeness: { status: "partial" as const, reason: "provider-token-components-missing" } }
+      : {}),
   });
 }
 
@@ -177,10 +177,9 @@ function parseArguments(value: string, callId: string): unknown {
   try {
     return JSON.parse(value === "" ? "{}" : value);
   } catch (error) {
-    throw new OpenAIResponsesProtocolError(
-      `OpenAI Responses function call "${callId}" has invalid arguments JSON`,
-      { cause: error },
-    );
+    throw new OpenAIResponsesProtocolError(`OpenAI Responses function call "${callId}" has invalid arguments JSON`, {
+      cause: error,
+    });
   }
 }
 
@@ -188,11 +187,12 @@ function responseFailure(value: unknown, type: string): Error {
   const response = requireRecord(value, type);
   const error = optionalRecord(response.error);
   const details = optionalRecord(response.incomplete_details);
-  const message = typeof error?.message === "string"
-    ? error.message
-    : typeof details?.reason === "string"
-    ? details.reason
-    : `OpenAI Responses emitted ${type}`;
+  const message =
+    typeof error?.message === "string"
+      ? error.message
+      : typeof details?.reason === "string"
+        ? details.reason
+        : `OpenAI Responses emitted ${type}`;
   return new OpenAIResponsesError(message, {
     ...(typeof error?.code === "string" ? { providerType: error.code } : {}),
   });
@@ -200,17 +200,14 @@ function responseFailure(value: unknown, type: string): Error {
 
 function streamError(event: Record<string, unknown>): Error {
   const error = optionalRecord(event.error) ?? event;
-  return new OpenAIResponsesError(
-    typeof error.message === "string" ? error.message : "OpenAI Responses stream error",
-    {
-      ...(typeof error.code === "string"
-        ? { providerType: error.code }
-        : typeof error.type === "string"
+  return new OpenAIResponsesError(typeof error.message === "string" ? error.message : "OpenAI Responses stream error", {
+    ...(typeof error.code === "string"
+      ? { providerType: error.code }
+      : typeof error.type === "string"
         ? { providerType: error.type }
         : {}),
-      ...(typeof event.request_id === "string" ? { requestId: event.request_id } : {}),
-    },
-  );
+    ...(typeof event.request_id === "string" ? { requestId: event.request_id } : {}),
+  });
 }
 
 function parseJson(value: string, field: string): Record<string, unknown> {
@@ -218,10 +215,7 @@ function parseJson(value: string, field: string): Record<string, unknown> {
     return requireRecord(JSON.parse(value), field);
   } catch (error) {
     if (error instanceof OpenAIResponsesProtocolError) throw error;
-    throw new OpenAIResponsesProtocolError(
-      `OpenAI Responses emitted invalid JSON for ${field}`,
-      { cause: error },
-    );
+    throw new OpenAIResponsesProtocolError(`OpenAI Responses emitted invalid JSON for ${field}`, { cause: error });
   }
 }
 

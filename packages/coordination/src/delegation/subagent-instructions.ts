@@ -1,13 +1,13 @@
 import type { MaybeCodeSubagentConfiguration, MaybeCodeSubagentRole } from "./subagents.js";
 
 /** 主 Agent 可用委派工具时提供的协作指导。 */
-export function delegationInstructions(
-  configuration: MaybeCodeSubagentConfiguration,
-  available: boolean,
-): string {
+export function delegationInstructions(configuration: MaybeCodeSubagentConfiguration, available: boolean): string {
   if (!available) return "";
   const roles = configuration.roles
-    .map((role) => `- ${role.name}: tools ${role.tools.join(", ")}; may delegate to ${role.delegateTo.length === 0 ? "no role" : role.delegateTo.join(", ")}${role.model === undefined ? "" : `; model profile ${role.model}`}`)
+    .map(
+      (role) =>
+        `- ${role.name}: tools ${role.tools.join(", ")}; may delegate to ${role.delegateTo.length === 0 ? "no role" : role.delegateTo.join(", ")}${role.model === undefined ? "" : `; model profile ${role.model}`}`,
+    )
     .join("\n");
   const limits = configuration.limits;
   return `# Delegation context
@@ -58,9 +58,11 @@ Assigned files:
 ${files === undefined ? "Use the file assignments in your task brief." : files.length === 0 ? "No files assigned for modification." : files.join("\n")}
 
 Delegation permissions:
-${maxDepthReached
+${
+  maxDepthReached
     ? "The request has reached its nesting limit; delegation is unavailable."
     : role.delegateTo.length === 0
       ? "This role has no authorized delegation targets."
-      : `Authorized roles: ${role.delegateTo.join(", ")}. Use delegate_tasks with a complete standalone brief.`}`;
+      : `Authorized roles: ${role.delegateTo.join(", ")}. Use delegate_tasks with a complete standalone brief.`
+}`;
 }

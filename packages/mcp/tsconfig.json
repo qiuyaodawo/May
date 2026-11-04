@@ -8,8 +8,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../may" },
-    { "path": "../observability" }
-  ]
+  "references": [{ "path": "../may" }, { "path": "../observability" }]
 }

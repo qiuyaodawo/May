@@ -14,25 +14,15 @@ export class PruneOldToolResultsStrategy implements ContextCompactionStrategy {
   private readonly minimumResultBytes: number;
 
   constructor(options: PruneOldToolResultsOptions = {}) {
-    this.keepRecentToolResults = nonNegativeInteger(
-      options.keepRecentToolResults ?? 4,
-      "keepRecentToolResults",
-    );
-    this.minimumResultBytes = nonNegativeInteger(
-      options.minimumResultBytes ?? 2048,
-      "minimumResultBytes",
-    );
+    this.keepRecentToolResults = nonNegativeInteger(options.keepRecentToolResults ?? 4, "keepRecentToolResults");
+    this.minimumResultBytes = nonNegativeInteger(options.minimumResultBytes ?? 2048, "minimumResultBytes");
   }
 
   compact(snapshot: Readonly<ContextSnapshot>): readonly Message[] {
     const toolIndexes = snapshot.messages
-      .map((message, index) => message.role === "tool" ? index : undefined)
+      .map((message, index) => (message.role === "tool" ? index : undefined))
       .filter((index): index is number => index !== undefined);
-    const retained = new Set(
-      this.keepRecentToolResults === 0
-        ? []
-        : toolIndexes.slice(-this.keepRecentToolResults),
-    );
+    const retained = new Set(this.keepRecentToolResults === 0 ? [] : toolIndexes.slice(-this.keepRecentToolResults));
 
     return snapshot.messages.map((message, index) => {
       if (message.role !== "tool" || retained.has(index)) return message;
@@ -45,19 +35,23 @@ export class PruneOldToolResultsStrategy implements ContextCompactionStrategy {
 }
 
 function isPrunedToolMessage(message: ToolMessage): boolean {
-  return message.content.length === 1 &&
+  return (
+    message.content.length === 1 &&
     message.content[0]?.type === "text" &&
     message.content[0].text.startsWith("[Older ") &&
-    / tool result pruned \(\d+ bytes\)\.\]$/u.test(message.content[0].text);
+    / tool result pruned \(\d+ bytes\)\.\]$/u.test(message.content[0].text)
+  );
 }
 
 function prunedToolMessage(message: ToolMessage, bytes: number): ToolMessage {
   return {
     ...message,
-    content: [{
-      type: "text",
-      text: `[Older ${message.name} tool result pruned (${bytes} bytes).]`,
-    }],
+    content: [
+      {
+        type: "text",
+        text: `[Older ${message.name} tool result pruned (${bytes} bytes).]`,
+      },
+    ],
   };
 }
 

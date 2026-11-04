@@ -30,8 +30,14 @@ export type ImagePlacement = {
   readonly rows: number;
 } & ({ readonly protocol: "kitty" | "iterm2" } | { readonly protocol: "sixel"; readonly sixel: string });
 
-export function placeImages(images: readonly ImagePlacement[] | undefined, y: number, height: number): ImagePlacement[] {
-  return (images ?? []).map(image => ({ ...image, y: image.y + y })).filter(image => image.y >= 0 && image.y + image.rows <= height);
+export function placeImages(
+  images: readonly ImagePlacement[] | undefined,
+  y: number,
+  height: number,
+): ImagePlacement[] {
+  return (images ?? [])
+    .map((image) => ({ ...image, y: image.y + y }))
+    .filter((image) => image.y >= 0 && image.y + image.rows <= height);
 }
 
 export interface Component {
@@ -66,10 +72,7 @@ export interface FocusTarget {
   handleKey(stroke: KeyStroke): boolean;
 }
 
-export function renderComponent(
-  component: Component,
-  size: RenderSize,
-): RenderResult {
+export function renderComponent(component: Component, size: RenderSize): RenderResult {
   assertRenderSize(size);
   return component.render(size);
 }

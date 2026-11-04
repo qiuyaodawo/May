@@ -3,12 +3,7 @@ import { closeSync, openSync, writeSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, rmdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { testOutputRoot } from "@sortedyuan/test-support";
-import {
-  BasicTracer,
-  BatchSpanProcessor,
-  ConsoleSpanExporter,
-  JsonlFileSpanExporter,
-} from "../../dist/index.js";
+import { BasicTracer, BatchSpanProcessor, ConsoleSpanExporter, JsonlFileSpanExporter } from "../../dist/index.js";
 
 const root = join(testOutputRoot, "observability");
 await mkdir(root, { recursive: true });
@@ -55,8 +50,14 @@ try {
   tracer.startSpan("shutdown-export").end();
   await processor.shutdown();
   assert.equal(errors.length, 1);
-  const spans = (await readFile(path, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
-  assert.deepEqual(spans.map((span) => span.name), ["after-failure", "shutdown-export"]);
+  const spans = (await readFile(path, "utf8"))
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  assert.deepEqual(
+    spans.map((span) => span.name),
+    ["after-failure", "shutdown-export"],
+  );
 } finally {
   if (descriptor !== undefined) closeSync(descriptor);
   await rm(directory, { recursive: true, force: true });

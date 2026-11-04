@@ -1,18 +1,9 @@
 import { ToolRegistry, omitUndefined, resolveRunBudget, type Tool } from "../core/index.js";
 import type { SessionStore } from "../session/index.js";
 
-import {
-  AgentApplication,
-  type AgentApplicationOptions,
-} from "./application.js";
+import { AgentApplication, type AgentApplicationOptions } from "./application.js";
 
-type SessionBoundAgentOption =
-  | "store"
-  | "sessionId"
-  | "resume"
-  | "fork"
-  | "metadata"
-  | "contextMetadata";
+type SessionBoundAgentOption = "store" | "sessionId" | "resume" | "fork" | "metadata" | "contextMetadata";
 
 /**
  * Reusable behavior and policy for an Agent, independent of any Session.
@@ -20,10 +11,7 @@ type SessionBoundAgentOption =
  * Tool registries are accepted through their iterable contract. The iterable
  * is consumed and snapshotted when the definition is created.
  */
-export type AgentDefinitionOptions = Omit<
-  AgentApplicationOptions,
-  SessionBoundAgentOption | "tools"
-> & {
+export type AgentDefinitionOptions = Omit<AgentApplicationOptions, SessionBoundAgentOption | "tools"> & {
   readonly tools?: Iterable<Tool>;
 };
 
@@ -37,10 +25,7 @@ export interface AgentDefinitionOpenOptions {
   readonly contextMetadata?: Readonly<Record<string, unknown>>;
 }
 
-type StoredAgentDefinitionOptions = Omit<
-  AgentApplicationOptions,
-  SessionBoundAgentOption
->;
+type StoredAgentDefinitionOptions = Omit<AgentApplicationOptions, SessionBoundAgentOption>;
 
 /**
  * A reusable Agent composition that can open any number of independent
@@ -64,12 +49,8 @@ export class AgentDefinition {
       ...this.applicationOptions,
       store: options.store,
       ...omitUndefined({ sessionId: options.sessionId, resume: options.resume, fork: options.fork }),
-      ...(options.metadata === undefined
-        ? {}
-        : { metadata: { ...options.metadata } }),
-      ...(options.contextMetadata === undefined
-        ? {}
-        : { contextMetadata: { ...options.contextMetadata } }),
+      ...(options.metadata === undefined ? {} : { metadata: { ...options.metadata } }),
+      ...(options.contextMetadata === undefined ? {} : { contextMetadata: { ...options.contextMetadata } }),
     });
   }
 }
@@ -79,9 +60,7 @@ export function defineAgent(options: AgentDefinitionOptions): AgentDefinition {
   return new AgentDefinition(options);
 }
 
-function snapshotDefinitionOptions(
-  options: AgentDefinitionOptions,
-): StoredAgentDefinitionOptions {
+function snapshotDefinitionOptions(options: AgentDefinitionOptions): StoredAgentDefinitionOptions {
   const {
     tools,
     traceAttributes,
@@ -97,45 +76,27 @@ function snapshotDefinitionOptions(
     ...rest,
     ...(plugins === undefined ? {} : { plugins: Object.freeze([...plugins]) }),
     ...(runBudget === undefined ? {} : { runBudget: resolveRunBudget(runBudget) }),
-    ...(tools === undefined
-      ? {}
-      : { tools: new ToolRegistry(tools) }),
-    ...(traceAttributes === undefined
-      ? {}
-      : { traceAttributes: Object.freeze({ ...traceAttributes }) }),
-    ...(contextBudget === undefined
-      ? {}
-      : { contextBudget: Object.freeze({ ...contextBudget }) }),
+    ...(tools === undefined ? {} : { tools: new ToolRegistry(tools) }),
+    ...(traceAttributes === undefined ? {} : { traceAttributes: Object.freeze({ ...traceAttributes }) }),
+    ...(contextBudget === undefined ? {} : { contextBudget: Object.freeze({ ...contextBudget }) }),
     ...(autoCompactionStrategies === undefined
       ? {}
       : {
-          autoCompactionStrategies: Object.freeze([
-            ...autoCompactionStrategies,
-          ]),
+          autoCompactionStrategies: Object.freeze([...autoCompactionStrategies]),
         }),
     ...(sessionHistory === undefined || sessionHistory === false
-      ? (sessionHistory === false ? { sessionHistory: false as const } : {})
+      ? sessionHistory === false
+        ? { sessionHistory: false as const }
+        : {}
       : { sessionHistory: Object.freeze({ ...sessionHistory }) }),
   });
 }
 
 function assertDefinitionOptions(options: AgentDefinitionOptions): void {
-  const candidate = options as AgentDefinitionOptions &
-    Partial<Record<SessionBoundAgentOption, unknown>>;
-  for (
-    const name of [
-      "store",
-      "sessionId",
-      "resume",
-      "fork",
-      "metadata",
-      "contextMetadata",
-    ] as const
-  ) {
+  const candidate = options as AgentDefinitionOptions & Partial<Record<SessionBoundAgentOption, unknown>>;
+  for (const name of ["store", "sessionId", "resume", "fork", "metadata", "contextMetadata"] as const) {
     if (name in candidate) {
-      throw new TypeError(
-        `Agent definition option "${name}" is Session-bound; pass it to open()`,
-      );
+      throw new TypeError(`Agent definition option "${name}" is Session-bound; pass it to open()`);
     }
   }
 }

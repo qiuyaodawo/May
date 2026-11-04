@@ -1,7 +1,4 @@
-import type {
-  MayConfig,
-  ResolveProviderOptions,
-} from "@sortedyuan/may/config";
+import type { MayConfig, ResolveProviderOptions } from "@sortedyuan/may/config";
 import {
   ProviderConfigurationError,
   selectProviderModel,

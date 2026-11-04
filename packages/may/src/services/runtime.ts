@@ -1,7 +1,15 @@
 import { May, omitUndefined, type RuntimeFactory } from "../core/index.js";
 import { InMemoryContextFactory, type ContextFactory } from "../context/index.js";
 import { definePlugin, type PluginContext, type PluginDefinition, type Disposer } from "../plugin/index.js";
-import { services, factoryMetadata, type PluginFactoryMetadata, type ContextOptionsSource, type ContextWrapper, type ContributionOptions, type ToolSource } from "./index.js";
+import {
+  services,
+  factoryMetadata,
+  type PluginFactoryMetadata,
+  type ContextOptionsSource,
+  type ContextWrapper,
+  type ContributionOptions,
+  type ToolSource,
+} from "./index.js";
 
 export interface RuntimePluginOptions<C = unknown> extends PluginFactoryMetadata<C> {
   readonly id?: string;
@@ -9,15 +17,26 @@ export interface RuntimePluginOptions<C = unknown> extends PluginFactoryMetadata
   readonly create?: (context: PluginContext<C>) => RuntimeFactory | Promise<RuntimeFactory>;
   readonly dispose?: (factory: RuntimeFactory) => void | Promise<void>;
 }
-export function createRuntimePlugin<C = unknown>(factoryOrOptions: RuntimeFactory | RuntimePluginOptions<C> = {}, id = "may.runtime"): PluginDefinition<C> {
-  const options: RuntimePluginOptions<C> = typeof factoryOrOptions === "function" ? { id, factory: factoryOrOptions } : factoryOrOptions;
-  if (options.create !== undefined && options.factory !== undefined) throw new TypeError("Runtime plugin accepts one factory source");
-  return definePlugin({ ...factoryMetadata(options), id: options.id ?? id, provides: [services.runtimeFactory], async setup(context) {
-    const factory = options.create === undefined ? options.factory ?? ((input) => new May(input)) : await options.create(context);
-    if (options.dispose) context.defer(() => options.dispose!(factory));
-    if (typeof factory !== "function") throw new TypeError("Runtime plugin must create a RuntimeFactory");
-    context.provide(services.runtimeFactory, factory);
-  } });
+export function createRuntimePlugin<C = unknown>(
+  factoryOrOptions: RuntimeFactory | RuntimePluginOptions<C> = {},
+  id = "may.runtime",
+): PluginDefinition<C> {
+  const options: RuntimePluginOptions<C> =
+    typeof factoryOrOptions === "function" ? { id, factory: factoryOrOptions } : factoryOrOptions;
+  if (options.create !== undefined && options.factory !== undefined)
+    throw new TypeError("Runtime plugin accepts one factory source");
+  return definePlugin({
+    ...factoryMetadata(options),
+    id: options.id ?? id,
+    provides: [services.runtimeFactory],
+    async setup(context) {
+      const factory =
+        options.create === undefined ? (options.factory ?? ((input) => new May(input))) : await options.create(context);
+      if (options.dispose) context.defer(() => options.dispose!(factory));
+      if (typeof factory !== "function") throw new TypeError("Runtime plugin must create a RuntimeFactory");
+      context.provide(services.runtimeFactory, factory);
+    },
+  });
 }
 
 export interface ContextPluginOptions<C = unknown> extends PluginFactoryMetadata<C> {
@@ -27,37 +46,66 @@ export interface ContextPluginOptions<C = unknown> extends PluginFactoryMetadata
   readonly dispose?: (factory: ContextFactory) => void | Promise<void>;
 }
 export function createContextPlugin<C = unknown>(options: ContextPluginOptions<C> = {}): PluginDefinition<C> {
-  return definePlugin({ ...factoryMetadata(options), id: options.id ?? "may.context", provides: [services.contextFactory, ...(options.options === undefined ? [] : [services.contextOptions])], async setup(context) {
-    const factory = options.create === undefined ? new InMemoryContextFactory() : await options.create(context);
-    if (options.dispose) context.defer(() => options.dispose!(factory));
-    if (typeof factory?.create !== "function") throw new TypeError("Context plugin must create a ContextFactory");
-    context.provide(services.contextFactory, factory);
-    if (options.options !== undefined) context.provide(services.contextOptions, options.options);
-  } });
+  return definePlugin({
+    ...factoryMetadata(options),
+    id: options.id ?? "may.context",
+    provides: [services.contextFactory, ...(options.options === undefined ? [] : [services.contextOptions])],
+    async setup(context) {
+      const factory = options.create === undefined ? new InMemoryContextFactory() : await options.create(context);
+      if (options.dispose) context.defer(() => options.dispose!(factory));
+      if (typeof factory?.create !== "function") throw new TypeError("Context plugin must create a ContextFactory");
+      context.provide(services.contextFactory, factory);
+      if (options.options !== undefined) context.provide(services.contextOptions, options.options);
+    },
+  });
 }
 
-export interface ContextWrapperPluginOptions<C = unknown> extends Omit<ContributionOptions, "pluginOrder">, PluginFactoryMetadata<C> {
+export interface ContextWrapperPluginOptions<C = unknown>
+  extends Omit<ContributionOptions, "pluginOrder">, PluginFactoryMetadata<C> {
   readonly create: (context: PluginContext<C>) => ContextWrapper | Promise<ContextWrapper>;
   readonly dispose?: Disposer;
 }
 export function createContextWrapperPlugin<C = unknown>(options: ContextWrapperPluginOptions<C>): PluginDefinition<C> {
-  return definePlugin({ ...factoryMetadata(options, [{ service: services.contextWrappers }]), id: options.id, async setup(context) {
-    if (options.dispose) context.defer(options.dispose);
-    context.defer(context.get(services.contextWrappers).add(await options.create(context), omitUndefined({
-      id: context.pluginId, pluginOrder: context.pluginOrder, order: options.order,
-    })));
-  } });
+  return definePlugin({
+    ...factoryMetadata(options, [{ service: services.contextWrappers }]),
+    id: options.id,
+    async setup(context) {
+      if (options.dispose) context.defer(options.dispose);
+      context.defer(
+        context.get(services.contextWrappers).add(
+          await options.create(context),
+          omitUndefined({
+            id: context.pluginId,
+            pluginOrder: context.pluginOrder,
+            order: options.order,
+          }),
+        ),
+      );
+    },
+  });
 }
 
-export interface ToolsPluginOptions<C = unknown> extends Omit<ContributionOptions, "pluginOrder">, PluginFactoryMetadata<C> {
+export interface ToolsPluginOptions<C = unknown>
+  extends Omit<ContributionOptions, "pluginOrder">, PluginFactoryMetadata<C> {
   readonly create: (context: PluginContext<C>) => ToolSource | Promise<ToolSource>;
   readonly dispose?: Disposer;
 }
 export function createToolsPlugin<C = unknown>(options: ToolsPluginOptions<C>): PluginDefinition<C> {
-  return definePlugin({ ...factoryMetadata(options, [{ service: services.toolSources }]), id: options.id, async setup(context) {
-    if (options.dispose) context.defer(options.dispose);
-    context.defer(context.get(services.toolSources).add(await options.create(context), omitUndefined({
-      id: context.pluginId, pluginOrder: context.pluginOrder, order: options.order,
-    })));
-  } });
+  return definePlugin({
+    ...factoryMetadata(options, [{ service: services.toolSources }]),
+    id: options.id,
+    async setup(context) {
+      if (options.dispose) context.defer(options.dispose);
+      context.defer(
+        context.get(services.toolSources).add(
+          await options.create(context),
+          omitUndefined({
+            id: context.pluginId,
+            pluginOrder: context.pluginOrder,
+            order: options.order,
+          }),
+        ),
+      );
+    },
+  });
 }

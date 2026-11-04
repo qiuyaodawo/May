@@ -54,11 +54,11 @@ MCP request headers are not forwarded into OAuth requests. A static
 
 Registration options:
 
-| Registration configuration | Requirements |
-| --- | --- |
+| Registration configuration       | Requirements                                                                                                           |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `clientId` plus `expectedIssuer` | Pre-registered public native client; exact issuer match. Secret-based machine clients require a different integration. |
-| `clientMetadataUrl` | Public HTTPS Client ID Metadata Document with a document path; the server advertises CIMD support. |
-| Neither option | The SDK uses Dynamic Client Registration when advertised. |
+| `clientMetadataUrl`              | Public HTTPS Client ID Metadata Document with a document path; the server advertises CIMD support.                     |
+| Neither option                   | The SDK uses Dynamic Client Registration when advertised.                                                              |
 
 Do not specify both client ID options. `callbackPort` optionally selects a
 loopback port (0–65535); the default 0 allocates an unused port. A new DCR login
@@ -157,12 +157,12 @@ and 1 MiB per response. Server/tool content remains untrusted.
 
 ## Troubleshooting
 
-| Symptom | Check and action |
-| --- | --- |
-| OAuth origin is rejected | Add the provider's exact trusted origin to `authorizationOrigins` |
-| Callback cannot complete | Check the registered redirect URL and selected loopback port; restart login before its five-minute deadline |
-| Credential store is unavailable | Unlock or configure the OS keyring, or inject a secure `McpCredentialStore` |
-| A vault lock remains after a crash | Verify the recorded PID has exited before deleting that specific lock file |
-| `MCP_AUTHENTICATION_REQUIRED` | Complete the explicit scope login, reconnect and start a new Run |
+| Symptom                            | Check and action                                                                                            |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| OAuth origin is rejected           | Add the provider's exact trusted origin to `authorizationOrigins`                                           |
+| Callback cannot complete           | Check the registered redirect URL and selected loopback port; restart login before its five-minute deadline |
+| Credential store is unavailable    | Unlock or configure the OS keyring, or inject a secure `McpCredentialStore`                                 |
+| A vault lock remains after a crash | Verify the recorded PID has exited before deleting that specific lock file                                  |
+| `MCP_AUTHENTICATION_REQUIRED`      | Complete the explicit scope login, reconnect and start a new Run                                            |
 
 Connection and ownership limits are maintained in the [MCP capability reference](../reference/mcp-capabilities.md).

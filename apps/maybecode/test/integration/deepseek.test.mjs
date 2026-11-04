@@ -32,19 +32,26 @@ test("runs and resumes a real coding session", async (t) => {
 
   assert.match(textOf(firstResult.message), /May/u);
   assert.ok(
-    observedFirst.some((event) =>
-      event.type === "run.event" &&
-      event.event.type === "tool.completed" &&
-      event.event.call.name === "read"
+    observedFirst.some(
+      (event) =>
+        event.type === "run.event" && event.event.type === "tool.completed" && event.event.call.name === "read",
     ),
   );
 
-  const resumed = await openConfiguredMaybeCode({ git: false, workspace, dataDirectory, model: liveModelProfile(), autoResume: true });
+  const resumed = await openConfiguredMaybeCode({
+    git: false,
+    workspace,
+    dataDirectory,
+    model: liveModelProfile(),
+    autoResume: true,
+  });
   assert.equal(resumed.sessionId, sessionId);
   const resumedEvents = collectAndApprove(resumed);
-  const secondResult = await (await resumed.submit({
-    input: "Reply with exactly CONTEXT_OK if the previous request asked you to read README.md.",
-  })).result;
+  const secondResult = await (
+    await resumed.submit({
+      input: "Reply with exactly CONTEXT_OK if the previous request asked you to read README.md.",
+    })
+  ).result;
   await resumed.close();
   await resumedEvents;
 
@@ -55,10 +62,7 @@ async function collectAndApprove(app) {
   const events = [];
   for await (const event of app.events) {
     events.push(event);
-    if (
-      event.type === "permission.event" &&
-      event.event.type === "approval.requested"
-    ) {
+    if (event.type === "permission.event" && event.event.type === "approval.requested") {
       await app.resolveApproval(event.event.request.id, "allow");
     }
   }

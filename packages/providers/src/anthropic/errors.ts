@@ -33,11 +33,7 @@ export class AnthropicStreamError extends AnthropicError {
   readonly providerType: string | undefined;
   readonly requestId: string | undefined;
 
-  constructor(options: {
-    message: string;
-    providerType?: string;
-    requestId?: string;
-  }) {
+  constructor(options: { message: string; providerType?: string; requestId?: string }) {
     super("ANTHROPIC_STREAM_ERROR", options.message);
     this.providerType = options.providerType;
     this.requestId = options.requestId;
@@ -54,10 +50,7 @@ export class AnthropicFinishReasonError extends AnthropicError {
   readonly finishReason: string;
 
   constructor(finishReason: string) {
-    super(
-      "ANTHROPIC_INCOMPLETE_RESPONSE",
-      `Anthropic stopped with finish reason "${finishReason}"`,
-    );
+    super("ANTHROPIC_INCOMPLETE_RESPONSE", `Anthropic stopped with finish reason "${finishReason}"`);
     this.finishReason = finishReason;
   }
 }

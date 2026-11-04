@@ -30,7 +30,12 @@ export interface GoalState {
   readonly objective: string;
   readonly status: GoalStatus;
   readonly budget: GoalBudget;
-  readonly usage: { readonly runs: number; readonly totalTokens: number; readonly elapsedMs: number; readonly usageComplete: boolean };
+  readonly usage: {
+    readonly runs: number;
+    readonly totalTokens: number;
+    readonly elapsedMs: number;
+    readonly usageComplete: boolean;
+  };
   readonly calls: readonly GoalCall[];
   readonly runIds: readonly string[];
   readonly progress: string;
@@ -64,7 +69,10 @@ export interface GoalAgent {
 }
 
 export interface GoalOptions {
-  readonly verify?: (state: GoalState, signal: AbortSignal) => Promise<{ readonly completed: boolean; readonly evidence: string }>;
+  readonly verify?: (
+    state: GoalState,
+    signal: AbortSignal,
+  ) => Promise<{ readonly completed: boolean; readonly evidence: string }>;
   readonly validateBudget?: (budget: GoalBudget) => void;
 }
 

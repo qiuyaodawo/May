@@ -32,22 +32,31 @@ export class FullscreenRenderer {
     const next = ScreenBuffer.from(result, size);
     const previous = this.previous;
     const images = placeImages(result.images, 0, size.height);
-    const imagesChanged = images.length !== this.images.length || images.some((image, index) => {
-      const old = this.images[index];
-      return !old || image.id !== old.id || image.y !== old.y || image.x !== old.x || image.rows !== old.rows || image.columns !== old.columns || image.protocol !== old.protocol || (image.protocol === "sixel" && old.protocol === "sixel" && image.sixel !== old.sixel);
-    });
-    const resized = previous !== undefined &&
-      (previous.width !== next.width || previous.height !== next.height);
+    const imagesChanged =
+      images.length !== this.images.length ||
+      images.some((image, index) => {
+        const old = this.images[index];
+        return (
+          !old ||
+          image.id !== old.id ||
+          image.y !== old.y ||
+          image.x !== old.x ||
+          image.rows !== old.rows ||
+          image.columns !== old.columns ||
+          image.protocol !== old.protocol ||
+          (image.protocol === "sixel" && old.protocol === "sixel" && image.sixel !== old.sixel)
+        );
+      });
+    const resized = previous !== undefined && (previous.width !== next.width || previous.height !== next.height);
     let output = "\x1b[?25l";
 
     if (previous === undefined || resized || imagesChanged) {
-      if (this.images.some(image => image.protocol === "kitty")) output += "\x1b_Ga=d,d=A,q=2\x1b\\";
+      if (this.images.some((image) => image.protocol === "kitty")) output += "\x1b_Ga=d,d=A,q=2\x1b\\";
       output += "\x1b[2J";
     }
 
-    const rowCount = previous === undefined || resized
-      ? next.lines.length
-      : Math.max(next.lines.length, previous.lines.length);
+    const rowCount =
+      previous === undefined || resized ? next.lines.length : Math.max(next.lines.length, previous.lines.length);
     const erasedRows = new Set<number>();
     for (let row = 0; row < rowCount; row++) {
       const line = next.lineAt(row);
@@ -58,8 +67,11 @@ export class FullscreenRenderer {
     }
 
     for (const image of images) {
-      const erased = image.protocol === "sixel" && Array.from({ length: image.rows }, (_, index) => image.y + index).some(row => erasedRows.has(row));
-      if (imagesChanged || resized || previous === undefined || erased) output += moveTo(image.y, image.x) + encodeImage(image);
+      const erased =
+        image.protocol === "sixel" &&
+        Array.from({ length: image.rows }, (_, index) => image.y + index).some((row) => erasedRows.has(row));
+      if (imagesChanged || resized || previous === undefined || erased)
+        output += moveTo(image.y, image.x) + encodeImage(image);
     }
     this.images = images;
     const cursor = next.cursor;
@@ -83,7 +95,7 @@ export class FullscreenRenderer {
   dispose(options: { readonly clear?: boolean } = {}): void {
     this.previous = undefined;
     this.terminal.write(
-      `${this.images.some(image => image.protocol === "kitty") ? "\x1b_Ga=d,d=A,q=2\x1b\\" : ""}${options.clear === true || this.images.length ? "\x1b[2J\x1b[H" : ""}\x1b[0m\x1b[?25h`,
+      `${this.images.some((image) => image.protocol === "kitty") ? "\x1b_Ga=d,d=A,q=2\x1b\\" : ""}${options.clear === true || this.images.length ? "\x1b[2J\x1b[H" : ""}\x1b[0m\x1b[?25h`,
     );
     this.images = [];
   }

@@ -14,7 +14,8 @@ test("通知续行保留缩进，复制包含完整路径、中文和 emoji", ()
     const rendered = view.render({ width, height: 2000 });
     for (const [index, line] of rendered.lines.entries()) {
       assert.ok(stringWidth(line) <= width);
-      if (index > 0 && stripVTControlCharacters(line).trim() !== "") assert.match(stripVTControlCharacters(line), /^ {2}/u);
+      if (index > 0 && stripVTControlCharacters(line).trim() !== "")
+        assert.match(stripVTControlCharacters(line), /^ {2}/u);
       if (stripVTControlCharacters(line).trim() !== "") assert.ok(line.includes("38;2;148;163;184"));
     }
     const pointer = (type, x, y) => ({ type, x, y, button: 0, ctrl: false, alt: false, shift: false });
@@ -31,7 +32,9 @@ test("Text 续行缩进校验以及窄窗口和关闭换行", () => {
   }
   for (const width of [1, 2, 3, 20]) {
     const result = new Text("abcdefghij", { continuationIndent: 100 }).render({ width, height: 20 });
-    assert.ok(result.lines.every(line => stringWidth(line) <= width));
+    assert.ok(result.lines.every((line) => stringWidth(line) <= width));
   }
-  assert.deepEqual(new Text("abcdefgh", { continuationIndent: 4, wrap: false }).render({ width: 5, height: 2 }).lines, ["abcde"]);
+  assert.deepEqual(new Text("abcdefgh", { continuationIndent: 4, wrap: false }).render({ width: 5, height: 2 }).lines, [
+    "abcde",
+  ]);
 });

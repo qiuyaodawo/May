@@ -9,7 +9,7 @@ import { ToolRendererRegistry } from "../dist/agent/tool-renderers.js";
 import { TerminalImages } from "../dist/images.js";
 
 const pointer = (type, x, y) => ({ type, x, y, button: 0, ctrl: false, alt: false, shift: false });
-const plainLines = result => result.lines.map(stripVTControlCharacters);
+const plainLines = (result) => result.lines.map(stripVTControlCharacters);
 
 test("重复绘制保留空行之后的阅读位置，也保留位于顶部的空行", () => {
   const scroll = new ScrollView(new Text("heading\n\n\nfirst\nsecond\nthird", { sourceId: "document" }));
@@ -25,8 +25,15 @@ test("重复绘制保留空行之后的阅读位置，也保留位于顶部的�
 });
 
 function appendAssistant(store, text, runId = "run-1") {
-  store.applyMayEvent({ type: "model.completed", runId, step: 1, seq: 1, timestamp: 1,
-    contextMessageCount: 1, message: { role: "assistant", content: [{ type: "text", text }] } });
+  store.applyMayEvent({
+    type: "model.completed",
+    runId,
+    step: 1,
+    seq: 1,
+    timestamp: 1,
+    contextMessageCount: 1,
+    message: { role: "assistant", content: [{ type: "text", text }] },
+  });
 }
 
 test("copies user text across automatic wrapping without labels or additional newlines", () => {
@@ -81,7 +88,7 @@ test("selection stays attached to graphemes while streaming and resizing", () =>
   store.applyMayEvent({ ...base, type: "model.text.delta", seq: 2, delta: " appended text" });
   const result = view.render({ width: 5, height: 30 });
   assert.equal(view.selectedText, "你好👩‍💻");
-  assert.equal(result.lines.filter(line => line.includes("\x1b[7m")).length, 2);
+  assert.equal(result.lines.filter((line) => line.includes("\x1b[7m")).length, 2);
   store.reset("another-session");
   view.render({ width: 5, height: 30 });
   assert.equal(view.selectedText, "");
@@ -89,9 +96,15 @@ test("selection stays attached to graphemes while streaming and resizing", () =>
 
 test("tool output selection excludes renderer borders and preserves indentation", () => {
   const store = new TranscriptStore();
-  store.applyMayEvent({ type: "tool.completed", runId: "run-1", step: 1, timestamp: 1, seq: 1,
+  store.applyMayEvent({
+    type: "tool.completed",
+    runId: "run-1",
+    step: 1,
+    timestamp: 1,
+    seq: 1,
     call: { id: "shell-1", name: "shell", input: { command: "printf output" } },
-    output: { stdout: "  one\n    two", stderr: "", exitCode: 0 } });
+    output: { stdout: "  one\n    two", stderr: "", exitCode: 0 },
+  });
   const view = new TranscriptView(store);
   const result = view.render({ width: 40, height: 20 });
   const lines = plainLines(result);
@@ -119,10 +132,17 @@ test("流式 Markdown 标记完成后保留所选正文，继续追加文字不�
 
 test("自定义工具文字保留字面符号，可通过渲染元数据排除装饰", () => {
   const store = new TranscriptStore();
-  store.applyMayEvent({ type: "tool.completed", runId: "run-1", step: 1, timestamp: 1, seq: 1,
-    call: { id: "tool-1", name: "custom", input: {} }, output: "  │ literal border" });
+  store.applyMayEvent({
+    type: "tool.completed",
+    runId: "run-1",
+    step: 1,
+    timestamp: 1,
+    seq: 1,
+    call: { id: "tool-1", name: "custom", input: {} },
+    output: "  │ literal border",
+  });
   const toolRenderers = new ToolRendererRegistry().register("custom", {
-    render: item => String(item.output),
+    render: (item) => String(item.output),
   });
   const view = new TranscriptView(store, { toolRenderers });
   view.render({ width: 30, height: 10 });
@@ -130,8 +150,8 @@ test("自定义工具文字保留字面符号，可通过渲染元数据排除�
   view.handlePointer(pointer("up", 30, 0));
   assert.equal(view.selectedText, "  │ literal border");
   const documentRenderers = new ToolRendererRegistry().register("custom", {
-    render: item => String(item.output),
-    renderDocument: item => [{ value: String(item.output), copy: { start: 4, end: String(item.output).length } }],
+    render: (item) => String(item.output),
+    renderDocument: (item) => [{ value: String(item.output), copy: { start: 4, end: String(item.output).length } }],
   });
   const documentView = new TranscriptView(store, { toolRenderers: documentRenderers });
   documentView.render({ width: 30, height: 10 });
@@ -142,9 +162,15 @@ test("自定义工具文字保留字面符号，可通过渲染元数据排除�
 
 test("文件读取工具的行号和边框不进入复制内容", () => {
   const store = new TranscriptStore();
-  store.applyMayEvent({ type: "tool.completed", runId: "run-1", step: 1, timestamp: 1, seq: 1,
+  store.applyMayEvent({
+    type: "tool.completed",
+    runId: "run-1",
+    step: 1,
+    timestamp: 1,
+    seq: 1,
     call: { id: "read-1", name: "read", input: { path: "a.ts" } },
-    output: { path: "a.ts", startLine: 9, endLine: 10, totalLines: 10, content: "  first\n    second" } });
+    output: { path: "a.ts", startLine: 9, endLine: 10, totalLines: 10, content: "  first\n    second" },
+  });
   const view = new TranscriptView(store, { showToolDetails: true });
   const result = view.render({ width: 40, height: 20 });
   const lines = plainLines(result);
@@ -155,12 +181,22 @@ test("文件读取工具的行号和边框不进入复制内容", () => {
 
 test("图片链接按原有顺序加入文字选择并保留自动换行前的地址", () => {
   const store = new TranscriptStore();
-  store.applyMayEvent({ type: "model.completed", runId: "run-1", step: 1, seq: 1, timestamp: 1,
-    contextMessageCount: 1, message: { role: "assistant", content: [
-      { type: "text", text: "before" },
-      { type: "image", source: { type: "url", url: "https://example.com/long-image.png" } },
-      { type: "text", text: "after" },
-    ] } });
+  store.applyMayEvent({
+    type: "model.completed",
+    runId: "run-1",
+    step: 1,
+    seq: 1,
+    timestamp: 1,
+    contextMessageCount: 1,
+    message: {
+      role: "assistant",
+      content: [
+        { type: "text", text: "before" },
+        { type: "image", source: { type: "url", url: "https://example.com/long-image.png" } },
+        { type: "text", text: "after" },
+      ],
+    },
+  });
   const view = new TranscriptView(store, { images: new TerminalImages(undefined, "none") });
   const result = view.render({ width: 14, height: 20 });
   const lines = plainLines(result);
@@ -174,7 +210,11 @@ test("a held pointer extends selection while scrolling and stops on release", as
   store.appendUser(Array.from({ length: 15 }, (_, index) => `line${index}`).join("\n"));
   const view = new TranscriptView(store);
   const size = { width: 30, height: 5 };
-  const scroll = new ScrollView(view, { onInvalidate: () => { scroll.render(size); } });
+  const scroll = new ScrollView(view, {
+    onInvalidate: () => {
+      scroll.render(size);
+    },
+  });
   t.after(() => scroll.dispose());
   scroll.render(size);
   scroll.handlePointer(pointer("down", 2, 1));
@@ -219,10 +259,12 @@ test("scroll boundary keys remain consumed and ignore unrelated modifiers", () =
 });
 
 test("Markdown layout metadata excludes quote and code decorations before wrapping", () => {
-  const result = new Markdown("> ```js\n>   let x = 1;\n> ```", { colors: false, sourceId: "body" })
-    .render({ width: 9, height: 20 });
-  assert.equal(result.textRows.find(row => row !== undefined).source, "  let x = 1;");
-  const spans = result.textRows.flatMap(row => row?.spans ?? []);
+  const result = new Markdown("> ```js\n>   let x = 1;\n> ```", { colors: false, sourceId: "body" }).render({
+    width: 9,
+    height: 20,
+  });
+  assert.equal(result.textRows.find((row) => row !== undefined).source, "  let x = 1;");
+  const spans = result.textRows.flatMap((row) => row?.spans ?? []);
   assert.equal(spans[0].start, 0);
   assert.equal(spans.at(-1).end, 12);
 });
@@ -238,7 +280,10 @@ test("代码中的空行和 Tab 在选择复制后保留，Tab 使用固定列�
   view.handlePointer(pointer("down", 2, lines.indexOf("│   first")));
   view.handlePointer(pointer("up", 12, lines.indexOf("│     second")));
   assert.equal(view.selectedText, "\tfirst\n\n\t\tsecond");
-  assert.equal(result.lines.some(line => line.includes("\t")), false);
+  assert.equal(
+    result.lines.some((line) => line.includes("\t")),
+    false,
+  );
 });
 
 test("一万行内容保留有界视口和完整复制来源，销毁后清理选择状态", () => {

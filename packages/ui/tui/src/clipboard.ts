@@ -59,9 +59,12 @@ export function createTerminalClipboard(options: TerminalClipboardOptions = {}):
   const env = options.env ?? process.env;
   const mode = options.mode ?? env.MAY_CLIPBOARD ?? "auto";
   switch (mode) {
-    case "system": return new SystemClipboard();
-    case "osc52": return new Osc52Clipboard(options.output ?? process.stdout);
-    case "disabled": return new UnavailableClipboard("Clipboard access is disabled by MAY_CLIPBOARD.");
+    case "system":
+      return new SystemClipboard();
+    case "osc52":
+      return new Osc52Clipboard(options.output ?? process.stdout);
+    case "disabled":
+      return new UnavailableClipboard("Clipboard access is disabled by MAY_CLIPBOARD.");
     case "auto":
       if (env.SSH_CONNECTION || env.SSH_CLIENT || env.SSH_TTY) {
         return new UnavailableClipboard(
@@ -69,6 +72,7 @@ export function createTerminalClipboard(options: TerminalClipboardOptions = {}):
         );
       }
       return new SystemClipboard();
-    default: throw new RangeError(`Unsupported MAY_CLIPBOARD value: ${mode}. Expected auto, system, osc52, or disabled.`);
+    default:
+      throw new RangeError(`Unsupported MAY_CLIPBOARD value: ${mode}. Expected auto, system, osc52, or disabled.`);
   }
 }

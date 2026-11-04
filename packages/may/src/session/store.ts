@@ -14,34 +14,36 @@ export interface SessionStore {
   delete?(sessionId: string): Promise<boolean>;
 }
 
-export function validateSessionHistory(
-  sessionId: string,
-  events: readonly SessionEvent[],
-): void {
+export function validateSessionHistory(sessionId: string, events: readonly SessionEvent[]): void {
   readRecordedModelRequests(events);
   const continuations = new Set<string>();
   const startedContinuations = new Set<string>();
   for (const [index, event] of events.entries()) {
     if (event.sessionId !== sessionId) {
-      throw new Error(
-        `Expected session id "${sessionId}", received "${event.sessionId}"`,
-      );
+      throw new Error(`Expected session id "${sessionId}", received "${event.sessionId}"`);
     }
 
     const expectedSeq = index + 1;
     if (event.seq !== expectedSeq) {
-      throw new Error(
-        `Expected session event sequence ${expectedSeq}, received ${event.seq}`,
-      );
+      throw new Error(`Expected session event sequence ${expectedSeq}, received ${event.seq}`);
     }
     if (event.type === "continuation.submitted") {
-      if (typeof event.continuationId !== "string" || event.continuationId.trim() === "" || event.continuationId.length > 256 || continuations.has(event.continuationId)) {
+      if (
+        typeof event.continuationId !== "string" ||
+        event.continuationId.trim() === "" ||
+        event.continuationId.length > 256 ||
+        continuations.has(event.continuationId)
+      ) {
         throw new Error("Invalid or duplicate continuation identity");
       }
       continuations.add(event.continuationId);
     }
     if (event.type === "run.started" && event.continuationId !== undefined) {
-      if (event.continuation !== true || !continuations.has(event.continuationId) || startedContinuations.has(event.continuationId)) {
+      if (
+        event.continuation !== true ||
+        !continuations.has(event.continuationId) ||
+        startedContinuations.has(event.continuationId)
+      ) {
         throw new Error("Run has no unique submitted continuation identity");
       }
       startedContinuations.add(event.continuationId);
@@ -57,9 +59,7 @@ export class InMemorySessionStore implements SessionStore {
     const expectedSeq = events.length + 1;
 
     if (event.seq !== expectedSeq) {
-      throw new Error(
-        `Expected session event sequence ${expectedSeq}, received ${event.seq}`,
-      );
+      throw new Error(`Expected session event sequence ${expectedSeq}, received ${event.seq}`);
     }
 
     events.push(event);
@@ -70,7 +70,9 @@ export class InMemorySessionStore implements SessionStore {
     return [...(this.sessions.get(sessionId) ?? [])];
   }
 
-  inspect(sessionId: string): Promise<readonly SessionEvent[]> { return this.read(sessionId); }
+  inspect(sessionId: string): Promise<readonly SessionEvent[]> {
+    return this.read(sessionId);
+  }
 
   async delete(sessionId: string): Promise<boolean> {
     return this.sessions.delete(sessionId);

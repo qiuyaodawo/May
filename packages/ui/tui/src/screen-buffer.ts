@@ -9,11 +9,7 @@ export class ScreenBuffer {
   readonly lines: readonly string[];
   readonly cursor: CursorPosition | undefined;
 
-  private constructor(
-    size: RenderSize,
-    lines: readonly string[],
-    cursor: CursorPosition | undefined,
-  ) {
+  private constructor(size: RenderSize, lines: readonly string[], cursor: CursorPosition | undefined) {
     this.width = size.width;
     this.height = size.height;
     this.lines = lines;
@@ -22,9 +18,7 @@ export class ScreenBuffer {
 
   static from(result: RenderResult, size: RenderSize): ScreenBuffer {
     assertRenderSize(size);
-    const lines = result.lines
-      .slice(0, size.height)
-      .map((line) => normalizeLine(line, size.width));
+    const lines = result.lines.slice(0, size.height).map((line) => normalizeLine(line, size.width));
     const cursor = normalizeCursor(result.cursor, size);
     return new ScreenBuffer(size, lines, cursor);
   }
@@ -41,10 +35,7 @@ function normalizeLine(line: string, width: number): string {
   return stringWidth(line) <= width ? line : sliceAnsi(line, 0, width);
 }
 
-function normalizeCursor(
-  cursor: CursorPosition | undefined,
-  size: RenderSize,
-): CursorPosition | undefined {
+function normalizeCursor(cursor: CursorPosition | undefined, size: RenderSize): CursorPosition | undefined {
   if (cursor === undefined) return undefined;
   const y = clampInteger(cursor.y, 0, Math.max(0, size.height - 1));
   const x = clampInteger(cursor.x, 0, size.width - 1);

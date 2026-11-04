@@ -133,7 +133,6 @@ beside the configuration; subsequent loads only need read permission on all thre
 with `loadMayConfig({ path })` before making a configuration directory read-only.
 All processes that update the same configuration must use this protocol.
 
-
 The bundled editor schema also describes MaybeCode MCP stdio/Streamable HTTP,
 OAuth, opt-in `host` compatibility fields and the default-off `tasks` flag. Endpoint/header safety and
 service availability remain application/runtime validation responsibilities.

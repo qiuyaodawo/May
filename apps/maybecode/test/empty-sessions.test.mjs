@@ -14,29 +14,48 @@ import { MaybeCodeApplication } from "../dist/application.js";
 import { MaybeCodeWorkspace } from "../dist/workspace.js";
 import { createTestWorkspace } from "./fixtures/workspace.mjs";
 
-test("CLI 在 retained 界面通过 /quit 退出后清理历史文件和会话目录", async t => {
+test("CLI 在 retained 界面通过 /quit 退出后清理历史文件和会话目录", async (t) => {
   const workspace = await createTestWorkspace(t);
   const dataDirectory = join(workspace, "data");
   const configPath = join(workspace, "may.json");
-  await writeFile(configPath, JSON.stringify({
-    providers: { local: { adapter: "openai-responses", apiKey: "unused-without-model-requests", baseURL: "http://127.0.0.1:1/v1" } },
-    defaultModel: "offline",
-    models: { offline: { provider: "local", model: "gpt-4.1" } },
-    apps: { maybecode: { git: false } },
-  }));
-  const input = new PassThrough(), output = new PassThrough();
+  await writeFile(
+    configPath,
+    JSON.stringify({
+      providers: {
+        local: {
+          adapter: "openai-responses",
+          apiKey: "unused-without-model-requests",
+          baseURL: "http://127.0.0.1:1/v1",
+        },
+      },
+      defaultModel: "offline",
+      models: { offline: { provider: "local", model: "gpt-4.1" } },
+      apps: { maybecode: { git: false } },
+    }),
+  );
+  const input = new PassThrough(),
+    output = new PassThrough();
   let rendered = "";
-  output.on("data", chunk => { rendered += chunk.toString(); });
+  output.on("data", (chunk) => {
+    rendered += chunk.toString();
+  });
   const terminal = new NodeTerminalDriver({ input, output, requireTTY: false });
-  t.after(() => { terminal.close(); input.destroy(); output.destroy(); });
+  t.after(() => {
+    terminal.close();
+    input.destroy();
+    output.destroy();
+  });
   const exitCode = runMaybeCode(["--config", configPath, workspace], {
-    open: options => openConfiguredMaybeCode({ ...options, dataDirectory }),
-    runRetainedUI: app => runRetainedTerminalUI(app, { terminal }),
+    open: (options) => openConfiguredMaybeCode({ ...options, dataDirectory }),
+    runRetainedUI: (app) => runRetainedTerminalUI(app, { terminal }),
   });
   while (!rendered.includes("MaybeCode")) await delay(20);
   input.write("/quit\r");
   assert.equal(await exitCode, 0);
-  assert.deepEqual((await readdir(join(dataDirectory, "sessions"))).filter(name => name.endsWith(".jsonl")), []);
+  assert.deepEqual(
+    (await readdir(join(dataDirectory, "sessions"))).filter((name) => name.endsWith(".jsonl")),
+    [],
+  );
   assert.deepEqual(await new FileSessionCatalog(join(dataDirectory, "catalog.json")).list(workspace), []);
 });
 
@@ -59,12 +78,12 @@ async function storageOptions(t) {
   };
 }
 
-test("退出后删除新建空会话，重新启动后会话列表不再包含它", async t => {
+test("退出后删除新建空会话，重新启动后会话列表不再包含它", async (t) => {
   const options = await storageOptions(t);
   const app = await MaybeCodeWorkspace.open(options);
   const sessionId = app.sessionId;
-  assert.ok((await app.history()).some(event => event.type === "state.updated"));
-  assert.ok((await app.listSessions()).some(session => session.id === sessionId));
+  assert.ok((await app.history()).some((event) => event.type === "state.updated"));
+  assert.ok((await app.listSessions()).some((session) => session.id === sessionId));
   await Promise.all([app.close(), app.close()]);
 
   const reopened = await MaybeCodeWorkspace.open({
@@ -74,13 +93,16 @@ test("退出后删除新建空会话，重新启动后会话列表不再包含�
   });
   try {
     assert.deepEqual(await options.store.inspect(sessionId), []);
-    assert.equal((await reopened.listSessions()).some(session => session.id === sessionId), false);
+    assert.equal(
+      (await reopened.listSessions()).some((session) => session.id === sessionId),
+      false,
+    );
   } finally {
     await reopened.close();
   }
 });
 
-test("退出时清理本次运行通过 newSession 创建的全部空会话", async t => {
+test("退出时清理本次运行通过 newSession 创建的全部空会话", async (t) => {
   const options = await storageOptions(t);
   const app = await MaybeCodeWorkspace.open(options);
   const first = app.sessionId;
@@ -92,7 +114,7 @@ test("退出时清理本次运行通过 newSession 创建的全部空会话", as
   assert.deepEqual(await options.catalog.list(options.workspace), []);
 });
 
-test("恢复的空会话在退出后继续保留", async t => {
+test("恢复的空会话在退出后继续保留", async (t) => {
   const options = await storageOptions(t);
   const original = await MaybeCodeApplication.open(options);
   const sessionId = original.sessionId;
@@ -101,10 +123,10 @@ test("恢复的空会话在退出后继续保留", async t => {
   const app = await MaybeCodeWorkspace.open({ ...options, sessionId });
   await app.close();
   assert.ok((await options.store.inspect(sessionId)).length > 0);
-  assert.ok((await options.catalog.list(options.workspace)).some(session => session.id === sessionId));
+  assert.ok((await options.catalog.list(options.workspace)).some((session) => session.id === sessionId));
 });
 
-test("提交消息后即使模型请求失败，退出后仍然保留会话", async t => {
+test("提交消息后即使模型请求失败，退出后仍然保留会话", async (t) => {
   const options = await storageOptions(t);
   const app = await MaybeCodeWorkspace.open(options);
   const sessionId = app.sessionId;
@@ -115,11 +137,11 @@ test("提交消息后即使模型请求失败，退出后仍然保留会话", as
     await app.close();
   }
   const history = await options.store.inspect(sessionId);
-  assert.ok(history.some(event => event.type === "input.submitted"));
-  assert.ok((await options.catalog.list(options.workspace)).some(session => session.id === sessionId));
+  assert.ok(history.some((event) => event.type === "input.submitted"));
+  assert.ok((await options.catalog.list(options.workspace)).some((session) => session.id === sessionId));
 });
 
-test("启动并暂停 goal 后，退出时保留会话", async t => {
+test("启动并暂停 goal 后，退出时保留会话", async (t) => {
   const { goals: _goals, ...options } = await storageOptions(t);
   const app = await MaybeCodeWorkspace.open(options);
   const sessionId = app.sessionId;
@@ -130,12 +152,15 @@ test("启动并暂停 goal 后，退出时保留会话", async t => {
     await app.close();
   }
   const history = await options.store.inspect(sessionId);
-  assert.equal(history.some(event => event.type === "run.started"), false);
-  assert.ok(history.some(event => event.type === "state.updated" && event.key === "may.goal"));
-  assert.ok((await options.catalog.list(options.workspace)).some(session => session.id === sessionId));
+  assert.equal(
+    history.some((event) => event.type === "run.started"),
+    false,
+  );
+  assert.ok(history.some((event) => event.type === "state.updated" && event.key === "may.goal"));
+  assert.ok((await options.catalog.list(options.workspace)).some((session) => session.id === sessionId));
 });
 
-test("提交补充消息后取消执行，退出后仍然保留会话", async t => {
+test("提交补充消息后取消执行，退出后仍然保留会话", async (t) => {
   const options = await storageOptions(t);
   const app = await MaybeCodeWorkspace.open(options);
   const sessionId = app.sessionId;
@@ -146,6 +171,6 @@ test("提交补充消息后取消执行，退出后仍然保留会话", async t 
     await app.close();
   }
   const history = await options.store.inspect(sessionId);
-  assert.ok(history.some(event => event.type === "input.steering.queued"));
-  assert.ok((await options.catalog.list(options.workspace)).some(session => session.id === sessionId));
+  assert.ok(history.some((event) => event.type === "input.steering.queued"));
+  assert.ok((await options.catalog.list(options.workspace)).some((session) => session.id === sessionId));
 });

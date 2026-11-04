@@ -13,6 +13,7 @@
   Remote CoordinationWorker 将已保存的取消意图发送给分离的外部执行，并通过恢复查询确认结果。
 
   PowerShell shell 工具根据最后执行命令的状态返回 exitCode，失败的 cmdlet 返回非零值。
+
 - 0dc3f68: `ModelContextCompactionResult` 新增 `usage`：provider 原生压缩据此上报压缩请求自身的
   usage，OpenAI Responses 的 `/responses/compact` 已经解析该 usage 并直接返回；没有 usage
   的压缩器仍然可以只返回消息。
@@ -20,6 +21,7 @@
   `ContextSummaryRequest` 新增 `runId` 与 `step`，`SummaryTailStrategy` 把触发压缩的
   Run 身份传给摘要器，可复用的模型摘要器再把它交给 `Model.stream`。使用同一个模型的
   计账方因此可以为 Run 内的摘要调用给出可追踪的调用身份。
+
 - 89bcd8d: Add scoped plugin composition with typed versioned services, validated dependencies,
   configuration and state schemas, lifecycle Hooks, state migration, resource cleanup
   and serialized replacement. Agent definitions and applications accept plugins;
@@ -41,6 +43,7 @@
   argument boundary; use ordinary data objects and arrays to represent those values.
   Custom parsed instances retain their prototypes and methods and must protect any
   mutable internal state themselves.
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`

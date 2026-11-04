@@ -5,11 +5,18 @@ export type ImageProtocol = "kitty" | "iterm2" | "sixel" | "none";
 
 export function terminalImageProtocol(output: { readonly isTTY?: boolean } = process.stdout): ImageProtocol {
   const setting = process.env.MAY_IMAGE_PROTOCOL;
-  if (setting !== undefined && !["auto", "kitty", "iterm2", "sixel", "none"].includes(setting)) throw new Error("MAY_IMAGE_PROTOCOL must be auto, kitty, iterm2, sixel or none");
+  if (setting !== undefined && !["auto", "kitty", "iterm2", "sixel", "none"].includes(setting))
+    throw new Error("MAY_IMAGE_PROTOCOL must be auto, kitty, iterm2, sixel or none");
   if (setting && setting !== "auto") return setting as ImageProtocol;
   if (!output.isTTY || process.env.TMUX || process.env.STY) return "none";
   const graphics = createSupportsTerminalGraphics(output);
-  return graphics.iterm2 ? "iterm2" : graphics.kitty ? "kitty" : graphics.sixel || process.env.WT_SESSION ? "sixel" : "none";
+  return graphics.iterm2
+    ? "iterm2"
+    : graphics.kitty
+      ? "kitty"
+      : graphics.sixel || process.env.WT_SESSION
+        ? "sixel"
+        : "none";
 }
 
 export interface TerminalCellSize {
@@ -48,7 +55,9 @@ export class TerminalImageSupport {
     this.supported = forced;
   }
 
-  get cellSize(): TerminalCellSize | undefined { return this.supported ? this.measured : undefined; }
+  get cellSize(): TerminalCellSize | undefined {
+    return this.supported ? this.measured : undefined;
+  }
 
   query(): void {
     if (this.protocol !== "sixel" || !this.output.isTTY) return;
@@ -72,12 +81,20 @@ export class TerminalImageSupport {
 
   async ready(): Promise<void> {
     if (this.protocol !== "sixel" || this.cellSize) return;
-    await new Promise<void>(resolve => {
-      const finish = () => { clearTimeout(timer); dispose(); resolve(); };
-      const dispose = this.onChange(() => { if (this.cellSize) finish(); });
+    await new Promise<void>((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        dispose();
+        resolve();
+      };
+      const dispose = this.onChange(() => {
+        if (this.cellSize) finish();
+      });
       const timer = setTimeout(finish, 300);
     });
   }
 
-  private changed(): void { for (const listener of this.listeners) listener(); }
+  private changed(): void {
+    for (const listener of this.listeners) listener();
+  }
 }

@@ -129,9 +129,19 @@ export interface RunHandle {
   cancel(reason?: string): void;
 }
 
-export type RunCheckpointEvent = Extract<MayEventPayload, {
-  type: "run.started" | "model.completed" | "tool.started" | "tool.completed" | "tool.failed" | "run.yielded" | "input.generated";
-}> & { readonly runId: string };
+export type RunCheckpointEvent = Extract<
+  MayEventPayload,
+  {
+    type:
+      | "run.started"
+      | "model.completed"
+      | "tool.started"
+      | "tool.completed"
+      | "tool.failed"
+      | "run.yielded"
+      | "input.generated";
+  }
+> & { readonly runId: string };
 export type RunCheckpoint = (event: RunCheckpointEvent) => Promise<void>;
 
 export type StepInputSource = (boundary: {
@@ -156,7 +166,9 @@ interface RunExecution {
 }
 
 export class May implements AgentRuntime {
-  get supportsRequestRecording(): boolean { return this.model.supportsRequestRecording === true; }
+  get supportsRequestRecording(): boolean {
+    return this.model.supportsRequestRecording === true;
+  }
   readonly descriptor = DEFAULT_RUNTIME_DESCRIPTOR;
   readonly supportedHooks = RUNTIME_HOOKS;
   private readonly hooks: HookDispatcher | undefined;
@@ -186,7 +198,12 @@ export class May implements AgentRuntime {
     }
 
     this.toolSettleTimeoutMs = options.toolSettleTimeoutMs ?? 2000;
-    if (!Number.isSafeInteger(this.toolSettleTimeoutMs) || this.toolSettleTimeoutMs < 1 || this.toolSettleTimeoutMs > 2_147_483_647) throw new RangeError("toolSettleTimeoutMs must be a valid positive timer duration");
+    if (
+      !Number.isSafeInteger(this.toolSettleTimeoutMs) ||
+      this.toolSettleTimeoutMs < 1 ||
+      this.toolSettleTimeoutMs > 2_147_483_647
+    )
+      throw new RangeError("toolSettleTimeoutMs must be a valid positive timer duration");
     const tools = new ToolRegistry(options.tools);
 
     this.model = options.model;
@@ -220,11 +237,21 @@ export class May implements AgentRuntime {
 
   private start(input: UserMessage | undefined, options: ContinueOptions): RunHandle {
     const {
-      signal: externalSignal, traceContext: parentTraceContext, traceAttributes: runTraceAttributes,
-      checkpoint, runBudget: budgetOverride, shouldYield, stepInputSource, recordRequest,
+      signal: externalSignal,
+      traceContext: parentTraceContext,
+      traceAttributes: runTraceAttributes,
+      checkpoint,
+      runBudget: budgetOverride,
+      shouldYield,
+      stepInputSource,
+      recordRequest,
     } = options;
-    if (recordRequest !== undefined && this.model.supportsRequestRecording !== true) throw new Error("Model does not support complete request recording");
-    if (this.unsafeToReuse) throw new RunCheckpointError(new Error("Tool outcomes or Context are uncertain; reconcile before creating a new runtime"));
+    if (recordRequest !== undefined && this.model.supportsRequestRecording !== true)
+      throw new Error("Model does not support complete request recording");
+    if (this.unsafeToReuse)
+      throw new RunCheckpointError(
+        new Error("Tool outcomes or Context are uncertain; reconcile before creating a new runtime"),
+      );
     const budget = new RunBudgetMeter(resolveRunBudget(this.runBudget, budgetOverride));
     if (this.concurrentRuns === "reject" && this.activeRuns > 0) {
       throw new ConcurrentRunError();
@@ -232,7 +259,8 @@ export class May implements AgentRuntime {
     // Resolve before touching Context or run bookkeeping; never mid-step.
     const tools = ToolRegistry.compose(this.tools, this.toolSource?.() ?? []).snapshot();
     const scope = Object.freeze({ ...this.toolScope?.() });
-    if (Object.values(scope).some((value) => typeof value !== "string")) throw new TypeError("Tool scope values must be strings");
+    if (Object.values(scope).some((value) => typeof value !== "string"))
+      throw new TypeError("Tool scope values must be strings");
     this.activeRuns += 1;
     const runId = createRunId();
     this.runScopes.set(runId, scope);
@@ -241,20 +269,29 @@ export class May implements AgentRuntime {
       isDroppable: isStreamingMayEvent,
     });
     const controller = new AbortController();
-    const timer = budget.limits.maxDurationMs === undefined ? undefined : setTimeout(() => {
-      controller.abort(new RunBudgetExceededError("durationMs", budget.limits.maxDurationMs!, budget.snapshot().elapsedMs));
-    }, budget.limits.maxDurationMs);
+    const timer =
+      budget.limits.maxDurationMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            controller.abort(
+              new RunBudgetExceededError("durationMs", budget.limits.maxDurationMs!, budget.snapshot().elapsedMs),
+            );
+          }, budget.limits.maxDurationMs);
     let seq = 0;
-    const runSpan = startTraceSpan(this.tracer, "may.run", omitUndefined({
-      parent: parentTraceContext,
-      attributes: {
-        ...this.traceAttributes,
-        ...(runTraceAttributes ?? {}),
-        "may.run.id": runId,
-        "may.run.continuation": input === undefined,
-        "may.run.max_steps": this.maxSteps,
-      },
-    }));
+    const runSpan = startTraceSpan(
+      this.tracer,
+      "may.run",
+      omitUndefined({
+        parent: parentTraceContext,
+        attributes: {
+          ...this.traceAttributes,
+          ...(runTraceAttributes ?? {}),
+          "may.run.id": runId,
+          "may.run.continuation": input === undefined,
+          "may.run.max_steps": this.maxSteps,
+        },
+      }),
+    );
 
     const onExternalAbort = () => controller.abort(externalSignal?.reason);
     if (externalSignal?.aborted) {
@@ -273,15 +310,19 @@ export class May implements AgentRuntime {
     };
 
     let checkpointFailure: RunCheckpointError | undefined;
-    const durableCheckpoint: RunCheckpoint | undefined = checkpoint === undefined ? undefined : async (event) => {
-      if (checkpointFailure !== undefined) throw checkpointFailure;
-      try { await checkpoint(event); }
-      catch (error) {
-        checkpointFailure ??= new RunCheckpointError(error);
-        controller.abort(checkpointFailure);
-        throw checkpointFailure;
-      }
-    };
+    const durableCheckpoint: RunCheckpoint | undefined =
+      checkpoint === undefined
+        ? undefined
+        : async (event) => {
+            if (checkpointFailure !== undefined) throw checkpointFailure;
+            try {
+              await checkpoint(event);
+            } catch (error) {
+              checkpointFailure ??= new RunCheckpointError(error);
+              controller.abort(checkpointFailure);
+              throw checkpointFailure;
+            }
+          };
 
     const result = this.execute({
       tools,
@@ -296,45 +337,48 @@ export class May implements AgentRuntime {
       stepInputSource,
       abortPending: (reason) => controller.abort(reason),
       recordRequest,
-    }).then(
-      (value) => {
-        endTraceSpan(runSpan, {
-          status: "ok",
-          attributes: {
-            "may.run.steps": value.steps,
-            "may.run.model_calls": value.modelCalls,
-            "may.run.tool_calls": value.toolCalls,
-            ...usageTraceAttributes(value.usage),
-          },
-        });
-        return value;
-      },
-      async (error: unknown) => {
-        const snapshot = budget.snapshot();
-        endTraceSpan(runSpan, {
-          status: controller.signal.aborted || error instanceof RunCancelledError
-            ? "cancelled"
-            : "error",
-          error: traceError(error),
-          attributes: omitUndefined({
-            "may.run.model_calls": snapshot.modelCalls,
-            "may.run.tool_calls": snapshot.toolCalls,
-            "may.run.steps": snapshot.steps,
-            "may.run.total_tokens": snapshot.totalTokens,
-            "may.run.usage_complete": snapshot.usageComplete,
-            "may.run.cost_usd": snapshot.costUsd,
-            "may.run.cost_complete": snapshot.costComplete === true,
-            "may.run.cost_kind": snapshot.costKind,
-          }),
-        });
-        try {
-          await this.observe(runtimeHooks.runFailed, { error: serializeError(error) }, { runId, signal: controller.signal });
-        } catch (observerError) {
-          throw new AggregateError([error, observerError], "Run and failure Hook both failed", { cause: error });
-        }
-        throw error;
-      },
-    )
+    })
+      .then(
+        (value) => {
+          endTraceSpan(runSpan, {
+            status: "ok",
+            attributes: {
+              "may.run.steps": value.steps,
+              "may.run.model_calls": value.modelCalls,
+              "may.run.tool_calls": value.toolCalls,
+              ...usageTraceAttributes(value.usage),
+            },
+          });
+          return value;
+        },
+        async (error: unknown) => {
+          const snapshot = budget.snapshot();
+          endTraceSpan(runSpan, {
+            status: controller.signal.aborted || error instanceof RunCancelledError ? "cancelled" : "error",
+            error: traceError(error),
+            attributes: omitUndefined({
+              "may.run.model_calls": snapshot.modelCalls,
+              "may.run.tool_calls": snapshot.toolCalls,
+              "may.run.steps": snapshot.steps,
+              "may.run.total_tokens": snapshot.totalTokens,
+              "may.run.usage_complete": snapshot.usageComplete,
+              "may.run.cost_usd": snapshot.costUsd,
+              "may.run.cost_complete": snapshot.costComplete === true,
+              "may.run.cost_kind": snapshot.costKind,
+            }),
+          });
+          try {
+            await this.observe(
+              runtimeHooks.runFailed,
+              { error: serializeError(error) },
+              { runId, signal: controller.signal },
+            );
+          } catch (observerError) {
+            throw new AggregateError([error, observerError], "Run and failure Hook both failed", { cause: error });
+          }
+          throw error;
+        },
+      )
       .finally(() => {
         if (timer !== undefined) clearTimeout(timer);
         this.activeRuns -= 1;
@@ -357,8 +401,18 @@ export class May implements AgentRuntime {
 
   private async execute(run: RunExecution): Promise<RunResult> {
     const {
-      tools, runId, input, signal, emit, runTraceContext, checkpoint, budget,
-      shouldYield, stepInputSource, abortPending, recordRequest,
+      tools,
+      runId,
+      input,
+      signal,
+      emit,
+      runTraceContext,
+      checkpoint,
+      budget,
+      shouldYield,
+      stepInputSource,
+      abortPending,
+      recordRequest,
     } = run;
     const yieldRun = async (step: number, result: RunResult): Promise<RunResult> => {
       result.finishReason = "yielded";
@@ -370,15 +424,18 @@ export class May implements AgentRuntime {
     let aggregateUsage: Usage | undefined;
     let modelCalls = 0;
     let toolCalls = 0;
-    let pendingTools: {
-      closed?: boolean;
-      readonly step: number;
-      readonly calls: readonly ToolCall[];
-      readonly outcomes: Array<ToolExecutionOutcome | undefined>;
-      readonly executions: Array<Promise<ToolExecutionOutcome> | undefined>;
-    } | undefined;
+    let pendingTools:
+      | {
+          closed?: boolean;
+          readonly step: number;
+          readonly calls: readonly ToolCall[];
+          readonly outcomes: Array<ToolExecutionOutcome | undefined>;
+          readonly executions: Array<Promise<ToolExecutionOutcome> | undefined>;
+        }
+      | undefined;
     try {
-      if (signal.aborted) emit(input === undefined ? { type: "run.started", continuation: true } : { type: "run.started" });
+      if (signal.aborted)
+        emit(input === undefined ? { type: "run.started", continuation: true } : { type: "run.started" });
       throwIfAborted(signal);
       if (input !== undefined) {
         await traceOperation(
@@ -397,9 +454,7 @@ export class May implements AgentRuntime {
       await this.observe(runtimeHooks.runBefore, { continuation: input === undefined }, { runId, signal });
       throwIfAborted(signal);
       await checkpoint?.({ type: "run.started", runId, ...(input === undefined ? { continuation: true } : {}) });
-      emit(input === undefined
-        ? { type: "run.started", continuation: true }
-        : { type: "run.started" });
+      emit(input === undefined ? { type: "run.started", continuation: true } : { type: "run.started" });
       await this.observe(runtimeHooks.runStarted, { continuation: input === undefined }, { runId, signal });
 
       for (let step = 1; step <= this.maxSteps; step++) {
@@ -408,10 +463,14 @@ export class May implements AgentRuntime {
         await this.observe(runtimeHooks.stepBefore, { step }, { runId, step, signal });
         emit({ type: "step.started", step });
 
-        const snapshotSpan = startTraceSpan(this.tracer, "may.context.snapshot", omitUndefined({
-          parent: runTraceContext,
-          attributes: { "may.step": step },
-        }));
+        const snapshotSpan = startTraceSpan(
+          this.tracer,
+          "may.context.snapshot",
+          omitUndefined({
+            parent: runTraceContext,
+            attributes: { "may.step": step },
+          }),
+        );
         let snapshot: ContextSnapshot;
         let contextMessageCount: number;
         try {
@@ -434,25 +493,34 @@ export class May implements AgentRuntime {
           endOperationSpan(snapshotSpan, error, signal);
           throw error;
         }
-        const request = await this.transform(runtimeHooks.modelBefore, this.createModelRequest(snapshot, tools), { runId, step, signal });
+        const request = await this.transform(runtimeHooks.modelBefore, this.createModelRequest(snapshot, tools), {
+          runId,
+          step,
+          signal,
+        });
         for (const definition of request.tools) {
-          if (!tools.get(definition.name)) throw new ModelProtocolError(`Hook requested an unavailable tool: ${definition.name}`);
+          if (!tools.get(definition.name))
+            throw new ModelProtocolError(`Hook requested an unavailable tool: ${definition.name}`);
         }
         throwIfAborted(signal);
 
         emit({ type: "model.started", step });
         modelCalls += 1;
         const modelCallId = `${runId}:model:${step}`;
-        const modelSpan = startTraceSpan(this.tracer, "may.model.call", omitUndefined({
-          parent: runTraceContext,
-          attributes: {
-            "may.step": step,
-            "may.model.call_id": modelCallId,
-            ...modelConfigurationTraceAttributes(this.model),
-            "may.model.message_count": request.messages.length,
-            "may.model.tool_definition_count": request.tools.length,
-          },
-        }));
+        const modelSpan = startTraceSpan(
+          this.tracer,
+          "may.model.call",
+          omitUndefined({
+            parent: runTraceContext,
+            attributes: {
+              "may.step": step,
+              "may.model.call_id": modelCallId,
+              ...modelConfigurationTraceAttributes(this.model),
+              "may.model.message_count": request.messages.length,
+              "may.model.tool_definition_count": request.tools.length,
+            },
+          }),
+        );
         let modelResponse: { message: AssistantMessage; usage?: Usage; cost?: UsageCost };
         let responseUsage: Usage | undefined;
         let accounted = false;
@@ -472,14 +540,16 @@ export class May implements AgentRuntime {
           accounted = true;
           budget.recordUsage(responseUsage, modelResponse.cost);
           if (!budget.snapshot().usageComplete && aggregateUsage !== undefined) {
-            aggregateUsage = { ...aggregateUsage, completeness: { status: "partial", reason: "one-or-more-responses-have-incomplete-usage" } };
+            aggregateUsage = {
+              ...aggregateUsage,
+              completeness: { status: "partial", reason: "one-or-more-responses-have-incomplete-usage" },
+            };
           }
           const modelCost = budget.snapshot().latestCost;
           endTraceSpan(modelSpan, {
             status: "ok",
             attributes: {
-              "may.model.tool_call_count":
-                modelResponse.message.toolCalls?.length ?? 0,
+              "may.model.tool_call_count": modelResponse.message.toolCalls?.length ?? 0,
               ...usageTraceAttributes(modelResponse.usage, "may.model"),
               ...(modelCost === undefined ? {} : costTraceAttributes(modelCost)),
               ...modelConfigurationTraceAttributes(this.model),
@@ -495,19 +565,33 @@ export class May implements AgentRuntime {
               budget.recordUsage(responseUsage, error.cost);
             } catch (accountingError) {
               const latestCost = budget.snapshot().latestCost;
-              failure = new ModelResponseValidationError(error.message, omitUndefined({
-                usage: responseUsage,
-                cost: latestCost,
-                cause: new AggregateError([error, accountingError], "Model validation and accounting failed", { cause: error }),
-              }));
-              if (accountingError instanceof RunBudgetExceededError) emit({ type: "run.budget.exceeded", dimension: accountingError.dimension, limit: accountingError.limit, consumed: accountingError.consumed, budget: budget.snapshot() });
+              failure = new ModelResponseValidationError(
+                error.message,
+                omitUndefined({
+                  usage: responseUsage,
+                  cost: latestCost,
+                  cause: new AggregateError([error, accountingError], "Model validation and accounting failed", {
+                    cause: error,
+                  }),
+                }),
+              );
+              if (accountingError instanceof RunBudgetExceededError)
+                emit({
+                  type: "run.budget.exceeded",
+                  dimension: accountingError.dimension,
+                  limit: accountingError.limit,
+                  consumed: accountingError.consumed,
+                  budget: budget.snapshot(),
+                });
             }
           }
           if (accounted) {
             const snapshot = budget.snapshot();
             setTraceAttributes(modelSpan, {
               ...usageTraceAttributes(responseUsage, "may.model"),
-              ...(snapshot.latestCost === undefined ? { "may.model.cost_complete": false } : costTraceAttributes(snapshot.latestCost)),
+              ...(snapshot.latestCost === undefined
+                ? { "may.model.cost_complete": false }
+                : costTraceAttributes(snapshot.latestCost)),
             });
           }
           endOperationSpan(modelSpan, failure, signal);
@@ -529,7 +613,9 @@ export class May implements AgentRuntime {
           signal,
           () => this.context.append([message], { runId, step }),
         );
-        await checkpoint?.(omitUndefined({ type: "model.completed", runId, step, message, contextMessageCount, usage }));
+        await checkpoint?.(
+          omitUndefined({ type: "model.completed", runId, step, message, contextMessageCount, usage }),
+        );
         emit(omitUndefined({ type: "model.completed", step, message, contextMessageCount, usage }));
         const calls = message.toolCalls ?? [];
         if (calls.length > 0) pendingTools = { step, calls, outcomes: [], executions: [] };
@@ -538,27 +624,35 @@ export class May implements AgentRuntime {
           emit({ type: "step.completed", step });
           await this.observe(runtimeHooks.stepCompleted, { step }, { runId, step, signal });
 
-          const result = createRunResult(
-            runId,
-            step,
-            modelCalls,
-            toolCalls,
-            message,
-            aggregateUsage,
-          );
+          const result = createRunResult(runId, step, modelCalls, toolCalls, message, aggregateUsage);
           result.budget = budget.snapshot();
           if (shouldYield?.() === true) return await yieldRun(step, result);
           if (await this.receiveStepInput(stepInputSource, runId, step, signal, emit)) continue;
-          const settlement = await this.transform(runtimeHooks.runBeforeEnd, { result, continueMessages: [] }, { runId, step, signal });
-          if (!jsonEqual(settlement.result, result)) throw new ModelProtocolError("Run settlement cannot change the completed result");
+          const settlement = await this.transform(
+            runtimeHooks.runBeforeEnd,
+            { result, continueMessages: [] },
+            { runId, step, signal },
+          );
+          if (!jsonEqual(settlement.result, result))
+            throw new ModelProtocolError("Run settlement cannot change the completed result");
           throwIfAborted(signal);
           budget.checkTime();
           if (shouldYield?.() === true) return await yieldRun(step, result);
           if (settlement.continueMessages.length > 0) {
-            const generated = { type: "input.generated" as const, runId, step, messages: [...settlement.continueMessages], reason: settlement.reason! };
+            const generated = {
+              type: "input.generated" as const,
+              runId,
+              step,
+              messages: [...settlement.continueMessages],
+              reason: settlement.reason!,
+            };
             await checkpoint?.(generated);
-            try { await this.context.append(generated.messages, { runId, step }); }
-            catch (error) { this.unsafeToReuse = true; throw new RunCheckpointError(error); }
+            try {
+              await this.context.append(generated.messages, { runId, step });
+            } catch (error) {
+              this.unsafeToReuse = true;
+              throw new RunCheckpointError(error);
+            }
             emit(generated);
             continue;
           }
@@ -569,13 +663,17 @@ export class May implements AgentRuntime {
 
         budget.reserveTools(calls.length);
         toolCalls += calls.length;
-        const batchSpan = startTraceSpan(this.tracer, "may.tools.batch", omitUndefined({
-          parent: runTraceContext,
-          attributes: {
-            "may.step": step,
-            "may.tool.call_count": calls.length,
-          },
-        }));
+        const batchSpan = startTraceSpan(
+          this.tracer,
+          "may.tools.batch",
+          omitUndefined({
+            parent: runTraceContext,
+            attributes: {
+              "may.step": step,
+              "may.tool.call_count": calls.length,
+            },
+          }),
+        );
         let outcomes: readonly ToolExecutionOutcome[];
         try {
           outcomes = await this.scheduleTools(
@@ -589,9 +687,7 @@ export class May implements AgentRuntime {
             batchSpan?.context,
             checkpoint,
           );
-          const failedCount = outcomes.filter((outcome) =>
-            outcome.type === "failed"
-          ).length;
+          const failedCount = outcomes.filter((outcome) => outcome.type === "failed").length;
           endTraceSpan(batchSpan, {
             status: failedCount === 0 ? "ok" : "error",
             attributes: {
@@ -614,10 +710,11 @@ export class May implements AgentRuntime {
             "may.context.message_count": outcomes.length,
           },
           signal,
-          () => this.context.append(
-            outcomes.map((outcome) => outcome.message),
-            { runId, step },
-          ),
+          () =>
+            this.context.append(
+              outcomes.map((outcome) => outcome.message),
+              { runId, step },
+            ),
         );
         emitToolOutcomes(step, outcomes, emit);
         for (const outcome of outcomes) {
@@ -638,33 +735,62 @@ export class May implements AgentRuntime {
         await this.receiveStepInput(stepInputSource, runId, step, signal, emit);
       }
 
-      if (budget.limits.maxSteps !== undefined && budget.limits.maxSteps <= this.maxSteps) throw new RunBudgetExceededError("steps", budget.limits.maxSteps, this.maxSteps + 1);
+      if (budget.limits.maxSteps !== undefined && budget.limits.maxSteps <= this.maxSteps)
+        throw new RunBudgetExceededError("steps", budget.limits.maxSteps, this.maxSteps + 1);
       throw new MaxStepsExceededError(this.maxSteps);
     } catch (error) {
       const wasAborted = signal.aborted;
       if (pendingTools !== undefined) {
         abortPending(error);
-        const settled = await settleWithin(pendingTools.executions.filter((value) => value !== undefined), this.toolSettleTimeoutMs);
+        const settled = await settleWithin(
+          pendingTools.executions.filter((value) => value !== undefined),
+          this.toolSettleTimeoutMs,
+        );
         pendingTools.closed = true;
         if (!settled) {
           this.unsafeToReuse = true;
-          const failure = new RunCheckpointError(new Error("Tools did not settle before the cancellation deadline; external effects are unknown"));
+          const failure = new RunCheckpointError(
+            new Error("Tools did not settle before the cancellation deadline; external effects are unknown"),
+          );
           emit({ type: "run.failed", error: serializeError(failure) });
           throw failure;
         }
-        if (!wasAborted && !(error instanceof RunCancelledError) && !(error instanceof RunBudgetExceededError) && !(error instanceof RunCheckpointError)) {
-          if (pendingTools.executions.some((execution, index) => execution !== undefined && pendingTools!.outcomes[index] === undefined)) {
+        if (
+          !wasAborted &&
+          !(error instanceof RunCancelledError) &&
+          !(error instanceof RunBudgetExceededError) &&
+          !(error instanceof RunCheckpointError)
+        ) {
+          if (
+            pendingTools.executions.some(
+              (execution, index) => execution !== undefined && pendingTools!.outcomes[index] === undefined,
+            )
+          ) {
             this.unsafeToReuse = true;
-            const failure = new RunCheckpointError(new Error("Tool execution ended without a known outcome; host reconciliation is required"));
+            const failure = new RunCheckpointError(
+              new Error("Tool execution ended without a known outcome; host reconciliation is required"),
+            );
             emit({ type: "run.failed", error: serializeError(failure) });
             throw failure;
           }
-          const outcomes = pendingTools.calls.map((call, index) => pendingTools!.outcomes[index] ?? createSkippedToolOutcome(call, new FatalToolExecutionError(String(error))));
+          const outcomes = pendingTools.calls.map(
+            (call, index) =>
+              pendingTools!.outcomes[index] ??
+              createSkippedToolOutcome(call, new FatalToolExecutionError(String(error))),
+          );
           try {
             const snapshot = await this.context.snapshot();
             const assistantIndex = snapshot.messages.map((message) => message.role).lastIndexOf("assistant");
-            const existing = new Set(snapshot.messages.slice(assistantIndex + 1).filter((message) => message.role === "tool").map((message) => message.toolCallId));
-            await this.context.append(outcomes.filter((outcome) => !existing.has(outcome.call.id)).map((outcome) => outcome.message), { runId, step: pendingTools.step });
+            const existing = new Set(
+              snapshot.messages
+                .slice(assistantIndex + 1)
+                .filter((message) => message.role === "tool")
+                .map((message) => message.toolCallId),
+            );
+            await this.context.append(
+              outcomes.filter((outcome) => !existing.has(outcome.call.id)).map((outcome) => outcome.message),
+              { runId, step: pendingTools.step },
+            );
             emitToolOutcomes(pendingTools.step, outcomes, emit);
           } catch (contextError) {
             this.unsafeToReuse = true;
@@ -684,21 +810,22 @@ export class May implements AgentRuntime {
         emit({ type: "run.failed", error: serializeError(signal.reason) });
         throw signal.reason;
       }
-      const budgetError = signal.reason instanceof RunBudgetExceededError ? signal.reason
-        : error instanceof RunBudgetExceededError ? error : undefined;
+      const budgetError =
+        signal.reason instanceof RunBudgetExceededError
+          ? signal.reason
+          : error instanceof RunBudgetExceededError
+            ? error
+            : undefined;
       if (signal.aborted || error instanceof RunCancelledError) {
-        const cancelled = error instanceof RunCancelledError
-          ? error
-          : new RunCancelledError(toReason(signal.reason));
+        const cancelled = error instanceof RunCancelledError ? error : new RunCancelledError(toReason(signal.reason));
         const reason = toReason(signal.reason);
 
         if (pendingTools !== undefined) {
           const settledOutcomes = pendingTools.outcomes.filter(
             (outcome): outcome is ToolExecutionOutcome => outcome !== undefined,
           );
-          const cancellationOutcomes = pendingTools.calls.map((call, index) =>
-            pendingTools?.outcomes[index] ??
-              createCancelledToolOutcome(call, cancelled)
+          const cancellationOutcomes = pendingTools.calls.map(
+            (call, index) => pendingTools?.outcomes[index] ?? createCancelledToolOutcome(call, cancelled),
           );
           try {
             await this.context.append(
@@ -716,17 +843,28 @@ export class May implements AgentRuntime {
         }
 
         if (budgetError !== undefined) {
-          emit({ type: "run.budget.exceeded", dimension: budgetError.dimension, limit: budgetError.limit, consumed: budgetError.consumed, budget: budget.snapshot() });
+          emit({
+            type: "run.budget.exceeded",
+            dimension: budgetError.dimension,
+            limit: budgetError.limit,
+            consumed: budgetError.consumed,
+            budget: budget.snapshot(),
+          });
           emit({ type: "run.failed", error: serializeError(budgetError) });
           throw budgetError;
         }
-        emit(reason === undefined
-          ? { type: "run.cancelled" }
-          : { type: "run.cancelled", reason });
+        emit(reason === undefined ? { type: "run.cancelled" } : { type: "run.cancelled", reason });
         throw cancelled;
       }
 
-      if (budgetError !== undefined) emit({ type: "run.budget.exceeded", dimension: budgetError.dimension, limit: budgetError.limit, consumed: budgetError.consumed, budget: budget.snapshot() });
+      if (budgetError !== undefined)
+        emit({
+          type: "run.budget.exceeded",
+          dimension: budgetError.dimension,
+          limit: budgetError.limit,
+          consumed: budgetError.consumed,
+          budget: budget.snapshot(),
+        });
       emit({ type: "run.failed", error: serializeError(error) });
       throw error;
     }
@@ -747,8 +885,9 @@ export class May implements AgentRuntime {
       return false;
     }
     // 输入已经保存时，即使取消同时到达，也要完成 Context 更新以保持恢复一致。
-    try { await this.context.append([...messages], { runId, step }); }
-    catch (error) {
+    try {
+      await this.context.append([...messages], { runId, step });
+    } catch (error) {
       this.unsafeToReuse = true;
       throw new RunCheckpointError(error);
     }
@@ -796,98 +935,119 @@ export class May implements AgentRuntime {
     let text = false;
     let attempts = 0;
     let retryWaitMs = 0;
-    const observer = createModelAttemptObserver(omitUndefined({
-      tracer: this.tracer,
-      parent: modelSpan?.context,
-      modelCallId,
-      attributes: { ...modelConfigurationTraceAttributes(this.model), "may.run.id": runId, "may.step": step },
-      onRetryWait(durationMs: number) {
-        retryWaitMs += durationMs;
-        setTraceAttributes(modelSpan, { "may.model.retry_wait_ms": retryWaitMs });
-      },
-      onContent(kind: "text" | "reasoning" | "tool" | "other") {
-        if (!content) {
-          content = true;
-          setTraceAttributes(modelSpan, { "may.model.first_content_ms": performance.now() - started });
-        }
-        if (kind === "text" && !text) {
-          text = true;
-          setTraceAttributes(modelSpan, { "may.model.first_text_ms": performance.now() - started });
-        }
-      },
-    }));
+    const observer = createModelAttemptObserver(
+      omitUndefined({
+        tracer: this.tracer,
+        parent: modelSpan?.context,
+        modelCallId,
+        attributes: { ...modelConfigurationTraceAttributes(this.model), "may.run.id": runId, "may.step": step },
+        onRetryWait(durationMs: number) {
+          retryWaitMs += durationMs;
+          setTraceAttributes(modelSpan, { "may.model.retry_wait_ms": retryWaitMs });
+        },
+        onContent(kind: "text" | "reasoning" | "tool" | "other") {
+          if (!content) {
+            content = true;
+            setTraceAttributes(modelSpan, { "may.model.first_content_ms": performance.now() - started });
+          }
+          if (kind === "text" && !text) {
+            text = true;
+            setTraceAttributes(modelSpan, { "may.model.first_text_ms": performance.now() - started });
+          }
+        },
+      }),
+    );
     const attemptObserver = {
-      retryWait(durationMs: number) { observer.retryWait?.(durationMs); },
-      start(attempt: number) { attempts += 1; return observer.start(attempt); },
+      retryWait(durationMs: number) {
+        observer.retryWait?.(durationMs);
+      },
+      start(attempt: number) {
+        attempts += 1;
+        return observer.start(attempt);
+      },
     };
     let singleAttempt: ReturnType<typeof attemptObserver.start> | undefined;
     const streamOptions = omitUndefined({
-      signal, runId, step, modelCallId, attemptObserver,
-      recordRequest: recordRequest === undefined ? undefined : async (event: ModelRequestObservation) => {
-        try { await recordRequest({ ...event, runId, step, modelCallId }); }
-        catch (error) { this.unsafeToReuse = true; throw new RunCheckpointError(error); }
-      },
+      signal,
+      runId,
+      step,
+      modelCallId,
+      attemptObserver,
+      recordRequest:
+        recordRequest === undefined
+          ? undefined
+          : async (event: ModelRequestObservation) => {
+              try {
+                await recordRequest({ ...event, runId, step, modelCallId });
+              } catch (error) {
+                this.unsafeToReuse = true;
+                throw new RunCheckpointError(error);
+              }
+            },
       traceContext: modelSpan?.context,
     });
     try {
       await this.model.preflight?.(request, streamOptions);
       singleAttempt = this.model.reportsAttempts === true ? undefined : attemptObserver.start(1);
       for await (const event of this.model.stream(request, streamOptions)) {
-      if (event.type === "response.completed") {
-        if (responseCompleted) {
-          throw new ModelProtocolError("Model emitted more than one response.completed event");
+        if (event.type === "response.completed") {
+          if (responseCompleted) {
+            throw new ModelProtocolError("Model emitted more than one response.completed event");
+          }
+          responseCompleted = true;
+          usage = event.usage;
+          cost = event.cost;
         }
-        responseCompleted = true;
-        usage = event.usage;
-        cost = event.cost;
+        throwIfAborted(signal);
+        await this.observe(runtimeHooks.modelEvent, event, { runId, step, signal });
+
+        if (event.type === "text.delta") {
+          if (event.delta.length > 0) singleAttempt?.content("text");
+          emit({ type: "model.text.delta", step, delta: event.delta });
+          continue;
+        }
+
+        if (event.type === "reasoning.delta") {
+          if (event.delta.length > 0) singleAttempt?.content("reasoning");
+          emit({ type: "model.reasoning.delta", step, delta: event.delta });
+          continue;
+        }
+
+        if (event.type === "retrying") {
+          addTraceEvent(
+            modelSpan,
+            "may.model.retry",
+            omitUndefined({
+              "may.model.retry.attempt": event.attempt,
+              "may.model.retry.max_attempts": event.maxAttempts,
+              "may.model.retry.delay_ms": event.delayMs,
+              "error.type": event.error.name,
+              "error.code": event.error.code,
+            }),
+          );
+          emit({
+            type: "model.retrying",
+            step,
+            attempt: event.attempt,
+            maxAttempts: event.maxAttempts,
+            delayMs: event.delayMs,
+            error: event.error,
+          });
+          continue;
+        }
+
+        completed = event.message;
+        if (completed.content.some((part) => part.type === "text" && part.text.length > 0))
+          singleAttempt?.content("text");
+        if ((completed.toolCalls?.length ?? 0) > 0) singleAttempt?.content("tool");
+        if (completed.content.some((part) => part.type !== "text")) singleAttempt?.content("other");
       }
-      throwIfAborted(signal);
-      await this.observe(runtimeHooks.modelEvent, event, { runId, step, signal });
 
-      if (event.type === "text.delta") {
-        if (event.delta.length > 0) singleAttempt?.content("text");
-        emit({ type: "model.text.delta", step, delta: event.delta });
-        continue;
+      if (!completed) {
+        throw new ModelProtocolError("Model stream ended without a response.completed event");
       }
-
-      if (event.type === "reasoning.delta") {
-        if (event.delta.length > 0) singleAttempt?.content("reasoning");
-        emit({ type: "model.reasoning.delta", step, delta: event.delta });
-        continue;
-      }
-
-      if (event.type === "retrying") {
-        addTraceEvent(modelSpan, "may.model.retry", omitUndefined({
-          "may.model.retry.attempt": event.attempt,
-          "may.model.retry.max_attempts": event.maxAttempts,
-          "may.model.retry.delay_ms": event.delayMs,
-          "error.type": event.error.name,
-          "error.code": event.error.code,
-        }));
-        emit({
-          type: "model.retrying",
-          step,
-          attempt: event.attempt,
-          maxAttempts: event.maxAttempts,
-          delayMs: event.delayMs,
-          error: event.error,
-        });
-        continue;
-      }
-
-      completed = event.message;
-      if (completed.content.some((part) => part.type === "text" && part.text.length > 0)) singleAttempt?.content("text");
-      if ((completed.toolCalls?.length ?? 0) > 0) singleAttempt?.content("tool");
-      if (completed.content.some(part => part.type !== "text")) singleAttempt?.content("other");
-    }
-
-    if (!completed) {
-      throw new ModelProtocolError(
-        "Model stream ended without a response.completed event",
-      );
-    }
-    singleAttempt?.end(omitUndefined({ status: "ok", completed: true, usage }));
-    return omitUndefined({ message: completed, usage, cost });
+      singleAttempt?.end(omitUndefined({ status: "ok", completed: true, usage }));
+      return omitUndefined({ message: completed, usage, cost });
     } catch (error) {
       let failure = error;
       if (error instanceof ModelResponseValidationError) {
@@ -898,9 +1058,19 @@ export class May implements AgentRuntime {
           failure = new ModelResponseValidationError(error.message, omitUndefined({ usage, cost, cause: error }));
         }
       } else if (responseCompleted) {
-        failure = new ModelResponseValidationError("Model response processing failed after completion", omitUndefined({ usage, cost, cause: error }));
+        failure = new ModelResponseValidationError(
+          "Model response processing failed after completion",
+          omitUndefined({ usage, cost, cause: error }),
+        );
       }
-      singleAttempt?.end(omitUndefined({ status: signal.aborted ? "cancelled" : "error", error: traceError(failure), completed: responseCompleted, usage }));
+      singleAttempt?.end(
+        omitUndefined({
+          status: signal.aborted ? "cancelled" : "error",
+          error: traceError(failure),
+          completed: responseCompleted,
+          usage,
+        }),
+      );
       throw failure;
     } finally {
       setTraceAttributes(modelSpan, {
@@ -937,27 +1107,32 @@ export class May implements AgentRuntime {
         tool: tools.get(call.name),
         execute: () => {
           signal.throwIfAborted();
-          execution ??= this.executeTool(
-            tools,
-            runId,
-            step,
-            call,
-            signal,
-            emit,
-            batchTraceContext,
-            checkpoint,
-          )
-            .then(async (outcome) => {
+          execution ??= this.executeTool(tools, runId, step, call, signal, emit, batchTraceContext, checkpoint).then(
+            async (outcome) => {
               if (pending.closed) return outcome;
               pending.outcomes[index] = outcome;
-              await checkpoint?.(outcome.type === "completed"
-                ? { type: "tool.completed", runId, step, call, output: outcome.output, content: outcome.message.content }
-                : { type: "tool.failed", runId, step, call, error: outcome.error });
+              await checkpoint?.(
+                outcome.type === "completed"
+                  ? {
+                      type: "tool.completed",
+                      runId,
+                      step,
+                      call,
+                      output: outcome.output,
+                      content: outcome.message.content,
+                    }
+                  : { type: "tool.failed", runId, step, call, error: outcome.error },
+              );
               if (outcome.type === "completed" && outcome.fatal === undefined) {
-                await this.observe(runtimeHooks.toolAfter, { call, output: outcome.output, content: outcome.message.content }, { runId, step, signal });
+                await this.observe(
+                  runtimeHooks.toolAfter,
+                  { call, output: outcome.output, content: outcome.message.content },
+                  { runId, step, signal },
+                );
               }
               return outcome;
-            });
+            },
+          );
           pending.executions[index] = execution;
           return execution;
         },
@@ -966,35 +1141,22 @@ export class May implements AgentRuntime {
     });
     const outcomes = await abortable(this.toolScheduler.schedule(operations, { runId, step, signal }), signal);
     if (outcomes.length > calls.length) {
-      throw new ToolSchedulerError(
-        `Tool scheduler returned ${outcomes.length} results for ${calls.length} calls`,
-      );
+      throw new ToolSchedulerError(`Tool scheduler returned ${outcomes.length} results for ${calls.length} calls`);
     }
     for (let index = 0; index < outcomes.length; index++) {
       if (outcomes[index]?.call !== calls[index]) {
-        throw new ToolSchedulerError(
-          "Tool scheduler must return results in call order",
-        );
+        throw new ToolSchedulerError("Tool scheduler must return results in call order");
       }
     }
     if (outcomes.length === calls.length) return outcomes;
 
     const terminal = outcomes.at(-1);
-    if (
-      terminal?.fatal === undefined
-    ) {
-      throw new ToolSchedulerError(
-        `Tool scheduler returned ${outcomes.length} results for ${calls.length} calls`,
-      );
+    if (terminal?.fatal === undefined) {
+      throw new ToolSchedulerError(`Tool scheduler returned ${outcomes.length} results for ${calls.length} calls`);
     }
 
     const fatal = terminal.fatal;
-    return [
-      ...outcomes,
-      ...calls.slice(outcomes.length).map((call) =>
-        createSkippedToolOutcome(call, fatal)
-      ),
-    ];
+    return [...outcomes, ...calls.slice(outcomes.length).map((call) => createSkippedToolOutcome(call, fatal))];
   }
 
   private async executeTool(
@@ -1011,53 +1173,71 @@ export class May implements AgentRuntime {
     let active = true;
     let progressTail = Promise.resolve();
     let rawOutput: { readonly value: unknown; readonly content: ContentPart[] } | undefined;
-    const toolSpan = startTraceSpan(this.tracer, "may.tool.call", omitUndefined({
-      parent: parentTraceContext,
-      attributes: {
-        "may.step": step,
-        "may.tool.name": call.name,
-        "may.tool.call_id": call.id,
-      },
-    }));
+    const toolSpan = startTraceSpan(
+      this.tracer,
+      "may.tool.call",
+      omitUndefined({
+        parent: parentTraceContext,
+        attributes: {
+          "may.step": step,
+          "may.tool.name": call.name,
+          "may.tool.call_id": call.id,
+        },
+      }),
+    );
 
     try {
       const tool = tools.get(call.name);
       if (!tool) throw new ToolNotFoundError(call.name);
 
-      const prepared = await this.transform(runtimeHooks.toolBefore, { call, input: call.input }, { runId, step, signal });
-      if (prepared.call.id !== call.id || prepared.call.name !== call.name) throw new FatalToolExecutionError("Tool Hook cannot change call identity");
+      const prepared = await this.transform(
+        runtimeHooks.toolBefore,
+        { call, input: call.input },
+        { runId, step, signal },
+      );
+      if (prepared.call.id !== call.id || prepared.call.name !== call.name)
+        throw new FatalToolExecutionError("Tool Hook cannot change call identity");
       if (prepared.denyReason !== undefined) throw new ToolHookDeniedError(prepared.denyReason);
       throwIfAborted(signal);
       const input = freezeToolInput(tool.parse ? tool.parse(prepared.input) : prepared.input);
       await checkpoint?.({ type: "tool.started", runId, step, call, input });
       throwIfAborted(signal);
       emit({ type: "tool.started", step, call, input });
-      const output = await this.toolExecutor.execute(Object.freeze({
-        tool,
-        input,
-        context: omitUndefined({
-          scope: this.runScopes.get(runId)!,
-          runId,
-          step,
-          toolCallId: call.id,
-          idempotencyKey: `${runId}:${step}:${call.id}`,
-          signal,
-          traceContext: toolSpan?.context,
-          report: (update: ToolProgressUpdate) => {
-            if (!active || signal.aborted) return;
-            emitToolProgress(step, call, update, emit);
-            const savedUpdate = structuredClone(update);
-            progressTail = progressTail.then(() => this.observe(runtimeHooks.toolProgress, { call, update: savedUpdate }, { runId, step, signal }));
-            void progressTail.catch(() => undefined);
-          },
+      const output = await this.toolExecutor.execute(
+        Object.freeze({
+          tool,
+          input,
+          context: omitUndefined({
+            scope: this.runScopes.get(runId)!,
+            runId,
+            step,
+            toolCallId: call.id,
+            idempotencyKey: `${runId}:${step}:${call.id}`,
+            signal,
+            traceContext: toolSpan?.context,
+            report: (update: ToolProgressUpdate) => {
+              if (!active || signal.aborted) return;
+              emitToolProgress(step, call, update, emit);
+              const savedUpdate = structuredClone(update);
+              progressTail = progressTail.then(() =>
+                this.observe(runtimeHooks.toolProgress, { call, update: savedUpdate }, { runId, step, signal }),
+              );
+              void progressTail.catch(() => undefined);
+            },
+          }),
         }),
-      }));
+      );
 
       const originalContent: ContentPart[] = tool.resultContent?.(output) ?? [{ type: "json", value: output }];
       rawOutput = { value: output, content: originalContent };
       await progressTail;
-      const projected = await this.transform(runtimeHooks.toolResult, { call, content: originalContent }, { runId, step, signal });
-      if (projected.call.id !== call.id || projected.call.name !== call.name) throw new FatalToolExecutionError("Tool result Hook cannot change call identity");
+      const projected = await this.transform(
+        runtimeHooks.toolResult,
+        { call, content: originalContent },
+        { runId, step, signal },
+      );
+      if (projected.call.id !== call.id || projected.call.name !== call.name)
+        throw new FatalToolExecutionError("Tool result Hook cannot change call identity");
       const content = [...projected.content];
       rawOutput = { value: output, content };
       endTraceSpan(toolSpan, { status: "ok" });
@@ -1076,9 +1256,14 @@ export class May implements AgentRuntime {
       if (rawOutput !== undefined) {
         endTraceSpan(toolSpan, { status: "error", error: traceError(error) });
         return {
-          type: "completed", call, output: rawOutput.value,
+          type: "completed",
+          call,
+          output: rawOutput.value,
           message: { role: "tool", toolCallId: call.id, name: call.name, content: rawOutput.content },
-          fatal: error instanceof FatalToolExecutionError ? error : new FatalToolExecutionError(error instanceof Error ? error.message : String(error)),
+          fatal:
+            error instanceof FatalToolExecutionError
+              ? error
+              : new FatalToolExecutionError(error instanceof Error ? error.message : String(error)),
         };
       }
       if (signal.aborted || error instanceof RunCancelledError) {
@@ -1157,10 +1342,7 @@ interface FailedToolExecution {
 
 type ToolExecutionOutcome = CompletedToolExecution | FailedToolExecution;
 
-function createCancelledToolOutcome(
-  call: ToolCall,
-  error: RunCancelledError,
-): FailedToolExecution {
+function createCancelledToolOutcome(call: ToolCall, error: RunCancelledError): FailedToolExecution {
   return {
     type: "failed",
     call,
@@ -1169,10 +1351,7 @@ function createCancelledToolOutcome(
   };
 }
 
-function createSkippedToolOutcome(
-  call: ToolCall,
-  fatal: FatalToolExecutionError,
-): FailedToolExecution {
+function createSkippedToolOutcome(call: ToolCall, fatal: FatalToolExecutionError): FailedToolExecution {
   const error: SerializedError = {
     name: "ToolSkippedError",
     message: `Tool \"${call.name}\" was not executed because a previous tool failed fatally: ${fatal.message}`,
@@ -1271,15 +1450,9 @@ async function traceOperation<T>(
   }
 }
 
-function endOperationSpan(
-  span: TraceSpan | undefined,
-  error: unknown,
-  signal: AbortSignal,
-): void {
+function endOperationSpan(span: TraceSpan | undefined, error: unknown, signal: AbortSignal): void {
   endTraceSpan(span, {
-    status: signal.aborted || error instanceof RunCancelledError
-      ? "cancelled"
-      : "error",
+    status: signal.aborted || error instanceof RunCancelledError ? "cancelled" : "error",
     error: traceError(error),
   });
 }
@@ -1287,7 +1460,14 @@ function endOperationSpan(
 function modelConfigurationTraceAttributes(model: Model): TraceAttributes {
   const attributes: Record<string, string | number | boolean> = {};
   const configuration = model.configuration ?? {};
-  const fields = { provider: "provider", adapter: "adapter", model: "name", profile: "profile", reasoningEffort: "reasoning_effort", capabilityVersion: "capability_version" };
+  const fields = {
+    provider: "provider",
+    adapter: "adapter",
+    model: "name",
+    profile: "profile",
+    reasoningEffort: "reasoning_effort",
+    capabilityVersion: "capability_version",
+  };
   for (const [key, attribute] of Object.entries(fields)) {
     const value = configuration[key];
     if (value !== undefined) attributes[`may.model.${attribute}`] = value;
@@ -1296,10 +1476,7 @@ function modelConfigurationTraceAttributes(model: Model): TraceAttributes {
   return attributes;
 }
 
-function usageTraceAttributes(
-  usage: Usage | undefined,
-  prefix = "may.run",
-): TraceAttributes {
+function usageTraceAttributes(usage: Usage | undefined, prefix = "may.run"): TraceAttributes {
   if (usage === undefined) return { [`${prefix}.usage_complete`]: false };
   return omitUndefined({
     [`${prefix}.cached_read_tokens`]: usage.cachedReadTokens,
@@ -1334,36 +1511,48 @@ function emitToolProgress(
       throw new TypeError("Tool output delta must be a string");
     }
     if (update.delta === "") return;
-    emit(update.channel === undefined
-      ? { type: "tool.output.delta", step, call, delta: update.delta }
-      : {
-          type: "tool.output.delta",
-          step,
-          call,
-          delta: update.delta,
-          channel: update.channel,
-        });
+    emit(
+      update.channel === undefined
+        ? { type: "tool.output.delta", step, call, delta: update.delta }
+        : {
+            type: "tool.output.delta",
+            step,
+            call,
+            delta: update.delta,
+            channel: update.channel,
+          },
+    );
     return;
   }
 
   if (update.type !== "progress" || typeof update.message !== "string") {
     throw new TypeError("Tool progress update is invalid");
   }
-  emit(update.data === undefined
-    ? { type: "tool.progress", step, call, message: update.message }
-    : {
-        type: "tool.progress",
-        step,
-        call,
-        message: update.message,
-        data: update.data,
-      });
+  emit(
+    update.data === undefined
+      ? { type: "tool.progress", step, call, message: update.message }
+      : {
+          type: "tool.progress",
+          step,
+          call,
+          message: update.message,
+          data: update.data,
+        },
+  );
 }
 
 async function settleWithin(pending: readonly Promise<unknown>[], timeoutMs: number): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  try { return await Promise.race([Promise.allSettled(pending).then(() => true), new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), timeoutMs); })]); }
-  finally { if (timer !== undefined) clearTimeout(timer); }
+  try {
+    return await Promise.race([
+      Promise.allSettled(pending).then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 function abortable<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {

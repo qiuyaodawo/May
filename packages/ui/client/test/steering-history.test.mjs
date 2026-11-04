@@ -8,21 +8,28 @@ import { SessionSteeringQueue } from "../../../may/dist/session/steering.js";
 import { UiProjection } from "../dist/projection.js";
 import { recordedField, searchHistory } from "../dist/reading.js";
 
-test("file history and live projection retain steering text, FIFO order, and full searchable fields", async t => {
+test("file history and live projection retain steering text, FIFO order, and full searchable fields", async (t) => {
   const root = join(testOutputRoot, "ui-client", "steering");
   await mkdir(root, { recursive: true });
   const directory = await mkdtemp(join(root, "history-"));
-  t.after(async () => { assert.ok(resolve(directory).startsWith(root + sep)); await rm(directory, { recursive: true, force: true }); });
+  t.after(async () => {
+    assert.ok(resolve(directory).startsWith(root + sep));
+    await rm(directory, { recursive: true, force: true });
+  });
   const store = new FileSessionStore(directory);
   let seq = 0;
-  const record = event => store.append({ ...event, sessionId: "steering", seq: ++seq, timestamp: seq });
+  const record = (event) => store.append({ ...event, sessionId: "steering", seq: ++seq, timestamp: seq });
   await record({ type: "session.created" });
-  await record({ type: "input.submitted", message: { role: "user", content: [{ type: "text", text: "Original request" }] } });
+  await record({
+    type: "input.submitted",
+    message: { role: "user", content: [{ type: "text", text: "Original request" }] },
+  });
   const queue = new SessionSteeringQueue(record);
   const first = "Additional context ".repeat(5000) + "search-at-end";
   await queue.enqueue({ inputId: "first", input: first }, "active");
   await queue.enqueue({ inputId: "second", input: "Second message" }, "active");
-  const before = new UiProjection(); before.history(await store.inspect("steering"));
+  const before = new UiProjection();
+  before.history(await store.inspect("steering"));
   assert.equal(before.blocks.size, 1);
   const messages = await queue.deliver("active", 1, new AbortController().signal);
   await queue.enqueue({ inputId: "cancelled", input: "Do not deliver" });
@@ -32,9 +39,13 @@ test("file history and live projection retain steering text, FIFO order, and ful
   queue.submitted(idle.inputId);
 
   const history = await new FileSessionStore(directory).inspect("steering");
-  const projection = new UiProjection(); projection.history(history);
+  const projection = new UiProjection();
+  projection.history(history);
   const blocks = [...projection.blocks.values()];
-  assert.deepEqual(blocks.map(block => block.id), ["input:2", "steering:active:1:0", "steering:active:1:1", `input:${seq}`]);
+  assert.deepEqual(
+    blocks.map((block) => block.id),
+    ["input:2", "steering:active:1:0", "steering:active:1:1", `input:${seq}`],
+  );
   assert.equal(blocks[1].runId, "active");
   assert.equal(blocks[2].text, "Second message");
   assert.equal(blocks[3].text, "Idle follow-up");
@@ -44,7 +55,11 @@ test("file history and live projection retain steering text, FIFO order, and ful
   assert.equal(searchHistory(history, "Do not deliver").size, 0);
 
   const live = new UiProjection();
-  const event = { type: "run.event", event: { type: "input.received", runId: "active", step: 1, seq: 1, timestamp: 1, messages } };
-  live.event(event); live.event(event);
+  const event = {
+    type: "run.event",
+    event: { type: "input.received", runId: "active", step: 1, seq: 1, timestamp: 1, messages },
+  };
+  live.event(event);
+  live.event(event);
   assert.deepEqual([...live.blocks.values()], blocks.slice(1, 3));
 });

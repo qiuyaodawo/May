@@ -44,10 +44,7 @@ export class EditorHistory {
   private draft = "";
 
   constructor(options: EditorHistoryOptions = {}) {
-    this.maximumEntries = positiveInteger(
-      options.maximumEntries ?? 100,
-      "maximumEntries",
-    );
+    this.maximumEntries = positiveInteger(options.maximumEntries ?? 100, "maximumEntries");
     this.entries = (options.entries ?? [])
       .map(normalizeValue)
       .filter((value) => value.trim() !== "")
@@ -61,10 +58,7 @@ export class EditorHistory {
 
   record(value: string): void {
     const normalized = normalizeValue(value);
-    if (
-      normalized.trim() !== "" &&
-      this.entries.at(-1) !== normalized
-    ) {
+    if (normalized.trim() !== "" && this.entries.at(-1) !== normalized) {
       this.entries.push(normalized);
       if (this.entries.length > this.maximumEntries) {
         this.entries.splice(0, this.entries.length - this.maximumEntries);
@@ -83,9 +77,7 @@ export class EditorHistory {
   next(): string | undefined {
     if (this.index >= this.entries.length) return undefined;
     this.index += 1;
-    return this.index === this.entries.length
-      ? this.draft
-      : this.entries[this.index];
+    return this.index === this.entries.length ? this.draft : this.entries[this.index];
   }
 
   reset(): void {
@@ -118,10 +110,7 @@ export class Editor implements InteractiveComponent, FocusTarget {
     this.cursorIndex = this.graphemes.length;
     this.keymap = createEditorKeymap(options.keybindings);
     this.prompt = styleText(options.prompt ?? "> ", options.promptStyle);
-    this.continuationPrompt = styleText(
-      options.continuationPrompt ?? "  ",
-      options.promptStyle,
-    );
+    this.continuationPrompt = styleText(options.continuationPrompt ?? "  ", options.promptStyle);
   }
 
   get value(): string {
@@ -189,9 +178,7 @@ export class Editor implements InteractiveComponent, FocusTarget {
       this.insert(stroke.text);
       return true;
     }
-    const match = this.keymap.resolve(stroke, this.hasSelection
-      ? ["editor", "editor.selection"]
-      : ["editor"]);
+    const match = this.keymap.resolve(stroke, this.hasSelection ? ["editor", "editor.selection"] : ["editor"]);
     if (match.type === "pending") return true;
     if (match.type === "action") {
       this.performAction(match.action as EditorAction);
@@ -248,19 +235,17 @@ export class Editor implements InteractiveComponent, FocusTarget {
     let cursor = rendered.positions[this.cursorIndex]!;
     if (this.graphemes.length === 0 && this.options.placeholder !== undefined) {
       const prefix = fitPrefix(this.prompt, size.width);
-      lines = [sliceAnsi(
-        `${prefix}${styleText(this.options.placeholder.replace(/[\r\n]+/gu, " "), this.options.placeholderStyle)}`,
-        0,
-        size.width,
-      )];
+      lines = [
+        sliceAnsi(
+          `${prefix}${styleText(this.options.placeholder.replace(/[\r\n]+/gu, " "), this.options.placeholderStyle)}`,
+          0,
+          size.width,
+        ),
+      ];
       cursor = { x: stringWidth(prefix), y: 0 };
     }
 
-    this.viewportStart = clamp(
-      this.viewportStart,
-      Math.max(0, cursor.y - size.height + 1),
-      cursor.y,
-    );
+    this.viewportStart = clamp(this.viewportStart, Math.max(0, cursor.y - size.height + 1), cursor.y);
     this.viewportStart = Math.min(this.viewportStart, Math.max(0, lines.length - size.height));
     const visibleLines = lines.slice(this.viewportStart, this.viewportStart + size.height);
     return {
@@ -275,35 +260,93 @@ export class Editor implements InteractiveComponent, FocusTarget {
 
   performAction(action: EditorAction): void {
     switch (action) {
-      case EDITOR_ACTIONS.left: this.moveCursor(-1); break;
-      case EDITOR_ACTIONS.right: this.moveCursor(1); break;
-      case EDITOR_ACTIONS.selectLeft: this.moveCursor(-1, true); break;
-      case EDITOR_ACTIONS.selectRight: this.moveCursor(1, true); break;
-      case EDITOR_ACTIONS.up: this.moveVertical(-1); break;
-      case EDITOR_ACTIONS.down: this.moveVertical(1); break;
-      case EDITOR_ACTIONS.selectUp: this.moveVertical(-1, true); break;
-      case EDITOR_ACTIONS.selectDown: this.moveVertical(1, true); break;
-      case EDITOR_ACTIONS.lineStart: this.moveTo(lineStart(this.graphemes, this.cursorIndex)); break;
-      case EDITOR_ACTIONS.lineEnd: this.moveTo(lineEnd(this.graphemes, this.cursorIndex)); break;
-      case EDITOR_ACTIONS.selectLineStart: this.moveTo(lineStart(this.graphemes, this.cursorIndex), true); break;
-      case EDITOR_ACTIONS.selectLineEnd: this.moveTo(lineEnd(this.graphemes, this.cursorIndex), true); break;
-      case EDITOR_ACTIONS.start: this.moveTo(0); break;
-      case EDITOR_ACTIONS.end: this.moveTo(this.graphemes.length); break;
-      case EDITOR_ACTIONS.selectStart: this.moveTo(0, true); break;
-      case EDITOR_ACTIONS.selectEnd: this.moveTo(this.graphemes.length, true); break;
-      case EDITOR_ACTIONS.wordLeft: this.moveWord(-1); break;
-      case EDITOR_ACTIONS.wordRight: this.moveWord(1); break;
-      case EDITOR_ACTIONS.selectWordLeft: this.moveWord(-1, true); break;
-      case EDITOR_ACTIONS.selectWordRight: this.moveWord(1, true); break;
-      case EDITOR_ACTIONS.selectAll: this.selectAll(); break;
-      case EDITOR_ACTIONS.copy: this.copy(false); break;
-      case EDITOR_ACTIONS.cut: this.copy(true); break;
-      case EDITOR_ACTIONS.paste: this.paste(); break;
-      case EDITOR_ACTIONS.backspace: this.backspace(); break;
-      case EDITOR_ACTIONS.delete: this.deleteForward(); break;
-      case EDITOR_ACTIONS.deleteWord: this.deleteWordBackward(); break;
-      case EDITOR_ACTIONS.newline: this.insert("\n"); break;
-      case EDITOR_ACTIONS.tab: this.insert("\t"); break;
+      case EDITOR_ACTIONS.left:
+        this.moveCursor(-1);
+        break;
+      case EDITOR_ACTIONS.right:
+        this.moveCursor(1);
+        break;
+      case EDITOR_ACTIONS.selectLeft:
+        this.moveCursor(-1, true);
+        break;
+      case EDITOR_ACTIONS.selectRight:
+        this.moveCursor(1, true);
+        break;
+      case EDITOR_ACTIONS.up:
+        this.moveVertical(-1);
+        break;
+      case EDITOR_ACTIONS.down:
+        this.moveVertical(1);
+        break;
+      case EDITOR_ACTIONS.selectUp:
+        this.moveVertical(-1, true);
+        break;
+      case EDITOR_ACTIONS.selectDown:
+        this.moveVertical(1, true);
+        break;
+      case EDITOR_ACTIONS.lineStart:
+        this.moveTo(lineStart(this.graphemes, this.cursorIndex));
+        break;
+      case EDITOR_ACTIONS.lineEnd:
+        this.moveTo(lineEnd(this.graphemes, this.cursorIndex));
+        break;
+      case EDITOR_ACTIONS.selectLineStart:
+        this.moveTo(lineStart(this.graphemes, this.cursorIndex), true);
+        break;
+      case EDITOR_ACTIONS.selectLineEnd:
+        this.moveTo(lineEnd(this.graphemes, this.cursorIndex), true);
+        break;
+      case EDITOR_ACTIONS.start:
+        this.moveTo(0);
+        break;
+      case EDITOR_ACTIONS.end:
+        this.moveTo(this.graphemes.length);
+        break;
+      case EDITOR_ACTIONS.selectStart:
+        this.moveTo(0, true);
+        break;
+      case EDITOR_ACTIONS.selectEnd:
+        this.moveTo(this.graphemes.length, true);
+        break;
+      case EDITOR_ACTIONS.wordLeft:
+        this.moveWord(-1);
+        break;
+      case EDITOR_ACTIONS.wordRight:
+        this.moveWord(1);
+        break;
+      case EDITOR_ACTIONS.selectWordLeft:
+        this.moveWord(-1, true);
+        break;
+      case EDITOR_ACTIONS.selectWordRight:
+        this.moveWord(1, true);
+        break;
+      case EDITOR_ACTIONS.selectAll:
+        this.selectAll();
+        break;
+      case EDITOR_ACTIONS.copy:
+        this.copy(false);
+        break;
+      case EDITOR_ACTIONS.cut:
+        this.copy(true);
+        break;
+      case EDITOR_ACTIONS.paste:
+        this.paste();
+        break;
+      case EDITOR_ACTIONS.backspace:
+        this.backspace();
+        break;
+      case EDITOR_ACTIONS.delete:
+        this.deleteForward();
+        break;
+      case EDITOR_ACTIONS.deleteWord:
+        this.deleteWordBackward();
+        break;
+      case EDITOR_ACTIONS.newline:
+        this.insert("\n");
+        break;
+      case EDITOR_ACTIONS.tab:
+        this.insert("\t");
+        break;
       case EDITOR_ACTIONS.submit:
         if (this.options.onSubmit === undefined) this.insert("\n");
         else {
@@ -312,7 +355,8 @@ export class Editor implements InteractiveComponent, FocusTarget {
           this.options.onSubmit(value);
         }
         break;
-      default: throw new Error(`Unknown editor action: ${action}`);
+      default:
+        throw new Error(`Unknown editor action: ${action}`);
     }
   }
 
@@ -349,9 +393,7 @@ export class Editor implements InteractiveComponent, FocusTarget {
 
   private moveCursor(offset: number, extend = false): void {
     const [start, end] = this.selectionRange();
-    this.moveTo(!extend && this.hasSelection
-      ? offset < 0 ? start : end
-      : this.cursorIndex + offset, extend);
+    this.moveTo(!extend && this.hasSelection ? (offset < 0 ? start : end) : this.cursorIndex + offset, extend);
   }
 
   private moveTo(next: number, extend = false, preserveColumn = false): void {
@@ -379,7 +421,9 @@ export class Editor implements InteractiveComponent, FocusTarget {
       return;
     }
     const start = lineStart(this.graphemes, this.cursorIndex);
-    const column = this.graphemes.slice(start, this.cursorIndex).reduce((width, value) => width + stringWidth(displayGrapheme(value)), 0);
+    const column = this.graphemes
+      .slice(start, this.cursorIndex)
+      .reduce((width, value) => width + stringWidth(displayGrapheme(value)), 0);
     if (direction < 0) {
       if (start > 0) {
         this.moveTo(indexAtColumn(this.graphemes, lineStart(this.graphemes, start - 1), start - 1, column), extend);
@@ -397,9 +441,10 @@ export class Editor implements InteractiveComponent, FocusTarget {
   }
 
   private moveWord(direction: -1 | 1, extend = false): void {
-    const next = direction < 0
-      ? previousWordBoundary(this.graphemes, this.cursorIndex)
-      : nextWordBoundary(this.graphemes, this.cursorIndex);
+    const next =
+      direction < 0
+        ? previousWordBoundary(this.graphemes, this.cursorIndex)
+        : nextWordBoundary(this.graphemes, this.cursorIndex);
     this.moveTo(next, extend);
   }
 
@@ -417,9 +462,7 @@ export class Editor implements InteractiveComponent, FocusTarget {
   private navigateHistory(direction: -1 | 1): boolean {
     const history = this.options.history;
     if (history === undefined) return false;
-    const value = direction < 0
-      ? history.previous(this.value)
-      : history.next();
+    const value = direction < 0 ? history.previous(this.value) : history.next();
     if (value === undefined) return false;
     this.graphemes = segment(value);
     this.cursorIndex = this.graphemes.length;
@@ -487,7 +530,10 @@ export class Editor implements InteractiveComponent, FocusTarget {
     this.pendingClipboard = this.pendingClipboard.then(operation, operation);
     void this.pendingClipboard.catch((error: unknown) => {
       if (this.options.onError !== undefined) this.options.onError(error);
-      else queueMicrotask(() => { throw error; });
+      else
+        queueMicrotask(() => {
+          throw error;
+        });
     });
   }
 
@@ -495,7 +541,8 @@ export class Editor implements InteractiveComponent, FocusTarget {
     const layout = this.layout!;
     const size = this.renderSize!;
     if (y < 0) this.viewportStart = Math.max(0, this.viewportStart - 1);
-    else if (y >= size.height) this.viewportStart = Math.min(Math.max(0, layout.rows.length - size.height), this.viewportStart + 1);
+    else if (y >= size.height)
+      this.viewportStart = Math.min(Math.max(0, layout.rows.length - size.height), this.viewportStart + 1);
     const row = clamp(this.viewportStart + clamp(y, 0, size.height - 1), 0, layout.rows.length - 1);
     return indexAt(layout.rows[row]!, x);
   }
@@ -595,9 +642,7 @@ function layoutEditor(
     }
     positions[index] = { x: lineWidth, y: lines.length };
     cells.push({ index, x: lineWidth, width: graphemeWidth });
-    line += index >= selection[0] && index < selection[1]
-      ? styleText(displayed, selectionStyle)
-      : displayed;
+    line += index >= selection[0] && index < selection[1] ? styleText(displayed, selectionStyle) : displayed;
     lineWidth += graphemeWidth;
   }
   if (lineWidth >= width) nextLine(graphemes.length);
@@ -686,9 +731,7 @@ function nextWordBoundary(graphemes: readonly string[], cursor: number): number 
 
 function wordClass(value: string): "space" | "word" | "punctuation" {
   if (/^\s+$/u.test(value)) return "space";
-  return /^[\p{Letter}\p{Number}\p{Mark}_]+$/u.test(value)
-    ? "word"
-    : "punctuation";
+  return /^[\p{Letter}\p{Number}\p{Mark}_]+$/u.test(value) ? "word" : "punctuation";
 }
 
 function positiveInteger(value: number, name: string): number {

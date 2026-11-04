@@ -3,7 +3,11 @@ import type { GatewayAgentConfig } from "./gateway-types.js";
 import section from "./config-schema.json" with { type: "json" };
 
 export type GroupTrigger = "explicit" | "all";
-export interface EntranceTrigger { readonly conversation: string; readonly threadId?: string; readonly trigger: GroupTrigger }
+export interface EntranceTrigger {
+  readonly conversation: string;
+  readonly threadId?: string;
+  readonly trigger: GroupTrigger;
+}
 
 export interface ChannelSettings {
   readonly enabled?: boolean;
@@ -34,7 +38,11 @@ export interface MaybeClawSettings {
   };
   readonly channels?: {
     readonly telegram?: ChannelSettings & { readonly botToken?: string; readonly botTokenEnv?: string };
-    readonly feishu?: ChannelSettings & { readonly appId?: string; readonly appSecret?: string; readonly appSecretEnv?: string };
+    readonly feishu?: ChannelSettings & {
+      readonly appId?: string;
+      readonly appSecret?: string;
+      readonly appSecretEnv?: string;
+    };
   };
 }
 

@@ -16,10 +16,7 @@ import { MaybeCodeConfigError } from "./errors.js";
 export type MaybeCodeModelSelector = ModelProfileSelector;
 export type SelectedMaybeCodeModel = ProviderModelSelection;
 
-export function selectMaybeCodeModel(
-  config: MayConfig,
-  selector: MaybeCodeModelSelector = {},
-): SelectedMaybeCodeModel {
+export function selectMaybeCodeModel(config: MayConfig, selector: MaybeCodeModelSelector = {}): SelectedMaybeCodeModel {
   try {
     return selectProviderModel(config, selector);
   } catch (error) {
@@ -30,14 +27,9 @@ export function selectMaybeCodeModel(
   }
 }
 
-export function createMaybeCodeModel(
-  selection: SelectedMaybeCodeModel,
-  registry?: ProviderAdapterRegistry,
-): Model {
+export function createMaybeCodeModel(selection: SelectedMaybeCodeModel, registry?: ProviderAdapterRegistry): Model {
   try {
-    return registry === undefined
-      ? createBuiltinProviderModel(selection)
-      : registry.create(selection);
+    return registry === undefined ? createBuiltinProviderModel(selection) : registry.create(selection);
   } catch (error) {
     if (error instanceof ProviderAdapterRegistryError) {
       throw new MaybeCodeConfigError(error.message, { cause: error });

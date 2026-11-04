@@ -90,7 +90,7 @@ async function walkMarkdown(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = resolve(directory, entry.name);
     if (entry.isDirectory()) {
-      files.push(...await walkMarkdown(path));
+      files.push(...(await walkMarkdown(path)));
     } else if (entry.isFile() && entry.name.endsWith(".md")) {
       files.push(path);
     }

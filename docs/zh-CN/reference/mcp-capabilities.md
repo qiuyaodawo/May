@@ -26,31 +26,31 @@ flowchart LR
 
 ## 已实现能力
 
-| 能力 | 宿主职责 | 指南与专项测试 |
-| --- | --- | --- |
-| Stdio 与 Streamable HTTP | 配置可信进程或端点，关闭连接池 | [连接 MCP](../guides/mcp.md)；`packages/mcp/test/mcp.test.mjs` |
-| 原生 OAuth | 配置信任的认证来源与安全凭据存储，完成登录 | [认证](../guides/mcp-auth.md)；`oauth.test.mjs` |
-| 动态目录 | 每次 Run 使用工具快照，按需明确刷新或重连 | [目录](../guides/mcp.md#动态目录与端点恢复)；`catalog.test.mjs` |
-| 资源、提示模板与补全 | 授权读取，明确附加选中的内容 | [内容操作](../guides/mcp.md#资源提示词补全与附件)；`capabilities.test.mjs` |
-| 表单与 URL 交互 | 并发消费 broker 事件，审阅每次响应 | [宿主交互](../guides/mcp.md#有作用域的用户交互现代-mrtr)；`interactions.test.mjs` |
-| Roots 与 Sampling 兼容 | 分别启用服务，审阅披露内容并执行模型预算 | [兼容配置](../guides/mcp.md#rootssampling-与旧协议兼容)；`host-services.test.mjs` |
-| 长任务 Tasks | 提供日志和可信归属，明确检查、更新、等待或取消 | [Tasks](../guides/mcp-tasks.md)；`task-journal.test.mjs`、`task-runtime.test.mjs` |
-| 隔离 Apps | 提供同意流程、认证渲染通道和独立沙箱来源 | [Apps](../guides/mcp-apps.md)；`apps.test.mjs`、`test/browser/apps.test.mjs` |
-| 独立服务端导出 | 提供认证、授权、明确导出项和公开结果投影 | [服务端导出](../guides/mcp-server.md)；`server.test.mjs` |
+| 能力                     | 宿主职责                                       | 指南与专项测试                                                                    |
+| ------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------- |
+| Stdio 与 Streamable HTTP | 配置可信进程或端点，关闭连接池                 | [连接 MCP](../guides/mcp.md)；`packages/mcp/test/mcp.test.mjs`                    |
+| 原生 OAuth               | 配置信任的认证来源与安全凭据存储，完成登录     | [认证](../guides/mcp-auth.md)；`oauth.test.mjs`                                   |
+| 动态目录                 | 每次 Run 使用工具快照，按需明确刷新或重连      | [目录](../guides/mcp.md#动态目录与端点恢复)；`catalog.test.mjs`                   |
+| 资源、提示模板与补全     | 授权读取，明确附加选中的内容                   | [内容操作](../guides/mcp.md#资源提示词补全与附件)；`capabilities.test.mjs`        |
+| 表单与 URL 交互          | 并发消费 broker 事件，审阅每次响应             | [宿主交互](../guides/mcp.md#有作用域的用户交互现代-mrtr)；`interactions.test.mjs` |
+| Roots 与 Sampling 兼容   | 分别启用服务，审阅披露内容并执行模型预算       | [兼容配置](../guides/mcp.md#rootssampling-与旧协议兼容)；`host-services.test.mjs` |
+| 长任务 Tasks             | 提供日志和可信归属，明确检查、更新、等待或取消 | [Tasks](../guides/mcp-tasks.md)；`task-journal.test.mjs`、`task-runtime.test.mjs` |
+| 隔离 Apps                | 提供同意流程、认证渲染通道和独立沙箱来源       | [Apps](../guides/mcp-apps.md)；`apps.test.mjs`、`test/browser/apps.test.mjs`      |
+| 独立服务端导出           | 提供认证、授权、明确导出项和公开结果投影       | [服务端导出](../guides/mcp-server.md)；`server.test.mjs`                          |
 
 表格中除首个完整路径外，测试文件均位于 `packages/mcp/test/`。MaybeCode 的
 配置式 MCP、命令和能力测试覆盖产品集成。
 
 ## 协议兼容性
 
-| 接口 | 支持版本或模式 |
-| --- | --- |
-| 现代客户端与服务端核心协议 | `2026-07-28` |
-| 客户端旧协议协商 | Stdio 默认 `legacy`，HTTP 默认 `auto` |
-| 独立旧协议服务端 | 明确设置 `legacy: "stateless"` |
-| Tasks 扩展 | `io.modelcontextprotocol/tasks`，`2026-07-28` |
-| Apps UI | `2026-01-26`，独立于核心协议协商 |
-| TypeScript SDK | Client 与 server 2.0.0 |
+| 接口                       | 支持版本或模式                                |
+| -------------------------- | --------------------------------------------- |
+| 现代客户端与服务端核心协议 | `2026-07-28`                                  |
+| 客户端旧协议协商           | Stdio 默认 `legacy`，HTTP 默认 `auto`         |
+| 独立旧协议服务端           | 明确设置 `legacy: "stateless"`                |
+| Tasks 扩展                 | `io.modelcontextprotocol/tasks`，`2026-07-28` |
+| Apps UI                    | `2026-01-26`，独立于核心协议协商              |
+| TypeScript SDK             | Client 与 server 2.0.0                        |
 
 Tasks 使用扁平句柄和 `tasks/get`、`tasks/update`、`tasks/cancel`，不支持 2025
 实验版 Tasks。任务状态通过明确轮询获取，尚无任务订阅通知。已停止维护的双端点

@@ -10,22 +10,33 @@ import { AgentGateway } from "../../dist/gateway.js";
 import { gatewaySettings } from "../../dist/gateway-settings.js";
 import { startGatewayServer } from "../../dist/plugins/web-api.js";
 
-test("browser password login, session creation, password rotation, and logout", { timeout: 30_000 }, async t => {
+test("browser password login, session creation, password rotation, and logout", { timeout: 30_000 }, async (t) => {
   const base = join(testOutputRoot, "maybeclaw", "browser");
-  await mkdir(base, { recursive: true }); const directory = await mkdtemp(join(base, "case-"));
-  const path = join(directory, "config.json"), password = `  ${randomBytes(32).toString("base64url")}  `;
-  const config = { apps: { maybeclaw: { version: 2, agents: [{ id: "code", adapter: "may" }], server: { auth: { password } } } } };
+  await mkdir(base, { recursive: true });
+  const directory = await mkdtemp(join(base, "case-"));
+  const path = join(directory, "config.json"),
+    password = `  ${randomBytes(32).toString("base64url")}  `;
+  const config = {
+    apps: { maybeclaw: { version: 2, agents: [{ id: "code", adapter: "may" }], server: { auth: { password } } } },
+  };
   await writeFile(path, JSON.stringify(config));
   const gateway = new AgentGateway({ directory, configPath: path, settings: gatewaySettings(config) });
   let browser, server;
   t.after(async () => {
-    await browser?.close(); if (server) await server.close(); else await gateway.close();
-    assert.ok(resolve(directory).startsWith(resolve(base) + sep)); await rm(directory, { recursive: true, force: true });
+    await browser?.close();
+    if (server) await server.close();
+    else await gateway.close();
+    assert.ok(resolve(directory).startsWith(resolve(base) + sep));
+    await rm(directory, { recursive: true, force: true });
   });
   server = await startGatewayServer({ gateway, port: 0 });
-  browser = await chromium.launch({ headless: true, env: { ...process.env, TEMP: directory, TMP: directory, TMPDIR: directory } });
-  const page = await browser.newPage(), errors = [];
-  page.on("pageerror", error => errors.push(error.message));
+  browser = await chromium.launch({
+    headless: true,
+    env: { ...process.env, TEMP: directory, TMP: directory, TMPDIR: directory },
+  });
+  const page = await browser.newPage(),
+    errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(server.url);
   async function login(value) {
     await page.locator(".connection-button").click();
@@ -42,9 +53,11 @@ test("browser password login, session creation, password rotation, and logout", 
   await create.waitFor({ state: "detached" });
   assert.equal(gateway.sessions({ kind: "operator", id: "test" })[0].name, "密码登录创建");
   assert.deepEqual(await page.evaluate(() => [localStorage.length, sessionStorage.length]), [0, 0]);
-  await page.reload(); await page.waitForFunction(() => document.querySelector(".new-button")?.disabled);
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector(".new-button")?.disabled);
   await login(password);
-  const saved = JSON.parse(await readFile(path, "utf8")), nextPassword = randomBytes(32).toString("base64url");
+  const saved = JSON.parse(await readFile(path, "utf8")),
+    nextPassword = randomBytes(32).toString("base64url");
   assert.equal(saved.apps.maybeclaw.server.auth.password, undefined);
   saved.apps.maybeclaw.server.auth.password = nextPassword;
   await writeFile(path, JSON.stringify(saved));

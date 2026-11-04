@@ -13,18 +13,18 @@
     },
     {
       "heading": "Plugin definition and composition",
-      "en": "1e6d58cf959e09ff27e13e00447eec7327737c9ab7c009d99497163f2d9fc39c",
-      "zh": "fb717d5ed6b6170cdddd3a67fb1dc118cc05b2579c9e3acba2a5f94acb186c06"
+      "en": "3013986f341ea660a936fca4f034449ecb606ac98eae999935f6682cb30cbd8e",
+      "zh": "e831d700fd81fb65efa096131475433d655a15c3fac4dd3b078dc90dd8757380"
     },
     {
       "heading": "PluginContext and ctx",
-      "en": "8291824cf9af3f8012edaf2d4cde5ab0e62e6e0f8b2e92b9cb86244d0ff6f54a",
-      "zh": "2343b777e9d3752d69b63dce15b75b0c247f296c82c3b656064e6b005e10601b"
+      "en": "31fb8a2cf15547bc3abaa36e392eaaff9c5ea7091720eec635e162e2e3277111",
+      "zh": "590aa3692554ae466a2ff9625df8c395f73004c42dd40875c8fef5d24c39ed86"
     },
     {
       "heading": "Declare a plugin",
-      "en": "cae8d6d461dd6d40cd7b408d98abcfdd6e4e8b371d90ffcc8fbef69aeb77b334",
-      "zh": "f90b0749026c5661dc786db4e76fa2bfffc367bfad358602a2cd42f64afe9c75"
+      "en": "ae4df4bff98c42e7e797baf5387ec7678d3d13a659f88f89d06716a11d5c44c7",
+      "zh": "f0fbcbb9958fef10123b5d0b45f7358f50556e9569cce5e07d17674e3d97dc75"
     },
     {
       "heading": "Own resources within scopes",
@@ -33,8 +33,8 @@
     },
     {
       "heading": "Transform and observe lifecycle data",
-      "en": "ffebb5fbe9fe9f52e98071b3fa396402eee030ec45b75d6623c5c0e827637a9c",
-      "zh": "90450bdf07cb0a7a1ffcc78b1af1ac7b2d02bcd7e700201ddf5570d10690e8dd"
+      "en": "f4d460838307c63b2b3822844494325561d5676b41b1491759c1f0eb3f5deeb0",
+      "zh": "5c6de41b858b21b663092df41654504c4b30a70e19d93ba64ce34165a6c37a01"
     },
     {
       "heading": "Runtime and application services",
@@ -43,8 +43,8 @@
     },
     {
       "heading": "Reusable plugin packages",
-      "en": "89c299441a2549c8fe6664c5c75a68c16bddc0b2f9fe616170d36c3a137ccda7",
-      "zh": "1213776269232112d262a41b3593406a6be57f8b2d6669adf5a612e5c0ce2c40"
+      "en": "e33904ae307afeed3839c67f22c815dde7312baf0b1eb1ec1376942b1fbe54fc",
+      "zh": "718e76a9eebd4b2784622bd04bf1f4dedc9e9f93ad23d5aba63b281941e20c57"
     },
     {
       "heading": "Runtime factory",
@@ -58,8 +58,8 @@
     },
     {
       "heading": "Load plugins in products",
-      "en": "e2dd20f669ed91203e2df618ba94bc5a0f34bb06ebae11d49c4cf164ccfb7672",
-      "zh": "e5afb7ee9dfa48f868341255667a0fe3452c15697bbe2dbcb590839b9e7a4698"
+      "en": "8a3d73edad8aad3f0359e1734cb11ace7a61e10bf10c66669cce85f7d34e46e7",
+      "zh": "8c28592f748c5453140098eeb25661a1ee7586b7e43bf5d50211eac5e7ff176f"
     },
     {
       "heading": "Verification",

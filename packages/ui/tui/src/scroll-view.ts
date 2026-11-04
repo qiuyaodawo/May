@@ -60,7 +60,7 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
     this.maxContentLines = options.maxContentLines ?? 10_000;
     this.onInvalidate = options.onInvalidate;
     this.keymap = new Keymap(mergeKeyBindings(DEFAULT_SCROLL_KEYBINDINGS, options.keybindings), {
-      actions: DEFAULT_SCROLL_KEYBINDINGS.map(binding => binding.action),
+      actions: DEFAULT_SCROLL_KEYBINDINGS.map((binding) => binding.action),
     });
     if (!Number.isInteger(this.maxContentLines) || this.maxContentLines < 1) {
       throw new RangeError("maxContentLines must be a positive integer");
@@ -92,10 +92,7 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
   }
 
   /** Keep a logical content row at its current screen row across the next render. */
-  preserveAnchor(
-    region: ScrollRegion,
-    resolveAfterRender: () => ScrollRegion | undefined,
-  ): void {
+  preserveAnchor(region: ScrollRegion, resolveAfterRender: () => ScrollRegion | undefined): void {
     if (this.topAnchor !== undefined) return;
     this.viewportAnchor = undefined;
     this.followEnd = false;
@@ -171,15 +168,32 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
     if (result.type !== "action") return { consumed: result.type === "pending", redraw: false };
     let redraw: boolean;
     switch (result.action) {
-      case "scroll.wheelUp": redraw = this.scrollBy(-3); break;
-      case "scroll.wheelDown": redraw = this.scrollBy(3); break;
-      case "scroll.up": redraw = this.scrollBy(-1); break;
-      case "scroll.down": redraw = this.scrollBy(1); break;
-      case "scroll.pageUp": redraw = this.scrollBy(-this.lastPageSize); break;
-      case "scroll.pageDown": redraw = this.scrollBy(this.lastPageSize); break;
-      case "scroll.start": redraw = this.scrollToStart(); break;
-      case "scroll.end": redraw = this.scrollToEnd(); break;
-      default: throw new Error(`Unknown scroll action: ${result.action}`);
+      case "scroll.wheelUp":
+        redraw = this.scrollBy(-3);
+        break;
+      case "scroll.wheelDown":
+        redraw = this.scrollBy(3);
+        break;
+      case "scroll.up":
+        redraw = this.scrollBy(-1);
+        break;
+      case "scroll.down":
+        redraw = this.scrollBy(1);
+        break;
+      case "scroll.pageUp":
+        redraw = this.scrollBy(-this.lastPageSize);
+        break;
+      case "scroll.pageDown":
+        redraw = this.scrollBy(this.lastPageSize);
+        break;
+      case "scroll.start":
+        redraw = this.scrollToStart();
+        break;
+      case "scroll.end":
+        redraw = this.scrollToEnd();
+        break;
+      default:
+        throw new Error(`Unknown scroll action: ${result.action}`);
     }
     return { consumed: true, redraw };
   }
@@ -187,8 +201,7 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
   handlePointer(event: PointerEvent): boolean {
     if (this.child.handlePointer === undefined) return false;
     if (event.type !== "down" && this.pointer === undefined) return false;
-    const consumed = this.child.handlePointer({ ...event,
-      y: this.offset + clamp(event.y, 0, this.lastPageSize - 1) });
+    const consumed = this.child.handlePointer({ ...event, y: this.offset + clamp(event.y, 0, this.lastPageSize - 1) });
     if (event.type === "down" && consumed) {
       this.followEnd = false;
       this.topAnchor = undefined;
@@ -229,7 +242,11 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
         const direction = event.y <= 0 ? -1 : 1;
         if (!this.scrollBy(direction)) return;
         this.followEnd = false;
-        this.child.handlePointer?.({ ...event, type: "move", y: this.offset + clamp(event.y, 0, this.lastPageSize - 1) });
+        this.child.handlePointer?.({
+          ...event,
+          type: "move",
+          y: this.offset + clamp(event.y, 0, this.lastPageSize - 1),
+        });
         this.onInvalidate?.();
       }, 60);
       this.dragTimer.unref?.();
@@ -241,30 +258,31 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
       width: size.width,
       height: this.maxContentLines,
     };
-    const content = isTailRenderable(this.child)
-      ? this.child.renderTail(renderSize)
-      : this.child.render(renderSize);
+    const content = isTailRenderable(this.child) ? this.child.renderTail(renderSize) : this.child.render(renderSize);
     this.lastPageSize = size.height;
     this.lastMaximumOffset = Math.max(0, content.lines.length - size.height);
     const pendingAnchor = this.pendingAnchor;
     this.pendingAnchor = undefined;
     const anchoredRegion = pendingAnchor?.resolveAfterRender();
     const topRegion = this.topAnchor?.();
-    const maximumOffset = this.alignedToStart
-      ? Math.max(0, content.lines.length - 1)
-      : this.lastMaximumOffset;
+    const maximumOffset = this.alignedToStart ? Math.max(0, content.lines.length - 1) : this.lastMaximumOffset;
     const anchor = this.viewportAnchor;
-    const anchorIndex = anchor === undefined ? -1 : (content.textRows ?? []).findIndex(row => row?.sourceId === anchor.sourceId &&
-      row.start <= anchor.offset && row.end > anchor.offset);
-    this.offset = topRegion !== undefined
-      ? clamp(topRegion.start, 0, maximumOffset)
-      : anchoredRegion !== undefined && pendingAnchor !== undefined
-      ? clamp(anchoredRegion.start - pendingAnchor.screenRow, 0, this.lastMaximumOffset)
-      : this.followEnd
-      ? this.lastMaximumOffset
-      : anchorIndex >= 0 && anchor !== undefined
-      ? clamp(anchorIndex - anchor.screenRow, 0, maximumOffset)
-      : clamp(this.offset, 0, maximumOffset);
+    const anchorIndex =
+      anchor === undefined
+        ? -1
+        : (content.textRows ?? []).findIndex(
+            (row) => row?.sourceId === anchor.sourceId && row.start <= anchor.offset && row.end > anchor.offset,
+          );
+    this.offset =
+      topRegion !== undefined
+        ? clamp(topRegion.start, 0, maximumOffset)
+        : anchoredRegion !== undefined && pendingAnchor !== undefined
+          ? clamp(anchoredRegion.start - pendingAnchor.screenRow, 0, this.lastMaximumOffset)
+          : this.followEnd
+            ? this.lastMaximumOffset
+            : anchorIndex >= 0 && anchor !== undefined
+              ? clamp(anchorIndex - anchor.screenRow, 0, maximumOffset)
+              : clamp(this.offset, 0, maximumOffset);
 
     this.viewportAnchor = undefined;
     for (let index = this.offset; index < Math.min(content.lines.length, this.offset + size.height); index++) {
@@ -276,8 +294,7 @@ export class ScrollView implements InteractiveComponent, FocusTarget {
     }
 
     const cursor = content.cursor;
-    const cursorVisible = cursor !== undefined &&
-      cursor.y >= this.offset && cursor.y < this.offset + size.height;
+    const cursorVisible = cursor !== undefined && cursor.y >= this.offset && cursor.y < this.offset + size.height;
     return {
       lines: content.lines.slice(this.offset, this.offset + size.height),
       ...(content.textRows ? { textRows: content.textRows.slice(this.offset, this.offset + size.height) } : {}),

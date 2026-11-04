@@ -32,9 +32,12 @@
 
 ```ts
 const run = await controller.submit({ input });
-const result = await run.result;               // 最终汇总结果
-const runs = await run.runs();                 // 本请求内每个真实 Run 的身份与结果
-console.log(run.requestId, runs.map((item) => `${item.turn}:${item.runId}`));
+const result = await run.result; // 最终汇总结果
+const runs = await run.runs(); // 本请求内每个真实 Run 的身份与结果
+console.log(
+  run.requestId,
+  runs.map((item) => `${item.turn}:${item.runId}`),
+);
 ```
 
 Goal 的 Run 与 steering 的 Run 同样是一次请求，因此宿主启动的每个 Run 都可以委派，
@@ -55,14 +58,14 @@ Goal 的 Run 与 steering 的 Run 同样是一次请求，因此宿主启动的�
           "worker": {
             "instructions": "只检查并修改被分配的文件。",
             "tools": ["read", "shell", "edit", "write"],
-            "delegateTo": ["worker"]
+            "delegateTo": ["worker"],
           },
           "reviewer": {
             "model": "deepseek-v4-flash",
             "reasoningEffort": "high",
             "tools": ["read"],
-            "delegateTo": []
-          }
+            "delegateTo": [],
+          },
         },
         "defaultRole": "worker",
         "limits": {
@@ -70,15 +73,15 @@ Goal 的 Run 与 steering 的 Run 同样是一次请求，因此宿主启动的�
           "maxTasks": 24,
           "maxDepth": 3,
           "maxTaskTurns": 6,
-          "maxDurationMs": 900000
+          "maxDurationMs": 900000,
         },
         "runBudget": { "maxSteps": 24, "maxModelCalls": 24, "maxToolCalls": 48 },
         "maxModelCalls": 128,
         "maxTotalTokens": 200000,
-        "reservationTokens": 32768
-      }
-    }
-  }
+        "reservationTokens": 32768,
+      },
+    },
+  },
 }
 ```
 

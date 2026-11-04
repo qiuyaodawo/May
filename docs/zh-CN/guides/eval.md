@@ -19,22 +19,24 @@
 1. 在仓库根目录通过 `pnpm install --frozen-lockfile` 安装依赖，执行 `pnpm build`。
 2. 验证内置案例配置：
 
-```powershell
-pnpm eval validate --suite apps/eval/examples/suite.mjs
-```
+   ```powershell
+   pnpm eval validate --suite apps/eval/examples/suite.mjs
+   ```
 
    默认案例保持原配置时，命令输出 `Validated file-artifact`。
    配置验证不启动任务。
+
 3. 执行实验并检查报告：
 
-```powershell
-pnpm eval run --suite apps/eval/examples/suite.mjs --output .eval-results
-pnpm eval report --experiment .eval-results/file-artifact
-```
+   ```powershell
+   pnpm eval run --suite apps/eval/examples/suite.mjs --output .eval-results
+   pnpm eval report --experiment .eval-results/file-artifact
+   ```
 
    该实验计划执行两次，写入包含大写消息的 `result.json`，随后独立检查文件。
    检查两次执行的执行状态、验收状态和基础设施状态。执行 ID 和耗时会变化。
    实验目录保存 `report.json` 和 `report.md`。
+
 4. 保留报告和证据供审查。新执行不能复用已有实验 ID，重复案例时将
    `MAY_EVAL_EXAMPLE_ID` 设置为新的 ID。继续中断实验时，使用
    [重启流程](#重启与重新执行)。
@@ -64,7 +66,7 @@ export async function evaluateExperiment(
     registry,
     store: new FileEvalStore({ directory }),
     signal,
-    onTrial: state => console.log(state.trial.id, state.taskVerdict),
+    onTrial: (state) => console.log(state.trial.id, state.taskVerdict),
   });
   runner.validate(experiment);
   return await runner.run(experiment);
@@ -288,14 +290,14 @@ Session、Run、协作和 trace ID。评分修订可以转换为 Observability
 
 存储限制：
 
-| 对象 | 默认或固定上限 |
-| --- | --- |
-| 计划和状态记录 | 每份 32 MiB |
-| 遥测事件 | 每项 64 KiB |
-| 单个 trial 的事件文件 | 20,000 项或 16 MiB |
-| 内存中的单个指标范围 | 10,000 项独立事件 |
-| 单项证据 | 默认 65,536 字节 |
-| 单个 trial 的证据 | 默认 1,048,576 字节、64 项 |
+| 对象                  | 默认或固定上限             |
+| --------------------- | -------------------------- |
+| 计划和状态记录        | 每份 32 MiB                |
+| 遥测事件              | 每项 64 KiB                |
+| 单个 trial 的事件文件 | 20,000 项或 16 MiB         |
+| 内存中的单个指标范围  | 10,000 项独立事件          |
+| 单项证据              | 默认 65,536 字节           |
+| 单个 trial 的证据     | 默认 1,048,576 字节、64 项 |
 
 达到限制后以明确错误终止工作。完整输出只在 `retainContent: true` 时保存，
 受内容处理和证据大小限制。

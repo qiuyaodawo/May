@@ -55,9 +55,7 @@ export function parseRetryAfterMs(value: string | null): number | undefined {
     return Math.round(seconds * 1000);
   }
   const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp)
-    ? Math.max(0, timestamp - Date.now())
-    : undefined;
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - Date.now()) : undefined;
 }
 
 function throwIfAborted(signal: AbortSignal): void {

@@ -41,7 +41,10 @@ if (process.argv[2] === "--owner") {
     assert.equal(value.array[0].value, "original");
     value.array[0].value = "reader modified";
     assert.equal(store.get("jobs", "b").array[0].value, "original");
-    assert.deepEqual(store.list("jobs").map((record) => record.value ?? record.count), ["first", 1]);
+    assert.deepEqual(
+      store.list("jobs").map((record) => record.value ?? record.count),
+      ["first", 1],
+    );
     assert.equal(store.get("events", "missing"), undefined);
     store.put("jobs", "a", { value: "updated" });
     store.delete("jobs", "b");
@@ -52,33 +55,46 @@ if (process.argv[2] === "--owner") {
     const reopened = SqliteSchedulerStore.open(path);
     try {
       assert.deepEqual(reopened.list("jobs"), [{ value: "updated" }]);
-    } finally { reopened.close(); }
+    } finally {
+      reopened.close();
+    }
     assert.equal(existsSync(`${path}.scheduler-lock.sqlite`), true);
   });
 
   test("commits and rolls back multi-collection transactions and nested savepoints", (t) => {
     const store = SqliteSchedulerStore.open(fixture(t));
     cleanupOperations.get(t).push(() => store.close());
-    assert.equal(store.transaction(() => {
-      store.put("jobs", "job", { revision: 1 });
-      store.transaction(() => store.put("executions", "execution", { status: "pending" }));
-      return "committed";
-    }), "committed");
+    assert.equal(
+      store.transaction(() => {
+        store.put("jobs", "job", { revision: 1 });
+        store.transaction(() => store.put("executions", "execution", { status: "pending" }));
+        return "committed";
+      }),
+      "committed",
+    );
     assert.deepEqual(store.get("executions", "execution"), { status: "pending" });
 
-    assert.throws(() => store.transaction(() => {
-      store.put("jobs", "job", { revision: 2 });
-      store.put("events", "event", { topic: "created" });
-      throw new Error("transaction validation failed");
-    }), /transaction validation failed/u);
+    assert.throws(
+      () =>
+        store.transaction(() => {
+          store.put("jobs", "job", { revision: 2 });
+          store.put("events", "event", { topic: "created" });
+          throw new Error("transaction validation failed");
+        }),
+      /transaction validation failed/u,
+    );
     assert.deepEqual(store.get("jobs", "job"), { revision: 1 });
     assert.equal(store.get("events", "event"), undefined);
 
     store.transaction(() => {
-      assert.throws(() => store.transaction(() => {
-        store.delete("jobs", "job");
-        throw new Error("nested transaction failed");
-      }), /nested transaction failed/u);
+      assert.throws(
+        () =>
+          store.transaction(() => {
+            store.delete("jobs", "job");
+            throw new Error("nested transaction failed");
+          }),
+        /nested transaction failed/u,
+      );
       store.put("meta", "sequence", 1);
     });
     assert.deepEqual(store.get("jobs", "job"), { revision: 1 });
@@ -88,14 +104,22 @@ if (process.argv[2] === "--owner") {
   test("rejects asynchronous transactions before they can write and rolls back Promise results", (t) => {
     const store = SqliteSchedulerStore.open(fixture(t));
     cleanupOperations.get(t).push(() => store.close());
-    assert.throws(() => store.transaction(async () => {
-      store.put("meta", "async", 1);
-    }), /synchronous callback/u);
+    assert.throws(
+      () =>
+        store.transaction(async () => {
+          store.put("meta", "async", 1);
+        }),
+      /synchronous callback/u,
+    );
     assert.equal(store.get("meta", "async"), undefined);
-    assert.throws(() => store.transaction(() => {
-      store.put("meta", "promise", 1);
-      return Promise.resolve();
-    }), /cannot return a Promise/u);
+    assert.throws(
+      () =>
+        store.transaction(() => {
+          store.put("meta", "promise", 1);
+          return Promise.resolve();
+        }),
+      /cannot return a Promise/u,
+    );
     assert.equal(store.get("meta", "promise"), undefined);
     assert.throws(() => store.transaction(() => store.close()), /during a transaction/u);
     store.put("meta", "after-error", true);
@@ -112,7 +136,8 @@ if (process.argv[2] === "--owner") {
       () => store.put("jobs", "", null),
       () => store.get("jobs", "invalid\0id"),
       () => store.delete("jobs", ""),
-    ]) assert.throws(operation, TypeError);
+    ])
+      assert.throws(operation, TypeError);
     const cycle = {};
     cycle.self = cycle;
     for (const value of [undefined, Number.NaN, Infinity, 1n, { value: undefined }, new Date(), cycle, Array(2)]) {
@@ -126,7 +151,8 @@ if (process.argv[2] === "--owner") {
       () => store.put("jobs", "id", null),
       () => store.delete("jobs", "id"),
       () => store.transaction(() => {}),
-    ]) assert.throws(operation, /closed/u);
+    ])
+      assert.throws(operation, /closed/u);
   });
 
   test("enforces the individual JSON record limit while allowing larger collection results", (t) => {
@@ -137,10 +163,14 @@ if (process.argv[2] === "--owner") {
     assert.equal(store.get("meta", "maximum").length, maximum.length);
     assert.throws(() => store.put("meta", "oversized", `${maximum}a`), RangeError);
     assert.equal(store.get("meta", "oversized"), undefined);
-    assert.throws(() => store.transaction(() => {
-      store.put("meta", "transaction", "pending");
-      store.put("meta", "oversized", `${maximum}a`);
-    }), RangeError);
+    assert.throws(
+      () =>
+        store.transaction(() => {
+          store.put("meta", "transaction", "pending");
+          store.put("meta", "oversized", `${maximum}a`);
+        }),
+      RangeError,
+    );
     assert.equal(store.get("meta", "transaction"), undefined);
     store.put("meta", "second", "b".repeat(700_000));
     const records = store.list("meta");
@@ -154,14 +184,17 @@ if (process.argv[2] === "--owner") {
     cleanupOperations.get(t).push(() => store.close());
     assert.throws(() => SqliteSchedulerStore.open(path), /active owner/u);
     assert.throws(() => SqliteSchedulerStore.open(join(path, "..", "scheduler.sqlite")), /active owner/u);
-    if (process.platform === "win32") assert.throws(() => SqliteSchedulerStore.open(path.toUpperCase()), /active owner/u);
+    if (process.platform === "win32")
+      assert.throws(() => SqliteSchedulerStore.open(path.toUpperCase()), /active owner/u);
     const inspection = new DatabaseSync(path, { readOnly: true });
     try {
       assert.equal(inspection.prepare("PRAGMA journal_mode").get().journal_mode, "wal");
       assert.equal(inspection.prepare("PRAGMA synchronous").get().synchronous, 2);
       assert.notEqual(inspection.prepare("PRAGMA application_id").get().application_id, 0);
       assert.equal(inspection.prepare("PRAGMA user_version").get().user_version, 1);
-    } finally { inspection.close(); }
+    } finally {
+      inspection.close();
+    }
   });
 
   test("directory aliases share ownership and database hard links are rejected", (t) => {
@@ -173,7 +206,9 @@ if (process.argv[2] === "--owner") {
     const store = SqliteSchedulerStore.open(path);
     try {
       assert.throws(() => SqliteSchedulerStore.open(join(alias, "scheduler.sqlite")), /active owner/u);
-    } finally { store.close(); }
+    } finally {
+      store.close();
+    }
     linkSync(path, join(directory, "hard-link.sqlite"));
     assert.throws(() => SqliteSchedulerStore.open(path), /one filesystem link/u);
     assert.throws(() => SqliteSchedulerStore.open(join(directory, "hard-link.sqlite")), /one filesystem link/u);
@@ -187,8 +222,11 @@ if (process.argv[2] === "--owner") {
     foreign.close();
     assert.throws(() => SqliteSchedulerStore.open(foreignPath), /Unsupported scheduler database/u);
     const inspection = new DatabaseSync(foreignPath);
-    try { assert.equal(inspection.prepare("SELECT value FROM existing_data").get().value, "preserved"); }
-    finally { inspection.close(); }
+    try {
+      assert.equal(inspection.prepare("SELECT value FROM existing_data").get().value, "preserved");
+    } finally {
+      inspection.close();
+    }
 
     for (const [name, modification] of [
       ["future", "PRAGMA user_version = 2"],
@@ -207,14 +245,17 @@ if (process.argv[2] === "--owner") {
     writeFileSync(garbagePath, "invalid database contents");
     assert.throws(() => SqliteSchedulerStore.open(garbagePath), /not a database/u);
     assert.throws(() => SqliteSchedulerStore.open(garbagePath), /not a database/u);
-    for (const path of ["", ":memory:", "invalid\0path"]) assert.throws(() => SqliteSchedulerStore.open(path), TypeError);
+    for (const path of ["", ":memory:", "invalid\0path"])
+      assert.throws(() => SqliteSchedulerStore.open(path), TypeError);
   });
 
   test("rejects corrupted records and foreign or multiply linked ownership databases", (t) => {
     const path = fixture(t);
     SqliteSchedulerStore.open(path).close();
     const corruption = new DatabaseSync(path);
-    corruption.exec("PRAGMA ignore_check_constraints = ON; INSERT INTO scheduler_records VALUES ('meta', 'corrupt', 'invalid JSON')");
+    corruption.exec(
+      "PRAGMA ignore_check_constraints = ON; INSERT INTO scheduler_records VALUES ('meta', 'corrupt', 'invalid JSON')",
+    );
     corruption.close();
     assert.throws(() => SqliteSchedulerStore.open(path), /integrity validation failed/u);
     assert.throws(() => SqliteSchedulerStore.open(path), /integrity validation failed/u);
@@ -240,8 +281,11 @@ if (process.argv[2] === "--owner") {
     assert.equal(child.kill("SIGKILL"), true);
     await exited;
     const recovered = SqliteSchedulerStore.open(path);
-    try { assert.deepEqual(recovered.get("meta", "committed"), { value: "preserved" }); }
-    finally { recovered.close(); }
+    try {
+      assert.deepEqual(recovered.get("meta", "committed"), { value: "preserved" });
+    } finally {
+      recovered.close();
+    }
     const restarted = await startOwner(t, path);
     const restartedExit = once(restarted, "exit");
     restarted.kill("SIGKILL");
@@ -260,7 +304,9 @@ if (process.argv[2] === "--owner") {
       assert.deepEqual(recovered.get("meta", "committed"), { value: "preserved" });
       assert.equal(recovered.get("meta", "uncommitted"), undefined);
       recovered.put("meta", "continued", true);
-    } finally { recovered.close(); }
+    } finally {
+      recovered.close();
+    }
   });
 
   test("job identifiers preserve the complete supported length in durable identity metadata", async (t) => {
@@ -281,11 +327,18 @@ if (process.argv[2] === "--owner") {
 
   test("an immediate stop drains the initial background round without reporting a failure", async (t) => {
     const errors = [];
-    const { scheduler } = await schedulerFixture(t, { onError(error) { errors.push(error); } });
+    const { scheduler } = await schedulerFixture(t, {
+      onError(error) {
+        errors.push(error);
+      },
+    });
     const started = scheduler.start();
     const stopped = scheduler.stop();
     const outcomes = await Promise.allSettled([started, stopped]);
-    assert.deepEqual(outcomes.map((outcome) => outcome.status), ["fulfilled", "fulfilled"]);
+    assert.deepEqual(
+      outcomes.map((outcome) => outcome.status),
+      ["fulfilled", "fulfilled"],
+    );
     assert.deepEqual(errors, []);
     await scheduler.start();
     await scheduler.stop();
@@ -342,7 +395,11 @@ if (process.argv[2] === "--owner") {
       task: { handler: "write-artifact", payload },
       misfire: { policy: "latest", graceMs: 5_000 },
     };
-    await scheduler.createJob({ ...definition, id: "depth-time", trigger: { type: "at", time: new Date(Date.now() - 100).toISOString() } });
+    await scheduler.createJob({
+      ...definition,
+      id: "depth-time",
+      trigger: { type: "at", time: new Date(Date.now() - 100).toISOString() },
+    });
     await scheduler.createJob({ ...definition, id: "depth-event", trigger: { type: "event", topic: "depth" } });
     assert.equal((await scheduler.listJobs()).length, 2);
     const [eventExecution] = await scheduler.publish({
@@ -376,26 +433,50 @@ if (process.argv[2] === "--owner") {
     };
     const created = await scheduler.createJob(base);
     for (const payload of [nestedPayload(61), "a".repeat(64 * 1024 - 1)]) {
-      await assert.rejects(scheduler.createJob({ ...base, id: "invalid-boundaries", task: { handler: "write-artifact", payload } }), RangeError);
-      await assert.rejects(scheduler.updateJob(base.id, { task: { handler: "write-artifact", payload } }, created.revision), RangeError);
-      await assert.rejects(scheduler.publish({ source: "sqlite-store-tests", id: "invalid-event", topic: "boundaries", occurredAt: new Date().toISOString(), payload }), RangeError);
+      await assert.rejects(
+        scheduler.createJob({ ...base, id: "invalid-boundaries", task: { handler: "write-artifact", payload } }),
+        RangeError,
+      );
+      await assert.rejects(
+        scheduler.updateJob(base.id, { task: { handler: "write-artifact", payload } }, created.revision),
+        RangeError,
+      );
+      await assert.rejects(
+        scheduler.publish({
+          source: "sqlite-store-tests",
+          id: "invalid-event",
+          topic: "boundaries",
+          occurredAt: new Date().toISOString(),
+          payload,
+        }),
+        RangeError,
+      );
       assert.equal((await scheduler.listJobs()).length, 1);
       assert.deepEqual((await scheduler.listExecutions()).records, []);
     }
-    const [execution] = await scheduler.publish({ source: "sqlite-store-tests", id: "valid-event", topic: "boundaries", occurredAt: new Date().toISOString(), payload: {} });
+    const [execution] = await scheduler.publish({
+      source: "sqlite-store-tests",
+      id: "valid-event",
+      topic: "boundaries",
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
     assert.equal(execution.status, "submitted");
     assert.equal(host.tasks().length, 1);
   });
 
   test("misfire policies require a supported string value", async (t) => {
     const { scheduler } = await schedulerFixture(t);
-    await assert.rejects(scheduler.createJob({
-      id: "invalid-policy",
-      enabled: true,
-      trigger: { type: "event", topic: "policies" },
-      task: { handler: "write-artifact", payload: {} },
-      misfire: { policy: ["latest"], graceMs: 1_000 },
-    }), TypeError);
+    await assert.rejects(
+      scheduler.createJob({
+        id: "invalid-policy",
+        enabled: true,
+        trigger: { type: "event", topic: "policies" },
+        task: { handler: "write-artifact", payload: {} },
+        misfire: { policy: ["latest"], graceMs: 1_000 },
+      }),
+      TypeError,
+    );
     assert.deepEqual(await scheduler.listJobs(), []);
   });
 
@@ -435,8 +516,12 @@ async function startOwner(t, path, mode) {
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   let diagnostics = "";
-  child.stdout.on("data", (chunk) => { diagnostics += chunk; });
-  child.stderr.on("data", (chunk) => { diagnostics += chunk; });
+  child.stdout.on("data", (chunk) => {
+    diagnostics += chunk;
+  });
+  child.stderr.on("data", (chunk) => {
+    diagnostics += chunk;
+  });
   cleanupOperations.get(t).push(async () => {
     if (child.exitCode === null && child.signalCode === null) {
       const exited = once(child, "exit");
@@ -445,7 +530,10 @@ async function startOwner(t, path, mode) {
     }
   });
   await new Promise((resolveReady, rejectReady) => {
-    const timeout = setTimeout(() => rejectReady(new Error(`Child owner did not open scheduler storage: ${diagnostics}`)), 10_000);
+    const timeout = setTimeout(
+      () => rejectReady(new Error(`Child owner did not open scheduler storage: ${diagnostics}`)),
+      10_000,
+    );
     child.once("message", (message) => {
       clearTimeout(timeout);
       assert.equal(message.type, "ready");

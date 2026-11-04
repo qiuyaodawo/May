@@ -19,7 +19,10 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
   private failure: Error | undefined;
   private closing: Promise<void> | undefined;
 
-  private constructor(readonly path: string, private readonly lock: FileLock) {}
+  private constructor(
+    readonly path: string,
+    private readonly lock: FileLock,
+  ) {}
 
   static async open(options: FilePermissionRuleStoreOptions): Promise<FilePermissionRuleStore> {
     validateRuleIdentifier(options.path, "path");
@@ -30,8 +33,9 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
     const store = new FilePermissionRuleStore(path, lock);
     try {
       let exists = true;
-      try { await lstat(path); }
-      catch (error) {
+      try {
+        await lstat(path);
+      } catch (error) {
         if (!hasErrorCode(error, "ENOENT")) throw error;
         exists = false;
       }
@@ -39,17 +43,24 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
       else await store.writeNow([]);
       return store;
     } catch (error) {
-      try { await store.close(); }
-      catch (cleanup) { throw new AggregateError([error, cleanup], "Cannot open or release permission rule store"); }
+      try {
+        await store.close();
+      } catch (cleanup) {
+        throw new AggregateError([error, cleanup], "Cannot open or release permission rule store");
+      }
       throw error;
     }
   }
 
   async list(scopeId?: string): Promise<readonly PersistentPermissionRule[]> {
     if (scopeId !== undefined) validateRuleIdentifier(scopeId, "scopeId");
-    return this.enqueue(async () => Object.freeze((await this.readNow())
-      .filter((rule) => scopeId === undefined || rule.scopeId === scopeId)
-      .map(copyPermissionRule)));
+    return this.enqueue(async () =>
+      Object.freeze(
+        (await this.readNow())
+          .filter((rule) => scopeId === undefined || rule.scopeId === scopeId)
+          .map(copyPermissionRule),
+      ),
+    );
   }
 
   async create(rule: PersistentPermissionRule): Promise<void> {
@@ -74,12 +85,14 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
   }
 
   close(): Promise<void> {
-    return this.closing ??= (async () => {
+    return (this.closing ??= (async () => {
       try {
         await this.serial.close();
         await this.lock.assertHeld();
-      } finally { await this.lock.release(); }
-    })();
+      } finally {
+        await this.lock.release();
+      }
+    })());
   }
 
   private enqueue<T>(action: () => Promise<T>): Promise<T> {
@@ -97,7 +110,10 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
       if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n) {
         throw new Error("Permission rule store must be a regular file with one link");
       }
-      const file = await open(this.path, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
+      const file = await open(
+        this.path,
+        constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW),
+      );
       try {
         const info = await file.stat({ bigint: true });
         if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev) {
@@ -109,7 +125,9 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
           throw new Error("Permission rule file changed while reading");
         }
         return parseRules(JSON.parse(contents));
-      } finally { await file.close(); }
+      } finally {
+        await file.close();
+      }
     } catch (error) {
       this.fail(error);
       throw error;
@@ -132,9 +150,16 @@ export class FilePermissionRuleStore implements PermissionRuleStore {
 }
 
 function parseRules(value: unknown): readonly PersistentPermissionRule[] {
-  if (value === null || typeof value !== "object" || Array.isArray(value) ||
-      Object.keys(value).length !== 2 || !("version" in value) || value.version !== 1 ||
-      !("rules" in value) || !Array.isArray(value.rules)) {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.keys(value).length !== 2 ||
+    !("version" in value) ||
+    value.version !== 1 ||
+    !("rules" in value) ||
+    !Array.isArray(value.rules)
+  ) {
     throw new TypeError("Invalid permission rule store format or version");
   }
   const rules = value.rules.map(copyPermissionRule);

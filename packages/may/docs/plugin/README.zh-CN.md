@@ -37,10 +37,11 @@ const counterPlugin = definePlugin({
   setup(ctx) {
     ctx.provide(counter, {
       read: () => ctx.state.get<{ count: number }>().count,
-      increment: () => ctx.state.update((value) => {
-        const state = value as { count: number };
-        return { count: state.count + 1 };
-      }),
+      increment: () =>
+        ctx.state.update((value) => {
+          const state = value as { count: number };
+          return { count: state.count + 1 };
+        }),
     });
   },
 });
@@ -58,7 +59,7 @@ await host.close();
 Service token 包含稳定的 `id`、接口 `version`、`scope` 和能力名称。默认要求接口版本完全匹配；依赖可以明确选择兼容版本范围：
 
 ```ts
-requires: [{ service: counter, version: "^1.0.0", capabilities: ["increment"] }]
+requires: [{ service: counter, version: "^1.0.0", capabilities: ["increment"] }];
 ```
 
 `ctx.get(counter)` 获取已声明的必需或可选依赖。`ctx.optional(counter)` 获取已声明的可选依赖，服务缺失时返回 `undefined`。存在的可选服务也要通过版本、能力和范围检查。`ctx.provide()` 只能注册 `provides` 中声明的服务。
@@ -90,10 +91,14 @@ const instructions = definePlugin({
   version: "1.0.0",
   requiresHooks: [runtimeHooks.contextAfter],
   setup(ctx) {
-    ctx.on(runtimeHooks.contextAfter, (snapshot) => ({
-      ...snapshot,
-      instructions: `${snapshot.instructions ?? ""}\nUse the project formatter.`,
-    }), { order: 10, timeoutMs: 5_000 });
+    ctx.on(
+      runtimeHooks.contextAfter,
+      (snapshot) => ({
+        ...snapshot,
+        instructions: `${snapshot.instructions ?? ""}\nUse the project formatter.`,
+      }),
+      { order: 10, timeoutMs: 5_000 },
+    );
   },
 });
 

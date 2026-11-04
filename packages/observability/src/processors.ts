@@ -1,21 +1,23 @@
 import { omitUndefined } from "@sortedyuan/may/core";
-import type {
-  FinishedTraceSpan,
-  ObservabilityErrorHandler,
-  SpanExporter,
-  SpanProcessor,
-} from "./types.js";
+import type { FinishedTraceSpan, ObservabilityErrorHandler, SpanExporter, SpanProcessor } from "./types.js";
 
 /** Deterministic processor intended for tests and local inspection. */
 export class InMemorySpanProcessor implements SpanProcessor {
   private readonly finished: FinishedTraceSpan[] = [];
   private dropped = 0;
-  constructor(private readonly maxSpans = 2_048) { positiveInteger(maxSpans, "maxSpans"); }
-  get droppedSpans(): number { return this.dropped; }
+  constructor(private readonly maxSpans = 2_048) {
+    positiveInteger(maxSpans, "maxSpans");
+  }
+  get droppedSpans(): number {
+    return this.dropped;
+  }
 
   onEnd(span: FinishedTraceSpan): void {
     this.finished.push(span);
-    if (this.finished.length > this.maxSpans) { this.finished.shift(); this.dropped += 1; }
+    if (this.finished.length > this.maxSpans) {
+      this.finished.shift();
+      this.dropped += 1;
+    }
   }
 
   getFinishedSpans(): readonly FinishedTraceSpan[] {
@@ -36,11 +38,19 @@ export class SimpleSpanProcessor implements SpanProcessor {
     onError?: ObservabilityErrorHandler,
     options: Omit<BatchSpanProcessorOptions, "maxExportBatchSize" | "onError"> = {},
   ) {
-    this.processor = new BatchSpanProcessor(exporter, { ...options, maxExportBatchSize: 1, ...omitUndefined({ onError }) });
+    this.processor = new BatchSpanProcessor(exporter, {
+      ...options,
+      maxExportBatchSize: 1,
+      ...omitUndefined({ onError }),
+    });
   }
 
-  get droppedSpans(): number { return this.processor.droppedSpans; }
-  getDiagnostics(): ProcessorDiagnostics { return this.processor.getDiagnostics(); }
+  get droppedSpans(): number {
+    return this.processor.droppedSpans;
+  }
+  getDiagnostics(): ProcessorDiagnostics {
+    return this.processor.getDiagnostics();
+  }
 
   onEnd(span: FinishedTraceSpan): void {
     this.processor.onEnd(span);
@@ -94,21 +104,12 @@ export class BatchSpanProcessor implements SpanProcessor {
     private readonly exporter: SpanExporter,
     options: BatchSpanProcessorOptions = {},
   ) {
-    this.maxQueueSize = positiveInteger(
-      options.maxQueueSize ?? 2_048,
-      "maxQueueSize",
-    );
-    this.maxExportBatchSize = positiveInteger(
-      options.maxExportBatchSize ?? 512,
-      "maxExportBatchSize",
-    );
+    this.maxQueueSize = positiveInteger(options.maxQueueSize ?? 2_048, "maxQueueSize");
+    this.maxExportBatchSize = positiveInteger(options.maxExportBatchSize ?? 512, "maxExportBatchSize");
     if (this.maxExportBatchSize > this.maxQueueSize) {
       throw new RangeError("maxExportBatchSize cannot exceed maxQueueSize");
     }
-    this.scheduledDelayMs = nonNegativeNumber(
-      options.scheduledDelayMs ?? 5_000,
-      "scheduledDelayMs",
-    );
+    this.scheduledDelayMs = nonNegativeNumber(options.scheduledDelayMs ?? 5_000, "scheduledDelayMs");
     if (this.scheduledDelayMs > 2_147_483_647) throw new RangeError("scheduledDelayMs exceeds timer range");
     this.onError = options.onError;
     this.exportTimeoutMs = positiveInteger(options.exportTimeoutMs ?? 5_000, "exportTimeoutMs");
@@ -121,11 +122,21 @@ export class BatchSpanProcessor implements SpanProcessor {
   }
 
   getDiagnostics(): ProcessorDiagnostics {
-    return { queueSize: this.queue.length, exporting: this.exporting !== undefined, droppedSpans: this.dropped, exportFailures: this.failures, exportTimeouts: this.timeouts, closed: this.closed };
+    return {
+      queueSize: this.queue.length,
+      exporting: this.exporting !== undefined,
+      droppedSpans: this.dropped,
+      exportFailures: this.failures,
+      exportTimeouts: this.timeouts,
+      closed: this.closed,
+    };
   }
 
   onEnd(span: FinishedTraceSpan): void {
-    if (this.closed) { this.drop(1); return; }
+    if (this.closed) {
+      this.drop(1);
+      return;
+    }
     if (this.queue.length >= this.maxQueueSize) {
       this.drop(1);
       return;
@@ -153,8 +164,12 @@ export class BatchSpanProcessor implements SpanProcessor {
     this.shutdownStarted = true;
     this.closed = true;
     await this.forceFlush();
-    try { await boundedOperation(Promise.resolve().then(() => this.exporter.shutdown?.()), this.exportTimeoutMs); }
-    catch (error) {
+    try {
+      await boundedOperation(
+        Promise.resolve().then(() => this.exporter.shutdown?.()),
+        this.exportTimeoutMs,
+      );
+    } catch (error) {
       this.failures += 1;
       if (error instanceof ExportTimeoutError) this.timeouts += 1;
       this.metric({ name: "may.telemetry.export_failures", kind: "counter", value: 1 });
@@ -183,7 +198,10 @@ export class BatchSpanProcessor implements SpanProcessor {
     if (batch.length === 0) return;
     this.exporting = Promise.resolve().then(async () => {
       try {
-        await boundedOperation(Promise.resolve().then(() => this.exporter.export(batch)), this.exportTimeoutMs);
+        await boundedOperation(
+          Promise.resolve().then(() => this.exporter.export(batch)),
+          this.exportTimeoutMs,
+        );
       } catch (error) {
         this.failures += 1;
         this.metric({ name: "may.telemetry.export_failures", kind: "counter", value: 1 });
@@ -211,18 +229,37 @@ export class BatchSpanProcessor implements SpanProcessor {
     this.dropped += count;
     this.metric({ name: "may.telemetry.dropped_spans", kind: "counter", value: count });
   }
-  private queueMetric(): void { this.metric({ name: "may.telemetry.queue_size", kind: "gauge", value: this.queue.length }); }
+  private queueMetric(): void {
+    this.metric({ name: "may.telemetry.queue_size", kind: "gauge", value: this.queue.length });
+  }
   private metric(record: import("@sortedyuan/may/core").MetricRecord): void {
-    try { this.metrics?.record(record); } catch (error) { reportError(this.onError, error); }
+    try {
+      this.metrics?.record(record);
+    } catch (error) {
+      reportError(this.onError, error);
+    }
   }
 }
 
-class ExportTimeoutError extends Error { constructor() { super("Telemetry export timed out"); this.name = "ExportTimeoutError"; } }
+class ExportTimeoutError extends Error {
+  constructor() {
+    super("Telemetry export timed out");
+    this.name = "ExportTimeoutError";
+  }
+}
 
 async function boundedOperation<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  try { return await Promise.race([operation, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new ExportTimeoutError()), timeoutMs); })]); }
-  finally { if (timer !== undefined) clearTimeout(timer); }
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new ExportTimeoutError()), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 function positiveInteger(value: number, name: string): number {
@@ -239,10 +276,7 @@ function nonNegativeNumber(value: number, name: string): number {
   return value;
 }
 
-function reportError(
-  handler: ObservabilityErrorHandler | undefined,
-  error: unknown,
-): void {
+function reportError(handler: ObservabilityErrorHandler | undefined, error: unknown): void {
   try {
     handler?.(error);
   } catch {

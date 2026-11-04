@@ -8,9 +8,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../../may" },
-    { "path": "../../media" },
-    { "path": "../../tools/coding-tools" }
-  ]
+  "references": [{ "path": "../../may" }, { "path": "../../media" }, { "path": "../../tools/coding-tools" }]
 }

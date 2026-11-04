@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  TranscriptStore,
-  TranscriptView,
-} from "@sortedyuan/tui/transcript";
+import { TranscriptStore, TranscriptView } from "@sortedyuan/tui/transcript";
 
 test("projects live May and permission events into a terminal-safe transcript", () => {
   const store = new TranscriptStore();
@@ -45,9 +42,13 @@ test("projects live May and permission events into a terminal-safe transcript", 
     },
   });
 
-  assert.deepEqual(store.items.map((item) => item.kind), ["assistant", "approval"]);
+  assert.deepEqual(
+    store.items.map((item) => item.kind),
+    ["assistant", "approval"],
+  );
   const rendered = new TranscriptView(store, { assistantLabel: "Agent" })
-    .render({ width: 60, height: 10 }).lines.join("\n");
+    .render({ width: 60, height: 10 })
+    .lines.join("\n");
   assert.match(rendered, /Agent/u);
   assert.match(rendered, /␛\[2Jhello/u);
   assert.match(rendered, /Approval required for/u);
@@ -115,6 +116,9 @@ test("lets applications append product notices and change previews explicitly", 
     reason: "not readable",
   });
 
-  assert.deepEqual(store.items.map((item) => item.kind), ["notice", "tool"]);
+  assert.deepEqual(
+    store.items.map((item) => item.kind),
+    ["notice", "tool"],
+  );
   assert.equal(store.items[1].preview.status, "unavailable");
 });

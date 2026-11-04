@@ -13,8 +13,8 @@
     },
     {
       "heading": "Select a backend",
-      "en": "80f882e3f2b23465b814b70341c857add7c1d3cadfc8404a050f4fb24925668f",
-      "zh": "a89de07f8f5030cbb9093ad68bbd381f0ed4b0ed3f5aa11a1c5ae304969512b5"
+      "en": "7974ca07c7fe0ce7f4af9ccfb1799213da0b12300568f75d7a298e7665722023",
+      "zh": "37ff651e0276457450646c6eb2fe4ee8cc21cd1272f529c6c13b700411576c12"
     },
     {
       "heading": "SessionStore contract",
@@ -23,8 +23,8 @@
     },
     {
       "heading": "Database adapter skeleton",
-      "en": "764e6c863c843e9bfcb6c5bcc454a11f02842df200e0b84ec1bb4fab61a227cb",
-      "zh": "3dd65020a99f34836e870569d36a8d47bb72815a2e1a920a3fd5b1a6b7492b54"
+      "en": "ff2813c34f25be891d1d7479f83abe1fbe09e939146487cf2963bb809a8ee780",
+      "zh": "459d98154a4505a3cebf55e53824a24343766bf0b05ae13f1571f939423d4e0c"
     },
     {
       "heading": "SessionCatalog contract",
@@ -33,13 +33,13 @@
     },
     {
       "heading": "Built-in local storage",
-      "en": "dbfcb84bcfff7658b40306200c0b02d913410a602201c1c8457ee8e2323cd590",
-      "zh": "f68c1723f12ca1510ee4ab01297c1ae8a46889f4d6ee446ba611db37140e7a08"
+      "en": "4db0dbfe9700b48f9f11cd2b7d06f6b03b4f4363af34fc0de5a8ae69a6b34f81",
+      "zh": "617962e3c1309dfa594d4f272514c1844425e12b43b2c08e28c2848965935be7"
     },
     {
       "heading": "Coordinate local file access",
-      "en": "db152bc77f10eafdba836a1ec6cef6965f6ca0e9776a4b9af88e16b36dd30279",
-      "zh": "0e6a1018ec3353703839773d52397605c16dad408b1a71773ef299308833b6b5"
+      "en": "647405dd3e5c27b03f5423ea23057fae59f246a68a7e801468e11ec8b255d332",
+      "zh": "cedc6c8db71615a50cdb446b053fb033325386b6dcc9fd40184a9ee39db3abe1"
     },
     {
       "heading": "Verify persistence",

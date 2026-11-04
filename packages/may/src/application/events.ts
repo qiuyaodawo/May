@@ -1,10 +1,5 @@
 import type { ContextInspection } from "../context/index.js";
-import type {
-  MayEvent,
-  RunResult,
-  SerializedError,
-  TraceContext,
-} from "../core/index.js";
+import type { MayEvent, RunResult, SerializedError, TraceContext } from "../core/index.js";
 import type { PermissionEvent } from "../permissions/index.js";
 import type { SessionToolPresentation } from "../session/index.js";
 
@@ -49,7 +44,5 @@ export interface AgentSessionForkedEvent {
   readonly workspace: string;
 }
 
-export type AgentWorkspaceEvent<
-  ApplicationEvent = AgentApplicationEvent,
-  ExtensionEvent = never,
-> = ApplicationEvent | AgentSessionChangedEvent | AgentSessionForkedEvent | ExtensionEvent;
+export type AgentWorkspaceEvent<ApplicationEvent = AgentApplicationEvent, ExtensionEvent = never> =
+  ApplicationEvent | AgentSessionChangedEvent | AgentSessionForkedEvent | ExtensionEvent;

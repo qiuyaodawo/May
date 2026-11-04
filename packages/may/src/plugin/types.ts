@@ -91,7 +91,12 @@ export interface PluginHostOptions {
   readonly signal?: AbortSignal;
   readonly state?: PluginStateSnapshot;
   readonly onStateChange?: (snapshot: PluginStateSnapshot) => Promise<void>;
-  readonly onHookError?: (error: Error, hook: HookDefinition<unknown>, pluginId: string, context: HookContext) => void | Promise<void>;
+  readonly onHookError?: (
+    error: Error,
+    hook: HookDefinition<unknown>,
+    pluginId: string,
+    context: HookContext,
+  ) => void | Promise<void>;
 }
 
 export interface PluginScopeOptions {

@@ -23,8 +23,13 @@ test("the real provider rejects an invalid onboarding credential", options, asyn
   const resolved = resolveProviderConfig(config, profile.provider);
   const { apiKeyEnv, ...provider } = resolved;
   const { path, ...file } = config;
-  const invalid = parseMayConfig({ ...file, providers: { ...config.providers, [profile.provider]: { ...provider, apiKey: randomUUID() } } }, path);
-  await assert.rejects(checkOnboardingConnection(invalid, new AbortController().signal), error => [401, 403].includes(error.status));
+  const invalid = parseMayConfig(
+    { ...file, providers: { ...config.providers, [profile.provider]: { ...provider, apiKey: randomUUID() } } },
+    path,
+  );
+  await assert.rejects(checkOnboardingConnection(invalid, new AbortController().signal), (error) =>
+    [401, 403].includes(error.status),
+  );
 });
 
 test("a real onboarding request obeys its timeout and cancellation signal", options, async () => {
@@ -33,5 +38,5 @@ test("a real onboarding request obeys its timeout and cancellation signal", opti
   await assert.rejects(checkOnboardingConnection(config, new AbortController().signal, 1));
   assert.ok(performance.now() - start < 5000);
   const reason = new Error("User cancelled setup");
-  await assert.rejects(checkOnboardingConnection(config, AbortSignal.abort(reason)), error => error === reason);
+  await assert.rejects(checkOnboardingConnection(config, AbortSignal.abort(reason)), (error) => error === reason);
 });

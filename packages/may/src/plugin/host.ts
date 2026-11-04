@@ -4,9 +4,17 @@ import { satisfies } from "semver";
 import { asError, handlerContext, HookRegistry, immutable, orderHandlers, withDeadline } from "./hooks.js";
 import { StateStore } from "./state.js";
 import type {
-  AnyPlugin, Disposer, PluginChangeOptions, PluginContext, PluginHostOptions,
-  PluginOperationOptions, PluginScope, PluginScopeOptions, PluginStateSnapshot,
-  ServiceBinding, ServiceToken,
+  AnyPlugin,
+  Disposer,
+  PluginChangeOptions,
+  PluginContext,
+  PluginHostOptions,
+  PluginOperationOptions,
+  PluginScope,
+  PluginScopeOptions,
+  PluginStateSnapshot,
+  ServiceBinding,
+  ServiceToken,
 } from "./types.js";
 import { pluginScope, pluginSource, scopeIndex, snapshotPlugin, validateGraph } from "./validation.js";
 
@@ -55,12 +63,13 @@ export class PluginHost implements HookDispatcher {
     this.initializationSignal = scopeOptions?.signal;
     this.definitions = parent?.definitions ?? options.plugins.map(snapshotPlugin);
     this.bindingTemplates = [
-      ...(parent?.bindingTemplates ?? options.services ?? []), ...(scopeOptions?.services ?? []),
+      ...(parent?.bindingTemplates ?? options.services ?? []),
+      ...(scopeOptions?.services ?? []),
     ].map((binding) => Object.freeze({ ...binding }));
     this.ordered = validateGraph(this.definitions, this.bindingTemplates, options.hooks ?? []);
     this.hooks = new Map((options.hooks ?? []).map((hook) => [hook.name, hook]));
     this.stateStore = new StateStore(
-      scopeOptions?.state ?? (parent ? {} : options.state ?? {}),
+      scopeOptions?.state ?? (parent ? {} : (options.state ?? {})),
       scopeOptions?.onStateChange ?? (parent ? undefined : options.onStateChange),
     );
   }
@@ -68,12 +77,17 @@ export class PluginHost implements HookDispatcher {
   static async create(options: PluginHostOptions): Promise<PluginHost> {
     const timeout = options.timeoutMs ?? 30_000;
     if (!Number.isFinite(timeout) || timeout <= 0) throw new Error("Plugin timeoutMs must be positive and finite");
-    const host = new PluginHost(Object.freeze({
-      ...options, timeoutMs: timeout,
-      plugins: Object.freeze([...options.plugins]),
-      hooks: Object.freeze([...(options.hooks ?? [])]),
-      services: Object.freeze((options.services ?? []).map((binding) => Object.freeze({ ...binding }))),
-    }), "host", "host");
+    const host = new PluginHost(
+      Object.freeze({
+        ...options,
+        timeoutMs: timeout,
+        plugins: Object.freeze([...options.plugins]),
+        hooks: Object.freeze([...(options.hooks ?? [])]),
+        services: Object.freeze((options.services ?? []).map((binding) => Object.freeze({ ...binding }))),
+      }),
+      "host",
+      "host",
+    );
     options.signal?.throwIfAborted();
     await host.start();
     if (options.signal) {
@@ -115,7 +129,11 @@ export class PluginHost implements HookDispatcher {
     const child = new PluginHost(this.options, kind, options.id, this, options);
     this.children.add(child);
     try {
-      await this.use(() => child.start(), { cancel: () => { child.controller.abort(new Error("Scope creation cancelled")); } });
+      await this.use(() => child.start(), {
+        cancel: () => {
+          child.controller.abort(new Error("Scope creation cancelled"));
+        },
+      });
       return child;
     } catch (error) {
       this.children.delete(child);
@@ -140,7 +158,10 @@ export class PluginHost implements HookDispatcher {
 
   async use<T>(operation: () => T | Promise<T>, options: PluginOperationOptions = {}): Promise<T> {
     const chain = this.chain();
-    for (const scope of chain) { scope.assertReady(); scope.assertNotChanging(); }
+    for (const scope of chain) {
+      scope.assertReady();
+      scope.assertNotChanging();
+    }
     const pending = Promise.resolve().then(operation);
     const entry: Operation = { pending, ...options };
     for (const scope of chain) scope.active.add(entry);
@@ -155,17 +176,27 @@ export class PluginHost implements HookDispatcher {
     return this.dispatch((signal) => this.transformValue(hook, value, context, signal));
   }
 
-  private async transformValue<T>(hook: HookDefinition<T>, value: T, context: HookContext, cancellation: AbortSignal): Promise<T> {
+  private async transformValue<T>(
+    hook: HookDefinition<T>,
+    value: T,
+    context: HookContext,
+    cancellation: AbortSignal,
+  ): Promise<T> {
     const canonical = this.resolveHook(hook, "transform");
     if (!canonical.allowAborted) context.signal.throwIfAborted();
     let current = value;
     for (const registration of this.handlers(hook.name)) {
-      const parentSignal = AbortSignal.any([registration.signal, cancellation,
-        ...(canonical.allowAborted ? [] : [context.signal])]);
+      const parentSignal = AbortSignal.any([
+        registration.signal,
+        cancellation,
+        ...(canonical.allowAborted ? [] : [context.signal]),
+      ]);
       const result = await withDeadline(
         (signal) => registration.handler(immutable(current), handlerContext(context, signal)),
-        parentSignal, registration.options.timeoutMs ?? this.options.timeoutMs!,
-        `Hook ${hook.name} in plugin ${registration.pluginId}`, (task, cancel) => this.track(task, cancel),
+        parentSignal,
+        registration.options.timeoutMs ?? this.options.timeoutMs!,
+        `Hook ${hook.name} in plugin ${registration.pluginId}`,
+        (task, cancel) => this.track(task, cancel),
       );
       if (result !== undefined) current = canonical.validate(structuredClone(result)) as T;
     }
@@ -176,30 +207,54 @@ export class PluginHost implements HookDispatcher {
     return this.dispatch((signal) => this.observeValue(hook, value, context, signal));
   }
 
-  private async observeValue<T>(hook: HookDefinition<T>, value: T, context: HookContext, cancellation: AbortSignal): Promise<void> {
+  private async observeValue<T>(
+    hook: HookDefinition<T>,
+    value: T,
+    context: HookContext,
+    cancellation: AbortSignal,
+  ): Promise<void> {
     const canonical = this.resolveHook(hook, "observe");
     if (!canonical.allowAborted) context.signal.throwIfAborted();
     const registrations = this.handlers(hook.name);
     if (registrations.length === 0) return;
     const current = immutable(value);
     for (const registration of registrations) {
-      const parentSignal = AbortSignal.any([registration.signal, cancellation,
-        ...(canonical.allowAborted ? [] : [context.signal])]);
+      const parentSignal = AbortSignal.any([
+        registration.signal,
+        cancellation,
+        ...(canonical.allowAborted ? [] : [context.signal]),
+      ]);
       try {
         const result = await withDeadline(
           (signal) => registration.handler(current, handlerContext(context, signal)),
-          parentSignal, registration.options.timeoutMs ?? this.options.timeoutMs!,
-          `Hook ${hook.name} in plugin ${registration.pluginId}`, (task, cancel) => this.track(task, cancel),
+          parentSignal,
+          registration.options.timeoutMs ?? this.options.timeoutMs!,
+          `Hook ${hook.name} in plugin ${registration.pluginId}`,
+          (task, cancel) => this.track(task, cancel),
         );
         if (result !== undefined) throw new Error(`Observation hook ${hook.name} cannot return a replacement`);
       } catch (error) {
-        if ((registration.options.failure ?? canonical.failure ?? "propagate") !== "isolate" ||
-            registration.signal.aborted || cancellation.aborted || (!canonical.allowAborted && context.signal.aborted)) throw error;
-        if (!this.options.onHookError) throw new Error(`Hook ${hook.name} isolation requires onHookError`, { cause: error });
+        if (
+          (registration.options.failure ?? canonical.failure ?? "propagate") !== "isolate" ||
+          registration.signal.aborted ||
+          cancellation.aborted ||
+          (!canonical.allowAborted && context.signal.aborted)
+        )
+          throw error;
+        if (!this.options.onHookError)
+          throw new Error(`Hook ${hook.name} isolation requires onHookError`, { cause: error });
         await withDeadline(
-          (signal) => this.options.onHookError!(asError(error), canonical, registration.pluginId, handlerContext(context, signal)),
-          parentSignal, registration.options.timeoutMs ?? this.options.timeoutMs!,
-          `Hook ${hook.name} error reporter`, (task, cancel) => this.track(task, cancel),
+          (signal) =>
+            this.options.onHookError!(
+              asError(error),
+              canonical,
+              registration.pluginId,
+              handlerContext(context, signal),
+            ),
+          parentSignal,
+          registration.options.timeoutMs ?? this.options.timeoutMs!,
+          `Hook ${hook.name} error reporter`,
+          (task, cancel) => this.track(task, cancel),
         );
       }
     }
@@ -219,7 +274,8 @@ export class PluginHost implements HookDispatcher {
     return this.enqueueChange(() => {
       const index = this.definitions.findIndex((entry) => entry.id === plugin.id);
       const next = [...this.definitions];
-      if (index < 0) next.push(plugin); else next[index] = plugin;
+      if (index < 0) next.push(plugin);
+      else next[index] = plugin;
       return next;
     }, options);
   }
@@ -231,10 +287,16 @@ export class PluginHost implements HookDispatcher {
       let updated = true;
       while (updated) {
         updated = false;
-        const services = new Set(this.definitions.filter((plugin) => removed.has(plugin.id))
-          .flatMap((plugin) => (plugin.provides ?? []).map((token) => `${token.scope}:${token.id}`)));
+        const services = new Set(
+          this.definitions
+            .filter((plugin) => removed.has(plugin.id))
+            .flatMap((plugin) => (plugin.provides ?? []).map((token) => `${token.scope}:${token.id}`)),
+        );
         for (const plugin of this.definitions) {
-          if (!removed.has(plugin.id) && (plugin.requires ?? []).some(({ service }) => services.has(`${service.scope}:${service.id}`))) {
+          if (
+            !removed.has(plugin.id) &&
+            (plugin.requires ?? []).some(({ service }) => services.has(`${service.scope}:${service.id}`))
+          ) {
             removed.add(plugin.id);
             updated = true;
           }
@@ -247,7 +309,7 @@ export class PluginHost implements HookDispatcher {
   updateConfig(id: string, config: unknown, options: PluginChangeOptions = {}): Promise<void> {
     return this.enqueueChange(() => {
       if (!this.definitions.some((plugin) => plugin.id === id)) throw new Error(`Unknown plugin: ${id}`);
-      return this.definitions.map((plugin) => plugin.id === id ? { ...plugin, config } : plugin);
+      return this.definitions.map((plugin) => (plugin.id === id ? { ...plugin, config } : plugin));
     }, options);
   }
 
@@ -262,15 +324,31 @@ export class PluginHost implements HookDispatcher {
 
   private async finishClose(): Promise<void> {
     const errors: unknown[] = [];
-    try { await this.cancelActive(); } catch (error) { errors.push(error); }
+    try {
+      await this.cancelActive();
+    } catch (error) {
+      errors.push(error);
+    }
     for (const child of [...this.children].reverse()) {
-      try { await child.close(); } catch (error) { errors.push(error); }
+      try {
+        await child.close();
+      } catch (error) {
+        errors.push(error);
+      }
     }
     await this.idle();
     await this.changes.idle();
     this.stateStore.pauseWrites();
-    try { await this.stateStore.settled(); } catch (error) { errors.push(error); }
-    try { await this.stop(); } catch (error) { errors.push(error); }
+    try {
+      await this.stateStore.settled();
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      await this.stop();
+    } catch (error) {
+      errors.push(error);
+    }
     await this.externalCleanup?.();
     this.parent?.children.delete(this);
     if (errors.length) throw new AggregateError(errors, `Failed to close plugin scope ${this.id}`);
@@ -293,8 +371,12 @@ export class PluginHost implements HookDispatcher {
     } catch (error) {
       await this.cancelActive();
       await this.idle();
-      try { await this.stop(); } catch (cleanup) {
-        throw new AggregateError([error, cleanup], `Plugin initialization and cleanup failed in scope ${this.id}`, { cause: error });
+      try {
+        await this.stop();
+      } catch (cleanup) {
+        throw new AggregateError([error, cleanup], `Plugin initialization and cleanup failed in scope ${this.id}`, {
+          cause: error,
+        });
       }
       throw error;
     }
@@ -308,59 +390,89 @@ export class PluginHost implements HookDispatcher {
       instance.controller.signal.throwIfAborted();
     };
     const declared = (service: ServiceToken, optional: boolean) => {
-      const entries = optional ? plugin.optional ?? [] : [...(plugin.requires ?? []), ...(plugin.optional ?? [])];
-      const dependency = entries.find((dependency) => dependency.service.id === service.id && dependency.service.scope === service.scope);
+      const entries = optional ? (plugin.optional ?? []) : [...(plugin.requires ?? []), ...(plugin.optional ?? [])];
+      const dependency = entries.find(
+        (dependency) => dependency.service.id === service.id && dependency.service.scope === service.scope,
+      );
       if (!dependency) {
         throw new Error(`Plugin ${plugin.id} did not declare dependency ${service.id}`);
       }
       return dependency;
     };
     try {
-      await withDeadline(async (signal) => {
-        const context: PluginContext = {
-          pluginId: plugin.id, pluginOrder: this.definitions.indexOf(plugin), scope: this.kind, scopeId: this.id, config: immutable(plugin.config), signal,
-          state: this.stateStore.forPlugin(plugin, assertActive),
-          get: <T>(service: ServiceToken<T>): T => {
-            assertActive(); const dependency = declared(service, false);
-            const binding = this.find(service, dependency.version ?? dependency.service.version);
-            if (!binding) throw new Error(`Dependency ${service.id} is not ready for ${plugin.id}`);
-            return binding.value as T;
-          },
-          optional: <T>(service: ServiceToken<T>): T | undefined => {
-            assertActive(); const dependency = declared(service, true);
-            return this.find(service, dependency.version ?? dependency.service.version)?.value as T | undefined;
-          },
-          provide: <T>(service: ServiceToken<T>, value: T): void => {
-            assertActive();
-            const token = (plugin.provides ?? []).find((candidate) => candidate.id === service.id);
-            if (!token || token !== service) throw new Error(`Plugin ${plugin.id} did not declare provided service ${service.id}`);
-            if (this.services.has(service.id)) throw new Error(`Service ${service.id} is already registered`);
-            if (value === undefined || value === null) throw new Error(`Service ${service.id} must provide an instance`);
-            this.services.set(service.id, { service, value });
-            instance.disposers.push(() => { this.services.delete(service.id); });
-          },
-          on: (hook, handler, options = {}): Disposer => {
-            assertActive();
-            const canonical = this.resolveHook(hook, hook.kind);
-            const failure = options.failure ?? canonical.failure;
-            if (canonical.kind === "transform" && failure === "isolate") throw new Error(`Transformation hook ${hook.name} cannot isolate failures`);
-            if (failure === "isolate" && !this.options.onHookError) throw new Error(`Hook ${hook.name} isolation requires onHookError`);
-            const unsubscribe = this.registry.add(plugin.id, this.definitions.indexOf(plugin), hook, handler, options,
-              AbortSignal.any([this.signal, instance.controller.signal]));
-            instance.disposers.push(unsubscribe);
-            return unsubscribe;
-          },
-          defer: (cleanup): void => {
-            if (typeof cleanup !== "function") throw new TypeError(`Plugin ${plugin.id} cleanup must be a function`);
-            instance.disposers.push(cleanup);
-          },
-        };
-        const dispose = await plugin.setup(context);
-        if (dispose !== undefined && typeof dispose !== "function") throw new TypeError(`Plugin ${plugin.id} setup must return a cleanup function or undefined`);
-        if (dispose) instance.disposers.push(dispose);
-      }, AbortSignal.any([this.signal, instance.controller.signal,
-        ...(this.initializationSignal ? [this.initializationSignal] : [])]), this.options.timeoutMs!,
-      `Plugin ${plugin.id} setup`, (task, cancel) => this.track(task, cancel));
+      await withDeadline(
+        async (signal) => {
+          const context: PluginContext = {
+            pluginId: plugin.id,
+            pluginOrder: this.definitions.indexOf(plugin),
+            scope: this.kind,
+            scopeId: this.id,
+            config: immutable(plugin.config),
+            signal,
+            state: this.stateStore.forPlugin(plugin, assertActive),
+            get: <T>(service: ServiceToken<T>): T => {
+              assertActive();
+              const dependency = declared(service, false);
+              const binding = this.find(service, dependency.version ?? dependency.service.version);
+              if (!binding) throw new Error(`Dependency ${service.id} is not ready for ${plugin.id}`);
+              return binding.value as T;
+            },
+            optional: <T>(service: ServiceToken<T>): T | undefined => {
+              assertActive();
+              const dependency = declared(service, true);
+              return this.find(service, dependency.version ?? dependency.service.version)?.value as T | undefined;
+            },
+            provide: <T>(service: ServiceToken<T>, value: T): void => {
+              assertActive();
+              const token = (plugin.provides ?? []).find((candidate) => candidate.id === service.id);
+              if (!token || token !== service)
+                throw new Error(`Plugin ${plugin.id} did not declare provided service ${service.id}`);
+              if (this.services.has(service.id)) throw new Error(`Service ${service.id} is already registered`);
+              if (value === undefined || value === null)
+                throw new Error(`Service ${service.id} must provide an instance`);
+              this.services.set(service.id, { service, value });
+              instance.disposers.push(() => {
+                this.services.delete(service.id);
+              });
+            },
+            on: (hook, handler, options = {}): Disposer => {
+              assertActive();
+              const canonical = this.resolveHook(hook, hook.kind);
+              const failure = options.failure ?? canonical.failure;
+              if (canonical.kind === "transform" && failure === "isolate")
+                throw new Error(`Transformation hook ${hook.name} cannot isolate failures`);
+              if (failure === "isolate" && !this.options.onHookError)
+                throw new Error(`Hook ${hook.name} isolation requires onHookError`);
+              const unsubscribe = this.registry.add(
+                plugin.id,
+                this.definitions.indexOf(plugin),
+                hook,
+                handler,
+                options,
+                AbortSignal.any([this.signal, instance.controller.signal]),
+              );
+              instance.disposers.push(unsubscribe);
+              return unsubscribe;
+            },
+            defer: (cleanup): void => {
+              if (typeof cleanup !== "function") throw new TypeError(`Plugin ${plugin.id} cleanup must be a function`);
+              instance.disposers.push(cleanup);
+            },
+          };
+          const dispose = await plugin.setup(context);
+          if (dispose !== undefined && typeof dispose !== "function")
+            throw new TypeError(`Plugin ${plugin.id} setup must return a cleanup function or undefined`);
+          if (dispose) instance.disposers.push(dispose);
+        },
+        AbortSignal.any([
+          this.signal,
+          instance.controller.signal,
+          ...(this.initializationSignal ? [this.initializationSignal] : []),
+        ]),
+        this.options.timeoutMs!,
+        `Plugin ${plugin.id} setup`,
+        (task, cancel) => this.track(task, cancel),
+      );
       for (const token of plugin.provides ?? []) {
         if (!this.services.has(token.id)) throw new Error(`Plugin ${plugin.id} did not initialize service ${token.id}`);
       }
@@ -375,7 +487,9 @@ export class PluginHost implements HookDispatcher {
     for (const instance of this.instances.splice(0).reverse()) {
       instance.controller.abort(new Error(`Plugin ${instance.definition.id} unloaded`));
       for (const dispose of instance.disposers.reverse()) {
-        try { await dispose(); } catch (error) {
+        try {
+          await dispose();
+        } catch (error) {
           errors.push(new Error(`Plugin ${instance.definition.id} cleanup failed`, { cause: error }));
         }
       }
@@ -404,7 +518,8 @@ export class PluginHost implements HookDispatcher {
 
   private resolveHook<T>(hook: HookDefinition<T>, kind: "transform" | "observe"): HookDefinition<unknown> {
     const canonical = this.hooks.get(hook.name);
-    if (!canonical || canonical.kind !== kind || hook.kind !== kind) throw new Error(`Hook ${hook.name} is unavailable as ${kind}`);
+    if (!canonical || canonical.kind !== kind || hook.kind !== kind)
+      throw new Error(`Hook ${hook.name} is unavailable as ${kind}`);
     return canonical;
   }
 
@@ -421,7 +536,10 @@ export class PluginHost implements HookDispatcher {
   private track(pending: Promise<unknown>, cancel: Disposer): void {
     const operation = { pending, cancel };
     for (const scope of this.chain()) scope.active.add(operation);
-    void pending.then(() => this.untrack(operation), () => this.untrack(operation));
+    void pending.then(
+      () => this.untrack(operation),
+      () => this.untrack(operation),
+    );
   }
 
   private dispatch<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
@@ -442,7 +560,11 @@ export class PluginHost implements HookDispatcher {
   private async cancelActive(): Promise<void> {
     const errors: unknown[] = [];
     for (const { cancel } of [...this.active]) {
-      try { await cancel?.(); } catch (error) { errors.push(error); }
+      try {
+        await cancel?.();
+      } catch (error) {
+        errors.push(error);
+      }
     }
     if (errors.length) throw new AggregateError(errors, `Cancellation failed in plugin scope ${this.id}`);
   }
@@ -453,17 +575,25 @@ export class PluginHost implements HookDispatcher {
 
   private prepareChange(next: readonly AnyPlugin[]) {
     const plugins = next.map((plugin) => {
-      const ancestor = this.definitions.find((previous) => previous.id === plugin.id &&
-        scopeIndex(pluginScope(previous)) < scopeIndex(this.kind));
+      const ancestor = this.definitions.find(
+        (previous) => previous.id === plugin.id && scopeIndex(pluginScope(previous)) < scopeIndex(this.kind),
+      );
       return ancestor && pluginSource(ancestor) === pluginSource(plugin) ? ancestor : snapshotPlugin(plugin);
     });
     const descendants = this.descendants();
     const changedParents = new Set(plugins.filter((plugin) => scopeIndex(pluginScope(plugin)) < scopeIndex(this.kind)));
-    const previousParents = this.definitions.filter((plugin) => scopeIndex(pluginScope(plugin)) < scopeIndex(this.kind));
-    if (previousParents.length !== changedParents.size || previousParents.some((plugin) => !changedParents.has(plugin))) {
+    const previousParents = this.definitions.filter(
+      (plugin) => scopeIndex(pluginScope(plugin)) < scopeIndex(this.kind),
+    );
+    if (
+      previousParents.length !== changedParents.size ||
+      previousParents.some((plugin) => !changedParents.has(plugin))
+    ) {
       throw new Error(`Scope ${this.id} cannot change ancestor plugins`);
     }
-    const graphs = new Map(descendants.map((scope) => [scope, validateGraph(plugins, scope.bindingTemplates, this.options.hooks ?? [])]));
+    const graphs = new Map(
+      descendants.map((scope) => [scope, validateGraph(plugins, scope.bindingTemplates, this.options.hooks ?? [])]),
+    );
     return { plugins, descendants, graphs };
   }
 
@@ -495,14 +625,23 @@ export class PluginHost implements HookDispatcher {
       } catch (error) {
         const cleanupErrors: unknown[] = [];
         for (const scope of [...descendants].reverse()) {
-          try { await scope.stop(); } catch (cleanup) { cleanupErrors.push(cleanup); }
+          try {
+            await scope.stop();
+          } catch (cleanup) {
+            cleanupErrors.push(cleanup);
+          }
         }
-        if (cleanupErrors.length) throw new AggregateError([error, ...cleanupErrors], "Plugin replacement and cleanup failed", { cause: error });
+        if (cleanupErrors.length)
+          throw new AggregateError([error, ...cleanupErrors], "Plugin replacement and cleanup failed", {
+            cause: error,
+          });
         throw error;
       } finally {
         for (const scope of descendants) scope.changing = false;
       }
     });
-    return operation.finally(() => { this.changeCount--; });
+    return operation.finally(() => {
+      this.changeCount--;
+    });
   }
 }

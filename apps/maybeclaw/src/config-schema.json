@@ -4,7 +4,11 @@
   "required": ["version"],
   "properties": {
     "version": { "const": 2, "description": "Agent Gateway configuration version." },
-    "persistentRules": { "type": "boolean", "default": false, "description": "Enable administrator-managed persistent permissions in the Gateway data directory." },
+    "persistentRules": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable administrator-managed persistent permissions in the Gateway data directory."
+    },
     "agents": { "type": "array", "items": { "$ref": "#/$defs/maybeclawAgent" } },
     "access": {
       "type": "object",
@@ -12,7 +16,15 @@
         "sessionAdmins": { "$ref": "#/$defs/maybeclawIdentityLists" },
         "creators": { "$ref": "#/$defs/maybeclawIdentityList" },
         "deniedUsers": { "$ref": "#/$defs/maybeclawIdentityList" },
-        "allowedAgents": { "type": "object", "propertyNames": { "$ref": "#/$defs/maybeclawIdentifier" }, "additionalProperties": { "type": "array", "items": { "$ref": "#/$defs/maybeclawAgentId" }, "uniqueItems": true } }
+        "allowedAgents": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/maybeclawIdentifier" },
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/maybeclawAgentId" },
+            "uniqueItems": true
+          }
+        }
       },
       "additionalProperties": false
     },
@@ -23,8 +35,19 @@
         "auth": {
           "type": "object",
           "properties": {
-            "password": { "type": "string", "minLength": 10, "maxLength": 1024, "writeOnly": true, "description": "Administrator password, automatically replaced with passwordHash by the running Gateway or at startup." },
-            "passwordHash": { "type": "string", "maxLength": 512, "writeOnly": true, "description": "Generated Argon2id password hash." },
+            "password": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 1024,
+              "writeOnly": true,
+              "description": "Administrator password, automatically replaced with passwordHash by the running Gateway or at startup."
+            },
+            "passwordHash": {
+              "type": "string",
+              "maxLength": 512,
+              "writeOnly": true,
+              "description": "Generated Argon2id password hash."
+            },
             "sessionMs": { "type": "integer", "minimum": 1000, "maximum": 86400000, "default": 28800000 }
           },
           "anyOf": [{ "required": ["password"] }, { "required": ["passwordHash"] }],
@@ -33,7 +56,12 @@
         "idleMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "default": 600000 },
         "shutdownMs": { "type": "integer", "minimum": 0, "maximum": 2147483647, "default": 30000 },
         "approvalMs": { "type": "integer", "minimum": 1, "maximum": 9007199254740991, "default": 600000 },
-        "publicOrigin": { "type": "string", "format": "uri", "pattern": "^https://[^/?#@\\s]+$", "description": "Canonical HTTPS origin of the control service behind a reverse proxy, without a path, query, fragment, or credentials." }
+        "publicOrigin": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://[^/?#@\\s]+$",
+          "description": "Canonical HTTPS origin of the control service behind a reverse proxy, without a path, query, fragment, or credentials."
+        }
       },
       "additionalProperties": false
     },
@@ -44,18 +72,35 @@
           "type": "object",
           "properties": {
             "enabled": { "type": "boolean", "default": false },
-            "botToken": { "$ref": "#/$defs/channelCredential", "description": "Literal bot token. Do not also set botTokenEnv." },
+            "botToken": {
+              "$ref": "#/$defs/channelCredential",
+              "description": "Literal bot token. Do not also set botTokenEnv."
+            },
             "botTokenEnv": { "$ref": "#/$defs/credentialEnv", "default": "MAYBECLAW_TELEGRAM_TOKEN" },
-            "allowUsers": { "type": "array", "items": { "type": "string", "pattern": "^[1-9][0-9]{0,19}$" }, "uniqueItems": true },
-            "allowGroups": { "type": "array", "items": { "type": "string", "pattern": "^-[1-9][0-9]{0,19}$" }, "uniqueItems": true },
+            "allowUsers": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[1-9][0-9]{0,19}$" },
+              "uniqueItems": true
+            },
+            "allowGroups": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^-[1-9][0-9]{0,19}$" },
+              "uniqueItems": true
+            },
             "groupTrigger": { "enum": ["explicit", "all"], "default": "explicit" },
-            "entranceTriggers": { "type": "array", "items": { "$ref": "#/$defs/maybeclawEntranceTrigger" }, "uniqueItems": true }
+            "entranceTriggers": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/maybeclawEntranceTrigger" },
+              "uniqueItems": true
+            }
           },
           "if": { "required": ["enabled"], "properties": { "enabled": { "const": true } } },
-          "then": { "anyOf": [
-            { "required": ["allowUsers"], "properties": { "allowUsers": { "minItems": 1 } } },
-            { "required": ["allowGroups"], "properties": { "allowGroups": { "minItems": 1 } } }
-          ] },
+          "then": {
+            "anyOf": [
+              { "required": ["allowUsers"], "properties": { "allowUsers": { "minItems": 1 } } },
+              { "required": ["allowGroups"], "properties": { "allowGroups": { "minItems": 1 } } }
+            ]
+          },
           "not": { "required": ["botToken", "botTokenEnv"] },
           "additionalProperties": false
         },
@@ -64,18 +109,37 @@
           "properties": {
             "enabled": { "type": "boolean", "default": false },
             "appId": { "type": "string" },
-            "appSecret": { "$ref": "#/$defs/channelCredential", "description": "Literal app secret. Do not also set appSecretEnv." },
+            "appSecret": {
+              "$ref": "#/$defs/channelCredential",
+              "description": "Literal app secret. Do not also set appSecretEnv."
+            },
             "appSecretEnv": { "$ref": "#/$defs/credentialEnv", "default": "MAYBECLAW_FEISHU_SECRET" },
-            "allowUsers": { "type": "array", "items": { "type": "string", "pattern": "^ou_[A-Za-z0-9_-]{1,128}$" }, "uniqueItems": true },
-            "allowGroups": { "type": "array", "items": { "type": "string", "pattern": "^oc_[A-Za-z0-9_-]{1,128}$" }, "uniqueItems": true },
+            "allowUsers": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^ou_[A-Za-z0-9_-]{1,128}$" },
+              "uniqueItems": true
+            },
+            "allowGroups": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^oc_[A-Za-z0-9_-]{1,128}$" },
+              "uniqueItems": true
+            },
             "groupTrigger": { "enum": ["explicit", "all"], "default": "explicit" },
-            "entranceTriggers": { "type": "array", "items": { "$ref": "#/$defs/maybeclawEntranceTrigger" }, "uniqueItems": true }
+            "entranceTriggers": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/maybeclawEntranceTrigger" },
+              "uniqueItems": true
+            }
           },
           "if": { "required": ["enabled"], "properties": { "enabled": { "const": true } } },
-          "then": { "required": ["appId"], "properties": { "appId": { "pattern": "^cli_[0-9a-fA-F]{16}$" } }, "anyOf": [
-            { "required": ["allowUsers"], "properties": { "allowUsers": { "minItems": 1 } } },
-            { "required": ["allowGroups"], "properties": { "allowGroups": { "minItems": 1 } } }
-          ] },
+          "then": {
+            "required": ["appId"],
+            "properties": { "appId": { "pattern": "^cli_[0-9a-fA-F]{16}$" } },
+            "anyOf": [
+              { "required": ["allowUsers"], "properties": { "allowUsers": { "minItems": 1 } } },
+              { "required": ["allowGroups"], "properties": { "allowGroups": { "minItems": 1 } } }
+            ]
+          },
           "not": { "required": ["appSecret", "appSecretEnv"] },
           "additionalProperties": false
         }
@@ -86,9 +150,22 @@
   "additionalProperties": false,
   "$defs": {
     "maybeclawAgentId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$" },
-    "maybeclawIdentifier": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\s\\u0000-\\u001f\\u007f](?:[^\\u0000-\\u001f\\u007f]*[^\\s\\u0000-\\u001f\\u007f])?$" },
-    "maybeclawIdentityList": { "type": "array", "items": { "$ref": "#/$defs/maybeclawIdentifier" }, "uniqueItems": true },
-    "maybeclawIdentityLists": { "type": "object", "propertyNames": { "$ref": "#/$defs/maybeclawIdentifier" }, "additionalProperties": { "$ref": "#/$defs/maybeclawIdentityList" } },
+    "maybeclawIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\s\\u0000-\\u001f\\u007f](?:[^\\u0000-\\u001f\\u007f]*[^\\s\\u0000-\\u001f\\u007f])?$"
+    },
+    "maybeclawIdentityList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/maybeclawIdentifier" },
+      "uniqueItems": true
+    },
+    "maybeclawIdentityLists": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/maybeclawIdentifier" },
+      "additionalProperties": { "$ref": "#/$defs/maybeclawIdentityList" }
+    },
     "maybeclawEntranceTrigger": {
       "type": "object",
       "required": ["conversation", "trigger"],
@@ -111,22 +188,51 @@
         "enabled": { "type": "boolean", "default": true },
         "model": { "$ref": "#/$defs/maybeclawIdentifier" },
         "instructions": { "type": "string" },
-        "media": { "type": "array", "uniqueItems": true, "items": { "enum": ["image", "audio", "file", "video"] }, "description": "Explicit input media capabilities; video remains a file content part with a video MIME type." },
-        "readDirectory": { "$ref": "#/$defs/maybeclawIdentifier", "description": "Absolute directory, validated using the host platform's path rules." },
+        "media": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["image", "audio", "file", "video"] },
+          "description": "Explicit input media capabilities; video remains a file content part with a video MIME type."
+        },
+        "readDirectory": {
+          "$ref": "#/$defs/maybeclawIdentifier",
+          "description": "Absolute directory, validated using the host platform's path rules."
+        },
         "module": { "$ref": "#/$defs/maybeclawIdentifier" },
         "export": { "$ref": "#/$defs/maybeclawIdentifier", "default": "createAdapter" },
         "options": { "type": "object" },
         "plugins": { "$ref": "#/$defs/pluginSelections" },
         "idleMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
         "runBudget": { "$ref": "#/$defs/runBudget" },
-        "permissions": { "type": "object", "propertyNames": { "$ref": "#/$defs/maybeclawIdentifier" }, "additionalProperties": { "enum": ["allow", "deny", "ask"] } }
+        "permissions": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/maybeclawIdentifier" },
+          "additionalProperties": { "enum": ["allow", "deny", "ask"] }
+        }
       },
       "if": { "properties": { "adapter": { "const": "module" } } },
-      "then": { "required": ["module"], "not": { "anyOf": [{ "required": ["plugins"] }, { "required": ["requestRecording"] }, { "required": ["providerBodyRecording"] }] } },
-      "else": { "not": { "anyOf": [{ "required": ["module"] }, { "required": ["export"] }, { "required": ["options"] }] } },
+      "then": {
+        "required": ["module"],
+        "not": {
+          "anyOf": [
+            { "required": ["plugins"] },
+            { "required": ["requestRecording"] },
+            { "required": ["providerBodyRecording"] }
+          ]
+        }
+      },
+      "else": {
+        "not": { "anyOf": [{ "required": ["module"] }, { "required": ["export"] }, { "required": ["options"] }] }
+      },
       "additionalProperties": false
     },
-    "channelCredential": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^\\S+$", "writeOnly": true },
+    "channelCredential": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^\\S+$",
+      "writeOnly": true
+    },
     "credentialEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$" }
   }
 }

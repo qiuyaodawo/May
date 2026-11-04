@@ -52,7 +52,14 @@ export interface SessionPermissionRule {
 export type SessionPermissionRuleEvent =
   | { type: "rule.created"; rule: SessionPermissionRule }
   | { type: "rule.revoked"; ruleId: string; scopeId: string }
-  | { type: "rule.used"; ruleId: string; scopeId: string; decision: "allow" | "deny"; runId: string; toolCallId: string };
+  | {
+      type: "rule.used";
+      ruleId: string;
+      scopeId: string;
+      decision: "allow" | "deny";
+      runId: string;
+      toolCallId: string;
+    };
 
 export interface SessionApprovalRequest {
   id: string;
@@ -114,10 +121,25 @@ export type RecordablePermissionEvent = (
 export type SessionEventPayload =
   | import("./requests.js").SessionRequestEvent
   | { type: "state.updated"; key: string; value: unknown }
-  | { type: "run.budget.exceeded"; runId: string; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
-  | { type: "session.created"; metadata?: Record<string, unknown>; runtime?: RuntimeDescriptor; fork?: SessionForkOrigin }
+  | {
+      type: "run.budget.exceeded";
+      runId: string;
+      dimension: string;
+      limit: number;
+      consumed: number;
+      budget: RunBudgetSnapshot;
+    }
+  | {
+      type: "session.created";
+      metadata?: Record<string, unknown>;
+      runtime?: RuntimeDescriptor;
+      fork?: SessionForkOrigin;
+    }
   | { type: "session.fork.ready" }
-  | { type: "history.omitted"; reason: "permission" | "unconsumed-input" | "application-state" | "fork-initialization" | "execution-identity" }
+  | {
+      type: "history.omitted";
+      reason: "permission" | "unconsumed-input" | "application-state" | "fork-initialization" | "execution-identity";
+    }
   | { type: "runtime.state.saved"; runtime: RuntimeDescriptor; state: unknown }
   | { type: "runtime.changed"; runtime: RuntimeDescriptor; state?: unknown }
   | { type: "input.generated"; runId: string; step: number; messages: readonly UserMessage[]; reason: string }
@@ -189,6 +211,11 @@ export function sessionToolResultContent(
   event: Extract<SessionEventPayload, { type: "tool.completed" }>,
 ): ContentPart[] {
   return event.content === undefined
-    ? [{ type: "text", text: "This historical tool result has no saved model-visible content. The original output is available only to the host." }]
+    ? [
+        {
+          type: "text",
+          text: "This historical tool result has no saved model-visible content. The original output is available only to the host.",
+        },
+      ]
     : structuredClone(event.content);
 }

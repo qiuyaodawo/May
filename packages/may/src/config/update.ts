@@ -4,26 +4,26 @@ import { resolve } from "node:path";
 import writeFileAtomic from "write-file-atomic";
 import { withFileAccess, acquireFileLock } from "../storage/index.js";
 
-import {
-  MayConfigFileError,
-  MayConfigParseError,
-  MayConfigWriteError,
-} from "./errors.js";
+import { MayConfigFileError, MayConfigParseError, MayConfigWriteError } from "./errors.js";
 import { parseMayConfig } from "./parse.js";
 import type { MayConfig } from "./types.js";
 
 /** Atomically updates only the top-level defaultModel field. */
-export async function updateDefaultMayModel(
-  configPath: string,
-  profile: string,
-): Promise<MayConfig> {
+export async function updateDefaultMayModel(configPath: string, profile: string): Promise<MayConfig> {
   const path = resolve(configPath);
   let lock;
-  try { lock = await acquireFileLock(`${path}.lock`); }
-  catch (error) { throw new MayConfigWriteError(path, `configuration is being written by another process: ${path}.lock`, { cause: error }); }
+  try {
+    lock = await acquireFileLock(`${path}.lock`);
+  } catch (error) {
+    throw new MayConfigWriteError(path, `configuration is being written by another process: ${path}.lock`, {
+      cause: error,
+    });
+  }
   try {
     return await withFileAccess(path, "exclusive", () => updateLocked(path, profile));
-  } finally { await lock.release(); }
+  } finally {
+    await lock.release();
+  }
 }
 
 async function updateLocked(path: string, profile: string): Promise<MayConfig> {
@@ -64,10 +64,7 @@ async function readConfigSnapshot(path: string): Promise<{
     const source = await handle.readFile("utf8");
     const information = await handle.stat();
     if (!sameSnapshot(before, information)) {
-      throw new MayConfigWriteError(
-        path,
-        "the file changed while it was being read; retry the operation",
-      );
+      throw new MayConfigWriteError(path, "the file changed while it was being read; retry the operation");
     }
     return { source, information };
   } catch (error) {
@@ -78,14 +75,9 @@ async function readConfigSnapshot(path: string): Promise<{
   }
 }
 
-function serializeLike(
-  source: string,
-  value: Readonly<Record<string, unknown>>,
-): string {
+function serializeLike(source: string, value: Readonly<Record<string, unknown>>): string {
   const indentation = /\r?\n([ \t]+)"/u.exec(source)?.[1];
-  let output = indentation === undefined
-    ? JSON.stringify(value)
-    : JSON.stringify(value, null, indentation);
+  let output = indentation === undefined ? JSON.stringify(value) : JSON.stringify(value, null, indentation);
   if (source.includes("\r\n")) output = output.replace(/\n/gu, "\r\n");
   if (/\r?\n$/u.test(source)) {
     output += source.endsWith("\r\n") ? "\r\n" : "\n";
@@ -94,7 +86,9 @@ function serializeLike(
 }
 
 function sameSnapshot(before: Stats, after: Stats): boolean {
-  return before.size === after.size &&
+  return (
+    before.size === after.size &&
     before.mtimeMs === after.mtimeMs &&
-    (before.ino === 0 || after.ino === 0 || before.ino === after.ino);
+    (before.ino === 0 || after.ino === 0 || before.ino === after.ino)
+  );
 }

@@ -7,7 +7,8 @@ const applications = {
 };
 const id = process.argv[2];
 const application = applications[id];
-if (application === undefined) throw new Error(`Usage: write-config-schema.mjs <${Object.keys(applications).join("|")}>`);
+if (application === undefined)
+  throw new Error(`Usage: write-config-schema.mjs <${Object.keys(applications).join("|")}>`);
 const repository = new URL("../", import.meta.url);
 const { createApplicationConfigSchema } = await import(new URL("packages/may/dist/config/index.js", repository).href);
 const output = new URL(`${application.directory}/dist/`, repository);

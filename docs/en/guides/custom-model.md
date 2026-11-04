@@ -35,10 +35,7 @@ export class UppercaseModel implements Model {
     maxOutputTokens: 512,
   };
 
-  async *stream(
-    request: ModelRequest,
-    options: ModelStreamOptions,
-  ): AsyncIterable<ModelEvent> {
+  async *stream(request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     options.signal.throwIfAborted();
 
     const text = lastUserText(request).toUpperCase();
@@ -59,9 +56,7 @@ function lastUserText(request: ModelRequest): string {
   for (let index = request.messages.length - 1; index >= 0; index--) {
     const message = request.messages[index];
     if (message?.role !== "user") continue;
-    return message.content
-      .flatMap((part) => part.type === "text" ? [part.text] : [])
-      .join("");
+    return message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
   }
   return "";
 }

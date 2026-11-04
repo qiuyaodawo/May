@@ -5,31 +5,17 @@ import { parseMayConfig } from "@sortedyuan/may/config";
 import { parseCliArgs, runCli } from "../dist/index.js";
 
 test("parses the run command and options", () => {
-  assert.deepEqual(
-    parseCliArgs([
-      "run",
-      "--config",
-      "custom.json",
-      "--model",
-      "reasoner",
-      "hello",
-      "May",
-    ]),
-    {
-      type: "run",
-      prompt: "hello May",
-      configPath: "custom.json",
-      model: "reasoner",
-    },
-  );
+  assert.deepEqual(parseCliArgs(["run", "--config", "custom.json", "--model", "reasoner", "hello", "May"]), {
+    type: "run",
+    prompt: "hello May",
+    configPath: "custom.json",
+    model: "reasoner",
+  });
   assert.deepEqual(parseCliArgs(["run", "--", "--explain"]), {
     type: "run",
     prompt: "--explain",
   });
-  assert.throws(
-    () => parseCliArgs(["run", "--config", "--model", "chat", "hello"]),
-    /--config requires a value/,
-  );
+  assert.throws(() => parseCliArgs(["run", "--config", "--model", "chat", "hello"]), /--config requires a value/);
 });
 
 test("rejects invalid command arguments before loading config", async () => {
@@ -37,14 +23,7 @@ test("rejects invalid command arguments before loading config", async () => {
   const stdout = captureOutput();
   const stderr = captureOutput();
 
-  const code = await runCli([
-    "run",
-    "--model",
-    "reasoner",
-    "--model",
-    "other",
-    "hello",
-  ], {
+  const code = await runCli(["run", "--model", "reasoner", "--model", "other", "hello"], {
     stdout,
     stderr,
     async loadConfig() {
@@ -61,31 +40,28 @@ test("rejects invalid command arguments before loading config", async () => {
 });
 
 test("runs with the only configured model profile and streams output", async () => {
-  const config = parseMayConfig({
-    providers: {
-      deepseek: {
-        adapter: "deepseek-chat",
-        apiKey: "test-key",
-        baseURL: "https://example.test",
+  const config = parseMayConfig(
+    {
+      providers: {
+        deepseek: {
+          adapter: "deepseek-chat",
+          apiKey: "test-key",
+          baseURL: "https://example.test",
+        },
+      },
+      models: {
+        reasoner: { provider: "deepseek", model: "deepseek-reasoner" },
       },
     },
-    models: {
-      reasoner: { provider: "deepseek", model: "deepseek-reasoner" },
-    },
-  }, "memory.json");
+    "memory.json",
+  );
   const stdout = captureOutput();
   const stderr = captureOutput();
   let loadedWith;
   let selected;
   let request;
 
-  const code = await runCli([
-    "run",
-    "--config",
-    "custom.json",
-    "hello",
-    "May",
-  ], {
+  const code = await runCli(["run", "--config", "custom.json", "hello", "May"], {
     stdout,
     stderr,
     async loadConfig(options) {
@@ -168,15 +144,18 @@ test("selects a named model profile and prints a non-streamed final message", as
 });
 
 test("reports an ambiguous model selection", async () => {
-  const config = parseMayConfig({
-    providers: {
-      deepseek: { adapter: "deepseek-chat", apiKey: "key" },
+  const config = parseMayConfig(
+    {
+      providers: {
+        deepseek: { adapter: "deepseek-chat", apiKey: "key" },
+      },
+      models: {
+        first: { provider: "deepseek", model: "first" },
+        second: { provider: "deepseek", model: "second" },
+      },
     },
-    models: {
-      first: { provider: "deepseek", model: "first" },
-      second: { provider: "deepseek", model: "second" },
-    },
-  }, "memory.json");
+    "memory.json",
+  );
   const stderr = captureOutput();
 
   const code = await runCli(["run", "hello"], {

@@ -4,7 +4,12 @@ import type { PermissionPolicy } from "../permissions/index.js";
 import { defineService } from "../plugin/index.js";
 import type { SessionStore } from "../session/index.js";
 import type { SkillSession } from "../skills/index.js";
-import type { ContextWrapperRegistry, InstructionSourceRegistry, ModelWrapperRegistry, ToolSourceRegistry } from "./registries.js";
+import type {
+  ContextWrapperRegistry,
+  InstructionSourceRegistry,
+  ModelWrapperRegistry,
+  ToolSourceRegistry,
+} from "./registries.js";
 
 export interface ContextOptions {
   readonly budget?: ContextBudget;

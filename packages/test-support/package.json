@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "description": "Shared helpers for repository tests.",
-  "exports": { ".": "./index.mjs" },
-  "engines": { "node": ">=22" },
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "license": "MIT"
 }

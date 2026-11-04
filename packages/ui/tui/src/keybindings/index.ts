@@ -45,17 +45,12 @@ export class Keymap {
   private readonly chordTimeoutMs: number;
   private pending: PendingSequence | undefined;
 
-  constructor(
-    definitions: readonly KeyBindingDefinition[],
-    options: KeymapOptions = {},
-  ) {
-    const chordTimeoutMs = options.chordTimeoutMs === null ? Infinity : options.chordTimeoutMs ?? 1_000;
+  constructor(definitions: readonly KeyBindingDefinition[], options: KeymapOptions = {}) {
+    const chordTimeoutMs = options.chordTimeoutMs === null ? Infinity : (options.chordTimeoutMs ?? 1_000);
     if (options.chordTimeoutMs !== null && (!Number.isFinite(chordTimeoutMs) || chordTimeoutMs <= 0)) {
       throw new RangeError("chordTimeoutMs must be a positive finite number");
     }
-    const actions = options.actions === undefined
-      ? undefined
-      : new Set(options.actions);
+    const actions = options.actions === undefined ? undefined : new Set(options.actions);
     const leader = options.leader ?? "ctrl+x";
     this.bindings = definitions.map((definition) => {
       if (definition.context.trim() === "") {
@@ -76,17 +71,15 @@ export class Keymap {
     this.chordTimeoutMs = chordTimeoutMs;
   }
 
-  resolve(
-    stroke: KeyStroke,
-    contexts: readonly string[],
-    now = Date.now(),
-  ): KeymapResult {
+  resolve(stroke: KeyStroke, contexts: readonly string[], now = Date.now()): KeymapResult {
     const normalized = normalizeKeyStroke(stroke);
-    const previous = this.pending !== undefined && this.pending.expiresAt > now &&
+    const previous =
+      this.pending !== undefined &&
+      this.pending.expiresAt > now &&
       this.pending.contexts.length === contexts.length &&
       this.pending.contexts.every((context, index) => context === contexts[index])
-      ? this.pending.sequence
-      : [];
+        ? this.pending.sequence
+        : [];
     this.pending = undefined;
     const sequence = [...previous, normalized];
     const result = this.resolveSequence(sequence, contexts, now);
@@ -100,25 +93,19 @@ export class Keymap {
 
   keysForAction(action: string, context?: string): readonly string[] {
     return this.bindings
-      .filter(binding => binding.action === action && (context === undefined || binding.context === context))
-      .map(binding => formatKeySequence(binding.sequence));
+      .filter((binding) => binding.action === action && (context === undefined || binding.context === context))
+      .map((binding) => formatKeySequence(binding.sequence));
   }
 
-  private resolveSequence(
-    sequence: readonly KeyStroke[],
-    contexts: readonly string[],
-    now: number,
-  ): KeymapResult {
+  private resolveSequence(sequence: readonly KeyStroke[], contexts: readonly string[], now: number): KeymapResult {
     for (let index = contexts.length - 1; index >= 0; index--) {
       const context = contexts[index]!;
-      const candidates = this.bindings.filter((binding) =>
-        binding.context === context && isPrefix(sequence, binding.sequence)
+      const candidates = this.bindings.filter(
+        (binding) => binding.context === context && isPrefix(sequence, binding.sequence),
       );
       if (candidates.length === 0) continue;
 
-      const exact = candidates.find((binding) =>
-        binding.sequence.length === sequence.length
-      );
+      const exact = candidates.find((binding) => binding.sequence.length === sequence.length);
       if (exact !== undefined) {
         return { type: "action", action: exact.action };
       }
@@ -130,9 +117,7 @@ export class Keymap {
       };
       return {
         type: "pending",
-        completions: candidates.map((binding) =>
-          formatKeySequence(binding.sequence.slice(sequence.length))
-        ),
+        completions: candidates.map((binding) => formatKeySequence(binding.sequence.slice(sequence.length))),
       };
     }
     return { type: "unmatched" };
@@ -144,18 +129,19 @@ export function mergeKeyBindings(
   overrides: readonly KeyBindingDefinition[] = [],
   options: { readonly leader?: string } = {},
 ): readonly KeyBindingDefinition[] {
-  const replaced = new Set(overrides.map(binding => `${binding.context}\0${binding.action}`));
+  const replaced = new Set(overrides.map((binding) => `${binding.context}\0${binding.action}`));
   const keyId = (binding: KeyBindingDefinition): string =>
     `${binding.context}\0${formatKeySequence(parseKeySequence(binding.keys, options))}`;
   const rebound = new Set(overrides.map(keyId));
-  return [...defaults.filter(binding => !replaced.has(`${binding.context}\0${binding.action}`) &&
-    !rebound.has(keyId(binding))), ...overrides];
+  return [
+    ...defaults.filter(
+      (binding) => !replaced.has(`${binding.context}\0${binding.action}`) && !rebound.has(keyId(binding)),
+    ),
+    ...overrides,
+  ];
 }
 
-export function keyStroke(
-  key: string,
-  modifiers: Partial<Omit<KeyStroke, "key">> = {},
-): KeyStroke {
+export function keyStroke(key: string, modifiers: Partial<Omit<KeyStroke, "key">> = {}): KeyStroke {
   return normalizeKeyStroke({
     key,
     ctrl: modifiers.ctrl ?? false,
@@ -178,10 +164,7 @@ export function normalizeKeyStroke(stroke: KeyStroke): KeyStroke {
   };
 }
 
-export function parseKeySequence(
-  source: string,
-  options: { readonly leader?: string } = {},
-): readonly KeyStroke[] {
+export function parseKeySequence(source: string, options: { readonly leader?: string } = {}): readonly KeyStroke[] {
   const tokens = source.trim().split(/\s+/u).filter(Boolean);
   if (tokens.length === 0) throw new Error("Key sequence cannot be empty");
   const result: KeyStroke[] = [];
@@ -273,43 +256,29 @@ function validateBindings(bindings: readonly CompiledBinding[]): void {
       const right = bindings[rightIndex]!;
       if (left.context !== right.context) continue;
       if (sameSequence(left.sequence, right.sequence)) {
-        throw new Error(
-          `Duplicate keybinding in ${left.context}: ${left.keys}`,
-        );
+        throw new Error(`Duplicate keybinding in ${left.context}: ${left.keys}`);
       }
-      if (
-        isPrefix(left.sequence, right.sequence) ||
-        isPrefix(right.sequence, left.sequence)
-      ) {
-        throw new Error(
-          `Ambiguous keybinding prefix in ${left.context}: ` +
-            `${left.keys} and ${right.keys}`,
-        );
+      if (isPrefix(left.sequence, right.sequence) || isPrefix(right.sequence, left.sequence)) {
+        throw new Error(`Ambiguous keybinding prefix in ${left.context}: ` + `${left.keys} and ${right.keys}`);
       }
     }
   }
 }
 
-function sameSequence(
-  left: readonly KeyStroke[],
-  right: readonly KeyStroke[],
-): boolean {
+function sameSequence(left: readonly KeyStroke[], right: readonly KeyStroke[]): boolean {
   return left.length === right.length && isPrefix(left, right);
 }
 
-function isPrefix(
-  prefix: readonly KeyStroke[],
-  value: readonly KeyStroke[],
-): boolean {
-  return prefix.length <= value.length && prefix.every((stroke, index) =>
-    sameStroke(stroke, value[index]!)
-  );
+function isPrefix(prefix: readonly KeyStroke[], value: readonly KeyStroke[]): boolean {
+  return prefix.length <= value.length && prefix.every((stroke, index) => sameStroke(stroke, value[index]!));
 }
 
 function sameStroke(left: KeyStroke, right: KeyStroke): boolean {
-  return left.key === right.key &&
+  return (
+    left.key === right.key &&
     left.ctrl === right.ctrl &&
     left.alt === right.alt &&
     left.shift === right.shift &&
-    left.meta === right.meta;
+    left.meta === right.meta
+  );
 }

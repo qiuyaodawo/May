@@ -67,12 +67,8 @@ export class FocusManager {
 
   private move(offset: number): boolean {
     if (this.entries.length === 0) return false;
-    const currentIndex = this.entries.findIndex((entry) =>
-      entry.id === this.activeId
-    );
-    const index = currentIndex < 0
-      ? 0
-      : (currentIndex + offset + this.entries.length) % this.entries.length;
+    const currentIndex = this.entries.findIndex((entry) => entry.id === this.activeId);
+    const index = currentIndex < 0 ? 0 : (currentIndex + offset + this.entries.length) % this.entries.length;
     return this.focus(this.entries[index]!.id);
   }
 

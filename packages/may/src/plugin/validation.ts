@@ -42,9 +42,11 @@ export function validateToken(token: ServiceToken): void {
   }
 }
 
-export function defineService<T>(definition: Omit<ServiceToken<T>, "capabilities" | "valueType"> & {
-  readonly capabilities?: readonly string[];
-}): ServiceToken<T> {
+export function defineService<T>(
+  definition: Omit<ServiceToken<T>, "capabilities" | "valueType"> & {
+    readonly capabilities?: readonly string[];
+  },
+): ServiceToken<T> {
   const token = { ...definition, capabilities: Object.freeze([...(definition.capabilities ?? [])]) };
   validateToken(token);
   return Object.freeze(token);
@@ -65,17 +67,40 @@ export function snapshotPlugin(plugin: AnyPlugin): AnyPlugin {
     ...(plugin.config === undefined ? {} : { config: immutable(plugin.config) }),
     ...(plugin.configSchema === undefined ? {} : { configSchema: immutable(plugin.configSchema) }),
     ...(plugin.provides === undefined ? {} : { provides: Object.freeze([...plugin.provides]) }),
-    ...(plugin.requires === undefined ? {} : { requires: Object.freeze(plugin.requires.map((entry) => Object.freeze({
-      ...entry, ...(entry.capabilities ? { capabilities: Object.freeze([...entry.capabilities]) } : {}),
-    }))) }),
-    ...(plugin.optional === undefined ? {} : { optional: Object.freeze(plugin.optional.map((entry) => Object.freeze({
-      ...entry, ...(entry.capabilities ? { capabilities: Object.freeze([...entry.capabilities]) } : {}),
-    }))) }),
+    ...(plugin.requires === undefined
+      ? {}
+      : {
+          requires: Object.freeze(
+            plugin.requires.map((entry) =>
+              Object.freeze({
+                ...entry,
+                ...(entry.capabilities ? { capabilities: Object.freeze([...entry.capabilities]) } : {}),
+              }),
+            ),
+          ),
+        }),
+    ...(plugin.optional === undefined
+      ? {}
+      : {
+          optional: Object.freeze(
+            plugin.optional.map((entry) =>
+              Object.freeze({
+                ...entry,
+                ...(entry.capabilities ? { capabilities: Object.freeze([...entry.capabilities]) } : {}),
+              }),
+            ),
+          ),
+        }),
     ...(plugin.requiresHooks === undefined ? {} : { requiresHooks: Object.freeze([...plugin.requiresHooks]) }),
-    ...(plugin.state === undefined ? {} : { state: Object.freeze({
-      ...plugin.state, initial: immutable(plugin.state.initial),
-      ...(plugin.state.schema === undefined ? {} : { schema: immutable(plugin.state.schema) }),
-    }) }),
+    ...(plugin.state === undefined
+      ? {}
+      : {
+          state: Object.freeze({
+            ...plugin.state,
+            initial: immutable(plugin.state.initial),
+            ...(plugin.state.schema === undefined ? {} : { schema: immutable(plugin.state.schema) }),
+          }),
+        }),
   });
   pluginSources.set(snapshot, plugin);
   return snapshot;
@@ -144,7 +169,10 @@ export function validateGraph(
   for (const plugin of plugins) {
     const dependencies: AnyPlugin[] = [];
     const seen = new Set<string>();
-    for (const [required, declared] of [[true, plugin.requires], [false, plugin.optional]] as const) {
+    for (const [required, declared] of [
+      [true, plugin.requires],
+      [false, plugin.optional],
+    ] as const) {
       for (const dependency of declared ?? []) {
         validateToken(dependency.service);
         const { service, version = service.version, capabilities = [] } = dependency;
@@ -161,7 +189,9 @@ export function validateGraph(
           continue;
         }
         if (!satisfies(provider.token.version, version)) {
-          throw new Error(`Incompatible service ${service.id} for plugin ${plugin.id}: ${provider.token.version} does not satisfy ${version}`);
+          throw new Error(
+            `Incompatible service ${service.id} for plugin ${plugin.id}: ${provider.token.version} does not satisfy ${version}`,
+          );
         }
         for (const capability of [...service.capabilities, ...capabilities]) {
           if (!provider.token.capabilities.includes(capability)) {

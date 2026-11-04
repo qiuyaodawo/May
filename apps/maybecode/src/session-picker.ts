@@ -17,9 +17,7 @@ import type { TerminalIO } from "@sortedyuan/tui/node-terminal";
 type PickerMode = "browse" | "search" | "rename" | "delete";
 
 export type SessionPickerResult =
-  | { readonly type: "cancelled" }
-  | { readonly type: "empty" }
-  | { readonly type: "resume"; readonly sessionId: string };
+  { readonly type: "cancelled" } | { readonly type: "empty" } | { readonly type: "resume"; readonly sessionId: string };
 
 export interface SessionPickerOptions {
   readonly controller: MaybeCodeController;
@@ -28,9 +26,7 @@ export interface SessionPickerOptions {
   readonly question: (prompt: string) => Promise<string>;
 }
 
-export async function runSessionPicker(
-  options: SessionPickerOptions,
-): Promise<SessionPickerResult> {
+export async function runSessionPicker(options: SessionPickerOptions): Promise<SessionPickerResult> {
   if (options.sessions.length === 0) return { type: "empty" };
   if (
     options.terminal.interactive !== true ||
@@ -55,16 +51,20 @@ export async function runSessionPicker(
     while (true) {
       const visible = selection.items;
       const selected = selection.selected;
-      options.terminal.renderView(sanitizeTerminalText(renderSessionPicker({
-        sessions: visible,
-        selectedIndex: selection.selectedIndex,
-        currentSessionId: options.controller.sessionId,
-        mode,
-        query: selection.query,
-        renameText,
-        preview,
-        ...omitUndefined({ notice }),
-      })));
+      options.terminal.renderView(
+        sanitizeTerminalText(
+          renderSessionPicker({
+            sessions: visible,
+            selectedIndex: selection.selectedIndex,
+            currentSessionId: options.controller.sessionId,
+            mode,
+            query: selection.query,
+            renameText,
+            preview,
+            ...omitUndefined({ notice }),
+          }),
+        ),
+      );
       notice = undefined;
 
       const stroke = await options.terminal.readKey();
@@ -88,9 +88,7 @@ export async function runSessionPicker(
           try {
             const removed = await options.controller.deleteSession(selected.id);
             selection.setItems(await options.controller.listSessions());
-            notice = removed
-              ? `Deleted ${sessionLabel(selected)}`
-              : `Session ${selected.id} no longer exists`;
+            notice = removed ? `Deleted ${sessionLabel(selected)}` : `Session ${selected.id} no longer exists`;
           } catch (error) {
             notice = errorMessage(error);
           }
@@ -109,9 +107,7 @@ export async function runSessionPicker(
           renameText = removeLastCodePoint(renameText);
         } else if (action === "text.clear") {
           renameText = "";
-        } else if (
-          action === "session.rename.accept" && selected !== undefined
-        ) {
+        } else if (action === "session.rename.accept" && selected !== undefined) {
           try {
             await options.controller.renameSession(selected.id, renameText);
             selection.setItems(await options.controller.listSessions());
@@ -175,11 +171,10 @@ export async function runSessionPicker(
             keymap.reset();
           }
           break;
-        default:
-          {
-            const navigation = navigationAction(action);
-            if (navigation !== undefined) selection.move(navigation);
-          }
+        default: {
+          const navigation = navigationAction(action);
+          if (navigation !== undefined) selection.move(navigation);
+        }
       }
     }
   } finally {
@@ -187,16 +182,11 @@ export async function runSessionPicker(
   }
 }
 
-async function runLineSessionPicker(
-  options: SessionPickerOptions,
-): Promise<SessionPickerResult> {
-  options.terminal.write(sanitizeTerminalText(`\n${renderLineSessionList(
-    options.sessions,
-    options.controller.sessionId,
-  )}`));
-  const answer = (await options.question(
-    "Select a session number or ID (Enter to cancel): ",
-  )).trim();
+async function runLineSessionPicker(options: SessionPickerOptions): Promise<SessionPickerResult> {
+  options.terminal.write(
+    sanitizeTerminalText(`\n${renderLineSessionList(options.sessions, options.controller.sessionId)}`),
+  );
+  const answer = (await options.question("Select a session number or ID (Enter to cancel): ")).trim();
   if (answer === "") return { type: "cancelled" };
   const selected = resolveListInput(options.sessions, answer, (session) => session.id);
   if (selected === undefined) {
@@ -210,22 +200,19 @@ function resolvePickerAction(
   stroke: KeyStroke,
   mode: PickerMode,
 ): MaybeCodeKeyAction | undefined {
-  const contexts = mode === "browse"
-    ? ["global", "select", "sessionPicker"]
-    : mode === "search"
-    ? ["global", "select", "sessionSearch"]
-    : mode === "rename"
-    ? ["global", "sessionRename"]
-    : ["global", "sessionDelete"];
+  const contexts =
+    mode === "browse"
+      ? ["global", "select", "sessionPicker"]
+      : mode === "search"
+        ? ["global", "select", "sessionSearch"]
+        : mode === "rename"
+          ? ["global", "sessionRename"]
+          : ["global", "sessionDelete"];
   const result = keymap.resolve(stroke, contexts);
-  return result.type === "action"
-    ? result.action as MaybeCodeKeyAction
-    : undefined;
+  return result.type === "action" ? (result.action as MaybeCodeKeyAction) : undefined;
 }
 
-function navigationAction(
-  action: MaybeCodeKeyAction,
-): ListNavigationAction | undefined {
+function navigationAction(action: MaybeCodeKeyAction): ListNavigationAction | undefined {
   switch (action) {
     case "list.up":
       return "up";
@@ -260,9 +247,7 @@ function renderSessionPicker(state: RenderState): string {
   const start = Math.floor(state.selectedIndex / pageSize) * pageSize;
   const page = state.sessions.slice(start, start + pageSize);
   let output = "MaybeCode — Resume session\n\n";
-  output += state.query === ""
-    ? ""
-    : `Filter: ${state.query}${state.mode === "search" ? "▌" : ""}\n\n`;
+  output += state.query === "" ? "" : `Filter: ${state.query}${state.mode === "search" ? "▌" : ""}\n\n`;
   if (page.length === 0) {
     output += "  No matching sessions.\n";
   } else {
@@ -271,49 +256,47 @@ function renderSessionPicker(state: RenderState): string {
       const selected = index === state.selectedIndex ? ">" : " ";
       const current = session.id === state.currentSessionId ? " [current]" : "";
       output += `${selected} ${sessionLabel(session)}${current}\n`;
-      output += `    ${relativeTime(session.lastUsedAt)} · ` +
-        `${session.turnCount ?? 0} turns · ${session.id}\n`;
+      output += `    ${relativeTime(session.lastUsedAt)} · ` + `${session.turnCount ?? 0} turns · ${session.id}\n`;
     }
   }
 
   const selected = state.sessions[state.selectedIndex];
   if (state.preview && selected !== undefined) {
-    output += "\nPreview\n" +
+    output +=
+      "\nPreview\n" +
       `  created: ${new Date(selected.createdAt).toLocaleString()}\n` +
       `  last used: ${new Date(selected.lastUsedAt).toLocaleString()}\n` +
       `  ${selected.preview ?? "No message preview available."}\n`;
   }
   if (state.mode === "rename") {
-    output += `\nRename session\n  ${state.renameText}▌\n` +
-      "  Enter save · Esc cancel · Ctrl+U clear\n";
+    output += `\nRename session\n  ${state.renameText}▌\n` + "  Enter save · Esc cancel · Ctrl+U clear\n";
   } else if (state.mode === "delete" && selected !== undefined) {
-    output += `\nDelete “${sessionLabel(selected)}”? ` +
-      "This also removes its durable history.\n  Y delete · N/Esc cancel\n";
+    output +=
+      `\nDelete “${sessionLabel(selected)}”? ` + "This also removes its durable history.\n  Y delete · N/Esc cancel\n";
   } else if (state.mode === "search") {
     output += "\nType to filter · Enter finish · Esc close and clear search\n";
   } else {
-    output += "\n↑↓ move · Enter resume · / search · Space preview · " +
-      "R rename · D delete · Esc close\n";
+    output += "\n↑↓ move · Enter resume · / search · Space preview · " + "R rename · D delete · Esc close\n";
   }
   if (state.notice !== undefined) output += `\n${state.notice}\n`;
   return output;
 }
 
-function renderLineSessionList(
-  sessions: readonly SessionSummary[],
-  currentSessionId: string,
-): string {
+function renderLineSessionList(sessions: readonly SessionSummary[], currentSessionId: string): string {
   const lines = sessions.map((session, index) => {
     const current = session.id === currentSessionId ? " [current]" : "";
-    return `  ${index + 1}. ${sessionLabel(session)}${current}\n` +
-      `     ${relativeTime(session.lastUsedAt)} · ${session.id}`;
+    return (
+      `  ${index + 1}. ${sessionLabel(session)}${current}\n` +
+      `     ${relativeTime(session.lastUsedAt)} · ${session.id}`
+    );
   });
   return `Resume a session:\n${lines.join("\n")}\n`;
 }
 
 function sessionMatches(session: SessionSummary, normalizedQuery: string): boolean {
-  return [session.id, sessionLabel(session), session.preview]
-    .some((value) => value?.toLowerCase().includes(normalizedQuery) === true);
+  return [session.id, sessionLabel(session), session.preview].some(
+    (value) => value?.toLowerCase().includes(normalizedQuery) === true,
+  );
 }
 
 function sessionLabel(session: SessionSummary): string {

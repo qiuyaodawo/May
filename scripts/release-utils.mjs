@@ -13,7 +13,10 @@ export function runPnpm(args, cwd = repository, inherit = false) {
   assert.ok(executable, "Run release checks through pnpm");
   const nodeScript = /\.[cm]?js$/iu.test(executable);
   return execFileSync(nodeScript ? process.execPath : executable, nodeScript ? [executable, ...args] : args, {
-    cwd, encoding: "utf8", windowsHide: true, maxBuffer: 32 * 1024 * 1024,
+    cwd,
+    encoding: "utf8",
+    windowsHide: true,
+    maxBuffer: 32 * 1024 * 1024,
     stdio: inherit ? "inherit" : "pipe",
   });
 }
@@ -36,13 +39,20 @@ export async function checkRelease() {
     for (const field of ["dependencies", "optionalDependencies", "peerDependencies", "devDependencies"]) {
       for (const [dependency, range] of Object.entries(manifest[field] ?? {})) {
         assert.ok(!dependency.startsWith("@may/"), `${name}: old dependency ${dependency}`);
-        if (range.startsWith("workspace:")) assert.ok(manifests.has(dependency), `${name}: missing workspace dependency ${dependency}`);
+        if (range.startsWith("workspace:"))
+          assert.ok(manifests.has(dependency), `${name}: missing workspace dependency ${dependency}`);
         if (!selected || field === "devDependencies") continue;
         if (manifests.has(dependency)) {
           assert.ok(releaseNames.includes(dependency), `${name}: private runtime dependency ${dependency}`);
-          assert.ok(range.startsWith("workspace:") || semver.satisfies(manifests.get(dependency).manifest.version, range), `${name}: incompatible ${dependency}`);
+          assert.ok(
+            range.startsWith("workspace:") || semver.satisfies(manifests.get(dependency).manifest.version, range),
+            `${name}: incompatible ${dependency}`,
+          );
         } else {
-          assert.ok(semver.validRange(range), `${name}: runtime dependency must use a registry version range: ${dependency}`);
+          assert.ok(
+            semver.validRange(range),
+            `${name}: runtime dependency must use a registry version range: ${dependency}`,
+          );
         }
       }
     }

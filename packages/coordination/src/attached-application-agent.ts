@@ -8,11 +8,7 @@ import {
   taskTurnInputId,
 } from "./application-session.js";
 import { name } from "./validation.js";
-import type {
-  CoordinationAgent,
-  TaskExecution,
-  TaskExecutionContext,
-} from "./types.js";
+import type { CoordinationAgent, TaskExecution, TaskExecutionContext } from "./types.js";
 
 export interface AttachedApplicationTurn {
   /** 本任务当前 Session 内的轮次，从 0 开始。 */
@@ -55,9 +51,7 @@ export interface AttachedApplicationAgentOptions {
 }
 
 /** 宿主已经持有 Session 的任务使用的 coordination agent。 */
-export function createAttachedApplicationAgent(
-  options: AttachedApplicationAgentOptions,
-): CoordinationAgent {
+export function createAttachedApplicationAgent(options: AttachedApplicationAgentOptions): CoordinationAgent {
   name(options.version, "agent version");
   // 宿主 Session 可能已经保存了更早请求的输入，按输入身份定位本轮。
   const inspect = (execution: TaskExecution) => {
@@ -83,11 +77,10 @@ export function createAttachedApplicationAgent(
       if (applications.has(sessionId)) throw new Error("Task Session already active");
       const events = await options.read(sessionId);
       if (applications.has(sessionId)) throw new Error("Task Session already active");
-      if (inspectAttachedTaskSession(
-        events,
-        execution,
-        { ...inspect(execution), allowUnsubmittedContinuation: true },
-      ).status !== "not-started") {
+      if (
+        inspectAttachedTaskSession(events, execution, { ...inspect(execution), allowUnsubmittedContinuation: true })
+          .status !== "not-started"
+      ) {
         throw new Error("Task already submitted; recover its durable outcome instead");
       }
       context.signal.throwIfAborted();
@@ -96,7 +89,9 @@ export function createAttachedApplicationAgent(
         index: execution.task.turn ?? 0,
         first: (execution.task.turn ?? 0) === (execution.task.sessionStartTurn ?? 0),
         input: coordinationInput(execution),
-        requestYield: () => { delegated = true; },
+        requestYield: () => {
+          delegated = true;
+        },
       };
       const inputId = identityOf(execution, turn);
       const declared = options.submit(execution, turn, context);
@@ -106,23 +101,28 @@ export function createAttachedApplicationAgent(
         if (execution.telemetry.parent !== undefined) rest.traceContext = execution.telemetry.parent;
         rest.traceAttributes = { ...rest.traceAttributes, ...correlationTraceAttributes(execution.telemetry) };
       }
-      const signal = declared.signal === undefined
-        ? context.signal
-        : AbortSignal.any([declared.signal, context.signal]);
+      const signal =
+        declared.signal === undefined ? context.signal : AbortSignal.any([declared.signal, context.signal]);
       const application = options.attach(execution);
       applications.set(sessionId, application);
       try {
         // 宿主的让出边界与委派让出共用同一个 Run 边界。
         const shouldYield = () => delegated || declared.shouldYield?.() === true;
-        const run = turn.first && (options.mode ?? "submit") === "continue"
-          ? await application.continue({ ...rest, continuationId: taskTurnInputId(execution), shouldYield, signal } as SessionContinueOptions)
-          : await application.submit({
-              ...rest,
-              input: turn.first ? (declared.input as string | UserMessage) : turn.input,
-              inputId,
-              shouldYield,
-              signal,
-            });
+        const run =
+          turn.first && (options.mode ?? "submit") === "continue"
+            ? await application.continue({
+                ...rest,
+                continuationId: taskTurnInputId(execution),
+                shouldYield,
+                signal,
+              } as SessionContinueOptions)
+            : await application.submit({
+                ...rest,
+                input: turn.first ? (declared.input as string | UserMessage) : turn.input,
+                inputId,
+                shouldYield,
+                signal,
+              });
         const result = await run.result;
         if (delegated && result.finishReason === "yielded") return { yielded: true };
         return taskOutputFromResult(result);
@@ -131,17 +131,14 @@ export function createAttachedApplicationAgent(
       }
     },
     async recover(execution) {
-      if (applications.has(execution.task.sessionId)) return { status: "recovery-required", detail: "Task Session is still active" };
-      return inspectAttachedTaskSession(
-        await options.read(execution.task.sessionId),
-        execution,
-        inspect(execution),
-      );
+      if (applications.has(execution.task.sessionId))
+        return { status: "recovery-required", detail: "Task Session is still active" };
+      return inspectAttachedTaskSession(await options.read(execution.task.sessionId), execution, inspect(execution));
     },
     async resolveApproval(sessionId, requestId, decision) {
       const application = applications.get(sessionId);
       if (application === undefined) return false;
-      return await application.resolveApproval(requestId, decision) ?? false;
+      return (await application.resolveApproval(requestId, decision)) ?? false;
     },
   };
 }

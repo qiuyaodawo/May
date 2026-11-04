@@ -13,19 +13,13 @@ export class MayError extends Error {
 
 export class ConcurrentRunError extends MayError {
   constructor() {
-    super(
-      "CONCURRENT_RUN",
-      "This May runtime already has an active run",
-    );
+    super("CONCURRENT_RUN", "This May runtime already has an active run");
   }
 }
 
 /** Marks a tool or ToolExecutor failure that must terminate the run. */
 export class FatalToolExecutionError extends MayError {
-  constructor(
-    message: string,
-    options?: ErrorOptions & { readonly code?: string },
-  ) {
+  constructor(message: string, options?: ErrorOptions & { readonly code?: string }) {
     super(options?.code ?? "FATAL_TOOL_EXECUTION", message, options);
   }
 }
@@ -67,10 +61,7 @@ export class UnsupportedContentError extends MayError {
   readonly role: string;
 
   constructor(adapter: string, contentType: string, role: string) {
-    super(
-      "UNSUPPORTED_CONTENT",
-      `${adapter} does not support ${contentType} content in ${role} messages`,
-    );
+    super("UNSUPPORTED_CONTENT", `${adapter} does not support ${contentType} content in ${role} messages`);
     this.adapter = adapter;
     this.contentType = contentType;
     this.role = role;
@@ -92,7 +83,9 @@ export class RunCancelledError extends MayError {
 /** A failed durable barrier leaves external effects uncertain; reopen the Session. */
 export class RunCheckpointError extends MayError {
   constructor(cause: unknown) {
-    super("RUN_CHECKPOINT_FAILED", `Run checkpoint failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    super("RUN_CHECKPOINT_FAILED", `Run checkpoint failed: ${cause instanceof Error ? cause.message : String(cause)}`, {
+      cause,
+    });
   }
 }
 
@@ -112,7 +105,11 @@ export class HookExecutionError extends MayError {
   readonly hookName: string;
 
   constructor(cause: unknown, hookName: string) {
-    super("HOOK_EXECUTION_FAILED", `Hook ${hookName} failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    super(
+      "HOOK_EXECUTION_FAILED",
+      `Hook ${hookName} failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+      { cause },
+    );
     this.hookName = hookName;
   }
 }

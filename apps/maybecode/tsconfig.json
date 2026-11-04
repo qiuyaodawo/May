@@ -6,14 +6,9 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "resolveJsonModule": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.json"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.json"],
   "references": [
     { "path": "../../packages/may" },
     { "path": "../../packages/coordination" },

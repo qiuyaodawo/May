@@ -12,7 +12,10 @@ export interface FileAccessOptions {
   readonly signal?: AbortSignal;
 }
 
-interface AccessOwner { readonly identity: string; active: boolean }
+interface AccessOwner {
+  readonly identity: string;
+  active: boolean;
+}
 const activeAccess = new AsyncLocalStorage<readonly AccessOwner[]>();
 
 /** 同一路径的全部读取和修改需要使用这个入口，并等待 action 完成文件操作。 */
@@ -23,7 +26,8 @@ export async function withFileAccess<T>(
   options: FileAccessOptions = {},
 ): Promise<T> {
   const timeoutMs = options.timeoutMs ?? 30_000;
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new TypeError("File access timeout must be a positive finite number");
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
+    throw new TypeError("File access timeout must be a positive finite number");
   options.signal?.throwIfAborted();
   const deadline = performance.now() + timeoutMs;
   const accessPath = `${resolve(path)}.access`;
@@ -36,17 +40,22 @@ export async function withFileAccess<T>(
     const info = await validateAccessFile(accessPath, file);
     const identity = `${info.dev}:${info.ino}`;
     const inherited = activeAccess.getStore() ?? [];
-    if (inherited.some(entry => entry.active && entry.identity === identity)) {
-      throw Object.assign(new Error(`Nested file access for the same path is unsupported: ${path}`), { code: "FILE_ACCESS_REENTRANT" });
+    if (inherited.some((entry) => entry.active && entry.identity === identity)) {
+      throw Object.assign(new Error(`Nested file access for the same path is unsupported: ${path}`), {
+        code: "FILE_ACCESS_REENTRANT",
+      });
     }
     const gatePath = `${accessPath}.gate`;
     gate = await openAccessFile(gatePath, mode, options.initialize !== false);
     const gateInfo = await validateAccessFile(gatePath, gate);
-    if (info.dev === gateInfo.dev && info.ino === gateInfo.ino) throw new Error(`File access markers must be different files: ${path}`);
+    if (info.dev === gateInfo.dev && info.ino === gateInfo.ino)
+      throw new Error(`File access markers must be different files: ${path}`);
     while (true) {
       options.signal?.throwIfAborted();
       if (performance.now() >= deadline) {
-        throw Object.assign(new Error(`Timed out after ${timeoutMs}ms waiting for ${mode} file access: ${path}`), { code: "ETIMEDOUT" });
+        throw Object.assign(new Error(`Timed out after ${timeoutMs}ms waiting for ${mode} file access: ${path}`), {
+          code: "ETIMEDOUT",
+        });
       }
       // 写入者等待已有读取者结束时保留 gate，使后续读取请求等待。
       if (!gateLocked) gateLocked = tryLock(gate.fd, 0, 0, { shared: mode === "shared" });
@@ -67,12 +76,17 @@ export async function withFileAccess<T>(
     return await activeAccess.run([...inherited, owner], action);
   } finally {
     if (owner) owner.active = false;
-    try { if (locked) unlock(file.fd, 0, 0); }
-    finally {
-      try { if (gateLocked && gate) unlock(gate.fd, 0, 0); }
-      finally {
-        try { await gate?.close(); }
-        finally { await file.close(); }
+    try {
+      if (locked) unlock(file.fd, 0, 0);
+    } finally {
+      try {
+        if (gateLocked && gate) unlock(gate.fd, 0, 0);
+      } finally {
+        try {
+          await gate?.close();
+        } finally {
+          await file.close();
+        }
       }
     }
   }
@@ -81,11 +95,18 @@ export async function withFileAccess<T>(
 async function openAccessFile(path: string, mode: "shared" | "exclusive", initialize: boolean): Promise<FileHandle> {
   const noFollow = process.platform === "win32" ? 0 : constants.O_NOFOLLOW;
   const flags = (mode === "shared" ? constants.O_RDONLY : constants.O_RDWR) | noFollow | constants.O_NONBLOCK;
-  try { return await open(path, flags); }
-  catch (error) {
+  try {
+    return await open(path, flags);
+  } catch (error) {
     if (!hasErrorCode(error, "ENOENT")) throw error;
     if (!initialize) {
-      throw Object.assign(new Error(`File access is not initialized: ${path}. Initialize it once with withFileAccess using directory write permission before opening read-only storage.`, { cause: error }), { code: "FILE_ACCESS_NOT_INITIALIZED" });
+      throw Object.assign(
+        new Error(
+          `File access is not initialized: ${path}. Initialize it once with withFileAccess using directory write permission before opening read-only storage.`,
+          { cause: error },
+        ),
+        { code: "FILE_ACCESS_NOT_INITIALIZED" },
+      );
     }
   }
   try {
@@ -100,7 +121,13 @@ async function openAccessFile(path: string, mode: "shared" | "exclusive", initia
 async function validateAccessFile(path: string, file: FileHandle) {
   const info = await file.stat({ bigint: true });
   const current = await lstat(path, { bigint: true });
-  if (!info.isFile() || !current.isFile() || current.isSymbolicLink() || info.dev !== current.dev || info.ino !== current.ino) {
+  if (
+    !info.isFile() ||
+    !current.isFile() ||
+    current.isSymbolicLink() ||
+    info.dev !== current.dev ||
+    info.ino !== current.ino
+  ) {
     throw new Error(`File access requires an unchanged regular file without symbolic links: ${path}`);
   }
   return info;

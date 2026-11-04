@@ -38,9 +38,9 @@ export class DurableTaskHost extends EventEmitter {
     if (request.handler !== "write-artifact") {
       throw new TaskRejectedError(`Unknown handler: ${request.handler}`);
     }
-    const existing = this.database.prepare(
-      "SELECT task_id, request_json FROM tasks WHERE execution_id = ?",
-    ).get(request.executionId);
+    const existing = this.database
+      .prepare("SELECT task_id, request_json FROM tasks WHERE execution_id = ?")
+      .get(request.executionId);
     if (existing !== undefined) {
       const { telemetry: previousTelemetry, ...previous } = JSON.parse(existing.request_json);
       const { telemetry: currentTelemetry, ...current } = request;
@@ -52,10 +52,14 @@ export class DurableTaskHost extends EventEmitter {
     const taskId = `task_${randomUUID()}`;
     const acceptedAt = new Date().toISOString();
     const artifactPath = join(this.directory, `${taskId}.json`);
-    this.database.prepare(`
+    this.database
+      .prepare(
+        `
       INSERT INTO tasks (execution_id, task_id, request_json, accepted_at, artifact_path)
       VALUES (?, ?, ?, ?, ?)
-    `).run(request.executionId, taskId, JSON.stringify(request), acceptedAt, artifactPath);
+    `,
+      )
+      .run(request.executionId, taskId, JSON.stringify(request), acceptedAt, artifactPath);
     this.activeSubmissions += 1;
     this.maxActiveSubmissions = Math.max(this.maxActiveSubmissions, this.activeSubmissions);
     try {
@@ -104,10 +108,12 @@ export class DurableTaskHost extends EventEmitter {
   async close() {
     if (this.server !== undefined) {
       this.server.closeAllConnections();
-      await new Promise((resolve, reject) => this.server.close((error) => {
-        if (error) reject(error);
-        else resolve();
-      }));
+      await new Promise((resolve, reject) =>
+        this.server.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        }),
+      );
       this.server = undefined;
     }
     this.database.close();

@@ -6,9 +6,7 @@ import { ScrollView } from "@sortedyuan/tui";
 
 test("keeps the newest transcript rows after the scroll buffer limit", () => {
   const store = new TranscriptStore();
-  store.appendUser(Array.from({ length: 10_050 }, (_, index) =>
-    `old-${index}`
-  ).join("\n"));
+  store.appendUser(Array.from({ length: 10_050 }, (_, index) => `old-${index}`).join("\n"));
   store.appendUser("LATEST-MESSAGE");
   const scroll = new ScrollView(new TranscriptView(store), { followEnd: true });
 
@@ -17,12 +15,12 @@ test("keeps the newest transcript rows after the scroll buffer limit", () => {
   assert.doesNotMatch(rendered, /old-0(?:\D|$)/u);
 
   const single = new TranscriptStore();
-  single.appendUser(Array.from({ length: 10_050 }, (_, index) =>
-    `single-${index}`
-  ).join("\n"));
+  single.appendUser(Array.from({ length: 10_050 }, (_, index) => `single-${index}`).join("\n"));
   const singleRendered = new ScrollView(new TranscriptView(single), {
     followEnd: true,
-  }).render({ width: 80, height: 4 }).lines.join("\n");
+  })
+    .render({ width: 80, height: 4 })
+    .lines.join("\n");
   assert.match(singleRendered, /single-10049/u);
   assert.doesNotMatch(singleRendered, /single-0(?:\D|$)/u);
 });
@@ -55,7 +53,10 @@ test("does not display input that the controller rejected", async () => {
   });
   await new Promise((resolve) => setImmediate(resolve));
 
-  assert.equal(store.items.some((item) => item.kind === "user"), false);
+  assert.equal(
+    store.items.some((item) => item.kind === "user"),
+    false,
+  );
   assert.match(view.render({ width: 80, height: 20 }).lines.join("\n"), /busy/u);
   view.dispose();
 });
@@ -81,10 +82,7 @@ test("routes approval shortcuts through the retained modal", async () => {
       report() {},
     },
   });
-  assert.match(
-    view.render({ width: 80, height: 20 }).lines.join("\n"),
-    /Allow matching calls for this session/u,
-  );
+  assert.match(view.render({ width: 80, height: 20 }).lines.join("\n"), /Allow matching calls for this session/u);
   view.handleKey({
     key: "s",
     text: "s",
@@ -102,9 +100,8 @@ test("completes slash commands and selects sessions in retained dialogs", async 
   const view = new MaybeCodeTerminalView({
     store: new TranscriptStore(),
     workspace: "workspace",
-    suggestions: async (input) => input.startsWith("/res")
-      ? [{ value: "/resume", label: "/resume", description: "Resume" }]
-      : [],
+    suggestions: async (input) =>
+      input.startsWith("/res") ? [{ value: "/resume", label: "/resume", description: "Resume" }] : [],
     onSubmit(value) {
       submitted.push(value);
     },
@@ -150,10 +147,7 @@ test("completes slash commands and selects sessions in retained dialogs", async 
   });
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(submitted, ["/resume"]);
-  assert.match(
-    view.render({ width: 80, height: 20 }).lines.join("\n"),
-    /Tool details shown/u,
-  );
+  assert.match(view.render({ width: 80, height: 20 }).lines.join("\n"), /Tool details shown/u);
   view.handleKey({
     key: "up",
     ctrl: false,
@@ -161,29 +155,29 @@ test("completes slash commands and selects sessions in retained dialogs", async 
     shift: false,
     meta: false,
   });
-  assert.match(
-    view.render({ width: 80, height: 20 }).lines.join("\n"),
-    /\/details/u,
-  );
+  assert.match(view.render({ width: 80, height: 20 }).lines.join("\n"), /\/details/u);
 
-  const selection = view.requestSessionAction([
-    {
-      id: "current",
-      workspace: "workspace",
-      createdAt: 1,
-      lastUsedAt: 2,
-      turnCount: 1,
-      title: "Current",
-    },
-    {
-      id: "older",
-      workspace: "workspace",
-      createdAt: 1,
-      lastUsedAt: 1,
-      turnCount: 2,
-      title: "Older session",
-    },
-  ], "current");
+  const selection = view.requestSessionAction(
+    [
+      {
+        id: "current",
+        workspace: "workspace",
+        createdAt: 1,
+        lastUsedAt: 2,
+        turnCount: 1,
+        title: "Current",
+      },
+      {
+        id: "older",
+        workspace: "workspace",
+        createdAt: 1,
+        lastUsedAt: 1,
+        turnCount: 2,
+        title: "Older session",
+      },
+    ],
+    "current",
+  );
   view.handleKey({
     key: "down",
     ctrl: false,
@@ -200,22 +194,25 @@ test("completes slash commands and selects sessions in retained dialogs", async 
   });
   assert.deepEqual(await selection, { type: "resume", sessionId: "older" });
 
-  const modelAction = view.requestModelAction([
-    {
-      name: "first",
-      provider: "local",
-      adapter: "openai-responses",
-      model: "first-model",
-      isDefault: true,
-    },
-    {
-      name: "second",
-      provider: "local",
-      adapter: "openai-responses",
-      model: "second-model",
-      isDefault: false,
-    },
-  ], "first");
+  const modelAction = view.requestModelAction(
+    [
+      {
+        name: "first",
+        provider: "local",
+        adapter: "openai-responses",
+        model: "first-model",
+        isDefault: true,
+      },
+      {
+        name: "second",
+        provider: "local",
+        adapter: "openai-responses",
+        model: "second-model",
+        isDefault: false,
+      },
+    ],
+    "first",
+  );
   view.handleKey({
     key: "down",
     ctrl: false,

@@ -108,10 +108,10 @@ records are read-only. The host still validates every choice.
 
 ```ts
 const extensions: WebUiExtensions = {
-  tools: { "my.tool": block => renderToolSummary(block) },
-  approvalDetails: { "my.tool": request => renderApprovalExplanation(request) },
-  diagnostics: { "MY_ERROR": diagnostic => renderHelp(diagnostic) },
-  presentations: { "my.preview": { 1: block => renderPreview(block) } },
+  tools: { "my.tool": (block) => renderToolSummary(block) },
+  approvalDetails: { "my.tool": (request) => renderApprovalExplanation(request) },
+  diagnostics: { MY_ERROR: (diagnostic) => renderHelp(diagnostic) },
+  presentations: { "my.preview": { 1: (block) => renderPreview(block) } },
 };
 ```
 
@@ -126,7 +126,6 @@ Approval details do not by themselves implement evidence-bound pre-approval Diff
 Run `node examples/web-ui/states.mjs` from the repository root after building to
 inspect a read-only synthetic gallery, including failed renderers and unsupported
 presentation versions. Use `stop` to close it. It is not runtime recovery evidence.
-
 
 ## Typed navigation and product extension
 
@@ -143,7 +142,22 @@ export interface WebUiNavigationItem {
   readonly label: string;
   readonly title?: string;
   readonly badge?: string;
-  readonly icon?: "plus" | "menu" | "send" | "stop" | "panel" | "search" | "arrow" | "code" | "task" | "trash" | "gear" | "users" | "message" | "check" | "filter";
+  readonly icon?:
+    | "plus"
+    | "menu"
+    | "send"
+    | "stop"
+    | "panel"
+    | "search"
+    | "arrow"
+    | "code"
+    | "task"
+    | "trash"
+    | "gear"
+    | "users"
+    | "message"
+    | "check"
+    | "filter";
   readonly ariaLabel?: string;
   readonly disabled?: boolean | ((state: UiClientState) => boolean);
   action(context: WebUiContext): void | Promise<void>;

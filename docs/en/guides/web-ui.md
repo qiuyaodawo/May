@@ -81,19 +81,19 @@ completion and Tab inserts it. Unknown commands and invalid arguments produce
 command errors. Management output remains in page memory outside conversation
 history.
 
-| Task | Web entry |
-| --- | --- |
-| Select model/default profile | Model dropdown; `/model`; `/model profile --default` |
-| Select reasoning effort | Effort dropdown; `/effort`; `/effort default` |
-| Manage Sessions | Sidebar; `/new`, `/resume [id]`; rename and confirmed deletion |
-| Retry or inspect execution | `/retry`, `/instructions`, `/status`, `/context` |
-| Manage goals | `/goal start`, `status`, `pause`, `resume`, `cancel` |
-| Compact Context | `/compact [history-reference\|provider-native]` or compact button |
-| Use Skills | `/skills`, `/skills show name`, `/skills use name [task]` |
-| Use MCP | `/mcp` catalog, resource, prompt, watch and task commands |
-| Investigate recovery | `/recovery`, `/recovery resolve id finding` |
-| Read details | `/details`, `/thinking`, transcript search and inspector |
-| Exit the host | `/quit` or `/exit`, then confirm |
+| Task                         | Web entry                                                         |
+| ---------------------------- | ----------------------------------------------------------------- |
+| Select model/default profile | Model dropdown; `/model`; `/model profile --default`              |
+| Select reasoning effort      | Effort dropdown; `/effort`; `/effort default`                     |
+| Manage Sessions              | Sidebar; `/new`, `/resume [id]`; rename and confirmed deletion    |
+| Retry or inspect execution   | `/retry`, `/instructions`, `/status`, `/context`                  |
+| Manage goals                 | `/goal start`, `status`, `pause`, `resume`, `cancel`              |
+| Compact Context              | `/compact [history-reference\|provider-native]` or compact button |
+| Use Skills                   | `/skills`, `/skills show name`, `/skills use name [task]`         |
+| Use MCP                      | `/mcp` catalog, resource, prompt, watch and task commands         |
+| Investigate recovery         | `/recovery`, `/recovery resolve id finding`                       |
+| Read details                 | `/details`, `/thinking`, transcript search and inspector          |
+| Exit the host                | `/quit` or `/exit`, then confirm                                  |
 
 An ordinary message cancels active execution, waits for cancellation and starts
 the new request. `/steer <message>` saves FIFO input for the next complete Step
@@ -219,14 +219,14 @@ Hosts can page diagnostics independently. See
 
 ## Integrate a custom host
 
-| Package or layer | Responsibility |
-| --- | --- |
-| Application/product host | Execution, permissions, budgets, persistence and recovery |
-| `@sortedyuan/ui-client` | JSON types and browser connection/state synchronization |
-| `@sortedyuan/ui-client/application` | Single-active-Session workspace adapter |
-| `@sortedyuan/ui-client/server` | Loopback HTTP, authentication, Origin checks, receipts and SSE |
-| `@sortedyuan/web-ui` | Workbench and reusable transcript, composer, approval and detail components |
-| Product extensions | File diffs, task lifecycle, delivery and domain-specific presentation |
+| Package or layer                    | Responsibility                                                              |
+| ----------------------------------- | --------------------------------------------------------------------------- |
+| Application/product host            | Execution, permissions, budgets, persistence and recovery                   |
+| `@sortedyuan/ui-client`             | JSON types and browser connection/state synchronization                     |
+| `@sortedyuan/ui-client/application` | Single-active-Session workspace adapter                                     |
+| `@sortedyuan/ui-client/server`      | Loopback HTTP, authentication, Origin checks, receipts and SSE              |
+| `@sortedyuan/web-ui`                | Workbench and reusable transcript, composer, approval and detail components |
+| Product extensions                  | File diffs, task lifecycle, delivery and domain-specific presentation       |
 
 Implement `UiHost`, or connect `ApplicationUiHost` to an `AgentWorkspaceController`.
 Browser modules use browser-safe exports; Node adapters belong in the host.
@@ -283,12 +283,12 @@ the OS. Browser text currently uses Chinese.
 
 ## Protocol v1 and limits
 
-| Route | Purpose |
-| --- | --- |
-| `GET /api/ui/snapshot?selected=<id>` | Capabilities, resources, selected transcript, interactions and panels |
-| `GET /api/ui/events` | Authenticated SSE invalidations |
-| `POST /api/ui/commands` | `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }` |
-| `GET /api/ui/complete` | Authenticated host/Session-bound completion |
+| Route                                | Purpose                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| `GET /api/ui/snapshot?selected=<id>` | Capabilities, resources, selected transcript, interactions and panels     |
+| `GET /api/ui/events`                 | Authenticated SSE invalidations                                           |
+| `POST /api/ui/commands`              | `{ version, hostId, requestId, name, targetId, expectedActiveId?, args }` |
+| `GET /api/ui/complete`               | Authenticated host/Session-bound completion                               |
 
 Clients resnapshot on connect, invalidation and reconnect. A two-second heartbeat
 observes external owners, and live changes are coalesced for 120 ms. Slow event
@@ -336,11 +336,11 @@ These checks include resource paging/search, additions/deletions/renames, retain
 page state and expired cursors. Browser work stays under ignored `.test-output/web-ui/`.
 Checks that require configured providers have separate prerequisites:
 
-| Check | Required flags and command |
-| --- | --- |
+| Check                                      | Required flags and command                                                                                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | MaybeCode controls and shared terminal/Web | `MAYBECODE_WEB_LIVE=1`; `pnpm --filter @sortedyuan/maybecode exec node --test test/integration/web-controls.test.mjs test/integration/web-terminal.test.mjs` |
-| Workspace file versions | `MAY_LIVE_PROVIDER_UI_TESTS=1`; `node --test packages/ui/web/test/browser/workspace-versions.test.mjs` |
-| Session fork and isolated test commits | Both `MAY_LIVE_PROVIDER_UI_TESTS=1` and `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`; `node --test packages/ui/web/test/browser/workspace-session-fork.test.mjs` |
+| Workspace file versions                    | `MAY_LIVE_PROVIDER_UI_TESTS=1`; `node --test packages/ui/web/test/browser/workspace-versions.test.mjs`                                                       |
+| Session fork and isolated test commits     | Both `MAY_LIVE_PROVIDER_UI_TESTS=1` and `MAY_GIT_CHECKPOINT_TEST_COMMITS=1`; `node --test packages/ui/web/test/browser/workspace-session-fork.test.mjs`      |
 
 The file-version check initializes the configured Model and checks Git and the
 page. Tests that submit messages use configured credentials and consume provider

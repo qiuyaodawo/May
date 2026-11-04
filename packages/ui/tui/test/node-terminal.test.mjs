@@ -11,9 +11,7 @@ test("completes suggestions and redraws an active prompt around output", async (
     history: false,
     suggestions(line) {
       suggestionInputs.push(line);
-      return line.startsWith("/")
-        ? [{ value: "/retry", label: "/retry", description: "Retry" }]
-        : [];
+      return line.startsWith("/") ? [{ value: "/retry", label: "/retry", description: "Retry" }] : [];
     },
   });
   await tick();
@@ -70,7 +68,7 @@ function createTestTerminal() {
   stream.isTTY = true;
   stream.columns = 80;
   let output = "";
-  stream.on("data", (chunk) => output += chunk.toString());
+  stream.on("data", (chunk) => (output += chunk.toString()));
   return {
     input,
     terminal: createNodeTerminal({ input, output: stream, colors: false }),

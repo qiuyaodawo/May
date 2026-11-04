@@ -5,10 +5,18 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import * as rootApi from "@sortedyuan/may";
-import { GitCheckpointError, GitWorkspaceConflictError, ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
+import {
+  GitCheckpointError,
+  GitWorkspaceConflictError,
+  ProjectGitWorkspace,
+} from "@sortedyuan/may/application/git-workspace";
 
 const directory = dirname(fileURLToPath(import.meta.url));
-assert.ok((await realpath(fileURLToPath(import.meta.resolve("@sortedyuan/may/application/git-workspace")))).startsWith(join(directory, "node_modules")));
+assert.ok(
+  (await realpath(fileURLToPath(import.meta.resolve("@sortedyuan/may/application/git-workspace")))).startsWith(
+    join(directory, "node_modules"),
+  ),
+);
 assert.equal("ProjectGitWorkspace" in rootApi, false);
 assert.equal(typeof GitCheckpointError, "function");
 assert.equal(typeof GitWorkspaceConflictError, "function");
@@ -21,8 +29,12 @@ assert.equal(await git("rev-parse", "--show-toplevel"), workspace.replaceAll("\\
 await git("config", "--local", "user.name", "May packaged integration test");
 await git("config", "--local", "user.email", "may-package-test@example.invalid");
 await git("config", "--local", "core.autocrlf", "false");
-const files = await ProjectGitWorkspace.open({ workspace, dataRoot: join(directory, "records"),
-  worktreesRoot: join(directory, "worktrees"), authorizeCommit: request => request.workspace === resolve(workspace) });
+const files = await ProjectGitWorkspace.open({
+  workspace,
+  dataRoot: join(directory, "records"),
+  worktreesRoot: join(directory, "worktrees"),
+  authorizeCommit: (request) => request.workspace === resolve(workspace),
+});
 await writeFile(join(workspace, "source.txt"), "initial\n");
 const initial = await files.prepare("session");
 assert.equal(initial.status, "committed");

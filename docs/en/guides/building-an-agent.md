@@ -38,13 +38,13 @@ MaybeCode is a reference composition, not a required superclass or runtime.
 
 ## Choose the lifecycle level first
 
-| Start with | Use it when | You must own |
-| --- | --- | --- |
-| `May` from `@sortedyuan/may/core` | One-shot, ephemeral, or deeply embedded execution | Context continuity, persistence, permissions, and shutdown above the run |
-| `Session` from `@sortedyuan/may/session` | You need a durable conversation identity but want to assemble lifecycle pieces manually | Runtime reconstruction, permission event persistence, discovery, and UI relays |
-| `AgentDefinition` from `@sortedyuan/may` | Reusable behavior should open one or more independent resumable Sessions | Collaborator lifecycle/concurrency, Session storage, metadata, and event handling |
-| `AgentApplication` from `@sortedyuan/may` | A headless product needs one active resumable Session without a reusable definition | Product model, tools, instructions, policies, storage, and event handling |
-| `AgentWorkspace` from `@sortedyuan/may` | A product lets users create, list, resume, rename, or delete Sessions | An application factory, a `SessionCatalog`, and product-specific configuration transitions |
+| Start with                                | Use it when                                                                             | You must own                                                                               |
+| ----------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `May` from `@sortedyuan/may/core`         | One-shot, ephemeral, or deeply embedded execution                                       | Context continuity, persistence, permissions, and shutdown above the run                   |
+| `Session` from `@sortedyuan/may/session`  | You need a durable conversation identity but want to assemble lifecycle pieces manually | Runtime reconstruction, permission event persistence, discovery, and UI relays             |
+| `AgentDefinition` from `@sortedyuan/may`  | Reusable behavior should open one or more independent resumable Sessions                | Collaborator lifecycle/concurrency, Session storage, metadata, and event handling          |
+| `AgentApplication` from `@sortedyuan/may` | A headless product needs one active resumable Session without a reusable definition     | Product model, tools, instructions, policies, storage, and event handling                  |
+| `AgentWorkspace` from `@sortedyuan/may`   | A product lets users create, list, resume, rename, or delete Sessions                   | An application factory, a `SessionCatalog`, and product-specific configuration transitions |
 
 Most interactive products should define behavior with `defineAgent()` and open
 applications from it. Call `AgentApplication.open()` directly when there is no
@@ -123,10 +123,7 @@ const lookup: Tool<{ key: string }, { value: string | null }> = {
     additionalProperties: false,
   },
   parse(input) {
-    if (
-      typeof input !== "object" || input === null ||
-      !("key" in input) || typeof input.key !== "string"
-    ) {
+    if (typeof input !== "object" || input === null || !("key" in input) || typeof input.key !== "string") {
       throw new TypeError("key must be a string");
     }
     return { key: input.key };
@@ -152,8 +149,7 @@ export function createExampleAgent(model: Model): AgentDefinition {
       "Use lookup when a requested value may exist in the data source.",
       "Do not invent missing values.",
     ].join("\n"),
-    permissionPolicy: ({ tool }) =>
-      tool.name === "lookup" ? "allow" : "deny",
+    permissionPolicy: ({ tool }) => (tool.name === "lookup" ? "allow" : "deny"),
     contextFactory: new InMemoryContextFactory(),
     contextBudget: {
       contextWindowTokens: 64_000,
@@ -520,12 +516,12 @@ selection and other product state outside the generic workspace.
 
 These four data sets are related but not interchangeable:
 
-| Data | Purpose | Durable? | Model-visible? |
-| --- | --- | --- | --- |
-| Live application/Core events | Streaming UI, progress, approval protocol | No; bounded relays may drop streaming deltas | Not by themselves |
-| Session history | Ordered finalized facts and resumable audit trail | Yes, according to the selected store | Replayed facts rebuild Context; presentation metadata is excluded |
-| Context | The current request view after selection/compaction | Only when the application records replacement checkpoints | Yes |
-| Session Catalog | Small discovery index: id, workspace, title, preview, timestamps | According to the selected catalog | No |
+| Data                         | Purpose                                                          | Durable?                                                  | Model-visible?                                                    |
+| ---------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------- |
+| Live application/Core events | Streaming UI, progress, approval protocol                        | No; bounded relays may drop streaming deltas              | Not by themselves                                                 |
+| Session history              | Ordered finalized facts and resumable audit trail                | Yes, according to the selected store                      | Replayed facts rebuild Context; presentation metadata is excluded |
+| Context                      | The current request view after selection/compaction              | Only when the application records replacement checkpoints | Yes                                                               |
+| Session Catalog              | Small discovery index: id, workspace, title, preview, timestamps | According to the selected catalog                         | No                                                                |
 
 Do not implement a transcript as the source of truth. A UI transcript is a
 projection; rebuild it from durable history and then apply live events.

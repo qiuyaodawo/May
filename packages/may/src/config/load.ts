@@ -2,10 +2,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { withFileAccess } from "../storage/index.js";
-import {
-  MayConfigFileError,
-  MayConfigParseError,
-} from "./errors.js";
+import { MayConfigFileError, MayConfigParseError } from "./errors.js";
 import { parseMayConfig } from "./parse.js";
 import type { LoadMayConfigOptions, MayConfig } from "./types.js";
 
@@ -13,12 +10,8 @@ export function getDefaultMayConfigPath(): string {
   return join(homedir(), ".may", "config.json");
 }
 
-export async function loadMayConfig(
-  options: LoadMayConfigOptions = {},
-): Promise<MayConfig> {
-  const path = options.path === undefined
-    ? getDefaultMayConfigPath()
-    : resolve(options.path);
+export async function loadMayConfig(options: LoadMayConfigOptions = {}): Promise<MayConfig> {
+  const path = options.path === undefined ? getDefaultMayConfigPath() : resolve(options.path);
   let source: string;
 
   try {

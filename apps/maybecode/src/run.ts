@@ -1,8 +1,5 @@
 import { omitUndefined } from "@sortedyuan/may/core";
-import {
-  MAYBE_CODE_USAGE,
-  parseMaybeCodeArgs,
-} from "./args.js";
+import { MAYBE_CODE_USAGE, parseMaybeCodeArgs } from "./args.js";
 import type { OpenConfiguredMaybeCodeOptions } from "./configured.js";
 import { MaybeCodeUsageError } from "./errors.js";
 import { createNodeTerminal, type TerminalIO } from "@sortedyuan/tui/node-terminal";
@@ -13,9 +10,7 @@ import type { runMaybeCodeWebUI } from "./web-ui.js";
 
 export interface RunMaybeCodeDependencies {
   readonly terminal?: TerminalIO;
-  readonly open?: (
-    options: OpenConfiguredMaybeCodeOptions,
-  ) => Promise<MaybeCodeController>;
+  readonly open?: (options: OpenConfiguredMaybeCodeOptions) => Promise<MaybeCodeController>;
   readonly runRetainedUI?: (app: MaybeCodeController) => Promise<void>;
   readonly mcpAuth?: typeof runMaybeCodeMcpCommand;
   readonly team?: typeof runMaybeCodeTeamCommand;
@@ -59,7 +54,8 @@ export async function runMaybeCode(
       try {
         const team = dependencies.team ?? (await import("./team.js")).runMaybeCodeTeamCommand;
         return await team(command, {
-          write: (text) => outputTerminal().write(text), signal: cancellation.signal,
+          write: (text) => outputTerminal().write(text),
+          signal: cancellation.signal,
         });
       } finally {
         process.removeListener("SIGINT", interrupt);
@@ -73,7 +69,8 @@ export async function runMaybeCode(
       try {
         const mcpAuth = dependencies.mcpAuth ?? (await import("./mcp-auth.js")).runMaybeCodeMcpCommand;
         await mcpAuth(command, {
-          write: (text) => outputTerminal().write(text), signal: cancellation.signal,
+          write: (text) => outputTerminal().write(text),
+          signal: cancellation.signal,
         });
       } finally {
         process.removeListener("SIGINT", interrupt);
@@ -86,28 +83,32 @@ export async function runMaybeCode(
       const path = await missingMaybeCodeConfig(command);
       if (path !== undefined) {
         const { runMaybeCodeOnboarding } = await import("./onboarding.js");
-        if (!await runMaybeCodeOnboarding(path, command)) {
+        if (!(await runMaybeCodeOnboarding(path, command))) {
           terminal?.close();
           return 130;
         }
       }
     }
     const open = dependencies.open ?? (await import("./configured.js")).openConfiguredMaybeCode;
-    const runWebUI = command.ui === "web"
-      ? dependencies.runWebUI ?? (await import("./web-ui.js")).runMaybeCodeWebUI : undefined;
-    const runRetainedUI = command.ui === "retained"
-      ? dependencies.runRetainedUI ?? (await import("./ui/retained-tui.js")).runRetainedTerminalUI : undefined;
-    const app = await open(omitUndefined({
-      permissionMode: command.permissionMode,
-      mcpInteractions: true,
-      workspace: command.workspace,
-      configPath: command.configPath,
-      model: command.model,
-      sessionId: command.sessionId,
-      autoResume: command.autoResume,
-    }));
+    const runWebUI =
+      command.ui === "web" ? (dependencies.runWebUI ?? (await import("./web-ui.js")).runMaybeCodeWebUI) : undefined;
+    const runRetainedUI =
+      command.ui === "retained"
+        ? (dependencies.runRetainedUI ?? (await import("./ui/retained-tui.js")).runRetainedTerminalUI)
+        : undefined;
+    const app = await open(
+      omitUndefined({
+        permissionMode: command.permissionMode,
+        mcpInteractions: true,
+        workspace: command.workspace,
+        configPath: command.configPath,
+        model: command.model,
+        sessionId: command.sessionId,
+        autoResume: command.autoResume,
+      }),
+    );
     if (command.ui === "web") {
-      await runWebUI!(app, { ...omitUndefined({ port: command.port }), write: text => outputTerminal().write(text) });
+      await runWebUI!(app, { ...omitUndefined({ port: command.port }), write: (text) => outputTerminal().write(text) });
       terminal?.close();
     } else {
       terminal?.close();

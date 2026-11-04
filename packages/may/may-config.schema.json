@@ -153,24 +153,43 @@
       "properties": {
         "fields": { "$ref": "#/$defs/capabilityFields" },
         "reasoning": {
-          "oneOf": [
-            { "const": false },
-            { "$ref": "#/$defs/reasoningCapabilities" }
-          ]
+          "oneOf": [{ "const": false }, { "$ref": "#/$defs/reasoningCapabilities" }]
         }
       },
       "additionalProperties": false
     },
     "capabilityFields": {
       "type": "object",
-      "propertyNames": { "enum": [
-        "input.text", "input.image", "input.audio", "input.file", "input.resource",
-        "input.image.sources", "input.audio.sources", "input.file.sources",
-        "output.text", "output.image", "output.audio", "tools", "tools.maxCalls",
-        "structuredOutput.json", "structuredOutput.jsonSchema", "structuredOutput.schemaDialects",
-        "structuredOutput.schemaConstraint", "contextWindowTokens", "maxOutputTokens", "maxImages",
-        "maxAttachments", "maxAttachmentBytes", "fileTypes", "parameters", "contextCompaction", "reasoning.modes"
-      ] },
+      "propertyNames": {
+        "enum": [
+          "input.text",
+          "input.image",
+          "input.audio",
+          "input.file",
+          "input.resource",
+          "input.image.sources",
+          "input.audio.sources",
+          "input.file.sources",
+          "output.text",
+          "output.image",
+          "output.audio",
+          "tools",
+          "tools.maxCalls",
+          "structuredOutput.json",
+          "structuredOutput.jsonSchema",
+          "structuredOutput.schemaDialects",
+          "structuredOutput.schemaConstraint",
+          "contextWindowTokens",
+          "maxOutputTokens",
+          "maxImages",
+          "maxAttachments",
+          "maxAttachmentBytes",
+          "fileTypes",
+          "parameters",
+          "contextCompaction",
+          "reasoning.modes"
+        ]
+      },
       "additionalProperties": { "type": "boolean" },
       "properties": {
         "contextWindowTokens": { "$ref": "#/$defs/capabilityLimit" },
@@ -190,8 +209,18 @@
       }
     },
     "capabilityLimit": { "oneOf": [{ "const": false }, { "$ref": "#/$defs/positiveInteger" }] },
-    "capabilityStrings": { "oneOf": [{ "const": false }, { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmptyString" } }] },
-    "capabilitySources": { "oneOf": [{ "const": false }, { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["url", "base64", "file"] } }] },
+    "capabilityStrings": {
+      "oneOf": [
+        { "const": false },
+        { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmptyString" } }
+      ]
+    },
+    "capabilitySources": {
+      "oneOf": [
+        { "const": false },
+        { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["url", "base64", "file"] } }
+      ]
+    },
     "reasoningCapabilities": {
       "type": "object",
       "required": ["efforts"],
@@ -336,8 +365,23 @@
     },
     "modelResponseFormat": {
       "oneOf": [
-        { "type": "object", "properties": { "type": { "const": "json" } }, "required": ["type"], "additionalProperties": false },
-        { "type": "object", "properties": { "type": { "const": "jsonSchema" }, "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" }, "schema": { "type": "object" }, "strict": { "type": "boolean" } }, "required": ["type", "name", "schema"], "additionalProperties": false }
+        {
+          "type": "object",
+          "properties": { "type": { "const": "json" } },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "jsonSchema" },
+            "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+            "schema": { "type": "object" },
+            "strict": { "type": "boolean" }
+          },
+          "required": ["type", "name", "schema"],
+          "additionalProperties": false
+        }
       ]
     },
     "runBudget": {
@@ -386,9 +430,11 @@
         "cachedWritePerMillion": { "type": "number", "minimum": 0 },
         "reasoningPerMillion": { "type": "number", "minimum": 0 },
         "items": {
-          "type": "object", "maxProperties": 64,
+          "type": "object",
+          "maxProperties": 64,
           "additionalProperties": {
-            "type": "object", "required": ["unit", "perUnit"],
+            "type": "object",
+            "required": ["unit", "perUnit"],
             "properties": {
               "unit": { "type": "string", "minLength": 1, "maxLength": 256 },
               "perUnit": { "type": "number", "minimum": 0 }

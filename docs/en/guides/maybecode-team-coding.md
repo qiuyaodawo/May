@@ -14,9 +14,9 @@ Repository users prefix the commands below with `pnpm`.
 
 1. Start a coding team:
 
-```powershell
-maybecode team run "Implement the requested change in your private copy" --mode coding --workspace C:\work\example
-```
+   ```powershell
+   maybecode team run "Implement the requested change in your private copy" --mode coding --workspace C:\work\example
+   ```
 
    The default coding preset grants `write`/`edit` to `worker`; `supervisor`
    remains read-only. A custom `--plan <json>` must list the editing tools.
@@ -25,20 +25,21 @@ maybecode team run "Implement the requested change in your private copy" --mode 
 2. Record the team ID. Once the selected tasks have stopped, capture their changes.
    The default preset contains `analysis` and `review`:
 
-```powershell
-maybecode team diff <team-id> --tasks analysis,review
-```
+   ```powershell
+   maybecode team diff <team-id> --tasks analysis,review
+   ```
 
    The command saves an immutable bundle and prints its ID, confirmation digest,
    task identities and unified diff. Retain the original `--data-directory`.
+
 3. Review the complete diff, conflicts and acceptance for the selected tasks.
    When configured checks exist, they must be current and passing. Without
    checks, the edits retain their unverified, human-reviewed status.
 4. Apply the reviewed bundle with its exact digest:
 
-```powershell
-maybecode team apply <team-id> --patch <patch-id> --confirm <exact-digest>
-```
+   ```powershell
+   maybecode team apply <team-id> --patch <patch-id> --confirm <exact-digest>
+   ```
 
 5. Check the application result and changed source files. A completed application
    reports `applied`. For `unknown`, follow the recovery procedure below before

@@ -11,8 +11,12 @@ import { inspectSessionRunOutcome } from "@sortedyuan/may/session";
 import { CoordinationRuntime, createAttachedApplicationAgent } from "../dist/index.js";
 import { FileCoordinationStore } from "../dist/file-store.js";
 
-for (const [boundary, expected] of [["continuation.submitted", "recovery-required"], ["run.cancelled", "cancelled"], ["run.failed", "failed"]]) {
-  test(`attached continuation recovers after process exit at ${boundary}`, async t => {
+for (const [boundary, expected] of [
+  ["continuation.submitted", "recovery-required"],
+  ["run.cancelled", "cancelled"],
+  ["run.failed", "failed"],
+]) {
+  test(`attached continuation recovers after process exit at ${boundary}`, async (t) => {
     let application;
     let resumed;
     t.after(async () => {
@@ -32,13 +36,23 @@ for (const [boundary, expected] of [["continuation.submitted", "recovery-require
     assert.equal(history.at(-1).type, boundary);
     const continuationId = `${interrupted.tasks[0].dispatchId}:0`;
     assert.equal(inspectSessionRunOutcome(history, { continuationId }).status, expected);
-    application = await AgentApplication.open({ sessionId: "attached-root", resume: true, store: sessions,
+    application = await AgentApplication.open({
+      sessionId: "attached-root",
+      resume: true,
+      store: sessions,
       model: new OpenAIChatCompletionsModel({ apiKey: "unused-during-recovery", model: "gpt-4o" }),
     });
-    const worker = createAttachedApplicationAgent({ version: "v1", mode: "continue", attach: () => application,
-      read: sessionId => sessions.inspect(sessionId), submit: () => ({ input: "Continue" }),
+    const worker = createAttachedApplicationAgent({
+      version: "v1",
+      mode: "continue",
+      attach: () => application,
+      read: (sessionId) => sessions.inspect(sessionId),
+      submit: () => ({ input: "Continue" }),
     });
-    resumed = await CoordinationRuntime.resume({ id: "attached-recovery", store, agents: { worker },
+    resumed = await CoordinationRuntime.resume({
+      id: "attached-recovery",
+      store,
+      agents: { worker },
       policy: { version: "v1", authorize: () => true },
     });
     assert.equal((await resumed.wait()).tasks[0].status, expected);

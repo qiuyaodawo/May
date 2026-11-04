@@ -8,7 +8,8 @@ import { createMaybeCodeWebHost, startMaybeCodeWebServer } from "./web-ui.js";
 function eventQueue() {
   return new AsyncEventQueue<MaybeCodeEvent>({
     maxBufferedValues: 1024,
-    isDroppable: event => event.type === "mcp.resource.updated" || event.type === "run.event" && isStreamingMayEvent(event.event),
+    isDroppable: (event) =>
+      event.type === "mcp.resource.updated" || (event.type === "run.event" && isStreamingMayEvent(event.event)),
   });
 }
 
@@ -22,10 +23,15 @@ export class MaybeCodeTerminalWeb {
   private closing: Promise<void> | undefined;
   readonly events: AsyncIterable<MaybeCodeEvent>;
 
-  constructor(private readonly app: MaybeCodeController, private readonly exit?: () => void) {
+  constructor(
+    private readonly app: MaybeCodeController,
+    private readonly exit?: () => void,
+  ) {
     this.host = createMaybeCodeWebHost(app, { events: this.webEvents, closeApplication: false, terminal: true });
     this.events = this.readTerminalEvents();
-    this.relay = this.forwardEvents().catch(error => { this.failure = error; });
+    this.relay = this.forwardEvents().catch((error) => {
+      this.failure = error;
+    });
   }
 
   private async forwardEvents(): Promise<void> {
@@ -61,23 +67,31 @@ export class MaybeCodeTerminalWeb {
 
   async startServer(): ReturnType<typeof startMaybeCodeWebServer> {
     if (this.closing) throw new Error("MaybeCode 正在关闭。");
-    this.starting ??= startMaybeCodeWebServer(this.host, { token: randomBytes(32).toString("base64url"), port: 0, browserLogin: true, exit: () => { if (this.exit) this.exit(); else void this.close(); } });
+    this.starting ??= startMaybeCodeWebServer(this.host, {
+      token: randomBytes(32).toString("base64url"),
+      port: 0,
+      browserLogin: true,
+      exit: () => {
+        if (this.exit) this.exit();
+        else void this.close();
+      },
+    });
     const server = await this.starting;
     if (this.closing) throw new Error("MaybeCode 正在关闭。");
     return server;
   }
 
   close(): Promise<void> {
-    return this.closing ??= this.closeOwnedResources();
+    return (this.closing ??= this.closeOwnedResources());
   }
 
   private async closeOwnedResources(): Promise<void> {
     const results = await Promise.allSettled([
       this.app.close(),
-      this.starting ? this.starting.then(server => server.close()) : this.host.close(),
+      this.starting ? this.starting.then((server) => server.close()) : this.host.close(),
     ]);
     await this.relay;
-    const failures = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+    const failures = results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
     if (this.failure !== undefined) failures.push(this.failure);
     if (failures.length) throw new AggregateError(failures, "关闭 MaybeCode 时发生错误。");
   }

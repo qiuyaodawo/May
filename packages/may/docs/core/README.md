@@ -114,9 +114,7 @@ there is no process-global registry.
 ```ts
 import { ToolRegistry } from "@sortedyuan/may/core";
 
-const tools = new ToolRegistry([readTool])
-  .register(writeTool)
-  .registerAll([searchTool, fetchTool]);
+const tools = new ToolRegistry([readTool]).register(writeTool).registerAll([searchTool, fetchTool]);
 
 const may = new May({ model, tools, context });
 ```

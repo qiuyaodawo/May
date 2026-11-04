@@ -8,5 +8,8 @@ export const experiment = {
   ...original,
   repetitions: 1,
   concurrency: 1,
-  cases: original.cases.map(value => ({ ...value, evaluators: [...value.evaluators, { id: "artifact-review", version: "1", required: true }] })),
+  cases: original.cases.map((value) => ({
+    ...value,
+    evaluators: [...value.evaluators, { id: "artifact-review", version: "1", required: true }],
+  })),
 };

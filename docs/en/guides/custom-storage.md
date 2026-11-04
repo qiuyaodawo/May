@@ -16,12 +16,12 @@ model and permission policy; see [Build an Agent](building-an-agent.md).
 
 ## Select a backend
 
-| Requirement | Backend |
-| --- | --- |
-| Process-local history | `InMemorySessionStore` from `@sortedyuan/may/session` |
-| Local history across restarts | `FileSessionStore` from `@sortedyuan/may/session/file-store` |
-| Local Session discovery | `FileSessionCatalog` from `@sortedyuan/may/session/catalog` |
-| Database, encryption, or cross-process coordination | Custom implementations of the interfaces below |
+| Requirement                                         | Backend                                                      |
+| --------------------------------------------------- | ------------------------------------------------------------ |
+| Process-local history                               | `InMemorySessionStore` from `@sortedyuan/may/session`        |
+| Local history across restarts                       | `FileSessionStore` from `@sortedyuan/may/session/file-store` |
+| Local Session discovery                             | `FileSessionCatalog` from `@sortedyuan/may/session/catalog`  |
+| Database, encryption, or cross-process coordination | Custom implementations of the interfaces below               |
 
 For file-backed storage, jump to [Built-in local storage](#built-in-local-storage).
 Database adapters must implement durable writes and consistent ordered reads.
@@ -65,11 +65,7 @@ implementation using your database library before instantiating the store.
 insert the new row in the same transaction.
 
 ```ts
-import {
-  validateSessionHistory,
-  type SessionEvent,
-  type SessionStore,
-} from "@sortedyuan/may/session";
+import { validateSessionHistory, type SessionEvent, type SessionStore } from "@sortedyuan/may/session";
 
 export interface SessionEventTable {
   appendIfCurrentSequence(input: {
@@ -94,9 +90,7 @@ export class DatabaseSessionStore implements SessionStore {
       json: JSON.stringify(event),
     });
     if (!committed) {
-      throw new Error(
-        `Session ${event.sessionId} is no longer at sequence ${event.seq - 1}`,
-      );
+      throw new Error(`Session ${event.sessionId} is no longer at sequence ${event.seq - 1}`);
     }
   }
 
@@ -124,12 +118,17 @@ function decodeEvent(source: string, row: number): SessionEvent {
     throw new Error(`Invalid session event JSON in row ${row}`);
   }
   if (
-    typeof value !== "object" || value === null ||
-    !("type" in value) || typeof value.type !== "string" ||
-    !("sessionId" in value) || typeof value.sessionId !== "string" ||
-    !("seq" in value) || typeof value.seq !== "number" ||
+    typeof value !== "object" ||
+    value === null ||
+    !("type" in value) ||
+    typeof value.type !== "string" ||
+    !("sessionId" in value) ||
+    typeof value.sessionId !== "string" ||
+    !("seq" in value) ||
+    typeof value.seq !== "number" ||
     !Number.isSafeInteger(value.seq) ||
-    !("timestamp" in value) || typeof value.timestamp !== "number"
+    !("timestamp" in value) ||
+    typeof value.timestamp !== "number"
   ) {
     throw new Error(`Invalid session event in row ${row}`);
   }
@@ -186,14 +185,15 @@ const workspace = await AgentWorkspace.open({
   workspace: process.cwd(),
   store,
   catalog,
-  openApplication: ({ sessionId, resume }) => AgentApplication.open({
-    model,
-    tools,
-    permissionPolicy,
-    store,
-    resume,
-    ...(sessionId === undefined ? {} : { sessionId }),
-  }),
+  openApplication: ({ sessionId, resume }) =>
+    AgentApplication.open({
+      model,
+      tools,
+      permissionPolicy,
+      store,
+      resume,
+      ...(sessionId === undefined ? {} : { sessionId }),
+    }),
 });
 
 try {
@@ -231,12 +231,9 @@ await withFileAccess(path, "exclusive", async () => {
   await writeFile(temporary, JSON.stringify({ revision: 1 }));
   await rename(temporary, path);
 });
-const state = await withFileAccess(
-  path,
-  "shared",
-  async () => JSON.parse(await readFile(path, "utf8")),
-  { initialize: false },
-);
+const state = await withFileAccess(path, "shared", async () => JSON.parse(await readFile(path, "utf8")), {
+  initialize: false,
+});
 console.log(state.revision);
 ```
 

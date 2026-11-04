@@ -23,15 +23,21 @@ export async function startOAuthFixture(t) {
       const body = Buffer.concat(chunks).toString();
       const url = new URL(req.url, origin);
       requests.push({ url, headers: req.headers, method: req.method });
-      const json = (value, status = 200) => res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(value));
+      const json = (value, status = 200) =>
+        res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(value));
       if (url.pathname.startsWith("/.well-known/oauth-protected-resource")) {
         json({ resource: `${origin}/mcp`, authorization_servers: [issuer], scopes_supported: ["read", "write"] });
       } else if (url.pathname.startsWith("/.well-known/")) {
         json({
-          issuer, authorization_endpoint: `${origin}/authorize`, token_endpoint: `${origin}/token`,
-          registration_endpoint: `${origin}/register`, revocation_endpoint: `${origin}/revoke`,
-          response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"],
-          token_endpoint_auth_methods_supported: ["none"], code_challenge_methods_supported: ["S256"],
+          issuer,
+          authorization_endpoint: `${origin}/authorize`,
+          token_endpoint: `${origin}/token`,
+          registration_endpoint: `${origin}/register`,
+          revocation_endpoint: `${origin}/revoke`,
+          response_types_supported: ["code"],
+          grant_types_supported: ["authorization_code", "refresh_token"],
+          token_endpoint_auth_methods_supported: ["none"],
+          code_challenge_methods_supported: ["S256"],
           authorization_response_iss_parameter_supported: true,
           client_id_metadata_document_supported: true,
         });
@@ -47,7 +53,9 @@ export async function startOAuthFixture(t) {
         assert.equal(url.searchParams.get("code_challenge_method"), "S256");
         assert.equal(url.searchParams.get("resource"), `${origin}/mcp`);
         const client = clients.get(url.searchParams.get("client_id"));
-        const knownPublic = ["may-public", "https://client.example/metadata.json"].includes(url.searchParams.get("client_id"));
+        const knownPublic = ["may-public", "https://client.example/metadata.json"].includes(
+          url.searchParams.get("client_id"),
+        );
         assert.ok(knownPublic || client?.redirect_uris.includes(url.searchParams.get("redirect_uri")));
         const code = randomUUID();
         codes.set(code, url.searchParams);
@@ -64,7 +72,10 @@ export async function startOAuthFixture(t) {
           const saved = codes.get(params.get("code"));
           assert.ok(saved);
           assert.equal(params.get("client_id"), saved.get("client_id"));
-          assert.equal(createHash("sha256").update(params.get("code_verifier")).digest("base64url"), saved.get("code_challenge"));
+          assert.equal(
+            createHash("sha256").update(params.get("code_verifier")).digest("base64url"),
+            saved.get("code_challenge"),
+          );
           codes.delete(params.get("code"));
           scope = saved.get("scope") ?? "read";
         } else {
@@ -78,20 +89,37 @@ export async function startOAuthFixture(t) {
       } else if (url.pathname === "/revoke") {
         counts.revocations++;
         const token = new URLSearchParams(body).get("token");
-        if (token === refresh) { access = undefined; refresh = undefined; }
+        if (token === refresh) {
+          access = undefined;
+          refresh = undefined;
+        }
         res.writeHead(200).end();
       } else if (url.pathname === "/mcp") {
         if (req.headers.authorization !== `Bearer ${access}` || access === undefined) {
-          res.writeHead(401, { "www-authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource", scope="read"` }).end("do-not-log-response");
+          res
+            .writeHead(401, {
+              "www-authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource", scope="read"`,
+            })
+            .end("do-not-log-response");
           return;
         }
         const message = JSON.parse(body);
-        const reply = (result) => json({ jsonrpc: "2.0", id: message.id, result: { resultType: "complete", ...result } });
-        if (message.method === "server/discover") reply({ supportedVersions: ["2026-07-28"], capabilities: { tools: {}, resources: {} } });
-        else if (message.method === "tools/list") reply({ ttlMs: 0, cacheScope: "private", tools: [{ name: "echo", inputSchema: { type: "object" } }] });
-        else if (message.method === "resources/list") reply({ resources: [{ name: "private", uri: "private:///data" }], ttlMs: 0, cacheScope: "private" });
-        else if (message.method === "resources/templates/list") reply({ resourceTemplates: [], ttlMs: 0, cacheScope: "private" });
-        else if (message.method === "resources/read") reply({ contents: [{ uri: message.params.uri, text: "private-account-data" }], ttlMs: 300000, cacheScope: "private" });
+        const reply = (result) =>
+          json({ jsonrpc: "2.0", id: message.id, result: { resultType: "complete", ...result } });
+        if (message.method === "server/discover")
+          reply({ supportedVersions: ["2026-07-28"], capabilities: { tools: {}, resources: {} } });
+        else if (message.method === "tools/list")
+          reply({ ttlMs: 0, cacheScope: "private", tools: [{ name: "echo", inputSchema: { type: "object" } }] });
+        else if (message.method === "resources/list")
+          reply({ resources: [{ name: "private", uri: "private:///data" }], ttlMs: 0, cacheScope: "private" });
+        else if (message.method === "resources/templates/list")
+          reply({ resourceTemplates: [], ttlMs: 0, cacheScope: "private" });
+        else if (message.method === "resources/read")
+          reply({
+            contents: [{ uri: message.params.uri, text: "private-account-data" }],
+            ttlMs: 300000,
+            cacheScope: "private",
+          });
         else if (message.method === "tools/call") {
           counts.toolCalls++;
           if (demandWrite && !scope.split(" ").includes("write")) {
@@ -99,22 +127,40 @@ export async function startOAuthFixture(t) {
           } else reply(toolInput?.(message) ?? { content: [{ type: "text", text: "authorized" }] });
         } else res.writeHead(202).end();
       } else res.writeHead(404).end();
-    } catch (error) { failures.push(error); res.writeHead(500).end(); }
+    } catch (error) {
+      failures.push(error);
+      res.writeHead(500).end();
+    }
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   origin = `http://127.0.0.1:${server.address().port}`;
   issuer = origin;
   t.after(async () => {
-    await new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
+    await new Promise((resolve) => {
+      server.close(resolve);
+      server.closeAllConnections();
+    });
     assert.deepEqual(failures, []);
   });
   return {
-    url: `${origin}/mcp`, origin, counts, requests,
-    setToolInput: (input) => { toolInput = input; },
-    invalidateAccess: () => { access = "expired"; },
-    demandWrite: () => { demandWrite = true; },
-    rotateIssuer: () => { issuer = `${origin}/issuer2`; access = "expired"; },
+    url: `${origin}/mcp`,
+    origin,
+    counts,
+    requests,
+    setToolInput: (input) => {
+      toolInput = input;
+    },
+    invalidateAccess: () => {
+      access = "expired";
+    },
+    demandWrite: () => {
+      demandWrite = true;
+    },
+    rotateIssuer: () => {
+      issuer = `${origin}/issuer2`;
+      access = "expired";
+    },
     async callback(url) {
       const response = await fetch(url, { redirect: "manual" });
       assert.equal(response.status, 302);

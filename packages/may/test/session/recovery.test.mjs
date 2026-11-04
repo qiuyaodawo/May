@@ -36,12 +36,32 @@ test("history polling serializes with large appends and rejects malformed comple
   const work = [];
   for (let seq = 2; seq <= 12; seq++) {
     work.push(store.read("s"));
-    work.push(store.append({ type: "state.updated", key: "data", value: "x".repeat(256 * 1024), sessionId: "s", seq, timestamp: seq }));
+    work.push(
+      store.append({
+        type: "state.updated",
+        key: "data",
+        value: "x".repeat(256 * 1024),
+        sessionId: "s",
+        seq,
+        timestamp: seq,
+      }),
+    );
   }
   await Promise.all(work);
   assert.equal((await store.read("s")).length, 12);
   const [file] = await readdir(dir);
-  await appendFile(join(dir, file), JSON.stringify({ type: "assistant.completed", runId: "r", step: 1, message: null, sessionId: "s", seq: 13, timestamp: 13 }) + "\n");
+  await appendFile(
+    join(dir, file),
+    JSON.stringify({
+      type: "assistant.completed",
+      runId: "r",
+      step: 1,
+      message: null,
+      sessionId: "s",
+      seq: 13,
+      timestamp: 13,
+    }) + "\n",
+  );
   await assert.rejects(store.read("s"), /Invalid session event/);
 });
 
@@ -55,24 +75,42 @@ test("recovery distinguishes unknown effects from unstarted calls, blocks execut
     { type: "tool.completed", runId: "r", step: 1, call: call("a"), output: "done" },
     { type: "tool.started", runId: "r", step: 1, call: call("b") },
   ];
-  for (const [index, fact] of facts.entries()) await store.append({ ...fact, sessionId: "s", seq: index + 1, timestamp: index });
-  let seen; let calls = 0;
-  const createRuntime = (messages) => new May({ context: new InMemoryContext({ messages }), model: {
-    async *stream(request) { calls++; seen = request.messages; yield { type: "response.completed", message: { role: "assistant", content: [] } }; },
-  }});
+  for (const [index, fact] of facts.entries())
+    await store.append({ ...fact, sessionId: "s", seq: index + 1, timestamp: index });
+  let seen;
+  let calls = 0;
+  const createRuntime = (messages) =>
+    new May({
+      context: new InMemoryContext({ messages }),
+      model: {
+        async *stream(request) {
+          calls++;
+          seen = request.messages;
+          yield { type: "response.completed", message: { role: "assistant", content: [] } };
+        },
+      },
+    });
   const session = await Session.resume({ requestRecording: "off", id: "s", store, createRuntime });
   assert.equal(session.listRecoveries().length, 1);
   assert.equal(session.listRecoveries()[0].call.id, "b");
   await assert.rejects(session.submit({ input: "continue" }), { code: "SESSION_RECOVERY_REQUIRED" });
   assert.equal(calls, 0);
   const repair = (await session.history()).at(-1);
-  assert.deepEqual(repair.recoveries.map((r) => r.status), ["unknown", "not-started"]);
+  assert.deepEqual(
+    repair.recoveries.map((r) => r.status),
+    ["unknown", "not-started"],
+  );
   const reopened = await Session.resume({ requestRecording: "off", id: "s", store, createRuntime });
   assert.equal((await reopened.history()).length, facts.length + 1);
   await reopened.resolveRecovery("r:1:b", "Checked the destination: write completed successfully; do not repeat it.");
-  await (await reopened.continue()).result;
+  await (
+    await reopened.continue()
+  ).result;
   assert.equal(seen.filter((m) => m.role === "tool").length, 3);
-  assert.deepEqual(seen.filter((m) => m.role === "tool").map((m) => m.toolCallId), ["b", "a", "c"]);
+  assert.deepEqual(
+    seen.filter((m) => m.role === "tool").map((m) => m.toolCallId),
+    ["b", "a", "c"],
+  );
   assert.match(seen.at(-1).content[0].text, /Checked the destination/);
   const again = await Session.resume({ requestRecording: "off", id: "s", store, createRuntime });
   assert.equal(again.listRecoveries().length, 0);
@@ -81,27 +119,52 @@ test("recovery distinguishes unknown effects from unstarted calls, blocks execut
 test("old histories conservatively treat unfinished calls as unknown", async () => {
   const store = new InMemorySessionStore();
   for (const [index, fact] of [
-    { type: "session.created" }, { type: "run.started", runId: "r" },
+    { type: "session.created" },
+    { type: "run.started", runId: "r" },
     { type: "assistant.completed", runId: "r", step: 1, message: assistant([call("a")]) },
-  ].entries()) await store.append({ ...fact, sessionId: "s", seq: index + 1, timestamp: index });
-  const session = await Session.resume({ requestRecording: "off", id: "s", store, createRuntime: (messages) => new May({ context: new InMemoryContext({ messages }), model: { async *stream() {} } }) });
+  ].entries())
+    await store.append({ ...fact, sessionId: "s", seq: index + 1, timestamp: index });
+  const session = await Session.resume({
+    requestRecording: "off",
+    id: "s",
+    store,
+    createRuntime: (messages) => new May({ context: new InMemoryContext({ messages }), model: { async *stream() {} } }),
+  });
   assert.equal(session.listRecoveries()[0].status, "unknown");
 });
 
 test("tools cannot run ahead of durable model/start/outcome checkpoints", async () => {
-  const backing = new InMemorySessionStore(); let executed = 0;
-  const store = { read: (id) => backing.read(id), append: async (event) => {
-    if (event.type === "tool.completed") throw new Error("disk unavailable");
-    await backing.append(event);
-  }};
-  const runtime = new May({ context: new InMemoryContext(), model: { async *stream() {
-    yield { type: "response.completed", message: assistant([call("a"), call("b")]) };
-  }}, tools: [{ name: "write", description: "write", inputSchema: {}, async execute() {
-    const history = await backing.read("s");
-    assert.equal(history.at(-1).type, "tool.started");
-    assert.ok(history.some((e) => e.type === "assistant.completed"));
-    executed++; return "done";
-  }}] });
+  const backing = new InMemorySessionStore();
+  let executed = 0;
+  const store = {
+    read: (id) => backing.read(id),
+    append: async (event) => {
+      if (event.type === "tool.completed") throw new Error("disk unavailable");
+      await backing.append(event);
+    },
+  };
+  const runtime = new May({
+    context: new InMemoryContext(),
+    model: {
+      async *stream() {
+        yield { type: "response.completed", message: assistant([call("a"), call("b")]) };
+      },
+    },
+    tools: [
+      {
+        name: "write",
+        description: "write",
+        inputSchema: {},
+        async execute() {
+          const history = await backing.read("s");
+          assert.equal(history.at(-1).type, "tool.started");
+          assert.ok(history.some((e) => e.type === "assistant.completed"));
+          executed++;
+          return "done";
+        },
+      },
+    ],
+  });
   const session = await Session.create({ requestRecording: "off", id: "s", store, runtime });
   await assert.rejects((await session.submit({ input: "write" })).result, /disk unavailable/);
   assert.equal(executed, 1);

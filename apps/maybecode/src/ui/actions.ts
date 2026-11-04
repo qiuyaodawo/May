@@ -8,8 +8,7 @@ export interface MaybeCodeUiAction {
 }
 
 export type MaybeCodeUiCommandResult =
-  | { readonly matched: false }
-  | { readonly matched: true; readonly status: string };
+  { readonly matched: false } | { readonly matched: true; readonly status: string };
 
 /** Instance-scoped display actions; these never enter the agent controller. */
 export class MaybeCodeUiActionRegistry {

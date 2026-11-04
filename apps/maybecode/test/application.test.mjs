@@ -25,14 +25,16 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
           message: {
             role: "assistant",
             content: [],
-            toolCalls: [{
-              id: `write_${modelCall}`,
-              name: "write",
-              input: {
-                path: "result.txt",
-                content: modelCall === 1 ? "first" : "second",
+            toolCalls: [
+              {
+                id: `write_${modelCall}`,
+                name: "write",
+                input: {
+                  path: "result.txt",
+                  content: modelCall === 1 ? "first" : "second",
+                },
               },
-            }],
+            ],
           },
         };
         return;
@@ -45,7 +47,9 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
   };
   const sessionDirectory = join(workspace, ".sessions");
   const catalog = new InMemorySessionCatalog();
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const app = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace,
     subagents: false,
     model,
@@ -56,30 +60,17 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
   const sessionId = app.sessionId;
   const eventReader = collectEvents(app, events, "allow-session");
 
-  assert.equal(
-    (await (await app.submit({ input: "create result" })).result).message
-      .content[0].text,
-    "created",
-  );
-  assert.equal(
-    (await (await app.submit({ input: "update result" })).result).message
-      .content[0].text,
-    "updated",
-  );
+  assert.equal((await (await app.submit({ input: "create result" })).result).message.content[0].text, "created");
+  assert.equal((await (await app.submit({ input: "update result" })).result).message.content[0].text, "updated");
   assert.equal(await readFile(join(workspace, "result.txt"), "utf8"), "second");
 
   const history = await app.history();
-  assert.equal(
-    history.filter((event) => event.type === "approval.requested").length,
-    1,
-  );
+  assert.equal(history.filter((event) => event.type === "approval.requested").length, 1);
   assert.ok(
     history.findIndex((event) => event.type === "approval.resolved") <
       history.findIndex((event) => event.type === "tool.completed"),
   );
-  const persistedPreviews = history.filter(
-    (event) => event.type === "tool.presentation",
-  );
+  const persistedPreviews = history.filter((event) => event.type === "tool.presentation");
   assert.deepEqual(
     persistedPreviews.map((event) => [event.kind, event.version, event.data.kind]),
     [
@@ -91,10 +82,7 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
   await app.close();
   await eventReader;
   assert.equal(
-    events.filter((event) =>
-      event.type === "permission.event" &&
-      event.event.type === "approval.requested"
-    ).length,
+    events.filter((event) => event.type === "permission.event" && event.event.type === "approval.requested").length,
     1,
   );
   const previews = events.filter((event) => event.type === "change.preview");
@@ -103,7 +91,9 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
     ["create", "update"],
   );
 
-  const resumed = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const resumed = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace,
     subagents: false,
     model,
@@ -114,9 +104,7 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
   const restoredTranscript = new TranscriptStore();
   restoredTranscript.loadHistory(await resumed.history());
   assert.deepEqual(
-    restoredTranscript.items
-      .filter((item) => item.kind === "tool")
-      .map((item) => item.preview?.kind),
+    restoredTranscript.items.filter((item) => item.kind === "tool").map((item) => item.preview?.kind),
     ["create", "update"],
   );
   await resumed.close();
@@ -126,7 +114,9 @@ test("retries a failed run after resuming its durable session", async (t) => {
   const workspace = await temporaryDirectory(t);
   const store = new FileSessionStore(join(workspace, ".sessions"));
   const catalog = new InMemorySessionCatalog();
-  const first = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const first = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace,
     model: {
       async *stream() {
@@ -138,14 +128,13 @@ test("retries a failed run after resuming its durable session", async (t) => {
     autoResume: false,
   });
   const sessionId = first.sessionId;
-  await assert.rejects(
-    (await first.submit({ input: "keep this request" })).result,
-    /provider offline/,
-  );
+  await assert.rejects((await first.submit({ input: "keep this request" })).result, /provider offline/);
   await first.close();
 
   let request;
-  const resumed = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const resumed = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace,
     model: {
       async *stream(value) {
@@ -161,19 +150,12 @@ test("retries a failed run after resuming its durable session", async (t) => {
     autoResume: true,
   });
   assert.equal(resumed.sessionId, sessionId);
-  await (await resumed.retry()).result;
-  assert.equal(
-    request.messages.filter((message) => message.role === "user").length,
-    1,
-  );
-  assert.equal(request.messages.find((message) => message.role === "user")
-    .content[0].text, "keep this request");
-  assert.equal(
-    (await resumed.history()).filter((event) =>
-      event.type === "input.submitted"
-    ).length,
-    1,
-  );
+  await (
+    await resumed.retry()
+  ).result;
+  assert.equal(request.messages.filter((message) => message.role === "user").length, 1);
+  assert.equal(request.messages.find((message) => message.role === "user").content[0].text, "keep this request");
+  assert.equal((await resumed.history()).filter((event) => event.type === "input.submitted").length, 1);
   await resumed.close();
 });
 
@@ -206,13 +188,13 @@ test("executes read, write, edit, and shell through the application", async (t) 
       const call = calls[modelCall++];
       yield {
         type: "response.completed",
-        message: call === undefined
-          ? assistantMessage("done")
-          : { role: "assistant", content: [], toolCalls: [call] },
+        message: call === undefined ? assistantMessage("done") : { role: "assistant", content: [], toolCalls: [call] },
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const app = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace,
     model,
     store: new (await import("@sortedyuan/may/session")).InMemorySessionStore(),
@@ -223,22 +205,20 @@ test("executes read, write, edit, and shell through the application", async (t) 
   const events = [];
   const eventReader = collectEvents(app, events, "allow");
 
-  await (await app.submit({ input: "use every tool" })).result;
+  await (
+    await app.submit({ input: "use every tool" })
+  ).result;
   assert.equal(await readFile(join(workspace, "target.txt"), "utf8"), "new");
   await app.close();
   await eventReader;
 
   const completed = events
-    .filter((event) =>
-      event.type === "run.event" && event.event.type === "tool.completed"
-    )
+    .filter((event) => event.type === "run.event" && event.event.type === "tool.completed")
     .map((event) => event.event);
-  assert.deepEqual(completed.map((event) => event.call.name), [
-    "read",
-    "write",
-    "edit",
-    "shell",
-  ]);
+  assert.deepEqual(
+    completed.map((event) => event.call.name),
+    ["read", "write", "edit", "shell"],
+  );
   assert.equal(completed[3].output.stdout, "verified");
   const shellDefinition = firstRequest.tools.find((tool) => tool.name === "shell");
   assert.match(
@@ -247,9 +227,7 @@ test("executes read, write, edit, and shell through the application", async (t) 
   );
   assert.match(
     firstRequest.messages[0].content[0].text,
-    process.platform === "win32"
-      ? /Shell: (?:Windows PowerShell|PowerShell 7)/u
-      : /Shell: Bash/u,
+    process.platform === "win32" ? /Shell: (?:Windows PowerShell|PowerShell 7)/u : /Shell: Bash/u,
   );
 });
 
@@ -265,25 +243,28 @@ test("exposes bounded active-session history as an approval-free tool", async ()
           message: {
             role: "assistant",
             content: [],
-            toolCalls: [{
-              id: "history_1",
-              name: "session_history",
-              input: { order: "desc", limit: 5 },
-            }],
+            toolCalls: [
+              {
+                id: "history_1",
+                name: "session_history",
+                input: { order: "desc", limit: 5 },
+              },
+            ],
           },
         };
         return;
       }
-      historyOutput = request.messages.find((message) =>
-        message.role === "tool" && message.name === "session_history"
-      )?.content[0]?.value;
+      historyOutput = request.messages.find((message) => message.role === "tool" && message.name === "session_history")
+        ?.content[0]?.value;
       yield {
         type: "response.completed",
         message: assistantMessage("history inspected"),
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const app = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace: process.cwd(),
     model,
     store: new (await import("@sortedyuan/may/session")).InMemorySessionStore(),
@@ -292,12 +273,12 @@ test("exposes bounded active-session history as an approval-free tool", async ()
     subagents: false,
   });
 
-  await (await app.submit({ input: "inspect this session" })).result;
+  await (
+    await app.submit({ input: "inspect this session" })
+  ).result;
 
   assert.ok(Array.isArray(historyOutput.events));
-  assert.ok(historyOutput.events.some((event) =>
-    event.type === "input.submitted"
-  ));
+  assert.ok(historyOutput.events.some((event) => event.type === "input.submitted"));
   assert.equal(
     (await app.history()).some((event) => event.type === "approval.requested"),
     false,
@@ -333,7 +314,9 @@ test("starts fresh by default and explicitly resumes workspace sessions", async 
 
   const first = await MaybeCodeWorkspace.open({ ...options, git: false, requestRecording: "off", autoResume: false });
   const firstId = first.sessionId;
-  await (await first.submit({ input: "first" })).result;
+  await (
+    await first.submit({ input: "first" })
+  ).result;
   await first.close();
 
   const resumed = await MaybeCodeWorkspace.open({ ...options, git: false, requestRecording: "off", autoResume: true });
@@ -343,13 +326,13 @@ test("starts fresh by default and explicitly resumes workspace sessions", async 
   assert.equal(inspection.measuredInputTokens, undefined);
   assert.ok(inspection.effectiveTokens > 100);
   assert.equal(inspection.contextWindowTokens, 10000);
-  await (await resumed.submit({ input: "second" })).result;
-  assert.deepEqual(requests[1].messages.map((message) => message.role), [
-    "system",
-    "user",
-    "assistant",
-    "user",
-  ]);
+  await (
+    await resumed.submit({ input: "second" })
+  ).result;
+  assert.deepEqual(
+    requests[1].messages.map((message) => message.role),
+    ["system", "user", "assistant", "user"],
+  );
 
   const secondId = await resumed.newSession();
   assert.notEqual(secondId, firstId);
@@ -388,7 +371,9 @@ test("creates context through an injected factory for each session", async () =>
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const app = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace: process.cwd(),
     model,
     store,
@@ -398,22 +383,27 @@ test("creates context through an injected factory for each session", async () =>
   });
 
   const firstId = app.sessionId;
-  await (await app.submit({ input: "first" })).result;
+  await (
+    await app.submit({ input: "first" })
+  ).result;
   await app.newSession();
   await app.resumeSession(firstId);
 
   assert.equal(inputs.length, 3);
   assert.equal(new Set(contexts).size, 3);
-  assert.deepEqual(inputs.map((input) => input.messages?.length ?? 0), [0, 0, 2]);
+  assert.deepEqual(
+    inputs.map((input) => input.messages?.length ?? 0),
+    [0, 0, 2],
+  );
   assert.match(inputs[0].instructions, /Session origin: new session/u);
   assert.match(inputs[2].instructions, /Session origin: resumed session/u);
-  assert.equal(inputs[0].instructions.replace("Session origin: new session", "Session origin: resumed session"), inputs[2].instructions);
+  assert.equal(
+    inputs[0].instructions.replace("Session origin: new session", "Session origin: resumed session"),
+    inputs[2].instructions,
+  );
   assert.deepEqual(inputs[0].metadata, { workspace: process.cwd() });
   assert.equal(await app.inspectContext(), undefined);
-  await assert.rejects(
-    app.compactContext(),
-    /compaction is not supported/u,
-  );
+  await assert.rejects(app.compactContext(), /compaction is not supported/u);
   await app.close();
 });
 
@@ -444,9 +434,7 @@ test("persists the default prune-and-summary view across resume", async () => {
       }
       yield {
         type: "response.completed",
-        message: assistantMessage(
-          `answer ${modelCall} ${"x".repeat(1500)}`,
-        ),
+        message: assistantMessage(`answer ${modelCall} ${"x".repeat(1500)}`),
       };
     },
   };
@@ -455,14 +443,16 @@ test("persists the default prune-and-summary view across resume", async () => {
     model,
     store,
     catalog,
-    tools: [{
-      name: "large",
-      description: "Returns a large result",
-      inputSchema: { type: "object" },
-      async execute(input) {
-        return { index: input.index, payload: "x".repeat(4000) };
+    tools: [
+      {
+        name: "large",
+        description: "Returns a large result",
+        inputSchema: { type: "object" },
+        async execute(input) {
+          return { index: input.index, payload: "x".repeat(4000) };
+        },
       },
-    }],
+    ],
     permissionPolicy: () => "allow",
     subagents: false,
     contextSummarizer: {
@@ -474,40 +464,42 @@ test("persists the default prune-and-summary view across resume", async () => {
   };
 
   const first = await MaybeCodeWorkspace.open({ ...options, git: false, requestRecording: "off", autoResume: false });
-  await (await first.submit({ input: "first request" })).result;
-  await (await first.submit({ input: "second request" })).result;
-  await (await first.submit({ input: "third request" })).result;
+  await (
+    await first.submit({ input: "first request" })
+  ).result;
+  await (
+    await first.submit({ input: "second request" })
+  ).result;
+  await (
+    await first.submit({ input: "third request" })
+  ).result;
   const result = await first.compactContext();
   assert.equal(result.changed, true);
   assert.equal(result.strategy, "prune+summary-tail");
-  const summarizedTools = summarized[0].filter((message) =>
-    message.role === "tool"
-  );
+  const summarizedTools = summarized[0].filter((message) => message.role === "tool");
   assert.equal(summarizedTools.length, 5);
   assert.match(summarizedTools[0].content[0].text, /tool result pruned/u);
   assert.equal(summarizedTools[4].content[0].value.index, 4);
-  assert.equal(
-    (await first.history()).filter((event) => event.type === "context.compacted")
-      .length,
-    1,
-  );
+  assert.equal((await first.history()).filter((event) => event.type === "context.compacted").length, 1);
   await first.close();
 
   const resumed = await MaybeCodeWorkspace.open({ ...options, git: false, requestRecording: "off", autoResume: true });
-  await (await resumed.submit({ input: "fourth request" })).result;
+  await (
+    await resumed.submit({ input: "fourth request" })
+  ).result;
   const resumedRequest = requests.at(-1);
   assert.ok(
-    resumedRequest.messages.some((message) =>
-      message.role === "system" &&
-      message.content[0]?.type === "text" &&
-      message.content[0].text.includes("Earlier conversation summary")
+    resumedRequest.messages.some(
+      (message) =>
+        message.role === "system" &&
+        message.content[0]?.type === "text" &&
+        message.content[0].text.includes("Earlier conversation summary"),
     ),
   );
   assert.equal(
-    resumedRequest.messages.some((message) =>
-      message.role === "user" &&
-      message.content[0]?.type === "text" &&
-      message.content[0].text === "first request"
+    resumedRequest.messages.some(
+      (message) =>
+        message.role === "user" && message.content[0]?.type === "text" && message.content[0].text === "first request",
     ),
     false,
   );
@@ -526,14 +518,14 @@ test("automatically compacts before a model call and persists the active view", 
       modelCall += 1;
       yield {
         type: "response.completed",
-        message: assistantMessage(
-          modelCall === 1 ? `large ${"x".repeat(2500)}` : "done",
-        ),
+        message: assistantMessage(modelCall === 1 ? `large ${"x".repeat(2500)}` : "done"),
       };
     },
   };
   const events = [];
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const app = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace,
     instructions: "Use the available tools.",
     model,
@@ -545,19 +537,23 @@ test("automatically compacts before a model call and persists the active view", 
       compactTriggerRatio: 0.5,
     },
     subagents: false,
-    autoCompactionStrategies: [{
-      name: "keep-current-input",
-      compact(snapshot) {
-        return snapshot.messages.length < 3
-          ? snapshot.messages
-          : snapshot.messages.slice(-1);
+    autoCompactionStrategies: [
+      {
+        name: "keep-current-input",
+        compact(snapshot) {
+          return snapshot.messages.length < 3 ? snapshot.messages : snapshot.messages.slice(-1);
+        },
       },
-    }],
+    ],
   });
   const eventReader = collectEvents(app, events, "allow");
 
-  await (await app.submit({ input: "first" })).result;
-  await (await app.submit({ input: "second" })).result;
+  await (
+    await app.submit({ input: "first" })
+  ).result;
+  await (
+    await app.submit({ input: "second" })
+  ).result;
 
   assert.deepEqual(
     requests[1].messages.map((message) => message.role),
@@ -565,22 +561,19 @@ test("automatically compacts before a model call and persists the active view", 
   );
   assert.equal(requests[1].messages[1].content[0].text, "second");
   const history = await app.history();
-  const compacted = history.filter((event) =>
-    event.type === "context.compacted"
-  );
+  const compacted = history.filter((event) => event.type === "context.compacted");
   assert.equal(compacted.length, 1);
   assert.equal(compacted[0].strategy, "keep-current-input");
-  assert.deepEqual(compacted[0].messages, [{
-    role: "user",
-    content: [{ type: "text", text: "second" }],
-  }]);
+  assert.deepEqual(compacted[0].messages, [
+    {
+      role: "user",
+      content: [{ type: "text", text: "second" }],
+    },
+  ]);
 
   await app.close();
   await eventReader;
-  assert.equal(
-    events.filter((event) => event.type === "context.compacted").length,
-    1,
-  );
+  assert.equal(events.filter((event) => event.type === "context.compacted").length, 1);
 });
 
 test("persists automatic compaction after the run events it contains", async (t) => {
@@ -612,7 +605,9 @@ test("persists automatic compaction after the run events it contains", async (t)
     compactionDidStart = resolve;
   });
   let modelCall = 0;
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const app = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace,
     instructions: "Use the available tools.",
     subagents: false,
@@ -634,14 +629,16 @@ test("persists automatic compaction after the run events it contains", async (t)
             };
       },
     },
-    tools: [{
-      name: "large",
-      description: "Returns enough data to trigger compaction",
-      inputSchema: { type: "object" },
-      async execute() {
-        return { payload: "x".repeat(5000) };
+    tools: [
+      {
+        name: "large",
+        description: "Returns enough data to trigger compaction",
+        inputSchema: { type: "object" },
+        async execute() {
+          return { payload: "x".repeat(5000) };
+        },
       },
-    }],
+    ],
     permissionPolicy: () => "allow",
     store,
     catalog: new InMemorySessionCatalog(),
@@ -650,17 +647,19 @@ test("persists automatic compaction after the run events it contains", async (t)
       contextWindowTokens: 2000,
       compactTriggerRatio: 0.5,
     },
-    autoCompactionStrategies: [{
-      name: "drop-input",
-      compact(snapshot) {
-        compactionDidStart();
-        return snapshot.messages.slice(1).map((message) =>
-          message.role === "tool"
-            ? { ...message, content: [{ type: "json", value: { pruned: true } }] }
-            : message
-        );
+    autoCompactionStrategies: [
+      {
+        name: "drop-input",
+        compact(snapshot) {
+          compactionDidStart();
+          return snapshot.messages
+            .slice(1)
+            .map((message) =>
+              message.role === "tool" ? { ...message, content: [{ type: "json", value: { pruned: true } }] } : message,
+            );
+        },
       },
-    }],
+    ],
   });
 
   const run = await app.submit({ input: "use the large tool" });
@@ -672,9 +671,7 @@ test("persists automatic compaction after the run events it contains", async (t)
 
   const history = await app.history();
   const toolIndex = history.findIndex((event) => event.type === "tool.completed");
-  const compactionIndex = history.findIndex((event) =>
-    event.type === "context.compacted"
-  );
+  const compactionIndex = history.findIndex((event) => event.type === "context.compacted");
   assert.ok(toolIndex >= 0);
   assert.ok(compactionIndex > toolIndex);
 
@@ -688,12 +685,7 @@ test("persists automatic compaction after the run events it contains", async (t)
       return {};
     },
   });
-  assert.equal(
-    replayed.filter((message) =>
-      message.role === "tool" && message.toolCallId === "large_1"
-    ).length,
-    1,
-  );
+  assert.equal(replayed.filter((message) => message.role === "tool" && message.toolCallId === "large_1").length, 1);
   await app.close();
 });
 
@@ -707,16 +699,21 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
     fetch: async (url) => {
       urls.push(String(url));
       if (String(url).endsWith("/responses/compact")) {
-        return new Response(JSON.stringify({
-          error: { message: "compact service unavailable", type: "server_error" },
-        }), { status: 503 });
+        return new Response(
+          JSON.stringify({
+            error: { message: "compact service unavailable", type: "server_error" },
+          }),
+          { status: 503 },
+        );
       }
       return openAIResponse("fallback worked");
     },
   });
   const store = new (await import("@sortedyuan/may/session")).InMemorySessionStore();
   const events = [];
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const app = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace,
     instructions: "Use the available tools.",
     model,
@@ -733,10 +730,12 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
       {
         name: "offline-fallback",
         compact() {
-          return [{
-            role: "user",
-            content: [{ type: "text", text: "Continue after fallback." }],
-          }];
+          return [
+            {
+              role: "user",
+              content: [{ type: "text", text: "Continue after fallback." }],
+            },
+          ];
         },
       },
     ],
@@ -745,16 +744,11 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
 
   const result = await (await app.submit({ input: "x".repeat(2500) })).result;
   assert.equal(result.message.content[0].text, "fallback worked");
-  assert.deepEqual(urls, [
-    "https://example.test/v1/responses/compact",
-    "https://example.test/v1/responses",
-  ]);
+  assert.deepEqual(urls, ["https://example.test/v1/responses/compact", "https://example.test/v1/responses"]);
 
   await app.close();
   await eventReader;
-  const failed = events.find((event) =>
-    event.type === "context.compaction.failed"
-  );
+  const failed = events.find((event) => event.type === "context.compaction.failed");
   assert.equal(failed.strategy, "openai-responses-compact");
   assert.equal(failed.automatic, true);
   assert.equal(failed.error.name, "OpenAIResponsesError");
@@ -762,16 +756,11 @@ test("falls back when OpenAI native compaction returns 503 and exposes the failu
   assert.equal(failed.continuing, true);
   assert.equal(failed.before.shouldCompact, true);
   assert.equal(
-    events.some((event) =>
-      event.type === "context.compacted" &&
-      event.strategy === "offline-fallback"
-    ),
+    events.some((event) => event.type === "context.compacted" && event.strategy === "offline-fallback"),
     true,
   );
   assert.equal(
-    (await app.history()).some((event) =>
-      event.type === "context.compaction.failed"
-    ),
+    (await app.history()).some((event) => event.type === "context.compaction.failed"),
     false,
   );
 });
@@ -782,7 +771,9 @@ test("cancels an active summary compaction without persisting it", async () => {
   const started = new Promise((resolve) => {
     summaryStarted = resolve;
   });
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const app = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace: process.cwd(),
     model: {
       async *stream() {
@@ -799,17 +790,15 @@ test("cancels an active summary compaction without persisting it", async () => {
       summarize({ signal }) {
         summaryStarted();
         return new Promise((_resolve, reject) => {
-          signal.addEventListener(
-            "abort",
-            () => reject(new RunCancelledError("summary stopped")),
-            { once: true },
-          );
+          signal.addEventListener("abort", () => reject(new RunCancelledError("summary stopped")), { once: true });
         });
       },
     },
   });
   for (const input of ["one", "two", "three"]) {
-    await (await app.submit({ input })).result;
+    await (
+      await app.submit({ input })
+    ).result;
   }
 
   const compaction = app.compactContext();
@@ -841,7 +830,9 @@ test("cancels an active model call", async () => {
       };
     },
   };
-  const app = await MaybeCodeWorkspace.open({ git: false, requestRecording: "off",
+  const app = await MaybeCodeWorkspace.open({
+    git: false,
+    requestRecording: "off",
     workspace: process.cwd(),
     model,
     store: new (await import("@sortedyuan/may/session")).InMemorySessionStore(),
@@ -851,10 +842,7 @@ test("cancels an active model call", async () => {
 
   const run = await app.submit({ input: "wait" });
   await modelStarted;
-  await assert.rejects(
-    app.compactContext(),
-    /while an operation is active/u,
-  );
+  await assert.rejects(app.compactContext(), /while an operation is active/u);
   assert.equal(app.cancel("stop"), true);
   await assert.rejects(run.result, RunCancelledError);
   assert.equal(app.application.getDelegationState().status, "cancelled");
@@ -873,12 +861,14 @@ function openAIResponse(text) {
       id: "resp_test",
       object: "response",
       status: "completed",
-      output: [{
-        type: "message",
-        role: "assistant",
-        status: "completed",
-        content: [{ type: "output_text", text, annotations: [] }],
-      }],
+      output: [
+        {
+          type: "message",
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text, annotations: [] }],
+        },
+      ],
       usage: { input_tokens: 12, output_tokens: 4, total_tokens: 16 },
     },
   };
@@ -891,10 +881,7 @@ function openAIResponse(text) {
 async function collectEvents(app, target, approvalDecision) {
   for await (const event of app.events) {
     target.push(event);
-    if (
-      event.type === "permission.event" &&
-      event.event.type === "approval.requested"
-    ) {
+    if (event.type === "permission.event" && event.event.type === "approval.requested") {
       await app.resolveApproval(event.event.request.id, approvalDecision);
     }
   }

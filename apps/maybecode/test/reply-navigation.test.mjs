@@ -10,18 +10,25 @@ function openView(t, store) {
   const view = new MaybeCodeTerminalView({
     store,
     workspace: "workspace",
-    onSubmit() { assert.fail("navigation must not submit the draft"); },
+    onSubmit() {
+      assert.fail("navigation must not submit the draft");
+    },
   });
   const input = new PassThrough();
   const driver = new NodeTerminalDriver({ input, output: new PassThrough(), requireTTY: false });
   driver.onKey((stroke) => view.handleKey(stroke));
   driver.start();
   driver.enterAlternateScreen();
-  t.after(() => { driver.close(); view.dispose(); });
+  t.after(() => {
+    driver.close();
+    view.dispose();
+  });
   return {
     input,
     view,
-    jump() { input.write("\x07r"); },
+    jump() {
+      input.write("\x07r");
+    },
     render(width = 100, height = 24) {
       return view.render({ width, height }).lines.map(stripVTControlCharacters);
     },
@@ -30,13 +37,26 @@ function openView(t, store) {
 
 function completeReply(store, text, runId = "run-1", reasoning = "FINAL-THINKING\n".repeat(40)) {
   const base = { runId, step: 2, timestamp: 1 };
-  const message = { role: "assistant", content: [
-    { type: "reasoning", text: reasoning }, { type: "text", text },
-  ] };
+  const message = {
+    role: "assistant",
+    content: [
+      { type: "reasoning", text: reasoning },
+      { type: "text", text },
+    ],
+  };
   store.applyMayEvent({ ...base, seq: 10, type: "model.completed", message, contextMessageCount: 4 });
-  store.applyMayEvent({ ...base, seq: 11, type: "run.completed", result: {
-    runId, steps: 2, modelCalls: 2, toolCalls: 1, message,
-  } });
+  store.applyMayEvent({
+    ...base,
+    seq: 11,
+    type: "run.completed",
+    result: {
+      runId,
+      steps: 2,
+      modelCalls: 2,
+      toolCalls: 1,
+      message,
+    },
+  });
 }
 
 test("jumps to final Markdown body through terminal input and preserves draft, focus and reading position", (t) => {
@@ -44,12 +64,24 @@ test("jumps to final Markdown body through terminal input and preserves draft, f
   store.appendUser("question");
   const base = { runId: "run-1", step: 1, timestamp: 1 };
   store.applyMayEvent({ ...base, seq: 1, type: "run.started" });
-  store.applyMayEvent({ ...base, seq: 2, type: "model.completed", contextMessageCount: 2, message: {
-    role: "assistant", content: [{ type: "text", text: "TOOL-PREAMBLE" }],
-    toolCalls: [{ id: "call-1", name: "read", input: { path: "notes.md" } }],
-  } });
-  store.applyMayEvent({ ...base, seq: 3, type: "tool.completed",
-    call: { id: "call-1", name: "read", input: { path: "notes.md" } }, output: "TOOL-OUTPUT\n".repeat(50) });
+  store.applyMayEvent({
+    ...base,
+    seq: 2,
+    type: "model.completed",
+    contextMessageCount: 2,
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text: "TOOL-PREAMBLE" }],
+      toolCalls: [{ id: "call-1", name: "read", input: { path: "notes.md" } }],
+    },
+  });
+  store.applyMayEvent({
+    ...base,
+    seq: 3,
+    type: "tool.completed",
+    call: { id: "call-1", name: "read", input: { path: "notes.md" } },
+    output: "TOOL-OUTPUT\n".repeat(50),
+  });
   completeReply(store, "# REPLY-START\n\n" + "正文内容需要自动换行。".repeat(400));
   const terminal = openView(t, store);
   terminal.input.write("draft");
@@ -136,17 +168,29 @@ test("waits for the current final reply and keeps modal input isolated", async (
 
 test("restores the final reply from durable history and excludes empty completed output", (t) => {
   const store = new TranscriptStore();
-  const message = { role: "assistant", content: [
-    { type: "reasoning", text: "history thinking\n".repeat(50) },
-    { type: "text", text: "HISTORY-REPLY\n".repeat(50) },
-  ] };
+  const message = {
+    role: "assistant",
+    content: [
+      { type: "reasoning", text: "history thinking\n".repeat(50) },
+      { type: "text", text: "HISTORY-REPLY\n".repeat(50) },
+    ],
+  };
   const base = { sessionId: "session-1", runId: "run-1", timestamp: 1 };
   const history = [
     { ...base, seq: 1, type: "run.started" },
     { ...base, seq: 2, type: "assistant.completed", step: 1, message },
-    { ...base, seq: 3, type: "run.completed", result: {
-      runId: "run-1", steps: 1, modelCalls: 1, toolCalls: 0, message,
-    } },
+    {
+      ...base,
+      seq: 3,
+      type: "run.completed",
+      result: {
+        runId: "run-1",
+        steps: 1,
+        modelCalls: 1,
+        toolCalls: 0,
+        message,
+      },
+    },
   ];
   store.loadHistory(history);
   const terminal = openView(t, store);

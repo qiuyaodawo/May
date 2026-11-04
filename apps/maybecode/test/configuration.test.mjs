@@ -1,13 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  readdir,
-  realpath,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -16,45 +8,32 @@ import { InMemoryContext } from "@sortedyuan/may/core";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
 
 import { openConfiguredMaybeCode, runMaybeCode } from "../dist/index.js";
-import { createMaybeCodeSlashCommandSuggester, executeMaybeCodeSlashCommand, formatMaybeCodeMcpStatus } from "../dist/slash-commands.js";
+import {
+  createMaybeCodeSlashCommandSuggester,
+  executeMaybeCodeSlashCommand,
+  formatMaybeCodeMcpStatus,
+} from "../dist/slash-commands.js";
 import { createCodingPermissionPolicy } from "../dist/policy.js";
 import { parseMaybeCodeArgs } from "../dist/args.js";
 import { resolveMaybeCodeMcp, resolveMaybeCodeObservability, resolveMaybeCodeRetry } from "../dist/configured.js";
 import { runMaybeCodeMcpCommand } from "../dist/mcp-auth.js";
 
 test("parses MaybeCode startup options", () => {
-  assert.deepEqual(
-    parseMaybeCodeArgs([
-      "--config",
-      "custom.json",
-      "--model",
-      "reasoner",
-      "--resume",
-      "abc",
-      ".",
-    ]),
-    {
-      type: "start",
-      workspace: ".",
-      configPath: "custom.json",
-      model: "reasoner",
-      sessionId: "abc",
-      autoResume: false,
-      ui: "retained",
-    },
-  );
+  assert.deepEqual(parseMaybeCodeArgs(["--config", "custom.json", "--model", "reasoner", "--resume", "abc", "."]), {
+    type: "start",
+    workspace: ".",
+    configPath: "custom.json",
+    model: "reasoner",
+    sessionId: "abc",
+    autoResume: false,
+    ui: "retained",
+  });
   assert.equal(parseMaybeCodeArgs(["--ui", "retained"]).ui, "retained");
   assert.throws(() => parseMaybeCodeArgs(["--ui", "classic"]), /--ui must be "retained" or "web"/);
   assert.equal(parseMaybeCodeArgs([]).autoResume, false);
   assert.equal(parseMaybeCodeArgs(["--continue"]).autoResume, true);
-  assert.throws(
-    () => parseMaybeCodeArgs(["--continue", "--resume", "abc"]),
-    /cannot be used together/,
-  );
-  assert.throws(
-    () => parseMaybeCodeArgs(["--config", "--model", "chat"]),
-    /--config requires a value/,
-  );
+  assert.throws(() => parseMaybeCodeArgs(["--continue", "--resume", "abc"]), /cannot be used together/);
+  assert.throws(() => parseMaybeCodeArgs(["--config", "--model", "chat"]), /--config requires a value/);
 });
 
 test("opens configured MaybeCode with injected model creation", async (t) => {
@@ -68,7 +47,8 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   let request;
   let contextOptions;
   const app = await openConfiguredMaybeCode(
-    { git: false,
+    {
+      git: false,
       skills: false,
       workspace: directory,
       dataDirectory: join(directory, "data"),
@@ -135,15 +115,8 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
     adapter: "deepseek-chat",
     model: "deepseek-chat",
   });
-  assert.equal(
-    (await (await app.submit({ input: "hello" })).result).message.content[0]
-      .text,
-    "ok",
-  );
-  assert.match(
-    request.messages[0].content[0].text,
-    /^custom system\n\n# Current environment\n\n/u,
-  );
+  assert.equal((await (await app.submit({ input: "hello" })).result).message.content[0].text, "ok");
+  assert.match(request.messages[0].content[0].text, /^custom system\n\n# Current environment\n\n/u);
   assert.match(
     request.messages[0].content[0].text,
     /\n\n# Project instructions\n\nSource: [^\n]+\n\nproject rules\n\n# Tool use\n\n/u,
@@ -174,11 +147,7 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
   let closed = false;
   let releaseEvents;
   const app = await openConfiguredMaybeCode(
-    { git: false,
-      workspace: directory,
-      dataDirectory: join(directory, "data"),
-      autoResume: false,
-    },
+    { git: false, workspace: directory, dataDirectory: join(directory, "data"), autoResume: false },
     {
       async loadConfig() {
         return {
@@ -213,9 +182,13 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
         const closedEvent = new Promise((resolve) => {
           releaseEvents = resolve;
         });
-        return mockPool = {
-          async refresh(id) { refreshed.push(["refresh", id]); },
-          async reconnect(id) { refreshed.push(["reconnect", id]); },
+        return (mockPool = {
+          async refresh(id) {
+            refreshed.push(["refresh", id]);
+          },
+          async reconnect(id) {
+            refreshed.push(["reconnect", id]);
+          },
           events: {
             async *[Symbol.asyncIterator]() {
               yield {
@@ -238,64 +211,72 @@ test("adds configured MCP tools and owns the client pool lifecycle", async (t) =
               };
             },
           },
-          tools: [{
-            name: "mcp__local__lookup",
-            description: "lookup",
-            inputSchema: { type: "object" },
-            async execute() {
-              return { content: [{ type: "text", text: "found" }] };
+          tools: [
+            {
+              name: "mcp__local__lookup",
+              description: "lookup",
+              inputSchema: { type: "object" },
+              async execute() {
+                return { content: [{ type: "text", text: "found" }] };
+              },
             },
-          }],
+          ],
           status() {
-            return [{
-              serverId: "local",
-              transport: "stdio",
-              required: true,
-              state: "connected",
-              toolNames: ["mcp__local__lookup"],
-            }];
+            return [
+              {
+                serverId: "local",
+                transport: "stdio",
+                required: true,
+                state: "connected",
+                toolNames: ["mcp__local__lookup"],
+              },
+            ];
           },
           async close() {
             closed = true;
             releaseEvents();
           },
-        };
+        });
       },
     },
   );
 
-  assert.deepEqual(openedWith.servers, [{
-    id: "local",
-    command: "test-server",
-    args: ["--stdio"],
-    cwd: await realpath(directory),
-  }]);
+  assert.deepEqual(openedWith.servers, [
+    {
+      id: "local",
+      command: "test-server",
+      args: ["--stdio"],
+      cwd: await realpath(directory),
+    },
+  ]);
   assert.equal((await app.getMcpStatus())[0].state, "connected");
-  assert.equal(
-    (await executeMaybeCodeSlashCommand("/mcp", app)).type,
-    "mcp.status",
-  );
+  assert.equal((await executeMaybeCodeSlashCommand("/mcp", app)).type, "mcp.status");
   const observedEvents = [];
   const eventTask = (async () => {
     for await (const event of app.events) observedEvents.push(event);
   })();
-  await (await app.submit({ input: "hello" })).result;
+  await (
+    await app.submit({ input: "hello" })
+  ).result;
   assert.ok(request.tools.some((tool) => tool.name === "read"));
   assert.ok(request.tools.some((tool) => tool.name === "mcp__local__lookup"));
   mockPool.tools = [{ ...mockPool.tools[0], name: "mcp__local__updated" }];
-  await (await app.submit({ input: "next run" })).result;
+  await (
+    await app.submit({ input: "next run" })
+  ).result;
   assert.ok(request.tools.some((tool) => tool.name === "mcp__local__updated"));
   assert.ok(!request.tools.some((tool) => tool.name === "mcp__local__lookup"));
   await executeMaybeCodeSlashCommand("/mcp refresh local", app);
   await executeMaybeCodeSlashCommand("/mcp reconnect local", app);
-  assert.deepEqual(refreshed, [["refresh", "local"], ["reconnect", "local"]]);
+  assert.deepEqual(refreshed, [
+    ["refresh", "local"],
+    ["reconnect", "local"],
+  ]);
   await app.close();
   await eventTask;
   assert.equal(closed, true);
   assert.deepEqual(
-    observedEvents
-      .filter((event) => event.type.startsWith("mcp.server."))
-      .map((event) => event.type),
+    observedEvents.filter((event) => event.type.startsWith("mcp.server.")).map((event) => event.type),
     ["mcp.server.connected", "mcp.server.disconnected"],
   );
 });
@@ -345,16 +326,19 @@ test("writes configured content-free traces and flushes them on close", async (t
     },
   );
 
-  await (await app.submit({ input: "private prompt" })).result;
+  await (
+    await app.submit({ input: "private prompt" })
+  ).result;
   const sessionId = app.sessionId;
   await app.close();
 
-  const traceFiles = (await readdir(traceDirectory)).filter((name) =>
-    /^traces-\d{4}-\d{2}-\d{2}\.jsonl$/u.test(name)
-  );
+  const traceFiles = (await readdir(traceDirectory)).filter((name) => /^traces-\d{4}-\d{2}-\d{2}\.jsonl$/u.test(name));
   assert.equal(traceFiles.length, 1);
   const content = await readFile(join(traceDirectory, traceFiles[0]), "utf8");
-  const spans = content.trim().split("\n").map((line) => JSON.parse(line));
+  const spans = content
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
   const run = spans.find((span) => span.name === "may.run");
   assert.ok(run);
   assert.equal(run.attributes["service.name"], "maybecode");
@@ -367,144 +351,219 @@ test("writes configured content-free traces and flushes them on close", async (t
 test("resolves and validates MaybeCode observability configuration", () => {
   const base = { path: "config.json", providers: {}, models: {} };
   assert.equal(resolveMaybeCodeObservability(base), false);
-  assert.equal(resolveMaybeCodeObservability({
-    ...base,
-    apps: { maybecode: { observability: { enabled: false } } },
-  }), false);
-  assert.deepEqual(resolveMaybeCodeObservability({
-    ...base,
-    apps: {
-      maybecode: {
-        observability: {
-          file: "trace/output.jsonl",
-          samplingRatio: 0.25,
-          retentionDays: 30,
-          batch: { maxQueueSize: 32, maxExportBatchSize: 8 },
+  assert.equal(
+    resolveMaybeCodeObservability({
+      ...base,
+      apps: { maybecode: { observability: { enabled: false } } },
+    }),
+    false,
+  );
+  assert.deepEqual(
+    resolveMaybeCodeObservability({
+      ...base,
+      apps: {
+        maybecode: {
+          observability: {
+            file: "trace/output.jsonl",
+            samplingRatio: 0.25,
+            retentionDays: 30,
+            batch: { maxQueueSize: 32, maxExportBatchSize: 8 },
+          },
         },
       },
+    }),
+    {
+      file: "trace/output.jsonl",
+      samplingRatio: 0.25,
+      retentionDays: 30,
+      maxQueueSize: 32,
+      maxExportBatchSize: 8,
     },
-  }), {
-    file: "trace/output.jsonl",
-    samplingRatio: 0.25,
-    retentionDays: 30,
-    maxQueueSize: 32,
-    maxExportBatchSize: 8,
-  });
-  assert.throws(() => resolveMaybeCodeObservability({
-    ...base,
-    apps: {
-      maybecode: {
-        observability: {
-          batch: { maxQueueSize: 8, maxExportBatchSize: 9 },
+  );
+  assert.throws(
+    () =>
+      resolveMaybeCodeObservability({
+        ...base,
+        apps: {
+          maybecode: {
+            observability: {
+              batch: { maxQueueSize: 8, maxExportBatchSize: 9 },
+            },
+          },
         },
-      },
-    },
-  }), /maxExportBatchSize cannot exceed maxQueueSize/u);
-  assert.throws(() => resolveMaybeCodeObservability({
-    ...base,
-    apps: { maybecode: { observability: { destination: "somewhere" } } },
-  }), /observability\.destination is not supported/u);
+      }),
+    /maxExportBatchSize cannot exceed maxQueueSize/u,
+  );
+  assert.throws(
+    () =>
+      resolveMaybeCodeObservability({
+        ...base,
+        apps: { maybecode: { observability: { destination: "somewhere" } } },
+      }),
+    /observability\.destination is not supported/u,
+  );
 });
 
 test("resolves workspace-relative MCP servers and environment references", () => {
   const workspace = join(process.cwd(), "workspace");
   const base = { path: "config.json", providers: {}, models: {} };
   assert.equal(resolveMaybeCodeMcp(base, workspace), false);
-  assert.deepEqual(resolveMaybeCodeMcp({
-    ...base,
-    apps: {
-      maybecode: {
-        mcpServers: {
-          files: {
-            command: "node",
-            args: ["server.mjs", "--root", "."],
-            cwd: "tools",
-            env: { TOKEN: "Bearer ${MCP_TOKEN}" },
-            required: false,
-            requestTimeoutMs: 1_000,
-            stderrMaxBytes: 2_048,
+  assert.deepEqual(
+    resolveMaybeCodeMcp(
+      {
+        ...base,
+        apps: {
+          maybecode: {
+            mcpServers: {
+              files: {
+                command: "node",
+                args: ["server.mjs", "--root", "."],
+                cwd: "tools",
+                env: { TOKEN: "Bearer ${MCP_TOKEN}" },
+                required: false,
+                requestTimeoutMs: 1_000,
+                stderrMaxBytes: 2_048,
+              },
+              disabled: { enabled: false },
+            },
           },
-          disabled: { enabled: false },
         },
       },
-    },
-  }, workspace, { MCP_TOKEN: "secret" }), {
-    servers: [{
-      id: "files",
-      command: "node",
-      required: false,
-      args: ["server.mjs", "--root", "."],
-      cwd: join(workspace, "tools"),
-      env: { TOKEN: "Bearer secret" },
-      requestTimeoutMs: 1_000,
-      stderrMaxBytes: 2_048,
-    }],
-  });
-  assert.throws(() => resolveMaybeCodeMcp({
-    ...base,
-    apps: {
-      maybecode: {
-        mcpServers: {
-          files: { command: "node", env: { TOKEN: "${MISSING}" } },
+      workspace,
+      { MCP_TOKEN: "secret" },
+    ),
+    {
+      servers: [
+        {
+          id: "files",
+          command: "node",
+          required: false,
+          args: ["server.mjs", "--root", "."],
+          cwd: join(workspace, "tools"),
+          env: { TOKEN: "Bearer secret" },
+          requestTimeoutMs: 1_000,
+          stderrMaxBytes: 2_048,
         },
-      },
+      ],
     },
-  }, workspace, {}), /missing environment variable MISSING/u);
+  );
+  assert.throws(
+    () =>
+      resolveMaybeCodeMcp(
+        {
+          ...base,
+          apps: {
+            maybecode: {
+              mcpServers: {
+                files: { command: "node", env: { TOKEN: "${MISSING}" } },
+              },
+            },
+          },
+        },
+        workspace,
+        {},
+      ),
+    /missing environment variable MISSING/u,
+  );
 });
 
 test("resolves HTTP MCP headers, validates transport options, and formats protocol status", () => {
   const workspace = process.cwd();
   const base = { path: "config.json", providers: {}, models: {} };
   const config = (remote) => ({
-    ...base, apps: { maybecode: { mcpServers: { remote } } },
+    ...base,
+    apps: { maybecode: { mcpServers: { remote } } },
   });
   const endpoint = {
-    transport: "streamable-http", url: "https://mcp.example.com/mcp",
-    headers: { Authorization: "Bearer ${MCP_TOKEN}" }, protocolMode: "auto",
-    required: false, requestTimeoutMs: 1_000,
+    transport: "streamable-http",
+    url: "https://mcp.example.com/mcp",
+    headers: { Authorization: "Bearer ${MCP_TOKEN}" },
+    protocolMode: "auto",
+    required: false,
+    requestTimeoutMs: 1_000,
   };
   assert.deepEqual(resolveMaybeCodeMcp(config(endpoint), workspace, { MCP_TOKEN: "secret" }), {
     servers: [{ ...endpoint, id: "remote", headers: { Authorization: "Bearer secret" } }],
   });
   assert.throws(() => resolveMaybeCodeMcp(config(endpoint), workspace, {}), /missing environment variable MCP_TOKEN/u);
   for (const change of [
-    { cwd: "." }, { command: "node" }, { stderrMaxBytes: 1_024 },
-    { url: "http://example.com" }, { transport: "sse" }, { protocolMode: "pin" },
+    { cwd: "." },
+    { command: "node" },
+    { stderrMaxBytes: 1_024 },
+    { url: "http://example.com" },
+    { transport: "sse" },
+    { protocolMode: "pin" },
     { headers: { Host: "spoof" } },
   ]) {
     assert.throws(() => resolveMaybeCodeMcp(config({ ...endpoint, ...change }), workspace, { MCP_TOKEN: "secret" }));
   }
-  assert.throws(() => resolveMaybeCodeMcp(config({ command: "node", headers: {} }), workspace), /mcpServers\.remote\.headers is not supported/u);
-  assert.match(formatMaybeCodeMcpStatus([{
-    serverId: "remote", transport: "streamable-http", required: false,
-    state: "connected", protocolVersion: "2026-07-28", toolNames: ["mcp__remote__lookup"],
-  }]), /optional, streamable-http\)\n  protocol: 2026-07-28/u);
+  assert.throws(
+    () => resolveMaybeCodeMcp(config({ command: "node", headers: {} }), workspace),
+    /mcpServers\.remote\.headers is not supported/u,
+  );
+  assert.match(
+    formatMaybeCodeMcpStatus([
+      {
+        serverId: "remote",
+        transport: "streamable-http",
+        required: false,
+        state: "connected",
+        protocolVersion: "2026-07-28",
+        toolNames: ["mcp__remote__lookup"],
+      },
+    ]),
+    /optional, streamable-http\)\n  protocol: 2026-07-28/u,
+  );
 });
 
 test("MCP login commands run before model startup and accept OAuth configuration", async () => {
   const command = parseMaybeCodeArgs(["mcp", "login", "remote", "--config", "auth.json", "--scope", "write"]);
-  assert.deepEqual(command, { type: "mcp", action: "login", serverId: "remote", configPath: "auth.json", scopes: ["write"] });
+  assert.deepEqual(command, {
+    type: "mcp",
+    action: "login",
+    serverId: "remote",
+    configPath: "auth.json",
+    scopes: ["write"],
+  });
   assert.throws(() => parseMaybeCodeArgs(["mcp", "logout", "remote", "--scope", "write"]));
   const configured = {
-    path: "auth.json", providers: {}, models: {},
-    apps: { maybecode: { mcpServers: { remote: {
-      transport: "streamable-http", url: "https://mcp.example.com/mcp",
-      auth: { type: "oauth", scopes: ["read"], authorizationOrigins: ["https://accounts.example.com"] },
-    } } } },
+    path: "auth.json",
+    providers: {},
+    models: {},
+    apps: {
+      maybecode: {
+        mcpServers: {
+          remote: {
+            transport: "streamable-http",
+            url: "https://mcp.example.com/mcp",
+            auth: { type: "oauth", scopes: ["read"], authorizationOrigins: ["https://accounts.example.com"] },
+          },
+        },
+      },
+    },
   };
   const output = [];
   let loggedIn;
   const deps = {
-    write: (text) => output.push(text), loadConfig: async () => configured,
-    oauth: { async login(server) { loggedIn = server; } },
+    write: (text) => output.push(text),
+    loadConfig: async () => configured,
+    oauth: {
+      async login(server) {
+        loggedIn = server;
+      },
+    },
   };
   await runMaybeCodeMcpCommand(command, deps);
   assert.deepEqual(loggedIn.auth.scopes, ["read", "write"]);
   assert.match(output.join(""), /login complete/u);
   const code = await runMaybeCode(["mcp", "status", "remote"], {
     terminal: { write: (text) => output.push(text), close() {} },
-    open: () => { throw new Error("Agent must not start"); },
-    mcpAuth: async (value) => { assert.equal(value.action, "status"); },
+    open: () => {
+      throw new Error("Agent must not start");
+    },
+    mcpAuth: async (value) => {
+      assert.equal(value.action, "status");
+    },
   });
   assert.equal(code, 0);
   configured.apps.maybecode.mcpServers.remote.auth.clientId = "public-client";
@@ -540,11 +599,7 @@ test("switches configured model profiles by prefix without changing sessions", a
   const created = [];
   const persistedDefaults = [];
   const app = await openConfiguredMaybeCode(
-    { git: false,
-      workspace: directory,
-      dataDirectory: join(directory, "data"),
-      autoResume: false,
-    },
+    { git: false, workspace: directory, dataDirectory: join(directory, "data"), autoResume: false },
     {
       async loadConfig() {
         return {
@@ -589,7 +644,9 @@ test("switches configured model profiles by prefix without changing sessions", a
   );
 
   const sessionId = app.sessionId;
-  await (await app.submit({ input: "before" })).result;
+  await (
+    await app.submit({ input: "before" })
+  ).result;
   const suggest = createMaybeCodeSlashCommandSuggester(app);
   assert.deepEqual(
     (await suggest("/model cliproxy-")).map((item) => item.label),
@@ -600,10 +657,7 @@ test("switches configured model profiles by prefix without changing sessions", a
     (await suggest("/model clip ")).map((item) => item.label),
     ["--default"],
   );
-  const switched = await executeMaybeCodeSlashCommand(
-    "/model clip --default",
-    app,
-  );
+  const switched = await executeMaybeCodeSlashCommand("/model clip --default", app);
   assert.equal(switched.type, "model.switched");
   assert.equal(switched.profile, "cliproxy-low");
   assert.equal(app.sessionId, sessionId);
@@ -611,18 +665,11 @@ test("switches configured model profiles by prefix without changing sessions", a
   assert.deepEqual(created, ["cliproxy-high", "cliproxy-low"]);
   assert.deepEqual(persistedDefaults, ["cliproxy-low"]);
   assert.deepEqual(
-    (await app.listModels()).filter((model) => model.isDefault)
-      .map((model) => model.name),
+    (await app.listModels()).filter((model) => model.isDefault).map((model) => model.name),
     ["cliproxy-low"],
   );
-  assert.equal(
-    (await (await app.submit({ input: "after" })).result).message.content[0].text,
-    "cliproxy-low",
-  );
-  assert.equal(
-    (await executeMaybeCodeSlashCommand("/model", app)).type,
-    "model.selection.requested",
-  );
+  assert.equal((await (await app.submit({ input: "after" })).result).message.content[0].text, "cliproxy-low");
+  assert.equal((await executeMaybeCodeSlashCommand("/model", app)).type, "model.selection.requested");
   await app.close();
 });
 
@@ -630,11 +677,7 @@ test("switches supported reasoning effort without duplicating model profiles", a
   const directory = await temporaryDirectory(t);
   const createdEfforts = [];
   const app = await openConfiguredMaybeCode(
-    { git: false,
-      workspace: directory,
-      dataDirectory: join(directory, "data"),
-      autoResume: false,
-    },
+    { git: false, workspace: directory, dataDirectory: join(directory, "data"), autoResume: false },
     {
       async loadConfig() {
         return {
@@ -688,10 +731,7 @@ test("switches supported reasoning effort without duplicating model profiles", a
 test("does not enable provider-native automatic compaction by default", async (t) => {
   const opened = await openWithCapturedOpenAIContext(t, {});
 
-  assert.deepEqual(opened.strategyNames, [
-    "prune-old-tool-results",
-    "summary-tail",
-  ]);
+  assert.deepEqual(opened.strategyNames, ["prune-old-tool-results", "summary-tail"]);
   await opened.app.close();
 });
 
@@ -730,48 +770,57 @@ test("validates automatic compaction configuration shape", async (t) => {
 test("resolves and validates MaybeCode model retry configuration", () => {
   const base = { path: "config.json", providers: {}, models: {} };
   assert.deepEqual(resolveMaybeCodeRetry(base), {});
-  assert.equal(resolveMaybeCodeRetry({
-    ...base,
-    apps: { maybecode: { retry: false } },
-  }), false);
-  assert.deepEqual(resolveMaybeCodeRetry({
-    ...base,
-    apps: {
-      maybecode: {
-        retry: {
-          maxAttempts: 4,
-          baseDelayMs: 100,
-          maxDelayMs: 2000,
-          jitterRatio: 0.1,
+  assert.equal(
+    resolveMaybeCodeRetry({
+      ...base,
+      apps: { maybecode: { retry: false } },
+    }),
+    false,
+  );
+  assert.deepEqual(
+    resolveMaybeCodeRetry({
+      ...base,
+      apps: {
+        maybecode: {
+          retry: {
+            maxAttempts: 4,
+            baseDelayMs: 100,
+            maxDelayMs: 2000,
+            jitterRatio: 0.1,
+          },
         },
       },
+    }),
+    {
+      maxAttempts: 4,
+      baseDelayMs: 100,
+      maxDelayMs: 2000,
+      jitterRatio: 0.1,
     },
-  }), {
-    maxAttempts: 4,
-    baseDelayMs: 100,
-    maxDelayMs: 2000,
-    jitterRatio: 0.1,
-  });
-  assert.throws(() => resolveMaybeCodeRetry({
-    ...base,
-    apps: { maybecode: { retry: { maxAttempts: 0 } } },
-  }), /apps\.maybecode\.retry\.maxAttempts must be >= 1/u);
-  assert.throws(() => resolveMaybeCodeRetry({
-    ...base,
-    apps: { maybecode: { retry: { baseDelayMs: 9000 } } },
-  }), /baseDelayMs cannot exceed maxDelayMs/u);
+  );
+  assert.throws(
+    () =>
+      resolveMaybeCodeRetry({
+        ...base,
+        apps: { maybecode: { retry: { maxAttempts: 0 } } },
+      }),
+    /apps\.maybecode\.retry\.maxAttempts must be >= 1/u,
+  );
+  assert.throws(
+    () =>
+      resolveMaybeCodeRetry({
+        ...base,
+        apps: { maybecode: { retry: { baseDelayMs: 9000 } } },
+      }),
+    /baseDelayMs cannot exceed maxDelayMs/u,
+  );
 });
 
 test("configured MaybeCode automatically retries transient model failures", async (t) => {
   const directory = await temporaryDirectory(t);
   let attempts = 0;
   const app = await openConfiguredMaybeCode(
-    { git: false,
-      workspace: directory,
-      dataDirectory: join(directory, "data"),
-      autoResume: false,
-      subagents: false,
-    },
+    { git: false, workspace: directory, dataDirectory: join(directory, "data"), autoResume: false, subagents: false },
     {
       async loadConfig() {
         return {
@@ -821,25 +870,21 @@ test("configured MaybeCode automatically retries transient model failures", asyn
   await app.close();
 });
 
-test(
-  "explains Windows drive-relative paths mangled by Git Bash",
-  { skip: process.platform !== "win32" },
-  async () => {
-    for (const workspace of ["E:codeept", "E:"]) {
-      await assert.rejects(
-        openConfiguredMaybeCode(
-          { git: false, workspace },
-          {
-            async loadConfig() {
-              throw new Error("config should not be loaded");
-            },
+test("explains Windows drive-relative paths mangled by Git Bash", { skip: process.platform !== "win32" }, async () => {
+  for (const workspace of ["E:codeept", "E:"]) {
+    await assert.rejects(
+      openConfiguredMaybeCode(
+        { git: false, workspace },
+        {
+          async loadConfig() {
+            throw new Error("config should not be loaded");
           },
-        ),
-        /Git Bash removes unquoted backslashes.*E:\/code\/project/u,
-      );
-    }
-  },
-);
+        },
+      ),
+      /Git Bash removes unquoted backslashes.*E:\/code\/project/u,
+    );
+  }
+});
 
 function assistantMessage(text) {
   return { role: "assistant", content: [{ type: "text", text }] };
@@ -855,7 +900,8 @@ async function openWithCapturedOpenAIContext(t, apps) {
   const directory = await temporaryDirectory(t);
   let contextOptions;
   const app = await openConfiguredMaybeCode(
-    { git: false,
+    {
+      git: false,
       workspace: directory,
       dataDirectory: join(directory, "data"),
       autoResume: false,
@@ -892,8 +938,6 @@ async function openWithCapturedOpenAIContext(t, apps) {
   );
   return {
     app,
-    strategyNames: contextOptions.autoCompactionStrategies.map(
-      (strategy) => strategy.name,
-    ),
+    strategyNames: contextOptions.autoCompactionStrategies.map((strategy) => strategy.name),
   };
 }

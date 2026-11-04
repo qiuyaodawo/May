@@ -1,18 +1,10 @@
-import {
-  loadMayConfig,
-  type LoadMayConfigOptions,
-  type MayConfig,
-} from "@sortedyuan/may/config";
+import { loadMayConfig, type LoadMayConfigOptions, type MayConfig } from "@sortedyuan/may/config";
 import { InMemoryContext, May, omitUndefined, type Model } from "@sortedyuan/may/core";
 import type { ProviderAdapterRegistry } from "@sortedyuan/providers";
 import { CLI_USAGE, parseCliArgs } from "./args.js";
 import { CliUsageError } from "./errors.js";
 import { createConfiguredModel } from "./model.js";
-import {
-  selectModelConfig,
-  type ModelSelector,
-  type SelectedModelConfig,
-} from "./selection.js";
+import { selectModelConfig, type ModelSelector, type SelectedModelConfig } from "./selection.js";
 
 export interface CliOutput {
   write(text: string): unknown;
@@ -22,17 +14,12 @@ export interface RunCliDependencies {
   readonly stdout?: CliOutput;
   readonly stderr?: CliOutput;
   readonly signal?: AbortSignal;
-  readonly loadConfig?: (
-    options?: LoadMayConfigOptions,
-  ) => Promise<MayConfig>;
+  readonly loadConfig?: (options?: LoadMayConfigOptions) => Promise<MayConfig>;
   readonly createModel?: (selection: SelectedModelConfig) => Model;
   readonly adapterRegistry?: ProviderAdapterRegistry;
 }
 
-export async function runCli(
-  args: readonly string[],
-  dependencies: RunCliDependencies = {},
-): Promise<number> {
+export async function runCli(args: readonly string[], dependencies: RunCliDependencies = {}): Promise<number> {
   const stdout = dependencies.stdout ?? process.stdout;
   const stderr = dependencies.stderr ?? process.stderr;
 
@@ -58,19 +45,19 @@ export async function runCli(
     const config = await loadConfig(loadOptions);
     const selector: ModelSelector = omitUndefined({ model: command.model });
     const selection = selectModelConfig(config, selector);
-    const model = dependencies.createModel === undefined
-      ? createConfiguredModel(selection, dependencies.adapterRegistry)
-      : dependencies.createModel(selection);
+    const model =
+      dependencies.createModel === undefined
+        ? createConfiguredModel(selection, dependencies.adapterRegistry)
+        : dependencies.createModel(selection);
 
-    return await executeRun(
-      model,
-      command.prompt,
-      stdout,
-      stderr,
-      dependencies.signal,
-    );
+    return await executeRun(model, command.prompt, stdout, stderr, dependencies.signal);
   } catch (error) {
-    if (dependencies.signal?.aborted && (error === dependencies.signal.reason || error instanceof Error && (error.name === "AbortError" || "code" in error && error.code === "RUN_CANCELLED"))) {
+    if (
+      dependencies.signal?.aborted &&
+      (error === dependencies.signal.reason ||
+        (error instanceof Error &&
+          (error.name === "AbortError" || ("code" in error && error.code === "RUN_CANCELLED"))))
+    ) {
       stderr.write("Cancelled\n");
       return 130;
     }

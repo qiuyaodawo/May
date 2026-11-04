@@ -18,10 +18,22 @@ export class DeepSeekModel extends OpenAICompatibleChatModel {
   constructor(options: DeepSeekModelOptions) {
     const { thinking, maxTokens, ...shared } = options;
     super(omitUndefined({ ...shared, maxOutputTokens: maxTokens }), {
-      provider: "DeepSeek", adapter: "deepseek-chat", errorCodePrefix: "DEEPSEEK",
-      defaultBaseURL: "https://api.deepseek.com", maxTokensField: "max_tokens",
-      streamUsage: true, includeToolName: false, requireDone: false, supportsResponseFormat: false,
-      ...(thinking === undefined ? {} : { extendRequest: (body) => { body.thinking = { type: thinking }; } }),
+      provider: "DeepSeek",
+      adapter: "deepseek-chat",
+      errorCodePrefix: "DEEPSEEK",
+      defaultBaseURL: "https://api.deepseek.com",
+      maxTokensField: "max_tokens",
+      streamUsage: true,
+      includeToolName: false,
+      requireDone: false,
+      supportsResponseFormat: false,
+      ...(thinking === undefined
+        ? {}
+        : {
+            extendRequest: (body) => {
+              body.thinking = { type: thinking };
+            },
+          }),
     });
   }
 }

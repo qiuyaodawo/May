@@ -16,11 +16,11 @@ maybecode team run "分阶段评审方案" --preset pipeline --workspace C:\work
 maybecode team run "对比独立调查结果" --preset parallel --workspace C:\work\example
 ```
 
-| 预设 | 初始任务图 | 动态委派 |
-| --- | --- | --- |
-| `supervisor`（默认） | `analysis`、`review` 独立执行，再由 `summary` 汇总 | Supervisor 可委派给 `worker` |
-| `pipeline` | `analysis` → `review` → `summary`；汇总收到前两份报告 | 禁用 |
-| `parallel` | `analysis`、`review` 独立执行，再由 `summary` 汇总 | 禁用 |
+| 预设                 | 初始任务图                                            | 动态委派                     |
+| -------------------- | ----------------------------------------------------- | ---------------------------- |
+| `supervisor`（默认） | `analysis`、`review` 独立执行，再由 `summary` 汇总    | Supervisor 可委派给 `worker` |
+| `pipeline`           | `analysis` → `review` → `summary`；汇总收到前两份报告 | 禁用                         |
+| `parallel`           | `analysis`、`review` 独立执行，再由 `summary` 汇总    | 禁用                         |
 
 依赖传递显式报告，**不会传递工作副本修改**。包括流水线阶段在内，每个任务都获得同一份过滤后基线的独立副本。评审任务不能假设前一任务的编辑已经出现在自己的副本中。编码流程会单独导出可审查的修改，计划不会自动合并它们。
 

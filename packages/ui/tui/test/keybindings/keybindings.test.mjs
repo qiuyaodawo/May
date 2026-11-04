@@ -10,34 +10,30 @@ test("resolves contextual actions and leader sequences", () => {
     { context: "chat", keys: "enter", action: "chat.submit" },
   ]);
 
-  assert.deepEqual(
-    keymap.resolve(keyStroke("enter"), ["global", "chat", "select"]),
-    { type: "action", action: "list.accept" },
-  );
-  assert.equal(
-    keymap.resolve(keyStroke("x", { ctrl: true }), ["global", "chat"]).type,
-    "pending",
-  );
-  assert.deepEqual(
-    keymap.resolve(keyStroke("l", { text: "l" }), ["global", "chat"]),
-    { type: "action", action: "session.open" },
-  );
+  assert.deepEqual(keymap.resolve(keyStroke("enter"), ["global", "chat", "select"]), {
+    type: "action",
+    action: "list.accept",
+  });
+  assert.equal(keymap.resolve(keyStroke("x", { ctrl: true }), ["global", "chat"]).type, "pending");
+  assert.deepEqual(keymap.resolve(keyStroke("l", { text: "l" }), ["global", "chat"]), {
+    type: "action",
+    action: "session.open",
+  });
 });
 
 test("rejects ambiguous bindings within one context", () => {
   assert.throws(
-    () => new Keymap([
-      { context: "global", keys: "ctrl+x", action: "one" },
-      { context: "global", keys: "ctrl+x l", action: "two" },
-    ]),
+    () =>
+      new Keymap([
+        { context: "global", keys: "ctrl+x", action: "one" },
+        { context: "global", keys: "ctrl+x l", action: "two" },
+      ]),
     /Ambiguous keybinding prefix/,
   );
 });
 
 test("上下文变化清除未完成的组合键，提示来自展开后的绑定", () => {
-  const keymap = new Keymap([
-    { context: "global", keys: "<leader> r", action: "reply" },
-  ], { leader: "ctrl+g" });
+  const keymap = new Keymap([{ context: "global", keys: "<leader> r", action: "reply" }], { leader: "ctrl+g" });
   assert.deepEqual(keymap.keysForAction("reply"), ["ctrl+g r"]);
   assert.equal(keymap.resolve(keyStroke("g", { ctrl: true }), ["global"]).type, "pending");
   assert.equal(keymap.resolve(keyStroke("r"), ["global", "dialog"]).type, "unmatched");

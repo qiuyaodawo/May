@@ -30,16 +30,16 @@ the [configuration reference](../reference/configuration.md#maybecode-settings).
 
 ## Sources and order
 
-| Order | Source | Availability |
-| --- | --- | --- |
-| -100 | Base prompt | Every request |
-| -80 | Current environment | Every request |
-| -60 | Project rule chain from the project root through the workspace, with absolute source paths | When present |
-| -40 | Tool-use guidance | Every request |
-| 0 | Skill metadata and activated documents | When Skills are available |
-| 20 | Delegation context or child assignment | When delegation is available, or for a child |
-| 40 | Goal objective, progress and execution guidance | While a Goal is active |
-| 60 | Context continuity guidance | In history-reference mode |
+| Order | Source                                                                                     | Availability                                 |
+| ----- | ------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| -100  | Base prompt                                                                                | Every request                                |
+| -80   | Current environment                                                                        | Every request                                |
+| -60   | Project rule chain from the project root through the workspace, with absolute source paths | When present                                 |
+| -40   | Tool-use guidance                                                                          | Every request                                |
+| 0     | Skill metadata and activated documents                                                     | When Skills are available                    |
+| 20    | Delegation context or child assignment                                                     | When delegation is available, or for a child |
+| 40    | Goal objective, progress and execution guidance                                            | While a Goal is active                       |
+| 60    | Context continuity guidance                                                                | In history-reference mode                    |
 
 `InstructionSources` assembles contributions by `order`, plugin composition order,
 then registration order. Plugins register their own guidance; tool descriptions

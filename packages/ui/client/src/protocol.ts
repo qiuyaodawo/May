@@ -90,9 +90,27 @@ export interface UiResource {
   readonly updatedAt: number;
 }
 
-export type UiBlockStatus = "queued" | "streaming" | "running" | "awaiting-approval" | "completed" | "failed" | "cancelled" | "interrupted" | "unknown" | "not-started" | "denied";
-export interface UiDiagnostic { readonly message: string; readonly code?: string }
-export interface UiPresentation { readonly kind: string; readonly version: number; readonly text: string }
+export type UiBlockStatus =
+  | "queued"
+  | "streaming"
+  | "running"
+  | "awaiting-approval"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "interrupted"
+  | "unknown"
+  | "not-started"
+  | "denied";
+export interface UiDiagnostic {
+  readonly message: string;
+  readonly code?: string;
+}
+export interface UiPresentation {
+  readonly kind: string;
+  readonly version: number;
+  readonly text: string;
+}
 /** A historical decision is evidence, never an actionable request. */
 export interface UiApprovalRecord {
   readonly id: string;
@@ -173,7 +191,11 @@ export interface UiControls {
   readonly busy: boolean;
   readonly forms: readonly UiForm[];
 }
-export interface UiCompletion { readonly value: string; readonly label: string; readonly description?: string }
+export interface UiCompletion {
+  readonly value: string;
+  readonly label: string;
+  readonly description?: string;
+}
 
 export interface UiSnapshot {
   readonly workspace?: UiWorkspaceGit;
@@ -215,13 +237,38 @@ export interface UiCommand {
   readonly args: Readonly<Record<string, string>>;
 }
 
-export interface UiReceipt { readonly selectedId?: string | null; readonly output?: UiCommandOutput; readonly diff?: UiWorkspaceDiff; readonly disconnect?: boolean }
+export interface UiReceipt {
+  readonly selectedId?: string | null;
+  readonly output?: UiCommandOutput;
+  readonly diff?: UiWorkspaceDiff;
+  readonly disconnect?: boolean;
+}
 
-export interface UiPageRequest { readonly query?: string; readonly cursor?: string }
-export interface UiPage<T> { readonly hostId: string; readonly items: readonly T[]; readonly nextCursor: string | null; readonly total: number }
+export interface UiPageRequest {
+  readonly query?: string;
+  readonly cursor?: string;
+}
+export interface UiPage<T> {
+  readonly hostId: string;
+  readonly items: readonly T[];
+  readonly nextCursor: string | null;
+  readonly total: number;
+}
 export type UiField = "input" | "text" | "reasoning" | "diagnostic" | "presentation" | "request";
-export interface UiFieldRequest { readonly blockId: string; readonly field: UiField; readonly offset: number; readonly version?: string }
-export interface UiFieldPage { readonly hostId: string; readonly text: string; readonly offset: number; readonly nextOffset: number | null; readonly total: number; readonly version: string }
+export interface UiFieldRequest {
+  readonly blockId: string;
+  readonly field: UiField;
+  readonly offset: number;
+  readonly version?: string;
+}
+export interface UiFieldPage {
+  readonly hostId: string;
+  readonly text: string;
+  readonly offset: number;
+  readonly nextOffset: number | null;
+  readonly total: number;
+  readonly version: string;
+}
 
 /** One owner consumes runtime events; many clients subscribe to invalidations. */
 export interface UiHost {
@@ -233,15 +280,27 @@ export interface UiHost {
   resources?(request: UiPageRequest): Promise<UiPage<UiResource>>;
   history?(selectedId: string, request: UiPageRequest): Promise<UiPage<UiBlock>>;
   field?(selectedId: string, request: UiFieldRequest): Promise<UiFieldPage>;
-  complete?(selectedId: string, text: string): Promise<{ readonly hostId: string; readonly items: readonly UiCompletion[] }>;
+  complete?(
+    selectedId: string,
+    text: string,
+  ): Promise<{ readonly hostId: string; readonly items: readonly UiCompletion[] }>;
 }
 
 export class UiError extends Error {
-  constructor(readonly status: number, message: string) { super(message); this.name = "UiError"; }
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "UiError";
+  }
 }
 
 export function commandArgs(command: UiCommand, required: readonly string[], optional: readonly string[] = []): void {
-  if (required.some(key => !command.args[key]?.trim()) || Object.keys(command.args).some(key => !required.includes(key) && !optional.includes(key))) {
+  if (
+    required.some((key) => !command.args[key]?.trim()) ||
+    Object.keys(command.args).some((key) => !required.includes(key) && !optional.includes(key))
+  ) {
     throw new UiError(400, "命令参数不正确。");
   }
 }

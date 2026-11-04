@@ -9,14 +9,14 @@
 
   这是包路径的破坏性变更。使用方需要更新依赖声明、源码导入及加载这些模块的配置：
 
-  | 原包 | 公开子路径 | 需要安装的包 |
-  | --- | --- | --- |
-  | `@sortedyuan/plugin-models` | `@sortedyuan/plugin-services/models` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-runtime` | `@sortedyuan/plugin-services/runtime` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-permissions` | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-skills` | `@sortedyuan/plugin-services/skills` | `@sortedyuan/plugin-services` |
-  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin` | `@sortedyuan/coordination` |
-  | `@sortedyuan/session-tools` | `@sortedyuan/session/tools` | `@sortedyuan/session` |
+  | 原包                              | 公开子路径                                | 需要安装的包                  |
+  | --------------------------------- | ----------------------------------------- | ----------------------------- |
+  | `@sortedyuan/plugin-models`       | `@sortedyuan/plugin-services/models`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-runtime`      | `@sortedyuan/plugin-services/runtime`     | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-permissions`  | `@sortedyuan/plugin-services/permissions` | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-skills`       | `@sortedyuan/plugin-services/skills`      | `@sortedyuan/plugin-services` |
+  | `@sortedyuan/plugin-coordination` | `@sortedyuan/coordination/plugin`         | `@sortedyuan/coordination`    |
+  | `@sortedyuan/session-tools`       | `@sortedyuan/session/tools`               | `@sortedyuan/session`         |
 
   选择包含这些子路径的发布版本，重新安装依赖并编译使用方。六个原包从本仓库的发布清单移除。
   插件 ID、ServiceToken ID、持久状态格式、函数名称及生命周期行为保持不变。
@@ -86,6 +86,7 @@
   Skills state is saved through versioned plugin state while existing Session
   activation records remain readable. Goals and history-memory retain their existing
   durable state records for migration.
+
 - 63f68e5: Breaking change: package names use the `@sortedyuan` npm scope. Update dependency
   names, imports, pnpm filters, and configured module specifiers from `@may/` to
   `@sortedyuan/`, then reinstall dependencies. MaybeCode provides the `maybecode`

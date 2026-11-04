@@ -6,79 +6,205 @@ import { MaybeCodeWebCommands } from "./web-commands.js";
 import { formatGoal } from "./goal-commands.js";
 import { userInfo } from "node:os";
 
-export function createMaybeCodeWebHost(app: MaybeCodeController, options: Pick<ApplicationUiOptions, "events" | "closeApplication"> & { terminal?: boolean } = {}) {
+export function createMaybeCodeWebHost(
+  app: MaybeCodeController,
+  options: Pick<ApplicationUiOptions, "events" | "closeApplication"> & { terminal?: boolean } = {},
+) {
   const commands = new MaybeCodeWebCommands(app, () => host.changed());
   const host = new ApplicationUiHost(app, {
     ...options,
     permissionActor: () => `local:${userInfo().username}`,
-    ...(app.application.persistentRulesEnabled && app.listPermissionRules && app.revokePermissionRule ? { permissionRules: {
-      list: () => app.listPermissionRules!(), revoke: (id: string) => app.revokePermissionRule!(id),
-      ...(app.createPermissionRuleFrom ? { create: (id: string, decision: "allow" | "deny") =>
-        app.createPermissionRuleFrom!(id, { decision, createdBy: `local:${userInfo().username}` }) } : {}),
-    } } : {}),
-    product: { id: "maybecode", title: "MaybeCode", resourceKind: "session", subtitle: "围绕你的代码工作。查看工具执行，在关键操作前确认，让每一步都有迹可循。", suggestions: ["介绍这个项目的结构", "检查当前工作区的改动", "帮我定位一个问题"] },
-    commands: ["model.switch", "effort.set", "permission.set",
+    ...(app.application.persistentRulesEnabled && app.listPermissionRules && app.revokePermissionRule
+      ? {
+          permissionRules: {
+            list: () => app.listPermissionRules!(),
+            revoke: (id: string) => app.revokePermissionRule!(id),
+            ...(app.createPermissionRuleFrom
+              ? {
+                  create: (id: string, decision: "allow" | "deny") =>
+                    app.createPermissionRuleFrom!(id, { decision, createdBy: `local:${userInfo().username}` }),
+                }
+              : {}),
+          },
+        }
+      : {}),
+    product: {
+      id: "maybecode",
+      title: "MaybeCode",
+      resourceKind: "session",
+      subtitle: "围绕你的代码工作。查看工具执行，在关键操作前确认，让每一步都有迹可循。",
+      suggestions: ["介绍这个项目的结构", "检查当前工作区的改动", "帮我定位一个问题"],
+    },
+    commands: [
+      "model.switch",
+      "effort.set",
+      "permission.set",
       ...(app.getModelCapabilities && app.modelCapabilitiesAvailable !== false ? ["model.capabilities.refresh"] : []),
-      ...(app.forkSession ? ["session.fork"] : []), ...(app.getChanges ? ["changes.view"] : []),
+      ...(app.forkSession ? ["session.fork"] : []),
+      ...(app.getChanges ? ["changes.view"] : []),
       ...(app.getWorktrees ? ["worktree.open", "worktree.delete"] : []),
-      ...(app.previewRestore && app.restoreFiles ? ["changes.restore.preview", "changes.restore.apply"] : [])],
+      ...(app.previewRestore && app.restoreFiles ? ["changes.restore.preview", "changes.restore.apply"] : []),
+    ],
     ...(app.getWorkspaceGit ? { workspace: () => app.getWorkspaceGit!() } : {}),
     ...(app.getForkPoints ? { forkPoints: (sessionId: string) => app.getForkPoints!(sessionId) } : {}),
     ...(app.getCheckpoints ? { checkpoints: (sessionId: string) => app.getCheckpoints!(sessionId) } : {}),
     ...(app.getWorktrees ? { worktrees: () => app.getWorktrees!() } : {}),
-    badges: () => app.permissionMode === "yolo" ? [{ label: "YOLO · Auto-approve", tone: "warning" }] : [],
+    badges: () => (app.permissionMode === "yolo" ? [{ label: "YOLO · Auto-approve", tone: "warning" }] : []),
     concurrentCommands: ["console.execute", "console.action", "mcp.respond", "console.cancel", "message.submit"],
     interactionCommands: ["mcp.respond", "console.cancel", "console.execute"],
     controls: () => commands.controls(),
-    available: name => commands.available(name),
-    complete: text => commands.suggest(text),
-    submit: async text => { if (text.trimStart().startsWith("/")) throw new UiError(400, "请通过命令输入执行斜杠命令。"); return undefined; },
+    available: (name) => commands.available(name),
+    complete: (text) => commands.suggest(text),
+    submit: async (text) => {
+      if (text.trimStart().startsWith("/")) throw new UiError(400, "请通过命令输入执行斜杠命令。");
+      return undefined;
+    },
     choices: async () => {
       const models = await app.listModels();
       const effort = await app.getReasoningEffort();
-      const resetEffort = models.find(model => model.name === app.application.modelInfo?.profile)?.reasoningEffort ?? effort.defaultEffort;
-      return [...(models.length ? [{ command: "model.switch", label: "模型配置", value: app.application.modelInfo?.profile ?? models[0]!.name, options: models.map(m => ({ value: m.name, label: m.name })) }] : []),
-        ...(effort.status === "known" ? [{ command: "effort.set", label: "Reasoning effort", value: effort.overridden ? effort.effectiveEffort ?? "default" : "default", options: [{ value: "default", label: `配置默认 (${resetEffort ?? "Provider"})` }, ...effort.efforts.map(value => ({ value, label: value }))] }] : []),
-        { command: "permission.set", label: "Permissions", value: app.permissionMode, options: [
-          { value: "default", label: "Default" }, { value: "yolo", label: "YOLO · Auto-approve" },
-        ] }];
+      const resetEffort =
+        models.find((model) => model.name === app.application.modelInfo?.profile)?.reasoningEffort ??
+        effort.defaultEffort;
+      return [
+        ...(models.length
+          ? [
+              {
+                command: "model.switch",
+                label: "模型配置",
+                value: app.application.modelInfo?.profile ?? models[0]!.name,
+                options: models.map((m) => ({ value: m.name, label: m.name })),
+              },
+            ]
+          : []),
+        ...(effort.status === "known"
+          ? [
+              {
+                command: "effort.set",
+                label: "Reasoning effort",
+                value: effort.overridden ? (effort.effectiveEffort ?? "default") : "default",
+                options: [
+                  { value: "default", label: `配置默认 (${resetEffort ?? "Provider"})` },
+                  ...effort.efforts.map((value) => ({ value, label: value })),
+                ],
+              },
+            ]
+          : []),
+        {
+          command: "permission.set",
+          label: "Permissions",
+          value: app.permissionMode,
+          options: [
+            { value: "default", label: "Default" },
+            { value: "yolo", label: "YOLO · Auto-approve" },
+          ],
+        },
+      ];
     },
     panels: async () => [
-      { id: "permissions", title: "Permissions", fields: [{ label: "Mode", value: app.permissionMode === "yolo" ? "YOLO · Auto-approve" : "Default" }] },
-      { id: "model", title: "模型", fields: [{ label: "当前模型", value: app.application.modelInfo?.model ?? "未知" }, { label: "Provider", value: app.application.modelInfo?.provider ?? "未知" }] },
-      ...(app.getModelCapabilities && app.modelCapabilitiesAvailable !== false ? [{ id: "model-capabilities", title: "模型能力", fields: capabilityFields(await app.getModelCapabilities()), actions: [{ label: "刷新能力信息", command: "model.capabilities.refresh", args: {} }] }] : []),
+      {
+        id: "permissions",
+        title: "Permissions",
+        fields: [{ label: "Mode", value: app.permissionMode === "yolo" ? "YOLO · Auto-approve" : "Default" }],
+      },
+      {
+        id: "model",
+        title: "模型",
+        fields: [
+          { label: "当前模型", value: app.application.modelInfo?.model ?? "未知" },
+          { label: "Provider", value: app.application.modelInfo?.provider ?? "未知" },
+        ],
+      },
+      ...(app.getModelCapabilities && app.modelCapabilitiesAvailable !== false
+        ? [
+            {
+              id: "model-capabilities",
+              title: "模型能力",
+              fields: capabilityFields(await app.getModelCapabilities()),
+              actions: [{ label: "刷新能力信息", command: "model.capabilities.refresh", args: {} }],
+            },
+          ]
+        : []),
       ...(app.getTelemetry ? [createTelemetryPanel(app.getTelemetry({ limit: 40 }))] : []),
-      { id: "subagents", title: "子 Agent", ...subagentPanel(app) },      { id: "recovery", title: "恢复", fields: [{ label: "待处理项", value: String(app.listRecoveries().length) }, { label: "处理方式", value: "使用 /recovery 查看证据并记录核查结果。" }] },
+      { id: "subagents", title: "子 Agent", ...subagentPanel(app) },
+      {
+        id: "recovery",
+        title: "恢复",
+        fields: [
+          { label: "待处理项", value: String(app.listRecoveries().length) },
+          { label: "处理方式", value: "使用 /recovery 查看证据并记录核查结果。" },
+        ],
+      },
       { id: "goal", title: "目标", fields: [{ label: "状态", value: formatGoal(app.application.getGoal()) }] },
-      ...(options.terminal ? [{ id: "terminal", title: "终端", fields: [{ label: "共享会话", value: "MCP 交互可以在终端或当前页面处理。退出宿主会关闭 Web 服务。" }] }] : []),
+      ...(options.terminal
+        ? [
+            {
+              id: "terminal",
+              title: "终端",
+              fields: [{ label: "共享会话", value: "MCP 交互可以在终端或当前页面处理。退出宿主会关闭 Web 服务。" }],
+            },
+          ]
+        : []),
     ],
-    execute: command => commands.execute(command),
+    execute: (command) => commands.execute(command),
   });
   return host;
 }
 
-function capabilityFields(capabilities: import("@sortedyuan/providers").ModelCapabilities): { label: string; value: string }[] {
-  const names: Record<string, string> = { "input.text": "文本输入", "input.image": "图片输入", "input.audio": "音频输入", "input.file": "文件输入", "output.text": "文本输出", "output.image": "图片输出", "output.audio": "音频输出", tools: "工具调用", "structuredOutput.json": "JSON 输出", "structuredOutput.jsonSchema": "JSON Schema", contextCompaction: "Context 压缩" };
-  return [...Object.entries(capabilities.fields ?? {}).slice(0, 40).map(([key, field]) => ({
-    label: names[key] ?? key,
-    value: field!.status === "unknown" ? "能力未知" : field!.status === "unsupported" ? `不支持 · ${field!.source}` : `${JSON.stringify(field!.value)} · ${field!.source}`,
-  })), ...(capabilities.version === undefined ? [] : [{ label: "能力版本", value: capabilities.version }]),
-  ...(capabilities.diagnostics?.map(item => ({ label: item.discovery, value: `${item.code} · ${new Date(item.observedAt).toISOString()}` })) ?? [])];
+function capabilityFields(
+  capabilities: import("@sortedyuan/providers").ModelCapabilities,
+): { label: string; value: string }[] {
+  const names: Record<string, string> = {
+    "input.text": "文本输入",
+    "input.image": "图片输入",
+    "input.audio": "音频输入",
+    "input.file": "文件输入",
+    "output.text": "文本输出",
+    "output.image": "图片输出",
+    "output.audio": "音频输出",
+    tools: "工具调用",
+    "structuredOutput.json": "JSON 输出",
+    "structuredOutput.jsonSchema": "JSON Schema",
+    contextCompaction: "Context 压缩",
+  };
+  return [
+    ...Object.entries(capabilities.fields ?? {})
+      .slice(0, 40)
+      .map(([key, field]) => ({
+        label: names[key] ?? key,
+        value:
+          field!.status === "unknown"
+            ? "能力未知"
+            : field!.status === "unsupported"
+              ? `不支持 · ${field!.source}`
+              : `${JSON.stringify(field!.value)} · ${field!.source}`,
+      })),
+    ...(capabilities.version === undefined ? [] : [{ label: "能力版本", value: capabilities.version }]),
+    ...(capabilities.diagnostics?.map((item) => ({
+      label: item.discovery,
+      value: `${item.code} · ${new Date(item.observedAt).toISOString()}`,
+    })) ?? []),
+  ];
 }
 
 /** 活动请求的子任务树，条目数量有界，适合面板布局。 */
-function subagentPanel(app: MaybeCodeController): { readonly fields: readonly { readonly label: string; readonly value: string }[] } {
+function subagentPanel(app: MaybeCodeController): {
+  readonly fields: readonly { readonly label: string; readonly value: string }[];
+} {
   const state = app.application.getDelegationState();
   const requests = app.application.listDelegationRequests();
   if (state === undefined && requests.length === 0) {
     return { fields: [{ label: "状态", value: "本次会话还没有子 Agent 请求。" }] };
   }
   const tasks = state?.tasks ?? requests[0]?.tasks ?? [];
-  const fields = [{
-    label: "当前请求",
-    value: state === undefined ? "空闲" : `${state.status} · ${state.requestId}`,
-  }];
-  for (const task of [...tasks].sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id)).slice(0, 12)) {
+  const fields = [
+    {
+      label: "当前请求",
+      value: state === undefined ? "空闲" : `${state.status} · ${state.requestId}`,
+    },
+  ];
+  for (const task of [...tasks]
+    .sort((left, right) => left.depth - right.depth || left.id.localeCompare(right.id))
+    .slice(0, 12)) {
     const detail = task.detail ?? (task.output === undefined ? "" : task.output.replace(/\s+/gu, " ").slice(0, 80));
     fields.push({
       label: `${"· ".repeat(Math.max(0, task.depth - 1))}${task.role}/${task.id}`,
@@ -89,39 +215,64 @@ function subagentPanel(app: MaybeCodeController): { readonly fields: readonly { 
     // 估计值也计入 token 总计，界面必须说明它不是完整用量。
     fields.push({
       label: "请求用量",
-      value: `${state.budget.modelCalls}/${state.budget.maxModelCalls} 次模型调用 · ` +
+      value:
+        `${state.budget.modelCalls}/${state.budget.maxModelCalls} 次模型调用 · ` +
         `${state.budget.totalTokens} tokens${state.budget.usageComplete ? "" : "（含预留值计账）"}`,
     });
   }
   const pending = requests.flatMap((request) =>
-    request.tasks.filter((task) => task.status === "recovery-required").map((task) => task.id));
+    request.tasks.filter((task) => task.status === "recovery-required").map((task) => task.id),
+  );
   fields.push({
     label: "查看与恢复",
-    value: pending.length === 0
-      ? "/delegations 查看任务树，/delegations tools <任务> 查看工具记录"
-      : `/delegations resolve <任务> <failed|cancelled> <核查结论>（待核对：${pending.join(", ")}）`,
+    value:
+      pending.length === 0
+        ? "/delegations 查看任务树，/delegations tools <任务> 查看工具记录"
+        : `/delegations resolve <任务> <failed|cancelled> <核查结论>（待核对：${pending.join(", ")}）`,
   });
   return { fields };
 }
 
-export async function startMaybeCodeWebServer(host: ApplicationUiHost, options: { token: string; port?: number; browserLogin?: boolean; exit?: () => void }) {
+export async function startMaybeCodeWebServer(
+  host: ApplicationUiHost,
+  options: { token: string; port?: number; browserLogin?: boolean; exit?: () => void },
+) {
   try {
     const { startMaybeCodeWebServer: startServer } = await import("./web-server.js");
     return await startServer(host, options);
-  } catch (error) { await host.close(); throw error; }
+  } catch (error) {
+    await host.close();
+    throw error;
+  }
 }
 
 export async function startMaybeCodeWebUI(app: MaybeCodeController, options: { token: string; port?: number }) {
   return startMaybeCodeWebServer(createMaybeCodeWebHost(app), options);
 }
 
-export async function runMaybeCodeWebUI(app: MaybeCodeController, options: { port?: number; write: (text: string) => void }): Promise<void> {
+export async function runMaybeCodeWebUI(
+  app: MaybeCodeController,
+  options: { port?: number; write: (text: string) => void },
+): Promise<void> {
   const token = process.env.MAYBECODE_CONTROL_TOKEN ?? "";
-  if (!token) { await app.close(); throw new Error("Set MAYBECODE_CONTROL_TOKEN (32..256 printable ASCII characters) before starting --ui web."); }
+  if (!token) {
+    await app.close();
+    throw new Error("Set MAYBECODE_CONTROL_TOKEN (32..256 printable ASCII characters) before starting --ui web.");
+  }
   const server = await startMaybeCodeWebUI(app, omitUndefined({ token, port: options.port }));
-  options.write(`MaybeCode Web UI: ${server.url}\nEnter MAYBECODE_CONTROL_TOKEN in the connection dialog. Closing a browser tab does not stop the agent. Ctrl+C stops the host.\n`);
-  const stop = () => { void server.close(); };
-  process.once("SIGINT", stop); process.once("SIGTERM", stop);
-  try { await server.closed; await server.close(); }
-  finally { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); }
+  options.write(
+    `MaybeCode Web UI: ${server.url}\nEnter MAYBECODE_CONTROL_TOKEN in the connection dialog. Closing a browser tab does not stop the agent. Ctrl+C stops the host.\n`,
+  );
+  const stop = () => {
+    void server.close();
+  };
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
+  try {
+    await server.closed;
+    await server.close();
+  } finally {
+    process.removeListener("SIGINT", stop);
+    process.removeListener("SIGTERM", stop);
+  }
 }

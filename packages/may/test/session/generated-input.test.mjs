@@ -37,14 +37,14 @@ function createRuntime(messages) {
 
 test("FileSessionStore 重新打开后读取并恢复 generated input", async (t) => {
   const store = await createStore(t);
-  const messages = [userMessage("Continue the current request"), {
-    role: "user",
-    content: [{ type: "json", value: { status: "continue" } }],
-  }];
-  await appendPayloads(store, "continuation", [
-    { type: "session.created" },
-    generatedInput({ messages }),
-  ]);
+  const messages = [
+    userMessage("Continue the current request"),
+    {
+      role: "user",
+      content: [{ type: "json", value: { status: "continue" } }],
+    },
+  ];
+  await appendPayloads(store, "continuation", [{ type: "session.created" }, generatedInput({ messages })]);
 
   const reopened = new FileSessionStore(store.directory);
   const history = await reopened.read("continuation");
@@ -67,8 +67,14 @@ test("FileSessionStore 重新打开后读取并恢复 generated input", async (t
   assert.deepEqual((await restored.getRuntimeInfo()).messages, messages);
   await restored.closeRuntime();
 
-  await reopened.append({ type: "state.updated", key: "continuation", value: true,
-    sessionId: "continuation", seq: 3, timestamp: 3 });
+  await reopened.append({
+    type: "state.updated",
+    key: "continuation",
+    value: true,
+    sessionId: "continuation",
+    seq: 3,
+    timestamp: 3,
+  });
   assert.equal((await new FileSessionStore(store.directory).read("continuation")).length, 3);
 });
 
@@ -81,10 +87,17 @@ test("Session.fork 保存已交付的补充输入并成功重新打开文件分�
     { type: "session.created" },
     { type: "input.submitted", message: request },
     { type: "run.started", runId: "source-run" },
-    { type: "input.steering.queued", input: { inputId: "additional-input", message: delivered, status: "pending", runId: "source-run" } },
+    {
+      type: "input.steering.queued",
+      input: { inputId: "additional-input", message: delivered, status: "pending", runId: "source-run" },
+    },
     { type: "input.steering.delivered", runId: "source-run", step: 1, inputIds: ["additional-input"] },
     { type: "assistant.completed", runId: "source-run", step: 1, message: response },
-    { type: "run.completed", runId: "source-run", result: { runId: "source-run", steps: 1, modelCalls: 1, toolCalls: 0, message: response } },
+    {
+      type: "run.completed",
+      runId: "source-run",
+      result: { runId: "source-run", steps: 1, modelCalls: 1, toolCalls: 0, message: response },
+    },
     { type: "run.settled", runId: "source-run" },
   ]);
   const source = await store.inspect("source");
@@ -106,18 +119,25 @@ test("Session.fork 保存已交付的补充输入并成功重新打开文件分�
 test("FileSessionStore 拒绝字段无效的 generated input 完整记录", async (t) => {
   const store = await createStore(t);
   const invalid = [
-    { runId: undefined }, { runId: 7 }, { runId: " " },
-    { step: undefined }, { step: 0 }, { step: 1.5 }, { step: Number.MAX_SAFE_INTEGER + 1 },
-    { messages: undefined }, { messages: {} }, { messages: [null] },
+    { runId: undefined },
+    { runId: 7 },
+    { runId: " " },
+    { step: undefined },
+    { step: 0 },
+    { step: 1.5 },
+    { step: Number.MAX_SAFE_INTEGER + 1 },
+    { messages: undefined },
+    { messages: {} },
+    { messages: [null] },
     { messages: [{ role: "assistant", content: [] }] },
     { messages: [{ role: "user", content: [{ type: "text", text: 7 }] }] },
-    { reason: undefined }, { reason: 7 }, { reason: " " },
+    { reason: undefined },
+    { reason: 7 },
+    { reason: " " },
   ];
   for (const [index, overrides] of invalid.entries()) {
     const sessionId = `invalid-${index}`;
-    await appendPayloads(store, sessionId, [
-      { type: "session.created" }, generatedInput(overrides),
-    ]);
+    await appendPayloads(store, sessionId, [{ type: "session.created" }, generatedInput(overrides)]);
     const reopened = new FileSessionStore(store.directory);
     await assert.rejects(reopened.read(sessionId), /Invalid session event/);
     await assert.rejects(reopened.inspect(sessionId), /Invalid session event/);

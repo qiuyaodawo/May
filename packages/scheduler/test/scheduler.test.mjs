@@ -29,7 +29,11 @@ async function setup(t, name, options = {}) {
     store,
     dispatcher: host,
     maxConcurrentSubmissions: options.maxConcurrentSubmissions,
-    onError: options.onError ?? ((error) => { backgroundErrors.push(error); }),
+    onError:
+      options.onError ??
+      ((error) => {
+        backgroundErrors.push(error);
+      }),
   });
   t.after(async () => {
     await scheduler.close();
@@ -109,10 +113,14 @@ test("revisions, execution snapshots, pause and deletion remain durable", async 
   assert.equal(created.revision, 1);
   const first = event("original");
   const [execution] = await scheduler.publish(first);
-  const updated = await scheduler.updateJob("editable", {
-    task: { handler: "write-artifact", payload: { label: "updated" } },
-    enabled: false,
-  }, created.revision);
+  const updated = await scheduler.updateJob(
+    "editable",
+    {
+      task: { handler: "write-artifact", payload: { label: "updated" } },
+      enabled: false,
+    },
+    created.revision,
+  );
   assert.equal(updated.revision, created.revision + 1);
   await assert.rejects(scheduler.updateJob("editable", { enabled: true }, created.revision));
   await assert.rejects(scheduler.deleteJob("editable", created.revision));
@@ -143,7 +151,10 @@ test("event acceptance matches the active jobs once and rejects identity conflic
   await assert.rejects(scheduler.publish({ ...input, payload: { label: "conflicting" } }));
   assert.equal((await scheduler.listExecutions()).records.length, 1);
   const results = await Promise.all(Array.from({ length: 8 }, () => scheduler.tick()));
-  assert.equal(results.reduce((total, result) => total + result.submitted, 0), 0);
+  assert.equal(
+    results.reduce((total, result) => total + result.submitted, 0),
+    0,
+  );
   assert.equal(host.tasks().length, 1);
 });
 
@@ -179,16 +190,31 @@ test("skip and latest policies use the real scheduled time and grace interval", 
 
 test("timezone and daylight-saving transitions use the documented local times", () => {
   const dailyShanghai = { type: "cron", expression: "0 8 * * *", timezone: "Asia/Shanghai" };
-  assert.equal(new Date(nextTime(dailyShanghai, Date.parse("2026-10-04T00:00:00Z"))).toISOString(), "2026-10-05T00:00:00.000Z");
+  assert.equal(
+    new Date(nextTime(dailyShanghai, Date.parse("2026-10-04T00:00:00Z"))).toISOString(),
+    "2026-10-05T00:00:00.000Z",
+  );
   const missingTime = { type: "cron", expression: "30 2 * * *", timezone: "America/New_York" };
-  assert.equal(new Date(nextTime(missingTime, Date.parse("2026-03-08T06:59:00Z"))).toISOString(), "2026-03-09T06:30:00.000Z");
+  assert.equal(
+    new Date(nextTime(missingTime, Date.parse("2026-03-08T06:59:00Z"))).toISOString(),
+    "2026-03-09T06:30:00.000Z",
+  );
   const repeatedTime = { type: "cron", expression: "30 1 * * *", timezone: "America/New_York" };
   const first = nextTime(repeatedTime, Date.parse("2026-11-01T04:59:00Z"));
   assert.equal(new Date(first).toISOString(), "2026-11-01T05:30:00.000Z");
   assert.equal(new Date(nextTime(repeatedTime, Date.parse(first))).toISOString(), "2026-11-02T06:30:00.000Z");
-  assert.equal(latestTime(dailyShanghai, Date.parse("2026-10-01T00:00:00Z"), Date.parse("2026-10-04T03:00:00Z")), "2026-10-04T00:00:00.000Z");
-  assert.equal(latestTime(missingTime, Date.parse("2026-03-07T07:30:00Z"), Date.parse("2026-03-08T08:00:00Z")), undefined);
-  assert.equal(latestTime(repeatedTime, Date.parse("2026-11-01T05:30:00Z"), Date.parse("2026-11-01T07:00:00Z")), undefined);
+  assert.equal(
+    latestTime(dailyShanghai, Date.parse("2026-10-01T00:00:00Z"), Date.parse("2026-10-04T03:00:00Z")),
+    "2026-10-04T00:00:00.000Z",
+  );
+  assert.equal(
+    latestTime(missingTime, Date.parse("2026-03-07T07:30:00Z"), Date.parse("2026-03-08T08:00:00Z")),
+    undefined,
+  );
+  assert.equal(
+    latestTime(repeatedTime, Date.parse("2026-11-01T05:30:00Z"), Date.parse("2026-11-01T07:00:00Z")),
+    undefined,
+  );
 });
 
 test("submission concurrency is bounded and accepted tasks are real durable artifacts", async (t) => {
@@ -211,9 +237,15 @@ test("submission concurrency is bounded and accepted tasks are real durable arti
 
 test("an explicit task rejection records failed and does not replay the rejection", async (t) => {
   const { scheduler, host } = await setup(t, "task-rejection");
-  await scheduler.createJob(job("rejected", { type: "event", topic: "tasks" }, {
-    task: { handler: "unregistered-handler", payload: {} },
-  }));
+  await scheduler.createJob(
+    job(
+      "rejected",
+      { type: "event", topic: "tasks" },
+      {
+        task: { handler: "unregistered-handler", payload: {} },
+      },
+    ),
+  );
   const [rejected] = await scheduler.publish(event("rejected-event"));
   assert.equal(rejected.status, "failed");
   assert.equal((await scheduler.listExecutions()).records[0].status, "failed");
@@ -257,7 +289,10 @@ test("stop leaves queued submissions pending and an explicit tick resumes them",
   assert.equal(result.created, 2);
   assert.equal(result.submitted, 1);
   assert.equal(host.tasks().length, 1);
-  assert.deepEqual((await scheduler.listExecutions()).records.map((record) => record.status), ["submitted", "pending"]);
+  assert.deepEqual(
+    (await scheduler.listExecutions()).records.map((record) => record.status),
+    ["submitted", "pending"],
+  );
   await assert.rejects(async () => scheduler.publish(event("after-stop")));
   assert.equal((await scheduler.tick()).submitted, 1);
   assert.equal(host.tasks().length, 2);
@@ -265,10 +300,12 @@ test("stop leaves queued submissions pending and an explicit tick resumes them",
 
 test("an immediate stop excludes restart until drained and a subsequent start runs the timer", async (t) => {
   const { scheduler, host } = await setup(t, "immediate-restart");
-  await scheduler.createJob(job("restart-timer", {
-    type: "at",
-    time: new Date(Date.now() + 100).toISOString(),
-  }));
+  await scheduler.createJob(
+    job("restart-timer", {
+      type: "at",
+      time: new Date(Date.now() + 100).toISOString(),
+    }),
+  );
   const starting = scheduler.start();
   const stopping = scheduler.stop();
   await assert.rejects(async () => scheduler.start(), /stop/u);
@@ -293,7 +330,10 @@ test("execution pages preserve sequence order, filters and cursor bounds", async
   assert.equal(second.nextAfterSeq, undefined);
   assert.equal(new Set([...first.records, ...second.records].map((record) => record.id)).size, 105);
   assert.equal(host.tasks().length, 105);
-  assert.equal((await scheduler.listExecutions({ jobId: "paged-job", status: "submitted", limit: 1000 })).records.length, 105);
+  assert.equal(
+    (await scheduler.listExecutions({ jobId: "paged-job", status: "submitted", limit: 1000 })).records.length,
+    105,
+  );
   assert.equal((await scheduler.listExecutions({ status: "pending" })).records.length, 0);
   assert.equal((await scheduler.listExecutions({ jobId: "unmatched" })).records.length, 0);
   await assert.rejects(scheduler.listExecutions({ limit: 0 }));
@@ -319,13 +359,21 @@ test("pending records survive a real scheduler process interruption", async (t) 
   t.after(() => host.close());
   const databasePath = join(path, "scheduler.sqlite");
   const accepted = once(host, "accepted", { signal: AbortSignal.timeout(5_000) });
-  const child = fork(fileURLToPath(new URL("./fixtures/crash-scheduler.mjs", import.meta.url)), [databasePath, endpoint, "pending"], {
-    stdio: ["ignore", "pipe", "pipe", "ipc"],
-  });
+  const child = fork(
+    fileURLToPath(new URL("./fixtures/crash-scheduler.mjs", import.meta.url)),
+    [databasePath, endpoint, "pending"],
+    {
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
+    },
+  );
   let errors = "";
-  child.stderr.on("data", (chunk) => { errors += chunk; });
+  child.stderr.on("data", (chunk) => {
+    errors += chunk;
+  });
   const exit = once(child, "exit");
-  t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); });
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  });
   await accepted;
   child.kill("SIGKILL");
   await exit;
@@ -339,7 +387,10 @@ test("pending records survive a real scheduler process interruption", async (t) 
   assert.equal(pending.status, "pending");
   assert.equal((await scheduler.tick()).submitted, 2);
   assert.equal(host.tasks().length, 2);
-  assert.equal((await scheduler.listExecutions()).records.find((record) => record.id === pending.id).status, "submitted");
+  assert.equal(
+    (await scheduler.listExecutions()).records.find((record) => record.id === pending.id).status,
+    "submitted",
+  );
 });
 
 test("a process interruption after host acceptance recovers with the identical executionId", async (t) => {
@@ -349,11 +400,17 @@ test("a process interruption after host acceptance recovers with the identical e
   t.after(() => host.close());
   const databasePath = join(path, "scheduler.sqlite");
   const accepted = once(host, "accepted", { signal: AbortSignal.timeout(5_000) });
-  const child = fork(fileURLToPath(new URL("./fixtures/crash-scheduler.mjs", import.meta.url)), [databasePath, endpoint], {
-    stdio: ["ignore", "pipe", "pipe", "ipc"],
-  });
+  const child = fork(
+    fileURLToPath(new URL("./fixtures/crash-scheduler.mjs", import.meta.url)),
+    [databasePath, endpoint],
+    {
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
+    },
+  );
   const exit = once(child, "exit");
-  t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); });
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  });
   const [receipt] = await accepted;
   child.kill("SIGKILL");
   await exit;
@@ -413,46 +470,54 @@ test("maximum-length public identifiers remain valid across persistence and dele
   assert.equal(host.tasks().length, 1);
 });
 
-test("an actual HTTP acknowledgement timeout leaves dispatching and recovers the accepted task", { timeout: 10_000 }, async (t) => {
-  const path = await directory("http-timeout");
-  const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
-  const endpoint = await host.listen();
-  t.after(() => host.close());
-  const databasePath = join(path, "scheduler.sqlite");
-  const scheduler = await Scheduler.open({
-    store: await SqliteSchedulerStore.open(databasePath),
-    dispatcher: new HttpTaskDispatcher(endpoint, { signal: acknowledgementTimeout(t, host) }),
-  });
-  t.after(() => scheduler.close());
-  await scheduler.createJob(job("timeout-task", { type: "event", topic: "tasks" }));
-  const input = event("timeout-event");
-  await assert.rejects(scheduler.publish(input), { name: "TimeoutError" });
-  const [uncertain] = (await scheduler.listExecutions()).records;
-  assert.equal(uncertain.status, "dispatching");
-  assert.equal(host.tasks().length, 1);
-  const taskId = host.tasks()[0].task_id;
-  await scheduler.close();
-  const recovered = await Scheduler.open({
-    store: await SqliteSchedulerStore.open(databasePath),
-    dispatcher: new HttpTaskDispatcher(endpoint),
-  });
-  t.after(() => recovered.close());
-  const [confirmed] = await recovered.publish(input);
-  assert.equal(confirmed.id, uncertain.id);
-  assert.equal(confirmed.taskId, taskId);
-  assert.equal(confirmed.status, "submitted");
-  assert.equal(host.tasks().length, 1);
-});
+test(
+  "an actual HTTP acknowledgement timeout leaves dispatching and recovers the accepted task",
+  { timeout: 10_000 },
+  async (t) => {
+    const path = await directory("http-timeout");
+    const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
+    const endpoint = await host.listen();
+    t.after(() => host.close());
+    const databasePath = join(path, "scheduler.sqlite");
+    const scheduler = await Scheduler.open({
+      store: await SqliteSchedulerStore.open(databasePath),
+      dispatcher: new HttpTaskDispatcher(endpoint, { signal: acknowledgementTimeout(t, host) }),
+    });
+    t.after(() => scheduler.close());
+    await scheduler.createJob(job("timeout-task", { type: "event", topic: "tasks" }));
+    const input = event("timeout-event");
+    await assert.rejects(scheduler.publish(input), { name: "TimeoutError" });
+    const [uncertain] = (await scheduler.listExecutions()).records;
+    assert.equal(uncertain.status, "dispatching");
+    assert.equal(host.tasks().length, 1);
+    const taskId = host.tasks()[0].task_id;
+    await scheduler.close();
+    const recovered = await Scheduler.open({
+      store: await SqliteSchedulerStore.open(databasePath),
+      dispatcher: new HttpTaskDispatcher(endpoint),
+    });
+    t.after(() => recovered.close());
+    const [confirmed] = await recovered.publish(input);
+    assert.equal(confirmed.id, uncertain.id);
+    assert.equal(confirmed.taskId, taskId);
+    assert.equal(confirmed.status, "submitted");
+    assert.equal(host.tasks().length, 1);
+  },
+);
 
 test("a real storage failure stops the timer and reports the error to the host", async (t) => {
   const reported = [];
   const { scheduler, host, store } = await setup(t, "storage-failure", {
-    onError(error) { reported.push(error); },
+    onError(error) {
+      reported.push(error);
+    },
   });
-  await scheduler.createJob(job("storage-failure", {
-    type: "at",
-    time: new Date(Date.now() + 80).toISOString(),
-  }));
+  await scheduler.createJob(
+    job("storage-failure", {
+      type: "at",
+      time: new Date(Date.now() + 80).toISOString(),
+    }),
+  );
   await scheduler.start();
   store.close();
   await waitUntil(() => reported.length > 0);
@@ -465,40 +530,48 @@ test("a real storage failure stops the timer and reports the error to the host",
   assert.deepEqual(host.tasks(), []);
 });
 
-test("a service-mode event communication error stops timers until explicit recovery", { timeout: 10_000 }, async (t) => {
-  const path = await directory("service-transport-error");
-  const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
-  const endpoint = await host.listen();
-  t.after(() => host.close());
-  const reported = [];
-  const dispatcher = new HttpTaskDispatcher(endpoint, { signal: acknowledgementTimeout(t, host) });
-  const scheduler = await Scheduler.open({
-    store: await SqliteSchedulerStore.open(join(path, "scheduler.sqlite")),
-    dispatcher,
-    onError(error) { reported.push(error); },
-  });
-  t.after(() => scheduler.close());
-  await scheduler.createJob(job("event-error", { type: "event", topic: "tasks" }));
-  await scheduler.createJob(job("timer-after-error", { type: "at", time: new Date(Date.now() + 60_000).toISOString() }));
-  await scheduler.start();
-  await assert.rejects(scheduler.publish(event("service-timeout")), { name: "TimeoutError" });
-  assert.equal(reported.length, 1);
-  assert.equal(reported[0].name, "TimeoutError");
-  const acceptedId = host.tasks()[0].execution_id;
-  const acceptedTaskId = host.tasks()[0].task_id;
-  await assert.rejects(async () => scheduler.publish(event("service-stopped")));
-  await scheduler.updateJob("timer-after-error", { trigger: { type: "at", time: new Date().toISOString() } }, 1);
-  await delay(160);
-  assert.equal(host.tasks().length, 1);
-  assert.equal((await scheduler.listExecutions()).records.length, 1);
-  dispatcher.signal = undefined;
-  assert.equal((await scheduler.tick()).submitted, 2);
-  const recovered = (await scheduler.listExecutions()).records.find((record) => record.id === acceptedId);
-  assert.equal(recovered.status, "submitted");
-  assert.equal(recovered.taskId, acceptedTaskId);
-  assert.equal(host.tasks().length, 2);
-  assert.equal(reported.length, 1);
-});
+test(
+  "a service-mode event communication error stops timers until explicit recovery",
+  { timeout: 10_000 },
+  async (t) => {
+    const path = await directory("service-transport-error");
+    const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
+    const endpoint = await host.listen();
+    t.after(() => host.close());
+    const reported = [];
+    const dispatcher = new HttpTaskDispatcher(endpoint, { signal: acknowledgementTimeout(t, host) });
+    const scheduler = await Scheduler.open({
+      store: await SqliteSchedulerStore.open(join(path, "scheduler.sqlite")),
+      dispatcher,
+      onError(error) {
+        reported.push(error);
+      },
+    });
+    t.after(() => scheduler.close());
+    await scheduler.createJob(job("event-error", { type: "event", topic: "tasks" }));
+    await scheduler.createJob(
+      job("timer-after-error", { type: "at", time: new Date(Date.now() + 60_000).toISOString() }),
+    );
+    await scheduler.start();
+    await assert.rejects(scheduler.publish(event("service-timeout")), { name: "TimeoutError" });
+    assert.equal(reported.length, 1);
+    assert.equal(reported[0].name, "TimeoutError");
+    const acceptedId = host.tasks()[0].execution_id;
+    const acceptedTaskId = host.tasks()[0].task_id;
+    await assert.rejects(async () => scheduler.publish(event("service-stopped")));
+    await scheduler.updateJob("timer-after-error", { trigger: { type: "at", time: new Date().toISOString() } }, 1);
+    await delay(160);
+    assert.equal(host.tasks().length, 1);
+    assert.equal((await scheduler.listExecutions()).records.length, 1);
+    dispatcher.signal = undefined;
+    assert.equal((await scheduler.tick()).submitted, 2);
+    const recovered = (await scheduler.listExecutions()).records.find((record) => record.id === acceptedId);
+    assert.equal(recovered.status, "submitted");
+    assert.equal(recovered.taskId, acceptedTaskId);
+    assert.equal(host.tasks().length, 2);
+    assert.equal(reported.length, 1);
+  },
+);
 
 test("an error callback can immediately restart the scheduler and resume its real timers", async (t) => {
   const path = await directory("callback-restart");
@@ -553,15 +626,25 @@ test("a real error-report write failure terminates the child and preserves recov
   const reportPath = join(path, "unwritable-report.json");
   await mkdir(reportPath);
   const accepted = once(host, "accepted", { signal: AbortSignal.timeout(5_000) });
-  const child = fork(fileURLToPath(new URL("./fixtures/failing-error-handler.mjs", import.meta.url)), [databasePath, endpoint, reportPath], {
-    stdio: ["ignore", "pipe", "pipe", "ipc"],
-  });
+  const child = fork(
+    fileURLToPath(new URL("./fixtures/failing-error-handler.mjs", import.meta.url)),
+    [databasePath, endpoint, reportPath],
+    {
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
+    },
+  );
   let stdout = "";
   let stderr = "";
-  child.stdout.on("data", (chunk) => { stdout += chunk; });
-  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk;
+  });
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
   const exit = once(child, "exit", { signal: AbortSignal.timeout(5_000) });
-  t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL"); });
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  });
   const [receipt] = await accepted;
   const [exitCode, signal] = await exit;
   assert.equal(signal, null, stderr);
@@ -583,15 +666,22 @@ test("a real error-report write failure terminates the child and preserves recov
   assert.equal(recovered.taskId, receipt.taskId);
   assert.equal(recovered.status, "submitted");
   assert.equal(host.tasks().length, 1);
-  await writeFile(join(path, "failure-evidence.json"), `${JSON.stringify({
-    exitCode,
-    signal,
-    stdout,
-    stderr,
-    interrupted,
-    recovered,
-    taskArtifactPath: receipt.artifactPath,
-  }, null, 2)}\n`);
+  await writeFile(
+    join(path, "failure-evidence.json"),
+    `${JSON.stringify(
+      {
+        exitCode,
+        signal,
+        stdout,
+        stderr,
+        interrupted,
+        recovered,
+        taskArtifactPath: receipt.artifactPath,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 });
 
 test("rejects invalid trigger, payload and concurrency before executing tasks", async (t) => {
@@ -599,14 +689,36 @@ test("rejects invalid trigger, payload and concurrency before executing tasks", 
   assert.throws(() => Scheduler.open({ store, dispatcher: host, maxConcurrentSubmissions: 0 }));
   assert.throws(() => Scheduler.open({ store, dispatcher: host, maxConcurrentSubmissions: 1.5 }));
   await assert.rejects(scheduler.createJob(job("missing-offset", { type: "at", time: "2026-10-04T08:00:00" })));
-  await assert.rejects(scheduler.createJob(job("invalid-cron", { type: "cron", expression: "bad expression", timezone: "Asia/Shanghai" })));
-  await assert.rejects(scheduler.createJob(job("invalid-timezone", { type: "cron", expression: "0 8 * * *", timezone: "Unknown/Timezone" })));
-  await assert.rejects(scheduler.createJob(job("invalid-payload", { type: "event", topic: "tasks" }, {
-    task: { handler: "write-artifact", payload: { value: Infinity } },
-  })));
-  await assert.rejects(scheduler.createJob(job("invalid-grace", { type: "event", topic: "tasks" }, {
-    misfire: { policy: "latest", graceMs: -1 },
-  })));
+  await assert.rejects(
+    scheduler.createJob(job("invalid-cron", { type: "cron", expression: "bad expression", timezone: "Asia/Shanghai" })),
+  );
+  await assert.rejects(
+    scheduler.createJob(
+      job("invalid-timezone", { type: "cron", expression: "0 8 * * *", timezone: "Unknown/Timezone" }),
+    ),
+  );
+  await assert.rejects(
+    scheduler.createJob(
+      job(
+        "invalid-payload",
+        { type: "event", topic: "tasks" },
+        {
+          task: { handler: "write-artifact", payload: { value: Infinity } },
+        },
+      ),
+    ),
+  );
+  await assert.rejects(
+    scheduler.createJob(
+      job(
+        "invalid-grace",
+        { type: "event", topic: "tasks" },
+        {
+          misfire: { policy: "latest", graceMs: -1 },
+        },
+      ),
+    ),
+  );
   const invalidTopics = ["t".repeat(257), "tasks\u0000", "tasks\u001f", "tasks\u007f"];
   for (const [index, topic] of invalidTopics.entries()) {
     await assert.rejects(scheduler.createJob(job(`invalid-topic-${index}`, { type: "event", topic })));
@@ -616,9 +728,15 @@ test("rejects invalid trigger, payload and concurrency before executing tasks", 
   const topic = "t".repeat(256);
   const valid = await scheduler.createJob(job("valid-topic-boundary", { type: "event", topic }));
   for (const invalidTopic of invalidTopics) {
-    await assert.rejects(scheduler.updateJob(valid.id, {
-      trigger: { type: "event", topic: invalidTopic },
-    }, valid.revision));
+    await assert.rejects(
+      scheduler.updateJob(
+        valid.id,
+        {
+          trigger: { type: "event", topic: invalidTopic },
+        },
+        valid.revision,
+      ),
+    );
   }
   const [stored] = await scheduler.listJobs();
   assert.equal(stored.revision, valid.revision);

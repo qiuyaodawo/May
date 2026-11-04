@@ -1,9 +1,4 @@
-import type {
-  TraceAttributes,
-  TraceContext,
-  TraceError,
-  TraceSpanStatus,
-} from "@sortedyuan/may/core";
+import type { TraceAttributes, TraceContext, TraceError, TraceSpanStatus } from "@sortedyuan/may/core";
 
 export interface TraceSpanEventData {
   readonly name: string;

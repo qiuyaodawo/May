@@ -3,11 +3,7 @@ import { access, link, mkdir, readFile, symlink, writeFile } from "node:fs/promi
 import { join } from "node:path";
 import test from "node:test";
 
-import {
-  createEditTool,
-  createReadTool,
-  createWriteTool,
-} from "../dist/index.js";
+import { createEditTool, createReadTool, createWriteTool } from "../dist/index.js";
 import { assertErrorCode, createWorkspace, executeTool } from "./helpers.mjs";
 
 test("file tools reject lexical paths outside the workspace", async (t) => {
@@ -46,11 +42,7 @@ test("file tools reject symlinks that escape the workspace", async (t) => {
   await mkdir(outside);
   await writeFile(join(outside, "secret.txt"), "secret");
   try {
-    await symlink(
-      outside,
-      join(cwd, "escape"),
-      process.platform === "win32" ? "junction" : "dir",
-    );
+    await symlink(outside, join(cwd, "escape"), process.platform === "win32" ? "junction" : "dir");
   } catch (error) {
     if (error?.code === "EPERM" || error?.code === "EACCES") {
       t.skip("creating symlinks is not permitted in this environment");
