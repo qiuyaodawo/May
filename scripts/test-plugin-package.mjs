@@ -25,6 +25,7 @@ const targets = [
   "@sortedyuan/gateway",
 ];
 const manifests = new Map();
+const packageDirectories = new Map();
 for (const group of ["packages", "packages/tools", "packages/ui"]) {
   for (const entry of await readdir(join(repository, group), { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -32,6 +33,7 @@ for (const group of ["packages", "packages/tools", "packages/ui"]) {
     if (!(await readdir(directory)).includes("package.json")) continue;
     const manifest = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
     manifests.set(manifest.name, manifest);
+    packageDirectories.set(manifest.name, `${group}/${entry.name}`);
   }
 }
 const required = new Set();
@@ -83,6 +85,27 @@ const subpathTests = [
   "packages/coordination/test/plugin.test.mjs",
   "packages/may/test/session/history-retrieval-tools.test.mjs",
 ];
+const testDependencies = new Map();
+for (const path of subpathTests) {
+  const owner = [...packageDirectories].find(([, directory]) => path.startsWith(`${directory}/`));
+  if (!owner) throw new Error(`Test file is outside a workspace package: ${path}`);
+  for (const [name, range] of Object.entries(manifests.get(owner[0]).devDependencies ?? {})) {
+    let specifier;
+    if (range.startsWith("workspace:")) {
+      if (required.has(name)) continue;
+      if (!manifests.get(name)?.private)
+        throw new Error(`Test dependency ${name} of ${owner[0]} is a public package outside the packed chain`);
+      specifier = `link:${relative(consumer, join(repository, packageDirectories.get(name))).replaceAll("\\", "/")}`;
+    } else {
+      specifier = `${name}@${range}`;
+    }
+    const existing = testDependencies.get(name);
+    if (existing !== undefined && existing !== specifier)
+      throw new Error(`Test dependency ${name} is declared as both ${existing} and ${specifier}`);
+    testDependencies.set(name, specifier);
+  }
+}
+await runPnpm(["--dir", consumer, "add", "--save-dev", ...testDependencies.values(), "--ignore-scripts"], consumer);
 for (const path of subpathTests) {
   await mkdir(dirname(join(consumer, path)), { recursive: true });
   await copyFile(join(repository, path), join(consumer, path));
