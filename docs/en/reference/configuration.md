@@ -140,13 +140,28 @@ May resolves model-specific capabilities separately from the adapter's broad
 protocol-level option validation. The resolution order is:
 
 1. A model profile's explicit `capabilities` override.
-2. An enhanced provider model endpoint. For OpenAI-compatible connections,
-   May recognizes CLIProxyAPI's Codex catalog at
-   `/v1/models?client_version=...` and reads `supported_reasoning_levels`.
+2. The provider's model endpoint, described below.
 3. May's built-in model catalog, maintained from vendor documentation.
 4. `unknown` when no reliable source describes the model.
 
-The standard OpenAI `/v1/models` response only identifies models. Capability
+Every built-in adapter queries its model endpoint at the configured `baseURL`,
+or at the adapter's default service address when `baseURL` is unset:
+
+| Adapter | Request | Authentication |
+| --- | --- | --- |
+| `openai-responses`, `openai-chat-completions`, `deepseek-chat`, `kimi-chat`, `zhipu-chat` | `GET {baseURL}/models?client_version=may` | `Authorization: Bearer` |
+| `anthropic-messages` | `GET {baseURL}/v1/models?limit=1000` | `x-api-key` and `anthropic-version` |
+| `google-gemini` | `GET {baseURL}/models/{model}` | `x-goog-api-key` |
+
+Model lists are matched as `models[]` entries by `slug` (CLIProxyAPI's Codex
+catalog) or `data[]` entries by `id`. May reads reasoning efforts from the
+matching entry's `supported_reasoning_levels`, `reasoning_levels`, or
+`effort.supported_levels`, with the default from `default_reasoning_level` or
+`effort.default_level`. A Gemini model with `thinking: false` reports reasoning
+effort as unsupported. A `404` response or an entry without these fields leaves
+the capability to the next source.
+
+Many model endpoints only identify models. Capability
 snapshots include redacted discovery diagnostics and a bounded cache with
 explicit refresh; unavailable fields stay `unknown`.
 

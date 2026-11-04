@@ -19,7 +19,7 @@ test("CLI 在 retained 界面通过 /quit 退出后清理历史文件和会话�
   const dataDirectory = join(workspace, "data");
   const configPath = join(workspace, "may.json");
   await writeFile(configPath, JSON.stringify({
-    providers: { local: { adapter: "openai-responses", apiKey: "unused-without-model-requests" } },
+    providers: { local: { adapter: "openai-responses", apiKey: "unused-without-model-requests", baseURL: "http://127.0.0.1:1/v1" } },
     defaultModel: "offline",
     models: { offline: { provider: "local", model: "gpt-4.1" } },
     apps: { maybecode: { git: false } },

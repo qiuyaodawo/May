@@ -93,6 +93,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
             deepseek: {
               adapter: "deepseek-chat",
               apiKey: "test",
+              baseURL: "http://127.0.0.1:1",
             },
           },
           models: {
@@ -639,7 +640,7 @@ test("switches supported reasoning effort without duplicating model profiles", a
         return {
           path: join(directory, "config.json"),
           providers: {
-            deepseek: { adapter: "deepseek-chat", apiKey: "test" },
+            deepseek: { adapter: "deepseek-chat", apiKey: "test", baseURL: "http://127.0.0.1:1" },
           },
           models: {
             reasoner: {
@@ -776,7 +777,7 @@ test("configured MaybeCode automatically retries transient model failures", asyn
         return {
           path: join(directory, "config.json"),
           providers: {
-            deepseek: { adapter: "deepseek-chat", apiKey: "test" },
+            deepseek: { adapter: "deepseek-chat", apiKey: "test", baseURL: "http://127.0.0.1:1" },
           },
           models: {
             chat: { provider: "deepseek", model: "deepseek-chat" },

@@ -127,13 +127,27 @@ Adapter 在创建模型时校验选项结构，具体模型支持的 reasoning �
 May 分别处理模型能力与 Adapter 协议级选项校验。模型能力按以下优先级解析：
 
 1. 模型配置中明确设置的 `capabilities`；
-2. 增强型 Provider 的模型端点。对于 OpenAI 兼容连接，May 能识别
-   CLIProxyAPI 的 Codex 目录：`/v1/models?client_version=...`，并读取
-   `supported_reasoning_levels`；
+2. Provider 的模型端点，见下文；
 3. 根据厂商文档维护的 May 内置模型目录；
 4. 无可靠来源时为 `unknown`。
 
-标准 OpenAI `/v1/models` 响应标识模型。能力记录包含经过内容限制的发现诊断，
+每个内置 Adapter 都会请求模型端点。地址使用配置的 `baseURL`；没有设置 `baseURL` 时，
+使用该 Adapter 默认的服务地址：
+
+| Adapter | 请求 | 认证 |
+| --- | --- | --- |
+| `openai-responses`、`openai-chat-completions`、`deepseek-chat`、`kimi-chat`、`zhipu-chat` | `GET {baseURL}/models?client_version=may` | `Authorization: Bearer` |
+| `anthropic-messages` | `GET {baseURL}/v1/models?limit=1000` | `x-api-key` 和 `anthropic-version` |
+| `google-gemini` | `GET {baseURL}/models/{model}` | `x-goog-api-key` |
+
+模型列表按 `slug` 匹配 `models[]` 中的条目（CLIProxyAPI 的 Codex 目录），或者按 `id`
+匹配 `data[]` 中的条目。May 从匹配条目的 `supported_reasoning_levels`、
+`reasoning_levels` 或 `effort.supported_levels` 读取推理强度，从
+`default_reasoning_level` 或 `effort.default_level` 读取默认值。Gemini 模型带有
+`thinking: false` 时，推理强度为不支持。响应为 `404`，或者条目中没有这些字段时，
+交给下一个来源处理。
+
+许多模型端点只标识模型。能力记录包含经过内容限制的发现诊断，
 缓存限制数量与有效时间，并支持明确刷新。未知字段保持 `unknown`。
 
 可以将以下 `models` 片段合并到已有配置，覆盖缺失的能力元数据。

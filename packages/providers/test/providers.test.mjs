@@ -299,6 +299,61 @@ test("resolves model capabilities by explicit, provider, builtin, then unknown p
   assert.equal(flakyRequests, 2);
 });
 
+test("reads reasoning levels from OpenAI-style data model lists", async () => {
+  const resolver = createModelCapabilityResolver({
+    async fetch(url) {
+      assert.equal(url, "https://gateway.test/v1/models?client_version=may");
+      return Response.json({
+        object: "list",
+        data: [
+          { id: "plain-model", object: "model" },
+          { id: "codex/gpt-6-luna", object: "model", supported_reasoning_levels: [{ effort: "low" }, { effort: "max" }] },
+          { id: "levels-only", object: "model", reasoning_levels: ["none", "high"] },
+        ],
+      });
+    },
+  });
+  const select = model => modelSelection("openai-chat-completions", model, { baseURL: "https://gateway.test/v1" });
+  assert.deepEqual((await resolver.resolve(select("codex/gpt-6-luna"))).reasoningEffort,
+    { status: "known", source: "provider", efforts: ["low", "max"] });
+  assert.deepEqual((await resolver.resolve(select("levels-only"))).reasoningEffort,
+    { status: "known", source: "provider", efforts: ["none", "high"] });
+  assert.deepEqual((await resolver.resolve(select("plain-model"))).reasoningEffort, { status: "unknown", source: "unknown" });
+});
+
+test("discovers reasoning levels through each adapter's model endpoint and authentication", async () => {
+  const requests = [];
+  const bodies = {
+    "https://api.deepseek.com/models?client_version=may": { object: "list", data: [{ id: "deepseek-flash", effort: { supported_levels: ["low", "high", "max"], default_level: "high" } }] },
+    "https://open.bigmodel.cn/api/paas/v4/models?client_version=may": { object: "list", data: [{ id: "glm-test" }] },
+    "https://gateway.test/v1/models?limit=1000": { data: [{ id: "claude-test", supported_reasoning_levels: [{ effort: "low" }, { effort: "max" }] }] },
+    "https://gemini.test/v1beta/models/gemini-test": { name: "models/gemini-test", thinking: false },
+  };
+  const resolver = createModelCapabilityResolver({
+    async fetch(url, init) {
+      requests.push({ url, headers: init.headers });
+      return url in bodies ? Response.json(bodies[url]) : new Response("not found", { status: 404 });
+    },
+  });
+  const resolve = async (adapter, model, providerConfig = {}, options = {}) =>
+    (await resolver.resolve({ ...modelSelection(adapter, model, { apiKey: "key", ...providerConfig }), options })).reasoningEffort;
+  assert.deepEqual(await resolve("deepseek-chat", "deepseek-flash"),
+    { status: "known", source: "provider", efforts: ["low", "high", "max"], defaultEffort: "high" });
+  assert.deepEqual(await resolve("zhipu-chat", "glm-test"), { status: "unknown", source: "unknown" });
+  assert.deepEqual(await resolve("anthropic-messages", "claude-test", { baseURL: "https://gateway.test/" }, { apiVersion: "2024-01-01" }),
+    { status: "known", source: "provider", efforts: ["low", "max"] });
+  assert.deepEqual(await resolve("google-gemini", "gemini-test", { baseURL: "https://gemini.test/v1beta" }),
+    { status: "unsupported", source: "provider" });
+  assert.deepEqual(await resolve("google-gemini", "missing", { baseURL: "https://gemini.test/v1beta" }), { status: "unknown", source: "unknown" });
+  assert.deepEqual(requests.map(({ url, headers }) => [url, headers]), [
+    ["https://api.deepseek.com/models?client_version=may", { Authorization: "Bearer key" }],
+    ["https://open.bigmodel.cn/api/paas/v4/models?client_version=may", { Authorization: "Bearer key" }],
+    ["https://gateway.test/v1/models?limit=1000", { "anthropic-version": "2024-01-01", "x-api-key": "key" }],
+    ["https://gemini.test/v1beta/models/gemini-test", { "x-goog-api-key": "key" }],
+    ["https://gemini.test/v1beta/models/missing", { "x-goog-api-key": "key" }],
+  ]);
+});
+
 test("maps provider-specific configuration into each adapter request", async () => {
   const requests = [];
   const registry = createBuiltinProviderAdapterRegistry({

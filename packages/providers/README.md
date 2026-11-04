@@ -33,9 +33,14 @@ model limits and optional capabilities such as OpenAI Responses compaction.
 `createModelCapabilityResolver()` resolves model capability fields and reasoning efforts in
 this order: explicit model-profile metadata, enhanced provider discovery,
 May's vendor-documented built-in catalog, then `unknown`. Its default provider
-discovery understands CLIProxyAPI's enriched Codex response from
-`/v1/models?client_version=...`; ordinary OpenAI model-list responses do not
-contain enough information and are ignored.
+discovery queries the model endpoint of every built-in adapter at its configured
+or default base URL, with that adapter's authentication. It reads reasoning
+levels from `models[]` entries matched by `slug` (CLIProxyAPI's Codex response),
+`data[]` entries matched by `id`, or a single Gemini model resource. Entries
+without `supported_reasoning_levels`, `reasoning_levels` or
+`effort.supported_levels` leave the capability to the next source. See
+[Model capabilities](../../docs/en/reference/configuration.md#model-capabilities)
+for the requests per adapter.
 
 ```ts
 import { createModelCapabilityResolver } from "@sortedyuan/providers";

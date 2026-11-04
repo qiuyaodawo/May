@@ -75,7 +75,7 @@ export class ModelCapabilityResolver {
   private readonly records: ModelCapabilityVerificationRecord[] = [];
 
   constructor(options: ModelCapabilityResolverOptions = {}) {
-    this.discoveries = options.discoveries ?? [new CpaCodexCapabilityDiscovery(options.fetch ?? globalThis.fetch)];
+    this.discoveries = options.discoveries ?? [new ModelListCapabilityDiscovery(options.fetch ?? globalThis.fetch)];
     this.ttl = positive(options.cacheTtlMs ?? 300_000, "cacheTtlMs");
     this.maxEntries = positive(options.maxCacheEntries ?? 128, "maxCacheEntries");
     this.maxRecords = positive(options.maxVerificationRecords ?? 256, "maxVerificationRecords");
@@ -283,24 +283,76 @@ function builtinReasoningEffort(selection: ProviderModelSelection): ReasoningEff
   return entry === undefined ? undefined : omitUndefined({ status: "known", source: "builtin", efforts: [...entry.efforts], defaultEffort: entry.defaultEffort });
 }
 function catalogKey(adapter: string, model: string): string { return `${adapter}\u0000${model}`; }
-class CpaCodexCapabilityDiscovery implements ModelCapabilityDiscovery {
-  readonly name = "cpa-codex";
+interface ModelEndpoint {
+  readonly url: string;
+  readonly headers: Record<string, string>;
+  /** Selects the entry describing the requested model from the parsed response body. */
+  readonly entry: (body: Record<string, unknown>) => unknown;
+}
+const BEARER_DEFAULT_BASE_URLS: Readonly<Record<string, string>> = {
+  "openai-responses": "https://api.openai.com/v1",
+  "openai-chat-completions": "https://api.openai.com/v1",
+  "deepseek-chat": "https://api.deepseek.com",
+  "kimi-chat": "https://api.moonshot.ai/v1",
+  "zhipu-chat": "https://open.bigmodel.cn/api/paas/v4",
+};
+function trimBaseURL(value: string): string { return value.replace(/\/+$/u, ""); }
+/** Finds `models[]` entries by `slug` (CLIProxyAPI's Codex catalog) and `data[]` entries by `id`. */
+function listEntry(model: string): (body: Record<string, unknown>) => unknown {
+  return (body) => Array.isArray(body.models) ? body.models.find((entry) => isRecord(entry) && entry.slug === model)
+    : Array.isArray(body.data) ? body.data.find((entry) => isRecord(entry) && entry.id === model) : undefined;
+}
+function modelEndpoint(selection: ProviderModelSelection): ModelEndpoint | undefined {
+  const { adapter, model, providerConfig, options } = selection;
+  const apiKey = providerConfig.apiKey === undefined || providerConfig.apiKey.trim() === "" ? undefined : providerConfig.apiKey;
+  const bearer = BEARER_DEFAULT_BASE_URLS[adapter];
+  if (bearer !== undefined) {
+    return { url: `${trimBaseURL(providerConfig.baseURL ?? bearer)}/models?client_version=may`,
+      headers: apiKey === undefined ? {} : { Authorization: `Bearer ${apiKey}` }, entry: listEntry(model) };
+  }
+  if (adapter === "anthropic-messages") {
+    return { url: `${trimBaseURL(providerConfig.baseURL ?? "https://api.anthropic.com")}/v1/models?limit=1000`,
+      headers: { "anthropic-version": typeof options.apiVersion === "string" ? options.apiVersion : "2023-06-01", ...(apiKey === undefined ? {} : { "x-api-key": apiKey }) },
+      entry: listEntry(model) };
+  }
+  if (adapter === "google-gemini") {
+    return { url: `${trimBaseURL(providerConfig.baseURL ?? "https://generativelanguage.googleapis.com/v1beta")}/models/${encodeURIComponent(model)}`,
+      headers: apiKey === undefined ? {} : { "x-goog-api-key": apiKey }, entry: (body) => body };
+  }
+  return undefined;
+}
+function effortNames(levels: readonly unknown[]): string[] {
+  return [...new Set(levels.flatMap((level) => {
+    const effort = typeof level === "string" ? level : isRecord(level) ? level.effort : undefined;
+    return typeof effort === "string" && effort.trim() !== "" ? [effort] : [];
+  }))];
+}
+/** Reads `supported_reasoning_levels`, `reasoning_levels`, `effort.supported_levels` or Gemini's `thinking: false`. */
+function entryReasoningEffort(entry: Record<string, unknown>): ReasoningEffortCapabilities | undefined {
+  const effort = isRecord(entry.effort) ? entry.effort : undefined;
+  const levels = Array.isArray(entry.supported_reasoning_levels) ? entry.supported_reasoning_levels
+    : Array.isArray(entry.reasoning_levels) ? entry.reasoning_levels
+      : Array.isArray(effort?.supported_levels) ? effort.supported_levels : undefined;
+  if (levels === undefined) return entry.thinking === false ? { status: "unsupported", source: "provider" } : undefined;
+  const efforts = effortNames(levels);
+  if (efforts.length === 0) return undefined;
+  const defaultEffort = entry.default_reasoning_level ?? effort?.default_level;
+  return { status: "known", source: "provider", efforts, ...(typeof defaultEffort === "string" && efforts.includes(defaultEffort) ? { defaultEffort } : {}) };
+}
+/** Reads reasoning levels from the model endpoint of every built-in adapter. */
+class ModelListCapabilityDiscovery implements ModelCapabilityDiscovery {
+  readonly name = "model-list";
   constructor(private readonly fetchImplementation: typeof globalThis.fetch) {}
   async discoverReasoningEffort(selection: ProviderModelSelection): Promise<ReasoningEffortCapabilities | undefined> {
-    if (!["openai-responses", "openai-chat-completions"].includes(selection.adapter)) return undefined;
-    const baseURL = selection.providerConfig.baseURL;
-    if (baseURL === undefined) return undefined;
-    const apiKey = selection.providerConfig.apiKey;
-    const response = await this.fetchImplementation(`${baseURL.replace(/\/+$/u, "")}/models?client_version=may`, { signal: AbortSignal.timeout(10_000), ...(apiKey === undefined || apiKey.trim() === "" ? {} : { headers: { Authorization: `Bearer ${apiKey}` } }) });
+    const endpoint = modelEndpoint(selection);
+    if (endpoint === undefined) return undefined;
+    const response = await this.fetchImplementation(endpoint.url, { signal: AbortSignal.timeout(10_000), headers: endpoint.headers });
+    if (response.status === 404) return undefined;
     if (!response.ok) throw new Error("Capability catalog request failed");
     const value: unknown = await response.json();
-    if (!isRecord(value) || !Array.isArray(value.models)) return undefined;
-    const model = value.models.find((entry) => isRecord(entry) && entry.slug === selection.model);
-    if (!isRecord(model) || !Array.isArray(model.supported_reasoning_levels)) return undefined;
-    const efforts = [...new Set(model.supported_reasoning_levels.flatMap((level) => { const effort = typeof level === "string" ? level : isRecord(level) ? level.effort : undefined; return typeof effort === "string" && effort.trim() !== "" ? [effort] : []; }))];
-    if (efforts.length === 0) return undefined;
-    const defaultEffort = model.default_reasoning_level;
-    return { status: "known", source: "provider", efforts, ...(typeof defaultEffort === "string" && efforts.includes(defaultEffort) ? { defaultEffort } : {}) };
+    if (!isRecord(value)) return undefined;
+    const entry = endpoint.entry(value);
+    return isRecord(entry) ? entryReasoningEffort(entry) : undefined;
   }
 }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
