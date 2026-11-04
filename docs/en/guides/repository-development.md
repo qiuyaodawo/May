@@ -92,12 +92,12 @@ is unset. Adapter-specific provider tests select a profile with that adapter:
 pnpm --filter @sortedyuan/maybeclaw test:integration
 ```
 
-The MaybeCode model switching and historical fork tests also read
-`MAY_LIVE_SWITCH_MODEL`. It must name a second configured profile with a
-different provider, model, or adapter, and known reasoning effort capabilities:
+The MaybeCode reasoning effort test requires known reasoning effort capabilities
+for the selected profile. Declare `capabilities` for that profile in the
+configuration, or select a profile with known capabilities:
 
 ```bash
-MAY_LIVE_SWITCH_MODEL=<other-profile> pnpm test:integration:maybecode
+MAY_LIVE_MODEL=<profile> pnpm test:integration:maybecode
 ```
 
 System clipboard checks require a Windows desktop session:

@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
-import { liveModelProfile, liveSwitchModelProfile } from "../fixtures/live-model.mjs";
+import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
 import { loadMayConfig } from "@sortedyuan/may/config";
@@ -384,7 +384,9 @@ test("real historical forks restore the selected model profile, effort and conti
   assert.notEqual(earlyFork, lateFork);
   assert.equal(app.application.modelInfo.profile, profiles[0]);
   assert.equal((await app.history()).some(event => event.type === "assistant.completed" && event.runId === second.id), false);
-  config = { ...config, models: { ...config.models, [profiles[1]]: config.models[liveSwitchModelProfile()] } };
+  config = { ...config, models: { ...config.models, [profiles[1]]: {
+    ...config.models[profiles[1]], model: `${config.models[profiles[1]].model}-changed-after-fork-point`,
+  } } };
   await assert.rejects(app.forkSession(secondPoint.id, "current"), /original provider, model and adapter/u);
   assert.equal(app.sessionId, earlyFork);
 });

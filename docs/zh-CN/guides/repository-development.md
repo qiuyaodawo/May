@@ -80,11 +80,11 @@ Provider 的测试使用 `MAY_LIVE_MODEL` 指定的模型配置；没有设置�
 pnpm --filter @sortedyuan/maybeclaw test:integration
 ```
 
-MaybeCode 的模型切换和历史分支测试还读取 `MAY_LIVE_SWITCH_MODEL`。它必须是另一个
-已经配置的模型，provider、model 或 adapter 不同，并且推理强度能力已知：
+MaybeCode 的推理强度测试要求所选模型配置的推理强度能力已知。可以在配置中为这个
+模型配置声明 `capabilities`，或者选择能力已知的模型配置：
 
 ```bash
-MAY_LIVE_SWITCH_MODEL=<other-profile> pnpm test:integration:maybecode
+MAY_LIVE_MODEL=<profile> pnpm test:integration:maybecode
 ```
 
 系统剪贴板检查需要 Windows 桌面会话：

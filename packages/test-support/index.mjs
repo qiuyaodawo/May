@@ -13,15 +13,6 @@ export function selectLiveModelProfile(config) {
   return profile;
 }
 
-/** Second real model profile for model switching tests, read from `MAY_LIVE_SWITCH_MODEL`. */
-export function selectLiveSwitchModelProfile(config) {
-  const profile = process.env.MAY_LIVE_SWITCH_MODEL;
-  if (!profile) throw new Error("Set MAY_LIVE_SWITCH_MODEL to a second configured model profile");
-  if (!Object.hasOwn(config.models, profile)) throw new Error(`Model profile "${profile}" is not configured in ${config.path}`);
-  if (profile === selectLiveModelProfile(config)) throw new Error("MAY_LIVE_SWITCH_MODEL must differ from the live model profile");
-  return profile;
-}
-
 /**
  * Create `<repository>/.test-output/<name>-XXXXXX` for one test and remove it after the test.
  * `name` usually starts with the package, for example `coordination/pricing`.
