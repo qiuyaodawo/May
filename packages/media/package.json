@@ -19,11 +19,13 @@
   },
   "dependencies": {
     "@sortedyuan/may": "workspace:*",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "write-file-atomic": "7.0.1"
   },
   "devDependencies": {
     "@sortedyuan/test-support": "workspace:*",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "@types/write-file-atomic": "4.0.3"
   },
   "engines": {
     "node": ">=22"

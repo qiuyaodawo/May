@@ -1,6 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, rename, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import writeFileAtomic from "write-file-atomic";
 import type { ContentPart, MediaSource } from "@sortedyuan/may/core";
 import { withFileAccess } from "@sortedyuan/may/storage";
 
@@ -93,19 +94,8 @@ export class FileMediaStore {
     const extension = image.mediaType === "image/jpeg" ? "jpg" : image.mediaType.slice(6);
     const path = join(this.directory, `${id}.${extension}`);
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    const temporary = join(this.directory, `${id}.${randomUUID()}.partial`);
-    const file = await open(temporary, "wx", 0o600);
-    try {
-      await file.writeFile(image.data);
-      await file.sync();
-    } finally {
-      await file.close();
-    }
-    try {
-      await withFileAccess(path, "exclusive", () => rename(temporary, path));
-    } finally {
-      await rm(temporary, { force: true });
-    }
+    const data = Buffer.from(image.data.buffer, image.data.byteOffset, image.data.byteLength);
+    await withFileAccess(path, "exclusive", () => writeFileAtomic(path, data, { mode: 0o600 }));
     return { ...image, id, path };
   }
   async verify(saved: SavedImage): Promise<ImageData> {

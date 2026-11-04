@@ -2,6 +2,7 @@ import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, resolve, relative, sep } from "node:path";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { shellRuntimeInstructions, type ShellToolInfo } from "./shell.js";
+import { isMissingPathError } from "./missing-path.js";
 
 export const DEFAULT_CODING_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
 export const DEFAULT_SYSTEM_INSTRUCTIONS_FILENAME = "system.md";
@@ -546,8 +547,4 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 
 function isAbortError(error: unknown, signal: AbortSignal | undefined): boolean {
   return signal?.aborted === true || (error instanceof Error && error.name === "AbortError");
-}
-
-function isMissingPathError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR");
 }

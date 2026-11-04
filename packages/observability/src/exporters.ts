@@ -1,6 +1,7 @@
 import { appendFile, mkdir, readdir, unlink } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { AsyncStateSerializer } from "@sortedyuan/may/core";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 
 import type { FinishedTraceSpan, SpanExporter } from "./types.js";
 
@@ -155,7 +156,7 @@ export class JsonlFileSpanExporter implements SpanExporter {
       try {
         await unlink(join(dirname(this.path), entry.name));
       } catch (error) {
-        if (!isMissingFileError(error)) throw error;
+        if (!hasErrorCode(error, "ENOENT")) throw error;
       }
     }
     this.lastCleanupDate = today;
@@ -188,8 +189,4 @@ function retentionCutoff(today: string, retentionDays: number): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-}
-
-function isMissingFileError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

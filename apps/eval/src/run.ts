@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import writeFileAtomic from "write-file-atomic";
 import {
   EvalRegistry,
   EvalRunner,
@@ -121,7 +121,10 @@ export async function runCli(
   });
   const release = await candidateLocation.store.acquire(candidateLocation.experimentId);
   try {
-    await atomicWrite(join(candidateLocation.directory, "comparison.json"), JSON.stringify(comparison, null, 2));
+    await writeFileAtomic(
+      join(candidateLocation.directory, "comparison.json"),
+      `${JSON.stringify(comparison, null, 2)}\n`,
+    );
   } finally {
     await release();
   }
@@ -156,8 +159,8 @@ async function exportReport(store: FileEvalStore, experimentId: string, director
   try {
     const report = await readReport(store, experimentId);
     await mkdir(directory, { recursive: true });
-    await atomicWrite(join(directory, "report.json"), JSON.stringify(report, null, 2));
-    await atomicWrite(join(directory, "report.md"), renderEvalReportMarkdown(report));
+    await writeFileAtomic(join(directory, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+    await writeFileAtomic(join(directory, "report.md"), `${renderEvalReportMarkdown(report)}\n`);
     return report;
   } finally {
     await release();
@@ -181,23 +184,6 @@ async function preserveFailureReport(
         `Execution failed: ${formatCliError(error)}. Report persistence failed: ${formatCliError(reportError)}`,
       );
     }
-    throw error;
-  }
-}
-
-async function atomicWrite(path: string, content: string): Promise<void> {
-  const temporary = `${path}.${randomUUID()}.writing`;
-  const handle = await open(temporary, "wx");
-  try {
-    await handle.writeFile(`${content}\n`);
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-  try {
-    await rename(temporary, path);
-  } catch (error) {
-    await unlink(temporary);
     throw error;
   }
 }

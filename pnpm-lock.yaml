@@ -227,6 +227,9 @@ importers:
       '@sortedyuan/eval':
         specifier: workspace:*
         version: link:../../packages/eval
+      write-file-atomic:
+        specifier: 7.0.1
+        version: 7.0.1
     devDependencies:
       '@sortedyuan/test-support':
         specifier: workspace:*
@@ -234,6 +237,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      '@types/write-file-atomic':
+        specifier: 4.0.3
+        version: 4.0.3
 
   apps/maybeclaw:
     dependencies:
@@ -534,6 +540,9 @@ importers:
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
+      write-file-atomic:
+        specifier: 7.0.1
+        version: 7.0.1
     devDependencies:
       '@sortedyuan/test-support':
         specifier: workspace:*
@@ -541,6 +550,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      '@types/write-file-atomic':
+        specifier: 4.0.3
+        version: 4.0.3
 
   packages/observability:
     dependencies:

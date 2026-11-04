@@ -1,4 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
+import { isMissingPathError } from "./missing-path.js";
 import { resolveWritableWorkspacePath } from "./workspace-path.js";
 
 const MAX_PREVIEW_BYTES = 1024 * 1024;
@@ -588,10 +589,6 @@ function isToolChangePreview(value: unknown): value is ToolChangePreview {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
-}
-
-function isMissingPathError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR");
 }
 
 function errorMessage(error: unknown): string {

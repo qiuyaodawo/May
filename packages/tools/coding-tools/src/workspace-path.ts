@@ -1,6 +1,7 @@
 import { lstat, realpath, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { CodingToolError } from "./errors.js";
+import { isMissingPathError } from "./missing-path.js";
 
 export interface WorkspacePath {
   readonly absolute: string;
@@ -126,10 +127,6 @@ function assertInside(root: string, target: string, inputPath: string): void {
   if (pathFromRoot === ".." || pathFromRoot.startsWith(`..${sep}`) || isAbsolute(pathFromRoot)) {
     throw new CodingToolError("CODING_TOOL_PATH_OUTSIDE_WORKSPACE", `Path is outside the workspace: ${inputPath}`);
   }
-}
-
-function isMissingPathError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR");
 }
 
 function toDisplayPath(path: string): string {

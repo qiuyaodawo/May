@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
-import { access, chmod, lstat, mkdir, open, readFile, readdir, realpath, rename, rm } from "node:fs/promises";
+import { access, lstat, mkdir, readFile, readdir, realpath, rm } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { simpleGit, type SimpleGit, type StatusResult } from "simple-git";
 import { createPatch, diffLines } from "diff";
@@ -598,16 +598,7 @@ export class ProjectGitWorkspace {
         if (current?.content.equals(content) && (process.platform === "win32" || current.mode === file.targetMode))
           continue;
         await mkdir(resolve(target, ".."), { recursive: true });
-        const temporary = `${target}.${randomUUID()}.may-restore`;
-        const handle = await open(temporary, "wx", file.targetMode === "100755" ? 0o755 : 0o644);
-        try {
-          await handle.writeFile(content);
-          await handle.sync();
-        } finally {
-          await handle.close();
-        }
-        await rename(temporary, target);
-        if (process.platform !== "win32") await chmod(target, file.targetMode === "100755" ? 0o755 : 0o644);
+        await writeFileAtomic(target, content, { mode: file.targetMode === "100755" ? 0o755 : 0o644 });
         changed.push(file.path);
       }
       return options === undefined
